@@ -1,3 +1,4 @@
+import { logServerError } from './error-log.js';
 import {ApiError} from './errors.js';
 import {parsePrincipal} from './principal.js';
 import {createRateLimiter} from './rate-limit.js';
@@ -379,5 +380,5 @@ export function createFeedbackHandler({authenticate,service,productId}){
   }
   throw new ApiError(404,'not_found','요청을 찾을 수 없어요.');
  }
- return async request=>{try{return await handle(request);}catch(error){if(error instanceof ApiError)return {status:error.status,body:{error:{code:error.code,message:error.message,...(error.details||{})}},headers:NO_STORE};console.error('[lovetree-feedback] request failed',{path:request?.path,method:request?.method});return {status:500,body:{error:{code:'internal_error',message:'서버에서 처리하지 못했어요.'}},headers:NO_STORE};}};
+ return async request=>{try{return await handle(request);}catch(error){if(error instanceof ApiError)return {status:error.status,body:{error:{code:error.code,message:error.message,...(error.details||{})}},headers:NO_STORE};logServerError(error,'lovetree-feedback');return {status:500,body:{error:{code:'internal_error',message:'서버에서 처리하지 못했어요.'}},headers:NO_STORE};}};
 }

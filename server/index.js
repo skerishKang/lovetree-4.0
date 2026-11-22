@@ -1,3 +1,4 @@
+import { logServerError } from './error-log.js';
 import { createPrivateMediaStore, createMediaHandler } from './private-media.js';
 import { createServer } from 'node:http';
 import { pathToFileURL } from 'node:url';
@@ -20,6 +21,8 @@ import { createShareService, createShareHandler } from './share-service.js';
 import { createCommunityService, createCommunityHandler } from './community-service.js';
 import { createMomentCommunityService, createMomentCommunityHandler } from './moment-community-service.js';
 import { createMomentCommunityRepo } from './db/moment-community-postgres.js';
+import { createMyNewsService, createMyNewsHandler } from './my-news-service.js';
+import { createMyNewsRepo } from './db/my-news-postgres.js';
 import { createFeedbackRepo } from './db/feedback-postgres.js';
 import { createAdminCustomersRepo } from './db/admin-customers-postgres.js';
 import { createAdminCustomersService, createAdminCustomersHandler } from './admin-customers.js';
@@ -152,7 +155,7 @@ async function loginRoute(login, request) {
   try { return await login.route(request); }
   catch (error) {
     if (error instanceof ApiError) return { status: error.status, body: { error: { code: error.code, message: error.message, ...(error.details ?? {}) } } };
-    console.error('[lovetree-storage] 로그인 요청 처리 실패', { path: request.path, method: request.method });
+    logServerError(error, 'lovetree-login');
     return { status: 500, body: { error: { code: 'internal_error', message: '서버에서 처리하지 못했어요.' } } };
   }
 }
@@ -185,7 +188,7 @@ const shareService = createShareService({
 const service = createWorkspaceService({
   repo,
   productId: LOVETREE_PRODUCT_ID,
-  onCommit: ({ subjectId }) => shareService.syncSharesAfterSave(subjectId)
+  onCommit: ({ subjectId, changedTreeIds }) => shareService.syncSharesAfterSave(subjectId, changedTreeIds)
 });
 const legacyAuthenticate = await buildAuthenticate();
 const authenticate = createSharedAccessAuth({ enabled: sharedAuthEnabled(LOVETREE_SHARED_AUTH_ENABLED), legacy: legacyAuthenticate });
@@ -238,27 +241,33 @@ const shareHandler = createShareHandler({
  productId: LOVETREE_PRODUCT_ID
 });
 const rankingPolicy = { hasRealCustomers: hasRealCustomersFromEnv(process.env) };
-// #1098 2단계 — 순간 단위 ♡·댓글. 반응·댓글·신고 저장소에 순간 메서드를 덧붙인 한 벌을 두 서비스가 같이 쓰고,
-// 순간 경로는 새 핸들러가, 나머지 커뮤니티 경로는 기존 핸들러가 그대로 맡는다(fallback — 분기는 moment 핸들러 안에서).
-const communityRepo = createMomentCommunityRepo(createCommunityRepo(pool, rankingPolicy), pool);
-const communityHandler = createMomentCommunityHandler({
+// #1098 2·3단계 — 순간 단위 ♡·댓글과 내 소식. 반응·댓글·신고 저장소에 순간 메서드·내 소식 메서드를 덧붙인 한 벌을
+// 세 서비스가 같이 쓰고, 내 소식 경로는 새 핸들러가, 순간 경로는 moment 핸들러가, 나머지 커뮤니티 경로는 기존
+// 핸들러가 그대로 맡는다(fallback — 분기는 각 핸들러 안에서).
+const communityRepo = createMyNewsRepo(createMomentCommunityRepo(createCommunityRepo(pool, rankingPolicy), pool), pool);
+const communityHandler = createMyNewsHandler({
  authenticate: guardedAuthenticate,
- service: createMomentCommunityService({
-  communityRepo,
-  shareRepo, workspaceRepo: repo, visibilityRepo,
-  productId: LOVETREE_PRODUCT_ID, admin
- }),
+ service: createMyNewsService({communityRepo, productId: LOVETREE_PRODUCT_ID}),
  productId: LOVETREE_PRODUCT_ID,
- fallback: createCommunityHandler({
+ fallback: createMomentCommunityHandler({
   authenticate: guardedAuthenticate,
-  service: createCommunityService({
-   communityRepo, stageVoteRepo: createStageVoteRepo(pool, rankingPolicy),
-   shareRepo, workspaceRepo: repo, visibilityRepo, stageIndex,
-   productId: LOVETREE_PRODUCT_ID, admin,
-   // 가입일(첫 로그인 시각) — 담기 투표의 7일 게이트(#824 대표 결정)가 쓴다.
-   signupAtFor: ({productId: p, subjectId: s}) => accountRepo.createdAtFor({productId: p, subjectId: s})
+  service: createMomentCommunityService({
+   communityRepo,
+   shareRepo, workspaceRepo: repo, visibilityRepo,
+   productId: LOVETREE_PRODUCT_ID, admin
   }),
-  productId: LOVETREE_PRODUCT_ID
+  productId: LOVETREE_PRODUCT_ID,
+  fallback: createCommunityHandler({
+   authenticate: guardedAuthenticate,
+   service: createCommunityService({
+    communityRepo, stageVoteRepo: createStageVoteRepo(pool, rankingPolicy),
+    shareRepo, workspaceRepo: repo, visibilityRepo, stageIndex,
+    productId: LOVETREE_PRODUCT_ID, admin,
+    // 가입일(첫 로그인 시각) — 담기 투표의 7일 게이트(#824 대표 결정)가 쓴다.
+    signupAtFor: ({productId: p, subjectId: s}) => accountRepo.createdAtFor({productId: p, subjectId: s})
+   }),
+   productId: LOVETREE_PRODUCT_ID
+  })
  })
 });
 // 고객 의견 창구 (#540). 로그인·로그아웃 모두 받는다 — 그래서 인증 경계는 guardedAuthenticate를 그대로 쓰되,

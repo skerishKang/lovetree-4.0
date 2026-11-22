@@ -9,7 +9,6 @@ import {
   clearJourneyDraft, normalizeJourneyDraft,
   journeyRouteHash, parseJourneyRoute,
 } from '../../first-journey.mjs';
-
 export function createJourneyPage(env = {}) {
   const window = env.window ?? globalThis.window;
   const document = env.document ?? globalThis.document;

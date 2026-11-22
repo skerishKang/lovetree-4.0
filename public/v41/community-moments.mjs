@@ -2,6 +2,8 @@
 // iframe은 지금 것과 다음 것만 둔다 — 넘긴 것은 DOM에서 제거한다(동시에 살아 있는 iframe ≤ 2).
 // 세로 판정은 서버가 화면과 같은 함수(isVerticalMoment)로 해서 내려준다 — 여기서는 새로 만들지 않는다.
 import {parseTag,tagKey} from './tags.mjs';
+// #1060: 썸네일 주소 글자는 정본(youtube-id.mjs) 한 벌에서만 만든다.
+import {youtubeStageThumbUrl} from './youtube-id.mjs';
 const el=(tag,className,text)=>{const node=document.createElement(tag);if(className)node.className=className;if(text!=null)node.textContent=text;return node;};
 const SVG_NS='http://www.w3.org/2000/svg';
 // 나무 모양 선 아이콘 — 다른 단추와 같은 currentColor·같은 선 굵기(#1025 2단계).
@@ -38,7 +40,7 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin,a
  const media=el('div','moments-media');
  const poster=el('img','moments-poster');poster.alt='';poster.loading='lazy';
  // 썸네일이 안 떠도 판이 비지 않게 — 세로 포스터가 없으면 기존 가로 포스터로 한 번 더 시도한다.
- poster.onerror=()=>{const item=current();if(item?.videoId&&!/hqdefault\.jpg/.test(poster.getAttribute('src')||''))poster.src='https://i.ytimg.com/vi/'+encodeURIComponent(item.videoId)+'/hqdefault.jpg';};
+ poster.onerror=()=>{const item=current();if(item?.videoId&&!/hqdefault\.jpg/.test(poster.getAttribute('src')||''))poster.src=youtubeStageThumbUrl(item.videoId,'hqdefault');};
  const overlay=el('div','moments-overlay');
  const treeLine=el('div','moments-tree');
  const titleLine=el('div','moments-title');

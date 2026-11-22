@@ -344,6 +344,8 @@ DO $$ BEGIN ALTER TABLE lovetree_community_comments ADD COLUMN IF NOT EXISTS edi
 -- #1098 2단계(261122): 댓글 표에도 대상 칸을 덧붙인다(기존 행은 'tree'). 같은 idempotency 키라도
 -- 대상이 다르면(트리 댓글 vs 순간 댓글, 순간이 다르면) 다른 요청이므로 유일 제약도 대상까지 본다.
 DO $$
+DECLARE
+  constraint_name text;
 BEGIN
   IF to_regclass('public.lovetree_community_comments') IS NULL THEN
     RETURN;
@@ -357,12 +359,22 @@ BEGIN
   ALTER TABLE lovetree_community_comments
     ADD CONSTRAINT lovetree_community_comments_target_pair_check
     CHECK ((target_kind = 'tree' AND moment_id = '') OR (target_kind = 'moment' AND moment_id <> ''));
+  -- 옛 유일 제약(3칸)은 자동 이름이 63자에 잘려('…_client_ke…') 이름 추측으로는 못 지운다 —
+  -- 정의가 UNIQUE (product_id, subject_id, client_key) 인 것을 찾아 지운다(뒷수습 마이그레이션과 같은 방식).
+  FOR constraint_name IN
+    SELECT conname
+    FROM pg_constraint
+    WHERE conrelid = 'lovetree_community_comments'::regclass
+      AND contype = 'u'
+      AND pg_get_constraintdef(oid) ~ '^UNIQUE \(product_id, subject_id, client_key\)$'
+  LOOP
+    EXECUTE format('ALTER TABLE lovetree_community_comments DROP CONSTRAINT %I', constraint_name);
+  END LOOP;
   IF NOT EXISTS (
     SELECT 1 FROM pg_constraint
     WHERE conrelid = 'lovetree_community_comments'::regclass
       AND conname = 'lovetree_community_comments_client_target_key'
   ) THEN
-    EXECUTE 'ALTER TABLE lovetree_community_comments DROP CONSTRAINT IF EXISTS lovetree_community_comments_product_id_subject_id_client_key_key';
     EXECUTE 'ALTER TABLE lovetree_community_comments ADD CONSTRAINT lovetree_community_comments_client_target_key UNIQUE (product_id, subject_id, client_key, target_kind, moment_id)';
   END IF;
 END
@@ -371,6 +383,16 @@ CREATE INDEX IF NOT EXISTS lovetree_community_comments_share_idx
   ON lovetree_community_comments (product_id, share_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS lovetree_community_comments_moment_idx
   ON lovetree_community_comments (product_id, share_id, moment_id, created_at DESC);
+
+-- #1098 3단계(261122): 내 소식 읽음 시각. 계정(제품+사람)마다 한 줄 — 목록을 연 시점까지 읽음으로 본다.
+-- 같은 문장이 server/db/migrations/community-my-news-reads-261122.sql 에도 있다(기존 적용 DB용, 자동 적용 아님).
+CREATE TABLE IF NOT EXISTS lovetree_community_my_news_reads (
+  product_id text NOT NULL,
+  subject_id text NOT NULL,
+  last_read_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (product_id, subject_id)
+);
 
 CREATE TABLE IF NOT EXISTS lovetree_community_reports (
   product_id text NOT NULL,

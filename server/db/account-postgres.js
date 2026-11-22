@@ -17,6 +17,8 @@ export const ACCOUNT_USER_TABLES = Object.freeze([
     where: 'hidden_by = $2 OR share_id IN (SELECT share_id FROM lovetree_shares WHERE product_id = $1 AND subject_id = $2)'
   },
   { table: 'lovetree_community_moderation_audit', where: 'actor_subject_id = $2' },
+  // #1098 3단계: 내 소식 읽음 시각 — 계정 키가 있으므로 탈퇴 때 함께 지운다.
+  { table: 'lovetree_community_my_news_reads', where: 'subject_id = $2' },
   { table: 'lovetree_feedback_replies', where: 'author_subject_id = $2 OR post_id IN (SELECT id FROM lovetree_feedback WHERE product_id = $1 AND subject_id = $2)' },
   { table: 'lovetree_stage_moments', where: 'subject_id = $2' },
   { table: 'lovetree_shares', where: 'subject_id = $2' },
@@ -28,7 +30,9 @@ export const ACCOUNT_USER_TABLES = Object.freeze([
   { table: 'lovetree_feedback', where: 'subject_id = $2' },
   { table: 'lovetree_ai_personas', where: 'subject_id = $2' },
   { table: 'lovetree_product_roles', where: 'subject_id = $2' },
-  { table: 'lovetree_product_role_audit', where: 'subject_id = $2 OR actor_subject_id = $2' }
+  { table: 'lovetree_product_role_audit', where: 'subject_id = $2 OR actor_subject_id = $2' },
+  // #1063: 운영센터 고객 열람 기록도 탈퇴하는 고객의 행을 함께 없앤다(90일 보관 대상과 별개).
+  { table: 'lovetree_admin_customer_views', where: 'customer_subject_id = $2' }
 ]);
 
 // 사용자 키가 없어 탈퇴 경로가 지우지 않는 표. schema.sql의 사용자 키 검사에서 제외하는 근거다.

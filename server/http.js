@@ -1,3 +1,4 @@
+import { logServerError } from './error-log.js';
 import { MAX_MEDIA_BYTES } from './private-media.js';
 import { ApiError } from './errors.js';
 import { ROLE_ADMIN } from './admin-roles.js';
@@ -91,16 +92,6 @@ export function createApiHandler({ authenticate, service, productId, admin = nul
       return { status: 200, body: { ok: true, stats: await adminStats.stats() }, headers: ACCOUNT_NO_STORE };
     }
 
-    const treeItem = path.match(/^\/api\/workspace\/trees\/([^/]+)$/);
-    if (treeItem) {
-      if (method !== 'DELETE') throw new ApiError(405, 'method_not_allowed', '이 요청은 지원하지 않아요.');
-      // #1073 B-22: % 묶음이 깨진 경로는 지울 트리를 못 찾은 경우이므로 404로 답한다(500이 아니다).
-      let treeId;
-      try { treeId = decodeURIComponent(treeItem[1]); }
-      catch { throw new ApiError(404, 'not_found', '요청을 찾을 수 없어요.'); }
-      return { status: 200, body: await service.deleteTree(principal, treeId), headers: ACCOUNT_NO_STORE };
-    }
-
     if (path !== '/api/workspace') throw new ApiError(404, 'not_found', '요청을 찾을 수 없어요.');
     if (method === 'GET') {
       const document = await service.read(principal);
@@ -132,7 +123,7 @@ export function createApiHandler({ authenticate, service, productId, admin = nul
       return headers ? { status, body, headers } : { status, body };
     } catch (error) {
       if (error instanceof ApiError) return { status: error.status, body: errorBody(error) };
-      console.error('[lovetree-storage] 요청 처리 실패', { path: request?.path, method: request?.method });
+      logServerError(error, 'lovetree-storage');
       return { status: 500, body: { error: { code: 'internal_error', message: '서버에서 처리하지 못했어요.' } } };
     }
   };

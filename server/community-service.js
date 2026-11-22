@@ -1,8 +1,10 @@
+import { logServerError } from './error-log.js';
 import {randomUUID} from 'node:crypto';
 import {ApiError} from './errors.js';
 import {parsePrincipal} from './principal.js';
 import {createRateLimiter} from './rate-limit.js';
-import {projectSharedTree} from './share-service.js';
+import {projectSharedTree,projectSharedTreeFromScan} from './share-service.js';
+import {readStoredDocument} from './workspace-service.js';
 import {refreshStageIndex} from './stage-index-refresh.js';
 import {ROLE_TESTER,ROLE_UNKNOWN,isAiTesterRole} from './admin-roles.js';
 import {coverModeOf} from '../src/domain.js';
@@ -30,7 +32,7 @@ function jsonBody(request){
 function clientKey(request){const value=String(request?.headers?.['idempotency-key']||'');if(!IDEMPOTENCY.test(value))throw new ApiError(400,'idempotency_key_required','안전한 중복 방지 키가 필요해요.');return value;}
 function publicComment(row,viewer,isAdmin=false){const mine=!!viewer&&row.subjectId===viewer;const edited=!!(row.editedAt||(row.updatedAt&&row.createdAt&&String(row.updatedAt)>String(row.createdAt)));return {id:row.id,body:row.body,createdAt:row.createdAt,updatedAt:row.updatedAt,edited,mine,canDelete:mine||isAdmin,canEdit:mine,authorLabel:mine?'나':'기록한 사람'};}
 
-export function createCommunityService({communityRepo,shareRepo,workspaceRepo,visibilityRepo=null,productId,admin=null,stageIndex=null,stageVoteRepo=null,now=()=>Date.now(),makeId=()=>randomUUID(),signupAtFor=null,random=Math.random}){
+export function createCommunityService({communityRepo,shareRepo,workspaceRepo,visibilityRepo=null,productId,admin=null,stageIndex=null,stageVoteRepo=null,now=()=>Date.now(),makeId=()=>randomUUID(),signupAtFor=null,random=Math.random,validateDocument=readStoredDocument}){
  // 속도 제한은 공용 한 벌(server/rate-limit.js)로 — 커뮤니티 창구는 1분 창을 쓴다(#1073 B-19).
  const limiter=createRateLimiter({now});
  const rate=(subjectId,kind,limit=20)=>limiter.rate(subjectId+'\0'+kind,limit);
@@ -73,10 +75,21 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
   if(visibilityRepo){const visibility=(await visibilityRepo.get({productId,subjectId:share.subjectId,treeId:share.treeId})).visibility;if(visibility==='private')throw new ApiError(404,'share_not_found','공개 트리를 찾을 수 없어요.');}
   return share;
  }
- async function card(share,viewerSubjectId,statsOverride=null,lastActivityAt=null,aiTesterLookup=null){
-  const stored=await workspaceRepo.load({productId,subjectId:share.subjectId});
-  if(!stored)return null;
-  let projected;try{projected=projectSharedTree(stored.doc,share.treeId);}catch{return null;}
+ async function card(share,viewerSubjectId,statsOverride=null,lastActivityAt=null,aiTesterLookup=null,docScanCache=null){
+  // #1067: 주인별 문서 읽기·검증은 한 요청 안에서 한 번만. 캐시는 discover 안에서 만들어 요청을 넘지 않는다.
+  // 카드가 동시에 만들어지므로 결과가 아니라 그 약속을 먼저 저장해 같은 주인이 한 번만 읽게 한다.
+  let pending;
+  if(docScanCache&&docScanCache.has(share.subjectId))pending=docScanCache.get(share.subjectId);
+  else{
+   pending=(async()=>{
+    const stored=await workspaceRepo.load({productId,subjectId:share.subjectId});
+    return stored?validateDocument(stored.doc):null;
+   })();
+   if(docScanCache)docScanCache.set(share.subjectId,pending);
+  }
+  const scan=await pending;
+  if(!scan)return null;
+  let projected;try{projected=projectSharedTreeFromScan(scan,share.treeId);}catch{return null;}
   if(!projected.tree.moments.length)return null;
   const tree=projected.tree,cover=tree.moments.find(moment=>moment.id===tree.coverMomentId)||tree.moments.find(moment=>moment.id===share.entryMomentId)||tree.moments[0];
   const youtubeId=youtubeIdFrom(cover?.url||cover?.externalUrl);
@@ -86,7 +99,7 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
   const coverIsMoment=coverModeOf(tree)==='moment';
   const coverUrl=coverIsMoment?(cover?.url||''):'';
   const vertical=['video','youtube'].includes(coverType)&&isVerticalMoment(cover);
-  const safeCoverThumbnail=safeYoutubeThumb(cover?.mediaMetadata?.thumbnail||cover?.mediaMetadata?.thumbnailUrl||cover?.thumbnailUrl);
+  const safeCoverThumbnail=safeYoutubeThumb(cover?.mediaMetadata?.thumbnail);
   const thumbnailId=youtubeId||youtubeIdFrom(safeCoverThumbnail);
   const youtubeThumbnail=youtubeStageThumbUrl(thumbnailId,'mqdefault')||safeCoverThumbnail;
   // #887: 표지 후보 사슬 — 명시 표지(모드 moment) → 사진 표지(같은 자리) → 첫 YouTube 순간 썸네일(mqdefault) → 글자 칸.
@@ -178,6 +191,7 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
    // #611 3번: AI 명예회원 배지 비트 — 이번 한 번의 둘러보기 조회에서는 같은 주인이면 한 번만 묻는다.
    // #678 후속: 역할을 한 번만 물어 두고(주인당 한 번) 그 값으로 배지와 시험 계정 거름을 함께 판정한다.
    const roleCache=new Map();
+   const docScanCache=new Map();
    const roleOf=admin?async subjectId=>listedRole(subjectId,roleCache):null;
    const aiTesterLookup=roleOf?async subjectId=>isAiTesterRole(await roleOf(subjectId)):null;
    // #1071: 시험 계정뿐 아니라 역할을 읽지 못한 주인도 공개 목록에서 뺀다.
@@ -192,14 +206,14 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
     entries=await Promise.all(summaries.map(async summary=>{
      // 시험 계정·역할 모름 트리는 둘러보기 목록·검색에서 뺀다(#678 후속·#1071 — 공유 링크 직접 열기는 그대로).
      if(await isHiddenLookup(summary.share.subjectId))return null;
-     const item=await card(summary.share,viewerSubjectId,summary.stats,summary.lastActivityAt,aiTesterLookup);
+     const item=await card(summary.share,viewerSubjectId,summary.stats,summary.lastActivityAt,aiTesterLookup,docScanCache);
      return item;
     }));
    }else{
     const shares=await communityRepo.listDiscoverable({productId,viewerSubjectId,limit:240});
     entries=await Promise.all(shares.map(async share=>{
      if(await isHiddenLookup(share.subjectId))return null;
-     return card(share,viewerSubjectId,null,null,aiTesterLookup);
+     return card(share,viewerSubjectId,null,null,aiTesterLookup,docScanCache);
     }));
    }
    const baseCards=[];
@@ -260,7 +274,7 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
       treeTitle:tree.title,
       title:moment.title,
       url:moment.url||'',
-      thumbnail:moment.mediaMetadata?.thumbnail||moment.thumbnailUrl||'',
+      thumbnail:moment.mediaMetadata?.thumbnail||'',
       date:moment.date||'',
       aiTester
      });
@@ -316,7 +330,7 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
       treeTitle:tree.title,
       title:moment.title,
       url:moment.url||'',
-      thumbnail:safeYoutubeThumb(moment.mediaMetadata?.thumbnail||moment.thumbnailUrl||'')||(videoId?youtubeStageThumbUrl(videoId,'oardefault'):'')||moment.mediaMetadata?.thumbnail||'',
+      thumbnail:safeYoutubeThumb(moment.mediaMetadata?.thumbnail||'')||(videoId?youtubeStageThumbUrl(videoId,'oardefault'):'')||moment.mediaMetadata?.thumbnail||'',
       note:moment.note||'',
       emotion:moment.emotion||'',
       date:moment.date||'',
@@ -441,5 +455,5 @@ export function createCommunityHandler({authenticate,service,productId}){
   if(action){const who=await principal(request),[,shareId,kind]=action;if(kind==='favorite'&&(method==='PUT'||method==='DELETE'))return {status:200,body:{stats:await service.favorite(who.subjectId,shareId,method==='PUT')},headers:NO_STORE};if(kind==='reaction'&&(method==='PUT'||method==='DELETE')){let reactionKind='heart';if(method==='PUT'){try{const body=jsonBody(request);reactionKind=(body&&typeof body==='object'&&typeof body.kind==='string'&&body.kind.trim()!==''?body.kind.trim():'heart');}catch{reactionKind='heart';}}else{const q=String(request?.query?.get?.('kind')||'').trim();reactionKind=q||'heart';}return {status:200,body:{stats:await service.react(who.subjectId,shareId,method==='PUT',reactionKind)},headers:NO_STORE};}if(kind==='report'&&method==='POST'){const body=jsonBody(request);return {status:201,body:{report:await service.report(who.subjectId,shareId,body.reason,clientKey(request))},headers:NO_STORE};}if(kind==='block'&&method==='POST')return {status:200,body:await service.block(who.subjectId,shareId),headers:NO_STORE};}
   throw new ApiError(404,'not_found','요청을 찾을 수 없어요.');
  }
- return async request=>{try{return await handle(request);}catch(error){if(error instanceof ApiError)return {status:error.status,body:{error:{code:error.code,message:error.message,...(error.details||{})}},headers:NO_STORE};console.error('[lovetree-community] request failed',{path:request?.path,method:request?.method});return {status:500,body:{error:{code:'internal_error',message:'서버에서 처리하지 못했어요.'}},headers:NO_STORE};}};
+ return async request=>{try{return await handle(request);}catch(error){if(error instanceof ApiError)return {status:error.status,body:{error:{code:error.code,message:error.message,...(error.details||{})}},headers:NO_STORE};logServerError(error,'lovetree-community');return {status:500,body:{error:{code:'internal_error',message:'서버에서 처리하지 못했어요.'}},headers:NO_STORE};}};
 }

@@ -8,10 +8,16 @@
     const list = api.thumbnailCandidates({ url: String(url || '') }, { autoLoad: true });
     return list[0] || '';
   };
+  // #1060: ytimg 단계 주소 글자는 정본(youtube-id.mjs) 한 벌에서만 만든다.
+  // 보드 상세의 크기 순서(maxres → hq → mq)와 onerror 대체는 그대로 두고 크기 옵션만 넘긴다.
+  const stageThumb = (id, stage) => {
+    const api = globalThis.LTYouTubeId || globalThis.LTThumbFallback;
+    return api && typeof api.youtubeStageThumbUrl === 'function' ? api.youtubeStageThumbUrl(id, stage) : '';
+  };
   const REAL_YT_TEST = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
   function ytId(url=''){ return youtubeId(url); }
-  function ytMax(url=''){ let id=ytId(url); return id?`https://i.ytimg.com/vi/${id}/maxresdefault.jpg`:''; }
-  function ytHQ(url=''){ let id=ytId(url); return id?`https://i.ytimg.com/vi/${id}/hqdefault.jpg`:''; }
+  function ytMax(url=''){ let id=ytId(url); return id?stageThumb(id,'maxresdefault'):''; }
+  function ytHQ(url=''){ let id=ytId(url); return id?stageThumb(id,'hqdefault'):''; }
   function ytEmbed(url=''){ let id=ytId(url); return id?`https://www.youtube-nocookie.com/embed/${id}?playsinline=1&rel=0&modestbranding=1&autoplay=1`:''; }
   function isYtMoment(m){ return !!m && (m.type==='youtube' || (m.type==='video' && m.videoSource==='youtube')); }
   function originalUrl(m){ return m?.sourceUrl || m?.url || ''; }
@@ -29,7 +35,7 @@
   function ytMediaHTML(url, extra=''){
     let id=ytId(url), fallback=V12_FALLBACK(url||'VIDEO');
     if(!id) return `<div class="ytThumbWrap"><img src="${fallback}" alt="YouTube preview"><span class="ytLoadState fail">유효한 YouTube URL을 입력하세요</span>${extra}</div>`;
-    let mq=`https://i.ytimg.com/vi/${id}/mqdefault.jpg`;
+    let mq=stageThumb(id,'mqdefault');
     return `<div class="ytThumbWrap"><img src="${ytHQ(url)}" data-hq="${ytHQ(url)}" data-mq="${mq}" data-url="${esc(url||'')}" data-fallback="${fallback}" data-stage="hq" onload="__ytThumbLoad(this)" onerror="__ytThumbFail(this)" alt="YouTube thumbnail" referrerpolicy="no-referrer"><span class="ytLoadState">YouTube 미리보기를 불러오는 중</span><span class="ytSourceBadge">YOUTUBE</span>${extra}</div>`;
   }
   function armYTThumbs(root=document){root.querySelectorAll('.ytThumbWrap img[data-stage]').forEach(img=>{if(img.dataset.timeoutArmed)return;img.dataset.timeoutArmed='1';setTimeout(()=>{if((!img.complete||!img.naturalWidth)&&img.dataset.stage==='max')window.__ytThumbFail(img)},1800);setTimeout(()=>{if((!img.complete||!img.naturalWidth)&&img.dataset.stage==='hq')window.__ytThumbFail(img)},3600)})}

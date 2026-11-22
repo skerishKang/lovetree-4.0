@@ -150,6 +150,37 @@ test('migrations apply cleanly to empty DB and are re-runnable', { skip }, async
       /duplicate|unique/i,
       '같은 대상·같은 키의 댓글은 한 행만 허용된다'
     );
+    // ③-3 옛 3칸 유일 제약(UNIQUE (product_id, subject_id, client_key))은 남아 있으면 안 된다.
+    //    새로 깐 DB에서는 애초에 없어 이 단정이 자명하지만, 기존 표를 업그레이드하는 경로(아래 옛 모양 시험)가
+    //    진짜 검증이다. 여기서는 재적용 안전성까지 함께 단정한다.
+    const legacyUnique = await pool.query(
+      `SELECT conname FROM pg_constraint
+        WHERE conrelid = 'lovetree_community_comments'::regclass AND contype = 'u'
+          AND pg_get_constraintdef(oid) ~ '^UNIQUE \\(product_id, subject_id, client_key\\)$'`
+    );
+    assert.equal(legacyUnique.rows.length, 0, '옛 3칸 유일 제약은 지워져야 한다(남으면 같은 키의 트리·순간 댓글이 충돌한다)');
+
+    // ③-4 #1098 3단계: 내 소식 읽음 시각 표(새 표 — 덧붙이기만). 계정당 한 줄이고 기존 표는 한 칸도 바뀌지 않는다.
+    const readColumns = await pool.query(
+      `SELECT column_name FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'lovetree_community_my_news_reads'
+        ORDER BY ordinal_position`
+    );
+    assert.deepEqual(readColumns.rows.map((row) => row.column_name),
+      ['product_id', 'subject_id', 'last_read_at', 'updated_at'], '내 소식 읽음 표의 칸이 있어야 한다');
+    const readUpsert = `INSERT INTO lovetree_community_my_news_reads(product_id, subject_id, last_read_at)
+      VALUES ($1, $2, $3::timestamptz)
+      ON CONFLICT (product_id, subject_id) DO UPDATE
+        SET last_read_at = GREATEST(lovetree_community_my_news_reads.last_read_at, EXCLUDED.last_read_at), updated_at = now()
+      RETURNING last_read_at`;
+    await pool.query(readUpsert, [productId, 'news-subject', '2026-11-21T00:00:00Z']);
+    const replayedRead = await pool.query(readUpsert, [productId, 'news-subject', '2026-11-21T09:00:00Z']);
+    assert.equal(replayedRead.rows[0].last_read_at.toISOString(), '2026-11-21T09:00:00.000Z', '같은 계정의 다시 읽음은 시각을 앞으로 옮긴다');
+    const readRows = await pool.query(
+      'SELECT count(*)::int AS n FROM lovetree_community_my_news_reads WHERE product_id = $1 AND subject_id = $2',
+      [productId, 'news-subject']
+    );
+    assert.equal(readRows.rows[0].n, 1, '계정별 마지막 읽은 시각은 한 줄만 저장된다');
 
     // ④ 계정 이메일: 표가 스키마에 있고, 같은 계정에 다시 쓰면 덮어쓴다(업서트).
     const emailColumns = await pool.query(
@@ -420,3 +451,139 @@ for (const install of ['schema.sql', 'stage-schema-261119.sql']) {
     assert.deepEqual(votes.rows, [{ target_kind: 'tree', target_id: 'tree', voted_at: new Date(originalTime) }]);
   });
 }
+
+// #1098 2단계 뒷수습 — 운영에서 발견된 것의 재현 시험.
+// 옛 모양(자동 이름 유일 제약 — PostgreSQL이 63자로 잘라 '…_client_ke…'가 됨)의 댓글 표에
+// 마이그레이션 전체를 적용하면 옛 제약이 정의로 지워지는지 단정한다.
+// 이름을 추측해 지우던 첫 판은 이 경로에서 'does not exist, skipping'으로 넘어가 남았다.
+// 이 파일은 CI 전용 잡(빈 DB, --test-concurrency=1)에서 혼자 도니까 표를 다시 만들어도 안전하다.
+test('옛 모양 댓글 표에 마이그레이션을 적용하면 잘린 이름의 옛 유일 제약도 정의로 지워진다', { skip }, async () => {
+  assertIsolatedTestDatabase(DATABASE_URL);
+  const pool = await createPool(DATABASE_URL, { max: 1 });
+  try {
+    await pool.query('DROP TABLE IF EXISTS lovetree_community_comments');
+    await pool.query(`CREATE TABLE lovetree_community_comments (
+      product_id text NOT NULL,
+      comment_id text NOT NULL,
+      share_id text NOT NULL,
+      subject_id text NOT NULL,
+      body text NOT NULL CHECK (char_length(body) BETWEEN 1 AND 1000),
+      client_key text NOT NULL,
+      status text NOT NULL DEFAULT 'visible' CHECK (status IN ('visible','deleted','hidden')),
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now(),
+      edited_at timestamptz,
+      PRIMARY KEY (product_id, comment_id),
+      UNIQUE (product_id, subject_id, client_key)
+    )`);
+    const legacyDef = `SELECT conname FROM pg_constraint
+      WHERE conrelid = 'lovetree_community_comments'::regclass AND contype = 'u'
+        AND pg_get_constraintdef(oid) ~ '^UNIQUE \\(product_id, subject_id, client_key\\)$'`;
+    const before = await pool.query(legacyDef);
+    assert.equal(before.rows.length, 1, '옛 모양 표에는 3칸 유일 제약이 하나 있다');
+    assert.ok(before.rows[0].conname.startsWith('lovetree_community_comments_product_id_subject_id_client_'),
+      '자동 이름은 63자에 잘려 문서와 달라진다 — 이름이 아니라 정의로 찾아야 한다');
+
+    // 운영과 같은 순서: schema.sql(표가 있으니 CREATE는 건너뛰고 업그레이드 블록이 돈다) → migrations 전부.
+    const schemaSql = await readFile(SCHEMA_PATH, 'utf8');
+    await pool.query(schemaSql);
+    await applyAllMigrations(pool);
+
+    // 단정: 3칸 유일 제약 0개, 새 대상 제약 존재.
+    const after = await pool.query(legacyDef);
+    assert.equal(after.rows.length, 0, '옛 3칸 유일 제약은 정의로 지워져야 한다');
+    const target = await pool.query(`SELECT 1 FROM pg_constraint
+      WHERE conrelid = 'lovetree_community_comments'::regclass AND conname = 'lovetree_community_comments_client_target_key'`);
+    assert.equal(target.rows.length, 1, '대상 5칸 유일 제약이 있어야 한다');
+
+    // 같은 client_key로 트리·순간에 각각 쓰면 둘 다 저장된다(옛 제약이 남으면 두 번째가 유일 위반으로 실패한다).
+    const tag = Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
+    const productId = ('lt-' + tag).slice(0, 32);
+    const shareId = ('s' + tag).padEnd(24, 'x').slice(0, 24);
+    const both = `INSERT INTO lovetree_community_comments
+      (product_id, comment_id, share_id, subject_id, body, client_key, target_kind, moment_id)
+      VALUES ($1, $2, $3, 'reader', $4, 'same-key', $5, $6)`;
+    await pool.query(both, [productId, 'legacy-fix-tree', shareId, '트리 댓글', 'tree', '']);
+    await pool.query(both, [productId, 'legacy-fix-moment', shareId, '순간 댓글', 'moment', 'm1']);
+    const saved = await pool.query(
+      `SELECT count(*)::int AS n FROM lovetree_community_comments
+        WHERE product_id=$1 AND subject_id='reader' AND client_key='same-key'`,
+      [productId]
+    );
+    assert.equal(saved.rows[0].n, 2, '같은 키라도 대상이 다르면 둘 다 저장된다');
+
+    // 뒷정리: 표준 모양으로 되돌려 놓는다(같은 DB를 이어 쓰는 실행 보호).
+    await pool.query('DROP TABLE lovetree_community_comments');
+    await pool.query(schemaSql);
+    await applyAllMigrations(pool);
+  } finally {
+    await pool.end();
+  }
+});
+
+// #1098 3단계 — 내 소식 읽음 시각 표: 재실행 안전과 되돌리기 SQL 실행까지 확인한다.
+// 되돌리기는 이 마이그레이션이 만든 표 하나만 삭제한다(잘린 자동 이름을 추측할 일이 없다 — #1146 교훈).
+test('내 소식 읽음 표 — 마이그레이션 재실행에도 같고, 되돌리기 SQL이 실행된 뒤 다시 적용된다', { skip }, async () => {
+  assertIsolatedTestDatabase(DATABASE_URL);
+  const pool = await createPool(DATABASE_URL, { max: 1 });
+  try {
+    const migrationPath = fileURLToPath(new URL('../server/db/migrations/community-my-news-reads-261122.sql', import.meta.url));
+    const rollbackPath = fileURLToPath(new URL('../server/db/rollbacks/community-my-news-reads-261122-rollback.sql', import.meta.url));
+    const migration = await readFile(migrationPath, 'utf8');
+    const rollback = await readFile(rollbackPath, 'utf8');
+
+    await pool.query(await readFile(SCHEMA_PATH, 'utf8'));
+    await pool.query(migration);
+    await pool.query(migration); // 재실행 안전 — 두 번 적용해도 같은 상태다.
+
+    const columns = await pool.query(
+      `SELECT column_name, data_type, is_nullable
+         FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'lovetree_community_my_news_reads'
+        ORDER BY ordinal_position`
+    );
+    assert.deepEqual(
+      columns.rows.map((row) => ({ column: row.column_name, type: row.data_type, nullable: row.is_nullable })),
+      [
+        { column: 'product_id', type: 'text', nullable: 'NO' },
+        { column: 'subject_id', type: 'text', nullable: 'NO' },
+        { column: 'last_read_at', type: 'timestamp with time zone', nullable: 'NO' },
+        { column: 'updated_at', type: 'timestamp with time zone', nullable: 'NO' }
+      ],
+      '내 소식 읽음 표의 칸이 마이그레이션대로다'
+    );
+    const primaryKey = await pool.query(
+      `SELECT pg_get_constraintdef(oid) AS def FROM pg_constraint
+        WHERE conrelid = 'lovetree_community_my_news_reads'::regclass AND contype = 'p'`
+    );
+    assert.match(String(primaryKey.rows[0]?.def), /PRIMARY KEY \(product_id, subject_id\)/, '계정당 한 줄이다');
+
+    // 읽음 표시의 실제 쓰기 — 계정당 한 줄, 시각은 뒤로 가지 않는다(서비스의 GREATEST 업서트).
+    const tag = Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
+    const productId = ('lt-' + tag).slice(0, 32);
+    const upsert = `INSERT INTO lovetree_community_my_news_reads(product_id, subject_id, last_read_at)
+      VALUES ($1, $2, $3::timestamptz)
+      ON CONFLICT (product_id, subject_id) DO UPDATE
+        SET last_read_at = GREATEST(lovetree_community_my_news_reads.last_read_at, EXCLUDED.last_read_at),
+            updated_at = now()
+      RETURNING last_read_at`;
+    await pool.query(upsert, [productId, 'news-owner', '2026-11-22T00:00:00Z']);
+    const later = await pool.query(upsert, [productId, 'news-owner', '2026-11-22T09:00:00Z']);
+    const earlier = await pool.query(upsert, [productId, 'news-owner', '2026-11-22T01:00:00Z']);
+    assert.equal(later.rows[0].last_read_at.toISOString(), '2026-11-22T09:00:00.000Z');
+    assert.equal(earlier.rows[0].last_read_at.toISOString(), '2026-11-22T09:00:00.000Z', '읽음 시각은 뒤로 가지 않는다');
+    await pool.query(upsert, [productId, 'news-other', '2026-11-22T00:00:00Z']);
+    const both = await pool.query('SELECT count(*)::int AS n FROM lovetree_community_my_news_reads WHERE product_id = $1', [productId]);
+    assert.equal(both.rows[0].n, 2, '계정끼리는 줄이 따로다');
+
+    // 되돌리기: 표가 사라지고, 마이그레이션을 다시 적용하면 같은 모양으로 돌아온다.
+    await pool.query(rollback);
+    const gone = await pool.query(`SELECT to_regclass('public.lovetree_community_my_news_reads') AS t`);
+    assert.equal(gone.rows[0].t, null, '되돌리기 뒤에는 표가 없다');
+    await pool.query(migration);
+    const back = await pool.query(`SELECT to_regclass('public.lovetree_community_my_news_reads') AS t`);
+    assert.ok(back.rows[0].t, '다시 적용하면 표가 돌아온다');
+  } finally {
+    await pool.end();
+  }
+});

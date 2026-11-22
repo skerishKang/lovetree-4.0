@@ -1,3 +1,4 @@
+import { logServerError } from './error-log.js';
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { ApiError } from './errors.js';
 import { parsePrincipal } from './principal.js';
@@ -63,18 +64,19 @@ export function createAccountService({ repo, productId, admin = null, mediaStore
     const hash = subjectHash(principal.subjectId);
     let alreadyDeleted;
     try { alreadyDeleted = await repo.isDeleted({ productId, subjectHash: hash }); }
-    catch { throw new ApiError(503, 'account_delete_failed', '탈퇴 상태를 확인하지 못했습니다. 다시 시도해 주세요.'); }
+    catch (error) { logServerError(error, 'account-delete'); throw new ApiError(503, 'account_delete_failed', '탈퇴 상태를 확인하지 못했습니다. 다시 시도해 주세요.'); }
     let outcome = null;
     if (!alreadyDeleted) {
       try {
         outcome = await repo.deleteAll({ productId, subjectId: principal.subjectId, subjectHash: hash, at: now().toISOString() });
-      } catch {
+      } catch (error) {
+        logServerError(error, 'account-delete');
         throw new ApiError(503, 'account_delete_failed', '탈퇴를 처리하지 못했습니다. 저장된 기록은 그대로입니다. 다시 시도해 주세요.');
       }
     }
     let mediaCleaned = null;
     if (mediaStore && typeof mediaStore.removeAccount === 'function') {
-      try { await mediaStore.removeAccount(principal); mediaCleaned = true; } catch { mediaCleaned = false; }
+      try { await mediaStore.removeAccount(principal); mediaCleaned = true; } catch (error) { logServerError(error, 'account-delete'); mediaCleaned = false; }
     }
     return {
       deleted: true,

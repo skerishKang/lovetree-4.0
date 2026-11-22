@@ -23,27 +23,27 @@ test('로그아웃 상태는 기존 로그인 알약, 로그인 상태는 첫 �
   assert.equal(out.initial, '');
   assert.equal(out.ariaLabel, null, '로그아웃 상태에는 계정 메뉴 aria-label을 붙이지 않는다');
 
-  const inState = accountPresentation({owned: true, email: 'kimbs5993+tutorial01@gmail.com'});
+  const inState = accountPresentation({owned: true, email: 'kate@example.test'});
   assert.equal(inState.mode, 'avatar');
   assert.equal(inState.initial, 'K');
-  assert.equal(inState.label, 'kimbs5993+tutorial01@gmail.com');
-  assert.equal(inState.ariaLabel, '내 계정 메뉴, kimbs5993+tutorial01@gmail.com으로 로그인됨');
-  assert.equal(accountPresentation({owned: true, email: 'fan@love.io'}).ariaLabel, '내 계정 메뉴, fan@love.io로 로그인됨');
+  assert.equal(inState.label, 'kate@example.test');
+  assert.equal(inState.ariaLabel, '내 계정 메뉴, kate@example.test으로 로그인됨');
+  assert.equal(accountPresentation({owned: true, email: 'kate@example.test'}).ariaLabel, '내 계정 메뉴, kate@example.test으로 로그인됨');
 });
 
 test('계정 첫 글자는 이메일 앞부분의 첫 글자이고, 없으면 점으로 둔다', () => {
-  assert.equal(firstLetter('kimbs5993+tutorial01@gmail.com'), 'K');
-  assert.equal(firstLetter('  limone@example.com'), 'L');
+  assert.equal(firstLetter('kate@example.test'), 'K');
+  assert.equal(firstLetter('  lee@example.test'), 'L');
   assert.equal(firstLetter('김범수@example.com'), '김');
   assert.equal(firstLetter(''), '·');
   assert.equal(firstLetter('   '), '·');
-  assert.equal(firstLetter('+tag@example.com'), 'T', '기호는 건너뛰고 첫 글자를 쓴다');
+  assert.equal(firstLetter('.tess@example.test'), 'T', '기호는 건너뛰고 첫 글자를 쓴다');
 });
 
 // #368 보완 1·2: 동그라미 글자는 표시 이름 → 이메일 첫 글자 순서고 subject(usr_…) 첫 글자는 쓰지 않는다.
 test('동그라미 글자는 표시 이름을 먼저 쓰고, 없으면 이메일 첫 글자를 쓴다', () => {
-  assert.equal(accountPresentation({owned: true, name: '김범수', email: 'fan@love.io'}).initial, '김', '표시 이름이 있으면 그 첫 글자');
-  assert.equal(accountPresentation({owned: true, email: 'fan@love.io'}).initial, 'F', '표시 이름이 없으면 이메일 첫 글자');
+  assert.equal(accountPresentation({owned: true, name: '김범수', email: 'kate@example.test'}).initial, '김', '표시 이름이 있으면 그 첫 글자');
+  assert.equal(accountPresentation({owned: true, email: 'fay@example.test'}).initial, 'F', '표시 이름이 없으면 이메일 첫 글자');
 });
 
 test('이메일이 없어도 subject 첫 글자는 쓰지 않고 점·내 계정으로 안전하게 둔다', () => {
@@ -251,7 +251,7 @@ const MIME644 = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript',
 const ROOT644 = existsSync644(new URL('../dist/v41/home.html', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'))
   ? new URL('../dist', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')
   : new URL('../public', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
-const PREFS644 = { titleDisplay: 'both', displayName: '', accentColor: '', dateStyle: 'dot', startPlace: 'resume', shareView: 'book', shareDiscover: false, treeChipOrder: [], homeMoment: { mode: 'last', treeId: '', momentId: '' } };
+const PREFS644 = { titleDisplay: 'both', displayName: '', accentColor: '', dateStyle: 'dot', startPlace: 'resume', shareView: 'book', shareDiscover: false, treeChipOrder: [], bookDisplay: 'book', homeMoment: { mode: 'last', treeId: '', momentId: '' } };
 
 const doc644 = (trees) => ({ version: 1, trees, prefs: PREFS644 });
 const tree644 = (subject, title) => createTree({ subject, title, note: '기록', emotion: '설렘', date: '2026-11-15', url: '' }, '2026-11-15T00:00:00.000Z');

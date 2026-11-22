@@ -12,7 +12,7 @@ let exampleTree=null,examplePromise=null,exampleInitializing=false;
 function loadExampleTree(){if(!examplePromise)examplePromise=import('./example.mjs').then(mod=>{exampleTree=mod.exampleTree;return exampleTree});return examplePromise;}
 import {parseSelectionRoute,memberStartupView,ownerSelectionRoute,accountPosition,rememberAccountPosition,resolveAccountPosition,stashPendingOwnerRoute,pendingOwnerRoute,takePendingOwnerRoute} from './selection-location.mjs';
 import {applyViewAccessibility,connectionLabel} from './view-a11y.mjs';
-import {accountPresentation,treePickerLabel,treePickerText,treeViewsVisible,writeMenuLabel,headerState,headerPartsFor,readTipsSeen,writeTipsSeen,tipsWanted,unsavedNoticeText,FIRST_TREE_TIPS,homeCenterState,homeStartLoginUrl,readTheme,readLoginIntent,writeTheme,nextTheme,themeButtonLabel,themeButtonAriaLabel,themePressed,appliedTheme,applyThemeAttribute,LOGIN_INTENTS,readPageTurn,writePageTurn} from './header-state.mjs';
+import {accountPresentation,treePickerLabel,treePickerText,treeViewsVisible,writeMenuLabel,headerState,headerPartsFor,readTipsSeen,writeTipsSeen,tipsWanted,unsavedNoticeText,FIRST_TREE_TIPS,homeCenterState,homeStartLoginUrl,readTheme,readLoginIntent,writeTheme,nextTheme,themeButtonLabel,themeButtonAriaLabel,themePressed,appliedTheme,applyThemeAttribute,LOGIN_INTENTS,readPageTurn,writePageTurn,readBookDisplay,writeBookDisplay,bookDisplayVisible} from './header-state.mjs';
 import {parseJourneyRoute,journeyRouteDecision} from './first-journey.mjs';
 import {displayTreeTitle} from './tree-name.mjs';
 import {titleView, withoutAutoTitle} from './book-usability.mjs';
@@ -51,7 +51,7 @@ import {createNotifier, syncedNoticeText, newlyPublishedTrees} from './shell/not
 import {createSettings} from './shell/settings.mjs';
 import {createNoticeQueue} from './shell/notice-queue.mjs';
 import {paintLoginLinks,paintThemeControls,applyTheme as applyThemeFor,toggleTheme as toggleThemeFor} from './shell/theme.mjs';
-import {normalizeTitleDisplay, normalizeAccentColor, normalizeDateStyle, normalizeStartPlace, normalizeShareView, normalizeHomeMoment, coverModeOf, normalizeCoverDesign} from './domain.mjs';
+import {normalizeTitleDisplay, normalizeAccentColor, normalizeDateStyle, normalizeStartPlace, normalizeShareView, normalizeHomeMoment, normalizeBookDisplay, coverModeOf, normalizeCoverDesign} from './domain.mjs';
 import {backfillVideoTitles} from './title-backfill.mjs';
 import {thumbnailCandidates, coverFallbackAttrs, fallbackCardData, emotionToneOf, mountThumbFallback, ADD_TITLE_LABEL, VIDEO_UNAVAILABLE_TEXT} from './thumb-fallback.mjs';
 const $=id=>document.getElementById(id);
@@ -88,7 +88,12 @@ if(updatesCardBox)new MutationObserver(()=>{
     updatesCardBox.hidden=true;
     noticeQueue.request('updates',{show:()=>{hideToast();updatesCardBox.hidden=false;},hide:()=>{updatesCardBox.hidden=true;}});
   }
+  broadcastUpdatesBand();
 }).observe(updatesCardBox,{attributes:true,attributeFilter:['hidden']});
+function broadcastUpdatesBand(){
+ const height=updatesCardBox&&!updatesCardBox.hidden?Math.round(updatesCardBox.getBoundingClientRect().height):0;
+ for(const f of frames()){try{f.contentWindow.postMessage({type:'lt41-updates-band',height},location.origin)}catch{}}
+}
 // #977: 서버 기록에 형식이 어긋난 트리가 섞여 있으면 그 트리만 빼고 셸을 연다(읽기는 workspace-guard.mjs).
 // #986: 서버가 읽지 못해 빼 둔 트리는 개수(quarantined)만 응답에 온다 — 화면 안내에 함께 센다.
 // 화면에는 짧은 안내 한 줄, 콘솔에는 어느 트리가 왜 어긋났는지 한 줄만 남긴다 — 같은 기록을 다시 읽어도 한 번만.
@@ -128,6 +133,20 @@ function setTitleDisplay(value){
  rememberTitleDisplay(titleDisplayValue());
  paintTitleDisplayControls();
  postTitleDisplay();
+}
+// #1094: 책/목록 보기 선택. 계정 상태(state.prefs.bookDisplay)에 저장하고 기기 미러(lt41.bookDisplay)에 함께 둔다
+// (날짜 표기·제목 보기와 같은 길). 머리줄 묶음(.view-toggle)과 설정 창의 같은 data-book-display 단추 두 칸을 칠한다.
+// 서재 안의 프레임은 누르는 순간 부모의 prefs와 미러를 함께 읽어, 중간 화면 없이 고른 방식으로 연다.
+function currentBookDisplay(){try{return normalizeBookDisplay(member?.state?.().prefs?.bookDisplay)}catch{return readBookDisplay(localStorage)}}
+function rememberBookDisplay(value){writeBookDisplay(localStorage,value)}
+function paintBookDisplayControls(){const value=currentBookDisplay();for(const b of document.querySelectorAll('[data-book-display]'))b.setAttribute('aria-checked',String(b.dataset.bookDisplay===value));}
+function setBookDisplay(value){
+ const next=normalizeBookDisplay(value);
+ if(!member?.snapshot().owned){notify('로그인한 뒤 보기 방식을 바꿀 수 있어요.');return;}
+ try{member.apply('setPrefs',{bookDisplay:next});}catch(e){notify('보기 방식을 저장하지 못했어요. 잠시 뒤 다시 시도해 주세요.');return;}
+ if(window.LT41)window.LT41.prefs=member.state().prefs;
+ rememberBookDisplay(currentBookDisplay());
+ paintBookDisplayControls();
 }
 let backfillStarted=false,backfillAttempted=new Set();
 async function runTitleBackfill(state,session){
@@ -279,7 +298,7 @@ if(window.visualViewport){const fabKbd=()=>document.body.classList.toggle('lt-kb
 const initialRoute=parseSelectionRoute(location.hash);
 let model=null,current=screenForView(initialRoute.view)[1],source='example',loadGeneration=0,previousDirty=false,member=null,handledHash=null,activeShareId=null,resumeAfterStart=null;
 // #1092: 둘러보기 화면 — 창 모듈의 showModal 호출을 비모달 화면 열기로 바꾸고, 닫을 때 #explore 주소 기록을 지킨다.
-const shellCommunityScreen=createCommunityScreen({$,setHandled:hash=>{handledHash=hash;}});
+const shellCommunityScreen=createCommunityScreen({$,setHandled:hash=>{handledHash=hash;},flowNavigation});
 // #583 '이 순간 열기': 주소(#my/network?tree=…&moment=…)로 지도를 특정 순간을 가운데 두고 열 요청이 오면
 // 여기에 한 번 적어 두고, 지도 프레임을 띄울 때(show) 소비해 프레임 주소에 ?open=<순간>을 붙인다.
 // 지도(network.js)는 이 표시가 있을 때만 그 순간을 고른 상태로 가운데에 둔다 — 그냥 지도를 열 때는
@@ -300,6 +319,7 @@ const shellAuth=createAuth({
   $,
   getMember:()=>member,
   notify:text=>notify(text),
+  onAuthRequired:()=>shellHeader.paintAuthExpired(),
   closeAccountMenu:()=>closeAccountMenu(),
   openEditor:(mode,parentId)=>openEditor(mode,parentId),
   showScreen:file=>show(file)
@@ -686,6 +706,7 @@ const shellScreens=createScreens({
     // #478: 고급 기능 보기 값도 새로 열린 화면에 알린다. applyAdvanced는 지금 화면(#view)에만 보내므로
     // 화면을 옮긴 뒤 열린 프레임은 단순 모드로 남았다(보드 도구가 숨는 결함).
     try{frame.contentWindow.postMessage({type:'lt41-advanced',value:readAdvanced()},location.origin)}catch{}
+    broadcastUpdatesBand();
     // 화면 교대(두 장 앞뒤 바꿈)가 늦게 끝나는 경우를 위해 한 번 더 알린다(같은 값을 또 보내는 건 무해하다).
     for(const message of ready.repeats)setTimeout(()=>sendToFrame(frame,message),1600);
     d.addEventListener('click',e=>{const b=e.target.closest('button,a');if(!b)return;let file;if(b.matches('[data-action="tree"],[data-menu="tree"]'))file='track32-bookshelf.html';if(b.matches('#storyBook,[data-menu="book"]'))file='track59-sketchbook.html';if(current==='track56-network.html'&&b.id==='openMoment')file='track59-sketchbook.html';if(file){e.preventDefault();e.stopImmediatePropagation();show(file);}},true);
@@ -1139,6 +1160,9 @@ async function startMember(){setMemberRefreshStarted(true);if(!leaveMember())ret
    // #481: 제목 보기도 같은 이유로 기기 미러를 계정값으로 채운다.
    rememberTitleDisplay(state.prefs?.titleDisplay);
    paintTitleDisplayControls();
+   // #1094: 책/목록 보기도 같은 이유로 기기 미러를 계정값으로 채운다.
+   rememberBookDisplay(state.prefs?.bookDisplay);
+   paintBookDisplayControls();
    if(!backfillStarted&&snapshot.owned){backfillStarted=true;void runTitleBackfill(state,session);}
    if(snapshot.owned&&resolved.position.treeId){if(viewForFile(current)!=='home')writeLocation('replace');takePendingOwnerRoute(sessionStorage);if(route?.scope==='owner'&&resolved.treeMissing)startupNotice='이 주소의 기록을 현재 계정에서 찾을 수 없어 최근 위치를 열었어요.';else if(route?.scope==='owner'&&resolved.momentMissing)startupNotice='이 주소의 순간을 찾을 수 없어 트리의 시작 순간을 열었어요.';}
  }catch(error){openFallbackShell(error);}},onStatus:status=>{if(generation===loadGeneration)memberStatus(status);},
@@ -1167,10 +1191,14 @@ $('account-avatar').onclick=e=>{
  e.stopPropagation();
  if($('account-popover').hidden){openAccountMenu(e.detail===0?'keyboard':'mouse');void shellSettings.getFeedbackBoard().refreshReplyDot();}else closeAccountMenu();
 };
-const shellSettings=createSettings({ $, notify, panel, show, frames, frameLoaded, hideFrames, closeAccountMenu, openAccountMenu, renderAccount, updateAccountControls, openAssets, openEditor, sample, backup, clear, startMember, leaveMember, openFallbackShell, writeLocation, load, flowNavigation, renderTreeMenu, requestBoardOpen, lastShelfTreeId, shellHeader, shellDialogs,  shareApi, accountApi, readTheme, writeTheme, normalizeAccentColor, normalizeDateStyle, normalizeStartPlace, normalizeShareView, normalizeHomeMoment,  readPageTurn, writePageTurn, frameMessage, displayTreeTitle, accountPresentation, createFeedbackDialog, createFeedbackBoard, mountUpdates, readWriteTab, writeWriteTab, clearCachedWorkspace, createWorkspaceApi, paintThemeControls, applyTheme, toggleTheme, get member(){return member}, get model(){return model}, get current(){return current}, get source(){return source}, get motionPaused(){return motionPaused}, get loadGeneration(){return loadGeneration}, get handledHash(){return handledHash}, get activeShareId(){return activeShareId}, set member(v){member=v}, set model(v){model=v}, set current(v){current=v}, set source(v){source=v}, set motionPaused(v){motionPaused=v}, set loadGeneration(v){loadGeneration=v}, set handledHash(v){handledHash=v}, set activeShareId(v){activeShareId=v}
+const shellSettings=createSettings({ $, notify, panel, show, frames, frameLoaded, hideFrames, closeAccountMenu, openAccountMenu, renderAccount, updateAccountControls, openAssets, openEditor, sample, backup, clear, startMember, leaveMember, openFallbackShell, writeLocation, load, flowNavigation, renderTreeMenu, requestBoardOpen, lastShelfTreeId, shellHeader, shellDialogs,  shareApi, accountApi, readTheme, writeTheme, normalizeAccentColor, normalizeDateStyle, normalizeStartPlace, normalizeShareView, normalizeHomeMoment,  readPageTurn, writePageTurn, frameMessage, displayTreeTitle, accountPresentation, createFeedbackDialog, createFeedbackBoard, mountUpdates, readWriteTab, writeWriteTab, clearCachedWorkspace, createWorkspaceApi, paintThemeControls, applyTheme, toggleTheme, paintBookDisplayControls, get member(){return member}, get model(){return model}, get current(){return current}, get source(){return source}, get motionPaused(){return motionPaused}, get loadGeneration(){return loadGeneration}, get handledHash(){return handledHash}, get activeShareId(){return activeShareId}, set member(v){member=v}, set model(v){model=v}, set current(v){current=v}, set source(v){source=v}, set motionPaused(v){motionPaused=v}, set loadGeneration(v){loadGeneration=v}, set handledHash(v){handledHash=v}, set activeShareId(v){activeShareId=v}
  });
 const { applyAdvanced, applyDateStyleToFrame, applyPageTurnToFrame, applyNetworkViewToFrame, applyBoardThemeToFrame, syncBoardThemeToApp, quickTargetPreference, profileDirty, paintSettingsProfile, accountConfirmMatches, openAccountData, openAccountSettings, paintDateStyleControls, paintStartPlaceControls, paintShareControls, paintQuickTargetControls, paintNetworkViewControls, paintPageTurnControls, paintBoardThemeControls, paintTreeVisibilityList, paintSettingsUsage, loadTreeVisibility, paintTreeManagerVisibility, paintSettingsTab, focusSettingsSection, fillProfileForm, paintScreenControls, readAdvanced, advancedKey, currentDateStyle, currentPageTurn, sendToFrame, currentStartPlace, currentShareView, currentBoardTheme }=shellSettings;
-paintThemeControls();applyTheme();paintTitleDisplayControls();applyAdvanced();
+// #1094: 머리줄 묶음과 설정 창의 같은 data-book-display 두 칸이 하나의 길로 바뀌고 저장된다.
+for(const b of document.querySelectorAll('[data-book-display]'))b.onclick=()=>{
+ setBookDisplay(b.dataset.bookDisplay);
+};
+paintThemeControls();applyTheme();paintTitleDisplayControls();paintBookDisplayControls();applyAdvanced();
 if(initialRoute.scope==='public')showPublicRoute(initialRoute);
 else if(/^#explore/.test(location.hash)){/* #1025: 둘러보기가 자기 주소를 연다 — 예시 로드로 주소를 덮지 않는다. #1092: [트리] 보기(#explore)는 화면으로 바로 연다 — [순간](#explore/moments)은 창 모듈이 자기 주소로 연다. */
  if(location.hash==='#explore')shellCommunityScreen.openRoute();
