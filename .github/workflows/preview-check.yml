@@ -1429,15 +1429,9 @@ jobs:
     name: 미리보기 postdeploy(로그아웃)
     runs-on: ubuntu-latest
     if: always()
-    needs: [screen-board, screen-home, screen-book, screen-reload, screen-shell, screen-map-a, screen-map-b, screen-book-screen, screen-audit-a, screen-audit-b, screen-audit-c, deploy]
+    needs: [screen-changes, screen-board, screen-home, screen-book, screen-reload, screen-shell, screen-map-a, screen-map-b, screen-book-screen, screen-audit-a, screen-audit-b, screen-audit-c, deploy]
     steps:
       - name: 모든 화면 시험·배포 검사 결과 모으기
         env:
           RESULTS: ${{ toJSON(needs) }}
-        run: |
-          echo "$RESULTS" | node -e '
-            let t="";process.stdin.on("data",d=>t+=d).on("end",()=>{
-              const needs=JSON.parse(t);let bad=0;
-              for(const [k,v] of Object.entries(needs)){console.log(`${k}: ${v.result}`);if(v.result!=="success"&&v.result!=="skipped")bad++;}
-              if(bad){console.error(`실패·취소된 잡 ${bad}개`);process.exit(1);}
-            });'
+        run: echo "$RESULTS" | node tools/ci/screen-results.mjs
