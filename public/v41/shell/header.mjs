@@ -120,6 +120,21 @@ function updateAccountControls(){const owned=!!getMember()?.snapshot().owned;if(
  
   // 창 폭이 바뀌면 390의 토글 자리를 다시 정한다(머리줄 ↔ 화면 안 도구 줄).
   if(typeof addEventListener==='function')addEventListener('resize',()=>flowNavigation());
+// #1134: 401 뒤 상단 단추만 로그인으로 바뀌고 계정 메뉴는 그대로 남아 반쯤 로그아웃되던 것을 막는다.
+// authRequired()가 부르는 한 벌 — 계정 메뉴의 이메일·운영·로그아웃을 함께 로그아웃 상태로 맞춘다.
+function paintAuthExpired(){
+  accountEmail='';emailTried=false;aiCustomer=false;isAdmin=false;
+  renderAccount();
+  const pop=$('account-popover');if(pop){pop.hidden=true;pop.dataset.ltOpenedBy='';}
+  const avatar=$('account-avatar');if(avatar){avatar.hidden=true;avatar.setAttribute('aria-expanded','false');}
+  const logout=$('logout');if(logout)logout.hidden=true;
+  const menuLogout=$('account-logout');if(menuLogout)menuLogout.hidden=true;
+  const ops=$('account-ops-group');if(ops)ops.hidden=true;
+  const journal=$('account-journal');if(journal)journal.hidden=true;
+  const entry=$('account-entry');if(entry){entry.hidden=false;entry.textContent='로그인';}
+}
+
+
   return {
     flowNavigation,
     updateNavFade,
@@ -129,6 +144,7 @@ function updateAccountControls(){const owned=!!getMember()?.snapshot().owned;if(
     openAccountMenu,
     loadAccountEmail,
     updateAccountControls,
+    paintAuthExpired,
     currentAccountEmail: () => accountEmail
   };
 }

@@ -652,8 +652,9 @@ body[data-fab-lift=shelf] .home-links{display:none}
  body.lt-fab-ok[data-fab-lift="network"] .updates-card{bottom:calc(224px + env(safe-area-inset-bottom))}}
  @media(max-width:520px){.updates-card{padding:0 10px;gap:8px;bottom:calc(max(10px, env(safe-area-inset-bottom)) + 66px)}body.lt-fab-ok .updates-card{bottom:calc(76px + env(safe-area-inset-bottom))}.updates-card-text{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
 /* 창(모달·패널)이 열려 있으면 아래 고정 요소는 모두 숨는다 — 닫으면 저절로 돌아온다(의견 #26 점검). */
+body.lt-viewer-open .updates-card,body.lt-viewer-open .home-links,body.lt-viewer-open #toast,
 body:has(dialog[open]) .updates-card,body.lt-sheet-open .updates-card,
-body:has(dialog[open]) .home-links,body.lt-sheet-open .home-links{display:none}
+body:has(dialog[open]) .home-links,body.lt-sheet-open .home-links,body.lt-viewer-open #toast{display:none}
 /* 짧은 알림은 창 밖에 둔다. 셸 창은 화면 맨 위, 프레임 창은 셸 머리글 바로 아래의 빈 띠에 둔다. */
 body:has(dialog[open]) #toast{top:calc(8px + env(safe-area-inset-top));bottom:auto;left:14px;transform:none;max-width:calc(100% - 88px)}
 /* 프레임 창은 셸 머리글 바로 아래 띠에 둔다. 실제 본문 글꼴(Pretendard) 줄 높이까지 재서 창 윗변을 침범하지 않게 한다. */
