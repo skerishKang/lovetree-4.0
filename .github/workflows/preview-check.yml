@@ -241,7 +241,8 @@ jobs:
           fi
   screen-home:
     name: 화면 시험 — 첫 화면
-    runs-on: ubuntu-latest
+    # 2026-11-22: 호스트 실행기 대기(동시 3개 안팎)를 피해 같은 저장소 PR은 CGI 자체 실행기에서 돈다(보드 잡과 같은 식).
+    runs-on: ${{ fromJSON((github.event.pull_request.head.repo.full_name == github.repository && vars.USE_CGI_RUNNER == '1') && '["self-hosted","Linux","X64","cgi"]' || '["ubuntu-latest"]') }}
     timeout-minutes: 12
     needs: screen-changes
     if: needs.screen-changes.outputs.changed == 'true'
@@ -250,11 +251,13 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
+          clean: true
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
       - uses: actions/cache@v4
+        if: runner.environment != 'self-hosted'
         with:
           path: ~/.cache/ms-playwright
           key: ms-playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
@@ -263,7 +266,10 @@ jobs:
         if: needs.screen-changes.outputs.changed == 'true'
         run: |
           npm i --no-save --no-package-lock playwright@$(node -p "require('./package-lock.json').packages['node_modules/playwright'].version")
-          if ls "$HOME/.cache/ms-playwright" 2>/dev/null | grep -q chromium; then
+          if [ "$RUNNER_ENVIRONMENT" = "self-hosted" ]; then
+            # 자체 실행기: 이 버전 Chromium이 있으면 받지 않고 끝난다(시스템 라이브러리는 미리 깔림, sudo 없음).
+            npx playwright install chromium
+          elif ls "$HOME/.cache/ms-playwright" 2>/dev/null | grep -q chromium; then
             echo "캐시된 Chromium 사용"
           else
             npx playwright install --with-deps chromium
@@ -368,6 +374,7 @@ jobs:
 
   screen-book:
     name: 화면 시험 — 책·감상
+    # 책 화면 잡은 글자 줄바꿈·페이지 넘침을 재므로 글꼴이 다른 CGI가 아니라 호스트에서 돈다(2026-11-22 CGI에서 넘침 실측이 달라 실패).
     runs-on: ubuntu-latest
     timeout-minutes: 12
     needs: screen-changes
@@ -377,11 +384,13 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
+          clean: true
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
       - uses: actions/cache@v4
+        if: runner.environment != 'self-hosted'
         with:
           path: ~/.cache/ms-playwright
           key: ms-playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
@@ -390,7 +399,10 @@ jobs:
         if: needs.screen-changes.outputs.changed == 'true'
         run: |
           npm i --no-save --no-package-lock playwright@$(node -p "require('./package-lock.json').packages['node_modules/playwright'].version")
-          if ls "$HOME/.cache/ms-playwright" 2>/dev/null | grep -q chromium; then
+          if [ "$RUNNER_ENVIRONMENT" = "self-hosted" ]; then
+            # 자체 실행기: 이 버전 Chromium이 있으면 받지 않고 끝난다(시스템 라이브러리는 미리 깔림, sudo 없음).
+            npx playwright install chromium
+          elif ls "$HOME/.cache/ms-playwright" 2>/dev/null | grep -q chromium; then
             echo "캐시된 Chromium 사용"
           else
             npx playwright install --with-deps chromium
@@ -452,7 +464,8 @@ jobs:
 
   screen-shell:
     name: 화면 시험 — 셸·창·둘러보기
-    runs-on: ubuntu-latest
+    # 2026-11-22: 호스트 실행기 대기(동시 3개 안팎)를 피해 같은 저장소 PR은 CGI 자체 실행기에서 돈다(보드 잡과 같은 식).
+    runs-on: ${{ fromJSON((github.event.pull_request.head.repo.full_name == github.repository && vars.USE_CGI_RUNNER == '1') && '["self-hosted","Linux","X64","cgi"]' || '["ubuntu-latest"]') }}
     timeout-minutes: 12
     needs: screen-changes
     if: needs.screen-changes.outputs.changed == 'true'
@@ -461,11 +474,13 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
+          clean: true
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
       - uses: actions/cache@v4
+        if: runner.environment != 'self-hosted'
         with:
           path: ~/.cache/ms-playwright
           key: ms-playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
@@ -474,7 +489,10 @@ jobs:
         if: needs.screen-changes.outputs.changed == 'true'
         run: |
           npm i --no-save --no-package-lock playwright@$(node -p "require('./package-lock.json').packages['node_modules/playwright'].version")
-          if ls "$HOME/.cache/ms-playwright" 2>/dev/null | grep -q chromium; then
+          if [ "$RUNNER_ENVIRONMENT" = "self-hosted" ]; then
+            # 자체 실행기: 이 버전 Chromium이 있으면 받지 않고 끝난다(시스템 라이브러리는 미리 깔림, sudo 없음).
+            npx playwright install chromium
+          elif ls "$HOME/.cache/ms-playwright" 2>/dev/null | grep -q chromium; then
             echo "캐시된 Chromium 사용"
           else
             npx playwright install --with-deps chromium
@@ -870,7 +888,8 @@ jobs:
           fi
   screen-reload:
     name: 화면 시험 — 저장 재적재
-    runs-on: ubuntu-latest
+    # 2026-11-22: 호스트 실행기 대기(동시 3개 안팎)를 피해 같은 저장소 PR은 CGI 자체 실행기에서 돈다(보드 잡과 같은 식).
+    runs-on: ${{ fromJSON((github.event.pull_request.head.repo.full_name == github.repository && vars.USE_CGI_RUNNER == '1') && '["self-hosted","Linux","X64","cgi"]' || '["ubuntu-latest"]') }}
     timeout-minutes: 12
     needs: screen-changes
     if: needs.screen-changes.outputs.changed == 'true'
@@ -879,11 +898,13 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
+          clean: true
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
       - uses: actions/cache@v4
+        if: runner.environment != 'self-hosted'
         with:
           path: ~/.cache/ms-playwright
           key: ms-playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
@@ -892,7 +913,10 @@ jobs:
         if: needs.screen-changes.outputs.changed == 'true'
         run: |
           npm i --no-save --no-package-lock playwright@$(node -p "require('./package-lock.json').packages['node_modules/playwright'].version")
-          if ls "$HOME/.cache/ms-playwright" 2>/dev/null | grep -q chromium; then
+          if [ "$RUNNER_ENVIRONMENT" = "self-hosted" ]; then
+            # 자체 실행기: 이 버전 Chromium이 있으면 받지 않고 끝난다(시스템 라이브러리는 미리 깔림, sudo 없음).
+            npx playwright install chromium
+          elif ls "$HOME/.cache/ms-playwright" 2>/dev/null | grep -q chromium; then
             echo "캐시된 Chromium 사용"
           else
             npx playwright install --with-deps chromium
@@ -1182,6 +1206,7 @@ jobs:
           fi
   screen-book-screen:
     name: 화면 시험 — 책 대비·초점
+    # 책 화면 잡은 글자 줄바꿈·페이지 넘침을 재므로 글꼴이 다른 CGI가 아니라 호스트에서 돈다(2026-11-22 CGI에서 넘침 실측이 달라 실패).
     runs-on: ubuntu-latest
     timeout-minutes: 25
     needs: screen-changes
@@ -1191,11 +1216,13 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
+          clean: true
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
       - uses: actions/cache@v4
+        if: runner.environment != 'self-hosted'
         with:
           path: ~/.cache/ms-playwright
           key: ms-playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
@@ -1205,7 +1232,10 @@ jobs:
         run: |
           # 모듈은 항상 설치한다(캐시는 브라우저 바이너리에만 걸린다). 캐시가 있어도 모듈이 없으면 실행이 안 된다.
           npm i --no-save --no-package-lock playwright@$(node -p "require('./package-lock.json').packages['node_modules/playwright'].version")
-          if ls "$HOME/.cache/ms-playwright" 2>/dev/null | grep -q chromium; then
+          if [ "$RUNNER_ENVIRONMENT" = "self-hosted" ]; then
+            # 자체 실행기: 이 버전 Chromium이 있으면 받지 않고 끝난다(시스템 라이브러리는 미리 깔림, sudo 없음).
+            npx playwright install chromium
+          elif ls "$HOME/.cache/ms-playwright" 2>/dev/null | grep -q chromium; then
             echo "캐시된 Chromium 사용"
           else
             npx playwright install --with-deps chromium

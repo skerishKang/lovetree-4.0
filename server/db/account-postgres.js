@@ -20,6 +20,8 @@ export const ACCOUNT_USER_TABLES = Object.freeze([
   // #1098 3단계: 내 소식 읽음 시각 — 계정 키가 있으므로 탈퇴 때 함께 지운다.
   { table: 'lovetree_community_my_news_reads', where: 'subject_id = $2' },
   { table: 'lovetree_feedback_replies', where: 'author_subject_id = $2 OR post_id IN (SELECT id FROM lovetree_feedback WHERE product_id = $1 AND subject_id = $2)' },
+  // #1190: 보내기 줄에도 의견 id가 남으므로 탈퇴할 때 함께 정리한다.
+  { table: 'lovetree_feedback_outbox', where: 'feedback_id IN (SELECT id FROM lovetree_feedback WHERE product_id = $1 AND subject_id = $2)' },
   { table: 'lovetree_stage_moments', where: 'subject_id = $2' },
   { table: 'lovetree_shares', where: 'subject_id = $2' },
   { table: 'lovetree_tree_visibility', where: 'subject_id = $2' },

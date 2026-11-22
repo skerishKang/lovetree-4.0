@@ -8,6 +8,7 @@ import { createMemoryWorkspaceRepo } from '../server/testing/memory-workspace-re
 import { unconfiguredAuth } from '../server/auth.js';
 import { createAuthorityWriter } from '../server/authority-writer.js';
 import { createLoginService } from '../server/login-service.js';
+import { createHandoffMintClient } from '../server/handoff-mint-client.js';
 import { createMemoryLoginStateStore } from '../server/login-state-store.js';
 import { createModelControlPlane } from '../server/testing/model-control-plane.js';
 import { createCredentialVerifier } from '../server/credentials/lovetree-credential-module.js';
@@ -169,5 +170,36 @@ test('the node handler carries redirect and cookie headers out to the socket', a
     assert.equal(refused.headers['cache-control'], 'no-store');
   } finally {
     await new Promise(resolve => server.close(resolve));
+  }
+});
+
+test('#1175 거절 사유 로그에는 코드만 남고 표·상태 값은 적지 않는다', async () => {
+  const warnings = [];
+  const original = console.warn;
+  console.warn = (...args) => { warnings.push(args.map(String).join(' ')); };
+  try {
+    const mint = createHandoffMintClient({
+      url: 'http://127.0.0.1:9/mint', callerSecret: 'caller-secret-for-tests', productId: PRODUCT,
+      fetchImpl: async () => Response.json({ error: { code: 'invalid_handoff' } }, { status: 401 })
+    });
+    const ticket = 'lovt_0123456789abcdefABCDEFGH', state = 'state-secret-do-not-log-1234567890';
+    await assert.rejects(() => mint.redeem({ handoffTicket: ticket, loginState: state }), error => error.code === 'login_handoff_rejected');
+    assert.equal(warnings.length, 1, '거절마다 한 줄');
+    assert.match(warnings[0], /invalid_handoff/, '받은 mint 오류 코드를 남긴다');
+    assert.doesNotMatch(warnings[0], /lovt_|state-secret/, '표·상태 값은 남기지 않는다');
+
+    warnings.length = 0;
+    const plane = createModelControlPlane();
+    const writer = createAuthorityWriter({ call: (m, p) => plane[m](p), productId: PRODUCT });
+    const service = createLoginService({
+      productId: PRODUCT, writer, credentialSecret: SECRET, stateStore: createMemoryLoginStateStore(),
+      provider: { authorizationUrl: ({ state }) => `https://login.padiem.test/x?state=${state}`, exchangeCode: async () => ({ handoffTicket: 'htk_placeholder' }) }
+    });
+    await assert.rejects(() => service.route({ method: 'GET', path: '/auth/callback', query: new URLSearchParams({ state: 'wrong-secret-state', code: 'x' }), headers: {} }), error => error.code === 'invalid_login_state');
+    assert.equal(warnings.length, 1, '콜백 거절도 한 줄');
+    assert.match(warnings[0], /invalid_login_state/);
+    assert.doesNotMatch(warnings[0], /wrong-secret-state/, '상태 값은 남기지 않는다');
+  } finally {
+    console.warn = original;
   }
 });

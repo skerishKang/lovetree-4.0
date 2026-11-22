@@ -1,4 +1,4 @@
-import test from 'node:test';import assert from 'node:assert/strict';import {readFileSync} from 'node:fs';import vm from 'node:vm';import {exampleTree,designData} from '../public/v41/example.mjs';
+import test from 'node:test';import assert from 'node:assert/strict';import {readFileSync,existsSync,statSync} from 'node:fs';import vm from 'node:vm';import {exampleTree,designData} from '../public/v41/example.mjs';
 test('complete Limone demo preserves forty moments and all forty actual edges',()=>{const ids=new Set(exampleTree.moments.map(m=>m.id));assert.equal(ids.size,40);assert.equal(exampleTree.edges.length,40);assert.ok(exampleTree.edges.every(e=>ids.has(e.from)&&ids.has(e.to)));for(const m of designData.moments)assert.deepEqual(exampleTree.edges.filter(e=>e.from===m.id).map(e=>e.to),[m.next,m.branch].filter(Boolean));});
 test('member context never receives demo image decoration even when IDs match',()=>{const window={};vm.runInNewContext(readFileSync(new URL('../public/v41/runtime.js',import.meta.url),'utf8'),{window,parent:{LT41:{tree:{...exampleTree,demoData:undefined},momentId:'m01'},postMessage(){}},location:{origin:'https://example.test'}});assert.ok(window.LTDEMO.moments.every(m=>m.type==='memo'&&m.image===''));assert.equal(window.LTDEMO.edges.length,40);});
 
@@ -7,3 +7,24 @@ test('runtime uses canonical connections when original demo data omits edges',()
 test('example root has no incoming parent edge',()=>{const root=exampleTree.moments.find(m=>m.first);assert.ok(root);assert.equal(exampleTree.edges.filter(e=>e.kind==='parent'&&e.to===root.id).length,0);});
 
 test('all example parent links are acyclic',()=>{const edges=exampleTree.edges,colour=new Map();function visit(id){assert.notEqual(colour.get(id),1,'cycle at '+id);if(colour.get(id)===2)return;colour.set(id,1);for(const edge of edges.filter(e=>e.from===id))visit(edge.to);colour.set(id,2);}for(const m of exampleTree.moments)if(!colour.has(m.id))visit(m.id);});
+
+test('#1026 예시 그림 주소는 모두 실제 파일이다',()=>{
+ const urls=new Set();
+ for(const m of [...designData.moments,...exampleTree.moments]){
+  if(m.image)urls.add(m.image);
+  for(const c of m.thumbCandidates||[])urls.add(c);
+ }
+ assert.ok(urls.size>=30,`예시 그림 ${urls.size}개`);
+ for(const url of urls){
+  assert.match(url,/^\/v41\/example-media\/[\w-]+\.webp$/,url);
+  const file=new URL('../public/v41'+url.replace('/v41',''),import.meta.url);
+  assert.ok(existsSync(file),`그림 파일이 있다: ${url}`);
+ }
+});
+
+test('#1026 첫 화면 예시 데이터 전송량 상한',()=>{
+ const dataBytes=statSync(new URL('../public/v41/example.mjs',import.meta.url)).size;
+ assert.ok(dataBytes<100*1024,`예시 데이터 ${dataBytes}바이트 < 100KB`);
+ const first=Array.from({length:8},(_,i)=>statSync(new URL(`../public/v41/example-media/ex${String(i+1).padStart(2,'0')}.webp`,import.meta.url)).size);
+ assert.ok(first.reduce((a,b)=>a+b,0)<200*1024,`첫 화면 그림 ${first.reduce((a,b)=>a+b,0)}바이트 < 200KB`);
+});
