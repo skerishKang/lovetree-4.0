@@ -34,6 +34,7 @@ test('나머지 규칙은 그대로다 — 화면·화면 밖·애미', () => {
   assert.equal(classify(['public/v41/shell.css'], screen, helpers).changed, true, 'public은 화면');
   assert.equal(classify(['src/views/orbit/orbit.js'], screen, helpers).changed, true, 'src/views는 화면');
   assert.equal(classify(['.github/workflows/preview-check.yml'], screen, helpers).changed, true, '워크플로 자체는 화면');
+  assert.equal(classify(['.github/workflows/ci.yml'], screen, helpers).changed, false, '다른 워크플로만 바뀌면 화면 밖');
   assert.equal(classify(['docs/HANDOFF.md'], screen, helpers).changed, false, '문서는 화면 밖');
   assert.equal(classify(['src/server/community-service.js'], screen, helpers).changed, false, '서버는 화면 밖');
   assert.equal(classify(['src/new-thing.js'], screen, helpers).changed, true, '애매하면 바뀜');

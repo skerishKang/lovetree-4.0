@@ -51,6 +51,7 @@ jobs:
     runs-on: ${{ fromJSON((github.event.pull_request.head.repo.full_name == github.repository && vars.USE_CGI_RUNNER == '1') && '["self-hosted","Linux","X64","cgi"]' || '["ubuntu-latest"]') }}
     timeout-minutes: 25
     needs: screen-changes
+    if: needs.screen-changes.outputs.changed == 'true'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -227,6 +228,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     needs: screen-changes
+    if: needs.screen-changes.outputs.changed == 'true'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -353,6 +355,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     needs: screen-changes
+    if: needs.screen-changes.outputs.changed == 'true'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -436,6 +439,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     needs: screen-changes
+    if: needs.screen-changes.outputs.changed == 'true'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -568,6 +572,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     needs: screen-changes
+    if: needs.screen-changes.outputs.changed == 'true'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -655,6 +660,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     needs: screen-changes
+    if: needs.screen-changes.outputs.changed == 'true'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -742,6 +748,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     needs: screen-changes
+    if: needs.screen-changes.outputs.changed == 'true'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -828,6 +835,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     needs: screen-changes
+    if: needs.screen-changes.outputs.changed == 'true'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -872,6 +880,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     needs: screen-changes
+    if: needs.screen-changes.outputs.changed == 'true'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -987,6 +996,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     needs: screen-changes
+    if: needs.screen-changes.outputs.changed == 'true'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -1136,6 +1146,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     needs: screen-changes
+    if: needs.screen-changes.outputs.changed == 'true'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -1425,15 +1436,12 @@ jobs:
     name: 미리보기 postdeploy(로그아웃)
     runs-on: ubuntu-latest
     if: always()
-    needs: [screen-board, screen-home, screen-book, screen-reload, screen-shell, screen-map-a, screen-map-b, screen-book-screen, screen-audit-a, screen-audit-b, screen-audit-c, deploy]
+    needs: [screen-changes, screen-board, screen-home, screen-book, screen-reload, screen-shell, screen-map-a, screen-map-b, screen-book-screen, screen-audit-a, screen-audit-b, screen-audit-c, deploy]
     steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: tools/ci
       - name: 모든 화면 시험·배포 검사 결과 모으기
         env:
           RESULTS: ${{ toJSON(needs) }}
-        run: |
-          echo "$RESULTS" | node -e '
-            let t="";process.stdin.on("data",d=>t+=d).on("end",()=>{
-              const needs=JSON.parse(t);let bad=0;
-              for(const [k,v] of Object.entries(needs)){console.log(`${k}: ${v.result}`);if(v.result!=="success")bad++;}
-              if(bad){console.error(`실패·취소된 잡 ${bad}개`);process.exit(1);}
-            });'
+        run: echo "$RESULTS" | node tools/ci/screen-results.mjs
