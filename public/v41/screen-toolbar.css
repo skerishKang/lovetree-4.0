@@ -42,6 +42,7 @@ html[data-book-shape=phone] .lt-toolbar-tools .desktop-only{display:none}
 .lt-toolbar-more[hidden]{display:none}
 /* 줄이 생긴 만큼 화면 본문을 아래로 내려 첫 줄·이동 단추가 가리지 않게 한다. */
 html[data-v41-screen=book] .stage{top:var(--lt-content-top,122px)}
+@media(min-width:601px){html[data-v41-screen=book] .stage{padding-top:18px}}
 html[data-v41-screen=board] .boardTitle{top:130px}
 @media(max-width:600px){
   .lt-screen-toolbar{height:48px;padding:0 12px}
