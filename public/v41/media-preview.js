@@ -185,7 +185,7 @@ function mediaContext() {
     return { source, owned };
   } catch { return { source: '', owned: false }; }
 }
-const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const esc=globalThis.LTEscapeHtml; // A-15: 글자 막기 정본(html-escape.js) 한 벌
 // #393: 세로 영상 판정 한 벌 — /shorts/ 주소 또는 영상 정보의 가로세로(세로가 더 길면 세로).
 // #584: 주소·정보만으로 못 정하면 썸네일 실측으로 보강한다(oardefault 가로세로).
 //   oEmbed의 가로세로는 watch 주소 기준 항상 200×113(가로)이라 신호로 못 쓴다(2026-11-14 실측).

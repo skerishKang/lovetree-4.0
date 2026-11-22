@@ -8,7 +8,9 @@ import {
   readTheme, writeTheme, nextTheme, themeButtonLabel, themeButtonAriaLabel, themePressed,
   appliedTheme, applyThemeAttribute, THEME_KEY,
   normalizeBookDisplay, readBookDisplay, writeBookDisplay, bookDisplayVisible,
-  bookDisplayLabel, bookDisplayAriaLabel, bookDisplayPressed, BOOK_DISPLAY_KEY
+  bookDisplayLabel, bookDisplayAriaLabel, bookDisplayPressed, BOOK_DISPLAY_KEY,
+  normalizeShelfView, readShelfView, writeShelfView, shelfViewVisible,
+  shelfViewLabel, shelfViewAriaLabel, shelfViewPressed, SHELF_VIEW_KEY
 } from '../public/v41/header-state.mjs';
 
 
@@ -226,6 +228,22 @@ test('책/목록 보기는 기본 책, 미러 저장·반환, 서재·책에서�
   assert.equal(bookDisplayAriaLabel('list'), '목록으로 보기');
   assert.equal(bookDisplayPressed('book'), false);
   assert.equal(bookDisplayPressed('list'), true);
+  // #1093: 서재 진열 방식도 같은 계약 — 기본 선반, 서재에서만 보인다.
+  assert.equal(readShelfView(memoryStorage({})), 'shelf', '저장 없으면 선반이다');
+  assert.equal(writeShelfView(storage, 'carousel'), 'carousel');
+  assert.equal(storage.data[SHELF_VIEW_KEY], 'carousel');
+  assert.equal(readShelfView(storage), 'carousel', '다시 들어와도 기억된다');
+  assert.equal(readShelfView(brokenStorage()), 'shelf', '저장소가 막히면 선반이다');
+  assert.equal(writeShelfView(brokenStorage(), 'carousel'), 'shelf', '저장 실패는 기본을 돌려준다');
+  assert.equal(normalizeShelfView('엉뚱한값'), 'shelf');
+  assert.equal(shelfViewVisible({ current: 'track32-bookshelf.html' }), true);
+  for (const file of ['track59-sketchbook.html', 'track58-pinboard.html', 'track56-network.html', 'src064-orbit.html', '']) assert.equal(shelfViewVisible({ current: file }), false, file);
+  assert.equal(shelfViewLabel('shelf'), '선반');
+  assert.equal(shelfViewLabel('carousel'), '회전');
+  assert.equal(shelfViewAriaLabel('shelf'), '선반 보기');
+  assert.equal(shelfViewAriaLabel('carousel'), '회전 책장 보기');
+  assert.equal(shelfViewPressed('shelf'), false);
+  assert.equal(shelfViewPressed('carousel'), true);
 });
 
 // #886: 화면 CSS가 토큰을 직접 값으로 복사하지 않고 전역 토큰을 쓰면 계산된 색이 토큰과 같다.

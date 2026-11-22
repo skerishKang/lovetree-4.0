@@ -1,10 +1,8 @@
 // 기억 보드의 순수 계산 한 벌. 화면(board.js)이 실제로 이 함수들을 부른다.
 // 일반 스크립트로 불러오고(node 시험은 import), window.LT58Model 하나로 노출한다.
 window.LT58Model = (() => {
-  // 사용자 글자를 HTML에 넣기 전에 이스케이프한다.
-  function escapeHTML(v) {
-    return String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  }
+  // A-15: 사용자 글자 막기는 정본(html-escape.js) 한 벌을 쓴다.
+  const escapeHTML = globalThis.LTEscapeHtml;
 
   // === 바둑판 배치(#582): 보드는 핀보드다 — 관계 기준 배치를 버리고 날짜 최신순 바둑판에 꽂는다. ===
   // 관계도(줄)는 지도가 맡는다. 보드의 자리는 '칸(col)×줄(row)' 슬롯이다.

@@ -10,6 +10,7 @@ import {applyHomeCenter} from './home-center.js';
 import {readTheme,writeTheme,appliedTheme,applyThemeAttribute} from '../public/v41/header-state.mjs';
 import {readTitleDisplay, titleDisplayOf, shouldReloadForTitleDisplay} from '../public/v41/book-usability.mjs';
 import {momentListEntries, momentListTrees} from './moment-list.js';
+import {youtubeIdFrom} from '../public/v41/youtube-id.mjs';
 // 261116 PR 2: 카드 모드(마지막·고정·그날·무작위·트리)·숫자 줄이기 — 순수 계산 한 벌.
 import {HOME_MOMENT_KEY, readHomeMoment, normalizeHomeMoment, homeMomentPick, homeDayMoment, homeMomentMenu, formatCount} from './home-card-mode.js';
 const themeHost=document.getElementById('orbit');
@@ -73,6 +74,60 @@ const renderedTitleDisplay=titleDisplayOf(readTitleDisplay(parent.LT41));
 // #394: 순간 목록 열기 요청을 받았다고 셸에 알린다 — 셸은 요청 플래그를 치워 다음 화면 이동에 되풀이하지 않게 한다.
 if(momentsRequest){try{parent.postMessage({type:'lt41-moments-opened'},location.origin)}catch{}}
 const shadow=document.getElementById('orbit').shadowRoot;
+const viewerStyle=document.createElement('style');
+viewerStyle.textContent=`#mediaViewerHome .mediaVisual iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#000}#mediaViewerHome .mediaActions button,#mediaViewerHome .mediaActions a{font-size:13px;min-height:44px;padding:8px 14px}`;
+shadow.append(viewerStyle);
+const viewer=document.createElement('div');viewer.className='mediaViewer';viewer.id='mediaViewerHome';viewer.setAttribute('aria-hidden','true');
+viewer.innerHTML=`<div class="mediaShell" role="dialog" aria-modal="true" aria-labelledby="mediaTitleHome"><div class="mediaVisual" id="mediaVisualHome"><button class="mediaClose" id="mediaCloseHome" aria-label="미디어 닫기">×</button><div class="videoBadge" id="mediaTypeBadgeHome">PHOTO</div><img id="mediaImageHome" alt="" src="" hidden><button class="videoPlay" id="mediaPlayHome" aria-label="미디어 미리보기 재생">▶</button><div class="mediaMemo" id="mediaMemoHome" hidden><div class="memoLabel">MEMORY NOTE</div><div class="memoMain" id="mediaMemoBodyHome"></div><div class="memoDate" id="mediaMemoDateHome"></div></div></div><div class="mediaInfo"><div class="mediaKicker" id="mediaKickerHome">MOMENT</div><h3 id="mediaTitleHome"></h3><div class="mediaMeta" id="mediaMetaHome"></div><div class="mediaWhy"><b>WHY NEXT</b><p id="mediaWhyHome"></p></div><div class="mediaActions"><button class="primary" id="mediaBookHome">책에서 이어 보기</button><a id="mediaExternalHome" href="#" target="_blank" rel="noopener" hidden>원본 보기 ↗</a></div></div></div>`;
+shadow.append(viewer);
+const vEl=id=>shadow.querySelector('#'+id);
+shadow.querySelector('.recent-card')?.setAttribute('tabindex','0');
+let viewerOpener=null;
+function closeHomeViewer(){
+ if(!viewer.classList.contains('open'))return;
+ viewer.querySelector('iframe')?.remove();
+ viewer.classList.remove('open');viewer.setAttribute('aria-hidden','true');
+ try{parent.postMessage({type:'lt41-viewer',open:false},location.origin)}catch{}
+ vEl('mediaImageHome').hidden=true;vEl('mediaMemoHome').hidden=true;
+ viewerOpener?.focus?.();viewerOpener=null;
+}
+function openHomeViewer(moment){
+ if(!moment||viewer.classList.contains('open'))return;
+ const card=shadow.querySelector('.recent-card');viewerOpener=card||document.activeElement;
+ const videoId=youtubeIdFrom(moment.url||'');
+ vEl('mediaTitleHome').textContent=moment.title||'';
+ vEl('mediaMetaHome').textContent=[moment.date||'',moment.emotion||''].filter(Boolean).join(' · ');
+ vEl('mediaKickerHome').textContent=`MOMENT · ${videoId?'VIDEO':moment.image?'PHOTO':'MEMO'}`;
+ vEl('mediaTypeBadgeHome').textContent=videoId?'VIDEO':moment.image?'PHOTO':'MEMO';
+ const img=vEl('mediaImageHome'),memo=vEl('mediaMemoHome');
+ img.hidden=!!videoId||!moment.image;memo.hidden=!!videoId||!!moment.image;
+ if(moment.image)img.src=moment.image;
+ if(!videoId&&!moment.image){vEl('mediaMemoBodyHome').textContent=moment.note||moment.title||'';vEl('mediaMemoDateHome').textContent=[moment.date||'',moment.emotion||''].filter(Boolean).join(' · ');}
+ vEl('mediaPlayHome').hidden=!videoId;
+ const book=vEl('mediaBookHome'),external=vEl('mediaExternalHome');
+ book.onclick=()=>{closeHomeViewer();bridge.actions.openBook(moment.treeId,moment.id);};
+ external.hidden=!moment.url;if(moment.url)external.href=moment.url;
+ const visual=vEl('mediaVisualHome');
+ visual.querySelector('iframe')?.remove();
+ if(videoId){
+  const frame=document.createElement('iframe');
+  frame.src=`https://www.youtube-nocookie.com/embed/${encodeURIComponent(videoId)}?autoplay=1&mute=1&playsinline=1&controls=0&rel=0&modestbranding=1`;
+  frame.allow='autoplay; encrypted-media';frame.title=moment.title||'';
+  visual.append(frame);
+ }
+ viewer.classList.add('open');viewer.setAttribute('aria-hidden','false');
+ try{parent.postMessage({type:'lt41-viewer',open:true},location.origin)}catch{}
+ vEl('mediaCloseHome').focus();
+}
+vEl('mediaCloseHome').onclick=closeHomeViewer;
+viewer.addEventListener('click',event=>{if(event.target===viewer)closeHomeViewer();});
+addEventListener('keydown',event=>{if(event.key==='Escape')closeHomeViewer();});
+shadow.addEventListener('click',event=>{
+ if(!event.target.closest?.('.recent-card'))return;
+ if(event.target.closest?.('[data-recent-head],[data-recent-change]'))return;
+ event.stopPropagation();event.preventDefault();
+ openHomeViewer(homeMomentChoice?.moment);
+},true);
 // 261116 PR 2: 오른쪽 위 '순간 목록' 단추는 없앤다 — 목록 입구는 가운데 세트 첫 단추로 옮겼다.
 shadow.querySelector('.top-actions > .menuBtn[data-do="index"]')?.remove();
 // #380(2026-11-11): 가운데 세 버튼 — 자리·개수 그대로, 남은 폭을 똑같이 나눠 세 폭 동일(가장 긴 글자 기준 고정), 로그인 후 상태 한 줄.

@@ -12,7 +12,7 @@ let exampleTree=null,examplePromise=null,exampleInitializing=false;
 function loadExampleTree(){if(!examplePromise)examplePromise=import('./example.mjs').then(mod=>{exampleTree=mod.exampleTree;return exampleTree});return examplePromise;}
 import {parseSelectionRoute,memberStartupView,ownerSelectionRoute,accountPosition,rememberAccountPosition,resolveAccountPosition,stashPendingOwnerRoute,pendingOwnerRoute,takePendingOwnerRoute} from './selection-location.mjs';
 import {applyViewAccessibility,connectionLabel} from './view-a11y.mjs';
-import {accountPresentation,treePickerLabel,treePickerText,treeViewsVisible,writeMenuLabel,headerState,headerPartsFor,readTipsSeen,writeTipsSeen,tipsWanted,unsavedNoticeText,FIRST_TREE_TIPS,homeCenterState,homeStartLoginUrl,readTheme,readLoginIntent,writeTheme,nextTheme,themeButtonLabel,themeButtonAriaLabel,themePressed,appliedTheme,applyThemeAttribute,LOGIN_INTENTS,readPageTurn,writePageTurn,readBookDisplay,writeBookDisplay,bookDisplayVisible} from './header-state.mjs';
+import {accountPresentation,treePickerLabel,treePickerText,treeViewsVisible,writeMenuLabel,headerState,headerPartsFor,readTipsSeen,writeTipsSeen,tipsWanted,unsavedNoticeText,FIRST_TREE_TIPS,homeCenterState,homeStartLoginUrl,readTheme,readLoginIntent,writeTheme,nextTheme,themeButtonLabel,themeButtonAriaLabel,themePressed,appliedTheme,applyThemeAttribute,LOGIN_INTENTS,readPageTurn,writePageTurn,readBookDisplay,writeBookDisplay,bookDisplayVisible,readShelfView,writeShelfView,shelfViewVisible} from './header-state.mjs';
 import {parseJourneyRoute,journeyRouteDecision} from './first-journey.mjs';
 import {displayTreeTitle} from './tree-name.mjs';
 import {titleView, withoutAutoTitle} from './book-usability.mjs';
@@ -51,7 +51,7 @@ import {createNotifier, syncedNoticeText, newlyPublishedTrees} from './shell/not
 import {createSettings} from './shell/settings.mjs';
 import {createNoticeQueue} from './shell/notice-queue.mjs';
 import {paintLoginLinks,paintThemeControls,applyTheme as applyThemeFor,toggleTheme as toggleThemeFor} from './shell/theme.mjs';
-import {normalizeTitleDisplay, normalizeAccentColor, normalizeDateStyle, normalizeStartPlace, normalizeShareView, normalizeHomeMoment, normalizeBookDisplay, coverModeOf, normalizeCoverDesign} from './domain.mjs';
+import {normalizeTitleDisplay, normalizeAccentColor, normalizeDateStyle, normalizeStartPlace, normalizeShareView, normalizeHomeMoment, normalizeBookDisplay, normalizeShelfView, coverModeOf, normalizeCoverDesign} from './domain.mjs';
 import {backfillVideoTitles} from './title-backfill.mjs';
 import {thumbnailCandidates, coverFallbackAttrs, fallbackCardData, emotionToneOf, mountThumbFallback, ADD_TITLE_LABEL, VIDEO_UNAVAILABLE_TEXT} from './thumb-fallback.mjs';
 const $=id=>document.getElementById(id);
@@ -147,6 +147,19 @@ function setBookDisplay(value){
  if(window.LT41)window.LT41.prefs=member.state().prefs;
  rememberBookDisplay(currentBookDisplay());
  paintBookDisplayControls();
+}
+// #1093: 서재 진열 방식(선반/회전)도 같은 길로 저장하고, 서재 화면에 바로 알린다.
+function currentShelfView(){try{return normalizeShelfView(member?.state?.().prefs?.shelfView)}catch{return readShelfView(localStorage)}}
+function rememberShelfView(value){writeShelfView(localStorage,value)}
+function paintShelfViewControls(){const value=currentShelfView();for(const b of document.querySelectorAll('[data-shelf-view]'))b.setAttribute('aria-checked',String(b.dataset.shelfView===value));}
+function setShelfView(value){
+ const next=normalizeShelfView(value);
+ if(!member?.snapshot().owned){notify('로그인한 뒤 진열 방식을 바꿀 수 있어요.');return;}
+ try{member.apply('setPrefs',{shelfView:next});}catch(e){notify('진열 방식을 저장하지 못했어요. 잠시 뒤 다시 시도해 주세요.');return;}
+ if(window.LT41)window.LT41.prefs=member.state().prefs;
+ rememberShelfView(currentShelfView());
+ paintShelfViewControls();
+ try{$('view').contentWindow.postMessage({type:'lt41-shelf-view',value:currentShelfView()},location.origin)}catch{}
 }
 let backfillStarted=false,backfillAttempted=new Set();
 async function runTitleBackfill(state,session){
@@ -320,6 +333,8 @@ const shellAuth=createAuth({
   getMember:()=>member,
   notify:text=>notify(text),
   onAuthRequired:()=>shellHeader.paintAuthExpired(),
+  // #1134 후속: 401 뒤 세션을 다시 확인하는 가벼운 요청 — api.mjs를 거치지 않아 401 이벤트를 다시 보내지 않는다.
+  checkSession:async()=>{try{const r=await fetch('/api/account',{headers:{accept:'application/json'},credentials:'same-origin'});return r.ok;}catch{return false;}},
   closeAccountMenu:()=>closeAccountMenu(),
   openEditor:(mode,parentId)=>openEditor(mode,parentId),
   showScreen:file=>show(file)
@@ -494,6 +509,8 @@ const shellMessages=createMessages({
   $,
   getCurrent:()=>current,
   setCurrent:file=>{current=file;},
+  // #1093: 서재 도구 줄의 토글이 부모 저장 경로를 쓰게 한다.
+  setShelfView,
   getModel:()=>model,
   getSource:()=>source,
   getMember:()=>member,
@@ -1163,6 +1180,9 @@ async function startMember(){setMemberRefreshStarted(true);if(!leaveMember())ret
    // #1094: 책/목록 보기도 같은 이유로 기기 미러를 계정값으로 채운다.
    rememberBookDisplay(state.prefs?.bookDisplay);
    paintBookDisplayControls();
+   // #1093: 서재 진열 방식도 같은 이유로 기기 미러를 계정값으로 채운다.
+   rememberShelfView(state.prefs?.shelfView);
+   paintShelfViewControls();
    if(!backfillStarted&&snapshot.owned){backfillStarted=true;void runTitleBackfill(state,session);}
    if(snapshot.owned&&resolved.position.treeId){if(viewForFile(current)!=='home')writeLocation('replace');takePendingOwnerRoute(sessionStorage);if(route?.scope==='owner'&&resolved.treeMissing)startupNotice='이 주소의 기록을 현재 계정에서 찾을 수 없어 최근 위치를 열었어요.';else if(route?.scope==='owner'&&resolved.momentMissing)startupNotice='이 주소의 순간을 찾을 수 없어 트리의 시작 순간을 열었어요.';}
  }catch(error){openFallbackShell(error);}},onStatus:status=>{if(generation===loadGeneration)memberStatus(status);},
@@ -1191,14 +1211,18 @@ $('account-avatar').onclick=e=>{
  e.stopPropagation();
  if($('account-popover').hidden){openAccountMenu(e.detail===0?'keyboard':'mouse');void shellSettings.getFeedbackBoard().refreshReplyDot();}else closeAccountMenu();
 };
-const shellSettings=createSettings({ $, notify, panel, show, frames, frameLoaded, hideFrames, closeAccountMenu, openAccountMenu, renderAccount, updateAccountControls, openAssets, openEditor, sample, backup, clear, startMember, leaveMember, openFallbackShell, writeLocation, load, flowNavigation, renderTreeMenu, requestBoardOpen, lastShelfTreeId, shellHeader, shellDialogs,  shareApi, accountApi, readTheme, writeTheme, normalizeAccentColor, normalizeDateStyle, normalizeStartPlace, normalizeShareView, normalizeHomeMoment,  readPageTurn, writePageTurn, frameMessage, displayTreeTitle, accountPresentation, createFeedbackDialog, createFeedbackBoard, mountUpdates, readWriteTab, writeWriteTab, clearCachedWorkspace, createWorkspaceApi, paintThemeControls, applyTheme, toggleTheme, paintBookDisplayControls, get member(){return member}, get model(){return model}, get current(){return current}, get source(){return source}, get motionPaused(){return motionPaused}, get loadGeneration(){return loadGeneration}, get handledHash(){return handledHash}, get activeShareId(){return activeShareId}, set member(v){member=v}, set model(v){model=v}, set current(v){current=v}, set source(v){source=v}, set motionPaused(v){motionPaused=v}, set loadGeneration(v){loadGeneration=v}, set handledHash(v){handledHash=v}, set activeShareId(v){activeShareId=v}
+const shellSettings=createSettings({ $, notify, setTitleDisplay, openLoginStart, links, screenForView, choose, panel, show, frames, frameLoaded, hideFrames, closeAccountMenu, openAccountMenu, renderAccount, updateAccountControls, openAssets, openEditor, sample, backup, clear, startMember, leaveMember, openFallbackShell, writeLocation, load, flowNavigation, renderTreeMenu, requestBoardOpen, lastShelfTreeId, shellHeader, shellDialogs,  shareApi, accountApi, readTheme, writeTheme, normalizeAccentColor, normalizeDateStyle, normalizeStartPlace, normalizeShareView, normalizeHomeMoment,  readPageTurn, writePageTurn, frameMessage, displayTreeTitle, accountPresentation, createFeedbackDialog, createFeedbackBoard, mountUpdates, readWriteTab, writeWriteTab, clearCachedWorkspace, createWorkspaceApi, paintThemeControls, applyTheme, toggleTheme, paintBookDisplayControls, get member(){return member}, get model(){return model}, get current(){return current}, get source(){return source}, get motionPaused(){return motionPaused}, get loadGeneration(){return loadGeneration}, get handledHash(){return handledHash}, get activeShareId(){return activeShareId}, set member(v){member=v}, set model(v){model=v}, set current(v){current=v}, set source(v){source=v}, set motionPaused(v){motionPaused=v}, set loadGeneration(v){loadGeneration=v}, set handledHash(v){handledHash=v}, set activeShareId(v){activeShareId=v}
  });
-const { applyAdvanced, applyDateStyleToFrame, applyPageTurnToFrame, applyNetworkViewToFrame, applyBoardThemeToFrame, syncBoardThemeToApp, quickTargetPreference, profileDirty, paintSettingsProfile, accountConfirmMatches, openAccountData, openAccountSettings, paintDateStyleControls, paintStartPlaceControls, paintShareControls, paintQuickTargetControls, paintNetworkViewControls, paintPageTurnControls, paintBoardThemeControls, paintTreeVisibilityList, paintSettingsUsage, loadTreeVisibility, paintTreeManagerVisibility, paintSettingsTab, focusSettingsSection, fillProfileForm, paintScreenControls, readAdvanced, advancedKey, currentDateStyle, currentPageTurn, sendToFrame, currentStartPlace, currentShareView, currentBoardTheme }=shellSettings;
+const { showPublicRoute, applyAdvanced, applyDateStyleToFrame, applyPageTurnToFrame, applyNetworkViewToFrame, applyBoardThemeToFrame, syncBoardThemeToApp, quickTargetPreference, profileDirty, paintSettingsProfile, accountConfirmMatches, openAccountData, openAccountSettings, paintDateStyleControls, paintStartPlaceControls, paintShareControls, paintQuickTargetControls, paintNetworkViewControls, paintPageTurnControls, paintBoardThemeControls, paintTreeVisibilityList, paintSettingsUsage, loadTreeVisibility, paintTreeManagerVisibility, paintSettingsTab, focusSettingsSection, fillProfileForm, paintScreenControls, readAdvanced, advancedKey, currentDateStyle, currentPageTurn, sendToFrame, currentStartPlace, currentShareView, currentBoardTheme }=shellSettings;
 // #1094: 머리줄 묶음과 설정 창의 같은 data-book-display 두 칸이 하나의 길로 바뀌고 저장된다.
 for(const b of document.querySelectorAll('[data-book-display]'))b.onclick=()=>{
  setBookDisplay(b.dataset.bookDisplay);
 };
-paintThemeControls();applyTheme();paintTitleDisplayControls();paintBookDisplayControls();applyAdvanced();
+// #1093: 서재 진열 두 칸도 같은 길로 바뀌고 저장된다.
+for(const b of document.querySelectorAll('[data-shelf-view]'))b.onclick=()=>{
+ setShelfView(b.dataset.shelfView);
+};
+paintThemeControls();applyTheme();paintTitleDisplayControls();paintBookDisplayControls();paintShelfViewControls();applyAdvanced();
 if(initialRoute.scope==='public')showPublicRoute(initialRoute);
 else if(/^#explore/.test(location.hash)){/* #1025: 둘러보기가 자기 주소를 연다 — 예시 로드로 주소를 덮지 않는다. #1092: [트리] 보기(#explore)는 화면으로 바로 연다 — [순간](#explore/moments)은 창 모듈이 자기 주소로 연다. */
  if(location.hash==='#explore')shellCommunityScreen.openRoute();

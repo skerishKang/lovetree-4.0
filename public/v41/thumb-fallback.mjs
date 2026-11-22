@@ -19,9 +19,9 @@ const PRIVATE_PHOTO_PATH = /^\/api\/media\/[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-
 const EMOTION_TONES = { 설렘: 1, 그리움: 2, 위로: 3, 벅참: 4, 고마움: 5, 즐거움: 6 };
 
 const trimText = (value) => (typeof value === 'string' ? value.trim() : '');
-export const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (ch) => ({
-  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-}[ch]));
+// A-15: 글자 막기 정본(html-escape.mjs) 한 벌 — 쓰던 이름은 그대로 다시 내보낸다.
+import { escapeHtml } from './html-escape.mjs';
+export { escapeHtml };
 
 export function isVideoMoment(moment) {
   const url = trimText(moment?.url) || trimText(moment?.externalUrl);

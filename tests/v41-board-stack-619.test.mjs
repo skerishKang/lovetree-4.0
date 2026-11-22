@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 globalThis.window = globalThis;
+import '../public/v41/html-escape.mjs'; // A-15: 글자 막기 정본을 먼저 등록한다.
 await import('../public/v41/views/board/board-model.js');
 const M = globalThis.LT58Model;
 const REQUIRE = process.env.LT_BOARD_STACK_619_REQUIRE === '1';

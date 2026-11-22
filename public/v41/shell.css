@@ -235,10 +235,10 @@ html[data-v41-screen=book] .tools .ui-btn::after,html[data-v41-screen=board] hea
 }
 /* 책/목록 토글(상단 단추)이 보일 때만 머리줄을 감아 트리 줄을 온전히 남긴다. */
 @media(max-width:780px){
- .app-header:has(#book-display-toggle:not([hidden])){flex-wrap:wrap}
- .app-header:has(#book-display-toggle:not([hidden])) .main-nav{flex-basis:100%;order:3}
+ .app-header:has(.view-toggle:not([hidden])){flex-wrap:wrap}
+ .app-header:has(.view-toggle:not([hidden])) .main-nav{flex-basis:100%;order:3}
  /* 머리줄이 두 줄이 되면 트리 팝오버도 그 아래에서 열린다. */
- .app-header:has(#book-display-toggle:not([hidden])) .tree-popover{top:108px}
+ .app-header:has(.view-toggle:not([hidden])) .tree-popover{top:108px}
 }
 /* 넘치는 쪽 끝의 페이드. 스크롤 위치에 따라 켜고 끄는 클래스는 shell.mjs가 붙인다. */
 @media(max-width:780px){
@@ -629,7 +629,9 @@ html[data-lt-theme=garden] .home-links .feedback-link:hover{color:var(--lt-ink)}
 @media(max-width:520px){body.home-screen .home-links{flex-wrap:wrap;max-width:calc(100% - 150px)}body.home-screen .home-links a.feedback-link{display:inline-flex}body.home-screen .home-links .feedback-link{min-height:30px;padding:2px 8px}}
 /* 390 지도·책·서재 목록: 조작 줄·책 테두리·'책 속의 트리' 상자와 겹치던 아래 링크 줄을 숨긴다(1440은 지금 자리).
    서재 목록은 프레임 안이 스크롤되므로 화면에 붙은 링크 줄이 지나가는 글자 위에 포개진다 — 책·지도와 같은 길로 숨긴다. */
-@media(max-width:520px){body[data-fab-lift=book] .home-links,body[data-fab-lift=network] .home-links,body[data-fab-lift=shelf] .home-links{display:none}}
+/* #1093: 여러 줄 선반 위에 화면에 붙은 링크가 포개지므로 서재는 폭과 무관하게 숨긴다. */
+body[data-fab-lift=shelf] .home-links{display:none}
+@media(max-width:520px){body[data-fab-lift=book] .home-links,body[data-fab-lift=network] .home-links{display:none}}
 /* 이슈 611: 계정 단추 점 — 새 소식이나 새 답글이 있을 때. */
 .account-avatar{position:relative}
 .account-avatar.has-dot::after{content:'';position:absolute;top:2px;right:2px;width:9px;height:9px;border-radius:50%;background:var(--lt-rose);border:1px solid var(--lt-stage)}
@@ -650,8 +652,9 @@ html[data-lt-theme=garden] .home-links .feedback-link:hover{color:var(--lt-ink)}
  body.lt-fab-ok[data-fab-lift="network"] .updates-card{bottom:calc(224px + env(safe-area-inset-bottom))}}
  @media(max-width:520px){.updates-card{padding:0 10px;gap:8px;bottom:calc(max(10px, env(safe-area-inset-bottom)) + 66px)}body.lt-fab-ok .updates-card{bottom:calc(76px + env(safe-area-inset-bottom))}.updates-card-text{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
 /* 창(모달·패널)이 열려 있으면 아래 고정 요소는 모두 숨는다 — 닫으면 저절로 돌아온다(의견 #26 점검). */
+body.lt-viewer-open .updates-card,body.lt-viewer-open .home-links,body.lt-viewer-open #toast,
 body:has(dialog[open]) .updates-card,body.lt-sheet-open .updates-card,
-body:has(dialog[open]) .home-links,body.lt-sheet-open .home-links{display:none}
+body:has(dialog[open]) .home-links,body.lt-sheet-open .home-links,body.lt-viewer-open #toast{display:none}
 /* 짧은 알림은 창 밖에 둔다. 셸 창은 화면 맨 위, 프레임 창은 셸 머리글 바로 아래의 빈 띠에 둔다. */
 body:has(dialog[open]) #toast{top:calc(8px + env(safe-area-inset-top));bottom:auto;left:14px;transform:none;max-width:calc(100% - 88px)}
 /* 프레임 창은 셸 머리글 바로 아래 띠에 둔다. 실제 본문 글꼴(Pretendard) 줄 높이까지 재서 창 윗변을 침범하지 않게 한다. */
@@ -942,6 +945,20 @@ body.community-screen #stage>iframe,body.community-screen #empty{display:none}
 #community-preview .community-more-button::-webkit-details-marker{display:none}
 #community-preview .community-more-panel{display:grid;gap:12px;min-width:min(380px,calc(100vw - 48px));margin-top:8px;padding:14px;border:1px solid var(--lt-line-paper);border-radius:var(--lt-r-card);background:var(--lt-paper);color:var(--lt-ink)}
 #community-preview .community-menu-title{margin:0;color:var(--lt-ink);font-size:15px}
+/* #1098 2단계: 판의 순간 목록 — 판 위쪽(트리 숫자)과 섞지 않게, 이 목록의 순간 카드만 그 순간의 ♡·댓글 수를 보인다. */
+#community-preview .community-moment-list{display:grid;gap:8px}
+#community-preview .community-moment-list[hidden]{display:none}
+#community-preview .community-moment{display:grid;gap:6px;padding:10px 12px;border:1px solid var(--lt-line-paper);border-radius:var(--lt-r-card);background:var(--lt-paper)}
+#community-preview .community-moment-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px}
+#community-preview .community-moment-title{color:var(--lt-ink);font-size:14px;font-weight:700}
+#community-preview .community-moment-date{color:var(--lt-ink);font-size:12px;opacity:.75}
+#community-preview .community-moment-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+#community-preview .community-moment-heart .community-moment-heart-glyph{font-size:16px}
+#community-preview .community-moment-count{font-weight:700}
+#community-preview .community-moment-note{margin:0;color:var(--lt-ink);font-size:13px;line-height:1.5}
+#community-preview .community-moment-note[hidden]{display:none}
+#community-preview .community-moment-comments{display:grid;gap:8px}
+#community-preview .community-moment-comments[hidden]{display:none}
 #community-preview .community-comment-host,#community-preview .community-comments{display:grid;gap:10px}
 #community-preview .community-comment,#community-preview .community-comment-form,#community-preview .community-comment-edit{display:grid;gap:8px;color:var(--lt-ink)}
 #community-preview .community-comment small,#community-preview .community-comment p,#community-preview .community-muted{margin:0;color:var(--lt-ink);font-size:13px;line-height:1.5}
