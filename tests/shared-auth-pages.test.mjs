@@ -132,6 +132,20 @@ test('invalid refresh grant is 401 while auth outage remains 503', async () => {
  }
 });
 
+// 운영 비밀 값 앞에 BOM이 붙어 콜백이 매번 "is not valid JSON"으로 실패하던 결함.
+test('비밀 키 앞뒤의 BOM·공백이 있어도 토큰 교환 요청까지 간다', async () => {
+ const keys=await crypto.subtle.generateKey({name:'ECDSA',namedCurve:'P-256'},true,['sign','verify']);
+ const env={LOVETREE_AUTH_CLIENT_PRIVATE_JWK:'\uFEFF '+JSON.stringify(await crypto.subtle.exportKey('jwk',keys.privateKey))+'\u200B\n',LOVETREE_AUTH_CLIENT_KID:'\u00A0test '};
+ let sent=null;
+ const auth=createSharedPagesAuth({fetcher:async(url,init)=>{sent=init;return Response.json({error:'invalid_grant'},{status:400});}});
+ const result=await auth(new Request('https://lovetree.padiem.net/auth/refresh',{method:'POST',headers:{origin:'https://lovetree.padiem.net',cookie:'lovetree_refresh=x'}}),env);
+ assert.equal(result.status,401);
+ assert.ok(sent,'토큰 교환 요청이 나가야 한다');
+ const body=String(sent.body);
+ const jwt=new URLSearchParams(body).get('client_assertion');
+ assert.equal(JSON.parse(Buffer.from(jwt.split('.')[0],'base64url').toString()).kid,'test');
+});
+
 // #213: 로그인 뒤 사이트 루트(/)로 떨어지던 결함. next=/v41/?intent=new-tree|shelf 를 그대로 살린다.
 test('validNext는 첫 화면 경로와 의도(intent) 하나만 허용하고 나머지는 /v41/로 떨어뜨린다', async () => {
   const { validNext } = await import('../functions/_lib/shared-auth.mjs');
