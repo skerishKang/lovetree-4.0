@@ -220,7 +220,7 @@ function detailMediaHTML(n){
  const m=LTDEMO.moments.find(x=>x.id===n.id)||{};
  if(m.url&&window.LTMedia)return window.LTMedia.markup(m.url,m.title,m.mediaMetadata,m.id,null,null,{compact:true});
  const img=m.image||m.asset||'';
- if(img)return `<img class="detailPhoto" src="${escHtml(img)}" alt="">`;
+ if(img)return `<img class="detailPhoto" src="${escHtml(img)}" alt="${escHtml(m.title||n.title||'기록한 그림')}">`;
  if(m.video)return `<video class="detailVideo" src="${escHtml(m.video)}" controls muted playsinline></video>`;
  return '';
 }
