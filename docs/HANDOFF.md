@@ -2189,6 +2189,8 @@ COM2에는 merge `6900df8aa446dfe0201d01997457fae04c4abe16`의 변경 서버 파
 
 ## 2026-11-09 첫 화면(src064-orbit) 파일 지도 (원본 정리, ai/lt-orbit-source-261109)
 
+> 아래 표는 그날의 기록이다. 첫 화면은 vite 진입점(`v41/home.html`·`src/views/orbit.js`)으로 이미 바뀌었고, 표의 `src064-orbit.html`·`orbit.css`·`orbit.js`·`orbit-cards.mjs` 네 파일은 A-13에서 정리되었다.
+
 | 파일 | 줄 수 | 내용 |
 |---|---|---|
 | `public/v41/views/src064-orbit.html` | 49 | 마크업 + `orbit.css`·`orbit.js` 연결만 (75KB → 5.0KB) |
@@ -2415,7 +2417,7 @@ COM2에는 merge `6900df8aa446dfe0201d01997457fae04c4abe16`의 변경 서버 파
 
 ## 2026-11-15 — 보여주기 2단계 '그래프 보기' 설계 + 독립 시안 (#627, 컴1 로컬 레인, ai/local4-graph-261115, main 40123dd 기준)
 
-- **이번 PR 범위**: `docs/GRAPH_VIEW_20261115.md`(설계) + `public/v41/prototypes/graph-view.html`(독립 시안, 메뉴 연결 없음). 실제 화면·메뉴·views/network·서버·DB 변경 없음. updates.json 없음.
+- **이번 PR 범위**: `docs/GRAPH_VIEW_20261115.md`(설계) + `reference/prototypes/graph-view.html`(독립 시안, 메뉴 연결 없음). 실제 화면·메뉴·views/network·서버·DB 변경 없음. updates.json 없음.
 - **설계 요약**: 허브(큰 점)=확정 꼬리표 값 중 가수·노래·무대, 같은 값 2개 이상일 때만. 1차 소속 규칙 무대>노래>가수. 발자취 줄=전체 순간을 무대 날짜 시간 순서로 잇는 금실(지도 발자취 수리를 2단계에 합친 대표 결정의 실체 — 그래프 보기가 시간 순서 재생을 실제 기록까지로 넓힘). 꼬리표 없는 순간은 '꼬리표 없는' 선반(시간순·흐리게) + '꼬리표 한 번에 제안받기'(#680 기능 연결). 추천 배치안=안2 '묶음 원형(결정론)' — 겹침 0을 시험으로 단정 가능·limone L53·현재 network-model과 같은 결정론 계열·1→300순간 같은 규칙. 지금 지도와는 '대체가 아니라 보기 방식 하나로 추가'(같은 지도 입구에 전환 알약).
 - **시안 데이터**: 첫 화면 예시 40순간(example.mjs designData 그대로) + 가짜 꼬리표('종류:값' 저장 규칙 모양): 가수 2·노래 3·무대 4종, 꼬리표 없는 4개(m10·m23·m34·m40). 시안 안의 색은 identity.css --lt-* 토큰만.
 - **확인한 기존 구현**(재사용 판단은 문서 §1): limone Lineage53VerticalNetworkOverview(SVG 결정론 클러스터·범례 필터·경로 내비 — 구조 재사용), limone V4GraphExperiences(자유 배치 — '저절로 정리'와 안 맞아 배제), 현재 views/network-model.js(canvas 결정론 — 방식 계승), tags.mjs(저장 형식 그대로). 참고 문서 '러브트리_보여주기_방향_20261115'는 저장소·로컬에서 못 찾아 #627 본문·댓글 기준으로 씀 — 미확인 사실.

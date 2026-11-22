@@ -183,10 +183,6 @@ export function journeyStepProblem(step, draft = {}) {
   return '';
 }
 
-export function canAdvanceJourney(step, draft) {
-  return journeyStepProblem(step, draft) === '';
-}
-
 export function journeyPreviewTitle(draft = {}) {
   const value = normalizeJourneyDraft(draft);
   try {
