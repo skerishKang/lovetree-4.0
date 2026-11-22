@@ -37,7 +37,7 @@ function flowNavigation(){
   const onCommunity=document.body.classList.contains('community-screen');
   const onShelf=getCurrent()==='track32-bookshelf.html';
   // #1093: 390에서는 토글을 화면 안 도구 줄로 옮긴다 — 머리줄에서는 숨겨 한 줄(62px)을 유지한다.
-  const inlineToggles=matchMedia('(max-width:520px)').matches;
+  const inlineToggles=typeof globalThis.matchMedia==='function' && globalThis.matchMedia('(max-width:520px)').matches;
   const bookToggle=$('book-display-toggle');
   if(bookToggle)bookToggle.hidden=!bookDisplayVisible({current:getCurrent()})||onShelf||onCommunity||inlineToggles;
   const shelfToggle=$('shelf-view-toggle');
