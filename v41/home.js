@@ -1,3 +1,4 @@
+import { MSG, isShellMessage } from '../public/v41/frame-messages.mjs';
 // #586: 첫 화면 문서는 src/styles.css 를 읽지 않는다(vite가 styles-*.css link를 주입해 궤도 그림자의
 // 스타일 재계산이 프레임당 수십 ms가 걸렸다). 그림자가 쓰는 --ui 토큰은 v41/home.html 의 style에 둔다.
 import {mountOrbit,ORBIT_EXAMPLE} from '../src/views/orbit.js';
@@ -72,7 +73,7 @@ const renderedTitleDisplay=titleDisplayOf(readTitleDisplay(parent.LT41));
  authHtml:`<button class="menuBtn auth-entry" data-home-account>${presentation.accountLabel}</button>`,actions:bridge.actions
 });
 // #394: 순간 목록 열기 요청을 받았다고 셸에 알린다 — 셸은 요청 플래그를 치워 다음 화면 이동에 되풀이하지 않게 한다.
-if(momentsRequest){try{parent.postMessage({type:'lt41-moments-opened'},location.origin)}catch{}}
+if(momentsRequest){try{parent.postMessage({type:MSG.momentsOpened},location.origin)}catch{}}
 const shadow=document.getElementById('orbit').shadowRoot;
 const viewerStyle=document.createElement('style');
 viewerStyle.textContent=`#mediaViewerHome .mediaVisual iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#000}#mediaViewerHome .mediaActions button,#mediaViewerHome .mediaActions a{display:inline-flex;align-items:center;justify-content:center;font-size:13px;min-height:44px;padding:8px 14px}#mediaViewerHome .mediaWhy[hidden]{display:none}`;
@@ -87,7 +88,7 @@ function closeHomeViewer(){
  if(!viewer.classList.contains('open'))return;
  viewer.querySelector('iframe')?.remove();
  viewer.classList.remove('open');viewer.setAttribute('aria-hidden','true');
- try{parent.postMessage({type:'lt41-viewer',open:false},location.origin)}catch{}
+ try{parent.postMessage({type:MSG.viewer,open:false},location.origin)}catch{}
  vEl('mediaImageHome').hidden=true;vEl('mediaMemoHome').hidden=true;
  viewerOpener?.focus?.();viewerOpener=null;
 }
@@ -119,7 +120,7 @@ function openHomeViewer(moment,opener=null){
   visual.append(frame);
  }
  viewer.classList.add('open');viewer.setAttribute('aria-hidden','false');
- try{parent.postMessage({type:'lt41-viewer',open:true},location.origin)}catch{}
+ try{parent.postMessage({type:MSG.viewer,open:true},location.origin)}catch{}
  vEl('mediaCloseHome').focus();
 }
 vEl('mediaCloseHome').onclick=closeHomeViewer;
@@ -246,7 +247,7 @@ const setHomeMoment=next=>{
  homeMomentValue=normalizeHomeMoment(next);
  try{localStorage.setItem(HOME_MOMENT_KEY,JSON.stringify(homeMomentValue))}catch{}
  // 계정 설정(이미 있는 저장 길)에 저장한다 — 셸이 setPrefs로 계정 기록에 반영한다.
- try{parent.postMessage({type:'lt41-home-moment',value:homeMomentValue},location.origin)}catch{}
+ try{parent.postMessage({type:MSG.homeMoment,value:homeMomentValue},location.origin)}catch{}
  const picked=homeMomentPick(momentList?.entries,homeMomentValue,{day:homeMomentDay,trees:momentList?.trees||[]});
  orbit?.recent?.set(picked.moment,picked.header);
  closeRecentMenu();
@@ -411,27 +412,27 @@ const mobileFit=document.createElement('style');mobileFit.textContent='@media(ma
 addEventListener('message',event=>{
  if(event.origin!==location.origin)return;
  const type=event.data?.type;
-   if(type==='lt41-motion'){motionPaused=!!event.data.paused;orbit?.motion?.set?.(motionPaused);}
-   // #1109: 배경 상태 반영은 다시 띄우지 않고 지금 화면의 숫자·최근 순간만 고친다 — 열려 있는 창이 남는다.
-   else if(type==='lt41-trees-saved'){refreshCountsFromParent();}
-   else if(type==='lt41-home-cards'){location.reload();}
-  else if(type==='lt41-home-moment-set'){setHomeMoment(event.data.value);}
+  if(type===MSG.motion){motionPaused=!!event.data.paused;orbit?.motion?.set?.(motionPaused);}
+  // #1109: 배경 상태 반영은 다시 띄우지 않고 지금 화면의 숫자·최근 순간만 고친다.
+  else if(type===MSG.treesSaved&&isShellMessage(event)){refreshCountsFromParent();}
+  else if(type===MSG.homeCards){location.reload();}
+  else if(type===MSG.homeMomentSet){setHomeMoment(event.data.value);}
 
  // #481: 제목 보기도 궤도가 그릴 때 값을 박아 두므로(orbit의 titleMode) 바뀌면 다시 떠야 한다.
  // 날짜 표기와 같은 판정 — 지금 그린 값과 다르고, 기기 미러가 이미 그 값일 때만(다시 뜨면 새 값으로 그려진다).
- else if(type==='lt41-title-display'){
+ else if(type===MSG.titleDisplay){
   let titleMirror=null;try{titleMirror=localStorage.getItem('lt41.titleDisplay');}catch{}
   if(shouldReloadForTitleDisplay({value:event.data.value,rendered:renderedTitleDisplay,mirror:titleMirror}))location.reload();
  }
  // #441 후속: 날짜 표기도 책·보드·지도처럼 열린 채 바로 반영한다(궤도는 셸 iframe이라 다시 그려야 한다).
  // 셸은 프레임이 뜰 때마다 같은 값을 보내므로, 값이 실제로 바뀌었을 때만 다시 띄운다(shouldReloadForDateStyle).
- else if(type==='lt41-date-style'){
+ else if(type===MSG.dateStyle){
   let mirror=null;try{mirror=localStorage.getItem('lt41.dateStyle');}catch{}
   if(shouldReloadForDateStyle({value:event.data.value,rendered:renderedDateStyle,mirror}))location.reload();
  }
  // 2026-11-16 계정 메뉴 정리: 셸 계정 메뉴의 '어떻게 쓰나요'가 이 메시지로 같은 안내 패널을 연다.
  // 이미 열려 있을 때 showModal을 다시 부르면 InvalidStateError가 나므로 열려 있으면 무시한다.
- else if(type==='lt41-open-guide'){if(!guideDialog.open)openGuide();}
+ else if(type===MSG.openGuide){if(!guideDialog.open)openGuide();}
 });
 // #776 규칙: 테마는 머리줄 #theme-toggle 하나로 통일 — 첫 화면 ◐ 빠른 단추는 두지 않는다.
 // 로그아웃은 내 순간이 없으므로 '순간 목록' 입구도 두지 않는다(예시 카드는 '감상 예시' 안내 그대로).

@@ -1,3 +1,4 @@
+import { MSG } from '../public/v41/frame-messages.mjs';
 import test from 'node:test';import assert from 'node:assert/strict';import vm from 'node:vm';import {readFileSync, existsSync} from 'node:fs';
 import {embedUrl} from '../public/v41/book-usability.mjs';
 import {serve} from './helpers/screen-audit.mjs';
@@ -5,7 +6,7 @@ import {parseMomentLink} from '../src/media.js';
 import '../public/v41/youtube-id.mjs'; // #1060: 정본이 모듈 로드 뒤 globalThis.LTYouTubeId 에 등록한 값을 vm 에도 넣는다.
 import '../public/v41/html-escape.mjs'; // A-15: 글자 막기 정본을 vm 에도 넣는다.
 // media-preview.js 는 클래식 스크립트(IIFE)라 vm 으로 읽어 window.LTMedia 를 본다(기존 시험과 같은 방법).
-const scope={window:{},URL,URLSearchParams,LTYouTubeId:globalThis.LTYouTubeId,LTEscapeHtml:globalThis.LTEscapeHtml};vm.runInNewContext(readFileSync(new URL('../public/v41/media-preview.js',import.meta.url),'utf8'),scope);const media=scope.window.LTMedia;
+const scope={ LT41_MSG: MSG,window:{},URL,URLSearchParams,LTYouTubeId:globalThis.LTYouTubeId,LTEscapeHtml:globalThis.LTEscapeHtml};vm.runInNewContext(readFileSync(new URL('../public/v41/media-preview.js',import.meta.url),'utf8'),scope);const media=scope.window.LTMedia;
 const read=path=>readFileSync(new URL('../'+path,import.meta.url),'utf8');
 const SHORTS='https://www.youtube.com/shorts/9NXOCr-T8LU';
 const WATCH='https://www.youtube.com/watch?v=abc123DEF45';

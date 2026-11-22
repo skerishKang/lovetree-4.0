@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { workspaceModel } from '../public/v41/workspace-model.mjs';
 import vm from 'node:vm';
+import { MSG } from '../public/v41/frame-messages.mjs';
 import fs from 'node:fs';
 
 const time = '2026-10-31T00:00:00Z';
@@ -62,7 +63,7 @@ test('shelf management uses real metadata and removes unsupported fixed classifi
 test('view runtime uses imported text only, keeps every edge, and does not persist',()=>{
   const input=document();input.state.trees[0].moments[0].title='<b>원문 그대로</b>';
   const model=workspaceModel(input), context={tree:model.trees[0],momentId:'root'},sent=[];
-  const scope={parent:{LT41:context,postMessage:value=>sent.push(value)},window:{},location:{origin:'https://example.test'}};
+  const scope={parent:{LT41:context,postMessage:value=>sent.push(value)},window:{},location:{origin:'https://example.test'},LT41_MSG:MSG};
   vm.runInNewContext(fs.readFileSync(new URL('../public/v41/runtime.js',import.meta.url),'utf8'),scope);
   const data=scope.window.LTDEMO;
   assert.equal(data.moments.length,4);assert.equal(data.edges.length,4);

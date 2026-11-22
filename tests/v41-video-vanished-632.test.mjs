@@ -1,6 +1,7 @@
 // #632: 사라진 영상(삭제·비공개) 감지·표시 시험.
 // 동작은 함수 직접 호출로(video-status.mjs 분류·기억·요청, media-preview.js 표시), 마크업 속성·문구는
 // 만들어진 결과물로 확인한다(docs/TESTING.md). 실제 응답 값(200/404/502)은 2026-11-15 유튜브·프록시 실측과 같다.
+import { MSG } from '../public/v41/frame-messages.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
@@ -148,6 +149,7 @@ const docStub = {
   addEventListener: () => {}
 };
 const scope = {
+  LT41_MSG: MSG,
   window: {}, URL, URLSearchParams, setTimeout, clearTimeout,
   LTYouTubeId: globalThis.LTYouTubeId, // #1060: 정본이 등록한 단계 주소 함수를 vm 에도 넣는다.
   LTEscapeHtml: globalThis.LTEscapeHtml, // A-15: 글자 막기 정본을 vm 에도 넣는다.

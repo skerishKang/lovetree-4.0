@@ -102,11 +102,38 @@ test('#942 첫 화면 추가 단추와 숫자 묶음', { skip: REQUIRE ? false :
   const trees=[make('좋아하는 순간들',8),make('여름',3),make('함께 부른 노래',3)];
   const workspace={revision:1,state:{version:1,trees,prefs:{displayName:'화면검사 시험계정'}},subject:'visual-audit-fake',writeSubjectBound:true,savedAt:'2026-11-20T00:00:00.000Z'};
   const share={id:'audit-share-000000000001',treeId:trees[0].id,view:'book',status:'active',origin:'manual',createdAt:'2026-11-20T00:00:00.000Z'};
-  const measure=e=>{
-    const s=getComputedStyle(e),r=e.getBoundingClientRect();
-    const L=color=>(color.match(/[\d.]+/g)||[]).slice(0,3).map(v=>Number(v)/255).map(v=>v<=.04045?v/12.92:((v+.055)/1.055)**2.4).reduce((n,v,i)=>n+v*[.2126,.7152,.0722][i],0);
-    const a=L(s.backgroundColor),b=L(s.color);
-    return {text:e.textContent.trim(),bg:s.backgroundColor,ink:s.color,border:s.borderTopWidth,contrast:(Math.max(a,b)+.05)/(Math.min(a,b)+.05),visible:!!e.getClientRects().length,x:r.x,y:r.y,w:r.width,h:r.height};
+  const readHome = member => {
+    const frame = document.getElementById('view');
+    if (!frame?.checkVisibility()) return false;
+    const doc = frame.contentDocument;
+    const root = doc?.getElementById('orbit')?.shadowRoot;
+    const first = root?.querySelector(member ? '.actions [data-do=moments]' : '.actions [data-do=start]');
+    if (!first?.checkVisibility() || doc.fonts.status !== 'loaded') return false;
+    // 공개 집계와 공유 목록은 따로 도착한다. 숫자의 값과 치수는 아래에서 그대로 판정한다.
+    const countFor = action => root.querySelector('.actions [data-do='+action+']')?.parentElement.querySelector('.home-count');
+    if (!countFor('community')?.checkVisibility()) return false;
+    if (member && !countFor('trees')?.querySelector('.home-count-line:nth-child(2) > *')) return false;
+
+    const measure = e => {
+      const s = e.ownerDocument.defaultView.getComputedStyle(e), r = e.getBoundingClientRect();
+      const L=color=>(color.match(/[\d.]+/g)||[]).slice(0,3).map(v=>Number(v)/255).map(v=>v<=.04045?v/12.92:((v+.055)/1.055)**2.4).reduce((n,v,i)=>n+v*[.2126,.7152,.0722][i],0);
+      const a=L(s.backgroundColor),b=L(s.color);
+      return {text:e.textContent.trim(),bg:s.backgroundColor,ink:s.color,border:s.borderTopWidth,contrast:(Math.max(a,b)+.05)/(Math.min(a,b)+.05),visible:!!e.getClientRects().length,x:r.x,y:r.y,w:r.width,h:r.height};
+    };
+    const buttons = [...root.querySelectorAll('.center .actions > .subtleBtn,.center .actions > .home-action-group > .subtleBtn')].map(e => {
+      const s = doc.defaultView.getComputedStyle(e);
+      return { text: e.textContent.trim(), bg: s.backgroundColor, border: s.borderTopWidth };
+    });
+    const headers = [...document.querySelectorAll('#write-menu,#mobile-add')].map(e => ({ id: e.id, visible: !!e.getClientRects().length }));
+    const head = measure(document.getElementById('write-menu')), fab = measure(document.getElementById('mobile-add'));
+    const add = root.querySelector('.home-add-top'), top = add ? measure(add) : null;
+    const groups = [...root.querySelectorAll('.home-action-group')].map(e => {
+      const b=e.querySelector('.subtleBtn'),n=e.querySelector('.home-count'),r=e.getBoundingClientRect(),br=b.getBoundingClientRect(),nr=n.getBoundingClientRect();
+      const range=doc.createRange();range.selectNodeContents(n);const tr=range.getBoundingClientRect();
+      const lines=[...n.querySelectorAll('.home-count-line')].map(row=>row.textContent.trim());
+      return {label:b.textContent.trim(),count:n.hidden?'':lines.join('|'),x:r.x,y:r.y,w:r.width,h:r.height,inner:n.hidden?null:nr.top-br.bottom,center:n.hidden?null:(tr.left+tr.width/2)-(br.left+br.width/2),font:parseFloat(doc.defaultView.getComputedStyle(n).fontSize),overflow:n.hidden?0:Math.max(0,tr.right-br.right,br.left-tr.left)};
+    });
+    return { buttons, headers, head, fab, top, groups };
   };
   const failures=[];
   const check=(ok,message)=>{if(!ok)failures.push(message)};
@@ -135,26 +162,15 @@ test('#942 첫 화면 추가 단추와 숫자 묶음', { skip: REQUIRE ? false :
           if(await ask.isVisible())await ask.click();
           await ask.waitFor({state:'hidden'});
         }
-        const current=page.frameLocator('#view');
-        const first=member?'moments':'start';
-        await current.locator('.center .actions [data-do='+first+']').waitFor({state:'visible'});
-        await current.locator('.center .actions [data-do='+first+']').evaluate(async e=>{await e.ownerDocument.fonts.ready});
-        await current.locator('.home-count:not([hidden])').first().waitFor({state:'visible'});
-        await page.waitForTimeout(450);
-        const buttons=await current.locator('.center .actions > .subtleBtn,.center .actions > .home-action-group > .subtleBtn').evaluateAll((es,fn)=>es.map(e=>({text:e.textContent.trim(),bg:getComputedStyle(e).backgroundColor,border:getComputedStyle(e).borderTopWidth})));
-        const headers=await page.locator('#write-menu,#mobile-add').evaluateAll(es=>es.map(e=>({id:e.id,visible:!!e.getClientRects().length})));
-        const head=await page.locator('#write-menu').evaluate(measure),fab=await page.locator('#mobile-add').evaluate(measure);
-        const top=await current.locator('.home-add-top').count()?await current.locator('.home-add-top').evaluate(measure):null;
-        const groups=await current.locator('.home-action-group').evaluateAll(es=>es.map(e=>{
-          const b=e.querySelector('.subtleBtn'),n=e.querySelector('.home-count'),r=e.getBoundingClientRect(),br=b.getBoundingClientRect(),nr=n.getBoundingClientRect();
-          const range=document.createRange();range.selectNodeContents(n);const tr=range.getBoundingClientRect();
-           const lines=[...n.querySelectorAll('.home-count-line')].map(row=>row.textContent.trim());
-           return {label:b.textContent.trim(),count:n.hidden?'':lines.join('|'),x:r.x,y:r.y,w:r.width,h:r.height,inner:n.hidden?null:nr.top-br.bottom,center:n.hidden?null:(tr.left+tr.width/2)-(br.left+br.width/2),font:parseFloat(getComputedStyle(n).fontSize),overflow:n.hidden?0:Math.max(0,tr.right-br.right,br.left-tr.left)};
-        }));
-        const values={buttons,headers,head,fab,top,groups};const key=width+'-'+theme+'-'+kind;
+        // 두 프레임의 이름은 화면을 넘길 때 바뀐다. 지금 보이는 문서에서 모든 치수를 한 번에 읽는다.
+        const result = await page.waitForFunction(readHome, member);
+        const values = await result.jsonValue();
+        await result.dispose();
+        const { buttons, head, fab, top, groups } = values;
+        const key=width+'-'+theme+'-'+kind;
         console.log('#942',key,JSON.stringify(values));
         if(dest){
-          if(width===1440)await current.locator('.card:not(.off):not(.clash)').first().waitFor({state:'visible',timeout:8000});
+          if(width===1440)await page.frameLocator('#view').locator('.card:not(.off):not(.clash)').first().waitFor({state:'visible',timeout:8000});
           await page.screenshot({path:join(dest,'home-'+key+'.png'),animations:'allow'});
         }
         const rose=theme==='night'?'rgb(180, 87, 107)':'rgb(152, 80, 94)';
@@ -2320,9 +2336,18 @@ test('#657 후속 261117: 트리 0개 계정의 탭 4개와 화면별 빈 상태
         const ctx = await browser.newContext({ viewport: { width, height: width === 390 ? 844 : 900 }, reducedMotion: 'reduce' });
         await ctx.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); } catch {} }, theme);
         await ctx.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
-        await ctx.route('**/api/workspace**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ revision: 1, state: { version: 1, trees: [], prefs: {} }, subject: '시험계정', writeSubjectBound: true, savedAt: '2026-11-17T00:00:00.000Z' }) }));
+        const slowTabs=process.env.LT_EMPTY_TABS_SLOW==='1';
+        await ctx.route('**/api/workspace**', async (r) => {
+          if(slowTabs)await new Promise(resolve=>setTimeout(resolve,600));
+          return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ revision: 1, state: { version: 1, trees: [], prefs: {} }, subject: '시험계정', writeSubjectBound: true, savedAt: '2026-11-17T00:00:00.000Z' }) });
+        });
         const page = await ctx.newPage();
+        if(slowTabs){const cdp=await ctx.newCDPSession(page);await cdp.send('Emulation.setCPUThrottlingRate',{rate:4});}
         await page.goto(`${base}/v41/?account=1`, { waitUntil: 'load', timeout: 30000 });
+        if(slowTabs)console.log('# 탭 상태',JSON.stringify(await page.evaluate(()=>{
+          const chain=[];for(let e=document.querySelector('#tree-views button[data-view]');e;e=e.parentElement){const s=getComputedStyle(e),r=e.getBoundingClientRect();chain.push({id:e.id,tag:e.tagName,cls:e.className,hidden:e.hidden,display:s.display,visibility:s.visibility,w:r.width,h:r.height,data:{...e.dataset}})}
+          return {chain,member:document.body.dataset.member,source:document.body.dataset.recordSource,treeCount:document.body.dataset.treeCount,loading:!document.getElementById('stage-loading')?.hidden};
+        })));
         const labels = { 'track32-bookshelf.html': '서재', 'track59-sketchbook.html': '책', 'track58-pinboard.html': '보드', 'track56-network.html': '지도' };
         const openMore = async () => {
           if (width !== 390) return;

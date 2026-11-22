@@ -3,6 +3,7 @@
 // 보드 도구 줄(v41-board-readonly-520-521: 공유·예시 390/1440에서 ＋ 순간 꽂기 없음), 책 손잡이와
 // 마지막 장(v41-book-readonly-464, v41-share-guest-635: → 를 눌러도 쓰기 창·쓰기 메시지 0건),
 // 공유 감상 안내 문구는 배지·안내 표시 시험이 확인한다. 글자 검사는 구현 모양만 고정했다.
+import { MSG } from '../public/v41/frame-messages.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -23,6 +24,7 @@ test('LTDEMO.readOnly는 공유(share)와 예시(example)에서 참이다', asyn
     };
     const listeners = [];
     const scope = {
+      LT41_MSG: MSG,
       window: {},
       document,
       parent: { LT41: { source, tree: { id: 't1', title: '트리', moments: [], edges: [] } } },
@@ -41,6 +43,7 @@ test('#464 예시 트리(demoData)는 source와 무관하게 읽기 전용이다
   const vm = await import('node:vm');
   for (const source of ['server', 'example']) {
     const scope = {
+      LT41_MSG: MSG,
       window: {},
       document: { querySelectorAll: () => [], getElementById: () => null, addEventListener: () => {} },
       parent: { LT41: { source, tree: { id: 'e', title: '예시', moments: [], edges: [], demoData: { moments: [], edges: [] } } } },
@@ -64,6 +67,7 @@ test('공유 렌더: 공개 응답을 runtime에 넘기면 올린 사진 주소�
   const run = (sourceTree, source) => {
     const document = { querySelectorAll: () => [], getElementById: () => null, addEventListener: () => {} };
     const scope = {
+      LT41_MSG: MSG,
       window: {}, document,
       parent: { LT41: { source, tree: { ...sourceTree, edges: [] } } },
       addEventListener: () => {}, setTimeout, clearTimeout

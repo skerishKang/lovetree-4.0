@@ -228,7 +228,7 @@ function upgradeVerticals(root = (typeof document !== 'undefined' ? document : n
         const momentId = el.closest('[data-moment]')?.dataset.moment;
         const moment = momentId && typeof window !== 'undefined' ? window.LTDEMO?.moments?.find(m => m.id === momentId) : null;
         if (moment?.url && window.parent !== window) {
-          try { window.parent.postMessage({ type: 'lt41-media-metadata', momentId, url: moment.url, mediaMetadata: { ...(moment.mediaMetadata || {}), vertical: v } }, location.origin); } catch {}
+          try { window.parent.postMessage({ type: globalThis.LT41_MSG.mediaMetadata, momentId, url: moment.url, mediaMetadata: { ...(moment.mediaMetadata || {}), vertical: v } }, location.origin); } catch {}
         }
       }
       if (!v) return;
@@ -367,7 +367,7 @@ async function youtubeMeta(root,m,onUnavailable){
   const body=root.querySelector('.lt-media-body');if(!body)return;
   const source=new URL(root.dataset.ltUrl).hostname,caption=document.createElement('p');caption.className='lt-media-title';caption.textContent=[...bits,source].join(' · ');body.append(caption);
   const momentId=root.dataset.ltMomentId;
-  if(momentId&&window.parent!==window)window.parent.postMessage({type:'lt41-media-metadata',momentId,url:root.dataset.ltUrl,mediaMetadata:{title,channel,source,...(thumbnail?{thumbnail}:{})}},location.origin);
+  if(momentId&&window.parent!==window)window.parent.postMessage({type:globalThis.LT41_MSG.mediaMetadata,momentId,url:root.dataset.ltUrl,mediaMetadata:{title,channel,source,...(thumbnail?{thumbnail}:{})}},location.origin);
  }catch{}
 }
 async function load(root){

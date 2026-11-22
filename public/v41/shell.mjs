@@ -1,3 +1,4 @@
+import { MSG } from './frame-messages.mjs';
 import {mountPrivateUpload} from './private-upload.mjs';
 import {memberLoginUrl,shouldLoadMemberRecords} from './member-entry.mjs';
 import {workspaceModel} from './workspace-model.mjs';
@@ -97,12 +98,7 @@ if(updatesCardBox)new MutationObserver(()=>{
     updatesCardBox.hidden=true;
     noticeQueue.request('updates',{show:()=>{hideToast();updatesCardBox.hidden=false;},hide:()=>{updatesCardBox.hidden=true;}});
   }
-  broadcastUpdatesBand();
 }).observe(updatesCardBox,{attributes:true,attributeFilter:['hidden']});
-function broadcastUpdatesBand(){
- const height=updatesCardBox&&!updatesCardBox.hidden?Math.round(updatesCardBox.getBoundingClientRect().height):0;
- for(const f of frames()){try{f.contentWindow.postMessage({type:'lt41-updates-band',height},location.origin)}catch{}}
-}
 // #977: 서버 기록에 형식이 어긋난 트리가 섞여 있으면 그 트리만 빼고 셸을 연다(읽기는 workspace-guard.mjs).
 // #986: 서버가 읽지 못해 빼 둔 트리는 개수(quarantined)만 응답에 온다 — 화면 안내에 함께 센다.
 // 화면에는 짧은 안내 한 줄, 콘솔에는 어느 트리가 왜 어긋났는지 한 줄만 남긴다 — 같은 기록을 다시 읽어도 한 번만.
@@ -168,7 +164,7 @@ function setShelfView(value){
  if(window.LT41)window.LT41.prefs=member.state().prefs;
  rememberShelfView(currentShelfView());
  paintShelfViewControls();
- try{$('view').contentWindow.postMessage({type:'lt41-shelf-view',value:currentShelfView()},location.origin)}catch{}
+ try{$('view').contentWindow.postMessage({type:MSG.shelfView,value:currentShelfView()},location.origin)}catch{}
 }
 let backfillStarted=false,backfillAttempted=new Set();
 async function runTitleBackfill(state,session){
@@ -192,7 +188,7 @@ function buildFoldMenu(){
  // #458: 지금 보고 있는 화면 항목에 aria-current를 남긴다(메뉴를 열 때마다 다시 만들어 지금 상태를 반영한다).
  add('첫 화면',()=>document.querySelector('.brand').click(),current==='src064-orbit.html');
  add('둘러보기',()=>$('community-menu').click());
- add('서재',()=>{member?.snapshot().owned?show('track32-bookshelf.html'):openLoginStart('shelf')},current==='track32-bookshelf.html');
+ add('서재',()=>{memberViewsAvailable()?show('track32-bookshelf.html'):openLoginStart('shelf')},current==='track32-bookshelf.html');
  // 2026-11-17 대표 결정: 트리 0개여도 네 화면이 모두 열리므로 접기 메뉴에서도 책·보드·지도를 늘 둔다.
  add('책',()=>show('track59-sketchbook.html'),current==='track59-sketchbook.html');
  add('보드',()=>show('track58-pinboard.html'),current==='track58-pinboard.html');
@@ -209,7 +205,7 @@ addEventListener('lt41-trees-changed',()=>{
  try {
   const titles=(window.LT41?.trees||[]).map(t=>({id:t.id,title:t.title}));
   // #984: frames()는 iframe 요소다 — contentWindow로 보내야 한다(f?.postMessage는 TypeError로 삼켜져 한 번도 나가지 않았다).
-  for(const f of frames()) f.contentWindow?.postMessage({type:'lt41-trees-renamed',titles},location.origin);
+  for(const f of frames()) f.contentWindow?.postMessage({type:MSG.treesRenamed,titles},location.origin);
  } catch {}
 });
 $('mobile-more').addEventListener('click',event=>{
@@ -612,6 +608,7 @@ const shellHeader=createHeader({
   getAccountTip:()=>shellSettings.getAccountTip(),
   delegate:{syncTreeTips:()=>syncTreeTips()}
 });
+function memberViewsAvailable(){return treeViewsVisible({...member?.snapshot(),publicReading:source==='share'});}
 function flowNavigation(){return shellHeader.flowNavigation();}
 function updateNavFade(){return shellHeader.updateNavFade();}
 function revealCurrentTab(){return shellHeader.revealCurrentTab();}
@@ -657,8 +654,7 @@ const shellScreens=createScreens({
     applyPageTurnToFrame(frame);applyDateStyleToFrame(frame);applyBoardThemeToFrame(frame);
     // #478: 고급 기능 보기 값도 새로 열린 화면에 알린다. applyAdvanced는 지금 화면(#view)에만 보내므로
     // 화면을 옮긴 뒤 열린 프레임은 단순 모드로 남았다(보드 도구가 숨는 결함).
-    try{frame.contentWindow.postMessage({type:'lt41-advanced',value:readAdvanced()},location.origin)}catch{}
-    broadcastUpdatesBand();
+    try{frame.contentWindow.postMessage({type:MSG.advanced,value:readAdvanced()},location.origin)}catch{}
     // 화면 교대(두 장 앞뒤 바꿈)가 늦게 끝나는 경우를 위해 한 번 더 알린다(같은 값을 또 보내는 건 무해하다).
     for(const message of ready.repeats)setTimeout(()=>sendToFrame(frame,message),1600);
     d.addEventListener('click',e=>{const b=e.target.closest('button,a');if(!b)return;let file;if(b.matches('[data-action="tree"],[data-menu="tree"]'))file='track32-bookshelf.html';if(b.matches('#storyBook,[data-menu="book"]'))file='track59-sketchbook.html';if(current==='track56-network.html'&&b.id==='openMoment')file='track59-sketchbook.html';if(file){e.preventDefault();e.stopImmediatePropagation();show(file);}},true);
@@ -936,7 +932,7 @@ function memberStatus(status){
  else if(status.phase==='synced'){
   // #984: 저장이 서버에서 확인되면(직전 미저장→synced) 열린 화면에 표지·이름 다시 그리기를 알린다.
   // 실패(rejected·offline·conflict·login)에서는 알리지 않는다 — 화면은 원래 표지를 그대로 두고 저장 안내 떠가 실패를 알린다.
-  if(previousDirty){try{for(const f of frames())f.contentWindow?.postMessage({type:'lt41-trees-saved'},location.origin);}catch(error){report(error, '저장 알림 보내기');}}
+  if(previousDirty){try{for(const f of frames())f.contentWindow?.postMessage({type:MSG.treesSaved},location.origin);}catch(error){report(error, '저장 알림 보내기');}}
   // #549: 기록(순간)이 0개인 새 계정의 첫 안내는 '불러왔어요' 대신 첫 순간 안내로(문구는 notice.mjs 한 벌).
   // #905: 자동 저장이 성공하면 알리지 않는다 — 직전에 저장 안 됨이었다면(previousDirty) 방금 저장된 것이다.
   // 알림은 실패·오프라인·충돌(저장 안내 떠)과 사용자가 누른 큰 동작의 완료 확인만 띄운다.
@@ -967,14 +963,18 @@ function memberStatus(status){
  }
  else if(status.phase==='login'&&!status.dirty&&document.body.dataset.member==='in')notify('로그인이 필요해요.');/* #1175: 로그아웃 상태로 시작할 때(저장 연결 확인 401)는 진입만으로 알림을 띄우지 않는다 — 머리글의 로그인 단추가 이미 길을 알린다. */
  else if(!status.dirty&&status.phase==='offline')notify(status.detail||'내 기록을 불러오지 못했어요.');
- $('write-menu').textContent=status.dirty?'저장 안 됨' :'＋ 순간 추가';$('empty-records').textContent=status.writable?'＋ 첫 트리 만들기':'내 기록 불러오기';/* #463: 이름을 한 곳에서 정한다(paintEmptyCopy와 같은 글자) *//* #463: 주 버튼 표시도 같이 유지한다(쓸 상태가 바뀌도 강조가 엉키지 않게). */$('empty-records').classList.toggle('primary',!!status.writable);$('empty-sample').classList.toggle('primary',!status.writable);previousDirty=status.dirty;renderAccount();flowNavigation();document.body.dataset.member=member?.snapshot().owned?'in':'out';document.body.dataset.treeCount=String(model?.trees?.length||0);applyAdvanced();
+ $('write-menu').textContent=status.dirty?'저장 안 됨' :'＋ 순간 추가';
+ // #1109: 내 화면을 먼저 고른 경우 빈 판 안내를 회원 상태 알림이 덮지 않는다.
+ if(current!=='src064-orbit.html'&&!window.LT41&&source!=='share'&&!$('empty').hidden)paintEmptyForScreen(current);
+ else{$('empty-records').textContent=status.writable?'＋ 첫 트리 만들기':'내 기록 불러오기';$('empty-records').classList.toggle('primary',!!status.writable);$('empty-sample').classList.toggle('primary',!status.writable);}
+ previousDirty=status.dirty;renderAccount();flowNavigation();document.body.dataset.member=member?.snapshot().owned?'in':'out';document.body.dataset.treeCount=String(model?.trees?.length||0);applyAdvanced();
 }
 async function startMember(){setMemberRefreshStarted(true);if(!leaveMember())return;backfillStarted=false;backfillAttempted.clear();const startup=parseSelectionRoute(location.hash);if(startup.scope==='owner')stashPendingOwnerRoute(sessionStorage,location.hash);++loadGeneration;const generation=loadGeneration;clear(true);
  const api=createWorkspaceApi({fetchImpl:(url,init)=>fetch(init?.method==='GET'&&url==='/api/workspace'?'/api/workspace?features=bound-writes':url,init)});
  let initialized=false,startupNotice='',session;
  session=createMemberSession({api,onGuard:read=>workspaceGuardNotice(read),onState:(state,selection,meta)=>{if(generation!==loadGeneration)return;try{
   // 4.1 기억 보드 저장·트리 편집(#984)·한마디 저장/자동 제목 보정(#1001): 화면이 이미 자기 상태를 들고 있으므로 셸은 모델만 갱신하고 iframe을 다시 그리지 않는다.
-  if(meta?.board||meta?.tree||meta?.moment){const projected=workspaceModel({revision:0,state});model=projected;if(window.LT41){const tree=projected.trees.find(t=>t.id===window.LT41.tree.id);if(tree){window.LT41.tree=tree;window.LT41.trees=projected.trees;window.LT41.writable=meta.board?true:(source==='server'&&!!member?.snapshot().writable);if(meta.moment&&!meta.story){if(selection?.momentId&&tree.moments.some(m=>m.id===selection.momentId))window.LT41.momentId=selection.momentId;try{for(const f of frames())f.contentWindow?.postMessage({type:'lt41-moments-saved',treeId:tree.id,momentId:window.LT41.momentId},location.origin);}catch{}}}}return;}const snapshot=session.snapshot(),saved=accountPosition(localStorage,snapshot.subject)||{},active=parseSelectionRoute(location.hash),pending=!initialized&&active.scope!=='owner'?pendingOwnerRoute(sessionStorage):null,route=active.scope==='owner'?active:pending;let requested=selection||stateSelection();
+  if(meta?.board||meta?.tree||meta?.moment){const projected=workspaceModel({revision:0,state});model=projected;if(window.LT41){const tree=projected.trees.find(t=>t.id===window.LT41.tree.id);if(tree){window.LT41.tree=tree;window.LT41.trees=projected.trees;window.LT41.writable=meta.board?true:(source==='server'&&!!member?.snapshot().writable);if(meta.moment&&!meta.story){if(selection?.momentId&&tree.moments.some(m=>m.id===selection.momentId))window.LT41.momentId=selection.momentId;try{for(const f of frames())f.contentWindow?.postMessage({type:MSG.momentsSaved,treeId:tree.id,momentId:window.LT41.momentId},location.origin);}catch{}}}}return;}const snapshot=session.snapshot(),saved=accountPosition(localStorage,snapshot.subject)||{},active=parseSelectionRoute(location.hash),pending=!initialized&&active.scope!=='owner'?pendingOwnerRoute(sessionStorage):null,route=active.scope==='owner'?active:pending;let requested=selection||stateSelection();
    if(!initialized){if(route)requested=route;else if(!selection)requested=saved;
     // #583 '이 순간 열기': 맨 처음 주소(#my/network?tree=…&moment=…)로 열 때도 지도가 그 순간을 가운데 두게 한다 —
     // 뒤의 주소 이동(applyBrowserLocation)과 같은 규칙. 이후 동기화 때는 다시 정하지 않는다(initialized 뒤).
@@ -1001,7 +1001,7 @@ async function startMember(){setMemberRefreshStarted(true);if(!leaveMember())ret
     Object.assign(context,{tree,trees:projected.trees,prefs:state.prefs,momentId:position.position.momentId,writable:!!member?.snapshot().writable});
     document.body.dataset.treeCount=String(projected.trees.length);
     links();
-    for(const f of frames()){try{f.contentWindow?.postMessage({type:'lt41-trees-saved',background:true,treeId:tree.id,momentId:context.momentId},location.origin)}catch(error){report(error,'기록 갱신 알림');}}
+    for(const f of frames()){try{f.contentWindow?.postMessage({type:MSG.treesSaved,background:true,treeId:tree.id,momentId:context.momentId},location.origin)}catch(error){report(error,'기록 갱신 알림');}}
     resolved=position;
    }else{
     resolved=load({revision:0,state},'server',requested,saved);initialized=true;
@@ -1050,7 +1050,7 @@ $('account-avatar').onclick=e=>{
  e.stopPropagation();
  if($('account-popover').hidden){openAccountMenu(e.detail===0?'keyboard':'mouse');void shellSettings.getFeedbackBoard().refreshReplyDot();void shellSettings.refreshMyNewsCount?.();}else closeAccountMenu();
 };
-const shellSettings=createSettings({ $, notify, setTitleDisplay, openLoginStart, links, screenForView, choose, panel, show, frames, frameLoaded, hideFrames, closeAccountMenu, openAccountMenu, renderAccount, updateAccountControls, openAssets, openEditor, sample, backup, clear, startMember, leaveMember, openFallbackShell, writeLocation, load, flowNavigation, renderTreeMenu, requestBoardOpen, lastShelfTreeId, shellHeader, shellDialogs,  shareApi, accountApi, myNewsApi, readTheme, writeTheme, normalizeAccentColor, normalizeDateStyle, normalizeStartPlace, normalizeShareView, normalizeHomeMoment,  readPageTurn, writePageTurn, frameMessage, displayTreeTitle, accountPresentation, createFeedbackDialog, createFeedbackBoard, mountUpdates, mountMyNews, readWriteTab, writeWriteTab, clearCachedWorkspace, forgetLoginSubject, createWorkspaceApi, paintThemeControls, applyTheme, toggleTheme, paintBookDisplayControls, get member(){return member}, get model(){return model}, get current(){return current}, get source(){return source}, get motionPaused(){return motionPaused}, get loadGeneration(){return loadGeneration}, get handledHash(){return handledHash}, get activeShareId(){return activeShareId}, set member(v){member=v}, set model(v){model=v}, set current(v){current=v}, set source(v){source=v}, set motionPaused(v){motionPaused=v}, set loadGeneration(v){loadGeneration=v}, set handledHash(v){handledHash=v}, set activeShareId(v){activeShareId=v}
+const shellSettings=createSettings({ $, memberViewsAvailable, notify, setTitleDisplay, openLoginStart, links, screenForView, choose, panel, show, frames, frameLoaded, hideFrames, closeAccountMenu, openAccountMenu, renderAccount, updateAccountControls, openAssets, openEditor, sample, backup, clear, startMember, leaveMember, openFallbackShell, writeLocation, load, flowNavigation, renderTreeMenu, requestBoardOpen, lastShelfTreeId, shellHeader, shellDialogs,  shareApi, accountApi, myNewsApi, readTheme, writeTheme, normalizeAccentColor, normalizeDateStyle, normalizeStartPlace, normalizeShareView, normalizeHomeMoment,  readPageTurn, writePageTurn, frameMessage, displayTreeTitle, accountPresentation, createFeedbackDialog, createFeedbackBoard, mountUpdates, mountMyNews, readWriteTab, writeWriteTab, clearCachedWorkspace, forgetLoginSubject, createWorkspaceApi, paintThemeControls, applyTheme, toggleTheme, paintBookDisplayControls, get member(){return member}, get model(){return model}, get current(){return current}, get source(){return source}, get motionPaused(){return motionPaused}, get loadGeneration(){return loadGeneration}, get handledHash(){return handledHash}, get activeShareId(){return activeShareId}, set member(v){member=v}, set model(v){model=v}, set current(v){current=v}, set source(v){source=v}, set motionPaused(v){motionPaused=v}, set loadGeneration(v){loadGeneration=v}, set handledHash(v){handledHash=v}, set activeShareId(v){activeShareId=v}
  });
 const { showPublicRoute, applyAdvanced, applyDateStyleToFrame, applyPageTurnToFrame, applyNetworkViewToFrame, applyBoardThemeToFrame, syncBoardThemeToApp, quickTargetPreference, profileDirty, paintSettingsProfile, accountConfirmMatches, openAccountData, openAccountSettings, paintDateStyleControls, paintStartPlaceControls, paintShareControls, paintQuickTargetControls, paintNetworkViewControls, paintPageTurnControls, paintBoardThemeControls, paintTreeVisibilityList, paintSettingsUsage, loadTreeVisibility, paintTreeManagerVisibility, paintSettingsTab, focusSettingsSection, fillProfileForm, paintScreenControls, readAdvanced, advancedKey, currentDateStyle, currentPageTurn, sendToFrame, currentStartPlace, currentShareView, currentBoardTheme }=shellSettings;
 // #1094: 머리줄 묶음과 설정 창의 같은 data-book-display 두 칸이 하나의 길로 바뀌고 저장된다.

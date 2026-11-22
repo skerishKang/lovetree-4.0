@@ -69,8 +69,9 @@ export function treePickerAriaLabel(options = {}) {
 
 // 트리 보기 탭(기억책·기억 보드·관계 지도)은 로그인한 내 트리에서만 열린다.
 // 로그아웃 상태에서는 예시 트리가 열려 있어도 숨긴다(내 기록이 아니다).
-export function treeViewsVisible({ owned = false, publicReading = false } = {}) {
-  return owned && !publicReading;
+export function treeViewsVisible({ owned = false, phase = '', publicReading = false } = {}) {
+  // 회원 기록 확인 중이거나 일시적인 읽기 실패 상태에서도 화면 탐색은 가능하다.
+  return !publicReading && (owned || phase === 'checking' || phase === 'offline');
 }
 
 // 상태별 헤더 노출(대표 결정 2026-11-08, #213 3번).

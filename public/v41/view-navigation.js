@@ -8,7 +8,7 @@
  LTDEMO.refreshLibrary();
  LTDEMO.openBook=(id,treeId=c.tree.id)=>{
   if(!LTDEMO.library.some(t=>t.id===treeId&&t.moments.some(m=>m.id===id)))return;
-  parent.postMessage({type:'lt41-open-book',treeId,id},location.origin);
+  parent.postMessage({type:globalThis.LT41_MSG.openBook,treeId,id},location.origin);
  };
  const apply=()=>{
   const shelf=location.pathname.includes('track32-bookshelf');

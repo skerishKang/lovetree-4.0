@@ -135,7 +135,7 @@ test('#1109 배경 상태 반영을 받아도 순간 목록 창이 열린 채로
   assert.ok(frame, '첫 화면 프레임을 찾는다');
   await frame.evaluate(() => document.getElementById('orbit').shadowRoot.querySelector('[data-do=moments],[data-do=index]').click());
   await frame.locator('.orbit-dialog[open]').waitFor({ state: 'attached', timeout: 8000 });
-  await frame.evaluate(() => window.postMessage({ type: 'lt41-trees-saved' }, location.origin));
+  await page.evaluate(() => document.getElementById('view').contentWindow.postMessage({ type: 'lt41-trees-saved' }, location.origin));
   await page.waitForTimeout(300);
   const facts = await frame.evaluate(() => {
    const d = document.getElementById('orbit').shadowRoot.querySelector('.orbit-dialog');
@@ -157,7 +157,7 @@ test('#1109 배경 상태 반영은 프레임을 갈지 않고 화면 숫자를 
    const tree = window.LT41.trees[0];
    tree.moments.push({ id: 'bg-added', parentId: tree.moments[0].id, title: '다른 기기에서 담은 순간', note: '', emotion: '설렘', date: '2026-11-22', url: '', createdAt: '2026-11-22T00:00:00.000Z' });
   });
-  await frame.evaluate(() => window.postMessage({ type: 'lt41-trees-saved' }, location.origin));
+  await page.evaluate(() => document.getElementById('view').contentWindow.postMessage({ type: 'lt41-trees-saved' }, location.origin));
   await page.waitForTimeout(300);
   const after = await frame.evaluate(() => ({ url: location.href, text: [...document.getElementById('orbit').shadowRoot.querySelectorAll('.home-count')].map(n => n.textContent).join('|') }));
   assert.equal(after.url, before.url, '프레임 주소가 그대로다(다시 띄우지 않음)');
@@ -243,4 +243,71 @@ test('#1109 저장본이 없는 회원 진입은 서버 응답 전 빈 첫 화�
   assert.equal(await page.evaluate(()=>document.getElementById('view-next').contentWindow.location.href),'about:blank','기록으로 처음부터 한 장만 연다');
   assert.deepEqual(errors,[],'페이지 오류 없음');
  });
+});
+
+test('#1109 회원 기록 확인 중과 읽기 실패에도 빈 화면 탐색을 유지한다', { skip: skip || undefined }, async (t) => {
+ if (skip) { t.skip(skip); return; }
+ const server=await serve(),base=`http://127.0.0.1:${server.address().port}`;
+ const browser=await chromium.launch({headless:true});
+ const states=['empty','delayed','offline','login'];
+ try {
+  for(const [width,height] of [[1440,900],[390,844]])for(const state of states){
+   const ctx=await browser.newContext({viewport:{width,height},reducedMotion:'reduce'});
+   let release,requested;
+   const gate=new Promise(resolve=>{release=resolve});
+   const started=new Promise(resolve=>{requested=resolve});
+   try {
+    await ctx.addInitScript(()=>localStorage.setItem('lt41.theme','garden'));
+    await ctx.route('**/*',r=>new URL(r.request().url()).origin===base?r.fallback():r.abort());
+    await ctx.route('**/api/**',r=>r.fulfill({status:200,json:{ok:true,items:[]}}));
+    await ctx.route('**/api/workspace**',async r=>{
+     requested();
+     if(state==='delayed'||state==='offline')await Promise.all([gate,new Promise(resolve=>setTimeout(resolve,600))]);
+     if(state==='offline')return r.fulfill({status:503,json:{ok:false,code:'unavailable'}});
+     if(state==='login')return r.fulfill({status:401,json:{ok:false,code:'unauthenticated'}});
+     return r.fulfill({status:200,json:{revision:1,state:{version:1,trees:[],prefs:{}},subject:'test-1109-empty',writeSubjectBound:true,savedAt:'2026-11-22T00:00:00Z'}});
+    });
+    const page=await ctx.newPage(),cdp=await ctx.newCDPSession(page);
+    await cdp.send('Emulation.setCPUThrottlingRate',{rate:4});
+    await page.goto(`${base}/v41/?account=1`,{waitUntil:'load'});
+    await started;
+    const facts=async()=>{
+     if(width===390&&await page.locator('#header-overflow').isHidden())await page.locator('#mobile-more').click();
+     return page.evaluate(()=>{
+      const menu=innerWidth<=780,labels=['서재','책','보드','지도'];
+      const nodes=[...document.querySelectorAll(menu?'#header-overflow button':'#tree-views button[data-view]')].filter(b=>labels.includes(b.textContent.trim()));
+      const nav=document.querySelector('#tree-views');
+      return {hidden:nav.hidden,display:getComputedStyle(nav).display,member:document.body.dataset.member,source:document.body.dataset.recordSource,buttons:nodes.map(b=>{const r=b.getBoundingClientRect();return {text:b.textContent.trim(),w:r.width,h:r.height}})};
+     });
+    };
+    const check=async(stage)=>{
+     const row=await facts();console.log('# 빈 화면 탐색',width,state,stage,JSON.stringify(row));
+     assert.equal(row.hidden,false,`${width}/${state}/${stage}: 회원 탭이 숨지 않는다`);
+     assert.equal(row.buttons.length,4);
+     assert.ok(row.buttons.every(b=>b.w>0&&b.h>0),JSON.stringify(row.buttons));
+    };
+    if(state==='delayed'||state==='offline'){
+     await check('응답 전');
+     assert.equal(await page.locator('#write-menu').isHidden(),true,'확인 전 쓰기 권한 없음');
+     assert.equal(await page.locator('#account-avatar').isHidden(),true,'확인 전 계정 표시 없음');
+     if(width===390)await page.locator('#header-overflow button').filter({hasText:/^서재$/}).click();
+     else await page.locator('#tree-views button[data-view="track32-bookshelf.html"]').click();
+     assert.equal(await page.locator('#empty h1').textContent(),'아직 책장이 비어 있어요.');
+     release();
+    }
+    await page.waitForFunction(wanted=>document.body.dataset.recordSource==='server'&&document.body.dataset.member===wanted,['empty','delayed'].includes(state)?'in':'out');
+    if(state==='login'){
+     assert.equal(await page.locator('#tree-views').evaluate(e=>e.hidden),true,'인증 실패가 확정되면 회원 탭을 숨긴다');
+     continue;
+    }
+    await check('응답 후');
+    if(state==='delayed'||state==='offline'){
+     assert.equal(new URL(page.url()).hash,'#shelf','먼저 고른 서재 주소 유지');
+     assert.equal(await page.locator('#empty h1').textContent(),'아직 책장이 비어 있어요.');
+     assert.equal(await page.locator('#empty-records').textContent(),'＋ 새 트리');
+    }
+    if(state==='offline')assert.equal(await page.locator('#account-avatar').isHidden(),true,'읽기 실패를 로그인 성공으로 보지 않는다');
+   } finally {release();await ctx.close();}
+  }
+ } finally {await browser.close();await new Promise(resolve=>server.close(resolve));}
 });
