@@ -704,16 +704,18 @@ test('같은 tree_id를 가진 두 계정은 둘 다 소개되고 한쪽 숨김�
       shareIds[subjectId] = shareId;
     }
     const repo = createCommunityRepo(pool);
+    // summaries는 {share:{…}} 모양, listDiscoverable은 행 자체(shareRow)를 돌려준다 — 도우미를 나눠 쓴다.
     const subjectsOf = rows => rows.map(row => row.share.subjectId).sort();
+    const subjectIdsOf = rows => rows.map(row => row.subjectId).sort();
     // 두 계정 모두 목록에 나온다 — tree_id 겹침으로 한쪽이 가려지지 않는다.
     assert.deepEqual(subjectsOf(await repo.listDiscoverableSummaries({ productId, limit: 10 })), ['owner-a', 'owner-b']);
-    assert.deepEqual(subjectsOf(await repo.listDiscoverable({ productId, limit: 10 })), ['owner-a', 'owner-b']);
+    assert.deepEqual(subjectIdsOf(await repo.listDiscoverable({ productId, limit: 10 })), ['owner-a', 'owner-b']);
     assert.deepEqual(await repo.discoverTotals({ productId }), { trees: 2, moments: 6 });
     // 한쪽 숨김 — 그 계정만 목록에서 내려가고 같은 tree_id의 다른 계정에 번지지 않는다.
     await pool.query('INSERT INTO lovetree_community_hidden_shares(product_id,share_id,hidden_by) VALUES($1,$2,$3)',
       [productId, shareIds['owner-a'], 'moderator']);
     assert.deepEqual(subjectsOf(await repo.listDiscoverableSummaries({ productId, limit: 10 })), ['owner-b']);
-    assert.deepEqual(subjectsOf(await repo.listDiscoverable({ productId, limit: 10 })), ['owner-b']);
+    assert.deepEqual(subjectIdsOf(await repo.listDiscoverable({ productId, limit: 10 })), ['owner-b']);
     assert.deepEqual(await repo.discoverTotals({ productId }), { trees: 1, moments: 3 });
     // 숨김 제거 — 두 계정이 다시 나온다.
     await pool.query('DELETE FROM lovetree_community_hidden_shares WHERE product_id=$1', [productId]);
