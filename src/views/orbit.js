@@ -153,7 +153,7 @@ export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSel
  const app=shadow.querySelector('.app'),world=shadow.querySelector('.world'),dialog=shadow.querySelector('dialog');
  // #1010: 예시 안내 줄 — 떠다니는 예시 카드가 숨는 좁은 화면에서는 함께 숨긴다(아래 배치에서 data-off를 묻는다).
  const centerNote=shadow.querySelector('.center-note');
- const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;let paused=reduced,phase=0,raf=0,previous=0,drag=null,moved=0,opener=null,spin=0,glide=0;
+ const reduceQuery=matchMedia('(prefers-reduced-motion: reduce)');let reduced=reduceQuery.matches,paused=reduced,phase=0,raf=0,previous=0,drag=null,moved=0,opener=null,spin=0,glide=0;
   // #942: 가리키기·클릭으로 배경이 움직이지 않게 카메라는 항상 중심(0,0)에 둔다. 회전은 끌 때만 phase 로 누적한다.
   let cameraTarget={x:0,y:0}, camera={x:0,y:0};
  // #586: 패럴랙스는 pointermove마다 화면 중심을 재지 않는다 — 끄는 동안 pointermove가 프레임보다
@@ -675,7 +675,7 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
     // 첫 자리·모양은 위 placeCard 가 이미 다 그렸으므로(화면 변화 0), WAAPI 붙임만 뒤로 미룬다.
     elements.forEach((el,i)=>{orbitKF[i]=null;});
     const total=Math.min(cap,elements.length),chunk=12;
-    for(let from=0;from<total;from+=chunk){const start=from;requestAnimationFrame(()=>{for(let i=start;i<Math.min(start+chunk,total);i++)startOrbit(i,w,h,warmups);if(animRunning())startOrbitLoop();});}
+    for(let from=0;from<total;from+=chunk){const start=from;requestAnimationFrame(()=>{for(let i=start;i<Math.min(start+chunk,total);i++)startOrbit(i,w,h,warmups);if(animRunning())startOrbitLoop();else orbitWrite(performance.now());});}
     orbitBox=boxKey;
    }
    orbitBand=band;
@@ -806,8 +806,10 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
  // #593: 첫 배치를 한 번 하고 나면 유휴에는 프레임을 예약하지 않는다. 화면이 살아 있음을 확인하는
  // 낮은 주기 박동(초당 4회)만 남긴다 — 카드 style 은 쓰지 않으므로 스타일 재계산이 들지 않는다.
  layoutPending=true;schedule();
- // #1086 3차: 공전 루프는 배치(keyframe 굽기)와 무관하게 즉시 시작해 프레임을 이어간다.
- if(animRunning())startOrbitLoop();
+ // #1086: 동작 줄이기가 켜져도 정지 위치는 한 번 써서 카드가 보이게 한다. 설정 변경 시 루프를 켜고 끄고 위치를 다시 쓴다.
+ if(animRunning())startOrbitLoop();else orbitWrite(performance.now());
+ const onReduceChange=(e)=>{reduced=e.matches;syncMotion();orbitWrite(performance.now());};
+ reduceQuery.addEventListener?.('change',onReduceChange);track(()=>reduceQuery.removeEventListener?.('change',onReduceChange));
  track(()=>cancelAnimationFrame(raf));track(()=>stopOrbitLoop());track(()=>orbitAnims.forEach(a=>a?.cancel()));track(()=>floatAnims.forEach(a=>a?.cancel()));track(()=>dialog.close());
  // #213 2번: 첫 화면 도구 줄의 "보기" 메뉴가 움직임을 읽고 바꾼다. dispose는 함수 그대로 둔다.
  dispose.motion={get paused(){return paused;},set(value){setMotionPaused(value);},toggle(){setMotionPaused(!paused);return paused;}};
