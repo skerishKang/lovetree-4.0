@@ -19,7 +19,7 @@ const BUILTINS = new Set(('String Number Boolean Array Object JSON Math Date Pro
   + 'matchMedia Intl FormData Blob File Image CustomEvent Event KeyboardEvent ResizeObserver MutationObserver IntersectionObserver '
   + 'AbortController TextEncoder TextDecoder DataTransfer atob btoa Symbol WeakMap WeakSet Reflect Proxy BigInt Uint8Array globalThis '
   + 'addEventListener removeEventListener dispatchEvent focus').split(' '));
-const KEYWORDS = new Set('if for while switch catch return typeof new function await async import super delete void of in'.split(' '));
+const KEYWORDS = new Set('if else for while switch catch return typeof new function await async import super delete void of in'.split(' '));
 
 function stripComments(src) {
   return src
@@ -85,15 +85,33 @@ test('셸과 셸·공통 모듈마다 이름으로 부르는 함수는 그 파�
   assert.deepEqual(problems, [], `받지 않은 채 부르는 이름이 있다:\n${problems.join('\n')}`);
 });
 
-test('셸이 설정 모듈 함수를 이름으로 부르면 셸이 그 이름을 받아 둔다', async () => {
-  const shell = await readFile(shellUrl, 'utf8');
+test('셸이 설정 모듈 함수를 이름으로 부르면 그 모듈이 이름을 받거나 공유 연결을 가진다', async () => {
+  const names = (await readdir(dir)).filter(n => n.endsWith('.mjs'));
+  const all = await Promise.all(names.map(async name => [name, stripComments(await readFile(new URL(name, dir), 'utf8'))]));
+  const runtime = all.filter(([,source]) => /Object\.defineProperties\s*\(\s*ctx\s*,/.test(source) || /export\s+function\s+create\w+\s*\(\s*ctx\s*\)/.test(source));
+  const sources = [['shell.mjs', stripComments(await readFile(shellUrl, 'utf8'))], ...runtime];
   const settings = await readFile(new URL('settings.mjs', dir), 'utf8');
-  const own = new Set();
-  for (const m of shell.matchAll(/(?:function|const|let|var|class)\s+([A-Za-z0-9_$]+)/g)) own.add(m[1]);
-  const pulled = /const\s*\{([^}]*)\}\s*=\s*shellSettings/.exec(shell);
-  if (pulled) for (const n of pulled[1].split(',')) own.add(n.trim());
-  for (const m of shell.matchAll(/import\s*\{([^}]*)\}/g)) for (const n of m[1].split(',')) own.add(n.trim().split(/\s+as\s+/).pop());
-  const fns = [...settings.matchAll(/^(?:async )?function ([A-Za-z0-9_$]+)\(/gm)].map(m => m[1]);
-  const missing = fns.filter(n => new RegExp(`(^|[^.A-Za-z0-9_$])${n}\\(`).test(stripComments(shell)) && !own.has(n));
-  assert.deepEqual(missing, [], `셸이 받지 않은 채 부르는 설정 함수: ${missing.join(', ')}`);
+  const fns = [...settings.matchAll(/^(?:async\s+)?function\s+([A-Za-z0-9_$]+)\s*\(/gm)].map(m => m[1]);
+  const providers = new Map();
+  for (const [name, source] of runtime) {
+    for (const m of source.matchAll(/^\s*([\w$]+)\s*:\s*\{\s*(?:value|get)\s*:/gm)) {
+      const existing = providers.get(m[1]) || [];
+      existing.push(name);
+      providers.set(m[1], existing);
+    }
+  }
+  const problems = [];
+  for (const [name, source] of sources) {
+    const own = new Set();
+    for (const m of source.matchAll(/(?:function|const|let|var|class)\s+([A-Za-z0-9_$]+)/g)) own.add(m[1]);
+    for (const m of source.matchAll(/\{([^}]+)\}\s*=\s*shellSettings\b/g)) for (const n of m[1].split(',')) own.add(n.trim());
+    for (const m of source.matchAll(/import\s*\{([^}]*)\}/g)) for (const n of m[1].split(',')) own.add(n.trim().split(/\s+as\s+/).pop());
+    for (const n of fns) if (new RegExp(String.raw`(^|[^.A-Za-z0-9_$])${n}\s*\(`).test(source) && !own.has(n)) problems.push(name + ': ' + n);
+    // 공유 ctx로 접근하는 이름(함수와 상태)은 정확히 한 모듈에서 연결해야 한다.
+    for (const m of stripStrings(source).matchAll(/\bctx\s*\.\s*([\w$]+)/g)) {
+      if (providers.get(m[1])?.length !== 1) problems.push(name + ': ctx.' + m[1]);
+      if (fns.includes(m[1]) && providers.get(m[1])?.[0] !== 'settings-runtime.mjs') problems.push(name + ': settings ctx.' + m[1]);
+    }
+  }
+  assert.deepEqual(problems, [], '받지 않은 채 부르는 설정 함수 또는 중복/누락 공유 연결');
 });
