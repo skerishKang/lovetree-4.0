@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {MEMBER_LOGIN_URL,shouldLoadMemberRecords} from '../public/v41/member-entry.mjs';
 import { createSharedPagesAuth } from '../functions/_lib/shared-auth.mjs';
+import { createAuthPagesHandler } from '../functions/auth/[[path]].js';
 
 async function setup() {
   const keys = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
@@ -271,4 +272,37 @@ test('저장소 호출이 실패해도 로그인은 성공한다', async () => {
   assert.equal(done.status, 302);
   assert.match(done.headers.get('set-cookie'), /__Host-lovetree-access=access/);
   assert.equal(outcomes.filter((url) => url !== 'https://auth.padiem.net/token').length, 1);
+});
+
+test('#1175 콜백 거절은 옛 경로·새 경로 모두 날 글자 대신 안내 표지로 돌아간다', async () => {
+  const f = await setup();
+  const begin = await f.auth(new Request('https://lovetree-4-0.pages.dev/auth/login'), f.env);
+  const cookie = begin.headers.get('set-cookie').split(';')[0];
+  const shared = createAuthPagesHandler({ shared: f.auth, legacy: async () => new Response('legacy', { status: 401 }) });
+  const rejected = await shared({
+    request: new Request('https://lovetree-4-0.pages.dev/auth/callback?state=wrong&code=x', { headers: { cookie } }),
+    env: { ...f.env, LOVETREE_SHARED_AUTH_ENABLED: 'true' }
+  });
+  assert.equal(rejected.status, 302, '새 경로의 401도 이동으로 바꾼다');
+  assert.equal(rejected.headers.get('location'), '/v41/?loginNotice=1');
+  assert.equal(await rejected.text(), '', 'JSON을 브라우저에 보내지 않는다');
+
+  const legacy = createAuthPagesHandler({
+    legacy: async () => Response.json({ error: { code: 'login_handoff_rejected' } }, { status: 401 }),
+    shared: async () => { throw new Error('legacy 경로에서는 shared를 부르지 않는다'); }
+  });
+  const old = await legacy({ request: new Request('https://lovetree-4-0.pages.dev/auth/callback?state=wrong&code=x'), env: {} });
+  assert.equal(old.status, 302, '옛 프록시 경로의 401도 이동으로 바꾼다');
+  assert.equal(old.headers.get('location'), '/v41/?loginNotice=1');
+
+  const success = createAuthPagesHandler({
+    shared: async () => new Response(null, { status: 302, headers: { location: '/v41/' } }),
+    legacy: async () => new Response(null, { status: 302, headers: { location: '/v41/' } })
+  });
+  const ok = await success({
+    request: new Request('https://lovetree-4-0.pages.dev/auth/callback?state=ok&code=x', { headers: { cookie } }),
+    env: { ...f.env, LOVETREE_SHARED_AUTH_ENABLED: 'true' }
+  });
+  assert.equal(ok.status, 302);
+  assert.equal(ok.headers.get('location'), '/v41/', '성공 콜백은 그대로');
 });
