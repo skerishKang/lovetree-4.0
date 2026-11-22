@@ -23,11 +23,13 @@ export function mountScreenToolbar({ screen, titleFrom, tools = [] }) {
   // 좌우 여백과 세로 자리는 상단 메뉴의 실제 계산값을 따른다(화면별 하드코딩 없음).
   const align = () => {
     if (!header) return;
-    const bottom = Math.round(header.getBoundingClientRect().bottom);
+    const bottom = Math.round(header.getBoundingClientRect().bottom) + 4;
     bar.style.setProperty('--lt-toolbar-top', `${bottom}px`);
     bar.style.setProperty('--lt-toolbar-pad', getComputedStyle(header).paddingLeft);
     const height = Math.round(parseFloat(getComputedStyle(bar).height) || 52);
     document.documentElement.style.setProperty('--lt-content-top', `${bottom + height}px`);
+    document.documentElement.style.setProperty('--lt-toolbar-top', `${bottom}px`);
+    document.documentElement.style.setProperty('--lt-toolbar-height', `${height}px`);
   };
   align();
 
