@@ -1,6 +1,7 @@
 import {createWorkspaceApi} from './api.mjs';
 // #480 L13: 보관 파일의 날짜도 책·보드·지도와 같은 한 벌로 적는다.
 import {formatDisplayDate} from './book-usability.mjs';
+import {mediaAssetUrl} from './youtube-id.mjs'; // A-11: 올린 사진 주소도 정본 한 벌에서 만든다.
 const TYPES=new Set(['image/png','image/jpeg','image/gif','image/webp','video/mp4','video/webm']);
 const SIZE_PROBLEM='PNG·JPEG·GIF·WebP(약 4.2MB), MP4·WebM(약 8.4MB)만 올릴 수 있어요.';
 // 2026-11-08 순간 추가·수정 패널: 링크와 사진을 한 묶음으로 두고, 파일은 선택하면 바로 올린다.
@@ -38,7 +39,7 @@ export function mountPrivateUpload({form,assets,getSubject,getState,onChange,onU
    const result=await api.uploadMedia(file,subject,id,controller.signal,file.name);
    if(generation!==version||getSubject()!==subject)return;
    if(!result.ok){status.textContent=result.message||(result.code==='cancelled'?'전송을 멈췄어요. 서버에 보관됐을 수 있으니 내가 올린 사진·영상을 확인해 주세요.':result.code==='timeout'?'응답이 늦어요. 같은 파일로 다시 시도하거나 내가 올린 사진·영상을 확인해 주세요.':'파일을 올리지 못했어요. 로그인과 연결을 확인한 뒤 다시 시도해 주세요.');return;}
-   if(typeof result.media?.url!=='string'||!result.media.url.startsWith(location.origin+'/api/media/')){status.textContent='파일 보관 응답을 확인하지 못했어요. 내가 올린 사진·영상을 확인해 주세요.';return;}
+   if(typeof result.media?.url!=='string'||!result.media.url.startsWith(mediaAssetUrl('',location.origin))){status.textContent='파일 보관 응답을 확인하지 못했어요. 내가 올린 사진·영상을 확인해 주세요.';return;}
    if(onUploaded){
     // #256-3 2단계: 주소만 넘겨 후속을 맡긴다. 순간 폼의 링크 칸은 건드리지 않는다.
     const url=result.media.url;fileInput.value='';file=null;id=null;setName('');onChange();
@@ -83,7 +84,7 @@ export function mountPrivateUpload({form,assets,getSubject,getState,onChange,onU
    host.append(list);
   }else{const none=document.createElement('p');none.className='assets-detail-none';none.textContent='이 파일을 쓰는 순간은 없어요.';host.append(none);}
   const row=document.createElement('div');row.className='button-row';
-  const use=document.createElement('button');use.type='button';use.textContent='이 파일 첨부';use.onclick=()=>{if(busy||getSubject()!==subject)return;const url=location.origin+'/api/media/'+asset.name;assets.close();const accepted=onUseAsset?onUseAsset(url):true;if(accepted===false)return;form.elements.url.value=url;onChange();form.elements.url.focus?.();status.textContent='첨부할 파일을 골랐어요. 순간을 저장해 주세요.';};
+  const use=document.createElement('button');use.type='button';use.textContent='이 파일 첨부';use.onclick=()=>{if(busy||getSubject()!==subject)return;const url=mediaAssetUrl(asset.name,location.origin);assets.close();const accepted=onUseAsset?onUseAsset(url):true;if(accepted===false)return;form.elements.url.value=url;onChange();form.elements.url.focus?.();status.textContent='첨부할 파일을 골랐어요. 순간을 저장해 주세요.';};
   const remove=document.createElement('button');remove.type='button';remove.textContent='파일 삭제';remove.className='danger';
   remove.onclick=async()=>{if(busy||getSubject()!==subject||!confirm('이 파일을 지우면 이 파일을 쓴 순간에서도 볼 수 없게 돼요. 지울까요?'))return;remove.disabled=true;const result=await api.removeMedia(asset.name,subject);if(getSubject()!==subject)return;if(result.ok){if(assetName(form.elements.url.value)===asset.name){form.elements.url.value='';onChange();}host.replaceChildren();await refresh();}else{status.textContent=result.message||'삭제하지 못했어요. 다시 시도해 주세요.';remove.disabled=false;}};
   row.append(use,remove);host.append(row);
@@ -100,7 +101,7 @@ export function mountPrivateUpload({form,assets,getSubject,getState,onChange,onU
    const card=document.createElement('div');card.className='asset-card';
    const open=document.createElement('button');open.type='button';open.className='asset-card-open';open.setAttribute('aria-label',assetLabel(asset)+' 보기');
    const thumb=document.createElement('span');thumb.className='asset-thumb';
-   if(asset.mime.startsWith('image/')){const img=document.createElement('img');img.src=location.origin+'/api/media/'+asset.name;img.alt='';img.loading='lazy';thumb.append(img);}
+   if(asset.mime.startsWith('image/')){const img=document.createElement('img');img.src=mediaAssetUrl(asset.name,location.origin);img.alt='';img.loading='lazy';thumb.append(img);}
    else{const mark=document.createElement('span');mark.className='asset-thumb-video';mark.textContent='▶';thumb.append(mark);}
    const name=document.createElement('span');name.className='asset-name';name.textContent=assetLabel(asset);
    const count=document.createElement('span');count.className='asset-count';count.textContent=references?references+'개 순간에서 사용':'연결된 순간 없음';
@@ -117,7 +118,7 @@ export function mountPrivateUpload({form,assets,getSubject,getState,onChange,onU
    const result=await api.uploadMedia(chosen,subject,crypto.randomUUID(),controller.signal,chosen.name);
    if(generation!==version||getSubject()!==subject)return;
    if(!result.ok){A('[data-usage]').textContent=result.message||'파일을 올리지 못했어요. 로그인과 연결을 확인한 뒤 다시 시도해 주세요.';return;}
-   if(typeof result.media?.url!=='string'||!result.media.url.startsWith(location.origin+'/api/media/')){A('[data-usage]').textContent='파일 보관 응답을 확인하지 못했어요.';return;}
+   if(typeof result.media?.url!=='string'||!result.media.url.startsWith(mediaAssetUrl('',location.origin))){A('[data-usage]').textContent='파일 보관 응답을 확인하지 못했어요.';return;}
    await refresh();
   }finally{controller=null;setBusy(false);}
  }

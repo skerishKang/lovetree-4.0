@@ -11,3 +11,6 @@ export const youtubeIdFrom = canonical.youtubeIdFrom;
 export const safeYoutubeThumb = canonical.safeYoutubeThumb;
 export const youtubeStageThumbUrl = canonical.youtubeStageThumbUrl;
 export const isVerticalMoment = canonical.isVerticalMoment;
+export const MEDIA_ASSET_PATH = canonical.MEDIA_ASSET_PATH;
+export const CARD_IMAGE_URL = canonical.CARD_IMAGE_URL;
+export const mediaAssetUrl = canonical.mediaAssetUrl;

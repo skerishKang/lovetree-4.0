@@ -246,10 +246,10 @@ html[data-v41-screen=book] .tools .ui-btn::after,html[data-v41-screen=board] hea
 }
 /* 책/목록 토글(상단 단추)이 보일 때만 머리줄을 감아 트리 줄을 온전히 남긴다. */
 @media(max-width:780px){
- .app-header:has(#book-display-toggle:not([hidden])){flex-wrap:wrap}
- .app-header:has(#book-display-toggle:not([hidden])) .main-nav{flex-basis:100%;order:3}
+ .app-header:has(.view-toggle:not([hidden])){flex-wrap:wrap}
+ .app-header:has(.view-toggle:not([hidden])) .main-nav{flex-basis:100%;order:3}
  /* 머리줄이 두 줄이 되면 트리 팝오버도 그 아래에서 열린다. */
- .app-header:has(#book-display-toggle:not([hidden])) .tree-popover{top:108px}
+ .app-header:has(.view-toggle:not([hidden])) .tree-popover{top:108px}
 }
 /* 넘치는 쪽 끝의 페이드. 스크롤 위치에 따라 켜고 끄는 클래스는 shell.mjs가 붙인다. */
 @media(max-width:780px){
@@ -640,7 +640,9 @@ html[data-lt-theme=garden] .home-links .feedback-link:hover{color:var(--lt-ink)}
 @media(max-width:520px){body.home-screen .home-links{flex-wrap:wrap;max-width:calc(100% - 150px)}body.home-screen .home-links a.feedback-link{display:inline-flex}body.home-screen .home-links .feedback-link{min-height:30px;padding:2px 8px}}
 /* 390 지도·책·서재 목록: 조작 줄·책 테두리·'책 속의 트리' 상자와 겹치던 아래 링크 줄을 숨긴다(1440은 지금 자리).
    서재 목록은 프레임 안이 스크롤되므로 화면에 붙은 링크 줄이 지나가는 글자 위에 포개진다 — 책·지도와 같은 길로 숨긴다. */
-@media(max-width:520px){body[data-fab-lift=book] .home-links,body[data-fab-lift=network] .home-links,body[data-fab-lift=shelf] .home-links{display:none}}
+/* #1093: 여러 줄 선반 위에 화면에 붙은 링크가 포개지므로 서재는 폭과 무관하게 숨긴다. */
+body[data-fab-lift=shelf] .home-links{display:none}
+@media(max-width:520px){body[data-fab-lift=book] .home-links,body[data-fab-lift=network] .home-links{display:none}}
 /* 이슈 611: 계정 단추 점 — 새 소식이나 새 답글이 있을 때. */
 .account-avatar{position:relative}
 .account-avatar.has-dot::after{content:'';position:absolute;top:2px;right:2px;width:9px;height:9px;border-radius:50%;background:var(--lt-rose);border:1px solid var(--lt-stage)}

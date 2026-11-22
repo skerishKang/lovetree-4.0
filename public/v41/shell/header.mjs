@@ -2,7 +2,7 @@
 // 2026-11-08 리팩터링: 동작·겉모습 변경 0. shell.mjs에서 조건·조회 방식·인자 형태를 바꾸지 않고 그대로 옮겼다.
 // 셸은 자기 상태(member·model·source·current)를 읽기 함수로 넘기고, 이 파일은 헤더만 만진다.
 import {hasPendingDraft} from '../sync-controller.mjs';
-import {accountPresentation,treePickerText,treePickerVisible,treePickerAriaLabel,treeViewsVisible,writeMenuLabel,headerPartsFor,bookDisplayVisible} from '../header-state.mjs';
+import {accountPresentation,treePickerText,treePickerVisible,treePickerAriaLabel,treeViewsVisible,writeMenuLabel,headerPartsFor,bookDisplayVisible,shelfViewVisible} from '../header-state.mjs';
 import {normalizeAccentColor} from '../domain.mjs';
 import {displayTreeTitle} from '../tree-name.mjs';
 
@@ -32,10 +32,16 @@ function flowNavigation(){
   const showTreeViews=parts.treeViews&&treeViewsVisible({owned,publicReading});
   $('tree-views').hidden=!showTreeViews;for(const b of $('tree-views').querySelectorAll('button')){b.disabled=false;b.title='';}
   $('tree-views').setAttribute('aria-label','이 트리 보기');
-  // #1094: 보기 방식(책/목록) 전환 묶음은 서재·책 화면에서만 보인다(보드·지도에는 없다).
-  // #1092 후속: 둘러보기는 서재 위에 뜨는 화면이라 현재 화면 값이 서재로 남는다 — 둘러보기 화면에서도 접는다.
+  // #1094: 보기 방식(책/목록) 전환 묶음은 책 화면에서만, #1093 서재 진열 묶음은 서재 화면에서만 보인다.
+  // #1092 후속: 둘러보기는 서재 위에 뜨는 화면이라 현재 화면 값이 서재로 남는다 — 둘러보기 화면에서는 둘 다 접는다.
+  const onCommunity=document.body.classList.contains('community-screen');
+  const onShelf=getCurrent()==='track32-bookshelf.html';
+  // #1093: 서재 진열 토글만 390에서 화면 안 도구 줄로 옮긴다 — #1121 책 보기 토글의 자리·보임은 그대로다.
+  const inlineShelfToggle=typeof globalThis.matchMedia==='function' && globalThis.matchMedia('(max-width:520px)').matches;
   const bookToggle=$('book-display-toggle');
-  if(bookToggle)bookToggle.hidden=!bookDisplayVisible({current:getCurrent()})||document.body.classList.contains('community-screen');
+  if(bookToggle)bookToggle.hidden=!bookDisplayVisible({current:getCurrent()})||onCommunity;
+  const shelfToggle=$('shelf-view-toggle');
+  if(shelfToggle)shelfToggle.hidden=!shelfViewVisible({current:getCurrent()})||onCommunity||inlineShelfToggle;
   for(const b of document.querySelectorAll('nav>button'))b.hidden=publicReading;
   // 트리 선택은 뒤쪽 탭 묶음 바로 앞에 있고, 로그인 상태에서만 "트리: <이름> ▾"로 보여 준다.
   // 2026-11-18 13:49 대표 결정: 트리 선택은 모든 페이지에서 똑같이 보인다(서재 포함).
@@ -111,6 +117,9 @@ function openAccountMenu(via='keyboard'){const owned=!!getMember()?.snapshot().o
  function applyAccountRoles(){const j=$('account-journal');if(j)j.hidden=!aiCustomer;const opsGroup=$('account-ops-group');if(opsGroup)opsGroup.hidden=!isAdmin;const p=$('account-my-posts');if(p)p.hidden=false;}
 async function loadAccountEmail(){emailTried=true;const answer=await accountApi.account().catch(()=>null);if(!answer?.ok){emailTried=false;return;}if(answer.email)accountEmail=answer.email;aiCustomer=!!answer.aiCustomer;isAdmin=!!answer.admin;applyAccountRoles();renderAccount();}
 function updateAccountControls(){const owned=!!getMember()?.snapshot().owned;if(!owned){accountEmail='';emailTried=false;aiCustomer=false;isAdmin=false;}document.querySelectorAll('[data-guest-login]').forEach(x=>x.hidden=owned);$('server').hidden=!owned;$('logout').hidden=!owned;applyAccountRoles();renderAccount();if(owned&&!accountEmail&&!emailTried)void loadAccountEmail();}
+ 
+  // 창 폭이 바뀌면 390의 토글 자리를 다시 정한다(머리줄 ↔ 화면 안 도구 줄).
+  if(typeof addEventListener==='function')addEventListener('resize',()=>flowNavigation());
 // #1134: 401 뒤 상단 단추만 로그인으로 바뀌고 계정 메뉴는 그대로 남아 반쯤 로그아웃되던 것을 막는다.
 // authRequired()가 부르는 한 벌 — 계정 메뉴의 이메일·운영·로그아웃을 함께 로그아웃 상태로 맞춘다.
 function paintAuthExpired(){
@@ -124,6 +133,7 @@ function paintAuthExpired(){
   const journal=$('account-journal');if(journal)journal.hidden=true;
   const entry=$('account-entry');if(entry){entry.hidden=false;entry.textContent='로그인';}
 }
+
 
   return {
     flowNavigation,
