@@ -2,7 +2,8 @@
    색은 모두 --lt-* 토큰만 쓴다(화면별 하드코딩 금지). */
 html{--lt-toolbar-height:52px;--lt-content-top:calc(var(--lt-toolbar-top,66px) + var(--lt-toolbar-height))}
 html[data-v41-screen=book]{--lt-toolbar-top:70px;--lt-toolbar-pad:28px}
-html[data-v41-screen=board]{--lt-toolbar-top:66px;--lt-toolbar-pad:24px}
+/* Board header is 66px (56px narrow); reserve its 4px gap before the module mounts. */
+html[data-v41-screen=board]{--lt-toolbar-top:70px;--lt-toolbar-pad:24px}
 html[data-v41-screen=shelf]{--lt-toolbar-top:82px;--lt-toolbar-pad:18px}
 /* 서재는 도구 줄을 실제 흐름에 넣고, 책 수는 이어 보기 띠 아래에 남긴다. */
 html[data-v41-screen=shelf] .lt-screen-toolbar{position:relative;top:auto;margin-top:4px;flex:none}
@@ -50,11 +51,11 @@ html[data-book-shape=phone][data-v41-screen=book] .stage{top:auto;min-height:cal
 @media(min-width:601px){html[data-v41-screen=book] .stage{padding-top:18px}}
 html[data-v41-screen=board] .boardTitle{top:calc(var(--lt-content-top) + 8px)}
 html[data-v41-screen=board]{--lt-board-frame-top:calc(var(--lt-content-top) + 80px)}
-@media(max-width:700px){html[data-v41-screen=board]{--lt-board-frame-top:var(--lt-content-top)}}
+@media(max-width:700px){html[data-v41-screen=board]{--lt-toolbar-top:60px;--lt-board-frame-top:var(--lt-content-top)}}
 @media(max-width:600px){
   html{--lt-toolbar-height:48px}
   .lt-screen-toolbar{padding:0 12px}
   html[data-v41-screen=book]{--lt-toolbar-pad:12px;--lt-toolbar-top:60px}
-  html[data-v41-screen=board]{--lt-toolbar-pad:12px;--lt-toolbar-top:56px}
+  html[data-v41-screen=board]{--lt-toolbar-pad:12px}
   html[data-v41-screen=shelf]{--lt-toolbar-pad:12px}
 }
