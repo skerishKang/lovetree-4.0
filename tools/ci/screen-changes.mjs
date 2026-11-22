@@ -44,6 +44,16 @@ function isScreenTool(file) {
   return SCREEN_TOOLS.test(file);
 }
 
+// 지도(추후 개발) 쪽 파일: 지도 화면·지도 시험과 helpers·지도가 쓰는 테마 공통 파일. 이 판정 도구와
+// 화면 워크플로가 바뀌어도 지도 시험을 돌린다. 애매하면 바뀜으로 두지 않는다 — 지도는 지금 손대지 않으므로
+// 지도 파일이 실제로 바뀐 PR만 잰다.
+const MAP_FILE = /(?:network|graph|map-|-map|\/map\.|views\/network|identity\.css|theme\.mjs)/;
+export function mapChanged(changedFiles) {
+  return changedFiles.some((f) => f && (
+    MAP_FILE.test(f) || f === '.github/workflows/preview-check.yml' || f === 'tools/ci/screen-changes.mjs'
+  ));
+}
+
 export function classify(changedFiles, screenTests, screenHelpers) {
   const reasons = [];
   let changed = false;
@@ -80,5 +90,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const result = classify(changed, new Set(tests), new Set(helperFiles(tests)));
   for (const line of result.reasons) console.log(line);
   console.log(`화면 바뀜: ${result.changed} (${changed.length}개 파일)`);
-  if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `changed=${result.changed}\n`);
+  const map = result.changed && mapChanged(changed);
+  console.log(`지도 바뀜: ${map}`);
+  if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `changed=${result.changed}\nmap_changed=${map}\n`);
 }

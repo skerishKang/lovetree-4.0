@@ -25,6 +25,8 @@ jobs:
     timeout-minutes: 5
     outputs:
       changed: ${{ steps.diff.outputs.changed }}
+      # 지도는 추후 개발(11-22 대표 결정). 지도 대비·부채꼴 시험은 지도 파일이 바뀐 PR에서만 돈다.
+      map_changed: ${{ steps.diff.outputs.map_changed }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -35,7 +37,7 @@ jobs:
         run: |
           base='${{ github.event.pull_request.base.sha }}'
           head='${{ github.event.pull_request.head.sha }}'
-          git diff --name-only "$base...$head" > /tmp/changed-files.txt 2>/dev/null || { echo "diff 실패 — 바뀜으로 둔다"; echo "changed=true" >> "$GITHUB_OUTPUT"; exit 0; }
+          git diff --name-only "$base...$head" > /tmp/changed-files.txt 2>/dev/null || { echo "diff 실패 — 바뀜으로 둔다"; echo "changed=true" >> "$GITHUB_OUTPUT"; echo "map_changed=true" >> "$GITHUB_OUTPUT"; exit 0; }
           # 판정은 tools/ci/screen-changes.mjs가 한다. 화면 시험 목록은 이 워크플로의 화면 잡 구간에서
           # 자동으로 뽑는다(손으로 따로 적지 않는다) — 시험 파일은 화면 잡이 실제로 실행하는 파일과
           # 그 helpers가 바뀌었을 때만 화면 바뀜이다(이슈 947 — #958 같은 시험 정리 PR도 다 돌던 것을 줄인다).
@@ -940,10 +942,11 @@ jobs:
           fc-cache -f >/dev/null 2>&1 || true
           echo "한글 글꼴 $(fc-list :lang=ko | wc -l)개 · 대표 $(fc-match 'sans-serif:lang=ko' | head -1)"
           echo "한글 글꼴 준비 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+      # 지도는 추후 개발(11-22 대표 결정): 지도 파일이 안 바뀐 PR에서는 이 단계를 건너뛴다(같은 잡의 서재·순간 시험은 그대로 돈다).
       - name: 지도 실제 대비 시험(건너뜀=실패)
         env:
           LT_MAP_CONTRAST_REQUIRE: '1'
-        if: needs.screen-changes.outputs.changed == 'true'
+        if: needs.screen-changes.outputs.changed == 'true' && needs.screen-changes.outputs.map_changed == 'true'
         run: |
           start=$(date +%s)
           # #529: 이름표 대비는 실제로 그려진 한글 글자를 잰다 — 한글 글꼴은 앞의 '한글 글꼴 준비' 단계에서 둔다.
