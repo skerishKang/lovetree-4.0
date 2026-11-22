@@ -1,7 +1,7 @@
 // 설정·계정 창 — shell.mjs에서 코드 위치만 옮긴 모듈(#886). 동작·기준은 그대로다.
 // 상태는 deps의 getter로 받는다(모듈이 shell을 다시 import하지 않는다).
 export function createSettings(deps){
-const { $, notify, panel, show, frames, frameLoaded, hideFrames, closeAccountMenu, openAccountMenu, renderAccount, updateAccountControls, openAssets, openEditor, sample, backup, clear, startMember, leaveMember, openFallbackShell, writeLocation, load, flowNavigation, closePanels, renderTreeMenu, requestBoardOpen, lastShelfTreeId, shellHeader, shellDialogs,  shareApi, accountApi, readTheme, writeTheme, normalizeAccentColor, normalizeDateStyle, normalizeStartPlace, normalizeShareView, normalizeHomeMoment,  readPageTurn, writePageTurn, frameMessage, displayTreeTitle, accountPresentation, createFeedbackDialog, createFeedbackBoard, mountUpdates, readWriteTab, writeWriteTab, clearCachedWorkspace, createWorkspaceApi, paintThemeControls, applyTheme, toggleTheme } = deps;
+const { $, notify, panel, show, frames, frameLoaded, hideFrames, closeAccountMenu, openAccountMenu, renderAccount, updateAccountControls, openAssets, openEditor, sample, backup, clear, startMember, leaveMember, openFallbackShell, writeLocation, load, flowNavigation, closePanels, renderTreeMenu, requestBoardOpen, lastShelfTreeId, shellHeader, shellDialogs,  shareApi, accountApi, readTheme, writeTheme, normalizeAccentColor, normalizeDateStyle, normalizeStartPlace, normalizeShareView, normalizeHomeMoment,  readPageTurn, writePageTurn, frameMessage, displayTreeTitle, accountPresentation, createFeedbackDialog, createFeedbackBoard, mountUpdates, readWriteTab, writeWriteTab, clearCachedWorkspace, createWorkspaceApi, paintThemeControls, applyTheme, toggleTheme, paintBookDisplayControls } = deps;
 const $on=(id,fn)=>{const el=$(id);if(el)el.onclick=fn;};
 function advancedKey(){try{return 'lt41.advanced.'+(deps.member?.snapshot().subject||'')}catch{return 'lt41.advanced.'}}
 function readAdvanced(){try{return localStorage.getItem(advancedKey())==='1'}catch{return false}}
@@ -96,6 +96,29 @@ const themeToggleTop=$('theme-toggle');if(themeToggleTop)themeToggleTop.onclick=
   const motion=$('settings-motion');
   // #465 2: 움직임은 켬/끔 스위치(role=switch) — 켬(기본, aria-checked=true)·끔(멈춤)으로 상태가 보인다.
  if(motion){motion.setAttribute('aria-checked',String(!deps.motionPaused));motion.textContent=deps.motionPaused?'끔':'켬';}
+  paintHomeMomentChoice();
+ }
+ const HOME_MOMENT_MODES=[['last','마지막'],['pin','고정'],['day','그날'],['random','무작위']];
+ function readHomeMomentValue(){try{const v=JSON.parse(localStorage.getItem('lt41.homeMoment')||'null');return v&&typeof v==='object'?deps.normalizeHomeMoment(v):{mode:'last'}}catch{return {mode:'last'}}}
+ function paintHomeMomentChoice(){
+  const box=$('settings-card-pick');if(!box)return;
+  const cur=readHomeMomentValue();box.replaceChildren();
+  const add=(label,mode,treeId)=>{
+   const b=document.createElement('button');b.type='button';b.setAttribute('role','radio');b.textContent=label;
+   b.dataset.homeMoment=mode;if(treeId)b.dataset.homeMomentTree=treeId;
+   b.setAttribute('aria-checked',String(treeId?cur.mode==='tree'&&cur.treeId===treeId:cur.mode===mode&&cur.mode!=='tree'));
+   b.onclick=()=>{
+    const value=treeId?{mode:'tree',treeId}:{mode};
+    try{localStorage.setItem('lt41.homeMoment',JSON.stringify(value))}catch{}
+    if(deps.member?.snapshot().owned){try{deps.member.apply('setPrefs',{homeMoment:value});if(window.LT41)window.LT41.prefs=deps.member.state().prefs}catch{}}
+    paintHomeMomentChoice();
+    try{$('view').contentWindow.postMessage({type:'lt41-home-moment-set',value},location.origin)}catch{}
+    notify('첫 화면 카드를 바꿨어요.');
+   };
+   box.append(b);
+  };
+  for(const [mode,label] of HOME_MOMENT_MODES)add(label,mode);
+  for(const tree of (window.LT41?.trees||[]))add(tree.title||tree.subject||'트리','tree',tree.id);
  }
  for(const b of document.querySelectorAll('[data-home-cards]'))b.onclick=()=>{
   if(!HOME_CARD_MODES.includes(b.dataset.homeCards))return;
@@ -419,7 +442,7 @@ async function openAccountSettings({section=''}={}){
  if(!deps.member?.snapshot().owned){notify('로그인한 뒤 설정을 열 수 있어요.');return;}
  paintSettingsProfile();
  fillProfileForm();
- paintDateStyleControls();paintStartPlaceControls();paintNetworkViewControls();paintShareControls();paintQuickTargetControls();
+ paintDateStyleControls();paintBookDisplayControls();paintStartPlaceControls();paintNetworkViewControls();paintShareControls();paintQuickTargetControls();
  void paintSettingsUsage();void loadTreeVisibility();
  panel('account-settings');
  focusSettingsSection(section);

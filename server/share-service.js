@@ -1,3 +1,4 @@
+import { logServerError } from './error-log.js';
 import { createHash, randomBytes } from 'node:crypto';
 import { coverModeOf, normalizeCoverDesign } from '../src/domain.js';
 import { ApiError } from './errors.js';
@@ -273,7 +274,7 @@ export function createShareHandler({ authenticate, service, productId }) {
     try { return await handle(request); }
     catch (error) {
       if (error instanceof ApiError) return { status: error.status, body: { error: { code: error.code, message: error.message, ...(error.details || {}) } }, headers: NO_STORE };
-      console.error('[lovetree-share] 요청 처리 실패', { path: request?.path, method: request?.method });
+      logServerError(error, 'lovetree-share');
       return { status: 500, body: { error: { code: 'internal_error', message: '서버에서 처리하지 못했어요.' } }, headers: NO_STORE };
     }
   };

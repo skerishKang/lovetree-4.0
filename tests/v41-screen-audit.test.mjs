@@ -148,7 +148,8 @@ test('#942 첫 화면 추가 단추와 숫자 묶음', { skip: REQUIRE ? false :
         const groups=await current.locator('.home-action-group').evaluateAll(es=>es.map(e=>{
           const b=e.querySelector('.subtleBtn'),n=e.querySelector('.home-count'),r=e.getBoundingClientRect(),br=b.getBoundingClientRect(),nr=n.getBoundingClientRect();
           const range=document.createRange();range.selectNodeContents(n);const tr=range.getBoundingClientRect();
-          return {label:b.textContent.trim(),count:n.hidden?'':n.textContent.trim(),x:r.x,y:r.y,w:r.width,h:r.height,inner:n.hidden?null:nr.top-br.bottom,center:n.hidden?null:(tr.left+tr.width/2)-(br.left+br.width/2),font:parseFloat(getComputedStyle(n).fontSize),overflow:n.hidden?0:Math.max(0,tr.right-br.right,br.left-tr.left)};
+           const lines=[...n.querySelectorAll('.home-count-line')].map(row=>row.textContent.trim());
+           return {label:b.textContent.trim(),count:n.hidden?'':lines.join('|'),x:r.x,y:r.y,w:r.width,h:r.height,inner:n.hidden?null:nr.top-br.bottom,center:n.hidden?null:(tr.left+tr.width/2)-(br.left+br.width/2),font:parseFloat(getComputedStyle(n).fontSize),overflow:n.hidden?0:Math.max(0,tr.right-br.right,br.left-tr.left)};
         }));
         const values={buttons,headers,head,fab,top,groups};const key=width+'-'+theme+'-'+kind;
         console.log('#942',key,JSON.stringify(values));
@@ -167,7 +168,7 @@ test('#942 첫 화면 추가 단추와 숫자 묶음', { skip: REQUIRE ? false :
         check(member?buttons.every(b=>b.bg===light):buttons[0]?.bg===rose,key+' 자주색 하나·나머지는 밝은 단추(#1084) '+JSON.stringify(buttons.map(b=>b.bg)));
         check(buttons.slice(member?0:1).every(b=>b.bg===light&&b.border!=='0px'),key+' 밝은 바탕·얇은 테두리 '+JSON.stringify(buttons));
         check(groups.length===3,key+' 묶음 3개');
-        check(JSON.stringify(groups.map(g=>g.count))===JSON.stringify(member?['순간 14 · 모아둔 0','공개 트리 17','트리 3']:['',(signedIn?'':'예시 ')+'공개 트리 17 · 순간 123','']),key+' 숫자 귀속');
+         check(JSON.stringify(groups.map(g=>g.count))===JSON.stringify(member?['순간 14|','공개 트리 17|공개 순간 123','트리 3|공개 트리 1']:['',(signedIn?'':'예시 ')+'공개 트리 17|순간 123','']),key+' 숫자 귀속');
         for(const g of groups.filter(g=>g.count))check(g.inner>=4&&g.inner<=6&&Math.abs(g.center)<=2&&g.font>=12&&g.overflow<=1,key+' 숫자 간격 '+JSON.stringify(g));
         for(let i=1;i<groups.length;i++){
           const a=groups[i-1],b=groups[i],gap=Math.abs(a.y-b.y)<2?b.x-a.x-a.w:b.y-a.y-a.h;
@@ -705,22 +706,33 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     await take(page4, '둘러보기');
     // #784: 반응 단추는 격자 카드에 없고, 카드를 열어야 미리보기에서 보인다.
     await page4.locator('.community-card').first().click();
+    // #1098 1단계(2026-11-22 대표 승인): '반응 남기기' 접힘을 ♡ 하나로 바꿨다 — 기준을 느슨하게 하지 않고 두 규칙을 모두 검사한다.
+    // ① 기본 줄에는 ♡([data-reaction-kind="heart"]) 하나만 보이고 다른 반응 칩은 0개다.
     await page4.waitForFunction(() => {
       const preview = document.getElementById('community-preview');
-      return preview?.open && preview.querySelector('.community-reaction-open');
+      return preview?.open && preview.querySelector('[data-reaction-kind="heart"]');
     }, null, { timeout: 8000 });
     await page4.waitForTimeout(400);
     const reactions = await page4.evaluate(() => {
       const preview = document.getElementById('community-preview');
+      const kinds = [...(preview?.querySelectorAll('[data-reaction-kind]') || [])].map((b) => b.dataset.reactionKind);
       return {
         previewOpen: Boolean(preview?.open),
-        open: preview?.querySelectorAll('.community-reaction-open').length || 0,
-        zeroChips: [...(preview?.querySelectorAll('.community-reaction') || [])].filter((b) => / 0$/.test(b.textContent.trim())).length
+        hearts: kinds.filter((kind) => kind === 'heart').length,
+        others: kinds.filter((kind) => kind !== 'heart').length
       };
     });
     assert.equal(reactions.previewOpen, true, '카드를 누르면 둘러보기 미리보기가 열린다');
-    assert.ok(reactions.open >= 1, '반응이 없으면 미리보기에서 반응 남기기 단추가 보인다');
-    assert.equal(reactions.zeroChips, 0, '0짜리 반응 칩은 보이지 않는다');
+    assert.equal(reactions.hearts, 1, '기본 줄에는 ♡(공감) 단추 하나만 보인다');
+    assert.equal(reactions.others, 0, '기본 줄에 다른 반응 칩은 0개다');
+    // ② 길게 누르면(0.45초 규칙) 나머지 여섯 종이 그 자리에서 펼쳐진다.
+    const heartBox = await page4.locator('#community-preview [data-reaction-kind="heart"]').boundingBox();
+    await page4.mouse.move(heartBox.x + heartBox.width / 2, heartBox.y + heartBox.height / 2);
+    await page4.mouse.down();
+    await page4.waitForFunction(() => document.querySelectorAll('#community-preview [data-reaction-kind]').length >= 7, null, { timeout: 8000 });
+    await page4.mouse.up();
+    const revealed = await page4.evaluate(() => [...document.querySelectorAll('#community-preview [data-reaction-kind]')].map((b) => b.dataset.reactionKind).sort());
+    assert.deepEqual(revealed, ['angry', 'heart', 'laugh', 'like', 'love', 'sad', 'wow'], '길게 누르면 나머지 6종까지 일곱 종이 모두 펼쳐진다');
     // #903: 가입 7일 미만이 담기를 누르면 서버 안내가 담기 단추 바로 다음 줄에 뜬다 —
     // 단추와 안내의 세로 거리를 1440·390에서 모두 12px 이하로 잰다(눈이 아니라 수치로).
     await ctx4.route('**/api/community/shares/*/favorite', (r) => r.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ error: { code: 'vote_too_new', message: '가입하고 7일이 지나면 투표할 수 있어요.' } }) }));
@@ -2645,4 +2657,72 @@ test('#987 보드 첫 줄과 모바일 셸 겹침·현재 표시', { skip: REQUI
     }
   } finally { await browser.close(); await new Promise(r => server.close(r)); }
   assert.deepEqual(failures, []);
+});
+
+// #1094 후속: 390 서재 목록 첫 화면(스크롤 전)에서 화면에 붙은 아래 링크 줄이
+// '책 속의 트리' 상자 위에 포개지지 않는다(겹침 넓이 0, 상자는 끝까지 보인다).
+test('#1094 390 목록 첫 화면 아래 링크 × 책 속의 트리 겹침 0', { skip: REQUIRE ? false : skip, timeout: 180000 }, async () => {
+  if (skip) assert.fail(skip);
+  const server = await serve();
+  const base = 'http://127.0.0.1:' + server.address().port;
+  const browser = await chromium.launch({ headless: true });
+  const input = (title, date) => ({ subject: '겹침 시험', title, note: '화면 확인용 가짜 기록', emotion: '설렘', date, url: '' });
+  let tree = createTree(input('겹침 시험 책', '2026-11-22'), '2026-11-22T00:00:00.000Z');
+  tree = addMoment(tree, input('둘째 순간', '2026-11-21'), tree.moments[0].id, '2026-11-21T00:00:00.000Z');
+  const workspace = { revision: 1, state: { version: 1, trees: [tree], prefs: { bookDisplay: 'list' } }, subject: 'visual-audit-fake', writeSubjectBound: true, savedAt: '2026-11-22T00:00:00.000Z' };
+  try {
+    for (const theme of ['night', 'garden']) {
+      const ctx = await browser.newContext({ viewport: { width: 390, height: 900 }, reducedMotion: 'reduce' });
+      try {
+        await ctx.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); localStorage.setItem('lt41.updatesCardDay', 'audit'); } catch {} }, theme);
+        await ctx.route('**/*', (route) => {
+          const u = new URL(route.request().url());
+          if (u.origin !== base) return u.hostname === 'i.ytimg.com' || u.hostname === 'audit.invalid' ? THUMB(route) : route.abort();
+          if (u.pathname === '/api/workspace') return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(workspace) });
+          if (u.pathname === '/api/account') return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, email: 'audit@example.invalid', subject: 'visual-audit-fake' }) });
+          if (u.pathname.startsWith('/api/')) return route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' });
+          return route.continue();
+        });
+        const page = await ctx.newPage();
+        await page.goto(base + '/v41/?account=1', { waitUntil: 'domcontentloaded' });
+        await page.goto(base + '/v41/?account=1#my/shelf', { waitUntil: 'load' });
+        await page.waitForFunction(() => window.LT41?.trees?.length === 1 && !document.querySelector('#account-avatar')?.hidden, null, { timeout: 20000 });
+        await page.waitForTimeout(1200);
+        const frame = page.frames().find((f) => /track32-bookshelf/.test(f.url()));
+        assert.ok(frame, '책장 화면이 열린다');
+        await frame.waitForSelector('.book-card', { timeout: 10000 });
+        await frame.evaluate(() => localStorage.setItem('lt41.bookDisplay', 'list'));
+        await frame.locator('.book-card').first().click();
+        await frame.waitForFunction(() => document.querySelector('#readerScreen')?.classList.contains('active'));
+        await frame.locator('.info-rule').waitFor();
+        await page.waitForTimeout(700);
+        const m = await page.evaluate(() => {
+          const f = document.getElementById('view'), fr = f.getBoundingClientRect(), d = f.contentDocument;
+          const links = document.querySelector('.home-links'), ls = getComputedStyle(links), lr = links.getBoundingClientRect();
+          const linksShown = ls.display !== 'none' && ls.visibility !== 'hidden' && lr.width > 0 && lr.height > 0;
+          const box = d.querySelector('.info-rule'), br = box.getBoundingClientRect();
+          const screen = d.querySelector('#readerScreen'), sr = screen.getBoundingClientRect();
+          const clip = { left: Math.max(fr.left, fr.left + sr.left), right: Math.min(fr.right, fr.left + sr.right), top: Math.max(fr.top, fr.top + sr.top), bottom: Math.min(fr.bottom, fr.top + sr.bottom) };
+          const shown = { left: Math.max(fr.left + br.left, clip.left), right: Math.min(fr.left + br.right, clip.right), top: Math.max(fr.top + br.top, clip.top), bottom: Math.min(fr.top + br.bottom, clip.bottom) };
+          const overlap = linksShown
+            ? Math.max(0, Math.min(lr.right, shown.right) - Math.max(lr.left, shown.left)) * Math.max(0, Math.min(lr.bottom, shown.bottom) - Math.max(lr.top, shown.top))
+            : 0;
+          return {
+            text: box.textContent.trim(), scrollTop: screen.scrollTop, linksDisplay: ls.display,
+            box: { x: Math.round(fr.left + br.left), y: Math.round(fr.top + br.top), width: Math.round(br.width), height: Math.round(br.height) },
+            visible: { width: Math.round(Math.max(0, shown.right - shown.left)), height: Math.round(Math.max(0, shown.bottom - shown.top)), bottom: Math.round(shown.bottom) },
+            viewportHeight: innerHeight, overlap: Math.round(overlap)
+          };
+        });
+        console.log('#1094 list', theme, JSON.stringify(m));
+        assert.match(m.text, /책 속의 트리/, theme + ': ' + m.text);
+        assert.equal(m.scrollTop, 0, theme + ': 스크롤 전 첫 화면에서 잰다');
+        assert.equal(m.overlap, 0, theme + ': 아래 링크 × 책 속의 트리 겹침 넓이 0 — ' + JSON.stringify(m));
+        assert.equal(m.visible.width, m.box.width, theme + ': 트리 상자 가로가 잘리지 않는다 — ' + JSON.stringify(m));
+        assert.equal(m.visible.height, m.box.height, theme + ': 트리 상자 세로가 잘리지 않는다 — ' + JSON.stringify(m));
+        assert.ok(m.visible.bottom <= m.viewportHeight, theme + ': 트리 상자가 화면 안에 있다 — ' + JSON.stringify(m));
+        assert.equal(m.linksDisplay, 'none', theme + ': 390 서재에서는 바닥 링크 줄이 내용 위에 뜨지 않는다 — ' + JSON.stringify(m));
+      } finally { await ctx.close(); }
+    }
+  } finally { await browser.close(); await new Promise((r) => server.close(r)); }
 });

@@ -2,6 +2,9 @@ import { ROLE_AI_CUSTOMER, ROLE_TESTER } from '../admin-roles.js';
 
 export function createMemoryCommunityRepo({isPrivateTree=null,isDiscoverOn=null,hasRealCustomers=false,roleFor=null,now=()=>new Date().toISOString()}={}){
  const favorites=new Set(),reactionSet=new Set(),comments=new Map(),reports=new Map(),blocks=new Set(),hiddenShares=new Set(),audits=[],votes=new Map();
+ // #1098 2단계: 순간 단위 반응은 별도 묶음 — 트리 단위 숫자(reactionSet)와 절대 섞이지 않게 한다.
+ // 키는 product\0share\0moment\0subject\0kind. 순간 반응 종류는 ♡(heart) 하나다.
+ const momentReactions=new Set();
  const key=(...parts)=>parts.join('\0'),copy=value=>structuredClone(value);
  const reactionKeys=()=>[...reactionSet];
  // #538: 둘러보기 후보는 활성 공유 행 가운데 moment_count>=3(직접 올린 사진만 있는 순간도 센다)이고,
@@ -46,7 +49,7 @@ export function createMemoryCommunityRepo({isPrivateTree=null,isDiscoverOn=null,
     const reactions={heart:0,like:0,love:0,laugh:0,wow:0,sad:0,angry:0};
     for(const v of reqs){const kind=v.split('\0')[3]||'heart';if(Object.prototype.hasOwnProperty.call(reactions,kind))reactions[kind]+=1;}
     const mine=reqs.filter(v=>viewerSubjectId&&v.split('\0')[2]===viewerSubjectId).map(v=>v.split('\0')[3]||'heart').sort();
-    const visible=[...comments.values()].filter(v=>v.productId===productId&&v.shareId===share.shareId&&v.status==='visible');
+    const visible=[...comments.values()].filter(v=>v.productId===productId&&v.shareId===share.shareId&&v.status==='visible'&&v.targetKind!=='moment');
     const lastActivityAt=visible.length?visible.map(v=>v.createdAt).sort().at(-1):share.createdAt;
     const weekFavorites=weekCounts[share.shareId]||0;
     return {share:copy(share),lastActivityAt,stats:{favorites:[...favorites].filter(v=>v.startsWith(prefix)).length,hearts:heartCount,comments:visible.length,favored:favorites.has(key(productId,share.shareId,viewerSubjectId)),hearted:reactionSet.has(key(productId,share.shareId,viewerSubjectId,'heart')),weeklyFavorites:weekFavorites,reactions,mine}};
@@ -89,7 +92,7 @@ export function createMemoryCommunityRepo({isPrivateTree=null,isDiscoverOn=null,
    const reactions={heart:0,like:0,love:0,laugh:0,wow:0,sad:0,angry:0};
    for(const v of reqs){const kind=v.split('\0')[3]||'heart';if(Object.prototype.hasOwnProperty.call(reactions,kind))reactions[kind]+=1;}
    const mine=reqs.filter(v=>viewerSubjectId&&v.split('\0')[2]===viewerSubjectId).map(v=>v.split('\0')[3]||'heart').sort();
-   return {favorites:[...favorites].filter(v=>v.startsWith(prefix)).length,hearts:heartCount,comments:[...comments.values()].filter(v=>v.productId===productId&&v.shareId===shareId&&v.status==='visible').length,favored:favorites.has(key(productId,shareId,viewerSubjectId)),hearted:reactionSet.has(key(productId,shareId,viewerSubjectId,'heart')),reactions,mine};
+   return {favorites:[...favorites].filter(v=>v.startsWith(prefix)).length,hearts:heartCount,comments:[...comments.values()].filter(v=>v.productId===productId&&v.shareId===shareId&&v.status==='visible'&&v.targetKind!=='moment').length,favored:favorites.has(key(productId,shareId,viewerSubjectId)),hearted:reactionSet.has(key(productId,shareId,viewerSubjectId,'heart')),reactions,mine};
   },
   async setFavorite({productId,shareId,subjectId,enabled}){const value=key(productId,shareId,subjectId);enabled?favorites.add(value):favorites.delete(value);},
   // 투표 기록(#824) — append-only 메모리 모형. 이미 있으면 새 표로 세지 않는다(1인 1표 영구).
@@ -108,15 +111,63 @@ export function createMemoryCommunityRepo({isPrivateTree=null,isDiscoverOn=null,
   async listFavorites({productId,subjectId}){return [...favorites].filter(v=>v.startsWith(key(productId)+'\0')&&v.endsWith('\0'+subjectId)).map(v=>v.split('\0')[1]);},
   async setReaction({productId,shareId,subjectId,enabled,kind='heart'}){const value=key(productId,shareId,subjectId,kind);enabled?reactionSet.add(value):reactionSet.delete(value);},
   async isBlocked({productId,blockerSubjectId,blockedSubjectId}){return blocks.has(key(productId,blockerSubjectId,blockedSubjectId))||blocks.has(key(productId,blockedSubjectId,blockerSubjectId));},
-  async listComments({productId,shareId,limit}){return [...comments.values()].filter(v=>v.productId===productId&&v.shareId===shareId&&v.status==='visible').slice(0,limit).map(copy);},
+  async listComments({productId,shareId,limit}){return [...comments.values()].filter(v=>v.productId===productId&&v.shareId===shareId&&v.status==='visible'&&v.targetKind!=='moment').slice(0,limit).map(copy);},
   async getComment({productId,commentId}){const row=comments.get(key(productId,commentId));return row?copy(row):null;},
   async updateComment({productId,commentId,subjectId,body}){const row=comments.get(key(productId,commentId));if(!row||row.status!=='visible'||row.subjectId!==subjectId)return null;row.body=body;row.updatedAt=now();row.editedAt=row.updatedAt;return copy(row);},
-  async createComment(input){const existing=[...comments.values()].find(v=>v.productId===input.productId&&v.subjectId===input.subjectId&&v.clientKey===input.clientKey);if(existing)return copy(existing);const row={id:input.commentId,...input,status:'visible',createdAt:now(),updatedAt:now(),editedAt:null};comments.set(key(input.productId,input.commentId),row);return copy(row);},
+  async createComment(input){const existing=[...comments.values()].find(v=>v.productId===input.productId&&v.subjectId===input.subjectId&&v.clientKey===input.clientKey&&(v.targetKind??'tree')==='tree');if(existing)return copy(existing);const row={id:input.commentId,...input,status:'visible',createdAt:now(),updatedAt:now(),editedAt:null};comments.set(key(input.productId,input.commentId),row);return copy(row);},
   async deleteComment({productId,commentId,subjectId,admin}){const row=comments.get(key(productId,commentId));if(!row||row.status!=='visible'||(!admin&&row.subjectId!==subjectId))return null;row.status=admin?'hidden':'deleted';row.updatedAt=now();if(admin)audits.push({productId,targetType:'comment',targetId:commentId,action:'hide_comment',actorSubjectId:subjectId});return copy(row);},
-  async createReport(input){const existing=[...reports.values()].find(v=>v.productId===input.productId&&v.subjectId===input.subjectId&&v.clientKey===input.clientKey);if(existing)return copy(existing);const row={id:input.reportId,shareId:input.shareId,reporterSubjectId:input.subjectId,subjectId:input.subjectId,reason:input.reason,clientKey:input.clientKey,productId:input.productId,status:'open',createdAt:now(),resolvedAt:null,hidden:false};reports.set(key(input.productId,input.reportId),row);return copy(row);},
+  async createReport(input){const existing=[...reports.values()].find(v=>v.productId===input.productId&&v.subjectId===input.subjectId&&v.clientKey===input.clientKey);if(existing)return copy(existing);const row={id:input.reportId,shareId:input.shareId,reporterSubjectId:input.subjectId,subjectId:input.subjectId,reason:input.reason,clientKey:input.clientKey,productId:input.productId,commentId:input.commentId??null,status:'open',createdAt:now(),resolvedAt:null,hidden:false};reports.set(key(input.productId,input.reportId),row);return copy(row);},
   async blockOwner({productId,blockerSubjectId,blockedSubjectId}){blocks.add(key(productId,blockerSubjectId,blockedSubjectId));},
-  async listReports({productId,limit}){return [...reports.values()].filter(v=>v.productId===productId).slice(0,limit).map(row=>({...copy(row),hidden:hiddenShares.has(key(productId,row.shareId))}));},
+  async listReports({productId,limit}){return [...reports.values()].filter(v=>v.productId===productId).slice(0,limit).map(row=>({...copy(row),hidden:row.commentId?(comments.get(key(productId,row.commentId))?.status==='hidden'):hiddenShares.has(key(productId,row.shareId))}));},
   async moderateReport({productId,reportId,status,visibility,actorSubjectId}){const row=reports.get(key(productId,reportId));if(!row)return null;row.status=status;row.resolvedAt=now();audits.push({productId,reportId,action:status,actorSubjectId});const hiddenKey=key(productId,row.shareId),wasHidden=hiddenShares.has(hiddenKey);if(visibility==='hidden')hiddenShares.add(hiddenKey);else hiddenShares.delete(hiddenKey);if(wasHidden!==(visibility==='hidden'))audits.push({productId,reportId,action:visibility==='hidden'?'hide_share':'restore_share',actorSubjectId});row.hidden=visibility==='hidden';return copy(row);},
-  inspect(){return {favorites:[...favorites],reactions:[...reactionSet],comments:[...comments.values()].map(copy),reports:[...reports.values()].map(copy),blocks:[...blocks],hiddenShares:[...hiddenShares],audits:audits.map(copy)};}
+  // ===== #1098 2단계 — 순간 단위 ♡·댓글(러브버드 규칙) =====
+  // 반응 종류는 ♡ 하나(서비스 계층이 막는다), 같은 요청 두 번은 한 칸(묶음의 성질), 숫자는 시험 계정(tester)을 빼고
+  // AI 명예회원(ai_customer) 비트를 함께 내려준다.
+  async setMomentReaction({productId,shareId,momentId,subjectId,enabled,kind='heart'}){const value=key(productId,shareId,momentId,subjectId,kind);enabled?momentReactions.add(value):momentReactions.delete(value);},
+  async momentStats({productId,shareId,momentId,viewerSubjectId}){
+   const role=async subjectId=>roleFor?await roleFor({productId,subjectId}):null;
+   const reqs=[...momentReactions].filter(v=>v.startsWith(key(productId,shareId,momentId)+'\0')&&(v.split('\0')[4]||'heart')==='heart');
+   let hearts=0,aiHearts=0;
+   for(const v of reqs){const r=await role(v.split('\0')[3]);if(r===ROLE_TESTER)continue;hearts+=1;if(r===ROLE_AI_CUSTOMER)aiHearts+=1;}
+   const visible=[...comments.values()].filter(v=>v.productId===productId&&v.shareId===shareId&&v.momentId===momentId&&v.targetKind==='moment'&&v.status==='visible');
+   let commentCount=0;
+   for(const v of visible){const r=await role(v.subjectId);if(r===ROLE_TESTER)continue;commentCount+=1;}
+   const hearted=viewerSubjectId?momentReactions.has(key(productId,shareId,momentId,viewerSubjectId,'heart')):false;
+   return {hearts,aiHearts,comments:commentCount,hearted};
+  },
+  async listMomentComments({productId,shareId,momentId,limit=50}){
+   const rows=[];
+   const visible=[...comments.values()].filter(v=>v.productId===productId&&v.shareId===shareId&&v.momentId===momentId&&v.targetKind==='moment'&&v.status==='visible').slice(0,limit);
+   for(const v of visible){
+    const r=roleFor?await roleFor({productId,subjectId:v.subjectId}):null;
+    if(r===ROLE_TESTER)continue;
+    rows.push({...copy(v),aiTester:r===ROLE_AI_CUSTOMER});
+   }
+   return rows;
+  },
+  async createMomentComment(input){
+   const existing=[...comments.values()].find(v=>v.productId===input.productId&&v.subjectId===input.subjectId&&v.clientKey===input.clientKey&&v.targetKind==='moment'&&v.momentId===input.momentId);
+   if(existing)return copy(existing);
+   const row={id:input.commentId,...input,targetKind:'moment',status:'visible',createdAt:now(),updatedAt:now(),editedAt:null};
+   comments.set(key(input.productId,input.commentId),row);
+   return copy(row);
+  },
+  async getReport({productId,reportId}){const row=reports.get(key(productId,reportId));return row?copy(row):null;},
+  // 순간 댓글 신고는 트리 신고와 같은 신고 표·운영센터 길로 처리한다 — 숨기면 트리가 아니라 그 댓글만 숨겨진다.
+  async moderateMomentCommentReport({productId,reportId,status,visibility,actorSubjectId}){
+   const row=reports.get(key(productId,reportId));
+   if(!row||!row.commentId)return null;
+   row.status=status;row.resolvedAt=now();
+   audits.push({productId,reportId,targetType:'report',targetId:reportId,action:status,actorSubjectId});
+   const comment=comments.get(key(productId,row.commentId));
+   let hidden=!!comment&&comment.status==='hidden';
+   if(visibility==='hidden'&&comment&&comment.status==='visible'){
+    comment.status='hidden';comment.updatedAt=now();hidden=true;
+    audits.push({productId,targetType:'comment',targetId:row.commentId,action:'hide_comment',actorSubjectId});
+   }
+   row.hidden=hidden;
+   return copy(row);
+  },
+  inspect(){return {favorites:[...favorites],reactions:[...reactionSet],momentReactions:[...momentReactions],comments:[...comments.values()].map(copy),reports:[...reports.values()].map(copy),blocks:[...blocks],hiddenShares:[...hiddenShares],audits:audits.map(copy)};}
  };
 }

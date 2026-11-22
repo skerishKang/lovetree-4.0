@@ -111,7 +111,7 @@ test('무대 소속 갱신이 실패해도 저장·공개·회수·운영 숨김
       { status, visibility }, 'admin');
     assert.equal(result.body.report.hidden, visibility === 'hidden');
   }
-  assert.equal((await h.workspace.deleteTree(owner, tree.id)).deleted, true);
+  await h.workspace.write(owner, { state: { version: 1, trees: [] }, expectedRevision: 1, clientKey: 'tree-gone' });
   assert.deepEqual(calls, Array(8).fill(owner));
   assert.equal(logger.mock.callCount(), calls.length);
   assert.ok(logger.mock.calls.every(call => call.arguments.length === 1 && !call.arguments[0].includes('test failure')));
@@ -235,7 +235,7 @@ test('주인이 트리를 지우면 자동 공개도 즉시 내려간다', async
   await h.discoverOn(tree);
   const [auto] = await h.shareRepo.list({ productId: PRODUCT, subjectId: 'alice' });
   assert.equal((await h.browse()).items.length, 1);
-  await h.workspace.deleteTree(principal('alice'), tree.id);
+  await h.workspace.write(principal('alice'), { state: { version: 1, trees: [] }, expectedRevision: 1, clientKey: 'tree-gone' });
   const shares = await h.shareRepo.list({ productId: PRODUCT, subjectId: 'alice' });
   assert.equal(shares[0].status, 'revoked', '자동 공개 행이 함께 내려간다');
   assert.deepEqual((await h.browse()).items, []);
@@ -266,7 +266,7 @@ test('주인이 지운 트리의 주인 만든 공유 행도 회수하고 소개
   assert.equal((await h.browse()).items.length, 2);
   assert.equal((await h.shareRepo.load({ productId: PRODUCT, shareId: goneShareId })).status, 'active');
 
-  await h.workspace.deleteTree(principal('alice'), gone.id);
+  await h.workspace.write(principal('alice'), { state: { version: 1, trees: [kept] }, expectedRevision: 1, clientKey: 'tree-gone' });
 
   // 지워진 트리: 주인 만든 공유 행도 revoked, 소개 행도 없다(유령이 남지 않는다).
   assert.equal((await h.shareRepo.load({ productId: PRODUCT, shareId: goneShareId })).status, 'revoked', '주인 만든 공유 행도 회수된다');

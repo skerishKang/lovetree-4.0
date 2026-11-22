@@ -47,7 +47,7 @@ test('#638: 자세한 추가에서 적은 제목은 마음 한마디가 있어�
 test('invalid parent and non-web URLs cannot be saved', () => {
   const tree = createTree(input());
   assert.throws(() => addMoment(tree, input(), 'missing'));
-  for (const url of ['javascript:alert(1)', 'data:text/html,bad', 'file:///c:/private', 'https://name:secret@example.com']) assert.throws(() => safeUrl(url));
+  for (const url of ['javascript:alert(1)', 'data:text/html,bad', 'file:///secret/private', 'https://name:secret@example.com']) assert.throws(() => safeUrl(url));
   assert.equal(safeUrl('https://youtu.be/abc?t=32'), 'https://youtu.be/abc?t=32');
 });
 test('import rejects duplicate IDs, cycles and disconnected references', () => {

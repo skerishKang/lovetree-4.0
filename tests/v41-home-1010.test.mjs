@@ -194,22 +194,25 @@ test('#1010 예시 카드를 누르면 감상(자세히 보기)이 열리고, �
   } finally { await browser.close(); }
 });
 
-test('#1010 숫자 줄 띄어쓰기 — 순간 N · 모아둔 M(글자 사이 공백이 실제로 그려진다)', { skip: REQUIRE1010 ? false : skip1010, timeout: 180000 }, async () => {
+test('#1010 숫자 두 줄 — 순간 N / 모아둔 M이 겹치지 않고 각자 눌린다(#1087)', { skip: REQUIRE1010 ? false : skip1010, timeout: 180000 }, async () => {
   if (skip1010) assert.fail(skip1010);
   const browser = await chromium1010.launch({ headless: true });
   try {
     const h = await boot1010(browser, { mix: true });
     try {
       const line = await h.frame.locator('.home-action-group:has([data-do="moments"]) .home-count').evaluate(el => {
-        const node = el.firstChild, dot = node.textContent.indexOf('·');
-        const rect = (from, to) => { const r = document.createRange(); r.setStart(node, from); r.setEnd(node, to); return r.getBoundingClientRect(); };
-        const word = rect(0, dot - 1), mark = rect(dot, dot + 1);
-        const ir = document.createRange(); ir.selectNodeContents(el.lastChild);
-        const inbox = ir.getBoundingClientRect();
-        return { text: el.textContent, leftGap: mark.left - word.right, rightGap: inbox.left - mark.right };
+        const rows = [...el.querySelectorAll('.home-count-line')];
+        return {
+          text: rows.map(row => row.textContent.trim()),
+          buttons: rows.map(row => !!row.querySelector('button')),
+          gap: rows.length === 2 ? rows[1].getBoundingClientRect().top - rows[0].getBoundingClientRect().bottom : null
+        };
       });
-      assert.match(line.text, /순간 \d+ · 모아둔 \d+/, '숫자 줄이 "순간 N · 모아둔 M"이다: ' + line.text);
-      assert.ok(line.leftGap >= 2 && line.rightGap >= 2, '가름점 양옆 공백이 실제로 그려진다(붙으면 0): ' + JSON.stringify(line));
+      assert.equal(line.text.length, 2, '숫자는 두 줄: ' + JSON.stringify(line));
+      assert.match(line.text[0], /^순간 \d+$/, '첫 줄 ' + line.text[0]);
+      assert.match(line.text[1], /^모아둔 \d+$/, '둘 줄 ' + line.text[1]);
+      assert.deepEqual(line.buttons, [true, true], '두 숫자 모두 단추다');
+      assert.ok(line.gap >= 0, '두 줄이 겹치지 않는다: ' + JSON.stringify(line));
     } finally { await close1010(h); }
   } finally { await browser.close(); }
 });

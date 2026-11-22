@@ -6,7 +6,7 @@ import {createTree, EMPTY_STATE} from '../public/v41/domain.mjs';
 
 const CLOCK = '2026-11-11T00:00:00.000Z';
 const fields = {subject: '별', title: '처음', note: '기억할 마음', date: '2026-11-11', emotion: '설렘', url: ''};
-const stateOf = (...titles) => ({version: 1, trees: titles.map(t => createTree({...fields, title: t}, CLOCK)), prefs: { titleDisplay: 'both', displayName: '', accentColor: '', dateStyle: 'dot', startPlace: 'resume', shareView: 'book', shareDiscover: false, treeChipOrder: [], homeMoment: { mode: 'last', treeId: '', momentId: '' } }});
+const stateOf = (...titles) => ({version: 1, trees: titles.map(t => createTree({...fields, title: t}, CLOCK)), prefs: { titleDisplay: 'both', displayName: '', accentColor: '', dateStyle: 'dot', startPlace: 'resume', shareView: 'book', shareDiscover: false, treeChipOrder: [], bookDisplay: 'book', homeMoment: { mode: 'last', treeId: '', momentId: '' } }});
 
 function fakeStorage(map = new Map()) {
   return {

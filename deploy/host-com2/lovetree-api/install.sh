@@ -67,12 +67,11 @@ install -m 0644 "$source_root/public/v41/youtube-id.mjs" "$app/public/v41/youtub
 if [[ -f "$source_root/public/v41/youtube-id.js" ]]; then
   install -m 0644 "$source_root/public/v41/youtube-id.js" "$app/public/v41/youtube-id.js"
 fi
-# 컴1 내보내기가 ssh 로 부르는 읽기 전용 DB 판독기(tools/export-ai-customer-db.mjs).
+# 남는 운영 도구(admin-role·ops-reply·relink-opinion-author)가 함께 쓰는 .env 읽기 도구(tools/env-file.mjs).
 # 접속 값은 실행 시점에 읽는다 — 설치 트리에는 비밀 값이 없다.
-# 옛 소스 트리(되돌림 설치)에는 파일이 없을 수 있으므로 있을 때만 넣는다.
-if [[ -f "$source_root/tools/export-ai-customer-db.mjs" ]]; then
+if [[ -f "$source_root/tools/env-file.mjs" ]]; then
   install -d -m 0755 "$app/tools"
-  install -m 0644 "$source_root/tools/export-ai-customer-db.mjs" "$app/tools/export-ai-customer-db.mjs"
+  install -m 0644 "$source_root/tools/env-file.mjs" "$app/tools/env-file.mjs"
 fi
 if [[ -f "$source_root/tools/admin-role.mjs" ]]; then
   install -d -m 0755 "$app/tools"
@@ -97,7 +96,7 @@ install -m 0644 "$here/preflight_imports.mjs" "$app/preflight_imports.mjs"
 chmod 0755 "$app"
 chmod -R a+rX "$app/server" "$app/src" "$app/public" "$app/node_modules"
 chmod a+r "$app/check_config.mjs" "$app/preflight_imports.mjs" "$app/package.json" "$app/package-lock.json"
-if [[ -f "$app/tools/export-ai-customer-db.mjs" ]]; then chmod a+r "$app/tools/export-ai-customer-db.mjs"; fi
+if [[ -f "$app/tools/env-file.mjs" ]]; then chmod a+r "$app/tools/env-file.mjs"; fi
 if [[ -f "$app/tools/ops-reply.mjs" ]]; then chmod a+r "$app/tools/ops-reply.mjs"; fi
 if [[ -f "$app/tools/relink-opinion-author.mjs" ]]; then chmod a+r "$app/tools/relink-opinion-author.mjs"; fi
 # 사전점검: server/index.js의 import 그래프가 실제 파일로 해석되는지 확인한다.

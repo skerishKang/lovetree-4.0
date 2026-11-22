@@ -11,10 +11,7 @@
 .env
 .env.*
 .local/
-.tmp-*/
-.tmp49/
-.tmp553/
-.tmpcur/
+.tmp*/
 .wrangler/
 Thumbs.db
 __pycache__/

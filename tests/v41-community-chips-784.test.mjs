@@ -411,4 +411,154 @@ testOrSkip('#792 ⑤ 화면: 인기 무대 줄(3표 미만 제외)과 미리보�
   }
 });
 
+// #1098 1단계 시험 — 반응·댓글 수가 겉에 보이는 공개 트리 하나(댓글 5개). 작성자 이름은 서버가 내리는 표시 라벨만 흉내 낸다.
+const COUNTS_CARDS = [{
+  shareId: 'r000000000000000000000a', title: '반응·댓글 있는 공개 트리', subject: '확인 대상', summary: '첫 순간 소개',
+  createdAt: '2026-11-20T09:00:00.000Z', momentCount: 3, emotions: ['설렘'],
+  cover: { momentId: 'm-cover-1098', url: '', title: '첫 순간', emotion: '설렘' },
+  stats: { favorites: 0, hearts: 5, favored: false, hearted: false, comments: 5,
+           reactions: { heart: 5, like: 1, love: 1, laugh: 0, wow: 0, sad: 0, angry: 0 }, mine: [] },
+}];
+const COUNTS_COMMENTS = [1, 2, 3, 4, 5].map((n) => ({
+  id: `c1098-${n}`, authorLabel: `팬 ${n}`, body: `${n}번째 댓글`, createdAt: `2026-11-20T${String(9 + n).padStart(2, '0')}:00:00.000Z`,
+  edited: false, canEdit: false, canDelete: false,
+}));
+
+async function openCountsPreview(page, port) {
+  await page.goto(`http://127.0.0.1:${port}/probe`);
+  await page.getByRole('button', { name: '둘러보기' }).click();
+  await page.waitForSelector('#community-panel[open]');
+  await page.locator('.community-card').first().click();
+  await page.waitForSelector('#community-preview[open]');
+  await page.waitForSelector('#community-preview .community-comment', { timeout: 5000 });
+}
+
+testOrSkip('#1098 1단계: 판 아래에 최근 댓글 3개·댓글 모두 보기 — ⋯에는 신고·차단만, 겉에 반응 수·댓글 수', async () => {
+  const server = createServer(async (req, res) => {
+    const clean = decodeURIComponent((req.url || '/').split('?')[0]);
+    if (clean === '/probe') { res.writeHead(200, { 'content-type': MIME['.html'] }); res.end(PROBE_HTML); return; }
+    const file = path.join(PUB, clean);
+    try {
+      const st = await stat(file);
+      if (!st.isFile()) { res.writeHead(404); res.end(); return; }
+      res.writeHead(200, { 'content-type': MIME[path.extname(file)] || 'application/octet-stream' });
+      createReadStream(file).pipe(res);
+    } catch { res.writeHead(404); res.end(); }
+  });
+  await new Promise((r) => server.listen(0, r));
+  const port = server.address().port;
+  const browser = await chromium.launch();
+  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  const json = (body) => ({ contentType: 'application/json', body: JSON.stringify(body) });
+  try {
+    await page.route('**/api/**', (route) => {
+      const url = route.request().url();
+      if (/\/comments$/.test(url)) return route.fulfill(json({ comments: COUNTS_COMMENTS }));
+      if (url.includes('/api/community/shares')) return route.fulfill(json({ items: COUNTS_CARDS, nextCursor: null, totalVisible: 1, groups: [], groupsAll: [] }));
+      return route.fulfill(json({ ok: true, items: [] }));
+    });
+    await openCountsPreview(page, port);
+    const state = await page.evaluate(() => {
+      const preview = document.getElementById('community-preview');
+      const host = preview.querySelector('.community-comment-host');
+      const panel = preview.querySelector('.community-more-panel');
+      return {
+        metaText: preview.querySelector('.community-preview-meta')?.textContent || '',
+        heading: preview.querySelector('.community-preview-comments .community-menu-title')?.textContent || '',
+        articles: host.querySelectorAll('.community-comment').length,
+        firstBody: host.querySelector('.community-comment p')?.textContent || '',
+        hasMore: [...host.querySelectorAll('button')].some((b) => b.textContent.includes('댓글 모두 보기')),
+        menuLabel: preview.querySelector('.community-more-menu summary')?.getAttribute('aria-label') || '',
+        menuHasReport: Boolean(panel?.querySelector('.community-report-form')),
+        menuHasComment: Boolean(panel?.querySelector('.community-comment, .community-comment-host')),
+        heartCount: preview.querySelector('[data-reaction-kind="heart"]')?.textContent.trim() || '',
+        overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      };
+    });
+    assert.equal(state.articles, 3, `판 아래에는 최근 댓글 3개만: ${state.articles}`);
+    assert.equal(state.firstBody, '1번째 댓글', '최신 댓글부터');
+    assert.equal(state.hasMore, true, '댓글 모두 보기 단추가 있다');
+    assert.doesNotMatch(state.metaText, /반응/, '한 줄 정보에는 반응 수를 두지 않는다(반응 수는 ♡ 단추 한 곳)');
+    assert.match(state.metaText, /댓글 5/, '겉에 댓글 수가 보인다');
+    assert.equal(state.heading, '댓글 5', '댓글 줄 머리글에도 수가 있다');
+    assert.equal(state.heartCount, '7', '♡ 단추에 반응 전체 수가 보인다(공감 5+좋아요 1+사랑 1)');
+    assert.equal(state.menuLabel, '신고, 차단 메뉴', '⋯ 메뉴는 신고·차단만');
+    assert.equal(state.menuHasReport, true, '⋯ 안에 신고가 남는다');
+    assert.equal(state.menuHasComment, false, '⋯ 안에는 댓글이 없다');
+    assert.ok(state.overflow <= 1, `1440 가로 넉침 0: ${state.overflow}`);
+    await page.getByRole('button', { name: '댓글 모두 보기' }).click();
+    await page.waitForFunction(() => document.querySelectorAll('#community-preview .community-comment').length === 5, null, { timeout: 3000 });
+    // 390에서도 겉 숫자·판 아래 댓글이 한 줄 안넘치게.
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.waitForTimeout(200);
+    const mobile = await page.evaluate(() => ({ overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth, meta: document.querySelector('#community-preview .community-preview-meta')?.textContent || '' }));
+    assert.ok(mobile.overflow <= 1, `390 가로 넉침 0: ${mobile.overflow}`);
+    assert.match(mobile.meta, /댓글 5/);
+  } finally {
+    await browser.close();
+    await new Promise((r) => server.close(r));
+  }
+});
+
+testOrSkip('#1098 1단계: ♡는 크게 하나 — 빠르게 누르면 공감 토글, 길게 누르면 일곱 종 칩(#678 펼침 규칙 재사용)', async () => {
+  const server = createServer(async (req, res) => {
+    const clean = decodeURIComponent((req.url || '/').split('?')[0]);
+    if (clean === '/probe') { res.writeHead(200, { 'content-type': MIME['.html'] }); res.end(PROBE_HTML); return; }
+    const file = path.join(PUB, clean);
+    try {
+      const st = await stat(file);
+      if (!st.isFile()) { res.writeHead(404); res.end(); return; }
+      res.writeHead(200, { 'content-type': MIME[path.extname(file)] || 'application/octet-stream' });
+      createReadStream(file).pipe(res);
+    } catch { res.writeHead(404); res.end(); }
+  });
+  await new Promise((r) => server.listen(0, r));
+  const port = server.address().port;
+  const browser = await chromium.launch();
+  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  const json = (body) => ({ contentType: 'application/json', body: JSON.stringify(body) });
+  let reactionBody = '';
+  try {
+    await page.route('**/api/**', (route) => {
+      const url = route.request().url();
+      if (/\/comments$/.test(url)) return route.fulfill(json({ comments: COUNTS_COMMENTS }));
+      if (/\/reaction$/.test(url)) { reactionBody = route.request().postData() || ''; return route.fulfill(json({ stats: { ...COUNTS_CARDS[0].stats, hearted: true, mine: ['heart'], reactions: { heart: 6, like: 1, love: 1, laugh: 0, wow: 0, sad: 0, angry: 0 } } })); }
+      if (url.includes('/api/community/shares')) return route.fulfill(json({ items: COUNTS_CARDS, nextCursor: null, totalVisible: 1, groups: [], groupsAll: [] }));
+      return route.fulfill(json({ ok: true, items: [] }));
+    });
+    await openCountsPreview(page, port);
+    const before = await page.evaluate(() => {
+      const group = document.querySelector('#community-preview .community-reaction-group');
+      const heart = group?.querySelector('[data-reaction-kind="heart"]');
+      return {
+        chips: group ? group.querySelectorAll('.community-reaction').length : 0,
+        pressed: heart?.getAttribute('aria-pressed') || '',
+        label: heart?.getAttribute('aria-label') || '',
+        height: heart ? Math.round(heart.getBoundingClientRect().height) : 0,
+        favHeight: (() => { const fav = document.querySelector('#community-preview [data-community-action="favorite"]'); return fav ? Math.round(fav.getBoundingClientRect().height) : 0; })(),
+      };
+    });
+    assert.equal(before.chips, 1, '기본에는 ♡ 하나만 선다');
+    assert.equal(before.pressed, 'false');
+    assert.equal(before.label, '공감 · 반응 7', '♡ 단추 이름에 반응 전체 수가 들어간다');
+    assert.ok(before.height >= 44, `누르는 자리 44px 이상: ${before.height}`);
+    assert.ok(before.height > before.favHeight, `♡가 즐겨찾기보다 크다: ♡ ${before.height} > 즐겨찾기 ${before.favHeight}`);
+    // 빠르게 누르면 공감(heart) 토글 한 번.
+    await page.locator('#community-preview [data-reaction-kind="heart"]').click();
+    await page.waitForFunction(() => document.querySelector('#community-preview [data-reaction-kind="heart"]')?.getAttribute('aria-pressed') === 'true', null, { timeout: 3000 });
+    assert.equal(reactionBody.includes('"heart"'), true, `누른 것은 공감: ${reactionBody}`);
+    // 길게 누르면(0.45초) 일곱 종 칩으로 펼쳐진다.
+    const box = await page.locator('#community-preview [data-reaction-kind="heart"]').boundingBox();
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.waitForFunction(() => document.querySelectorAll('#community-preview .community-reaction').length === 7, null, { timeout: 3000 });
+    await page.mouse.up();
+    const kinds = await page.evaluate(() => [...document.querySelectorAll('#community-preview .community-reaction')].map((b) => b.dataset.reactionKind).sort());
+    assert.deepEqual(kinds, ['angry', 'heart', 'laugh', 'like', 'love', 'sad', 'wow'], '일곱 종이 모두 펼쳐진다');
+  } finally {
+    await browser.close();
+    await new Promise((r) => server.close(r));
+  }
+});
+
 if (REQUIRE && skipReason) throw new Error('LT_COMMUNITY_784_REQUIRE=1 인데 화면 시험을 건너뛴다 — 깨진 채로 두지 않는다');

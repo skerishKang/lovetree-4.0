@@ -2,7 +2,7 @@
 // 2026-11-08 리팩터링: 동작·겉모습 변경 0. shell.mjs에서 조건·조회 방식·인자 형태를 바꾸지 않고 그대로 옮겼다.
 // 셸은 자기 상태(member·model·source·current)를 읽기 함수로 넘기고, 이 파일은 헤더만 만진다.
 import {hasPendingDraft} from '../sync-controller.mjs';
-import {accountPresentation,treePickerText,treePickerVisible,treePickerAriaLabel,treeViewsVisible,writeMenuLabel,headerPartsFor} from '../header-state.mjs';
+import {accountPresentation,treePickerText,treePickerVisible,treePickerAriaLabel,treeViewsVisible,writeMenuLabel,headerPartsFor,bookDisplayVisible} from '../header-state.mjs';
 import {normalizeAccentColor} from '../domain.mjs';
 import {displayTreeTitle} from '../tree-name.mjs';
 
@@ -32,6 +32,10 @@ function flowNavigation(){
   const showTreeViews=parts.treeViews&&treeViewsVisible({owned,publicReading});
   $('tree-views').hidden=!showTreeViews;for(const b of $('tree-views').querySelectorAll('button')){b.disabled=false;b.title='';}
   $('tree-views').setAttribute('aria-label','이 트리 보기');
+  // #1094: 보기 방식(책/목록) 전환 묶음은 서재·책 화면에서만 보인다(보드·지도에는 없다).
+  // #1092 후속: 둘러보기는 서재 위에 뜨는 화면이라 현재 화면 값이 서재로 남는다 — 둘러보기 화면에서도 접는다.
+  const bookToggle=$('book-display-toggle');
+  if(bookToggle)bookToggle.hidden=!bookDisplayVisible({current:getCurrent()})||document.body.classList.contains('community-screen');
   for(const b of document.querySelectorAll('nav>button'))b.hidden=publicReading;
   // 트리 선택은 뒤쪽 탭 묶음 바로 앞에 있고, 로그인 상태에서만 "트리: <이름> ▾"로 보여 준다.
   // 2026-11-18 13:49 대표 결정: 트리 선택은 모든 페이지에서 똑같이 보인다(서재 포함).
