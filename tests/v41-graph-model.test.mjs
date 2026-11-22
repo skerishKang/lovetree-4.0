@@ -308,10 +308,14 @@ test('같은 영상·같은 무대는 stacks 한 무더기 — leadId는 발자�
 });
 
 test('순간 300개(겹치는 영상·같은 무대 섞임): stacks는 30개에 비해 제곱으로 느려지지 않는다', () => {
+  // 같은 영상끼리 같은 무대에 오도록 묶는다. 앞 30개도 같은 모양(영상 15개×2번, 무대 두 개)이라
+  // 크기만 다른 두 입력을 비교한다(#1179 후속).
   const moments = [];
   for (let i = 0; i < 300; i += 1) {
-    moments.push(M('m' + i, i % 2 ? '2026-11-05' : '2026-11-12', [stage(i % 2 ? '인기가요' : '뮤직뱅크'), song('Super Shy')], {
-      url: `https://youtu.be/v${String(i % 150).padStart(10, '0')}`, // 영상 150개 × 2번
+    const video = Math.floor(i / 2) % 150; // 영상 150개 × 2번, 짝지은 두 순간은 같은 무대
+    const first = video % 2 === 0;
+    moments.push(M('m' + i, first ? '2026-11-05' : '2026-11-12', [stage(first ? '뮤직뱅크' : '인기가요'), song('Super Shy')], {
+      url: `https://youtu.be/v${String(video).padStart(10, '0')}`,
       createdOrder: i + 1,
     }));
   }

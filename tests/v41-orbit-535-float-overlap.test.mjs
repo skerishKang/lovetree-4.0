@@ -186,7 +186,7 @@ s('#535 떠 있는 폭이 눈에 보이고, 동작 줄이기면 거의 멈춘다
     const moved = await frame.evaluate(async () => {
       const sr = document.querySelector('main#orbit').shadowRoot;
       // #942: 궤도는 90초로 빨라졌다 — 부유 폭만 재려면 궤도 애니메이션을 멈춘다.
-      for (const a of sr.getAnimations({ subtree: true })) if (a.id === 'lt-orbit') a.pause();
+      window.__LT_ORBIT_TEST__?.hold(true); // #1086: WAAPI lt-orbit 대신 JS 공전 루프를 멈춘다
       const cards = [...sr.querySelectorAll('.card')].filter((e) => getComputedStyle(e).display !== 'none');
       // 부유는 .lt-lift 층이 든다 — .card 겉사각형은 궤도 자리만 안다. 261118: 부유 층을 직접 잰다.
       const el = cards[3].querySelector('.lt-lift') || cards[3];
@@ -211,7 +211,7 @@ s('#535 떠 있는 폭이 눈에 보이고, 동작 줄이기면 거의 멈춘다
     const still = await openHome(browser, lib.base, { width: 1440, height: 900, member: 'in', reducedMotion: 'reduce' });
     const quiet = await still.frame.evaluate(async () => {
       const sr = document.querySelector('main#orbit').shadowRoot;
-      for (const a of sr.getAnimations({ subtree: true })) if (a.id === 'lt-orbit') a.pause();
+      window.__LT_ORBIT_TEST__?.hold(true); // #1086: WAAPI lt-orbit 대신 JS 공전 루프를 멈춘다
       const el = [...sr.querySelectorAll('.card')].filter((e) => getComputedStyle(e).display !== 'none')[3].querySelector('.lt-lift') || [...sr.querySelectorAll('.card')].filter((e) => getComputedStyle(e).display !== 'none')[3];
       const a = el.getBoundingClientRect(); const x0 = a.left + a.width / 2, y0 = a.top + a.height / 2;
       const t0 = performance.now();
@@ -387,7 +387,16 @@ s('#942 궤도는 한 방향으로 60~120초에 한 바퀴, 정지·튐 0, 클�
       const series = cards.map(() => []);
       // 표본 시각은 애니메이션 시계(currentTime)로 찍는다 — setInterval 이 늦게 오면 벽시계 간격이
       // 실제 이동 간격과 어긋나 속도(튐) 판정이 흔들린다(실측 23px/50ms 거짓 실패).
-      const sample = () => cards.forEach((c, i) => { const r = c.getBoundingClientRect(); const a = c.getAnimations().find((x) => x.id === 'lt-orbit'); const t = a ? Number(a.currentTime) : performance.now(); series[i].push([t, r.left + r.width / 2, r.top + r.height / 2]); });
+      // #1086: 위치 = f(시각). 장면 간격이 66~82ms여도 그 시각의 기대 위치와 같으면 정상이다.
+      // 실제 중심과 '그 시각에 있어야 할 중심'을 함께 기록해 차이를 튐으로 판정한다(기준 13px 그대로).
+      const sample = () => {
+        const t = performance.now();
+        const actual = cards.map((c) => { const r = c.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; });
+        window.__LT_ORBIT_TEST__.seek(window.__LT_ORBIT_TEST__.progress(window.__LT_ORBIT_TEST__.lastWriteAt()));
+        const expected = cards.map((c) => { const r = c.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; });
+        window.__LT_ORBIT_TEST__.restore();
+        cards.forEach((c, i) => series[i].push([t, actual[i][0], actual[i][1], expected[i][0], expected[i][1]]));
+      };
       const run = async (ms) => {
         const t0 = performance.now();
         sample();
@@ -404,18 +413,16 @@ s('#942 궤도는 한 방향으로 60~120초에 한 바퀴, 정지·튐 0, 클�
         for (let i = 1; i < pts.length; i++) {
           const dx = pts[i][1] - pts[i - 1][1], dy = pts[i][2] - pts[i - 1][2];
           path += Math.hypot(dx, dy);
-          const speed = Math.hypot(dx, dy) * 50 / Math.max(1, pts[i][0] - pts[i - 1][0]);
-          if (speed > maxStep) { maxStep = speed; maxAt = pts[i][0]; }
+          const deviation = Math.hypot(pts[i][1] - pts[i][3], pts[i][2] - pts[i][4]);
+          if (deviation > maxStep) { maxStep = deviation; maxAt = pts[i][0]; }
           const a0 = Math.atan2(pts[i - 1][2] - cy, pts[i - 1][1] - cx), a1 = Math.atan2(pts[i][2] - cy, pts[i][1] - cx);
           let d = a1 - a0; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI;
           angle += d;
         }
         return { path: Math.round(path), maxStep: Math.round(maxStep), maxAt: Math.round(maxAt), angle: Number(angle.toFixed(3)), meanStep: Number((path / Math.max(1, pts.length - 1)).toFixed(2)) };
       });
-      const animAt = () => cards.map((c) => { const a = c.getAnimations().find((x) => x.id === 'lt-orbit'); return a ? [a.currentTime, a.effect.getTiming().duration, a.playbackRate] : null; });
-      const animStart = animAt();
+      // #1086: 공전은 WAAPI가 아니라 JS 루프 — 주기는 화면이 노출한 값으로 읽는다.
       const beforeMs = await run(6000);
-      const animEnd = animAt();
       const before = stats();
       const stylesAt = () => cards.map((c) => [c.style.transform || '', c.querySelector('.lt-move')?.style.transform || '']);
       const styleBefore = stylesAt();
@@ -426,7 +433,8 @@ s('#942 궤도는 한 방향으로 60~120초에 한 바퀴, 정지·튐 0, 클�
       series.forEach((s) => { s.length = 0; });
       const afterMs = await run(6000);
       const after = stats();
-      const period = animStart.map((a, i) => a && animEnd[i] ? Math.round(1000 * a[1] / (1000 * a[2]) / 1000) : 0);
+      const periodSec = window.__LT_ORBIT_TEST__ ? Math.round(window.__LT_ORBIT_TEST__.period() / 1000) : 0;
+      const period = cards.map(() => periodSec);
       return { cards: cards.length, beforeMs, afterMs, before, after, period, styleBefore, styleAfterClick };
     });
     if (CAP) {

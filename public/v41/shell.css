@@ -108,7 +108,7 @@ html[data-lt-theme=garden] #context-kind{color:var(--lt-rose-ink)}
 .community-card h3,.community-card .community-summary{color:#342a28!important}
 .community-card .community-muted,.community-card .community-subject{color:#6a5a51!important}
 .community-card .community-actions button,.community-card .community-details button{background:#e4d7cb;color:#3a2f29;border-color:#b6a08f}
-.community-card .community-actions .community-primary{background:#1a1620;color:var(--lt-pearl)}
+.community-card .community-actions .community-primary{background:var(--lt-btn-ink,#1a1620);color:var(--lt-pearl)}
 .community-card .community-details summary{color:#6a5549}
 .community-card .community-details{border-color:#b6a08f}
 .community-preview{position:sticky;top:0;min-height:420px;padding:28px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-panel);background:var(--lt-paper);color:var(--lt-ink);box-shadow:0 0 0 1px rgba(255,230,166,.12),0 0 32px rgba(238,190,104,.14),0 25px 60px #0005}
@@ -118,7 +118,7 @@ html[data-lt-theme=garden] #context-kind{color:var(--lt-rose-ink)}
 .community-preview-paper{display:grid;gap:14px}.community-preview-subject,.community-preview-summary{margin:0}
 .community-preview-moment{display:grid;gap:12px;min-height:150px;align-content:center;padding:24px;background:#fffbf3;border:1px solid #d8c9b3;transform:rotate(-1deg)}
 .community-preview-moment small{color:var(--lt-gold-ink)}.community-preview-moment strong{font:600 20px/1.5 var(--lt-font-display)}
-.community-preview-open{min-height:48px;border:0;border-radius:var(--lt-r-pill);background:#1a1620;color:var(--lt-pearl);font-weight:700}
+.community-preview-open{min-height:48px;border:0;border-radius:var(--lt-r-pill);background:var(--lt-btn-ink,#1a1620);color:var(--lt-pearl);font-weight:700}
 @media(max-width:900px){.community-layout{grid-template-columns:1fr}.community-preview{position:static;min-height:0}}
 @media(max-width:600px){#community-list{grid-template-columns:1fr}.community-card{grid-template-columns:90px minmax(0,1fr)}.community-cover{min-height:170px}.community-preview{padding:20px}.community-preview h3{font-size:23px}}
 
@@ -703,6 +703,18 @@ body.lt-frame-dialog-open #toast{top:calc(68px + env(safe-area-inset-top));botto
 .updates-heart{font-size:12px;line-height:1}
 .updates-source-user{margin-left:8px;font-size:13px;color:var(--lt-gold)}
 .updates-source-summary{margin:18px 0 0;padding-top:12px;border-top:1px solid var(--lt-line);font-size:13px;line-height:1.7;color:var(--lt-gold)}
+/* #1098 3단계: 내 소식 창 — updates 창과 같은 틀(최대 960·닫기 여백)을 쓰고 줄 모양만 더한다. */
+#my-news-panel>.panel-heading,#my-news-panel>.panel-note,#my-news-panel>.my-news-list,#my-news-panel>#my-news-error,#my-news-panel>.updates-foot{max-width:960px;margin-left:auto;margin-right:auto}
+.my-news-list{display:grid;gap:10px;margin-top:14px;margin-bottom:64px}
+.my-news-rows{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.my-news-day{min-height:24px;padding:10px 2px 0;font-size:12px;font-weight:700;letter-spacing:var(--lt-track);color:var(--lt-rose)}
+.my-news-line{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 12px;min-height:44px;padding:9px 12px;border:1px solid var(--lt-line);border-radius:var(--lt-r-card);background:#ffffff05}
+.my-news-label{font-size:14px;font-weight:700;color:var(--lt-pearl);white-space:nowrap}
+.my-news-last{min-width:0;font-size:13px;line-height:1.7;color:var(--lt-pearl);overflow-wrap:anywhere}
+.my-news-target{font-size:12px;color:var(--muted);overflow-wrap:anywhere}
+.my-news-ai{font-size:12px;color:var(--lt-gold);white-space:nowrap}
+.my-news-empty,.my-news-loading{margin:6px 0 0}
+#my-news-error{color:var(--lt-rose)}
 
 /* '러브트리가 걸어온 길'(261116 대표 확정) — 새 소식 창 맨 아래 접이식 구획. 처음엔 접힘.
    토큰만 쓴다(밤·정원 모두 --lt-pearl/--lt-muted/--lt-gold가 테마에서 갈린다). 자료를 못 읽으면 hidden. */
@@ -912,10 +924,10 @@ body.community-screen #stage>iframe,body.community-screen #empty{display:none}
 #community-panel .community-cover-image.is-loading,#community-panel .community-cover-backdrop.is-loading{opacity:0}
 #community-panel .community-cover-image.is-ready{opacity:1}
 #community-panel .community-cover-backdrop.is-ready{opacity:.78}
-#community-panel .community-card-title{margin:12px 14px 0;color:var(--lt-ink)!important;font-size:16px;font-weight:700;line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-#community-panel .community-card-moment{margin:4px 14px 0;color:var(--lt-ink)!important;font-size:14px;line-height:1.45;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#community-panel .community-card-title{margin:12px 14px 0;color:var(--lt-ink);font-size:16px;font-weight:700;line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#community-panel .community-card-moment{margin:4px 14px 0;color:var(--lt-ink);font-size:14px;line-height:1.45;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #community-panel .community-card-distinct{display:block;margin:4px 14px 0;color:var(--lt-ink);font-size:12px;line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-#community-panel .community-card-meta{margin:7px 14px 14px;color:var(--lt-ink)!important;font-size:13px;line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#community-panel .community-card-meta{margin:7px 14px 14px;color:var(--lt-ink);font-size:13px;line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #community-panel .community-policy{max-width:1500px;margin:20px auto 8px;color:var(--lt-pearl);font-size:13px;line-height:1.6}
 #community-panel .community-empty{max-width:520px;margin:28px auto;padding:28px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-panel);background:var(--lt-paper);color:var(--lt-ink);text-align:center}
 #community-panel .community-empty p{color:var(--lt-ink)}
