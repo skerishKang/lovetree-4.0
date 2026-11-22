@@ -35,8 +35,8 @@ test('실제 기록 판본 문구를 기준으로 통일했다(범례 제목·�
 });
 
 test('재생 안내는 source가 아니라 데이터 상태(예시 여부)로 갈린다', () => {
-  assert.match(SERVER, /if\(!canPlay\)\{toast\('실제 연결은 상단 부모·자식 및 관련 순간에서 선택하세요\.'\);return\}/);
-  assert.doesNotMatch(SERVER, /source===['"]example['"]/);
+  assert.match(SERVER, /if\s*\(!canPlay\)\s*\{\s*toast\('실제 연결은 상단 부모·자식 및 관련 순간에서 선택하세요\.'\);\s*return;?\s*\}/);
+  assert.doesNotMatch(SERVER, /source\s*===\s*['"]example['"]/);
   assert.match(RUNTIME, /example:!!demo/);
 });
 
@@ -45,10 +45,10 @@ test('트리 크기에 맞춘 배치는 한 벌(network-model.js)이 맡는다',
   // #461: 작은 트리 고정 보정(smallTreeLayout) 대신 화면 상자(fitBox)에 맞춘 배치(networkLayout)가 크기를 맡는다.
   const MODEL = fs.readFileSync(new URL('../public/v41/views/network/network-model.js', import.meta.url), 'utf8');
   assert.ok(!MODEL.includes('function smallTreeLayout('), '고정 무대 보정은 없앴다');
-  assert.ok(SERVER.includes('LT56Model.networkLayout(LTDEMO.moments,{box:BOX'));
-  assert.ok(SERVER.includes("document.querySelectorAll('.legend-row').forEach"));
+  assert.match(SERVER, /LT56Model\.networkLayout\(LTDEMO\.moments,\s*\{\s*box:\s*BOX/);
+  assert.match(SERVER, /document\.querySelectorAll\('\.legend-row'\)\.forEach/);
   // #601: 묶음은 감정별(LT56Model.emotionGroups) — 묶음 이름을 화면에서 다시 만들지 않는다.
-  assert.ok(SERVER.includes('LT56Model.pickGroups(LTDEMO.moments,LTDEMO.edges)'));
+  assert.match(SERVER, /LT56Model\.pickGroups\(LTDEMO\.moments,\s*LTDEMO\.edges\)/);
   assert.ok(!SERVER.includes('LT56Model.clusterSpan('), '묶음 이름은 모델의 감정 묶음 한 벌로 대체됐다');
 });
 

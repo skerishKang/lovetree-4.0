@@ -217,22 +217,22 @@ test('17. 장식 애니메이션 정지 판정(#346 2단계): 이동·확대·�
 
 test('18. 정지 배선: 셸이 decor-paused를 토글하고, CSS가 장식 애니메이션만 멈춘다', () => {
   const CSS = fs.readFileSync(new URL('../public/v41/views/board/board.css', import.meta.url), 'utf8');
-  assert.match(EXTRAS, /LT58Model\.decorationMotion\(\{pan:!!pan,pinch:!!pinch,dragging:!!drag,touches:boardTouches\.size\}\)/, '판정 한 벌을 쓴다');
+  assert.match(EXTRAS, /LT58Model\.decorationMotion\(\{\s*pan:\s*!!pan,\s*pinch:\s*!!pinch,\s*dragging:\s*!!drag,\s*touches:\s*boardTouches\.size\s*\}\)/, '판정 한 벌을 쓴다');
   assert.match(EXTRAS, /classList\.toggle\('decor-paused'/, '클래스 토글이 있다');
-  assert.match(EXTRAS, /addEventListener\('pointerdown',\(\)=>queueMicrotask\(applyDecorMotion\)\)/, '손을 대면 적용');
-  assert.match(EXTRAS, /addEventListener\('pointerup',\(\)=>queueMicrotask\(applyDecorMotion\)\)/, '손을 떼면 해제');
+  assert.match(EXTRAS, /addEventListener\('pointerdown',\s*\(\)\s*=>\s*queueMicrotask\(applyDecorMotion\)\)/, '손을 대면 적용');
+  assert.match(EXTRAS, /addEventListener\('pointerup',\s*\(\)\s*=>\s*queueMicrotask\(applyDecorMotion\)\)/, '손을 떼면 해제');
   assert.ok(CSS.includes('body.decor-paused .threadWave,body.decor-paused .pin::after{animation-play-state:paused}'), 'CSS 정지 규칙이 있다');
 });
 
 test('14. board-extras.js는 필터 판정을 다시 구현하지 않고 한 벌을 부른다', () => {
-  assert.doesNotMatch(EXTRAS, /ok=(m\.createdOrder\|\|0)>=maxOrder-2/);
-  assert.doesNotMatch(EXTRAS, /ok=!connections\.some\(c=>c\.a===m\.id\|\|c\.b===m\.id\)/);
-  assert.doesNotMatch(EXTRAS, /ok=ok&&\(m\.keywords\|\|\[\]\)\.includes\(kf\)/);
-  assert.doesNotMatch(EXTRAS, /maxOrder=Math\.max\(\.\.\.moments\.map\(m=>m\.createdOrder/);
-  assert.ok(EXTRAS.includes('LT58Model.filterVisible(m,state,connections)'));
+  assert.doesNotMatch(EXTRAS, /ok\s*=\s*\(m\.createdOrder\s*\|\|\s*0\)\s*>=\s*maxOrder\s*-\s*2/);
+  assert.doesNotMatch(EXTRAS, /ok\s*=\s*!\s*connections\.some\(c\s*=>\s*c\.a\s*===\s*m\.id\s*\|\|\s*c\.b\s*===\s*m\.id\)/);
+  assert.doesNotMatch(EXTRAS, /ok\s*=\s*ok\s*&&\s*\(m\.keywords\s*\|\|\s*\[\]\)\.includes\(kf\)/);
+  assert.doesNotMatch(EXTRAS, /maxOrder\s*=\s*Math\.max\(\s*\.\.\.\s*moments\.map\(m\s*=>\s*m\.createdOrder/);
+  assert.match(EXTRAS, /LT58Model\.filterVisible\(m,\s*state,\s*connections\)/);
   assert.ok(EXTRAS.includes('LT58Model.maxCreatedOrder(moments)'));
   // DOM 반영(클래스 토글)은 화면에 그대로 남는다.
-  assert.ok(EXTRAS.includes("el.classList.toggle('filteredOut',!ok)"));
+  assert.match(EXTRAS, /el\.classList\.toggle\('filteredOut',\s*!ok\)/);
 });
 
 test('처음 배치(#395 → #582 바둑판): 관계를 버려도 처음 꽂힌 자리는 남는다 — 저장 자리가 있으면 그 칸을 쓴다', () => {
@@ -368,17 +368,17 @@ test('#460 화면은 처음 자리·전체 보기·기억을 이 계산으로 �
   assert.match(BOARD, /LT58Model\.rememberView\(/);
   // #662(CTO 지시): 좁은 판 초기 화면은 전체 맞춤(40장을 손톱만 하게 몰아 넣음)이 아니라 지금 순간 카드를
   // 읽히는 배율로 크게 보이는 초점 보기다. 판이 아직 없으면(모듈 로드 순서) 전체 맞춤으로 대체한다.
-  assert.match(BOARD, /function boardStartView\(\)\{if\(innerWidth<700\)\{if\(typeof focusBoardMoment==='function'\)focusBoardMoment\(LTDEMO\.get\(\),false\);else fitAll\(false\);viewMode='start';return\}/);
+  assert.match(BOARD, /function\s+boardStartView\(\)\s*\{\s*if\s*\(innerWidth\s*<\s*700\)\s*\{\s*if\s*\(typeof\s+focusBoardMoment\s*===\s*'function'\)\s*focusBoardMoment\(LTDEMO\.get\(\),\s*false\);?\s*else\s+fitAll\(false\);?\s*viewMode\s*=\s*'start';?\s*return;?\s*\}/);
   // #490: 숨은 프레임(폭 0)에서 한 맞춤은 '전체 보기'가 아니다 — 드러난 뒤 resize가 처음 자리(또는 기억한 자리)를 다시 계산한다.
-  assert.ok(BOARD.includes("function boardResize(){if(innerWidth<700||cinema)return;placeAll();if(viewMode==='fit')fitAll(false);else boardStartView()}"), "boardResize: 저장 자리 없는 카드 재꽂기 포함")
+  assert.match(BOARD, /function\s+boardResize\(\)\s*\{\s*if\s*\(innerWidth\s*<\s*700\s*\|\|\s*cinema\)\s*return;?\s*placeAll\(\);?\s*if\s*\(viewMode\s*===\s*'fit'\)\s*fitAll\(false\);?\s*else\s+boardStartView\(\);?\s*\}/, "boardResize: 저장 자리 없는 카드 재꽂기 포함")
   assert.match(DETAIL, /boardStartView\(\);applyPathHighlight\(\)/);
-  assert.match(EXTRAS, /setTimeout\(boardStartView,40\)/);
-  assert.match(EXTRAS, /addEventListener\('resize',boardResize\)/);
+  assert.match(EXTRAS, /setTimeout\(boardStartView,\s*40\)/);
+  assert.match(EXTRAS, /addEventListener\('resize',\s*boardResize\)/);
   // 저장소는 try로 감싼다(사생활 창·차단에서도 화면은 뜬다).
-  assert.match(BOARD, /function readBoardView\(\)\{[^\n]*try\{/);
-  assert.match(BOARD, /function writeBoardView\(v\)\{[^\n]*try\{/);
+  assert.match(BOARD, /function\s+readBoardView\(\)\s*\{[\s\S]*?try\s*\{/);
+  assert.match(BOARD, /function\s+writeBoardView\(v\)\s*\{[\s\S]*?try\s*\{/);
   // 확대 단추는 화면 가운데 기준.
-  assert.match(BOARD, /\$\('#plusBtn'\)\.onclick=\(\)=>zoomAtCenter\(/);
+  assert.match(BOARD, /\$\('#plusBtn'\)\.onclick\s*=\s*\(\)\s*=>\s*zoomAtCenter\(/);
 });
 
 test('#460 판 크기: 순간이 기본 무대 아래까지 놓이면 판을 늘려 카드가 판 밖에 떨어지지 않는다', () => {
