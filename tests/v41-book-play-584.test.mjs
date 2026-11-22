@@ -429,7 +429,7 @@ test('584 실행: 머리줄 — 1장|2장 한 묶음, 돋보기 아이콘, 말�
       assert.match(head.toggleStyle.border, /^[01]px\/9999px$|^[01]px\/999px/, '묶음은 알약 테두리 한 줄');
       assert.ok(head.lens.svg, '돋보기는 SVG 아이콘');
       assert.equal(head.lens.text, '', '아이콘뿐이다(글자 없음)');
-      assert.equal(head.lens.aria, '찾기', '돋보기 단추의 접근성 이름은 찾기다');
+      assert.equal(head.lens.aria, '돋보기', '돋보기 단추의 접근성 이름은 돋보기다(켜짐·꺼짐은 aria-pressed)');
       assert.equal(head.overview.text, '이어진 순간');
       assert.equal(head.overview.tip, '처음 순간부터 지금까지 이어진 순간을 한눈에');
       assert.equal(head.archive.tip, '순간 목차 — 순간을 한눈에 훑어 보기');
