@@ -547,3 +547,61 @@ test('#1092 주소(#explore)로 직접 들어와도 둘러보기는 화면으로
   } finally { await browser.close(); }
 });
 
+
+test('#1098 순간 댓글 창은 불투명하고 뒤 단추를 가린다', { skip: REQUIRE ? false : skip, timeout: 180000 }, async () => {
+  if (skip) assert.fail(skip);
+  const contrast = (fg, bg) => {
+    const lin = color => color.match(/[\d.]+/g).slice(0, 3).map(Number).map(v => v / 255).map(v => v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)
+      .reduce((sum, v, i) => sum + v * [0.2126, 0.7152, 0.0722][i], 0);
+    const a = lin(fg), b = lin(bg);
+    return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+  };
+  const browser = await chromium.launch({ headless: true });
+  try {
+    for (const [width, height] of [[1440, 900], [390, 844]]) {
+      const h = await boot(browser, { width, height, theme: 'night' });
+      try {
+        const panel = h.page.locator('#community-moments-panel');
+        await panel.locator('.moments-rail-button', { hasText: '댓글' }).click();
+        const dialog = panel.locator('.moments-comments-dialog');
+        await dialog.waitFor({ state: 'visible', timeout: 5000 });
+        const look = await dialog.evaluate(el => {
+          const s = getComputedStyle(el);
+          const title = getComputedStyle(el.querySelector('.moments-comments-title'));
+          const input = getComputedStyle(el.querySelector('textarea'));
+          return { bg: s.backgroundColor, ink: title.color, inputBg: input.backgroundColor, inputInk: input.color };
+        });
+        assert.ok(/^rgb\(/.test(look.bg), '창 바탕이 불투명하다: ' + JSON.stringify(look));
+        assert.ok(contrast(look.ink, look.bg) >= 4.5, '제목 대비: ' + JSON.stringify(look));
+        assert.ok(contrast(look.inputInk, look.inputBg) >= 4.5, '입력 칸 대비: ' + JSON.stringify(look));
+        const behind = await panel.evaluate(el => ({
+          rail: getComputedStyle(el.querySelector('.moments-rail')).opacity,
+          nav: getComputedStyle(el.querySelector('.moments-nav')).opacity
+        }));
+        assert.equal(behind.rail, '0', '뒤 단추 줄이 가려진다: ' + JSON.stringify(behind));
+        assert.equal(behind.nav, '0', '뒤 위아래 단추가 가려진다: ' + JSON.stringify(behind));
+        await dialog.locator('.moments-add-close').click();
+        assert.equal(await dialog.getAttribute('hidden'), '', '닫기로 닫힌다');
+        const restored = await panel.evaluate(el => getComputedStyle(el.querySelector('.moments-rail')).opacity);
+        assert.equal(restored, '1', '닫으면 단추가 돌아온다');
+      } finally { await h.ctx.close(); await new Promise(r => h.server.close(r)); }
+    }
+  } finally { await browser.close(); }
+});
+
+test('#1098 회색 썸네일이면 제목 카드로 바뀐다', { skip: REQUIRE ? false : skip, timeout: 180000 }, async () => {
+  if (skip) assert.fail(skip);
+  const GRAY = route => route.fulfill({ status: 200, contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="90"><rect width="120" height="90" fill="#8a7a92"/><circle cx="30" cy="45" r="5" fill="#fff"/><circle cx="60" cy="45" r="5" fill="#fff"/><circle cx="90" cy="45" r="5" fill="#fff"/></svg>' });
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const h = await boot(browser, { width: 390, height: 844, theme: 'garden', thumb: GRAY });
+    try {
+      const panel = h.page.locator('#community-moments-panel');
+      const fallback = panel.locator('.moments-fallback');
+      await fallback.waitFor({ state: 'visible', timeout: 10000 });
+      const text = (await fallback.textContent()) || '';
+      assert.ok(text.includes('세로 순간 1'), '제목이 있는 카드로 대체된다: ' + text.slice(0, 120));
+      assert.equal(await panel.locator('.moments-poster').isVisible(), false, '회색 점 그림은 숨는다');
+    } finally { await h.ctx.close(); await new Promise(r => h.server.close(r)); }
+  } finally { await browser.close(); }
+});

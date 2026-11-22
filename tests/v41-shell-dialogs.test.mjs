@@ -454,7 +454,7 @@ test('보이는 연 버튼(data-lt-return)이 있으면 더보기 버튼으로 �
 // 보내기 전 검사와 보낸 뒤 화면(제목·안내·주 단추)을 실제 값으로 고정한다.
 import { createFeedbackDialog } from '../public/v41/feedback.mjs';
 
-function feedbackHarness({loggedIn = false} = {}) {
+function feedbackHarness({loggedIn = false, recentErrors = null} = {}) {
   const make = (props = {}) => ({
     value: '', textContent: '', hidden: false, disabled: false, open: false,
     dataset: {}, listeners: {}, focusCount: 0,
@@ -469,7 +469,9 @@ function feedbackHarness({loggedIn = false} = {}) {
   const boxes = [
     {dataset: {ctx: 'screen'}, checked: true},
     {dataset: {ctx: 'viewport'}, checked: true},
-    {dataset: {ctx: 'version'}, checked: false}
+    {dataset: {ctx: 'version'}, checked: false},
+    // #1072 A-16: 최근 오류 기록 — 기록이 있을 때만 칸이 보이고, 끄면 보내지 않는다. 기본(미지정)은 켜져 있다.
+    {dataset: {ctx: 'recentErrors'}, checked: recentErrors === null || recentErrors.length > 0}
   ];
   const els = {
     'feedback-panel': make({querySelectorAll: () => boxes}),
@@ -480,6 +482,7 @@ function feedbackHarness({loggedIn = false} = {}) {
     'feedback-count': make(),
     'feedback-send': make(),
     'feedback-tree-field': make({hidden: true}),
+    'feedback-report-field': make({hidden: true}),
     'feedback-category': make(),
     'feedback-title': make(),
     'feedback-note': make(),
@@ -492,7 +495,8 @@ function feedbackHarness({loggedIn = false} = {}) {
   const dialog = createFeedbackDialog({
     $: id => els[id] || null,
     notify: () => {},
-    getContext: () => ({screen: '첫 화면', viewport: '1440x900', theme: 'night', version: '4.1', loggedIn, treeId: ''}),
+    // #1072 A-16: recentErrors를 직접 넘기면 그 값을 쓰고(빈 목록 = 기록 없음), 아니면 실제 report 기록을 쓴다.
+    getContext: () => ({screen: '첫 화면', viewport: '1440x900', theme: 'night', version: '4.1', loggedIn, treeId: '', recentErrors: recentErrors !== null ? recentErrors : reportEntries()}),
     show: () => { els['feedback-panel'].open = true; },
     openMyPosts: () => { myPostsOpened += 1; },
     api: {send: async (payload) => { sent.push(payload); return {ok: true, status: 201}; }}
@@ -713,4 +717,65 @@ test('#933 잠깐 판(옮길 트리 고르기)은 지금처럼 위에 겹쳐 연
   manager.open = true; manager.modal = true;
   Proto.showModal.call(picker);
   assert.equal(manager.open, true, '앞 일로 돌아가는 창은 겹침을 허용한다(#845 3단계 그대로)');
+});
+
+// ---- #1072 A-16: 화면 공용 오류 기록(report)과 의견 보내기 연결 ----
+import {report, reportEntries} from '../public/v41/report.mjs';
+
+test('오류 기록: 최근 20건만 메모리에 두고 메시지·위치·시각만 남긴다', () => {
+  for (let i = 1; i <= 25; i += 1) report(new Error('오류 ' + i), '위치 ' + i);
+  const entries = reportEntries();
+  assert.equal(entries.length, 20, '20건을 넘기면 오래된 것부터 버린다');
+  assert.equal(entries[0].message, '오류 6', '가장 오래된 기록은 6번째 오류다');
+  assert.equal(entries.at(-1).message, '오류 25');
+  for (const entry of entries) {
+    assert.deepEqual(Object.keys(entry).sort(), ['at', 'message', 'where'], '한 건은 메시지·위치·시각뿐이다');
+    assert.ok(!('error' in entry) && !('stack' in entry), '오류 객체·스택은 기록하지 않는다');
+  }
+});
+
+test('오류 기록: 메시지에 메일 모양 글자가 섞이면 지워서 남긴다', () => {
+  report(new Error('user@example.com 계정에서 보드 저장이 실패했어요'), '보드 저장');
+  const last = reportEntries().at(-1);
+  assert.ok(!last.message.includes('user@example.com'), '메일 주소는 기록하지 않는다');
+  assert.ok(last.message.includes('메일'), '메일 모양 글자는 지우고 남긴다');
+  assert.equal(last.where, '보드 저장');
+});
+
+test('의견 창: 오류 기록이 있으면 최근 오류 기록 칸을 보이고 함께 보낸다', async () => {
+  report(new Error('보드 저장이 서버에서 거절됐어요'), '보드 저장');
+  const h = feedbackHarness();
+  h.dialog.open();
+  assert.equal(h.els['feedback-report-field'].hidden, false, '기록이 있으면 칸을 보인다');
+  h.els['feedback-category'].value = 'bug';
+  h.els['feedback-body'].value = '보드 저장이 안 돼요. 기록을 함께 보냅니다.';
+  await h.els['feedback-form'].listeners.submit({preventDefault() {}});
+  assert.equal(h.sent.length, 1);
+  const list = h.sent[0].context.recentErrors;
+  assert.ok(Array.isArray(list) && list.length >= 1, '함께 보낸 정보에 오류 기록이 있다');
+  assert.equal(list.at(-1).where, '보드 저장', '방금 남긴 기록이 실린다');
+  assert.ok(list.every((entry) => JSON.stringify(Object.keys(entry).sort()) === JSON.stringify(['at', 'message', 'where'])), '기록 한 건은 메시지·위치·시각뿐이다');
+});
+
+test('의견 창: 기록이 없으면 칸을 숨기고, 기록이 있어도 끄면 보내지 않는다', async () => {
+  const empty = feedbackHarness({recentErrors: []});
+  empty.dialog.open();
+  assert.equal(empty.els['feedback-report-field'].hidden, true, '기록이 없으면 칸을 숨긴다');
+  empty.els['feedback-category'].value = 'bug';
+  empty.els['feedback-body'].value = '의견만 보낸다';
+  await empty.els['feedback-form'].listeners.submit({preventDefault() {}});
+  assert.equal(empty.sent[0].context.recentErrors, undefined, '빈 기록은 보내지 않는다');
+
+  // 끈 상자: selectedContext가 끈 정보는 담지 않는다(의견 창 #631 규칙과 같다).
+  const saved = [{message: '오류', where: '보드 저장', at: '2026-11-22T00:00:00.000Z'}];
+  const unchecked = {dataset: {ctx: 'recentErrors'}, checked: false};
+  const dialog = {querySelectorAll: () => [unchecked]};
+  const base = {recentErrors: saved};
+  const out = {};
+  for (const box of dialog.querySelectorAll('[data-ctx]')) {
+    const key = box.dataset.ctx;
+    if (Array.isArray(base[key]) && !base[key].length) continue;
+    if (box.checked && base[key] !== undefined && base[key] !== null && base[key] !== '') out[key] = base[key];
+  }
+  assert.equal(out.recentErrors, undefined, '끈 최근 오류 기록은 보내지 않는다');
 });

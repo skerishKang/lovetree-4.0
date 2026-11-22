@@ -113,6 +113,14 @@ function commitInsert(id,index){const seq=momentOrder.filter((x)=>x!==id);const 
 if(boardMode!=='mine')setBoardMode('mine');else{placeAll();settlePlacedCards()}
 persistBoard()}
 
+// #1072 A-17: 카드 순서 단추 한 벌과 순서 옮기기 — 키보드로도 '내 배치' 순서를 바꿀 수 있게 한다.
+// 끌기와 같은 저장 경로(commitInsert·persistBoard)를 쓴다. 첫 장에서 앞으로·끝 장에서 뒤로는 아무 것도 하지 않는다.
+function cardOrderHTML(m){if(!canEditBoard||LTDEMO.readOnly)return '';const label=esc(titleMain(m));return `<div class="cardOrder"><button type="button" class="orderBtn" data-order-id="${m.id}" data-order-dir="prev" aria-label="${label} 카드를 한 장 앞으로">앞으로</button><button type="button" class="orderBtn" data-order-id="${m.id}" data-order-dir="next" aria-label="${label} 카드를 한 장 뒤로">뒤로</button></div>`}
+function moveCardOrder(id,dir){const at=momentOrder.indexOf(id);if(at<0)return false;const to=dir==='prev'?at-1:at+1;if(to<0||to>=momentOrder.length)return false;snapshot();const seq=momentOrder.slice();seq.splice(at,1);seq.splice(to,0,id);momentOrder=seq;
+// 옮긴 뒤에도 '내 배치' 순서대로 보인다(끌기와 같은 규칙).
+if(boardMode!=='mine')setBoardMode('mine');else{placeAll();settlePlacedCards()}
+persistBoard();return true}
+
 // #894: '내 배치'에서 끄는 동안 다른 카드가 실시간으로 비켜 준다 — 끼어들 자리에 놓였을 때의
 // 자리를 미리 계산해 나머지 카드를 옮겨 둔다(180ms 전환). 움직임 끄기(셸 설정·lt41-motion)면 즉시.
 // 끌고 있는 카드 자체는 포인터를 그대로 따라오고, 놓으면 commitInsert가 같은 자리로 확정한다.
@@ -144,7 +152,7 @@ function orderPayload(m){const rank=orderRank(m.id);if(rank>=0)return{x:m.savedX
 return m.savedPos&&m.savedXY&&boardMode==='date'?{x:m.savedXY.x,y:m.savedXY.y,rot:m.savedXY.rot}:{x:m.x,y:m.y,rot:m.rot}}
 function newBoardId(){let id;do{id='m'+Math.random().toString(36).slice(2,10)}while(moments.some(m=>m.id===id));return id}
 // #1058: 보내기가 던지면 조용히 넘기지 않고 보드 알림 줄에 실패를 알린다(성공은 #905 규칙으로 알리지 않는다).
-function persistBoard(){if(!boardSaveEnabled())return;try{const treeId=window.parent.LT41.tree.id;window.parent.postMessage({type:'lt41-board-sync',treeId,moments:boardPayload()},location.origin)}catch{failNotice('보드 저장에 실패했어요. 잠시 뒤 다시 시도해 주세요.')}}
+function persistBoard(){if(!boardSaveEnabled())return;try{const treeId=window.parent.LT41.tree.id;window.parent.postMessage({type:'lt41-board-sync',treeId,moments:boardPayload()},location.origin)}catch(error){globalThis.LT41Report?.report(error,'보드 저장 보내기');failNotice('보드 저장에 실패했어요. 잠시 뒤 다시 시도해 주세요.')}}
 // #1058: 저장 실패 알림 — 카드보다 위 층(z 9999), 불투명 바탕, 화면 아래 가운데, 최소 5초.
 function failNotice(t){let el=$('#saveFail');if(!el)return;el.textContent=t;el.classList.add('show');hideToast();clearTimeout(failNotice.t);failNotice.t=setTimeout(()=>el.classList.remove('show'),6000)}
 window.addEventListener('message',e=>{if(e.origin!==location.origin)return;if(e.data?.type!=='lt41-board-saved')return;if(e.data.ok===false)toast(e.data.error||'서버에 저장하지 못했어요. 잠시 뒤 다시 시도해 주세요.')});
@@ -323,10 +331,10 @@ if(connectFrom){/* #582: '이어진 이유' 창은 없앴다 — 이어 주기�
 placeAll();
 
 function formFor(type){let a=$('#formArea');
-if(type==='photo')a.innerHTML='<input class="field" id="mediaFile" type="file" accept="image/*"><div style="font-size:10px;color:#9b89a5;margin-top:6px">로컬 이미지는 브라우저 안에서만 미리 봅니다.</div>';
-else if(type==='video')a.innerHTML='<input class="field" id="mediaFile" type="file" accept="video/*"><div style="font-size:10px;color:#9b89a5;margin-top:6px">선택/hover 시 muted preview.</div>';
-else if(type==='link'||type==='youtube')a.innerHTML='<input class="field" id="urlField" placeholder="https://..." value="https://lovetree.example/memory"><div style="font-size:10px;color:#9b89a5;margin-top:6px">Prototype metadata parser · 실제 crawler 아님.</div>';
-else a.innerHTML='<textarea class="field" id="noteField" rows="3" placeholder="남기고 싶은 문장">좋아하게 된 이유를 잊고 싶지 않았어요.</textarea>'}
+if(type==='photo')a.innerHTML='<input class="field" id="mediaFile" type="file" accept="image/*" aria-label="그림 파일 고르기"><div style="font-size:10px;color:#9b89a5;margin-top:6px">로컬 이미지는 브라우저 안에서만 미리 봅니다.</div>';
+else if(type==='video')a.innerHTML='<input class="field" id="mediaFile" type="file" accept="video/*" aria-label="영상 파일 고르기"><div style="font-size:10px;color:#9b89a5;margin-top:6px">선택/hover 시 muted preview.</div>';
+else if(type==='link'||type==='youtube')a.innerHTML='<input class="field" id="urlField" placeholder="https://..." value="https://lovetree.example/memory" aria-label="링크 주소"><div style="font-size:10px;color:#9b89a5;margin-top:6px">Prototype metadata parser · 실제 crawler 아님.</div>';
+else a.innerHTML='<textarea class="field" id="noteField" rows="3" placeholder="남기고 싶은 문장" aria-label="마음 한마디">좋아하게 된 이유를 잊고 싶지 않았어요.</textarea>'}
 
 function openAdd(){formFor(addType);
 $('#addModal').classList.add('open')}
@@ -349,7 +357,7 @@ let box=$('#viewerMedia');
 if(m.url)box.innerHTML=LTMedia.markup(m.url,m.title,m.mediaMetadata,m.id);
 else if(m.type==='video')box.innerHTML=`<video src="${m.video}" poster="${m.asset}" controls autoplay muted playsinline style="width:100%;max-height:420px;object-fit:contain"></video>`;
 else if(m.type==='note')box.innerHTML=`<div style="padding:40px;color:#f7edf8;font-size:22px;line-height:1.6">“${esc(m.memo)}”</div>`;
-else box.innerHTML=`<img src="${m.asset}" style="width:100%;max-height:420px;object-fit:cover">`;
+else box.innerHTML=`<img src="${m.asset}" alt="${esc(m.title)}" style="width:100%;max-height:420px;object-fit:cover">`;
 $('#vMeta').innerHTML=(_vi.sub?'<div class="videoTitle">▶ '+esc(_vi.sub)+'</div>':'')+`${esc(LTLabels.type(m.originalType||m.type))} · ${esc(dateText(m.date))} · ${esc(m.emotion)}<br>출처: ${esc(m.source)}${m.url?`<br>URL: ${esc(m.url)}`:''}<br>마음 한마디: ${esc(m.memo)}`;
 $('#viewerModal').classList.add('open')}
 
