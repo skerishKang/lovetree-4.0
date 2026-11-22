@@ -19,6 +19,12 @@ export function createCommunityApi({fetchImpl=(...args)=>fetch(...args)}={}){
   comments:id=>call('/api/community/shares/'+encodeURIComponent(id)+'/comments'),
   comment:(id,body)=>call('/api/community/shares/'+encodeURIComponent(id)+'/comments',{method:'POST',headers:{'idempotency-key':key('comment')},body:JSON.stringify({body})}),
   removeComment:id=>call('/api/community/comments/'+encodeURIComponent(id),{method:'DELETE'}),
+  // #1098 2단계: 순간 단위 ♡·댓글(서버 #1136의 순간 경로) — 통계 읽기·♡ 켜기/끄기·댓글 읽기/쓰기.
+  publicShare:shareId=>call('/api/public/shares/'+encodeURIComponent(shareId)),
+  momentStats:(shareId,momentId)=>call('/api/community/shares/'+encodeURIComponent(shareId)+'/moments/'+encodeURIComponent(momentId)),
+  momentReact:(shareId,momentId,enabled)=>call('/api/community/shares/'+encodeURIComponent(shareId)+'/moments/'+encodeURIComponent(momentId)+'/reaction',{method:enabled?'PUT':'DELETE',body:enabled?JSON.stringify({kind:'heart'}):undefined}),
+  momentComments:(shareId,momentId)=>call('/api/community/shares/'+encodeURIComponent(shareId)+'/moments/'+encodeURIComponent(momentId)+'/comments'),
+  momentComment:(shareId,momentId,body)=>call('/api/community/shares/'+encodeURIComponent(shareId)+'/moments/'+encodeURIComponent(momentId)+'/comments',{method:'POST',headers:{'idempotency-key':key('moment-comment')},body:JSON.stringify({body})}),
   editComment:(id,body)=>call('/api/community/comments/'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify({body})}),
   report:(id,reason)=>call('/api/community/shares/'+encodeURIComponent(id)+'/report',{method:'POST',headers:{'idempotency-key':key('report')},body:JSON.stringify({reason})}),
   block:id=>call('/api/community/shares/'+encodeURIComponent(id)+'/block',{method:'POST'})

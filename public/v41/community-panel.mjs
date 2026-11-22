@@ -12,6 +12,8 @@ import {localDateOnly} from './local-date.mjs';
 import {POPULAR_STAGE_TITLE,POPULAR_STAGE_EMPTY,POPULAR_STAGE_WEEK_LABEL,publicStageCount,stageVoteLabel,stageVoteNotice,stageMomentTitle,readStage,toggleStage} from './community-stages.mjs';
 // #1025: [순간] 탭 — 공개 세로 순간 숏츠 보기(서버 조회·세로 판정은 기존 한 벌 재사용).
 import {mountMoments} from './community-moments.mjs';
+// #1098 2단계: 판의 순간 목록 — 순간 카드에 그 순간의 ♡·댓글 수, ♡ 누르기·댓글 쓰기는 순간 단위 API(서버 #1136).
+import {mountMomentList} from './community-moment-list.mjs';
 const el=(tag,className,text)=>{const node=document.createElement(tag);if(className)node.className=className;if(text!=null)node.textContent=text;return node;};
 // 셸이 낯선 주소를 #home으로 바꾸기 전에(module import 시점) 직접 들어온 주소를 기억한다(#1025).
 const hashNow=()=>typeof location!=='undefined'?(location.hash||''):'';
@@ -21,7 +23,7 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
  // #1025: [트리] [순간] 탭 — 주소 #explore/moments 는 새로고침·공유로 유지한다.
  const treeTab=dialog.querySelector('#community-tab-trees'),momentsTab=dialog.querySelector('#community-tab-moments');
  const treePanel=dialog.querySelector('#community-tree-panel'),momentsPanel=dialog.querySelector('#community-moments-panel');
- const moments=momentsPanel?mountMoments({panel:momentsPanel,onOpenShare,onAddToTree,notify,memberLogin}):null;
+ const moments=momentsPanel?mountMoments({panel:momentsPanel,onOpenShare,onAddToTree,notify,memberLogin,api}):null;
  let currentTab='trees',hashGuard=false;
  const writeHash=value=>{
   if(typeof history==='undefined'||typeof history.pushState!=='function'||typeof history.replaceState!=='function')return;
@@ -289,8 +291,14 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
   const commentSection=el('section','community-preview-comments');commentSection.setAttribute('aria-label','댓글');
   const commentHeading=el('h4','community-menu-title','댓글'),commentHost=el('div','community-comment-host');
   commentSection.append(commentHeading,commentHost);
-  body.append(title,subject,moment);if(summary)body.append(summary);body.append(meta,actions,commentSection,choices,moreMenu(item),status);
+  // #1098 2단계: 판의 순간 목록 — 판 위쪽(한 줄 정보·단추·트리 댓글)은 트리 숫자를 유지하고, 이 목록의 순간 카드만 그 순간의 ♡·댓글 수를 보인다.
+  const momentSection=el('section','community-moment-list');momentSection.setAttribute('aria-label','순간 목록');momentSection.hidden=true;
+  const momentHeading=el('h4','community-menu-title','순간 목록'),momentHost=el('div','community-moment-host');
+  momentSection.append(momentHeading,momentHost);
+  body.append(title,subject,moment);if(summary)body.append(summary);body.append(meta,actions,commentSection,momentSection,choices,moreMenu(item),status);
   preview.replaceChildren(head,renderCover(item,{loading:'eager'}),body);
+  // 순간 목록은 판을 그릴 때 한 번 — 응답이 늦게 와도 다시 그리기(렌더 토큰)로 오래된 표시가 남지 않게 한다.
+  mountMomentList({section:momentSection,host:momentHost,api,shareId:item.shareId,when,countLabel:smallCountLabel});
   if(item.cover?.momentId)mountStageVote(item,stageBox);
   comments(item,{host:commentHost,heading:commentHeading,meta});
  }

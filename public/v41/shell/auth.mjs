@@ -34,10 +34,21 @@ export function createAuth(deps) {
     startLogin(intent === 'first' ? '' : intent);
   }
 
-  // 401·로그인 만료: 화면을 로그아웃 상태로 되돌리고 안내 줄을 남긴다(#218·#144와 같은 문구).
-  function authRequired() {
-    if (!getMember()?.snapshot().owned) return;
-    // #1134: 상단 단추만 로그인으로 바뀌고 계정 메뉴가 그대로면 반쯤 로그아웃된다 — 헤더 한 벌에 맞춘다.
+  // #1134 후속: 401(갱신 재시도 뒤)이 나도 바로 로그아웃 처리하지 않는다. 2초·5초 뒤 두 번 세션을 다시 확인해
+  // 둘 다 401일 때만 로그아웃 상태로 바꾸고 안내한다. 중간에 성공하면 아무 표시 없이 그대로 둔다.
+  // 다시 확인하는 동안 같은 401이 여러 번 와도 확인은 한 벌만 한다.
+  let rechecking = false;
+  let recheckPromise = null;
+  const sleep = deps.sleep || (ms => new Promise(r => setTimeout(r, ms)));
+  const checkSession = deps.checkSession || (async () => false);
+  async function recheckTwice() {
+    await sleep(2000);
+    if (await checkSession().catch(() => false)) return true;
+    await sleep(3000);
+    if (await checkSession().catch(() => false)) return true;
+    return false;
+  }
+  function applyAuthExpired() {
     deps.onAuthRequired?.();
     $('account-entry').textContent = '로그인';
     $('account-entry').hidden = false;
@@ -45,6 +56,13 @@ export function createAuth(deps) {
     closeAccountMenu();
     // #368: 안내 줄은 설정 창 상태 줄·토스트(notify)가 한 벌로 맡는다.
     notify('로그인 확인이 필요해요. 다시 로그인해 주세요.');
+  }
+  function authRequired() {
+    if (!getMember()?.snapshot().owned) return Promise.resolve();
+    if (rechecking) return recheckPromise;
+    rechecking = true;
+    recheckPromise = recheckTwice().then(ok => { rechecking = false; if (!ok) applyAuthExpired(); });
+    return recheckPromise;
   }
 
   // 로그인하고 돌아왔을 때 의도한 화면으로 이어 준다(new-tree → 첫 여정, shelf → 내 트리).
