@@ -6,6 +6,7 @@ import {mkdir, readdir, open, readFile, writeFile, link, unlink, rm} from 'node:
 import {join, isAbsolute} from 'node:path';
 import {ApiError} from './errors.js';
 import {parsePrincipal} from './principal.js';
+import {mediaAssetUrl} from '../public/v41/youtube-id.mjs'; // A-11: 올린 사진 주소도 화면과 같은 정본에서 만든다.
 
 export const MAX_MEDIA_BYTES = 8 * 1024 * 1024;
 export const IMAGE_LIMIT_BYTES = 4 * 1024 * 1024;
@@ -95,7 +96,7 @@ export function createMediaHandler({authenticate,productId,store,publicOrigin,ad
    if(collection&&method==='POST'){
     if(request.bodyTooLarge)throw failure(413,'media_size',"사진은 4MiB, 영상은 8MiB 이하만 올릴 수 있어요.");
     body=await store.put(principal,{id:request.headers?.['x-lovetree-upload-id'],mime:String(request.headers?.['content-type']||'').split(';')[0].toLowerCase(),bytes:request.rawBody||Buffer.alloc(0),label:request.headers?.['x-lovetree-file-name']});
-    body={...body,url:request.headers.origin+'/api/media/'+body.name};
+    body={...body,url:mediaAssetUrl(body.name,request.headers.origin)};
    }
    if(item&&method==='GET'){const asset=await store.get(principal,path.slice(11));return {status:200,headers:{...headers,'content-type':asset.mime},binary:asset.bytes};}
    if(item&&method==='DELETE')body=await store.remove(principal,path.slice(11));

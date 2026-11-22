@@ -67,7 +67,12 @@
     return Number(meta?.width) > 0 && Number(meta?.height) > Number(meta?.width);
   }
 
+  // A-11: 올린 사진 주소와 기본 카드 그림도 같은 정본에서 만든다(출력 형식은 종전과 같다).
+  const MEDIA_ASSET_PATH = '/api/media/';
+  const CARD_IMAGE_URL = 'https://lovetree.padiem.net/og/lovetree-card.png';
+  const mediaAssetUrl = (name, origin) => `${origin}${MEDIA_ASSET_PATH}${name}`;
+
   if (typeof globalThis !== 'undefined') {
-    globalThis.LTYouTubeId = { YOUTUBE_HOSTS, YTIMG_HOST, VIDEO_ID_RE, youtubeIdFrom, safeYoutubeThumb, youtubeStageThumbUrl, isVerticalMoment };
+    globalThis.LTYouTubeId = { YOUTUBE_HOSTS, YTIMG_HOST, VIDEO_ID_RE, youtubeIdFrom, safeYoutubeThumb, youtubeStageThumbUrl, isVerticalMoment, MEDIA_ASSET_PATH, CARD_IMAGE_URL, mediaAssetUrl };
   }
 })();
