@@ -102,7 +102,7 @@ test('수신 분기마다 화면 상태를 바꾸기 전에 공통 확인을 거
   const network = read('public/v41/views/network/network.js');
   assert.ok(network.includes('LT41_MSG.networkView') && network.includes('LT41_isShellMessage'), '지도 기본 보기 분기에 공통 확인이 있다');
   // 지도 기능은 바꾸지 않는다 — 보기 정규화와 전환 호출이 그대로다.
-  assert.ok(network.includes("e.data.value==='concentric'?'tag':e.data.value"), '지도 보기 정규화가 그대로다');
+  assert.match(network, /e\.data\.value\s*===\s*'concentric'\s*\?\s*'tag'\s*:\s*e\.data\.value/, '지도 보기 정규화가 그대로다');
   assert.ok(network.includes('setView(v)'), '지도 보기 전환 호출이 그대로다');
   for (const file of ['public/v41/views/track56-network.html', 'public/v41/views/track58-pinboard.html']) {
     const source = read(file);

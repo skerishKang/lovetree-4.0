@@ -9,6 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
+import { parseAst } from 'rolldown/parseAst';
 
 const repoRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const networkPath = path.join(repoRoot, 'public/v41/views/network/network.js');
@@ -83,21 +84,22 @@ function loadNetwork() {
 
 const source = fs.readFileSync(networkPath, 'utf8');
 
-/** network.js에서 drawHub 함수 정의를 그대로 뽑는다(파일이 한 줄로 minify 되어 있다). */
+/** network.js를 파싱해 drawHub 함수 노드를 찾고, 그 범위를 그대로 쓴다(문자열로 자르지 않는다). */
 function hubDrawSource() {
   const src = fs.readFileSync(networkPath, 'utf8');
-  const at = src.indexOf('function drawHub(c){');
-  assert.ok(at >= 0, 'drawHub 정의를 찾았다');
-  let i = src.indexOf('{', at);
-  let depth = 0;
-  for (; i < src.length; i += 1) {
-    if (src[i] === '{') depth += 1;
-    else if (src[i] === '}') {
-      depth -= 1;
-      if (depth === 0) return src.slice(at, i + 1);
+  const ast = parseAst(src, {}, 'network.js');
+  const found = [];
+  const walk = (n) => {
+    if (!n || typeof n !== 'object') return;
+    if (n.type === 'FunctionDeclaration' && n.id && n.id.name === 'drawHub') found.push(n);
+    for (const v of Object.values(n)) {
+      if (Array.isArray(v)) v.forEach(walk);
+      else walk(v);
     }
-  }
-  throw new Error('drawHub 본문이 닫히지 않는다');
+  };
+  walk(ast);
+  assert.equal(found.length, 1, 'drawHub 정의를 하나 찾았다');
+  return src.slice(found[0].start, found[0].end);
 }
 
 test('#449 실행: 후광 반지름 실제 계산이 어떤 배율에서도 음수가 되지 않는다', () => {

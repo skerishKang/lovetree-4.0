@@ -20,8 +20,8 @@ test('런타임 한 벌만 부르고 자원 경로는 /v41/ 절대 경로', () =
 });
 
 test('연결은 데이터(LTDEMO.edges)에서 만들고 실제 기록 문구를 기준으로 쓴다', () => {
-  assert.match(SERVER, /function projectBoardConnections\(\)\{return LTDEMO\.edges\.map\(/);
-  assert.match(SERVER, /let connections=projectBoardConnections\(\);/);
+  assert.match(SERVER, /function\s+projectBoardConnections\(\)\s*\{\s*return\s+LTDEMO\.edges\.map\(/);
+  assert.match(SERVER, /let\s+connections\s*=\s*projectBoardConnections\(\);/);
   assert.ok(!SERVER.includes('감상 예시'));
   assert.ok(!SERVER.includes('부모·자식 연결'));
   assert.ok(!SERVER.includes('공개 예시'));
@@ -32,10 +32,10 @@ test('예시 판본 판단은 한 곳에만 둔다(연결 색이 같은 값을 �
   const branches = SERVER.match(/LTDEMO\.example/g) || [];
   assert.equal(branches.length, 1);
   // #619-6: 판단은 exampleBoard 한 곳에 두고, 연결 색과 꾸밈 카드 스타일이 같은 값을 본다.
-  assert.match(SERVER, /const exampleBoard=LTDEMO\.example;/);
-  assert.match(SERVER, /let canEditBoard=exampleBoard\|\|boardSaveEnabled\(\);/);
-  assert.match(SERVER, /'cyan':\(canEditBoard\?\['rose','violet','cyan','amber'\]\[Math\.max\(0,moments\.findIndex/);
-  assert.doesNotMatch(SERVER, /source===['"]example['"]/);
+  assert.match(SERVER, /const\s+exampleBoard\s*=\s*LTDEMO\.example;/);
+  assert.match(SERVER, /let\s+canEditBoard\s*=\s*exampleBoard\s*\|\|\s*boardSaveEnabled\(\);/);
+  assert.match(SERVER, /'cyan'\s*:\s*canEditBoard\s*\?\s*\[\s*'rose',\s*'violet',\s*'cyan',\s*'amber'\s*\]\s*\[\s*Math\.max\(\s*0,\s*moments\.findIndex/);
+  assert.doesNotMatch(SERVER, /source\s*===\s*['"]example['"]/);
   assert.ok(!SERVER.includes('deleteConnBubble'), '연결 말풍선 단추는 없다');
 });
 
@@ -44,7 +44,7 @@ test('읽기 전용에서는 바꾸지 않는다(정렬 되돌리기도 같은 �
   // #582: 줄 지우기는 사라졌지만 판 자리 바꾸기(끌어 꽂기·정렬 되돌리기)는 같은 가드를 쓴다.
   const MODEL = fs.readFileSync(new URL('../public/v41/views/board/board-model.js', import.meta.url), 'utf8');
   assert.match(MODEL, /'읽기 전용에서는 연결을 변경할 수 없어요\.'/);
-  assert.match(SERVER, /if\(guard\.blocked\)\{toast\(guard\.message\);/);
+  assert.match(SERVER, /if\s*\(guard\.blocked\)\s*\{\s*toast\(guard\.message\);/);
   assert.match(SERVER, /LT58Model\.editGuard\(canEditBoard\)/);
   assert.doesNotMatch(SERVER, /LT58Model\.removeConnection/);
 });

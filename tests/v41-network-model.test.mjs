@@ -115,7 +115,7 @@ test('8. 화면은 같은 계산을 다시 구현하지 않고 한 벌을 부른
   assert.doesNotMatch(SCREEN, /LT56Model\.groupSizeFor/);
   assert.doesNotMatch(SCREEN, /LT56Model\.clusterSpan/);
   // 예시 판본 판단(canPlay)은 그대로 한 곳에 있다.
-  assert.match(SCREEN, /const canPlay=LTDEMO\.example;/);
+  assert.match(SCREEN, /const\s+canPlay\s*=\s*LTDEMO\.example;/);
   // #366 성능 원칙(#346): 상시 rAF 루프는 없다 — 상태가 바뀔 때 scheduleDraw 한 번.
   assert.doesNotMatch(SCREEN, /requestAnimationFrame\(loop\)/);
   assert.match(SCREEN, /function scheduleDraw\(\)/);

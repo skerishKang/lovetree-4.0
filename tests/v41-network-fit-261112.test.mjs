@@ -27,12 +27,12 @@ test('지도 배율: 아주 낮은·좁은 창에서도 상자·배율·점 반�
 });
 
 test('지도 배율: 전체 보기는 배율 1, 확대·축소는 0.5~4배로 묶는다(바닥값 있음)', () => {
-  assert.match(js, /function fitView\(\)\{state\.scale=1;state\.tx=0;state\.ty=0\}/, '전체 보기 = 배율 1');
-  assert.match(js, /state\.scale=Math\.max\(\.5,Math\.min\(4,state\.scale\*f\)\)/, '확대·축소 바닥값');
+  assert.match(js, /function\s+fitView\(\)\s*\{\s*state\.scale\s*=\s*1;\s*state\.tx\s*=\s*0;\s*state\.ty\s*=\s*0;?\s*\}/, '전체 보기 = 배율 1');
+  assert.match(js, /state\.scale\s*=\s*Math\.max\(\s*(?:0)?\.5\s*,\s*Math\.min\(\s*4\s*,\s*state\.scale\s*\*\s*f\s*\)\s*\)/, '확대·축소 바닥값');
   // 바닥값 없는 min() 배율이 되살아나면 낮은 창에서 다시 음수가 될 수 있다.
-  assert.doesNotMatch(js, /state\.scale=Math\.min\(/, '바닥값 없는 배율 계산 금지');
+  assert.doesNotMatch(js, /state\.scale\s*=\s*Math\.min\(/, '바닥값 없는 배율 계산 금지');
 });
 
 test('지도 배율: 그라디언트 반지름은 음수가 되지 않는다', () => {
-  assert.match(js, /,r=Math\.max\(\.5,c\.hubR\*state\.scale\)/, '허브 반지름 바닥값');
+  assert.match(js, /,\s*r\s*=\s*Math\.max\(\s*(?:0)?\.5\s*,\s*c\.hubR\s*\*\s*state\.scale\s*\)/, '허브 반지름 바닥값');
 });
