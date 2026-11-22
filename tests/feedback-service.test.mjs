@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createFeedbackHandler, createFeedbackService, maskPersonal} from '../server/feedback-service.js';
 import {createMemoryFeedbackRepo} from '../server/testing/memory-feedback-repo.js';
+import {createMemoryFeedbackOutbox} from '../server/testing/memory-feedback-outbox.js';
+import {createFeedbackOutboxDispatcher, RETRY_DELAYS_MS} from '../server/feedback-outbox-dispatcher.js';
 import {ApiError} from '../server/errors.js';
 
 const PRODUCT = 'lovetree-test';
@@ -433,4 +435,79 @@ test('순간 줄은 제목·날짜·감정·꼬리표·주소·메모를 전부 
   assert.equal(row.uploaded, true);
   assert.equal(row.keywords.join(','), 'a');
   assert.equal(momentRow(null), null);
+});
+
+test('1190: 새 의견을 저장하면 보낼 줄이 생기고 이메일·소개는 담지 않는다', async () => {
+  const feedbackRepo=createMemoryFeedbackRepo();
+  const outbox=createMemoryFeedbackOutbox({now:()=>1000});
+  const admin={roleFor:async value=>value?.subjectId==='ai'?'ai_customer':null};
+  const service=createFeedbackService({feedbackRepo,productId:PRODUCT,admin,outbox,now:()=>1000});
+  const saved=await service.submit({principal:principal('ai'),request:{headers:{}},category:'bug',body:'새 의견',context:{}});
+  const rows=await outbox.list();
+  assert.equal(rows.length,1);
+  assert.equal(rows[0].kind,'new');
+  assert.equal(rows[0].feedbackId,saved.id);
+  assert.equal(rows[0].payload.event,'new');
+  assert.equal(rows[0].payload.body,'새 의견');
+  assert.equal(rows[0].payload.status,'received');
+  assert.equal(rows[0].payload.isAiCustomer,true);
+  assert.equal(rows[0].payload.accountSubjectId,'ai');
+  assert.equal(rows[0].payload.email,undefined);
+  assert.equal(rows[0].payload.intro,undefined);
+});
+
+test('1190: 같은 의견 id와 일 키는 한 줄만 만든다', async () => {
+  const outbox=createMemoryFeedbackOutbox({now:()=>1000});
+  const event={productId:PRODUCT,feedbackId:7,eventKey:'new',kind:'new',payload:{event:'new',body:'같은 의견'}};
+  assert.ok(await outbox.enqueue(event));
+  assert.equal(await outbox.enqueue(event),null);
+  assert.equal((await outbox.list()).length,1);
+});
+
+test('1190: 받는 쪽이 받으면 보냄이 되고 시각·사이트·서명을 함께 보낸다', async () => {
+  const outbox=createMemoryFeedbackOutbox({now:()=>1000});
+  await outbox.enqueue({productId:PRODUCT,feedbackId:7,eventKey:'new',kind:'new',payload:{event:'new',body:'보낼 내용'}});
+  let clock=1000;
+  const calls=[];
+  const dispatcher=createFeedbackOutboxDispatcher({
+    outbox,receiverUrl:'https://ops.example.test/inbox',secret:'fake-secret',now:()=>clock,
+    fetchImpl:async(url,init)=>{calls.push({url,init});return {status:200};}
+  });
+  assert.equal(await dispatcher.drain(),1);
+  assert.equal((await outbox.list())[0].status,'sent');
+  assert.equal(calls.length,1);
+  assert.equal(calls[0].init.headers['x-lt-site'],'lovetree');
+  assert.match(calls[0].init.headers['x-lt-signature'],/^sha256=[a-f0-9]{64}$/);
+});
+
+test('1190: 실패하면 다음 시각을 정하고 다섯 번 실패하면 실패로 남는다', async () => {
+  let clock=1000;
+  const outbox=createMemoryFeedbackOutbox({now:()=>clock});
+  await outbox.enqueue({productId:PRODUCT,feedbackId:8,eventKey:'new',kind:'new',payload:{event:'new',body:'다시 보내기'}});
+  const dispatcher=createFeedbackOutboxDispatcher({
+    outbox,receiverUrl:'https://ops.example.test/inbox',secret:'fake-secret',now:()=>clock,
+    fetchImpl:async()=>({status:500})
+  });
+  for(let i=0;i<RETRY_DELAYS_MS.length;i+=1){
+    await dispatcher.drain();
+    const row=(await outbox.list())[0];
+    assert.equal(row.attempts,i+1);
+    if(i<RETRY_DELAYS_MS.length-1){
+      assert.equal(row.status,'pending');
+      assert.equal(Date.parse(row.nextAttemptAt),clock+RETRY_DELAYS_MS[i]);
+      clock=Date.parse(row.nextAttemptAt);
+    }else{
+      assert.equal(row.status,'failed');
+    }
+  }
+});
+
+test('1190: 받는 주소나 비밀이 없으면 줄에만 쌓고 보내지 않는다', async () => {
+  const outbox=createMemoryFeedbackOutbox({now:()=>1000});
+  await outbox.enqueue({productId:PRODUCT,feedbackId:9,eventKey:'new',kind:'new',payload:{event:'new',body:'대기'}});
+  let called=false;
+  const dispatcher=createFeedbackOutboxDispatcher({outbox,receiverUrl:'',secret:'fake-secret',now:()=>1000,fetchImpl:async()=>{called=true;return {status:200};}});
+  assert.equal(await dispatcher.drain(),0);
+  assert.equal(called,false);
+  assert.equal((await outbox.list())[0].status,'pending');
 });
