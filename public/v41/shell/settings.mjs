@@ -1,3 +1,4 @@
+import { MSG } from '../frame-messages.mjs';
 // 설정·계정 창 — shell.mjs에서 코드 위치만 옮긴 모듈(#886). 동작·기준은 그대로다.
 // 상태는 deps의 getter로 받는다(모듈이 shell을 다시 import하지 않는다).
 export function createSettings(deps){
@@ -5,7 +6,7 @@ const { $, notify, panel, show, frames, frameLoaded, hideFrames, closeAccountMen
 const $on=(id,fn)=>{const el=$(id);if(el)el.onclick=fn;};
 function advancedKey(){try{return 'lt41.advanced.'+(deps.member?.snapshot().subject||'')}catch{return 'lt41.advanced.'}}
 function readAdvanced(){try{return localStorage.getItem(advancedKey())==='1'}catch{return false}}
-function applyAdvanced(){const on=readAdvanced();document.body.classList.toggle('lt-advanced',on);const sw=$('settings-advanced');if(sw){sw.setAttribute('aria-checked',String(on));sw.textContent=on?'켬':'끔';}try{$('view').contentWindow.postMessage({type:'lt41-advanced',value:on},location.origin)}catch{}}
+function applyAdvanced(){const on=readAdvanced();document.body.classList.toggle('lt-advanced',on);const sw=$('settings-advanced');if(sw){sw.setAttribute('aria-checked',String(on));sw.textContent=on?'켬':'끔';}try{$('view').contentWindow.postMessage({type:MSG.advanced,value:on},location.origin)}catch{}}
  $('account-assets-open').onclick=()=>{closeAccountMenu();openAssets($('account-avatar'));};
 // #368: 설정 "내 데이터"의 내 보관 파일 열기. 창 위에 보관 파일 창이 열리고 닫으면 이 버튼으로 초점이 돌아온다.
 $('settings-assets-open').onclick=()=>openAssets($('settings-assets-open'));
@@ -31,7 +32,7 @@ const themeToggleTop=$('theme-toggle');if(themeToggleTop)themeToggleTop.onclick=
  // 첫 화면이 아니면 먼저 첫 화면으로 옮긴 뒤, 프레임이 안내 패널을 만들었을 때(초기화 끝) 여는 메시지를 한 번 보낸다(최대 3초).
  function openGuideFromMenu(){
   closeAccountMenu();
-  const send=()=>{try{$('view').contentWindow.postMessage({type:'lt41-open-guide'},location.origin)}catch{}};
+  const send=()=>{try{$('view').contentWindow.postMessage({type:MSG.openGuide},location.origin)}catch{}};
   if(deps.current==='src064-orbit.html'){send();return;}
   show('src064-orbit.html');
   let tries=0;
@@ -112,7 +113,7 @@ const themeToggleTop=$('theme-toggle');if(themeToggleTop)themeToggleTop.onclick=
     try{localStorage.setItem('lt41.homeMoment',JSON.stringify(value))}catch{}
     if(deps.member?.snapshot().owned){try{deps.member.apply('setPrefs',{homeMoment:value});if(window.LT41)window.LT41.prefs=deps.member.state().prefs}catch{}}
     paintHomeMomentChoice();
-    try{$('view').contentWindow.postMessage({type:'lt41-home-moment-set',value},location.origin)}catch{}
+    try{$('view').contentWindow.postMessage({type:MSG.homeMomentSet,value},location.origin)}catch{}
     notify('첫 화면 카드를 바꿨어요.');
    };
    box.append(b);
@@ -124,7 +125,7 @@ const themeToggleTop=$('theme-toggle');if(themeToggleTop)themeToggleTop.onclick=
   if(!HOME_CARD_MODES.includes(b.dataset.homeCards))return;
   try{localStorage.setItem('lt41.homeCards',b.dataset.homeCards)}catch{}
   paintScreenControls();
-  try{$('view').contentWindow.postMessage({type:'lt41-home-cards',mode:b.dataset.homeCards},location.origin)}catch{}
+  try{$('view').contentWindow.postMessage({type:MSG.homeCards,mode:b.dataset.homeCards},location.origin)}catch{}
   notify('첫 화면 카드를 바꿨어요. 첫 화면으로 돌아가면 그대로 보입니다.');
  };
  for(const b of document.querySelectorAll('[data-write-tab]'))b.onclick=()=>{
@@ -132,9 +133,9 @@ const themeToggleTop=$('theme-toggle');if(themeToggleTop)themeToggleTop.onclick=
   paintScreenControls();
   notify(tab==='detailed'?'순간 추가를 자세한 추가로 엽니다.':'순간 추가를 쉬운 추가로 엽니다.');
  };
- $on('settings-motion',()=>{deps.motionPaused=!deps.motionPaused;paintScreenControls();try{$('view').contentWindow.postMessage({type:'lt41-motion',paused:deps.motionPaused},location.origin)}catch{};
+ $on('settings-motion',()=>{deps.motionPaused=!deps.motionPaused;paintScreenControls();try{$('view').contentWindow.postMessage({type:MSG.motion,paused:deps.motionPaused},location.origin)}catch{};
   // #894: 보드·지도 같은 안쪽 화면에도 움직임 끄기를 알린다 — 끌기 미리 보기 등 화면 움직임이 즉시(전환 없이) 따라 바뀐다.
-  for(const f of frames()){try{f.contentWindow.postMessage({type:'lt41-motion',paused:deps.motionPaused},location.origin)}catch{}}
+  for(const f of frames()){try{f.contentWindow.postMessage({type:MSG.motion,paused:deps.motionPaused},location.origin)}catch{}}
   notify(deps.motionPaused?'첫 화면 움직임을 멈췄어요.':'첫 화면 움직임을 다시 켰어요.');});
  paintScreenControls();
  $('account-logout').onclick=async()=>{closeAccountMenu();$('logout').click();};
@@ -256,7 +257,7 @@ paintStartPlaceControls();
 const NETWORK_VIEW_KEY='lt41.network.view';
 function currentNetworkView(){try{return localStorage.getItem(NETWORK_VIEW_KEY)==='concentric'?'concentric':'network'}catch{return 'network'}}
 function paintNetworkViewControls(){const value=currentNetworkView();for(const b of document.querySelectorAll('[data-network-view]'))b.setAttribute('aria-checked',String(b.dataset.networkView===value));}
-function applyNetworkViewToFrame(frame){try{frame.contentWindow?.postMessage({type:'lt41-network-view',value:currentNetworkView()},location.origin);}catch{}}
+function applyNetworkViewToFrame(frame){try{frame.contentWindow?.postMessage({type:MSG.networkView,value:currentNetworkView()},location.origin);}catch{}}
 for(const b of document.querySelectorAll('[data-network-view]'))b.onclick=()=>{
  try{localStorage.setItem(NETWORK_VIEW_KEY,b.dataset.networkView)}catch{}
  paintNetworkViewControls();for(const f of frames())applyNetworkViewToFrame(f);
@@ -409,12 +410,12 @@ window.addEventListener('message',e=>{
  if(e.origin!==location.origin)return;
  // #891: 보드·지도 드롭의 고르기 요청 — 보드가 이미 적용·저장했으므로 셸은 같은 값으로 맞추고
  // 다른 화면(지도·설정)에 알린다. 알림 문구는 보르지 않는다(판이 바로 바뀌어 보이므로).
- if(e.data?.type==='lt41-board-theme-choice'){
+ if(e.data?.type===MSG.boardThemeChoice){
   const value=e.data.value==='night'?'night':e.data.value==='paper'?'paper':'auto';
   saveBoardTheme(value);
   return;
  }
- if(e.data?.type==='lt41-home-moment'){
+ if(e.data?.type===MSG.homeMoment){
   // 261116 PR 2: 첫 화면 카드 모드 저장 — 기기 미러를 먼저 쓰고 계정 설정(이미 있는 setPrefs 길)에 반영한다.
   const value=normalizeHomeMoment(e.data.value);
   try{localStorage.setItem('lt41.homeMoment',JSON.stringify(value))}catch{}
@@ -422,7 +423,7 @@ window.addEventListener('message',e=>{
    try{deps.member.apply('setPrefs',{homeMoment:value});if(window.LT41)window.LT41.prefs=deps.member.state().prefs;}catch{}
   }
  }
- if(e.data?.type==='lt41-board-theme'){
+ if(e.data?.type===MSG.boardTheme){
   const next=e.data.value==='night'?'night':'paper';
   try{localStorage.setItem(BOARD_THEME_KEY,next)}catch{}
   paintBoardThemeControls();
@@ -524,7 +525,7 @@ document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{if(b.dataset.
  show(b.dataset.view);});
 for(const f of frames())f.addEventListener('load',()=>{frameLoaded(f);
  // #894: 새로 뜬 안쪽 화면에도 움직임 끄기 상태를 알린다(메모리 상태 — 화면을 다시 열면 처음 상태).
- try{f.contentWindow.postMessage({type:'lt41-motion',paused:deps.motionPaused},location.origin)}catch{}});
+ try{f.contentWindow.postMessage({type:MSG.motion,paused:deps.motionPaused},location.origin)}catch{}});
 return { getFeedbackDialog:()=>feedbackDialog, getFeedbackBoard:()=>feedbackBoard, getAccountTip:()=>accountTip, applyAdvanced, applyDateStyleToFrame, applyPageTurnToFrame, applyNetworkViewToFrame, applyBoardThemeToFrame, syncBoardThemeToApp, quickTargetPreference, profileDirty, paintSettingsProfile, accountConfirmMatches, openAccountData, openAccountSettings, paintDateStyleControls, paintStartPlaceControls, paintShareControls, paintQuickTargetControls, paintNetworkViewControls, paintPageTurnControls, paintBoardThemeControls, paintTreeVisibilityList, paintSettingsUsage, loadTreeVisibility, paintTreeManagerVisibility, paintSettingsTab, focusSettingsSection, fillProfileForm, paintScreenControls, readAdvanced, advancedKey, currentDateStyle, currentPageTurn, sendToFrame, currentStartPlace, currentShareView, currentBoardTheme };
 }
 

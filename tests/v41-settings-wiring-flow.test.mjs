@@ -5,6 +5,8 @@
 // 여기서는 셸이 쓰는 바로 그 함수(public/v41/frame-wiring.mjs)를 돌려 보내는 시점과 받는 쪽 동작을 함께 확인한다.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { MSG, FRAME_MESSAGES } from '../public/v41/frame-messages.mjs';
 import {
   FRAME_MESSAGE_TYPES, frameMessage, frameReadyMessages, shouldReloadOnFrameMessage, runFrameFlow
 } from '../public/v41/frame-wiring.mjs';
@@ -109,3 +111,39 @@ test('흐름 대조: 예전 판정(받으면 무조건 다시 띄우기)이면 �
 // '배선 계약: 셸이 이 모듈의 함수로 값을 만들고, 메시지 타입을 따로 적지 않는다' 글자 검사는 지웠다(이슈 952).
 // 이 모듈이 지키는 실제 계약 — 다시 띄우기 판정·보내는 시점·흐름 — 은 위 실행 시험들이 확인하고,
 // 셸 연결 글자는 #477 사고의 방어(shouldReloadOnFrameMessage 판정)를 대신하지 못하는 문자열 고정이었다.
+
+test('#1061: 코드가 쓰는 메시지 이름은 모두 표에 있고, 표에만 있는 이름은 없다', async () => {
+  const { readdirSync } = await import('node:fs');
+  const { join } = await import('node:path');
+  const root = process.cwd();
+  const files = [];
+  for (const dir of ['public/v41', 'v41', 'src/views']) {
+    const walk = (d) => {
+      for (const entry of readdirSync(d, { withFileTypes: true })) {
+        const full = join(d, entry.name);
+        if (entry.isDirectory()) walk(full);
+        else if (/\.(mjs|js|html)$/.test(entry.name)) files.push(full);
+      }
+    };
+    walk(join(root, dir));
+  }
+  const used = new Set();
+  const literal = [];
+  for (const file of files) {
+    const text = readFileSync(file, 'utf8');
+    for (const m of text.matchAll(/(?:type\s*:|\.type\s*(?:===|!==))\s*MSG\.(\w+)/g)) {
+      assert.ok(Object.hasOwn(MSG, m[1]), file + ': 표에 없는 상수 ' + m[1]);
+      used.add(MSG[m[1]]);
+    }
+    for (const m of text.matchAll(/(?:type\s*:|\.type\s*(?:===|!==))\s*['"](lt(?:41)?-[a-z0-9-]+)['"]/g)) literal.push(m[1]);
+  }
+  assert.deepEqual(literal, [], '메시지 이름 리터럴이 남아 있다');
+  const tableNames = Object.values(MSG);
+  assert.deepEqual(tableNames, Object.values(FRAME_MESSAGES).map((entry) => entry.name), '표와 상수가 같다');
+  for (const name of used) assert.ok(tableNames.includes(name), '표에 없는 이름을 코드가 쓴다: ' + name);
+  const unused = tableNames.filter((name) => !used.has(name));
+  assert.deepEqual(unused, [], '표에만 있고 아무도 쓰지 않는 이름: ' + unused.join(', '));
+  assert.equal(MSG.dateStyle, 'lt41-date-style', '옛 이름 값은 그대로');
+  assert.equal(MSG.pageTurn, 'lt41-page-turn');
+  assert.equal(MSG.write, 'lt41-write');
+});

@@ -5,6 +5,7 @@
 // - 같은 영상·같은 무대(stacks — same-stage.mjs 한 벌)는 한 무더기 + 개수로 접어 그린다.
 // - 꼬리표 없는 순간은 아래 선반 + '꼬리표 한 번에 제안받기'(tags.mjs suggestForMoments — 제안만, 저장은 정리 화면).
 // - 색·모서리는 identity.css의 --lt-* 토큰만(밤·정원은 속성 전환으로 CSS가 처리한다).
+import { MSG } from '../../frame-messages.mjs';
 import { buildGraph, pathFor } from '../../graph-model.mjs';
 import { suggestForMoments } from '../../tags.mjs';
 import { videoKey } from '../../same-stage.mjs';
@@ -380,7 +381,7 @@ function render() {
       countEl.setAttribute('y', (chosen.cy + h2).toFixed(1));
     }
     // #1057: 순간 점도 키보드로 같은 감상 상세를 연다.
-    const activateMoment = () => { stopWalk(); selected = { type: 'moment', id: m.id }; try { parent.postMessage({ type: 'lt-selection', id: m.id }, location.origin); } catch {} refresh(); };
+    const activateMoment = () => { stopWalk(); selected = { type: 'moment', id: m.id }; try { parent.postMessage({ type: MSG.selection, id: m.id }, location.origin); } catch {} refresh(); };
     g.addEventListener('click', activateMoment);
     g.addEventListener('keydown', (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); activateMoment(); } });
   }
@@ -619,7 +620,7 @@ function drawShelf() {
    (lt41-navigate) 한 길로 지도로 돌아간다. 지금 트리·순간은 셸이 그대로 유지한다. */
 const goMapWithView = (v) => {
   try { localStorage.setItem('lt41.network.view', v); } catch {}
-  try { parent.postMessage({ type: 'lt41-navigate', view: 'track56-network.html' }, location.origin); } catch {}
+  try { parent.postMessage({ type: MSG.navigate, view: 'track56-network.html' }, location.origin); } catch {}
 };
 document.getElementById('gViewNet')?.addEventListener('click', () => goMapWithView('network'));
 document.getElementById('gViewConc')?.addEventListener('click', () => goMapWithView('tag'));
@@ -628,8 +629,8 @@ document.getElementById('gViewGraph')?.addEventListener('click', () => goMapWith
    (2026-11-16 CTO 지적: '꼬리표 없는'이 아니라 '아직 묶음에 안 든'이다). */
 function showSuggestions() {
   const untagged = model.graph.moments.filter((m) => m.hubId === null).map((m) => MOMENT_OF.get(m.id)).filter(Boolean);
-  try { parent.postMessage({ type: 'lt-suggest-request', momentIds: untagged.map((m) => m.id) }, location.origin); } catch {}
-  try { parent.postMessage({ type: 'lt41-open-tags', suggest: true }, location.origin); } catch {}
+  try { parent.postMessage({ type: MSG.suggestRequest, momentIds: untagged.map((m) => m.id) }, location.origin); } catch {}
+  try { parent.postMessage({ type: MSG.openTags, suggest: true }, location.origin); } catch {}
   const requestSuggestions = ctx.suggestForMoments || suggestForMoments;
   const byMoment = new Map((requestSuggestions(untagged) || []).map((s) => [s.momentId, s.suggestions]));
   const card = document.getElementById('detailCard');
@@ -655,7 +656,7 @@ function showSuggestions() {
 }
 document.getElementById('shelfHint').addEventListener('click', () => showSuggestions());
 window.addEventListener('message', (event) => {
-  if (event.origin !== location.origin || event.data?.type !== 'lt41-tags-saved' || !event.data.ok) return;
+  if (event.origin !== location.origin || event.data?.type !== MSG.tagsSaved || !event.data.ok) return;
   const moment = MOMENT_OF.get(event.data.momentId);
   if (!moment) return;
   moment.keywords = Array.isArray(event.data.keywords) ? event.data.keywords : [];

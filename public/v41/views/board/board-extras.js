@@ -1,3 +1,4 @@
+import { MSG } from '../../frame-messages.mjs';
 window.addEventListener('resize',boardResize);
 
 renderCards();
@@ -162,9 +163,9 @@ const _st=LT58Model.detailButtonState(ins,outs);const _cin=$('#cinemaFromMoment'
 const _ytLink=$('#detailYtLink'),_ytRow=$('#ytLinkRow');if(_ytLink&&_ytRow){const _u=(window.__LT58YT?.originalUrl?.(m))||m.url||'';_ytRow.hidden=!_u;if(_u)_ytLink.href=_u}
  // 이슈 327 2부: 내 기록(서버)의 순간 상세에서 다른 트리로 옮기기. 공유·예시는 숨긴다.
  // #891: 단추는 이제 판 HTML의 '⋯ 더 보기' 메뉴 안에 있다 — 누름 길만 여기서 맞춘다.
- const mv=$('#detailMoveBtn');if(mv)mv.onclick=()=>{if(selected)parent.postMessage({type:'lt41-move',momentId:selected},location.origin)};
+ const mv=$('#detailMoveBtn');if(mv)mv.onclick=()=>{if(selected)parent.postMessage({type:MSG.move,momentId:selected},location.origin)};
  // #582 4: '지도에서 관계 보기' — 관계도는 지도가 맡는다. 셸이 지도를 그 순간으로 열게 요청한다.
- const mapBtn=$('#detailMapBtn');if(mapBtn)mapBtn.onclick=()=>{if(selected)parent.postMessage({type:'lt41-open-network',treeId:window.parent?.LT41?.tree?.id,momentId:selected},location.origin)};
+ const mapBtn=$('#detailMapBtn');if(mapBtn)mapBtn.onclick=()=>{if(selected)parent.postMessage({type:MSG.openNetwork,treeId:window.parent?.LT41?.tree?.id,momentId:selected},location.origin)};
  if(mv)mv.hidden=!(window.parent!==window&&window.parent.LT41&&window.parent.LT41.source==='server'&&!LTDEMO.readOnly)}}
 function connRow(c,dir){const t=moments.find(x=>x.id===(dir==='next'?c.b:c.a));return `<button type="button" class="connCard" data-cid="${c.id}" data-dir="${dir}">${connThumb(t)}<span class="connName">${esc(titleMain(t))}</span>${(c.why&&c.why!=='관련 순간')?`<span class="connWhy">${esc(c.why)}</span>`:''}</button>`}
 let editBtn=[...$('#detail').querySelectorAll('button')].find(b=>b.textContent.trim()==='수정'||b.textContent.trim()==='편집');if(editBtn)editBtn.id='editMomentBtn';
@@ -220,7 +221,7 @@ function saveEdit(){if(LTDEMO.readOnly)return;/* #315: 공유 감상은 저장�
 $('#editMomentBtn').onclick=openEdit;$('#editCancel').onclick=()=>$('#editModal').classList.remove('open');$('#editRevert').onclick=()=>{if(!editBase)return;let m=moments.find(x=>x.id===selected);Object.assign(m,JSON.parse(JSON.stringify(editBase)));openEdit();toast('편집 입력을 원래 값으로 되돌렸어요.')};$('#editSave').onclick=saveEdit;
 openViewer=function(id){let m=moments.find(x=>x.id===id);if(!m)return;const _vi=titleInfo(m);$('#vTitle').textContent=_vi.main;let box=$('#viewerMedia');if(m.url)box.innerHTML=LTMedia.markup(m.url,m.title,m.mediaMetadata,m.id);else if(m.type==='video')box.innerHTML=`<video src="${m.video}" poster="${m.asset}" controls autoplay muted playsinline style="width:100%;max-height:420px;object-fit:contain"></video>`;else if(m.type==='note')box.innerHTML=`<div style="padding:40px;color:#f7edf8;font-size:22px;line-height:1.6">“${esc(m.memo)}”</div>`;else box.innerHTML=`<img src="${m.type==='youtube'?youtubeThumb(m.url||''):m.asset}" data-fallback="${ASSET.link}" ${thumbRetryAttrs(m)} style="width:100%;max-height:420px;object-fit:cover">`;$('#vMeta').innerHTML=(_vi.sub?'<div class="videoTitle">▶ '+esc(_vi.sub)+'</div>':'')+`${esc(LTLabels.type(m.originalType||m.type))} · ${esc(dateText(m.date))} · ${esc(m.emotion)}<br>출처: ${esc(m.source)}${m.url?`<br>URL: ${esc(m.url)}`:''}<br>Keywords: ${(m.keywords||[]).map(k=>'#'+esc(k)).join(' ')}<br>마음 한마디: ${esc(m.memo)}`;
  // #327 2부: 내 기록(서버)의 순간 보기에서 다른 트리로 옮기기. 공유·예시는 숨긴다.
- if(window.parent!==window&&window.parent.LT41&&window.parent.LT41.source==='server'&&!LTDEMO.readOnly){const button=document.createElement('button');button.type='button';button.className='lt-move-btn';button.textContent='다른 트리로 옮기기';button.addEventListener('click',()=>parent.postMessage({type:'lt41-move',momentId:m.id},location.origin));$('#vMeta').append(button)}$('#viewerModal').classList.add('open')}
+ if(window.parent!==window&&window.parent.LT41&&window.parent.LT41.source==='server'&&!LTDEMO.readOnly){const button=document.createElement('button');button.type='button';button.className='lt-move-btn';button.textContent='다른 트리로 옮기기';button.addEventListener('click',()=>parent.postMessage({type:MSG.move,momentId:m.id},location.origin));$('#vMeta').append(button)}$('#viewerModal').classList.add('open')}
 headerFade=function(on){document.querySelector('header').style.opacity=on?'.12':'1';document.querySelector('.toolbar').style.opacity=on?'0':'1';$('#cinemaBtn').style.opacity=on?'0':'1';$('#leftPanel').style.opacity=on?'.07':'1';$('#leftPanel').style.pointerEvents=on?'none':'auto';$('#themeBadge').style.opacity=on?'.08':'1';if(on)$('#detail').classList.remove('open');}
 /* Beat-controlled cinema */
 const cinemaV11={active:false,paused:false,beats:[],index:0,progress:0,last:0,focused:null,raf:0,fromMoment:null};
@@ -242,7 +243,7 @@ let styleSec=document.createElement('div');styleSec.className='section';styleSec
 if($('#addBtn'))$('#addBtn').onclick=()=>{if(LTDEMO.readOnly)return;openAdd()};$('#confirmAdd').onclick=()=>{if(LTDEMO.readOnly)return;confirmAdd()};renderCards();renderThreads();updateKeywordFilter();formFor(addType);fitAll(false);applyPathHighlight();setTimeout(()=>{/* #891: 탭으로 들어오면 닫힘, ?open= 주소만 자동 열림(board.js bootDetailPanel) */bootDetailPanel()},100);
 window.__LT58V11={youtubeId,youtubeThumb,youtubeThumbUrl,openEdit,saveEdit,chooseNext,highlightPath,startCinema:startCinemaV11,endCinema:endCinemaV11,setCinemaPosition,theme:t=>{document.body.dataset.theme=t},setMomentStyle:(id,pin,card)=>{let m=moments.find(x=>x.id===id);m.pinStyle=pin;m.cardStyle=card;renderCards()},get cinema(){return{active:cinemaV11.active,paused:cinemaV11.paused,index:cinemaV11.index,beat:cinemaV11.beats[cinemaV11.index]?.label,focused:cinemaV11.focused}},get state(){return{moments:moments.length,connections:connections.length,theme:document.body.dataset.theme,selected,keywords:[...new Set(moments.flatMap(m=>m.keywords||[]))]}}};
 
-addEventListener('message',e=>{if(e.data?.type==='lt41-title-display'){if(typeof renderCards==='function')renderCards();if(typeof renderThreads==='function')renderThreads();if(selected)selectMoment(selected,$('#detail').classList.contains('open'));}});
+addEventListener('message',e=>{if(e.data?.type===MSG.titleDisplay){if(typeof renderCards==='function')renderCards();if(typeof renderThreads==='function')renderThreads();if(selected)selectMoment(selected,$('#detail').classList.contains('open'));}});
 addEventListener('lt-title-ready',()=>{if(typeof renderCards==='function')renderCards();if(typeof renderThreads==='function')renderThreads();if(selected)selectMoment(selected,$('#detail').classList.contains('open'));});
 
 // #368 3차: 설정의 날짜 표기가 바뀌면 카드·실을 다시 그린다(상세는 다음에 열 때 새 표기).

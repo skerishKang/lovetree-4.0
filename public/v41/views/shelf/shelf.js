@@ -1,6 +1,7 @@
 // 내 트리(책장) 동작 (#231 후속, 2026-11-09).
 // 계산(표지 색·이름·정보 줄·검색·카드 배치·페이지)은 shelf-model.mjs로 옮기고 여기서는 화면만 다룬다.
 // 조건·문구·id·순서 변경 0. #291(궤도)와 같이 모듈로 불러 쓴다.
+import { MSG } from '../../frame-messages.mjs';
 import {
   COVER_PALETTE, allBooks as allBooksOf, bookMeta, buildShelf, carouselTransform,
   escapeShelf, filterShelf, findBook, lastMomentDate as lastMomentDateOf,
@@ -114,7 +115,7 @@ import { createReader } from './shelf-reader.js';
         $('#resumeGo').textContent=info.action+' ▶';
         strip.dataset.resumeKind=info.kind;
         strip.onclick=function(){
-          if(info.kind==='first'){parent.postMessage({type:'lt41-write',mode:'new'},location.origin);return;}
+          if(info.kind==='first'){parent.postMessage({type:MSG.write,mode:'new'},location.origin);return;}
           // #1094 목록 방식: 띠도 목록으로 곧바로 연다(책 방식은 지금처럼 책으로 바로 간다).
           if(reader&&typeof reader.shelfBookDisplay==='function'&&reader.shelfBookDisplay()==='list'){openReader(info.book.id,null);return;}
           if(info.moment)LTDEMO.openBook(info.moment.id,info.book.id);
@@ -166,7 +167,7 @@ import { createReader } from './shelf-reader.js';
         // 261118 대표 지적 2차 5: 서재에서 마지막에 본 트리(가운데 책의 트리)를 셸에 알린다 —
         // 서재 화면에서 콕·보드·지도 탭을 누르면 그 트리로 열린다.
         var centered=state.shelfList[center];
-        if(centered&&centered.id!==state.reportedTreeId){state.reportedTreeId=centered.id;try{parent.postMessage({type:'lt41-shelf-tree',treeId:centered.id},location.origin);}catch{}}
+        if(centered&&centered.id!==state.reportedTreeId){state.reportedTreeId=centered.id;try{parent.postMessage({type:MSG.shelfTree,treeId:centered.id},location.origin);}catch{}}
       }
       function moveShelf(direction) {
         if(!state.shelfList.length)return;
@@ -230,8 +231,8 @@ import { createReader } from './shelf-reader.js';
       }
       function bind() {
         // 261118 대표 지적 3: '+ 새 트리' 입구는 오른쪽 단추(#shelfNewTree) 하나다.
-        var openNewTree=function(){parent.postMessage({type:'lt41-new-tree'},location.origin);};
-        var openManageTree=function(id){parent.postMessage({type:'lt41-manage-tree',treeId:id},location.origin);};
+        var openNewTree=function(){parent.postMessage({type:MSG.newTree},location.origin);};
+        var openManageTree=function(id){parent.postMessage({type:MSG.manageTree,treeId:id},location.origin);};
         $('#shelfRail').addEventListener('click',function(event){var railManage=event.target.closest('[data-manage-id]');if(railManage)openManageTree(railManage.dataset.manageId);});
         $('#shelfNewTree').addEventListener('click',openNewTree);
         $('#shelfJump').addEventListener('click',function(){state.query='';state.filter='all';$('#searchInput').value='';$$('.filter').forEach(function(item){item.classList.toggle('active',item.dataset.filter==='all');});renderShelf();var book=getShelfCard(state.shelfIndex)?.querySelector('button[data-book-id]');if(book)openReader(book.dataset.bookId,book.closest('.book-card'));});
@@ -263,13 +264,13 @@ import { createReader } from './shelf-reader.js';
 const renderedTitleDisplay=titleDisplayOf((()=>{try{return parent.LT41?.prefs?.titleDisplay||'both'}catch{return 'both'}})());
 window.__shelfListenerInstalled=true;
 if(typeof addEventListener==='function')addEventListener('message',e=>{
- if(e.data?.type==='lt41-shelf-select-tree'){
+ if(e.data?.type===MSG.shelfSelectTree){
   window.__pickSeen=e.data.treeId;
   var picked=books.findIndex(b=>b.id===e.data.treeId);
   if(picked>=0){var rail=$('#shelfRail');state.shelfIndex=picked;state.shelfOffset=shelfRowLayout(state.shelfList.length,rail?rail.clientWidth:0).offsetFor(picked,state.shelfOffset||0);updateCarousel();}
   return;
  }
- if(e.data?.type==='lt41-trees-saved'){
+ if(e.data?.type===MSG.treesSaved){
   // #984: 저장이 서버에서 확인되면 책장·열린 책의 표지를 바로 다시 그린다(다시 열 필요 없이).
   // 저장 실패 때는 이 메시지가 오지 않는다 — 책장은 원래 표지를 그대로 두고, 셸의 저장 안내 떠가 실패를 알린다.
   var freshTrees=window.parent&&window.parent.LT41?window.parent.LT41.trees:null;
@@ -290,7 +291,7 @@ if(typeof addEventListener==='function')addEventListener('message',e=>{
   if(savedOpenChanged){var savedOpenBook=getBook(state.selectedId);if(savedOpenBook)setCover(savedOpenBook);}
   return;
  }
- if(e.data?.type==='lt41-trees-renamed'){
+ if(e.data?.type===MSG.treesRenamed){
   var fresh=window.parent&&window.parent.LT41?window.parent.LT41.trees:null;
   if(Array.isArray(fresh)&&fresh.length!==books.length){location.reload();return;}
   if(Array.isArray(fresh)){
@@ -310,7 +311,7 @@ if(typeof addEventListener==='function')addEventListener('message',e=>{
   if(changed)renderShelf();
   return;
  }
- if(e.data?.type!=='lt41-title-display')return;
+ if(e.data?.type!==MSG.titleDisplay)return;
  let mirror=null;try{mirror=localStorage.getItem('lt41.titleDisplay');}catch{}
  if(shouldReloadForTitleDisplay({value:e.data.value,rendered:renderedTitleDisplay,mirror}))location.reload();
 });

@@ -2,6 +2,7 @@
 // 저장 경로는 기존 순간 수정 경로 가운데 keywords를 이미 받는 boardSync(4.1 기억 보드 저장)를 쓴다.
 // boardSync는 셸이 iframe을 다시 그리지 않는 길이라 상세를 연 채로 칩이 바뀐다 — 화면 사본은 lt41-tags-saved
 // 답과 lt41-tags-changed 이벤트로 각자 바꾼다. 서버는 같은 문서 규칙(validateState)으로 받는다.
+import { MSG } from '../frame-messages.mjs';
 import { normalizeTags } from '../tags.mjs';
 import { momentsWithKeywords } from '../tag-model.mjs';
 
@@ -16,7 +17,7 @@ export function createTagSave(deps) {
   function announce(momentId, keywords) {
     const origin = globalThis.location?.origin;
     for (const win of frames()) {
-      try { win.postMessage({ type: 'lt41-tags-saved', ok: true, momentId, keywords }, origin); } catch { /* 닫힌 프레임은 건너뛴다 */ }
+      try { win.postMessage({ type: MSG.tagsSaved, ok: true, momentId, keywords }, origin); } catch { /* 닫힌 프레임은 건너뛴다 */ }
     }
   }
 

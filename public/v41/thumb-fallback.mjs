@@ -2,6 +2,7 @@
 // 순서: 저장된 썸네일 주소(mediaMetadata.thumbnail) → [세로이고 저장 썸네일 없으면 oardefault]
 //      → hqdefault → mqdefault → 모두 회색(120×90)/실패면 글 카드 → 제목도 없으면 최소 카드.
 // 썸네일 그림은 우리 서버에 복사하지 않고 주소만 다룬다(저작권 원칙).
+import { MSG } from './frame-messages.mjs';
 import { userTitleText, formatDisplayDate } from './book-usability.mjs';
 import { YOUTUBE_HOSTS, YTIMG_HOST, youtubeIdFrom, safeYoutubeThumb, youtubeStageThumbUrl, isVerticalMoment } from './youtube-id.mjs';
 
@@ -431,8 +432,8 @@ export function mountThumbFallback(root = globalThis.document, { onEditTitle = n
     }
     try {
       if (globalThis.window?.parent && globalThis.window.parent !== globalThis.window) {
-        if (!treeId) globalThis.window.parent.postMessage({ type: 'lt41-select', id: momentId }, globalThis.location.origin);
-        globalThis.window.parent.postMessage({ type: 'lt41-write', mode: 'edit', treeId, momentId, focusTitle: true }, globalThis.location.origin);
+        if (!treeId) globalThis.window.parent.postMessage({ type: MSG.select, id: momentId }, globalThis.location.origin);
+        globalThis.window.parent.postMessage({ type: MSG.write, mode: 'edit', treeId, momentId, focusTitle: true }, globalThis.location.origin);
       }
     } catch { /* ignore cross-window failure */ }
   };

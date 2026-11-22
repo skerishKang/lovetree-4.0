@@ -1,6 +1,7 @@
 // 셸의 공유 패널·둘러보기 연결·lt41-* 메시지 수신 (#231 1-B③-3).
 // 2026-11-08 리팩터링: 동작·문구·주소 형식 변경 0. shell.mjs에서 조건·조회 방식·인자 형태를 바꾸지 않고 그대로 옮겼다.
 // #1026 E 2단계(A-06): 둘러보기 창 모듈은 이 연결 지점에서만 받는다(첫 클릭 리스너는 곧바로 단다).
+import { MSG } from '../frame-messages.mjs';
 import {displayTreeTitle} from '../tree-name.mjs';
 import {parseTag,tagKey,isChannelLikeArtist} from '../tags.mjs';
 // #480 L13: 날짜는 책·보드·지도·첫 화면과 같은 한 벌(formatDisplayDate)로만 적는다.
@@ -65,22 +66,22 @@ export function createMessages(deps) {
     const fromView = event.source === $('view')?.contentWindow || event.source === $('view-next')?.contentWindow;
     if (event.origin !== location.origin || !fromView) return;
     // 4.1 기억 보드 저장: 화면이 만든 순간·연결·배치를 기존 워크스페이스 저장 경로로 보낸다.
-    if (data?.type === 'lt41-board-sync') {
-      const reply = (ok, error) => { try { event.source?.postMessage({type:'lt41-board-saved', ok, error}, location.origin); } catch {} };
+    if (data?.type === MSG.boardSync) {
+      const reply = (ok, error) => { try { event.source?.postMessage({type:MSG.boardSaved, ok, error}, location.origin); } catch {} };
       if (getSource() !== 'server' || !getMember()?.snapshot().writable) { reply(false, '서버 편집 연결이 없어 저장하지 않았어요.'); return; }
       try { getMember().apply('boardSync', {moments: data.moments}, {treeId: data.treeId}); reply(true); }
       catch (error) { reply(false, error?.message || '저장하지 못했어요.'); }
       return;
     }
-    if (data?.type === 'lt41-open-tags') {
+    if (data?.type === MSG.openTags) {
       const ok = deps.openTagManager?.({ suggest: data.suggest === true }) === true;
-      try { event.source?.postMessage({ type: 'lt41-tags-opened', ok }, location.origin); } catch {}
+      try { event.source?.postMessage({ type: MSG.tagsOpened, ok }, location.origin); } catch {}
       return;
     }
     // #627 PR B: 화면의 꼬리표 줄이 확인한 것 — keywords만 기존 저장 경로(shellTags → boardSync)로 바꾼다.
     // 답(lt41-tags-saved)을 보낸 화면에만 돌려 화면 사본이 칩을 다시 맞추게 한다. iframe을 다시 그리지 않는다.
-    if (data?.type === 'lt41-tags') {
-      const reply = (ok, keywords, error) => { try { event.source?.postMessage({type:'lt41-tags-saved', ok, momentId: data.momentId, keywords, error}, location.origin); } catch {} };
+    if (data?.type === MSG.tags) {
+      const reply = (ok, keywords, error) => { try { event.source?.postMessage({type:MSG.tagsSaved, ok, momentId: data.momentId, keywords, error}, location.origin); } catch {} };
       if (getSource() !== 'server' || !getMember()?.snapshot().writable) { reply(false, null, '읽어 보는 화면에서는 꼬리표를 바꿀 수 없어요.'); return; }
       const saved = saveTags({ treeId: data.treeId, momentId: data.momentId, keywords: data.keywords, quiet: true });
       // 결함 ③(tags-sync): 저장이 실제로 바뀌었으면 tag-save가 열린 프레임 모두(부낸 화면 포함)에 알렸다 —
@@ -88,12 +89,12 @@ export function createMessages(deps) {
       if (!saved.ok || !saved.changed) reply(saved.ok, saved.ok ? saved.keywords : null, saved.error);
       return;
     }
-    if (data?.type === 'lt41-story-save') {
+    if (data?.type === MSG.storySave) {
       const treeId = typeof data.treeId === 'string' ? data.treeId : '';
       const fromMomentId = typeof data.fromMomentId === 'string' ? data.fromMomentId : '';
       const momentId = typeof data.momentId === 'string' ? data.momentId : '';
       const relation = typeof data.relation === 'string' ? data.relation.trim() : null;
-      const reply = (ok, error) => { try { event.source?.postMessage({type:'lt41-story-saved', ok, treeId, fromMomentId, momentId, relation: relation ?? '', error}, location.origin); } catch {} };
+      const reply = (ok, error) => { try { event.source?.postMessage({type:MSG.storySaved, ok, treeId, fromMomentId, momentId, relation: relation ?? '', error}, location.origin); } catch {} };
       const member = getMember();
       const tree = getModel()?.trees?.find(item => item.id === treeId);
       const parent = tree?.moments?.find(item => item.id === fromMomentId);
@@ -111,29 +112,29 @@ export function createMessages(deps) {
       } catch (error) { reply(false, error?.message || '저장하지 못했어요.'); }
       return;
     }
-    if (data?.type === 'lt41-theme') { applyTheme(); paintThemeControls(); }
-    if (data?.type === 'lt41-journey-step') { journey.noteJourneyStep(data.step); return; }
-    if (data?.type === 'lt41-journey-save') { if (getSource() === 'share') return; journey.saveFirstJourney(data.draft); return; }
-    if (data?.type === 'lt41-journey-open-book') { journey.openJourneyBook(data); return; }
-    if (data?.type === 'lt41-journey-close') { journey.closeFirstJourney(); return; }
-    if (data?.type === 'lt41-media-metadata' && getSource() === 'server' && getMember()?.snapshot().owned) {
+    if (data?.type === MSG.theme) { applyTheme(); paintThemeControls(); }
+    if (data?.type === MSG.journeyStep) { journey.noteJourneyStep(data.step); return; }
+    if (data?.type === MSG.journeySave) { if (getSource() === 'share') return; journey.saveFirstJourney(data.draft); return; }
+    if (data?.type === MSG.journeyOpenBook) { journey.openJourneyBook(data); return; }
+    if (data?.type === MSG.journeyClose) { journey.closeFirstJourney(); return; }
+    if (data?.type === MSG.mediaMetadata && getSource() === 'server' && getMember()?.snapshot().owned) {
       const tree = window.LT41?.tree, moment = tree?.moments.find(m => m.id === data.momentId && m.url === data.url);
       if (moment) try {
         getMember().apply('cacheMediaMetadata', {url: data.url, mediaMetadata: data.mediaMetadata}, {treeId: tree.id, momentId: moment.id});
       } catch {}
     }
-    if (data?.type === 'lt41-shelf-tree' && getModel()?.trees?.some(t => t.id === data.treeId)) { shelfTreeId = data.treeId; return; }
-    if (data?.type === 'lt41-navigate') {
+    if (data?.type === MSG.shelfTree && getModel()?.trees?.some(t => t.id === data.treeId)) { shelfTreeId = data.treeId; return; }
+    if (data?.type === MSG.navigate) {
       if (data.view === 'track32-bookshelf.html' && !getMember()?.snapshot().owned) { openLoginStart('shelf'); return; }
       show(data.view);
     }
-    if (data?.type === 'lt41-select' && window.LT41?.tree.moments.some(m => m.id === data.id)) {
+    if (data?.type === MSG.select && window.LT41?.tree.moments.some(m => m.id === data.id)) {
       window.LT41.momentId = data.id; links(); writeLocation();
     }
     // #315: 공유 감상(share)은 읽기 전용이다. 안쪽 화면의 버튼 정리를 통과한 쓰기 메시지가 남아도 여기서 막는다(이중).
-    if (data?.type === 'lt41-new-tree') { openNewTree(); return; }
-    if (data?.type === 'lt41-write' && getSource() === 'share') return;
-    if (data?.type === 'lt41-write' && data.mode === 'edit' && data.momentId) {
+    if (data?.type === MSG.newTree) { openNewTree(); return; }
+    if (data?.type === MSG.write && getSource() === 'share') return;
+    if (data?.type === MSG.write && data.mode === 'edit' && data.momentId) {
       const targetTree = data.treeId
         ? getModel()?.trees.find(t => t.id === data.treeId && t.moments.some(m => m.id === data.momentId))
         : (window.LT41?.tree?.moments.some(m => m.id === data.momentId) ? window.LT41.tree : getModel()?.trees.find(t => t.moments.some(m => m.id === data.momentId)));
@@ -144,15 +145,15 @@ export function createMessages(deps) {
     }
     // 이슈 671: 고치기(edit)는 지금처럼 편집기로, 새로 추가(new·add)는 같은 쓰기 창으로 보낸다.
     // 목적지(트리·이어질 순간)가 오면 쓰기 창에 넘겨 그 트리·그 순간 다음에 담는다(#647 고른 트리 우선 재사용).
-    if (data?.type === 'lt41-write' && data.mode === 'edit') openEditor(data.mode, data.parentId);
-    else if (data?.type === 'lt41-write') openWriteEntry({ treeId: data.treeId || '', parentId: data.parentId || '' });
-    if (data?.type === 'lt41-write' && data.focusTitle) focusTitleInput?.();
+    if (data?.type === MSG.write && data.mode === 'edit') openEditor(data.mode, data.parentId);
+    else if (data?.type === MSG.write) openWriteEntry({ treeId: data.treeId || '', parentId: data.parentId || '' });
+    if (data?.type === MSG.write && data.focusTitle) focusTitleInput?.();
     // #327 2부: 순간 상세의 '다른 트리로 옮기기'. 공유·예시 화면에서는 보내지 않고, 여기서도 한 번 더 막는다.
-    if (data?.type === 'lt41-move' && getSource() === 'server') openMovePicker({ momentId: data.momentId });
+    if (data?.type === MSG.move && getSource() === 'server') openMovePicker({ momentId: data.momentId });
     // 순간 목록에서의 옮기기(2026-11-17, 대표 결정): 골라 온 순간들을 한 트리로 옮긴다 — 기존
     // member.apply('moveMoment') 한 길(cleanup.mjs와 같다). 옮긴 뒤에는 지금 보기를 다시 그려 목록을
     // 열어 둔다(LT41_MOMENTS_OPEN을 되살려 목록이 다시 뜰 때 같은 목록·되돌리기 안내를 받게 한다).
-    if (data?.type === 'lt41-move-moments' && getSource() === 'server') {
+    if (data?.type === MSG.moveMoments && getSource() === 'server') {
       const wanted = Array.isArray(data.pairs) && data.pairs.length
         ? data.pairs.map(p => ({ id: String(p?.id || ''), fromTreeId: String(p?.fromTreeId || ''), toTreeId: String(p?.toTreeId || data.toTreeId || '') })).filter(p => p.id && p.toTreeId)
         : (Array.isArray(data.momentIds) ? data.momentIds.map(id => ({ id: String(id || ''), fromTreeId: String(data.fromTreeId || ''), toTreeId: String(data.toTreeId || '') })).filter(p => p.id && p.toTreeId) : []);
@@ -185,24 +186,24 @@ export function createMessages(deps) {
       return;
     }
     // 트리 칩 순서(2026-11-17, 대표 결정): 계정 설정 칸(state.prefs.treeChipOrder)에 저장 — 기존 setPrefs 한 길.
-    if (data?.type === 'lt41-prefs' && data.patch?.treeChipOrder && getSource() === 'server') {
+    if (data?.type === MSG.prefs && data.patch?.treeChipOrder && getSource() === 'server') {
       try { getMember().apply('setPrefs', { treeChipOrder: data.patch.treeChipOrder }); } catch (error) { notify(error?.message || '순서를 저장하지 못했어요.'); }
       return;
     }
     // 261117 고객 의견: 첫 화면 둘째 줄 '모아둔 순간 N개 정리하기' — 모아둔 순간 정리 창을 연다(옮기기와 별개).
-    if (data?.type === 'lt41-cleanup' && getSource() === 'server') { openCleanup({}); return; }
-    if (data?.type === 'lt41-open-book' && getModel()?.trees.some(t => t.id === data.treeId && t.moments.some(m => m.id === data.id))) {
+    if (data?.type === MSG.cleanup && getSource() === 'server') { openCleanup({}); return; }
+    if (data?.type === MSG.openBook && getModel()?.trees.some(t => t.id === data.treeId && t.moments.some(m => m.id === data.id))) {
       setCurrent('track59-sketchbook.html'); choose(data.treeId, data.id); writeLocation();
     }
     // #810: 서재 ⋯ — 그 트리로 고른 뒤 기존 트리 관리 창을 연다(새 창 만들지 않음). 없는 트리는 무시한다.
-    if (data?.type === 'lt41-manage-tree' && getSource() === 'server' && getModel()?.trees.some(t => t.id === data.treeId)) {
+    if (data?.type === MSG.manageTree && getSource() === 'server' && getModel()?.trees.some(t => t.id === data.treeId)) {
       // #984: 이미 고른 트리라면 화면을 다시 띄우지 않는다 — 서재가 깜빡이며 프레임이 바뀌면 저장 직후 표지·이름 알림이 유실된다.
       if (window.LT41?.tree?.id !== data.treeId) choose(data.treeId);
       openTreeManager?.();
     }
     // #582: 보드 상세의 '지도에서 관계 보기' — 지도→책 이동과 같은 셸 방식(LT41.momentId로 그 순간을 연다).
     // 지도 파일은 건드리지 않는다. 지도는 뜰 때 LTDEMO.get()(=LT41.momentId)의 순간을 선택한다.
-    if (data?.type === 'lt41-open-network') {
+    if (data?.type === MSG.openNetwork) {
       const treeId = data.treeId || window.LT41?.tree?.id;
       if (getModel()?.trees.some(t => t.id === treeId && t.moments.some(m => m.id === data.momentId))) {
         setCurrent('track56-network.html'); choose(treeId, data.momentId); writeLocation();
@@ -210,20 +211,20 @@ export function createMessages(deps) {
     }
     // #417: 보드·지도 화면의 트리 ▾ — 다른 트리를 같은 보기로 열 때 쓴다. 책(lt41-open-book)과 같은 규칙이고,
     // 보기는 board·network만 허용하며(그 밖은 무시), 없는 트리도 무시한다.
-    if (data?.type === 'lt41-open-view' && ['board', 'network'].includes(data.view) && getModel()?.trees.some(t => t.id === data.treeId)) {
+    if (data?.type === MSG.openView && ['board', 'network'].includes(data.view) && getModel()?.trees.some(t => t.id === data.treeId)) {
       setCurrent(data.view === 'board' ? 'track58-pinboard.html' : 'track56-network.html'); choose(data.treeId); writeLocation();
     }
     // #394: 첫 화면이 순간 목록을 열었다(시작 트리 전달 완료) — 요청 플래그를 치워 다음 화면 이동에 되풀이하지 않게 한다.
-    if (data?.type === 'lt41-moments-opened') delete window.LT41_MOMENTS_OPEN;
-    if (data?.type === 'lt41-start') { openLoginStart('first'); return; }
-    if (data?.type === 'lt41-account') {
+    if (data?.type === MSG.momentsOpened) delete window.LT41_MOMENTS_OPEN;
+    if (data?.type === MSG.start) { openLoginStart('first'); return; }
+    if (data?.type === MSG.account) {
       if (getMember()?.snapshot().owned) openAccountMenu(); else $('account-entry').click();
     }
-    if (data?.type === 'lt41-community') $('community-menu').click();
-    if (data?.type === 'lt41-example' && exampleTree?.moments?.some(m => m.id === data.momentId) && ['track59-sketchbook.html', 'track58-pinboard.html'].includes(data.view)) {
+    if (data?.type === MSG.community) $('community-menu').click();
+    if (data?.type === MSG.example && exampleTree?.moments?.some(m => m.id === data.momentId) && ['track59-sketchbook.html', 'track58-pinboard.html'].includes(data.view)) {
       sample({treeId: exampleTree.id, momentId: data.momentId}, data.view);
     }
-    if (data?.type === 'lt-selection' || data?.type === 'lt41-choose') { links(); writeLocation(); }
+    if (data?.type === MSG.selection || data?.type === MSG.choose) { links(); writeLocation(); }
   });
 
   function sharePayload() {

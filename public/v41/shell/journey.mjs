@@ -1,6 +1,7 @@
 // 셸의 첫 여정 연결 (#231 1-B③-3).
 // 2026-11-08 리팩터링: 동작·문구·주소 형식 변경 0. shell.mjs에서 조건·조회 방식·인자 형태를 바꾸지 않고 그대로 옮겼다.
 // 여정 화면(iframe)과 셸 사이의 저장·이동·뒤로가기 기록을 이 파일 하나가 맡는다.
+import { MSG } from '../frame-messages.mjs';
 import {journeyEntry, journeySavePlan, journeyRouteHash, parseJourneyRoute} from '../first-journey.mjs';
 
 export function createJourney(deps) {
@@ -51,7 +52,7 @@ export function createJourney(deps) {
   function gotoJourneyStep(step) {
     if (getCurrent() !== 'first-journey.html') { openFirstJourney({step, route: true}); return; }
     journeyStep = parseJourneyRoute(journeyRouteHash(step))?.step || 0;
-    try { $('view').contentWindow?.postMessage({type: 'lt41-journey-goto', step: journeyStep}, location.origin); } catch {}
+    try { $('view').contentWindow?.postMessage({type: MSG.journeyGoto, step: journeyStep}, location.origin); } catch {}
     setHandled(location.hash);
   }
 
@@ -108,13 +109,13 @@ export function createJourney(deps) {
 
   function saveFirstJourney(draft) {
     if (getSource() !== 'server' || !getMember()?.snapshot().owned) {
-      journeyReply({type: 'lt41-journey-result', ok: false, message: '로그인한 뒤 내 기록에 저장할 수 있어요.'}); return;
+      journeyReply({type: MSG.journeyResult, ok: false, message: '로그인한 뒤 내 기록에 저장할 수 있어요.'}); return;
     }
     if (!getMember().snapshot().writable) {
-      journeyReply({type: 'lt41-journey-result', ok: false, message: '서버 편집 연결이 아직 준비되지 않았어요. 기록은 안전하게 읽을 수 있습니다.'}); return;
+      journeyReply({type: MSG.journeyResult, ok: false, message: '서버 편집 연결이 아직 준비되지 않았어요. 기록은 안전하게 읽을 수 있습니다.'}); return;
     }
     let plan;
-    try { plan = journeySavePlan(draft); } catch (error) { journeyReply({type: 'lt41-journey-result', ok: false, message: error.message}); return; }
+    try { plan = journeySavePlan(draft); } catch (error) { journeyReply({type: MSG.journeyResult, ok: false, message: error.message}); return; }
     try {
       let treeId = plan.treeId, momentId = plan.momentId, firstMomentId = plan.momentId;
       if (plan.first) {
@@ -125,8 +126,8 @@ export function createJourney(deps) {
         const added = getMember().apply('add', plan.second, {treeId, momentId});
         momentId = added.momentId;
       }
-      journeyReply({type: 'lt41-journey-result', ok: true, treeId, firstMomentId, momentId, connected: !!plan.second});
-    } catch (error) { journeyReply({type: 'lt41-journey-result', ok: false, message: error.message}); }
+      journeyReply({type: MSG.journeyResult, ok: true, treeId, firstMomentId, momentId, connected: !!plan.second});
+    } catch (error) { journeyReply({type: MSG.journeyResult, ok: false, message: error.message}); }
   }
 
   function openJourneyBook({treeId, firstMomentId} = {}) {

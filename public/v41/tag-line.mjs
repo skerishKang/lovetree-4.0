@@ -2,6 +2,7 @@
 // 규칙·계산은 tag-model.mjs·tags.mjs 한 벌을 쓰고, 이 파일은 그리기·누르기만 한다.
 // 제안은 흐린 칩, 확정은 진한 칩이다. 누르면 확정·해제된다. 사용자가 확인하기 전에는 저장하지 않는다 —
 // 저장 호출은 onCommit(바뀐 keywords 전체, 지금 보고 있는 순간 id)으로 바깥에 맡기고, 이 파일은 저장 경로를 모른다.
+import { MSG } from './frame-messages.mjs';
 import { TAG_KINDS, parseTag } from './tags.mjs';
 import { cardTags, chipText, tagLineChips, toggledKeywords, inputTag } from './tag-model.mjs';
 
@@ -268,7 +269,7 @@ function knownTagsOf(context) {
 // 셸에 저장을 부른다(기존 순간 수정 경로). 답이 오면 lt41-tags-saved로 돌아온다.
 function sendTags(context, momentId, keywords) {
   try {
-    window.parent.postMessage({ type: 'lt41-tags', treeId: context?.tree?.id || '', momentId, keywords }, location.origin);
+    window.parent.postMessage({ type: MSG.tags, treeId: context?.tree?.id || '', momentId, keywords }, location.origin);
   } catch { /* 부모와 통신할 수 없는 화면(직접 연 뒤)에서는 누름을 저장하지 않는다 */ }
 }
 
@@ -324,7 +325,7 @@ export function mountViewTagLine({ screen }) {
 
   // 셸의 저장 답: 모델의 keywords를 다시 읽어 그리고, 화면이 들고 있는 자기 사본에게 알린다(보드 카드 등).
   addEventListener('message', (event) => {
-    if (event.origin !== location.origin || event.data?.type !== 'lt41-tags-saved') return;
+    if (event.origin !== location.origin || event.data?.type !== MSG.tagsSaved) return;
     const c = context();
     const moment = momentOf(event.data.momentId);
     if (moment && Array.isArray(event.data.keywords)) {

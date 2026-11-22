@@ -1,3 +1,4 @@
+import { MSG } from '../../public/v41/frame-messages.mjs';
 import {fetchVideoStatus} from '../../public/v41/video-status.mjs';
 import originalCSS from './orbit-source.css?inline';
 import {titleView, formatDisplayDate, embedUrl} from '../../public/v41/book-usability.mjs';
@@ -400,7 +401,7 @@ shadow.addEventListener('click',e=>{const play=e.target.closest('[data-recent-pl
   onEditTitle:({momentId,treeId})=>{
    if(dialog.open)dialog.close();
    if(typeof window!=='undefined'&&window.parent&&window.parent!==window){
-    window.parent.postMessage({type:'lt41-write',mode:'edit',treeId:treeId||'',momentId,focusTitle:true},location.origin);
+    window.parent.postMessage({type:MSG.write,mode:'edit',treeId:treeId||'',momentId,focusTitle:true},location.origin);
    }
   }
  });

@@ -1,3 +1,4 @@
+import { MSG } from './frame-messages.mjs';
 // Reuse Track32's cover transition, then read through the single Track59 reader.
 (() => {
  const c=parent.LT41;
@@ -8,7 +9,7 @@
  LTDEMO.library=(c?.trees||[c.tree]).map(t=>({id:t.id,title:t.title,subject:t.subject,coverMomentId:t.coverMomentId||'',coverDesign:t.coverDesign||'',coverMode:t.coverMode||'',inbox:t.inbox===true,moments:t.id===c.tree.id?LTDEMO.moments.map(moment=>{const raw=t.moments.find(item=>item.id===moment.id),media=describe(raw?.url||''),yt=ytThumb(raw,media),photo=media.kind==='photo'&&media.privateFile?media.loadUrl:'';return {...moment,mediaMetadata:raw?.mediaMetadata||moment.mediaMetadata||null,image:photo||moment.image||yt,youtubeThumb:!!(!photo&&!moment.image&&yt)};}):t.moments.map(m=>{const media=describe(m.url||''),yt=ytThumb(m,media),photo=media.kind==='photo'&&media.privateFile?media.loadUrl:'';return {id:m.id,title:m.title,memo:m.note,emotion:m.emotion,date:m.date,mediaMetadata:m.mediaMetadata||null,externalUrl:m.url||'',type:media.kind==='photo'?'photo':media.kind==='video'||media.kind==='youtube'?'video':m.url?'link':'memo',image:photo||yt,youtubeThumb:!!(!photo&&yt)};})}));
  LTDEMO.openBook=(id,treeId=c.tree.id)=>{
   if(!LTDEMO.library.some(t=>t.id===treeId&&t.moments.some(m=>m.id===id)))return;
-  parent.postMessage({type:'lt41-open-book',treeId,id},location.origin);
+  parent.postMessage({type:MSG.openBook,treeId,id},location.origin);
  };
  const apply=()=>{
   const shelf=location.pathname.includes('track32-bookshelf');

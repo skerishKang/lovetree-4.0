@@ -2,6 +2,7 @@
 // 목록은 셸이 넘긴 window.parent.LT41(tree·trees)에서 읽고(board.js 관례), 이동은 셸이 듣는
 // lt41-open-view 메시지(messages.mjs)로 같은 보기(보드·지도)를 연다. 셸 파일은 부르기만 한다.
 // 공유·예시(읽기 전용)에서는 ▾와 ← 내 트리를 숨긴다(셸의 트리 선택도 로그인한 내 기록에서만 보인다).
+import { MSG } from '../frame-messages.mjs';
 import {treeTitleText} from '/v41/book-usability.mjs';
 import {coverChoice, COVER_PALETTE} from '/v41/views/shelf/shelf-model.mjs';
 import {thumbnailCandidates, coverFallbackAttrs, mountThumbFallback} from '/v41/thumb-fallback.mjs';
@@ -68,7 +69,7 @@ export function mountTreeTitle({view}) {
   const name = treeTitleText(context()?.tree?.title || '');
   if (name) title.textContent = name;
   // ← 내 트리: 내 트리 전체 보기(책장). 셸이 이미 듣고 있는 lt41-navigate 메시지로 간다.
-  if (back && !ro) back.addEventListener('click', () => { parent.postMessage({type: 'lt41-navigate', view: 'track32-bookshelf.html'}, location.origin); });
+  if (back && !ro) back.addEventListener('click', () => { parent.postMessage({type: MSG.navigate, view: 'track32-bookshelf.html'}, location.origin); });
   // (#420의 '.app 굴림 0 복귀' 임시 가드는 #428에서 숨은 프레임을 inert로 막으면서 걷어냈다 —
   //  숨은 프레임 문서가 초점을 청해도 초점 자체가 일어나지 않아 .app이 굴러가지 않는다.)
   if (ro) return; /* 공유·예시에서는 트리를 고르지 못한다(셸과 같다) */
@@ -90,7 +91,7 @@ export function mountTreeTitle({view}) {
     close();
     const id = row.dataset.treeId;
     if (!id || id === currentId()) return;
-    parent.postMessage({type: 'lt41-open-view', treeId: id, view}, location.origin);
+    parent.postMessage({type: MSG.openView, treeId: id, view}, location.origin);
   });
   document.addEventListener('click', e => { if (!menu.hidden && !e.target.closest('.tree-title')) close(); });
   // 캡처 단계에서 듣는다 — 메뉴가 열려 있으면 맨 위 겹이므로, 셸이 화면에 붙이는 Esc 닫기

@@ -721,7 +721,7 @@ document.getElementById('shelfHint').addEventListener('click', async () => {
   const { suggestForMoments } = await import('../tags.mjs');
   const shelfIds = new Set(MODEL.moments.filter((m) => !m.primary).map((m) => m.id));
   const shelf = MOMENTS.filter((m) => shelfIds.has(m.id));
-  try { parent.postMessage({ type: 'lt-suggest-request', momentIds: shelf.map((m) => m.id) }, location.origin); } catch {}
+  try { parent.postMessage({ type: MSG.suggestRequest, momentIds: shelf.map((m) => m.id) }, location.origin); } catch {}
   const rows = suggestForMoments(shelf.map((m) => ({ id: m.id, title: m.t, keywords: Array.isArray(m.tags) ? m.tags : [] })));
   const card = document.getElementById('detailCard');
   card.replaceChildren();
