@@ -60,14 +60,6 @@ function staticSpecifiers(body) {
   return [...new Set(out)];
 }
 
-// #1026: 셸이 첫 화면에서 곧바로 부르는 동적 import는 목록에 포함한다(도구와 같은 예외).
-const STARTUP_DYNAMIC = new Set(['example.mjs']);
-function startupDynamicSpecifiers(body) {
-  const out = [];
-  for (const m of body.matchAll(/import\(\s*(['"])([^'"]+\.m?js)\1\s*\)/g)) out.push(m[2]);
-  return out;
-}
-
 /** specifier를 public/v41 기준 상대 경로로 푼다. */
 function resolveSpec(spec, fromFilePosix) {
   if (spec.startsWith('/v41/')) return path.posix.normalize(spec.slice(5));
@@ -103,14 +95,9 @@ function walkScreen(screen) {
     seen.add(file);
     const full = path.join(publicRoot, file);
     if (!fs.existsSync(full)) continue;
-    const body = fs.readFileSync(full, 'utf8');
-    for (const spec of staticSpecifiers(body)) {
+    for (const spec of staticSpecifiers(fs.readFileSync(full, 'utf8'))) {
       const resolved = resolveSpec(spec, file);
       if (resolved && !seen.has(resolved)) queue.push(resolved);
-    }
-    for (const spec of startupDynamicSpecifiers(body)) {
-      const resolved = resolveSpec(spec, file);
-      if (resolved && STARTUP_DYNAMIC.has(resolved) && !seen.has(resolved)) queue.push(resolved);
     }
   }
   return seen;

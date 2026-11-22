@@ -13,6 +13,8 @@ export function createMemoryFeedbackRepo() {
   return {
     rows,
     replies,
+    // #1190: 시험용이라 트랜잭션 대신 같은 저장소를 그대로 넘긴다(계약만 맞춘다).
+    async transaction(fn) { return fn(this); },
     async create({productId, subjectId = null, kind = 'opinion', category, title = null, body, score = null, context = {}, journalDate = null}) {
       const row = {
         id: nextId++, productId, subjectId, kind, category, title, body,

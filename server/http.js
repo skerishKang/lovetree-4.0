@@ -129,7 +129,7 @@ export function createApiHandler({ authenticate, service, productId, admin = nul
   };
 }
 
-export function createNodeHandler(requestHandler, { maxBodyBytes = DEFAULT_MAX_BODY_BYTES } = {}) {
+export function createNodeHandler(requestHandler, { maxBodyBytes = DEFAULT_MAX_BODY_BYTES, afterResponse = null } = {}) {
   return async function nodeHandler(req, res) {
     const media = /^\/api\/media(?:\/|$)/.test(String(req.url).split('?')[0]);
     const limit = media ? MAX_MEDIA_BYTES : maxBodyBytes;
@@ -161,5 +161,7 @@ export function createNodeHandler(requestHandler, { maxBodyBytes = DEFAULT_MAX_B
     if (res.destroyed) return;
     res.writeHead(result.status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', ...(result.headers ?? {}) });
     res.end(result.binary ?? JSON.stringify(result.body));
+    // 응답은 이미 나갔다 — 뒤처리는 요청을 막지 않는다.
+    if (typeof afterResponse === 'function') void Promise.resolve().then(afterResponse).catch(() => {});
   };
 }

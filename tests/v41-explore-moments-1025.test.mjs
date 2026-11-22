@@ -350,10 +350,13 @@ test('#1098 2단계 — 쇼츠의 그 순간 ♡·댓글 수와 순간 단위 �
     const drawer = await h.page.evaluate(() => {
      const dialog = document.querySelector('#community-moments-panel .moments-comments-dialog');
      const heads = [...dialog.querySelectorAll('.community-comment small')].map((n) => n.textContent || '');
-     return { title: dialog.querySelector('.moments-comments-title')?.textContent || '', first: heads[0] || '' };
+     return { title: dialog.querySelector('.moments-comments-title')?.textContent || '', first: heads[0] || '', second: heads[1] || '' };
     });
     assert.equal(drawer.title, '댓글', '댓글 2·3 미만은 머리글에 숫자를 남기지 않는다');
-    assert.match(drawer.first, /^AI 명예회원/, 'AI 명예회원 댓글은 트리 작성자 표시와 같은 방식으로 구분된다');
+    assert.match(drawer.first, /^AI 명예회원 · 기록한 사람 · /, 'AI 명예회원 머리말과 이름은 · 로 나뉜다(판과 같은 머리말)');
+    assert.match(drawer.second, /^기록한 사람 · /, '일반 댓글에는 AI 명예회원 머리말을 붙이지 않는다');
+    // 쇼츠 댓글 창 날짜도 판과 같은 한 벌(formatDisplayDate·날짜 표기 설정)을 따른다 — 예전 UTC 절단('2026-11-20')이 아니다.
+    assert.match(drawer.first, /2026\. 11\. 20$/, '쇼츠 댓글 창 날짜는 판과 같은 formatDisplayDate(기본 점 표기)로 나온다');
     // 쓰기 단추 모양 — 판의 '댓글 남기기'와 같은 테마 색·둥근 모서리(회색 납작 막대 금지).
     const submitLook = await h.page.evaluate(() => {
       const submit = document.querySelector('#community-moments-panel .moments-comments-dialog button[type="submit"]');
