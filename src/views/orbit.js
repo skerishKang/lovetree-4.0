@@ -679,7 +679,7 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
     // 첫 자리·모양은 위 placeCard 가 이미 다 그렸으므로(화면 변화 0), WAAPI 붙임만 뒤로 미룬다.
     elements.forEach((el,i)=>{orbitKF[i]=null;});
     const total=Math.min(cap,elements.length),chunk=12;
-    for(let from=0;from<total;from+=chunk){const start=from;requestAnimationFrame(()=>{for(let i=start;i<Math.min(start+chunk,total);i++)startOrbit(i,w,h,warmups);if(animRunning())startOrbitLoop();else orbitWrite(performance.now());});}
+    for(let from=0;from<total;from+=chunk){const start=from;requestAnimationFrame(()=>{for(let i=start;i<Math.min(start+chunk,total);i++)startOrbit(i,w,h,warmups);if(animRunning())startOrbitLoop();orbitWrite(performance.now());});}
     orbitBox=boxKey;
    }
    orbitBand=band;
