@@ -1,6 +1,6 @@
 import { EMPTY_STATE, validateState } from './domain.mjs';
 import { guardWorkspaceState } from './workspace-guard.mjs';
-import { readCachedWorkspace, writeCachedWorkspace, clearCachedWorkspace } from './workspace-cache.mjs';
+import { readCachedWorkspace, readLoginSubject, rememberLoginSubject, forgetLoginSubject, writeCachedWorkspace, clearCachedWorkspace } from './workspace-cache.mjs';
 
 const LABELS = {
   checking: '서버 확인 중', login: '저장하려면 로그인해 주세요',
@@ -134,7 +134,9 @@ export function createSyncController({getState, replaceState, api, draftStorage 
     emit(status({phase:'checking'}));
     if (!cachePainted) {
       cachePainted = true;
-      const cached = readCachedWorkspace(cacheStorage);
+      // A-18: 로그인 표식의 계정과 저장본 계정이 같을 때만 먼저 그린다. 다르거나 모르면 그리지 않고
+      // 서버 응답을 기다린다(빈 틀 그대로) — 같은 브라우저를 다른 계정이 쓰면 옛 기록이 잠깐 보였다.
+      const cached = readCachedWorkspace(cacheStorage, readLoginSubject(cacheStorage));
       // 저장본은 서버 응답 전 첫 화면용일 뿐이다. phase은 checking 그대로 → 편집 잠금·서버본 우선.
       if (cached) replaceState(cached.state);
     }
@@ -144,13 +146,16 @@ export function createSyncController({getState, replaceState, api, draftStorage 
       owned = false; revision = null; dirty = false; attempt = null;
       replaceState(EMPTY_STATE());
       if (result.status === 401 || result.code === 'unauthenticated') {
-        // 인증이 없으면 저장본도 남기지 않는다(공용 컴퓨터).
+        // 인증이 없으면 저장본과 로그인 표식도 남기지 않는다(공용 컴퓨터).
         clearCachedWorkspace(cacheStorage);
+        forgetLoginSubject(cacheStorage);
         return emit(status({phase:'login',actions:actions.login}));
       }
       return emit(status({phase:'offline',detail:'서버를 확인하지 못했어요. 다시 시도해 주세요.',actions:[...actions.retry,...actions.login]}));
     }
     owned = true; revision = result.revision; dirty = false; attempt = null; seenRevision = null; editCount = 0; activeSubject = result.subject || null;
+    // 서버가 확인한 계정을 로그인 표식으로 남긴다 — 다음 접속에서 같은 계정일 때만 저장본을 먼저 그린다.
+    rememberLoginSubject(cacheStorage, activeSubject);
     adoptState(result.state, result.quarantined);
     writeCachedWorkspace(cacheStorage, activeSubject, getState());
     if (restorePendingDraft(activeSubject, revision)) return current;
@@ -276,6 +281,7 @@ export function createSyncController({getState, replaceState, api, draftStorage 
       if (gen !== generation) return current;
       if (!answer.ok) return emit(status({phase:'rejected',detail:'로그아웃하지 못했어요.',actions:actions.logout}));
       clearCachedWorkspace(cacheStorage, activeSubject);
+      forgetLoginSubject(cacheStorage);
       owned = false; revision = null; editCount = 0; replaceState(EMPTY_STATE()); navigate('#start');
       // 4.0의 act('logout')과 같은 알림 — 빠지면 셸이 로그인 상태로 남아 계정 동그라미가 지워지지 않는다.
       return emit(status({phase:'login',actions:actions.login}));
