@@ -4,7 +4,7 @@
 import {
   COVER_PALETTE, allBooks as allBooksOf, bookMeta, buildShelf, carouselTransform,
   escapeShelf, filterShelf, findBook, lastMomentDate as lastMomentDateOf,
-  resolveShelfIndex, resumeCard, resumeName, shelfBook, shelfRowLayout,
+  resolveShelfIndex, resumeCard, resumeName, shelfBook, shelfRowLayout, shelfRotationLayout,
   treeTitleOf, youtubeId as youtubeIdOf
 } from './shelf-model.mjs';
 import { shelfOrder } from '../../inbox-model.mjs';
@@ -31,6 +31,12 @@ import { createReader } from './shelf-reader.js';
       var storageKey = 'lovetree-people-book-shelf-v2-1-true-page-motion';
       var drag = { active:false, mode:'', startX:0, startY:0, moved:false, startProgress:0 };
       var shelfDrag = { active:false, startX:0, moved:false, downIndex:null };
+      // #1093: 계정 설정(bookDisplay와 같은 길) → 기기 미러 → 기본 선반.
+      function shelfView() {
+        try { var v=parent.LT41?.prefs?.shelfView; if(v==='shelf'||v==='carousel')return v; } catch {}
+        try { var m=localStorage.getItem('lt41.shelfView'); if(m==='shelf'||m==='carousel')return m; } catch {}
+        return 'shelf';
+      }
       try {
         var saved = {};
         state.selectedId = null;
@@ -62,6 +68,7 @@ import { createReader } from './shelf-reader.js';
          state.shelfList=list;
         state.shelfIndex=resolveShelfIndex(list, state.selectedId, state.shelfIndex);
         $('#resultCount').textContent='트리 '+list.length+'개';
+         var viewport=$('#shelfViewport');if(viewport)viewport.dataset.shelfView=shelfView();
         var railWidth=($('#shelfRail')&&$('#shelfRail').clientWidth)||0;
         // #944: 시작은 첫 책 왼쪽 끝이 책장 안쪽 여백. 고른 책이 뒤쪽이면 보이게만 최소로 민다.
         state.shelfOffset=shelfRowLayout(list.length, railWidth).offsetFor(state.shelfIndex, state.shelfOffset||0);
@@ -129,53 +136,66 @@ import { createReader } from './shelf-reader.js';
       }
       // 화살표 0개(다 들어감) / 2개(넘침). 레일 폭이 정해지기 전에는 잠시 숨기고, ResizeObserver가 다시 맞춘다.
       function applyShelfArrows(count, railWidth) {
-        var show=railWidth>0&&shelfRowLayout(count, railWidth).mode==='carousel'&&count>0;
+        var show=shelfView()==='carousel'&&railWidth>0&&shelfRowLayout(count, railWidth).mode==='carousel'&&count>0;
         var prevArrow=$('#shelfPrev'),nextArrow=$('#shelfNext');
         if(prevArrow)prevArrow.hidden=!show;
         if(nextArrow)nextArrow.hidden=!show;
+      }
+      function clearDragX(rail){
+        if(!rail||!rail.style)return;
+        if(typeof rail.style.removeProperty==='function')rail.style.removeProperty('--drag-x');
+        else if(typeof rail.style.setProperty==='function')rail.style.setProperty('--drag-x','');
+        else delete rail.style['--drag-x'];
+      }
+      function reportShelfTree(center){
+        // 261118 대표 지적 2차 5: 서재에서 마지막에 본 트리(가운데 책의 트리)를 셸에 알린다 —
+        // 서재 화면에서 콕·보드·지도 탭을 누르면 그 트리로 열린다.
+        var centered=state.shelfList[center];
+        if(centered&&centered.id!==state.reportedTreeId){state.reportedTreeId=centered.id;try{parent.postMessage({type:'lt41-shelf-tree',treeId:centered.id},location.origin);}catch{}}
       }
       function updateCarousel() {
         var rail=$('#shelfRail');
         if(!rail)return;
         applyShelfArrows(state.shelfList.length, rail.clientWidth);
         var center=state.shelfIndex;
-        // 11-19 대표 결정 + #944: 다 들어가면 왼쪽부터, 넘치면 첫 책 왼쪽 끝에서 화살표로 한 칸씩 민다.
-        var layout=shelfRowLayout(state.shelfList.length, rail.clientWidth);
-        state.shelfOffset=Math.max(0,Math.min(layout.maxOffset,state.shelfOffset||0));
-        var offset=state.shelfOffset;
+        if(shelfView()==='shelf'){
+          // 선반은 그리드가 자리를 정한다 — 좌표 계산 없이 가운데 책 표시만 갱신한다.
+          clearDragX(rail);
+          state.shelfList.forEach(function(book,index){
+            var card=rail.querySelector('[data-book-index="'+index+'"]');
+            if(card)card.classList.toggle('is-center',index===center);
+          });
+          setShelfAtmosphere(state.shelfList[center]);
+          reportShelfTree(center);
+          return;
+        }
+        // 회전: 예전 책장의 가운데 책 + 좌우 기울임을 되살리되 모든 책을 끝까지 보이게 둔다.
+        var layout=shelfRotationLayout(state.shelfList.length, rail.clientWidth);
+        center=layout.centerFor(center);state.shelfIndex=center;
         state.shelfList.forEach(function(book,index){
           var card=rail.querySelector('[data-book-index="'+index+'"]');
           if(!card)return;
-          // #212: 중앙 카드는 레일 높이(375)보다 큰 352px이라 위로 뜨면 표지 윗부분이 잘렸다.
-          // 책장은 모든 책을 같은 크기·각도로(선반에 앉은 채) 놓는다 — 가운데 책만 커지면
-          // 첫 책 왼쪽 끝이 안쪽 여백에서 어긋난다(#938, #944).
-          var placed=carouselTransform(index-offset, layout.wide);
-          placed.scale=1;placed.rotate=0;placed.alpha=1;placed.zIndex=1;placed.pointerEvents='auto';placed.filter='none';
-          card.style.setProperty('--x',layout.xOf(index,offset)+'px');
-          card.style.setProperty('--y',placed.y+'px');
-          card.style.setProperty('--z',placed.z+'px');
-          card.style.setProperty('--scale',placed.scale);
-          card.style.setProperty('--rot',placed.rotate+'deg');
-          card.style.setProperty('--alpha',placed.alpha);
-          card.style.zIndex=String(placed.zIndex);
+          card.style.setProperty('--x',layout.xOf(index,center)+'px');
+          card.style.setProperty('--rot',layout.rotate(index,center)+'deg');
+          card.style.setProperty('--alpha','1');
+          card.style.setProperty('--scale',String(layout.scale(index,center)));
+          card.style.setProperty('--z',layout.depth(index,center)+'px');
+          card.style.setProperty('--y','0px');
+          card.style.zIndex=String(100-Math.abs(index-center));
+          card.style.pointerEvents='auto';
+          card.style.filter='none';
           card.classList.toggle('is-center',index===center);
-          card.style.pointerEvents=placed.pointerEvents;
-          card.style.filter=placed.filter;
         });
+        clearDragX(rail);
         setShelfAtmosphere(state.shelfList[center]);
-        // 261118 대표 지적 2차 5: 서재에서 마지막에 본 트리(가운데 책의 트리)를 셸에 알린다 —
-        // 서재 화면에서 콕·보드·지도 탭을 누르면 그 트리로 열린다.
-        var centered=state.shelfList[center];
-        if(centered&&centered.id!==state.reportedTreeId){state.reportedTreeId=centered.id;try{parent.postMessage({type:'lt41-shelf-tree',treeId:centered.id},location.origin);}catch{}}
+        reportShelfTree(center);
       }
       function moveShelf(direction) {
-        if(!state.shelfList.length)return;
-        var rail=$('#shelfRail');
-        var layout=shelfRowLayout(state.shelfList.length, rail?rail.clientWidth:0);
-        // #944: 화살표 한 번 = 정확히 한 칸(pitch). 고른 책은 그대로 두고 책장만 민다.
-        var next=Math.max(0,Math.min(layout.maxOffset,(state.shelfOffset||0)+direction));
-        if(next===state.shelfOffset)return;
-        state.shelfOffset=next;save();updateCarousel();
+        if(!state.shelfList.length||shelfView()!=='carousel')return;
+        // 회전은 고른 책을 한 칸씩 옮긴다. 선반에서는 화살표가 숨겨져 있다.
+        var next=Math.max(0,Math.min(state.shelfList.length-1,(state.shelfIndex||0)+direction));
+        if(next===state.shelfIndex)return;
+        state.shelfIndex=next;save();updateCarousel();
       }
       function selectShelfIndex(index) {
         if(index<0||index>=state.shelfList.length)return;
@@ -202,28 +222,34 @@ import { createReader } from './shelf-reader.js';
           lpFired=false;lpTarget=(card&&card.dataset&&card.dataset.bookIndex!==undefined)?card:null;
           clearLp();lpStart={x:event.clientX,y:event.clientY};
           if(lpTarget){lpTimer=setTimeout(function(){if(lpTarget){lpTarget.classList.add('show-manage');lpFired=true;}lpTimer=null;},500);}
-          shelfDrag.active=true;shelfDrag.startX=event.clientX;shelfDrag.moved=false;shelfDrag.downIndex=card?Number(card.dataset.bookIndex):null;shelfDrag.startOffset=state.shelfOffset||0;
+          shelfDrag.active=true;shelfDrag.startX=event.clientX;shelfDrag.moved=false;shelfDrag.downIndex=card?Number(card.dataset.bookIndex):null;shelfDrag.startIndex=state.shelfIndex||0;
           rail.classList.add('dragging');rail.setPointerCapture(event.pointerId);
         });
         rail.addEventListener('pointermove',function(event){
           if(lpTimer&&lpStart&&(Math.abs(event.clientX-lpStart.x)>7||Math.abs(event.clientY-lpStart.y)>7))clearLp();
           if(!shelfDrag.active)return;
           var dx=event.clientX-shelfDrag.startX;
-          if(Math.abs(dx)>7)shelfDrag.moved=true;
-          if(shelfDrag.moved){var max=shelfRowLayout(state.shelfList.length,rail.clientWidth).maxOffset;state.shelfOffset=Math.max(0,Math.min(max,shelfDrag.startOffset-dx/200));updateCarousel();}
+          shelfDrag.lastDx=dx;
+           if(Math.abs(dx)>7)shelfDrag.moved=true;
+          // 끊김 방지(#1086와 같은 길): 움직이는 동안에는 레일의 CSS 변수 한 개만 바꾼다(카드별 재계산 없음).
+           if(shelfDrag.moved&&shelfView()==='carousel')rail.style.setProperty('--drag-x',dx+'px');
         });
         rail.addEventListener('pointerup',function(){
           clearLp();
           if(!shelfDrag.active)return;
           var moved=shelfDrag.moved,downIndex=shelfDrag.downIndex,longFired=lpFired;
           shelfDrag.active=false;rail.classList.remove('dragging');
-          if(moved){state.shelfOffset=Math.round(state.shelfOffset);save();updateCarousel();}
+          if(moved&&shelfView()==='carousel'){
+             var shifted=Math.round(-(shelfDrag.lastDx||0)/200);
+             state.shelfIndex=Math.max(0,Math.min(state.shelfList.length-1,shelfDrag.startIndex+shifted));
+             save();updateCarousel();
+           } else if(moved){clearDragX(rail);}
           else if(longFired){/* 길게 누르기: ⋯만 보이고 책은 열지 않는다 */}
           else if(downIndex!==null)selectShelfIndex(downIndex);
           shelfDrag.downIndex=null;
           if(!longFired){lpTarget=null;}
         });
-        rail.addEventListener('pointercancel',function(){clearLp();lpFired=false;lpTarget=null;if(!shelfDrag.active)return;shelfDrag.active=false;rail.classList.remove('dragging');state.shelfOffset=Math.round(state.shelfOffset);updateCarousel();});
+        rail.addEventListener('pointercancel',function(){clearLp();lpFired=false;lpTarget=null;if(!shelfDrag.active)return;shelfDrag.active=false;rail.classList.remove('dragging');state.shelfIndex=shelfDrag.startIndex||0;updateCarousel();});
         // #서재-빈공간: 레일 폭이 정해진 뒤에도 배치를 다시 잡는다 — 화면이 뜨는 동안 폭이 정해지기 전에
         // 그려지면 '왼쪽부터 순서 배치'가 그대로 남는다. 폭이 변할 때만 다시 그리므로 되풀이되지 않는다.
         if (typeof ResizeObserver !== 'undefined') { var shelfRailRo = new ResizeObserver(function () { updateCarousel(); }); shelfRailRo.observe(rail); }
@@ -263,7 +289,11 @@ import { createReader } from './shelf-reader.js';
 const renderedTitleDisplay=titleDisplayOf((()=>{try{return parent.LT41?.prefs?.titleDisplay||'both'}catch{return 'both'}})());
 window.__shelfListenerInstalled=true;
 if(typeof addEventListener==='function')addEventListener('message',e=>{
- if(e.data?.type==='lt41-shelf-select-tree'){
+ if(e.data?.type==='lt41-shelf-view'){
+   renderShelf();
+   return;
+  }
+  if(e.data?.type==='lt41-shelf-select-tree'){
   window.__pickSeen=e.data.treeId;
   var picked=books.findIndex(b=>b.id===e.data.treeId);
   if(picked>=0){var rail=$('#shelfRail');state.shelfIndex=picked;state.shelfOffset=shelfRowLayout(state.shelfList.length,rail?rail.clientWidth:0).offsetFor(picked,state.shelfOffset||0);updateCarousel();}

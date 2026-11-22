@@ -66,10 +66,44 @@ html[data-v41-screen=shelf] .book-card .book-card-meta{margin-top:8px}
    레일 바닥 = 선반 윗면이 되어 책 바닥과 선반 차이가 0~8px 안으로 들어온다. */
 html[data-v41-screen=shelf] .shelf-viewport{height:auto;padding:18px 51px 14px}
 html[data-v41-screen=shelf] .shelf-rail{height:380px}
-html[data-v41-screen=shelf] .book-card{top:auto;bottom:0;transform-origin:50% 100%;transform:translate(-50%,0) translate3d(var(--x,0px),var(--y,0px),var(--z,0px)) rotateY(var(--rot,0deg)) scale(var(--scale,1))}
+html[data-v41-screen=shelf] .book-card{top:auto;bottom:0;transform-origin:50% 100%;transform:translate(-50%,0) translate3d(calc(var(--x,0px) + var(--drag-x,0px)),var(--y,0px),var(--z,0px)) rotateY(var(--rot,0deg)) scale(var(--scale,1))}
 html[data-v41-screen=shelf] .shelf-base{position:static;left:auto;right:auto;bottom:auto;margin:0 29px}
 /* 261118 대표 지적 2차 4: 표지 사진은 가운데를 보여 준다(얼굴·주제가 잘리지 않게). */
 html[data-v41-screen=shelf] .book-card .book-cover-media{object-position:50% 50%}
+
+/* ── #1093 선반 보기: 여러 칸·여러 줄, 같은 크기의 책을 모두 보여 준다.
+   위치 계산값은 CSS 변수만 쓴다(강제 표시·인라인 style 없음). */
+html[data-v41-screen=shelf] .shelf-viewport[data-shelf-view=shelf] .shelf-rail{
+ display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:22px 16px;height:auto;min-height:280px;overflow:visible;padding:6px 0 4px
+}
+html[data-v41-screen=shelf] .shelf-viewport[data-shelf-view=shelf] .book-card{
+ position:relative;left:auto;right:auto;top:auto;bottom:auto;width:auto;height:auto;min-height:0;margin:0;padding:0;
+ transform:none;transform-origin:50% 100%;z-index:auto;opacity:1
+}
+html[data-v41-screen=shelf] .shelf-viewport[data-shelf-view=shelf] .book-card > button{height:auto}
+html[data-v41-screen=shelf] .shelf-viewport[data-shelf-view=shelf] .book-card .book-cover{
+ width:100%;height:auto;aspect-ratio:2/3;transform:rotateY(-8deg) rotateZ(var(--tilt,0deg));transform-origin:50% 100%;
+ box-shadow:9px 13px 19px rgba(62,42,39,.26),inset 8px 0 0 rgba(0,0,0,.13)
+}
+html[data-v41-screen=shelf] .shelf-viewport[data-shelf-view=shelf] .book-card:hover .book-cover,
+html[data-v41-screen=shelf] .shelf-viewport[data-shelf-view=shelf] .book-card:focus-within .book-cover{
+ transform:rotateY(0) rotateZ(0) translateY(-8px) scale(1.035);box-shadow:12px 19px 25px rgba(62,42,39,.3)
+}
+/* 책 아래 선반 널과 그림자 — 줄마다 책이 그 위에 앉는다. */
+html[data-v41-screen=shelf] .shelf-viewport[data-shelf-view=shelf] .book-card::after{
+ content:"";position:absolute;left:-6%;right:-6%;bottom:-9px;height:8px;border-radius:3px;pointer-events:none;
+ background:linear-gradient(#714b3b,#2e201e);box-shadow:0 6px 11px rgba(0,0,0,.22)
+}
+html[data-v41-screen=shelf] .shelf-viewport[data-shelf-view=shelf] .book-card-meta{margin-top:11px;text-align:center}
+html[data-v41-screen=shelf] .shelf-viewport[data-shelf-view=shelf] .book-card-meta strong{font-size:clamp(11px,1.1vw,14px)}
+html[data-v41-screen=shelf] .shelf-viewport[data-shelf-view=shelf] .cover-title{font-size:clamp(10px,1.05vw,14px)}
+@media(max-width:700px){
+ html[data-v41-screen=shelf] .shelf-viewport[data-shelf-view=shelf] .shelf-rail{grid-template-columns:repeat(3,minmax(0,1fr));gap:20px 10px;min-height:224px}
+ html[data-v41-screen=shelf] .shelf-viewport[data-shelf-view=shelf]{padding-left:18px;padding-right:18px}
+}
+@media(min-width:1900px){
+ html[data-v41-screen=shelf] .shelf-viewport[data-shelf-view=shelf] .shelf-rail{grid-template-columns:repeat(10,minmax(0,1fr))}
+}
 
 /* ── 261118 대표 지적 4: 이어 보기 띠 한 줄 — [가로 썸네일] 트리 이름 · 순간 제목 · '이어 보기 ▶'.
    트리가 있으면 소개 문('좋아하는 순간들을 한 권의 책으로.'+'책 열기') 대신 이 띠를 둔다.
@@ -234,3 +268,10 @@ html[data-v41-screen=shelf] .shelf-screen:has(.hero.strip-mode) .shelf-rail { he
 @media (max-width: 700px) {
   html[data-v41-screen=shelf] .shelf-screen:has(.hero.strip-mode) .shelf-rail { height: 224px; }
 }
+
+/* #1093 마지막에 둔다 — 위의 고정 높이 규칙보다 뒤에서 선반 높이를 되돌린다.
+   여러 줄이 잘리지 않게 레일·화면을 흐름에 맞추고, 넘치면 페이지가 스크롤된다. */
+html[data-v41-screen=shelf] .shelf-screen:has(.hero.strip-mode) .shelf-viewport[data-shelf-view=shelf] .shelf-rail{
+ height:auto;overflow:visible
+}
+html[data-v41-screen=shelf] .shelf-viewport[data-shelf-view=shelf]{overflow:visible}
