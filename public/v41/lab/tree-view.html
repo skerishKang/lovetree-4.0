@@ -362,20 +362,30 @@ body{background:var(--tv-page);color:var(--tv-bar-ink);font-family:var(--lt-ui);
     for (const n of list) {
       const pos = `--x:${n.wx}px;--y:${n.wy}px;--w:${n.w}px;--h:${n.h}px;`;
       if (n.kind === 'leaf') {
-        cards.push(`<div class="tv-card" style="${pos}--thumb-h:${cfg.thumb}px" aria-label="${n.date} ${n.title}">` +
+        cards.push(`<div class="tv-card" data-pos="${pos}--thumb-h:${cfg.thumb}px" aria-label="${n.date} ${n.title}">` +
           `<div class="tv-thumb"><img src="${n.img}" alt="" draggable="false"></div>` +
           `<div class="tv-cap"><span class="tv-date">${n.date}</span><span class="tv-name">${n.title}</span></div></div>`);
       } else if (n.kind === 'root') {
-        cards.push(`<div class="tv-card tv-root" style="${pos}" aria-label="뿌리, 첫 순간"><b>첫 순간</b><small>${n.date}</small></div>`);
+        cards.push(`<div class="tv-card tv-root" data-pos="${pos}" aria-label="뿌리, 첫 순간"><b>첫 순간</b><small>${n.date}</small></div>`);
       } else if (n.kind === 'bundle') {
-        cards.push(`<button type="button" class="tv-bundle" style="${pos}" data-expand="1" aria-label="묶인 24개 순간 펼치기">+24개</button>`);
+        cards.push(`<button type="button" class="tv-bundle" data-pos="${pos}" data-expand="1" aria-label="묶인 24개 순간 펼치기">+24개</button>`);
       } else if (n.kind === 'fold') {
-        cards.push(`<button type="button" class="tv-bundle" style="${pos}" data-fold="1" aria-label="27개 갈림 다시 묶기">접기</button>`);
+        cards.push(`<button type="button" class="tv-bundle" data-pos="${pos}" data-fold="1" aria-label="27개 갈림 다시 묶기">접기</button>`);
       } else {
-        cards.push(`<div class="tv-chip" style="${pos}" aria-label="${n.title}">${n.title}</div>`);
+        cards.push(`<div class="tv-chip" data-pos="${pos}" aria-label="${n.title}">${n.title}</div>`);
       }
     }
     nodes.innerHTML = cards.join('');
+    // 위치는 CSS 변수로만 넘긴다. 소스에 인라인 style을 두지 않는다.
+    for (const el of nodes.children) {
+      const value = el.getAttribute('data-pos');
+      if (!value) continue;
+      for (const decl of value.split(';')) {
+        const at = decl.indexOf(':');
+        if (at > 0) el.style.setProperty(decl.slice(0, at), decl.slice(at + 1));
+      }
+      el.removeAttribute('data-pos');
+    }
     status.textContent = `순간 ${state.set}개 · ${state.theme === 'garden' ? '정원' : '밤'} · ` +
       (state.set === 10 ? '갈림 3개' : state.expanded ? '27갈림 펼침' : '27갈림 중 24개 묶음 접힘');
     document.querySelectorAll('[data-set]').forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.set) === state.set)));
