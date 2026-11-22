@@ -139,7 +139,7 @@ html[data-lt-theme=garden] #context-kind{color:var(--lt-rose-ink)}
 .stage-loading{position:absolute;inset:0;z-index:6;display:grid;place-items:center;align-content:center;gap:18px;background:var(--lt-stage);opacity:0;transition:opacity .2s ease;pointer-events:none}
 .stage-loading.is-on{opacity:1}
 .stage-loading.is-still{transition:none}
-.stage-loading-frame{display:flex;align-items:flex-end;justify-content:center;gap:12px;width:min(420px,76%);height:min(210px,42%)}
+.stage-loading-frame{display:flex;align-items:flex-end;justify-content:center;gap:12px;width:min(420px,76%);height:clamp(120px,26vh,210px)}
 .stage-loading-card{flex:1 1 0;max-width:120px;height:100%;border:1px solid var(--lt-line);border-radius:14px;background:var(--lt-stage-2)}
 .stage-loading-text{margin:0;color:var(--muted);font-size:12px;letter-spacing:.04em}
 .stage-loading-retry{min-height:44px;padding:0 16px;border:1px solid var(--lt-gold-line);border-radius:999px;color:var(--lt-pearl);background:none;font-size:12px;pointer-events:auto}
