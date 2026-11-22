@@ -368,10 +368,6 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
    selectTab(wantMoments?'moments':'trees',{writeHash:false});
    if(!wantMoments){load(false);loadPopularStages();}
   };
-  button.onclick=openPanel;
-  // 주소로 직접 들어온 경우(#explore/moments)에도 같은 보기를 연다.
-  // 셸의 첫 화면 적용(screens.mjs가 패널을 닫는다)이 끝난 뒤에 연다.
-  if(ENTER_MOMENTS||hashNow()==='#explore/moments')setTimeout(openPanel,0);
   if(typeof window!=='undefined'&&typeof window.addEventListener==='function')window.addEventListener('hashchange',()=>{
    if(hashGuard)return;
    if(hashNow()==='#explore/moments'){openPanel();selectTab('moments',{writeHash:false});}
@@ -494,4 +490,8 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
   renderPopularStages(answer?.ok?answer.items:[]);
  }
  popularList.append(el('p','community-stages-empty',POPULAR_STAGE_EMPTY));
+ button.onclick=openPanel;
+ button.hidden=false;
+ // 직접 들어온 주소와 연결 전에 접기 메뉴에서 고른 주소를 같은 길로 연다.
+ if(hashNow()==='#explore'||hashNow()==='#explore/moments')openPanel();
 }
