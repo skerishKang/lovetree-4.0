@@ -47,8 +47,24 @@ const replyRow = value => value && ({
 export function createFeedbackRepo(pool) {
   if (!pool || typeof pool.query !== 'function') throw new Error('PostgreSQL pool이 필요합니다.');
   return {
-    async create({ productId, subjectId = null, kind = 'opinion', category, title = null, body, score = null, context = {}, journalDate = null }) {
-      const { rows } = await pool.query(
+    // #1190: 같은 연결로 저장과 보낼 줄 넣기를 한 트랜잭션에 담는다.
+    async transaction(fn) {
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        const result = await fn(client);
+        await client.query('COMMIT');
+        return result;
+      } catch (error) {
+        await client.query('ROLLBACK').catch(() => {});
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
+
+    async create({ productId, subjectId = null, kind = 'opinion', category, title = null, body, score = null, context = {}, journalDate = null }, client) {
+      const { rows } = await (client || pool).query(
         `INSERT INTO lovetree_feedback (product_id, subject_id, kind, category, title, body, score, journal_date, context)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb)
          RETURNING *`,
@@ -130,10 +146,10 @@ export function createFeedbackRepo(pool) {
       return feedbackRow(rows[0]);
     },
 
-    async update({ productId, id, status, memo, issueNumber, title, body, score }) {
+    async update({ productId, id, status, memo, issueNumber, title, body, score }, client) {
       const numeric = Number(id);
       if (!Number.isSafeInteger(numeric) || numeric <= 0) return null;
-      const { rows } = await pool.query(
+      const { rows } = await (client || pool).query(
         `UPDATE lovetree_feedback
             SET status = COALESCE($3, status),
                 memo = COALESCE($4, memo),
@@ -163,8 +179,8 @@ export function createFeedbackRepo(pool) {
       return rows[0] ? feedbackRow(rows[0]) : null;
     },
 
-    async addReply({ productId, postId, authorType, authorSubjectId = null, body }) {
-      const { rows } = await pool.query(
+    async addReply({ productId, postId, authorType, authorSubjectId = null, body }, client) {
+      const { rows } = await (client || pool).query(
         `INSERT INTO lovetree_feedback_replies (product_id, post_id, author_type, author_subject_id, body)
          VALUES ($1, $2, $3, $4, $5) RETURNING *`,
         [productId, Number(postId), authorType, authorSubjectId, body]

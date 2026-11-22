@@ -1,6 +1,8 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {applySchema,createPool} from '../server/db/postgres.js';
 import {createFeedbackRepo} from '../server/db/feedback-postgres.js';
+import {createFeedbackOutboxRepo} from '../server/db/feedback-outbox-postgres.js';
+import {ACCOUNT_USER_TABLES} from '../server/db/account-postgres.js';
 import {assertIsolatedTestDatabase} from '../server/testing/isolated-test-database.js';
 const DATABASE_URL=process.env.LOVETREE_TEST_DATABASE_URL??'',skip=DATABASE_URL?false:'isolated PostgreSQL unavailable';
 const suffix=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,9);
@@ -144,5 +146,25 @@ test('#671 후속: DATE 칸은 DB의 YYYY-MM-DD를 그대로 내린다 — 현�
   assert.deepEqual(replies.rows.map(r=>r.body),['로그인 의견의 답글'],'남는 의견의 답글도 남는다');
   const del=await pool.query('SELECT subject_hash FROM lovetree_account_deletions WHERE product_id=$1',[productId]);
   assert.deepEqual(del.rows.map(r=>r.subject_hash),[hashKeep],'90일 안 된 탈퇴 기록은 남는다');
+ }finally{await pool.end();}
+});
+test('1190 outbox: 보낼 줄은 저장과 같은 트랜잭션에 넣고 같은 일 키는 한 줄만 둔다',{skip},async()=>{
+ assertIsolatedTestDatabase(DATABASE_URL);const pool=await createPool(DATABASE_URL,{max:3});
+ try{
+  await applySchema(pool);const repo=createFeedbackRepo(pool),outbox=createFeedbackOutboxRepo(pool),tag=suffix(),productId='lt-'+tag;
+  const saved=await repo.transaction(async client=>{
+   const row=await repo.create({productId,subjectId:'sub_'+tag,category:'bug',body:'보낼 의견'},client);
+   await outbox.enqueue({productId,feedbackId:row.id,eventKey:'new',kind:'new',payload:{event:'new',body:row.body,status:row.status}},client);
+   return row;
+  });
+  assert.ok(saved.id>0);
+  const first=await outbox.enqueue({productId,feedbackId:saved.id,eventKey:'new',kind:'new',payload:{event:'new',body:'중복'}});
+  assert.equal(first,null,'같은 의견 id·일 키는 새 줄을 만들지 않는다');
+  const rows=await outbox.list({productId});
+  assert.equal(rows.length,1);
+  assert.equal(rows[0].kind,'new');
+  assert.equal(rows[0].payload.body,'보낼 의견','처음 넣은 값이 그대로 남는다');
+  assert.equal(rows[0].status,'pending');
+  assert.ok(ACCOUNT_USER_TABLES.some(item=>item.table==='lovetree_feedback_outbox'),'탈퇴 정리 목록에 보낼 줄 표가 있다');
  }finally{await pool.end();}
 });

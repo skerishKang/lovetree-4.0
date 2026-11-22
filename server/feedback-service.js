@@ -81,7 +81,7 @@ function publicFollowup(row,viewer){
   return {id:row.id,body:row.body,createdAt:row.createdAt,edited:!!row.editedAt,mine,canEdit:mine,canDelete:mine};
 }
 
-export function createFeedbackService({feedbackRepo,productId,admin=null,opsNotify=null,now=()=>Date.now()}={}){
+export function createFeedbackService({feedbackRepo,productId,admin=null,opsNotify=null,outbox=null,now=()=>Date.now()}={}){
   if(!feedbackRepo)throw new Error('feedbackRepo가 필요합니다.');
   // 속도 제한은 공용 한 벌(server/rate-limit.js)로 — 의견 창구는 10분 창을 쓴다(#1073 B-19).
   const limiter=createRateLimiter({now,windowMs:10*60_000});
@@ -93,6 +93,27 @@ export function createFeedbackService({feedbackRepo,productId,admin=null,opsNoti
   async function requireAdmin(principal){if(!await isAdmin(principal))throw new ApiError(403,'admin_forbidden','관리자만 볼 수 있어요.');}
   async function isAiCustomer(principal){return await roleOf(principal)===ROLE_AI_CUSTOMER;}
   function requirePrincipal(principal){if(!principal)throw new ApiError(401,'unauthenticated','로그인이 필요해요.');return principal;}
+
+  // #1190: 저장과 보낼 줄 넣기를 같은 트랜잭션에 담는다. 보낼 값에 이메일·소개는 넣지 않는다.
+  function outboxEvent(event, {feedbackId,body='',status='',append=null,isAiCustomer=false,accountSubjectId=null,category='',title='',createdAt='',eventKey=''}={}) {
+    return {
+      productId,
+      feedbackId:Number(feedbackId),
+      eventKey:eventKey || (event==='new'?'new':`${event}:${status}:${createdAt}`),
+      kind:event,
+      payload:{event,feedbackId:Number(feedbackId),body,status,append,isAiCustomer,accountSubjectId,category,title,createdAt}
+    };
+  }
+  async function saveWithOutbox(work,events){
+    const run=async client=>{
+      const result=await work(client);
+      if(!outbox?.enqueue)return result;
+      const list=await events(result);
+      for(const item of [].concat(list||[]))if(item)await outbox.enqueue(item,client);
+      return result;
+    };
+    return typeof feedbackRepo.transaction==='function'?feedbackRepo.transaction(run):run();
+  }
 
   return {
    categories:FEEDBACK_CATEGORIES,
@@ -108,8 +129,13 @@ export function createFeedbackService({feedbackRepo,productId,admin=null,opsNoti
     if(subjectId)rate('sub:'+subjectId,20,'잠시 뒤 다시 보내 주세요.');
     else rate('ip:'+clientKey(request),3,'같은 곳에서 10분에 3번까지 보낼 수 있어요. 잠시 뒤 다시 시도해 주세요.');
     const masked=maskPersonal(text);
-    const row=await feedbackRepo.create({productId,subjectId,kind:'opinion',category,title:firstLine(masked),body:masked,context:sanitizeContext(context)});
-    notifySaved('feedback_new',row.title||firstLine(masked),String(row.id),await notifyAudience(principal));
+    const isAi=await isAiCustomer(principal);
+    const audience=await notifyAudience(principal);
+    const row=await saveWithOutbox(
+      client=>feedbackRepo.create({productId,subjectId,kind:'opinion',category,title:firstLine(masked),body:masked,context:sanitizeContext(context)},client),
+      saved=>outboxEvent('new',{feedbackId:saved.id,body:masked,status:saved.status,isAiCustomer:isAi,accountSubjectId:subjectId,category,title:saved.title,createdAt:saved.createdAt})
+    );
+    notifySaved('feedback_new',row.title||firstLine(masked),String(row.id),audience);
     return {id:row.id,status:row.status,createdAt:row.createdAt};
    },
 
@@ -176,14 +202,22 @@ export function createFeedbackService({feedbackRepo,productId,admin=null,opsNoti
     const text=clean(body,MAX_BODY);
     if(!text)throw new ApiError(400,'body_required','덧붙일 말을 입력해 주세요.');
     rate('followup:'+principal.subjectId,20,'잠시 뒤 다시 시도해 주세요.');
-    const reply=await feedbackRepo.addReply({productId,postId:post.id,authorType:'customer',authorSubjectId:principal.subjectId,body:maskPersonal(text)});
-    notifySaved('feedback_append',post.title||firstLine(post.body),String(reply.id),await notifyAudience(principal));
-    let status=post.status;
-    if(status==='fixed'||status==='closed'){
-     const reopened=await feedbackRepo.update({productId,id:post.id,status:'reviewing',memo:null,issueNumber:null,title:null,body:null,score:null});
-     status=reopened?.status||'reviewing';
-    }
-    return {id:reply.id,postId:post.id,status,createdAt:reply.createdAt};
+    const isAi=await isAiCustomer(principal);
+    const audience=await notifyAudience(principal);
+    const result=await saveWithOutbox(async client=>{
+     const reply=await feedbackRepo.addReply({productId,postId:post.id,authorType:'customer',authorSubjectId:principal.subjectId,body:maskPersonal(text)},client);
+     let status=post.status;
+     if(status==='fixed'||status==='closed'){
+      const reopened=await feedbackRepo.update({productId,id:post.id,status:'reviewing',memo:null,issueNumber:null,title:null,body:null,score:null},client);
+      status=reopened?.status||'reviewing';
+     }
+     return {reply,status};
+    },({reply,status})=>[
+     outboxEvent('append',{feedbackId:post.id,body:reply.body,status,append:reply.body,isAiCustomer:isAi,accountSubjectId:principal.subjectId,createdAt:reply.createdAt,eventKey:'reply:'+reply.id}),
+     status!==post.status?outboxEvent('status',{feedbackId:post.id,body:post.body,status,isAiCustomer:isAi,accountSubjectId:principal.subjectId,createdAt:reply.createdAt}):null
+    ]);
+    notifySaved('feedback_append',post.title||firstLine(post.body),String(result.reply.id),audience);
+    return {id:result.reply.id,postId:post.id,status:result.status,createdAt:result.reply.createdAt};
    },
 
    /** #678 후속: 고객이 자기 덧붙임을 고친다(커뮤니티 댓글 updateComment와 같은 방식).
@@ -272,7 +306,10 @@ export function createFeedbackService({feedbackRepo,productId,admin=null,opsNoti
     if(patch.title!==undefined)title=clean(patch.title,MAX_TITLE);
     if(patch.body!==undefined)pbody=clean(patch.body,MAX_BODY);
     if(patch.score!==undefined&&patch.score!==null&&patch.score!==''){pscore=Number(patch.score);if(!Number.isInteger(pscore)||pscore<1||pscore>5)throw new ApiError(400,'score_invalid','점수는 1~5로 주세요.');}
-    const row=await feedbackRepo.update({productId,id,status:status||null,memo,issueNumber:pint,title,pbody,score:pscore});
+    const row=await saveWithOutbox(
+     client=>feedbackRepo.update({productId,id,status:status||null,memo,issueNumber:pint,title,pbody,score:pscore},client),
+     saved=>status?outboxEvent('status',{feedbackId:saved.id,body:saved.body,status:saved.status,accountSubjectId:saved.subjectId,createdAt:saved.updatedAt}):null
+    );
     if(!row)throw new ApiError(404,'feedback_not_found','글을 찾을 수 없어요.');
     return boardRow(row);
    },
