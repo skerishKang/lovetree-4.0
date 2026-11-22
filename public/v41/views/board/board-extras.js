@@ -259,7 +259,7 @@ addEventListener('lt-date-style-changed',()=>{try{renderCards()}catch{}try{rende
 function syncMomentPickerTop(){
   const head=document.querySelector('header');
   const badge=document.getElementById('themeBadge');
-  const bottoms=[head,badge].filter(Boolean).map(el=>el.getBoundingClientRect().bottom);
+  const bottoms=[head,document.querySelector('.lt-screen-toolbar')].filter(Boolean).map(el=>el.getBoundingClientRect().bottom);
   const bottom=bottoms.length?Math.max(...bottoms):0;
   if(bottom>0) document.documentElement.style.setProperty('--lt-board-picker-top',Math.round(bottom+7)+'px');
   else document.documentElement.style.removeProperty('--lt-board-picker-top');

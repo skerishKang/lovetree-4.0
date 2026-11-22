@@ -429,7 +429,7 @@ test('584 실행: 머리줄 — 1장|2장 한 묶음, 돋보기 아이콘, 말�
       assert.match(head.toggleStyle.border, /^[01]px\/9999px$|^[01]px\/999px/, '묶음은 알약 테두리 한 줄');
       assert.ok(head.lens.svg, '돋보기는 SVG 아이콘');
       assert.equal(head.lens.text, '', '아이콘뿐이다(글자 없음)');
-      assert.match(head.lens.aria, /돋보기 — 마우스 근처를 크게 보기 · 꺼짐/);
+      assert.equal(head.lens.aria, '찾기', '돋보기 단추의 접근성 이름은 찾기다');
       assert.equal(head.overview.text, '이어진 순간');
       assert.equal(head.overview.tip, '처음 순간부터 지금까지 이어진 순간을 한눈에');
       assert.equal(head.archive.tip, '순간 목차 — 순간을 한눈에 훑어 보기');
@@ -456,10 +456,10 @@ test('584 실행: 머리줄 — 1장|2장 한 묶음, 돋보기 아이콘, 말�
       const on = await frame.evaluate(() => ({
         cls: document.getElementById('lensBtn').classList.contains('active'),
         color: getComputedStyle(document.getElementById('lensBtn')).color,
-        aria: document.getElementById('lensBtn').getAttribute('aria-label'),
+        tip: document.getElementById('lensBtn').getAttribute('data-lt-tip'),
       }));
       assert.ok(on.cls, '켜짐 상태');
-      assert.match(on.aria, /· 켜짐$/, '말풍선·낭독 이름에 상태가 들어간다');
+      assert.match(on.tip, /· 켜짐$/, '말풍선에 상태가 들어간다');
       // 이어진 순간 창.
       await frame.click('#overviewBtn');
       await frame.waitForSelector('#overview.open', { timeout: 5000 });

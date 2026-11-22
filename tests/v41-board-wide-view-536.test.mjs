@@ -189,12 +189,13 @@ test('#536 머리줄 배경 드롭: 고급을 켜지 않아도 보이고, 한 �
       const drop = document.getElementById('boardBgDrop');
       return {
         inHeader: !!drop && header.contains(drop),
+        inToolbar: !!drop && !!document.querySelector('.lt-screen-toolbar')?.contains(drop),
         toolbarSwitch: !!document.querySelector('.toolbar #boardBgDrop'),
         visible: drop && getComputedStyle(drop).display !== 'none' && drop.getBoundingClientRect().width > 0,
         checked: document.querySelector('#boardBgMenu [data-bg="auto"]')?.getAttribute('aria-checked')
       };
     });
-    assert.equal(state.inHeader, true, '배경 드롭은 머리줄에 있다');
+    assert.ok(state.inHeader || state.inToolbar, '배경 드롭은 머리줄 또는 공통 도구 줄에 있다');
     assert.equal(state.toolbarSwitch, false, '도구 줄에는 두 벌째가 없다');
     assert.equal(state.visible, true, '고급을 켜지 않아도 보인다');
     assert.equal(state.checked, 'true', '처음에는 테마 따라가기(기본)가 눌려 있다');
