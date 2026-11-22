@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import { buildGraph, footprint, pathFor, ORDER_Y_BASE, ORDER_Y_RANGE } from '../public/v41/graph-model.mjs';
 import { makeTag } from '../public/v41/tags.mjs';
+import '../public/v41/html-escape.mjs'; // A-15: 글자 막기 정본을 vm 에도 넣는다.
 import { timingRatio, TIMING_RATIO_LIMIT, TIMING_CEILING_MS } from './helpers/timing-ratio.mjs';
 
 // #627 2단계 PR2: 그래프 보기의 순수 규칙(buildGraph·footprint·pathFor)을 입력→출력으로만 본다.
@@ -189,7 +190,7 @@ test('발자취: 날짜 순(오래된→최신), 같은 날은 내 순서(순위
 });
 
 test('순위 값의 경계는 보드(board-model)와 같은 값을 쓴다', () => {
-  const scope = { window: {} };
+  const scope = { window: {}, LTEscapeHtml: globalThis.LTEscapeHtml };
   vm.runInNewContext(readFileSync(new URL('../public/v41/views/board/board-model.js', import.meta.url), 'utf8'), scope);
   const board = scope.window.LT58Model;
   assert.equal(board.ORDER_Y_BASE, ORDER_Y_BASE, '순위 시작값은 보드 한 벌과 같다');

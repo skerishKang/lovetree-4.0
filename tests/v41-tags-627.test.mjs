@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { makeTag, parseTag, normalizeTags, tagValues, tagKey, TAG_KINDS, TAG_MAX_LENGTH, TAG_MAX_COUNT, suggestTagsFromTitle, suggestForMoments, isChannelLikeArtist } from '../public/v41/tags.mjs';
 import { tagFacets, filterMomentsByTags, matchMomentText } from '../public/v41/tag-filter.mjs';
+import { valueLimit } from '../public/v41/tag-line.mjs';
 import { createTree, addMoment, validateState } from '../src/domain.js';
 import { timingRatio, TIMING_RATIO_LIMIT, TIMING_CEILING_MS } from './helpers/timing-ratio.mjs';
 import { renderTagLine, mountViewTagLine } from '../public/v41/tag-line.mjs';
@@ -272,6 +273,13 @@ test('#856: 값이 실질적으로 빈 꼬리표는 카드·상세 칩에도 보
   assert.deepEqual(line.confirmed.map((c) => c.value), ['아이유', 'Love wins'], '상세 꼬리표 줄에도 이름 없는 칩은 없다');
   // 칩을 숨긴다고 저장 값이 줄지 않는다 — 이 함수들은 화면에 보일 목록만 정한다.
   assert.equal(keywords.length, 3);
+});
+
+test('A-20: 값 입력 한도는 종류 표시를 뺀 24자 예산이다', () => {
+  assert.equal(valueLimit(''), TAG_MAX_LENGTH, '종류 없음이면 값 24자');
+  assert.equal(valueLimit('song'), 21, '노래: 표시 3자를 뺀다');
+  assert.equal(valueLimit('era'), 20, '활동기: 표시 4자를 뺀다');
+  assert.equal(makeTag('era', 'x'.repeat(valueLimit('era')))?.length, TAG_MAX_LENGTH, '최대 길이로 넣은 꼬리표가 저장된다');
 });
 
 test('가수 종류: 접두어는 3자라 값 예산이 21자로 노래·멤버와 같다(24자 한도는 그대로)', () => {
