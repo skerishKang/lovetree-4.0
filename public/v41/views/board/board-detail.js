@@ -69,7 +69,7 @@
     const _tags=(window.LTTagLine?window.LTTagLine.cardTags(m.keywords):[])||[];
     const _tagRow=_tags.length?`<div class="cardTags">${_tags.map(_t=>`<span class="lt-tag-chip is-card">${esc(_t.value)}</span>`).join('')}</div>`:'';
     let heading=titleMain(m);
-    return `<article class="card ${m.first?'first':''} ${m.type==='note'?'noteCard':''} ${pinClass(m)} ${cardClass(m)}" data-id="${m.id}" style="left:${m.x}px;top:${m.y}px;--rot:${m.rot}deg;--pin:${colors[m.color]};--halo:${colors[m.color]}55">${m.first?'<div class="firstTag">첫 순간</div>':''}<button class="pin" data-pin="${m.id}" aria-hidden="true" tabindex="-1"></button>${media}<div class="cardBody"><h3 class="cardTitle">${esc(heading)}</h3><div class="cardMeta"><span class="emotionDot"></span>${esc(m.emotion)} · ${esc(dateText(m.date))}</div>${_tagRow}</div>${cardOrderHTML(m)}</article>`;
+    return `<article class="card ${m.first?'first':''} ${m.type==='note'?'noteCard':''} ${pinClass(m)} ${cardClass(m)}" data-id="${m.id}" style="--card-x:${m.x}px;--card-y:${m.y}px;--rot:${m.rot}deg;--pin:${colors[m.color]};--halo:${colors[m.color]}55">${m.first?'<div class="firstTag">첫 순간</div>':''}<button class="pin" data-pin="${m.id}" aria-hidden="true" tabindex="-1"></button>${media}<div class="cardBody"><h3 class="cardTitle">${esc(heading)}</h3><div class="cardMeta"><span class="emotionDot"></span>${esc(m.emotion)} · ${esc(dateText(m.date))}</div>${_tagRow}</div>${cardOrderHTML(m)}</article>`;
   };
 
   /* Composer: VIDEO supports local or YouTube source; VIDEO LINK remains a direct YouTube 순간. */
@@ -90,12 +90,12 @@
   function addVideoSource(){return document.querySelector('input[name="addVideoSource"]:checked')?.value||'local'}
   updateComposerPreview=function(){
     let type=addType,title=$('#momentTitle').value||'새로운 순간',memo=$('#momentMemo').value||'',emotion=$('#addEmotion')?.value||'설렘',media='';
-    if(type==='note') media=`<div class="previewMedia" style="background:#fff6dd;color:#4d3d50;padding:20px;font-size:16px">“${esc($('#noteField')?.value||memo)}”</div>`;
+    if(type==='note') media=`<div class="previewMedia previewNote">“${esc($('#noteField')?.value||memo)}”</div>`;
     else if(type==='youtube') media=`<div class="previewMedia">${ytMediaHTML($('#urlField')?.value||'')}</div>`;
     else if(type==='video'&&addVideoSource()==='youtube') media=`<div class="previewMedia">${ytMediaHTML($('#videoUrlField')?.value||'')}</div>`;
     else if(type==='video'&&$('#mediaFile')?.files?.[0]){let u=URL.createObjectURL($('#mediaFile').files[0]);media=`<div class="previewMedia"><video src="${u}" muted playsinline controls></video></div>`}
     else {let file=$('#mediaFile')?.files?.[0],asset=file?URL.createObjectURL(file):(type==='link'?ASSET.link:type==='video'?ASSET.first:ASSET.glance);media=`<div class="previewMedia"><img src="${asset}" alt="새 순간 그림 미리보기" data-fallback="${ASSET.link}" onerror="this.onerror=null;this.src=this.dataset.fallback"></div>`}
-    $('#composerPreview').innerHTML=`<div class="previewCard"><span class="previewPin"></span>${media}<div style="margin-top:12px;font-size:9px;color:#64566f">${esc(type.toUpperCase())} · ${esc(emotion)}${type==='video'?' · '+(addVideoSource()==='youtube'?'YOUTUBE':'LOCAL'):''}</div><h3 style="margin:5px 0;color:#34283d">${esc(title)}</h3><div style="font-size:10px;color:#5d4f66">${esc(memo)}</div></div>`;
+    $('#composerPreview').innerHTML=`<div class="previewCard"><span class="previewPin"></span>${media}<div class="previewTypeRow">${esc(type.toUpperCase())} · ${esc(emotion)}${type==='video'?' · '+(addVideoSource()==='youtube'?'YOUTUBE':'LOCAL'):''}</div><h3 class="previewTitle">${esc(title)}</h3><div class="previewMemo">${esc(memo)}</div></div>`;
   };
   confirmAdd=function(){
     let id=newBoardId(),type=addType,title=$('#momentTitle').value||'새로운 순간',emotion=$('#addEmotion')?.value||'설렘',memo=$('#momentMemo').value||'',source=$('#addSource')?.value||'내 보관함',asset=ASSET.note,video=null,url=null,sourceUrl=null,videoSource=null,videoId='';let file=$('#mediaFile')?.files?.[0];
@@ -114,7 +114,7 @@
 
   function videoEditBlock(m){let src=m.videoSource||'local',yt=src==='youtube';return `<div class="label">VIDEO SOURCE</div><div class="videoSourceChoice"><label><input type="radio" name="editVideoSource" value="local" ${!yt?'checked':''}> 로컬 영상</label><label><input type="radio" name="editVideoSource" value="youtube" ${yt?'checked':''}> YouTube 링크</label></div><div class="videoSourcePanel" id="editVideoLocal" ${yt?'hidden':''}><input class="field" id="editMediaFile" type="file" accept="video/*" aria-label="바꿀 영상 파일 고르기"><div class="netNote">순간 ID·날짜·Connection은 유지하고 미디어만 교체합니다.</div></div><div class="videoSourcePanel" id="editVideoYoutube" ${!yt?'hidden':''}><input class="field" id="editVideoUrl" value="${esc(originalUrl(m)||REAL_YT_TEST)}" aria-label="바꿀 YouTube 링크 주소"><div class="netNote">YouTube URL로 바꿔도 순간 provenance와 board position은 유지합니다.</div></div>`}
   editMediaFields=function(m){
-    if(m.type==='photo')return `<div class="label">PHOTO</div><div class="netNote">기존 이미지 미리보기 · 교체하거나 기본 상태로 복귀할 수 있어요.</div><input class="field" id="editMediaFile" type="file" accept="image/*" aria-label="바꿀 그림 파일 고르기"><button type="button" class="miniBtn" id="removePhoto" style="margin-top:7px">이미지 제거</button>`;
+    if(m.type==='photo')return `<div class="label">PHOTO</div><div class="netNote">기존 이미지 미리보기 · 교체하거나 기본 상태로 복귀할 수 있어요.</div><input class="field" id="editMediaFile" type="file" accept="image/*" aria-label="바꿀 그림 파일 고르기"><button type="button" class="miniBtn" id="removePhoto">이미지 제거</button>`;
     if(m.type==='video')return videoEditBlock(m);
     if(m.type==='link')return `<div class="label">LINK</div><input class="field" id="editUrl" value="${esc(m.url||'')}" aria-label="바꿀 링크 주소">`;
     if(m.type==='youtube')return `<div class="label">VIDEO LINK / YOUTUBE</div><input class="field" id="editUrl" value="${esc(originalUrl(m)||REAL_YT_TEST)}" aria-label="바꿀 YouTube 링크 주소"><div class="netNote">실제 thumbnail은 maxres → HQ → offline fallback 순서로 표시됩니다.</div>`;
@@ -123,7 +123,7 @@
   function editVideoSource(){return document.querySelector('input[name="editVideoSource"]:checked')?.value||'local'}
   openEdit=function(){
     let m=moments.find(x=>x.id===selected);if(!m)return;editBase=JSON.parse(JSON.stringify(m));removePhotoFlag=false;editTempAsset=null;
-    let f=$('#editFields');f.innerHTML=`${editMediaFields(m)}<input class="field" id="editTitle" value="${esc(m.title)}" aria-label="순간 제목"><textarea class="field" id="editMemo" rows="3" aria-label="마음 한마디">${esc(m.memo)}</textarea>${styleFieldsHTML('edit',m)}<div class="label" style="margin-top:12px">DATE</div><input class="field" id="editDate" type="date" value="${esc(m.date||'')}" aria-label="순간 날짜"><div class="netNote">PRIVACY · ${esc(m.privacy||'PRIVATE')} · 순간 ID ${esc(m.id)}</div>`;
+    let f=$('#editFields');f.innerHTML=`${editMediaFields(m)}<input class="field" id="editTitle" value="${esc(m.title)}" aria-label="순간 제목"><textarea class="field" id="editMemo" rows="3" aria-label="마음 한마디">${esc(m.memo)}</textarea>${styleFieldsHTML('edit',m)}<div class="label labelSpaced">DATE</div><input class="field" id="editDate" type="date" value="${esc(m.date||'')}" aria-label="순간 날짜"><div class="netNote">PRIVACY · ${esc(m.privacy||'PRIVATE')} · 순간 ID ${esc(m.id)}</div>`;
     bindKeywordPicker('edit',updateEditPreview);f.querySelectorAll('input,textarea,select').forEach(x=>x.addEventListener('input',updateEditPreview));$('#editMediaFile')?.addEventListener('change',updateEditPreview);$('#editUrl')?.addEventListener('input',updateEditPreview);$('#editVideoUrl')?.addEventListener('input',updateEditPreview);$('#removePhoto')?.addEventListener('click',()=>{removePhotoFlag=true;updateEditPreview()});
     f.querySelectorAll('input[name="editVideoSource"]').forEach(r=>r.addEventListener('change',()=>{let yt=r.value==='youtube'&&r.checked;$('#editVideoLocal').hidden=yt;$('#editVideoYoutube').hidden=!yt;updateEditPreview()}));
     $('#editModal').classList.add('open');updateEditPreview();
@@ -140,11 +140,11 @@
   };
   updateEditPreview=function(){
     let m=editPreviewState(),media='';
-    if(m.type==='note')media=`<div class="previewMedia" style="background:#fff6dd;color:#4d3d50;padding:20px">“${esc(m.memo)}”</div>`;
+    if(m.type==='note')media=`<div class="previewMedia previewNote">“${esc(m.memo)}”</div>`;
     else if(isYtMoment(m))media=`<div class="previewMedia">${ytMediaHTML(originalUrl(m))}</div>`;
     else if(m.type==='video')media=`<div class="previewMedia"><video src="${m.video||''}" poster="${m.asset}" muted playsinline controls></video></div>`;
     else media=`<div class="previewMedia"><img src="${m.asset}" alt="${esc(m.title)} 바꿀 그림 미리보기" data-fallback="${ASSET.link}" onerror="this.onerror=null;this.src=this.dataset.fallback"></div>`;
-    $('#editPreview').innerHTML=`<div class="label">LIVE PREVIEW</div><div class="previewCard" style="margin-top:12px"><span class="previewPin"></span>${media}<div style="margin-top:10px;font-size:9px;color:#64566f">${esc(LTLabels.type(m.originalType||m.type))} · ${esc(m.emotion)}${m.type==='video'?' · '+(m.videoSource==='youtube'?'YOUTUBE':'LOCAL'):''}</div><h3 style="color:#34283d">${esc(m.title)}</h3><div style="font-size:10px;color:#5d4f66">${esc(m.memo)}</div></div>`;
+    $('#editPreview').innerHTML=`<div class="label">LIVE PREVIEW</div><div class="previewCard"><span class="previewPin"></span>${media}<div class="previewTypeRow">${esc(LTLabels.type(m.originalType||m.type))} · ${esc(m.emotion)}${m.type==='video'?' · '+(m.videoSource==='youtube'?'YOUTUBE':'LOCAL'):''}</div><h3 class="previewTitle">${esc(m.title)}</h3><div class="previewMemo">${esc(m.memo)}</div></div>`;
   };
   saveEdit=function(){let m=moments.find(x=>x.id===selected),n=editPreviewState();// #608: 날짜는 책의 수정 경로(editMoment→validateMomentInput)와 같은 규칙으로 미리 걷는다 — 도메인도 저장 때 boardSync→validateState에서 같은 규칙으로 거른다.
     const _d=String(n.date||'');if(!/^\d{4}-\d{2}-\d{2}$/.test(_d)||Number.isNaN(Date.parse(_d))||new Date(_d).toISOString().slice(0,10)!==_d){toast('날짜를 확인해 주세요.');return}
@@ -161,9 +161,9 @@
       const renderFallback=()=>{box.innerHTML=vid?`<div class="viewerYouTube"><iframe id="youtubeEmbed" src="${embed}" title="${esc(m.title)}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe><div class="viewerFallback"><span>영상 소유자 설정이나 네트워크 정책에 따라 여기서 바로 재생되지 않을 수 있어요.</span><button class="miniBtn accent" id="openYoutubeExternal">YouTube에서 재생</button></div></div>`:`<div class="viewerYouTube">${ytMediaHTML(url)}<div class="viewerFallback"><span>유효한 YouTube videoId를 찾지 못했어요.</span></div></div>`;setTimeout(()=>{let b=$('#openYoutubeExternal');if(b)b.onclick=()=>window.open(url,'_blank','noopener,noreferrer')},0)};
       if(!vid){renderFallback()}
       else{import('/v41/yt-expand.mjs').then(helper=>{if(!box.isConnected)return;const frame=document.createElement('iframe');frame.id='youtubeEmbed';frame.src=embed;frame.title=m.title;frame.setAttribute('allow','accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share');frame.allowFullscreen=true;frame.setAttribute('referrerpolicy','strict-origin-when-cross-origin');const holder=document.createElement('div');holder.className='viewerYouTube';box.replaceChildren(holder);const cell=helper.mountExpandControls(holder,{url,openUrl:url,title:m.title,vertical:/youtube\.com\/shorts/i.test(url),lightbox:(u,t,v)=>window.LTMedia&&LTMedia.openLightbox(u,t,v),showOpen:false});cell.stage.append(frame);const fb=document.createElement('div');fb.className='viewerFallback';fb.innerHTML='<span>영상 소유자 설정이나 네트워크 정책에 따라 여기서 바로 재생되지 않을 수 있어요.</span><button class="miniBtn accent" id="openYoutubeExternal">YouTube에서 재생</button>';holder.append(fb);setTimeout(()=>{let b=$('#openYoutubeExternal');if(b)b.onclick=()=>window.open(url,'_blank','noopener,noreferrer')},0)}).catch(()=>{if(box.isConnected)renderFallback()})}
-    }else if(m.url)box.innerHTML=LTMedia.markup(m.url,m.title,m.mediaMetadata,m.id);else if(m.type==='video')box.innerHTML=`<video src="${m.video}" poster="${m.asset}" controls autoplay muted playsinline style="width:100%;max-height:420px;object-fit:contain"></video>`;
-    else if(m.type==='note')box.innerHTML=`<div style="padding:40px;color:#f7edf8;font-size:22px;line-height:1.6">“${esc(m.memo)}”</div>`;
-    else box.innerHTML=`<img src="${m.asset}" alt="${esc(m.title)}" data-fallback="${ASSET.link}" onerror="this.onerror=null;this.src=this.dataset.fallback" style="width:100%;max-height:420px;object-fit:cover">`;
+    }else if(m.url)box.innerHTML=LTMedia.markup(m.url,m.title,m.mediaMetadata,m.id);else if(m.type==='video')box.innerHTML=`<video src="${m.video}" poster="${m.asset}" controls autoplay muted playsinline class="viewerFitVideo"></video>`;
+    else if(m.type==='note')box.innerHTML=`<div class="viewerNoteQuote">“${esc(m.memo)}”</div>`;
+    else box.innerHTML=`<img src="${m.asset}" alt="${esc(m.title)}" data-fallback="${ASSET.link}" onerror="this.onerror=null;this.src=this.dataset.fallback" class="viewerFitImg">`;
     $('#vMeta').innerHTML=`${esc(LTLabels.type(m.originalType||m.type))}${m.type==='video'?` · ${esc(m.videoSource||'local').toUpperCase()}`:''} · ${esc(m.date)} · ${esc(m.emotion)}<br>출처: ${esc(m.source)}${originalUrl(m)?`<br>URL: ${esc(originalUrl(m))}`:''}<br>Keywords: ${(m.keywords||[]).map(k=>'#'+esc(k)).join(' ')}<br>마음 한마디: ${esc(m.memo)}`;$('#viewerModal').classList.add('open');
   };
 

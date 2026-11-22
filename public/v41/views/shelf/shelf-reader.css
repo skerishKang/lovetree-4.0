@@ -2,6 +2,8 @@
     .reader-screen { display: none; }
     .reader-screen.active { position: fixed; inset: 0; z-index: 60; display: block; overflow: auto; padding: 14px 18px 28px; background: var(--paper); animation: reader-in .42s ease both; }
     .reader-screen.is-preparing { visibility: hidden; }
+    /* #886: 책을 펼치는 동안 책장 화면 숨김도 인라인 display 대신 클래스로 한다(.shelf-screen 규칙보다 한 단계 위). */
+    .shelf-screen.is-covered { display: none; }
     @keyframes reader-in { from { opacity: 0; } to { opacity: 1; } }
     .reader-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 7px 0 12px; }
     .back-button { display: inline-flex; align-items: center; gap: 7px; border: 0; color: var(--muted); background: transparent; font-size: 12px; }
@@ -117,6 +119,9 @@
 
     .transfer-book { position: fixed; z-index: 100; pointer-events: none; overflow: visible; transform-origin: center center; transition: left .72s cubic-bezier(.2,.76,.24,1), top .72s cubic-bezier(.2,.76,.24,1), width .72s cubic-bezier(.2,.76,.24,1), height .72s cubic-bezier(.2,.76,.24,1), transform .72s cubic-bezier(.2,.76,.24,1); }
     .transfer-book > .book-cover { width: 100%; height: 100%; margin: 0; transform: rotateY(0) rotateZ(0); box-shadow: 18px 26px 30px rgba(0,0,0,.34); }
+    /* #886: 책이 날아가는 자세와 닿는 자세 — 고정 transform도 클래스로 옮겼다. */
+    .transfer-book.is-lifting { transform: rotateY(-14deg) rotateZ(-1deg); }
+    .transfer-book.is-landed { transform: rotateY(0deg) rotateZ(0deg); }
 
     .reader-info { display: flex; flex-direction: column; min-height: 720px; padding: 25px; border: 1px solid rgba(119,91,82,.14); border-radius: 24px; background: rgba(255,252,247,.89); box-shadow: var(--shadow-lg); }
     .reader-info h2 { margin: 0 0 7px; font: 400 31px var(--display); letter-spacing: -.08em; }

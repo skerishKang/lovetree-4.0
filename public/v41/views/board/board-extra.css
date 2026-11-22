@@ -363,3 +363,8 @@ html[data-lt-theme=garden] .ytLinkRow a{color:var(--lt-link,#3b5bdb)}
 .card:hover .cardOrder,.card:focus-within .cardOrder{opacity:1;pointer-events:auto}
 .card .orderBtn{appearance:none;border:1px solid rgba(90,65,103,.35);background:rgba(16,10,25,.72);color:#f7edf8;font-size:11px;line-height:1;padding:7px 10px;border-radius:7px;cursor:pointer;backdrop-filter:blur(8px)}
 .card .orderBtn:hover,.card .orderBtn:focus-visible{background:rgba(16,10,25,.92)}
+
+/* === #886: 크게 보기 창의 영상·그림·기록 널모양 — JS 고정 인라인을 클래스로 옮겼다. === */
+.viewerFitVideo{width:100%;max-height:420px;object-fit:contain}
+.viewerFitImg{width:100%;max-height:420px;object-fit:cover}
+#viewerMedia .viewerNoteQuote{padding:40px;color:#f7edf8;font-size:22px;line-height:1.6}

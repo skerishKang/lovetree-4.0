@@ -184,7 +184,7 @@ else if(m.type==='note') media=`<div class="noteText">“${esc(m.cardMemo||m.mem
 else if(m.type==='video') media=`<div class="media"><video muted playsinline loop poster="${m.asset}" src="${m.video}"></video><span class="playBadge">▶</span><span class="duration">${m.duration||'00:03'}</span></div>`;
 else media=`<div class="media ${m.type==='link'||m.type==='youtube'?'linkMedia':''}"><img src="${m.asset}" alt=""><span class="${m.type==='youtube'?'playBadge':''}">${m.type==='youtube'?'▶':''}</span></div>`;
 // #601: 카드는 훑기용 — 큰 썸네일 + 제목 2줄 + 감정·날짜 한 줄만. 나머지(마음·출처·키워드·크게 보기)는 상세가 맡는다.
-return `<article class="card ${m.first?'first':''} ${m.type==='note'?'noteCard':''}" data-id="${m.id}" title="끌어서 자리 옮기기" style="left:${m.x}px;top:${m.y}px;--rot:${m.rot}deg;--pin:${colors[m.color]};--halo:${colors[m.color]}55">${m.first?'<div class="firstTag">첫 순간</div>':''}<button class="pin" data-pin="${m.id}" aria-hidden="true" tabindex="-1"></button>${media}<div class="cardBody"><h3 class="cardTitle">${esc(titleMain(m))}</h3><div class="cardMeta"><span class="emotionDot"></span>${esc(m.emotion)} · ${esc(dateText(m.date))}</div></div></article>`}
+return `<article class="card ${m.first?'first':''} ${m.type==='note'?'noteCard':''}" data-id="${m.id}" title="끌어서 자리 옮기기" style="--card-x:${m.x}px;--card-y:${m.y}px;--rot:${m.rot}deg;--pin:${colors[m.color]};--halo:${colors[m.color]}55">${m.first?'<div class="firstTag">첫 순간</div>':''}<button class="pin" data-pin="${m.id}" aria-hidden="true" tabindex="-1"></button>${media}<div class="cardBody"><h3 class="cardTitle">${esc(titleMain(m))}</h3><div class="cardMeta"><span class="emotionDot"></span>${esc(m.emotion)} · ${esc(dateText(m.date))}</div></div></article>`}
 
 function renderCards(){cardLayer.innerHTML=moments.map(cardHTML).join('');
  cardLayer.querySelectorAll('.card').forEach(el=>bindCard(el));
@@ -204,7 +204,7 @@ function settlePlacedCards(){
   if(changed)rerenderThreads();
 }
 
-function applyView(animated=false){growBoard();world.style.transition=animated?'transform 1s cubic-bezier(.22,.8,.2,1)':'none';
+function applyView(animated=false){growBoard();world.classList.toggle('lt-view-pan',animated);
 world.style.transform=`translate(${view.x}px,${view.y}px) scale(${view.z})`;
 $('#zoomLabel').textContent=Math.round(view.z*100)+'%'}
 
@@ -331,9 +331,9 @@ if(connectFrom){/* #582: '이어진 이유' 창은 없앴다 — 이어 주기�
 placeAll();
 
 function formFor(type){let a=$('#formArea');
-if(type==='photo')a.innerHTML='<input class="field" id="mediaFile" type="file" accept="image/*" aria-label="그림 파일 고르기"><div style="font-size:10px;color:#9b89a5;margin-top:6px">로컬 이미지는 브라우저 안에서만 미리 봅니다.</div>';
-else if(type==='video')a.innerHTML='<input class="field" id="mediaFile" type="file" accept="video/*" aria-label="영상 파일 고르기"><div style="font-size:10px;color:#9b89a5;margin-top:6px">선택/hover 시 muted preview.</div>';
-else if(type==='link'||type==='youtube')a.innerHTML='<input class="field" id="urlField" placeholder="https://..." value="https://lovetree.example/memory" aria-label="링크 주소"><div style="font-size:10px;color:#9b89a5;margin-top:6px">Prototype metadata parser · 실제 crawler 아님.</div>';
+if(type==='photo')a.innerHTML='<input class="field" id="mediaFile" type="file" accept="image/*" aria-label="그림 파일 고르기"><div class="mediaFieldNote">로컬 이미지는 브라우저 안에서만 미리 봅니다.</div>';
+else if(type==='video')a.innerHTML='<input class="field" id="mediaFile" type="file" accept="video/*" aria-label="영상 파일 고르기"><div class="mediaFieldNote">선택/hover 시 muted preview.</div>';
+else if(type==='link'||type==='youtube')a.innerHTML='<input class="field" id="urlField" placeholder="https://..." value="https://lovetree.example/memory" aria-label="링크 주소"><div class="mediaFieldNote">Prototype metadata parser · 실제 crawler 아님.</div>';
 else a.innerHTML='<textarea class="field" id="noteField" rows="3" placeholder="남기고 싶은 문장" aria-label="마음 한마디">좋아하게 된 이유를 잊고 싶지 않았어요.</textarea>'}
 
 function openAdd(){formFor(addType);
@@ -355,9 +355,9 @@ if(!m)return;
 const _vi=titleInfo(m);$('#vTitle').textContent=_vi.main;
 let box=$('#viewerMedia');
 if(m.url)box.innerHTML=LTMedia.markup(m.url,m.title,m.mediaMetadata,m.id);
-else if(m.type==='video')box.innerHTML=`<video src="${m.video}" poster="${m.asset}" controls autoplay muted playsinline style="width:100%;max-height:420px;object-fit:contain"></video>`;
-else if(m.type==='note')box.innerHTML=`<div style="padding:40px;color:#f7edf8;font-size:22px;line-height:1.6">“${esc(m.memo)}”</div>`;
-else box.innerHTML=`<img src="${m.asset}" alt="${esc(m.title)}" style="width:100%;max-height:420px;object-fit:cover">`;
+else if(m.type==='video')box.innerHTML=`<video src="${m.video}" poster="${m.asset}" controls autoplay muted playsinline class="viewerFitVideo"></video>`;
+else if(m.type==='note')box.innerHTML=`<div class="viewerNoteQuote">“${esc(m.memo)}”</div>`;
+else box.innerHTML=`<img src="${m.asset}" alt="${esc(m.title)}" class="viewerFitImg">`;
 $('#vMeta').innerHTML=(_vi.sub?'<div class="videoTitle">▶ '+esc(_vi.sub)+'</div>':'')+`${esc(LTLabels.type(m.originalType||m.type))} · ${esc(dateText(m.date))} · ${esc(m.emotion)}<br>출처: ${esc(m.source)}${m.url?`<br>URL: ${esc(m.url)}`:''}<br>마음 한마디: ${esc(m.memo)}`;
 $('#viewerModal').classList.add('open')}
 
@@ -402,15 +402,14 @@ $('#cinemaOverlay').classList.remove('active');
 $('#cinemaTitle').classList.remove('show');
 $('#cinemaCaption').classList.remove('show');
 $('#finalCTA').classList.remove('show');
-document.body.classList.remove('boardBloom');
+document.body.classList.remove('boardBloom','lt-bloom-glow');
 document.querySelectorAll('.card video').forEach(v=>{v.pause();v.currentTime=0});
 document.querySelectorAll('.card').forEach(c=>c.classList.remove('cinemaDim','cinemaFocus'));
 headerFade(false);
 fitAll(true)}
 
-function headerFade(on){document.querySelector('header').style.opacity=on?'.18':'1';
-document.querySelector('.toolbar').style.opacity=on?'0':'1';
-$('#cinemaBtn').style.opacity=on?'0':'1'}
+// #886: 시네마 동안 머리줄 흐림은 body.lt-cinema-fade 한 벌이 맡는다(board-extras의 값이 이긴다).
+function headerFade(on){document.body.classList.toggle('lt-cinema-fade',on)}
 
 let boardTouches=new Map(),pinch=null;
 viewport.addEventListener('pointerdown',e=>{if(cinema||e.target.closest('.card'))return;if(e.pointerType==='touch'){boardTouches.set(e.pointerId,{x:e.clientX,y:e.clientY});if(boardTouches.size===1){pan={x:e.clientX,y:e.clientY,vx:view.x,vy:view.y}}else if(boardTouches.size===2){let a=[...boardTouches.values()],dx=a[1].x-a[0].x,dy=a[1].y-a[0].y;pinch={dist:Math.hypot(dx,dy),z:view.z,x:view.x,y:view.y,cx:(a[0].x+a[1].x)/2,cy:(a[0].y+a[1].y)/2};pan=null}return}pan={x:e.clientX,y:e.clientY,vx:view.x,vy:view.y};viewport.setPointerCapture?.(e.pointerId);viewport.classList.add('panning')});
@@ -460,7 +459,7 @@ $('#minusBtn').onclick=()=>zoomAtCenter(Math.max(.38,view.z-.1));
 $('#plusBtn').onclick=()=>zoomAtCenter(Math.min(1.45,view.z+.1));
 $('#cinemaBtn').onclick=()=>startCinema(0);
 $('#walkAgain').onclick=()=>{cinema=false;
-document.body.classList.remove('boardBloom');
+document.body.classList.remove('boardBloom','lt-bloom-glow');
 $('#finalCTA').classList.remove('show');
 document.querySelectorAll('.card').forEach(c=>c.classList.remove('cinemaDim','cinemaFocus'));
 startCinema(0)}
