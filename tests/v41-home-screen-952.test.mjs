@@ -488,3 +488,54 @@ test('#1087 390 새 소식 띠와 숫자 두 줄 겹침 0', { skip: REQUIRE952 ?
     }
   } finally { await browser.close(); }
 });
+
+test('#1088 가운데 카드 누름은 화면 이동 없이 크게 보기를 연다', { skip: REQUIRE952 ? false : skip952, timeout: 180000 }, async () => {
+  if (skip952) assert.fail(skip952);
+  const at = i => '2026-11-' + String(i + 1).padStart(2, '0') + 'T00:00:00.000Z';
+  const tree = createTree({ subject: '팬 트리', title: '마지막 순간', date: '2026-11-20', emotion: '설렘', note: '순간', url: 'https://www.youtube.com/shorts/a1111111111' }, at(0));
+  tree.moments[0].mediaMetadata = { vertical: true, width: 1080, height: 1920 };
+  tree.moments[0].image = 'https://i.ytimg.com/vi/a1111111111/oardefault.jpg';
+  tree.moments[0].youtubeThumb = true;
+  const workspace = { revision: 1, state: { version: 1, trees: [tree], prefs: {} }, subject: 'visual-audit-fake', writeSubjectBound: true, savedAt: at(1) };
+  const browser = await chromium952.launch({ headless: true });
+  try {
+    const h = await boot952(browser, { member: true, width: 1440, routes: { '/api/workspace': route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(workspace) }) } });
+    try {
+      const frame = h.frame;
+      await frame.locator('.recent-card').waitFor({ state: 'visible', timeout: 15000 });
+      await h.page.evaluate(() => { window.__nav1088 = []; addEventListener('message', e => { if (['lt41-navigate', 'lt41-community', 'lt41-cleanup'].includes(e.data?.type)) window.__nav1088.push(e.data.type); }); });
+      const hashBefore = await h.page.evaluate(() => location.hash);
+      const viewer = frame.locator('#mediaViewerHome');
+      const open = async () => { await frame.locator('.recent-play').click(); await viewer.waitFor({ state: 'visible', timeout: 5000 }); };
+      await open();
+      assert.equal(await viewer.getAttribute('aria-hidden'), 'false', '크게 보기 열림');
+      const src = await frame.locator('#mediaVisualHome iframe').getAttribute('src');
+      assert.match(src, /a1111111111/, '영상 id');
+      assert.match(src, /autoplay=1/, '누름 안에서 재생 시작');
+      assert.ok(await frame.locator('#mediaBookHome').isVisible(), '책에서 이어 보기');
+      assert.ok(await frame.locator('#mediaExternalHome').isVisible(), '원본 보기');
+      assert.ok(await h.page.evaluate(() => getComputedStyle(document.getElementById('updates-card')).display === 'none'), '열린 동안 아래 띠가 숨는다');
+      assert.equal(await h.page.evaluate(() => location.hash), hashBefore, '주소 moved 0');
+      assert.deepEqual(await h.page.evaluate(() => window.__nav1088), [], '화면 이동 요청 0');
+      const focusAfterOpen = await frame.evaluate(() => document.querySelector('#orbit').shadowRoot.activeElement?.id || '');
+      assert.equal(focusAfterOpen, 'mediaCloseHome', '열면 닫기 단추에 초점');
+
+      await h.page.keyboard.press('Escape');
+      assert.equal(await viewer.getAttribute('aria-hidden'), 'true', 'Esc로 닫힘');
+      const focusAfterEsc = await frame.evaluate(() => document.querySelector('#orbit').shadowRoot.activeElement?.className || '');
+      assert.match(focusAfterEsc, /recent-card/, 'Esc 뒤 카드로 초점 복귀');
+
+      await open();
+      await frame.locator('#mediaCloseHome').click();
+      assert.equal(await viewer.getAttribute('aria-hidden'), 'true', '×로 닫힘');
+      const focusAfterX = await frame.evaluate(() => document.querySelector('#orbit').shadowRoot.activeElement?.className || '');
+      assert.match(focusAfterX, /recent-card/, '× 뒤 카드로 초점 복귀');
+
+      await open();
+      await viewer.evaluate(el => el.click());
+      assert.equal(await viewer.getAttribute('aria-hidden'), 'true', '바깥 누름으로 닫힘');
+      const focusAfterBackdrop = await frame.evaluate(() => document.querySelector('#orbit').shadowRoot.activeElement?.className || '');
+      assert.match(focusAfterBackdrop, /recent-card/, '바깥 누름 뒤 카드로 초점 복귀');
+    } finally { await close952(h); }
+  } finally { await browser.close(); }
+});
