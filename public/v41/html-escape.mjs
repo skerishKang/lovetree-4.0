@@ -3,5 +3,7 @@
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (ch) => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
 })[ch]);
+// 클래식 스크립트를 쓰지 않는 쪽과 시험이 읽는 전역도 함께 등록한다.
+if (typeof globalThis !== 'undefined') globalThis.LTEscapeHtml = escapeHtml;
 export { escapeHtml };
 export default escapeHtml;
