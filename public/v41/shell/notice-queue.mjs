@@ -1,7 +1,7 @@
 // #1103: 첫 화면의 세 안내(첫 트리 안내 판 → 새 소식 띠 → 기록 불러옴 토스트)가
 // 한 줄을 차례로 지나가게 한다. 동시에 보이는 안내는 항상 1개 이하.
 // 앞의 것이 떠 있는 동안 뒤의 것은 기다리고, ③ 정보 안내는 maxWait가 지나면 건너뛴다.
-export const NOTICE_PRIORITY = { tips: 1, updates: 2, toast: 3 };
+export const NOTICE_PRIORITY = { loginNotice: 0, tips: 1, updates: 2, toast: 3 };
 
 export function createNoticeQueue({ now = () => Date.now() } = {}) {
   let current = null;

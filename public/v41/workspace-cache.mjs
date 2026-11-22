@@ -1,20 +1,22 @@
 // #400 2번: 마지막으로 받은 내 기록을 계정별로 localStorage에 저장해 다음 접속에 서버 응답 전 먼저 그린다.
 // 서버본이 항상 이긴다(읽기는 시작 화면용일 뿐). 저장본을 보는 동안 편집은 셸의 checking 단계가 잠근다.
 // 로그아웃하면 지운다(공용 컴퓨터). 1MB가 넘으면 저장하지 않는다. 읽기·쓰기는 전부 try/catch.
+// A-18: 서버가 계정을 확인한 뒤 로그인 표식을 남긴다. 저장본을 먼저 그릴 때는 표식의 계정과
+// 저장본 계정이 같을 때만 그린다 — 다르거나 모르면 그리지 않고 서버 응답을 기다린다.
 import { validateState } from './domain.mjs';
 import { guardWorkspaceState } from './workspace-guard.mjs';
 
 const KEY_PREFIX = 'lovetree.v41.workspace-cache:';
 const LAST_KEY = 'lovetree.v41.workspace-cache:last';
+const LOGIN_KEY = 'lovetree.v41.login-subject';
 const MAX_BYTES = 1024 * 1024;
 const subjectValid = value => typeof value === 'string' && /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(value);
 
-export function readCachedWorkspace(storage) {
+export function readCachedWorkspace(storage, subject = null) {
   if (!storage) return null;
-  let subject = null;
+  // A-18: 로그인 표식의 계정을 알고 그 계정의 저장본일 때만 읽는다. 표식을 모르면 읽지 않는다.
+  if (!subjectValid(subject)) return null;
   try {
-    subject = storage.getItem(LAST_KEY);
-    if (!subjectValid(subject)) return null;
     const raw = storage.getItem(KEY_PREFIX + subject);
     if (!raw) return null;
     const entry = JSON.parse(raw);
@@ -32,7 +34,7 @@ export function readCachedWorkspace(storage) {
     return { subject, state };
   } catch {
     // 깨진 저장본은 남기지 않는다(다음 접속에 다시 실패하지 않게).
-    try { if (subjectValid(subject)) storage.removeItem(KEY_PREFIX + subject); } catch { /* 저장소 접근 불가 */ }
+    try { storage.removeItem(KEY_PREFIX + subject); } catch { /* 저장소 접근 불가 */ }
     return null;
   }
 }
@@ -64,4 +66,23 @@ export function clearCachedWorkspace(storage, subject = null) {
     storage.removeItem(KEY_PREFIX + target);
     if (storage.getItem(LAST_KEY) === target) storage.removeItem(LAST_KEY);
   } catch { /* 저장소 접근 불가 */ }
+}
+
+// 로그인 표식: 서버가 계정을 확인해 준 뒤에만 남긴다. 로그아웃·인증 만료 때 함께 비운다.
+export function readLoginSubject(storage) {
+  if (!storage) return null;
+  try {
+    const subject = storage.getItem(LOGIN_KEY);
+    return subjectValid(subject) ? subject : null;
+  } catch { return null; }
+}
+
+export function rememberLoginSubject(storage, subject) {
+  if (!storage || !subjectValid(subject)) return false;
+  try { storage.setItem(LOGIN_KEY, subject); return true; } catch { return false; }
+}
+
+export function forgetLoginSubject(storage) {
+  if (!storage) return;
+  try { storage.removeItem(LOGIN_KEY); } catch { /* 저장소 접근 불가 */ }
 }

@@ -449,3 +449,41 @@ test('서버 요청 출처 확인: 프록시가 공유 머리말을 업스트림
   await onRequest(proxy, 'https://lovetree.example/api/workspace', { method: 'GET' }, { LOVETREE_API_ORIGIN: UPSTREAM, LOVETREE_PROXY_SECRET: 's'.repeat(48) });
   assert.equal(fetcher.calls.at(-1).headers['x-lovetree-proxy-proof'], 's'.repeat(48));
 });
+
+test('#1175 연결이 안 될 때만 한 번 더 부르고, 서버에 닿은 뒤 실패는 재전송하지 않는다', async () => {
+  const sleeps = [];
+  let attempts = 0;
+  const flaky = createProxy({
+    retryDelayMs: 1500,
+    sleep: ms => { sleeps.push(ms); return Promise.resolve(); },
+    fetcher: async () => {
+      attempts += 1;
+      if (attempts === 1) throw new TypeError('connect refused');
+      return new Response('{}', { headers: { 'content-type': 'application/json' } });
+    }
+  });
+  const ok = await onRequest(flaky, 'https://lovetree.example/auth/callback?code=x');
+  assert.equal(ok.status, 200, '연결 거부 1회 뒤 성공하면 정상 응답');
+  assert.equal(attempts, 2);
+  assert.deepEqual(sleeps, [1500], '1~2초 쉬고 한 번 더');
+
+  let calls = 0;
+  const reachedSleeps = [];
+  const reached = createProxy({
+    sleep: ms => { reachedSleeps.push(ms); return Promise.resolve(); },
+    fetcher: async () => { calls += 1; return Response.json({ error: { code: 'x' } }, { status: 500 }); }
+  });
+  const failed = await onRequest(reached, 'https://lovetree.example/auth/callback?code=x');
+  assert.equal(failed.status, 500, '서버가 받은 뒤의 실패는 그대로 전달');
+  assert.equal(calls, 1, '서버에 닿았으면 다시 보내지 않는다');
+  assert.deepEqual(reachedSleeps, [], '재전송하지 않으므로 대기도 없다');
+
+  let posts = 0;
+  const withBody = createProxy({
+    sleep: () => Promise.resolve(),
+    fetcher: async () => { posts += 1; throw new TypeError('refused'); }
+  });
+  const post = await onRequest(withBody, 'https://lovetree.example/api/workspace', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: '{}' });
+  assert.equal(post.status, 502);
+  assert.equal(posts, 1, '본문이 있는 요청은 연결 실패여도 다시 보내지 않는다');
+});

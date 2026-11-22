@@ -529,6 +529,24 @@ CREATE TABLE IF NOT EXISTS lovetree_feedback_replies (
 CREATE INDEX IF NOT EXISTS lovetree_feedback_replies_post_idx
   ON lovetree_feedback_replies (product_id, post_id, created_at);
 
+-- #1190: 공용 운영센터로 보낼 줄. 의견 id·종류·일 키를 묶어 같은 일을 두 번 넣지 않는다.
+CREATE TABLE IF NOT EXISTS lovetree_feedback_outbox (
+  id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  product_id text NOT NULL,
+  feedback_id bigint NOT NULL,
+  event_key text NOT NULL,
+  kind text NOT NULL CHECK (kind IN ('new','append','status')),
+  payload jsonb NOT NULL,
+  attempts integer NOT NULL DEFAULT 0,
+  next_attempt_at timestamptz NOT NULL DEFAULT now(),
+  status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','sent','failed')),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (product_id, feedback_id, kind, event_key)
+);
+CREATE INDEX IF NOT EXISTS lovetree_feedback_outbox_due_idx
+  ON lovetree_feedback_outbox (status, next_attempt_at) WHERE status = 'pending';
+
 -- AI 고객 페르소나 소개. 관리자가 쓰고 고친다.
 CREATE TABLE IF NOT EXISTS lovetree_ai_personas (
   product_id text NOT NULL,

@@ -159,7 +159,7 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin,a
  const whenOf=(value)=>{try{return when?when(value):String(value||'').slice(0,10);}catch{return '';}};
  const paintCommentsRow=(comment)=>{
   const item=el('article','community-comment');const edited=comment.edited?' · 수정됨':'';
-  item.append(el('small','',`${comment.aiTester?'AI 명예회원 ':''}${comment.authorLabel} · ${whenOf(comment.createdAt)}${edited}`));
+  item.append(el('small','',`${comment.aiTester?'AI 명예회원 · ':''}${comment.authorLabel} · ${whenOf(comment.createdAt)}${edited}`));
   item.append(el('p','',comment.body));
   return item;
  };

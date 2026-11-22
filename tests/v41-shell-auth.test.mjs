@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 // #231 1-B③-1: 옮긴 로그인 시작·세션 함수를 직접 불러 결과를 본다(최소 가짜 location·DOM).
 import { createAuth } from '../public/v41/shell/auth.mjs';
 
-function harness({ search = '', owned = false, writable = true, checkResults = [] } = {}) {
+function harness({ search = '', owned = false, writable = true, checkResults = [], store = null } = {}) {
   const assigned = [];
   const replaced = [];
   const checks = [...checkResults];
@@ -18,7 +18,7 @@ function harness({ search = '', owned = false, writable = true, checkResults = [
   };
   globalThis.location = { search, pathname: '/v41/', hash: '', assign: url => assigned.push(url) };
   globalThis.history = { replaceState: (_s, _t, url) => replaced.push(url) };
-  globalThis.localStorage = { getItem: () => 'garden', setItem() {}, removeItem() {} };
+  globalThis.localStorage = store ?? { getItem: () => 'garden', setItem() {}, removeItem() {} };
   let notified = 0, closed = 0, editor = null, shown = null;
   const auth = createAuth({
     $: id => els[id] ?? el(),
@@ -38,7 +38,7 @@ function harness({ search = '', owned = false, writable = true, checkResults = [
     if (saved.history === undefined) delete globalThis.history;
     if (saved.localStorage === undefined) delete globalThis.localStorage;
   };
-  return { auth, els, assigned, replaced, counts: () => ({ notified, closed }), checks: () => seen, editor: () => editor, shown: () => shown, restore };
+  return { auth, els, assigned, replaced, counts: () => ({ notified, closed }), checks: () => seen, editor: () => editor, shown: () => shown, store, restore };
 }
 
 test('주소의 의도(intent)를 읽고 주소에서는 지운다', () => {
@@ -151,5 +151,25 @@ test('로그인 뒤 의도대로 이어 준다 — new-tree는 첫 여정, shelf
     assert.equal(noWrite.editor(), null);
   } finally {
     noWrite.restore();
+  }
+});
+
+test('A-18 로그인을 새로 시작하면 로그인 표식을 비우고 로그인 주소로 이동한다', () => {
+  const LOGIN = 'lovetree.v41.login-subject';
+  // 이전 계정 표식이 남은 상태에서 startLogin — 보내기 직전에 표식이 비워진다.
+  const map = new Map([[LOGIN, 'member-A']]);
+  const store = { getItem: k => (map.has(k) ? map.get(k) : null), setItem: (k, v) => map.set(k, String(v)), removeItem: k => map.delete(k) };
+  const h = harness({ store });
+  try {
+    h.auth.startLogin('shelf');
+    assert.equal(store.getItem(LOGIN), null, '로그인 시작 때 표식을 비운다');
+    assert.match(h.assigned[0], /^\/auth\/login\?next=/, '표식을 비운 뒤 로그인 주소로 이동한다');
+    // openLoginStart도 startLogin을 통하므로 같은 일을 한다.
+    store.setItem(LOGIN, 'member-A');
+    h.auth.openLoginStart('first');
+    assert.equal(store.getItem(LOGIN), null, '시작 입구 경로에서도 표식을 비운다');
+    assert.equal(h.assigned.length, 2);
+  } finally {
+    h.restore();
   }
 });
