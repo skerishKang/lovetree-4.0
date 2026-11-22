@@ -99,15 +99,8 @@ test('#1077 390 로그아웃 첫 화면의 떠다니는 카드는 바닥 링크�
         });
         assert.ok(crossed > 0, `${theme}: 궤도 경로가 바닥 자리를 지난다(최대 교차 ${crossed}px²) — 빈손 통과가 아니다`);
 
-        // 위상을 억지로 옮겨 잰 뒤에는 원래 위상으로 돌려 두고, 가드가 클래스를 반영하고
-        // 글꼴·그림이 실제로 그려진 다음부터 샘플을 모은다(첫 프레임에 카드가 아직 안 보이던 흔들림).
-        await frame.evaluate(() => {
-          const root = document.getElementById('orbit').shadowRoot;
-          for (const card of root.querySelectorAll('button.card')) {
-            const anim = card.getAnimations().find((a) => a.id === 'lt-orbit');
-            if (anim) anim.currentTime = 0;
-          }
-        });
+        // 위상은 위에서 restore()로 되돌렸다. 가드가 클래스를 반영하고 글꼴·그림이 실제로
+        // 그려진 다음부터 샘플을 모은다(첫 프레임에 카드가 아직 안 보이던 흔들림, #1191).
         await page.evaluate(() => document.fonts.ready);
         await frame.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
 
