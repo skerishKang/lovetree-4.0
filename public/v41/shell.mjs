@@ -51,7 +51,8 @@ function lazyPanel(load){
 }
 import {connectionSignature} from './shell/panel-dirty.mjs';
 import {createLocation} from './shell/location.mjs';
-import {createNotifier, syncedNoticeText, newlyPublishedTrees} from './shell/notice.mjs';
+import {createNotifier, syncedNoticeText, newlyPublishedTrees, NOTICE_HIDE_MS} from './shell/notice.mjs';
+import {LOGIN_NOTICE_PARAM, LOGIN_NOTICE_TEXT, LOGIN_NOTICE_BUTTON, loginNoticeFrom} from './shell/login-notice.mjs';
 import {createSettings} from './shell/settings.mjs';
 import {createTreeMenu} from './shell/tree-menu.mjs';
 import {createConnections} from './shell/connections.mjs';
@@ -1048,6 +1049,19 @@ addEventListener('beforeunload',e=>{
 if(shouldLoadMemberRecords(location.search,document.cookie,location.hash)||shellIntake.pending())void startMember().catch(error=>openFallbackShell(error));
 // 로그아웃으로 다시 연 문서에서는 '로그인이 필요해요' 대신 이 안내를 한 번 띄운다.
 try{if(sessionStorage.getItem('lt41.logoutNotice')==='1'){sessionStorage.removeItem('lt41.logoutNotice');notify('로그아웃했어요.');}}catch{}
+// #1175: 로그인 콜백이 거절되면 서버가 JSON 대신 이 표지를 달아 /v41/로 보낸다.
+// 날 글자 대신 한 줄 안내와 다시 로그인 단추를 보여 주고, 표지는 주소에서 걷어 다시 뜨지 않게 한다.
+if(loginNoticeFrom(location.search)){
+ try{const clean=new URL(location.href);clean.searchParams.delete(LOGIN_NOTICE_PARAM);history.replaceState(null,'',clean.pathname+clean.search+clean.hash);}catch{}
+ // 첫 화면의 다른 안내(새 소식 띠·첫 트리 안내)보다 먼저 보인다 — 그 쪽이 뜨며 토스트를 감추지 못하게 한다.
+ noticeQueue.request('loginNotice',{
+  show:()=>{
+   notify(LOGIN_NOTICE_TEXT,{hold:true,action:{label:LOGIN_NOTICE_BUTTON,run:()=>openLoginStart('first')}});
+   setTimeout(()=>noticeQueue.release('loginNotice'),NOTICE_HIDE_MS+50);
+  },
+  hide:hideToast
+ });
+}
 
 
 

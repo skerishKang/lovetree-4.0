@@ -1,3 +1,4 @@
+import {loginNoticeFrom, LOGIN_NOTICE_TEXT, LOGIN_NOTICE_BUTTON} from '../public/v41/shell/login-notice.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createWorkspaceApi, setMemberRefreshStarted} from '../public/v41/api.mjs';
@@ -126,4 +127,13 @@ test('failed refresh restores the same-account draft after login and never expos
   assert.equal(new Set(allBodies).size,1);
   assert.equal(afterLogin.snapshot().dirty,false);
   assert.equal(storage.getItem(pendingKey),null);
+});
+
+test('#1175 로그인 실패 표지는 한 줄 안내와 다시 로그인 단추로 읽는다', () => {
+  assert.equal(loginNoticeFrom('?loginNotice=1'), true);
+  assert.equal(loginNoticeFrom('?account=1&loginNotice=1'), true);
+  assert.equal(loginNoticeFrom('?loginNotice=2'), false);
+  assert.equal(loginNoticeFrom(''), false);
+  assert.match(LOGIN_NOTICE_TEXT, /로그인이 끊겼어요/);
+  assert.equal(LOGIN_NOTICE_BUTTON, '다시 로그인');
 });
