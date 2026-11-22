@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { isDeepStrictEqual } from 'node:util';
 import { EMPTY_STATE, MAX_TREES, validateState } from '../src/domain.js';
 import { ApiError } from './errors.js';
 
@@ -75,12 +76,25 @@ function parseWriteInput(payload) {
   return { validated, expectedRevision, clientKey };
 }
 
+// B-12(#1068): 저장 뒤 동기화가 바뀐 트리만 다시 쓰도록 이전 상태와 새 상태를 트리별로 비교한다.
+// 이전에 읽지 못했던(격리) 트리가 이번에 살아나면 새 트리로 센다 — 비교는 같은 검증을 통과한 상태끼리다.
+function changedTreeIdsOf(previous, next) {
+  const before = new Map((previous?.trees ?? []).map(tree => [tree.id, tree]));
+  const changed = [];
+  for (const tree of next.trees) {
+    if (!before.has(tree.id) || !isDeepStrictEqual(before.get(tree.id), tree)) changed.push(tree.id);
+  }
+  return changed;
+}
+
 export function createWorkspaceService({ repo, productId, onCommit = null }) {
   // #538: 저장이 성공한 뒤 같은 훅에서 공유 행(자동 공개·moment_count)을 동기화한다.
   // 저장 자체는 이미 끝났으므로 동기화 실패는 응답을 막지 않고 로그만 남긴다.
-  async function afterCommit(subjectId, doc) {
+  // B-12(#1068): 훅에 이번 저장에서 바뀐 트리 목록(changedTreeIds)도 넘긴다 — 동기화 질의 수를
+  // 바뀐 트리 수에 비례하게 줄이는 데 쓴다.
+  async function afterCommit(subjectId, doc, changedTreeIds) {
     if (!onCommit) return;
-    try { await onCommit({ subjectId, doc }); }
+    try { await onCommit({ subjectId, doc, changedTreeIds }); }
     catch { console.error('[lovetree-workspace] 저장 뒤 공유 동기화 실패'); }
   }
   return {
@@ -120,7 +134,7 @@ export function createWorkspaceService({ repo, productId, onCommit = null }) {
       if (outcome.status === 'keyConflict') {
         throw new ApiError(409, 'client_key_conflict', '같은 요청 키로 다른 내용을 보내려 해요. 새 키로 다시 시도해 주세요.');
       }
-      await afterCommit(principal.subjectId, validated);
+      await afterCommit(principal.subjectId, validated, changedTreeIdsOf(scan ? scan.state : null, validated));
       return { revision: outcome.revision, savedAt: outcome.savedAt };
     }
   };
