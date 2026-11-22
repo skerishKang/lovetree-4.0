@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { DEFAULT_EMAILS, accountSecretKeys, chooseTestAccount, defaultProfileFor, laneFor, normaliseAccount } from './accounts.mjs';
+import { DEFAULT_EMAILS, ledgerEmail, accountSecretKeys, chooseTestAccount, defaultProfileFor, laneFor, normaliseAccount } from './accounts.mjs';
 import { fillAuthEmailLogin } from './auth-login.mjs';
 import { chromium } from 'playwright-core';
 import { mkdir, writeFile } from 'node:fs/promises';
@@ -244,12 +244,12 @@ async function readSecret(key, secretsPath) {
   }
 }
 
-// 01은 예전처럼 고정 주소를 기본값으로 쓴다(값이 .secrets에 없어도 지금까지대로 동작).
+// 실제 주소가 비밀값에 없으면 저장소 밖 대장에서 읽는다(경로 환경 변수가 없으면 멈춤).
 async function resolveAccount(account, secretsPath) {
   const keys = accountSecretKeys(account);
   const found = await readSecret(keys.email, secretsPath);
-  const email = found.ok ? found.value.trim() : (DEFAULT_EMAILS[normaliseAccount(account)] || '');
-  return { account: normaliseAccount(account), email, emailKey: keys.email, emailSource: found.ok ? 'secrets' : 'default', passwordKey: keys.password };
+  const email = found.ok ? found.value.trim() : ledgerEmail(account);
+  return { account: normaliseAccount(account), email, emailKey: keys.email, emailSource: found.ok ? 'secrets' : 'ledger', passwordKey: keys.password };
 }
 
 // 실행마다 한 번만 계정을 정한다(번호 → .secrets 키 → 값). 값은 로그에 쓰지 않는다.

@@ -75,11 +75,11 @@ test('개인 정보(이메일·전화번호)는 저장 전에 가려진다', asy
   assert.equal(maskPersonal('연락처 010-1234-5678'), '연락처 [전화번호]');
   await call('POST', '/api/feedback', {
     account: 'alice',
-    body: {category: 'other', body: '연락은 010-1234-5678 또는 kim@site.co.kr로 주세요'}
+    body: {category: 'other', body: '연락은 010-1234-5678 또는 kate@example.test로 주세요'}
   });
   const saved = feedbackRepo.rows[0].body;
   assert.equal(saved.includes('010-1234-5678'), false);
-  assert.equal(saved.includes('kim@site.co.kr'), false);
+  assert.equal(saved.includes('kate@example.test'), false);
   assert.match(saved, /\[전화번호\]/);
   assert.match(saved, /\[이메일\]/);
 });

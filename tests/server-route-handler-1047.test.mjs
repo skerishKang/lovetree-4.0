@@ -17,6 +17,7 @@ const EXPECTED = new Map([
   ['/api/workspace', 'storage'], ['/api/shares', 'share'], ['/api/shares/preview', 'share'],
   ['/api/community/shares', 'community'], ['/api/community/stats', 'community'],
   ['/api/community/me/favorites', 'community'], ['/api/community/admin/reports', 'community'],
+  ['/api/community/my-news', 'community'], ['/api/community/my-news/unread-count', 'community'],
   ['/api/public/tag-moments', 'community'], ['/api/public/moments', 'community'],
   ['/api/feedback', 'feedback'], ['/api/board', 'feedback'], ['/api/board/mine', 'feedback'],
   ['/api/board/journal/today', 'feedback'], ['/api/admin/feedback', 'feedback'],

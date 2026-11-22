@@ -384,6 +384,16 @@ CREATE INDEX IF NOT EXISTS lovetree_community_comments_share_idx
 CREATE INDEX IF NOT EXISTS lovetree_community_comments_moment_idx
   ON lovetree_community_comments (product_id, share_id, moment_id, created_at DESC);
 
+-- #1098 3단계(261122): 내 소식 읽음 시각. 계정(제품+사람)마다 한 줄 — 목록을 연 시점까지 읽음으로 본다.
+-- 같은 문장이 server/db/migrations/community-my-news-reads-261122.sql 에도 있다(기존 적용 DB용, 자동 적용 아님).
+CREATE TABLE IF NOT EXISTS lovetree_community_my_news_reads (
+  product_id text NOT NULL,
+  subject_id text NOT NULL,
+  last_read_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (product_id, subject_id)
+);
+
 CREATE TABLE IF NOT EXISTS lovetree_community_reports (
   product_id text NOT NULL,
   report_id text NOT NULL,

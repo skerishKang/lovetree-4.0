@@ -65,6 +65,7 @@ export function createMessages(deps) {
     const data = event.data;
     const fromView = event.source === $('view')?.contentWindow || event.source === $('view-next')?.contentWindow;
     if (event.origin !== location.origin || !fromView) return;
+    if (data?.type === 'lt41-viewer') { document.body.classList.toggle('lt-viewer-open', data.open === true); return; }
     // 4.1 기억 보드 저장: 화면이 만든 순간·연결·배치를 기존 워크스페이스 저장 경로로 보낸다.
     if (data?.type === MSG.boardSync) {
       const reply = (ok, error) => { try { event.source?.postMessage({type:MSG.boardSaved, ok, error}, location.origin); } catch {} };
