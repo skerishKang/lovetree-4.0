@@ -498,6 +498,9 @@ const shellLocation=createLocation({
   notify:text=>notify(text),
   startMember:()=>startMember(),
   showPublicRoute:route=>showPublicRoute(route),
+  // #1175: share 잔여(source·공유 아이디·공유 기록)를 치우고 예시 기록을 다시 싣는다 — 로그아웃 상태에서
+  // 공유 화면 밖으로 나가는 길(로고·뒤로 가기)이 share 주소 재진입에 묶히지 않게 하고, 남은 '감상' 안내도 거둔다.
+  leaveShare:view=>leaveShare(view),
   requestNetworkOpen,
   requestBoardOpen,
   journey:shellJourney,
@@ -578,7 +581,12 @@ function setHomeHash(){
 const shellHomeLink=createHomeLink({
   $,
   getCurrent:()=>current,
-  show:(file,write)=>show(file,write),
+  show:(file,write)=>{
+    // #1175: 공유 화면을 본 뒤 로고로 나가면 share 잔여를 치운다 — share 상태가 남으면 탭 줄이 숨어
+    // 서재 단추에 닿지 못하고, 화면을 옮길 때마다 공유 기록을 다시 읽어 '감상' 안내가 되풀이된다.
+    if(file==='src064-orbit.html'&&source==='share'){leaveShare(file);return true;}
+    return show(file,write);
+  },
   closePanels:closePanelsForHome,
   setHomeHash,
   scrollToTop:scrollHomeToTop
@@ -942,7 +950,7 @@ function memberStatus(status){
    if(!shown)notifyPublicBanner((model?.trees||[])[0]?.id);
   }
  }
- else if(status.phase==='login'&&!status.dirty)notify('로그인이 필요해요.');
+ else if(status.phase==='login'&&!status.dirty&&document.body.dataset.member==='in')notify('로그인이 필요해요.');/* #1175: 로그아웃 상태로 시작할 때(저장 연결 확인 401)는 진입만으로 알림을 띄우지 않는다 — 머리글의 로그인 단추가 이미 길을 알린다. */
  else if(!status.dirty&&status.phase==='offline')notify(status.detail||'내 기록을 불러오지 못했어요.');
  $('write-menu').textContent=status.dirty?'저장 안 됨' :'＋ 순간 추가';$('empty-records').textContent=status.writable?'＋ 첫 트리 만들기':'내 기록 불러오기';/* #463: 이름을 한 곳에서 정한다(paintEmptyCopy와 같은 글자) *//* #463: 주 버튼 표시도 같이 유지한다(쓸 상태가 바뀌도 강조가 엉키지 않게). */$('empty-records').classList.toggle('primary',!!status.writable);$('empty-sample').classList.toggle('primary',!status.writable);previousDirty=status.dirty;renderAccount();flowNavigation();document.body.dataset.member=member?.snapshot().owned?'in':'out';document.body.dataset.treeCount=String(model?.trees?.length||0);applyAdvanced();
 }
@@ -999,6 +1007,8 @@ async function startMember(){setMemberRefreshStarted(true);if(!leaveMember())ret
  if(generation===loadGeneration){const startupJourney=parseJourneyRoute(location.hash);if(startupJourney){if(session.snapshot().owned&&session.snapshot().writable)openFirstJourney({step:startupJourney.step,route:true});else{history.replaceState(null,'','#home');handledHash='#home';}}}
 }
 async function sample(selection={},view){if(!pauseMember())return;const tree=await loadExampleTree();++loadGeneration;if(view)current=view;load(null,'example',selection,{},tree);if(view)writeLocation();$('save-feedback').hidden=true;if($('account-settings').open)$('account-settings').close();}
+// #1175: 공유 화면 밖으로 나가는 길 한 벌 — share 잔여를 치우고 예시 첫 화면으로 돌아가며, 화면에 남은 '감상' 안내를 거둔다.
+function leaveShare(view){hideToast();void sample({},view);}
 $('account-entry').onclick=e=>{
  if(member?.snapshot().owned){e.preventDefault();openAccountMenu();}
  else if(parseSelectionRoute(location.hash).scope==='owner')stashPendingOwnerRoute(sessionStorage,location.hash);
