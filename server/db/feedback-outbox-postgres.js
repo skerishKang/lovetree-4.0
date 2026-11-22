@@ -1,4 +1,4 @@
-﻿// #1190: 공용 운영센터로 보낼 줄(outbox) 저장소. 표 이름은 마이그레이션·되돌리기와 같다.
+// #1190: 공용 운영센터로 보낼 줄(outbox) 저장소. 표 이름은 마이그레이션·되돌리기와 같다.
 export const FEEDBACK_OUTBOX_TABLE = 'lovetree_feedback_outbox';
 export const OUTBOX_KINDS = Object.freeze(['new', 'append', 'status']);
 export const OUTBOX_STATUSES = Object.freeze(['pending', 'sent', 'failed']);

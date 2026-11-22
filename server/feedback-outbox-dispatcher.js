@@ -1,4 +1,4 @@
-﻿import { createHmac } from 'node:crypto';
+import { createHmac } from 'node:crypto';
 import { assertServiceUrl } from './http-client.js';
 
 // 재시도: 1분·5분·30분·2시간·12시간. 마지막 간격을 넘기면 '실패'로 남는다.

@@ -1,4 +1,4 @@
-﻿// #1190: 보낼 줄(outbox) 시험용 메모리 저장소. PostgreSQL 저장소와 같은 계약만 구현한다.
+// #1190: 보낼 줄(outbox) 시험용 메모리 저장소. PostgreSQL 저장소와 같은 계약만 구현한다.
 export function createMemoryFeedbackOutbox({ now = () => Date.now() } = {}) {
   const rows = [];
   let nextId = 1;
