@@ -1,0 +1,491 @@
+<!doctype html>
+<html lang="ko" data-lt-theme="night">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>이슈 777 · 트리 보기 시험</title>
+<style>
+/* 이 파일은 실험용 한 장이다. 색·모서리 토큰은 public/v41/identity.css와 같은 값으로 여기에만 둔다.
+   실행 중 외부 주소를 부르지 않는다(글꼴도 시스템 글꼴만 쓴다). */
+:root{
+  --lt-ui:'Pretendard Variable',Pretendard,'Noto Sans KR',system-ui,sans-serif;
+  --lt-stage:#040407;--lt-stage-2:#0a0a11;
+  --lt-pearl:#f5f1e9;--lt-muted:#9b98a6;
+  --lt-gold:#ffe6a6;--lt-gold-deep:#e6b14c;--lt-gold-ink:#8a6420;
+  --lt-gold-line:rgba(255,230,166,.45);
+  --lt-rose:#d88f9c;--lt-rose-ink:#bd5d72;
+  --lt-blue:#7892c9;--lt-violet:#a99ac9;
+  --lt-paper:#f5efe2;--lt-ink:#433a34;
+  --lt-glass:rgba(10,10,16,.78);--lt-line:rgba(255,255,255,.14);
+  --lt-r-pill:999px;--lt-r-card:14px;
+  --tv-page:radial-gradient(circle at 50% 82%,var(--lt-stage-2) 0%,var(--lt-stage) 62%,var(--lt-stage) 100%);
+  --tv-bar:rgba(10,10,16,.78);--tv-bar-line:var(--lt-line);--tv-bar-ink:var(--lt-pearl);
+  --tv-sub:var(--lt-muted);--tv-btn:rgba(255,255,255,.06);--tv-btn-on:var(--lt-gold-deep);
+  --tv-btn-on-ink:var(--lt-stage);--tv-card-bg:var(--lt-glass);--tv-card-ink:var(--lt-pearl);
+  --tv-card-line:var(--lt-gold-line);--tv-branch:var(--lt-gold-deep);
+  --tv-chip-bg:rgba(10,10,16,.9);--tv-chip-ink:var(--lt-pearl);
+  --tv-root-bg:var(--lt-gold-deep);--tv-root-ink:var(--lt-stage);
+  --tv-bundle-bg:rgba(216,143,156,.16);--tv-bundle-ink:var(--lt-rose);
+  --tv-shadow:0 12px 28px rgba(0,0,0,.45);
+}
+html[data-lt-theme=garden]{
+  --tv-page:radial-gradient(circle at 50% 82%,color-mix(in srgb,var(--lt-paper) 92%,var(--lt-gold)) 0%,var(--lt-paper) 66%,color-mix(in srgb,var(--lt-paper) 88%,var(--lt-ink)) 100%);
+  --tv-bar:rgba(245,239,226,.93);--tv-bar-line:rgba(73,61,58,.2);--tv-bar-ink:var(--lt-ink);
+  --tv-sub:color-mix(in srgb,var(--lt-ink) 62%,transparent);
+  --tv-btn:rgba(67,58,52,.06);--tv-btn-on:var(--lt-ink);--tv-btn-on-ink:var(--lt-paper);
+  --tv-card-bg:var(--lt-paper);--tv-card-ink:var(--lt-ink);--tv-card-line:rgba(138,100,32,.55);
+  --tv-branch:var(--lt-gold-ink);--tv-chip-bg:rgba(245,239,226,.94);--tv-chip-ink:var(--lt-ink);
+  --tv-root-bg:var(--lt-ink);--tv-root-ink:var(--lt-paper);
+  --tv-bundle-bg:rgba(189,93,114,.12);--tv-bundle-ink:var(--lt-rose-ink);
+  --tv-shadow:0 12px 28px rgba(75,51,42,.16);
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--tv-page);color:var(--tv-bar-ink);font-family:var(--lt-ui);overflow:hidden;-webkit-text-size-adjust:100%}
+.tv-app{height:100%;display:grid;grid-template-rows:auto 1fr}
+.tv-bar{padding:12px 18px 10px;border-bottom:1px solid var(--tv-bar-line);background:var(--tv-bar);position:relative;z-index:2}
+.tv-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.tv-head strong{font-size:16px;letter-spacing:.02em;font-weight:600}
+.tv-head span{font-size:12px;color:var(--tv-sub)}
+.tv-controls{display:flex;gap:10px 18px;flex-wrap:wrap;align-items:center;margin-top:9px}
+.tv-group{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.tv-label{font-size:11px;color:var(--tv-sub);margin-right:2px}
+.tv-group button{
+  min-height:32px;padding:5px 11px;border-radius:var(--tv-r-pill);
+  border:1px solid var(--tv-bar-line);background:var(--tv-btn);color:var(--tv-bar-ink);
+  font-size:12px;line-height:1;cursor:pointer;white-space:nowrap
+}
+.tv-group button[aria-pressed=true]{background:var(--tv-btn-on);border-color:var(--tv-btn-on);color:var(--tv-btn-on-ink);font-weight:600}
+.tv-group button:focus-visible{outline:2px solid var(--tv-branch);outline-offset:2px}
+.tv-hint{margin:8px 0 0;font-size:11px;color:var(--tv-sub);line-height:1.4}
+.tv-stage{position:relative;overflow:hidden;touch-action:none;cursor:grab}
+.tv-stage[data-dragging=true]{cursor:grabbing}
+.tv-world{position:absolute;left:0;top:0;width:0;height:0;transform-origin:0 0;will-change:transform}
+.tv-lines{position:absolute;left:0;top:0;width:1px;height:1px;overflow:visible;pointer-events:none}
+.tv-lines path{fill:none;stroke:var(--tv-branch);stroke-linecap:round}
+.tv-nodes{position:absolute;left:0;top:0}
+.tv-card,.tv-chip,.tv-bundle{
+  position:absolute;left:var(--x);top:var(--y);width:var(--w);height:var(--h);
+  border-radius:var(--lt-r-card);overflow:hidden;user-select:none
+}
+.tv-card{
+  background:var(--tv-card-bg);border:1px solid var(--tv-card-line);
+  box-shadow:var(--tv-shadow);color:var(--tv-card-ink);display:flex;flex-direction:column
+}
+.tv-thumb{height:var(--thumb-h);flex:0 0 var(--thumb-h);background:color-mix(in srgb,var(--tv-card-line) 22%,transparent);overflow:hidden}
+.tv-thumb img{display:block;width:100%;height:100%;object-fit:cover;pointer-events:none}
+.tv-cap{padding:4px 7px 5px;display:flex;flex-direction:column;gap:1px;min-height:0}
+.tv-date{font-size:9px;line-height:1.2;color:var(--tv-sub);white-space:nowrap}
+.tv-name{font-size:10px;line-height:1.2;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tv-chip{
+  display:flex;align-items:center;justify-content:center;text-align:center;padding:0 5px;
+  background:var(--tv-chip-bg);border:1px solid var(--tv-card-line);color:var(--tv-chip-ink);
+  font-size:10px;line-height:1.2;line-break:keep-all;overflow-wrap:anywhere
+}
+.tv-root{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  background:var(--tv-root-bg);color:var(--tv-root-ink);border-color:var(--tv-root-bg);
+  box-shadow:var(--tv-shadow);gap:1px
+}
+.tv-root b{font-size:13px;line-height:1.1;letter-spacing:.04em}
+.tv-root small{font-size:9px;line-height:1.1;opacity:.82}
+.tv-bundle{
+  display:flex;align-items:center;justify-content:center;background:var(--tv-bundle-bg);
+  border:1px dashed var(--tv-bundle-ink);color:var(--tv-bundle-ink);
+  font-size:12px;font-weight:700;cursor:pointer;padding:0
+}
+.tv-bundle:hover,.tv-bundle:focus-visible{filter:brightness(1.18);outline:none}
+.tv-status{
+  position:absolute;left:12px;bottom:10px;max-width:calc(100% - 24px);
+  padding:5px 10px;border-radius:var(--tv-r-pill);background:var(--tv-bar);
+  border:1px solid var(--tv-bar-line);color:var(--tv-sub);font-size:11px;line-height:1.3;
+  pointer-events:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap
+}
+@media(max-width:600px){
+  .tv-bar{padding:9px 12px 8px}
+  .tv-head strong{font-size:14px}
+  .tv-head span{font-size:11px}
+  .tv-controls{gap:6px 10px;margin-top:7px}
+  .tv-group{gap:4px}
+  .tv-group button{min-height:30px;padding:4px 9px;font-size:11px}
+  .tv-hint{margin-top:6px;font-size:10px}
+  .tv-status{left:8px;bottom:8px;font-size:10px;max-width:calc(100% - 16px)}
+  .tv-date{font-size:10px}
+  .tv-name{font-size:11px}
+  .tv-chip{font-size:11px}
+  .tv-root b{font-size:14px}
+  .tv-root small{font-size:10px}
+  .tv-bundle{font-size:13px}
+}
+@media(prefers-reduced-motion:reduce){.tv-world{will-change:auto}}
+</style>
+</head>
+<body>
+<div class="tv-app">
+  <header class="tv-bar">
+    <div class="tv-head">
+      <strong>이슈 777 · 트리 보기</strong>
+      <span>실험용 한 장 · 앱 화면과 메뉴에 연결하지 않음</span>
+    </div>
+    <div class="tv-controls">
+      <div class="tv-group" role="group" aria-label="데이터 골라 보기">
+        <span class="tv-label">데이터</span>
+        <button type="button" data-set="10" aria-pressed="true">순간 10개</button>
+        <button type="button" data-set="40" aria-pressed="false">순간 40개</button>
+      </div>
+      <div class="tv-group" role="group" aria-label="테마 골라 보기">
+        <span class="tv-label">테마</span>
+        <button type="button" data-theme="garden" aria-pressed="false">정원</button>
+        <button type="button" data-theme="night" aria-pressed="true">밤</button>
+      </div>
+      <div class="tv-group" role="group" aria-label="화면 조작">
+        <button type="button" id="tv-fit">맞춤</button>
+        <button type="button" id="tv-out" aria-label="축소">−</button>
+        <button type="button" id="tv-in" aria-label="확대">＋</button>
+      </div>
+    </div>
+    <p class="tv-hint">화면을 끌어 옮기고 휠로 확대·축소한다. 묶음 가지(+24개)를 누르면 펼쳐지고 접기를 누르면 다시 묶인다.</p>
+  </header>
+  <main class="tv-stage" id="stage" aria-label="순간 트리 그림">
+    <div class="tv-world" id="world">
+      <svg class="tv-lines" id="lines" aria-hidden="true"></svg>
+      <div class="tv-nodes" id="nodes"></div>
+    </div>
+    <div class="tv-status" id="status" aria-live="polite"></div>
+  </main>
+</div>
+<script>
+(() => {
+  'use strict';
+  const stage = document.getElementById('stage');
+  const world = document.getElementById('world');
+  const lines = document.getElementById('lines');
+  const nodes = document.getElementById('nodes');
+  const status = document.getElementById('status');
+
+  const TITLES = [
+    '첫 인사','창가에 앉아','비 오는 저녁','같은 우산','역 앞에서','따뜻한 차 한 잔',
+    '오래 기다린 날','작은 편지','같이 걷던 길','밤하늘','처음 부른 노래','오래된 사진',
+    '손끝의 온도','느린 오후','기억에 남은 말','환한 창문','잠든 오후','다시 만난 날',
+    '한 걸음 더','바람 좋은 날','벚꽃길','주머니 속 편지','오후 네 시','가로등 아래',
+    '함께 접은 종이','먼 곳에서 온 안부','오래 이어진 대화','작은 선물','하루의 끝',
+    '다음 계절','다시 시작한 날','지금 이 순간','남겨 둔 문장','조용한 저녁','함께 웃던 날',
+    '오늘의 기록','천천히 걷기','맑은 아침','마음에 남기','계속 이어 가기'
+  ];
+  const DATES = [
+    '3월 14일','3월 21일','4월 2일','4월 17일','5월 5일','5월 19일','6월 3일','6월 28일',
+    '7월 11일','8월 8일','8월 30일','9월 14일','10월 1일','10월 22일','11월 6일','12월 12일',
+    '1월 9일','2월 14일','3월 3일','4월 12일','5월 24일','6월 15일','7월 7일','8월 19일',
+    '9월 27일','10월 9일','11월 18일','12월 25일','1월 28일','2월 11일','3월 30일','4월 26일',
+    '5월 13일','6월 21일','7월 29일','8월 16일','9월 8일','10월 4일','11월 2일','12월 6일'
+  ];
+  const img = (i) => '../example-media/ex' + String(i % 33 + 1).padStart(2, '0') + '.webp';
+  const leaf = (i) => ({ kind: 'leaf', title: TITLES[i], date: DATES[i], img: img(i) });
+
+  const state = {
+    set: 10,
+    theme: 'night',
+    expanded: false,
+    scale: 1, tx: 0, ty: 0,
+    root: null,
+    cfg: null,
+    drag: null
+  };
+
+  function params() {
+    const q = new URLSearchParams(location.search);
+    const set = q.get('n');
+    const theme = q.get('theme');
+    const expanded = q.get('expanded');
+    if (set === '40') state.set = 40;
+    if (theme === 'garden' || theme === 'night') state.theme = theme;
+    state.expanded = expanded === '1';
+  }
+
+  function syncUrl() {
+    const q = new URLSearchParams();
+    q.set('n', String(state.set));
+    q.set('theme', state.theme);
+    if (state.expanded) q.set('expanded', '1');
+    history.replaceState(null, '', location.pathname + '?' + q.toString());
+  }
+
+  // 한 순간에서 갈라진 27개를 담는다. 접힌 상태에서는 처음 3개만 카드로 보이고 나머지 24개는 묶음 가지가 된다.
+  function treeData() {
+    const root = { kind: 'root', title: '첫 순간', date: '2024. 3. 14', children: [] };
+    if (state.set === 10) {
+      root.children = [
+        { kind: 'branch', title: '처음 마주친 날', date: '3월 14일', children: [leaf(0), leaf(1), leaf(2)] },
+        { kind: 'branch', title: '함께 걷던 길', date: '5월 5일', children: [leaf(3), leaf(4), leaf(5), leaf(6)] },
+        { kind: 'branch', title: '지금 이 순간', date: '8월 8일', children: [leaf(7), leaf(8), leaf(9)] }
+      ];
+    } else {
+      const fork = { kind: 'branch', title: '갈림의 순간', date: '11월 18일', children: [] };
+      for (let i = 13; i < 40; i++) fork.children.push(leaf(i));
+      if (!state.expanded) {
+        const shown = fork.children.slice(0, 3);
+        fork.children = shown.concat([{ kind: 'bundle', title: '+24개', hidden: 24 }]);
+      } else {
+        fork.children.push({ kind: 'fold', title: '접기' });
+      }
+      root.children = [
+        { kind: 'branch', title: '작은 순간들', date: '3월 21일', children: [leaf(0), leaf(1), leaf(2), leaf(3), leaf(4), leaf(5)] },
+        { kind: 'branch', title: '함께한 날들', date: '6월 3일', children: [leaf(6), leaf(7), leaf(8), leaf(9), leaf(10)] },
+        { kind: 'branch', title: '기억에 남은 말', date: '9월 14일', children: [leaf(11), leaf(12)] },
+        fork
+      ];
+    }
+    return root;
+  }
+
+  function config() {
+    const phone = stage.clientWidth <= 600;
+    return phone
+      ? { root: [124, 52], branch: [120, 42], leaf: [148, 104], bundle: [84, 42], fold: [76, 40], gapX: 10, gapY: 20, thumb: 62, pad: 14, maxScale: 1.6, minScale: .72 }
+      : { root: [146, 58], branch: [132, 44], leaf: [158, 116], bundle: [86, 44], fold: [78, 42], gapX: 17, gapY: 28, thumb: 74, pad: 36, maxScale: 1.5, minScale: .12 };
+  }
+
+  function build(spec, parent) {
+    const n = Object.assign({}, spec, { parent, children: [], x: 0, y: 0, ax: 0, ay: 0 });
+    n.children = (spec.children || []).map((child) => build(child, n));
+    return n;
+  }
+
+  // 윤곽선 구간을 합친다. 같은 높이 구간에서 가장 왼쪽(또는 가장 오른쪽) 값만 남긴다.
+  function mergeSegments(segments, op) {
+    const points = [...new Set(segments.flatMap((s) => [s.y0, s.y1]))].sort((a, b) => a - b);
+    const out = [];
+    for (let i = 0; i < points.length - 1; i++) {
+      const a = points[i], b = points[i + 1];
+      let best = null;
+      for (const s of segments) {
+        if (s.y0 <= a + 1e-6 && s.y1 >= b - 1e-6) best = best === null ? s.x : op(best, s.x);
+      }
+      if (best === null) continue;
+      const last = out[out.length - 1];
+      if (last && Math.abs(last.x - best) < 1e-6 && Math.abs(last.y1 - a) < 1e-6) last.y1 = b;
+      else out.push({ y0: a, y1: b, x: best });
+    }
+    return out;
+  }
+
+  // 카드마다 크기가 다르므로 형제의 윤곽선이 겹치지 않게 옆으로 민다(가변 크기 정돈 트리 배치).
+  function layout(root, cfg) {
+    function sizes(n) {
+      const box = cfg[n.kind];
+      n.w = box[0]; n.h = box[1];
+      n.effH = n.h + (n.children.length ? cfg.gapY : 0);
+      n.leaves = n.kind === 'bundle' ? n.hidden : n.kind === 'fold' ? 0 : (n.children.length ? n.children.reduce((sum, c) => sum + sizes(c), 0) : 1);
+      return n.leaves;
+    }
+    sizes(root);
+
+    function firstWalk(n) {
+      if (!n.children.length) {
+        n.l = [{ y0: 0, y1: n.effH, x: 0 }];
+        n.r = [{ y0: 0, y1: n.effH, x: n.w }];
+        return;
+      }
+      let placedRight = null;
+      n.children.forEach((child, i) => {
+        firstWalk(child);
+        let shift = 0;
+        if (i > 0) {
+          for (const a of placedRight) {
+            for (const b of child.l) {
+              if (a.y1 <= b.y0 || b.y1 <= a.y0) continue;
+              shift = Math.max(shift, a.x + cfg.gapX - b.x);
+            }
+          }
+        }
+        child.x = shift;
+        child.y = n.effH;
+        const right = child.r.map((s) => ({ y0: s.y0, y1: s.y1, x: s.x + child.x }));
+        placedRight = placedRight ? mergeSegments(placedRight.concat(right), Math.max) : right;
+      });
+      let leftEdge = Infinity, rightEdge = -Infinity;
+      for (const child of n.children) {
+        for (const s of child.l) leftEdge = Math.min(leftEdge, s.x + child.x);
+        for (const s of child.r) rightEdge = Math.max(rightEdge, s.x + child.x);
+      }
+      const dx = n.w / 2 - (leftEdge + rightEdge) / 2;
+      for (const child of n.children) child.x += dx;
+      const left = [{ y0: 0, y1: n.effH, x: 0 }];
+      const right = [{ y0: 0, y1: n.effH, x: n.w }];
+      for (const child of n.children) {
+        for (const s of child.l) left.push({ y0: s.y0, y1: s.y1, x: s.x + child.x });
+        for (const s of child.r) right.push({ y0: s.y0, y1: s.y1, x: s.x + child.x });
+      }
+      n.l = mergeSegments(left, Math.min);
+      n.r = mergeSegments(right, Math.max);
+    }
+    firstWalk(root);
+
+    function secondWalk(n, ax, ay) {
+      n.ax = ax + n.x;
+      n.ay = ay + n.y;
+      // 좌표 뒤집기: 배치에서는 아래로 자라지만 화면에서는 뿌리를 맨 아래 두고 위로 자란다.
+      n.wx = n.ax;
+      n.wy = -(n.ay + n.h);
+      for (const child of n.children) secondWalk(child, n.ax, n.ay);
+    }
+    secondWalk(root, 0, 0);
+    return root;
+  }
+
+  function allNodes(n, list) {
+    list.push(n);
+    for (const child of n.children) allNodes(child, list);
+    return list;
+  }
+
+  function draw() {
+    const cfg = config();
+    state.cfg = cfg;
+    state.root = layout(build(treeData(), null), cfg);
+    const list = allNodes(state.root, []);
+
+    const paths = [];
+    for (const n of list) {
+      if (!n.parent) continue;
+      const p = n.parent;
+      const sx = p.wx + p.w / 2, sy = p.wy;
+      const tx = n.wx + n.w / 2, ty = n.wy + n.h;
+      const dy = Math.max(1, sy - ty);
+      const d = `M${sx.toFixed(1)},${sy.toFixed(1)} C${sx.toFixed(1)},${(sy - dy * .55).toFixed(1)} ${tx.toFixed(1)},${(ty + dy * .55).toFixed(1)} ${tx.toFixed(1)},${ty.toFixed(1)}`;
+      const width = 1.1 + 7.6 * Math.pow(n.leaves / state.root.leaves, .62);
+      paths.push(`<path d="${d}" stroke-width="${width.toFixed(2)}" stroke-opacity="${(0.52 + 0.38 * n.leaves / state.root.leaves).toFixed(2)}"></path>`);
+    }
+    lines.innerHTML = paths.join('');
+
+    const cards = [];
+    for (const n of list) {
+      const pos = `--x:${n.wx}px;--y:${n.wy}px;--w:${n.w}px;--h:${n.h}px;`;
+      if (n.kind === 'leaf') {
+        cards.push(`<div class="tv-card" style="${pos}--thumb-h:${cfg.thumb}px" aria-label="${n.date} ${n.title}">` +
+          `<div class="tv-thumb"><img src="${n.img}" alt="" draggable="false"></div>` +
+          `<div class="tv-cap"><span class="tv-date">${n.date}</span><span class="tv-name">${n.title}</span></div></div>`);
+      } else if (n.kind === 'root') {
+        cards.push(`<div class="tv-card tv-root" style="${pos}" aria-label="뿌리, 첫 순간"><b>첫 순간</b><small>${n.date}</small></div>`);
+      } else if (n.kind === 'bundle') {
+        cards.push(`<button type="button" class="tv-bundle" style="${pos}" data-expand="1" aria-label="묶인 24개 순간 펼치기">+24개</button>`);
+      } else if (n.kind === 'fold') {
+        cards.push(`<button type="button" class="tv-bundle" style="${pos}" data-fold="1" aria-label="27개 갈림 다시 묶기">접기</button>`);
+      } else {
+        cards.push(`<div class="tv-chip" style="${pos}" aria-label="${n.title}">${n.title}</div>`);
+      }
+    }
+    nodes.innerHTML = cards.join('');
+    status.textContent = `순간 ${state.set}개 · ${state.theme === 'garden' ? '정원' : '밤'} · ` +
+      (state.set === 10 ? '갈림 3개' : state.expanded ? '27갈림 펼침' : '27갈림 중 24개 묶음 접힘');
+    document.querySelectorAll('[data-set]').forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.set) === state.set)));
+    document.querySelectorAll('[data-theme]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.theme === state.theme)));
+    document.documentElement.dataset.ltTheme = state.theme;
+    fit();
+  }
+
+  function bounds() {
+    const list = allNodes(state.root, []);
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (const n of list) {
+      minX = Math.min(minX, n.wx); maxX = Math.max(maxX, n.wx + n.w);
+      minY = Math.min(minY, n.wy); maxY = Math.max(maxY, n.wy + n.h);
+    }
+    return { minX, maxX, minY, maxY, cx: (minX + maxX) / 2, cy: (minY + maxY) / 2 };
+  }
+
+  function apply() {
+    world.style.transform = `translate(${state.tx}px,${state.ty}px) scale(${state.scale})`;
+  }
+
+  function fit() {
+    const b = bounds();
+    const pad = state.cfg.pad;
+    const w = stage.clientWidth, h = stage.clientHeight;
+    const scale = Math.max(state.cfg.minScale, Math.min(state.cfg.maxScale,
+      (w - pad * 2) / Math.max(1, b.maxX - b.minX),
+      (h - pad * 2) / Math.max(1, b.maxY - b.minY)));
+    // 좁은 화면에서 카드가 너무 작아지면 억지로 줄이지 않고 뿌리를 가운데 두고 옆으로 끌어 보게 한다.
+    const cx = scale > state.cfg.minScale + 1e-6 ? b.cx : state.root.wx + state.root.w / 2;
+    state.scale = scale;
+    state.tx = w / 2 - cx * scale;
+    state.ty = h / 2 - b.cy * scale;
+    apply();
+  }
+
+  function zoom(factor, px, py) {
+    const x = px === undefined ? stage.clientWidth / 2 : px;
+    const y = py === undefined ? stage.clientHeight / 2 : py;
+    const wx = (x - state.tx) / state.scale;
+    const wy = (y - state.ty) / state.scale;
+    const next = Math.max(.1, Math.min(4, state.scale * factor));
+    state.scale = next;
+    state.tx = x - wx * next;
+    state.ty = y - wy * next;
+    apply();
+  }
+
+  document.querySelectorAll('[data-set]').forEach((b) => b.addEventListener('click', () => {
+    state.set = Number(b.dataset.set);
+    state.expanded = false;
+    syncUrl(); draw();
+  }));
+  document.querySelectorAll('[data-theme]').forEach((b) => b.addEventListener('click', () => {
+    state.theme = b.dataset.theme;
+    syncUrl(); draw();
+  }));
+  document.getElementById('tv-fit').addEventListener('click', fit);
+  document.getElementById('tv-in').addEventListener('click', () => zoom(1.25));
+  document.getElementById('tv-out').addEventListener('click', () => zoom(.8));
+
+  nodes.addEventListener('click', (e) => {
+    if (e.target.closest('[data-expand]')) state.expanded = true;
+    else if (e.target.closest('[data-fold]')) state.expanded = false;
+    else return;
+    syncUrl(); draw();
+  });
+
+  stage.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const rect = stage.getBoundingClientRect();
+    zoom(Math.exp(-e.deltaY * .0015), e.clientX - rect.left, e.clientY - rect.top);
+  }, { passive: false });
+
+  stage.addEventListener('pointerdown', (e) => {
+    if (e.target.closest('button')) return;
+    state.drag = { id: e.pointerId, x: e.clientX, y: e.clientY, tx: state.tx, ty: state.ty };
+    stage.setPointerCapture(e.pointerId);
+    stage.dataset.dragging = 'true';
+  });
+  stage.addEventListener('pointermove', (e) => {
+    if (!state.drag || state.drag.id !== e.pointerId) return;
+    state.tx = state.drag.tx + e.clientX - state.drag.x;
+    state.ty = state.drag.ty + e.clientY - state.drag.y;
+    apply();
+  });
+  const endDrag = (e) => {
+    if (!state.drag || state.drag.id !== e.pointerId) return;
+    state.drag = null;
+    delete stage.dataset.dragging;
+  };
+  stage.addEventListener('pointerup', endDrag);
+  stage.addEventListener('pointercancel', endDrag);
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === '+' || e.key === '=') zoom(1.2);
+    else if (e.key === '-') zoom(.83);
+    else if (e.key === '0') fit();
+  });
+
+  let resizeTimer = 0;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(draw, 120);
+  });
+
+  params();
+  draw();
+})();
+</script>
+</body>
+</html>
