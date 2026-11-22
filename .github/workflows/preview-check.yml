@@ -521,6 +521,16 @@ jobs:
           node --test --test-concurrency=1 tests/v41-account-settings.test.mjs tests/v41-header-tabs-mobile.test.mjs tests/v41-a11y-shell-names.test.mjs tests/v41-theme-ab.test.mjs tests/v41-shell-notice.test.mjs
           echo "셸·설정·테마 화면 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
 
+      - name: 색 토큰 계산 화면 시험(건너뜀=실패 — #886)
+        env:
+          LT_TOKEN_COLOR_886_REQUIRE: '1'
+        if: needs.screen-changes.outputs.changed == 'true'
+        run: |
+          start=$(date +%s)
+          npx vite build > /dev/null
+          node --test --test-concurrency=1 tests/v41-token-color-886.test.mjs
+          echo "색 토큰 계산 화면 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+
       # 이슈 952: 첫 화면(홈·궤도·설정 배선) — 카드 불투명·밝기 깊이·금빛 테두리(#429), ▶·no-referrer
       # 유튜브 썸네일 카드(#340), 설정의 카드 출처·움직임 배선(#380 5번), 같은 날짜 표기 되풀이
       # 새로고침 금지(#466 M2), 인기 카드 #share/ 이동(#379), 추가·둘러보기·안내 패널(#426·#635·#388)을
