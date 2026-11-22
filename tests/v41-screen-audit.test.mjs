@@ -2500,7 +2500,7 @@ test('#972 서재·책 상세·둘러보기·새 소식 화면 치수', { skip: 
         if (width === 390 || width === 2560) {
           await page.goto(`${base}/v41/#shelf`);
           await page.waitForFunction(() => typeof document.querySelector('#community-menu')?.onclick === 'function');
-          await page.evaluate(() => document.querySelector('#community-menu').click());
+          await page.evaluate(() => document.getElementById('community-menu').click());
           await page.waitForSelector('#community-panel[open] .community-group-chip:nth-child(4)');
           const discover = await page.evaluate(() => {
             const rect = sel => document.querySelector(sel).getBoundingClientRect();
@@ -2789,10 +2789,18 @@ test('#1026 무대 불러오는 중 표시 — 느림 표시·빠름 비표시·
           window.__cls1026 = 0;
           new PerformanceObserver((list) => { for (const e of list.getEntries()) if (!e.hadRecentInput) window.__cls1026 += e.value; }).observe({ type: 'layout-shift', buffered: true });
         });
-        const delay = (r, ms) => new Promise((ok) => setTimeout(ok, ms)).then(() => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, items: [share], totalVisible: 1, nextCursor: '', groups: [], groupsAll: [] }) }));
-        await ctx.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
-        await ctx.route('**/api/workspace**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ revision: 1, state: { version: 1, trees: [], prefs: {} }, subject: 'visual-audit-fake', writeSubjectBound: true, savedAt: '2026-11-22T00:00:00.000Z' }) }));
-        await ctx.route('**/api/community/shares**', (r) => delay(r, slow ? 2200 : 0));
+        // 실행기 속도와 무관하게: 빠른 조건은 데이터·그림을 즉시, 느린 조건은 2초 붙잡아 돌려준다.
+        const tiny = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Z5x8AAAAASUVORK5CYII=', 'base64');
+        const hold = () => slow ? new Promise((ok) => setTimeout(ok, 2000)) : Promise.resolve();
+        await ctx.route('**/*', async (r) => {
+          const u = new URL(r.request().url());
+          if (u.hostname !== 'i.ytimg.com' && !/\.(webp|png|jpe?g)$/.test(u.pathname)) return r.continue();
+          await hold();
+          return r.fulfill({ status: 200, contentType: 'image/png', body: tiny });
+        });
+        await ctx.route('**/api/**', async (r) => { await hold(); return r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }); });
+        await ctx.route('**/api/workspace**', async (r) => { await hold(); return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ revision: 1, state: { version: 1, trees: [], prefs: {} }, subject: 'visual-audit-fake', writeSubjectBound: true, savedAt: '2026-11-22T00:00:00.000Z' }) }); });
+        await ctx.route('**/api/community/shares**', async (r) => { await hold(); return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, items: [share], totalVisible: 1, nextCursor: '', groups: [], groupsAll: [] }) }); });
         const page = await ctx.newPage();
         const state = () => page.evaluate(() => {
           const el = document.getElementById('stage-loading');
@@ -2800,8 +2808,9 @@ test('#1026 무대 불러오는 중 표시 — 느림 표시·빠름 비표시·
         });
         if (slow) {
           await page.goto(base + '/v41/', { waitUntil: 'domcontentloaded' });
-          await page.waitForFunction(() => !!document.querySelector('#community-menu'), null, { timeout: 20000 });
-          await page.evaluate(() => document.querySelector('#community-menu').click());
+          await page.waitForFunction(() => !!window.LT41 && !!document.querySelector('#community-menu'), null, { timeout: 30000 });
+          await page.evaluate(() => document.getElementById('community-menu').click());
+          await page.waitForSelector('#community-panel[open]', { state: 'attached', timeout: 15000 });
           await page.waitForTimeout(1100);
           const m = await state();
           console.log('#1026 slow', JSON.stringify(m));
@@ -2815,8 +2824,9 @@ test('#1026 무대 불러오는 중 표시 — 느림 표시·빠름 비표시·
           assert.ok(after.cls <= 0.1, '내용 도착 뒤 자리 밀림 0.1 이하 — ' + JSON.stringify(after));
         } else {
           await page.goto(base + '/v41/', { waitUntil: 'domcontentloaded' });
-          await page.waitForFunction(() => !!document.querySelector('#community-menu'), null, { timeout: 20000 });
-          await page.evaluate(() => document.querySelector('#community-menu').click());
+          await page.waitForFunction(() => !!window.LT41 && !!document.querySelector('#community-menu'), null, { timeout: 30000 });
+          await page.evaluate(() => document.getElementById('community-menu').click());
+          await page.waitForSelector('#community-panel[open]', { state: 'attached', timeout: 15000 });
           await page.waitForTimeout(700);
           const m = await state();
           console.log('#1026 fast', JSON.stringify(m));
@@ -2832,9 +2842,10 @@ test('#1026 무대 불러오는 중 표시 — 느림 표시·빠름 비표시·
       await ctx.route('**/api/community/shares**', (r) => new Promise((ok) => setTimeout(ok, 11500)).then(() => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, items: [share], totalVisible: 1, nextCursor: '', groups: [], groupsAll: [] }) })));
       const page = await ctx.newPage();
       await page.goto(base + '/v41/', { waitUntil: 'domcontentloaded' });
-      await page.waitForFunction(() => !!document.querySelector('#community-menu'), null, { timeout: 20000 });
-      await page.evaluate(() => document.querySelector('#community-menu').click());
-      await page.waitForFunction(() => !document.getElementById('stage-loading-retry').hidden, null, { timeout: 14000 });
+      await page.waitForFunction(() => !!window.LT41 && !!document.querySelector('#community-menu'), null, { timeout: 30000 });
+      await page.evaluate(() => document.getElementById('community-menu').click());
+      await page.waitForSelector('#community-panel[open]', { state: 'attached', timeout: 15000 });
+      await page.waitForFunction(() => !document.getElementById('stage-loading-retry').hidden, null, { timeout: 20000, polling: 500 });
       const retryText = await page.locator('#stage-loading-retry').textContent();
       console.log('#1026 retry', JSON.stringify({ retryText }));
       assert.match(retryText, /느리게 불러오고 있어요/, '10초 뒤 느리다는 안내가 뜬다');
