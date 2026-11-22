@@ -231,7 +231,7 @@ test('사용자 키가 있는 표를 빠짐없이 지운다 (스키마 누락 �
   const schema = readFileSync(new URL('../server/db/schema.sql', import.meta.url), 'utf8');
   const declared = [...schema.matchAll(/CREATE TABLE IF NOT EXISTS\s+(\w+)\s*\(([\s\S]*?)\n\);/g)]
     .map((match) => ({ table: match[1], body: match[2] }));
-  const keys = /(?:^|\s)(subject_id|reporter_subject_id|blocker_subject_id|blocked_subject_id|actor_subject_id|hidden_by)\s+text/;
+  const keys = /(?:^|\s)(\w*subject_id|hidden_by)\s+text/;
   const userKeyed = declared.filter((entry) => keys.test(entry.body)).map((entry) => entry.table);
   const covered = new Set([...ACCOUNT_USER_TABLES.map((entry) => entry.table), ...ACCOUNT_PRESERVED_TABLES]);
   const missing = userKeyed.filter((table) => !covered.has(table));

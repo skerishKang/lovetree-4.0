@@ -28,7 +28,9 @@ export const ACCOUNT_USER_TABLES = Object.freeze([
   { table: 'lovetree_feedback', where: 'subject_id = $2' },
   { table: 'lovetree_ai_personas', where: 'subject_id = $2' },
   { table: 'lovetree_product_roles', where: 'subject_id = $2' },
-  { table: 'lovetree_product_role_audit', where: 'subject_id = $2 OR actor_subject_id = $2' }
+  { table: 'lovetree_product_role_audit', where: 'subject_id = $2 OR actor_subject_id = $2' },
+  // #1063: 운영센터 고객 열람 기록도 탈퇴하는 고객의 행을 함께 없앤다(90일 보관 대상과 별개).
+  { table: 'lovetree_admin_customer_views', where: 'customer_subject_id = $2' }
 ]);
 
 // 사용자 키가 없어 탈퇴 경로가 지우지 않는 표. schema.sql의 사용자 키 검사에서 제외하는 근거다.
