@@ -23,6 +23,7 @@ export function createCommunityScreen(deps) {
     if (dialog.open) return;
     dialog.show();               // 비모달 — 뒤 덮개가 없어 상단 메뉴가 그대로 보인다
     paintPage(true);
+    deps.flowNavigation?.();     // #1094: 서재 전용 보기 방식 토글을 둘러보기 화면에서 접는다
     // 주소도 다른 화면과 같은 방식 — 탭·메뉴로 열 때는 #explore 기록을 새로 쌓는다.
     // 주소(#explore·#explore/moments)로 열렸다면 이미 주소가 있으니 덮지 않는다.
     if (!exploreHash()) { history.pushState(null, '', '#explore'); setHandled?.('#explore'); }
@@ -43,6 +44,7 @@ export function createCommunityScreen(deps) {
     // 살아 있어야 하고, 다른 주소(#my/…·#share/…)로 가는 중에는 그 주소를 덮지 않아야 하기 때문이다.
     if (location.hash === '#home' && was !== '#home') history.replaceState(null, '', was);
     paintPage(false);
+    deps.flowNavigation?.();     // 둘러보기를 닫으면 서재·책에서 토글이 돌아온다
   };
 
   // 주소(뒤로·앞으로 가기, 직접 들어온 주소)로 열기 — '둘러보기' 탭을 누른 것과 같은 규칙.

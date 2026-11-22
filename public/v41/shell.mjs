@@ -293,7 +293,7 @@ if(window.visualViewport){const fabKbd=()=>document.body.classList.toggle('lt-kb
 const initialRoute=parseSelectionRoute(location.hash);
 let model=null,current=screenForView(initialRoute.view)[1],source='example',loadGeneration=0,previousDirty=false,member=null,handledHash=null,activeShareId=null,resumeAfterStart=null;
 // #1092: 둘러보기 화면 — 창 모듈의 showModal 호출을 비모달 화면 열기로 바꾸고, 닫을 때 #explore 주소 기록을 지킨다.
-const shellCommunityScreen=createCommunityScreen({$,setHandled:hash=>{handledHash=hash;}});
+const shellCommunityScreen=createCommunityScreen({$,setHandled:hash=>{handledHash=hash;},flowNavigation});
 // #583 '이 순간 열기': 주소(#my/network?tree=…&moment=…)로 지도를 특정 순간을 가운데 두고 열 요청이 오면
 // 여기에 한 번 적어 두고, 지도 프레임을 띄울 때(show) 소비해 프레임 주소에 ?open=<순간>을 붙인다.
 // 지도(network.js)는 이 표시가 있을 때만 그 순간을 고른 상태로 가운데에 둔다 — 그냥 지도를 열 때는

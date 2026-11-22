@@ -33,7 +33,9 @@ function flowNavigation(){
   $('tree-views').hidden=!showTreeViews;for(const b of $('tree-views').querySelectorAll('button')){b.disabled=false;b.title='';}
   $('tree-views').setAttribute('aria-label','이 트리 보기');
   // #1094: 보기 방식(책/목록) 전환 묶음은 서재·책 화면에서만 보인다(보드·지도에는 없다).
-  const bookToggle=$('book-display-toggle');if(bookToggle)bookToggle.hidden=!bookDisplayVisible({current:getCurrent()});
+  // #1092 후속: 둘러보기는 서재 위에 뜨는 화면이라 현재 화면 값이 서재로 남는다 — 둘러보기 화면에서도 접는다.
+  const bookToggle=$('book-display-toggle');
+  if(bookToggle)bookToggle.hidden=!bookDisplayVisible({current:getCurrent()})||document.body.classList.contains('community-screen');
   for(const b of document.querySelectorAll('nav>button'))b.hidden=publicReading;
   // 트리 선택은 뒤쪽 탭 묶음 바로 앞에 있고, 로그인 상태에서만 "트리: <이름> ▾"로 보여 준다.
   // 2026-11-18 13:49 대표 결정: 트리 선택은 모든 페이지에서 똑같이 보인다(서재 포함).
