@@ -19,11 +19,9 @@ export const SITE_TAGLINE = '좋아하는 순간을 모아 두는 곳';
 // 서버 share-service 의 SHARE_ID 와 같은 형식 검사. 주소 형식이 밖이면 서버까지 가지 않는다.
 export const SHARE_ID = /^[A-Za-z0-9_-]{20,64}$/;
 
-export function escapeHtml(value) {
-  return String(value ?? '').replace(/[&<>"']/g, (ch) => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-  }[ch]));
-}
+// A-15: 화면과 같은 글자 막기 정본 한 벌 — 쓰던 이름은 그대로 다시 내보낸다.
+import { escapeHtml } from '../../public/v41/html-escape.mjs';
+export { escapeHtml };
 
 // 카드·메타에 들어갈 문장은 한 줄로 줄인다(개행 제거, 너무 길면 말줄임).
 export function oneLine(value, max = 80) {

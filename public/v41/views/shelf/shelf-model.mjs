@@ -5,7 +5,9 @@ import { normalizeCoverDesign, coverDesignPaletteIndex, coverModeOf } from '../.
 import { thumbnailCandidates, thumbFallbackAttrs, fallbackCardMarkup } from '../../thumb-fallback.mjs';
 import { youtubeIdFrom } from '../../youtube-id.mjs';
 
-export const escapeShelf = (value) => String(value || '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' })[char]);
+// A-15: 글자 막기 정본(html-escape.mjs) 한 벌 — 쓰던 이름은 그대로 다시 내보낸다.
+import { escapeHtml } from '../../html-escape.mjs';
+export const escapeShelf = escapeHtml;
 
 // #212: 표지에 보이는 이름은 한 번만 쓴다. 자동 접미사(", 나의 순간들")는 표시 단계에서만 뺀다(tree-name.mjs).
 export const treeTitleOf = (value, namer) => (namer ? namer(value) : value);

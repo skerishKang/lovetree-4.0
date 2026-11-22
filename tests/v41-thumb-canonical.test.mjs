@@ -8,6 +8,7 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import { thumbnailCandidates, nextThumbnailStep } from '../public/v41/thumb-fallback.mjs';
 import { youtubeIdFrom, youtubeStageThumbUrl } from '../public/v41/youtube-id.mjs';
+import { escapeHtml } from '../public/v41/html-escape.mjs';
 import { videoKey } from '../public/v41/same-stage.mjs';
 import { cardImageFor } from '../functions/_lib/tree-preview.mjs';
 
@@ -110,9 +111,13 @@ const STAGES = [
   ['unknown-stage', 'hqdefault.jpg'],
 ];
 
-const mediaScope = { window: {}, URL, URLSearchParams, LTYouTubeId: globalThis.LTYouTubeId };
+const mediaScope = { window: {}, URL, URLSearchParams, LTYouTubeId: globalThis.LTYouTubeId, LTEscapeHtml: escapeHtml };
 vm.runInNewContext(read('public/v41/media-preview.js'), mediaScope);
 const media = mediaScope.window.LTMedia;
+
+test('A-15 글자 막기 정본: 꺾쇠·따옴표·앰퍼샌드를 글자로 바꾼다', () => {
+  assert.equal(escapeHtml(`<b title="x&y">'z'</b>`), '&lt;b title=&quot;x&amp;y&quot;&gt;&#39;z&#39;&lt;/b&gt;');
+});
 
 test('#1060 크기 표: 단계 함수는 옵션마다 정본 주소를 만든다(보드 상세 maxres 포함)', () => {
   for (const [stage, file] of STAGES) {
@@ -161,7 +166,7 @@ test('#1060 남은 자리도 같은 단계 옵션으로 정본을 부른다(주�
 });
 
 test('#1060 일반 스크립트 정본: 첫 그리기부터 주소가 들어간다', () => {
-  const scope = { window: {}, URL, URLSearchParams };
+  const scope = { window: {}, URL, URLSearchParams, LTEscapeHtml: escapeHtml };
   // 보드가 싣는 일반 스크립트 정본을 먼저 실행한다(모듈 대기·다시 채우기 없음).
   vm.runInNewContext(read('public/v41/youtube-id.js'), scope);
   assert.equal(scope.LTYouTubeId.youtubeStageThumbUrl(ID, 'hqdefault'), `https://i.ytimg.com/vi/${ID}/hqdefault.jpg`);
