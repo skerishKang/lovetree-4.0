@@ -57,6 +57,8 @@ $$;
 
 -- 2) 댓글 표: 대상 칸 덧붙이기 + 유일 제약 넓히기 + 순간 목록용 색인
 DO $$
+DECLARE
+  constraint_name text;
 BEGIN
   IF to_regclass('public.lovetree_community_comments') IS NULL THEN
     RAISE NOTICE 'lovetree_community_comments 테이블 없음 — 건너뜀';
@@ -76,12 +78,24 @@ BEGIN
     ADD CONSTRAINT lovetree_community_comments_target_pair_check
     CHECK ((target_kind = 'tree' AND moment_id = '') OR (target_kind = 'moment' AND moment_id <> ''));
 
+  -- 옛 유일 제약(3칸)은 자동 이름이 63자에 잘려('…_client_ke…') 이름 추측으로는 못 지운다 —
+  -- 정의가 UNIQUE (product_id, subject_id, client_key) 인 것을 찾아 지운다(뒷수습 마이그레이션과 같은 방식).
+  FOR constraint_name IN
+    SELECT conname
+    FROM pg_constraint
+    WHERE conrelid = 'lovetree_community_comments'::regclass
+      AND contype = 'u'
+      AND pg_get_constraintdef(oid) ~ '^UNIQUE \(product_id, subject_id, client_key\)$'
+  LOOP
+    EXECUTE format('ALTER TABLE lovetree_community_comments DROP CONSTRAINT %I', constraint_name);
+    RAISE NOTICE '옛 3칸 유일 제약 % 제거', constraint_name;
+  END LOOP;
+
   IF NOT EXISTS (
     SELECT 1 FROM pg_constraint
     WHERE conrelid = 'lovetree_community_comments'::regclass
       AND conname = 'lovetree_community_comments_client_target_key'
   ) THEN
-    EXECUTE 'ALTER TABLE lovetree_community_comments DROP CONSTRAINT IF EXISTS lovetree_community_comments_product_id_subject_id_client_key_key';
     EXECUTE 'ALTER TABLE lovetree_community_comments ADD CONSTRAINT lovetree_community_comments_client_target_key UNIQUE (product_id, subject_id, client_key, target_kind, moment_id)';
     RAISE NOTICE 'lovetree_community_comments: 유일 제약을 대상까지 보도록 넓힘';
   END IF;
