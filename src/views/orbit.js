@@ -434,7 +434,7 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
  // 되돌려, 예전에 elapsed 가 0 에 얼어 있던 화면과 같은 자리를 보여 준다.
  // #1086 3차 완결: 진행률은 누적 dt가 아니라 전역 시작 시각 하나에서 계산한다.
  // 프레임이 느려도 위치는 실제 경과 시간을 따라가고, 멈춘 시간은 pausedTotal로 보정한다.
- let orbitRaf=0,orbitStart=performance.now(),pausedTotal=0,pausedAt=0;
+ let orbitRaf=0,orbitStart=performance.now(),pausedTotal=0,pausedAt=0,lastWriteAt=orbitStart;
  const orbitPause=()=>{if(!pausedAt)pausedAt=performance.now();};
  const orbitResume=()=>{if(pausedAt){pausedTotal+=performance.now()-pausedAt;pausedAt=0;}};
  const syncMotion=()=>{const rate=animRunning()?1:0;
@@ -535,7 +535,7 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
   floatAnims[i].playbackRate=animRunning()?1:0;};
  // 애니메이션의 현재 시각을 phase 에 맞춘다(끌고 난 뒤 이어지는 자리가 튀지 않게).
   const syncOrbitTime=()=>{}; // #1086 3차: WAAPI 제거로 할 일 없음(끌기 복귀 시 자리는 JS 루프가 이어감).
-  const orbitWrite=(now)=>{for(let i=0;i<elements.length;i++){
+  const orbitWrite=(now)=>{lastWriteAt=now;for(let i=0;i<elements.length;i++){
    const frames=orbitFrames[i],el=elements[i];if(!frames||!frames.length||!el||el.classList.contains('off'))continue;
    const cfg=(layoutBox&&layoutBox.w<=650?ringsNarrow:rings)[cards[i].ring];
    const elapsed=now-orbitStart-pausedTotal-(pausedAt?now-pausedAt:0);
@@ -544,7 +544,7 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
    if(tf&&el.__orbitTf!==tf){el.__orbitTf=tf;el.style.transform=tf;}
   }};
   // #1086: 궤도 경로 검사용 — 지정 진행률로 카드를 그린다(실제 루프와 같은 orbitWrite 경로).
-  globalThis.__LT_ORBIT_TEST__={period(){const w=layoutBox&&layoutBox.w<=650?ringsNarrow:rings;return Math.round(ORBIT_MS/(w[cards[0].ring].speed));},hold(on){if(on){orbitPause();stopOrbitLoop();}else{orbitResume();startOrbitLoop();}},seek(t){for(let i=0;i<elements.length;i++){
+  globalThis.__LT_ORBIT_TEST__={lastWriteAt(){return lastWriteAt;},progress(now){const cfg=(layoutBox&&layoutBox.w<=650?ringsNarrow:rings)[cards[0].ring];const el=now-orbitStart-pausedTotal-(pausedAt?now-pausedAt:0);return ((el/Math.round(ORBIT_MS/cfg.speed))+phase)%1;},period(){const w=layoutBox&&layoutBox.w<=650?ringsNarrow:rings;return Math.round(ORBIT_MS/(w[cards[0].ring].speed));},hold(on){if(on){orbitPause();stopOrbitLoop();}else{orbitResume();startOrbitLoop();}},seek(t){for(let i=0;i<elements.length;i++){
    const frames=orbitFrames[i],el=elements[i];if(!frames||!frames.length||!el)continue;
    if(el.__seekSaved===undefined)el.__seekSaved=el.style.transform;
    const tf=orbitTransform(frames,t);if(tf){el.style.transform=tf;}}
