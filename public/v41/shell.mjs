@@ -319,6 +319,7 @@ const shellAuth=createAuth({
   $,
   getMember:()=>member,
   notify:text=>notify(text),
+  onAuthRequired:()=>shellHeader.paintAuthExpired(),
   closeAccountMenu:()=>closeAccountMenu(),
   openEditor:(mode,parentId)=>openEditor(mode,parentId),
   showScreen:file=>show(file)

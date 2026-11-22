@@ -111,6 +111,19 @@ function openAccountMenu(via='keyboard'){const owned=!!getMember()?.snapshot().o
  function applyAccountRoles(){const j=$('account-journal');if(j)j.hidden=!aiCustomer;const opsGroup=$('account-ops-group');if(opsGroup)opsGroup.hidden=!isAdmin;const p=$('account-my-posts');if(p)p.hidden=false;}
 async function loadAccountEmail(){emailTried=true;const answer=await accountApi.account().catch(()=>null);if(!answer?.ok){emailTried=false;return;}if(answer.email)accountEmail=answer.email;aiCustomer=!!answer.aiCustomer;isAdmin=!!answer.admin;applyAccountRoles();renderAccount();}
 function updateAccountControls(){const owned=!!getMember()?.snapshot().owned;if(!owned){accountEmail='';emailTried=false;aiCustomer=false;isAdmin=false;}document.querySelectorAll('[data-guest-login]').forEach(x=>x.hidden=owned);$('server').hidden=!owned;$('logout').hidden=!owned;applyAccountRoles();renderAccount();if(owned&&!accountEmail&&!emailTried)void loadAccountEmail();}
+// #1134: 401 뒤 상단 단추만 로그인으로 바뀌고 계정 메뉴는 그대로 남아 반쯤 로그아웃되던 것을 막는다.
+// authRequired()가 부르는 한 벌 — 계정 메뉴의 이메일·운영·로그아웃을 함께 로그아웃 상태로 맞춘다.
+function paintAuthExpired(){
+  accountEmail='';emailTried=false;aiCustomer=false;isAdmin=false;
+  renderAccount();
+  const pop=$('account-popover');if(pop){pop.hidden=true;pop.dataset.ltOpenedBy='';}
+  const avatar=$('account-avatar');if(avatar){avatar.hidden=true;avatar.setAttribute('aria-expanded','false');}
+  const logout=$('logout');if(logout)logout.hidden=true;
+  const menuLogout=$('account-logout');if(menuLogout)menuLogout.hidden=true;
+  const ops=$('account-ops-group');if(ops)ops.hidden=true;
+  const journal=$('account-journal');if(journal)journal.hidden=true;
+  const entry=$('account-entry');if(entry){entry.hidden=false;entry.textContent='로그인';}
+}
 
   return {
     flowNavigation,
@@ -121,6 +134,7 @@ function updateAccountControls(){const owned=!!getMember()?.snapshot().owned;if(
     openAccountMenu,
     loadAccountEmail,
     updateAccountControls,
+    paintAuthExpired,
     currentAccountEmail: () => accountEmail
   };
 }

@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 // #231 1-B②-2: 옮긴 헤더 함수를 직접 불러 결과를 본다(소스 글자 시험이 아니라 최소 가짜 DOM).
 import { createHeader } from '../public/v41/shell/header.mjs';
+import { createAuth } from '../public/v41/shell/auth.mjs';
 
 function fakeEl(extra = {}) {
   return {
@@ -32,6 +33,9 @@ function harness({ owned = false, trees = 0, tree = null, source = 'example', cu
     'account-avatar': fakeEl({ hidden: true }),
     'account-email': fakeEl(),
     'account-popover': fakeEl({ hidden: true }),
+    'account-ops-group': fakeEl(),
+    'account-logout': fakeEl(),
+    'account-journal': fakeEl(),
     'server': fakeEl(),
     'logout': fakeEl()
   };
@@ -295,3 +299,40 @@ test('#465 4: 저장본 표시 이름이 있으면 이메일과 무관하게 표
   await h.header.loadAccountEmail();
   assert.equal(h.els['account-avatar'].textContent, '윤', '표시 이름 첫 글자가 이메일 글자보다 우선(#368 규칙)');
 });
+
+test('#1134: 401 뒤 상단 단추·계정 메뉴가 같은 로그아웃 상태로 맞는다', () => {
+  const h = harness({ owned: true, trees: 1, tree: { id: 't0', title: '리센느', moments: [] }, source: 'server' });
+  try {
+    h.els['account-popover'].hidden = false;
+    h.els['account-logout'].hidden = false;
+    h.els['account-ops-group'].hidden = false;
+    h.header.paintAuthExpired();
+    assert.equal(h.els['account-entry'].textContent, '로그인', '상단 단추는 로그인');
+    assert.equal(h.els['account-entry'].hidden, false, '로그인 단추는 보인다');
+    assert.equal(h.els['account-avatar'].hidden, true, '계정 동그라미는 숨긴다');
+    assert.equal(h.els['account-popover'].hidden, true, '계정 메뉴는 닫는다');
+    assert.equal(h.els['account-logout'].hidden, true, '로그아웃 항목도 숨긴다');
+    assert.equal(h.els['account-ops-group'].hidden, true, '운영 묶음도 숨긴다');
+  } finally { h.restore(); }
+});
+
+test('#1134: authRequired()는 헤더의 로그아웃 상태 한 벌을 부른다(반쯤 로그아웃 금지)', () => {
+  const savedLoc = globalThis.location;
+  globalThis.location = { search: '', pathname: '/v41/', hash: '' };
+  const calls = [];
+  try {
+    const auth = createAuth({
+      $: id => ({ textContent: '', hidden: false }),
+      getMember: () => ({ snapshot: () => ({ owned: true }) }),
+      notify: t => calls.push(['notify', t]),
+      closeAccountMenu: () => calls.push(['close']),
+      openEditor: () => {},
+      showScreen: () => {},
+      onAuthRequired: () => calls.push(['paintAuthExpired'])
+    });
+    auth.authRequired();
+    assert.deepEqual(calls, [['paintAuthExpired'], ['close'], ['notify', '로그인 확인이 필요해요. 다시 로그인해 주세요.']], '헤더 상태 동기화를 먼저 부르고 안내를 띄운다');
+  } finally { globalThis.location = savedLoc; }
+});
+
+
