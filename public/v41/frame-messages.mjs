@@ -54,6 +54,7 @@ export const FRAME_MESSAGES = Object.freeze({
   treesRenamed: Object.freeze({ name: 'lt41-trees-renamed', from: '', to: '', payload: '없음' }),
   treesSaved: Object.freeze({ name: 'lt41-trees-saved', from: '화면', to: '화면', payload: '없음' }),
   updatesBand: Object.freeze({ name: 'lt41-updates-band', from: '', to: '', payload: '없음' }),
+  viewer: Object.freeze({ name: 'lt41-viewer', from: '화면', to: '셸', payload: 'open' }),
   write: Object.freeze({ name: 'lt41-write', from: '셸', to: '셸', payload: '없음' }),
 });
 

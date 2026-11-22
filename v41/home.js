@@ -88,7 +88,7 @@ function closeHomeViewer(){
  if(!viewer.classList.contains('open'))return;
  viewer.querySelector('iframe')?.remove();
  viewer.classList.remove('open');viewer.setAttribute('aria-hidden','true');
- try{parent.postMessage({type:'lt41-viewer',open:false},location.origin)}catch{}
+ try{parent.postMessage({type:MSG.viewer,open:false},location.origin)}catch{}
  vEl('mediaImageHome').hidden=true;vEl('mediaMemoHome').hidden=true;
  viewerOpener?.focus?.();viewerOpener=null;
 }
@@ -117,7 +117,7 @@ function openHomeViewer(moment){
   visual.append(frame);
  }
  viewer.classList.add('open');viewer.setAttribute('aria-hidden','false');
- try{parent.postMessage({type:'lt41-viewer',open:true},location.origin)}catch{}
+ try{parent.postMessage({type:MSG.viewer,open:true},location.origin)}catch{}
  vEl('mediaCloseHome').focus();
 }
 vEl('mediaCloseHome').onclick=closeHomeViewer;
