@@ -3,6 +3,8 @@
 export function mountScreenToolbar({ screen, titleFrom, tools = [] }) {
   const bar = document.createElement('div');
   bar.className = 'lt-screen-toolbar';
+  bar.setAttribute('role', 'region');
+  bar.setAttribute('aria-label', '화면 도구');
   bar.dataset.screen = screen;
   const title = document.createElement('span');
   title.className = 'lt-toolbar-title';
