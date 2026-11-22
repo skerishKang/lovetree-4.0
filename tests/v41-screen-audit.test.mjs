@@ -2773,3 +2773,48 @@ test('#1093 선반 40권 아래 링크와 책 겹침 0', { skip: REQUIRE ? false
     }
   } finally { await browser.close(); await new Promise((r) => server.close(r)); }
 });
+test('#1091: 책·보드 화면 도구 줄의 높이·바탕·단추 높이·글자 크기 계산값이 같다', { skip: !!skip, timeout: 120000 }, async () => {
+  const server = await serve();
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const measure = async (screen, width, theme) => {
+      const ctx = await browser.newContext({ viewport: { width, height: 900 } });
+      await ctx.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); } catch {} }, theme);
+      const page = await ctx.newPage();
+      const file = screen === 'book' ? 'track59-sketchbook.html' : 'track58-pinboard.html';
+      await page.goto(`${base}/v41/views/${file}`, { waitUntil: 'load' });
+      await page.waitForSelector('.lt-screen-toolbar', { timeout: 15000 });
+      const value = await page.evaluate((name) => {
+        const bar = document.querySelector('.lt-screen-toolbar');
+        const button = bar.querySelector('button');
+        const barStyle = getComputedStyle(bar);
+        const buttonStyle = getComputedStyle(button);
+        const content = document.querySelector(name === 'book' ? '.stage' : '.boardFrame');
+        return {
+          height: barStyle.height,
+          background: barStyle.backgroundColor,
+          buttonHeight: buttonStyle.height,
+          fontSize: buttonStyle.fontSize,
+          shelfBack: !!document.getElementById('shelfBackBtn'),
+          covered: !!content && bar.getBoundingClientRect().bottom > content.getBoundingClientRect().top
+        };
+      }, screen);
+      await ctx.close();
+      return value;
+    };
+    for (const [width, theme] of [[1440, 'night'], [1440, 'garden'], [390, 'night'], [390, 'garden']]) {
+      const book = await measure('book', width, theme);
+      const board = await measure('board', width, theme);
+      assert.deepEqual(book, board, `${width}·${theme}에서 책·보드 줄 계산값이 다르다`);
+      assert.equal(book.height, width === 390 ? '48px' : '52px');
+      assert.equal(book.buttonHeight, '36px');
+      assert.equal(book.shelfBack, false, '← 서재 단추가 남아 있다');
+      assert.equal(book.covered, false, '책 첫 줄이 도구 줄에 가려졌다');
+      assert.equal(board.covered, false, '보드 제목이 도구 줄에 가려졌다');
+    }
+  } finally {
+    await browser.close();
+    await new Promise((ok) => server.close(ok));
+  }
+});
