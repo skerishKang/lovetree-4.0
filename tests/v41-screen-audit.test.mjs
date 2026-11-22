@@ -703,12 +703,16 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
         const lines = (el) => { const range = document.createRange(); range.selectNodeContents(el); return range.getClientRects().length; };
         const card = document.getElementById('updates-card'), fab = document.getElementById('mobile-add');
         const text = document.getElementById('updates-card-text'), view = document.getElementById('updates-view');
-        return { card: box(card), fab: box(fab), gap: Math.round(fab.getBoundingClientRect().top - card.getBoundingClientRect().bottom), text: text.textContent.trim(), textLines: lines(text), viewLines: lines(view) };
+        const c = card.getBoundingClientRect();
+        // 단추가 카드 테두리 안쪽에 떠 있는지 — 위·아래·오른쪽 여백(테두리 1px 포함 3px 이상), 오른쪽 끝에 붙는다.
+        const inset = [view, document.getElementById('updates-dismiss')].map((b) => { const r = b.getBoundingClientRect(); return Math.round(Math.min(r.top - c.top, c.bottom - r.bottom, c.right - r.right)); });
+        return { card: box(card), fab: box(fab), gap: Math.round(fab.getBoundingClientRect().top - card.getBoundingClientRect().bottom), text: text.textContent.trim(), textLines: lines(text), viewLines: lines(view), inset };
       });
       assert.equal(cardPair.card.width, 358, `390 새 소식 카드가 원래 전체 폭이다: ${JSON.stringify(cardPair)}`);
       assert.equal(cardPair.gap, 8, `390 카드 아래와 ＋ 위 간격이 8px이다: ${JSON.stringify(cardPair)}`);
       assert.equal(cardPair.textLines, 1, `390 새 소식 카드 문구가 한 줄이다: ${JSON.stringify(cardPair)}`);
       assert.equal(cardPair.viewLines, 1, `390 보기 단추 문구가 한 줄이다: ${JSON.stringify(cardPair)}`);
+      assert.ok(cardPair.inset.every((v) => v >= 3), `390 보기·× 단추가 카드 테두리에 닿지 않는다: ${JSON.stringify(cardPair)}`);
       assert.match(cardPair.text, /\d+\.\d+\.\d+/, `390 카드에 최신 버전 글자가 보인다: ${JSON.stringify(cardPair)}`);
     }
     await raiseToast(page4);
