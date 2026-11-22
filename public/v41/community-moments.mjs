@@ -16,6 +16,14 @@ function treeIcon(){
  return svg;
 }
 const EMBED='https://www.youtube-nocookie.com/embed/';
+// #1098 2단계: 댓글 단추 아이콘 — 나무 선 아이콘과 같은 선 굵기·currentColor 한 벌.
+function bubbleIcon(){
+ const svg=document.createElementNS(SVG_NS,'svg');
+ for(const [key,value] of Object.entries({viewBox:'0 0 24 24',width:'24',height:'24',fill:'none',stroke:'currentColor','stroke-width':'1.6','stroke-linecap':'round','stroke-linejoin':'round','aria-hidden':'true'}))svg.setAttribute(key,value);
+ const bubble=document.createElementNS(SVG_NS,'path');bubble.setAttribute('d','M4 5h16v11H10l-6 4V5z');
+ svg.append(bubble);
+ return svg;
+}
 // 구간 재생: 시작·끝 초가 있으면 기존 구간 재생 규칙(start·end)대로 주소에 넣는다.
 const embedSrc=(id,item={})=>{
  const params=['autoplay=1','mute=1','playsinline=1','controls=0','rel=0','modestbranding=1','enablejsapi=1'];
@@ -26,7 +34,7 @@ const embedSrc=(id,item={})=>{
  return `${EMBED}${encodeURIComponent(id)}?${params.join('&')}`;
 };
 
-export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin}){
+export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin,api=null,when=null}){
  const stage=el('div','moments-stage');
  const card=el('div','moments-card');
  const media=el('div','moments-media');
@@ -48,7 +56,7 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin})
  const down=el('button','moments-step','▼');down.type='button';down.setAttribute('aria-label','다음 순간');
  nav.append(up,down);
  stage.append(card,rail,nav);
- let liked=false,heartButton=null;
+ let liked=false,heartButton=null,heartCount=null,commentsCount=null;
  const setLiked=(value)=>{
   liked=!!value;
   if(!heartButton)return;
@@ -56,8 +64,36 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin})
   heartButton.classList?.toggle?.('is-liked',liked);
   heartButton.setAttribute('aria-pressed',String(liked));
  };
+ // #1098 2단계: 그 순간의 ♡·댓글 수 — 공개 숫자 규칙(#824 결정 7)을 그대로, 3 미만은 숫자를 남기지 않는다.
+ const momentStats={hearts:0,comments:0};
+ const paintCount=(span,value)=>{if(span)span.textContent=Number(value)>=3?String(value):'';};
+ const paintCounts=()=>{paintCount(heartCount,momentStats.hearts);paintCount(commentsCount,momentStats.comments);};
+ const applyStats=(answer)=>{
+  if(!answer)return;
+  if(Number.isFinite(answer.hearts))momentStats.hearts=Number(answer.hearts);
+  if(Number.isFinite(answer.comments))momentStats.comments=Number(answer.comments);
+  if('hearted' in answer)setLiked(!!answer.hearted);
+  paintCounts();
+ };
+ async function loadStats(){
+  const item=current();if(!item||!item.shareId||!item.id||!api||typeof api.momentStats!=='function')return;
+  const answer=await api.momentStats(item.shareId,item.id);
+  if(!answer.ok||current()!==item)return; // 모양이 다른 응답(모의 응답)·넘겨 뒤 늦게 온 응답은 조용히 버린다
+  applyStats(answer);
+ }
+ async function toggleHeart(){
+  const item=current();if(!item||!item.shareId||!item.id||!api||typeof api.momentReact!=='function')return setLiked(!liked);
+  const enabled=!liked;
+  setLiked(enabled); // 낙관적 표시 — 서버가 막으면 되돌린다
+  const answer=await api.momentReact(item.shareId,item.id,enabled);
+  if(answer.ok){applyStats(answer);return;}
+  setLiked(!enabled); // 막히면 되돌리고 서버 응답 안내를 그대로 보여 준다
+  notify?.((answer&&answer.message)||(answer.status===401?'로그인하면 공감을 남길 수 있어요.':'공감을 남기지 못했어요.'));
+  if(answer.status===401)memberLogin?.();
+ }
  const railButtons=[
-  {icon:'♡',label:'마음',action:()=>setLiked(!liked)},
+  {icon:'♡',label:'마음',action:()=>toggleHeart()},
+  {icon:bubbleIcon(),label:'댓글',action:()=>current()&&openComments()},
   {icon:treeIcon(),label:'트리',action:()=>current()&&onOpenShare?.({shareId:current().shareId,view:'book'})},
   {icon:'＋',label:'담기',action:()=>current()&&openAddDialog(current())},
   {icon:'↗',label:'공유',action:()=>current()&&copyShare(current())}
@@ -70,7 +106,8 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin})
   button.append(icon,el('span','moments-rail-label',spec.label));
   if(spec.action)button.onclick=spec.action;
   else{button.disabled=true;button.title='랭킹과 함께 정해요';button.setAttribute('aria-disabled','true');}
-  if(spec.label==='마음'){button.classList?.add?.('is-heart');heartButton=button;setLiked(false);}
+  if(spec.label==='마음'){button.classList?.add?.('is-heart');heartButton=button;setLiked(false);heartCount=el('span','moments-rail-count','');button.append(heartCount);}
+  if(spec.label==='댓글'){commentsCount=el('span','moments-rail-count','');button.append(commentsCount);}
   rail.append(button);
  }
  const chips=el('div','moments-chips');chips.setAttribute('role','group');chips.setAttribute('aria-label','가수 고르기');
@@ -102,6 +139,65 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin})
   }));
   addDialog.hidden=false;
  }
+ // #1098 2단계: 순간 댓글 창 — 읽기·쓰기는 순간 단위 API(서버 #1136). 막히면 서버 응답 안내를 그대로 보여 주고,
+ // 로그아웃(401)에는 트리 댓글과 같이 로그인 안내를 곁들인다. AI 명예회원 댓글은 트리 작성자 표시와 같은 방식으로 구분한다.
+ const commentsDialog=el('div','moments-comments-dialog');commentsDialog.setAttribute('role','dialog');commentsDialog.setAttribute('aria-modal','true');commentsDialog.setAttribute('aria-label','순간 댓글');commentsDialog.hidden=true;
+ const commentsTitle=el('h3','moments-comments-title','댓글');
+ const commentsClose=el('button','moments-add-close','×');commentsClose.type='button';commentsClose.setAttribute('aria-label','닫기');commentsClose.onclick=()=>{commentsDialog.hidden=true;};
+ const commentsNotice=el('p','moments-comments-notice');commentsNotice.setAttribute('role','status');commentsNotice.hidden=true;
+ const commentsList=el('div','moments-comments-list');
+ const commentsForm=el('form','community-comment-form');const commentsInput=el('textarea','');const commentsSubmit=el('button','community-mini','댓글 남기기');
+ commentsInput.maxLength=1000;commentsInput.required=true;commentsInput.placeholder='이 순간에 남길 말을 적어 주세요.';commentsSubmit.type='submit';
+ commentsForm.append(commentsInput,commentsSubmit);
+ commentsDialog.append(commentsTitle,commentsClose,commentsNotice,commentsList,commentsForm);
+ panel.append(commentsDialog);
+ const whenOf=(value)=>{try{return when?when(value):String(value||'').slice(0,10);}catch{return '';}};
+ const paintCommentsRow=(comment)=>{
+  const item=el('article','community-comment');const edited=comment.edited?' · 수정됨':'';
+  item.append(el('small','',`${comment.aiTester?'AI 명예회원 ':''}${comment.authorLabel} · ${whenOf(comment.createdAt)}${edited}`));
+  item.append(el('p','',comment.body));
+  return item;
+ };
+ const emptyComments=()=>el('p','community-muted','아직 댓글이 없어요. 첫 댓글을 남겨 보세요.');
+ let commentsCache=[];
+ const paintCommentRows=(list)=>{
+  commentsList.replaceChildren(...(list.length?list.map(paintCommentsRow):[emptyComments()]));
+  commentsTitle.textContent=Number(list.length)>=3?`댓글 ${list.length}`:'댓글';
+  momentStats.comments=list.length;paintCounts();
+ };
+ async function openComments(){
+  const item=current();if(!item||!item.shareId||!item.id||!api||typeof api.momentComments!=='function')return;
+  commentsDialog.hidden=false;commentsNotice.hidden=true;
+  commentsTitle.textContent='댓글';
+  commentsList.replaceChildren(el('p','community-muted','댓글을 불러오는 중…'));
+  const answer=await api.momentComments(item.shareId,item.id);
+  if(current()!==item){commentsDialog.hidden=true;return;} // 넘겨 뒤 늦게 온 응답은 버린다
+  if(!answer.ok){
+   commentsNotice.textContent=(answer&&answer.message)||(answer.status===401?'로그인하면 댓글을 남길 수 있어요.':'댓글을 불러오지 못했어요.');
+   commentsNotice.hidden=false;
+   if(answer.status===401)memberLogin?.();
+   commentsList.replaceChildren();
+   return;
+  }
+  const list=Array.isArray(answer.comments)?answer.comments:[];
+  commentsCache=list;paintCommentRows(list);
+ }
+ commentsForm.onsubmit=async event=>{
+  event.preventDefault();commentsSubmit.disabled=true;
+  const item=current();
+  const answer=item?await api.momentComment(item.shareId,item.id,commentsInput.value):{ok:false,status:0,message:''};
+  commentsSubmit.disabled=false;
+  if(!answer.ok){
+   commentsNotice.textContent=(answer&&answer.message)||(answer&&answer.status===401?'로그인하면 댓글을 남길 수 있어요.':'댓글을 남기지 못했어요.');
+   commentsNotice.hidden=false;
+   if(answer.status===401)memberLogin?.();
+   return;
+  }
+  commentsInput.value='';commentsNotice.hidden=true;
+  // 서버가 돌려 준 그 댓글을 그 자리에 더한다(POST 응답 {comment}) — 다시 읽어 오는 동안 목록이 깜빡이지 않게.
+  if(answer.comment&&answer.comment.body!=null){commentsCache=[...commentsCache,answer.comment];paintCommentRows(commentsCache);}
+  else await openComments();
+ };
  // 공유: 공개 공유가 있는 순간은 /t/<shareId> 주소가 늘 있다 — 복사할 주소가 없으면 원본 영상 주소로 돌린다.
  async function copyShare(item){
   const url=item.shareId?new URL('/t/'+encodeURIComponent(item.shareId),location.origin).href:(item.url||'');
@@ -173,6 +269,8 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin})
   currentFrame=now;
   stage.dataset.ltMomentsCount=String(frames.length);
   stage.dataset.ltMomentsId=item.videoId||item.id;
+  commentsDialog.hidden=true; // 순간을 넘기면 댓글 창을 닫는다 — 다음 순간 것을 다시 열게
+  void loadStats(); // 그 순간의 ♡·댓글 수 — 모양이 다른 응답은 조용히 기본 표시를 유지한다
  }
  let currentFrame=null;
  async function load(){

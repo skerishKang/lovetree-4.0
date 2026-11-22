@@ -943,6 +943,20 @@ body.community-screen #stage>iframe,body.community-screen #empty{display:none}
 #community-preview .community-more-button::-webkit-details-marker{display:none}
 #community-preview .community-more-panel{display:grid;gap:12px;min-width:min(380px,calc(100vw - 48px));margin-top:8px;padding:14px;border:1px solid var(--lt-line-paper);border-radius:var(--lt-r-card);background:var(--lt-paper);color:var(--lt-ink)}
 #community-preview .community-menu-title{margin:0;color:var(--lt-ink);font-size:15px}
+/* #1098 2단계: 판의 순간 목록 — 판 위쪽(트리 숫자)과 섞지 않게, 이 목록의 순간 카드만 그 순간의 ♡·댓글 수를 보인다. */
+#community-preview .community-moment-list{display:grid;gap:8px}
+#community-preview .community-moment-list[hidden]{display:none}
+#community-preview .community-moment{display:grid;gap:6px;padding:10px 12px;border:1px solid var(--lt-line-paper);border-radius:var(--lt-r-card);background:var(--lt-paper)}
+#community-preview .community-moment-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px}
+#community-preview .community-moment-title{color:var(--lt-ink);font-size:14px;font-weight:700}
+#community-preview .community-moment-date{color:var(--lt-ink);font-size:12px;opacity:.75}
+#community-preview .community-moment-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+#community-preview .community-moment-heart .community-moment-heart-glyph{font-size:16px}
+#community-preview .community-moment-count{font-weight:700}
+#community-preview .community-moment-note{margin:0;color:var(--lt-ink);font-size:13px;line-height:1.5}
+#community-preview .community-moment-note[hidden]{display:none}
+#community-preview .community-moment-comments{display:grid;gap:8px}
+#community-preview .community-moment-comments[hidden]{display:none}
 #community-preview .community-comment-host,#community-preview .community-comments{display:grid;gap:10px}
 #community-preview .community-comment,#community-preview .community-comment-form,#community-preview .community-comment-edit{display:grid;gap:8px;color:var(--lt-ink)}
 #community-preview .community-comment small,#community-preview .community-comment p,#community-preview .community-muted{margin:0;color:var(--lt-ink);font-size:13px;line-height:1.5}
