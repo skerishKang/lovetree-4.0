@@ -1,6 +1,9 @@
 name: Check
+# PR 브랜치에 push하면 push 실행과 PR 실행이 둘 다 돌아 같은 잡이 두 벌 돈다(2026-11-22 CI 대기 원인).
+# push 실행은 main에만 두고, 작업 브랜치는 PR 실행 하나로 본다.
 on:
   push:
+    branches: [main]
   pull_request:
 permissions:
   contents: read
