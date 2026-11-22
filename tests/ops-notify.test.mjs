@@ -91,7 +91,7 @@ test('실패분은 다음 의견 때 다시 보내고 같은 글은 한 번만 �
 
   const second = await notify.notify({ kind: 'feedback_append', audience: 'ai', title: '덧붙임', sourceId: 'p2' });
   assert.equal(second.sent, true);
-  await waitUntil(() => sink.seen.filter((item) => item.status === 200).length === 2);
+  await waitUntil(() => sink.seen.filter((item) => item.status === 200).length === 2 && notify.pending.length === 0);
   assert.deepEqual(sink.seen.filter((item) => item.status === 200).map((item) => item.body.source_id).sort(), ['p1', 'p2']);
   assert.equal(notify.pending.length, 0);
 
@@ -115,7 +115,7 @@ test('10분 주기에도 실패분을 다시 보낸다', async (t) => {
   assert.equal(first.sent, false);
   assert.equal(typeof tick, 'function');
   tick();
-  await waitUntil(() => sink.seen.length === 2);
+  await waitUntil(() => sink.seen.length === 2 && notify.pending.length === 0);
   assert.equal(notify.pending.length, 0);
 });
 
