@@ -84,6 +84,7 @@ new MutationObserver(placeToast).observe(document.body,{attributes:true,attribut
 placeToast();
 // #1103: 세 안내가 같은 줄을 차례로 지나간다. 판·띠가 떠 있는 동안 토스트는 띄우지 않는다.
 const noticeQueue=createNoticeQueue();
+const syncedNoticeKeys=new Set();
 // 안내 한 벌(#353 후속): 담기·중복·로그인 필요 안내(hold)가 상태 안내보다 먼저 일정 시간 보인다.
 // 안내가 스스로 내려가면(시간이 다 되어 숨을 때) 줄을 비워 다음 안내가 올라오게 한다.
 const shellNotice=createNotifier({$,beforeShow:placeToast,afterShow:()=>{placeToast();setTimeout(placeToast,600);setTimeout(placeToast,1400);},onHide:()=>{noticeQueue.release('toast');}});
@@ -940,10 +941,19 @@ function memberStatus(status){
   // #1076: 서버 기록을 처음 불러왔을 때만 한 번 — 화면 이동·다시 띄우기로 오는 synced 상태에서는 띄우지 않는다.
   if(!previousDirty){
    const text=syncedNoticeText({writable:status.writable,previousDirty,momentCount}),key='synced:'+String(member?.snapshot()?.subject||'session');
-   noticeQueue.request('toast',{maxWait:5000,
-    show:()=>shellNotice.notifyOnce(text,key),
-    hide:hideToast
-   });
+   // #952: 빈 첫 화면을 미리 열지 않으면 기록 응답이 새 소식 확인보다 앞설 수 있다.
+   // 새 소식 띠가 줄에 들어온 뒤 안내를 올려야 먼저 보였다가 가려지는 일이 없다.
+   if(!syncedNoticeKeys.has(key)){
+    const generation=loadGeneration;
+    void shellSettings.updatesReady.then(()=>{
+     if(generation!==loadGeneration||!member?.snapshot().owned||syncedNoticeKeys.has(key))return;
+     syncedNoticeKeys.add(key);
+     noticeQueue.request('toast',{maxWait:5000,
+      show:()=>shellNotice.notifyOnce(text,key),
+      hide:hideToast
+     });
+    }).catch(error=>report(error,'새 소식 확인'));
+   }
   }
   // 소개 질문(2026-11-16 대표 결정): 아직 안 물은 트리 중 순간 3개 이상인 것이 있으면 묻는다 —
   // 2→3 저장 직후가 대표 경로다. 직전 관측 스냅샷(상태마다 재촬영)은 두지 않는다(#718 원인): 재촬영하면

@@ -91,7 +91,8 @@ const themeToggleTop=$('theme-toggle');if(themeToggleTop)themeToggleTop.onclick=
  $('account-my-news').onclick=()=>{closeAccountMenu();void myNewsMount.open();};
  $('updates-link').onclick=()=>{void updatesMount.openUpdates();};
  $('settings-updates-open').onclick=()=>{$('account-settings').close();void updatesMount.openUpdates();};
- void updatesMount.start();
+ // #952: 첫 접속 안내는 새 소식 여부를 확인한 뒤 차례로 올린다.
+ const updatesReady=updatesMount.start();
  if(deps.member?.snapshot?.().owned)void feedbackBoard.refreshReplyDot();
  if(deps.member?.snapshot?.().owned)void myNewsMount.refreshCount();
  $('advanced-backup').onclick=()=>backup();
@@ -543,7 +544,7 @@ document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{if(b.dataset.
 for(const f of frames())f.addEventListener('load',()=>{frameLoaded(f);
  // #894: 새로 뜬 안쪽 화면에도 움직임 끄기 상태를 알린다(메모리 상태 — 화면을 다시 열면 처음 상태).
  try{f.contentWindow.postMessage({type:MSG.motion,paused:deps.motionPaused},location.origin)}catch{}});
-return { showPublicRoute, getFeedbackDialog:()=>feedbackDialog, getFeedbackBoard:()=>feedbackBoard, refreshMyNewsCount:()=>myNewsMount.refreshCount(), openMyNews:()=>myNewsMount.open(), getAccountTip:()=>accountTip, applyAdvanced, applyDateStyleToFrame, applyPageTurnToFrame, applyNetworkViewToFrame, applyBoardThemeToFrame, syncBoardThemeToApp, quickTargetPreference, profileDirty, paintSettingsProfile, accountConfirmMatches, openAccountData, openAccountSettings, paintDateStyleControls, paintStartPlaceControls, paintShareControls, paintQuickTargetControls, paintNetworkViewControls, paintPageTurnControls, paintBoardThemeControls, paintTreeVisibilityList, paintSettingsUsage, loadTreeVisibility, paintTreeManagerVisibility, paintSettingsTab, focusSettingsSection, fillProfileForm, paintScreenControls, readAdvanced, advancedKey, currentDateStyle, currentPageTurn, sendToFrame, currentStartPlace, currentShareView, currentBoardTheme };
+return { updatesReady, showPublicRoute, getFeedbackDialog:()=>feedbackDialog, getFeedbackBoard:()=>feedbackBoard, refreshMyNewsCount:()=>myNewsMount.refreshCount(), openMyNews:()=>myNewsMount.open(), getAccountTip:()=>accountTip, applyAdvanced, applyDateStyleToFrame, applyPageTurnToFrame, applyNetworkViewToFrame, applyBoardThemeToFrame, syncBoardThemeToApp, quickTargetPreference, profileDirty, paintSettingsProfile, accountConfirmMatches, openAccountData, openAccountSettings, paintDateStyleControls, paintStartPlaceControls, paintShareControls, paintQuickTargetControls, paintNetworkViewControls, paintPageTurnControls, paintBoardThemeControls, paintTreeVisibilityList, paintSettingsUsage, loadTreeVisibility, paintTreeManagerVisibility, paintSettingsTab, focusSettingsSection, fillProfileForm, paintScreenControls, readAdvanced, advancedKey, currentDateStyle, currentPageTurn, sendToFrame, currentStartPlace, currentShareView, currentBoardTheme };
 }
 
 

@@ -158,6 +158,18 @@ test('952 실행: 부팅이 끝나면 synced 안내가 토스트에 뜬다(기�
       await ctx.addInitScript(() => { try { localStorage.setItem('lt41.theme', 'night'); } catch {} });
       await ctx.route('**/api/**', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
       await ctx.route('**/api/workspace*', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ revision: 1, state: { version: 1, trees }, subject: '검사기계정', writeSubjectBound: true, savedAt: '2026-11-16T09:00:00.000Z' }) }));
+      await ctx.addInitScript(() => {
+        window.__noticeTrace = [];
+        let previous = '';
+        new MutationObserver(() => {
+          const snapshot = ['tree-tips', 'updates-card', 'toast'].map(id => {
+            const el = document.getElementById(id);
+            return [id, el?.hidden, id === 'toast' ? el?.textContent : ''];
+          });
+          const key = JSON.stringify(snapshot);
+          if (key !== previous) { previous = key; window.__noticeTrace.push([Math.round(performance.now()), snapshot]); }
+        }).observe(document, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden'] });
+      });
       const page = await ctx.newPage();
       try {
         await page.goto(`${base}/v41/?account=1`, { waitUntil: 'load' });
@@ -172,6 +184,83 @@ test('952 실행: 부팅이 끝나면 synced 안내가 토스트에 뜬다(기�
           const toast = document.getElementById('toast');
           return !!toast && !toast.hidden && toast.textContent === want;
         }, expected, { timeout: 20000 });
+      } catch (error) {
+        console.log('안내 변화', trees.length, JSON.stringify(await page.evaluate(() => window.__noticeTrace)));
+        throw error;
+      } finally { await ctx.close(); }
+    }
+  } finally { await browser.close(); server.close(); }
+});
+
+test('#952: 늦은 새 소식·회원 응답에서도 부팅 완료 안내는 한 번만 뜬다', { skip: REQUIRE952N ? false : skip952n || undefined, timeout: 180000 }, async () => {
+  if (skip952n) assert.fail(skip952n);
+  const { serve } = await import('./helpers/screen-audit.mjs');
+  const server = await serve({});
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium952n.launch();
+  try {
+    for (const scenario of [
+      { name: '기록 있음', trees: [tree952(1)], status: 200, delay: 0, cpu: 1 },
+      { name: '기록 없음', trees: [], status: 200, delay: 0, cpu: 1 },
+      { name: '응답 지연', trees: [], status: 200, delay: 600, cpu: 1 },
+      { name: '느린 기기', trees: [tree952(1)], status: 200, delay: 600, cpu: 4 },
+      { name: '인증 실패', trees: [], status: 401, delay: 600, cpu: 4 },
+      { name: '조회 실패', trees: [], status: 503, delay: 600, cpu: 4 }
+    ]) {
+      const { name, trees, status, delay, cpu } = scenario;
+      const expected = trees.length ? '내 기록을 불러왔어요.' : '반가워요. 첫 순간을 남겨 보세요.';
+      const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
+      try {
+        await ctx.addInitScript(() => {
+          localStorage.setItem('lt41.theme', 'night');
+          window.__bootNotices = [];
+          let visible = '';
+          new MutationObserver(() => {
+            const t = document.getElementById('toast');
+            const next = t && !t.hidden ? t.textContent : '';
+            if (next && next !== visible) window.__bootNotices.push(next);
+            visible = next;
+          }).observe(document, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden'] });
+        });
+        await ctx.route('**/api/**', route => route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
+        await ctx.route('**/api/workspace*', async route => {
+          if (delay) await new Promise(resolve => setTimeout(resolve, delay));
+          await route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(status === 200
+            ? { revision: 1, state: { version: 1, trees }, subject: '검사기계정', writeSubjectBound: true, savedAt: '2026-11-16T09:00:00.000Z' }
+            : { ok: false, code: status === 401 ? 'unauthenticated' : 'unavailable' }) });
+        });
+        // 기록이 먼저 도착하고 새 소식이 나중에 줄에 들어오는 순서를 고정한다.
+        await ctx.route('**/v41/updates.json', async route => {
+          await new Promise(resolve => setTimeout(resolve, 900));
+          await route.continue();
+        });
+        const page = await ctx.newPage();
+        if (cpu !== 1) {
+          const cdp = await ctx.newCDPSession(page);
+          await cdp.send('Emulation.setCPUThrottlingRate', { rate: cpu });
+        }
+        await page.goto(`${base}/v41/?account=1`, { waitUntil: 'load' });
+        // 새 소식·첫 트리 안내를 각각 한 번만 닫는다. 완료 안내를 다시 요청하지 않는다.
+        for (const id of ['tree-tips', 'updates-card']) {
+          if (id === 'tree-tips' && !trees.length) continue;
+          await page.waitForFunction(id => !document.getElementById(id)?.hidden, id, { timeout: 10000 });
+          await page.click(id === 'tree-tips' ? '#tree-tips-close' : '#updates-dismiss');
+        }
+        if (status === 200) {
+          await page.waitForFunction(want => {
+            const t = document.getElementById('toast');
+            return !!t && !t.hidden && t.textContent === want;
+          }, expected, { timeout: 20000 });
+          // 같은 안내가 다시 나타나지 않으며 기존 표시 시간이 지나면 사라진다.
+          await page.waitForFunction(() => document.getElementById('toast').hidden, null, { timeout: 10000 });
+        } else {
+          await page.waitForFunction(() => document.body.dataset.member === 'out' && document.getElementById('account-avatar').hidden, null, { timeout: 10000 });
+          if (status === 503) assert.equal(await page.evaluate(() => window.__bootNotices.some(t => t.includes('확인하지 못했어요'))), true, name);
+        }
+        const notices = await page.evaluate(() => window.__bootNotices);
+        const count = notices.filter(text => ['내 기록을 불러왔어요.', '반가워요. 첫 순간을 남겨 보세요.'].includes(text)).length;
+        assert.equal(count, status === 200 ? 1 : 0, name + ': ' + JSON.stringify(notices));
+        console.log(name, '완료 안내', count, '회');
       } finally { await ctx.close(); }
     }
   } finally { await browser.close(); server.close(); }
