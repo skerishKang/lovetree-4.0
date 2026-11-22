@@ -25,10 +25,10 @@ function privateMedia(value) {
   try { return new URL(value, 'https://lovetree.invalid').pathname.startsWith('/api/media/'); }
   catch { return true; }
 }
-export function projectSharedTree(document, treeId) {
+// #1067: 이미 검증한 주인 문서 사본으로 트리 공개 사본을 만든다(요청 안에서만 재사용).
+export function projectSharedTreeFromScan(scan, treeId) {
   // #986: 저장된 문서에 격리 트리가 섞여 있어도, 읽을 수 있는 트리의 공유는 그대로 동작한다.
   // 문서 전체를 검사하면 트리 하나 때문에 공유 만들기·공개 읽기·커뮤니티 카드가 함께 실패한다.
-  const scan = readStoredDocument(document);
   if (!scan) throw new ApiError(500, 'stored_document_invalid', '보관된 기록을 읽을 수 없어요.');
   const source = scan.state.trees.find(tree => tree.id === treeId);
   if (!source) throw new ApiError(410, 'share_removed', '공유된 트리가 삭제되었거나 더 이상 존재하지 않아요.');
@@ -45,6 +45,9 @@ export function projectSharedTree(document, treeId) {
   // 디자인이 없으면 기본 색 표지로 바꾼다. 저장본은 건드리지 않는다.
   if (coverModeOf(source) === 'photo') tree.coverMode = normalizeCoverDesign(source.coverDesign) ? 'design' : 'basic';
   return { tree, omittedPrivateMedia };
+}
+export function projectSharedTree(document, treeId) {
+  return projectSharedTreeFromScan(readStoredDocument(document), treeId);
 }
 function selectEntry(tree, value) {
   if (typeof value === 'string' && RECORD_ID.test(value) && tree.moments.some(moment => moment.id === value)) return value;
