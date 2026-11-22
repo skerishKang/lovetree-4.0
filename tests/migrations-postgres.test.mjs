@@ -93,6 +93,64 @@ test('migrations apply cleanly to empty DB and are re-runnable', { skip }, async
       /check|violates/i
     );
 
+    // ③-2 #1098 2단계: 반응·댓글 표의 대상 칸(덧붙이기만) — 기존 방식 INSERT는 'tree'로 채워지고,
+    // 순간 행은 대상 조합이 PK/유일 제약으로 하나만 남는다(같은 요청 두 번 막기). 신고 표에는
+    // 순간 댓글 신고가 어떤 댓글인지 comment_id 칸으로 남는다.
+    const targetColumns = await pool.query(
+      `SELECT table_name, column_name
+         FROM information_schema.columns
+        WHERE table_name IN ('lovetree_community_reactions','lovetree_community_comments')
+          AND column_name IN ('target_kind','moment_id')
+        ORDER BY table_name, column_name`
+    );
+    assert.equal(targetColumns.rows.length, 4, '반응·댓글 표에 대상 칸(target_kind·moment_id)이 있어야 한다');
+    const reportColumn = await pool.query(
+      `SELECT column_name FROM information_schema.columns
+        WHERE table_name = 'lovetree_community_reports' AND column_name = 'comment_id'`
+    );
+    assert.equal(reportColumn.rows.length, 1, '신고 표에 comment_id 칸이 있어야 한다(순간 댓글 신고용)');
+    const momentPrimaryKey = await pool.query(
+      `SELECT pg_get_constraintdef(oid) AS def FROM pg_constraint
+        WHERE conname = 'lovetree_community_reactions_pkey'`
+    );
+    assert.match(String(momentPrimaryKey.rows[0]?.def), /moment_id/, '반응 PK는 moment_id를 포함해야 한다');
+    const seededTreeRow = await pool.query(
+      `INSERT INTO lovetree_community_reactions(product_id, share_id, subject_id, kind)
+       VALUES ($1, $2, 'reader', 'heart') RETURNING target_kind, moment_id`,
+      [productId, shareId]
+    );
+    assert.equal(seededTreeRow.rows[0].target_kind, 'tree', '기존 방식 INSERT(대상 칸 없음)는 tree로 채워진다');
+    assert.equal(seededTreeRow.rows[0].moment_id, '');
+    await pool.query(
+      `INSERT INTO lovetree_community_reactions(product_id, share_id, subject_id, kind, target_kind, moment_id)
+       VALUES ($1, $2, 'reader', 'heart', 'moment', 'm1')`,
+      [productId, shareId]
+    );
+    const momentReplay = await pool.query(
+      `INSERT INTO lovetree_community_reactions(product_id, share_id, subject_id, kind, target_kind, moment_id)
+       VALUES ($1, $2, 'reader', 'heart', 'moment', 'm1') ON CONFLICT DO NOTHING`,
+      [productId, shareId]
+    );
+    assert.equal(momentReplay.rowCount, 0, '같은 대상의 반응 재삽입은 무시되어야 한다(한 칸)');
+    await assert.rejects(
+      pool.query(
+        `INSERT INTO lovetree_community_reactions(product_id, share_id, subject_id, kind, target_kind, moment_id)
+         VALUES ($1, $2, 'reader', 'heart', 'moment', '')`,
+        [productId, shareId]
+      ),
+      /check|violates/i,
+      '순간 행에 빈 moment_id는 받지 않는다'
+    );
+    const commentInsert = `INSERT INTO lovetree_community_comments(product_id, comment_id, share_id, subject_id, body, client_key, target_kind, moment_id)
+      VALUES ($1, $2, $3, 'reader', $4, $5, $6, $7)`;
+    await pool.query(commentInsert, [productId, 'c-tree', shareId, '트리 댓글', 'dup-key', 'tree', '']);
+    await pool.query(commentInsert, [productId, 'c-moment', shareId, '순간 댓글', 'dup-key', 'moment', 'm1']);
+    await assert.rejects(
+      pool.query(commentInsert, [productId, 'c-moment-2', shareId, '같은 순간 같은 키', 'dup-key', 'moment', 'm1']),
+      /duplicate|unique/i,
+      '같은 대상·같은 키의 댓글은 한 행만 허용된다'
+    );
+
     // ④ 계정 이메일: 표가 스키마에 있고, 같은 계정에 다시 쓰면 덮어쓴다(업서트).
     const emailColumns = await pool.query(
       `SELECT column_name, is_nullable, data_type

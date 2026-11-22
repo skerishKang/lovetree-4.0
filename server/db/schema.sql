@@ -246,13 +246,19 @@ CREATE TABLE IF NOT EXISTS lovetree_stage_saves (
 CREATE INDEX IF NOT EXISTS lovetree_stage_saves_subject_idx
   ON lovetree_stage_saves (product_id, subject_id);
 
+-- #1098 2단계(261122): 반응 표에 대상 종류(target_kind)와 순간 id(moment_id)를 덧붙인다.
+-- 기존 행은 전부 'tree'(기존 트리 단위 반응)이고 moment_id 는 빈 값이다. 순간 반응은 target_kind='moment'
+-- 이고 같은 (공유, 대상 순간, 사람, 종) 조합이 PK로 하나만 남는다(같은 요청 두 번 막기 — idempotency).
 CREATE TABLE IF NOT EXISTS lovetree_community_reactions (
   product_id text NOT NULL,
   share_id text NOT NULL,
   subject_id text NOT NULL,
   kind text NOT NULL CHECK (kind IN ('heart','like','love','laugh','wow','sad','angry')),
+  target_kind text NOT NULL DEFAULT 'tree' CONSTRAINT lovetree_community_reactions_target_kind_check CHECK (target_kind IN ('tree','moment')),
+  moment_id text NOT NULL DEFAULT '',
   created_at timestamptz NOT NULL DEFAULT now(),
-  PRIMARY KEY (product_id, share_id, subject_id, kind)
+  PRIMARY KEY (product_id, share_id, subject_id, kind, moment_id),
+  CONSTRAINT lovetree_community_reactions_target_pair_check CHECK ((target_kind = 'tree' AND moment_id = '') OR (target_kind = 'moment' AND moment_id <> ''))
 );
 
 -- Existing deployments created with kind IN ('heart') only. Re-applying
@@ -277,6 +283,43 @@ BEGIN
 END
 $$;
 
+-- Existing deployments lack the moment-target columns (#1098 2단계). Re-applying
+-- schema.sql on them upgrades in place; the same statements live in
+-- server/db/migrations/community-moment-targets-261122.sql (not auto-applied).
+-- 덧붙이기만 한다 — 기존 행은 그대로 'tree'가 되고 데이터는 옮기거나 지우지 않는다.
+DO $$
+BEGIN
+  IF to_regclass('public.lovetree_community_reactions') IS NULL THEN
+    RETURN;
+  END IF;
+  ALTER TABLE lovetree_community_reactions ADD COLUMN IF NOT EXISTS target_kind text NOT NULL DEFAULT 'tree';
+  ALTER TABLE lovetree_community_reactions ADD COLUMN IF NOT EXISTS moment_id text NOT NULL DEFAULT '';
+  ALTER TABLE lovetree_community_reactions DROP CONSTRAINT IF EXISTS lovetree_community_reactions_target_kind_check;
+  ALTER TABLE lovetree_community_reactions
+    ADD CONSTRAINT lovetree_community_reactions_target_kind_check CHECK (target_kind IN ('tree','moment'));
+  ALTER TABLE lovetree_community_reactions DROP CONSTRAINT IF EXISTS lovetree_community_reactions_target_pair_check;
+  ALTER TABLE lovetree_community_reactions
+    ADD CONSTRAINT lovetree_community_reactions_target_pair_check
+    CHECK ((target_kind = 'tree' AND moment_id = '') OR (target_kind = 'moment' AND moment_id <> ''));
+  IF EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'lovetree_community_reactions'::regclass
+      AND conname = 'lovetree_community_reactions_pkey'
+      AND pg_get_constraintdef(oid) NOT LIKE '%moment_id%'
+  ) THEN
+    EXECUTE 'ALTER TABLE lovetree_community_reactions DROP CONSTRAINT lovetree_community_reactions_pkey';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'lovetree_community_reactions'::regclass
+      AND conname = 'lovetree_community_reactions_pkey'
+      AND pg_get_constraintdef(oid) LIKE '%moment_id%'
+  ) THEN
+    EXECUTE 'ALTER TABLE lovetree_community_reactions ADD CONSTRAINT lovetree_community_reactions_pkey PRIMARY KEY (product_id, share_id, subject_id, kind, moment_id)';
+  END IF;
+END
+$$;
+
 CREATE TABLE IF NOT EXISTS lovetree_community_comments (
   product_id text NOT NULL,
   comment_id text NOT NULL,
@@ -285,18 +328,49 @@ CREATE TABLE IF NOT EXISTS lovetree_community_comments (
   body text NOT NULL CHECK (char_length(body) BETWEEN 1 AND 1000),
   client_key text NOT NULL,
   status text NOT NULL DEFAULT 'visible' CHECK (status IN ('visible','deleted','hidden')),
+  target_kind text NOT NULL DEFAULT 'tree' CONSTRAINT lovetree_community_comments_target_kind_check CHECK (target_kind IN ('tree','moment')),
+  moment_id text NOT NULL DEFAULT '',
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   edited_at timestamptz,
   PRIMARY KEY (product_id, comment_id),
-  UNIQUE (product_id, subject_id, client_key)
+  CONSTRAINT lovetree_community_comments_client_target_key UNIQUE (product_id, subject_id, client_key, target_kind, moment_id),
+  CONSTRAINT lovetree_community_comments_target_pair_check CHECK ((target_kind = 'tree' AND moment_id = '') OR (target_kind = 'moment' AND moment_id <> ''))
 );
 -- Existing deployments lack edited_at. The column is nullable so old rows
 -- remain valid; the same ALTER lives in
 -- server/db/migrations/community-comments-enhance-261104.sql (not auto-applied).
 DO $$ BEGIN ALTER TABLE lovetree_community_comments ADD COLUMN IF NOT EXISTS edited_at timestamptz; END $$;
+-- #1098 2단계(261122): 댓글 표에도 대상 칸을 덧붙인다(기존 행은 'tree'). 같은 idempotency 키라도
+-- 대상이 다르면(트리 댓글 vs 순간 댓글, 순간이 다르면) 다른 요청이므로 유일 제약도 대상까지 본다.
+DO $$
+BEGIN
+  IF to_regclass('public.lovetree_community_comments') IS NULL THEN
+    RETURN;
+  END IF;
+  ALTER TABLE lovetree_community_comments ADD COLUMN IF NOT EXISTS target_kind text NOT NULL DEFAULT 'tree';
+  ALTER TABLE lovetree_community_comments ADD COLUMN IF NOT EXISTS moment_id text NOT NULL DEFAULT '';
+  ALTER TABLE lovetree_community_comments DROP CONSTRAINT IF EXISTS lovetree_community_comments_target_kind_check;
+  ALTER TABLE lovetree_community_comments
+    ADD CONSTRAINT lovetree_community_comments_target_kind_check CHECK (target_kind IN ('tree','moment'));
+  ALTER TABLE lovetree_community_comments DROP CONSTRAINT IF EXISTS lovetree_community_comments_target_pair_check;
+  ALTER TABLE lovetree_community_comments
+    ADD CONSTRAINT lovetree_community_comments_target_pair_check
+    CHECK ((target_kind = 'tree' AND moment_id = '') OR (target_kind = 'moment' AND moment_id <> ''));
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'lovetree_community_comments'::regclass
+      AND conname = 'lovetree_community_comments_client_target_key'
+  ) THEN
+    EXECUTE 'ALTER TABLE lovetree_community_comments DROP CONSTRAINT IF EXISTS lovetree_community_comments_product_id_subject_id_client_key_key';
+    EXECUTE 'ALTER TABLE lovetree_community_comments ADD CONSTRAINT lovetree_community_comments_client_target_key UNIQUE (product_id, subject_id, client_key, target_kind, moment_id)';
+  END IF;
+END
+$$;
 CREATE INDEX IF NOT EXISTS lovetree_community_comments_share_idx
   ON lovetree_community_comments (product_id, share_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS lovetree_community_comments_moment_idx
+  ON lovetree_community_comments (product_id, share_id, moment_id, created_at DESC);
 
 CREATE TABLE IF NOT EXISTS lovetree_community_reports (
   product_id text NOT NULL,
@@ -306,12 +380,16 @@ CREATE TABLE IF NOT EXISTS lovetree_community_reports (
   reason text NOT NULL CHECK (char_length(reason) BETWEEN 1 AND 500),
   client_key text NOT NULL,
   status text NOT NULL DEFAULT 'open' CHECK (status IN ('open','resolved','dismissed')),
+  comment_id text,
   created_at timestamptz NOT NULL DEFAULT now(),
   resolved_at timestamptz,
   resolved_by text,
   PRIMARY KEY (product_id, report_id),
   UNIQUE (product_id, reporter_subject_id, client_key)
 );
+-- #1098 2단계(261122): 순간 댓글 신고는 같은 신고 표·운영센터 길을 쓰고, 어떤 댓글인지 comment_id 로 붙인다.
+-- 기존 신고(트리 신고)는 comment_id 없음(NULL) — 처리(숨기기)는 트리를 숨기던 기존 규칙 그대로다.
+DO $$ BEGIN ALTER TABLE lovetree_community_reports ADD COLUMN IF NOT EXISTS comment_id text; END $$;
 
 CREATE TABLE IF NOT EXISTS lovetree_community_blocks (
   product_id text NOT NULL,
