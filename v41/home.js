@@ -93,6 +93,7 @@ function closeHomeViewer(){
 }
 function openHomeViewer(moment,opener=null){
  if(!moment||viewer.classList.contains('open'))return;
+ const orbitDialog=shadow.querySelector('dialog');if(orbitDialog?.open)orbitDialog.close();
  viewerOpener=opener||shadow.querySelector('.recent-card')||document.activeElement;
  const videoId=youtubeIdFrom(moment.url||'');
  vEl('mediaTitleHome').textContent=moment.title||'';
@@ -132,12 +133,13 @@ shadow.addEventListener('click',event=>{
 },true);
 shadow.addEventListener('click',event=>{
  const floating=event.target.closest?.('.card');
- if(!floating||event.target.closest?.('button,a'))return;
+ if(!floating||event.target.closest?.('[data-lt-title-edit],a[href]'))return;
  const label=floating.querySelector('.caption span')?.textContent||'';
- const moment=(momentList?.entries||[]).find(entry=>entry.id===floating.dataset.id||entry.title===label);
+ const pool=[...(momentList?.entries||[]),...(ORBIT_EXAMPLE?.moments||[])];
+ const moment=pool.find(entry=>entry.id===floating.dataset.id||(entry.title&&label.includes(entry.title)));
  if(!moment)return;
  event.stopPropagation();event.preventDefault();
- openHomeViewer(moment,floating);
+ openHomeViewer(moment,floating.querySelector('.surface')||floating);
 },true);
 // 261116 PR 2: 오른쪽 위 '순간 목록' 단추는 없앤다 — 목록 입구는 가운데 세트 첫 단추로 옮겼다.
 shadow.querySelector('.top-actions > .menuBtn[data-do="index"]')?.remove();

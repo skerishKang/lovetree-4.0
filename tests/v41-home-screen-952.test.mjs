@@ -124,11 +124,11 @@ test('#340 내 YouTube 순간은 ▶·유튜브 썸네일 카드로, 예시 포�
       const glyph = await video.first().locator('.playGlyph').evaluate(e => ({ hidden: e.getAttribute('aria-hidden'), text: e.textContent.trim() }));
       assert.equal(glyph.hidden, 'true');
       assert.equal(glyph.text, '▶');
-      // 내 카드를 누르면 예시 문구 대신 내 순간(책)으로 간다 — lt41-open-book이 셸에 닿는다.
+      // 내 카드를 누르면 화면을 옮기지 않고 그 자리에서 크게 보기를 연다.
       await h.page.evaluate(() => { window.__opened = []; addEventListener('message', e => { if (e.data?.type === 'lt41-open-book') window.__opened.push(e.data.treeId + '/' + e.data.id); }); });
       await video.first().locator('.surface').evaluate(e => e.click());
-      await h.page.waitForFunction(() => (window.__opened || []).length > 0, null, { timeout: 5000 });
-      assert.ok((await h.page.evaluate(() => window.__opened))[0].length > 0, '내 영상 카드는 내 순간 열기(lt41-open-book)로 이어진다');
+      await h.frame.locator('#mediaViewerHome.open').waitFor({ state: 'visible', timeout: 5000 });
+      assert.deepEqual(await h.page.evaluate(() => window.__opened), [], '누름에 화면 이동 요청이 없다');
     } finally { await close952(h); }
     // 예시(로그아웃 데모): 포스터 예시 카드는 재생 표시·유튜브 썸네일 없이 그려진다 —
     // ▶ 표시와 i.ytimg.com 썸네일은 내 YouTube 순간 카드만 붙는다(자세히 보기의
@@ -543,7 +543,10 @@ test('#1088 가운데 카드 누름은 화면 이동 없이 크게 보기를 연
 test('#1088 2단계 떠 있는 카드도 그 자리에서 크게 보기', { skip: REQUIRE952 ? false : skip952, timeout: 180000 }, async () => {
   if (skip952) assert.fail(skip952);
   const at = '2026-11-20T00:00:00.000Z';
-  let tree = createTree({ subject: '팬 트리', title: '이유가 있는 순간', date: '2026-11-20', emotion: '설렘', note: '기억', url: '' }, at);
+  let tree = createTree({ subject: '팬 트리', title: '이유가 있는 순간', date: '2026-11-20', emotion: '설렘', note: '기억', url: 'https://www.youtube.com/shorts/a1111111111' }, at);
+  tree.moments[0].mediaMetadata = { vertical: true, width: 1080, height: 1920 };
+  tree.moments[0].image = 'https://i.ytimg.com/vi/a1111111111/oardefault.jpg';
+  tree.moments[0].youtubeThumb = true;
   tree.moments[0].whyNext = '다음에 이어 볼 이유';
   for (let i = 1; i < 8; i += 1) tree = addMoment(tree, { title: '순간 ' + i, note: '', emotion: '설렘', date: '2026-11-20', url: '' }, tree.moments[0].id, at);
   const workspace = { revision: 1, state: { version: 1, trees: [tree], prefs: {} }, subject: 'visual-audit-fake', writeSubjectBound: true, savedAt: at };
@@ -579,11 +582,21 @@ test('#1088 2단계 떠 있는 카드도 그 자리에서 크게 보기', { skip
       await h.page.keyboard.press('Escape');
       assert.equal(await viewer.getAttribute('aria-hidden'), 'true', 'Esc로 닫힘');
 
-      const surface = frame.locator('.card.mine .surface, .card .surface').first();
-      await surface.waitFor({ state: 'visible', timeout: 15000 });
-      const label = await surface.getAttribute('aria-label');
+      const surface = frame.locator('.card.video .surface').first();
+      const label = await surface.evaluate(el => el.getAttribute('aria-label') || '');
+      const point = await surface.evaluate(el => { const r = el.getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; });
       await surface.click();
       await viewer.waitFor({ state: 'visible', timeout: 5000 });
+      const topmost = await frame.evaluate(({ x, y }) => {
+        const root = document.querySelector('#orbit').shadowRoot;
+        const hit = root.elementFromPoint(x, y);
+        const mid = root.querySelector('#mediaVisualHome').getBoundingClientRect();
+        const hitMid = root.elementFromPoint(Math.round(mid.left + mid.width / 2), Math.round(mid.top + mid.height / 2));
+        return { cls: hit ? String(hit.className || hit.tagName) : '', insideViewer: !!hit && !!root.querySelector('#mediaViewerHome').contains(hit), midCls: hitMid ? String(hitMid.className || hitMid.tagName) : '', midInside: !!hitMid && !!root.querySelector('#mediaViewerHome').contains(hitMid) };
+      }, point);
+      assert.equal(topmost.midInside, true, '가림막이 맨 위다: ' + JSON.stringify(topmost));
+      const dlg = await frame.evaluate(() => { const d = document.querySelector('#orbit').shadowRoot.querySelector('.orbit-dialog'); return d?.open || false; });
+      assert.equal(dlg, false, '뒤에 상세 창이 열리지 않는다');
       assert.deepEqual(await h.page.evaluate(() => window.__nav2), [], '화면 이동 요청 0');
       await h.page.keyboard.press('Escape');
       const focused = await frame.evaluate(() => document.querySelector('#orbit').shadowRoot.activeElement?.getAttribute('aria-label') || '');

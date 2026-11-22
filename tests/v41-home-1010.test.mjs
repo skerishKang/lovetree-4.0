@@ -160,36 +160,31 @@ test('#1010 섞어서(내 카드가 있는) 기존 사용자의 안내 줄은 �
   } finally { await browser.close(); }
 });
 
-test('#1010 예시 카드를 누르면 감상(자세히 보기)이 열리고, 책 읽기는 예시 기억책으로 간다', { skip: REQUIRE1010 ? false : skip1010, timeout: 180000 }, async () => {
+test('#1010 떠 있는 카드를 누르면 그 자리에서 크게 보고 책 길도 같다', { skip: REQUIRE1010 ? false : skip1010, timeout: 180000 }, async () => {
   if (skip1010) assert.fail(skip1010);
   const browser = await chromium1010.launch({ headless: true });
   try {
     const h = await boot1010(browser, { width: 1440 });
     try {
-      // 떠다니는 예시 카드(궤도)의 안쪽 .surface를 누른다 — .world가 포인터를 가로채므로 직접 클릭을 부른다(#952 #426과 같은 요령).
       const opened = await h.frame.locator('#orbit').evaluate(() => {
         const root = document.getElementById('orbit').shadowRoot;
         const surface = [...root.querySelectorAll('.card:not(.off) .surface')][0];
         if (!surface) return false;
         surface.click();
-        const dialog = root.querySelector('dialog');
-        return !!(dialog && dialog.open);
+        return !!root.querySelector('#mediaViewerHome.open');
       });
-      assert.ok(opened, '예시 카드를 누르면 자세히 보기 창이 열린다(수정 전에는 아무 반응이 없었다)');
-      const label = await h.frame.locator('#orbit').evaluate(() => {
-        const root = document.getElementById('orbit').shadowRoot;
-        const dialog = root.querySelector('dialog');
-        return { kicker: dialog.querySelector('.detail-copy small')?.textContent || '', book: dialog.querySelector('[data-do="book"]')?.textContent || '' };
-      });
-      assert.match(label.kicker, /감상 예시/, '창은 감상 예시임을 밝힌다: ' + label.kicker);
+      assert.ok(opened, '떠 있는 카드를 누르면 크게 보기 창이 열린다');
+      const before = await h.page.evaluate(() => (window.__lt1010msgs || []).filter(m => m && m.type === 'lt41-navigate').length);
       await h.frame.locator('#orbit').evaluate(() => {
         const root = document.getElementById('orbit').shadowRoot;
-        root.querySelector('dialog [data-do="book"]').click();
+        root.querySelector('#mediaBookHome').click();
       });
       await h.page.waitForFunction(() => (window.__lt1010msgs || []).some(m => m && m.type === 'lt41-example'), null, { timeout: 8000 });
       const msg = await h.page.evaluate(() => (window.__lt1010msgs || []).find(m => m && m.type === 'lt41-example'));
       assert.equal(msg.view, 'track59-sketchbook.html', '책 읽기는 예시 기억책 화면을 청한다: ' + JSON.stringify(msg));
       assert.ok(msg.momentId, '어느 순간을 볼지 함께 넘긴다: ' + JSON.stringify(msg));
+      const after = await h.page.evaluate(() => (window.__lt1010msgs || []).filter(m => m && m.type === 'lt41-navigate').length);
+      assert.equal(after, before, '화면 이동 요청은 늘지 않는다');
     } finally { await close1010(h); }
   } finally { await browser.close(); }
 });
