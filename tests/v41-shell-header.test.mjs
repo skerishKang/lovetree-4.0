@@ -183,7 +183,7 @@ test('renderAccount: 이메일이 없으면 subject를 쓰지 않고 점·내 �
 
 // #368 보완 1: 이메일을 메뉴를 열 때가 아니라 로그인 직후(updateAccountControls) 불러온다.
 test('updateAccountControls: 로그인 직후 계정 API를 불러 동그라미·라벨이 이메일을 쓰게 한다', async () => {
-  const email = 'fan02@love.io';
+  const email = 'fay@example.test';
   let calls = 0;
   const h = harness({ owned: true, accountApi: { account: async () => { calls += 1; return { ok: true, confirmKind: 'email', email }; } } });
   try {
@@ -228,7 +228,7 @@ test('updateAccountControls: 이메일 없는 계정은 한 번만 부르고, �
 });
 
 test('updateAccountControls: 로그아웃하면 이메일을 지워 다음 계정에 남기지 않는다', async () => {
-  const email = 'fan02@love.io';
+  const email = 'kate@example.test';
   const h = harness({ owned: true, accountApi: { account: async () => ({ ok: true, confirmKind: 'email', email }) } });
   try {
     h.header.updateAccountControls();
@@ -245,7 +245,7 @@ test('updateAccountControls: 로그아웃하면 이메일을 지워 다음 계�
 });
 
 test('loadAccountEmail: 계정 API가 이메일을 주면 갱신하고, 아니면 그대로 둔다', async () => {
-  const email = 'fan02@love.io';
+  const email = 'kate@example.test';
   const loaded = harness({ owned: true, accountApi: { account: async () => ({ ok: true, confirmKind: 'email', email }) } });
   try {
     await loaded.header.loadAccountEmail();
@@ -275,7 +275,7 @@ test('#465 4: 계정 정보를 부르는 동안에도 동그라미가 깜빡이�
 });
 
 test('#465 4: 저장본·직전 글자가 없으면 지금처럼 나였다가 이메일 글자로 바뀐다', async () => {
-  const email = 'fan02@love.io';
+  const email = 'fay@example.test';
   const h = harness({ owned: true, accountApi: { account: async () => ({ ok: true, confirmKind: 'email', email }) } });
   h.header.renderAccount();
   assert.equal(h.els['account-avatar'].textContent, '나', '다른 근거가 없으면 나로 시작(기존 동작)');
@@ -291,7 +291,7 @@ test('#465 4: 저장본·직전 글자가 없으면 지금처럼 나였다가 �
 });
 
 test('#465 4: 저장본 표시 이름이 있으면 이메일과 무관하게 표시 이름 첫 글자를 유지한다', async () => {
-  const h = harness({ owned: true, cachedName: '윤슬지기', accountApi: { account: async () => ({ ok: true, confirmKind: 'email', email: 'fan02@love.io' }) } });
+  const h = harness({ owned: true, cachedName: '윤슬지기', accountApi: { account: async () => ({ ok: true, confirmKind: 'email', email: 'kate@example.test' }) } });
   await h.header.loadAccountEmail();
   assert.equal(h.els['account-avatar'].textContent, '윤', '표시 이름 첫 글자가 이메일 글자보다 우선(#368 규칙)');
 });

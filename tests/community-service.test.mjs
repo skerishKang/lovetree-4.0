@@ -554,7 +554,7 @@ test('tag-moments: 소개가 꺼진 트리의 순간은 나오지 않는다(2026
 
 test('tag-moments: 응답은 제목·영상 주소·썸네일·무대 날짜·트리 이름·공유 링크·aiTester뿐 — 개인정보 필드가 없다',async()=>{
  const data=await tagSetup({
-  accounts:[{subject:'kimbs5993+tutorial01@gmail.com',trees:[{title:'공개 트리',moments:[
+  accounts:[{subject:'kate@example.test',trees:[{title:'공개 트리',moments:[
    {title:'비공개 미디어 순간',date:'2026-11-05',url:PHOTO,keywords:['무대:쇼챔피언']},
    {title:'영상 순간',date:'2026-11-04',url:TAG_URL,keywords:['무대:쇼챔피언'],mediaMetadata:{thumbnail:'https://i.ytimg.com/vi/abcdefghijk/hqdefault.jpg'}},
   ]}]}],

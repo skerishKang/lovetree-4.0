@@ -200,7 +200,7 @@ test('#1059 표 시험: 모든 진입 함수(정본·서재 모델)가 같은 �
     'https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=PL123',
     'https://www.youtube.com/playlist?list=PL123',
     'https://youtube.com.evil.test/watch?v=dQw4w9WgXcQ',
-    'https://user:pass@www.youtube.com/watch?v=dQw4w9WgXcQ',
+    'https://user:kate@example.test/watch?v=dQw4w9WgXcQ',
     'ftp://youtu.be/dQw4w9WgXcQ',
     'https://www.youtube.com/shorts/abcdefghijkEXTRA',
     'https://youtu.be/short',
