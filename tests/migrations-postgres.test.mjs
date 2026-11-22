@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { createPool } from '../server/db/postgres.js';
 import { assertIsolatedTestDatabase } from '../server/testing/isolated-test-database.js';
 import { createAccountRepo } from '../server/db/account-postgres.js';
+import { createShareShowPendingRepo } from '../server/db/share-show-pending-postgres.js';
 
 /**
  * 실제 PostgreSQL에서만 도는 migration 실행 시험.
@@ -582,6 +583,63 @@ test('내 소식 읽음 표 — 마이그레이션 재실행에도 같고, 되�
     assert.equal(gone.rows[0].t, null, '되돌리기 뒤에는 표가 없다');
     await pool.query(migration);
     const back = await pool.query(`SELECT to_regclass('public.lovetree_community_my_news_reads') AS t`);
+    assert.ok(back.rows[0].t, '다시 적용하면 표가 돌아온다');
+  } finally {
+    await pool.end();
+  }
+});
+
+// #1163(#1068 2단계) — 보임 동기화 실패 표식 표: 재실행 안전과 되돌리기 SQL 실행까지 확인한다.
+// 되돌리기는 이 마이그레이션이 만든 표 하나만 삭제한다(잘린 자동 이름을 추측할 일이 없다 — #1146 교훈).
+test('보임 동기화 표식 표 — 마이그레이션 재실행에도 같고, 되돌리기 SQL이 실행된 뒤 다시 적용된다', { skip }, async () => {
+  assertIsolatedTestDatabase(DATABASE_URL);
+  const pool = await createPool(DATABASE_URL, { max: 1 });
+  try {
+    const migrationPath = fileURLToPath(new URL('../server/db/migrations/share-show-pending-261122.sql', import.meta.url));
+    const rollbackPath = fileURLToPath(new URL('../server/db/rollbacks/share-show-pending-261122-rollback.sql', import.meta.url));
+    const migration = await readFile(migrationPath, 'utf8');
+    const rollback = await readFile(rollbackPath, 'utf8');
+
+    await pool.query(await readFile(SCHEMA_PATH, 'utf8'));
+    await pool.query(migration);
+    await pool.query(migration); // 재실행 안전 — 두 번 적용해도 같은 상태다.
+
+    const columns = await pool.query(
+      `SELECT column_name, data_type, is_nullable
+         FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'lovetree_share_show_pending'
+        ORDER BY ordinal_position`
+    );
+    assert.deepEqual(
+      columns.rows.map((row) => ({ column: row.column_name, type: row.data_type, nullable: row.is_nullable })),
+      [
+        { column: 'product_id', type: 'text', nullable: 'NO' },
+        { column: 'subject_id', type: 'text', nullable: 'NO' },
+        { column: 'created_at', type: 'timestamp with time zone', nullable: 'NO' }
+      ],
+      '보임 동기화 표식 표의 칸이 마이그레이션대로다'
+    );
+
+    // 표식 저장소의 실제 쓰기 — 계정당 한 줄, 재표식은 무시, 해제 뒤 다시 남길 수 있다.
+    const pending = createShareShowPendingRepo(pool);
+    const tag = Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
+    const productId = 'lt-' + tag;
+    await pending.mark({ productId, subjectId: 'sync-owner' });
+    await pending.mark({ productId, subjectId: 'sync-owner' });
+    assert.equal(await pending.has({ productId, subjectId: 'sync-owner' }), true);
+    await pending.clear({ productId, subjectId: 'sync-owner' });
+    assert.equal(await pending.has({ productId, subjectId: 'sync-owner' }), false, '성공하면 표식을 해제한다');
+    await pending.mark({ productId, subjectId: 'sync-owner' });
+    assert.equal(await pending.has({ productId, subjectId: 'sync-owner' }), true, '해제 뒤 다시 남길 수 있다');
+    await pending.mark({ productId, subjectId: 'sync-other' });
+    assert.equal(await pending.has({ productId, subjectId: 'sync-other' }), true, '계정끼리는 줄이 따로다');
+
+    // 되돌리기: 표가 사라지고, 마이그레이션을 다시 적용하면 같은 모양으로 돌아온다.
+    await pool.query(rollback);
+    const gone = await pool.query(`SELECT to_regclass('public.lovetree_share_show_pending') AS t`);
+    assert.equal(gone.rows[0].t, null, '되돌리기 뒤에는 표가 없다');
+    await pool.query(migration);
+    const back = await pool.query(`SELECT to_regclass('public.lovetree_share_show_pending') AS t`);
     assert.ok(back.rows[0].t, '다시 적용하면 표가 돌아온다');
   } finally {
     await pool.end();

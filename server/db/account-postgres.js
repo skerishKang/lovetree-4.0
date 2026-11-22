@@ -24,6 +24,8 @@ export const ACCOUNT_USER_TABLES = Object.freeze([
   { table: 'lovetree_shares', where: 'subject_id = $2' },
   { table: 'lovetree_tree_visibility', where: 'subject_id = $2' },
   { table: 'lovetree_tree_discover', where: 'subject_id = $2' },
+  // #1163(#1068 2단계): 보임 동기화 실패 표식 — 계정 표식이므로 탈퇴 때 함께 사라진다.
+  { table: 'lovetree_share_show_pending', where: 'subject_id = $2' },
   { table: 'lovetree_request_claims', where: 'subject_id = $2' },
   { table: 'lovetree_account_emails', where: 'subject_id = $2' },
   { table: 'lovetree_workspaces', where: 'subject_id = $2' },

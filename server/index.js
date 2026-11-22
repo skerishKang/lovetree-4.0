@@ -4,6 +4,7 @@ import { createServer } from 'node:http';
 import { pathToFileURL } from 'node:url';
 import { createPool, createWorkspaceRepo } from './db/postgres.js';
 import { createShareRepo } from './db/shares-postgres.js';
+import { createShareShowPendingRepo } from './db/share-show-pending-postgres.js';
 import { createStageIndexRepo } from './db/stage-index-postgres.js';
 import { createTreeVisibilityRepo } from './db/tree-visibility-postgres.js';
 import { createTreeDiscoverRepo } from './db/tree-discover-postgres.js';
@@ -176,19 +177,22 @@ const admin = createAdminRoleService({ store: createAdminRoleRepo(pool, { stageI
 // #655 2차 운영센터 전체 숫자. 집계는 저장소 안에서 한 번에 끝내고(전체 행을 읽어 오지 않는다)
 // 서비스는 숫자만 다듬는다. 이 자리는 운영센터 화면만 부르며 권한은 storageHandler 가 판정한다.
 const adminStats = createAdminStatsService({ repo: createStatsRepo(pool), productId: LOVETREE_PRODUCT_ID });
+const shareShowPending = createShareShowPendingRepo(pool);
 const shareService = createShareService({
   shareRepo,
   stageIndex,
   workspaceRepo: repo,
   visibilityRepo,
   discoverRepo,
+  pendingShowSync: shareShowPending,
   productId: LOVETREE_PRODUCT_ID,
   admin
 });
 const service = createWorkspaceService({
   repo,
   productId: LOVETREE_PRODUCT_ID,
-  onCommit: ({ subjectId, changedTreeIds }) => shareService.syncSharesAfterSave(subjectId, changedTreeIds)
+  onCommit: ({ subjectId, changedTreeIds }) => shareService.afterSave(subjectId, changedTreeIds),
+  onAccess: ({ subjectId }) => shareService.retryPendingVisibleSync(subjectId).catch(() => {})
 });
 const legacyAuthenticate = await buildAuthenticate();
 const authenticate = createSharedAccessAuth({ enabled: sharedAuthEnabled(LOVETREE_SHARED_AUTH_ENABLED), legacy: legacyAuthenticate });

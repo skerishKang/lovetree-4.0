@@ -214,7 +214,7 @@ function selectMoment(n,center=false){mobilePicker?.select(n.id);LTDEMO.select(n
  syncRibbon();scheduleDraw();if(getComputedStyle($('routeStatus')).display==='none')toast('첫 순간에서 이 순간까지 지나온 길을 밝혔어요.')}
 /* #951 ⑤: 순간 상세 판 — 보드(#891·#662)와 같은 틀을 쓴다. 판 안: 제목·사진/영상·내가 남긴 마음·날짜와 트리·이어진 순간.
    아래 고정 줄: 크게 보기·여기부터 시네마·⋯ 더 보기. 지도에서 새로 만들지 않고 보드 판의 규칙(한 벌 스크롤·44px 줄)을 그대로 따른다. */
-function escHtml(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+const escHtml=globalThis.LTEscapeHtml; // A-15: 글자 막기 정본(html-escape.js) 한 벌
 function autoTitleOf(n){const raw=LTDEMO.moments.find(x=>x.id===n.id);const autoRe=/^(?:[a-z0-9-]+\.)+[a-z]{2,}(?::\d{1,5})?에서 간직한 순간$/i;const t=String(n.title||'').trim();const clean=autoRe.test(t)?(String(raw?.mediaMetadata?.title||'').trim()||n.note||'순간'):n.title;return {raw,clean}}
 function detailMediaHTML(n){
  const m=LTDEMO.moments.find(x=>x.id===n.id)||{};

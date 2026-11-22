@@ -324,6 +324,8 @@ const shellAuth=createAuth({
   getMember:()=>member,
   notify:text=>notify(text),
   onAuthRequired:()=>shellHeader.paintAuthExpired(),
+  // #1134 후속: 401 뒤 세션을 다시 확인하는 가벼운 요청 — api.mjs를 거치지 않아 401 이벤트를 다시 보내지 않는다.
+  checkSession:async()=>{try{const r=await fetch('/api/account',{headers:{accept:'application/json'},credentials:'same-origin'});return r.ok;}catch{return false;}},
   closeAccountMenu:()=>closeAccountMenu(),
   openEditor:(mode,parentId)=>openEditor(mode,parentId),
   showScreen:file=>show(file)

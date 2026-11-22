@@ -553,3 +553,13 @@ CREATE INDEX IF NOT EXISTS lovetree_admin_customer_views_retention_idx
   ON lovetree_admin_customer_views (viewed_at, id);
 CREATE INDEX IF NOT EXISTS lovetree_admin_customer_views_customer_idx
   ON lovetree_admin_customer_views (product_id, customer_subject_id, viewed_at DESC);
+
+-- #1163(#1068 2단계): 보임 쪽 공유 동기화 실패 표식 — 계정당 한 줄. 보임 동기화가 저장 응답 뒤에
+-- 실패하면 표식을 남기고, 표식이 있는 계정은 다음 저장·조회 요청에서 보임 동기화를 다시 시도해
+-- 성공하면 해제한다. (server/db/migrations/share-show-pending-261122.sql 과 같은 모양.)
+CREATE TABLE IF NOT EXISTS lovetree_share_show_pending (
+  product_id text NOT NULL,
+  subject_id text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (product_id, subject_id)
+);
