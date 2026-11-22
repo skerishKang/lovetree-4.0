@@ -108,7 +108,7 @@ html[data-lt-theme=garden] #context-kind{color:var(--lt-rose-ink)}
 .community-card h3,.community-card .community-summary{color:#342a28!important}
 .community-card .community-muted,.community-card .community-subject{color:#6a5a51!important}
 .community-card .community-actions button,.community-card .community-details button{background:#e4d7cb;color:#3a2f29;border-color:#b6a08f}
-.community-card .community-actions .community-primary{background:#1a1620;color:var(--lt-pearl)}
+.community-card .community-actions .community-primary{background:var(--lt-btn-ink,#1a1620);color:var(--lt-pearl)}
 .community-card .community-details summary{color:#6a5549}
 .community-card .community-details{border-color:#b6a08f}
 .community-preview{position:sticky;top:0;min-height:420px;padding:28px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-panel);background:var(--lt-paper);color:var(--lt-ink);box-shadow:0 0 0 1px rgba(255,230,166,.12),0 0 32px rgba(238,190,104,.14),0 25px 60px #0005}
@@ -118,7 +118,7 @@ html[data-lt-theme=garden] #context-kind{color:var(--lt-rose-ink)}
 .community-preview-paper{display:grid;gap:14px}.community-preview-subject,.community-preview-summary{margin:0}
 .community-preview-moment{display:grid;gap:12px;min-height:150px;align-content:center;padding:24px;background:#fffbf3;border:1px solid #d8c9b3;transform:rotate(-1deg)}
 .community-preview-moment small{color:var(--lt-gold-ink)}.community-preview-moment strong{font:600 20px/1.5 var(--lt-font-display)}
-.community-preview-open{min-height:48px;border:0;border-radius:var(--lt-r-pill);background:#1a1620;color:var(--lt-pearl);font-weight:700}
+.community-preview-open{min-height:48px;border:0;border-radius:var(--lt-r-pill);background:var(--lt-btn-ink,#1a1620);color:var(--lt-pearl);font-weight:700}
 @media(max-width:900px){.community-layout{grid-template-columns:1fr}.community-preview{position:static;min-height:0}}
 @media(max-width:600px){#community-list{grid-template-columns:1fr}.community-card{grid-template-columns:90px minmax(0,1fr)}.community-cover{min-height:170px}.community-preview{padding:20px}.community-preview h3{font-size:23px}}
 
@@ -898,10 +898,10 @@ body.community-screen #stage>iframe,body.community-screen #empty{display:none}
 #community-panel .community-cover-image.is-loading,#community-panel .community-cover-backdrop.is-loading{opacity:0}
 #community-panel .community-cover-image.is-ready{opacity:1}
 #community-panel .community-cover-backdrop.is-ready{opacity:.78}
-#community-panel .community-card-title{margin:12px 14px 0;color:var(--lt-ink)!important;font-size:16px;font-weight:700;line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-#community-panel .community-card-moment{margin:4px 14px 0;color:var(--lt-ink)!important;font-size:14px;line-height:1.45;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#community-panel .community-card-title{margin:12px 14px 0;color:var(--lt-ink);font-size:16px;font-weight:700;line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#community-panel .community-card-moment{margin:4px 14px 0;color:var(--lt-ink);font-size:14px;line-height:1.45;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #community-panel .community-card-distinct{display:block;margin:4px 14px 0;color:var(--lt-ink);font-size:12px;line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-#community-panel .community-card-meta{margin:7px 14px 14px;color:var(--lt-ink)!important;font-size:13px;line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#community-panel .community-card-meta{margin:7px 14px 14px;color:var(--lt-ink);font-size:13px;line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #community-panel .community-policy{max-width:1500px;margin:20px auto 8px;color:var(--lt-pearl);font-size:13px;line-height:1.6}
 #community-panel .community-empty{max-width:520px;margin:28px auto;padding:28px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-panel);background:var(--lt-paper);color:var(--lt-ink);text-align:center}
 #community-panel .community-empty p{color:var(--lt-ink)}

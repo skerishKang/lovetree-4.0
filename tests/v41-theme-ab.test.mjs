@@ -227,3 +227,33 @@ test('책/목록 보기는 기본 책, 미러 저장·반환, 서재·책에서�
   assert.equal(bookDisplayPressed('book'), false);
   assert.equal(bookDisplayPressed('list'), true);
 });
+
+// #886: 화면 CSS가 토큰을 직접 값으로 복사하지 않고 전역 토큰을 쓰면 계산된 색이 토큰과 같다.
+test('#886 계산된 단추 색이 전역 토큰과 같다', async () => {
+  const { chromium } = await import('playwright');
+  const { serve } = await import('./helpers/screen-audit.mjs');
+  const server = await serve({});
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch({ headless: true });
+  try {
+    for (const theme of ['night', 'garden']) {
+      const ctx = await browser.newContext({ viewport: { width: 800, height: 600 } });
+      await ctx.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); } catch {} }, theme);
+      const page = await ctx.newPage();
+      await page.goto(base + '/v41/', { waitUntil: 'load' });
+      const got = await page.evaluate(() => {
+        const root = getComputedStyle(document.documentElement);
+        const host = document.createElement('div'); host.className = 'lt-media-body';
+        const button = document.createElement('button'); host.append(button); document.body.append(host);
+        const color = getComputedStyle(button).backgroundColor;
+        host.remove();
+        return { color, token: root.getPropertyValue('--lt-btn-ink').trim() };
+      });
+      assert.ok(got.token, `${theme}: --lt-btn-ink 토큰이 있다`);
+      const [r, g, b] = got.color.match(/\d+/g).map(Number);
+      const [tr, tg, tb] = got.token.match(/[\da-f]{2}/gi).map(v => parseInt(v, 16));
+      assert.deepEqual([r, g, b], [tr, tg, tb], `${theme}: 계산된 단추 바탕 ${got.color}이 토큰 ${got.token}과 같다`);
+      await ctx.close();
+    }
+  } finally { await browser.close(); server.close(); }
+});
