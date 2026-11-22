@@ -1,3 +1,4 @@
+import { logServerError } from './error-log.js';
 // Private product media: canonical identity from the existing PADIEM authenticator.
 // Local single-process store; no public URLs, external fetching, or filename paths.
 import {createHash, randomUUID} from 'node:crypto';
@@ -99,7 +100,7 @@ export function createMediaHandler({authenticate,productId,store,publicOrigin,ad
    if(item&&method==='GET'){const asset=await store.get(principal,path.slice(11));return {status:200,headers:{...headers,'content-type':asset.mime},binary:asset.bytes};}
    if(item&&method==='DELETE')body=await store.remove(principal,path.slice(11));
    return {status:200,headers,body:{...body,subject:principal.subjectId}};
-  }catch(e){return {status:e instanceof ApiError?e.status:503,headers,body:{error:{code:e instanceof ApiError?e.code:'media_unavailable',message:e instanceof ApiError?e.message:"파일 보관에 연결하지 못했어요. 다시 시도해 주세요."}}};}
+  }catch(e){if(!(e instanceof ApiError)||e.status>=500)logServerError(e,'lovetree-media');return {status:e instanceof ApiError?e.status:503,headers,body:{error:{code:e instanceof ApiError?e.code:'media_unavailable',message:e instanceof ApiError?e.message:"파일 보관에 연결하지 못했어요. 다시 시도해 주세요."}}};}
  };
 }
 

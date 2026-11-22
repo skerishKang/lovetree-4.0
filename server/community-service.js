@@ -1,3 +1,4 @@
+import { logServerError } from './error-log.js';
 import {randomUUID} from 'node:crypto';
 import {ApiError} from './errors.js';
 import {parsePrincipal} from './principal.js';
@@ -441,5 +442,5 @@ export function createCommunityHandler({authenticate,service,productId}){
   if(action){const who=await principal(request),[,shareId,kind]=action;if(kind==='favorite'&&(method==='PUT'||method==='DELETE'))return {status:200,body:{stats:await service.favorite(who.subjectId,shareId,method==='PUT')},headers:NO_STORE};if(kind==='reaction'&&(method==='PUT'||method==='DELETE')){let reactionKind='heart';if(method==='PUT'){try{const body=jsonBody(request);reactionKind=(body&&typeof body==='object'&&typeof body.kind==='string'&&body.kind.trim()!==''?body.kind.trim():'heart');}catch{reactionKind='heart';}}else{const q=String(request?.query?.get?.('kind')||'').trim();reactionKind=q||'heart';}return {status:200,body:{stats:await service.react(who.subjectId,shareId,method==='PUT',reactionKind)},headers:NO_STORE};}if(kind==='report'&&method==='POST'){const body=jsonBody(request);return {status:201,body:{report:await service.report(who.subjectId,shareId,body.reason,clientKey(request))},headers:NO_STORE};}if(kind==='block'&&method==='POST')return {status:200,body:await service.block(who.subjectId,shareId),headers:NO_STORE};}
   throw new ApiError(404,'not_found','요청을 찾을 수 없어요.');
  }
- return async request=>{try{return await handle(request);}catch(error){if(error instanceof ApiError)return {status:error.status,body:{error:{code:error.code,message:error.message,...(error.details||{})}},headers:NO_STORE};console.error('[lovetree-community] request failed',{path:request?.path,method:request?.method});return {status:500,body:{error:{code:'internal_error',message:'서버에서 처리하지 못했어요.'}},headers:NO_STORE};}};
+ return async request=>{try{return await handle(request);}catch(error){if(error instanceof ApiError)return {status:error.status,body:{error:{code:error.code,message:error.message,...(error.details||{})}},headers:NO_STORE};logServerError(error,'lovetree-community');return {status:500,body:{error:{code:'internal_error',message:'서버에서 처리하지 못했어요.'}},headers:NO_STORE};}};
 }

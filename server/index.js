@@ -1,3 +1,4 @@
+import { logServerError } from './error-log.js';
 import { createPrivateMediaStore, createMediaHandler } from './private-media.js';
 import { createServer } from 'node:http';
 import { pathToFileURL } from 'node:url';
@@ -152,7 +153,7 @@ async function loginRoute(login, request) {
   try { return await login.route(request); }
   catch (error) {
     if (error instanceof ApiError) return { status: error.status, body: { error: { code: error.code, message: error.message, ...(error.details ?? {}) } } };
-    console.error('[lovetree-storage] 로그인 요청 처리 실패', { path: request.path, method: request.method });
+    logServerError(error, 'lovetree-login');
     return { status: 500, body: { error: { code: 'internal_error', message: '서버에서 처리하지 못했어요.' } } };
   }
 }
