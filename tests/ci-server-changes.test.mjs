@@ -17,9 +17,26 @@ test('서버 관련 시험이 바뀌면 서버 바뀜이다', () => {
   assert.equal(changed(['tests/install-preflight.test.mjs']), true);
 });
 
-test('판정 도구·다른 워크플로·화면 파일은 서버 바뀜이 아니다', () => {
-  assert.equal(changed(['tools/ci/server-changes.mjs']), false);
-  assert.equal(changed(['.github/workflows/ci.yml']), false);
+test('판정 도구와 판정이 들어 있는 워크플로는 서버 바뀜이다', () => {
+  assert.equal(changed(['tools/ci/server-changes.mjs']), true);
+  assert.equal(changed(['.github/workflows/ci.yml']), true);
+});
+
+test('운영 설치 대상 파일 하나만 바뀌어도 서버 바뀜이다', () => {
+  assert.equal(changed(['public/v41/youtube-id.mjs']), true);
+  assert.equal(changed(['src/domain.js']), true);
+  assert.equal(changed(['tools/export-ai-customer-db.mjs']), true);
+  assert.equal(changed(['deploy/host-com2/lovetree-api/install.sh']), true);
+});
+
+test('확실히 서버와 무관한 것은 서버 바뀜이 아니다', () => {
+  assert.equal(changed(['docs/HANDOFF.md']), false);
+  assert.equal(changed(['public/v41/views/track58-pinboard.html']), false);
   assert.equal(changed(['public/v41/shell.css']), false);
-  assert.equal(changed(['tests/ci-server-changes.test.mjs']), false);
+  assert.equal(changed(['tests/v41-moment-list.test.mjs']), false);
+});
+
+test('모르는 경로와 src 새 파일은 애매하므로 서버 바뀜이다', () => {
+  assert.equal(changed(['src/new-thing.js']), true);
+  assert.equal(changed(['alpine/new-tool.sh']), true);
 });
