@@ -25,6 +25,10 @@ export const SCREENS = [
 
 // 정적 import/export ... from '...' 와 import '...' 만 본다(동적 import()는 필요할 때 부르므로 제외).
 const IMPORT_RE = /(?:^|[\n;}])\s*(?:import|export)\s*(?:[^'"()]*?\bfrom\s*)?['"]([^'"]+\.m?js)['"]/g;
+// 예외: 문자열 리터럴 동적 import 중 셸이 첫 화면에서 곧바로 부르는 데이터 모듈은 미리 받는다.
+// #1026 — 이게 빠져 있으면 example.mjs가 2.8초에 뒤늦게 시작해 6.8초를 직렬로 기다렸다.
+const STARTUP_DYNAMIC = new Set(['example.mjs']);
+const DYNAMIC_RE = /import\(\s*(['"])([^'"]+\.m?js)\1\s*\)/g;
 
 // 모듈 specifier를 public/v41 기준 상대 경로로 바꾼다. 화면 안쪽은 /v41/... 절대 경로도 쓴다.
 function resolve(spec, fromFile) {
@@ -79,6 +83,10 @@ export function collect(screen) {
     for (const spec of importsOf(text)) {
       const target = resolve(spec, file);
       if (target) visit(target);
+    }
+    for (const m of text.matchAll(DYNAMIC_RE)) {
+      const target = resolve(m[2], file);
+      if (target && STARTUP_DYNAMIC.has(target)) visit(target);
     }
   };
   for (const entry of entries(html, htmlDir === '.' ? '' : htmlDir)) visit(entry);
