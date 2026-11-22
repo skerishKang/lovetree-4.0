@@ -709,8 +709,10 @@ const { anyDialogOpen, tipsFollowDialogs, closeTreeTips, accountMenuOpen, tipsFo
 // 넘치는 쪽 끝에만 페이드를 켜서 잘린 것이 아니라 더 있다는 신호를 준다. 데스크톱(넓은 폭)은 스크롤이 없어 아무 일도 하지 않는다.
 const navBar=document.querySelector('.app-header nav');
 const narrowNav=()=>matchMedia('(max-width:780px)').matches;
-function choose(id,momentId,skipShow=false){const tree=model.trees.find(t=>t.id===id);window.LT41=tree?{tree,trees:model.trees,source,momentId:tree.moments.find(m=>m.id===momentId)?.id||tree.moments.find(m=>m.parentId===null)?.id||tree.moments[0]?.id,prefs:currentPrefs(),writable:source==='server'&&!!member?.snapshot().writable,}:null;
- if(!skipShow&&(tree||current==='src064-orbit.html'))show(current,false,id||'');
+function choose(id,momentId,skipShow=false,silent=false){const tree=model.trees.find(t=>t.id===id);window.LT41=tree?{tree,trees:model.trees,source,momentId:tree.moments.find(m=>m.id===momentId)?.id||tree.moments.find(m=>m.parentId===null)?.id||tree.moments[0]?.id,prefs:currentPrefs(),writable:source==='server'&&!!member?.snapshot().writable,}:null;
+  // #1109: 로그인 시작의 빈 모델 반영은 화면을 그리지 않는다 — 곧 데이터가 와서 한 번만 띄운다.
+  if(silent)return;
+  if(!skipShow&&(tree||current==='src064-orbit.html'))show(current,false,id||'');
  else if(!skipShow||!tree){flowNavigation();document.body.classList.remove('home-screen');hideFrames();
   // 261118 대표 결정: 트리 0개 계정이 주소(#my/shelf 등)로 바로 들어와도 그 화면의 빈 상태(#817)를 보여 준다 —
   // 탭을 눌러 열 때와 같은 문구('아직 책장이 비어 있어요.' 등)로 시작한다.
@@ -751,7 +753,7 @@ function projectWorkspace(input){
  try{return workspaceModel(input);}
  catch(error){console.warn('[LT41] 작업 공간을 읽지 못했어요:',error?.message||String(error));return null;}
 }
-function load(input,kind,selection={},fallback={},example=null){
+function load(input,kind,selection={},fallback={},example=null,silent=false){
  const projected=kind==='example'?{trees:[example||exampleTree].filter(Boolean)}:projectWorkspace(input);
  if(!projected){
   if(kind!=='server')throw new Error('기록을 읽을 수 없어요. 파일 형식을 확인해 주세요.');
@@ -769,8 +771,8 @@ function load(input,kind,selection={},fallback={},example=null){
  document.body.dataset.treeCount=String(model?.trees?.length||0);
  // #368: 트리 고르기는 맨 위 트리 ▾ 드롭다운 한 곳이다(옛 내 기록 창의 select는 없앴다).
  const resolved=resolveAccountPosition(model.trees,selection,fallback),chosen=model.trees.find(t=>t.id===resolved.position.treeId);
- choose(chosen?.id,resolved.position.momentId);
- return resolved;
+  choose(chosen?.id,resolved.position.momentId,false,silent);
+  return resolved;
 }
 function clear(){load({revision:0,state:{version:1,trees:[]}},'file');}
 function stateSelection(){return {treeId:window.LT41?.tree.id,momentId:window.LT41?.momentId};}
@@ -939,7 +941,7 @@ function memberStatus(status){
  else if(!status.dirty&&status.phase==='offline')notify(status.detail||'내 기록을 불러오지 못했어요.');
  $('write-menu').textContent=status.dirty?'저장 안 됨' :'＋ 순간 추가';$('empty-records').textContent=status.writable?'＋ 첫 트리 만들기':'내 기록 불러오기';/* #463: 이름을 한 곳에서 정한다(paintEmptyCopy와 같은 글자) *//* #463: 주 버튼 표시도 같이 유지한다(쓸 상태가 바뀌도 강조가 엉키지 않게). */$('empty-records').classList.toggle('primary',!!status.writable);$('empty-sample').classList.toggle('primary',!status.writable);previousDirty=status.dirty;renderAccount();flowNavigation();document.body.dataset.member=member?.snapshot().owned?'in':'out';document.body.dataset.treeCount=String(model?.trees?.length||0);applyAdvanced();
 }
-async function startMember(){setMemberRefreshStarted(true);if(!leaveMember())return;backfillStarted=false;backfillAttempted.clear();const startup=parseSelectionRoute(location.hash);if(startup.scope==='owner')stashPendingOwnerRoute(sessionStorage,location.hash);++loadGeneration;const generation=loadGeneration;clear();
+async function startMember(){setMemberRefreshStarted(true);if(!leaveMember())return;backfillStarted=false;backfillAttempted.clear();const startup=parseSelectionRoute(location.hash);if(startup.scope==='owner')stashPendingOwnerRoute(sessionStorage,location.hash);++loadGeneration;const generation=loadGeneration;load({revision:0,state:{version:1,trees:[]}},'file',{},{},null,true);
  const api=createWorkspaceApi({fetchImpl:(url,init)=>fetch(init?.method==='GET'&&url==='/api/workspace'?'/api/workspace?features=bound-writes':url,init)});
  let initialized=false,startupNotice='',session;
  session=createMemberSession({api,onGuard:read=>workspaceGuardNotice(read),onState:(state,selection,meta)=>{if(generation!==loadGeneration)return;try{

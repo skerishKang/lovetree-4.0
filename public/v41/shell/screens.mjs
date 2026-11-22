@@ -113,7 +113,7 @@ export function createScreens(deps) {
     // #996: 앞 전환이 비우려던 프레임은 이제 새 불러오기의 대상이다 — 대기 중인 비우기를 취소한다.
     clearTimeout(blankTimer);
     let settled = false;
-    const revealNow = () => {
+    const done = () => {
       if (settled || token !== viewToken) return;
       settled = true;
       next.hidden = false;
@@ -132,18 +132,6 @@ export function createScreens(deps) {
         if (token !== viewToken || active.hidden !== true || active === $('view')) return;
         try { active.contentWindow.location.replace('about:blank'); } catch {}
       }, 600);
-    };
-    const done = () => {
-      if (settled || token !== viewToken) return;
-      // #1109: 지금 보이는 장에 열린 창(순간 목록 등)이 있으면 바로 앞뒤를 바꾸지 않는다.
-      // 바꾸는 순간 그 창이 숨은 장으로 가서 닫기 단추가 0px로 재고된다.
-      let openDialog = false;
-      try {
-        const doc = active.contentDocument;
-        openDialog = !!(doc?.querySelector('dialog[open]') || [...(doc?.querySelectorAll('*') || [])].some(n => n.shadowRoot?.querySelector('dialog[open]')));
-      } catch {}
-      if (openDialog) { setTimeout(revealNow, 1500); return; }
-      revealNow();
     };
     const ready = () => {
       if (token !== viewToken) return;

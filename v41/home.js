@@ -323,9 +323,12 @@ function refreshCountsFromParent(){
   inboxCount?{text:`모아둔 ${formatCount(inboxCount)}`,label:`모아둔 순간 ${inboxCount}개 정리하기`,action:()=>bridge.actions.cleanup()}:null
  ]);
  showCount('trees',[{text:`트리 ${formatCount(fresh.length)}`,label:`트리 ${fresh.length}개 서재 열기`,action:openTrees},null]);
- const recent=fresh.flatMap(t=>t?.moments||[]).sort((a,b)=>String(b?.createdAt||'').localeCompare(String(a?.createdAt||'')))[0];
- if(recent)orbit?.recent?.set(recent);
- return true;
+  // 처음 그릴 때와 같은 길로 다시 고른다 — 머리글까지 넘겨야 같은 마크업·글자 크기로 그려진다.
+  const trees=momentListTrees(fresh),entries=momentListEntries(fresh);
+  const picked=homeMomentPick(entries,homeMomentValue,{day:loggedIn?homeDayMoment(fresh):null,trees});
+  if(momentList){momentList.trees=trees;momentList.entries=entries;momentList.recent=picked.moment;momentList.recentHeader=picked.header;}
+  if(picked.moment)orbit?.recent?.set(picked.moment,picked.header);
+  return true;
 }
 const inboxTree=(Array.isArray(context.trees)?context.trees:[]).find(t=>t?.inbox===true);
 const inboxCount=inboxTree?.moments?.length||0;
