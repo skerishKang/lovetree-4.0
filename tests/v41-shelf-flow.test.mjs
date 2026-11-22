@@ -339,7 +339,7 @@ test('#1094 책 방식이면 중간 화면 없이 책으로 바로 연다', () =
     assert.deepEqual(opened, [['m2', 'tree1']], '기억한 순간으로 책에 바로 간다');
     assert.equal(nodes.readerScreen.classList.contains('active'), false, '표지+목록 중간 화면은 한 번도 그리지 않는다');
     assert.equal(nodes.shelfScreen.classList.contains('is-leaving'), false, '책장을 떠나지 않는다');
-    assert.equal(nodes.shelfScreen.style.display, undefined, '책장을 숨기지 않는다');
+    assert.equal(nodes.shelfScreen.classList.contains('is-covered'), false, '책장을 숨기지 않는다');
   } finally {
     delete globalThis.LTDEMO;
     delete globalThis.parent;
@@ -356,7 +356,7 @@ test('#1094 목록 방식이면 표지+목록을 곧바로 보이고, 책 열기
     assert.deepEqual(opened, [], '목록으로 오면 책으로 넘어가지 않는다');
     assert.equal(nodes.readerScreen.classList.contains('active'), true, '목록 화면을 곧바로 보인다');
     assert.equal(nodes.readerScreen.classList.contains('is-preparing'), false, '숨김(준비 중) 상태로는 보이지 않는다');
-    assert.equal(nodes.shelfScreen.style.display, 'none', '책장을 숨기고 목록만 보인다');
+    assert.equal(nodes.shelfScreen.classList.contains('is-covered'), true, '책장을 숨기고 목록만 보인다');
     reader.openBook();
     assert.deepEqual(opened, [['m2', 'tree1']], '목록에서 책 열기는 기억한 순간으로 책에 간다');
   } finally {

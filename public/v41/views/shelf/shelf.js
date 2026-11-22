@@ -193,8 +193,6 @@ import { createReader } from './shelf-reader.js';
           card.style.setProperty('--z',layout.depth(index,center)+'px');
           card.style.setProperty('--y','0px');
           card.style.zIndex=String(100-Math.abs(index-center));
-          card.style.pointerEvents='auto';
-          card.style.filter='none';
           card.classList.toggle('is-center',index===center);
         });
         clearDragX(rail);

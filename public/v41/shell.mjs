@@ -24,6 +24,7 @@ import {screens,screenForView,viewForFile,themedViewFor} from './shell/navigatio
 import {createScreens} from './shell/screens.mjs';
 import {createHomeLink} from './shell/home-link.mjs';
 import {createCommunityScreen} from './shell/community-screen.mjs';
+import {createStageLoading} from './shell/stage-loading.mjs';
 import {createHeader} from './shell/header.mjs';
 import {createAuth} from './shell/auth.mjs';
 import {createPanels} from './shell/panels.mjs';
@@ -233,7 +234,9 @@ if(window.visualViewport){const fabKbd=()=>document.body.classList.toggle('lt-kb
 const initialRoute=parseSelectionRoute(location.hash);
 let model=null,current=screenForView(initialRoute.view)[1],source='example',loadGeneration=0,previousDirty=false,member=null,handledHash=null,activeShareId=null,resumeAfterStart=null;
 // #1092: 둘러보기 화면 — 창 모듈의 showModal 호출을 비모달 화면 열기로 바꾸고, 닫을 때 #explore 주소 기록을 지킨다.
-const shellCommunityScreen=createCommunityScreen({$,setHandled:hash=>{handledHash=hash;},flowNavigation});
+// #1026: 0.8초 안에 내용이 오지 않으면 무대에 불러오는 중을 띄운다(움직임 끄기 설정은 표시할 때 읽는다).
+const shellStageLoading=createStageLoading({$,isMotionOff:()=>motionPaused});
+const shellCommunityScreen=createCommunityScreen({$,setHandled:hash=>{handledHash=hash;},flowNavigation,stageLoading:shellStageLoading});
 // #583 '이 순간 열기': 주소(#my/network?tree=…&moment=…)로 지도를 특정 순간을 가운데 두고 열 요청이 오면
 // 여기에 한 번 적어 두고, 지도 프레임을 띄울 때(show) 소비해 프레임 주소에 ?open=<순간>을 붙인다.
 // 지도(network.js)는 이 표시가 있을 때만 그 순간을 고른 상태로 가운데에 둔다 — 그냥 지도를 열 때는
@@ -498,6 +501,9 @@ const shellLocation=createLocation({
   notify:text=>notify(text),
   startMember:()=>startMember(),
   showPublicRoute:route=>showPublicRoute(route),
+  // #1175: share 잔여(source·공유 아이디·공유 기록)를 치우고 예시 기록을 다시 싣는다 — 로그아웃 상태에서
+  // 공유 화면 밖으로 나가는 길(로고·뒤로 가기)이 share 주소 재진입에 묶히지 않게 하고, 남은 '감상' 안내도 거둔다.
+  leaveShare:view=>leaveShare(view),
   requestNetworkOpen,
   requestBoardOpen,
   journey:shellJourney,
@@ -578,7 +584,12 @@ function setHomeHash(){
 const shellHomeLink=createHomeLink({
   $,
   getCurrent:()=>current,
-  show:(file,write)=>show(file,write),
+  show:(file,write)=>{
+    // #1175: 공유 화면을 본 뒤 로고로 나가면 share 잔여를 치운다 — share 상태가 남으면 탭 줄이 숨어
+    // 서재 단추에 닿지 못하고, 화면을 옮길 때마다 공유 기록을 다시 읽어 '감상' 안내가 되풀이된다.
+    if(file==='src064-orbit.html'&&source==='share'){leaveShare(file);return true;}
+    return show(file,write);
+  },
   closePanels:closePanelsForHome,
   setHomeHash,
   scrollToTop:scrollHomeToTop
@@ -700,7 +711,10 @@ function watchFrameSheet(frame){
 function frames(){return shellScreens.frames();}
 function hideFrames(){return shellScreens.hideFrames();}
 function showInFrame(url,title){return shellScreens.showInFrame(url,title);}
-function show(file,write=true,treeKey=''){return shellScreens.show(file,write,treeKey);}
+function show(file,write=true,treeKey=''){
+ if(file==='src064-orbit.html')shellStageLoading.start('home');else shellStageLoading.cancel();
+ return shellScreens.show(file,write,treeKey);
+}
 function frameLoaded(frame){return shellScreens.frameLoaded(frame);}
 
 // #380 5번: '정리하기' 입구는 트리 ▾ 드롭다운 한 곳에서만 그린다(renderTreeMenu). 헤더 단추는 없앴다.
@@ -758,6 +772,7 @@ function projectWorkspace(input){
  try{return workspaceModel(input);}
  catch(error){console.warn('[LT41] 작업 공간을 읽지 못했어요:',error?.message||String(error));return null;}
 }
+const onExploreRoute=()=>/^#explore(?:\/moments)?$/.test(location.hash);
 function load(input,kind,selection={},fallback={},example=null){
  const projected=kind==='example'?{trees:[example||exampleTree].filter(Boolean)}:projectWorkspace(input);
  if(!projected){
@@ -776,7 +791,9 @@ function load(input,kind,selection={},fallback={},example=null){
  document.body.dataset.treeCount=String(model?.trees?.length||0);
  // #368: 트리 고르기는 맨 위 트리 ▾ 드롭다운 한 곳이다(옛 내 기록 창의 select는 없앴다).
  const resolved=resolveAccountPosition(model.trees,selection,fallback),chosen=model.trees.find(t=>t.id===resolved.position.treeId);
- choose(chosen?.id,resolved.position.momentId);
+ // 예시나 회원 기록이 늦게 도착해도 먼저 고른 둘러보기는 그대로 둔다.
+ const keepExplore=(kind==='server'||(kind==='example'&&exampleInitializing))&&onExploreRoute();
+ choose(chosen?.id,resolved.position.momentId,keepExplore);
  return resolved;
 }
 function clear(){load({revision:0,state:{version:1,trees:[]}},'file');}
@@ -942,7 +959,7 @@ function memberStatus(status){
    if(!shown)notifyPublicBanner((model?.trees||[])[0]?.id);
   }
  }
- else if(status.phase==='login'&&!status.dirty)notify('로그인이 필요해요.');
+ else if(status.phase==='login'&&!status.dirty&&document.body.dataset.member==='in')notify('로그인이 필요해요.');/* #1175: 로그아웃 상태로 시작할 때(저장 연결 확인 401)는 진입만으로 알림을 띄우지 않는다 — 머리글의 로그인 단추가 이미 길을 알린다. */
  else if(!status.dirty&&status.phase==='offline')notify(status.detail||'내 기록을 불러오지 못했어요.');
  $('write-menu').textContent=status.dirty?'저장 안 됨' :'＋ 순간 추가';$('empty-records').textContent=status.writable?'＋ 첫 트리 만들기':'내 기록 불러오기';/* #463: 이름을 한 곳에서 정한다(paintEmptyCopy와 같은 글자) *//* #463: 주 버튼 표시도 같이 유지한다(쓸 상태가 바뀌도 강조가 엉키지 않게). */$('empty-records').classList.toggle('primary',!!status.writable);$('empty-sample').classList.toggle('primary',!status.writable);previousDirty=status.dirty;renderAccount();flowNavigation();document.body.dataset.member=member?.snapshot().owned?'in':'out';document.body.dataset.treeCount=String(model?.trees?.length||0);applyAdvanced();
 }
@@ -980,7 +997,7 @@ async function startMember(){setMemberRefreshStarted(true);if(!leaveMember())ret
    rememberShelfView(state.prefs?.shelfView);
    paintShelfViewControls();
    if(!backfillStarted&&snapshot.owned){backfillStarted=true;void runTitleBackfill(state,session);}
-   if(snapshot.owned&&resolved.position.treeId){if(viewForFile(current)!=='home')writeLocation('replace');takePendingOwnerRoute(sessionStorage);if(route?.scope==='owner'&&resolved.treeMissing)startupNotice='이 주소의 기록을 현재 계정에서 찾을 수 없어 최근 위치를 열었어요.';else if(route?.scope==='owner'&&resolved.momentMissing)startupNotice='이 주소의 순간을 찾을 수 없어 트리의 시작 순간을 열었어요.';}
+   if(snapshot.owned&&resolved.position.treeId){if(viewForFile(current)!=='home'&&!onExploreRoute())writeLocation('replace');takePendingOwnerRoute(sessionStorage);if(route?.scope==='owner'&&resolved.treeMissing)startupNotice='이 주소의 기록을 현재 계정에서 찾을 수 없어 최근 위치를 열었어요.';else if(route?.scope==='owner'&&resolved.momentMissing)startupNotice='이 주소의 순간을 찾을 수 없어 트리의 시작 순간을 열었어요.';}
  }catch(error){openFallbackShell(error);}},onStatus:status=>{if(generation===loadGeneration)memberStatus(status);},
  navigate:url=>{
   if(url.startsWith('/auth/login')&&parseSelectionRoute(location.hash).scope==='owner')stashPendingOwnerRoute(sessionStorage,location.hash);
@@ -999,6 +1016,8 @@ async function startMember(){setMemberRefreshStarted(true);if(!leaveMember())ret
  if(generation===loadGeneration){const startupJourney=parseJourneyRoute(location.hash);if(startupJourney){if(session.snapshot().owned&&session.snapshot().writable)openFirstJourney({step:startupJourney.step,route:true});else{history.replaceState(null,'','#home');handledHash='#home';}}}
 }
 async function sample(selection={},view){if(!pauseMember())return;const tree=await loadExampleTree();++loadGeneration;if(view)current=view;load(null,'example',selection,{},tree);if(view)writeLocation();$('save-feedback').hidden=true;if($('account-settings').open)$('account-settings').close();}
+// #1175: 공유 화면 밖으로 나가는 길 한 벌 — share 잔여를 치우고 예시 첫 화면으로 돌아가며, 화면에 남은 '감상' 안내를 거둔다.
+function leaveShare(view){hideToast();void sample({},view);}
 $('account-entry').onclick=e=>{
  if(member?.snapshot().owned){e.preventDefault();openAccountMenu();}
  else if(parseSelectionRoute(location.hash).scope==='owner')stashPendingOwnerRoute(sessionStorage,location.hash);
@@ -1020,7 +1039,7 @@ for(const b of document.querySelectorAll('[data-shelf-view]'))b.onclick=()=>{
 };
 paintThemeControls();applyTheme();paintTitleDisplayControls();paintBookDisplayControls();paintShelfViewControls();applyAdvanced();
 if(initialRoute.scope==='public')showPublicRoute(initialRoute);
-else if(/^#explore/.test(location.hash)){/* #1025: 둘러보기가 자기 주소를 연다 — 예시 로드로 주소를 덮지 않는다. #1092: [트리] 보기(#explore)는 화면으로 바로 연다 — [순간](#explore/moments)은 창 모듈이 자기 주소로 연다. */
+else if(onExploreRoute()){/* #1025: 둘러보기가 자기 주소를 연다 — 예시 로드로 주소를 덮지 않는다. #1092: [트리] 보기(#explore)는 화면으로 바로 연다 — [순간](#explore/moments)은 창 모듈이 자기 주소로 연다. */
  if(location.hash==='#explore')shellCommunityScreen.openRoute();
 }
 else if(shouldLoadMemberRecords(location.search,document.cookie,location.hash)||shellIntake.pending()){
@@ -1029,6 +1048,7 @@ else if(shouldLoadMemberRecords(location.search,document.cookie,location.hash)||
  clear();
 }else{
  // 로그아웃·신규 사용자는 예시가 실제 내용이므로 필요한 이 순간에만 동적으로 받는다.
+ shellStageLoading.start('home');
  exampleInitializing=true;
  void loadExampleTree().then(tree=>{if(source!=='server'&&source!=='share')load(null,'example',{}, {},tree);exampleInitializing=false;}).catch(()=>{exampleInitializing=false;});
 }
