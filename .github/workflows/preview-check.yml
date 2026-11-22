@@ -534,6 +534,18 @@ jobs:
           node --test --test-concurrency=1 tests/updates-screen-611.test.mjs
           echo "새 소식 화면 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
 
+      # #1098 3단계: 내 소식 화면 — 계정 단추 점(0이면 숨김)·계정 메뉴 입구·목록 창(최신순 묶음)·읽음 뒤
+      # 점 지움·불러오기 실패 안내 한 줄·키보드 열기·Esc 닫기·접근성 이름·폭 360·768·1280 × 밤/정원에서
+      # 점 위치·창 겹침을 실제 화면에서 잰다. 건너뜀=실패(크롬이 준비된 이 잡에서 돈다).
+      - name: 내 소식 화면 시험(건너뜀=실패 — #1098 3단계)
+        env:
+          LT_MY_NEWS_REQUIRE: '1'
+        if: needs.screen-changes.outputs.changed == 'true'
+        run: |
+          start=$(date +%s)
+          node --test --test-concurrency=1 tests/v41-my-news-screen-1098.test.mjs
+          echo "내 소식 화면 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+
       # #611 후속: 390 에서 새 소식 카드가 책 화면 '순간 목차' 단추를 가리지 않는지(겹침 0)를
       # 실제 화면에서 잰다. 건너뜀=실패(크롬이 준비된 이 잡에서 돈다).
       - name: 로고 복귀·빠른 재전환 시험(건너뜀=실패 — #782·#996)
