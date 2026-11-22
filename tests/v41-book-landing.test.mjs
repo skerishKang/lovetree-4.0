@@ -4,7 +4,7 @@
 // 수정: 재그림은 현재 선택 순간(LTDEMO.get())을 focusId로 유지해 선택이 왼쪽 페이지로 밀리지 않게 한다.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { MSG } from '../public/v41/frame-messages.mjs';
+import { MSG, isShellMessage } from '../public/v41/frame-messages.mjs';
 import { readFileSync } from 'node:fs';
 
 const read = (p) => readFileSync(new URL('../' + p, import.meta.url), 'utf8');
@@ -59,10 +59,19 @@ function runTitleDisplayChange(b, value) {
   const line = EXTRA.split('\n').find(l => l.includes("addEventListener('message'") && l.includes('LTDEMO.prefs') && l.includes('renderSpread'));
   assert.ok(line, '제목 보기 변경 핸들러 줄이 있다');
   const listeners = [];
-  const run = new Function('addEventListener', 'MSG', 'LTDEMO', 'renderSpread', 'current', '$b', 'selectedMomentId', 'showDetail', line);
-  run((t, fn) => listeners.push(fn), MSG, b.LTDEMO, b.renderSpread, 0, b.$b, b.selectedMomentId, b.showDetail);
+  const run = new Function('addEventListener', 'MSG', 'isShellMessage', 'LTDEMO', 'renderSpread', 'current', '$b', 'selectedMomentId', 'showDetail', line);
+  run((t, fn) => listeners.push(fn), MSG, isShellMessage, b.LTDEMO, b.renderSpread, 0, b.$b, b.selectedMomentId, b.showDetail);
   assert.equal(listeners.length, 1, 'message 리스너 한 개를 등록한다');
-  listeners[0]({ data: { type: 'lt41-title-display', value } });
+  const origin = 'https://lovetree-4-0.pages.dev';
+  const parentWindow = {};
+  const savedLocation = globalThis.location;
+  const savedWindow = globalThis.window;
+  globalThis.location = { origin };
+  globalThis.window = { parent: parentWindow };
+  try { listeners[0]({ origin, source: parentWindow, data: { type: 'lt41-title-display', value } }); } finally {
+    if (savedLocation === undefined) delete globalThis.location; else globalThis.location = savedLocation;
+    if (savedWindow === undefined) delete globalThis.window; else globalThis.window = savedWindow;
+  }
 }
 
 test('기능: 오른쪽 페이지 순간(m2)으로 열면 모듈 로딩 재그림 뒤에도 선택이 m2로 유지된다', () => {

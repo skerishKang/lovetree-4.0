@@ -222,7 +222,7 @@ window.__TRACK59__={playbackMoments:()=>allMoments(),getState:()=>({current,mach
    lt41-moments-saved로 알린다 — 화면을 다시 띄우지 않고 지금 펼침면·고른 순간·열린 상세·스크롤을 그대로 다시 그린다.
    boardSync·editTree(#997)와 같은 방식: 알림을 받아 화면이 자기 상태를 다시 그린다. 재적재 0. */
 addEventListener('message',e=>{
- if(e.origin!==location.origin||e.source!==window.parent||e.data?.type!==globalThis.LT41_MSG.momentsSaved)return;
+ if(e.data?.type!==globalThis.LT41_MSG.momentsSaved||!globalThis.LT41_isShellMessage?.(e))return;
  if(typeof LTDEMO.refresh!=='function'||!LTDEMO.refresh())return;
  const fm=LTDEMO.moments.find(m=>m.first)||LTDEMO.moments[0]||null;
  const next=fm?LT59Model.buildSpreads(LTDEMO.moments):[];

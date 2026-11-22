@@ -1,8 +1,6 @@
 // 셸과 화면 사이에 보내는 type과 본문 필드. ?는 요청이나 응답에 따라 생략할 수 있는 필드다.
 // 일반 스크립트 화면과 모듈이 같은 문서에 들어와도 두 표의 객체는 하나만 만든다.
 (() => {
-  if (globalThis.LT41_FRAME_MESSAGES && globalThis.LT41_MSG) return;
-
   function fromShell(name, payload) {
     return Object.freeze({ name, from: '셸', to: '화면', payload });
   }
@@ -76,8 +74,23 @@
     write: fromView('lt41-write', 'mode, treeId?, momentId?, parentId?, focusTitle?'),
   });
 
+  // 화면이 받는 셸→화면 메시지인지 보는 공통 확인 (#1161).
+  // 받은 메시지가 표에 있는 이름이고 방향이 셸→화면이며, 같은 출처이고 부모 창에서 온 경우에만 참이다.
+  function isShellMessage(event) {
+    const type = event?.data?.type;
+    if (typeof type !== 'string') return false;
+    const entry = Object.values(messages).find(item => item.name === type);
+    if (!entry || !entry.from.includes('셸') || !entry.to.includes('화면')) return false;
+    if (event.origin !== globalThis.location?.origin) return false;
+    if (event.source !== globalThis.window?.parent) return false;
+    return true;
+  }
+
+  if (globalThis.LT41_FRAME_MESSAGES && globalThis.LT41_MSG && globalThis.LT41_isShellMessage) return;
+
   globalThis.LT41_FRAME_MESSAGES = messages;
   globalThis.LT41_MSG = Object.freeze(Object.fromEntries(
     Object.entries(messages).map(([key, entry]) => [key, entry.name])
   ));
+  globalThis.LT41_isShellMessage = isShellMessage;
 })();
