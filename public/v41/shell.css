@@ -692,6 +692,18 @@ body.lt-frame-dialog-open #toast{top:calc(68px + env(safe-area-inset-top));botto
 .updates-heart{font-size:12px;line-height:1}
 .updates-source-user{margin-left:8px;font-size:13px;color:var(--lt-gold)}
 .updates-source-summary{margin:18px 0 0;padding-top:12px;border-top:1px solid var(--lt-line);font-size:13px;line-height:1.7;color:var(--lt-gold)}
+/* #1098 3단계: 내 소식 창 — updates 창과 같은 틀(최대 960·닫기 여백)을 쓰고 줄 모양만 더한다. */
+#my-news-panel>.panel-heading,#my-news-panel>.panel-note,#my-news-panel>.my-news-list,#my-news-panel>#my-news-error,#my-news-panel>.updates-foot{max-width:960px;margin-left:auto;margin-right:auto}
+.my-news-list{display:grid;gap:10px;margin-top:14px;margin-bottom:64px}
+.my-news-rows{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.my-news-day{min-height:24px;padding:10px 2px 0;font-size:12px;font-weight:700;letter-spacing:var(--lt-track);color:var(--lt-rose)}
+.my-news-line{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 12px;min-height:44px;padding:9px 12px;border:1px solid var(--lt-line);border-radius:var(--lt-r-card);background:#ffffff05}
+.my-news-label{font-size:14px;font-weight:700;color:var(--lt-pearl);white-space:nowrap}
+.my-news-last{min-width:0;font-size:13px;line-height:1.7;color:var(--lt-pearl);overflow-wrap:anywhere}
+.my-news-target{font-size:12px;color:var(--muted);overflow-wrap:anywhere}
+.my-news-ai{font-size:12px;color:var(--lt-gold);white-space:nowrap}
+.my-news-empty,.my-news-loading{margin:6px 0 0}
+#my-news-error{color:var(--lt-rose)}
 
 /* '러브트리가 걸어온 길'(261116 대표 확정) — 새 소식 창 맨 아래 접이식 구획. 처음엔 접힘.
    토큰만 쓴다(밤·정원 모두 --lt-pearl/--lt-muted/--lt-gold가 테마에서 갈린다). 자료를 못 읽으면 hidden. */
