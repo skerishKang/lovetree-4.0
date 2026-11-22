@@ -80,14 +80,14 @@ test('#417 화면: 제목 ▾는 셸 목록을 정리 전 트리부터 보여 �
   t.after(async () => { await context.close().catch(() => {}); await browser.close(); server.close(); });
   assert.deepEqual(problems, [], '화면 오류 없음: ' + problems.join(' | '));
 
-  // 머리 줄: ← 서재 + 지금 트리 제목 + ▾ — 셋 다 보인다.
+  // 머리 줄: 지금 트리 제목과 ▾ — ← 서재는 공통 도구 줄 개편으로 없다.
   const head = await frame.evaluate(() => ({
     back: !!document.getElementById('shelfBackBtn') && document.getElementById('shelfBackBtn').hidden === false,
     title: document.getElementById('treeTitleText')?.textContent.trim(),
     caretHidden: document.querySelector('.tree-title-caret')?.hidden === true,
     menuHidden: document.getElementById('treeMenuPanel').hidden
   }));
-  assert.equal(head.back, true, '← 서재가 보인다');
+  assert.equal(head.back, false, '← 서재 단추가 없다');
   assert.equal(head.title, '지금 보는 트리', `제목은 지금 트리(${head.title})`);
   assert.equal(head.caretHidden, false, '▾ 표시가 보인다');
   assert.equal(head.menuHidden, true, '목록은 처음에 닫혀 있다');
@@ -141,12 +141,6 @@ test('#417 화면: 제목 ▾는 셸 목록을 정리 전 트리부터 보여 �
   await page.waitForTimeout(300);
   const msgs = await page.evaluate(() => window.__msgs);
   assert.deepEqual(msgs.at(-1), { type: 'lt41-open-view', treeId: 't3', view: 'board' }, '행을 누르면 lt41-open-view로 같은 보기를 연다');
-  // ← 서재는 책장으로 간다.
-  await frame.click('#shelfBackBtn');
-  await page.waitForTimeout(300);
-  const last = await page.evaluate(() => window.__msgs.at(-1));
-  assert.equal(last?.type, 'lt41-navigate', '← 서재는 lt41-navigate로 책장에 간다');
-  assert.match(String(last?.view), /track32-bookshelf/, `책장 화면으로(${last?.view})`);
 });
 
 test('#417 화면: 공유·예시(읽기 전용)에서는 ▾와 ← 서재를 숨기고 목록을 열지 않는다', { skip: REQUIRE ? false : skip, timeout: 240000 }, async (t) => {
@@ -157,10 +151,10 @@ test('#417 화면: 공유·예시(읽기 전용)에서는 ▾와 ← 서재를 �
   assert.deepEqual(problems, [], '화면 오류 없음: ' + problems.join(' | '));
   const ro = await frame.evaluate(() => ({
     caret: document.querySelector('.tree-title-caret')?.hidden === true,
-    back: document.getElementById('shelfBackBtn')?.hidden === true
+    back: !document.getElementById('shelfBackBtn')
   }));
   assert.equal(ro.caret, true, '읽기 전용에서는 ▾를 숨긴다');
-  assert.equal(ro.back, true, '읽기 전용에서는 ← 서재를 숨긴다');
+  assert.equal(ro.back, true, '← 서재 단추가 없다');
   await frame.click('#treeTitleBtn');
   await page.waitForTimeout(300);
   assert.equal(await frame.evaluate(() => document.getElementById('treeMenuPanel').hidden), true, '읽기 전용에서는 목록을 열지 않는다');
