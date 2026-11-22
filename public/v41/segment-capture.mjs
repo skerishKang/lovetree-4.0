@@ -4,7 +4,6 @@
 import { formatTimecode, parseTimecode } from './domain.mjs';
 
 export const CAPTURE_DEFAULT_SECONDS = 10;
-export const SEGMENT_DURATIONS = [5, 10, 15];
 
 /** 재생 위치(초) → 시작은 내림, 끝은 시작+길이. 길이가 없으면 기본 10초. */
 export function capturedRange(currentSeconds, duration = CAPTURE_DEFAULT_SECONDS) {
