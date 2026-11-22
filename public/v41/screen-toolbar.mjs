@@ -18,20 +18,16 @@ export function mountScreenToolbar({ screen, titleFrom, tools = [] }) {
   menu.hidden = true;
   bar.append(title, group, more, menu);
   const header = document.querySelector('header');
-  const main = document.querySelector('main');
-  if (main) main.prepend(bar); // 랜드마크 안에 둔다(화면 내용이 main 밖에 남지 않게).
-  if (!main) (header || document.body).after(bar);
+  // 도구 줄과 본문은 같은 위치 기준을 쓰고, 서로의 자식이 되지 않는다.
+  if (header) header.after(bar);
+  else document.body.prepend(bar);
 
-  // 좌우 여백과 세로 자리는 상단 메뉴의 실제 계산값을 따른다(화면별 하드코딩 없음).
+  // 상단 메뉴의 실제 높이를 기준으로 하고 도구 줄 높이는 CSS 변수 하나를 쓴다.
   const align = () => {
     if (!header) return;
     const bottom = Math.round(header.getBoundingClientRect().bottom) + 4;
-    bar.style.setProperty('--lt-toolbar-top', `${bottom}px`);
     bar.style.setProperty('--lt-toolbar-pad', getComputedStyle(header).paddingLeft);
-    const height = Math.round(parseFloat(getComputedStyle(bar).height) || 52);
-    document.documentElement.style.setProperty('--lt-content-top', `${bottom + height}px`);
     document.documentElement.style.setProperty('--lt-toolbar-top', `${bottom}px`);
-    document.documentElement.style.setProperty('--lt-toolbar-height', `${height}px`);
   };
   align();
 

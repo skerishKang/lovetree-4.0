@@ -1,14 +1,17 @@
 /* #1091: 상단 메뉴 아래 화면 도구 줄 — 책·보드가 같은 부품을 쓴다. 서재는 #1154 병합 뒤 붙인다.
    색은 모두 --lt-* 토큰만 쓴다(화면별 하드코딩 금지). */
+html{--lt-toolbar-height:52px;--lt-content-top:calc(var(--lt-toolbar-top,66px) + var(--lt-toolbar-height))}
 html[data-v41-screen=book]{--lt-toolbar-top:70px;--lt-toolbar-pad:28px}
 html[data-v41-screen=board]{--lt-toolbar-top:66px;--lt-toolbar-pad:24px}
 html[data-v41-screen=shelf]{--lt-toolbar-top:82px;--lt-toolbar-pad:18px}
-/* 서재의 옛 컨트롤 줄은 도구 줄로 옮겼으니 자리만 비운다. 이어 보기 띠는 줄 아래에 그대로. */
-html[data-v41-screen=shelf] .shelf-controls{display:none}
-html[data-v41-screen=shelf] .shelf-screen{margin-top:var(--lt-content-top,52px)}
+/* 서재는 도구 줄을 실제 흐름에 넣고, 책 수는 이어 보기 띠 아래에 남긴다. */
+html[data-v41-screen=shelf] .lt-screen-toolbar{position:relative;top:auto;margin-top:4px;flex:none}
+html[data-v41-screen=shelf] .page{min-height:0}
+html[data-v41-screen=shelf] .shelf-controls{display:flex;flex:none;margin:0 0 8px}
+html[data-v41-screen=shelf] .shelf-controls .count{min-height:0}
 .lt-screen-toolbar{
   box-sizing:border-box;position:absolute;left:0;right:0;top:var(--lt-toolbar-top,66px);z-index:69;
-  display:flex;align-items:center;gap:12px;height:52px;padding:0 var(--lt-toolbar-pad,24px);
+  display:flex;align-items:center;gap:12px;height:var(--lt-toolbar-height);padding:0 var(--lt-toolbar-pad,24px);
   background:var(--lt-glass);border-bottom:1px solid var(--lt-line);color:var(--lt-pearl);font-family:var(--lt-ui);
 }
 .lt-toolbar-title{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;font-weight:600}
@@ -34,23 +37,24 @@ html[data-book-shape=phone] .lt-toolbar-tools .desktop-only{display:none}
 @media(max-width:600px){.lt-toolbar-tools .desktop-only{display:none}}
 .lt-toolbar-more{flex:none}
 .lt-toolbar-menu{
-  position:absolute;right:var(--lt-toolbar-pad,24px);top:52px;z-index:70;
+  position:absolute;right:var(--lt-toolbar-pad,24px);top:var(--lt-toolbar-height);z-index:70;
   display:flex;flex-direction:column;gap:6px;padding:10px;border:1px solid var(--lt-line);
   border-radius:14px;background:var(--lt-glass-strong);color:var(--lt-pearl);
 }
 .lt-toolbar-menu[hidden]{display:none}
 .lt-toolbar-more[hidden]{display:none}
 /* 줄이 생긴 만큼 화면 본문을 아래로 내려 첫 줄·이동 단추가 가리지 않게 한다. */
-html[data-v41-screen=book] .stage{top:var(--lt-content-top,122px)}
+html[data-v41-screen=book] .stage{top:var(--lt-content-top)}
+html[data-book-shape=phone][data-v41-screen=book] .lt-screen-toolbar{position:relative;top:auto;margin-top:4px}
+html[data-book-shape=phone][data-v41-screen=book] .stage{top:auto;min-height:calc(100dvh - var(--lt-content-top))}
 @media(min-width:601px){html[data-v41-screen=book] .stage{padding-top:18px}}
-html[data-v41-screen=board] .boardTitle{top:130px}
+html[data-v41-screen=board] .boardTitle{top:calc(var(--lt-content-top) + 8px)}
+html[data-v41-screen=board]{--lt-board-frame-top:calc(var(--lt-content-top) + 80px)}
+@media(max-width:700px){html[data-v41-screen=board]{--lt-board-frame-top:var(--lt-content-top)}}
 @media(max-width:600px){
-  .lt-screen-toolbar{height:48px;padding:0 12px}
+  html{--lt-toolbar-height:48px}
+  .lt-screen-toolbar{padding:0 12px}
   html[data-v41-screen=book]{--lt-toolbar-pad:12px;--lt-toolbar-top:60px}
   html[data-v41-screen=board]{--lt-toolbar-pad:12px;--lt-toolbar-top:56px}
   html[data-v41-screen=shelf]{--lt-toolbar-pad:12px}
-  html[data-v41-screen=book] .stage{top:var(--lt-content-top,108px)}
-  html[data-v41-screen=board] .boardTitle{top:112px}
-  html[data-v41-screen=shelf] .shelf-screen{margin-top:var(--lt-content-top,48px)}
-  .lt-toolbar-menu{top:48px}
 }
