@@ -420,3 +420,28 @@ test('stored vertical media values survive the readStoredDocument isolation path
   const reread = await get(handle);
   assert.equal(reread.body.state.trees[0].moments.find(m => m.url.includes('youtube')).mediaMetadata.vertical, true);
 });
+
+test('#1062: 저장소 오류의 500 기록에는 원인만 남고 요청 값은 섞이지 않는다', async () => {
+  const requestBody = '815d2018a65b9e6bdf6fa41e38e51b5c9c0b13a4';
+  const email = 'member@example.com';
+  const cookie = 'session=abcdef1234567890';
+  const dbUrl = 'postgres://app:pw@db.internal:5432/lovetree';
+  const boom = new Error(`보관 연결 실패 ${email} ${dbUrl} ${cookie}`);
+  boom.name = 'StoreFailure';
+  boom.code = 'STORE_DOWN';
+  const repo = { ...createMemoryWorkspaceRepo(), async load() { throw boom; } };
+  const { handle } = buildHandle({ repo });
+  const lines = [], original = console.error;
+  console.error = (...args) => lines.push(args.map(String).join(' '));
+  let response;
+  try { response = await get(handle, { headers: { cookie }, body: requestBody }); }
+  finally { console.error = original; }
+  assert.equal(response.status, 500);
+  assert.equal(lines.length, 1, '기록은 한 줄');
+  assert.match(lines[0], /StoreFailure/, '오류 이름');
+  assert.match(lines[0], /STORE_DOWN/, '오류 코드');
+  assert.match(lines[0], /보관 연결 실패/, '메시지는 남는다');
+  for (const secret of [requestBody, email, cookie, dbUrl]) {
+    assert.equal(lines[0].includes(secret), false, '기록에 요청 본문·식별자·비밀값이 없다');
+  }
+});

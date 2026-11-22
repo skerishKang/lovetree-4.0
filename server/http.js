@@ -1,3 +1,4 @@
+import { logServerError } from './error-log.js';
 import { MAX_MEDIA_BYTES } from './private-media.js';
 import { ApiError } from './errors.js';
 import { ROLE_ADMIN } from './admin-roles.js';
@@ -132,7 +133,7 @@ export function createApiHandler({ authenticate, service, productId, admin = nul
       return headers ? { status, body, headers } : { status, body };
     } catch (error) {
       if (error instanceof ApiError) return { status: error.status, body: errorBody(error) };
-      console.error('[lovetree-storage] 요청 처리 실패', { path: request?.path, method: request?.method });
+      logServerError(error, 'lovetree-storage');
       return { status: 500, body: { error: { code: 'internal_error', message: '서버에서 처리하지 못했어요.' } } };
     }
   };
