@@ -2,8 +2,7 @@
    색은 모두 --lt-* 토큰만 쓴다(화면별 하드코딩 금지). */
 html{--lt-toolbar-height:52px;--lt-content-top:calc(var(--lt-toolbar-top,66px) + var(--lt-toolbar-height))}
 html[data-v41-screen=book]{--lt-toolbar-top:70px;--lt-toolbar-pad:28px}
-/* Board header is 66px (56px narrow); reserve its 4px gap before the module mounts. */
-html[data-v41-screen=board]{--lt-toolbar-top:70px;--lt-toolbar-pad:24px}
+html[data-v41-screen=board]{--lt-toolbar-pad:24px}
 html[data-v41-screen=shelf]{--lt-toolbar-top:82px;--lt-toolbar-pad:18px}
 /* 서재는 도구 줄을 실제 흐름에 넣고, 책 수는 이어 보기 띠 아래에 남긴다. */
 html[data-v41-screen=shelf] .lt-screen-toolbar{position:relative;top:auto;margin-top:4px;flex:none}
@@ -25,12 +24,6 @@ html[data-v41-screen=shelf] .shelf-controls .count{min-height:0}
 .lt-toolbar-tools button[aria-pressed=true]{border-color:var(--lt-gold-line);color:var(--lt-gold)}
 .lt-toolbar-tools .view-toggle,.lt-toolbar-tools .boardModeSwitch,.lt-toolbar-tools .bgDrop{display:inline-flex;align-items:center;flex:none}
 .lt-toolbar-tools .view-toggle{border:1px solid var(--lt-line);border-radius:var(--lt-r-pill);overflow:hidden}
-/* 보드에서 예전 절대 위치 요소가 줄과 겹치지 않게 아래로 내린다(좁은 화면은 기존 흐름 유지). */
-@media(min-width:701px){
-  html[data-v41-screen=board] .themeBadge,
-  html[data-v41-screen=board] .detail,
-  html[data-v41-screen=board] .leftPanel{top:calc(var(--lt-toolbar-top,66px) + var(--lt-toolbar-height,52px) + 8px)}
-}
 /* 좁은 화면의 '선택한 순간' 줄도 도구 줄 아래에 둔다(머리글 실측보다 줄을 우선). */
 html[data-v41-screen=board] .lt-moment-picker{top:calc(var(--lt-toolbar-top,60px) + var(--lt-toolbar-height,48px) + 7px)}
 /* 휴대폰에서는 돋보기(찾기)를 숨긴다 — 줄 안으로 옮겨도 이 규칙이 이긴다. */
@@ -49,9 +42,6 @@ html[data-v41-screen=book] .stage{top:var(--lt-content-top)}
 html[data-book-shape=phone][data-v41-screen=book] .lt-screen-toolbar{position:relative;top:auto;margin-top:4px}
 html[data-book-shape=phone][data-v41-screen=book] .stage{top:auto;min-height:calc(100dvh - var(--lt-content-top))}
 @media(min-width:601px){html[data-v41-screen=book] .stage{padding-top:18px}}
-html[data-v41-screen=board] .boardTitle{top:calc(var(--lt-content-top) + 8px)}
-html[data-v41-screen=board]{--lt-board-frame-top:calc(var(--lt-content-top) + 80px)}
-@media(max-width:700px){html[data-v41-screen=board]{--lt-toolbar-top:60px;--lt-board-frame-top:var(--lt-content-top)}}
 @media(max-width:600px){
   html{--lt-toolbar-height:48px}
   .lt-screen-toolbar{padding:0 12px}

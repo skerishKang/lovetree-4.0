@@ -10,6 +10,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { createServer } from 'node:http';
 import { createReadStream } from 'node:fs';
+import { createGzip } from 'node:zlib';
 import { stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -50,8 +51,12 @@ function serve(extra = {}) {
       if (path.relative(ROOT, file).startsWith('..')) continue;
       try {
         if (!(await stat(file)).isFile()) continue;
-        res.writeHead(200, { 'content-type': MIME[path.extname(file)] || 'application/octet-stream' });
-        createReadStream(file).pipe(res); return;
+        const type = MIME[path.extname(file)] || 'application/octet-stream';
+        // Slow-network measurements use compressed static text, as on Pages.
+        const gzip = process.env.LT_BOARD_582_SLOW === '1' && /^(text\/|application\/json)/.test(type);
+        res.writeHead(200, { 'content-type': type, ...(gzip ? { 'content-encoding': 'gzip' } : {}) });
+        const stream = createReadStream(file);
+        (gzip ? stream.pipe(createGzip()) : stream).pipe(res); return;
       } catch {}
     }
     res.writeHead(404); res.end('not found');
@@ -282,7 +287,20 @@ test('#1026 동작: 그림 지연 도착에도 카드 top 변화 0, 보드 CLS 0
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
   await context.addInitScript(() => {
     window.__shift1026 = [];
-    try { new PerformanceObserver((list) => { for (const e of list.getEntries()) if (!e.hadRecentInput) window.__shift1026.push({ v: +e.value.toFixed(6), t: Math.round(e.startTime), src: (e.sources || []).map(s => s.node ? (s.node.nodeName + (s.node.id ? '#' + s.node.id : '') + (typeof s.node.className === 'string' ? '.' + s.node.className.trim().split(/\s+/).slice(0, 2).join('.') : '')) : '?') }); }).observe({ type: 'layout-shift', buffered: true }); } catch {}
+    try {
+      const rect = (r) => ({ x: r.x, y: r.y, width: r.width, height: r.height });
+      new PerformanceObserver((list) => {
+        for (const e of list.getEntries()) if (!e.hadRecentInput) {
+          window.__shift1026.push({
+            v: +e.value.toFixed(6), t: Math.round(e.startTime),
+            src: (e.sources || []).map(s => ({
+              node: s.node ? (s.node.nodeName + (s.node.id ? '#' + s.node.id : '') + (typeof s.node.className === 'string' ? '.' + s.node.className.trim().split(/\s+/).slice(0, 2).join('.') : '')) : '?',
+              previousRect: rect(s.previousRect), currentRect: rect(s.currentRect)
+            }))
+          });
+        }
+      }).observe({ type: 'layout-shift', buffered: true });
+    } catch {}
   });
   await context.route('**/i.ytimg.com/**', async (route) => {
     await new Promise((ok) => setTimeout(ok, 500));
@@ -290,6 +308,14 @@ test('#1026 동작: 그림 지연 도착에도 카드 top 변화 0, 보드 CLS 0
   });
   try {
     const page = await context.newPage();
+    if (process.env.LT_BOARD_582_SLOW === '1') {
+      const cdp = await context.newCDPSession(page);
+      await cdp.send('Emulation.setCPUThrottlingRate', { rate: 6 });
+      await cdp.send('Network.enable');
+      await cdp.send('Network.emulateNetworkConditions', {
+        offline: false, latency: 400, downloadThroughput: 50000, uploadThroughput: 50000, connectionType: 'cellular3g'
+      });
+    }
     await page.goto(`${base}/__host-1026.html`, { waitUntil: 'domcontentloaded' });
     let frame = null;
     for (let i = 0; i < 80 && !frame; i++) {
