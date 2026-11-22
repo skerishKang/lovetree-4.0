@@ -6,6 +6,8 @@ import {parseTag,tagKey,isChannelLikeArtist} from '../tags.mjs';
 // #480 L13: 날짜는 책·보드·지도·첫 화면과 같은 한 벌(formatDisplayDate)로만 적는다.
 import {formatDisplayDate} from '../book-usability.mjs';
 import {copyPublicMoment} from '../moments-copy.mjs';
+// #1072 A-16: 화면 공용 오류 기록 — 저장·보드·미디어 경로에서 조용히 넘기던 빈 catch를 여기서 기록한다.
+import {report} from '../report.mjs';
 
 // 261118 대표 지적 2차 5: 서재 화면이 알려 준 '마지막에 본 트리'(가운데 책의 트리).
 // 서재 화면에서 콕·보드·지도 탭을 누르면 이 트리로 열린다(shell.mjs의 data-view 눌림에서 쓴다).
@@ -72,7 +74,7 @@ export function createMessages(deps) {
       const reply = (ok, error) => { try { event.source?.postMessage({type:'lt41-board-saved', ok, error}, location.origin); } catch {} };
       if (getSource() !== 'server' || !getMember()?.snapshot().writable) { reply(false, '서버 편집 연결이 없어 저장하지 않았어요.'); return; }
       try { getMember().apply('boardSync', {moments: data.moments}, {treeId: data.treeId}); reply(true); }
-      catch (error) { reply(false, error?.message || '저장하지 못했어요.'); }
+      catch (error) { report(error, '보드 저장'); reply(false, error?.message || '저장하지 못했어요.'); }
       return;
     }
     if (data?.type === 'lt41-open-tags') {
@@ -123,7 +125,7 @@ export function createMessages(deps) {
       const tree = window.LT41?.tree, moment = tree?.moments.find(m => m.id === data.momentId && m.url === data.url);
       if (moment) try {
         getMember().apply('cacheMediaMetadata', {url: data.url, mediaMetadata: data.mediaMetadata}, {treeId: tree.id, momentId: moment.id});
-      } catch {}
+      } catch (error) { report(error, '미디어 정보 저장'); }
     }
     if (data?.type === 'lt41-shelf-tree' && getModel()?.trees?.some(t => t.id === data.treeId)) { shelfTreeId = data.treeId; return; }
     if (data?.type === 'lt41-navigate') {

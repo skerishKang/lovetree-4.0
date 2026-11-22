@@ -3,6 +3,7 @@
 // 로그인 화면으로 가는 주소 규칙(테마 lt_theme, 의도 intent)은 member-entry.mjs·header-state.mjs가 그대로 맡는다.
 import {memberLoginUrl} from '../member-entry.mjs';
 import {readTheme, readLoginIntent, LOGIN_INTENTS} from '../header-state.mjs';
+import {forgetLoginSubject} from '../workspace-cache.mjs';
 
 export function createAuth(deps) {
   const {$} = deps;
@@ -27,6 +28,8 @@ export function createAuth(deps) {
   // 로그아웃 상태에서 로그인이 필요한 진입점은 안내 창 없이 바로 /auth/login으로 간다(#215).
   // 테마(lt_theme)와 의도(intent)는 주소에 유지한다.
   function startLogin(intent = '') {
+    // A-18: 새 로그인은 지금 확인된 계정이 없다는 뜻 — 표식을 비워 돌아올 때까지 저장본을 그리지 않는다.
+    forgetLoginSubject(localStorage);
     const target = LOGIN_INTENTS.includes(intent) ? intent : '';
     location.assign(memberLoginUrl(readTheme(localStorage), target));
   }
