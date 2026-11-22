@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import {
   COVER_PALETTE, addedLabel, allBooks, bookMeta, buildShelf, carouselTransform, coverStyle, escapeShelf,
   filterShelf, findBook, lastMomentDate, leftPageMarkup, pageMeta, pageTarget, resolveShelfIndex,
-  resumeCard, rightPageMarkup, shelfBook, shelfRowLayout, treeTitleOf, youtubeId
+  resumeCard, rightPageMarkup, shelfBook, shelfRowLayout, shelfRotationLayout, treeTitleOf, youtubeId
 } from '../public/v41/views/shelf/shelf-model.mjs';
 import { youtubeIdFrom } from '../public/v41/youtube-id.mjs';
 import { createReader } from '../public/v41/views/shelf/shelf-reader.js';
@@ -449,4 +449,26 @@ test('새 책을 만들면 이어 보기 띠를 다시 그린다 · 검색으로
   assert.equal(el('#resultCount').textContent, '트리 0개');
   assert.equal(el('#resumeStrip').hidden, false, '검색으로 좁아져도 띠는 바뀌지 않는다');
   assert.equal(el('#resumeStrip').dataset.resumeKind, 'resume');
+});
+
+// #1093: 회전 보기는 예전 책장의 가운데 배치를 되살리되 모든 책을 끝까지 보이게 둔다.
+test('#1093 회전 배치는 가운데 책을 중심으로 하고 모든 책을 누를 수 있다', () => {
+  const layout = shelfRotationLayout(14, 1200);
+  assert.equal(layout.centerFor(0), 0);
+  assert.equal(layout.centerFor(13), 13);
+  assert.equal(layout.centerFor(99), 13, '범위 밖은 마지막 책에서 멈춘다');
+  assert.equal(layout.xOf(6, 6), 0, '고른 책은 레일 가운데에 있다');
+  assert.equal(layout.xOf(7, 6), layout.pitch, '오른쪽 이웃은 한 칸 오른쪽');
+  assert.equal(layout.xOf(5, 6), -layout.pitch, '왼쪽 이웃은 한 칸 왼쪽');
+  for (let center = 0; center < 14; center++) {
+    for (let index = 0; index < 14; index++) {
+      assert.ok(Number.isFinite(layout.xOf(index, center)), '모든 책에 좌표가 있다');
+      assert.ok(Math.abs(layout.rotate(index, center)) <= 22, '기울임은 22도를 넘지 않는다');
+      assert.ok(layout.scale(index, center) > 0, '책이 사라지지 않는다');
+    }
+  }
+  assert.equal(layout.rotate(7, 6), -22, '오른쪽 책은 안쪽으로 기운다');
+  assert.equal(layout.rotate(5, 6), 22, '왼쪽 책은 안쪽으로 기운다');
+  assert.equal(layout.scale(6, 6), 1.06, '가운데 책만 살짝 앞으로');
+  assert.equal(layout.depth(6, 6), 0);
 });
