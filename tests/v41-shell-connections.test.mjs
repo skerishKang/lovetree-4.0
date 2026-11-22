@@ -22,7 +22,7 @@ const shellSource = () => {
   for (const name of readdirSync(new URL('shell/', dir))) {
     if (name.endsWith('.mjs')) source += readFileSync(new URL('shell/' + name, dir), 'utf8');
   }
-  return source.replace(/\s+/g, '');
+  return source;
 };
 
 test('셸이 연결하던 요소는 지금도 셸·shell/ 안에서 연결을 갖는다', () => {
@@ -34,7 +34,7 @@ test('셸이 연결하던 요소는 지금도 셸·shell/ 안에서 연결을 �
   // 2026-11-16: 계정 메뉴의 '고급 기능 보기'(account-advanced)는 설정 화면 탭의 스위치(settings-advanced)로 옮겨졌다 — 목록의 자리를 바꿨다(개수 40 유지).
   // #1097: 이전 순간·관련 연결의 별도 저장 버튼(change-parent 등)은 없어졌다 — 저장하기 한 번에 함께 저장한다.
   //  대신 '영상 바꾸기'(media-change-toggle) 연결을 이 자리에서 고정한다.
-  const missing = SHELL_CONNECTIONS.filter(id => !new RegExp(`\\$\\('${id}'\\)\\??\\.(onclick|onchange|onsubmit|oninput|addEventListener)`).test(source));
+  const missing = SHELL_CONNECTIONS.filter(id => !new RegExp(String.raw`(?:\$\s*|\(\s*0\s*,\s*ctx\.\$\s*\)\s*)\(\s*'${id}'\s*\)\s*\??\s*\.\s*(onclick|onchange|onsubmit|oninput|addEventListener)\b`).test(source));
   assert.deepEqual(missing, [], '연결이 사라진 요소: ' + missing.join(', '));
   assert.equal(SHELL_CONNECTIONS.length, 40);
 });

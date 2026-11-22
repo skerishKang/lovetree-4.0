@@ -455,12 +455,13 @@ test('#635 PR B 화면: 영상 칸 — 보관 썸네일을 먼저 보이고, 없
 //     첫 화면에서는 '드래그 · 금테 카드를 눌러 감상' 안내를 단추 묶음 바로 아래(안내 줄 옆)로 올리고 링크 줄과 16px 이상 띄운다.
 
 test('#635 PR C 규칙(정적): 시작 입구·첫날 표기·크게 보기 대비·아래쪽 간격·안내 자리', () => {
-  const shell = read('public/v41/shell.mjs');
+  const shell = read('public/v41/shell/navigation-menu.mjs');
   // 8. 로그아웃 메뉴 맨 위 시작 입구 — 로그인 상태에서는 붙지 않는다(조건이 add('첫 화면'…) 앞에 있다).
-  const foldAt = shell.indexOf('function buildFoldMenu()');
-  const startEntry = shell.indexOf("if(!member?.snapshot().owned)add('내 러브트리 시작하기',()=>openLoginStart('first'));");
-  assert.ok(startEntry > foldAt, '접기 메뉴(≡)에 시작 입구를 넣는다');
-  assert.ok(shell.indexOf("add('첫 화면'", startEntry) > startEntry, '시작 입구는 메뉴 맨 위다');
+  const fold = shell.match(/function\s+buildFoldMenu\s*\(\s*\)\s*\{([\s\S]*?)^\s*\}/m);
+  assert.ok(fold, '접기 메뉴 함수가 존재한다');
+  const startEntry = fold[1].search(/if\s*\(\s*!\s*ctx\.member\?\.snapshot\s*\(\s*\)\s*\.owned\s*\)\s*add\s*\(\s*'내 러브트리 시작하기'\s*,\s*\(\s*\)\s*=>\s*\(\s*0\s*,\s*ctx\.openLoginStart\s*\)\s*\(\s*'first'\s*\)\s*\)\s*;/);
+  assert.ok(startEntry >= 0, '접기 메뉴(≡)에 로그아웃 시작 입구를 넣는다');
+  assert.ok(fold[1].search(/add\s*\(\s*'첫 화면'/) > startEntry, '시작 입구는 첫 화면보다 먼저다');
   // 9. '0일' 표기 — '이어진 순간' 요약이 첫날·N일째로 읽힌다.
   const extra = read('public/v41/views/book/book-extra.js');
   assert.match(extra, /journey\.days===0\?'첫날':journey\.days\+'일째'/, "'이어진 순간' 요약: 같은 날은 '첫날', 그 뒤는 'N일째'");
