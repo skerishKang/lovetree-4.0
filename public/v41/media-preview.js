@@ -1,4 +1,3 @@
-import { MSG } from './frame-messages.mjs';
 // Reuses src/media.js parser (LoveBud b80647f1); display only.
 (() => {
 /* Pure parser excerpt from src/media.js; click-only network behavior follows below. */

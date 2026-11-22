@@ -1,7 +1,6 @@
 // 내 트리(책장) 동작 (#231 후속, 2026-11-09).
 // 계산(표지 색·이름·정보 줄·검색·카드 배치·페이지)은 shelf-model.mjs로 옮기고 여기서는 화면만 다룬다.
 // 조건·문구·id·순서 변경 0. #291(궤도)와 같이 모듈로 불러 쓴다.
-import { MSG, isTrustedFrameMessage } from '../../frame-messages.mjs';
 import {
   COVER_PALETTE, allBooks as allBooksOf, bookMeta, buildShelf, carouselTransform,
   escapeShelf, filterShelf, findBook, lastMomentDate as lastMomentDateOf,

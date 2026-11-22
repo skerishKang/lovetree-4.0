@@ -1,4 +1,3 @@
-import { MSG } from '../../public/v41/frame-messages.mjs';
 import {fetchVideoStatus} from '../../public/v41/video-status.mjs';
 import originalCSS from './orbit-source.css?inline';
 import {titleView, formatDisplayDate, embedUrl} from '../../public/v41/book-usability.mjs';

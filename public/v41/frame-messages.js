@@ -1,0 +1,70 @@
+// #1061 A-12: 일반 스크립트용 메시지 표. frame-messages.mjs와 같은 표를 window에 올린다.
+const FRAME_MESSAGES = Object.freeze({
+  selection: Object.freeze({ name: 'lt-selection', from: '', to: '', payload: '없음' }),
+  suggestRequest: Object.freeze({ name: 'lt-suggest-request', from: '', to: '', payload: '없음' }),
+  account: Object.freeze({ name: 'lt41-account', from: '', to: '', payload: '없음' }),
+  advanced: Object.freeze({ name: 'lt41-advanced', from: '', to: '', payload: '없음' }),
+  boardSaved: Object.freeze({ name: 'lt41-board-saved', from: '', to: '', payload: '없음' }),
+  boardSync: Object.freeze({ name: 'lt41-board-sync', from: '', to: '', payload: '없음' }),
+  boardTheme: Object.freeze({ name: 'lt41-board-theme', from: '셸', to: '셸', payload: '없음' }),
+  boardThemeChoice: Object.freeze({ name: 'lt41-board-theme-choice', from: '', to: '', payload: '없음' }),
+  choose: Object.freeze({ name: 'lt41-choose', from: '', to: '', payload: '없음' }),
+  cleanup: Object.freeze({ name: 'lt41-cleanup', from: '', to: '', payload: '없음' }),
+  community: Object.freeze({ name: 'lt41-community', from: '', to: '', payload: '없음' }),
+  dateStyle: Object.freeze({ name: 'lt41-date-style', from: '셸+화면', to: '셸+화면', payload: '없음' }),
+  example: Object.freeze({ name: 'lt41-example', from: '화면', to: '화면', payload: '없음' }),
+  homeCards: Object.freeze({ name: 'lt41-home-cards', from: '', to: '', payload: '없음' }),
+  homeMoment: Object.freeze({ name: 'lt41-home-moment', from: '', to: '', payload: '없음' }),
+  homeMomentSet: Object.freeze({ name: 'lt41-home-moment-set', from: '', to: '', payload: '없음' }),
+  journeyClose: Object.freeze({ name: 'lt41-journey-close', from: '', to: '', payload: '없음' }),
+  journeyGoto: Object.freeze({ name: 'lt41-journey-goto', from: '', to: '', payload: '없음' }),
+  journeyOpenBook: Object.freeze({ name: 'lt41-journey-open-book', from: '', to: '', payload: '없음' }),
+  journeyResult: Object.freeze({ name: 'lt41-journey-result', from: '', to: '', payload: '없음' }),
+  journeySave: Object.freeze({ name: 'lt41-journey-save', from: '', to: '', payload: '없음' }),
+  journeyStep: Object.freeze({ name: 'lt41-journey-step', from: '', to: '', payload: '없음' }),
+  manageTree: Object.freeze({ name: 'lt41-manage-tree', from: '', to: '', payload: '없음' }),
+  mediaMetadata: Object.freeze({ name: 'lt41-media-metadata', from: '', to: '', payload: '없음' }),
+  momentsOpened: Object.freeze({ name: 'lt41-moments-opened', from: '', to: '', payload: '없음' }),
+  momentsSaved: Object.freeze({ name: 'lt41-moments-saved', from: '화면', to: '화면', payload: 'refresh' }),
+  motion: Object.freeze({ name: 'lt41-motion', from: '화면', to: '화면', payload: '없음' }),
+  move: Object.freeze({ name: 'lt41-move', from: '셸', to: '셸', payload: '없음' }),
+  moveMoments: Object.freeze({ name: 'lt41-move-moments', from: '', to: '', payload: '없음' }),
+  navigate: Object.freeze({ name: 'lt41-navigate', from: '화면', to: '화면', payload: 'view' }),
+  networkView: Object.freeze({ name: 'lt41-network-view', from: '화면', to: '화면', payload: '없음' }),
+  newTree: Object.freeze({ name: 'lt41-new-tree', from: '', to: '', payload: '없음' }),
+  openBook: Object.freeze({ name: 'lt41-open-book', from: '셸+화면', to: '셸+화면', payload: '없음' }),
+  openGuide: Object.freeze({ name: 'lt41-open-guide', from: '', to: '', payload: '없음' }),
+  openNetwork: Object.freeze({ name: 'lt41-open-network', from: '', to: '', payload: '없음' }),
+  openTags: Object.freeze({ name: 'lt41-open-tags', from: '', to: '', payload: '없음' }),
+  openView: Object.freeze({ name: 'lt41-open-view', from: '화면', to: '화면', payload: '없음' }),
+  pageTurn: Object.freeze({ name: 'lt41-page-turn', from: '셸+화면', to: '셸+화면', payload: '없음' }),
+  prefs: Object.freeze({ name: 'lt41-prefs', from: '', to: '', payload: '없음' }),
+  select: Object.freeze({ name: 'lt41-select', from: '', to: '', payload: '없음' }),
+  shelfSelectTree: Object.freeze({ name: 'lt41-shelf-select-tree', from: '', to: '', payload: '없음' }),
+  shelfTree: Object.freeze({ name: 'lt41-shelf-tree', from: '', to: '', payload: '없음' }),
+  start: Object.freeze({ name: 'lt41-start', from: '', to: '', payload: '없음' }),
+  storySave: Object.freeze({ name: 'lt41-story-save', from: '', to: '', payload: '없음' }),
+  storySaved: Object.freeze({ name: 'lt41-story-saved', from: '', to: '', payload: '없음' }),
+  tags: Object.freeze({ name: 'lt41-tags', from: '셸+화면', to: '셸+화면', payload: 'B,momentId' }),
+  tagsOpened: Object.freeze({ name: 'lt41-tags-opened', from: '', to: '', payload: '없음' }),
+  tagsSaved: Object.freeze({ name: 'lt41-tags-saved', from: '셸+화면', to: '셸+화면', payload: 'B,momentId' }),
+  theme: Object.freeze({ name: 'lt41-theme', from: '', to: '', payload: '없음' }),
+  titleDisplay: Object.freeze({ name: 'lt41-title-display', from: '화면', to: '화면', payload: '없음' }),
+  treesRenamed: Object.freeze({ name: 'lt41-trees-renamed', from: '', to: '', payload: '없음' }),
+  treesSaved: Object.freeze({ name: 'lt41-trees-saved', from: '화면', to: '화면', payload: '없음' }),
+  updatesBand: Object.freeze({ name: 'lt41-updates-band', from: '', to: '', payload: '없음' }),
+  viewer: Object.freeze({ name: 'lt41-viewer', from: '화면', to: '셸', payload: 'open' }),
+  write: Object.freeze({ name: 'lt41-write', from: '셸', to: '셸', payload: '없음' }),
+});
+const MSG = Object.freeze(Object.fromEntries(
+  Object.entries(FRAME_MESSAGES).map(([key, entry]) => [key, entry.name])
+));
+function isTrustedFrameMessage(event, { fromParent = false, origin = globalThis.location?.origin, parentWindow = globalThis.parent } = {}) {
+  if (!event || event.origin !== origin) return false;
+  if (fromParent && event.source !== parentWindow) return false;
+  return true;
+}
+globalThis.LT41_FRAME_MESSAGES = FRAME_MESSAGES;
+globalThis.LT41_MSG = MSG;
+globalThis.MSG = MSG;
+globalThis.isTrustedFrameMessage = isTrustedFrameMessage;

@@ -171,8 +171,8 @@ test('#서재 책등 줄은 없고 "+ 새 트리" 입구는 오른쪽 단추 하
   const extra = read('public/v41/views/shelf/shelf-extra.css');
   // 책등 줄 흔적이 남지 않는다.
   // '+ 새 트리' 입구는 단추 하나. 점선 빈 책·빈 칸은 없다.
-  assert.equal((js.match(/lt41-write',mode:'new'/g) || []).length, 1, '이어 보기 띠 first 경로만 순간 추가');
-  assert.equal((js.match(/lt41-new-tree'/g) || []).length, 1, '새 트리 단추는 트리 만들기 메시지');
+  assert.equal((js.match(/MSG\.write,mode:\s*'new'/g) || []).length, 1, '이어 보기 띠 first 경로만 순간 추가');
+  assert.equal((js.match(/MSG\.newTree/g) || []).length, 1, '새 트리 단추는 트리 만들기 메시지');
 });
 
 // 261118 대표 지적 4: 이어 보기 띠가 테마를 따른다 — 정원에서도 검은 밤 카드로 남지 않는다.

@@ -58,7 +58,7 @@ test('목록 번호는 id 모양으로 갈린다(m01 → 01, 그 밖은 목록 �
 test('이어가기와 책으로 보기는 예시에서 원래 동작을 유지한다(데이터 상태 분기)', () => {
   assert.match(SERVER, /function continuePath\(\)\{if\(!LTDEMO\.example\)\{/);
   assert.match(SERVER, /branchChoice\.classList\.add\('open'\)/);
-  assert.match(SERVER, /function openStoryBook\(\)\{if\(!LTDEMO\.example\)\{parent\.postMessage\(\{type:'lt41-navigate'/);
+  assert.match(SERVER, /function openStoryBook\(\)\{if\(!LTDEMO\.example\)\{parent\.postMessage\(\{type:MSG\.navigate/);
   assert.match(SERVER, /resolveTrack59Target\(\)/);
   assert.doesNotMatch(SERVER, /source===['"]example['"]/);
 });

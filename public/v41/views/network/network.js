@@ -1,4 +1,3 @@
-import { MSG, isTrustedFrameMessage } from '../../frame-messages.mjs';
 (()=>{
 let mobilePicker=null;
 const canvas=document.getElementById('stage'),ctx=canvas.getContext('2d',{alpha:false});

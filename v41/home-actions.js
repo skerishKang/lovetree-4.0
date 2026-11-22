@@ -1,4 +1,3 @@
-import { MSG } from '../public/v41/frame-messages.mjs';
 const BOOK='track59-sketchbook.html', BOARD='track58-pinboard.html', SHELF='track32-bookshelf.html';
 // Reuse 4.0's screen. Only translate its actions into the 4.1 shell's existing selection.
 export function createHomeActions({getContext,send,gallery=false}) {

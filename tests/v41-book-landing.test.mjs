@@ -4,6 +4,7 @@
 // 수정: 재그림은 현재 선택 순간(LTDEMO.get())을 focusId로 유지해 선택이 왼쪽 페이지로 밀리지 않게 한다.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { MSG } from '../public/v41/frame-messages.mjs';
 import { readFileSync } from 'node:fs';
 
 const read = (p) => readFileSync(new URL('../' + p, import.meta.url), 'utf8');
@@ -55,11 +56,11 @@ function runModuleRerender(b) {
   run(b.renderSpread, b.LTDEMO, 0);
 }
 function runTitleDisplayChange(b, value) {
-  const line = EXTRA.split('\n').find(l => l.includes("type!=='lt41-title-display'"));
+  const line = EXTRA.split('\n').find(l => l.includes('MSG.titleDisplay'));
   assert.ok(line, '제목 보기 변경 핸들러 줄이 있다');
   const listeners = [];
-  const run = new Function('addEventListener', 'LTDEMO', 'renderSpread', 'current', '$b', 'selectedMomentId', 'showDetail', line);
-  run((t, fn) => listeners.push(fn), b.LTDEMO, b.renderSpread, 0, b.$b, b.selectedMomentId, b.showDetail);
+  const run = new Function('addEventListener', 'isTrustedFrameMessage', 'MSG', 'LTDEMO', 'renderSpread', 'current', '$b', 'selectedMomentId', 'showDetail', line);
+  run((t, fn) => listeners.push(fn), () => true, MSG, b.LTDEMO, b.renderSpread, 0, b.$b, b.selectedMomentId, b.showDetail);
   assert.equal(listeners.length, 1, 'message 리스너 한 개를 등록한다');
   listeners[0]({ data: { type: 'lt41-title-display', value } });
 }

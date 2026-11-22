@@ -1,4 +1,3 @@
-import { MSG } from './frame-messages.mjs';
 // Reuse Track32's cover transition, then read through the single Track59 reader.
 (() => {
  const c=parent.LT41;

@@ -1,4 +1,3 @@
-import { MSG } from './frame-messages.mjs';
 (() => {
   const context = parent.LT41;
   if (!context?.tree) throw new Error('트리를 먼저 선택하세요.');

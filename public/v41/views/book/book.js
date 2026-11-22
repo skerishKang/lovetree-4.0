@@ -1,4 +1,3 @@
-import { MSG } from '../../frame-messages.mjs';
 const firstMoment=LTDEMO.moments.find(m=>m.first)||LTDEMO.moments[0]||null;
 const rootJump=document.querySelector('[data-focus="m01"]');if(rootJump&&firstMoment){rootJump.dataset.focus=firstMoment.id;rootJump.querySelector('b').textContent=firstMoment.title;}
 const SPREADS=firstMoment?LT59Model.buildSpreads(LTDEMO.moments):[];

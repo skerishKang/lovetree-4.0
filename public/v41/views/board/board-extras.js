@@ -1,4 +1,3 @@
-import { MSG, isTrustedFrameMessage } from '../../frame-messages.mjs';
 window.addEventListener('resize',boardResize);
 
 renderCards();

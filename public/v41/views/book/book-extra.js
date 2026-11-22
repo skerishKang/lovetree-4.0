@@ -1,5 +1,4 @@
 // 2026-11-08 책 사용성 1~9 화면 보조. 데이터·저장 계약은 그대로 두고 표시만 바꾼다.
-import { MSG, isTrustedFrameMessage } from '../../frame-messages.mjs';
 import {displayTitle,withoutAutoTitle,titleParts,mediaSourceText,editAffordances,embedUrl,connectionLine,readLens,writeLens,detailPlacement,nextMomentMessage,NEXT_PAGE_COPY,NEXT_PAGE_ACTION,treeTitleText,isPrimaryButton,createOverflowRejudge,titleView,formatDisplayDate} from '/v41/book-usability.mjs';
 import {formatRange,youtubeRangeEmbedUrl} from '/v41/domain.mjs';
 import {coverChoice,COVER_PALETTE} from '/v41/views/shelf/shelf-model.mjs';

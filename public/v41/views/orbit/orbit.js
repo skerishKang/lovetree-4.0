@@ -1,6 +1,5 @@
 // 첫 화면 궤도(src064) — 실제 기록·예시 판본 공통 한 벌.
 // 원본 압축 스크립트를 공백만 정리해 옮겼다: 조건·문구·id·순서·동작 변경 0.
-import { MSG } from '../../frame-messages.mjs';
 import { BASE_CARDS } from './orbit-cards.mjs';
 import { escapeRecord, hasLayout, momentSeq } from './orbit-model.mjs';
 

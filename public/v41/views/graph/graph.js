@@ -5,7 +5,6 @@
 // - 같은 영상·같은 무대(stacks — same-stage.mjs 한 벌)는 한 무더기 + 개수로 접어 그린다.
 // - 꼬리표 없는 순간은 아래 선반 + '꼬리표 한 번에 제안받기'(tags.mjs suggestForMoments — 제안만, 저장은 정리 화면).
 // - 색·모서리는 identity.css의 --lt-* 토큰만(밤·정원은 속성 전환으로 CSS가 처리한다).
-import { MSG } from '../../frame-messages.mjs';
 import { buildGraph, pathFor } from '../../graph-model.mjs';
 import { suggestForMoments } from '../../tags.mjs';
 import { videoKey } from '../../same-stage.mjs';
