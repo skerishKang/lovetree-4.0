@@ -348,21 +348,6 @@ test('a new tree with the id of a quarantined tree replaces the kept original', 
   assert.equal((await get(handle)).body.quarantined, undefined);
 });
 
-test('deleting a tree leaves quarantined originals in storage', async () => {
-  const { handle, repo } = buildHandle();
-  const state = sampleState();
-  const deviant = deviantTree();
-  await seedDoc(repo, 'usr_a', { version: 1, trees: [...state.trees, deviant] });
-  const deleted = await handle({ method: 'DELETE', path: `/api/workspace/trees/${state.trees[0].id}`, headers: {} });
-  assert.equal(deleted.status, 200);
-  const stored = (await repo.load({ productId: PRODUCT, subjectId: 'usr_a' })).doc;
-  assert.deepEqual(stored.trees, [deviant], '읽을 수 있는 트리만 지워지고 격리 원본은 그대로다');
-  const got = await get(handle);
-  assert.equal(got.status, 200);
-  assert.deepEqual(got.body.state.trees, []);
-  assert.equal(got.body.quarantined, 1);
-});
-
 // #1073 B-22: % 묶음이 깨진 트리 경로는 서버 오류(500)가 아니라 404로 답한다.
 test('a malformed percent-encoded tree path answers 404, not 500', async () => {
   const { handle } = buildHandle();
@@ -393,8 +378,6 @@ test('onCommit receives the validated state only — quarantined originals stay 
   await service.write({ productId: PRODUCT, subjectId: 'usr_e' }, { state: { version: 1, trees: [tree] }, expectedRevision: 1, clientKey: 'k-986c' });
   assert.deepEqual(seen, [validateState({ version: 1, trees: [tree] })], '저장 뒤 onCommit에는 격리 원본이 없다');
 
-  await service.deleteTree({ productId: PRODUCT, subjectId: 'usr_e' }, tree.id);
-  assert.deepEqual(seen[1], { version: 1, trees: [], prefs: seen[1].prefs }, '삭제 뒤 onCommit에도 격리 원본이 없다');
   const stored = (await repo.load({ productId: PRODUCT, subjectId: 'usr_e' })).doc;
   assert.ok(stored.trees.some(t => t.id === deviant.id), '저장소에는 격리 원본이 그대로 남는다');
 });

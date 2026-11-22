@@ -75,7 +75,7 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
   const coverIsMoment=coverModeOf(tree)==='moment';
   const coverUrl=coverIsMoment?(cover?.url||''):'';
   const vertical=['video','youtube'].includes(coverType)&&isVerticalMoment(cover);
-  const safeCoverThumbnail=safeYoutubeThumb(cover?.mediaMetadata?.thumbnail||cover?.mediaMetadata?.thumbnailUrl||cover?.thumbnailUrl);
+  const safeCoverThumbnail=safeYoutubeThumb(cover?.mediaMetadata?.thumbnail);
   const thumbnailId=youtubeId||youtubeIdFrom(safeCoverThumbnail);
   const youtubeThumbnail=youtubeStageThumbUrl(thumbnailId,'mqdefault')||safeCoverThumbnail;
   // #887: 표지 후보 사슬 — 명시 표지(모드 moment) → 사진 표지(같은 자리) → 첫 YouTube 순간 썸네일(mqdefault) → 글자 칸.
@@ -249,7 +249,7 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
       treeTitle:tree.title,
       title:moment.title,
       url:moment.url||'',
-      thumbnail:moment.mediaMetadata?.thumbnail||moment.thumbnailUrl||'',
+      thumbnail:moment.mediaMetadata?.thumbnail||'',
       date:moment.date||'',
       aiTester
      });
@@ -306,7 +306,7 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
       treeTitle:tree.title,
       title:moment.title,
       url:moment.url||'',
-      thumbnail:safeYoutubeThumb(moment.mediaMetadata?.thumbnail||moment.thumbnailUrl||'')||(videoId?youtubeStageThumbUrl(videoId,'oardefault'):'')||moment.mediaMetadata?.thumbnail||'',
+      thumbnail:safeYoutubeThumb(moment.mediaMetadata?.thumbnail||'')||(videoId?youtubeStageThumbUrl(videoId,'oardefault'):'')||moment.mediaMetadata?.thumbnail||'',
       note:moment.note||'',
       emotion:moment.emotion||'',
       date:moment.date||'',

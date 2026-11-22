@@ -240,33 +240,6 @@ test('사용자 키가 있는 표를 빠짐없이 지운다 (스키마 누락 �
   for (const table of listed) assert.ok(declared.some((entry) => entry.table === table), '경로에만 있고 스키마에 없는 표: ' + table);
 });
 
-test('작업공간 문서 개별 삭제: 내 문서만 지우고 남의 문서는 거부한다', async () => {
-  const workspaceRepo = createMemoryWorkspaceRepo();
-  const alice = build({ workspaceRepo, verified: { productId: PRODUCT, subjectId: USER } });
-  const bob = build({ workspaceRepo, verified: { productId: PRODUCT, subjectId: OTHER } });
-
-  const saved = await alice.handle({ method: 'PUT', path: '/api/workspace', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ state: sampleState(), expectedRevision: 0, clientKey: 'k-1' }) });
-  assert.equal(saved.status, 200);
-  const treeId = saved.body.revision && (await alice.handle({ method: 'GET', path: '/api/workspace', headers: {} })).body.state.trees[0].id;
-
-  await bob.handle({ method: 'PUT', path: '/api/workspace', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ state: sampleState('남의 트리'), expectedRevision: 0, clientKey: 'k-b' }) });
-
-  const foreign = await bob.handle({ method: 'DELETE', path: '/api/workspace/trees/' + treeId, headers: {} });
-  assert.equal(foreign.status, 404);
-  assert.equal(foreign.body.error.code, 'tree_not_found');
-
-  const aliceAfterForeign = await alice.handle({ method: 'GET', path: '/api/workspace', headers: {} });
-  assert.equal(aliceAfterForeign.body.state.trees.length, 1, '남의 삭제 시도로 내 문서가 바뀌었다');
-
-  const own = await alice.handle({ method: 'DELETE', path: '/api/workspace/trees/' + treeId, headers: {} });
-  assert.equal(own.status, 200);
-  assert.equal(own.body.deleted, true);
-  const aliceAfter = await alice.handle({ method: 'GET', path: '/api/workspace', headers: {} });
-  assert.equal(aliceAfter.body.state.trees.length, 0);
-  const bobAfter = await bob.handle({ method: 'GET', path: '/api/workspace', headers: {} });
-  assert.equal(bobAfter.body.state.trees.length, 1, '다른 사용자의 문서가 지워졌다');
-});
-
 
 const RPC_SECRET = 'lovetree-account-deletion-test-secret-value-32';
 const IDENTITY_SECRET = 'control-plane-ingress-test-secret-value-32';

@@ -91,16 +91,6 @@ export function createApiHandler({ authenticate, service, productId, admin = nul
       return { status: 200, body: { ok: true, stats: await adminStats.stats() }, headers: ACCOUNT_NO_STORE };
     }
 
-    const treeItem = path.match(/^\/api\/workspace\/trees\/([^/]+)$/);
-    if (treeItem) {
-      if (method !== 'DELETE') throw new ApiError(405, 'method_not_allowed', '이 요청은 지원하지 않아요.');
-      // #1073 B-22: % 묶음이 깨진 경로는 지울 트리를 못 찾은 경우이므로 404로 답한다(500이 아니다).
-      let treeId;
-      try { treeId = decodeURIComponent(treeItem[1]); }
-      catch { throw new ApiError(404, 'not_found', '요청을 찾을 수 없어요.'); }
-      return { status: 200, body: await service.deleteTree(principal, treeId), headers: ACCOUNT_NO_STORE };
-    }
-
     if (path !== '/api/workspace') throw new ApiError(404, 'not_found', '요청을 찾을 수 없어요.');
     if (method === 'GET') {
       const document = await service.read(principal);

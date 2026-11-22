@@ -99,7 +99,3 @@ export async function createPool(databaseUrl, options = {}) {
   const { Pool } = pg.default ?? pg;
   return new Pool({ connectionString: databaseUrl, ...options });
 }
-
-export async function createWorkspaceRepoFromUrl(databaseUrl, options = {}) {
-  return createWorkspaceRepo(await createPool(databaseUrl, options));
-}
