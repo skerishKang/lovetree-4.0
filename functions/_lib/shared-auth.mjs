@@ -110,7 +110,7 @@ function callbackFor(request, env) {
   return url.href;
 }
 async function aesKey(env) {
-  const bytes = un64(env.LOVETREE_AUTH_STATE_KEY || '');
+  const bytes = un64(cleanSecret(env.LOVETREE_AUTH_STATE_KEY));
   if (bytes.length !== 32) throw new Error('state key unavailable');
   return crypto.subtle.importKey('raw', bytes, 'AES-GCM', false, ['encrypt', 'decrypt']);
 }
@@ -124,9 +124,11 @@ async function unseal(env, token) {
   const clear = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: un64(parts[0]) }, await aesKey(env), un64(parts[1]));
   return JSON.parse(dec.decode(clear));
 }
+// 비밀 값 앞뒤에 붙은 BOM·줄 바꿈 없는 공백·폭 없는 공백을 걷어낸다(대시보드 붙여넣기 때 섞여 들어온다).
+const cleanSecret = (value) => String(value || '').replace(/^[\s\u200B]+|[\s\u200B]+$/g, '');
 async function assertion(env, now) {
-  const jwk = JSON.parse(env.LOVETREE_AUTH_CLIENT_PRIVATE_JWK || '{}');
-  const kid = env.LOVETREE_AUTH_CLIENT_KID; if (!kid) throw new Error('client key unavailable');
+  const jwk = JSON.parse(cleanSecret(env.LOVETREE_AUTH_CLIENT_PRIVATE_JWK) || '{}');
+  const kid = cleanSecret(env.LOVETREE_AUTH_CLIENT_KID); if (!kid) throw new Error('client key unavailable');
   const key = await crypto.subtle.importKey('jwk', jwk, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign']);
   const input = `${j64({ alg: 'ES256', kid })}.${j64({ iss: CLIENT, sub: CLIENT, aud: `${AUTH}/token`, iat: now, exp: now + 120, jti: random() })}`;
   return `${input}.${b64(await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, key, enc.encode(input)))}`;
