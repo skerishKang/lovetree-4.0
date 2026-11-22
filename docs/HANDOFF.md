@@ -383,7 +383,7 @@
 - **4.1.4 두 판 → 하나**: updates.json에 4.1.4가 두 개였다(위 판 — f19c414(#649)가 새로 만든 것, 아래 판 — 029fbc5(#619-5)의 원래 것. 화면에는 '러브트리 4.1.4' 제목이 두 번 떴다). 한 판으로 합치고 뜻이 같은 줄은 한 줄만 남겼다 — '핀보드에서 카드를 열에 쌓아 담아요'·'원하는 자리에 끼워 넣고 순서를 저장해요'(team, 이슈 없음)는 아래 판의 #619 줄(이슈·더 쉬운 말)로 흡수. 40줄.
 - **4.1.5(2026.11.15, 5줄)**: 4.1.4 이후 머지됐는데 어디에도 못 들은 고객 화면 것만 — 내 의견 덧붙임 고치기·지우기(#678), 순간 담기 '무대 날짜' 이름·자동 채움 확인(#627), 책 카드 꼬리표·겹친 꼬리표 표시(#627), 책 제목 고치기 손잡이 복원(#676), 연습용 트리 둘러보기 제외(#678). 서버·운영센터·시험 정비(#686·#689·#690·#694·#697·#699·#702·#703)와 화면 호칭 정리(#698)는 고객 기능 변화가 없어 뺐다.
 - **AI 명예회원 이름 칸**: tester '테스터'는 역할 글자라 이름 칸에서 뺐다 — #635 회차 6줄은 실명으로(앞 세션 확인), #638 6줄·#671 1줄은 이름을 모르는 항목이라 tester 칸을 빼고 `sourceLabel`의 이름 없음 표시('AI 명예회원이 알려 준 것')로 보인다. 이미 실명으로 든 줄은 그대로.
-- **#726(#725 옆 한 줄)**: 시험 파일 8곳(admin-view·board-service·export-ai-customer·feedback-postgres·v41-book-play-584·v41-screen-audit·v41-tags-627·v41-title-backfill)에 남아 있던 AI 고객 이름을 이슈 번호·중립 이름으로 바꿨다 — #725의 이름 표기 규칙을 시험까지 맞춘 것(기대값만, 검사 구조는 그대로).
+- **#726(#725 옆 한 줄)**: 시험 파일 7곳(admin-view·board-service·feedback-postgres·v41-book-play-584·v41-screen-audit·v41-tags-627·v41-title-backfill)에 남아 있던 AI 고객 이름을 이슈 번호·중립 이름으로 바꿨다 — #725의 이름 표기 규칙을 시험까지 맞춘 것(기대값만, 검사 구조는 그대로).
 - **4.1.0(2026.11.14) 맨 아래 3줄**: '러브트리 4.1 첫 공개' 요약(검은 무대 금테 카드·책·보드·지도·둘러보기 자동 소개). 날짜는 운영 배포·실화면 확인이 기록된 2026-11-14(HANDOFF #565·#557).
 - **시험**: updates-format에 동작 시험 2건(버전 번호 겹침 금지·위에서부터 큰 번호 순서 / AI 명예회원 이름 칸에 '테스터'·'AI 테스터' 역할 글자 금지) — 고치기 전 red 2건 확인, 고친 뒤 green. 이름 없는 출처 계약으로 형식 시험을 다듬었다(tester는 선택 — `sourceLabel({source:'ai_tester'})`='AI 명예회원이 알려 준 것' 단정 추가).
 - **AGENTS.md**: 규칙 한 줄 추가 — '레인은 updates.json을 직접 고치지 않는다 — 새 소식은 하루 한 번 CTO가 정한 레인이 그날 머지된 PR을 모아 한 판으로 만든다.'
@@ -713,19 +713,6 @@
 - **고침**: board-detail.js 수정 창에 책과 같은 `<input type="date" id="editDate">`(레이블 DATE), editPreviewState가 그 값을 읽고, saveEdit는 책의 editMoment·validateMomentInput과 같은 규칙(YYYY-MM-DD + toISOString 왕복, 어긋나면 '날짜를 확인해 주세요.'로 저장 전에 막음 — 도메인도 boardSync→validateState에서 같은 규칙)으로 미리 걷는다. 날짜가 바뀌면 placeAll로 '날짜순' 바둑판을 다시 꽂는다('내 배치'의 저장 자리는 placeAll이 건드리지 않는다). board.css `#editDate{color-scheme:dark}`(창은 늘 어두운 판). #547(지역 날짜)·#548(글자 기준선) 그대로. 서버·DB 변경 없음.
 - **시험**: 신규 `tests/v41-board-date-edit-608.test.mjs` 3건 — 정적(살아 있는 정의 기준), 도메인(책 경로 edit과 보드 경로 boardSync가 같은 날짜를 받고 잘못된 날짜 3종을 둘 다 거름), 크롬 화면(수정 창이 그 순간 날짜로 시작 → 바꿔 저장 → 카드 글·날짜순 첫 칸 재배치·저장 메시지의 날짜 → 끌어 '내 배치' 뒤 재변경 시 자리·x·y 유지). preview-check '화면 시험 — 보드·접근성·날짜' 잡에 `LT_BOARD_608_REQUIRE=1` 단계 추가(건너뜀=실패). 주의: 보드의 '수정' 단추는 고급 모드(body.lt-advanced, 셸이 lt41-advanced 메시지로 켬)에서만 보인다 — 시험 호스트가 같은 판을 켠다. 처음 판에는 저장 메시지 경합이 있었다(카드 위치 갱신이 persistBoard보다 먼저 보일 수 있음) → 뒤충 PR #614로 메시지 도착을 기다리게 고침(로컬 4/4).
 - **검증**: 로컬 전체 npm test는 기준선(stash)과 동일 결과 — 차이 건(#553·지도 판 흐름·#571)은 동시 실행 잡음으로 단독 실행 시 전부 통과, 공통 실패(a11y 인자 2건·#548·#400)는 이 환경의 기존 사정. 머지 뒤 main에서 608 3/3·인접 보드 11/11·build·modulepreload --check 통과. CI 필수 검사 19 전부 초록.
-
-## 2026-11-14 — AI 고객 내보내기: 쿠키 없이 컴2 DB에서 (로컬5 레인, ai/local5-lt-ai-export-db-261114, main b79752d 기준)
-
-- **무엇**: 매일 07:00 AI 고객 내보내기의 원본을 컴2 운영 DB(읽기만)로 바꿨다. 관리자 세션 쿠키 방식은 폐지(쿠키 만료로 조용히 멈추는 문제·쿠키 파일 보관 문제).
-- **컴2 판독기** `tools/export-ai-customer-db.mjs`(신규): API 서비스와 같은 .env(LOVETREE_DATABASE_URL·LOVETREE_PRODUCT_ID, 값 출력 금지)를 읽고 `BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY` 로 SELECT 만 — `lovetree_ai_personas` ⋈ `lovetree_product_roles(role='ai_customer')` 고객 + `lovetree_feedback`(답글 포함)을 관리자 API 응답 모양(camelCase) JSON 으로 stdout 으로. subject·이메일·전화번호 계열 필드는 아예 넣지 않고(maskPersonal 규칙 재적용), 고객 구분은 페르소나 이름+내부 번호(no)만.
-- **컴1 md 작성** `tools/export-ai-customer.mjs`: 입력을 `--from-json <파일|->` 로 바꾸고 쿠키·fetch 방식 코드는 지움(옛 방식 잔재 없음). 일지·소개 렌더 함수·KST 날짜 판정은 그대로. 같은 이름 페르소나 둘이면 폴더 `이름_no` 로 겹치지 않게.
-- **컴1 실행 스크립트** `tools/run-ai-customer-export.ps1`(신규): Git 번들 ssh(Windows 내장 ssh.exe 가 깨져 있음 — `ssh -V` 도 255·무출력, 2026-11-14 실측) → comp2 → `wsl -e /usr/local/bin/node 판독기 --b64`(인용·파이프 없는 명령 — powershell.exe 5.1 예약 작업이 겹따옴표·| 를 깨뜨려 판독기에 --b64 모드를 넣음, 실측) → 디코드해 임시 JSON → md 작성 → 임시 삭제. 로그 `E:\lovetree-qa\export-log\ai-customer-YYMMDD.log` 맨 윗줄이 이유 한 줄(성공 요약/실패 이유), 실패 시 종료 코드 1.
-- **설치 목록**: `install.sh` 가 판독기를 `/opt/padiem/lovetree-api/tools/` 에 넣고, `autodeploy.sh` 의 API 변경 판정에 `tools/export-ai-customer-db.mjs` 를 추가(이 파일만 바뀌어도 설치). migration 변경 없음 — 자동 설치 대상.
-- **시험** `tests/export-ai-customer.test.mjs` 12건(문장 READ ONLY·쓰기 키워드 없음, subject·이메일 없음, 가림, JSON→md, 이름 중복 폴더). `npm test` 전체는 PR당 1회 실행(결과는 PR 본문).
-- **수정(2026-11-14, 머지 cf5ad94 뒤 실데이터 실행에서 발견)**: 판독기 posts SELECT에 `subject_id` 칼럼이 빠져 받아온 글을 고객에 묶지 못해 일지가 비었음(posts=0) — 칼럼을 결과에 추가하고 시험에 SELECT 절 단언을 넣음(테스트 입력에 subject_id 가 있어 미쳐지지 않았던 빠짐).
-- **컴1 고정 위치(2026-11-14 마무리)**: 예약 작업 `LoveTreeAICustomerExport0700`은 레인 작업 폴더가 아니라 `E:\lovetree-qa\export-tool\`(ps1+mjs 복사본 — export-ai-customer.mjs 는 node 내장만 import 해 두 파일이면 충분, ps1 은 $PSScriptRoot 기준이라 스크립트 수정 없음)에서 돈다. 저장소 tools 스크립트를 고치면 그 폴더에 다시 복사해 둔다.
-- **주의**: 컴2 ssh 는 Windows 셸(cmd)이고 예약 작업은 powershell.exe 5.1 — 겹따옴표·`|`·작은따옴표가 원격 전달에서 깨진다(2026-11-14 실측) → 원격 명령은 인용·파이프 없이 `wsl -e node 판독기 --b64` 한 줄(base64 는 판독기가 출력). WSL 기본 사용자 root — .env 읽기 가능. JSON 은 base64 한 줄로만 전달(한글·줄바꿈 안전). 판독기 오류 이유는 값 없이 한 줄만 stderr 로.
-
 ## 2026-11-14 — 운영센터 2차 다듬기: 탭 거르기·고치는 일 (#570, 로컬3 레인, ai/local3-admin-570-261115, main f605e81 기준)
 
 - **머리줄**: '러브트리로 돌아가기' 단추는 로고와 같은 일을 두 번 하는 셈이라 없애고 로고(LoveTree 4.1)만 남겼다. 로고에 `title`·`aria-label` '러브트리로'. 탭 이름은 게시판→'고객 글', 이슈→'고치는 일'(신고 그대로) — 상세의 '← 게시판'도 '← 고객 글'로 맞춤.
@@ -751,7 +738,6 @@
 - **운영센터 입구(앱 안)**: `server/account-service.describe` 가 `admin` 플래그를 더 돌려주고(`public/v41/api.mjs` 파싱), 오른쪽 위 계정 메뉴와 설정 화면에 '운영' 항목이 생겼다 — 계정 메뉴 '운영센터'(관리자에게만 보임, `/admin.html` 새 탭), 설정 '운영' 묶음 '운영센터 열기'(같은 판정, 열림 때마다 서버 응답으로 다시 판정). 관리자가 아니면 둘 다 보이지 않는다.
 - **관리자 화면 디자인 통일**: 머리줄을 앱(shell.css의 `.app-header`·`.brand`)과 같은 모양으로 — 'app으로'는 '러브트리로 돌아가기', 제목 옆 점(brand-dot) 제거. 권한 없음·로그인 필요 화면의 4.0 연베이지 상자·초록 글씨(`storage-notice`·`notice`)를 금테 카드 + `--lt-*` 안내 모양으로 바꾸고, 권한 없음 문구는 '운영센터는 관리자 계정만 볼 수 있어요' + '러브트리로 돌아가기' 단추. 전·후 스크린샷(390·1440 × 목록·상세·답글·페르소나·이슈 탭·권한 없음)은 `E:\lovetree-qa\admin-ui-261114\{before,after}\`(저장소 밖) — '전'은 pages.dev 라이브 화면에서 대표가 지적한 4가지(연베이지 상자·초록 글씨·제목 옆 점·'app으로')가 모두 보임을 확인.
 - **AI 고객 등록(컴2, 저장소 호출)**: `lovetree_ai_personas`에 AI 고객 페르소나(소개.md 내용을 who/why/how/satisfied/disappointed/now 키로). `lovetree_feedback`에 일지 1건(kind=journal, journal_date 2026-11-14, 다시 올 점수 4, 제목 '첫날 — 가입하고 리센느·하츠투하츠 트리 만들기')과 의견 4건(새벽 날짜→#547·고침, 작은 글씨→#548·확인 중, '감상 없이' 문구→#548·확인 중, '0일 전'→#549·확인 중). 일지 아래 '운영센터 답글'은 '감상 없이' 문구 의견의 고객에게 보이는 답변(customer reply)으로. 원본 일지·소개는 거버넌스 `_원본보관\\`에 보관.
-- **내보내기·예약**: 거버넌스 AI 고객 폴더 원본을 `_원본보관\\`로 복사한 뒤 `tools/export-ai-customer.mjs` 실데이터 1회 실행 — `일지_261114.md`·`소개.md`가 사이트 내용으로 다시 써짐을 확인. 컴1 작업 스케줄러에 매일 07:00 등록, 로그 `E:\lovetree-qa\\export-log\\`. 관리자 세션 쿠키는 계정비밀_대장 규칙대로 파일로만 보관(출력·커밋 금지).
 - **시험**: `npm test` 전부 통과(브라우저 지도 대비 제외 환경), `npm run build`·`node tools/v41-modulepreload.mjs --check` 통과. 설정 '운영' 묶음·계정 메뉴 항목은 서버 응답 기반 표시라 모의 `/api/account`로 DOM 확인.
 - **남긴 것**: 대표의 실제 관리자 화면 확인(게시판 보임)·`kate@example.test` 계정 관리자 권한은 대표 지시 대기. 내보내기 예약의 쿠키 만료(세션 최대 나이) 시 갱신 절차 필요.
 
@@ -812,9 +798,8 @@
 - **서버**: `server/feedback-service.js` 확장 — `POST /api/board`(AI 고객 하루 1건, 다시 쓰면 고침)·`GET /api/board/mine`·`GET /api/board/journal/today`·`GET /api/admin/feedback`(목록, kind·status 거르기)·`GET /api/admin/feedback/:id`(상세+답글+페르소나)·`POST /api/admin/feedback/:id/reply`·`GET·PUT /api/admin/persona/:id`. `admin-roles.js` 에 `ai_customer` 역할. `account-service.describe` 에 `aiCustomer`. proxy 허용 목록·라우팅 추가.
 - **운영센터**: `src/admin.js` 를 게시판으로 재작성(목록→상세→답글[고객 답변/내부 메모]→글쓴이 페르소나·이슈 탭[GitHub 공개 저장소]). 신고 검토 칸 유지. `admin.css` 를 --lt-* 토큰·검은 무대·금테 카드로. `admin.html` 에 identity.css 로드.
 - **사이트**: `public/v41/feedback-board.mjs`(AI 고객 '오늘 사용 일지' 글쓰기 + '내 의견'), 계정 메뉴 버튼(AI 고객 전용 '오늘 사용 일지', 로그인 사용자 '내 의견'). `shell.mjs` 배선.
-- **내보내기**: `tools/export-ai-customer.mjs`(컴1 node, 관리자 API) — AI 고객별 `일지_YYMMDD.md`·`소개.md`. 예약 등록은 대표 확인 뒤.
-- **시험**: `tests/board-service.test.mjs` 9건, `tests/export-ai-customer.test.mjs` 4건, `tests/feedback-postgres.test.mjs` +1(게시판). `npm test` 1,439 pass/0 fail(브라우저 지도 대비 제외), build·modulepreload 통과. 관리자 게시판 실화면(모의 관리자 API): 390·1440 목록·상세+답글·페르소나, 가로 넘침 0.
-- **남긴 것**: 실 PTgreSQL·배포·머지는 CI/컴2. 내보내기 실데이터 실행은 AI 고객·일지 데이터가 아직 없어 미실행(스크립트·포맷 시험만). 로그인 상태 사이트 플로우는 OAuth·비밀값 필요해 미확인.
+- **시험**: `tests/board-service.test.mjs` 9건, `tests/feedback-postgres.test.mjs` +1(게시판). `npm test` 1,439 pass/0 fail(브라우저 지도 대비 제외), build·modulepreload 통과. 관리자 게시판 실화면(모의 관리자 API): 390·1440 목록·상세+답글·페르소나, 가로 넘침 0.
+- **남긴 것**: 실 PTgreSQL·배포·머지는 CI/컴2. 로그인 상태 사이트 플로우는 OAuth·비밀값 필요해 미확인.
 
 ## 2026-11-14 — #536 보드: 넓은 화면 판 쏠림·별 모양 기둥 배치·머리줄 [종이|밤]·읽기 전용 표시 (로컬3, ai/local3-lt536-boardwide-261114, main 3c21387 기준)
 
@@ -2506,3 +2491,4 @@ COM2에는 merge `6900df8aa446dfe0201d01997457fae04c4abe16`의 변경 서버 파
 - **시험**: ①감사 '둘러보기' 상태에 Asia/Seoul timezoneId 문맥 + UTC 교차 fixture(2026-11-15T20:00Z = KST 11-16 05:00) — 카드 날짜가 '2026. 11. 16'이고 UTC 절단('2026. 11. 15')이 아닌지 단정(CI UTC에서도 timezoneId로 결정적). ②first-journey 단위 시험 1건(같은 교차 시각, localDateOnly 계약). ③v41-date-style-one-piece 계약 갱신(슬라이스 → localDateOnly 경유).
 - **캡처**: E:/lovetree-qa/lane/local3-graph/audit-community-date-{390,1440}.png(교차 fixture, 한국 날짜 확인 — 두 장 직접 읽음).
 - npm test 1719검 0 fail(33초), build·modulepreload --check 통과. updates.json 안 고침.
+

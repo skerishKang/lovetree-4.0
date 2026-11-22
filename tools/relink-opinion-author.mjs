@@ -2,7 +2,7 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
-import { parseEnvFile } from './export-ai-customer-db.mjs';
+import { parseEnvFile } from './env-file.mjs';
 
 const DEFAULT_ENV = '/opt/padiem/lovetree-api/.env';
 const DEFAULT_BACKUP_DIR = '/opt/padiem/lovetree-api/backups';
