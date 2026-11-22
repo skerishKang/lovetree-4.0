@@ -514,6 +514,7 @@ test('#1088 가운데 카드 누름은 화면 이동 없이 크게 보기를 연
       assert.match(src, /autoplay=1/, '누름 안에서 재생 시작');
       assert.ok(await frame.locator('#mediaBookHome').isVisible(), '책에서 이어 보기');
       assert.ok(await frame.locator('#mediaExternalHome').isVisible(), '원본 보기');
+      assert.ok(await h.page.evaluate(() => getComputedStyle(document.getElementById('updates-card')).display === 'none'), '열린 동안 아래 띠가 숨는다');
       assert.equal(await h.page.evaluate(() => location.hash), hashBefore, '주소 moved 0');
       assert.deepEqual(await h.page.evaluate(() => window.__nav1088), [], '화면 이동 요청 0');
       const focusAfterOpen = await frame.evaluate(() => document.querySelector('#orbit').shadowRoot.activeElement?.id || '');
