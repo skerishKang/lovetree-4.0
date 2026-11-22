@@ -2,6 +2,10 @@
    색은 모두 --lt-* 토큰만 쓴다(화면별 하드코딩 금지). */
 html[data-v41-screen=book]{--lt-toolbar-top:70px;--lt-toolbar-pad:28px}
 html[data-v41-screen=board]{--lt-toolbar-top:66px;--lt-toolbar-pad:24px}
+html[data-v41-screen=shelf]{--lt-toolbar-top:82px;--lt-toolbar-pad:18px}
+/* 서재의 옛 컨트롤 줄은 도구 줄로 옮겼으니 자리만 비운다. 이어 보기 띠는 줄 아래에 그대로. */
+html[data-v41-screen=shelf] .shelf-controls{display:none}
+html[data-v41-screen=shelf] .shelf-screen{margin-top:var(--lt-content-top,52px)}
 .lt-screen-toolbar{
   box-sizing:border-box;position:absolute;left:0;right:0;top:var(--lt-toolbar-top,66px);z-index:69;
   display:flex;align-items:center;gap:12px;height:52px;padding:0 var(--lt-toolbar-pad,24px);
@@ -25,13 +29,15 @@ html[data-v41-screen=board]{--lt-toolbar-top:66px;--lt-toolbar-pad:24px}
 .lt-toolbar-menu[hidden]{display:none}
 .lt-toolbar-more[hidden]{display:none}
 /* 줄이 생긴 만큼 화면 본문을 아래로 내려 첫 줄·이동 단추가 가리지 않게 한다. */
-html[data-v41-screen=book] .stage{top:122px}
+html[data-v41-screen=book] .stage{top:var(--lt-content-top,122px)}
 html[data-v41-screen=board] .boardTitle{top:130px}
 @media(max-width:600px){
   .lt-screen-toolbar{height:48px;padding:0 12px}
   html[data-v41-screen=book]{--lt-toolbar-pad:12px;--lt-toolbar-top:60px}
   html[data-v41-screen=board]{--lt-toolbar-pad:12px;--lt-toolbar-top:56px}
-  html[data-v41-screen=book] .stage{top:108px}
+  html[data-v41-screen=shelf]{--lt-toolbar-pad:12px}
+  html[data-v41-screen=book] .stage{top:var(--lt-content-top,108px)}
   html[data-v41-screen=board] .boardTitle{top:112px}
+  html[data-v41-screen=shelf] .shelf-screen{margin-top:var(--lt-content-top,48px)}
   .lt-toolbar-menu{top:48px}
 }

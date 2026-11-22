@@ -2773,46 +2773,56 @@ test('#1093 선반 40권 아래 링크와 책 겹침 0', { skip: REQUIRE ? false
     }
   } finally { await browser.close(); await new Promise((r) => server.close(r)); }
 });
-test('#1091: 책·보드 화면 도구 줄의 높이·바탕·단추 높이·글자 크기 계산값이 같다', { skip: !!skip, timeout: 120000 }, async () => {
+test('#1091: 서재·책·보드 화면 도구 줄의 계산값이 같고 390 머리줄은 한 줄이다', { skip: !!skip, timeout: 180000 }, async () => {
   const server = await serve();
   const base = `http://127.0.0.1:${server.address().port}`;
   const browser = await chromium.launch({ headless: true });
+  const files = { book: 'track59-sketchbook.html', board: 'track58-pinboard.html', shelf: 'track32-bookshelf.html' };
+  const content = { book: '.stage', board: '.boardFrame', shelf: '.shelf-screen' };
   try {
     const measure = async (screen, width, theme) => {
       const ctx = await browser.newContext({ viewport: { width, height: 900 } });
       await ctx.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); } catch {} }, theme);
       const page = await ctx.newPage();
-      const file = screen === 'book' ? 'track59-sketchbook.html' : 'track58-pinboard.html';
-      await page.goto(`${base}/v41/views/${file}`, { waitUntil: 'load' });
+      await page.goto(`${base}/v41/views/${files[screen]}`, { waitUntil: 'load' });
       await page.waitForSelector('.lt-screen-toolbar', { timeout: 15000 });
       const value = await page.evaluate((name) => {
         const bar = document.querySelector('.lt-screen-toolbar');
         const button = bar.querySelector('button');
         const barStyle = getComputedStyle(bar);
         const buttonStyle = getComputedStyle(button);
-        const content = document.querySelector(name === 'book' ? '.stage' : '.boardFrame');
+        const body = document.querySelector(name === 'book' ? '.stage' : name === 'board' ? '.boardFrame' : '.shelf-screen');
         return {
           height: barStyle.height,
           background: barStyle.backgroundColor,
           buttonHeight: buttonStyle.height,
           fontSize: buttonStyle.fontSize,
           shelfBack: !!document.getElementById('shelfBackBtn'),
-          covered: !!content && bar.getBoundingClientRect().bottom > content.getBoundingClientRect().top
+          covered: !!body && bar.getBoundingClientRect().bottom > body.getBoundingClientRect().top
         };
       }, screen);
       await ctx.close();
       return value;
     };
     for (const [width, theme] of [[1440, 'night'], [1440, 'garden'], [390, 'night'], [390, 'garden']]) {
-      const book = await measure('book', width, theme);
-      const board = await measure('board', width, theme);
-      assert.deepEqual(book, board, `${width}·${theme}에서 책·보드 줄 계산값이 다르다`);
-      assert.equal(book.height, width === 390 ? '48px' : '52px');
-      assert.equal(book.buttonHeight, '36px');
-      assert.equal(book.shelfBack, false, '← 서재 단추가 남아 있다');
-      assert.equal(book.covered, false, '책 첫 줄이 도구 줄에 가려졌다');
-      assert.equal(board.covered, false, '보드 제목이 도구 줄에 가려졌다');
+      const values = [];
+      for (const screen of ['book', 'board', 'shelf']) values.push(await measure(screen, width, theme));
+      assert.deepEqual(values[0], values[1], `${width}·${theme}에서 책·보드 줄 계산값이 다르다`);
+      assert.deepEqual(values[0], values[2], `${width}·${theme}에서 책·서재 줄 계산값이 다르다`);
+      for (const value of values) {
+        assert.equal(value.height, width === 390 ? '48px' : '52px');
+        assert.equal(value.buttonHeight, '36px');
+        assert.equal(value.shelfBack, false, '← 서재 단추가 남아 있다');
+        assert.equal(value.covered, false, '화면 본문이 도구 줄에 가려졌다');
+      }
     }
+    // #1093: 390에서 셸 머리줄이 두 줄로 접히지 않고 62px 한 줄이다.
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    const page = await ctx.newPage();
+    await page.goto(base + '/v41/', { waitUntil: 'load' });
+    const headerHeight = await page.evaluate(() => getComputedStyle(document.querySelector('.app-header')).height);
+    await ctx.close();
+    assert.ok(parseFloat(headerHeight) <= 62, '390 머리줄이 한 줄(62px 이하)이 아니다: ' + headerHeight);
   } finally {
     await browser.close();
     await new Promise((ok) => server.close(ok));
