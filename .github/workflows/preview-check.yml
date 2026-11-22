@@ -61,7 +61,10 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      # 자체 실행기는 홈 폴더에 Chromium이 그대로 남으므로 Actions 캐시를 쓰지 않는다.
+      # (2026-11-22: 시험 5분 뒤 591MB 캐시 올리기에 CGI 회선으로 9분이 더 걸렸다.)
       - uses: actions/cache@v4
+        if: runner.environment != 'self-hosted'
         with:
           path: ~/.cache/ms-playwright
           key: ms-playwright-${{ runner.os }}-1.49.1
