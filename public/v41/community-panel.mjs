@@ -274,12 +274,13 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
   const summary=item.summary?el('p','community-preview-summary',item.summary):null;
   const meta=el('p','community-preview-meta',previewMetaText(item));
   const actions=el('div','community-preview-actions');
-  // #903 후속(2026-11-22): 안내 칸을 단추 묶음 안, 담기 단추 바로 다음 풀폭 줄로 미리 둔다(hidden).
-  // 반응 칩이 펼쳐져 묶음이 여러 줄이 되어도 안내가 항상 담기 단추 바로 다음 줄에 오게 묶음 안으로 옮겼다(#1130 검사기 실패 111px).
+  // #903 후속(2026-11-22): 안내 칸은 담기 단추 바로 아래 전용 칸(세로 묶음)으로 미리 둔다(hidden).
+  // 반응 칩이 펼쳐져 묶음이 여러 줄이 되어도, 안내가 떠도 ♡와 단추 줄이 갈라지지 않고 안내가 항상 담기 단추 바로 다음 줄에 온다(#1130 검사기 실패 111px).
   const voteNote=el('p','community-vote-note');voteNote.setAttribute('role','status');voteNote.hidden=true;
+  const favWrap=el('div','community-fav-wrap');favWrap.append(statButton(item,'favorite','즐겨찾기',voteNote),voteNote);
   // #792 ⑤: 담기 단추 자리. 무대가 확인되기 전에는 비어 있고(자리도 차지하지 않는다), 확인되면 그 자리에서 열린다.
   const stageBox=el('div','community-stage-box');stageBox.hidden=true;
-  actions.append(statButton(item,'favorite','즐겨찾기',voteNote),voteNote,statButton(item,'reaction','공감',voteNote),stageBox);
+  actions.append(favWrap,statButton(item,'reaction','공감',voteNote),stageBox);
   const open=el('button','community-preview-open','대표 순간부터 감상');open.type='button';open.onclick=()=>onOpenShare(item);
   const start=el('button','community-preview-start','내 기록 새로 시작');start.type='button';start.onclick=()=>onStartRecord(item.subject);
   const status=el('p','community-preview-message','');status.dataset.communityPreviewMessage='';status.setAttribute('role','status');

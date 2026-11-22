@@ -140,7 +140,7 @@ test('#824: 3 미만 숫자는 라벨만 남기고, 3부터 숫자가 보인다'
     assert.doesNotMatch(meta, /이번 주/, '이번 주 2명도 숨긴다');
     card.onclick();
     const body = small.get('community-preview').children.find(node => node.className === 'community-preview-body');
-    const fav = body.children.find(node => node.className === 'community-preview-actions').children[0].textContent;
+    const fav = body.children.find(node => node.className === 'community-preview-actions').children.find(node => node.className === 'community-fav-wrap').children[0].textContent;
     assert.equal(fav, '즐겨찾기', '즐겨찾기 0은 라벨만 남긴다');
     const previewMeta = body.children.find(node => node.className === 'community-preview-meta').textContent;
     assert.doesNotMatch(previewMeta, /공감 2/);
@@ -154,7 +154,7 @@ test('#824: 3 미만 숫자는 라벨만 남기고, 3부터 숫자가 보인다'
     assert.match(meta, /이번 주 5명/, '이번 주 담은 수는 3 이상일 때 따라온다');
     card.onclick();
     const body = big.get('community-preview').children.find(node => node.className === 'community-preview-body');
-    const fav = body.children.find(node => node.className === 'community-preview-actions').children[0].textContent;
+    const fav = body.children.find(node => node.className === 'community-preview-actions').children.find(node => node.className === 'community-fav-wrap').children[0].textContent;
     assert.equal(fav, '즐겨찾기 3', '즐겨찾기 3은 숫자를 보여 준다');
   } finally { big.restore(); }
 });
@@ -200,14 +200,15 @@ test('#824·#903: 가입 7일 미만이 담기를 누르면 안내가 단추 바
     const card = h.get('community-list').children.find(node => node.dataset.shareId === 's1');
     card.onclick();
     const body = h.get('community-preview').children.find(node => node.className === 'community-preview-body');
-    const fav = body.children.find(node => node.className === 'community-preview-actions').children.find(node => node.dataset.communityAction === 'favorite');
+    const fav = body.children.find(node => node.className === 'community-preview-actions').children.find(node => node.className === 'community-fav-wrap').children.find(node => node.dataset.communityAction === 'favorite');
     assert.equal(fav.textContent, '즐겨찾기 5', '누르기 전에는 담지 않은 상태다');
-    // #903: 안내 칸은 담기 단추 묶음(community-preview-actions) 안에서 담기 단추 바로 다음 자리다 — 막히기 전에는 숨어 있다.
-    // (#903 후속 2026-11-22: 반응 칩이 펼쳐져 묶음이 여러 줄이 되어도 안내가 담기 단추 바로 다음 줄에 오게 묶음 안 풀폭 줄로 옮겼다.)
+    // #903: 안내 칸은 담기 단추 묶음 안에서 담기 단추 바로 다음 자리다 — 막히기 전에는 숨어 있다.
+    // (#903 후속 2026-11-22: 반응 칩이 펼쳐져도 안내가 담기 단추 바로 다음 줄에 오게, 담기 단추 전용 아래칸(community-fav-wrap)으로 옮겼다.)
     const noteOf = (nowBody) => {
       const nowActions = nowBody.children.find(node => node.className === 'community-preview-actions');
-      const nowFav = nowActions.children.find(node => node.dataset.communityAction === 'favorite');
-      return nowActions.children[nowActions.children.indexOf(nowFav) + 1];
+      const nowFavWrap = nowActions.children.find(node => node.className === 'community-fav-wrap');
+      const nowFav = nowFavWrap.children.find(node => node.dataset.communityAction === 'favorite');
+      return nowFavWrap.children[nowFavWrap.children.indexOf(nowFav) + 1];
     };
     const note = noteOf(body);
     assert.equal(note.className, 'community-vote-note', '안내 칸은 담기 단추 바로 다음 자리에 둔다');
@@ -225,12 +226,12 @@ test('#824·#903: 가입 7일 미만이 담기를 누르면 안내가 단추 바
     fav.onclick();
     await new Promise((r) => setTimeout(r, 0));
     const body2 = h.get('community-preview').children.find(node => node.className === 'community-preview-body');
-    const fav2 = body2.children.find(node => node.className === 'community-preview-actions').children.find(node => node.dataset.communityAction === 'favorite');
+    const fav2 = body2.children.find(node => node.className === 'community-preview-actions').children.find(node => node.className === 'community-fav-wrap').children.find(node => node.dataset.communityAction === 'favorite');
     assert.equal(fav2.textContent, '✓ 즐겨찾기 6', '성공한 담기는 하트 상태를 바꾼다');
     assert.equal(noteOf(body2).hidden, true, '담기에 성공하면 안내 칸은 다시 숨는다');
     // 투표 막힘이 아닌 실패(서버 고장)는 상태 줄로 내린다 — 단추 아래 칸은 숨은 채.
     failFavorite = 'server';
-    const fav3 = body2.children.find(node => node.className === 'community-preview-actions').children.find(node => node.dataset.communityAction === 'favorite');
+    const fav3 = body2.children.find(node => node.className === 'community-preview-actions').children.find(node => node.className === 'community-fav-wrap').children.find(node => node.dataset.communityAction === 'favorite');
     fav3.onclick();
     await new Promise((r) => setTimeout(r, 0));
     assert.equal(h.get('community-feedback').textContent, '요청을 처리하지 못했어요.', '다른 실패는 상태 줄로 내린다');
