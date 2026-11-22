@@ -40,14 +40,6 @@
       "important": 0,
       "inlineStyle": 1
     },
-    "public/v41/views/orbit/orbit.css": {
-      "important": 10,
-      "inlineStyle": 0
-    },
-    "public/v41/views/orbit/orbit.js": {
-      "important": 0,
-      "inlineStyle": 3
-    },
     "public/v41/views/tree-title.css": {
       "important": 1,
       "inlineStyle": 0

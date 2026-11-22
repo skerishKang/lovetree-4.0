@@ -28,6 +28,22 @@ test('무대 조회와 투표만 전달하고 담기 해제의 빈 204를 보존
     assert.equal(fetcher.calls.length,0);
   }
 });
+test('순간 하나의 ♡·댓글 경로는 서버로 넘기고 메서드 밖은 막는다(11-22 운영에서 막혀 있던 길)', async () => {
+  const share='s'.repeat(24), base='https://lovetree.example', moment='/api/community/shares/'+share+'/moments/m0';
+  const ok=[[moment,'GET'],[moment+'/reaction','PUT'],[moment+'/reaction','DELETE'],[moment+'/comments','GET'],[moment+'/comments','POST'],[moment+'/comments/c1/report','POST']];
+  for (const [path,method] of ok) {
+    const fetcher=recorder(new Response('{}',{headers:{'content-type':'application/json'}}));
+    const result=await onRequest(createProxy({fetcher}),base+path,{method,...(method==='PUT'||method==='POST'?{body:'{}',headers:{'content-type':'application/json'}}:{})});
+    assert.equal(fetcher.calls.length,1,path+' '+method);
+    assert.equal(fetcher.calls[0].url,UPSTREAM+path);
+    assert.equal(result.status,200);
+  }
+  for (const [path,method,status] of [[moment,'POST',405],[moment+'/reaction','GET',405],[moment+'/comments','DELETE',405],[moment+'/comments/c1/report','GET',405],[moment+'/hearts','GET',404]]) {
+    const fetcher=recorder(new Response());
+    assert.equal((await onRequest(createProxy({fetcher}),base+path,{method})).status,status,path+' '+method);
+    assert.equal(fetcher.calls.length,0);
+  }
+});
 const onRequest = (proxy, url, init, extraEnv = {}) => proxy({ request: new Request(url, init), env: { LOVETREE_API_ORIGIN: UPSTREAM, ...extraEnv } });
 
 function recorder(reply) {

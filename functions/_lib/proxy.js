@@ -25,6 +25,8 @@ const PUBLIC_SHARE_ITEM = /^\/api\/public\/shares\/[A-Za-z0-9_-]{1,128}$/;
 const COMMUNITY_SHARE_ACTION = /^\/api\/community\/shares\/[A-Za-z0-9_-]{1,128}\/(comments|favorite|reaction|report|block)$/;
 const COMMUNITY_COMMENT_ITEM = /^\/api\/community\/comments\/[A-Za-z0-9_-]{1,128}$/;
 const COMMUNITY_REPORT_ITEM = /^\/api\/community\/admin\/reports\/[A-Za-z0-9_-]{1,128}$/;
+// #1136·#1155: 순간 하나의 ♡·댓글(서버 moment-community-service). 프록시에 없으면 운영에서 '서버로 넘기지 않아요'로 막힌다(11-22).
+const MOMENT_COMMUNITY = /^\/api\/community\/shares\/[A-Za-z0-9_-]{20,64}\/moments\/[A-Za-z0-9_-]{1,80}(\/reaction|\/comments|\/comments\/[A-Za-z0-9_-]{1,80}\/report)?$/;
 const MOMENT_STAGE = /^\/api\/community\/shares\/[A-Za-z0-9_-]{20,64}\/moments\/[A-Za-z0-9_-]{1,80}\/stage$/;
 const STAGE_DETAIL = /^\/api\/community\/stages\/[A-Za-z0-9_-]{1,80}$/;
 const STAGE_VOTE = /^\/api\/community\/stages\/[A-Za-z0-9_-]{1,80}\/vote$/;
@@ -39,6 +41,8 @@ const ADMIN_CUSTOMER_ITEM = /^\/api\/admin\/customers\/sub_[A-Za-z0-9_-]{1,128}$
 const ADMIN_CUSTOMER_MEDIA = /^\/api\/admin\/customers\/sub_[A-Za-z0-9_-]{1,128}\/media\/[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}\.(?:png|jpg|gif|webp|mp4|webm)$/;
 function communityMethods(path) {
   if(MOMENT_STAGE.test(path)||STAGE_DETAIL.test(path))return new Set(['GET']);
+  const moment=path.match(MOMENT_COMMUNITY);
+  if(moment){const tail=moment[1]||'';if(tail==='')return new Set(['GET']);if(tail==='/reaction')return new Set(['PUT','DELETE']);if(tail==='/comments')return new Set(['GET','POST']);return new Set(['POST']);}
   if(STAGE_VOTE.test(path))return new Set(['PUT','DELETE']);
   const action=path.match(COMMUNITY_SHARE_ACTION)?.[1];
   if(action==='comments')return new Set(['GET','POST']);
