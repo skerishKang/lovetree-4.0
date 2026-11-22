@@ -6,9 +6,9 @@ import assert from 'node:assert/strict';
 import { execSync } from 'node:child_process';
 import path from 'node:path';
 
-const FORBIDDEN = [
+export const FORBIDDEN = [
   { pattern: /^tools\/postdeploy\/\.profile[^/]*\//, reason: '브라우저 프로필(세션 쿠키 포함)은 절대 커밋하지 않는다' },
-  { pattern: /^\.tmp-[^/]*\//, reason: '레인 임시 작업 폴더는 커밋하지 않는다' },
+  { pattern: /^\.tmp[^/]*\//, reason: '임시 작업 폴더는 커밋하지 않는다' },
   { pattern: /^out\//, reason: '캡처·리포트 결과(out/)는 커밋하지 않는다' },
   { pattern: /^tools\/postdeploy\/out\//, reason: 'postdeploy 결과는 커밋하지 않는다' }
 ];
@@ -31,4 +31,14 @@ test('트래킹 중인 파일에 금지 경로(프로필·임시 폴더·결과�
     }
   }
   assert.deepEqual(offenders, [], `금지 경로가 커밋돼 있다:\n${offenders.join('\n')}\ngit rm -r --cached 로 제거하고 .gitignore에 넣으세요.`);
+});
+
+test('임시 폴더 규칙은 .tmp-뿐 아니라 .tmp로 시작하는 최상위 임시 폴더 전부를 가린다(#1073 B-20)', () => {
+  const rule = FORBIDDEN.find(item => item.reason.includes('임시 작업 폴더'));
+  assert.ok(rule, '임시 폴더 규칙이 있다');
+  assert.equal(rule.pattern.test('.tmp553/hang.mjs'), true, '이름 뒤가 숫자인 임시 폴더도 가린다');
+  assert.equal(rule.pattern.test('.tmp-a/x'), true);
+  assert.equal(rule.pattern.test('.tmp/x'), true);
+  assert.equal(rule.pattern.test('src/main.js'), false);
+  assert.equal(rule.pattern.test('a/.tmp553/x'), false, '규칙은 최상위 경로에만 붙는다(이슈 식 그대로)');
 });

@@ -18,6 +18,7 @@ import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { createReadStream, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -78,7 +79,7 @@ const homeHostHTML = `<!doctype html><html lang="ko"><head><meta charset="utf-8"
 <script>window.LT41={source:'file',member:'out',treeCount:0,trees:[],prefs:{}};window.LT41_MESSAGES=[];addEventListener('message',(e)=>{if(e.data&&String(e.data.type||'').startsWith('lt41-'))window.LT41_MESSAGES.push(e.data.type)});</script>
 <iframe src="/v41/home.html" style="position:fixed;inset:0;width:100vw;height:100vh;border:0"></iframe></body></html>`;
 
-const CAPTURE_DIR = 'E:\\lovetree-qa\\lane\\local1-635c';
+const CAPTURE_DIR = process.env.LT_SHARE635_CAPTURE_DIR || path.join(tmpdir(), 'lt-share635-captures');
 const shot = (page, name) => { mkdirSync(CAPTURE_DIR, { recursive: true }); return page.screenshot({ path: path.join(CAPTURE_DIR, name + '.png'), fullPage: false }); };
 
 async function openBook(browser, url, { width = 1440, height = 900, theme = 'night', route = null } = {}) {

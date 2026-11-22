@@ -7,7 +7,7 @@
 // 관리자 세션 쿠키 방식은 없다(2026-11-14 대표 결정: 쿠키 없이 컴2 DB에서). 비밀 값은 출력하지 않는다.
 //
 // 환경변수:
-//   LOVETREE_EXPORT_DIR (기본 G:\Ddrive\BatangD\task\workdiary\ai-revenue-lab-governance\러브트리\AI고객)
+//   LOVETREE_EXPORT_DIR (미지정이면 실행을 거른다 — 거버넌스 md 폴더)
 //   LOVETREE_EXPORT_DAY YYYY-MM-DD (기본 JSON 의 day → 오늘, KST)
 
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
@@ -128,7 +128,8 @@ async function main() {
     process.exit(2);
   }
   const data = parseExportJson(text);
-  const dir = process.env.LOVETREE_EXPORT_DIR || 'G:\\Ddrive\\BatangD\\task\\workdiary\\ai-revenue-lab-governance\\러브트리\\AI고객';
+  const dir = process.env.LOVETREE_EXPORT_DIR;
+  if(!dir)throw new Error('LOVETREE_EXPORT_DIR 환경 변수를 지정해 주세요(거버넌스 md 폴더).');
   const day = process.env.LOVETREE_EXPORT_DAY || data.day || kstDay();
   const result = await exportAll({ data, dir, day });
   console.log(`exported customers=${result.customers} posts=${result.posts} files=${result.written.length}`);

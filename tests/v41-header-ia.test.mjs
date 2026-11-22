@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import {
   accountPresentation, firstLetter, treePickerLabel, treePickerText, treeViewsVisible, writeMenuLabel,
   homeCenterState, homeStartLoginUrl, HOME_LOGIN_NEXT
@@ -738,7 +740,7 @@ test('계정 메뉴: 운영 라벨 없음·구분선 유지·기본 항목 배�
 test('계정 메뉴 테두리: 마우스로 열면 0/none, 키보드 Enter로 열면 2px 실선(garden·night 1440)', { skip: menuSkip || false, timeout: 180000 }, async () => {
   if (menuSkip) assert.fail(`건너뜀=실패 — ${menuSkip}`);
   const { mkdirSync } = await import('node:fs');
-  const shotDir = process.env.LT_MENU3_SHOT_DIR || 'E:\\lovetree-qa\\local4\\계정메뉴3';
+  const shotDir = process.env.LT_MENU3_SHOT_DIR || path.join(tmpdir(), 'lt-menu3-shots');
   mkdirSync(shotDir, { recursive: true });
   const { serve } = await import('./helpers/screen-audit.mjs');
   const server = await serve();
