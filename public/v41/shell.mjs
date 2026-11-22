@@ -51,6 +51,9 @@ import {connectionSignature} from './shell/panel-dirty.mjs';
 import {createLocation} from './shell/location.mjs';
 import {createNotifier, syncedNoticeText, newlyPublishedTrees} from './shell/notice.mjs';
 import {createSettings} from './shell/settings.mjs';
+import {createTreeMenu} from './shell/tree-menu.mjs';
+import {createConnections} from './shell/connections.mjs';
+import {createTreeTips} from './shell/tree-tips.mjs';
 import {createNoticeQueue} from './shell/notice-queue.mjs';
 import {paintLoginLinks,paintThemeControls,applyTheme as applyThemeFor,toggleTheme as toggleThemeFor} from './shell/theme.mjs';
 import {normalizeTitleDisplay, normalizeAccentColor, normalizeDateStyle, normalizeStartPlace, normalizeShareView, normalizeHomeMoment, normalizeBookDisplay, normalizeShelfView, coverModeOf, normalizeCoverDesign} from './domain.mjs';
@@ -193,95 +196,9 @@ function buildFoldMenu(){
   if(!$('write-menu').hidden)add('＋ 순간 추가',()=>$('write-menu').click());
   add('의견 보내기',()=>shellSettings.getFeedbackDialog().open());
  }
-const escHTML=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-function treeMomentThumb(m){return thumbnailCandidates(m,{autoLoad:true})[0]||''}
-function treeCoverMarkup(tree){
- // #380 5번: 드롭다운 표지도 같은 판정(coverModeOf)을 따른다 — 디자인을 고른 트리는 사진 대신 디자인 보지를 보여 준다.
- const mode=coverModeOf(tree);
- if(mode==='design'){
-  const design=normalizeCoverDesign(tree?.coverDesign);
-  if(design)return `<span class="tree-cover" data-cover-design="${escHTML(design)}" aria-hidden="true"></span>`;
- }
- const moments=Array.isArray(tree?.moments)?[...tree.moments].sort((a,b)=>String(a.createdAt||'').localeCompare(String(b.createdAt||''))):[];
- const cover=mode!=='design'&&tree?.coverMomentId?moments.find(m=>m.id===tree.coverMomentId):null;
- const chosen=(cover&&treeMomentThumb(cover)?cover:null)||moments.find(m=>Boolean(treeMomentThumb(m)))||null;
- const thumb=chosen?treeMomentThumb(chosen):'';
- const fallback=chosen?coverFallbackAttrs(chosen):'';
- return `<span class="tree-cover" aria-hidden="true">${thumb?`<img src="${escHTML(thumb)}"${fallback} alt="" loading="lazy" referrerpolicy="no-referrer">`:''}</span>`;
-}
-function renderTreeMenu(){
- if(!treePopover)return;
- const trees=Array.isArray(model?.trees)?[...model.trees]:[];
- const ordered=trees.sort((a,b)=>Number(b?.inbox===true)-Number(a?.inbox===true));
- // #1028·#1079: 모든 폭에서 목록 칸을 감싸고, 트리가 8개 이상이면 이름 거르는 칸을 맨 위에 둔다.
- const currentId=window.LT41?.tree?.id||'';
- const rows=ordered.map(tree=>{
-  const active=tree.id===currentId;
-  const count=tree.inbox===true?`정리 전 ${tree.moments?.length||0}`:`${tree.moments?.length||0}개의 순간`;
-  return `<button type="button" role="menuitemradio" class="tree-item" data-tree-id="${escHTML(tree.id)}" aria-checked="${active}">${treeCoverMarkup(tree)}<span class="tree-name">${escHTML(displayTreeTitle(tree.title||tree.subject||'트리'))}</span><span class="tree-count">${count}</span>${active?'<span class="tree-check" aria-hidden="true">✓</span>':''}</button>`;
- }).join('');
- // #380 5번: '정리하기' 입구는 여기 한 곳(지금 트리가 모아둔 순간일 때 '정리 전 N' 바로 아래)뿐이다.
- const currentTree=window.LT41?.tree||null;
- const cleanupRow=cleanupAvailable({source,owned:!!member?.snapshot().owned,tree:currentTree})&&member?.snapshot().writable
-  ? `<button type="button" role="menuitem" class="tree-item tree-cleanup" data-tree-action="cleanup"><span class="tree-name">정리 전 ${currentTree?.moments?.length||0}개 정리하기</span></button>` : '';
- // #627 PR B: 기존 '정리' 옆에 두는 꼬리표 정리 입구(내 기록·쓸 수 있을 때만).
- const tagsRow=source==='server'&&member?.snapshot().owned&&member.snapshot().writable
-  ? '<button type="button" role="menuitem" class="tree-item tree-tags" data-tree-action="tags"><span class="tree-name">꼬리표 정리</span></button>' : '';
- const manage=source==='server'&&window.LT41&&member?.snapshot().owned&&member.snapshot().writable;
- // #394: 트리 드롭다운 맨 아래 "내 순간 전체 보기"(#380의 "내 트리 전체 보기" 자리 옆). 내 기록(서버)에서만 보인다.
- const momentsEntry=source==='server'&&window.LT41?'<button type="button" role="menuitem" data-tree-action="moments">내 순간 전체 보기</button>':'';
- // #380 2번: 맨 아래 "내 트리 전체 보기" — 지금의 책장 화면(모든 트리의 책장)을 연다. 로그인 상태에서만 보인다.
- const shelfEntry=member?.snapshot().owned?'<button type="button" role="menuitem" data-tree-action="shelf">서재 전체 보기</button>':'';
- // 261119 대표 결정: 목록 아래 메뉴 순서는 ＋ 새 트리 → 이 트리 관리 → 이 트리 공유 → 꼬리표 정리.
- // '정리 전 N개 정리하기'는 #380 5번대로 목록 바로 아래(맨 앞)에 둔다.
- const searchBox=ordered.length>=8?'<div class="tree-search" role="none"><input type="search" data-tree-search placeholder="트리 찾기" aria-label="트리 찾기" autocomplete="off" /></div>':'';
- const list=`${searchBox}<div class="tree-list" role="none">${rows}</div>`;
- treePopover.innerHTML=list+`<div class="tree-foot" role="none">${cleanupRow}<button type="button" role="menuitem" data-tree-action="new">＋ 새 트리</button>${manage?'<button type="button" role="menuitem" data-tree-action="manage">이 트리 관리 (이름·표지)</button><button type="button" role="menuitem" data-tree-action="share">이 트리 공유</button>':''}${tagsRow}${shelfEntry}${momentsEntry}</div>`;
- const search=treePopover.querySelector('[data-tree-search]');
- search?.addEventListener('input',()=>{
-  const q=search.value.trim().toLowerCase();
-  treePopover.querySelectorAll('[data-tree-id]').forEach(b=>{ const name=b.querySelector('.tree-name')?.textContent||''; b.hidden=!!q && !name.toLowerCase().includes(q); });
-  const active=treePopover.querySelector('[data-tree-id][aria-checked="true"]');
-  if(active&&!active.hidden)scrollTreeItemIntoView(active);
+const shellTreeMenu=createTreeMenu({$, document, window, location, get model(){return model}, get member(){return member}, get current(){return current}, get source(){return source}, treePopover, treeTrigger, thumbnailCandidates, coverFallbackAttrs, coverModeOf, normalizeCoverDesign, displayTreeTitle, cleanupAvailable, writeLocation, renderAccount, flowNavigation, choose, show, openEditor, openLoginStart, get shellCleanup(){return shellCleanup}, get shellTagManager(){return shellTagManager}, get shellPanels(){return shellPanels}
  });
-  // 트리를 누르면 그 트리로 이동한다: 책·보드·지도를 보던 중이면 같은 보기로, 그 외(첫 화면·내 트리·둘러보기)에는 그 트리의 책으로. 주소도 따라오게 남긴다.
-  const TREE_VIEWS=new Set(['track32-bookshelf.html','track59-sketchbook.html','track58-pinboard.html','track56-network.html']);
-  treePopover.querySelectorAll('[data-tree-id]').forEach(b=>b.onclick=()=>{
-   const id=b.dataset.treeId;closeTreeMenu();if(!id)return;
-   // 서재는 프레임을 다시 띄우지 않고 가운데 책만 고른 트리로 옮긴다(2026-11-18 13:49 결정).
-   if(current==='track32-bookshelf.html'){
-    choose(id,'',true);
-    renderAccount();
-    flowNavigation();
-    try{for(const f of document.querySelectorAll('iframe'))f.contentWindow?.postMessage({type:'lt41-shelf-select-tree',treeId:id},location.origin);}catch{}
-    writeLocation();return;
-   }
-   const wasTreeView=TREE_VIEWS.has(current);choose(id);if(!wasTreeView)show('track59-sketchbook.html',false);flowNavigation();writeLocation();
-  });
- treePopover.querySelector('[data-tree-action="new"]')?.addEventListener('click',()=>{closeTreeMenu();if(member?.snapshot().writable)openEditor('new');else openLoginStart('new-tree');});
- treePopover.querySelector('[data-tree-action="cleanup"]')?.addEventListener('click',()=>{closeTreeMenu();shellCleanup.open({});});
- // #627 PR B: 기존 '정리' 옆의 두 번째 입구 — 꼬리표 정리(이름 바꾸기·합치기·제안).
- treePopover.querySelector('[data-tree-action="tags"]')?.addEventListener('click',()=>{closeTreeMenu();shellTagManager.open();});
- treePopover.querySelector('[data-tree-action="manage"]')?.addEventListener('click',()=>{shellPanels.openTreeManager();closeTreeMenu();});
- treePopover.querySelector('[data-tree-action="share"]')?.addEventListener('click',()=>{closeTreeMenu();$('share-menu').click();});
- // #394: 첫 화면 순간 목록을 지금 트리가 골라진 상태로 연다. 화면을 다시 불러오므로 요청을 전역 플래그로 남긴다.
- treePopover.querySelector('[data-tree-action="moments"]')?.addEventListener('click',()=>{closeTreeMenu();window.LT41_MOMENTS_OPEN={treeId:window.LT41?.tree?.id||''};show('src064-orbit.html');});
- // #380 2번: 드롭다운 맨 아래 "내 트리 전체 보기" → 책장 화면. 로그인 상태에서만 이 버튼이 그려진다.
- treePopover.querySelector('[data-tree-action="shelf"]')?.addEventListener('click',()=>{closeTreeMenu();show('track32-bookshelf.html');});
-}
-// #1028: 목록 칸만 스크롤해 고른 줄이 보이게 한다(페이지 전체 스크롤은 건드리지 않는다).
-function scrollTreeItemIntoView(item){
- const list=item.closest('.tree-list');if(!list||list.scrollHeight<=list.clientHeight)return;
- const a=item.getBoundingClientRect(),box=list.getBoundingClientRect();
- if(a.bottom>box.bottom)list.scrollTop+=a.bottom-box.bottom+4;
- else if(a.top<box.top)list.scrollTop-=box.top-a.top+4;
-}
-function openTreeMenu(via='keyboard'){if(!treePopover)return;renderTreeMenu();treePopover.dataset.ltOpenedBy=via;treePopover.hidden=false;treeTrigger.setAttribute('aria-expanded','true');const active=treePopover.querySelector('[data-tree-id][aria-checked="true"]');treePopover.querySelector('button')?.focus();if(active&&!active.hidden)scrollTreeItemIntoView(active);}
-function closeTreeMenu(){if(!treePopover)return;treePopover.hidden=true;treeTrigger.setAttribute('aria-expanded','false');}
-$('record-menu').addEventListener('click',event=>{event.stopPropagation();if(treePopover?.hidden)openTreeMenu(event.detail===0?'keyboard':'mouse');else closeTreeMenu();});
-if(treePopover)treePopover.addEventListener('keydown',event=>{const items=[...treePopover.querySelectorAll('button')].filter(b=>!b.hidden);const at=items.indexOf(document.activeElement);if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();const next=event.key==='ArrowDown'?(at+1)%items.length:(at-1+items.length)%items.length;items[next]?.focus();}else if(event.key==='Home'){event.preventDefault();items[0]?.focus();}else if(event.key==='End'){event.preventDefault();items.at(-1)?.focus();}});
-document.addEventListener('click',event=>{if(treePopover&&!treePopover.hidden&&!event.target.closest('.tree-slot'))closeTreeMenu();});
-document.addEventListener('keydown',event=>{if(event.key==='Escape'&&treePopover&&!treePopover.hidden){closeTreeMenu();treeTrigger.focus();}});
+const { escHTML, treeMomentThumb, treeCoverMarkup, renderTreeMenu, scrollTreeItemIntoView, openTreeMenu, closeTreeMenu }=shellTreeMenu;
 addEventListener('lt41-trees-changed',()=>{
  if(treePopover&&!treePopover.hidden)renderTreeMenu();
  paintQuickTargetControls();
@@ -706,7 +623,7 @@ const shellScreens=createScreens({
   paintEmptyCopy,
   applyTheme,
   writeLocation,
-  links,
+  links:(...args)=>links(...args),
   onFrameReady:frame=>{
     const d=frame.contentDocument;if(!d)return;
     mountConnectionTool(d);applyViewAccessibility(d);shellQuick.mountFrame(d);watchFrameSheet(frame);
@@ -783,141 +700,13 @@ function frameLoaded(frame){return shellScreens.frameLoaded(frame);}
 
 // #380 5번: '정리하기' 입구는 트리 ▾ 드롭다운 한 곳에서만 그린다(renderTreeMenu). 헤더 단추는 없앴다.
 function viewContext(){}
-// 연결 보기는 헤더에서 뺐다(2026-11-07). 관계 지도 화면의 도구 줄(전체 보기·사용법과 같은 자리·모양)에
-// 같은 다이얼로그를 여는 버튼을 붙인다. 원본 화면 파일은 건드리지 않는다.
-// #951 ①: '이어진 선 N개'는 위 단추가 아니라 단추 줄 아래 작은 글자다 — 화면이 그 자리를 비워 두었으면
-// 그 글자를 채우고, 없으면(옛 판본) 단추 줄 끝에 만든다. 누르면 예전처럼 연결 목록 창이 열린다.
-function mapMetaText(moments,connections){const m=Math.max(0,Number(moments)||0),c=Math.max(0,Number(connections)||0);return `순간 ${m} · 이어진 선 ${c}개`;}
-let connectionMoments=0;
-function mountConnectionTool(doc){
- let button=doc.getElementById('connection-tool');
- if(!button){
-  if(doc.documentElement?.getAttribute('data-v41-screen')!=='network')return;
-  const host=doc.querySelector('.topbar');if(!host)return;
-  button=doc.createElement('button');button.id='connection-tool';button.type='button';button.className='map-meta';button.setAttribute('aria-haspopup','dialog');host.append(button);
- }
- button.onclick=()=>panel('connection-panel');
- // #481 L15: #connection-count·#connection-menu는 index.html에 없다(죽은 가드) — 읽지 않고 0에서 시작한다.
- // 값은 곧 links()의 setConnectionCount가 실제 연결 수로 채운다.
- button.textContent=mapMetaText(window.LT41?.tree?.moments?.length||0,0);button.removeAttribute('aria-label');
- // #601: 지도 화면의 '이어진 선' 버튼을 기억해 둔다 — links()가 매번 프레임 문서를 다시 찾지 않고
- // 같은 버튼을 고친다(지도를 다시 열거나 화면을 옮겨 다니면 0으로 돌아가던 버그의 뿌리).
- // show()는 프레임이 뜨기 전에 links()를 부르므로, 버튼이 생긴 뒤 다시 세어 처음부터 올바른 수를 보인다.
- connectionToolButton=button;links();
-}
-let connectionToolButton=null;
-function setConnectionCount(n){
- const text=mapMetaText(connectionMoments,n);
- // #601: 기억해 둔 지도 화면의 글자가 살아 있으면 그 글자를 고친다. 없으면(예전 부름) 프레임 문서에서 찾는다.
- if(connectionToolButton?.isConnected){connectionToolButton.textContent=text;connectionToolButton.removeAttribute('aria-label');return;}
- const t=$('connection-tool');if(t){t.textContent=text;t.removeAttribute('aria-label');}
-}
-// #380 4 2차: 순간 잇기 패널이 보여 준 연결 목록(고른 연결)을 기억해 두고, 그 뒤로 트리의 연결이 달라졌으면 더러움이다.
-// 패널 자체는 연결을 만들지 않으므로 보통은 확인 없이 닫힌다(보여 준 것과 저장본이 같기 때문).
-// #380 5번: 첫 화면 움직임 멈춤 상태(메모리에만 둔다 — 보기 메뉴 때와 같다. 화면을 다시 열면 처음 상태).
+const shellConnections=createConnections({$, document, window, panel, show, writeLocation, connectionSignature, viewContext, get current(){return current}
+ });
+const { mapMetaText, mountConnectionTool, setConnectionCount, connectionDirty, links }=shellConnections;
 let motionPaused=false;
-let connectionShown='';
-function connectionDirty(){return $('connection-panel').open&&connectionSignature(window.LT41?.tree,window.LT41?.momentId)!==connectionShown;}
-function links(){viewContext();const c=window.LT41;$('connections').replaceChildren();if(!c){setConnectionCount(0);$('selection-label').textContent='트리를 먼저 불러오세요.';connectionShown='';return;}
- const moment=c.tree.moments.find(m=>m.id===c.momentId);$('selection-label').textContent=moment?.title||'';
- // #601: '이어진 선 N개'는 지도에 실제 그린 연결 선 개수다 — 양 끝 순간이 모두 있는 연결을 센다.
- // (예전에는 선택한 순간에 닿는 선만 세어 대표 계정에서 '이어진 선 0개'로 나왔다.)
- const has=id=>c.tree.moments.some(m=>m.id===id);
- const all=c.tree.edges.filter(e=>has(e.from)&&has(e.to));connectionMoments=c.tree.moments.length;setConnectionCount(all.length);
- const edges=c.tree.edges.filter(e=>e.from===c.momentId||e.to===c.momentId);
- if(!edges.length){const p=document.createElement('p');p.textContent='아직 연결된 다른 순간이 없어요.';$('connections').append(p);}
- for(const e of edges){
-  const id=e.from===c.momentId?e.to:e.from,m=c.tree.moments.find(m=>m.id===id),b=document.createElement('button'),kind=document.createElement('small'),title=document.createElement('span');
-  kind.textContent=e.kind==='related'?'관련 순간':e.from===c.momentId?'다음 순간':'이전 순간';
-  const name=document.createElement('strong'),reason=document.createElement('span');
-  name.textContent=m.title;
-  reason.className='connection-reason';
-  reason.textContent=e.reason||(e.kind==='related'?'함께 기억할 관련 순간으로 연결했어요.':'연결 이유를 아직 남기지 않았어요.');
-  title.append(name,reason);b.append(kind,title);
-  b.onclick=()=>{c.momentId=id;$('connection-panel').close();show(current,false);writeLocation();};
-  $('connections').append(b);
- }
- connectionShown=connectionSignature(c.tree,c.momentId);
-}
-// #213 3번: 첫 트리 안내 말풍선. 한 번만 보여 주고, 닫으면 기억한다(저장소가 막히면 다시 보여 준다).
-// #549: 모달 창이 열려 있는 동안에는 창 밖 요소가 전부 inert가 되어 '알겠어요'가 눌리지 않았다(빈 알림
-// 요소가 가로채는 것이 아니라 모달 창 자체가 누름을 막는다). #566에서는 창 안 맨 위로 옮겨 붙였지만
-// 안내 판이 창 내용 위에 포개지는 일이 반복됐다(#845·#846 사용 일지 — 순간 추가·내 의견 창, PR #851 캡처).
-// 261118 대표 결정: 창 안으로 옮기지 않고, 창(#845 설계안의 15개 모달 창)이 하나라도 열려 있는 동안은
-// 안내 판을 숨긴다. 창이 모두 닫히면 다시 띄우고, 이때 '봤음'으로 적지 않는다(#666의 계정 메뉴 미루기와
-// 같은 규칙 — 미뤘다고 본 것으로 치지 않는다).
-let tipsReturnFocus=null;
-function anyDialogOpen(){return !!document.querySelector('dialog[open]');}
-function tipsFollowDialogs(){
-  const box=$('tree-tips');if(!box)return;
-  if(anyDialogOpen()){
-    if(!box.hidden){tipsHeld=true;noticeQueue.release('tips');}
-    return;
-  }
-  if(!tipsHeld)return;
-  tipsHeld=false;
-  // #845 2단계: 창이 닫히면서 자동으로 다시 뜰 때는 초점을 뺏지 않는다 — 초점은 창을 연 단추로 돌아간다.
-  syncTreeTips(false);
-}
-function closeTreeTips(remember=true){
-  const box=$('tree-tips');if(!box||box.hidden)return;
-  box.hidden=true;if(remember)writeTipsSeen(localStorage);
-  const back=tipsReturnFocus||$('tree-views')?.querySelector('button')||$('mobile-more');tipsReturnFocus=null;
-  if(back&&document.contains(back)&&!back.hidden)back.focus();
-}
-// 이슈 666: 계정 메뉴와 첫 트리 안내는 한 번에 하나만 보인다. 안내(z-index 25)는 머리줄 상자
-// (z-index 5) 안에 있는 메뉴 위로 떠 메뉴 항목을 가렸다. 메뉴가 열려 있으면 안내는 미뤄 두고,
-// 메뉴가 닫히면 그때 띄운다. 미뤘다고 '봤음'으로 적지 않는다 — 닫은 뒤에도 다시 보여 준다.
-function accountMenuOpen(){const pop=$('account-popover');return !!pop&&!pop.hidden;}
-let tipsHeld=false;
-function tipsFollowAccountMenu(){
-  const box=$('tree-tips');
-  if(accountMenuOpen()){
-    if(box&&!box.hidden){tipsHeld=true;noticeQueue.release('tips');closeTreeTips(false);}
-    return;
-  }
-  if(!tipsHeld)return;
-  tipsHeld=false;
-  // 메뉴가 닫히며 자동으로 다시 뜰 때도 초점은 계정 동그라미로 돌아간다(#845 2단계와 같은 규칙).
-  syncTreeTips(false);
-}
-function showTreeTips(takeFocus=true){
-  const box=$('tree-tips');if(!box||!box.hidden)return;
-  if(accountMenuOpen()||anyDialogOpen()){tipsHeld=true;return;}
-  // #845 2단계: 창이 닫히면 close 이벤트보다 먼저 주소 처리가 안내를 다시 띄우는 길이 있다.
-  // 창·메뉴 때문에 숨었던 판이 다시 뜨는 때는 초점을 뺏지 않는다 — 초점은 창을 연 단추로 돌아간다.
-  const resuming=tipsHeld;tipsHeld=false;
-  const list=$('tree-tips-list');
-  if(list&&!list.children.length)for(const tip of FIRST_TREE_TIPS){const li=document.createElement('li');const strong=document.createElement('strong');const span=document.createElement('span');strong.textContent=tip.title;span.textContent=tip.body;li.append(strong,span);list.append(li);}
-  if(!tipsReturnFocus)tipsReturnFocus=document.activeElement;
-  box.hidden=false;
-  // 초점은 직접 열 때만 가져간다. 자동으로 뜬 판은 Tab으로만 들어간다 — 닫기 단추는 Tab 순서에 그대로 있다.
-  if(takeFocus&&!resuming)$('tree-tips-close')?.focus();
-}
-function syncTreeTips(takeFocus=true){
-  const momentCount=model?.trees?.reduce((n,t)=>n+((t.moments||[]).length),0)||0;
-  // 이슈 933: 새 트리 만들기(첫 여정) 화면에서는 안내 판을 띄우지 않는다 — 아직 트리를 만든 적이 없는데
-  // '첫 트리를 만들었어요' 판이 미리보기 카드를 덮었다. 트리를 실제로 만든 뒤(다른 화면)에만 띄운다.
-  const wanted=current!=='first-journey.html'&&tipsWanted({owned:!!member?.snapshot().owned,treeCount:model?.trees?.length||0,momentCount,seen:readTipsSeen(localStorage),source});
-  if(wanted){
-   if(accountMenuOpen()||anyDialogOpen())showTreeTips(takeFocus);
-   else{
-    // 메뉴·창 때문에 숨었던 안내가 다시 보일 때 줄 상태를 맞춘다(#666 순서 유지).
-    if(noticeQueue.currentId()==='tips'&&$('tree-tips')?.hidden)noticeQueue.release('tips');
-    noticeQueue.request('tips',{show:()=>{hideToast();showTreeTips(takeFocus);},hide:()=>{const box=$('tree-tips');if(box)box.hidden=true;}});
-   }
-  }else{noticeQueue.release('tips');closeTreeTips(false);}
-}
-// 창이 닫힐 때마다 안내를 다시 맞춘다 — 열려 있는 창이 없어지면 숨긴 안내를 다시 띄운다(#845).
-document.addEventListener('close',()=>tipsFollowDialogs(),true);
-// 계정 메뉴가 열리고 닫힐 때마다 안내와의 순서를 다시 맞춘다(메뉴를 여는 길이 여럿이라 상태 변화를 본다).
-const accountPopoverBox=$('account-popover');
-if(accountPopoverBox)new MutationObserver(()=>tipsFollowAccountMenu()).observe(accountPopoverBox,{attributes:true,attributeFilter:['hidden']});
-$('tree-tips-close')?.addEventListener('click',()=>{closeTreeTips();noticeQueue.release('tips');});
-// #571: 안내의 [이름 바꾸기]는 트리 관리 창을 바로 열고 이름 칸에 초점을 둔다(openTreeManager가 초점을 옮긴다).
-// 창이 열려 있는 동안은 안내 판이 숨고(#845), 이름 창을 닫고 돌아오면 두 번째 안내와 알겠어요가 다시 보인다 —
-// 이때 '봤음'으로 적지 않는다. 순간 추가 창이 열려 있는 동안에는 안내가 숨어 누르지 않는다(#845 결정).
-$('tree-tips-rename')?.addEventListener('click',()=>shellPanels.openTreeManager());
+const shellTreeTips=createTreeTips({$, document, localStorage, get model(){return model}, get current(){return current}, get source(){return source}, get member(){return member}, noticeQueue, FIRST_TREE_TIPS, tipsWanted, readTipsSeen, writeTipsSeen, shellPanels, hideToast, flowNavigation
+ });
+const { anyDialogOpen, tipsFollowDialogs, closeTreeTips, accountMenuOpen, tipsFollowAccountMenu, showTreeTips, syncTreeTips }=shellTreeTips;
 // 2026-11-07: 390·360에서 탭 7개가 폭을 넘는다. 탭 줄은 가로 스크롤이고, 화면을 바꿀 때 현재 탭을 가운데로 당겨 보이게 한다.
 // 넘치는 쪽 끝에만 페이드를 켜서 잘린 것이 아니라 더 있다는 신호를 준다. 데스크톱(넓은 폭)은 스크롤이 없어 아무 일도 하지 않는다.
 const navBar=document.querySelector('.app-header nav');
@@ -1255,13 +1044,6 @@ addEventListener('beforeunload',e=>{
 if(shouldLoadMemberRecords(location.search,document.cookie,location.hash)||shellIntake.pending())void startMember().catch(error=>openFallbackShell(error));
 // 로그아웃으로 다시 연 문서에서는 '로그인이 필요해요' 대신 이 안내를 한 번 띄운다.
 try{if(sessionStorage.getItem('lt41.logoutNotice')==='1'){sessionStorage.removeItem('lt41.logoutNotice');notify('로그아웃했어요.');}}catch{}
-
-
-
-
-
-
-
 
 
 
