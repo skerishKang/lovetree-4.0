@@ -5,11 +5,11 @@
       "inlineStyle": 0
     },
     "public/v41/identity.css": {
-      "important": 25,
+      "important": 23,
       "inlineStyle": 0
     },
     "public/v41/shell.css": {
-      "important": 26,
+      "important": 10,
       "inlineStyle": 0
     },
     "public/v41/view-a11y.mjs": {
@@ -27,10 +27,6 @@
     "public/v41/views/network/network.js": {
       "important": 0,
       "inlineStyle": 1
-    },
-    "public/v41/views/tree-title.css": {
-      "important": 1,
-      "inlineStyle": 0
     },
     "public/v41/views/tree-title.mjs": {
       "important": 0,

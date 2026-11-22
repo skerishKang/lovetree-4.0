@@ -68,7 +68,6 @@ html[data-lt-theme=garden] #context-kind{color:var(--lt-rose-ink)}
 #community-search-form label{font-size:12px;color:var(--muted)}
 #community-search-form input{display:block;width:100%;min-height:44px;margin-top:7px;padding:10px 12px;border:1px solid rgba(255,255,255,.22);border-radius:12px;background:rgba(255,255,255,.04);color:var(--lt-pearl)}
 #community-search-form button,#community-more{min-height:44px;padding:10px 16px;border:0;border-radius:var(--lt-r-pill);background:var(--lt-primary);color:var(--lt-primary-ink)}
-/* Legacy community card and preview theme colors must win over generic dialog text. */
 .community-policy{padding:12px 14px;border-left:2px solid var(--lt-gold-line);color:var(--lt-muted);background:rgba(255,230,166,.05)}
 #community-feedback{min-height:24px;color:var(--lt-muted)}
 #community-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
@@ -88,8 +87,7 @@ html[data-lt-theme=garden] #context-kind{color:var(--lt-rose-ink)}
 .community-comment-edit{display:grid;gap:7px;margin-top:6px}.community-comment-edit textarea{width:100%;min-height:44px;padding:10px;border:1px solid rgba(255,255,255,.22);border-radius:12px;background:rgba(255,255,255,.04);color:var(--lt-pearl)}
 .community-details{margin-top:12px;border-top:1px solid #ffffff17;padding-top:10px}.community-details summary{color:#cdbec8;font-size:12px}.community-comment{padding:10px 0;border-bottom:1px solid #ffffff13}.community-comment p{margin:4px 0}.community-comment-form{display:grid;gap:7px;margin-top:10px}.community-comment-form textarea,.community-report-form input{width:100%;min-height:44px;padding:10px;border:1px solid rgba(255,255,255,.22);border-radius:12px;background:rgba(255,255,255,.04);color:var(--lt-pearl)}.community-report-form{display:grid;grid-template-columns:1fr auto;gap:7px;margin-top:14px}.community-link{background:transparent!important;color:#d9bdc8!important}.community-empty{grid-column:1/-1;padding:40px 18px;text-align:center;border:1px dashed rgba(255,255,255,.2);border-radius:var(--lt-r-panel);color:var(--muted)}
 #community-more{display:block;margin:16px auto 0}#community-more[hidden]{display:none}
-@media(max-width:780px){#community-menu{min-width:44px}#community-panel{padding:14px 14px 28px}#community-search-form{grid-template-columns:1fr}/* Legacy community card and preview theme colors must win over generic dialog text. */
-.community-policy{font-size:12px}#community-list{grid-template-columns:1fr}.community-card{grid-template-columns:112px minmax(0,1fr)}.community-cover{min-height:210px}.community-copy{padding:12px}.community-actions button{flex:1 1 44%}.community-reaction-group{flex-wrap:wrap}.community-reaction-group .community-reaction{flex:0 1 auto}.community-report-form{grid-template-columns:1fr}.community-report-form button{width:100%}}
+@media(max-width:780px){#community-menu{min-width:44px}#community-panel{padding:14px 14px 28px}#community-search-form{grid-template-columns:1fr}.community-policy{font-size:12px}#community-list{grid-template-columns:1fr}.community-card{grid-template-columns:112px minmax(0,1fr)}.community-cover{min-height:210px}.community-copy{padding:12px}.community-actions button{flex:1 1 44%}.community-reaction-group{flex-wrap:wrap}.community-reaction-group .community-reaction{flex:0 1 auto}.community-report-form{grid-template-columns:1fr}.community-report-form button{width:100%}}
 @media(max-width:390px){.community-actions button{flex:1 1 100%}.community-reaction-group{gap:4px}.community-reaction-group .community-reaction{min-height:44px}.community-comment-tools button{flex:1 1 auto}.community-comment-edit textarea{min-height:44px;width:100%}}
 
 /* Compact mobile actions without changing desktop controls. */
@@ -101,8 +99,7 @@ html[data-lt-theme=garden] #context-kind{color:var(--lt-rose-ink)}
 #community-panel{padding:20px clamp(16px,3vw,48px) 40px;background:radial-gradient(ellipse at 80% 0,#17121f,transparent 45%),var(--lt-stage);color:var(--lt-pearl)}
 #community-panel .panel-heading{max-width:1500px;margin:auto}
 #community-panel .panel-heading h2{font-family:var(--lt-font-display);font-size:clamp(25px,3vw,40px);line-height:1.35}
-#community-panel>.panel-note,#community-search-form,.community-layout,#community-panel>/* Legacy community card and preview theme colors must win over generic dialog text. */
-.community-policy{max-width:1500px;margin-left:auto;margin-right:auto}
+#community-panel>.panel-note,#community-search-form,.community-layout,#community-panel>.community-policy{max-width:1500px;margin-left:auto;margin-right:auto}
 .community-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(340px,1.02fr);gap:24px;align-items:start}
 /* #453 D3: 공개 트리가 0개일 때는 미리보기 칸을 숨기고 빈 안내만 가운데에 둔다. */
 .community-layout:has(#community-preview[hidden]){grid-template-columns:minmax(0,1fr)}
@@ -938,8 +935,7 @@ body.community-screen #stage>iframe,body.community-screen #empty{display:none}
 #community-panel .community-card-moment{margin:4px 14px 0;color:var(--lt-ink);font-size:14px;line-height:1.45;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #community-panel .community-card-distinct{display:block;margin:4px 14px 0;color:var(--lt-ink);font-size:12px;line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #community-panel .community-card-meta{margin:7px 14px 14px;color:var(--lt-ink);font-size:13px;line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-#community-panel /* Legacy community card and preview theme colors must win over generic dialog text. */
-.community-policy{max-width:1500px;margin:20px auto 8px;color:var(--lt-muted);font-size:13px;line-height:1.6}
+#community-panel .community-policy{max-width:1500px;margin:20px auto 8px;color:var(--lt-muted);font-size:13px;line-height:1.6}
 #community-panel .community-empty{max-width:520px;margin:28px auto;padding:28px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-panel);background:var(--lt-paper);color:var(--muted);text-align:center}
 #community-panel .community-empty p{color:var(--lt-ink)}
 #community-panel #community-more{display:block;min-height:44px;margin:22px auto;padding:10px 18px;border:1px solid var(--lt-line-paper);border-radius:var(--lt-r-pill);background:var(--lt-paper);color:var(--lt-ink)}
@@ -997,7 +993,7 @@ body.community-screen #stage>iframe,body.community-screen #empty{display:none}
 #community-preview .community-comment-host,#community-preview .community-comments{display:grid;gap:10px}
 #community-preview .community-comment,#community-preview .community-comment-form,#community-preview .community-comment-edit{display:grid;gap:8px;color:var(--lt-ink)}
 #community-preview .community-comment small,#community-preview .community-comment p,#community-preview .community-muted{margin:0;color:var(--lt-ink);font-size:13px;line-height:1.5}
-#community-preview .community-muted{color:var(--muted)}
+
 #community-preview .community-comment-form textarea,#community-preview .community-comment-edit textarea,#community-preview .community-report-form input{width:100%;min-height:44px;padding:10px 12px;border:1px solid var(--lt-line-paper);border-radius:var(--lt-r-card);background:var(--lt-paper);color:var(--lt-ink);font:inherit}
 #community-preview .community-report-form{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}
 #community-preview .community-report-form button.community-link{background:var(--lt-ink)!important;color:var(--lt-paper)!important}
@@ -1005,9 +1001,12 @@ body.community-screen #stage>iframe,body.community-screen #empty{display:none}
 #community-preview .community-link.danger{justify-self:start}
 #community-preview .community-preview-message{min-height:20px;margin:0;color:var(--lt-ink);font-size:13px}
 #community-panel #community-preview p{color:var(--lt-ink)}
+/* The existing subject, summary and muted palette wins over the generic preview paragraph color. */
+#community-panel #community-preview .community-subject{color:#d7a8ba}
+#community-panel #community-preview .community-summary{color:#e9dfe5}
+#community-panel #community-preview .community-muted{color:var(--muted)}
 @media(max-width:900px){#community-panel #community-list{grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}}
-@media(max-width:780px){#community-panel{padding:14px 14px 28px}#community-panel .community-top{padding-top:20px}#community-panel .community-toolbar{grid-template-columns:minmax(0,1fr) auto;gap:8px}#community-panel .community-search-submit{display:none}#community-panel #community-list{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}#community-panel .community-card-title{margin:10px 10px 0;font-size:15px}#community-panel .community-card-moment{margin:4px 10px 0;font-size:13px}#community-panel .community-card-distinct{margin:3px 10px 0;font-size:11px}#community-panel .community-card-meta{margin:6px 10px 11px;font-size:12px}#community-panel /* Legacy community card and preview theme colors must win over generic dialog text. */
-.community-policy{font-size:12px}}
+@media(max-width:780px){#community-panel{padding:14px 14px 28px}#community-panel .community-top{padding-top:20px}#community-panel .community-toolbar{grid-template-columns:minmax(0,1fr) auto;gap:8px}#community-panel .community-search-submit{display:none}#community-panel #community-list{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}#community-panel .community-card-title{margin:10px 10px 0;font-size:15px}#community-panel .community-card-moment{margin:4px 10px 0;font-size:13px}#community-panel .community-card-distinct{margin:3px 10px 0;font-size:11px}#community-panel .community-card-meta{margin:6px 10px 11px;font-size:12px}#community-panel .community-policy{font-size:12px}}
 @media(max-width:600px){#community-preview{inset:auto 0 0;transform:none;margin:0;width:100%;max-width:100vw;max-height:88dvh;padding-bottom:calc(12px + env(safe-area-inset-bottom));border-radius:var(--lt-r-panel) var(--lt-r-panel) 0 0}#community-preview>.community-cover{aspect-ratio:1.55;max-height:22dvh}#community-preview .community-preview-body{padding:12px 16px 16px;gap:7px}#community-preview .community-preview-body h3{font-size:21px}#community-preview .community-more-panel{min-width:min(360px,calc(100vw - 40px))}}
 @media(prefers-reduced-motion:reduce){#community-panel .community-card{transition:none}}
 /* 2026-11-17 대표 결정: 트리 0개 계정의 서재 빈 상태는 '+ 새 트리' 빈 책과 같은 점선 모양으로 둔다. */
