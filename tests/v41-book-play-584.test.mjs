@@ -15,6 +15,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { FALLBACK_SECONDS, playbackItemOf, buildPlaybackQueue, stepPlayable, firstPlayable, playbackChipText, segmentReached, playbackStatusOf, STATUS_PLAYING, STATUS_PAUSED, STATUS_BUFFERING, STATUS_SKIPPED } from '../public/v41/playback-core.mjs';
@@ -171,6 +172,46 @@ async function step(frame) {
   await frame.waitForFunction((prev) => document.getElementById('pageLabel').textContent !== prev, label, { timeout: 5000 });
   await frame.waitForTimeout(80);
 }
+
+// #1059 표 시험: 유튜브 주소 한 벌을 모든 진입 함수(정본·책 화면)가 같은 id로 판정한다.
+const YT_CORPUS = [
+  'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+  'https://youtu.be/dQw4w9WgXcQ?t=42',
+  'https://www.youtube.com/shorts/dQw4w9WgXcQ',
+  'https://www.youtube.com/live/dQw4w9WgXcQ',
+  'https://www.youtube.com/embed/dQw4w9WgXcQ',
+  'http://m.youtube.com/watch?v=dQw4w9WgXcQ',
+  'https://music.youtube.com/watch?v=dQw4w9WgXcQ',
+  'https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=PL123',
+  'https://www.youtube.com/playlist?list=PL123',
+  'https://youtube.com.evil.test/watch?v=dQw4w9WgXcQ',
+  'https://user:pass@www.youtube.com/watch?v=dQw4w9WgXcQ',
+  'ftp://youtu.be/dQw4w9WgXcQ',
+  'https://www.youtube.com/shorts/abcdefghijkEXTRA',
+  'https://youtu.be/short',
+  'https://www.youtube.com/watch?v=toolongid123456',
+  'javascript:alert(1)'
+];
+
+test('#1059 화면: 책 youtubeId 가 정본과 같은 판정이다(주소 표)', { skip }, async () => {
+  const browser = await chromium.launch();
+  try {
+    const { ctx, frame } = await openBook(browser, 1440, 900);
+    try {
+      const diffs = await frame.evaluate(async (corpus) => {
+        const { youtubeIdFrom } = await import('/v41/youtube-id.mjs');
+        const out = [];
+        for (const url of corpus) {
+          const a = youtubeId(url);
+          const b = youtubeIdFrom(url, { allowThumbnail: false });
+          if ((a || null) !== (b || null)) out.push(`${url} :: book=${a} canon=${b}`);
+        }
+        return out;
+      }, YT_CORPUS);
+      assert.deepEqual(diffs, [], `책 youtubeId 와 정본이 같다 (${diffs.join(' | ')})`);
+    } finally { await ctx.close(); }
+  } finally { await browser.close(); }
+});
 
 test('584 실행: 두 장 모드에서 두 쪽 모두 스크롤 없이 한 순간이 온전히 보인다(1440·1920)', { skip }, async () => {
   const browser = await chromium.launch();
@@ -502,7 +543,7 @@ test('26: 책을 열어 둔 채 트리를 바꾸면 책 제목·첫 카드·카�
   const { createTree: makeTree, addMoment: growTree } = await import('../public/v41/domain.mjs');
   const { serve: serveApp } = await import('./helpers/screen-audit.mjs');
   const { mkdirSync } = await import('node:fs');
-  const shotDir = process.env.LT_BOOK_SWITCH_SHOT_DIR || 'E:\\lovetree-qa\\local4\\책전환';
+  const shotDir = process.env.LT_BOOK_SWITCH_SHOT_DIR || path.join(tmpdir(), 'lt-book-switch-shots');
   mkdirSync(shotDir, { recursive: true });
   let a = makeTree({subject:'A',title:'A',note:'',emotion:'설렘',date:'2026-11-01',url:''},'2026-11-01T00:00:00Z');
   a = growTree(a,{title:'A 첫 순간',note:'',emotion:'설렘',date:'2026-11-01',url:''},a.moments[0].id,'2026-11-01T00:00:00Z');
@@ -780,15 +821,15 @@ test('1001b 실행: 책 순간 변경(고치기·연결·해제·이전 순간·
     assert.equal(afterEdit.focused, before.focused, '고른 순간의 선택 테두리가 그대로다');
     assert.ok(afterEdit.sideOpen || afterEdit.pageDetail, '열린 상세 판이 그대로다');
     assert.ok(afterEdit.detailText.includes('고친 제목'), '상세 판이 새 제목으로 다시 그려진다');
-    // ② 연결·해제·이전 순간 바꾸기: 각각 재적재 0.
-    await openEditor(m2); await page.evaluate(id => { document.querySelector('#related-target').value = id; }, m4); await page.click('#link-moment'); await waitPut(2); await page.waitForTimeout(1200);
-    await openEditor(m2); await page.evaluate(id => { document.querySelector('#related-target').value = id; }, m4); await page.click('#unlink-moment'); await waitPut(3); await page.waitForTimeout(1200);
-    await openEditor(m4); await page.evaluate(id => { document.querySelector('#parent-target').value = id; }, m3); await page.click('#change-parent'); await waitPut(4); await page.waitForTimeout(1200);
+    // ② 연결·해제·이전 순간 바꾸기(#1097: 저장하기 한 번에 함께 — edit + 연결 1씩): 각각 재적재 0.
+    await openEditor(m2); await page.evaluate(id => { const s = document.querySelector('#related-target'); s.value = id; s.dispatchEvent(new Event('change', {bubbles: true})); document.querySelector('#moment-form').requestSubmit(); }, m4); await waitPut(3); await page.waitForTimeout(1200);
+    await openEditor(m2); await page.evaluate(() => { document.querySelector('.related-chip-cut')?.click(); document.querySelector('#moment-form').requestSubmit(); }); await waitPut(5); await page.waitForTimeout(1200);
+    await openEditor(m4); await page.evaluate(id => { const s = document.querySelector('#parent-target'); s.value = id; s.dispatchEvent(new Event('change', {bubbles: true})); document.querySelector('#moment-form').requestSubmit(); }, m3); await waitPut(7); await page.waitForTimeout(1200);
     const afterLinks = await frame.evaluate(() => ({ doc: window.__doc1001b, msg: window.__msg1001b }));
     assert.equal(afterLinks.doc, 'alive', '연결·해제·이전 순간 뒤에도 같은 문서다');
     assert.ok(afterLinks.msg >= 4, '각 변경의 알림이 도착한다');
     // ③ 삭제: 고른 순간이 사라지면 선택은 이어지는 순간으로 폴백하고 화면은 다시 뜨지 않는다.
-    await openEditor(m2); await page.click('#delete-moment'); await waitPut(5); await page.waitForTimeout(1800);
+    await openEditor(m2); await page.click('#delete-moment'); await waitPut(8); await page.waitForTimeout(1800);
     const afterDelete = await frame.evaluate(() => ({ doc: window.__doc1001b, sel: LTDEMO.get(), count: LTDEMO.moments.length }));
     assert.equal(afterDelete.doc, 'alive', '삭제 뒤에도 같은 문서다');
     assert.equal(afterDelete.count, 3, '순간이 하나 줄어든다');

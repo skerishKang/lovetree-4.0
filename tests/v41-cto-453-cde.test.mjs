@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 // 시험 정비 2차(2026-11-15): community 배선 검사는 mountCommunity를 직접 띄워 동작으로 본다.
 import { mountCommunity } from '../public/v41/community-panel.mjs';
+import { createSettings } from '../public/v41/shell/settings.mjs';
+import { accountPresentation } from '../public/v41/header-state.mjs';
 
 // #453 CTO 점검 1차 PR 2: 설정 창 정리(C) · 자세한 추가 파일 단추(B-2) · 빈 화면 정리(D) · 예시 책 제목(E).
 // 화면 배선은 글자로, 순수 규칙은 함수로 고정한다.
@@ -78,12 +80,6 @@ function communityHarness({ items = [], defer = false, emptyHidden = true } = {}
   };
 }
 
-test('C3·C4·C5: 이름·용량·공유 보기 이름', () => {
-  const nameLine = shell.slice(shell.indexOf('function paintSettingsProfile'), shell.indexOf('function paintSettingsProfile') + 700);
-  assert.match(nameLine, /displayName/, '표시 이름을 먼저 쓴다');
-  assert.equal((nameLine.match(/@/g) || []).length <= 1, true, '이메일은 한 번만 쓴다');
-});
-
 test('D1: 대화상자를 닫으면 빈 화면이 아닐 때만 탭의 "지금 보는 곳"을 되살린다', async () => {
   // 전: community-panel.mjs의 emptyShown 배선 글자 → 후: mountCommunity를 띄우고 열었다 닫아 본다.
   // screens.mjs가 빈 화면에서 aria-current를 전부 지우는 동작은 tests/v41-shell-screens.test.mjs가
@@ -144,7 +140,7 @@ test('#824: 3 미만 숫자는 라벨만 남기고, 3부터 숫자가 보인다'
     assert.doesNotMatch(meta, /이번 주/, '이번 주 2명도 숨긴다');
     card.onclick();
     const body = small.get('community-preview').children.find(node => node.className === 'community-preview-body');
-    const fav = body.children.find(node => node.className === 'community-preview-actions').children[0].textContent;
+    const fav = body.children.find(node => node.className === 'community-preview-actions').children.find(node => node.className === 'community-fav-wrap').children[0].textContent;
     assert.equal(fav, '즐겨찾기', '즐겨찾기 0은 라벨만 남긴다');
     const previewMeta = body.children.find(node => node.className === 'community-preview-meta').textContent;
     assert.doesNotMatch(previewMeta, /공감 2/);
@@ -158,7 +154,7 @@ test('#824: 3 미만 숫자는 라벨만 남기고, 3부터 숫자가 보인다'
     assert.match(meta, /이번 주 5명/, '이번 주 담은 수는 3 이상일 때 따라온다');
     card.onclick();
     const body = big.get('community-preview').children.find(node => node.className === 'community-preview-body');
-    const fav = body.children.find(node => node.className === 'community-preview-actions').children[0].textContent;
+    const fav = body.children.find(node => node.className === 'community-preview-actions').children.find(node => node.className === 'community-fav-wrap').children[0].textContent;
     assert.equal(fav, '즐겨찾기 3', '즐겨찾기 3은 숫자를 보여 준다');
   } finally { big.restore(); }
 });
@@ -204,15 +200,18 @@ test('#824·#903: 가입 7일 미만이 담기를 누르면 안내가 단추 바
     const card = h.get('community-list').children.find(node => node.dataset.shareId === 's1');
     card.onclick();
     const body = h.get('community-preview').children.find(node => node.className === 'community-preview-body');
-    const fav = body.children.find(node => node.className === 'community-preview-actions').children.find(node => node.dataset.communityAction === 'favorite');
+    const fav = body.children.find(node => node.className === 'community-preview-actions').children.find(node => node.className === 'community-fav-wrap').children.find(node => node.dataset.communityAction === 'favorite');
     assert.equal(fav.textContent, '즐겨찾기 5', '누르기 전에는 담지 않은 상태다');
-    // #903: 안내 칸은 담기 단추 묶음(community-preview-actions) 바로 다음 줄이다 — 막히기 전에는 숨어 있다.
+    // #903: 안내 칸은 담기 단추 묶음 안에서 담기 단추 바로 다음 자리다 — 막히기 전에는 숨어 있다.
+    // (#903 후속 2026-11-22: 반응 칩이 펼쳐져도 안내가 담기 단추 바로 다음 줄에 오게, 담기 단추 전용 아래칸(community-fav-wrap)으로 옮겼다.)
     const noteOf = (nowBody) => {
       const nowActions = nowBody.children.find(node => node.className === 'community-preview-actions');
-      return nowBody.children[nowBody.children.indexOf(nowActions) + 1];
+      const nowFavWrap = nowActions.children.find(node => node.className === 'community-fav-wrap');
+      const nowFav = nowFavWrap.children.find(node => node.dataset.communityAction === 'favorite');
+      return nowFavWrap.children[nowFavWrap.children.indexOf(nowFav) + 1];
     };
     const note = noteOf(body);
-    assert.equal(note.className, 'community-vote-note', '안내 칸은 actions 바로 다음 줄자리에 둔다');
+    assert.equal(note.className, 'community-vote-note', '안내 칸은 담기 단추 바로 다음 자리에 둔다');
     assert.equal(note.hidden, true, '막히기 전에는 안내 칸이 보이지 않는다');
     fav.onclick();
     await new Promise((r) => setTimeout(r, 0));
@@ -227,12 +226,12 @@ test('#824·#903: 가입 7일 미만이 담기를 누르면 안내가 단추 바
     fav.onclick();
     await new Promise((r) => setTimeout(r, 0));
     const body2 = h.get('community-preview').children.find(node => node.className === 'community-preview-body');
-    const fav2 = body2.children.find(node => node.className === 'community-preview-actions').children.find(node => node.dataset.communityAction === 'favorite');
+    const fav2 = body2.children.find(node => node.className === 'community-preview-actions').children.find(node => node.className === 'community-fav-wrap').children.find(node => node.dataset.communityAction === 'favorite');
     assert.equal(fav2.textContent, '✓ 즐겨찾기 6', '성공한 담기는 하트 상태를 바꾼다');
     assert.equal(noteOf(body2).hidden, true, '담기에 성공하면 안내 칸은 다시 숨는다');
     // 투표 막힘이 아닌 실패(서버 고장)는 상태 줄로 내린다 — 단추 아래 칸은 숨은 채.
     failFavorite = 'server';
-    const fav3 = body2.children.find(node => node.className === 'community-preview-actions').children.find(node => node.dataset.communityAction === 'favorite');
+    const fav3 = body2.children.find(node => node.className === 'community-preview-actions').children.find(node => node.className === 'community-fav-wrap').children.find(node => node.dataset.communityAction === 'favorite');
     fav3.onclick();
     await new Promise((r) => setTimeout(r, 0));
     assert.equal(h.get('community-feedback').textContent, '요청을 처리하지 못했어요.', '다른 실패는 상태 줄로 내린다');
@@ -240,3 +239,30 @@ test('#824·#903: 가입 7일 미만이 담기를 누르면 안내가 단추 바
     globalThis.fetch = previous;
   } finally { h.restore(); }
 });
+
+// #886 PR 1: 코드 이전으로 지운 '이름·용량·공유 보기 이름' 글자 단정을 동작 시험으로 대체한다.
+// 설정 프로필이 표시 이름을 먼저 쓰고 이메일은 한 번만 쓰는 것을 실제 모듈로 확인한다.
+test('C3 동작: 설정 프로필은 표시 이름을 먼저 쓰고 이메일은 한 번만 표시한다', () => {
+  const saved = { document: globalThis.document, window: globalThis.window, location: globalThis.location, localStorage: globalThis.localStorage };
+  const els = new Map();
+  const mk = (id = '') => ({ id, textContent: '', hidden: false, value: '', open: false, tabIndex: 0, disabled: false, dataset: {}, style: {}, classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } }, setAttribute() {}, getAttribute() { return null; }, replaceChildren() {}, append() {}, addEventListener() {}, removeEventListener() {}, querySelectorAll() { return []; }, querySelector() { return null; }, focus() {}, scrollIntoView() {}, closest() { return null; } });
+  const $ = id => { if (!els.has(id)) els.set(id, mk(id)); return els.get(id); };
+  globalThis.document = { getElementById: $, querySelectorAll: () => [], querySelector: () => null, createElement: () => mk(), addEventListener() {}, body: mk('body'), activeElement: mk(), documentElement: mk('html') };
+  globalThis.window = { innerWidth: 1440, innerHeight: 900, addEventListener() {}, LT41: { tree: { id: 't1', title: '트리', moments: [] } } };
+  globalThis.location = { origin: 'http://test', href: 'http://test/v41/', hash: '', search: '', assign() {} };
+  globalThis.localStorage = { getItem: () => null, setItem() {}, removeItem() {} };
+  try {
+    const stub = new Proxy(function () {}, { get: () => stub, apply: () => stub });
+    const deps = new Proxy({ $, notify() {}, accountPresentation, normalizeAccentColor: () => '', member: { snapshot: () => ({ owned: true, subject: 'u1' }), state: () => ({ prefs: { displayName: '러브', accentColor: '' } }) } }, { get(t, k) { return k in t ? t[k] : stub; } });
+    const settings = createSettings(deps);
+    settings.paintSettingsProfile('fan@example.com');
+    assert.equal($('settings-profile-name').textContent, '러브', '표시 이름을 이메일보다 먼저 쓴다');
+    assert.equal($('settings-profile-email').textContent, 'fan@example.com', '이메일은 한 번 표시한다');
+    deps.member.state = () => ({ prefs: { displayName: '', accentColor: '' } });
+    settings.paintSettingsProfile('fan@example.com');
+    assert.equal($('settings-profile-name').textContent, '이름 없음', '표시 이름이 없으면 이름 없음으로 표시한다');
+  } finally {
+    for (const [key, value] of Object.entries(saved)) globalThis[key] = value;
+  }
+});
+

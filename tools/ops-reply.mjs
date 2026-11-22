@@ -17,7 +17,7 @@
 // 실행: node /opt/padiem/lovetree-api/tools/ops-reply.mjs --id 7 --reply /tmp/reply.txt --status fixed --issue 584
 
 import { readFile } from 'node:fs/promises';
-import { parseEnvFile } from './export-ai-customer-db.mjs';
+import { parseEnvFile } from './env-file.mjs';
 
 const STATUSES = ['received', 'reviewing', 'fixed', 'later', 'closed'];
 

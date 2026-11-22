@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import {
   STATUS_ORDER, PERSONA_FIELDS,
   richParagraph, formatTime, parseHash, viewHash, viewToTab,
@@ -443,7 +445,7 @@ try {
 test('운영센터 탭 셋(#888) + 사용 일지 탭 + 의견 갈래 칩 + 옛 주소 거르기', { skip: adminSkip || false, timeout: 180000 }, async () => {
   if (adminSkip) assert.fail(`건너뜀=실패 — ${adminSkip}`);
   const { mkdirSync } = await import('node:fs');
-  const shotDir = process.env.LT_OPS_SHOT_DIR || 'E:\\lovetree-qa\\ops-captures';
+  const shotDir = process.env.LT_OPS_SHOT_DIR || path.join(tmpdir(), 'lt-ops-captures');
   mkdirSync(shotDir, { recursive: true });
   const { serve } = await import('./helpers/screen-audit.mjs');
   const server = await serve();
@@ -750,7 +752,7 @@ test('첫 열기는 할 일, 숫자 0인 칸은 화면에서 숨긴다', () => {
 test('운영센터 폭 통일 + 한눈에 카드 4·3 + 고객 칸 이름(1440·390 × 밤·정원)', { skip: adminSkip || false, timeout: 180000 }, async () => {
   if (adminSkip) assert.fail(`건너뜀=실패 — ${adminSkip}`);
   const { mkdirSync } = await import('node:fs');
-  const shotDir = process.env.LT_OPS_SHOT_DIR || 'E:\\lovetree-qa\\local4\\운영센터';
+  const shotDir = process.env.LT_OPS_SHOT_DIR || path.join(tmpdir(), 'lt-ops-screens');
   mkdirSync(shotDir, { recursive: true });
   const { serve } = await import('./helpers/screen-audit.mjs');
   const server = await serve();

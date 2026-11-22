@@ -7,6 +7,7 @@ import {
   filterShelf, findBook, lastMomentDate, leftPageMarkup, pageMeta, pageTarget, resolveShelfIndex,
   resumeCard, rightPageMarkup, shelfBook, shelfRowLayout, treeTitleOf, youtubeId
 } from '../public/v41/views/shelf/shelf-model.mjs';
+import { youtubeIdFrom } from '../public/v41/youtube-id.mjs';
 import { createReader } from '../public/v41/views/shelf/shelf-reader.js';
 import { fakeEl } from './helpers/fake-dom.mjs';
 
@@ -165,8 +166,8 @@ test('#서재-빈공간 → 11-19 대표 결정 + #944: 책 위치는 늘 왼쪽
 });
 
 test('페이지 표시·화살표 상태·넘김 가능 범위', () => {
-  assert.deepEqual(pageMeta(0, 3), { counter: 'PAGE 01 / 03', prevDisabled: true, nextDisabled: false });
-  assert.deepEqual(pageMeta(2, 3), { counter: 'PAGE 03 / 03', prevDisabled: false, nextDisabled: true });
+  assert.deepEqual(pageMeta(0, 3), { counter: '01 / 03', prevDisabled: true, nextDisabled: false });
+  assert.deepEqual(pageMeta(2, 3), { counter: '03 / 03', prevDisabled: false, nextDisabled: true });
   assert.equal(pageTarget(1, 3, 1, undefined), 2);
   assert.equal(pageTarget(1, 3, -1, undefined), 0);
   assert.equal(pageTarget(1, 3, 1, 0), 0);       // 강제 이동
@@ -185,6 +186,32 @@ test('책 안 두 쪽 문구는 첫 장/지난 장·영상 안내를 그대로 �
   const video = rightPageMarkup({ ...book, chapters: [{ ...book.chapters[0], type: 'video', image: '' }] }, 0);
   assert.match(video, /영상의 예시 이미지입니다/);
   assert.match(video, /영상 예시 · 내 기록/);
+});
+
+test('#1059 표 시험: 모든 진입 함수(정본·서재 모델)가 같은 주소에서 같은 id를 준다', () => {
+  const CORPUS = [
+    'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+    'https://youtu.be/dQw4w9WgXcQ?t=42',
+    'https://www.youtube.com/shorts/dQw4w9WgXcQ',
+    'https://www.youtube.com/live/dQw4w9WgXcQ',
+    'https://www.youtube.com/embed/dQw4w9WgXcQ',
+    'http://m.youtube.com/watch?v=dQw4w9WgXcQ',
+    'https://music.youtube.com/watch?v=dQw4w9WgXcQ',
+    'https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=PL123',
+    'https://www.youtube.com/playlist?list=PL123',
+    'https://youtube.com.evil.test/watch?v=dQw4w9WgXcQ',
+    'https://user:pass@www.youtube.com/watch?v=dQw4w9WgXcQ',
+    'ftp://youtu.be/dQw4w9WgXcQ',
+    'https://www.youtube.com/shorts/abcdefghijkEXTRA',
+    'https://youtu.be/short',
+    'https://www.youtube.com/watch?v=toolongid123456',
+    'javascript:alert(1)'
+  ];
+  for (const url of CORPUS) {
+    assert.equal(youtubeId(url), youtubeIdFrom(url), `서재 모델 ${url}`);
+  }
+  assert.equal(youtubeId('https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg', () => null), '');
+  assert.equal(youtubeIdFrom('https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg'), 'dQw4w9WgXcQ');
 });
 
 test('유튜브 주소에서 영상 ID를 뽑고 LTMedia 설명이 있으면 그것을 먼저 쓴다', () => {
@@ -221,7 +248,7 @@ function readerHarness() {
 
 test('책 안에서 첫/마지막 장을 더 넘기면 안내만 하고 장은 그대로다', () => {
   const h = readerHarness();
-  assert.equal(h.nodes.pageCounter.textContent, 'PAGE 01 / 02');
+  assert.equal(h.nodes.pageCounter.textContent, '01 / 02');
   h.reader.turnPage(-1);
   assert.deepEqual(h.toasts, ['첫 순간예요.']);
   assert.equal(h.state.chapterIndex, 0);
@@ -239,7 +266,7 @@ test('책 안에서 첫/마지막 장을 더 넘기면 안내만 하고 장은 �
     assert.equal(h.state.chapterIndex, 1);
     assert.equal(h.state.pageTurning, false);
     assert.equal(h.nodes.turnSheet.className, 'sheet');
-    assert.equal(h.nodes.pageCounter.textContent, 'PAGE 02 / 02');
+    assert.equal(h.nodes.pageCounter.textContent, '02 / 02');
     assert.equal(h.nodes.nextPage.disabled, true);
     assert.equal(h.nodes.prevPage.disabled, false);
     // 마지막 장에서는 넘길 수 없다 — 안내만.
@@ -277,6 +304,65 @@ test('책을 열면 셸에 기록 id를 넘기고, 이미 열려 있으면 다�
   assert.deepEqual(opened, ['m2']);
   assert.deepEqual(openedBooks, ['tree1']);
   delete globalThis.LTDEMO;
+});
+
+// #1094: 서재에서 책을 누르면 중간 화면(표지+순간 목록) 없이 고른 방식으로 곧바로 연다.
+function openReaderHarness() {
+  const h = readerHarness();
+  h.state.open = false;
+  const nodes = {
+    bookCoverFace: fakeEl({ style: { setProperty() {}, removeProperty() {} }, getBoundingClientRect: () => ({ left: 10, top: 10, width: 100, height: 100 }), querySelector: () => fakeEl({ style: { setProperty() {} } }) }),
+    shelfScreen: fakeEl({ style: {}, classList: fakeEl().classList }),
+    readerScreen: fakeEl({ style: {}, classList: fakeEl().classList })
+  };
+  const stub = () => fakeEl({ style: { setProperty() {}, removeProperty() {} }, getBoundingClientRect: () => ({ left: 0, top: 0, width: 100, height: 100 }), querySelector: () => stub() });
+  const reader = createReader({
+    $: (selector) => nodes[selector.replace('#', '')] || stub(),
+    $$: () => [],
+    state: h.state,
+    getBook: () => h.book,
+    showToast: () => {},
+    save: () => {},
+    renderShelf: () => {},
+    getShelfCard: () => null
+  });
+  return { h, reader, nodes };
+}
+
+test('#1094 책 방식이면 중간 화면 없이 책으로 바로 연다', () => {
+  const { reader, nodes } = openReaderHarness();
+  const opened = [];
+  globalThis.LTDEMO = { get: () => 'm2', openBook: (momentId, treeId) => opened.push([momentId, treeId]) };
+  globalThis.parent = { LT41: null };
+  try {
+    reader.openReader('tree1', null);
+    assert.deepEqual(opened, [['m2', 'tree1']], '기억한 순간으로 책에 바로 간다');
+    assert.equal(nodes.readerScreen.classList.contains('active'), false, '표지+목록 중간 화면은 한 번도 그리지 않는다');
+    assert.equal(nodes.shelfScreen.classList.contains('is-leaving'), false, '책장을 떠나지 않는다');
+    assert.equal(nodes.shelfScreen.style.display, undefined, '책장을 숨기지 않는다');
+  } finally {
+    delete globalThis.LTDEMO;
+    delete globalThis.parent;
+  }
+});
+
+test('#1094 목록 방식이면 표지+목록을 곧바로 보이고, 책 열기로 책에 간다', () => {
+  const { reader, nodes } = openReaderHarness();
+  const opened = [];
+  globalThis.LTDEMO = { get: () => 'm2', openBook: (momentId, treeId) => opened.push([momentId, treeId]) };
+  globalThis.parent = { LT41: { prefs: { bookDisplay: 'list' } } };
+  try {
+    reader.openReader('tree1', null);
+    assert.deepEqual(opened, [], '목록으로 오면 책으로 넘어가지 않는다');
+    assert.equal(nodes.readerScreen.classList.contains('active'), true, '목록 화면을 곧바로 보인다');
+    assert.equal(nodes.readerScreen.classList.contains('is-preparing'), false, '숨김(준비 중) 상태로는 보이지 않는다');
+    assert.equal(nodes.shelfScreen.style.display, 'none', '책장을 숨기고 목록만 보인다');
+    reader.openBook();
+    assert.deepEqual(opened, [['m2', 'tree1']], '목록에서 책 열기는 기억한 순간으로 책에 간다');
+  } finally {
+    delete globalThis.LTDEMO;
+    delete globalThis.parent;
+  }
 });
 
 // ── 이어 읽기 칸(#256-1): 어떤 칸을 보여줄지·문구는 shelf-model 한 벌이 정한다 ──

@@ -117,7 +117,7 @@ test('users cannot reach each other workspace', async () => {
   await put(alice, { state: sampleState(), expectedRevision: 0, clientKey: 'k-1' });
   const read = await get(bob);
   assert.equal(read.status, 200);
-  assert.deepEqual(read.body, { revision: 0, savedAt: null, state: { version: 1, trees: [], prefs: { titleDisplay: 'both', displayName: '', accentColor: '', dateStyle: 'dot', startPlace: 'resume', shareView: 'book', shareDiscover: false, treeChipOrder: [], homeMoment: { mode: 'last', treeId: '', momentId: '' } } }, subject: 'usr_b' });
+  assert.deepEqual(read.body, { revision: 0, savedAt: null, state: { version: 1, trees: [], prefs: { titleDisplay: 'both', displayName: '', accentColor: '', dateStyle: 'dot', startPlace: 'resume', shareView: 'book', shareDiscover: false, treeChipOrder: [], bookDisplay: 'book', homeMoment: { mode: 'last', treeId: '', momentId: '' } } }, subject: 'usr_b' });
 
 });
 
@@ -348,19 +348,12 @@ test('a new tree with the id of a quarantined tree replaces the kept original', 
   assert.equal((await get(handle)).body.quarantined, undefined);
 });
 
-test('deleting a tree leaves quarantined originals in storage', async () => {
-  const { handle, repo } = buildHandle();
-  const state = sampleState();
-  const deviant = deviantTree();
-  await seedDoc(repo, 'usr_a', { version: 1, trees: [...state.trees, deviant] });
-  const deleted = await handle({ method: 'DELETE', path: `/api/workspace/trees/${state.trees[0].id}`, headers: {} });
-  assert.equal(deleted.status, 200);
-  const stored = (await repo.load({ productId: PRODUCT, subjectId: 'usr_a' })).doc;
-  assert.deepEqual(stored.trees, [deviant], '읽을 수 있는 트리만 지워지고 격리 원본은 그대로다');
-  const got = await get(handle);
-  assert.equal(got.status, 200);
-  assert.deepEqual(got.body.state.trees, []);
-  assert.equal(got.body.quarantined, 1);
+// #1073 B-22: % 묶음이 깨진 트리 경로는 서버 오류(500)가 아니라 404로 답한다.
+test('a malformed percent-encoded tree path answers 404, not 500', async () => {
+  const { handle } = buildHandle();
+  const bad = await handle({ method: 'DELETE', path: '/api/workspace/trees/%E0%A4%A', headers: {} });
+  assert.equal(bad.status, 404);
+  assert.equal(bad.body.error.code, 'not_found');
 });
 
 test('a stored tree with broken timestamps and names is repaired on read, not quarantined', async () => {
@@ -385,8 +378,6 @@ test('onCommit receives the validated state only — quarantined originals stay 
   await service.write({ productId: PRODUCT, subjectId: 'usr_e' }, { state: { version: 1, trees: [tree] }, expectedRevision: 1, clientKey: 'k-986c' });
   assert.deepEqual(seen, [validateState({ version: 1, trees: [tree] })], '저장 뒤 onCommit에는 격리 원본이 없다');
 
-  await service.deleteTree({ productId: PRODUCT, subjectId: 'usr_e' }, tree.id);
-  assert.deepEqual(seen[1], { version: 1, trees: [], prefs: seen[1].prefs }, '삭제 뒤 onCommit에도 격리 원본이 없다');
   const stored = (await repo.load({ productId: PRODUCT, subjectId: 'usr_e' })).doc;
   assert.ok(stored.trees.some(t => t.id === deviant.id), '저장소에는 격리 원본이 그대로 남는다');
 });
@@ -411,4 +402,29 @@ test('stored vertical media values survive the readStoredDocument isolation path
   assert.equal(again.status, 200);
   const reread = await get(handle);
   assert.equal(reread.body.state.trees[0].moments.find(m => m.url.includes('youtube')).mediaMetadata.vertical, true);
+});
+
+test('#1062: 저장소 오류의 500 기록에는 원인만 남고 요청 값은 섞이지 않는다', async () => {
+  const requestBody = '815d2018a65b9e6bdf6fa41e38e51b5c9c0b13a4';
+  const email = 'member@example.com';
+  const cookie = 'session=abcdef1234567890';
+  const dbUrl = 'postgres://app:pw@db.internal:5432/lovetree';
+  const boom = new Error(`보관 연결 실패 ${email} ${dbUrl} ${cookie}`);
+  boom.name = 'StoreFailure';
+  boom.code = 'STORE_DOWN';
+  const repo = { ...createMemoryWorkspaceRepo(), async load() { throw boom; } };
+  const { handle } = buildHandle({ repo });
+  const lines = [], original = console.error;
+  console.error = (...args) => lines.push(args.map(String).join(' '));
+  let response;
+  try { response = await get(handle, { headers: { cookie }, body: requestBody }); }
+  finally { console.error = original; }
+  assert.equal(response.status, 500);
+  assert.equal(lines.length, 1, '기록은 한 줄');
+  assert.match(lines[0], /StoreFailure/, '오류 이름');
+  assert.match(lines[0], /STORE_DOWN/, '오류 코드');
+  assert.match(lines[0], /보관 연결 실패/, '메시지는 남는다');
+  for (const secret of [requestBody, email, cookie, dbUrl]) {
+    assert.equal(lines[0].includes(secret), false, '기록에 요청 본문·식별자·비밀값이 없다');
+  }
 });

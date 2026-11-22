@@ -10,7 +10,7 @@ const SCREEN = fs.readFileSync(new URL('../public/v41/views/network/network.js',
 const HTML = fs.readFileSync(new URL('../public/v41/views/track56-network.html', import.meta.url), 'utf8');
 
 test('0. 계산 한 벌은 화면이 실제로 부르는 함수만 노출하고, 모델을 먼저 부른다', () => {
-  assert.deepEqual(Object.keys(M).sort(), ['bezierGeometry', 'bezierPoint', 'branchPoint', 'clusterSpan', 'concentricLayout', 'emotionGroups', 'fitBox', 'gridFor', 'groupSizeFor', 'labelTitle', 'monthGroups', 'networkLayout', 'originPath', 'pathEmphasis', 'pickGroups', 'placeLabels', 'relationText', 'routeEdges', 'shortTitle', 'treeLevels']);
+  assert.deepEqual(Object.keys(M).sort(), ['bezierGeometry', 'bezierPoint', 'branchPoint', 'clusterSpan', 'concentricLayout', 'emotionGroups', 'fitBox', 'gridFor', 'groupSizeFor', 'labelTitle', 'monthGroups', 'networkLayout', 'originPath', 'pathEmphasis', 'pickGroups', 'placeLabels', 'relationText', 'routeEdges', 'shortTitle', 'tagGroups', 'tagLayout', 'timeLayout', 'timeOrder', 'treeLevels']);
   assert.ok(HTML.indexOf('network-model.js') < HTML.indexOf('network.js'), '모델을 화면보다 먼저 부른다');
 });
 

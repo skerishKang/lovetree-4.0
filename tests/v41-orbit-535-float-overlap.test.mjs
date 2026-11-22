@@ -22,7 +22,7 @@ const REQUIRE = process.env.LT_ORBIT535_REQUIRE === '1';
 // #949: CI 글꼴(Noto Sans CJK KR) 재현 — LT_ORBIT535_CI_FONT=1 이면 시험 안에서만 @font-face 로 강제한다(컴1에 설치하지 않는다).
 // 파일은 LT_ORBIT535_FONT_FILE 로 지정(기본: 윈도의 NotoSansKR-VF.ttf — Noto Sans KR 과 같은 글줄기). CI 에서는 fonts-noto-cjk 의 .ttc 를 준다.
 const CI_FONT = process.env.LT_ORBIT535_CI_FONT === '1';
-const CI_FONT_FILE = process.env.LT_ORBIT535_FONT_FILE || 'C:/Windows/Fonts/NotoSansKR-VF.ttf';
+const CI_FONT_FILE = process.env.LT_ORBIT535_FONT_FILE || path.join(process.env.WINDIR || '', 'Fonts', 'NotoSansKR-VF.ttf');
 // #949: 가드와 같은 구역 함수 — 공용 모듈 소스를 페이지에 그대로 넣는다(순수 함수).
 const ZONE_SRC = readFileSync(path.join(REPO, 'public', 'v41', 'orbit-safe-zone.mjs'), 'utf8').replace(/^export /gm, '');
 const injectZone = (frame) => frame.evaluate((src) => { new Function(src + ';window.__ltZoneOf=safeZoneOf;window.__ltZoneOverlap=zoneOverlapArea;')(); }, ZONE_SRC);
@@ -311,7 +311,7 @@ s('#535 로그인·로그아웃 가운데 단추가 같은 세 자리·같은 �
         shape[`${w}/${member}`] = await frame.evaluate(() => {
           const sr = document.querySelector('main#orbit').shadowRoot;
           const wrap = sr.querySelector('.center .actions');
-          const bs = [...wrap.querySelectorAll('button')].filter((b) => !b.hidden && b.style.display !== 'none');
+          const bs = [...wrap.querySelectorAll('.subtleBtn')].filter((b) => !b.hidden && b.style.display !== 'none');
           const boxes = bs.map((b) => { const r = b.getBoundingClientRect(); return { label: b.textContent, w: Math.round(r.width), h: Math.round(r.height), l: Math.round(r.left), t: Math.round(r.top) }; });
           const gaps = boxes.slice(1).map((b, i) => (b.t !== boxes[i].t ? Math.round(b.t - (boxes[i].t + boxes[i].h)) : Math.round(b.l - (boxes[i].l + boxes[i].w))));
           return { count: Number(wrap.getAttribute('data-count')), labels: boxes.map((b) => b.label), w: boxes.map((b) => b.w), h: boxes.map((b) => b.h), t: boxes.map((b) => b.t), gaps };

@@ -237,7 +237,7 @@ export async function measureMapPixelsInPage([png, overlaysArg]) {
 /** 겹침 사각형 — 스크린샷 직전에 frame.evaluate 로 부른다(measureMap 첫 줄). */
 // 좌표는 화면 기준(getBoundingClientRect)이고, 가림 격자로 옮길 때 캔버스 원점을 뺀다.
 export function overlayRectsInPage() {
-  return [...document.querySelectorAll('.topbar button,.mode-pill,.hero,.legend,.controls,.detail.open,.route-status.show,.toast.show,.edge-tip.show,.mobile-ribbon,.lt-moment-picker')]
+  return [...document.querySelectorAll('.topbar button,.mode-pill,.hero,.legend,.controls,.detail.open,.route-status.show,.toast.show,.edge-tip.show,.mobile-ribbon,.lt-moment-picker,.tag-empty') ]
     .filter(el => { const r = el.getBoundingClientRect(), s = getComputedStyle(el); return r.width > 0 && r.height > 0 && s.visibility === 'visible' && Number(s.opacity) > .01; })
     .map(el => {
       const r = el.getBoundingClientRect();

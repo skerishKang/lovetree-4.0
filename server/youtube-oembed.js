@@ -1,3 +1,4 @@
+import { logServerError } from './error-log.js';
 // YouTube oEmbed 프록시 — 영상 제목·채널·썸네일만 서버에서 안전하게 가져온다.
 //
 // - 실제 요청은 고정 호스트 `www.youtube.com/oembed` 하나로만 나간다. 입력에서 온
@@ -146,7 +147,7 @@ export function createYoutubeOembedHandler({ authenticate, productId, client, fe
       return { status: 200, body: await resolved.metadata(videoId), headers };
     } catch (error) {
       if (error instanceof ApiError) return { status: error.status, body: { error: { code: error.code, message: error.message } }, headers: errorHeaders };
-      console.error('[lovetree-youtube] oEmbed 요청 실패', { path: request?.path, method: request?.method });
+      logServerError(error, 'lovetree-youtube');
       return { status: 502, body: { error: { code: 'youtube_unreachable', message: '영상 정보를 불러오지 못했어요.' } }, headers: errorHeaders };
     }
   };

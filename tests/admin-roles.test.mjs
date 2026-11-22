@@ -180,6 +180,19 @@ test('부여·회수는 이력으로 남고, 행이 고쳐지거나 저장이 �
   assert.deepEqual(await broken.history(), []);
 
   await assert.rejects(() => admin.assign({ actorPrincipal: target, targetSubjectId: MEMBER_SUBJECT }), (error) => error.status === 403 && error.code === 'admin_forbidden');
+  // B-09 (#1065): 역할이 있어도 관리자가 아니면 부여·회수 모두 403, 관리자는 그대로 성공.
+  const AI_SUBJECT = 'sub_' + '9'.repeat(32);
+  const TEST_SUBJECT = 'sub_' + '8'.repeat(32);
+  await store.assign({ productId: PRODUCT, subjectId: AI_SUBJECT, role: ROLE_AI_CUSTOMER });
+  await store.assign({ productId: PRODUCT, subjectId: TEST_SUBJECT, role: ROLE_TESTER });
+  for (const why of ['ai_customer', 'tester']) {
+    const actor2 = why === 'ai_customer' ? { productId: PRODUCT, subjectId: AI_SUBJECT } : { productId: PRODUCT, subjectId: TEST_SUBJECT };
+    await assert.rejects(() => admin.assign({ actorPrincipal: actor2, targetSubjectId: MEMBER_SUBJECT }), (error) => error.status === 403 && error.code === 'admin_forbidden', why + ' 부여 거부');
+    await assert.rejects(() => admin.revoke({ actorPrincipal: actor2, targetSubjectId: MEMBER_SUBJECT }), (error) => error.status === 403 && error.code === 'admin_forbidden', why + ' 회수 거부');
+  }
+  assert.equal(await admin.roleFor({ productId: PRODUCT, subjectId: MEMBER_SUBJECT }), null, '거부된 부여·회수는 저장소에 닿지 않는다');
+  const stillAdmin = await admin.assign({ actorPrincipal: actor, targetSubjectId: MEMBER_SUBJECT });
+  assert.equal(stillAdmin.assignment.role, ROLE_ADMIN, '관리자는 그대로 성공');
   await assert.rejects(() => admin.assign({ actorPrincipal: actor, targetSubjectId: 'usr_이메일주체' }), (error) => error.status === 400 && error.code === 'invalid_admin_subject');
   await assert.rejects(() => admin.assign({ actorPrincipal: actor, targetSubjectId: MEMBER_SUBJECT, role: 'OWNER' }), (error) => error.status === 400 && error.code === 'invalid_role');
 });

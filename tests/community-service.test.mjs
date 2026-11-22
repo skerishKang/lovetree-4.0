@@ -9,6 +9,7 @@ import { createMemoryTreeDiscoverRepo } from '../server/testing/memory-tree-disc
 import {createCommunityHandler,createCommunityService} from '../server/community-service.js';
 import {createShareService} from '../server/share-service.js';
 import {ApiError} from '../server/errors.js';
+import {createAdminRoleService} from '../server/admin-roles.js';
 
 const PRODUCT='lovetree-test',principal=subjectId=>({productId:PRODUCT,subjectId});
 const CLOCK='2026-11-01T00:00:00.000Z';
@@ -437,7 +438,7 @@ test('discover uses batched summaries, excludes blocked/hidden/deleted, and leak
 
 // ── #627 3단계 '다른 팬 보기': GET /api/public/tag-moments (화면 없음 — 서버 규칙만) ──────────
 const TAG_URL='https://example.com/video/zena.mp4';
-async function tagSetup({accounts,aiSubjects=[],testerSubjects=[],privateTreeId=null,hiddenShareIds=[],blocks=[],discoverOff=[]}={}){
+async function tagSetup({accounts,aiSubjects=[],testerSubjects=[],privateTreeId=null,hiddenShareIds=[],blocks=[],discoverOff=[],admin=null}={}){
  // accounts: [{subject, trees:[{title, moments:[{title, date, url, keywords, mediaMetadata?}]}]}]
  const workspaceRepo=createMemoryWorkspaceRepo(),workspace=createWorkspaceService({repo:workspaceRepo,productId:PRODUCT});
  const shareRepo=createMemoryShareRepo();
@@ -482,8 +483,8 @@ async function tagSetup({accounts,aiSubjects=[],testerSubjects=[],privateTreeId=
   await communityRepo.moderateReport({productId:PRODUCT,reportId:'report-'+String(r).padStart(20,'0'),status:'resolved',visibility:'hidden',actorSubjectId:'admin'});
  }
  for(const [a,b] of blocks)await communityRepo.blockOwner({productId:PRODUCT,blockerSubjectId:a,blockedSubjectId:b});
- const admin={roleFor:async value=>aiSubjects.includes(value.subjectId)?'ai_customer':(testerSubjects.includes(value.subjectId)?'tester':null)};
- const service=createCommunityService({communityRepo,shareRepo,workspaceRepo,productId:PRODUCT,admin,makeId:()=>String(++n).padStart(24,'c')});
+ const adminStub=admin||{roleFor:async value=>aiSubjects.includes(value.subjectId)?'ai_customer':(testerSubjects.includes(value.subjectId)?'tester':null)};
+ const service=createCommunityService({communityRepo,shareRepo,workspaceRepo,productId:PRODUCT,admin:adminStub,makeId:()=>String(++n).padStart(24,'c')});
  const authenticate=async request=>{const subjectId=request.headers?.account;if(!subjectId)throw new ApiError(401,'unauthenticated','login');return principal(subjectId);};
  return {communityRepo,shareRepo,discoverRepo,workspaceRepo,handle:createCommunityHandler({authenticate,service,productId:PRODUCT}),shareRows:rows.map(r=>({subjectId:r.subjectId,treeId:r.treeId,shareId:r.shareId}))};
 }
@@ -799,4 +800,32 @@ test('담기: 공개 순간을 고른 트리에 복사해도 원본 공개 트�
  assert.equal(moment.startSeconds,5);assert.equal(moment.endSeconds,20,'구간 복사');
  assert.ok(moment.note.startsWith('원래 출처: 원본 공개 트리'),'출처 표시: '+moment.note);
  assert.doesNotMatch(moment.note,/원래 마음 글/,'원래 마음 글은 비운다');
+});
+
+test('#1071: 역할 조회 실패는 모름으로 구분해 공개 목록에서 빼고 기록 한 줄을 남긴다',async()=>{
+ const broken='sub_'+'a'.repeat(16),normal='sub_'+'b'.repeat(16);
+ // 역할 저장소가 특정 주인에 대해 던진다 — 기본 roleFor 은 예전처럼 조용히 '역할 없음'으로 닫힌다.
+ const admin=createAdminRoleService({productId:PRODUCT,store:{async roleFor({subjectId}){
+  if(subjectId===broken)throw new Error('저장 장애');
+  return null;
+ }}});
+ assert.equal(await admin.roleFor({productId:PRODUCT,subjectId:broken}),null);
+ const data=await tagSetup({
+  accounts:[
+   {subject:broken,trees:[{title:'역할 모름 트리',moments:[{title:'역할 모름 순간',date:'2026-11-05',url:TAG_URL,keywords:['가수:RESCENE']}]}]},
+   {subject:normal,trees:[{title:'일반 트리',moments:[{title:'일반 순간',date:'2026-11-04',url:TAG_URL,keywords:['가수:RESCENE']}]}]}
+  ],
+  admin
+ });
+ const warnings=[],originalWarn=console.warn;
+ console.warn=(...args)=>warnings.push(args.join(' '));
+ let list;
+ try{list=await call(data.handle,'GET','/api/community/shares');}
+ finally{console.warn=originalWarn;}
+ assert.equal(list.status,200);
+ assert.deepEqual(list.body.items.map(item=>item.title),['일반 트리'],'역할을 읽지 못한 주인의 카드는 공개 목록에 없다');
+ assert.equal(warnings.length,1,'기록은 한 줄');
+ assert.match(warnings[0],/역할을 읽지 못해/);
+ const tagged=await tagCall(data.handle,'가수:RESCENE');
+ assert.equal(tagged.body.items.some(item=>item.treeTitle==='역할 모름 트리'),false,'다른 팬 보기에서도 빠진다');
 });

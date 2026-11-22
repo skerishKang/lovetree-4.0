@@ -2,6 +2,7 @@
 // views/shelf/shelf.js 안에 있던 함수를 그대로 옮겼다 — 조건·문구·id·순서 변경 0.
 // 화면(DOM)을 다루므로 node에서는 createReader(가짜 DOM)로 시험한다.
 import { escapeShelf, leftPageMarkup, pageMeta, pageTarget, rightPageMarkup, youtubeId as youtubeIdOf } from './shelf-model.mjs';
+import { normalizeBookDisplay } from '../../domain.mjs';
 import { coverFallbackAttrs } from '../../thumb-fallback.mjs';
 import { mountExpandControls } from '../../yt-expand.mjs';
 
@@ -10,6 +11,26 @@ export function createReader(deps) {
   const esc = escapeShelf;
   const leftMarkup = leftPageMarkup, rightMarkup = rightPageMarkup;
   const youtubeId = (url) => youtubeIdOf(url, window.LTMedia && window.LTMedia.describe);
+  // #1094: 서재에서 책을 누르면 고른 방식으로 곧바로 연다(중간 화면 없음).
+  // 부모의 계정 값(셸 prefs.bookDisplay) → 기기 미러(lt41.bookDisplay) → 기본 책 순으로 읽는다.
+  function shelfBookDisplay() {
+    try {
+      const saved = (typeof parent !== 'undefined' && parent && parent.LT41 && parent.LT41.prefs) ? parent.LT41.prefs.bookDisplay : null;
+      if (saved === 'book' || saved === 'list') return normalizeBookDisplay(saved);
+    } catch {}
+    try {
+      const mirror = localStorage.getItem('lt41.bookDisplay');
+      if (mirror === 'book' || mirror === 'list') return normalizeBookDisplay(mirror);
+    } catch {}
+    return 'book';
+  }
+  function openBookInShell(book, index) {
+    const chapter = book.chapters[Math.max(0, index)];
+    const demo = (typeof LTDEMO !== 'undefined') ? LTDEMO : null;
+    if (!chapter || !demo || typeof demo.openBook !== 'function') return false;
+    demo.openBook(chapter.id, book.id);
+    return true;
+  }
 
   function setCover(book) {
         var cover=$('#bookCoverFace');
@@ -36,7 +57,7 @@ export function createReader(deps) {
           var nodeMatch = String(nodeValue||'').match(/--lt-cover-(\d)/);
           return '<button class="chapter-item '+(index===state.chapterIndex?'active':'')+(nodeMatch?' chapter-node-'+nodeMatch[1]:'')+'" type="button" data-index="'+index+'"><span class="num">'+String(index+1).padStart(2,'0')+'</span><span><strong>'+esc(chapter.title)+'</strong><small>'+esc(chapter.mood)+'</small></span><span class="arrow">›</span></button>';
         }).join('');
-        $$('#chapterList [data-index]').forEach(function(item){item.addEventListener('click',function(){var index=Number(item.dataset.index);if(state.open){turnPage(index>state.chapterIndex?1:-1,index);}else{state.chapterIndex=index;save();renderChapterList(book);showToast('순간 '+String(index+1).padStart(2,'0')+'을 선택했어요. 책을 열어보세요.');}});});
+        $$('#chapterList [data-index]').forEach(function(item){item.addEventListener('click',function(){var index=Number(item.dataset.index);if(state.open){turnPage(index>state.chapterIndex?1:-1,index);}else if(shelfBookDisplay()==='list'&&openBookInShell(book,index)){state.chapterIndex=index;save();}else{state.chapterIndex=index;save();renderChapterList(book);showToast('순간 '+String(index+1).padStart(2,'0')+'을 선택했어요. 책을 열어보세요.');}});});
       }
   function clearVideo() {
         $$('#rightPage iframe, #sheetFront iframe, #sheetBack iframe').forEach(function(frame){frame.remove();});
@@ -139,9 +160,25 @@ export function createReader(deps) {
   function openReader(id,sourceCard) {
         var book=getBook(id);
         if(!book)return;
+        state.selectedId=id;state.shelfIndex=Math.max(0,state.shelfList.findIndex(function(item){return item.id===id;}));state.chapterIndex=Math.max(0,book.chapters.findIndex(m=>m.id===LTDEMO.get()));state.open=false;state.openProgress=0;save();
+        var display=shelfBookDisplay();
+        // #1094 목록 방식: 중간 화면(표지 애니메이션)을 거치지 않고 표지+순간 목록을 곧바로 보인다.
+        if(display==='list'){
+          $('#shelfScreen').style.display='none';
+          $('#shelfScreen').classList.remove('is-leaving');
+          $('#readerScreen').classList.add('active');
+          $('#readerScreen').classList.remove('is-preparing');
+          renderReader();
+          return;
+        }
+        // #1094 책 방식: 표지+순간 목록 화면을 한 장도 그리지 않고 책으로 곧바로 간다(중간 화면 표시 0회).
+        // 셸이 없으면 예전처럼 표지 애니메이션을 거친다(바탕 화면은 그대로 둔다).
+        if(typeof LTDEMO!=='undefined'&&LTDEMO&&typeof LTDEMO.openBook==='function'){
+          LTDEMO.openBook(book.chapters[state.chapterIndex].id,book.id);
+          return;
+        }
         var source=sourceCard&&sourceCard.querySelector('.book-cover');
         var sourceRect=source?source.getBoundingClientRect():null;
-        state.selectedId=id;state.shelfIndex=Math.max(0,state.shelfList.findIndex(function(item){return item.id===id;}));state.chapterIndex=Math.max(0,book.chapters.findIndex(m=>m.id===LTDEMO.get()));state.open=false;state.openProgress=0;save();
         $('#shelfScreen').classList.add('is-leaving');
         $('#readerScreen').classList.add('active','is-preparing');
         renderReader();
@@ -179,6 +216,8 @@ export function createReader(deps) {
   function openBook() {
         var book=getBook(state.selectedId);
         if(!book||state.open)return;
+        // #1094 목록 방식에서 '책 열기'는 셸의 책으로 곧바로 간다(바탕 화면은 3D 책으로 열린다).
+        if(shelfBookDisplay()==='list'&&openBookInShell(book,state.chapterIndex)){save();return;}
         renderPage(book);
         animateOpenProgress(1,function(){
           state.open=true;state.openProgress=1;save();renderReader();
@@ -263,5 +302,5 @@ export function createReader(deps) {
         });
         book3d.addEventListener('pointercancel',function(){drag.active=false;book3d.classList.remove('dragging');book3d.style.removeProperty('--body-rotate');book3d.style.removeProperty('--body-tilt');if(drag.mode==='cover')animateOpenProgress(0);});
       }
-  return { setCover, renderChapterList, clearVideo, renderPage, mountVideo, applyOpenProgress, animateOpenProgress, renderReader, animateSharedBook, openReader, backToShelf, openBook, closeBook, turnPage, bindBookDrag };
+  return { setCover, renderChapterList, clearVideo, renderPage, mountVideo, applyOpenProgress, animateOpenProgress, renderReader, animateSharedBook, openReader, backToShelf, openBook, closeBook, turnPage, bindBookDrag, shelfBookDisplay, openBookInShell };
 }

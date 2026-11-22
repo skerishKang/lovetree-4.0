@@ -55,6 +55,10 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
  // '이번 주 담은 사람 수'(결정 1)도 같은 규칙 — 3 이상일 때만 카드·미리보기에 한 줄로 따라온다.
  const smallCountLabel=(label,count)=>Number(count)>=3?`${label} ${count}`:label;
  const weeklyNote=item=>{const n=Number(item.stats?.weeklyFavorites||0);return n>=3?`이번 주 ${n}명`:'';};
+ // #1098 1단계 후속(대표 지정 2026-11-22): 반응 수는 ♡ 단추 한 곳에만 보이게 — 한 줄 정보에는 댓글 수만 남긴다.
+ // 반응 통계가 없는 응답(예전 모양)에서는 예전과 같이 심장(공감) 수로 센다.
+ const reactionTotal=item=>{const counts=item.stats?.reactions;if(counts)return Object.values(counts).reduce((sum,value)=>sum+Number(value||0),0);return Number(item.stats?.hearts||0);};
+ const previewMetaText=item=>`${item.cover?.emotion||item.emotions?.[0]||'공개'} · ${when(item.createdAt)} · ${smallCountLabel('댓글',item.stats?.comments||0)}${weeklyNote(item)?` · ${weeklyNote(item)}`:''}`;
  // #903: 담기·공감이 서버에 막히면(가입 7일 미만 등) 서버 문구를 단추 바로 다음 줄 안내 칸에도 내린다 —
  // 누른 자리에서 바로 이유를 보게 한다. 칸은 미리보기를 그릴 때 actions 다음에 미리 두고(hidden),
  // 막혔을 때만 보여 준다. 담기에 성공하면 render()가 미리보기를 다시 그려 안내가 지워진다.
@@ -84,20 +88,31 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
   const active=kind==='favorite'?item.stats.favored:item.stats.hearted,count=kind==='favorite'?item.stats.favorites:item.stats.hearts,b=el('button','community-mini',`${active?'✓ ':''}${smallCountLabel(label,count)}`);b.type='button';b.dataset.communityAction=kind;b.setAttribute('aria-pressed',String(active));
   b.onclick=async()=>{const answer=await api.favorite(item.shareId,!active);if(!answer.ok){const text=loginMessage(answer);if(voteBlocked(answer))setVoteNote(voteNote,text);else message(text);return;}item.stats=answer.stats;render();};return b;
  }
+ // #678 후속·#1098 1단계: 반응은 ♡(공감) 하나를 크게 기본으로 보이고, 길게 누르면 7종 칩이 그 자리에서
+ // 펼쳐진다 — 예전 '반응 남기기' 펼침 규칙(host를 칩들로 갈아끼우기)을 그대로 재사용한다. 펼침은
+ // 0.45초 길게 누르기 외에 마우스 오른쪽(모바일 길게 누르기가 부르는 contextmenu)·Enter 길게 누르기로도 연다.
+ const SVG_NS='http://www.w3.org/2000/svg';
+ function heartIcon(filled){
+  const svg=document.createElementNS(SVG_NS,'svg');
+  for(const [key,value] of Object.entries({viewBox:'0 0 24 24',width:'26',height:'26','aria-hidden':'true',focusable:'false'}))svg.setAttribute(key,value);
+  const path=document.createElementNS(SVG_NS,'path');
+  path.setAttribute('d','M12 20.2 5 13.2a4.6 4.6 0 1 1 6.5-6.5l.5.5.5-.5a4.6 4.6 0 1 1 6.5 6.5L12 20.2Z');
+  path.setAttribute('fill',filled?'currentColor':'none');path.setAttribute('stroke','currentColor');path.setAttribute('stroke-width','1.7');path.setAttribute('stroke-linejoin','round');
+  svg.append(path);return svg;
+ }
  function reactionButtons(item,label,voteNote){
   const kinds=['heart','like','love','laugh','wow','sad','angry'];
   const labels={heart:'공감',like:'좋아요',love:'사랑',laugh:'웃음',wow:'놀람',sad:'슬픔',angry:'화남'};
   const host=el('span','community-reaction-group');host.setAttribute('role','group');host.setAttribute('aria-label',label||'반응');
   const counts=item.stats.reactions||{heart:item.stats.hearts||0};const mine=new Set(item.stats.mine||[]);
   const active=kind=>mine.has(kind)||(kind==='heart'&&item.stats.hearted&&!item.stats.mine);
-  // #678 후속(회차 지적): 0짜리 반응 칩 7개가 늘어서 시끄럽다 — 반응이 하나도 없으면 '반응 남기기'
-  // 한 개만 보이고(누르면 7가지가 그 자리에서 펼쳐진다), 반응이 있으면 개수가 있는 것과 내가 누른 것만 보인다.
   const chips=()=>{
    const out=[];
    for(const reactionKind of kinds){
     const count=counts[reactionKind]||0;
     const isActive=active(reactionKind);
-    if(!count&&!isActive)continue;
+    // 이 칩들은 길게 눌러 펼친 '고르는 자리'에만 쓰인다 — 고르려면 0개인 종류도 보여야 하고(#1098 1단계),
+    // 숫자는 #824 결정 7 규칙(3 미만은 라벨만)을 그대로 따른다.
     const b=el('button','community-mini community-reaction',`${isActive?'✓ ':''}${smallCountLabel(labels[reactionKind]||reactionKind,count)}`);
     b.type='button';b.dataset.reactionKind=reactionKind;b.dataset.communityAction='reaction';b.setAttribute('aria-pressed',String(isActive));
     b.onclick=async()=>{const answer=await api.react(item.shareId,!isActive,reactionKind);if(!answer.ok){const text=loginMessage(answer);if(voteBlocked(answer))setVoteNote(voteNote,text);else message(text);return;}item.stats=answer.stats;render();};
@@ -105,24 +120,61 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
    }
    return out;
   };
-  const anyVisible=kinds.some(kind=>(counts[kind]||0)>0||active(kind));
-  if(!anyVisible){
-   const open=el('button','community-mini community-reaction-open','반응 남기기');
-   open.type='button';open.dataset.communityAction='reaction';
-   open.onclick=()=>host.replaceChildren(...chips());
-   host.append(open);
-   return host;
-  }
-  host.append(...chips());
+  const reactionCount=reactionTotal(item),heartActive=active('heart');
+  const main=el('button','community-mini community-reaction community-heart-main');
+  main.type='button';main.dataset.communityAction='reaction';main.dataset.reactionKind='heart';
+  main.setAttribute('aria-pressed',String(heartActive));
+  main.setAttribute('aria-label',reactionCount>=3?`${labels.heart} · 반응 ${reactionCount}`:labels.heart);
+  main.append(heartIcon(heartActive));
+  if(reactionCount>=3)main.append(el('span','community-heart-count',String(reactionCount)));
+  let pressTimer=null,revealed=false;
+  const reveal=()=>{if(pressTimer){clearTimeout(pressTimer);pressTimer=null;}if(revealed)return;revealed=true;host.replaceChildren(...chips());};
+  const cancelPress=()=>{if(pressTimer){clearTimeout(pressTimer);pressTimer=null;}};
+  const startPress=()=>{cancelPress();pressTimer=setTimeout(reveal,450);};
+  main.addEventListener('pointerdown',startPress);
+  main.addEventListener('pointerup',cancelPress);
+  main.addEventListener('pointercancel',cancelPress);
+  main.addEventListener('pointerleave',cancelPress);
+  main.addEventListener('contextmenu',event=>{event.preventDefault();reveal();});
+  main.addEventListener('keydown',event=>{if((event.key==='Enter'||event.key===' ')&&!event.repeat)startPress();});
+  main.addEventListener('keyup',event=>{if(event.key==='Enter'||event.key===' ')cancelPress();});
+  // 펼침 직후에 이어지는 click은 펼침의 부산물이니 반응 토글로 이어지지 않게 한 번 삼킨다.
+  main.onclick=async()=>{if(revealed){revealed=false;return;}const answer=await api.react(item.shareId,!heartActive,'heart');if(!answer.ok){const text=loginMessage(answer);if(voteBlocked(answer))setVoteNote(voteNote,text);else message(text);return;}item.stats=answer.stats;render();};
+  host.append(main);
   return host;
  }
- async function comments(item,host){
+ // #1098 1단계: 댓글을 '··· 더 보기' 메뉴에서 판 아래 바로 꺼낸다 — 최근 3개 + '댓글 모두 보기'.
+ // 미리보기를 다시 그릴 때마다 다시 부르지 않게 공유 단위로 한 번만 불러온다(서버 목록은 최신 50개까지).
+ const commentStates=new Map();
+ async function comments(item,parts){
+  const {host,heading=null,meta=null}=parts||{};
+  const state=commentStates.get(item.shareId)||{list:null,expanded:false,loading:false};
+  commentStates.set(item.shareId,state);
+  const draw=()=>{
+   const list=Array.isArray(state.list)?state.list:[];
+   if(heading)heading.textContent=smallCountLabel('댓글',list.length);
+   if(meta&&item.stats)meta.textContent=previewMetaText(item);
+   const rows=el('div','community-comments');const visible=state.expanded?list:list.slice(0,3);
+   for(const comment of visible){const row=el('article','community-comment'),editedNote=comment.edited?' · 수정됨':'',head=el('small','',`${comment.authorLabel} · ${when(comment.createdAt)}${editedNote}`),body=el('p','',comment.body);row.append(head,body);const tools=el('div','community-comment-tools');if(comment.canEdit){const edit=el('button','community-link','수정');edit.type='button';edit.onclick=()=>startEdit(row,comment,parts,item);tools.append(edit);}if(comment.canDelete){const remove=el('button','community-link','삭제');remove.type='button';remove.onclick=async()=>{const result=await api.removeComment(comment.id);if(result.ok)await comments(item,parts);else message(loginMessage(result));};tools.append(remove);}if(tools.children.length)row.append(tools);rows.append(row);}
+   if(!list.length)rows.append(el('p','community-muted','첫 댓글을 남겨 보세요.'));
+   if(!state.expanded&&list.length>3){const more=el('button','community-mini','댓글 모두 보기');more.type='button';more.onclick=()=>{state.expanded=true;draw();};rows.append(more);}
+   const write=el('form','community-comment-form'),input=el('textarea',''),submit=el('button','community-mini','댓글 남기기');input.maxLength=1000;input.required=true;input.placeholder='공개 트리에 남길 말을 적어 주세요.';submit.type='submit';write.append(input,submit);write.onsubmit=async event=>{event.preventDefault();submit.disabled=true;const result=await api.comment(item.shareId,input.value);submit.disabled=false;if(!result.ok){message(loginMessage(result));if(result.status===401){write.querySelector('.community-auth-notice')?.remove();const notice=el('p','community-auth-notice community-muted','댓글을 남기려면 로그인해 주세요. 입력은 이 화면에 남아 있어요. '),login=el('a','community-link','새 창에서 로그인');login.href=memberLoginUrl(readTheme(globalThis.localStorage));login.target='_blank';login.rel='noopener noreferrer';login.style.textDecoration='underline';notice.append(login);write.append(notice);}return;}await comments(item,parts);};host.replaceChildren(rows,write);
+  };
+  if(Array.isArray(state.list)){draw();return;}
+  if(state.loading)return;
+  state.loading=true;
   host.replaceChildren(el('p','community-muted','댓글을 불러오는 중이에요.'));
-  const answer=await api.comments(item.shareId);if(!answer.ok){host.replaceChildren(el('p','community-muted',answer.message||'댓글을 불러오지 못했어요.'));return;}
-  const rows=el('div','community-comments');for(const comment of answer.comments){const row=el('article','community-comment'),editedNote=comment.edited?' · 수정됨':'',head=el('small','',`${comment.authorLabel} · ${when(comment.createdAt)}${editedNote}`),body=el('p','',comment.body);row.append(head,body);const tools=el('div','community-comment-tools');if(comment.canEdit){const edit=el('button','community-link','수정');edit.type='button';edit.onclick=()=>startEdit(row,comment,host,item);tools.append(edit);}if(comment.canDelete){const remove=el('button','community-link','삭제');remove.type='button';remove.onclick=async()=>{const result=await api.removeComment(comment.id);if(result.ok)comments(item,host);else message(loginMessage(result));};tools.append(remove);}if(tools.children.length)row.append(tools);rows.append(row);}if(!answer.comments.length)rows.append(el('p','community-muted','첫 댓글을 남겨 보세요.'));
-  const write=el('form','community-comment-form'),input=el('textarea',''),submit=el('button','community-mini','댓글 남기기');input.maxLength=1000;input.required=true;input.placeholder='공개 트리에 남길 말을 적어 주세요.';submit.type='submit';write.append(input,submit);write.onsubmit=async event=>{event.preventDefault();submit.disabled=true;const result=await api.comment(item.shareId,input.value);submit.disabled=false;if(!result.ok){message(loginMessage(result));if(result.status===401){write.querySelector('.community-auth-notice')?.remove();const notice=el('p','community-auth-notice community-muted','댓글을 남기려면 로그인해 주세요. 입력은 이 화면에 남아 있어요. '),login=el('a','community-link','새 창에서 로그인');login.href=memberLoginUrl(readTheme(globalThis.localStorage));login.target='_blank';login.rel='noopener noreferrer';login.style.textDecoration='underline';notice.append(login);write.append(notice);}return;}await comments(item,host);};host.replaceChildren(rows,write);
+  const answer=await api.comments(item.shareId);
+  state.loading=false;
+  // 미리보기를 다시 그리거나 닫아 댓글 자리가 이미 떠났으면(연결 끊김) 그리지 않는다(mountStageVote와 같은 가드).
+  if(!host.isConnected)return;
+  if(!answer.ok){host.replaceChildren(el('p','community-muted',answer.message||'댓글을 불러오지 못했어요.'));return;}
+  state.list=Array.isArray(answer.comments)?answer.comments:[];
+  // 목록을 다 받았으면(50개 미만이면 그게 정확한 수) 겉에 보이는 댓글 수(stats)도 한 벌로 맞춘다.
+  if(item.stats)item.stats.comments=state.list.length<50?state.list.length:Math.max(item.stats.comments||0,state.list.length);
+  draw();
  }
- function startEdit(row,comment,host,item){
+ function startEdit(row,comment,parts,item){
   if(row.dataset.editing==='1')return;row.dataset.editing='1';
   const original=comment.body||'';const head=row.querySelector('small'),body=row.querySelector('p'),tools=row.querySelector('.community-comment-tools');
   row.replaceChildren();
@@ -130,7 +182,7 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
   const save=el('button','community-mini','저장');save.type='submit';
   const cancel=el('button','community-link','취소');cancel.type='button';
   form.append(input,save,cancel);
-  form.onsubmit=async event=>{event.preventDefault();save.disabled=true;const result=await api.editComment(comment.id,input.value);save.disabled=false;if(!result.ok){message(loginMessage(result));return;}await comments(item,host);};
+  form.onsubmit=async event=>{event.preventDefault();save.disabled=true;const result=await api.editComment(comment.id,input.value);save.disabled=false;if(!result.ok){message(loginMessage(result));return;}await comments(item,parts);};
   cancel.onclick=()=>{delete row.dataset.editing;row.replaceChildren();if(head)row.append(head);if(body)row.append(body);if(tools)row.append(tools);};
   row.append(form);
  }
@@ -203,15 +255,14 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
  }
  function moreMenu(item){
   const details=el('details','community-more-menu'),summary=el('summary','community-more-button','⋯');
-  summary.setAttribute('aria-label','댓글, 신고, 차단 메뉴');
-  const panel=el('div','community-more-panel'),commentTitle=el('h4','community-menu-title','댓글'),commentHost=el('div','community-comment-host');
-  const reportForm=el('form','community-report-form'),reportInput=el('input',''),reportButton=el('button','community-link','신고');
+  // #1098 1단계: 댓글은 판 아래 바로 꺼냈고 ··· 메뉴에는 신고·차단만 남긴다.
+  summary.setAttribute('aria-label','신고, 차단 메뉴');
+  const panel=el('div','community-more-panel'),reportForm=el('form','community-report-form'),reportInput=el('input',''),reportButton=el('button','community-link','신고');
   reportInput.maxLength=500;reportInput.required=true;reportInput.placeholder='신고 이유';reportInput.setAttribute('aria-label','신고 이유');reportButton.type='submit';reportForm.append(reportInput,reportButton);
   reportForm.onsubmit=async event=>{event.preventDefault();const answer=await api.report(item.shareId,reportInput.value);message(answer.ok?'신고를 접수했어요. 운영 검토 전에는 자동 숨김 처리하지 않아요.':loginMessage(answer));if(answer.ok)reportInput.value='';};
   const block=el('button','community-link danger','이 공개자의 트리 숨기기');block.type='button';
   block.onclick=async()=>{if(!confirm('이 공개자의 트리를 내 둘러보기 목록에서 숨길까요?'))return;const answer=await api.block(item.shareId);if(!answer.ok){message(loginMessage(answer));return;}items=items.filter(value=>value.shareId!==item.shareId);selectedId=items[0]?.shareId||null;if(preview.open)preview.close();render();message('내 둘러보기 목록에서 숨겼어요.');if(!selectedId)groups.querySelector('.community-group-chip')?.focus();};
-  panel.append(commentTitle,commentHost,reportForm,block);details.append(summary,panel);
-  details.ontoggle=()=>{if(details.open&&!commentHost.dataset.loaded){commentHost.dataset.loaded='1';comments(item,commentHost);}};
+  panel.append(reportForm,block);details.append(summary,panel);
   return details;
  }
  function renderPreview(item){
@@ -221,20 +272,27 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
   const body=el('div','community-preview-body'),title=el('h3','',displayTreeTitle(item.title));title.id='community-preview-title';
   const subject=el('p','community-preview-subject',item.subject||''),moment=el('p','community-preview-moment-title',item.cover?.title||'공개된 순간');
   const summary=item.summary?el('p','community-preview-summary',item.summary):null;
-  const weekly=weeklyNote(item),meta=el('p','community-preview-meta',`${item.cover?.emotion||item.emotions?.[0]||'공개'} · ${when(item.createdAt)} · ${smallCountLabel('공감',item.stats?.hearts||0)}${weekly?` · ${weekly}`:''}`);
+  const meta=el('p','community-preview-meta',previewMetaText(item));
   const actions=el('div','community-preview-actions');
-  // #903: 안내 칸은 actions 바로 다음 줄자리에 미리 두고(hidden) 막혔을 때만 보인다 — 격자 간격이 흔들리지 않게.
+  // #903 후속(2026-11-22): 안내 칸은 담기 단추 바로 아래 전용 칸(세로 묶음)으로 미리 둔다(hidden).
+  // 반응 칩이 펼쳐져 묶음이 여러 줄이 되어도, 안내가 떠도 ♡와 단추 줄이 갈라지지 않고 안내가 항상 담기 단추 바로 다음 줄에 온다(#1130 검사기 실패 111px).
   const voteNote=el('p','community-vote-note');voteNote.setAttribute('role','status');voteNote.hidden=true;
+  const favWrap=el('div','community-fav-wrap');favWrap.append(statButton(item,'favorite','즐겨찾기',voteNote),voteNote);
   // #792 ⑤: 담기 단추 자리. 무대가 확인되기 전에는 비어 있고(자리도 차지하지 않는다), 확인되면 그 자리에서 열린다.
   const stageBox=el('div','community-stage-box');stageBox.hidden=true;
-  actions.append(statButton(item,'favorite','즐겨찾기',voteNote),statButton(item,'reaction','공감',voteNote),stageBox);
+  actions.append(favWrap,statButton(item,'reaction','공감',voteNote),stageBox);
   const open=el('button','community-preview-open','대표 순간부터 감상');open.type='button';open.onclick=()=>onOpenShare(item);
   const start=el('button','community-preview-start','내 기록 새로 시작');start.type='button';start.onclick=()=>onStartRecord(item.subject);
   const status=el('p','community-preview-message','');status.dataset.communityPreviewMessage='';status.setAttribute('role','status');
   const choices=el('div','community-preview-choices');choices.append(open,start);
-  body.append(title,subject,moment);if(summary)body.append(summary);body.append(meta,actions,voteNote,choices,moreMenu(item),status);
+  // #1098 1단계: 댓글을 판 아래 바로 — 최근 3개 + '댓글 모두 보기'(⋯ 메뉴에는 신고·차단만 남는다).
+  const commentSection=el('section','community-preview-comments');commentSection.setAttribute('aria-label','댓글');
+  const commentHeading=el('h4','community-menu-title','댓글'),commentHost=el('div','community-comment-host');
+  commentSection.append(commentHeading,commentHost);
+  body.append(title,subject,moment);if(summary)body.append(summary);body.append(meta,actions,commentSection,choices,moreMenu(item),status);
   preview.replaceChildren(head,renderCover(item,{loading:'eager'}),body);
   if(item.cover?.momentId)mountStageVote(item,stageBox);
+  comments(item,{host:commentHost,heading:commentHeading,meta});
  }
  function openPreview(item){selectedId=item.shareId;renderPreview(item);if(!preview.open)preview.showModal();}
  function card(item){

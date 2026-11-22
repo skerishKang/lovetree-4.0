@@ -21,6 +21,9 @@ export const ROLE_AI_CUSTOMER = 'ai_customer';
 // 남에게 보이는 화면에는 아무 표시도 하지 않는다(AI 명예회원 표시는 ai_customer 만).
 export const ROLE_TESTER = 'tester';
 export const ROLES = Object.freeze([ROLE_ADMIN, ROLE_AI_CUSTOMER, ROLE_TESTER]);
+// #1071: 저장소를 읽지 못한 자리는 '역할 없음'(null)과 다른 '모름'으로 구분한다.
+// 기본 호출은 예전처럼 null — 거름이 필요한 쪽만 unknownOnFailure 로 '모름'을 받는다.
+export const ROLE_UNKNOWN = Symbol('role_unknown');
 
 // #936: 공개 카드의 'AI 명예회원' 비트는 역할 하나에서만 정한다. 목록·다른 팬 보기·공유 읽기가
 // 같은 규칙을 쓰고, 역할을 못 읽으면 어디서나 같은 값(false)으로 닫힌다.
@@ -53,13 +56,14 @@ export function createAdminRoleService({ store, productId, clock = () => new Dat
   };
 
   // 저장이 망가진 자리에서는 역할을 주지 않는다. PADIEM과 같은 닫는 방향.
-  async function readRole(subjectId) {
+  // #1071: 행이 없으면 그대로 '역할 없음', 읽다가 예외가 나면 unknownOnFailure 일 때만 '모름'.
+  async function readRole(subjectId, unknownOnFailure = false) {
     try {
       const row = await store.roleFor({ productId, subjectId });
       if (!row || row.subjectId !== subjectId || row.productId !== productId) return null;
       return ROLES.includes(row.role) ? row.role : null;
     } catch {
-      return null;
+      return unknownOnFailure ? ROLE_UNKNOWN : null;
     }
   }
 
@@ -68,13 +72,13 @@ export function createAdminRoleService({ store, productId, clock = () => new Dat
     roles: ROLES,
 
     /** 지금 세션의 주체가 이 제품에서 어떤 역할인지 다시 확인한다. */
-    async roleFor(principal) {
+    async roleFor(principal, { unknownOnFailure = false } = {}) {
       if (!principal || typeof principal.subjectId !== 'string') return null;
       if (principal.productId !== productId) return null;
       try {
-        return await readRole(requireSubject(principal.subjectId));
+        return await readRole(requireSubject(principal.subjectId), unknownOnFailure);
       } catch {
-        return null;
+        return unknownOnFailure ? ROLE_UNKNOWN : null;
       }
     },
 
@@ -100,7 +104,8 @@ export function createAdminRoleService({ store, productId, clock = () => new Dat
      */
     async assign({ actorPrincipal, targetSubjectId, role = ROLE_ADMIN, reason = null }) {
       const granted = await this.roleFor(actorPrincipal);
-      if (!granted) throw new ApiError(403, 'admin_forbidden', '역할을 바꿀 권한이 없어요.');
+      // B-09 (#1065): 역할이 있으면 통과시키지 않는다 — 관리자만 부여한다.
+      if (granted !== ROLE_ADMIN) throw new ApiError(403, 'admin_forbidden', '역할을 바꿀 권한이 없어요.');
       if (!ROLES.includes(role)) throw new ApiError(400, 'invalid_role', '알 수 없는 역할이에요.');
       const subjectId = requireSubject(targetSubjectId);
       const previous = await readRole(subjectId);
@@ -110,7 +115,8 @@ export function createAdminRoleService({ store, productId, clock = () => new Dat
 
     async revoke({ actorPrincipal, targetSubjectId }) {
       const granted = await this.roleFor(actorPrincipal);
-      if (!granted) throw new ApiError(403, 'admin_forbidden', '역할을 바꿀 권한이 없어요.');
+      // B-09 (#1065): 회수도 관리자만 한다.
+      if (granted !== ROLE_ADMIN) throw new ApiError(403, 'admin_forbidden', '역할을 바꿀 권한이 없어요.');
       const subjectId = requireSubject(targetSubjectId);
       const previous = await readRole(subjectId);
       const row = await store.revoke({ productId, subjectId, revokedBy: actorPrincipal.subjectId, at: at() });

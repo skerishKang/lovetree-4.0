@@ -30,6 +30,9 @@ export const MAX_LINKS = 20;
 export const INBOX_SUBJECT = '모아둔 순간';
 export const TITLE_DISPLAYS = ['both', 'mine', 'video'];
 export const DEFAULT_TITLE_DISPLAY = 'both';
+// #1094: 서재에서 책을 누를 때 여는 보기 — book(책으로)·list(목록으로). 모르는 값은 기본 '책'. 상태(state.prefs)에 저장한다.
+export const BOOK_DISPLAYS = ['book', 'list'];
+export const DEFAULT_BOOK_DISPLAY = 'book';
 // #368 2차: 프로필(표시 이름·동그라미 색). 계정 기록의 설정 칸(state.prefs)에 함께 저장한다(#371).
 // 표시 이름은 공백을 한 칸으로 모으고 20자(문자 단위)까지만 남긴다. 값이 없으면 ''라 이전 저장본도 그대로 읽힌다.
 export const MAX_DISPLAY_NAME = 20;
@@ -79,6 +82,9 @@ export function normalizeHomeMoment(value) {
 export function normalizeTitleDisplay(value) {
   return TITLE_DISPLAYS.includes(value) ? value : DEFAULT_TITLE_DISPLAY;
 }
+export function normalizeBookDisplay(value) {
+  return BOOK_DISPLAYS.includes(value) ? value : DEFAULT_BOOK_DISPLAY;
+}
 // 순간 목록의 트리 칩 순서(2026-11-17, 대표 결정): 계정 설정 칸(state.prefs)에 트리 id 순서로 저장한다.
 // 문자열만 남기고('전체'='all'은 칩 고정이라 저장하지 않는다) 중복을 지우며, 너무 긴 목록은 64개에서 끊는다.
 export function normalizeTreeChipOrder(value) {
@@ -101,7 +107,8 @@ export function normalizePrefs(value) {
     startPlace: normalizeStartPlace(value?.startPlace),
     shareView: normalizeShareView(value?.shareView),
     shareDiscover: normalizeShareDiscover(value?.shareDiscover),
-    treeChipOrder: normalizeTreeChipOrder(value?.treeChipOrder), homeMoment: normalizeHomeMoment(value?.homeMoment)
+    treeChipOrder: normalizeTreeChipOrder(value?.treeChipOrder),
+    bookDisplay: normalizeBookDisplay(value?.bookDisplay), homeMoment: normalizeHomeMoment(value?.homeMoment)
 
   };
 }

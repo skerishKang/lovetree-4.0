@@ -157,18 +157,19 @@ test('②③④ 지도 화면: 이름표·썸네일·묶음 판·두 보기 판 
       const rows = await page.evaluate(() => [...document.querySelectorAll('.legend-row')].filter(r => !r.hidden).map(r => r.textContent.trim()));
       assert.ok(rows.length >= 2 && rows.length <= 6, `묶음 행 개수: ${rows.length}`);
       assert.ok(rows.every(t => /·\s*\d+개$/.test(t) && !/·\s*0개/.test(t)), `빈 행·이름 없는 행 없음: ${rows.join(' / ')}`);
-      // ③ 두 보기에서 묶음 판+아래 단추 줄이 같이 보인다(#951 ⑥: 큰 탐색 판은 숨고 단추 줄이 그 자리를 맡는다).
-      for (const view of ['network', 'concentric']) {
+      // ③ 세 보기에서 묶음 판+아래 단추 줄이 같이 보인다(#951 ⑥: 큰 탐색 판은 숨고 단추 줄이 그 자리를 맡는다).
+      for (const view of ['network', 'tag', 'time']) {
         await page.evaluate(v => { document.body.dataset.ltView = v; }, view);
         const vis = await page.evaluate(() => {
           const show = s => { const el = document.querySelector(s); if (!el) return false; const cs = getComputedStyle(el); return cs.display !== 'none' && cs.visibility !== 'hidden' && el.getBoundingClientRect().width > 1; };
           const ribBtns = [...document.querySelectorAll('#mobileRibbon button')].map(b => b.textContent.trim());
           return { legend: show('.legend'), ribbon: show('.mobile-ribbon'), controls: show('.controls'), minus: !!document.querySelector('#mobileRibbon button[aria-label="지도 축소(−)"]'), plus: !!document.querySelector('#mobileRibbon button[aria-label="지도 확대(＋)"]'), reset: ribBtns[ribBtns.length - 1] };
         });
-        assert.ok(vis.legend && vis.ribbon && !vis.controls, `${view}: 묶음 판과 단추 줄이 같이 보이고 큰 탐색 판은 숨는다`);
+        if (view === 'time') assert.ok(!vis.legend && vis.ribbon && !vis.controls, `${view}: 시간 순은 범례 없이 단추 줄이 보인다`);
+        else assert.ok(vis.legend && vis.ribbon && !vis.controls, `${view}: 묶음 판과 단추 줄이 같이 보이고 큰 탐색 판은 숨는다`);
         assert.ok(vis.minus && vis.plus, `${view}: [−][＋] 단추`);
         const rows = await page.evaluate(() => [...document.querySelectorAll('#mobileRibbon button')].map(b => b.textContent.trim()));
-        assert.equal(vis.reset, '전체 보기', `${view}: 마지막 단추 문구(390과 같은 줄) — 실제 렌더링값 ${JSON.stringify(rows)}`);
+        assert.equal(vis.reset, '전체 맞춤', `${view}: 마지막 단추 문구(390과 같은 줄) — 실제 렌더링값 ${JSON.stringify(rows)}`);
       }
     } finally { await ctx.close(); await browser.close(); }
 
@@ -290,7 +291,7 @@ test('1001b 실행: 지도 순간 변경(고치기·연결·삭제) — 재적�
     assert.ok(afterEdit.detailOpen, '열린 상세 판이 그대로다');
     assert.equal(afterEdit.detailTitle, '지도 고친 제목', '상세 판 제목이 새 값으로 다시 그려진다');
     // ② 연결: 재적재 0.
-    await openEditor(m3); await page.evaluate(id => { document.querySelector('#related-target').value = id; }, m4); await page.click('#link-moment'); await waitPut(2); await page.waitForTimeout(1500);
+    await openEditor(m3); await page.evaluate(id => { const s = document.querySelector('#related-target'); s.value = id; s.dispatchEvent(new Event('change', {bubbles: true})); document.querySelector('#moment-form').requestSubmit(); }, m4); await waitPut(2); await page.waitForTimeout(1500);
     const afterLink = await frame.evaluate(() => ({ doc: window.__doc1001b, sel: window.__lt.state.selected?.id, msg: window.__msg1001b }));
     assert.equal(afterLink.doc, 'alive', '연결 뒤에도 같은 문서다');
     assert.equal(afterLink.sel, m3, '연결 뒤에도 고른 순간이 그대로다');

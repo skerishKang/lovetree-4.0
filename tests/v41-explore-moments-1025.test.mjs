@@ -6,6 +6,8 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { serve, auditPage, failuresOf } from './helpers/screen-audit.mjs';
+import { waitForShownScreen } from './helpers/visible-frame.mjs';
+import { createTree, addMoment } from '../public/v41/domain.mjs';
 
 const REQUIRE = process.env.LT_MOMENTS_1025_REQUIRE === '1';
 let chromium, skip = false;
@@ -278,6 +280,151 @@ test('#1075 — 밝은 영상 위에서도 390·1440의 단추 여섯 개가 보
      console.log('#1075', width, theme, JSON.stringify({ reached: nodes.filter(n => n.reaches).length, nav: nodes.slice(4).map(n => n.rect), rail: nodes.slice(0, 4).map(n => n.rect) }));
     } finally { await h.ctx.close(); await new Promise(r => h.server.close(r)); }
    }
+  } finally { await browser.close(); }
+});
+
+// ── #1092 — 둘러보기를 겹쳐 뜨는 창이 아니라 다른 탭(서재·책·보드·지도)과 같은 화면으로 연 시험.
+// · 둘러보기 탭을 누르면 상단 메뉴는 흐려지지 않고 그대로, '둘러보기' 탭에 밑줄(aria-current), 오른쪽 위 × 없음.
+// · 바깥 누름·Esc로 닫히지 않는다.
+// · 주소도 다른 화면과 같은 방식(#explore) — 둘러보기 → 서재 → 뒤로 가기 = 둘러보기.
+// · 안의 내용(공개 트리 목록)은 그대로 불려 온다.
+// 실제 계정 로그인 없이 가짜 작업장(시험계정)과 가짜 공개 목록만 쓴다.
+const EXPLORE_CARD = (i) => ({
+  shareId: 'share' + String(i).padStart(20, '0'), title: '공개 트리 ' + (i + 1), subject: '바다와 달', summary: '첫 기록',
+  momentCount: 3 + i, createdAt: '2026-11-2' + i + 'T09:30:00.000Z', publicDisplayName: '공개자' + (i + 1),
+  cover: { emotion: '설렘', title: '첫 순간', type: 'photo', url: '' }, emotions: ['설렘'],
+  stats: { hearts: 3, favorites: 1, hearted: false, favored: false, reactions: { heart: 3 }, mine: [] }
+});
+function exploreTree(n) {
+  let t = createTree({ subject: '시험' + n, title: '시험 트리 ' + n, note: '', emotion: '설렘', date: '2026-11-20', url: '' }, '2026-11-20T00:00:00Z');
+  for (let i = 1; i < 3; i++) t = addMoment(t, { title: '순간 ' + i, note: '', emotion: '설렘', date: '2026-11-2' + i, url: '' }, t.moments[0].id, '2026-11-20T00:0' + i + ':00Z');
+  return t;
+}
+async function bootExploreTab(browser, { width, height, theme }) {
+  const server = await serve();
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const ctx = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce', hasTouch: width <= 780, isMobile: width <= 780 });
+  await ctx.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); } catch {} }, theme);
+  await ctx.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
+  await ctx.route('**/api/community/shares**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, items: [EXPLORE_CARD(0), EXPLORE_CARD(1), EXPLORE_CARD(2)], totalVisible: 3, nextCursor: '', groups: [], groupsAll: [] }) }));
+  const state = { version: 1, trees: [exploreTree(1), exploreTree(2)], prefs: {} };
+  await ctx.route('**/api/workspace**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ revision: 1, state, subject: '시험계정', writeSubjectBound: true, savedAt: '2026-11-20T09:00:00.000Z' }) }));
+  const page = await ctx.newPage();
+  try {
+    await page.goto(`${base}/v41/?account=1#my/shelf`, { waitUntil: 'load', timeout: 60000 });
+    await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
+    // 기록 동기화가 서재 화면을 실제로 다 그릴 때까지 기다린다 — 시작 직후 전체 재그리기(choose→show)가 뒤따르므로 그 뒤에 움직인다.
+    await waitForShownScreen(page, { hash: '^#my/shelf', path: 'track32-bookshelf\\.html' }, 20000);
+    await page.locator('#discover-ask-no').click().catch(() => {});
+    return { server, ctx, page };
+  } catch (error) {
+    await ctx.close();
+    await new Promise((ok) => server.close(ok));
+    throw error;
+  }
+}
+// 좁은 화면(≤780)에서는 서재·둘러보기 탭이 접기 메뉴(☰) 안으로 접힌다 — 같은 단추를 누른 것으로 흘러간다.
+async function openExploreTab(page, width) {
+  if (width <= 780) {
+    await page.locator('#mobile-more').click();
+    await page.locator('#header-overflow.is-open button', { hasText: '둘러보기' }).click();
+  } else {
+    await page.locator('#community-menu').click();
+  }
+  await page.waitForSelector('#community-panel[open]', { timeout: 15000 });
+}
+async function goToShelfTab(page, width) {
+  if (width <= 780) {
+    await page.locator('#mobile-more').click();
+    await page.locator('#header-overflow.is-open button', { hasText: '서재' }).click();
+  } else {
+    await page.locator('#tree-views button[data-view="track32-bookshelf.html"]').click();
+  }
+}
+
+test('#1092 둘러보기는 탭 화면이다 — 밑줄·상단 메뉴 선명·× 없음·Esc/바깥 누름 무시·뒤로 가기 = 둘러보기', { skip: REQUIRE ? false : skip, timeout: 300000 }, async () => {
+  if (skip) assert.fail(skip);
+  const browser = await chromium.launch({ headless: true });
+  try {
+    for (const [width, height] of [[1440, 900], [390, 844]]) for (const theme of ['night', 'garden']) {
+      const h = await bootExploreTab(browser, { width, height, theme });
+      try {
+        const tail = `${width}·${theme}`;
+        await openExploreTab(h.page, width);
+        await h.page.waitForFunction(() => document.querySelectorAll('#community-list .community-card').length >= 1, null, { timeout: 15000 });
+        const opened = await h.page.evaluate(() => {
+          const panel = document.getElementById('community-panel');
+          const closeBtn = panel.querySelector('[data-close="community-panel"]');
+          const probe = document.getElementById('theme-toggle');
+          const pr = probe.getBoundingClientRect();
+          const hit = document.elementFromPoint(pr.left + pr.width / 2, pr.top + pr.height / 2);
+          return {
+            modal: panel.matches(':modal'),
+            hash: location.hash,
+            bodyClass: document.body.classList.contains('community-screen'),
+            currentTab: document.getElementById('community-menu').getAttribute('aria-current'),
+            closeHidden: closeBtn ? getComputedStyle(closeBtn).display === 'none' : true,
+            headerHitInsideHeader: !!hit?.closest?.('.app-header'),
+            frameHidden: [...document.querySelectorAll('#stage>iframe')].every((f) => getComputedStyle(f).display === 'none')
+          };
+        });
+        assert.equal(opened.modal, false, `${tail}: 둘러보기가 모달 창이 아니다`);
+        assert.equal(opened.hash, '#explore', `${tail}: 주소가 다른 화면과 같은 방식(#explore)으로 쓰인다`);
+        assert.equal(opened.bodyClass, true, `${tail}: 화면 상태(body.community-screen)가 붙는다`);
+        assert.equal(opened.currentTab, 'true', `${tail}: '둘러보기' 탭에 밑줄(aria-current)이 서 있다`);
+        assert.equal(opened.closeHidden, true, `${tail}: 오른쪽 위 × 가 없다`);
+        assert.equal(opened.headerHitInsideHeader, true, `${tail}: 상단 메뉴가 창 뒤에 가려지지 않는다(누름 좌표가 머리글 안)`);
+        assert.equal(opened.frameHidden, true, `${tail}: 화면 뒤의 iframe이 남지 않는다`);
+        // 바깥 누름·Esc로 닫히지 않는다.
+        await h.page.evaluate(() => document.querySelector('.app-header').click());
+        assert.equal(await h.page.evaluate(() => document.getElementById('community-panel')?.open), true, `${tail}: 바깥 누름으로 닫히지 않는다`);
+        await h.page.keyboard.press('Escape');
+        assert.equal(await h.page.evaluate(() => document.getElementById('community-panel')?.open), true, `${tail}: Esc로 닫히지 않는다`);
+        // 다른 탭(서재)을 누르면 그 화면으로 간다 — 창 닫기가 아니라 화면 이동(주소가 새로 쌓인다).
+        await goToShelfTab(h.page, width);
+        await h.page.waitForFunction(() => location.hash.startsWith('#my/shelf') && !document.getElementById('community-panel')?.open, null, { timeout: 15000 });
+        // 뒤로 가기 = 둘러보기.
+        await h.page.goBack();
+        await h.page.waitForFunction(() => location.hash === '#explore' && !!document.getElementById('community-panel')?.open && document.getElementById('community-menu')?.getAttribute('aria-current') === 'true', null, { timeout: 15000 });
+        const back = await h.page.evaluate(() => ({
+          modal: document.getElementById('community-panel').matches(':modal'),
+          currentTab: document.getElementById('community-menu').getAttribute('aria-current'),
+          treesShown: !document.getElementById('community-tree-panel')?.hidden
+        }));
+        assert.equal(back.modal, false, `${tail}: 뒤로 가기로 돌아온 둘러보기도 화면이다`);
+        assert.equal(back.currentTab, 'true', `${tail}: 뒤로 가기 후에도 '둘러보기' 탭 밑줄`);
+        assert.equal(back.treesShown, true, `${tail}: 뒤로 가기 후 [트리] 보기가 열린다`);
+      } finally {
+        await h.ctx.close();
+        await new Promise((ok) => h.server.close(ok));
+      }
+    }
+  } finally { await browser.close(); }
+});
+
+test('#1092 주소(#explore)로 직접 들어와도 둘러보기는 화면으로 열린다', { skip: REQUIRE ? false : skip, timeout: 120000 }, async () => {
+  if (skip) assert.fail(skip);
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const h = await bootExploreTab(browser, { width: 1440, height: 900, theme: 'night' });
+    try {
+      await h.page.evaluate(() => { location.hash = '#explore'; });
+      await h.page.waitForSelector('#community-panel[open]', { timeout: 15000 });
+      await h.page.waitForFunction(() => document.getElementById('community-menu')?.getAttribute('aria-current') === 'true', null, { timeout: 15000 });
+      const state = await h.page.evaluate(() => ({
+        modal: document.getElementById('community-panel').matches(':modal'),
+        hash: location.hash,
+        currentTab: document.getElementById('community-menu').getAttribute('aria-current'),
+        bodyClass: document.body.classList.contains('community-screen')
+      }));
+      assert.equal(state.modal, false, '주소로 열린 둘러보기도 모달 창이 아니다');
+      assert.equal(state.hash, '#explore', '주소가 유지된다');
+      assert.equal(state.currentTab, 'true', "'둘러보기' 탭에 밑줄이 서 있다");
+      assert.equal(state.bodyClass, true, '화면 상태가 붙는다');
+    } finally {
+      await h.ctx.close();
+      await new Promise((ok) => h.server.close(ok));
+    }
   } finally { await browser.close(); }
 });
 

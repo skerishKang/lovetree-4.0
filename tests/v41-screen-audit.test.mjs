@@ -148,7 +148,8 @@ test('#942 첫 화면 추가 단추와 숫자 묶음', { skip: REQUIRE ? false :
         const groups=await current.locator('.home-action-group').evaluateAll(es=>es.map(e=>{
           const b=e.querySelector('.subtleBtn'),n=e.querySelector('.home-count'),r=e.getBoundingClientRect(),br=b.getBoundingClientRect(),nr=n.getBoundingClientRect();
           const range=document.createRange();range.selectNodeContents(n);const tr=range.getBoundingClientRect();
-          return {label:b.textContent.trim(),count:n.hidden?'':n.textContent.trim(),x:r.x,y:r.y,w:r.width,h:r.height,inner:n.hidden?null:nr.top-br.bottom,center:n.hidden?null:(tr.left+tr.width/2)-(br.left+br.width/2),font:parseFloat(getComputedStyle(n).fontSize),overflow:n.hidden?0:Math.max(0,tr.right-br.right,br.left-tr.left)};
+           const lines=[...n.querySelectorAll('.home-count-line')].map(row=>row.textContent.trim());
+           return {label:b.textContent.trim(),count:n.hidden?'':lines.join('|'),x:r.x,y:r.y,w:r.width,h:r.height,inner:n.hidden?null:nr.top-br.bottom,center:n.hidden?null:(tr.left+tr.width/2)-(br.left+br.width/2),font:parseFloat(getComputedStyle(n).fontSize),overflow:n.hidden?0:Math.max(0,tr.right-br.right,br.left-tr.left)};
         }));
         const values={buttons,headers,head,fab,top,groups};const key=width+'-'+theme+'-'+kind;
         console.log('#942',key,JSON.stringify(values));
@@ -167,7 +168,7 @@ test('#942 첫 화면 추가 단추와 숫자 묶음', { skip: REQUIRE ? false :
         check(member?buttons.every(b=>b.bg===light):buttons[0]?.bg===rose,key+' 자주색 하나·나머지는 밝은 단추(#1084) '+JSON.stringify(buttons.map(b=>b.bg)));
         check(buttons.slice(member?0:1).every(b=>b.bg===light&&b.border!=='0px'),key+' 밝은 바탕·얇은 테두리 '+JSON.stringify(buttons));
         check(groups.length===3,key+' 묶음 3개');
-        check(JSON.stringify(groups.map(g=>g.count))===JSON.stringify(member?['순간 14 · 모아둔 0','공개 트리 17','트리 3']:['',(signedIn?'':'예시 ')+'공개 트리 17 · 순간 123','']),key+' 숫자 귀속');
+         check(JSON.stringify(groups.map(g=>g.count))===JSON.stringify(member?['순간 14|','공개 트리 17|공개 순간 123','트리 3|공개 트리 1']:['',(signedIn?'':'예시 ')+'공개 트리 17|순간 123','']),key+' 숫자 귀속');
         for(const g of groups.filter(g=>g.count))check(g.inner>=4&&g.inner<=6&&Math.abs(g.center)<=2&&g.font>=12&&g.overflow<=1,key+' 숫자 간격 '+JSON.stringify(g));
         for(let i=1;i<groups.length;i++){
           const a=groups[i-1],b=groups[i],gap=Math.abs(a.y-b.y)<2?b.x-a.x-a.w:b.y-a.y-a.h;
@@ -705,22 +706,33 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     await take(page4, '둘러보기');
     // #784: 반응 단추는 격자 카드에 없고, 카드를 열어야 미리보기에서 보인다.
     await page4.locator('.community-card').first().click();
+    // #1098 1단계(2026-11-22 대표 승인): '반응 남기기' 접힘을 ♡ 하나로 바꿨다 — 기준을 느슨하게 하지 않고 두 규칙을 모두 검사한다.
+    // ① 기본 줄에는 ♡([data-reaction-kind="heart"]) 하나만 보이고 다른 반응 칩은 0개다.
     await page4.waitForFunction(() => {
       const preview = document.getElementById('community-preview');
-      return preview?.open && preview.querySelector('.community-reaction-open');
+      return preview?.open && preview.querySelector('[data-reaction-kind="heart"]');
     }, null, { timeout: 8000 });
     await page4.waitForTimeout(400);
     const reactions = await page4.evaluate(() => {
       const preview = document.getElementById('community-preview');
+      const kinds = [...(preview?.querySelectorAll('[data-reaction-kind]') || [])].map((b) => b.dataset.reactionKind);
       return {
         previewOpen: Boolean(preview?.open),
-        open: preview?.querySelectorAll('.community-reaction-open').length || 0,
-        zeroChips: [...(preview?.querySelectorAll('.community-reaction') || [])].filter((b) => / 0$/.test(b.textContent.trim())).length
+        hearts: kinds.filter((kind) => kind === 'heart').length,
+        others: kinds.filter((kind) => kind !== 'heart').length
       };
     });
     assert.equal(reactions.previewOpen, true, '카드를 누르면 둘러보기 미리보기가 열린다');
-    assert.ok(reactions.open >= 1, '반응이 없으면 미리보기에서 반응 남기기 단추가 보인다');
-    assert.equal(reactions.zeroChips, 0, '0짜리 반응 칩은 보이지 않는다');
+    assert.equal(reactions.hearts, 1, '기본 줄에는 ♡(공감) 단추 하나만 보인다');
+    assert.equal(reactions.others, 0, '기본 줄에 다른 반응 칩은 0개다');
+    // ② 길게 누르면(0.45초 규칙) 나머지 여섯 종이 그 자리에서 펼쳐진다.
+    const heartBox = await page4.locator('#community-preview [data-reaction-kind="heart"]').boundingBox();
+    await page4.mouse.move(heartBox.x + heartBox.width / 2, heartBox.y + heartBox.height / 2);
+    await page4.mouse.down();
+    await page4.waitForFunction(() => document.querySelectorAll('#community-preview [data-reaction-kind]').length >= 7, null, { timeout: 8000 });
+    await page4.mouse.up();
+    const revealed = await page4.evaluate(() => [...document.querySelectorAll('#community-preview [data-reaction-kind]')].map((b) => b.dataset.reactionKind).sort());
+    assert.deepEqual(revealed, ['angry', 'heart', 'laugh', 'like', 'love', 'sad', 'wow'], '길게 누르면 나머지 6종까지 일곱 종이 모두 펼쳐진다');
     // #903: 가입 7일 미만이 담기를 누르면 서버 안내가 담기 단추 바로 다음 줄에 뜬다 —
     // 단추와 안내의 세로 거리를 1440·390에서 모두 12px 이하로 잰다(눈이 아니라 수치로).
     await ctx4.route('**/api/community/shares/*/favorite', (r) => r.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ error: { code: 'vote_too_new', message: '가입하고 7일이 지나면 투표할 수 있어요.' } }) }));
@@ -1043,15 +1055,17 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     });
     assert.deepEqual(closeBottom, { text: '닫기', visible: true }, '새 소식 창 맨 아래에도 닫기가 보인다');
     await take(page4, '새 소식 닫기 버튼');
-    // 겹친 창 닫기(2026-11-16 대표 지적): 새 소식(비모달) 위에อีก�창(공유 목록·모달)을 띄우고 Esc →
-    // 맨 위 창 하나만 닫힌다(공유 목록 닫힘·새 소식은 남음) → Esc 한 번 더 → 새 소식 닫힘.
+    // 겹친 창 닫기(2026-11-16 대표 지적): 새 소식(비모달) 위에 또 창(설정·모달)을 띄우고 Esc →
+    // 맨 위 창 하나만 닫힌다(설정 닫힘·새 소식은 남음) → Esc 한 번 더 → 새 소식 닫힘.
+    // (#1092부터 둘러보기는 창이 아니라 서재·책·보드·지도와 같은 화면이다 — Esc·바깥 누름으로 닫히지 않으므로,
+    //  겹친 창 시험은 맨 위 모달로 설정 창을 띄운다.)
     // 머리 메뉴(공유 목록 단추)는 '창이 열린 채 누르면 창 닫고 이동' 규칙의 대상이라, 겹친 창 시험은 메뉴를 거치지 않고 직접 띄운다.
-    await page4.evaluate(() => document.getElementById('community-panel')?.showModal());
-    await page4.waitForFunction(() => !!document.getElementById('community-panel')?.open, null, { timeout: 8000 }).catch(() => {});
+    await page4.evaluate(() => document.getElementById('account-settings')?.showModal());
+    await page4.waitForFunction(() => !!document.getElementById('account-settings')?.open, null, { timeout: 8000 }).catch(() => {});
     await page4.keyboard.press('Escape');
     await page4.waitForTimeout(500);
-    const afterFirst = await page4.evaluate(() => ({ community: !!document.getElementById('community-panel')?.open, updates: !!document.getElementById('updates-panel')?.open }));
-    assert.deepEqual(afterFirst, { community: false, updates: true }, 'Esc 1회는 맨 위 창(공유 목록) 하나만 닫는다 — 새 소식은 남는다');
+    const afterFirst = await page4.evaluate(() => ({ settings: !!document.getElementById('account-settings')?.open, updates: !!document.getElementById('updates-panel')?.open }));
+    assert.deepEqual(afterFirst, { settings: false, updates: true }, 'Esc 1회는 맨 위 창(설정) 하나만 닫는다 — 새 소식은 남는다');
     await take(page4, '겹친 창 닫기');
     await page4.keyboard.press('Escape');
     await page4.waitForTimeout(500);
@@ -1330,9 +1344,16 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     assert.deepEqual(listFooter, { sheet: true, links: 'none', card: 'none' }, `순간 목록 창이 열리면 아래 고정 항목이 숨는다: ${JSON.stringify(listFooter)}`);
     // #1103: 띠·판은 이 자리에서 우리가 닫았다. 정보 안내가 스스로 내려갈 때까지 기다린 뒤,
     // 문구 길이가 자리 검사에 끼어들지 않도록 짧은 한 줄을 셸 알림 줄 자리에 그대로 그린다.
-    await page5b.waitForFunction(() => { const t = document.getElementById('toast'); return t && t.hidden; }, null, { timeout: 12000 }).catch(() => {});
-    await page5b.evaluate(() => { const t = document.getElementById('toast'); t.textContent = '불러왔어요.'; t.hidden = false; });
-    const toastBox = await page5b.locator('#toast').boundingBox();
+    // #1109: 390의 순간 목록은 화면 꽉 찬 창이라 알림 줄을 접는다 — 겹칠 자체가 없다.
+    const narrow = width === 390;
+    if (narrow) {
+      const hidden = await page5b.evaluate(() => { const t = document.getElementById('toast'); return !t || t.hidden || getComputedStyle(t).display === 'none'; });
+      assert.equal(hidden, true, '390 꽉 찬 목록 창이 열리면 셸 알림 줄이 접힌다');
+    } else {
+      await page5b.waitForFunction(() => { const t = document.getElementById('toast'); return t && t.hidden; }, null, { timeout: 12000 }).catch(() => {});
+      await page5b.evaluate(() => { const t = document.getElementById('toast'); t.textContent = '불러왔어요.'; t.hidden = false; });
+    }
+    const toastBox = narrow ? null : await page5b.locator('#toast').boundingBox();
     const shellFrameBox = await page5b.locator('#view').boundingBox();
     const listFrame = await orbitFrameOf();
     const listWindowBox = await listFrame.evaluate(() => {
@@ -1344,15 +1365,19 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
       const r = rows.at(-1)?.getBoundingClientRect();
       return r && { x: r.x, y: r.y, width: r.width, height: r.height };
     });
-    assert.ok(toastBox?.width > 0 && toastBox?.height > 0 && shellFrameBox?.width > 0 && listWindowBox?.width > 0 && listWindowBox?.height > 0 && lastListRow?.width > 0 && lastListRow?.height > 0,
-      `목록 창 겹침 검사에서 알림·창·마지막 순간·프레임이 모두 보인다: ${JSON.stringify({ toastBox, shellFrameBox, listWindowBox, lastListRow })}`);
-    const rowInPage = { x: shellFrameBox.x + lastListRow.x, y: shellFrameBox.y + lastListRow.y, width: lastListRow.width, height: lastListRow.height };
-    const toastOverlap = Math.max(0, Math.min(toastBox.x + toastBox.width, rowInPage.x + rowInPage.width) - Math.max(toastBox.x, rowInPage.x))
-      * Math.max(0, Math.min(toastBox.y + toastBox.height, rowInPage.y + rowInPage.height) - Math.max(toastBox.y, rowInPage.y));
-    assert.equal(toastOverlap, 0, `알림 줄과 순간 목록 마지막 줄 겹침이 0px²이다: ${JSON.stringify({ toastBox, rowInPage, toastOverlap })}`);
-    assert.ok(toastBox.y + toastBox.height <= shellFrameBox.y + listWindowBox.top, `알림 줄은 목록 창 위쪽 바깥에 있다: ${JSON.stringify({ toastBox, shellFrameBox, listWindowBox })}`);
+    assert.ok(shellFrameBox?.width > 0 && listWindowBox?.width > 0 && listWindowBox?.height > 0 && lastListRow?.width > 0 && lastListRow?.height > 0,
+      `목록 창 겹침 검사에서 창·마지막 순간·프레임이 모두 보인다: ${JSON.stringify({ shellFrameBox, listWindowBox, lastListRow })}`);
+    if (!narrow) {
+      assert.ok(toastBox?.width > 0 && toastBox?.height > 0,
+        `목록 창 겹침 검사에서 알림 줄이 보인다: ${JSON.stringify(toastBox)}`);
+      const rowInPage = { x: shellFrameBox.x + lastListRow.x, y: shellFrameBox.y + lastListRow.y, width: lastListRow.width, height: lastListRow.height };
+      const toastOverlap = Math.max(0, Math.min(toastBox.x + toastBox.width, rowInPage.x + rowInPage.width) - Math.max(toastBox.x, rowInPage.x))
+        * Math.max(0, Math.min(toastBox.y + toastBox.height, rowInPage.y + rowInPage.height) - Math.max(toastBox.y, rowInPage.y));
+      assert.equal(toastOverlap, 0, `알림 줄과 순간 목록 마지막 줄 겹침이 0px²이다: ${JSON.stringify({ toastBox, rowInPage, toastOverlap })}`);
+      assert.ok(toastBox.y + toastBox.height <= shellFrameBox.y + listWindowBox.top, `알림 줄은 목록 창 위쪽 바깥에 있다: ${JSON.stringify({ toastBox, shellFrameBox, listWindowBox })}`);
+    }
     await take(page5b, '순간 목록 다섯 개');
-    await lowerToast(page5b);
+    if (!narrow) await lowerToast(page5b);
     const listClose = await frameEval(() => {
       const b = document.getElementById('orbit')?.shadowRoot?.querySelector('dialog[open] [data-do="close"]');
       const r = b?.getBoundingClientRect();
@@ -1602,32 +1627,28 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     // 돌려 undefined.evaluate로 죽던 자리(#657 CI 2차 실측) — 준비된 frame을 기다리고, 없으면 URL 목록을
     // 담은 메시지로 실패한다(null.evaluate TypeError가 나지 않게).
     const tripMapFrame = (why) => readyFrame(pageMap, /track56-network/, { root: '#mapMain', why });
-    await (await tripMapFrame('지도→그래프: 지도 프레임')).evaluate(() => document.getElementById('viewGraph').click());
-    await pageMap.waitForFunction(() => [...document.querySelectorAll('iframe')].some((f) => { try { return /track60-graph/.test(f.contentWindow.location.href); } catch { return false; } }), null, { timeout: 10000 });
-    // 그래프 모듈이 그려질 때까지(배지가 채워질 때까지) 기다린다 — 프레임 주소만으로는 그리기 전이다.
-    await pageMap.waitForFunction(() => {
-      const f = [...document.querySelectorAll('iframe')].find((x) => { try { return /track60-graph/.test(x.contentWindow.location.href); } catch { return false; } });
-      return Boolean(f && (f.contentDocument.getElementById('gBadge')?.textContent || '').length > 0);
-    }, null, { timeout: 10000 });
-    const gFrameTrip = await readyFrame(pageMap, /track60-graph/, { root: '#gBadge', why: '지도의 [그래프] 단추로 그래프 보기가 열린다(기존 lt41-navigate 한 길)' });
-    const tripGraph = await gFrameTrip.evaluate(() => {
-      const b = [...document.querySelectorAll('.g-view-switch .pill')];
-      return { n: b.length, pressed: b.map((x) => x.getAttribute('aria-pressed')), badge: document.getElementById('gBadge')?.textContent || '' };
+    // #1095: 시간 순은 지도 프레임 안에서 그리는 보기다(별도 그래프 화면으로 이동하지 않는다).
+    await (await tripMapFrame('지도 시간 순: 지도 프레임')).evaluate(() => document.getElementById('viewGraph').click());
+    await pageMap.waitForTimeout(600);
+    const tripGraph = await (await tripMapFrame('시간 순 상태 확인')).evaluate(() => {
+      const b = [...document.querySelectorAll('.view-switch .pill')];
+      return { n: b.length, pressed: b.map((x) => x.getAttribute('aria-pressed')), view: document.body.dataset.ltView, stored: localStorage.getItem('lt41.network.view') };
     });
-    assert.equal(tripGraph.n, 3, '그래프 머리줄 보기 고르기 세 단추');
-    assert.deepEqual(tripGraph.pressed, ['false', 'false', 'true'], '현재 보기(그래프)만 aria-pressed=true');
-    assert.ok(tripGraph.badge.startsWith(`순간 ${treeBeforeTrip.moments}`), `그래프 표시의 순간 수가 지금 트리와 같다(실제 ${tripGraph.badge})`);
+    assert.equal(tripGraph.n, 3, '지도 머리줄 보기 고르기 세 단추');
+    assert.deepEqual(tripGraph.pressed, ['false', 'false', 'true'], '현재 보기(시간 순)만 aria-pressed=true');
+    assert.equal(tripGraph.view, 'time', '하나의 캔버스 안에서 시간 순 보기로 바뀐다');
+    assert.equal(tripGraph.stored, 'time', '지도 보기 저장 키(lt41.network.view)가 바뀐다');
     const navCurrent = await pageMap.evaluate(() => document.querySelector('.tree-views [data-view="track56-network.html"]')?.getAttribute('aria-current'));
-    assert.equal(navCurrent, 'true', '그래프 보기에서 위쪽 메뉴(책·보드·지도)의 지도가 켜진 상태다');
-    await gFrameTrip.evaluate(() => document.getElementById('gViewConc').click());
+    assert.equal(navCurrent, 'true', '시간 순 보기에서도 위쪽 메뉴(책·보드·지도)의 지도가 켜진 상태다');
+    await (await tripMapFrame('시간 순→묶음: 지도 프레임')).evaluate(() => document.getElementById('viewConc').click());
     await pageMap.waitForFunction(() => {
       const f = [...document.querySelectorAll('iframe')].find((x) => { try { return /track56-network/.test(x.contentWindow.location.href); } catch { return false; } });
-      return Boolean(f && f.contentDocument?.body && f.contentDocument.body.dataset.ltView === 'concentric');
+      return Boolean(f && f.contentDocument?.body && f.contentDocument.body.dataset.ltView === 'tag');
     }, null, { timeout: 10000 });
     const mapAfterConc = await (await tripMapFrame('동심원 복귀: 지도 프레임')).evaluate(() => ({ view: document.body.dataset.ltView, concPressed: document.getElementById('viewConc')?.getAttribute('aria-pressed'), stored: localStorage.getItem('lt41.network.view') }));
-    assert.equal(mapAfterConc.view, 'concentric', '그래프의 [동심원형]으로 지도가 동심원형 보기로 열린다');
-    assert.equal(mapAfterConc.concPressed, 'true', '동심원형이 눌린 상태(aria-pressed=true)');
-    assert.equal(mapAfterConc.stored, 'concentric', '지도 보기 저장 키(lt41.network.view)가 바뀐다');
+    assert.equal(mapAfterConc.view, 'tag', '그래프의 [묶음]으로 지도가 꼬리표 묶음 보기로 열린다');
+    assert.equal(mapAfterConc.concPressed, 'true', '묶음이 눌린 상태(aria-pressed=true)');
+    assert.equal(mapAfterConc.stored, 'tag', '지도 보기 저장 키(lt41.network.view)가 바뀐다');
     await (await tripMapFrame('그물 복귀 누르기: 지도 프레임')).evaluate(() => document.getElementById('viewNet').click());
     const treeAfterTrip = await pageMap.evaluate(() => ({ id: window.LT41?.tree?.id || '', moments: (window.LT41?.tree?.moments || []).length, momentId: window.LT41?.momentId || '' }));
     const mapAfterNet = await (await readyFrame(pageMap, /track56-network/, { root: '#mapMain', view: 'network', timeout: 45000, why: '그물 복귀 확인: 지도 프레임이 다시 붙고 준비될 때까지' })).evaluate(() => ({ view: document.body.dataset.ltView, netPressed: document.getElementById('viewNet')?.getAttribute('aria-pressed') }));
@@ -2636,4 +2657,72 @@ test('#987 보드 첫 줄과 모바일 셸 겹침·현재 표시', { skip: REQUI
     }
   } finally { await browser.close(); await new Promise(r => server.close(r)); }
   assert.deepEqual(failures, []);
+});
+
+// #1094 후속: 390 서재 목록 첫 화면(스크롤 전)에서 화면에 붙은 아래 링크 줄이
+// '책 속의 트리' 상자 위에 포개지지 않는다(겹침 넓이 0, 상자는 끝까지 보인다).
+test('#1094 390 목록 첫 화면 아래 링크 × 책 속의 트리 겹침 0', { skip: REQUIRE ? false : skip, timeout: 180000 }, async () => {
+  if (skip) assert.fail(skip);
+  const server = await serve();
+  const base = 'http://127.0.0.1:' + server.address().port;
+  const browser = await chromium.launch({ headless: true });
+  const input = (title, date) => ({ subject: '겹침 시험', title, note: '화면 확인용 가짜 기록', emotion: '설렘', date, url: '' });
+  let tree = createTree(input('겹침 시험 책', '2026-11-22'), '2026-11-22T00:00:00.000Z');
+  tree = addMoment(tree, input('둘째 순간', '2026-11-21'), tree.moments[0].id, '2026-11-21T00:00:00.000Z');
+  const workspace = { revision: 1, state: { version: 1, trees: [tree], prefs: { bookDisplay: 'list' } }, subject: 'visual-audit-fake', writeSubjectBound: true, savedAt: '2026-11-22T00:00:00.000Z' };
+  try {
+    for (const theme of ['night', 'garden']) {
+      const ctx = await browser.newContext({ viewport: { width: 390, height: 900 }, reducedMotion: 'reduce' });
+      try {
+        await ctx.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); localStorage.setItem('lt41.updatesCardDay', 'audit'); } catch {} }, theme);
+        await ctx.route('**/*', (route) => {
+          const u = new URL(route.request().url());
+          if (u.origin !== base) return u.hostname === 'i.ytimg.com' || u.hostname === 'audit.invalid' ? THUMB(route) : route.abort();
+          if (u.pathname === '/api/workspace') return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(workspace) });
+          if (u.pathname === '/api/account') return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, email: 'audit@example.invalid', subject: 'visual-audit-fake' }) });
+          if (u.pathname.startsWith('/api/')) return route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' });
+          return route.continue();
+        });
+        const page = await ctx.newPage();
+        await page.goto(base + '/v41/?account=1', { waitUntil: 'domcontentloaded' });
+        await page.goto(base + '/v41/?account=1#my/shelf', { waitUntil: 'load' });
+        await page.waitForFunction(() => window.LT41?.trees?.length === 1 && !document.querySelector('#account-avatar')?.hidden, null, { timeout: 20000 });
+        await page.waitForTimeout(1200);
+        const frame = page.frames().find((f) => /track32-bookshelf/.test(f.url()));
+        assert.ok(frame, '책장 화면이 열린다');
+        await frame.waitForSelector('.book-card', { timeout: 10000 });
+        await frame.evaluate(() => localStorage.setItem('lt41.bookDisplay', 'list'));
+        await frame.locator('.book-card').first().click();
+        await frame.waitForFunction(() => document.querySelector('#readerScreen')?.classList.contains('active'));
+        await frame.locator('.info-rule').waitFor();
+        await page.waitForTimeout(700);
+        const m = await page.evaluate(() => {
+          const f = document.getElementById('view'), fr = f.getBoundingClientRect(), d = f.contentDocument;
+          const links = document.querySelector('.home-links'), ls = getComputedStyle(links), lr = links.getBoundingClientRect();
+          const linksShown = ls.display !== 'none' && ls.visibility !== 'hidden' && lr.width > 0 && lr.height > 0;
+          const box = d.querySelector('.info-rule'), br = box.getBoundingClientRect();
+          const screen = d.querySelector('#readerScreen'), sr = screen.getBoundingClientRect();
+          const clip = { left: Math.max(fr.left, fr.left + sr.left), right: Math.min(fr.right, fr.left + sr.right), top: Math.max(fr.top, fr.top + sr.top), bottom: Math.min(fr.bottom, fr.top + sr.bottom) };
+          const shown = { left: Math.max(fr.left + br.left, clip.left), right: Math.min(fr.left + br.right, clip.right), top: Math.max(fr.top + br.top, clip.top), bottom: Math.min(fr.top + br.bottom, clip.bottom) };
+          const overlap = linksShown
+            ? Math.max(0, Math.min(lr.right, shown.right) - Math.max(lr.left, shown.left)) * Math.max(0, Math.min(lr.bottom, shown.bottom) - Math.max(lr.top, shown.top))
+            : 0;
+          return {
+            text: box.textContent.trim(), scrollTop: screen.scrollTop, linksDisplay: ls.display,
+            box: { x: Math.round(fr.left + br.left), y: Math.round(fr.top + br.top), width: Math.round(br.width), height: Math.round(br.height) },
+            visible: { width: Math.round(Math.max(0, shown.right - shown.left)), height: Math.round(Math.max(0, shown.bottom - shown.top)), bottom: Math.round(shown.bottom) },
+            viewportHeight: innerHeight, overlap: Math.round(overlap)
+          };
+        });
+        console.log('#1094 list', theme, JSON.stringify(m));
+        assert.match(m.text, /책 속의 트리/, theme + ': ' + m.text);
+        assert.equal(m.scrollTop, 0, theme + ': 스크롤 전 첫 화면에서 잰다');
+        assert.equal(m.overlap, 0, theme + ': 아래 링크 × 책 속의 트리 겹침 넓이 0 — ' + JSON.stringify(m));
+        assert.equal(m.visible.width, m.box.width, theme + ': 트리 상자 가로가 잘리지 않는다 — ' + JSON.stringify(m));
+        assert.equal(m.visible.height, m.box.height, theme + ': 트리 상자 세로가 잘리지 않는다 — ' + JSON.stringify(m));
+        assert.ok(m.visible.bottom <= m.viewportHeight, theme + ': 트리 상자가 화면 안에 있다 — ' + JSON.stringify(m));
+        assert.equal(m.linksDisplay, 'none', theme + ': 390 서재에서는 바닥 링크 줄이 내용 위에 뜨지 않는다 — ' + JSON.stringify(m));
+      } finally { await ctx.close(); }
+    }
+  } finally { await browser.close(); await new Promise((r) => server.close(r)); }
 });
