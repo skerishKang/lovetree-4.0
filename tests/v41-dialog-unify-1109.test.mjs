@@ -24,24 +24,33 @@ function sampleTree() {
 const otherTree = () => createTree({ subject: '다른 트리', title: '다른 트리', note: '', emotion: '설렘', date: '2026-11-20', url: '' }, '2026-11-20T00:00:00Z');
 const workspace = (tree) => JSON.stringify({ revision: 1, state: { version: 1, trees: [tree, otherTree()], prefs: {} }, subject: '시험계정', writeSubjectBound: true, savedAt: '2026-11-20T09:00:00.000Z' });
 
-async function withShell(tree, { width, height, theme }, fn) {
+async function withShell(tree, { width, height, theme, deferred = false, cached = deferred, hash = '' }, fn) {
   const server = await serve();
   const base = `http://127.0.0.1:${server.address().port}`;
   const browser = await chromium.launch({ headless: true });
   const ctx = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
+  const initial = JSON.parse(workspace(tree));
+  initial.subject = 'test-1109';
+  let release;
+  const response = deferred ? new Promise(resolve => { release = resolve; }) : Promise.resolve(initial);
   try {
+    if (cached) await ctx.addInitScript(payload => {
+      if (window !== window.top) return;
+      localStorage.setItem('lovetree.v41.login-subject', payload.subject);
+      localStorage.setItem('lovetree.v41.workspace-cache:' + payload.subject, JSON.stringify({ version: 1, subject: payload.subject, state: payload.state }));
+    }, initial);
     await ctx.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); } catch {} }, theme);
     await ctx.route('**://i.ytimg.com/**', (route) => route.fulfill({ status: 200, contentType: 'image/png', body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64') }));
     await ctx.route('**/api/**', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
-    await ctx.route('**/api/workspace**', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: workspace(tree) }));
+    await ctx.route('**/api/workspace**', async (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(await response) }));
     const page = await ctx.newPage();
     const errors = [];
     page.on('pageerror', (error) => errors.push(String(error.message || error)));
-    await page.goto(`${base}/v41/?account=1`, { waitUntil: 'load' });
-    await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
-    await page.locator('#discover-ask-no').click().catch(() => {});
-    await fn({ page, errors });
-  } finally { await browser.close(); server.close(); }
+    await page.goto(`${base}/v41/?account=1${hash}`, { waitUntil: 'load' });
+    if (!deferred || cached) await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
+    if (!deferred) await page.locator('#discover-ask-no').click().catch(() => {});
+    await fn({ page, errors, initial, release });
+  } finally { release?.(initial); await browser.close(); server.close(); }
 }
 
 const closeFacts = (root, selector) => root.locator(selector).evaluate((el) => {
@@ -109,4 +118,196 @@ test('#1109 두 창의 닫기 단추·덮개·폭이 같고 정리 창 아래 �
       assert.deepEqual(errors, [], `${tail}: 페이지 오류 없음`);
     });
   }
+});
+async function momentListFrame(page) {
+ for (const f of page.frames()) {
+  if (f === page.mainFrame()) continue;
+  const ok = await f.evaluate(() => document.documentElement.getBoundingClientRect().width > 0 && !!document.getElementById('orbit')?.shadowRoot?.querySelector('[data-do=moments],[data-do=index]')).catch(() => false);
+  if (ok) return f;
+ }
+ return null;
+}
+
+test('#1109 배경 상태 반영을 받아도 순간 목록 창이 열린 채로 남는다', { skip: skip || undefined }, async (t) => {
+ if (skip) { t.skip(skip); return; }
+ await withShell(sampleTree(), { width: 1440, height: 900, theme: 'night' }, async ({ page, errors }) => {
+  const frame = await momentListFrame(page);
+  assert.ok(frame, '첫 화면 프레임을 찾는다');
+  await frame.evaluate(() => document.getElementById('orbit').shadowRoot.querySelector('[data-do=moments],[data-do=index]').click());
+  await frame.locator('.orbit-dialog[open]').waitFor({ state: 'attached', timeout: 8000 });
+  await page.evaluate(() => document.getElementById('view').contentWindow.postMessage({ type: 'lt41-trees-saved' }, location.origin));
+  await page.waitForTimeout(300);
+  const facts = await frame.evaluate(() => {
+   const d = document.getElementById('orbit').shadowRoot.querySelector('.orbit-dialog');
+   const b = d?.querySelector('button[data-do="close"]');
+   const r = b?.getBoundingClientRect();
+   return { open: !!d?.open, w: r ? Math.round(r.width) : 0, h: r ? Math.round(r.height) : 0 };
+  });
+  assert.deepEqual(facts, { open: true, w: 44, h: 44 }, '창이 열린 채이고 닫기 단추 크기가 그대로다');
+  assert.deepEqual(errors, [], '페이지 오류 없음');
+ });
+});
+
+test('#1109 배경 상태 반영은 프레임을 갈지 않고 화면 숫자를 새 값으로 고친다', { skip: skip || undefined }, async (t) => {
+ if (skip) { t.skip(skip); return; }
+ await withShell(sampleTree(), { width: 1440, height: 900, theme: 'night' }, async ({ page, errors }) => {
+  const frame = await momentListFrame(page);
+  const before = await frame.evaluate(() => ({ url: location.href, text: [...document.getElementById('orbit').shadowRoot.querySelectorAll('.home-count')].map(n => n.textContent).join('|') }));
+  await page.evaluate(() => {
+   const tree = window.LT41.trees[0];
+   tree.moments.push({ id: 'bg-added', parentId: tree.moments[0].id, title: '다른 기기에서 담은 순간', note: '', emotion: '설렘', date: '2026-11-22', url: '', createdAt: '2026-11-22T00:00:00.000Z' });
+  });
+  await page.evaluate(() => document.getElementById('view').contentWindow.postMessage({ type: 'lt41-trees-saved' }, location.origin));
+  await page.waitForTimeout(300);
+  const after = await frame.evaluate(() => ({ url: location.href, text: [...document.getElementById('orbit').shadowRoot.querySelectorAll('.home-count')].map(n => n.textContent).join('|') }));
+  assert.equal(after.url, before.url, '프레임 주소가 그대로다(다시 띄우지 않음)');
+  assert.notEqual(after.text, before.text, '숫자가 새 상태로 바뀐다');
+  assert.deepEqual(errors, [], '페이지 오류 없음');
+ });
+});
+
+test('#1109 다른 화면으로 가면 기존처럼 프레임이 바뀐다', { skip: skip || undefined }, async (t) => {
+ if (skip) { t.skip(skip); return; }
+ await withShell(sampleTree(), { width: 1440, height: 900, theme: 'night' }, async ({ page, errors }) => {
+  await page.locator('[data-view="track32-bookshelf.html"]').click();
+  await page.waitForFunction(() => {
+   const f = document.getElementById('view');
+   try { return new URL(f.contentWindow.location.href).pathname.endsWith('/track32-bookshelf.html'); } catch { return false; }
+  }, null, { timeout: 10000 });
+  assert.deepEqual(errors, [], '페이지 오류 없음');
+ });
+});
+test('#1109 저장본 뒤 서버 기록이 도착해도 네 화면은 같은 문서에서 갱신한다', { skip: skip || undefined, timeout: 120000 }, async (t) => {
+ if (skip) { t.skip(skip); return; }
+ for (const view of ['home','book','board','shelf']) {
+  t.diagnostic(view);
+  const tree = sampleTree();
+  await withShell(tree, { width: 1440, height: 900, theme: 'night', deferred: true, hash: '#my/'+view+'?tree='+tree.id }, async ({ page, errors, initial, release }) => {
+   const files={home:'home.html',book:'track59-sketchbook.html',board:'track58-pinboard.html',shelf:'track32-bookshelf.html'};
+   await page.waitForFunction(file => {
+    const f=document.getElementById('view');
+    try{return !f.hidden&&f.contentWindow.location.pathname.endsWith(file)&&!!(f.contentDocument.getElementById('orbit')?.shadowRoot?.querySelector('.recent-card')||f.contentWindow.__TRACK59__||f.contentWindow.__LT58V11||f.contentDocument.querySelector('.book-card'));}catch{return false;}
+   }, files[view], {timeout:20000});
+   const active=await page.locator('#view').elementHandle();
+   const frame=await active.contentFrame();
+   const before=await frame.evaluate(view=>{
+    window.__sameDocument1109=true;
+    if(view==='home'){
+     const root=document.getElementById('orbit').shadowRoot;
+     const fonts=[...root.querySelectorAll('.recent-head,.recent-change')].map(el=>getComputedStyle(el).fontSize);
+     root.querySelector('[data-do=moments],[data-do=index]').click();
+     return fonts;
+    }
+    return [];
+   }, view);
+   if(view==='home')await frame.locator('.orbit-dialog[open]').waitFor({state:'attached'});
+   const changed=structuredClone(initial);
+   changed.revision=2;
+   changed.state.trees[0]=addMoment(tree,{title:'서버에서 도착한 순간',note:'새 기록',emotion:'설렘',date:'2026-11-22',url:view==='home'?'https://www.youtube.com/watch?v=abcdefghijk':''},tree.moments[0].id,'2026-11-22T00:00:00Z');
+   const added=changed.state.trees[0].moments.at(-1).id;
+   release(changed);
+   await page.waitForFunction(id=>window.LT41?.tree?.moments.some(m=>m.id===id),added,{timeout:20000});
+   await frame.waitForFunction(({view,id})=>{
+    if(view==='home')return document.getElementById('orbit').shadowRoot.querySelector('.recent-card strong')?.textContent==='서버에서 도착한 순간';
+    if(view==='book')return window.__TRACK59__?.getState().pageIds.includes(id);
+    if(view==='board')return !!document.querySelector('.card[data-id="'+id+'"]');
+    return [...document.querySelectorAll('.book-card-meta')].some(el=>el.textContent.includes('13개 순간'));
+   },{view,id:added},{timeout:20000});
+   assert.equal(await active.getAttribute('id'),'view',view+': 보이는 프레임이 그대로다');
+   assert.equal(await frame.evaluate(()=>window.__sameDocument1109),true,view+': 같은 문서다');
+   if(view==='home'){
+    const after=await frame.evaluate(()=>{
+     const root=document.getElementById('orbit').shadowRoot;
+     const dialog=root.querySelector('.orbit-dialog');
+     const rect=dialog.querySelector('[data-do=close]').getBoundingClientRect();
+     return {open:dialog.open,w:Math.round(rect.width),h:Math.round(rect.height),fonts:[...root.querySelectorAll('.recent-head,.recent-change')].map(el=>getComputedStyle(el).fontSize),counts:[...root.querySelectorAll('.home-count')].map(el=>el.textContent).join('|')};
+    });
+    assert.deepEqual({open:after.open,w:after.w,h:after.h},{open:true,w:44,h:44});
+    assert.deepEqual(after.fonts,before,'최근 순간 칩 글자 크기가 그대로다');
+    assert.match(after.counts,/순간 14/,'두 트리의 전체 순간 수가 늘었다');
+    assert.ok(await frame.locator('.recent-card .recent-thumb').count(),'서버에서 확인한 영상 미리보기도 보인다');
+   }
+   assert.deepEqual(errors,[],view+': 페이지 오류 없음');
+  });
+ }
+});
+
+test('#1109 저장본이 없는 회원 진입은 서버 응답 전 빈 첫 화면 문서를 열지 않는다', { skip: skip || undefined }, async (t) => {
+ if (skip) { t.skip(skip); return; }
+ await withShell(sampleTree(), { width: 390, height: 844, theme: 'night', deferred: true, cached: false }, async ({ page, errors, initial, release }) => {
+  await page.waitForTimeout(300);
+  assert.deepEqual(await page.evaluate(()=>[...document.querySelectorAll('#view,#view-next')].map(f=>f.contentWindow.location.href)),['about:blank','about:blank'],'기록을 받기 전에는 빈 문서를 먼저 열지 않는다');
+  release(initial);
+  await page.waitForFunction(()=>!!window.LT41?.trees?.length);
+  await page.waitForFunction(()=>!!document.getElementById('view').contentDocument?.getElementById('orbit')?.shadowRoot?.querySelector('.recent-card'));
+  assert.equal(await page.evaluate(()=>document.getElementById('view-next').contentWindow.location.href),'about:blank','기록으로 처음부터 한 장만 연다');
+  assert.deepEqual(errors,[],'페이지 오류 없음');
+ });
+});
+
+test('#1109 회원 기록 확인 중과 읽기 실패에도 빈 화면 탐색을 유지한다', { skip: skip || undefined }, async (t) => {
+ if (skip) { t.skip(skip); return; }
+ const server=await serve(),base=`http://127.0.0.1:${server.address().port}`;
+ const browser=await chromium.launch({headless:true});
+ const states=['empty','delayed','offline','login'];
+ try {
+  for(const [width,height] of [[1440,900],[390,844]])for(const state of states){
+   const ctx=await browser.newContext({viewport:{width,height},reducedMotion:'reduce'});
+   let release,requested;
+   const gate=new Promise(resolve=>{release=resolve});
+   const started=new Promise(resolve=>{requested=resolve});
+   try {
+    await ctx.addInitScript(()=>localStorage.setItem('lt41.theme','garden'));
+    await ctx.route('**/*',r=>new URL(r.request().url()).origin===base?r.fallback():r.abort());
+    await ctx.route('**/api/**',r=>r.fulfill({status:200,json:{ok:true,items:[]}}));
+    await ctx.route('**/api/workspace**',async r=>{
+     requested();
+     if(state==='delayed'||state==='offline')await Promise.all([gate,new Promise(resolve=>setTimeout(resolve,600))]);
+     if(state==='offline')return r.fulfill({status:503,json:{ok:false,code:'unavailable'}});
+     if(state==='login')return r.fulfill({status:401,json:{ok:false,code:'unauthenticated'}});
+     return r.fulfill({status:200,json:{revision:1,state:{version:1,trees:[],prefs:{}},subject:'test-1109-empty',writeSubjectBound:true,savedAt:'2026-11-22T00:00:00Z'}});
+    });
+    const page=await ctx.newPage(),cdp=await ctx.newCDPSession(page);
+    await cdp.send('Emulation.setCPUThrottlingRate',{rate:4});
+    await page.goto(`${base}/v41/?account=1`,{waitUntil:'load'});
+    await started;
+    const facts=async()=>{
+     if(width===390&&await page.locator('#header-overflow').isHidden())await page.locator('#mobile-more').click();
+     return page.evaluate(()=>{
+      const menu=innerWidth<=780,labels=['서재','책','보드','지도'];
+      const nodes=[...document.querySelectorAll(menu?'#header-overflow button':'#tree-views button[data-view]')].filter(b=>labels.includes(b.textContent.trim()));
+      const nav=document.querySelector('#tree-views');
+      return {hidden:nav.hidden,display:getComputedStyle(nav).display,member:document.body.dataset.member,source:document.body.dataset.recordSource,buttons:nodes.map(b=>{const r=b.getBoundingClientRect();return {text:b.textContent.trim(),w:r.width,h:r.height}})};
+     });
+    };
+    const check=async(stage)=>{
+     const row=await facts();console.log('# 빈 화면 탐색',width,state,stage,JSON.stringify(row));
+     assert.equal(row.hidden,false,`${width}/${state}/${stage}: 회원 탭이 숨지 않는다`);
+     assert.equal(row.buttons.length,4);
+     assert.ok(row.buttons.every(b=>b.w>0&&b.h>0),JSON.stringify(row.buttons));
+    };
+    if(state==='delayed'||state==='offline'){
+     await check('응답 전');
+     assert.equal(await page.locator('#write-menu').isHidden(),true,'확인 전 쓰기 권한 없음');
+     assert.equal(await page.locator('#account-avatar').isHidden(),true,'확인 전 계정 표시 없음');
+     if(width===390)await page.locator('#header-overflow button').filter({hasText:/^서재$/}).click();
+     else await page.locator('#tree-views button[data-view="track32-bookshelf.html"]').click();
+     assert.equal(await page.locator('#empty h1').textContent(),'아직 책장이 비어 있어요.');
+     release();
+    }
+    await page.waitForFunction(wanted=>document.body.dataset.recordSource==='server'&&document.body.dataset.member===wanted,['empty','delayed'].includes(state)?'in':'out');
+    if(state==='login'){
+     assert.equal(await page.locator('#tree-views').evaluate(e=>e.hidden),true,'인증 실패가 확정되면 회원 탭을 숨긴다');
+     continue;
+    }
+    await check('응답 후');
+    if(state==='delayed'||state==='offline'){
+     assert.equal(new URL(page.url()).hash,'#shelf','먼저 고른 서재 주소 유지');
+     assert.equal(await page.locator('#empty h1').textContent(),'아직 책장이 비어 있어요.');
+     assert.equal(await page.locator('#empty-records').textContent(),'＋ 새 트리');
+    }
+    if(state==='offline')assert.equal(await page.locator('#account-avatar').isHidden(),true,'읽기 실패를 로그인 성공으로 보지 않는다');
+   } finally {release();await ctx.close();}
+  }
+ } finally {await browser.close();await new Promise(resolve=>server.close(resolve));}
 });

@@ -91,7 +91,8 @@ const themeToggleTop=$('theme-toggle');if(themeToggleTop)themeToggleTop.onclick=
  $('account-my-news').onclick=()=>{closeAccountMenu();void myNewsMount.open();};
  $('updates-link').onclick=()=>{void updatesMount.openUpdates();};
  $('settings-updates-open').onclick=()=>{$('account-settings').close();void updatesMount.openUpdates();};
- void updatesMount.start();
+ // #952: 첫 접속 안내는 새 소식 여부를 확인한 뒤 차례로 올린다.
+ const updatesReady=updatesMount.start();
  if(deps.member?.snapshot?.().owned)void feedbackBoard.refreshReplyDot();
  if(deps.member?.snapshot?.().owned)void myNewsMount.refreshCount();
  $('advanced-backup').onclick=()=>backup();
@@ -535,7 +536,7 @@ async function showPublicRoute(route){
  if(view==='board'&&answer.share.entryMomentId)requestBoardOpen(answer.share.entryMomentId);
  deps.activeShareId=answer.share.id;show(deps.current,false);writeLocation('replace');notify('공개된 트리를 감상하는 화면이에요. 감상만 할 수 있어요.'+(answer.aiTester?' AI 명예회원이 만든 트리예요.':'')+(answer.omittedPrivateMedia?' 올린 사진 '+answer.omittedPrivateMedia+'장은 나만 볼 수 있어요.':''));
 }
-document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{if(b.dataset.view==='track32-bookshelf.html'&&!deps.member?.snapshot().owned){openLoginStart('shelf');return;}
+document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{if(b.dataset.view==='track32-bookshelf.html'&&!deps.memberViewsAvailable()){openLoginStart('shelf');return;}
  // 261118 대표 지적 2차 5: 서재 화면에서 콕·보드·지도는 마지막에 본 트리(서재 가운데 책의 트리)로 연다.
  if(deps.current==='track32-bookshelf.html'&&b.dataset.view!=='track32-bookshelf.html'){const treeId=lastShelfTreeId();
   if(treeId&&deps.model?.trees?.some(t=>t.id===treeId)&&window.LT41?.tree?.id!==treeId){deps.current=b.dataset.view;choose(treeId);writeLocation();return;}}
@@ -543,7 +544,7 @@ document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{if(b.dataset.
 for(const f of frames())f.addEventListener('load',()=>{frameLoaded(f);
  // #894: 새로 뜬 안쪽 화면에도 움직임 끄기 상태를 알린다(메모리 상태 — 화면을 다시 열면 처음 상태).
  try{f.contentWindow.postMessage({type:MSG.motion,paused:deps.motionPaused},location.origin)}catch{}});
-return { showPublicRoute, getFeedbackDialog:()=>feedbackDialog, getFeedbackBoard:()=>feedbackBoard, refreshMyNewsCount:()=>myNewsMount.refreshCount(), openMyNews:()=>myNewsMount.open(), getAccountTip:()=>accountTip, applyAdvanced, applyDateStyleToFrame, applyPageTurnToFrame, applyNetworkViewToFrame, applyBoardThemeToFrame, syncBoardThemeToApp, quickTargetPreference, profileDirty, paintSettingsProfile, accountConfirmMatches, openAccountData, openAccountSettings, paintDateStyleControls, paintStartPlaceControls, paintShareControls, paintQuickTargetControls, paintNetworkViewControls, paintPageTurnControls, paintBoardThemeControls, paintTreeVisibilityList, paintSettingsUsage, loadTreeVisibility, paintTreeManagerVisibility, paintSettingsTab, focusSettingsSection, fillProfileForm, paintScreenControls, readAdvanced, advancedKey, currentDateStyle, currentPageTurn, sendToFrame, currentStartPlace, currentShareView, currentBoardTheme };
+return { updatesReady, showPublicRoute, getFeedbackDialog:()=>feedbackDialog, getFeedbackBoard:()=>feedbackBoard, refreshMyNewsCount:()=>myNewsMount.refreshCount(), openMyNews:()=>myNewsMount.open(), getAccountTip:()=>accountTip, applyAdvanced, applyDateStyleToFrame, applyPageTurnToFrame, applyNetworkViewToFrame, applyBoardThemeToFrame, syncBoardThemeToApp, quickTargetPreference, profileDirty, paintSettingsProfile, accountConfirmMatches, openAccountData, openAccountSettings, paintDateStyleControls, paintStartPlaceControls, paintShareControls, paintQuickTargetControls, paintNetworkViewControls, paintPageTurnControls, paintBoardThemeControls, paintTreeVisibilityList, paintSettingsUsage, loadTreeVisibility, paintTreeManagerVisibility, paintSettingsTab, focusSettingsSection, fillProfileForm, paintScreenControls, readAdvanced, advancedKey, currentDateStyle, currentPageTurn, sendToFrame, currentStartPlace, currentShareView, currentBoardTheme };
 }
 
 

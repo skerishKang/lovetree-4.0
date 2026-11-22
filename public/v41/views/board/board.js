@@ -49,7 +49,7 @@ if(bgBtn&&bgMenu){
 // 공유 감상(share)은 읽기 전용이다. 서버 쓰기 가능 여부는 셸이 LT41.writable로 넘긴다.
 function boardSaveEnabled(){try{return window.parent!==window&&window.parent.LT41?.source==='server'&&window.parent.LT41?.writable===true&&!LTDEMO.readOnly}catch{return false}}
 const exampleBoard=LTDEMO.example;
-const canEditBoard=exampleBoard||boardSaveEnabled();
+let canEditBoard=exampleBoard||boardSaveEnabled();
 // #553: 카드 종류별 예약 높이 — CSS가 정한 최대 높이에 여유를 더한 값(실측: 썸네일이 실린 YouTube 카드
 // 465px·세로 Shorts 648px, 기본 카드는 #548 글자 기준선 올림으로 최대 424px). 줄 간격은 이 예약 높이에서
 // 나오므로 링크 없는 트리(예시 40순간)는 기본 간격 460px(#548과 같다), YouTube 밴드는 그보다 크게 벌어진다.
@@ -82,11 +82,13 @@ if(replace&&!visibleCardCount())fitAll(false)}
 // '날짜순'에서는 저장 자리도 날짜순 바둑판으로 다시 꽂는다(보여 주기만 — 저장 값을 지우지 않는다).
 function gridPlan(vw){const slots=LT58Model.pinboardSpread(LT58Model.dateDescOrder(moments),{cols:LT58Model.gridColumns(vw),saved:boardMode==='mine'?savedSlotsOf(moments):null});
 const tops=LT58Model.gridRowTops(slots,(id)=>reservedHeights.get(id)||BASE_RESERVED_H);return{slots,tops}}
-let moments=LTDEMO.moments.map((m,i)=>{const saved=Number.isFinite(m.x)&&Number.isFinite(m.y)&&LT58Model.isPinboardSlot(m.x);return{id:m.id,type:m.type==='memo'?'note':'photo',originalType:m.type==='memo'?'note':m.type,createdOrder:i+1,title:m.title,emotion:m.emotion,date:m.date,source:m.source||'예시 기록',mediaMetadata:m.mediaMetadata||null,memo:m.memo||'',cardMemo:m.memo||m.whyNext||'',x:saved?m.x:0,y:saved?m.y:0,rot:saved?(Number.isFinite(m.rot)?m.rot:0):0,savedPos:saved,savedXY:saved?{x:m.x,y:m.y,rot:Number.isFinite(m.rot)?m.rot:0}:null,pinStyle:m.pinStyle,cardStyle:m.cardStyle,keywords:Array.isArray(m.keywords)?m.keywords:[],color:m.color||['rose','violet','cyan','amber'][i%4],asset:m.image,url:m.externalUrl||'',first:!!m.first}});
+function projectBoardMoments(){return LTDEMO.moments.map((m,i)=>{const saved=Number.isFinite(m.x)&&Number.isFinite(m.y)&&LT58Model.isPinboardSlot(m.x);return{id:m.id,type:m.type==='memo'?'note':'photo',originalType:m.type==='memo'?'note':m.type,createdOrder:i+1,title:m.title,emotion:m.emotion,date:m.date,source:m.source||'예시 기록',mediaMetadata:m.mediaMetadata||null,memo:m.memo||'',cardMemo:m.memo||m.whyNext||'',x:saved?m.x:0,y:saved?m.y:0,rot:saved?(Number.isFinite(m.rot)?m.rot:0):0,savedPos:saved,savedXY:saved?{x:m.x,y:m.y,rot:Number.isFinite(m.rot)?m.rot:0}:null,pinStyle:m.pinStyle,cardStyle:m.cardStyle,keywords:Array.isArray(m.keywords)?m.keywords:[],color:m.color||['rose','violet','cyan','amber'][i%4],asset:m.image,url:m.externalUrl||'',first:!!m.first}});}
+let moments=projectBoardMoments();
 // #619-6: '내 배치'의 순서는 좌표가 아니라 저장된 순서다(서버 변경 없이 y에 순위를 실어 보낸다 — board-model의 orderOfMoments).
 // 순서 값이 없으면 옛 x·y(핀보드 칸 자리)를 순서로 한 번 바꿔 읽고, 좌표는 그대로 둔다(지우지 않는다).
-let momentOrder=(()=>{const saved=LT58Model.orderOfMoments(LTDEMO.moments);if(saved)return saved;
-const slots=savedSlotsOf(moments);const rest=LT58Model.dateDescOrder(moments.filter((m)=>!slots.has(m.id)));return LT58Model.orderFromSaved(slots,rest)})();
+function projectBoardOrder(){const saved=LT58Model.orderOfMoments(LTDEMO.moments);if(saved)return saved;
+const slots=savedSlotsOf(moments);const rest=LT58Model.dateDescOrder(moments.filter((m)=>!slots.has(m.id)));return LT58Model.orderFromSaved(slots,rest)}
+let momentOrder=projectBoardOrder();
 function orderRank(id){return momentOrder.indexOf(id)}
 // #619-5: 쌓기 배치(핀터레스트식) — 열마다 위에서부터 차곡차곡 쌓는다. 줄을 맞추지 않으므로
 // 세로(쇼츠) 카드가 섞인 열 아래가 비지 않는다. #619-6: '내 배치'는 좌표가 아니라 순서로 쌓는다.
@@ -138,7 +140,8 @@ function previewShift(dragId,hit){
 }
 function clearPreviewShift(){previewSig='';cardLayer.querySelectorAll('.shiftPreview').forEach(el=>el.classList.remove('shiftPreview'))}
 
-let connections=LTDEMO.edges.map((e,i)=>({id:'c'+i,kind:e.kind,a:e.from,b:e.to,why:e.kind==='related'?'관련 순간':e.reason||'',color:e.kind==='related'?'cyan':(canEditBoard?['rose','violet','cyan','amber'][Math.max(0,moments.findIndex(m=>m.id===e.from))%4]:'rose')}));
+function projectBoardConnections(){return LTDEMO.edges.map((e,i)=>({id:'c'+i,kind:e.kind,a:e.from,b:e.to,why:e.kind==='related'?'관련 순간':e.reason||'',color:e.kind==='related'?'cyan':(canEditBoard?['rose','violet','cyan','amber'][Math.max(0,moments.findIndex(m=>m.id===e.from))%4]:'rose')}));}
+let connections=projectBoardConnections();
 
 // 보드 저장(#372 후속): 바뀐 순간·연결을 셸에 넘겨 기존 워크스페이스 저장 경로(PUT /api/workspace)로 보낸다.
 // 예시·공유는 보내지 않는다. 셸이 저장하지 못하면 토스트로 알린다.
@@ -157,7 +160,8 @@ function persistBoard(){if(!boardSaveEnabled())return;try{const treeId=window.pa
 function failNotice(t){let el=$('#saveFail');if(!el)return;el.textContent=t;el.classList.add('show');hideToast();clearTimeout(failNotice.t);failNotice.t=setTimeout(()=>el.classList.remove('show'),6000)}
 window.addEventListener('message',e=>{if(e.origin!==location.origin)return;if(e.data?.type!==globalThis.LT41_MSG.boardSaved)return;if(e.data.ok===false)toast(e.data.error||'서버에 저장하지 못했어요. 잠시 뒤 다시 시도해 주세요.')});
 
-const replayPath=(()=>{const ids=[],seen=new Set();let m=LTDEMO.moments[0];while(m&&!seen.has(m.id)){ids.push(m.id);seen.add(m.id);m=LTDEMO.moments.find(x=>x.id===m.next)}return ids})();
+function projectReplayPath(){const ids=[],seen=new Set();let m=LTDEMO.moments[0];while(m&&!seen.has(m.id)){ids.push(m.id);seen.add(m.id);m=LTDEMO.moments.find(x=>x.id===m.next)}return ids}
+let replayPath=projectReplayPath();
 
 let mobilePicker=null;
 

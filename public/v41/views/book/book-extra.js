@@ -569,6 +569,11 @@ if(typeof addEventListener==='function')addEventListener('message',e=>{
  if(e.data?.type!==MSG.treesSaved||!isShellMessage(e))return;
  const fresh=window.parent&&window.parent.LT41?window.parent.LT41.trees:null;
  if(!Array.isArray(fresh)||!Array.isArray(LTDEMO.library))return;
+ if(e.data.background){
+  paintTreeTitles();
+  if(treeMenu&&!treeMenu.hidden)openTreeMenu();
+  return;
+ }
  if(fresh.length!==LTDEMO.library.length){location.reload();return;}
  let savedChanged=false;
  for(const t of fresh){

@@ -69,7 +69,7 @@
     theme: fromView('lt41-theme', '없음'),
     titleDisplay: fromShell('lt41-title-display', 'value'),
     treesRenamed: fromShell('lt41-trees-renamed', 'titles'),
-    treesSaved: fromShell('lt41-trees-saved', '없음'),
+    treesSaved: fromShell('lt41-trees-saved', 'background?, treeId?, momentId?'),
     viewer: fromView('lt41-viewer', 'open'),
     write: fromView('lt41-write', 'mode, treeId?, momentId?, parentId?, focusTitle?'),
   });

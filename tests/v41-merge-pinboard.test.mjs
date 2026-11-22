@@ -20,7 +20,8 @@ test('런타임 한 벌만 부르고 자원 경로는 /v41/ 절대 경로', () =
 });
 
 test('연결은 데이터(LTDEMO.edges)에서 만들고 실제 기록 문구를 기준으로 쓴다', () => {
-  assert.match(SERVER, /let connections=LTDEMO\.edges\.map\(/);
+  assert.match(SERVER, /function projectBoardConnections\(\)\{return LTDEMO\.edges\.map\(/);
+  assert.match(SERVER, /let connections=projectBoardConnections\(\);/);
   assert.ok(!SERVER.includes('감상 예시'));
   assert.ok(!SERVER.includes('부모·자식 연결'));
   assert.ok(!SERVER.includes('공개 예시'));
@@ -32,7 +33,7 @@ test('예시 판본 판단은 한 곳에만 둔다(연결 색이 같은 값을 �
   assert.equal(branches.length, 1);
   // #619-6: 판단은 exampleBoard 한 곳에 두고, 연결 색과 꾸밈 카드 스타일이 같은 값을 본다.
   assert.match(SERVER, /const exampleBoard=LTDEMO\.example;/);
-  assert.match(SERVER, /const canEditBoard=exampleBoard\|\|boardSaveEnabled\(\);/);
+  assert.match(SERVER, /let canEditBoard=exampleBoard\|\|boardSaveEnabled\(\);/);
   assert.match(SERVER, /'cyan':\(canEditBoard\?\['rose','violet','cyan','amber'\]\[Math\.max\(0,moments\.findIndex/);
   assert.doesNotMatch(SERVER, /source===['"]example['"]/);
   assert.ok(!SERVER.includes('deleteConnBubble'), '연결 말풍선 단추는 없다');

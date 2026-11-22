@@ -29,7 +29,7 @@ function flowNavigation(){
   // 트리 보기 탭은 로그인한 내 트리에서만 연다. 로그아웃이면 예시가 열려 있어도 숨긴다.
   // #213 3번: 상태(out·in-empty·in-trees·share)마다 보이는 것만 남기고 나머지는 숨긴다(비활성 표시 없음).
   const parts=headerPartsFor({owned,treeCount:getModel()?.trees?.length||0,publicReading});
-  const showTreeViews=parts.treeViews&&treeViewsVisible({owned,publicReading});
+  const showTreeViews=treeViewsVisible({owned,phase:getMember()?.snapshot().phase,publicReading});
   $('tree-views').hidden=!showTreeViews;for(const b of $('tree-views').querySelectorAll('button')){b.disabled=false;b.title='';}
   $('tree-views').setAttribute('aria-label','이 트리 보기');
   // #1094: 보기 방식(책/목록) 전환 묶음은 책 화면에서만, #1093 서재 진열 묶음은 서재 화면에서만 보인다.

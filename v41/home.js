@@ -1,4 +1,4 @@
-import { MSG } from '../public/v41/frame-messages.mjs';
+import { MSG, isShellMessage } from '../public/v41/frame-messages.mjs';
 // #586: 첫 화면 문서는 src/styles.css 를 읽지 않는다(vite가 styles-*.css link를 주입해 궤도 그림자의
 // 스타일 재계산이 프레임당 수십 ms가 걸렸다). 그림자가 쓰는 --ui 토큰은 v41/home.html 의 style에 둔다.
 import {mountOrbit,ORBIT_EXAMPLE} from '../src/views/orbit.js';
@@ -324,6 +324,30 @@ function showCount(key,items){
  }
  line.hidden=false;return line;
 }
+// #1109: 셸이 같은 화면에서 상태만 바꿨을 때 프레임을 다시 띄우지 않고 숫자·최근 순간만 제자리에서 고친다.
+function refreshCountsFromParent(){
+ const fresh=parent.LT41?.trees;
+ if(!Array.isArray(fresh))return false;
+ context.trees=fresh;
+ const inbox=fresh.find(t=>t?.inbox===true),inboxCount=inbox?.moments?.length||0;
+ const total=fresh.reduce((n,t)=>n+(t?.moments?.length||0),0);
+ if(!total)return true;
+ showCount('moments',[
+  {text:`순간 ${formatCount(total)}`,label:`내 순간 ${total}개 목록 열기`,action:openMoments},
+  inboxCount?{text:`모아둔 ${formatCount(inboxCount)}`,label:`모아둔 순간 ${inboxCount}개 정리하기`,action:()=>bridge.actions.cleanup()}:null
+ ]);
+ const publicRow=countLines.get('trees')?.lastElementChild;
+ const treeCount=showCount('trees',[{text:`트리 ${formatCount(fresh.length)}`,label:`트리 ${fresh.length}개 서재 열기`,action:openTrees},null]);
+ if(publicRow&&treeCount)treeCount.lastElementChild.replaceWith(publicRow);
+  // 처음 그릴 때와 같은 길로 다시 고른다 — 머리글까지 넘겨야 같은 마크업·글자 크기로 그려진다.
+  const media=globalThis.LTMedia?.currentContext?.();
+  youtube.auto=globalThis.LTMedia?.autoLoadMedia?.(media?.source,media?.owned)===true;
+  const trees=momentListTrees(fresh),entries=momentListEntries({trees:fresh,youtube});
+  const picked=homeMomentPick(entries,homeMomentValue,{day:loggedIn?homeDayMoment(fresh):null,trees});
+  if(momentList){momentList.trees=trees;momentList.entries=entries;momentList.recent=picked.moment;momentList.recentHeader=picked.header;}
+  if(picked.moment)orbit?.recent?.set(picked.moment,picked.header);
+  return true;
+}
 const inboxTree=(Array.isArray(context.trees)?context.trees:[]).find(t=>t?.inbox===true);
 const inboxCount=inboxTree?.moments?.length||0;
 const totalCount=momentList?.entries?.length||0;
@@ -389,6 +413,8 @@ addEventListener('message',event=>{
  if(event.origin!==location.origin)return;
  const type=event.data?.type;
   if(type===MSG.motion){motionPaused=!!event.data.paused;orbit?.motion?.set?.(motionPaused);}
+  // #1109: 배경 상태 반영은 다시 띄우지 않고 지금 화면의 숫자·최근 순간만 고친다.
+  else if(type===MSG.treesSaved&&isShellMessage(event)){refreshCountsFromParent();}
   else if(type===MSG.homeCards){location.reload();}
   else if(type===MSG.homeMomentSet){setHomeMoment(event.data.value);}
 

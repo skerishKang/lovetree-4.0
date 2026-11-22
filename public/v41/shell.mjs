@@ -84,6 +84,7 @@ new MutationObserver(placeToast).observe(document.body,{attributes:true,attribut
 placeToast();
 // #1103: 세 안내가 같은 줄을 차례로 지나간다. 판·띠가 떠 있는 동안 토스트는 띄우지 않는다.
 const noticeQueue=createNoticeQueue();
+const syncedNoticeKeys=new Set();
 // 안내 한 벌(#353 후속): 담기·중복·로그인 필요 안내(hold)가 상태 안내보다 먼저 일정 시간 보인다.
 // 안내가 스스로 내려가면(시간이 다 되어 숨을 때) 줄을 비워 다음 안내가 올라오게 한다.
 const shellNotice=createNotifier({$,beforeShow:placeToast,afterShow:()=>{placeToast();setTimeout(placeToast,600);setTimeout(placeToast,1400);},onHide:()=>{noticeQueue.release('toast');}});
@@ -188,7 +189,7 @@ function buildFoldMenu(){
  // #458: 지금 보고 있는 화면 항목에 aria-current를 남긴다(메뉴를 열 때마다 다시 만들어 지금 상태를 반영한다).
  add('첫 화면',()=>document.querySelector('.brand').click(),current==='src064-orbit.html');
  add('둘러보기',()=>$('community-menu').click());
- add('서재',()=>{member?.snapshot().owned?show('track32-bookshelf.html'):openLoginStart('shelf')},current==='track32-bookshelf.html');
+ add('서재',()=>{memberViewsAvailable()?show('track32-bookshelf.html'):openLoginStart('shelf')},current==='track32-bookshelf.html');
  // 2026-11-17 대표 결정: 트리 0개여도 네 화면이 모두 열리므로 접기 메뉴에서도 책·보드·지도를 늘 둔다.
  add('책',()=>show('track59-sketchbook.html'),current==='track59-sketchbook.html');
  add('보드',()=>show('track58-pinboard.html'),current==='track58-pinboard.html');
@@ -608,6 +609,7 @@ const shellHeader=createHeader({
   getAccountTip:()=>shellSettings.getAccountTip(),
   delegate:{syncTreeTips:()=>syncTreeTips()}
 });
+function memberViewsAvailable(){return treeViewsVisible({...member?.snapshot(),publicReading:source==='share'});}
 function flowNavigation(){return shellHeader.flowNavigation();}
 function updateNavFade(){return shellHeader.updateNavFade();}
 function revealCurrentTab(){return shellHeader.revealCurrentTab();}
@@ -726,7 +728,7 @@ const { anyDialogOpen, tipsFollowDialogs, closeTreeTips, accountMenuOpen, tipsFo
 const navBar=document.querySelector('.app-header nav');
 const narrowNav=()=>matchMedia('(max-width:780px)').matches;
 function choose(id,momentId,skipShow=false){const tree=model.trees.find(t=>t.id===id);window.LT41=tree?{tree,trees:model.trees,source,momentId:tree.moments.find(m=>m.id===momentId)?.id||tree.moments.find(m=>m.parentId===null)?.id||tree.moments[0]?.id,prefs:currentPrefs(),writable:source==='server'&&!!member?.snapshot().writable,}:null;
- if(!skipShow&&(tree||current==='src064-orbit.html'))show(current,false,id||'');
+  if(!skipShow&&(tree||current==='src064-orbit.html'))show(current,false,id||'');
  else if(!skipShow||!tree){flowNavigation();document.body.classList.remove('home-screen');hideFrames();
   // 261118 대표 결정: 트리 0개 계정이 주소(#my/shelf 등)로 바로 들어와도 그 화면의 빈 상태(#817)를 보여 준다 —
   // 탭을 눌러 열 때와 같은 문구('아직 책장이 비어 있어요.' 등)로 시작한다.
@@ -768,7 +770,7 @@ function projectWorkspace(input){
  catch(error){console.warn('[LT41] 작업 공간을 읽지 못했어요:',error?.message||String(error));return null;}
 }
 const onExploreRoute=()=>/^#explore(?:\/moments)?$/.test(location.hash);
-function load(input,kind,selection={},fallback={},example=null){
+function load(input,kind,selection={},fallback={},example=null,silent=false){
  const projected=kind==='example'?{trees:[example||exampleTree].filter(Boolean)}:projectWorkspace(input);
  if(!projected){
   if(kind!=='server')throw new Error('기록을 읽을 수 없어요. 파일 형식을 확인해 주세요.');
@@ -786,12 +788,18 @@ function load(input,kind,selection={},fallback={},example=null){
  document.body.dataset.treeCount=String(model?.trees?.length||0);
  // #368: 트리 고르기는 맨 위 트리 ▾ 드롭다운 한 곳이다(옛 내 기록 창의 select는 없앴다).
  const resolved=resolveAccountPosition(model.trees,selection,fallback),chosen=model.trees.find(t=>t.id===resolved.position.treeId);
+ // #1109: 회원 기록을 기다리는 동안 첫 화면 문서를 먼저 열지 않는다. 빈 서재·책·보드는 기존 빈 판을 그린다.
+ if(silent&&(current==='src064-orbit.html'||onExploreRoute())){
+  window.LT41=null;
+  if(!onExploreRoute())shellStageLoading.start('home');
+  return resolved;
+ }
  // 예시나 회원 기록이 늦게 도착해도 먼저 고른 둘러보기는 그대로 둔다.
  const keepExplore=(kind==='server'||(kind==='example'&&exampleInitializing))&&onExploreRoute();
  choose(chosen?.id,resolved.position.momentId,keepExplore);
  return resolved;
 }
-function clear(){load({revision:0,state:{version:1,trees:[]}},'file');}
+function clear(silent=false){load({revision:0,state:{version:1,trees:[]}},'file',{},{},null,silent);}
 function stateSelection(){return {treeId:window.LT41?.tree.id,momentId:window.LT41?.momentId};}
 function formDirty(){return shellPanels.formDirty();}
 function treeDirty(){return shellPanels.treeDirty();}
@@ -933,10 +941,19 @@ function memberStatus(status){
   // #1076: 서버 기록을 처음 불러왔을 때만 한 번 — 화면 이동·다시 띄우기로 오는 synced 상태에서는 띄우지 않는다.
   if(!previousDirty){
    const text=syncedNoticeText({writable:status.writable,previousDirty,momentCount}),key='synced:'+String(member?.snapshot()?.subject||'session');
-   noticeQueue.request('toast',{maxWait:5000,
-    show:()=>shellNotice.notifyOnce(text,key),
-    hide:hideToast
-   });
+   // #952: 빈 첫 화면을 미리 열지 않으면 기록 응답이 새 소식 확인보다 앞설 수 있다.
+   // 새 소식 띠가 줄에 들어온 뒤 안내를 올려야 먼저 보였다가 가려지는 일이 없다.
+   if(!syncedNoticeKeys.has(key)){
+    const generation=loadGeneration;
+    void shellSettings.updatesReady.then(()=>{
+     if(generation!==loadGeneration||!member?.snapshot().owned||syncedNoticeKeys.has(key))return;
+     syncedNoticeKeys.add(key);
+     noticeQueue.request('toast',{maxWait:5000,
+      show:()=>shellNotice.notifyOnce(text,key),
+      hide:hideToast
+     });
+    }).catch(error=>report(error,'새 소식 확인'));
+   }
   }
   // 소개 질문(2026-11-16 대표 결정): 아직 안 물은 트리 중 순간 3개 이상인 것이 있으면 묻는다 —
   // 2→3 저장 직후가 대표 경로다. 직전 관측 스냅샷(상태마다 재촬영)은 두지 않는다(#718 원인): 재촬영하면
@@ -956,9 +973,13 @@ function memberStatus(status){
  }
  else if(status.phase==='login'&&!status.dirty&&document.body.dataset.member==='in')notify('로그인이 필요해요.');/* #1175: 로그아웃 상태로 시작할 때(저장 연결 확인 401)는 진입만으로 알림을 띄우지 않는다 — 머리글의 로그인 단추가 이미 길을 알린다. */
  else if(!status.dirty&&status.phase==='offline')notify(status.detail||'내 기록을 불러오지 못했어요.');
- $('write-menu').textContent=status.dirty?'저장 안 됨' :'＋ 순간 추가';$('empty-records').textContent=status.writable?'＋ 첫 트리 만들기':'내 기록 불러오기';/* #463: 이름을 한 곳에서 정한다(paintEmptyCopy와 같은 글자) *//* #463: 주 버튼 표시도 같이 유지한다(쓸 상태가 바뀌도 강조가 엉키지 않게). */$('empty-records').classList.toggle('primary',!!status.writable);$('empty-sample').classList.toggle('primary',!status.writable);previousDirty=status.dirty;renderAccount();flowNavigation();document.body.dataset.member=member?.snapshot().owned?'in':'out';document.body.dataset.treeCount=String(model?.trees?.length||0);applyAdvanced();
+ $('write-menu').textContent=status.dirty?'저장 안 됨' :'＋ 순간 추가';
+ // #1109: 내 화면을 먼저 고른 경우 빈 판 안내를 회원 상태 알림이 덮지 않는다.
+ if(current!=='src064-orbit.html'&&!window.LT41&&source!=='share'&&!$('empty').hidden)paintEmptyForScreen(current);
+ else{$('empty-records').textContent=status.writable?'＋ 첫 트리 만들기':'내 기록 불러오기';$('empty-records').classList.toggle('primary',!!status.writable);$('empty-sample').classList.toggle('primary',!status.writable);}
+ previousDirty=status.dirty;renderAccount();flowNavigation();document.body.dataset.member=member?.snapshot().owned?'in':'out';document.body.dataset.treeCount=String(model?.trees?.length||0);applyAdvanced();
 }
-async function startMember(){setMemberRefreshStarted(true);if(!leaveMember())return;backfillStarted=false;backfillAttempted.clear();const startup=parseSelectionRoute(location.hash);if(startup.scope==='owner')stashPendingOwnerRoute(sessionStorage,location.hash);++loadGeneration;const generation=loadGeneration;clear();
+async function startMember(){setMemberRefreshStarted(true);if(!leaveMember())return;backfillStarted=false;backfillAttempted.clear();const startup=parseSelectionRoute(location.hash);if(startup.scope==='owner')stashPendingOwnerRoute(sessionStorage,location.hash);++loadGeneration;const generation=loadGeneration;clear(true);
  const api=createWorkspaceApi({fetchImpl:(url,init)=>fetch(init?.method==='GET'&&url==='/api/workspace'?'/api/workspace?features=bound-writes':url,init)});
  let initialized=false,startupNotice='',session;
  session=createMemberSession({api,onGuard:read=>workspaceGuardNotice(read),onState:(state,selection,meta)=>{if(generation!==loadGeneration)return;try{
@@ -976,7 +997,25 @@ async function startMember(){setMemberRefreshStarted(true);if(!leaveMember())ret
     let view=memberStartupView(active,route,saved,viewForFile(current));
     if(startPlace!=='resume'&&!route&&active?.scope!=='owner'&&!(active?.scope==='screen'&&active.explicit)&&!pending)view=startPlace==='shelf'?'shelf':'home';
     current=screenForView(view)[1];}
-   const resolved=load({revision:0,state},'server',requested,saved);initialized=true;
+   // #1109: 같은 화면·같은 트리의 배경 상태 반영은 프레임을 갈지 않는다.
+   // 화면이 이미 자기 상태를 들고 있으므로 모델과 창 안 값만 고치고, 기존 '트리 저장' 메시지로 다시 그리게 한다.
+   let resolved;
+   const projected=workspaceModel({revision:0,state});
+   const position=resolveAccountPosition(projected.trees,requested,saved);
+   const context=window.LT41;
+   const sameTree=context?.tree?.id&&context.tree.id===position.position.treeId;
+   const canRefresh=['src064-orbit.html','track59-sketchbook.html','track58-pinboard.html','track32-bookshelf.html'].includes(current);
+   if(initialized&&!meta&&!selection&&sameTree&&canRefresh&&source==='server'){
+    model=projected;
+    const tree=projected.trees.find(t=>t.id===context.tree.id);
+    Object.assign(context,{tree,trees:projected.trees,prefs:state.prefs,momentId:position.position.momentId,writable:!!member?.snapshot().writable});
+    document.body.dataset.treeCount=String(projected.trees.length);
+    links();
+    for(const f of frames()){try{f.contentWindow?.postMessage({type:MSG.treesSaved,background:true,treeId:tree.id,momentId:context.momentId},location.origin)}catch(error){report(error,'기록 갱신 알림');}}
+    resolved=position;
+   }else{
+    resolved=load({revision:0,state},'server',requested,saved);initialized=true;
+   }
    if(window.LT41)window.LT41.prefs=state.prefs;
    // #441 후속: 다른 기기의 첫 그림도 계정 날짜 표기를 따르도록, 로그인 때 기기 미러 캐시를 계정값으로 채운다.
    try{localStorage.setItem('lt41.dateStyle',normalizeDateStyle(state.prefs?.dateStyle));}catch(error){report(error, '기기 설정 저장');}
@@ -1021,7 +1060,7 @@ $('account-avatar').onclick=e=>{
  e.stopPropagation();
  if($('account-popover').hidden){openAccountMenu(e.detail===0?'keyboard':'mouse');void shellSettings.getFeedbackBoard().refreshReplyDot();void shellSettings.refreshMyNewsCount?.();}else closeAccountMenu();
 };
-const shellSettings=createSettings({ $, notify, setTitleDisplay, openLoginStart, links, screenForView, choose, panel, show, frames, frameLoaded, hideFrames, closeAccountMenu, openAccountMenu, renderAccount, updateAccountControls, openAssets, openEditor, sample, backup, clear, startMember, leaveMember, openFallbackShell, writeLocation, load, flowNavigation, renderTreeMenu, requestBoardOpen, lastShelfTreeId, shellHeader, shellDialogs,  shareApi, accountApi, myNewsApi, readTheme, writeTheme, normalizeAccentColor, normalizeDateStyle, normalizeStartPlace, normalizeShareView, normalizeHomeMoment,  readPageTurn, writePageTurn, frameMessage, displayTreeTitle, accountPresentation, createFeedbackDialog, createFeedbackBoard, mountUpdates, mountMyNews, readWriteTab, writeWriteTab, clearCachedWorkspace, forgetLoginSubject, createWorkspaceApi, paintThemeControls, applyTheme, toggleTheme, paintBookDisplayControls, get member(){return member}, get model(){return model}, get current(){return current}, get source(){return source}, get motionPaused(){return motionPaused}, get loadGeneration(){return loadGeneration}, get handledHash(){return handledHash}, get activeShareId(){return activeShareId}, set member(v){member=v}, set model(v){model=v}, set current(v){current=v}, set source(v){source=v}, set motionPaused(v){motionPaused=v}, set loadGeneration(v){loadGeneration=v}, set handledHash(v){handledHash=v}, set activeShareId(v){activeShareId=v}
+const shellSettings=createSettings({ $, memberViewsAvailable, notify, setTitleDisplay, openLoginStart, links, screenForView, choose, panel, show, frames, frameLoaded, hideFrames, closeAccountMenu, openAccountMenu, renderAccount, updateAccountControls, openAssets, openEditor, sample, backup, clear, startMember, leaveMember, openFallbackShell, writeLocation, load, flowNavigation, renderTreeMenu, requestBoardOpen, lastShelfTreeId, shellHeader, shellDialogs,  shareApi, accountApi, myNewsApi, readTheme, writeTheme, normalizeAccentColor, normalizeDateStyle, normalizeStartPlace, normalizeShareView, normalizeHomeMoment,  readPageTurn, writePageTurn, frameMessage, displayTreeTitle, accountPresentation, createFeedbackDialog, createFeedbackBoard, mountUpdates, mountMyNews, readWriteTab, writeWriteTab, clearCachedWorkspace, forgetLoginSubject, createWorkspaceApi, paintThemeControls, applyTheme, toggleTheme, paintBookDisplayControls, get member(){return member}, get model(){return model}, get current(){return current}, get source(){return source}, get motionPaused(){return motionPaused}, get loadGeneration(){return loadGeneration}, get handledHash(){return handledHash}, get activeShareId(){return activeShareId}, set member(v){member=v}, set model(v){model=v}, set current(v){current=v}, set source(v){source=v}, set motionPaused(v){motionPaused=v}, set loadGeneration(v){loadGeneration=v}, set handledHash(v){handledHash=v}, set activeShareId(v){activeShareId=v}
  });
 const { showPublicRoute, applyAdvanced, applyDateStyleToFrame, applyPageTurnToFrame, applyNetworkViewToFrame, applyBoardThemeToFrame, syncBoardThemeToApp, quickTargetPreference, profileDirty, paintSettingsProfile, accountConfirmMatches, openAccountData, openAccountSettings, paintDateStyleControls, paintStartPlaceControls, paintShareControls, paintQuickTargetControls, paintNetworkViewControls, paintPageTurnControls, paintBoardThemeControls, paintTreeVisibilityList, paintSettingsUsage, loadTreeVisibility, paintTreeManagerVisibility, paintSettingsTab, focusSettingsSection, fillProfileForm, paintScreenControls, readAdvanced, advancedKey, currentDateStyle, currentPageTurn, sendToFrame, currentStartPlace, currentShareView, currentBoardTheme }=shellSettings;
 // #1094: 머리줄 묶음과 설정 창의 같은 data-book-display 두 칸이 하나의 길로 바뀌고 저장된다.
@@ -1040,7 +1079,7 @@ else if(onExploreRoute()){/* #1025: 둘러보기가 자기 주소를 연다 — 
 else if(shouldLoadMemberRecords(location.search,document.cookie,location.hash)||shellIntake.pending()){
  // #1026 E: 기존 사용자는 예시를 받지 않는다. 주소가 정해지는 즉시 빈 틀을 세우고,
  // 아래 startMember()가 기록을 받는 대로 화면 iframe을 연다 — example.mjs 요청 0.
- clear();
+ clear(true);
 }else{
  // 로그아웃·신규 사용자는 예시가 실제 내용이므로 필요한 이 순간에만 동적으로 받는다.
  shellStageLoading.start('home');

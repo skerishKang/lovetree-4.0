@@ -245,6 +245,23 @@ let styleSec=document.createElement('div');styleSec.className='section';styleSec
 if($('#addBtn'))$('#addBtn').onclick=()=>{if(LTDEMO.readOnly)return;openAdd()};$('#confirmAdd').onclick=()=>{if(LTDEMO.readOnly)return;confirmAdd()};renderCards();renderThreads();updateKeywordFilter();formFor(addType);fitAll(false);applyPathHighlight();setTimeout(()=>{/* #891: 탭으로 들어오면 닫힘, ?open= 주소만 자동 열림(board.js bootDetailPanel) */bootDetailPanel()},100);
 window.__LT58V11={youtubeId,youtubeThumb,youtubeThumbUrl,openEdit,saveEdit,chooseNext,highlightPath,startCinema:startCinemaV11,endCinema:endCinemaV11,setCinemaPosition,theme:t=>{document.body.dataset.theme=t},setMomentStyle:(id,pin,card)=>{let m=moments.find(x=>x.id===id);m.pinStyle=pin;m.cardStyle=card;renderCards()},get cinema(){return{active:cinemaV11.active,paused:cinemaV11.paused,index:cinemaV11.index,beat:cinemaV11.beats[cinemaV11.index]?.label,focused:cinemaV11.focused}},get state(){return{moments:moments.length,connections:connections.length,theme:document.body.dataset.theme,selected,keywords:[...new Set(moments.flatMap(m=>m.keywords||[]))]}}};
 
+// #1109: 서버 기록이 다시 도착해도 지금 판과 도구 창은 그대로 두고 카드 자료만 반영한다.
+addEventListener('message',e=>{
+ if(!globalThis.LT41_isShellMessage?.(e)||e.data?.type!==globalThis.LT41_MSG.treesSaved||!e.data.background)return;
+ if(!LTDEMO.refresh?.())return;
+ const detailOpen=$('#detail').classList.contains('open');
+ canEditBoard=exampleBoard||boardSaveEnabled();
+ moments=projectBoardMoments();
+ reservedHeights.clear();
+ for(const m of LTDEMO.moments)reservedHeights.set(m.id,m.externalUrl?(LTMedia.verticalVideo(m.externalUrl,m.mediaMetadata)?YT_VERTICAL_RESERVED_H:YT_RESERVED_H):BASE_RESERVED_H);
+ momentOrder=projectBoardOrder();
+ connections=projectBoardConnections();
+ replayPath=projectReplayPath();
+ undoStack=[];
+ if(!moments.some(m=>m.id===selected))selected=LTDEMO.get();
+ placeAll();renderCards();renderThreads();updateKeywordFilter();applyPathHighlight();applyView(false);
+ if(detailOpen&&selected)selectMoment(selected,true);
+});
 addEventListener('message',e=>{if(e.data?.type===globalThis.LT41_MSG.titleDisplay&&globalThis.LT41_isShellMessage?.(e)){if(typeof renderCards==='function')renderCards();if(typeof renderThreads==='function')renderThreads();if(selected)selectMoment(selected,$('#detail').classList.contains('open'));}});
 addEventListener('lt-title-ready',()=>{if(typeof renderCards==='function')renderCards();if(typeof renderThreads==='function')renderThreads();if(selected)selectMoment(selected,$('#detail').classList.contains('open'));});
 

@@ -41,5 +41,5 @@
     select:id=>{if(moments.some(m=>m.id===id)){context.momentId=id;parent.postMessage({type:globalThis.LT41_MSG.selection,id},location.origin)}},
     // #1001 (3): 셸이 모델만 갱신한 뒤(lt41-moments-saved) 화면이 부모 LT41.tree에서 순간·연결을 다시 읽는다.
     // moments 배열은 제자리에서 바꿔, 이미 이 배열을 든 화면(book.js SPREADS 재구축 등)이 같은 참조로 새 값을 본다.
-    refresh:()=>{const fresh=parent.LT41?.tree;if(!fresh||fresh.id!==tree.id)return false;const next=projectMoments(fresh,context);moments.length=0;for(const m of next)moments.push(m);window.LTDEMO.edges=fresh.edges;window.LTDEMO.title=fresh.title;return true;}};
+    refresh:()=>{const fresh=parent.LT41?.tree;if(!fresh||fresh.id!==tree.id)return false;const next=projectMoments(fresh,context);moments.length=0;for(const m of next)moments.push(m);window.LTDEMO.edges=fresh.edges;window.LTDEMO.title=fresh.title;window.LTDEMO.writable=parent.LT41?.source==='server'&&!!parent.LT41.writable;window.LTDEMO.prefs=parent.LT41?.prefs||{titleDisplay:'both'};return true;}};
 })();

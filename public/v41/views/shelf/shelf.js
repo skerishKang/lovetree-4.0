@@ -323,6 +323,14 @@ if(typeof addEventListener==='function')addEventListener('message',e=>{
   // 저장 실패 때는 이 메시지가 오지 않는다 — 책장은 원래 표지를 그대로 두고, 셸의 저장 안내 떠가 실패를 알린다.
   var freshTrees=window.parent&&window.parent.LT41?window.parent.LT41.trees:null;
   if(!Array.isArray(freshTrees))return;
+  if(e.data.background){
+   if(!LTDEMO.refresh?.())return;
+   LTDEMO.refreshLibrary();
+   books=buildShelf(shelfOrder(LTDEMO.library),palette,namer);
+   renderShelf();
+   var openBook=getBook(state.selectedId);if(openBook&&state.open)setCover(openBook);
+   return;
+  }
   if(freshTrees.length!==books.length){location.reload();return;}
   var savedChanged=false,savedOpenChanged=false;
   for(const t of freshTrees){

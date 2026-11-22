@@ -2336,9 +2336,18 @@ test('#657 후속 261117: 트리 0개 계정의 탭 4개와 화면별 빈 상태
         const ctx = await browser.newContext({ viewport: { width, height: width === 390 ? 844 : 900 }, reducedMotion: 'reduce' });
         await ctx.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); } catch {} }, theme);
         await ctx.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
-        await ctx.route('**/api/workspace**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ revision: 1, state: { version: 1, trees: [], prefs: {} }, subject: '시험계정', writeSubjectBound: true, savedAt: '2026-11-17T00:00:00.000Z' }) }));
+        const slowTabs=process.env.LT_EMPTY_TABS_SLOW==='1';
+        await ctx.route('**/api/workspace**', async (r) => {
+          if(slowTabs)await new Promise(resolve=>setTimeout(resolve,600));
+          return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ revision: 1, state: { version: 1, trees: [], prefs: {} }, subject: '시험계정', writeSubjectBound: true, savedAt: '2026-11-17T00:00:00.000Z' }) });
+        });
         const page = await ctx.newPage();
+        if(slowTabs){const cdp=await ctx.newCDPSession(page);await cdp.send('Emulation.setCPUThrottlingRate',{rate:4});}
         await page.goto(`${base}/v41/?account=1`, { waitUntil: 'load', timeout: 30000 });
+        if(slowTabs)console.log('# 탭 상태',JSON.stringify(await page.evaluate(()=>{
+          const chain=[];for(let e=document.querySelector('#tree-views button[data-view]');e;e=e.parentElement){const s=getComputedStyle(e),r=e.getBoundingClientRect();chain.push({id:e.id,tag:e.tagName,cls:e.className,hidden:e.hidden,display:s.display,visibility:s.visibility,w:r.width,h:r.height,data:{...e.dataset}})}
+          return {chain,member:document.body.dataset.member,source:document.body.dataset.recordSource,treeCount:document.body.dataset.treeCount,loading:!document.getElementById('stage-loading')?.hidden};
+        })));
         const labels = { 'track32-bookshelf.html': '서재', 'track59-sketchbook.html': '책', 'track58-pinboard.html': '보드', 'track56-network.html': '지도' };
         const openMore = async () => {
           if (width !== 390) return;
