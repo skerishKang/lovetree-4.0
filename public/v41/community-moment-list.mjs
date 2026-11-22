@@ -2,7 +2,7 @@
 // 이 목록의 순간 카드는 그 순간의 ♡ 수·댓글 수를 보인다. ♡ 누르기·댓글 쓰기는 순간 단위 API(서버 #1136)로 간다.
 // · 순간 반응은 ♡ 하나다(다른 종은 트리 반응의 일 — 순간과 섞지 않는다).
 // · 공개 숫자 규칙(#824 결정 7)을 그대로 — 3 미만 숫자는 보이지 않는다. 시험 계정 몫은 서버가 이미 뺀다.
-// · AI 명예회원 댓글은 트리 작성자 표시와 같은 방식('AI 명예회원' 배지·머리말)으로 구분하고, aiHearts가 있으면 ♡ 옆에 같은 배지를 둔다.
+// · AI 명예회원 댓글은 트리 작성자 표시와 같은 방식으로 작성자 이름 옆 'AI 명예회원' 머리말로 구분한다 — ♡ 단추에는 수만 둔다.
 // · 쓸 수 없을 때(비공개·로그아웃·횟수 제한)는 서버 응답 안내를 그대로 보여 주고 화면이 깨지지 않게 한다 —
 //   로그아웃(401)에는 트리 댓글과 같은 '새 창에서 로그인' 안내를 곁들인다.
 // · 응답 모양이 다르면(예전 모의 응답 등) 조용히 숨는다 — 판의 나머지 검사(겹침·넘침)를 흔들지 않게.
@@ -58,7 +58,6 @@ export function mountMomentList({section,host,api,shareId,when,countLabel}){
    // 공개 숫자 규칙(#824 결정 7) — 3 이상일 때만 숫자를 남긴다(라벨이 아니라 수만: 아이콘과 겹치지 않게).
    const count=state.loaded&&state.hearts>=3?String(state.hearts):'';
    if(count)heart.append(el('span','community-moment-count',count));
-   if(state.aiHearts>0)heart.append(el('span','community-ai community-moment-ai','AI 명예회원'));
    heart.setAttribute('aria-pressed',String(state.hearted));};
   paintHeart();
   heart.onclick=async()=>{

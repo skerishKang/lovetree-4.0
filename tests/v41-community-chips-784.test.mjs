@@ -647,7 +647,7 @@ testOrSkip('#1098 2단계: 판의 순간 목록 — 순간 카드에 그 순간�
     assert.equal(state.rows[0].title, '첫 순간', '목록은 공개 트리 읽기 순서를 따른다');
     assert.equal(state.rows[0].glyph, '♡', '기본은 빈 하트');
     assert.equal(state.rows[0].count, '7', '그 순간의 ♡ 수가 보인다(3 이상)');
-    assert.equal(state.rows[0].aiBadge, true, 'AI 명예회원 공감이 있으면 배지로 구분한다');
+    assert.equal(state.rows[0].aiBadge, false, '♡ 단추에는 AI 배지를 두지 않는다 — 그 순간의 수만 보인다');
     assert.equal(state.rows[0].commentsToggle, '댓글 4', '그 순간의 댓글 수가 보인다');
     assert.equal(state.rows[1].count, '', '3 미만 ♡ 수는 숫자를 남기지 않는다(#824 결정 7 규칙)');
     assert.equal(state.rows[1].commentsToggle, '댓글', '3 미만 댓글 수도 숫자를 남기지 않는다');

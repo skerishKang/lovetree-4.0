@@ -928,7 +928,6 @@ body.community-screen #stage>iframe,body.community-screen #empty{display:none}
 #community-preview .community-moment-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 #community-preview .community-moment-heart .community-moment-heart-glyph{font-size:16px}
 #community-preview .community-moment-count{font-weight:700}
-#community-preview .community-moment-ai{min-height:22px;font-size:11px}
 #community-preview .community-moment-note{margin:0;color:var(--lt-ink);font-size:13px;line-height:1.5}
 #community-preview .community-moment-note[hidden]{display:none}
 #community-preview .community-moment-comments{display:grid;gap:8px}

@@ -354,6 +354,15 @@ test('#1098 2단계 — 쇼츠의 그 순간 ♡·댓글 수와 순간 단위 �
     });
     assert.equal(drawer.title, '댓글', '댓글 2·3 미만은 머리글에 숫자를 남기지 않는다');
     assert.match(drawer.first, /^AI 명예회원/, 'AI 명예회원 댓글은 트리 작성자 표시와 같은 방식으로 구분된다');
+    // 쓰기 단추 모양 — 판의 '댓글 남기기'와 같은 테마 색·둥근 모서리(회색 납작 막대 금지).
+    const submitLook = await h.page.evaluate(() => {
+      const submit = document.querySelector('#community-moments-panel .moments-comments-dialog button[type="submit"]');
+      const cs = getComputedStyle(submit);
+      return { radius: cs.borderRadius, background: cs.backgroundColor, height: Math.round(submit.getBoundingClientRect().height) };
+    });
+    assert.equal(submitLook.radius, '999px', `쇼츠 쓰기 단추는 둥근 모서리: ${submitLook.radius}`);
+    assert.equal(submitLook.background, 'rgb(245, 239, 226)', `쇼츠 쓰기 단추는 테마 색(밤: 종이 색): ${submitLook.background}`);
+    assert.ok(submitLook.height >= 44, `쇼츠 쓰기 단추 44px 누르는 자리: ${submitLook.height}`);
     // ④ 댓글 쓰기 — 순간 댓글 API(POST)로, 목록에 더해진다.
     await h.page.locator('#community-moments-panel .moments-comments-dialog textarea').fill('우리도 같이 들었어요.');
     await h.page.locator('#community-moments-panel .moments-comments-dialog button[type="submit"]').click();

@@ -125,5 +125,8 @@ dialog.community-group-find::backdrop{background:transparent}
 .moments-comments-list .community-comment{border:1px solid var(--lt-line);border-radius:var(--lt-r-card,14px);padding:10px 12px}
 .moments-comments-list .community-comment small{color:var(--lt-muted)}
 .moments-comments-list .community-comment p{margin:4px 0 0;color:var(--lt-pearl);font-size:14px;line-height:1.55}
+/* #1098 2단계: 쇼츠 댓글 창의 쓰기 단추 — 판의 '댓글 남기기'(#community-preview .community-mini)와 같은 모양(테마 색·둥근 모서리). */
+.moments-comments-dialog .community-mini{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:9px 14px;border:1px solid var(--lt-line-paper);border-radius:var(--lt-r-pill);background:var(--lt-paper);color:var(--lt-ink);font-size:14px;font-weight:600;cursor:pointer}
+.moments-comments-dialog .community-mini:disabled{opacity:.6}
 /* #1098 2단계: 레일 숫자 — ♡·댓글 수(3 미만은 숫자 없음). 390에서도 아이콘 아래 숫자가 같은 자리에 온다. */
 .moments-rail-count{font-size:12px;color:var(--lt-pearl);min-height:14px}
