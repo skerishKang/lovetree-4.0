@@ -37,7 +37,8 @@ test('callback with wrong state and cross-origin refresh are rejected', async ()
   const f = await setup();
   const begin = await f.auth(new Request('https://lovetree-4-0.pages.dev/auth/login'), f.env);
   const response = await f.auth(new Request('https://lovetree-4-0.pages.dev/auth/callback?state=wrong&code=x', { headers: { cookie: begin.headers.get('set-cookie').split(';')[0] } }), f.env);
-  assert.equal(response.status, 401); assert.equal(f.calls(), 0);
+  // #1189 4번: 콜백 거절은 JSON 대신 안내 화면으로 보낸다.
+  assert.equal(response.status, 302); assert.equal(response.headers.get('location'), '/v41/?loginNotice=1'); assert.equal(f.calls(), 0);
   const refresh = await f.auth(new Request('https://lovetree-4-0.pages.dev/auth/refresh', { method: 'POST', headers: { origin: 'https://evil.example', cookie: 'lovetree_refresh=refresh' } }), f.env);
   assert.equal(refresh.status, 403);
 });
@@ -76,7 +77,7 @@ test('official aliases get their own callback and sealed state cannot cross host
   const cookie=start.headers.get('set-cookie').split(';')[0],query='?state='+target.searchParams.get('state')+'&code=fake';
   const other=origin.includes('pages.dev')?'https://lovetree.padiem.net':'https://lovetree-4-0.pages.dev';
   const before=f.calls();const cross=await f.auth(new Request(other+'/auth/callback'+query,{headers:{cookie}}),f.env);
-  assert.equal(cross.status,401);assert.equal(f.calls(),before);
+  assert.equal(cross.status,302);assert.equal(cross.headers.get('location'),'/v41/?loginNotice=1');assert.equal(f.calls(),before);
   const done=await f.auth(new Request(origin+'/auth/callback'+query,{headers:{cookie}}),f.env);
   assert.equal(done.status,302);assert.equal(done.headers.get('location'),'/v41/');
   assert.doesNotMatch(done.headers.get('set-cookie'),/Domain=/i);
@@ -322,4 +323,45 @@ test('email_assertion: 서명 일치·aud·만료·sub·필드 검증을 통과�
       assert.equal(push, undefined, `${name}: 저장소 호출 없음`);
     }
   }
+});
+
+// #1189 4번: 콜백 실패 4종은 JSON 대신 첫 화면 안내로 302. 로그에는 이유 한 단어만 남기고 값·토큰·이메일은 남기지 않는다.
+test('콜백 실패 4종은 안내 화면으로 보내고 로그에 이유만 남긴다', async () => {
+  const original = console.warn;
+  const logs = [];
+  console.warn = (...args) => { logs.push(args.map(String).join(' ')); };
+  const secret = 'super-secret-value';
+  const email = 'owner@example.test';
+  const env = { ...(await pagesEnv()), PADIEM_AUTH_EMAIL_ASSERTION_KEY_LOVETREE: secret };
+  const run = async (name, fetcher, verify, stateOverride) => {
+    const auth = createSharedPagesAuth({ now: () => 1000, fetcher, verify: verify || (async () => ({ accountId: 'sub_a' })) });
+    const begin = await auth(new Request('https://lovetree-4-0.pages.dev/auth/login'), env);
+    const target = new URL(begin.headers.get('location'));
+    const callback = new URL('https://lovetree-4-0.pages.dev/auth/callback');
+    callback.searchParams.set('state', stateOverride ?? target.searchParams.get('state'));
+    callback.searchParams.set('code', 'fake');
+    return auth(new Request(callback, { headers: { cookie: begin.headers.get('set-cookie').split(';')[0] } }), env);
+  };
+  try {
+    // 1) 상태 불일치
+    const badState = await run('state', async () => Response.json({ access_token: 'access', refresh_token: 'refresh' }), null, 'wrong-state');
+    assert.equal(badState.status, 302, '상태 불일치: 302');
+    assert.equal(badState.headers.get('location'), '/v41/?loginNotice=1');
+    // 2) 코드 교환 실패(invalid_grant)
+    const badCode = await run('code', async () => Response.json({ error: 'invalid_grant' }, { status: 400 }));
+    assert.equal(badCode.status, 302, '코드 교환 실패: 302');
+    assert.equal(badCode.headers.get('location'), '/v41/?loginNotice=1');
+    // 3) 토큰 검증 실패
+    const badToken = await run('token', async () => Response.json({ access_token: 'access', refresh_token: 'refresh' }), async () => { throw new Error('bad token'); });
+    assert.equal(badToken.status, 302, '토큰 검증 실패: 302');
+    assert.equal(badToken.headers.get('location'), '/v41/?loginNotice=1');
+    // 4) refresh 없음
+    const noRefresh = await run('refresh', async () => Response.json({ access_token: 'access' }));
+    assert.equal(noRefresh.status, 302, 'refresh 없음: 302');
+    assert.equal(noRefresh.headers.get('location'), '/v41/?loginNotice=1');
+    // 로그에 비밀·이메일 값이 없는지 확인
+    const joined = logs.join('\n');
+    assert.ok(!joined.includes(secret), '로그에 비밀이 없다');
+    assert.ok(!joined.includes(email), '로그에 이메일이 없다');
+  } finally { console.warn = original; }
 });

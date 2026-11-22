@@ -11,6 +11,12 @@ const j64 = x => b64(enc.encode(JSON.stringify(x)));
 const cookies = request => Object.fromEntries((request.headers.get('cookie') || '').split(';').map(x => x.trim().split(/=(.*)/s).slice(0, 2)).filter(x => x.length === 2));
 const attrs = 'Secure; HttpOnly; SameSite=Lax';
 const json = (status, error) => new Response(JSON.stringify({ error }), { status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } });
+// #1189 4번: 콜백 거절은 JSON 대신 첫 화면 안내로 보낸다. 셸이 이 표지를 읽어 안내와 다시 시도 단추를 띄운다.
+const LOGIN_FAILURE_NEXT = '/v41/?loginNotice=1';
+function loginFailure(reason) {
+  console.warn('[lovetree-auth]', JSON.stringify({ reason }));
+  return new Response(null, { status: 302, headers: { location: LOGIN_FAILURE_NEXT, 'cache-control': 'no-store' } });
+}
 // 토큰 교환 응답의 사용자 정보(profile.email)를 러브트리 서버 DB에 담는 서버-간 내부 경로.
 // 브라우저가 임의로 자기 이메일을 써 놓을 수 없게, 로그인 콜백 처리에서 받은 access 토큰과
 // 토큰 서명에 실린 sub만 보내고 COM2는 같은 토큰을 JWKS로 검증한 뒤 sub가 일치해야 저장한다.
@@ -168,10 +174,20 @@ export function createSharedPagesAuth({ fetcher = fetch, now = () => Math.floor(
       }
       if (path === '/auth/callback' && request.method === 'GET') {
         const state = await unseal(env, jar.lovetree_auth_state);
-        if (state.callback !== callbackFor(request, env) || state.exp <= current || !state.state || state.state !== url.searchParams.get('state') || !url.searchParams.get('code') || validNext(state.next) !== state.next) return json(401, 'invalid_state');
-        const tokens = await exchange(env, { grant_type: 'authorization_code', code: url.searchParams.get('code'), redirect_uri: callbackFor(request, env), code_verifier: state.verifier }, fetcher, current);
-        const verified = await verify(tokens.access_token);
-        if (typeof tokens.refresh_token !== 'string') throw new Error('missing refresh');
+        if (state.callback !== callbackFor(request, env) || state.exp <= current || !state.state || state.state !== url.searchParams.get('state') || !url.searchParams.get('code') || validNext(state.next) !== state.next) return loginFailure('invalid_state');
+        let tokens;
+        try {
+          tokens = await exchange(env, { grant_type: 'authorization_code', code: url.searchParams.get('code'), redirect_uri: callbackFor(request, env), code_verifier: state.verifier }, fetcher, current);
+        } catch (error) {
+          return loginFailure(error instanceof InvalidGrant ? 'invalid_grant' : 'token_exchange_failed');
+        }
+        let verified = null;
+        try {
+          verified = await verify(tokens.access_token);
+        } catch {
+          return loginFailure('token_verify_failed');
+        }
+        if (typeof tokens.refresh_token !== 'string') return loginFailure('missing_refresh');
         await recordAccountEmail(env, fetcher, tokens, verified, current);
         const h = issueCookies(tokens); h.set('location', state.next); return new Response(null, { status: 302, headers: h });
       }
@@ -195,6 +211,7 @@ export function createSharedPagesAuth({ fetcher = fetch, now = () => Math.floor(
       }
       return json(404, 'not_found');
     } catch (error) {
+      if (path === '/auth/callback') return loginFailure('invalid_state');
       if (path === '/auth/refresh' && error instanceof InvalidGrant) {
         const response = json(401, 'not_authenticated');
         response.headers.append('set-cookie', `__Host-lovetree-access=; Path=/; Max-Age=0; ${attrs}`);
