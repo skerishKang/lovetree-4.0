@@ -73,3 +73,16 @@ test('판정 표: 서버·함수·도구는 화면 밖, 화면 도구는 화면'
     assert.equal(r.changed, expected, `${label}(${files.join(',')}): ${JSON.stringify(r.reasons)}`);
   }
 });
+
+test('지도(추후 개발) 시험은 지도 파일이 바뀐 PR에서만 돈다', async () => {
+  const { mapChanged } = await import('../tools/ci/screen-changes.mjs');
+  assert.equal(mapChanged(['public/v41/views/network/network.js']), true, '지도 화면');
+  assert.equal(mapChanged(['public/v41/network.css']), true, '지도 스타일');
+  assert.equal(mapChanged(['tests/v41-map-contrast.test.mjs']), true, '지도 시험');
+  assert.equal(mapChanged(['tests/helpers/map-contrast.mjs']), true, '지도 시험 보조');
+  assert.equal(mapChanged(['public/v41/identity.css']), true, '지도가 쓰는 테마 공통');
+  assert.equal(mapChanged(['.github/workflows/preview-check.yml']), true, '화면 워크플로');
+  assert.equal(mapChanged(['public/v41/shell/auth.mjs']), false, '셸 로그인');
+  assert.equal(mapChanged(['public/v41/views/board/board.js']), false, '보드');
+  assert.equal(mapChanged(['public/v41/sitemap.xml']), false, '지도와 무관한 이름');
+});
