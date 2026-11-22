@@ -182,7 +182,7 @@ test('youtubeVideoId 는 thumb-fallback youtubeIdFrom 과 같은 판정이다', 
     'https://example.com/watch?v=dQw4w9WgXcQ',
     'https://www.youtube.com/watch?x=dQw4w9WgXcQ',
     'javascript:alert(1)',
-    'https://user:pass@www.youtube.com/watch?v=dQw4w9WgXcQ',
+    'https://user:kate@example.test/watch?v=dQw4w9WgXcQ',
     'https://www.youtube.com/watch?v=dQw4w9WgXcQ&more=1',
     ''
   ];

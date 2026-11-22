@@ -58,10 +58,15 @@ if [[ -f "$source_root/src/stage-key.js" ]]; then
   install -m 0644 "$source_root/src/stage-key.js" "$app/src/stage-key.js"
 fi
 # 서버가 공개 꼬리표 규칙과 YouTube ID/썸네일 안전 판정을 화면과 공유한다.
-# 둘 다 다른 파일을 import하지 않으므로 정적 import 그래프에는 이 두 파일만 복사하면 된다.
+# youtube-id.mjs는 일반 스크립트용 정본인 youtube-id.js를 import하므로 둘 다 복사한다.
+# 옛 소스(되돌림 설치)에는 .js가 없고 그 mjs는 .js를 import하지 않으므로 있을 때만 넣는다.
+# 새 소스에서 .js가 빠지면 install-preflight의 import 그래프 시험이 잡는다.
 install -d -m 0755 "$app/public/v41"
 install -m 0644 "$source_root/public/v41/tags.mjs" "$app/public/v41/tags.mjs"
 install -m 0644 "$source_root/public/v41/youtube-id.mjs" "$app/public/v41/youtube-id.mjs"
+if [[ -f "$source_root/public/v41/youtube-id.js" ]]; then
+  install -m 0644 "$source_root/public/v41/youtube-id.js" "$app/public/v41/youtube-id.js"
+fi
 # 남는 운영 도구(admin-role·ops-reply·relink-opinion-author)가 함께 쓰는 .env 읽기 도구(tools/env-file.mjs).
 # 접속 값은 실행 시점에 읽는다 — 설치 트리에는 비밀 값이 없다.
 if [[ -f "$source_root/tools/env-file.mjs" ]]; then

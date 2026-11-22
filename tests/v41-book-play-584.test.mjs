@@ -88,7 +88,7 @@ function serve(root) {
     }
     if (url.startsWith('/host-media')) {
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
-      res.end('<!doctype html><html><body data-record-source="server" data-member="in"><script src="/v41/media-preview.js"></script><div id="host"></div></body></html>');
+      res.end('<!doctype html><html><body data-record-source="server" data-member="in"><script type="module" src="/v41/youtube-id.mjs"></script><script src="/v41/media-preview.js"></script><div id="host"></div></body></html>');
       return;
     }
     const clean = decodeURIComponent(url.split('?')[0]);
@@ -185,7 +185,7 @@ const YT_CORPUS = [
   'https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=PL123',
   'https://www.youtube.com/playlist?list=PL123',
   'https://youtube.com.evil.test/watch?v=dQw4w9WgXcQ',
-  'https://user:pass@www.youtube.com/watch?v=dQw4w9WgXcQ',
+  'https://user:kate@example.test/watch?v=dQw4w9WgXcQ',
   'ftp://youtu.be/dQw4w9WgXcQ',
   'https://www.youtube.com/shorts/abcdefghijkEXTRA',
   'https://youtu.be/short',

@@ -37,6 +37,8 @@ export function createAuth(deps) {
   // 401·로그인 만료: 화면을 로그아웃 상태로 되돌리고 안내 줄을 남긴다(#218·#144와 같은 문구).
   function authRequired() {
     if (!getMember()?.snapshot().owned) return;
+    // #1134: 상단 단추만 로그인으로 바뀌고 계정 메뉴가 그대로면 반쯤 로그아웃된다 — 헤더 한 벌에 맞춘다.
+    deps.onAuthRequired?.();
     $('account-entry').textContent = '로그인';
     $('account-entry').hidden = false;
     $('account-avatar').hidden = true;
