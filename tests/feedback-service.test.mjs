@@ -444,7 +444,7 @@ test('#1211: 수신 답글과 상태는 한 번만 반영하고 고객에게 보
   const handle=createFeedbackHandler({authenticate:async()=>principal('alice'),service,productId:PRODUCT});
   const event={eventKey:'ops_reply_1234567',feedbackId:saved.id,kind:'reply',replyId:'reply-123',body:'확인했습니다.',createdAt:'2026-11-23T00:00:00.000Z'};
   const call=body=>handle({method:'POST',path:'/api/ops-feedback/ingest',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
-  for(const bad of [{eventKey:'short'},{feedbackId:String(saved.id)},{kind:'reply_edit'},{replyId:12},{body:'가'.repeat(2001)},{createdAt:'yesterday'},{kind:'status',status:'unknown'}]){
+  for(const bad of [{eventKey:'short'},{feedbackId:String(saved.id)},{kind:'reply_edit'},{replyId:12},{body:'가'.repeat(2001)},{createdAt:'yesterday'},{createdAt:'2026-02-30T00:00:00Z'},{createdAt:'0000-01-01T00:00:00Z'},{kind:'status',status:'unknown'}]){
     assert.equal((await call({...event,...bad})).status,400);
   }
   assert.equal((await handle({method:'POST',path:'/api/ops-feedback/ingest',headers:{},body:'{bad'})).status,400);

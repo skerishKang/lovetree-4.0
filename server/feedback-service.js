@@ -58,13 +58,23 @@ function clientKey(request) {
   return /^[0-9A-Fa-f.:]{3,64}$/.test(raw) ? raw : 'anonymous';
 }
 
+function isIsoDateTime(value){
+  if(typeof value!=='string')return false;
+  const match=/^(\d{4})-(\d{2})-(\d{2})T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.exec(value);
+  if(!match||!Number.isFinite(Date.parse(value)))return false;
+  const [,year,month,day]=match.map(Number);
+  const leap=year%4===0&&(year%100!==0||year%400===0);
+  const days=[31,leap?29:28,31,30,31,30,31,31,30,31,30,31];
+  return year>0&&month>=1&&month<=12&&day>=1&&day<=days[month-1];
+}
+
 function validateOpsEvent(event) {
   const invalid=()=>{throw new ApiError(400,'invalid_event','운영센터 요청 형식을 확인해 주세요.');};
   if(!event||typeof event!=='object'||Array.isArray(event)||typeof event.eventKey!=='string'||event.eventKey.length<16||event.eventKey.length>128||/[^A-Za-z0-9_-]/.test(event.eventKey)||!Number.isSafeInteger(event.feedbackId)||event.feedbackId<=0)invalid();
   if(event.kind==='status'){
     if(!isStatus(event.status))invalid();
   }else if(event.kind==='reply'){
-    if(typeof event.replyId!=='string'||!event.replyId.trim()||event.replyId.includes('\0')||typeof event.body!=='string'||!event.body.trim()||event.body.includes('\0')||[...event.body].length>2000||typeof event.createdAt!=='string'||!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(event.createdAt)||!Number.isFinite(Date.parse(event.createdAt)))invalid();
+    if(typeof event.replyId!=='string'||!event.replyId.trim()||event.replyId.includes('\0')||typeof event.body!=='string'||!event.body.trim()||event.body.includes('\0')||[...event.body].length>2000||!isIsoDateTime(event.createdAt))invalid();
   }else invalid();
   return event;
 }
