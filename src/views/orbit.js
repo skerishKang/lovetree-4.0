@@ -157,7 +157,7 @@ export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSel
  const app=shadow.querySelector('.app'),world=shadow.querySelector('.world'),dialog=shadow.querySelector('dialog');
  // #1010: 예시 안내 줄 — 떠다니는 예시 카드가 숨는 좁은 화면에서는 함께 숨긴다(아래 배치에서 data-off를 묻는다).
  const centerNote=shadow.querySelector('.center-note');
- const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;let paused=reduced,phase=0,raf=0,previous=0,drag=null,moved=0,opener=null,spin=0,glide=0;
+ const reduceQuery=matchMedia('(prefers-reduced-motion: reduce)');let reduced=reduceQuery.matches,paused=reduced,phase=0,raf=0,previous=0,drag=null,moved=0,opener=null,spin=0,glide=0;
   // #942: 가리키기·클릭으로 배경이 움직이지 않게 카메라는 항상 중심(0,0)에 둔다. 회전은 끌 때만 phase 로 누적한다.
   let cameraTarget={x:0,y:0}, camera={x:0,y:0};
  // #586: 패럴랙스는 pointermove마다 화면 중심을 재지 않는다 — 끄는 동안 pointermove가 프레임보다
@@ -406,7 +406,7 @@ shadow.addEventListener('click',e=>{const play=e.target.closest('[data-recent-pl
  });
  track(disposeThumb);
  checkRecentVideo(shadow.querySelector('.recent-card'));
-performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElement('button');b.className=`card ${c.type} ${c.sizeClass}${c.example?' example':''}${c.source==='mine'?' mine':''}`;b.style.setProperty('--fit',c.fitMode==='contain'?'contain':'cover');;b.dataset.example=c.example?'1':'';b.setAttribute('tabindex','-1');b.setAttribute('aria-hidden','true');b.innerHTML=`<span class="lt-move"><span class="lt-lift"><span class="surface" data-lt-thumb-host>${c.image?`<img src="${esc(c.image)}" alt="" draggable="false"${thumbFallbackAttrs(c,{candidates:c.thumbCandidates||[c.image],writable:!demo&&!c.example,variant:'orbit'})}${c.youtubeThumb?' referrerpolicy="no-referrer" loading="lazy" decoding="async"':''}>`:(!demo&&!c.example&&needsFallbackCard(c,{autoLoad:false})?fallbackCardMarkup(c,{writable:!demo&&!c.example,variant:'orbit',dateStyle}):`<div class="memoKicker">${esc(dateOf(c))}</div><div class="memoText">${esc(mainOf(c))}</div><div class="memoFoot">${esc(c.emotion)}</div>`)}</span></span></span>${c.youtubeThumb&&c.image?'<span class="playGlyph" aria-hidden="true">▶</span>':''}${c.first?'<div class="firstMark">FIRST</div>':''}<div class="caption"><span>${esc(mainOf(c))}${subMarkup(c)}</span></div>`;
+performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElement('button');b.className=`card ${c.type} ${c.sizeClass}${c.example?' example':''}${c.source==='mine'?' mine':''}`;b.style.setProperty('--fit',c.fitMode==='contain'?'contain':'cover');;b.dataset.example=c.example?'1':'';b.setAttribute('tabindex','-1');b.setAttribute('aria-hidden','true');b.innerHTML=`<span class="lt-move"><span class="lt-lift"><span class="surface" data-lt-thumb-host>${c.image?`<img src="${esc(c.image)}" alt="" draggable="false" loading="lazy" decoding="async"${thumbFallbackAttrs(c,{candidates:c.thumbCandidates||[c.image],writable:!demo&&!c.example,variant:'orbit'})}${c.youtubeThumb?' referrerpolicy="no-referrer"':''}>`:(!demo&&!c.example&&needsFallbackCard(c,{autoLoad:false})?fallbackCardMarkup(c,{writable:!demo&&!c.example,variant:'orbit',dateStyle}):`<div class="memoKicker">${esc(dateOf(c))}</div><div class="memoText">${esc(mainOf(c))}</div><div class="memoFoot">${esc(c.emotion)}</div>`)}</span></span></span>${c.youtubeThumb&&c.image?'<span class="playGlyph" aria-hidden="true">▶</span>':''}${c.first?'<div class="firstMark">FIRST</div>':''}<div class="caption"><span>${esc(mainOf(c))}${subMarkup(c)}</span></div>`;
  // #593: 바깥 .card 는 자리(궤도 애니메이션)만 맡는다 — 실제로 눌리고 초점을 받는 것은 안쪽 .surface 다(중첩 단추 방지).
  const surface=b.querySelector('.surface'),surfaceLabel=b.querySelector('.caption span')?.textContent||mainOf(c)||'순간';
  surface.setAttribute('role','button');surface.setAttribute('tabindex','0');surface.setAttribute('aria-label',surfaceLabel);
@@ -436,9 +436,15 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
  const floatDelay=cards.map((c,i)=>i*370);
  // 멈춤(동작 줄이기·보기 메뉴)·팝업·숨은 탭이면 애니메이션만 세운다. 멈출 때는 떠 있음 위상을 첫 자리(0·18px)로
  // 되돌려, 예전에 elapsed 가 0 에 얼어 있던 화면과 같은 자리를 보여 준다.
+ // #1086 3차 완결: 진행률은 누적 dt가 아니라 전역 시작 시각 하나에서 계산한다.
+ // 프레임이 느려도 위치는 실제 경과 시간을 따라가고, 멈춘 시간은 pausedTotal로 보정한다.
+ let orbitRaf=0,orbitStart=performance.now(),pausedTotal=0,pausedAt=0,lastWriteAt=orbitStart;
+ const orbitPause=()=>{if(!pausedAt)pausedAt=performance.now();};
+ const orbitResume=()=>{if(pausedAt){pausedTotal+=performance.now()-pausedAt;pausedAt=0;}};
  const syncMotion=()=>{const rate=animRunning()?1:0;
   for(const a of orbitAnims)if(a)a.playbackRate=rate;
-  floatAnims.forEach((a,i)=>{if(!a)return;a.playbackRate=rate;if(!rate){const d=a.effect.getTiming().duration;a.currentTime=floatDelay[i]%d;}});};
+  floatAnims.forEach((a,i)=>{if(!a)return;a.playbackRate=rate;if(!rate){const d=a.effect.getTiming().duration;a.currentTime=floatDelay[i]%d;}});
+  if(rate){orbitResume();startOrbitLoop();}else{orbitPause();stopOrbitLoop();orbitWrite(performance.now());}};
  // 떠 있음: 사인 한 주기를 네 점으로 나눈 표본. 카드마다 위상을 어긋내 한 덩어리로 흔들리지 않게 한다(#535).
  const floatKeyframes=()=>{const ax=11,ay=18,out=[];for(let k=0;k<=4;k++){const ph=k/4*TWO_PI;out.push({offset:k/4,translate:`${(Math.sin(ph)*ax).toFixed(2)}px ${(Math.cos(ph)*ay).toFixed(2)}px`,easing:'cubic-bezier(.37,0,.63,1)'});}return out;};
  // 궤도 키프레임: 아래 drawOnly 에서 카드 한 장에 하던 계산을 그대로 표본마다 되풀이해 굽는다.
@@ -513,17 +519,43 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
  let orbitBand=null,orbitBox=null;
  // 이 폭에서 보여 줄 자리가 없는 카드(모든 표본이 안전 구역 판정에서 숨겨짐) — 배치 때 숨긴다.
  const noFit=[];
- const startOrbit=(i,w,h,warm)=>{const el=elements[i];if(!el)return;const at=orbitAnims[i]?.currentTime;orbitAnims[i]?.cancel();
-  const cfg=(w<=650?ringsNarrow:rings)[cards[i].ring];
-  orbitAnims[i]=el.animate(orbitKeyframes(i,w,h,warm),{duration:Math.round(ORBIT_MS/cfg.speed),iterations:Infinity,id:'lt-orbit'});
-  if(at!=null)orbitAnims[i].currentTime=at;
-  orbitAnims[i].playbackRate=animRunning()?1:0;};
+  // #1086 3차: lt-orbit CSS 애니메이션을 없애고 JS 한 곳에서 transform만 적는다.
+  // 궤도 식·표본·보간은 orbitKeyframes가 만든 값을 그대로 쓰므로 모양·속도·시작 위치는 동일하다.
+  const orbitFrames=cards.map(()=>null);
+  const startOrbit=(i,w,h,warm)=>{const el=elements[i];if(!el)return;orbitAnims[i]?.cancel();orbitAnims[i]=null;
+   orbitFrames[i]=orbitKeyframes(i,w,h,warm);};
+   // #1086: 숫자 토큰 앞이 ( / , / 공백 일 때만 보간한다 — translate3d의 '3'을 숫자로 읽어
+   // 'translate3.00d'로 망가뜨리는 것을 막는다. perspective(1200px)는 첫 값으로 고정.
+   const NUM=/(?<=[(, ])-?[\d.]+/g;
+   const lerpTransform=(a,b,t)=>{const na=(a.match(NUM)||[]).map(Number),nb=(b.match(NUM)||[]).map(Number);
+    let k=0;return a.replace(NUM,()=>{const v=na[k]+(nb[k]-na[k])*t;k+=1;return k===1?String(na[0]):v.toFixed(2);});};
+  const orbitTransform=(frames,t)=>{if(!frames||!frames.length)return null;
+   if(t<=frames[0].offset)return frames[0].transform;
+   for(let j=1;j<frames.length;j++){const b=frames[j];if(t<=b.offset){const a=frames[j-1],span=b.offset-a.offset||1;
+    return lerpTransform(a.transform,b.transform,(t-a.offset)/span);}}
+   return frames[frames.length-1].transform;};
  const startFloat=(i)=>{const lift=elements[i]?.querySelector('.lt-lift');if(!lift)return;
   floatAnims[i]=lift.animate(floatKeyframes(),{duration:Math.round(1000*(11+(i%4)*1.7)),iterations:Infinity,id:'lt-float',delay:-floatDelay[i]});
   floatAnims[i].playbackRate=animRunning()?1:0;};
  // 애니메이션의 현재 시각을 phase 에 맞춘다(끌고 난 뒤 이어지는 자리가 튀지 않게).
- const syncOrbitTime=()=>{elements.forEach((el,i)=>{const a=orbitAnims[i],cfg=(layoutBox&&layoutBox.w<=650?ringsNarrow:rings)[cards[i].ring];if(!a)return;
-  const d=a.effect.getTiming().duration;const t=(phase*cfg.speed/(TWO_PI))%1;a.currentTime=((t+1)%1)*d;});};
+  const syncOrbitTime=()=>{}; // #1086 3차: WAAPI 제거로 할 일 없음(끌기 복귀 시 자리는 JS 루프가 이어감).
+  const orbitWrite=(now)=>{lastWriteAt=now;for(let i=0;i<elements.length;i++){
+   const frames=orbitFrames[i],el=elements[i];if(!frames||!frames.length||!el||el.classList.contains('off'))continue;
+   const cfg=(layoutBox&&layoutBox.w<=650?ringsNarrow:rings)[cards[i].ring];
+   const elapsed=now-orbitStart-pausedTotal-(pausedAt?now-pausedAt:0);
+   const t=((elapsed/Math.round(ORBIT_MS/cfg.speed))+phase)%1;
+   const tf=orbitTransform(frames,t);
+   if(tf&&el.__orbitTf!==tf){el.__orbitTf=tf;el.style.transform=tf;}
+  }};
+  // #1086: 궤도 경로 검사용 — 지정 진행률로 카드를 그린다(실제 루프와 같은 orbitWrite 경로).
+  globalThis.__LT_ORBIT_TEST__={lastWriteAt(){return lastWriteAt;},progress(now){const cfg=(layoutBox&&layoutBox.w<=650?ringsNarrow:rings)[cards[0].ring];const el=now-orbitStart-pausedTotal-(pausedAt?now-pausedAt:0);return ((el/Math.round(ORBIT_MS/cfg.speed))+phase)%1;},period(){const w=layoutBox&&layoutBox.w<=650?ringsNarrow:rings;return Math.round(ORBIT_MS/(w[cards[0].ring].speed));},hold(on){if(on){orbitPause();stopOrbitLoop();}else{orbitResume();startOrbitLoop();}},seek(t){for(let i=0;i<elements.length;i++){
+   const frames=orbitFrames[i],el=elements[i];if(!frames||!frames.length||!el)continue;
+   if(el.__seekSaved===undefined)el.__seekSaved=el.style.transform;
+   const tf=orbitTransform(frames,t);if(tf){el.style.transform=tf;}}
+   return true;},restore(){for(const el of elements){if(el.__seekSaved!==undefined){el.style.transform=el.__seekSaved;el.__orbitTf=el.__seekSaved;delete el.__seekSaved;}}}};
+  const orbitTick=(now)=>{if(!animRunning()){orbitRaf=0;return;}orbitWrite(now);orbitRaf=requestAnimationFrame(orbitTick);};
+  const startOrbitLoop=()=>{if(!orbitRaf){orbitWrite(performance.now());orbitRaf=requestAnimationFrame(orbitTick);}};
+  const stopOrbitLoop=()=>{if(orbitRaf)cancelAnimationFrame(orbitRaf);orbitRaf=0;};
  // 카메라(패럴랙스): 가까운 카드가 더 크게 움직인다. 층마다 값을 넘겨 애니메이션 사이에 끼어든다.
  // 깊이별 계수에 쓰는 sc 는 카드가 궤도 한 바퀴에서 갖는 배율의 평균(카드마다 고정) — 흔들림 폭 차이는 눈에 띄지 않는다.
  let avgScales=cards.map(()=>1);
@@ -647,7 +679,7 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
     // 첫 자리·모양은 위 placeCard 가 이미 다 그렸으므로(화면 변화 0), WAAPI 붙임만 뒤로 미룬다.
     elements.forEach((el,i)=>{orbitKF[i]=null;});
     const total=Math.min(cap,elements.length),chunk=12;
-    for(let from=0;from<total;from+=chunk){const start=from;requestAnimationFrame(()=>{for(let i=start;i<Math.min(start+chunk,total);i++)startOrbit(i,w,h,warmups);});}
+    for(let from=0;from<total;from+=chunk){const start=from;requestAnimationFrame(()=>{for(let i=start;i<Math.min(start+chunk,total);i++)startOrbit(i,w,h,warmups);if(animRunning())startOrbitLoop();orbitWrite(performance.now());});}
     orbitBox=boxKey;
    }
    orbitBand=band;
@@ -753,7 +785,7 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
  window.addEventListener('pointerup',()=>{
   // #535-3: 관성 — 손을 뗀 뒤에도 남은 속도로 살짝 미끄러지다 천천히 멈춘다(동작 줄이기면 곧바로 멈춤).
   if(drag&&!reduced&&performance.now()-drag.at<120)glide=Math.max(-.05,Math.min(.05,spin));else glide=0;
-  drag=null;schedule();},{signal});window.addEventListener('pointercancel',()=>{drag=null;moved=20},{signal});window.addEventListener('resize',()=>fitNotice(),{signal});document.addEventListener('visibilitychange',()=>{if(document.hidden){cancelAnimationFrame(raf);raf=0;}else{syncMotion();fitNotice();}},{signal});
+  drag=null;schedule();},{signal});window.addEventListener('pointercancel',()=>{drag=null;moved=20},{signal});window.addEventListener('resize',()=>fitNotice(),{signal});document.addEventListener('visibilitychange',()=>{if(document.hidden){cancelAnimationFrame(raf);raf=0;orbitPause();stopOrbitLoop();}else{syncMotion();fitNotice();}},{signal});
  // #81 뷰포트 높이 계약은 첫 화면만 갖는다. 동기화 안내가 흐름에 얹히는 만큼만 빼고,
  // 나머지 화면(책장·기억책·작업공간)은 본문 자연 높이 뒤에 안내가 오도록 건드리지 않는다.
  // 가리는 방식(overflow)은 쓰지 않고, 안내가 자라면 첫 화면이 그 만큼 줄어든다.
@@ -787,7 +819,11 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
  // #593: 첫 배치를 한 번 하고 나면 유휴에는 프레임을 예약하지 않는다. 화면이 살아 있음을 확인하는
  // 낮은 주기 박동(초당 4회)만 남긴다 — 카드 style 은 쓰지 않으므로 스타일 재계산이 들지 않는다.
  layoutPending=true;schedule();
- track(()=>cancelAnimationFrame(raf));track(()=>orbitAnims.forEach(a=>a?.cancel()));track(()=>floatAnims.forEach(a=>a?.cancel()));track(()=>dialog.close());
+ // #1086: 동작 줄이기가 켜져도 정지 위치는 한 번 써서 카드가 보이게 한다. 설정 변경 시 루프를 켜고 끄고 위치를 다시 쓴다.
+ if(animRunning())startOrbitLoop();else orbitWrite(performance.now());
+ const onReduceChange=(e)=>{reduced=e.matches;syncMotion();orbitWrite(performance.now());};
+ reduceQuery.addEventListener?.('change',onReduceChange);track(()=>reduceQuery.removeEventListener?.('change',onReduceChange));
+ track(()=>cancelAnimationFrame(raf));track(()=>stopOrbitLoop());track(()=>orbitAnims.forEach(a=>a?.cancel()));track(()=>floatAnims.forEach(a=>a?.cancel()));track(()=>dialog.close());
  // #213 2번: 첫 화면 도구 줄의 "보기" 메뉴가 움직임을 읽고 바꾼다. dispose는 함수 그대로 둔다.
  dispose.motion={get paused(){return paused;},set(value){setMotionPaused(value);},toggle(){setMotionPaused(!paused);return paused;}};
  // 261116 PR 2: 홈(v41/home.js)이 쓰는 좁은 출구 둘. recent.set — 모드가 바뀌면 카드 한 장을 같은 결(recentMarkup)로 갈아끼운다(header가 null이면 '마지막 순간 · N일 전' 기본 문구).

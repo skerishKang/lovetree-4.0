@@ -153,7 +153,7 @@ async function readWithDeadline(upstream, { limit, timedOut, cancel }) {
   return merged;
 }
 
-export function createProxy({ fetcher = (...args) => fetch(...args), timeoutMs = 15_000, maxResponseBytes = DEFAULT_RESPONSE_LIMIT_BYTES } = {}) {
+export function createProxy({ fetcher = (...args) => fetch(...args), timeoutMs = 15_000, maxResponseBytes = DEFAULT_RESPONSE_LIMIT_BYTES, retryDelayMs = 1_500, sleep = ms => new Promise(resolve => setTimeout(resolve, ms)) } = {}) {
   return async function onRequest({ request, env }) {
     const incoming = new URL(request.url);
     const media = incoming.pathname === '/api/media' || MEDIA_ITEM.test(incoming.pathname) || ADMIN_CUSTOMER_MEDIA.test(incoming.pathname);
@@ -204,13 +204,27 @@ export function createProxy({ fetcher = (...args) => fetch(...args), timeoutMs =
 
     try {
       const sendsBody = request.method !== 'GET' && request.method !== 'HEAD';
-      const upstream = await fetcher(`${origin}${incoming.pathname}${incoming.search}`, {
-        method: request.method,
-        headers,
-        ...(sendsBody ? { body: request.body, duplex: 'half' } : {}),
-        redirect: 'manual',
-        signal: controller.signal
-      });
+      let upstream;
+      // #1175: API 재시작 직후처럼 연결 자체가 안 될 때만 잠시 뒤 한 번 더 부른다.
+      // 응답을 한 번이라도 받았으면(시간 초과·5xx 포함) 다시 보내지 않는다 — 1회용 표·상태의 이중 사용을 막는다.
+      // 본문이 있는 요청도 재전송하지 않는다(스트림을 다시 읽을 수 없고 상태가 두 번 소비될 수 있다).
+      for (let attempt = 0; ; attempt += 1) {
+        try {
+          upstream = await fetcher(`${origin}${incoming.pathname}${incoming.search}`, {
+            method: request.method,
+            headers,
+            ...(sendsBody ? { body: request.body, duplex: 'half' } : {}),
+            redirect: 'manual',
+            signal: controller.signal
+          });
+          break;
+        } catch (error) {
+          if (expired) throw error;
+          if (attempt > 0 || sendsBody) throw error;
+          await sleep(retryDelayMs);
+          if (expired) throw error;
+        }
+      }
       if (expired) { await upstream.body?.cancel().catch(() => {}); return jsonError(504, 'upstream_timeout', '서버 응답이 제때 오지 않았어요.'); }
 
       // 정적 호스트 폴백(HTML)이나 계약 밖 형식은 성공이 아니다.

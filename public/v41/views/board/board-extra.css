@@ -355,3 +355,16 @@ html[data-lt-theme=garden] .ytLinkRow a{color:var(--lt-link,#3b5bdb)}
 #plusBtn::after{content:"";position:absolute;inset:-3px -2px}
 #resetBtn::after,#openMoment::after,#detailYtLink::after,#cinemaFromMoment::after,#dHeartSave::after,#toolCinema::after,#toolFit::after{content:"";position:absolute;inset:-5px 0}
 #detailClose::after{content:"";position:absolute;inset:-11px}
+
+/* #1072 A-17: 카드 순서 단추 — 키보드(탭)로도 '내 배치' 순서를 바꾼다.
+   평소에는 반투명하게 숨어 있다가 카드에 올려 놓거나 초점을 받으면 보인다.
+   display:none 대신 opacity를 쓰는 건 숨은 동안에도 탭 이동이 닿아야 하기 때문이다. */
+.card .cardOrder{position:absolute;left:10px;right:10px;bottom:10px;display:flex;gap:6px;justify-content:flex-end;z-index:3;opacity:0;pointer-events:none}
+.card:hover .cardOrder,.card:focus-within .cardOrder{opacity:1;pointer-events:auto}
+.card .orderBtn{appearance:none;border:1px solid rgba(90,65,103,.35);background:rgba(16,10,25,.72);color:#f7edf8;font-size:11px;line-height:1;padding:7px 10px;border-radius:7px;cursor:pointer;backdrop-filter:blur(8px)}
+.card .orderBtn:hover,.card .orderBtn:focus-visible{background:rgba(16,10,25,.92)}
+
+/* === #886: 크게 보기 창의 영상·그림·기록 널모양 — JS 고정 인라인을 클래스로 옮겼다. === */
+.viewerFitVideo{width:100%;max-height:420px;object-fit:contain}
+.viewerFitImg{width:100%;max-height:420px;object-fit:cover}
+#viewerMedia .viewerNoteQuote{padding:40px;color:#f7edf8;font-size:22px;line-height:1.6}

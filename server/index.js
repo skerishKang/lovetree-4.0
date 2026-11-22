@@ -25,6 +25,8 @@ import { createMomentCommunityRepo } from './db/moment-community-postgres.js';
 import { createMyNewsService, createMyNewsHandler } from './my-news-service.js';
 import { createMyNewsRepo } from './db/my-news-postgres.js';
 import { createFeedbackRepo } from './db/feedback-postgres.js';
+import { createFeedbackOutboxRepo } from './db/feedback-outbox-postgres.js';
+import { createFeedbackOutboxDispatcher } from './feedback-outbox-dispatcher.js';
 import { createAdminCustomersRepo } from './db/admin-customers-postgres.js';
 import { createAdminCustomersService, createAdminCustomersHandler } from './admin-customers.js';
 import { createFeedbackService, createFeedbackHandler } from './feedback-service.js';
@@ -74,6 +76,8 @@ const {
   LOVETREE_ACCOUNT_DELETE_RPC_SECRET = '',
   LOVETREE_IDENTITY_RPC_URL = '',
   LOVETREE_IDENTITY_RPC_SECRET = '',
+ LOVETREE_FEEDBACK_OUTBOX_URL = '',
+ LOVETREE_FEEDBACK_OUTBOX_SECRET = '',
   PORT = ''
 } = process.env;
 
@@ -277,9 +281,16 @@ const communityHandler = createMyNewsHandler({
 // 고객 의견 창구 (#540). 로그인·로그아웃 모두 받는다 — 그래서 인증 경계는 guardedAuthenticate를 그대로 쓰되,
 // 핸들러가 401을 '로그아웃'으로 받아들인다.
 const opsNotify = createOpsNotifier();
+const feedbackRepo = createFeedbackRepo(pool);
+const feedbackOutbox = createFeedbackOutboxRepo(pool);
+const feedbackOutboxDispatcher = createFeedbackOutboxDispatcher({
+  outbox: feedbackOutbox,
+  receiverUrl: LOVETREE_FEEDBACK_OUTBOX_URL,
+  secret: LOVETREE_FEEDBACK_OUTBOX_SECRET
+});
 const feedbackHandler = createFeedbackHandler({
  authenticate: guardedAuthenticate,
- service: createFeedbackService({ feedbackRepo: createFeedbackRepo(pool), productId: LOVETREE_PRODUCT_ID, admin, opsNotify }),
+ service: createFeedbackService({ feedbackRepo, productId: LOVETREE_PRODUCT_ID, admin, opsNotify, outbox: feedbackOutbox }),
  productId: LOVETREE_PRODUCT_ID
 });
 // 운영센터 고객 정보(261116 대표 결정) — 읽기만 한다. 자세히 판을 열 때 열람 기록을 남기고,
@@ -288,7 +299,7 @@ const adminCustomersHandler = createAdminCustomersHandler({
  authenticate: guardedAuthenticate,
  service: createAdminCustomersService({
   repo: createAdminCustomersRepo(pool),
-  feedbackRepo: createFeedbackRepo(pool),
+  feedbackRepo,
   productId: LOVETREE_PRODUCT_ID,
   admin,
   mediaStore
@@ -331,7 +342,13 @@ const requestHandler = async (request) => {
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   const { host, port } = resolveListen({ env: process.env });
-  createServer(createNodeHandler(requestHandler, { maxBodyBytes })).listen(port, host, () => {
+  createServer(createNodeHandler(requestHandler, {
+  maxBodyBytes,
+  // #1190: 응답을 돌려준 뒤 남은 보낼 줄을 처리한다(새 데몬 없이 기존 요청 흐름 사용).
+  afterResponse: () => feedbackOutboxDispatcher.drain()
+})).listen(port, host, () => {
+  // 서버를 다시 띄울 때도 남은 줄을 한 번 확인한다.
+  void feedbackOutboxDispatcher.drain();
     console.log(`lovetree storage api ${host}:${port}`);
   });
 }

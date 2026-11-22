@@ -1,7 +1,9 @@
 // 설정·계정 창 — shell.mjs에서 코드 위치만 옮긴 모듈(#886). 동작·기준은 그대로다.
 // 상태는 deps의 getter로 받는다(모듈이 shell을 다시 import하지 않는다).
+// #1072 A-16: 의견 보내기의 '함께 보낼 정보'에 실릴 최근 오류 기록은 report.mjs 한 곳에서 가져온다.
+import {reportEntries} from '../report.mjs';
 export function createSettings(deps){
-const { $, notify, setTitleDisplay, openLoginStart, links, screenForView, choose, panel, show, frames, frameLoaded, hideFrames, closeAccountMenu, openAccountMenu, renderAccount, updateAccountControls, openAssets, openEditor, sample, backup, clear, startMember, leaveMember, openFallbackShell, writeLocation, load, flowNavigation, closePanels, renderTreeMenu, requestBoardOpen, lastShelfTreeId, shellHeader, shellDialogs,  shareApi, accountApi, readTheme, writeTheme, normalizeAccentColor, normalizeDateStyle, normalizeStartPlace, normalizeShareView, normalizeHomeMoment,  readPageTurn, writePageTurn, frameMessage, displayTreeTitle, accountPresentation, createFeedbackDialog, createFeedbackBoard, mountUpdates, readWriteTab, writeWriteTab, clearCachedWorkspace, createWorkspaceApi, paintThemeControls, applyTheme, toggleTheme, paintBookDisplayControls } = deps;
+const { $, notify, setTitleDisplay, openLoginStart, links, screenForView, choose, panel, show, frames, frameLoaded, hideFrames, closeAccountMenu, openAccountMenu, renderAccount, updateAccountControls, openAssets, openEditor, sample, backup, clear, startMember, leaveMember, openFallbackShell, writeLocation, load, flowNavigation, closePanels, renderTreeMenu, requestBoardOpen, lastShelfTreeId, shellHeader, shellDialogs,  shareApi, accountApi, myNewsApi, readTheme, writeTheme, normalizeAccentColor, normalizeDateStyle, normalizeStartPlace, normalizeShareView, normalizeHomeMoment,  readPageTurn, writePageTurn, frameMessage, displayTreeTitle, accountPresentation, createFeedbackDialog, createFeedbackBoard, mountUpdates, mountMyNews, readWriteTab, writeWriteTab, clearCachedWorkspace, forgetLoginSubject, createWorkspaceApi, paintThemeControls, applyTheme, toggleTheme, paintBookDisplayControls } = deps;
 const $on=(id,fn)=>{const el=$(id);if(el)el.onclick=fn;};
 function advancedKey(){try{return 'lt41.advanced.'+(deps.member?.snapshot().subject||'')}catch{return 'lt41.advanced.'}}
 function readAdvanced(){try{return localStorage.getItem(advancedKey())==='1'}catch{return false}}
@@ -21,7 +23,9 @@ const themeToggleTop=$('theme-toggle');if(themeToggleTop)themeToggleTop.onclick=
   const owned=!!deps.member?.snapshot().owned;
   const screen=$('community-panel')?.open?'둘러보기':$('account-settings')?.open?'설정':(FEEDBACK_SCREEN[deps.current]||'첫 화면');
   const treeId=owned&&deps.source==='server'&&window.LT41?.tree?.id?String(window.LT41.tree.id):'';
-  return {screen,viewport:window.innerWidth+'x'+window.innerHeight,theme:readTheme(localStorage),version:'4.1',loggedIn:owned,treeId};
+  // #1072 A-16: 최근 오류 기록(최대 20건 — 메시지·위치·시각만)을 '함께 보낼 정보'로 실어 보낸다.
+  const recentErrors=reportEntries();
+  return {screen,viewport:window.innerWidth+'x'+window.innerHeight,theme:readTheme(localStorage),version:'4.1',loggedIn:owned,treeId,recentErrors};
  }
  const feedbackDialog=createFeedbackDialog({$,notify,getContext:feedbackContext,show:()=>panel('feedback-panel'),openMyPosts:()=>{shellDialogs.requestClose('feedback-panel');feedbackBoard.openMyPosts();}});
  // 2026-11-16 계정 메뉴 정리: 메뉴의 '의견 보내기' 칸을 없애고 내 의견 창 안에서 바로 보내게 했다.
@@ -43,14 +47,19 @@ const themeToggleTop=$('theme-toggle');if(themeToggleTop)themeToggleTop.onclick=
  $('feedback-link').onclick=()=>feedbackDialog.open();
  // 2차: AI 고객 '오늘 사용 일지'·모든 로그인 사용자 '내 의견'.
  // #611 4번: 새 답글 알림 — 단추 점과 '내 의견' 옆 숫자를 함께 갱신한다.
- const dotState={updates:false,replies:false};
+ const dotState={updates:false,replies:false,news:false};
  let accountTip='';
  // 이슈 644 2번: 아바타 점과 계정 메뉴 항목의 점·개수·설명을 함께 갱신한다.
+ // #1098 3단계: 내 소식 점이 묶음에 참가한다 — 읽지 않은 내 소식(0이면 점 없음)이 아바타·'내 소식' 항목에 같이 보인다.
  function paintAccountDots(){
   const avatar=$('account-avatar');
   if(avatar){
-   avatar.classList.toggle('has-dot',!!(dotState.updates||dotState.replies));
-   const tip=dotState.updates&&dotState.replies?'새 소식과 새 답글이 있어요':dotState.updates?'새 소식이 있어요':dotState.replies?'새 답글이 있어요':'';
+   avatar.classList.toggle('has-dot',!!(dotState.updates||dotState.replies||dotState.news));
+   const names=[];
+   if(dotState.updates)names.push('새 소식');
+   if(dotState.replies)names.push('새 답글');
+   if(dotState.news)names.push('내 소식');
+   const tip=names.length===3?'새 소식·새 답글·내 소식이 있어요':names.length===2?`${names[0]}과 ${names[1]}이 있어요`:names.length===1?`${names[0]}이 있어요`:'';
    accountTip=tip;
    avatar.title=tip||'내 계정';
   }
@@ -59,6 +68,9 @@ const themeToggleTop=$('theme-toggle');if(themeToggleTop)themeToggleTop.onclick=
   if(updatesCount){updatesCount.hidden=!dotState.updates;if(dotState.updates)updatesCount.textContent='1';}
   const postsItem=$('account-my-posts');
   if(postsItem)postsItem.classList.toggle('has-dot',dotState.replies);
+  const newsItem=$('account-my-news'),newsCount=$('account-my-news-count');
+  if(newsItem)newsItem.classList.toggle('has-dot',!!dotState.news);
+  if(newsCount){const n=myNewsMount?.lastCount?.()||0;newsCount.hidden=!(n>0);if(n>0)newsCount.textContent=String(n);}
  }
  function onReplyCount(count){const badge=$('account-my-posts-count');if(badge){badge.hidden=!(count>0);if(count>0)badge.textContent=String(count);}dotState.replies=count>0;paintAccountDots();}
  const feedbackBoard=createFeedbackBoard({$,notify,show:()=>panel('journal-panel'),showFull:()=>panel('myposts-panel'),onReplyCount,onOpenUpdates:version=>{void updatesMount.openUpdates(version);}});
@@ -72,10 +84,15 @@ const themeToggleTop=$('theme-toggle');if(themeToggleTop)themeToggleTop.onclick=
  // #611 새 소식: 계정 메뉴·설정 아래쪽·로그아웃 작은 링크 모두 같은 창을 쓴다.
  const updatesMount=mountUpdates({$,showPanel:id=>panel(id),onDot:unread=>{dotState.updates=!!unread;paintAccountDots();}});
  $('account-updates').onclick=()=>{closeAccountMenu();void updatesMount.openUpdates();};
+ // #1098 3단계: 내 소식 — 계정 메뉴 입구·목록 창·점. 서버 길은 #1159의 두 경로(myNewsApi)만 쓴다.
+ // 로그아웃·빈 계정이면 이 입구 자체가 열리지 않는다(계정 메뉴는 로그인한 사람만 연다). 점 숫자가 0이면 점도 숨는다.
+ const myNewsMount=mountMyNews({$,showPanel:id=>panel(id),fetchNews:()=>myNewsApi.myNews(),fetchCount:()=>myNewsApi.myNewsUnread(),getTrees:()=>deps.model?.trees||[],onCount:count=>{dotState.news=Number(count)>0;paintAccountDots();}});
+ $('account-my-news').onclick=()=>{closeAccountMenu();void myNewsMount.open();};
  $('updates-link').onclick=()=>{void updatesMount.openUpdates();};
  $('settings-updates-open').onclick=()=>{$('account-settings').close();void updatesMount.openUpdates();};
  void updatesMount.start();
  if(deps.member?.snapshot?.().owned)void feedbackBoard.refreshReplyDot();
+ if(deps.member?.snapshot?.().owned)void myNewsMount.refreshCount();
  $('advanced-backup').onclick=()=>backup();
  // #368: 기록 가져오기는 JSON 선택 input을 연다. input은 창 밖에 숨겨 두어 설정이 닫혀 있어도(빈 화면의 백업 파일 열기) 열린다.
  // CTO 결정(2026-11-12): 설정에는 "기록 가져오기" 하나만 둔다 — "백업 파일 열기"는 같은 선택 창이라 중복이고,
@@ -477,7 +494,7 @@ $('account-form').onsubmit=async event=>{
  notify(answer.commonAccountDeleted
   ? '러브트리 탈퇴와 함께 공통 로그인 계정과 인증 세션을 폐기했습니다.'
   : '러브트리에서 탈퇴했습니다. 다른 서비스 연결이 남아 있어 공통 계정은 유지됩니다.');
-};$('logout').onclick=async()=>{if(deps.member){await deps.member.act('logout');if(deps.member.snapshot().dirty){notify('미저장 기록이 있어 로그아웃하지 않았어요. 다시 저장하거나 백업해 주세요.');return;}/* 로그아웃 뒤 머리글만 바뀌고 첫 화면 본문·카드·숫자 줄이 회원 상태로 남았다 — 새 문서로 다시 열어 셸 전체를 비로그인 상태로 그린다(account=1·#my/... 같은 기록 주소도 함께 사라진다). */try{sessionStorage.setItem('lt41.logoutNotice','1');}catch{}location.replace(location.pathname);return;}const answer=await createWorkspaceApi().logout();if(answer.ok)clearCachedWorkspace(localStorage);notify(answer.ok?'로그아웃했습니다.':'로그아웃하지 못했어요. 다시 시도해 주세요.');};
+};$('logout').onclick=async()=>{if(deps.member){await deps.member.act('logout');if(deps.member.snapshot().dirty){notify('미저장 기록이 있어 로그아웃하지 않았어요. 다시 저장하거나 백업해 주세요.');return;}/* 로그아웃 뒤 머리글만 바뀌고 첫 화면 본문·카드·숫자 줄이 회원 상태로 남았다 — 새 문서로 다시 열어 셸 전체를 비로그인 상태로 그린다(account=1·#my/... 같은 기록 주소도 함께 사라진다). */try{sessionStorage.setItem('lt41.logoutNotice','1');}catch{}location.replace(location.pathname);return;}const answer=await createWorkspaceApi().logout();if(answer.ok){clearCachedWorkspace(localStorage);forgetLoginSubject(localStorage);}notify(answer.ok?'로그아웃했습니다.':'로그아웃하지 못했어요. 다시 시도해 주세요.');};
 $('file').onchange=async()=>{
  const f=$('file').files[0];
  if(!f)return;
@@ -525,7 +542,7 @@ document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{if(b.dataset.
 for(const f of frames())f.addEventListener('load',()=>{frameLoaded(f);
  // #894: 새로 뜬 안쪽 화면에도 움직임 끄기 상태를 알린다(메모리 상태 — 화면을 다시 열면 처음 상태).
  try{f.contentWindow.postMessage({type:'lt41-motion',paused:deps.motionPaused},location.origin)}catch{}});
-return { showPublicRoute, getFeedbackDialog:()=>feedbackDialog, getFeedbackBoard:()=>feedbackBoard, getAccountTip:()=>accountTip, applyAdvanced, applyDateStyleToFrame, applyPageTurnToFrame, applyNetworkViewToFrame, applyBoardThemeToFrame, syncBoardThemeToApp, quickTargetPreference, profileDirty, paintSettingsProfile, accountConfirmMatches, openAccountData, openAccountSettings, paintDateStyleControls, paintStartPlaceControls, paintShareControls, paintQuickTargetControls, paintNetworkViewControls, paintPageTurnControls, paintBoardThemeControls, paintTreeVisibilityList, paintSettingsUsage, loadTreeVisibility, paintTreeManagerVisibility, paintSettingsTab, focusSettingsSection, fillProfileForm, paintScreenControls, readAdvanced, advancedKey, currentDateStyle, currentPageTurn, sendToFrame, currentStartPlace, currentShareView, currentBoardTheme };
+return { showPublicRoute, getFeedbackDialog:()=>feedbackDialog, getFeedbackBoard:()=>feedbackBoard, refreshMyNewsCount:()=>myNewsMount.refreshCount(), openMyNews:()=>myNewsMount.open(), getAccountTip:()=>accountTip, applyAdvanced, applyDateStyleToFrame, applyPageTurnToFrame, applyNetworkViewToFrame, applyBoardThemeToFrame, syncBoardThemeToApp, quickTargetPreference, profileDirty, paintSettingsProfile, accountConfirmMatches, openAccountData, openAccountSettings, paintDateStyleControls, paintStartPlaceControls, paintShareControls, paintQuickTargetControls, paintNetworkViewControls, paintPageTurnControls, paintBoardThemeControls, paintTreeVisibilityList, paintSettingsUsage, loadTreeVisibility, paintTreeManagerVisibility, paintSettingsTab, focusSettingsSection, fillProfileForm, paintScreenControls, readAdvanced, advancedKey, currentDateStyle, currentPageTurn, sendToFrame, currentStartPlace, currentShareView, currentBoardTheme };
 }
 
 

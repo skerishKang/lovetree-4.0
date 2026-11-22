@@ -108,7 +108,7 @@ html[data-lt-theme=garden] #context-kind{color:var(--lt-rose-ink)}
 .community-card h3,.community-card .community-summary{color:#342a28!important}
 .community-card .community-muted,.community-card .community-subject{color:#6a5a51!important}
 .community-card .community-actions button,.community-card .community-details button{background:#e4d7cb;color:#3a2f29;border-color:#b6a08f}
-.community-card .community-actions .community-primary{background:#1a1620;color:var(--lt-pearl)}
+.community-card .community-actions .community-primary{background:var(--lt-btn-ink,#1a1620);color:var(--lt-pearl)}
 .community-card .community-details summary{color:#6a5549}
 .community-card .community-details{border-color:#b6a08f}
 .community-preview{position:sticky;top:0;min-height:420px;padding:28px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-panel);background:var(--lt-paper);color:var(--lt-ink);box-shadow:0 0 0 1px rgba(255,230,166,.12),0 0 32px rgba(238,190,104,.14),0 25px 60px #0005}
@@ -118,7 +118,7 @@ html[data-lt-theme=garden] #context-kind{color:var(--lt-rose-ink)}
 .community-preview-paper{display:grid;gap:14px}.community-preview-subject,.community-preview-summary{margin:0}
 .community-preview-moment{display:grid;gap:12px;min-height:150px;align-content:center;padding:24px;background:#fffbf3;border:1px solid #d8c9b3;transform:rotate(-1deg)}
 .community-preview-moment small{color:var(--lt-gold-ink)}.community-preview-moment strong{font:600 20px/1.5 var(--lt-font-display)}
-.community-preview-open{min-height:48px;border:0;border-radius:var(--lt-r-pill);background:#1a1620;color:var(--lt-pearl);font-weight:700}
+.community-preview-open{min-height:48px;border:0;border-radius:var(--lt-r-pill);background:var(--lt-btn-ink,#1a1620);color:var(--lt-pearl);font-weight:700}
 @media(max-width:900px){.community-layout{grid-template-columns:1fr}.community-preview{position:static;min-height:0}}
 @media(max-width:600px){#community-list{grid-template-columns:1fr}.community-card{grid-template-columns:90px minmax(0,1fr)}.community-cover{min-height:170px}.community-preview{padding:20px}.community-preview h3{font-size:23px}}
 
@@ -134,6 +134,17 @@ html[data-lt-theme=garden] #context-kind{color:var(--lt-rose-ink)}
 @media(max-width:600px){.community-top{gap:8px;margin-bottom:20px}.community-top>strong{font-size:10px}.community-top nav{overflow-x:auto}.community-top nav button,.community-top nav span{padding:0 8px;white-space:nowrap;font-size:12px}.community-top .close{width:40px;height:40px;flex-shrink:0}}
 
 /* 2026-11-05 첫 화면 기준 시각 통일: 안쪽 화면은 첫 화면과 같은 검은 무대 위 금테 카드 안에 놓인다. 첫 화면(body.home-screen)은 원래 전면 구성 그대로다. */
+/* #1026: 내용이 늦을 때 무대 자리에 먼저 잡아 둔 틀 — 자리를 밀지 않게 덮개로 띄운다. */
+#stage{position:relative}
+.stage-loading{position:absolute;inset:0;z-index:6;display:grid;place-items:center;align-content:center;gap:18px;background:var(--lt-stage);opacity:0;transition:opacity .2s ease;pointer-events:none}
+.stage-loading.is-on{opacity:1}
+.stage-loading.is-still{transition:none}
+.stage-loading-frame{display:flex;align-items:flex-end;justify-content:center;gap:12px;width:min(420px,76%);height:clamp(120px,26vh,210px)}
+.stage-loading-card{flex:1 1 0;max-width:120px;height:100%;border:1px solid var(--lt-line);border-radius:14px;background:var(--lt-stage-2)}
+.stage-loading-text{margin:0;color:var(--muted);font-size:12px;letter-spacing:.04em}
+.stage-loading-retry{min-height:44px;padding:0 16px;border:1px solid var(--lt-gold-line);border-radius:999px;color:var(--lt-pearl);background:none;font-size:12px;pointer-events:auto}
+.stage-loading-retry[hidden]{display:none}
+@media(prefers-reduced-motion:reduce){.stage-loading{transition:none}}
 body:not(.home-screen) #stage{padding:10px 14px 14px;background:radial-gradient(circle at 50% 0,var(--lt-stage-2),var(--lt-stage) 55%,#000)}
 body:not(.home-screen) iframe{border-radius:16px;border:1px solid var(--lt-gold-line);box-shadow:0 0 0 1px rgba(255,230,166,.1),0 0 32px rgba(238,190,104,.16),0 24px 60px rgba(0,0,0,.5)}
 @media(max-width:780px){body:not(.home-screen) #stage{padding:6px 6px 8px}body:not(.home-screen) iframe{border-radius:12px}}
@@ -655,8 +666,10 @@ body[data-fab-lift=shelf] .home-links{display:none}
 body.lt-viewer-open .updates-card,body.lt-viewer-open .home-links,body.lt-viewer-open #toast,
 body:has(dialog[open]) .updates-card,body.lt-sheet-open .updates-card,
 body:has(dialog[open]) .home-links,body.lt-sheet-open .home-links,body.lt-viewer-open #toast{display:none}
-/* 짧은 알림은 창 밖에 둔다. 셸 창은 화면 맨 위, 프레임 창은 셸 머리글 바로 아래의 빈 띠에 둔다. */
-body:has(dialog[open]) #toast{top:calc(8px + env(safe-area-inset-top));bottom:auto;left:14px;transform:none;max-width:calc(100% - 88px)}
+/* 짧은 알림은 창 밖에 둔다. 셸 창이 열려 있어도 로고·상단 메뉴를 덮지 않게 머리글 바로 아래 띠에 둔다(#1175). */
+body:has(dialog[open]) #toast{top:calc(68px + env(safe-area-inset-top));bottom:auto;left:14px;transform:none;max-width:calc(100% - 88px)}
+/* 780 이하는 머리글이 낮아진다 — 같은 띠에서 머리글 바로 아래에 붙인다(#1175). */
+@media(max-width:780px){body:has(dialog[open]) #toast{top:calc(62px + env(safe-area-inset-top))}}
 /* 프레임 창은 셸 머리글 바로 아래 띠에 둔다. 실제 본문 글꼴(Pretendard) 줄 높이까지 재서 창 윗변을 침범하지 않게 한다. */
 body.lt-frame-dialog-open #toast{top:calc(68px + env(safe-area-inset-top));bottom:auto;left:14px;transform:none;max-width:calc(100% - 88px)}
 /* 390에서 프레임 창(순간 목록)이 화면 거의 꽉 차게 뜨므로, 알림 줄은 머리글 바로 아래(62px)에 붙여 창 위쪽을 침범하지 않게 한다. */
@@ -692,6 +705,18 @@ body.lt-frame-dialog-open #toast{top:calc(68px + env(safe-area-inset-top));botto
 .updates-heart{font-size:12px;line-height:1}
 .updates-source-user{margin-left:8px;font-size:13px;color:var(--lt-gold)}
 .updates-source-summary{margin:18px 0 0;padding-top:12px;border-top:1px solid var(--lt-line);font-size:13px;line-height:1.7;color:var(--lt-gold)}
+/* #1098 3단계: 내 소식 창 — updates 창과 같은 틀(최대 960·닫기 여백)을 쓰고 줄 모양만 더한다. */
+#my-news-panel>.panel-heading,#my-news-panel>.panel-note,#my-news-panel>.my-news-list,#my-news-panel>#my-news-error,#my-news-panel>.updates-foot{max-width:960px;margin-left:auto;margin-right:auto}
+.my-news-list{display:grid;gap:10px;margin-top:14px;margin-bottom:64px}
+.my-news-rows{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.my-news-day{min-height:24px;padding:10px 2px 0;font-size:12px;font-weight:700;letter-spacing:var(--lt-track);color:var(--lt-rose)}
+.my-news-line{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 12px;min-height:44px;padding:9px 12px;border:1px solid var(--lt-line);border-radius:var(--lt-r-card);background:#ffffff05}
+.my-news-label{font-size:14px;font-weight:700;color:var(--lt-pearl);white-space:nowrap}
+.my-news-last{min-width:0;font-size:13px;line-height:1.7;color:var(--lt-pearl);overflow-wrap:anywhere}
+.my-news-target{font-size:12px;color:var(--muted);overflow-wrap:anywhere}
+.my-news-ai{font-size:12px;color:var(--lt-gold);white-space:nowrap}
+.my-news-empty,.my-news-loading{margin:6px 0 0}
+#my-news-error{color:var(--lt-rose)}
 
 /* '러브트리가 걸어온 길'(261116 대표 확정) — 새 소식 창 맨 아래 접이식 구획. 처음엔 접힘.
    토큰만 쓴다(밤·정원 모두 --lt-pearl/--lt-muted/--lt-gold가 테마에서 갈린다). 자료를 못 읽으면 hidden. */
@@ -901,10 +926,10 @@ body.community-screen #stage>iframe,body.community-screen #empty{display:none}
 #community-panel .community-cover-image.is-loading,#community-panel .community-cover-backdrop.is-loading{opacity:0}
 #community-panel .community-cover-image.is-ready{opacity:1}
 #community-panel .community-cover-backdrop.is-ready{opacity:.78}
-#community-panel .community-card-title{margin:12px 14px 0;color:var(--lt-ink)!important;font-size:16px;font-weight:700;line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-#community-panel .community-card-moment{margin:4px 14px 0;color:var(--lt-ink)!important;font-size:14px;line-height:1.45;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#community-panel .community-card-title{margin:12px 14px 0;color:var(--lt-ink);font-size:16px;font-weight:700;line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#community-panel .community-card-moment{margin:4px 14px 0;color:var(--lt-ink);font-size:14px;line-height:1.45;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #community-panel .community-card-distinct{display:block;margin:4px 14px 0;color:var(--lt-ink);font-size:12px;line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-#community-panel .community-card-meta{margin:7px 14px 14px;color:var(--lt-ink)!important;font-size:13px;line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#community-panel .community-card-meta{margin:7px 14px 14px;color:var(--lt-ink);font-size:13px;line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #community-panel .community-policy{max-width:1500px;margin:20px auto 8px;color:var(--lt-pearl);font-size:13px;line-height:1.6}
 #community-panel .community-empty{max-width:520px;margin:28px auto;padding:28px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-panel);background:var(--lt-paper);color:var(--lt-ink);text-align:center}
 #community-panel .community-empty p{color:var(--lt-ink)}

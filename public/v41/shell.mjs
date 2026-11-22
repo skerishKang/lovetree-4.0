@@ -3,9 +3,11 @@ import {memberLoginUrl,shouldLoadMemberRecords} from './member-entry.mjs';
 import {workspaceModel} from './workspace-model.mjs';
 import {createWorkspaceApi, setMemberRefreshStarted} from './api.mjs';
 import {createShareApi} from './share-api.mjs';
+import {createCommunityApi} from './community-api.mjs';
+import {mountMyNews} from './my-news.mjs';
 import {createMemberSession} from './member-session.mjs';
 import {hasPendingDraft} from './sync-controller.mjs';
-import {clearCachedWorkspace, readCachedWorkspace} from './workspace-cache.mjs';
+import {clearCachedWorkspace, readCachedWorkspace, readLoginSubject, forgetLoginSubject} from './workspace-cache.mjs';
 // #1026 E: 예시 데이터(1MB)는 정적으로 부르지 않는다 — 로그인 사용자의 화면 로딩을 막지 않게
 // 예시가 실제로 필요한 순간에만 동적으로 부른다(로그아웃 첫 화면, 예시 카드 열기, 예시 둘러보기).
 let exampleTree=null,examplePromise=null,exampleInitializing=false;
@@ -22,6 +24,7 @@ import {screens,screenForView,viewForFile,themedViewFor} from './shell/navigatio
 import {createScreens} from './shell/screens.mjs';
 import {createHomeLink} from './shell/home-link.mjs';
 import {createCommunityScreen} from './shell/community-screen.mjs';
+import {createStageLoading} from './shell/stage-loading.mjs';
 import {createHeader} from './shell/header.mjs';
 import {createAuth} from './shell/auth.mjs';
 import {createPanels} from './shell/panels.mjs';
@@ -33,6 +36,8 @@ import {createTagSave} from './shell/tag-save.mjs';
 import {headerBadge, cleanupAvailable} from './inbox-model.mjs';
 import {createDialogs} from './shell/dialogs.mjs';
 import {createFeedbackDialog} from './feedback.mjs';
+// #1072 A-16: 화면 공용 오류 기록 — 저장 경로의 빈 catch를 여기서 기록한다.
+import {report} from './report.mjs';
 import {createFeedbackBoard} from './feedback-board.mjs';
 import {mountUpdates} from './updates.mjs';
 // #1026 E 2단계(A-06): 창을 열 때만 쓰는 모듈은 그때 받는다. 지연 프록시는 첫 메서드 호출에 모듈을
@@ -47,7 +52,8 @@ function lazyPanel(load){
 }
 import {connectionSignature} from './shell/panel-dirty.mjs';
 import {createLocation} from './shell/location.mjs';
-import {createNotifier, syncedNoticeText, newlyPublishedTrees} from './shell/notice.mjs';
+import {createNotifier, syncedNoticeText, newlyPublishedTrees, NOTICE_HIDE_MS} from './shell/notice.mjs';
+import {LOGIN_NOTICE_PARAM, LOGIN_NOTICE_TEXT, LOGIN_NOTICE_BUTTON, loginNoticeFrom} from './shell/login-notice.mjs';
 import {createSettings} from './shell/settings.mjs';
 import {createTreeMenu} from './shell/tree-menu.mjs';
 import {createConnections} from './shell/connections.mjs';
@@ -228,7 +234,9 @@ if(window.visualViewport){const fabKbd=()=>document.body.classList.toggle('lt-kb
 const initialRoute=parseSelectionRoute(location.hash);
 let model=null,current=screenForView(initialRoute.view)[1],source='example',loadGeneration=0,previousDirty=false,member=null,handledHash=null,activeShareId=null,resumeAfterStart=null;
 // #1092: 둘러보기 화면 — 창 모듈의 showModal 호출을 비모달 화면 열기로 바꾸고, 닫을 때 #explore 주소 기록을 지킨다.
-const shellCommunityScreen=createCommunityScreen({$,setHandled:hash=>{handledHash=hash;},flowNavigation});
+// #1026: 0.8초 안에 내용이 오지 않으면 무대에 불러오는 중을 띄운다(움직임 끄기 설정은 표시할 때 읽는다).
+const shellStageLoading=createStageLoading({$,isMotionOff:()=>motionPaused});
+const shellCommunityScreen=createCommunityScreen({$,setHandled:hash=>{handledHash=hash;},flowNavigation,stageLoading:shellStageLoading});
 // #583 '이 순간 열기': 주소(#my/network?tree=…&moment=…)로 지도를 특정 순간을 가운데 두고 열 요청이 오면
 // 여기에 한 번 적어 두고, 지도 프레임을 띄울 때(show) 소비해 프레임 주소에 ?open=<순간>을 붙인다.
 // 지도(network.js)는 이 표시가 있을 때만 그 순간을 고른 상태로 가운데에 둔다 — 그냥 지도를 열 때는
@@ -244,6 +252,8 @@ const takeBoardOpen=()=>{const v=boardOpenMoment;boardOpenMoment=null;return v};
 setMemberRefreshStarted(false);
 const shareApi=createShareApi();
 const accountApi=createWorkspaceApi();
+// #1098 3단계 내 소식 — #1159의 두 읽기 경로(/api/community/my-news·/unread-count)만 쓰는 전용 연결. 서버 변경 없음.
+const myNewsApi=createCommunityApi();
 // 로그인 시작·세션 연결은 shell/auth.mjs가 맡는다(#231 1-B③-1). 셸은 자기 상태를 넘기고 부르기만 한다.
 const shellAuth=createAuth({
   $,
@@ -491,6 +501,9 @@ const shellLocation=createLocation({
   notify:text=>notify(text),
   startMember:()=>startMember(),
   showPublicRoute:route=>showPublicRoute(route),
+  // #1175: share 잔여(source·공유 아이디·공유 기록)를 치우고 예시 기록을 다시 싣는다 — 로그아웃 상태에서
+  // 공유 화면 밖으로 나가는 길(로고·뒤로 가기)이 share 주소 재진입에 묶히지 않게 하고, 남은 '감상' 안내도 거둔다.
+  leaveShare:view=>leaveShare(view),
   requestNetworkOpen,
   requestBoardOpen,
   journey:shellJourney,
@@ -571,7 +584,12 @@ function setHomeHash(){
 const shellHomeLink=createHomeLink({
   $,
   getCurrent:()=>current,
-  show:(file,write)=>show(file,write),
+  show:(file,write)=>{
+    // #1175: 공유 화면을 본 뒤 로고로 나가면 share 잔여를 치운다 — share 상태가 남으면 탭 줄이 숨어
+    // 서재 단추에 닿지 못하고, 화면을 옮길 때마다 공유 기록을 다시 읽어 '감상' 안내가 되풀이된다.
+    if(file==='src064-orbit.html'&&source==='share'){leaveShare(file);return true;}
+    return show(file,write);
+  },
   closePanels:closePanelsForHome,
   setHomeHash,
   scrollToTop:scrollHomeToTop
@@ -589,7 +607,7 @@ const shellHeader=createHeader({
   // #368: 이메일을 불러오거나 지울 때마다 설정 "프로필" 표시도 같이 칠한다.
   onEmailChange:email=>paintSettingsProfile(email),
   // #465 4: 동그라미 깜빡임 — 계정 정보를 부르는 동안 저장본(#408)의 표시 이름으로 먼저 그린다.
-  getCachedName:()=>{try{return readCachedWorkspace(localStorage)?.state?.prefs?.displayName||''}catch{return ''}},
+  getCachedName:()=>{try{return readCachedWorkspace(localStorage,readLoginSubject(localStorage))?.state?.prefs?.displayName||''}catch{return ''}},
   // 이슈 644 2번: 아바타에 새 소식이 있으면 마우스 설명을 점 안내로 바꾼다.
   getAccountTip:()=>shellSettings.getAccountTip(),
   delegate:{syncTreeTips:()=>syncTreeTips()}
@@ -693,7 +711,10 @@ function watchFrameSheet(frame){
 function frames(){return shellScreens.frames();}
 function hideFrames(){return shellScreens.hideFrames();}
 function showInFrame(url,title){return shellScreens.showInFrame(url,title);}
-function show(file,write=true,treeKey=''){return shellScreens.show(file,write,treeKey);}
+function show(file,write=true,treeKey=''){
+ if(file==='src064-orbit.html')shellStageLoading.start('home');else shellStageLoading.cancel();
+ return shellScreens.show(file,write,treeKey);
+}
 function frameLoaded(frame){return shellScreens.frameLoaded(frame);}
 
 // #380 5번: '정리하기' 입구는 트리 ▾ 드롭다운 한 곳에서만 그린다(renderTreeMenu). 헤더 단추는 없앴다.
@@ -709,9 +730,7 @@ const { anyDialogOpen, tipsFollowDialogs, closeTreeTips, accountMenuOpen, tipsFo
 // 넘치는 쪽 끝에만 페이드를 켜서 잘린 것이 아니라 더 있다는 신호를 준다. 데스크톱(넓은 폭)은 스크롤이 없어 아무 일도 하지 않는다.
 const navBar=document.querySelector('.app-header nav');
 const narrowNav=()=>matchMedia('(max-width:780px)').matches;
-function choose(id,momentId,skipShow=false,silent=false){const tree=model.trees.find(t=>t.id===id);window.LT41=tree?{tree,trees:model.trees,source,momentId:tree.moments.find(m=>m.id===momentId)?.id||tree.moments.find(m=>m.parentId===null)?.id||tree.moments[0]?.id,prefs:currentPrefs(),writable:source==='server'&&!!member?.snapshot().writable,}:null;
-  // #1109: 로그인 시작의 빈 모델 반영은 화면을 그리지 않는다 — 곧 데이터가 와서 한 번만 띄운다.
-  if(silent)return;
+function choose(id,momentId,skipShow=false){const tree=model.trees.find(t=>t.id===id);window.LT41=tree?{tree,trees:model.trees,source,momentId:tree.moments.find(m=>m.id===momentId)?.id||tree.moments.find(m=>m.parentId===null)?.id||tree.moments[0]?.id,prefs:currentPrefs(),writable:source==='server'&&!!member?.snapshot().writable,}:null;
   if(!skipShow&&(tree||current==='src064-orbit.html'))show(current,false,id||'');
  else if(!skipShow||!tree){flowNavigation();document.body.classList.remove('home-screen');hideFrames();
   // 261118 대표 결정: 트리 0개 계정이 주소(#my/shelf 등)로 바로 들어와도 그 화면의 빈 상태(#817)를 보여 준다 —
@@ -753,6 +772,7 @@ function projectWorkspace(input){
  try{return workspaceModel(input);}
  catch(error){console.warn('[LT41] 작업 공간을 읽지 못했어요:',error?.message||String(error));return null;}
 }
+const onExploreRoute=()=>/^#explore(?:\/moments)?$/.test(location.hash);
 function load(input,kind,selection={},fallback={},example=null,silent=false){
  const projected=kind==='example'?{trees:[example||exampleTree].filter(Boolean)}:projectWorkspace(input);
  if(!projected){
@@ -771,10 +791,18 @@ function load(input,kind,selection={},fallback={},example=null,silent=false){
  document.body.dataset.treeCount=String(model?.trees?.length||0);
  // #368: 트리 고르기는 맨 위 트리 ▾ 드롭다운 한 곳이다(옛 내 기록 창의 select는 없앴다).
  const resolved=resolveAccountPosition(model.trees,selection,fallback),chosen=model.trees.find(t=>t.id===resolved.position.treeId);
-  choose(chosen?.id,resolved.position.momentId,false,silent);
+ // #1109: 회원 기록을 기다리는 동안 첫 화면 문서를 먼저 열지 않는다. 빈 서재·책·보드는 기존 빈 판을 그린다.
+ if(silent&&(current==='src064-orbit.html'||onExploreRoute())){
+  window.LT41=null;
+  if(!onExploreRoute())shellStageLoading.start('home');
   return resolved;
+ }
+ // 예시나 회원 기록이 늦게 도착해도 먼저 고른 둘러보기는 그대로 둔다.
+ const keepExplore=(kind==='server'||(kind==='example'&&exampleInitializing))&&onExploreRoute();
+ choose(chosen?.id,resolved.position.momentId,keepExplore);
+ return resolved;
 }
-function clear(){load({revision:0,state:{version:1,trees:[]}},'file');}
+function clear(silent=false){load({revision:0,state:{version:1,trees:[]}},'file',{},{},null,silent);}
 function stateSelection(){return {treeId:window.LT41?.tree.id,momentId:window.LT41?.momentId};}
 function formDirty(){return shellPanels.formDirty();}
 function treeDirty(){return shellPanels.treeDirty();}
@@ -893,7 +921,7 @@ function memberStatus(status){
    b.textContent=a.name==='login'?'새 창에서 로그인':a.label;
    b.onclick=async()=>{
     if(a.name==='backup'){backup();return;}
-    if(a.name==='login'){window.open(memberLoginUrl(readTheme(localStorage)),'_blank','noopener,noreferrer');return;}
+    if(a.name==='login'){forgetLoginSubject(localStorage);/* A-18: 새 로그인은 확인된 계정이 없어지는 일 — 표식을 비우고 새 창으로 보낸다 */window.open(memberLoginUrl(readTheme(localStorage)),'_blank','noopener,noreferrer');return;}
     if(['pull','force'].includes(a.name)&&!confirm(a.name==='pull'
      ?'미저장 변경을 버리고 서버 기록을 불러올까요?'
      :'서버의 최신 기록으로 현재 입력을 덮어쓸까요? 다른 창의 변경이 사라질 수 있습니다.'))return;
@@ -908,7 +936,7 @@ function memberStatus(status){
  else if(status.phase==='synced'){
   // #984: 저장이 서버에서 확인되면(직전 미저장→synced) 열린 화면에 표지·이름 다시 그리기를 알린다.
   // 실패(rejected·offline·conflict·login)에서는 알리지 않는다 — 화면은 원래 표지를 그대로 두고 저장 안내 떠가 실패를 알린다.
-  if(previousDirty){try{for(const f of frames())f.contentWindow?.postMessage({type:'lt41-trees-saved'},location.origin);}catch{}}
+  if(previousDirty){try{for(const f of frames())f.contentWindow?.postMessage({type:'lt41-trees-saved'},location.origin);}catch(error){report(error, '저장 알림 보내기');}}
   // #549: 기록(순간)이 0개인 새 계정의 첫 안내는 '불러왔어요' 대신 첫 순간 안내로(문구는 notice.mjs 한 벌).
   // #905: 자동 저장이 성공하면 알리지 않는다 — 직전에 저장 안 됨이었다면(previousDirty) 방금 저장된 것이다.
   // 알림은 실패·오프라인·충돌(저장 안내 떠)과 사용자가 누른 큰 동작의 완료 확인만 띄운다.
@@ -937,11 +965,11 @@ function memberStatus(status){
    if(!shown)notifyPublicBanner((model?.trees||[])[0]?.id);
   }
  }
- else if(status.phase==='login'&&!status.dirty)notify('로그인이 필요해요.');
+ else if(status.phase==='login'&&!status.dirty&&document.body.dataset.member==='in')notify('로그인이 필요해요.');/* #1175: 로그아웃 상태로 시작할 때(저장 연결 확인 401)는 진입만으로 알림을 띄우지 않는다 — 머리글의 로그인 단추가 이미 길을 알린다. */
  else if(!status.dirty&&status.phase==='offline')notify(status.detail||'내 기록을 불러오지 못했어요.');
  $('write-menu').textContent=status.dirty?'저장 안 됨' :'＋ 순간 추가';$('empty-records').textContent=status.writable?'＋ 첫 트리 만들기':'내 기록 불러오기';/* #463: 이름을 한 곳에서 정한다(paintEmptyCopy와 같은 글자) *//* #463: 주 버튼 표시도 같이 유지한다(쓸 상태가 바뀌도 강조가 엉키지 않게). */$('empty-records').classList.toggle('primary',!!status.writable);$('empty-sample').classList.toggle('primary',!status.writable);previousDirty=status.dirty;renderAccount();flowNavigation();document.body.dataset.member=member?.snapshot().owned?'in':'out';document.body.dataset.treeCount=String(model?.trees?.length||0);applyAdvanced();
 }
-async function startMember(){setMemberRefreshStarted(true);if(!leaveMember())return;backfillStarted=false;backfillAttempted.clear();const startup=parseSelectionRoute(location.hash);if(startup.scope==='owner')stashPendingOwnerRoute(sessionStorage,location.hash);++loadGeneration;const generation=loadGeneration;load({revision:0,state:{version:1,trees:[]}},'file',{},{},null,true);
+async function startMember(){setMemberRefreshStarted(true);if(!leaveMember())return;backfillStarted=false;backfillAttempted.clear();const startup=parseSelectionRoute(location.hash);if(startup.scope==='owner')stashPendingOwnerRoute(sessionStorage,location.hash);++loadGeneration;const generation=loadGeneration;clear(true);
  const api=createWorkspaceApi({fetchImpl:(url,init)=>fetch(init?.method==='GET'&&url==='/api/workspace'?'/api/workspace?features=bound-writes':url,init)});
  let initialized=false,startupNotice='',session;
  session=createMemberSession({api,onGuard:read=>workspaceGuardNotice(read),onState:(state,selection,meta)=>{if(generation!==loadGeneration)return;try{
@@ -963,21 +991,26 @@ async function startMember(){setMemberRefreshStarted(true);if(!leaveMember())ret
    // 화면이 이미 자기 상태를 들고 있으므로 모델과 창 안 값만 고치고, 기존 '트리 저장' 메시지로 다시 그리게 한다.
    let resolved;
    const projected=workspaceModel({revision:0,state});
-   const sameTree=!!window.LT41?.tree&&projected.trees.some(t=>t.id===window.LT41.tree.id);
-   if(initialized&&!meta&&!selection&&sameTree){
+   const position=resolveAccountPosition(projected.trees,requested,saved);
+   const context=window.LT41;
+   const sameTree=context?.tree?.id&&context.tree.id===position.position.treeId;
+   const canRefresh=['src064-orbit.html','track59-sketchbook.html','track58-pinboard.html','track32-bookshelf.html'].includes(current);
+   if(initialized&&!meta&&!selection&&sameTree&&canRefresh&&source==='server'){
     model=projected;
-    const tree=projected.trees.find(t=>t.id===window.LT41.tree.id);
-    window.LT41.tree=tree;window.LT41.trees=projected.trees;window.LT41.prefs=state.prefs;window.LT41.writable=source==='server'&&!!member?.snapshot().writable;
-    for(const f of frames()){try{f.contentWindow?.postMessage({type:'lt41-trees-saved'},location.origin)}catch{}}
-    resolved={position:{treeId:tree.id,momentId:window.LT41.momentId},treeMissing:false,momentMissing:false};
+    const tree=projected.trees.find(t=>t.id===context.tree.id);
+    Object.assign(context,{tree,trees:projected.trees,prefs:state.prefs,momentId:position.position.momentId,writable:!!member?.snapshot().writable});
+    document.body.dataset.treeCount=String(projected.trees.length);
+    links();
+    for(const f of frames()){try{f.contentWindow?.postMessage({type:'lt41-trees-saved',background:true,treeId:tree.id,momentId:context.momentId},location.origin)}catch(error){report(error,'기록 갱신 알림');}}
+    resolved=position;
    }else{
     resolved=load({revision:0,state},'server',requested,saved);initialized=true;
    }
    if(window.LT41)window.LT41.prefs=state.prefs;
    // #441 후속: 다른 기기의 첫 그림도 계정 날짜 표기를 따르도록, 로그인 때 기기 미러 캐시를 계정값으로 채운다.
-   try{localStorage.setItem('lt41.dateStyle',normalizeDateStyle(state.prefs?.dateStyle));}catch{}
+   try{localStorage.setItem('lt41.dateStyle',normalizeDateStyle(state.prefs?.dateStyle));}catch(error){report(error, '기기 설정 저장');}
    // 261116 PR 2: 첫 화면 카드 모드도 기기 미러를 계정값으로 채운다(첫 화면 문서는 계정 값을 늦게 알 수 있다).
-   try{localStorage.setItem('lt41.homeMoment',JSON.stringify(normalizeHomeMoment(state.prefs?.homeMoment)));}catch{}
+   try{localStorage.setItem('lt41.homeMoment',JSON.stringify(normalizeHomeMoment(state.prefs?.homeMoment)));}catch(error){report(error, '기기 설정 저장');}
    // #481: 제목 보기도 같은 이유로 기기 미러를 계정값으로 채운다.
    rememberTitleDisplay(state.prefs?.titleDisplay);
    paintTitleDisplayControls();
@@ -988,7 +1021,7 @@ async function startMember(){setMemberRefreshStarted(true);if(!leaveMember())ret
    rememberShelfView(state.prefs?.shelfView);
    paintShelfViewControls();
    if(!backfillStarted&&snapshot.owned){backfillStarted=true;void runTitleBackfill(state,session);}
-   if(snapshot.owned&&resolved.position.treeId){if(viewForFile(current)!=='home')writeLocation('replace');takePendingOwnerRoute(sessionStorage);if(route?.scope==='owner'&&resolved.treeMissing)startupNotice='이 주소의 기록을 현재 계정에서 찾을 수 없어 최근 위치를 열었어요.';else if(route?.scope==='owner'&&resolved.momentMissing)startupNotice='이 주소의 순간을 찾을 수 없어 트리의 시작 순간을 열었어요.';}
+   if(snapshot.owned&&resolved.position.treeId){if(viewForFile(current)!=='home'&&!onExploreRoute())writeLocation('replace');takePendingOwnerRoute(sessionStorage);if(route?.scope==='owner'&&resolved.treeMissing)startupNotice='이 주소의 기록을 현재 계정에서 찾을 수 없어 최근 위치를 열었어요.';else if(route?.scope==='owner'&&resolved.momentMissing)startupNotice='이 주소의 순간을 찾을 수 없어 트리의 시작 순간을 열었어요.';}
  }catch(error){openFallbackShell(error);}},onStatus:status=>{if(generation===loadGeneration)memberStatus(status);},
  navigate:url=>{
   if(url.startsWith('/auth/login')&&parseSelectionRoute(location.hash).scope==='owner')stashPendingOwnerRoute(sessionStorage,location.hash);
@@ -1007,15 +1040,17 @@ async function startMember(){setMemberRefreshStarted(true);if(!leaveMember())ret
  if(generation===loadGeneration){const startupJourney=parseJourneyRoute(location.hash);if(startupJourney){if(session.snapshot().owned&&session.snapshot().writable)openFirstJourney({step:startupJourney.step,route:true});else{history.replaceState(null,'','#home');handledHash='#home';}}}
 }
 async function sample(selection={},view){if(!pauseMember())return;const tree=await loadExampleTree();++loadGeneration;if(view)current=view;load(null,'example',selection,{},tree);if(view)writeLocation();$('save-feedback').hidden=true;if($('account-settings').open)$('account-settings').close();}
+// #1175: 공유 화면 밖으로 나가는 길 한 벌 — share 잔여를 치우고 예시 첫 화면으로 돌아가며, 화면에 남은 '감상' 안내를 거둔다.
+function leaveShare(view){hideToast();void sample({},view);}
 $('account-entry').onclick=e=>{
  if(member?.snapshot().owned){e.preventDefault();openAccountMenu();}
  else if(parseSelectionRoute(location.hash).scope==='owner')stashPendingOwnerRoute(sessionStorage,location.hash);
 };
 $('account-avatar').onclick=e=>{
  e.stopPropagation();
- if($('account-popover').hidden){openAccountMenu(e.detail===0?'keyboard':'mouse');void shellSettings.getFeedbackBoard().refreshReplyDot();}else closeAccountMenu();
+ if($('account-popover').hidden){openAccountMenu(e.detail===0?'keyboard':'mouse');void shellSettings.getFeedbackBoard().refreshReplyDot();void shellSettings.refreshMyNewsCount?.();}else closeAccountMenu();
 };
-const shellSettings=createSettings({ $, notify, setTitleDisplay, openLoginStart, links, screenForView, choose, panel, show, frames, frameLoaded, hideFrames, closeAccountMenu, openAccountMenu, renderAccount, updateAccountControls, openAssets, openEditor, sample, backup, clear, startMember, leaveMember, openFallbackShell, writeLocation, load, flowNavigation, renderTreeMenu, requestBoardOpen, lastShelfTreeId, shellHeader, shellDialogs,  shareApi, accountApi, readTheme, writeTheme, normalizeAccentColor, normalizeDateStyle, normalizeStartPlace, normalizeShareView, normalizeHomeMoment,  readPageTurn, writePageTurn, frameMessage, displayTreeTitle, accountPresentation, createFeedbackDialog, createFeedbackBoard, mountUpdates, readWriteTab, writeWriteTab, clearCachedWorkspace, createWorkspaceApi, paintThemeControls, applyTheme, toggleTheme, paintBookDisplayControls, get member(){return member}, get model(){return model}, get current(){return current}, get source(){return source}, get motionPaused(){return motionPaused}, get loadGeneration(){return loadGeneration}, get handledHash(){return handledHash}, get activeShareId(){return activeShareId}, set member(v){member=v}, set model(v){model=v}, set current(v){current=v}, set source(v){source=v}, set motionPaused(v){motionPaused=v}, set loadGeneration(v){loadGeneration=v}, set handledHash(v){handledHash=v}, set activeShareId(v){activeShareId=v}
+const shellSettings=createSettings({ $, notify, setTitleDisplay, openLoginStart, links, screenForView, choose, panel, show, frames, frameLoaded, hideFrames, closeAccountMenu, openAccountMenu, renderAccount, updateAccountControls, openAssets, openEditor, sample, backup, clear, startMember, leaveMember, openFallbackShell, writeLocation, load, flowNavigation, renderTreeMenu, requestBoardOpen, lastShelfTreeId, shellHeader, shellDialogs,  shareApi, accountApi, myNewsApi, readTheme, writeTheme, normalizeAccentColor, normalizeDateStyle, normalizeStartPlace, normalizeShareView, normalizeHomeMoment,  readPageTurn, writePageTurn, frameMessage, displayTreeTitle, accountPresentation, createFeedbackDialog, createFeedbackBoard, mountUpdates, mountMyNews, readWriteTab, writeWriteTab, clearCachedWorkspace, forgetLoginSubject, createWorkspaceApi, paintThemeControls, applyTheme, toggleTheme, paintBookDisplayControls, get member(){return member}, get model(){return model}, get current(){return current}, get source(){return source}, get motionPaused(){return motionPaused}, get loadGeneration(){return loadGeneration}, get handledHash(){return handledHash}, get activeShareId(){return activeShareId}, set member(v){member=v}, set model(v){model=v}, set current(v){current=v}, set source(v){source=v}, set motionPaused(v){motionPaused=v}, set loadGeneration(v){loadGeneration=v}, set handledHash(v){handledHash=v}, set activeShareId(v){activeShareId=v}
  });
 const { showPublicRoute, applyAdvanced, applyDateStyleToFrame, applyPageTurnToFrame, applyNetworkViewToFrame, applyBoardThemeToFrame, syncBoardThemeToApp, quickTargetPreference, profileDirty, paintSettingsProfile, accountConfirmMatches, openAccountData, openAccountSettings, paintDateStyleControls, paintStartPlaceControls, paintShareControls, paintQuickTargetControls, paintNetworkViewControls, paintPageTurnControls, paintBoardThemeControls, paintTreeVisibilityList, paintSettingsUsage, loadTreeVisibility, paintTreeManagerVisibility, paintSettingsTab, focusSettingsSection, fillProfileForm, paintScreenControls, readAdvanced, advancedKey, currentDateStyle, currentPageTurn, sendToFrame, currentStartPlace, currentShareView, currentBoardTheme }=shellSettings;
 // #1094: 머리줄 묶음과 설정 창의 같은 data-book-display 두 칸이 하나의 길로 바뀌고 저장된다.
@@ -1028,15 +1063,16 @@ for(const b of document.querySelectorAll('[data-shelf-view]'))b.onclick=()=>{
 };
 paintThemeControls();applyTheme();paintTitleDisplayControls();paintBookDisplayControls();paintShelfViewControls();applyAdvanced();
 if(initialRoute.scope==='public')showPublicRoute(initialRoute);
-else if(/^#explore/.test(location.hash)){/* #1025: 둘러보기가 자기 주소를 연다 — 예시 로드로 주소를 덮지 않는다. #1092: [트리] 보기(#explore)는 화면으로 바로 연다 — [순간](#explore/moments)은 창 모듈이 자기 주소로 연다. */
+else if(onExploreRoute()){/* #1025: 둘러보기가 자기 주소를 연다 — 예시 로드로 주소를 덮지 않는다. #1092: [트리] 보기(#explore)는 화면으로 바로 연다 — [순간](#explore/moments)은 창 모듈이 자기 주소로 연다. */
  if(location.hash==='#explore')shellCommunityScreen.openRoute();
 }
 else if(shouldLoadMemberRecords(location.search,document.cookie,location.hash)||shellIntake.pending()){
  // #1026 E: 기존 사용자는 예시를 받지 않는다. 주소가 정해지는 즉시 빈 틀을 세우고,
  // 아래 startMember()가 기록을 받는 대로 화면 iframe을 연다 — example.mjs 요청 0.
- clear();
+ clear(true);
 }else{
  // 로그아웃·신규 사용자는 예시가 실제 내용이므로 필요한 이 순간에만 동적으로 받는다.
+ shellStageLoading.start('home');
  exampleInitializing=true;
  void loadExampleTree().then(tree=>{if(source!=='server'&&source!=='share')load(null,'example',{}, {},tree);exampleInitializing=false;}).catch(()=>{exampleInitializing=false;});
 }
@@ -1057,6 +1093,19 @@ addEventListener('beforeunload',e=>{
 if(shouldLoadMemberRecords(location.search,document.cookie,location.hash)||shellIntake.pending())void startMember().catch(error=>openFallbackShell(error));
 // 로그아웃으로 다시 연 문서에서는 '로그인이 필요해요' 대신 이 안내를 한 번 띄운다.
 try{if(sessionStorage.getItem('lt41.logoutNotice')==='1'){sessionStorage.removeItem('lt41.logoutNotice');notify('로그아웃했어요.');}}catch{}
+// #1175: 로그인 콜백이 거절되면 서버가 JSON 대신 이 표지를 달아 /v41/로 보낸다.
+// 날 글자 대신 한 줄 안내와 다시 로그인 단추를 보여 주고, 표지는 주소에서 걷어 다시 뜨지 않게 한다.
+if(loginNoticeFrom(location.search)){
+ try{const clean=new URL(location.href);clean.searchParams.delete(LOGIN_NOTICE_PARAM);history.replaceState(null,'',clean.pathname+clean.search+clean.hash);}catch{}
+ // 첫 화면의 다른 안내(새 소식 띠·첫 트리 안내)보다 먼저 보인다 — 그 쪽이 뜨며 토스트를 감추지 못하게 한다.
+ noticeQueue.request('loginNotice',{
+  show:()=>{
+   notify(LOGIN_NOTICE_TEXT,{hold:true,action:{label:LOGIN_NOTICE_BUTTON,run:()=>openLoginStart('first')}});
+   setTimeout(()=>noticeQueue.release('loginNotice'),NOTICE_HIDE_MS+50);
+  },
+  hide:hideToast
+ });
+}
 
 
 

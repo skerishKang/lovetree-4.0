@@ -4,6 +4,7 @@
 import {parseTag,tagKey} from './tags.mjs';
 // #1060: 썸네일 주소 글자는 정본(youtube-id.mjs) 한 벌에서만 만든다.
 import {youtubeStageThumbUrl} from './youtube-id.mjs';
+import {isGrayThumbnail,fallbackCardMarkup} from './thumb-fallback.mjs';
 const el=(tag,className,text)=>{const node=document.createElement(tag);if(className)node.className=className;if(text!=null)node.textContent=text;return node;};
 const SVG_NS='http://www.w3.org/2000/svg';
 // 나무 모양 선 아이콘 — 다른 단추와 같은 currentColor·같은 선 굵기(#1025 2단계).
@@ -39,8 +40,11 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin,a
  const card=el('div','moments-card');
  const media=el('div','moments-media');
  const poster=el('img','moments-poster');poster.alt='';poster.loading='lazy';
+ const posterFallback=el('div','moments-fallback');posterFallback.hidden=true;
+ function showPosterFallback(){const item=current();if(!item)return;posterFallback.innerHTML=fallbackCardMarkup(item,{variant:'orbit',videoUnavailable:!!item.videoId});posterFallback.hidden=false;poster.hidden=true;}
+ poster.onload=()=>{if(isGrayThumbnail(poster))showPosterFallback();};
  // 썸네일이 안 떠도 판이 비지 않게 — 세로 포스터가 없으면 기존 가로 포스터로 한 번 더 시도한다.
- poster.onerror=()=>{const item=current();if(item?.videoId&&!/hqdefault\.jpg/.test(poster.getAttribute('src')||''))poster.src=youtubeStageThumbUrl(item.videoId,'hqdefault');};
+ poster.onerror=()=>{const item=current();const src=poster.getAttribute('src')||'';if(item?.videoId&&!/hqdefault\.jpg/.test(src))poster.src=youtubeStageThumbUrl(item.videoId,'hqdefault');else showPosterFallback();};
  const overlay=el('div','moments-overlay');
  const treeLine=el('div','moments-tree');
  const titleLine=el('div','moments-title');
@@ -48,7 +52,7 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin,a
  const noteLine=el('div','moments-note');
  overlay.append(treeLine,titleLine,tagLine,noteLine);
  const progress=el('div','moments-progress');const progressFill=el('span','moments-progress-fill');progress.append(progressFill);
- media.append(poster,overlay,progress);
+ media.append(poster,posterFallback,overlay,progress);
  card.append(media);
  const rail=el('div','moments-rail');
  const nav=el('div','moments-nav');
@@ -143,7 +147,8 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin,a
  // 로그아웃(401)에는 트리 댓글과 같이 로그인 안내를 곁들인다. AI 명예회원 댓글은 트리 작성자 표시와 같은 방식으로 구분한다.
  const commentsDialog=el('div','moments-comments-dialog');commentsDialog.setAttribute('role','dialog');commentsDialog.setAttribute('aria-modal','true');commentsDialog.setAttribute('aria-label','순간 댓글');commentsDialog.hidden=true;
  const commentsTitle=el('h3','moments-comments-title','댓글');
- const commentsClose=el('button','moments-add-close','×');commentsClose.type='button';commentsClose.setAttribute('aria-label','닫기');commentsClose.onclick=()=>{commentsDialog.hidden=true;};
+ const closeComments=()=>{commentsDialog.hidden=true;panel.classList.remove('lt-comments-open');};
+ const commentsClose=el('button','moments-add-close','×');commentsClose.type='button';commentsClose.setAttribute('aria-label','닫기');commentsClose.onclick=closeComments;
  const commentsNotice=el('p','moments-comments-notice');commentsNotice.setAttribute('role','status');commentsNotice.hidden=true;
  const commentsList=el('div','moments-comments-list');
  const commentsForm=el('form','community-comment-form');const commentsInput=el('textarea','');const commentsSubmit=el('button','community-mini','댓글 남기기');
@@ -154,7 +159,7 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin,a
  const whenOf=(value)=>{try{return when?when(value):String(value||'').slice(0,10);}catch{return '';}};
  const paintCommentsRow=(comment)=>{
   const item=el('article','community-comment');const edited=comment.edited?' · 수정됨':'';
-  item.append(el('small','',`${comment.aiTester?'AI 명예회원 ':''}${comment.authorLabel} · ${whenOf(comment.createdAt)}${edited}`));
+  item.append(el('small','',`${comment.aiTester?'AI 명예회원 · ':''}${comment.authorLabel} · ${whenOf(comment.createdAt)}${edited}`));
   item.append(el('p','',comment.body));
   return item;
  };
@@ -167,11 +172,11 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin,a
  };
  async function openComments(){
   const item=current();if(!item||!item.shareId||!item.id||!api||typeof api.momentComments!=='function')return;
-  commentsDialog.hidden=false;commentsNotice.hidden=true;
+  commentsDialog.hidden=false;panel.classList.add('lt-comments-open');commentsNotice.hidden=true;
   commentsTitle.textContent='댓글';
   commentsList.replaceChildren(el('p','community-muted','댓글을 불러오는 중…'));
   const answer=await api.momentComments(item.shareId,item.id);
-  if(current()!==item){commentsDialog.hidden=true;return;} // 넘겨 뒤 늦게 온 응답은 버린다
+  if(current()!==item){closeComments();return;} // 넘겨 뒤 늦게 온 응답은 버린다
   if(!answer.ok){
    commentsNotice.textContent=(answer&&answer.message)||(answer.status===401?'로그인하면 댓글을 남길 수 있어요.':'댓글을 불러오지 못했어요.');
    commentsNotice.hidden=false;
@@ -246,6 +251,7 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin,a
   empty.hidden=true;stage.hidden=false;
   // 썸네일이 늘 보이게 깔고 iframe은 그 아래에 둔다 — 유튜브가 안 떠도 판이 비지 않는다(#1025 재검수).
   media.classList.remove('is-playing');
+  posterFallback.hidden=true;posterFallback.replaceChildren();poster.hidden=false;
   poster.src=item.thumbnail||'';
   poster.alt=item.title||'';
   treeLine.replaceChildren();
@@ -269,7 +275,7 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin,a
   currentFrame=now;
   stage.dataset.ltMomentsCount=String(frames.length);
   stage.dataset.ltMomentsId=item.videoId||item.id;
-  commentsDialog.hidden=true; // 순간을 넘기면 댓글 창을 닫는다 — 다음 순간 것을 다시 열게
+  closeComments(); // 순간을 넘기면 댓글 창을 닫는다 — 다음 순간 것을 다시 열게
   void loadStats(); // 그 순간의 ♡·댓글 수 — 모양이 다른 응답은 조용히 기본 표시를 유지한다
  }
  let currentFrame=null;

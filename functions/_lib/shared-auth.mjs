@@ -17,9 +17,46 @@ const json = (status, error) => new Response(JSON.stringify({ error }), { status
 const ACCOUNT_EMAIL_PATH = '/internal/account/email';
 // 프로필 클레임이 켜져 있으면 콜백에서 이메일을 모아 두고, 검증된 토큰이 인증한 계정에 한 번만
 // 적어 둔다. 로그인 흐름을 막지 않도록 최선 노력(best effort)으로 보내고 실패는 삼킨다.
-export async function recordAccountEmail(env, fetcher, tokens, verified) {
+// #1189: 토큰 교환 응답의 email_assertion 검증. 형식 v1.<payload>.<sig>,
+// sig = base64url(HMAC-SHA256(비밀, 'v1.'+payload)). 서명·aud·만료·필드 검증을 모두 통과해야 claim을 준다.
+const un64url = s => Uint8Array.from(atob(String(s).replaceAll('-', '+').replaceAll('_', '/').padEnd(Math.ceil(String(s).length / 4) * 4, '=')), c => c.charCodeAt(0));
+export async function verifyEmailAssertion(assertion, secret, now = Math.floor(Date.now() / 1000)) {
   try {
-    const email = emailFromExchange(tokens);
+    if (typeof secret !== 'string' || !secret.trim()) return null;
+    const parts = String(assertion || '').split('.');
+    if (parts.length !== 3 || parts[0] !== 'v1') return null;
+    const key = await crypto.subtle.importKey('raw', enc.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+    const expected = new Uint8Array(await crypto.subtle.sign('HMAC', key, enc.encode('v1.' + parts[1])));
+    const given = un64url(parts[2]);
+    if (given.length !== expected.length) return null;
+    let diff = 0;
+    for (let i = 0; i < given.length; i += 1) diff |= given[i] ^ expected[i];
+    if (diff !== 0) return null;
+    const claim = JSON.parse(dec.decode(un64url(parts[1])));
+    if (claim.aud !== 'lovetree' || claim.exp !== claim.iat + 600) return null;
+    if (now < claim.iat || now >= claim.exp) return null;
+    if (typeof claim.sub !== 'string' || !claim.sub) return null;
+    if (typeof claim.email !== 'string' || !claim.email.trim()) return null;
+    if (typeof claim.email_verified !== 'boolean') return null;
+    return claim;
+  } catch {
+    return null;
+  }
+}
+// #1189: recordAccountEmail은 profile.email 대신 검증된 assertion의 이메일만 보낸다.
+async function emailForRecord(env, tokens, verified, now) {
+  const assertion = tokens?.email_assertion;
+  const secret = env?.PADIEM_AUTH_EMAIL_ASSERTION_KEY_LOVETREE;
+  const claim = await verifyEmailAssertion(assertion, secret, now);
+  if (claim) {
+    const accountId = verified?.accountId ?? verified?.subject;
+    if (accountId && claim.sub === accountId) return claim.email.trim().toLowerCase();
+  }
+  return '';
+}
+export async function recordAccountEmail(env, fetcher, tokens, verified, now) {
+  try {
+    const email = await emailForRecord(env, tokens, verified, now);
     const accountId = verified?.accountId ?? verified?.subject;
     const origin = upstreamOrigin(env);
     if (!email || !accountId || !origin) return false;
@@ -38,11 +75,8 @@ export async function recordAccountEmail(env, fetcher, tokens, verified) {
     return false;
   }
 }
-// 토큰 교환 응답의 사용자 정보에서 이메일만 꺼낸다. 사용자 정보가 없거나(공통 로그인 쪽
-// 설정이 꺼져 있을 때) 이메일이 비어 있으면 ''를 돌려주고 로그인 자체는 실패하지 않는다.
-function emailFromExchange(body) {
-  return body?.profile && typeof body.profile.email === 'string' && body.profile.email.trim() ? body.profile.email.trim() : '';
-}
+// #1189: 프로필 이메일(profile.email)은 더 이상 신뢰하지 않는다 — 검증된 email_assertion만 쓴다.
+// (emailFromExchange는 제거했다.)
 // 로그인 뒤 돌아갈 자리. 기본값은 사이트 루트가 아니라 4.1 첫 화면이다.
 const NEXT_DEFAULT = '/v41/';
 const NEXT_ORIGIN = 'https://lovetree-4-0.pages.dev';
@@ -138,7 +172,7 @@ export function createSharedPagesAuth({ fetcher = fetch, now = () => Math.floor(
         const tokens = await exchange(env, { grant_type: 'authorization_code', code: url.searchParams.get('code'), redirect_uri: callbackFor(request, env), code_verifier: state.verifier }, fetcher, current);
         const verified = await verify(tokens.access_token);
         if (typeof tokens.refresh_token !== 'string') throw new Error('missing refresh');
-        await recordAccountEmail(env, fetcher, tokens, verified);
+        await recordAccountEmail(env, fetcher, tokens, verified, current);
         const h = issueCookies(tokens); h.set('location', state.next); return new Response(null, { status: 302, headers: h });
       }
       if ((path === '/auth/refresh' || path === '/auth/logout') && request.method === 'POST') {

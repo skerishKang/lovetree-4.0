@@ -49,7 +49,7 @@ if(bgBtn&&bgMenu){
 // 공유 감상(share)은 읽기 전용이다. 서버 쓰기 가능 여부는 셸이 LT41.writable로 넘긴다.
 function boardSaveEnabled(){try{return window.parent!==window&&window.parent.LT41?.source==='server'&&window.parent.LT41?.writable===true&&!LTDEMO.readOnly}catch{return false}}
 const exampleBoard=LTDEMO.example;
-const canEditBoard=exampleBoard||boardSaveEnabled();
+let canEditBoard=exampleBoard||boardSaveEnabled();
 // #553: 카드 종류별 예약 높이 — CSS가 정한 최대 높이에 여유를 더한 값(실측: 썸네일이 실린 YouTube 카드
 // 465px·세로 Shorts 648px, 기본 카드는 #548 글자 기준선 올림으로 최대 424px). 줄 간격은 이 예약 높이에서
 // 나오므로 링크 없는 트리(예시 40순간)는 기본 간격 460px(#548과 같다), YouTube 밴드는 그보다 크게 벌어진다.
@@ -82,11 +82,13 @@ if(replace&&!visibleCardCount())fitAll(false)}
 // '날짜순'에서는 저장 자리도 날짜순 바둑판으로 다시 꽂는다(보여 주기만 — 저장 값을 지우지 않는다).
 function gridPlan(vw){const slots=LT58Model.pinboardSpread(LT58Model.dateDescOrder(moments),{cols:LT58Model.gridColumns(vw),saved:boardMode==='mine'?savedSlotsOf(moments):null});
 const tops=LT58Model.gridRowTops(slots,(id)=>reservedHeights.get(id)||BASE_RESERVED_H);return{slots,tops}}
-let moments=LTDEMO.moments.map((m,i)=>{const saved=Number.isFinite(m.x)&&Number.isFinite(m.y)&&LT58Model.isPinboardSlot(m.x);return{id:m.id,type:m.type==='memo'?'note':'photo',originalType:m.type==='memo'?'note':m.type,createdOrder:i+1,title:m.title,emotion:m.emotion,date:m.date,source:m.source||'예시 기록',mediaMetadata:m.mediaMetadata||null,memo:m.memo||'',cardMemo:m.memo||m.whyNext||'',x:saved?m.x:0,y:saved?m.y:0,rot:saved?(Number.isFinite(m.rot)?m.rot:0):0,savedPos:saved,savedXY:saved?{x:m.x,y:m.y,rot:Number.isFinite(m.rot)?m.rot:0}:null,pinStyle:m.pinStyle,cardStyle:m.cardStyle,keywords:Array.isArray(m.keywords)?m.keywords:[],color:m.color||['rose','violet','cyan','amber'][i%4],asset:m.image,url:m.externalUrl||'',first:!!m.first}});
+function projectBoardMoments(){return LTDEMO.moments.map((m,i)=>{const saved=Number.isFinite(m.x)&&Number.isFinite(m.y)&&LT58Model.isPinboardSlot(m.x);return{id:m.id,type:m.type==='memo'?'note':'photo',originalType:m.type==='memo'?'note':m.type,createdOrder:i+1,title:m.title,emotion:m.emotion,date:m.date,source:m.source||'예시 기록',mediaMetadata:m.mediaMetadata||null,memo:m.memo||'',cardMemo:m.memo||m.whyNext||'',x:saved?m.x:0,y:saved?m.y:0,rot:saved?(Number.isFinite(m.rot)?m.rot:0):0,savedPos:saved,savedXY:saved?{x:m.x,y:m.y,rot:Number.isFinite(m.rot)?m.rot:0}:null,pinStyle:m.pinStyle,cardStyle:m.cardStyle,keywords:Array.isArray(m.keywords)?m.keywords:[],color:m.color||['rose','violet','cyan','amber'][i%4],asset:m.image,url:m.externalUrl||'',first:!!m.first}});}
+let moments=projectBoardMoments();
 // #619-6: '내 배치'의 순서는 좌표가 아니라 저장된 순서다(서버 변경 없이 y에 순위를 실어 보낸다 — board-model의 orderOfMoments).
 // 순서 값이 없으면 옛 x·y(핀보드 칸 자리)를 순서로 한 번 바꿔 읽고, 좌표는 그대로 둔다(지우지 않는다).
-let momentOrder=(()=>{const saved=LT58Model.orderOfMoments(LTDEMO.moments);if(saved)return saved;
-const slots=savedSlotsOf(moments);const rest=LT58Model.dateDescOrder(moments.filter((m)=>!slots.has(m.id)));return LT58Model.orderFromSaved(slots,rest)})();
+function projectBoardOrder(){const saved=LT58Model.orderOfMoments(LTDEMO.moments);if(saved)return saved;
+const slots=savedSlotsOf(moments);const rest=LT58Model.dateDescOrder(moments.filter((m)=>!slots.has(m.id)));return LT58Model.orderFromSaved(slots,rest)}
+let momentOrder=projectBoardOrder();
 function orderRank(id){return momentOrder.indexOf(id)}
 // #619-5: 쌓기 배치(핀터레스트식) — 열마다 위에서부터 차곡차곡 쌓는다. 줄을 맞추지 않으므로
 // 세로(쇼츠) 카드가 섞인 열 아래가 비지 않는다. #619-6: '내 배치'는 좌표가 아니라 순서로 쌓는다.
@@ -113,6 +115,14 @@ function commitInsert(id,index){const seq=momentOrder.filter((x)=>x!==id);const 
 if(boardMode!=='mine')setBoardMode('mine');else{placeAll();settlePlacedCards()}
 persistBoard()}
 
+// #1072 A-17: 카드 순서 단추 한 벌과 순서 옮기기 — 키보드로도 '내 배치' 순서를 바꿀 수 있게 한다.
+// 끌기와 같은 저장 경로(commitInsert·persistBoard)를 쓴다. 첫 장에서 앞으로·끝 장에서 뒤로는 아무 것도 하지 않는다.
+function cardOrderHTML(m){if(!canEditBoard||LTDEMO.readOnly)return '';const label=esc(titleMain(m));return `<div class="cardOrder"><button type="button" class="orderBtn" data-order-id="${m.id}" data-order-dir="prev" aria-label="${label} 카드를 한 장 앞으로">앞으로</button><button type="button" class="orderBtn" data-order-id="${m.id}" data-order-dir="next" aria-label="${label} 카드를 한 장 뒤로">뒤로</button></div>`}
+function moveCardOrder(id,dir){const at=momentOrder.indexOf(id);if(at<0)return false;const to=dir==='prev'?at-1:at+1;if(to<0||to>=momentOrder.length)return false;snapshot();const seq=momentOrder.slice();seq.splice(at,1);seq.splice(to,0,id);momentOrder=seq;
+// 옮긴 뒤에도 '내 배치' 순서대로 보인다(끌기와 같은 규칙).
+if(boardMode!=='mine')setBoardMode('mine');else{placeAll();settlePlacedCards()}
+persistBoard();return true}
+
 // #894: '내 배치'에서 끄는 동안 다른 카드가 실시간으로 비켜 준다 — 끼어들 자리에 놓였을 때의
 // 자리를 미리 계산해 나머지 카드를 옮겨 둔다(180ms 전환). 움직임 끄기(셸 설정·lt41-motion)면 즉시.
 // 끌고 있는 카드 자체는 포인터를 그대로 따라오고, 놓으면 commitInsert가 같은 자리로 확정한다.
@@ -130,7 +140,8 @@ function previewShift(dragId,hit){
 }
 function clearPreviewShift(){previewSig='';cardLayer.querySelectorAll('.shiftPreview').forEach(el=>el.classList.remove('shiftPreview'))}
 
-let connections=LTDEMO.edges.map((e,i)=>({id:'c'+i,kind:e.kind,a:e.from,b:e.to,why:e.kind==='related'?'관련 순간':e.reason||'',color:e.kind==='related'?'cyan':(canEditBoard?['rose','violet','cyan','amber'][Math.max(0,moments.findIndex(m=>m.id===e.from))%4]:'rose')}));
+function projectBoardConnections(){return LTDEMO.edges.map((e,i)=>({id:'c'+i,kind:e.kind,a:e.from,b:e.to,why:e.kind==='related'?'관련 순간':e.reason||'',color:e.kind==='related'?'cyan':(canEditBoard?['rose','violet','cyan','amber'][Math.max(0,moments.findIndex(m=>m.id===e.from))%4]:'rose')}));}
+let connections=projectBoardConnections();
 
 // 보드 저장(#372 후속): 바뀐 순간·연결을 셸에 넘겨 기존 워크스페이스 저장 경로(PUT /api/workspace)로 보낸다.
 // 예시·공유는 보내지 않는다. 셸이 저장하지 못하면 토스트로 알린다.
@@ -144,12 +155,13 @@ function orderPayload(m){const rank=orderRank(m.id);if(rank>=0)return{x:m.savedX
 return m.savedPos&&m.savedXY&&boardMode==='date'?{x:m.savedXY.x,y:m.savedXY.y,rot:m.savedXY.rot}:{x:m.x,y:m.y,rot:m.rot}}
 function newBoardId(){let id;do{id='m'+Math.random().toString(36).slice(2,10)}while(moments.some(m=>m.id===id));return id}
 // #1058: 보내기가 던지면 조용히 넘기지 않고 보드 알림 줄에 실패를 알린다(성공은 #905 규칙으로 알리지 않는다).
-function persistBoard(){if(!boardSaveEnabled())return;try{const treeId=window.parent.LT41.tree.id;window.parent.postMessage({type:'lt41-board-sync',treeId,moments:boardPayload()},location.origin)}catch{failNotice('보드 저장에 실패했어요. 잠시 뒤 다시 시도해 주세요.')}}
+function persistBoard(){if(!boardSaveEnabled())return;try{const treeId=window.parent.LT41.tree.id;window.parent.postMessage({type:'lt41-board-sync',treeId,moments:boardPayload()},location.origin)}catch(error){globalThis.LT41Report?.report(error,'보드 저장 보내기');failNotice('보드 저장에 실패했어요. 잠시 뒤 다시 시도해 주세요.')}}
 // #1058: 저장 실패 알림 — 카드보다 위 층(z 9999), 불투명 바탕, 화면 아래 가운데, 최소 5초.
 function failNotice(t){let el=$('#saveFail');if(!el)return;el.textContent=t;el.classList.add('show');hideToast();clearTimeout(failNotice.t);failNotice.t=setTimeout(()=>el.classList.remove('show'),6000)}
 window.addEventListener('message',e=>{if(e.origin!==location.origin)return;if(e.data?.type!=='lt41-board-saved')return;if(e.data.ok===false)toast(e.data.error||'서버에 저장하지 못했어요. 잠시 뒤 다시 시도해 주세요.')});
 
-const replayPath=(()=>{const ids=[],seen=new Set();let m=LTDEMO.moments[0];while(m&&!seen.has(m.id)){ids.push(m.id);seen.add(m.id);m=LTDEMO.moments.find(x=>x.id===m.next)}return ids})();
+function projectReplayPath(){const ids=[],seen=new Set();let m=LTDEMO.moments[0];while(m&&!seen.has(m.id)){ids.push(m.id);seen.add(m.id);m=LTDEMO.moments.find(x=>x.id===m.next)}return ids}
+let replayPath=projectReplayPath();
 
 let mobilePicker=null;
 
@@ -176,7 +188,7 @@ else if(m.type==='note') media=`<div class="noteText">“${esc(m.cardMemo||m.mem
 else if(m.type==='video') media=`<div class="media"><video muted playsinline loop poster="${m.asset}" src="${m.video}"></video><span class="playBadge">▶</span><span class="duration">${m.duration||'00:03'}</span></div>`;
 else media=`<div class="media ${m.type==='link'||m.type==='youtube'?'linkMedia':''}"><img src="${m.asset}" alt=""><span class="${m.type==='youtube'?'playBadge':''}">${m.type==='youtube'?'▶':''}</span></div>`;
 // #601: 카드는 훑기용 — 큰 썸네일 + 제목 2줄 + 감정·날짜 한 줄만. 나머지(마음·출처·키워드·크게 보기)는 상세가 맡는다.
-return `<article class="card ${m.first?'first':''} ${m.type==='note'?'noteCard':''}" data-id="${m.id}" title="끌어서 자리 옮기기" style="left:${m.x}px;top:${m.y}px;--rot:${m.rot}deg;--pin:${colors[m.color]};--halo:${colors[m.color]}55">${m.first?'<div class="firstTag">첫 순간</div>':''}<button class="pin" data-pin="${m.id}" aria-hidden="true" tabindex="-1"></button>${media}<div class="cardBody"><h3 class="cardTitle">${esc(titleMain(m))}</h3><div class="cardMeta"><span class="emotionDot"></span>${esc(m.emotion)} · ${esc(dateText(m.date))}</div></div></article>`}
+return `<article class="card ${m.first?'first':''} ${m.type==='note'?'noteCard':''}" data-id="${m.id}" title="끌어서 자리 옮기기" style="--card-x:${m.x}px;--card-y:${m.y}px;--rot:${m.rot}deg;--pin:${colors[m.color]};--halo:${colors[m.color]}55">${m.first?'<div class="firstTag">첫 순간</div>':''}<button class="pin" data-pin="${m.id}" aria-hidden="true" tabindex="-1"></button>${media}<div class="cardBody"><h3 class="cardTitle">${esc(titleMain(m))}</h3><div class="cardMeta"><span class="emotionDot"></span>${esc(m.emotion)} · ${esc(dateText(m.date))}</div></div></article>`}
 
 function renderCards(){cardLayer.innerHTML=moments.map(cardHTML).join('');
  cardLayer.querySelectorAll('.card').forEach(el=>bindCard(el));
@@ -196,7 +208,7 @@ function settlePlacedCards(){
   if(changed)rerenderThreads();
 }
 
-function applyView(animated=false){growBoard();world.style.transition=animated?'transform 1s cubic-bezier(.22,.8,.2,1)':'none';
+function applyView(animated=false){growBoard();world.classList.toggle('lt-view-pan',animated);
 world.style.transform=`translate(${view.x}px,${view.y}px) scale(${view.z})`;
 $('#zoomLabel').textContent=Math.round(view.z*100)+'%'}
 
@@ -323,10 +335,10 @@ if(connectFrom){/* #582: '이어진 이유' 창은 없앴다 — 이어 주기�
 placeAll();
 
 function formFor(type){let a=$('#formArea');
-if(type==='photo')a.innerHTML='<input class="field" id="mediaFile" type="file" accept="image/*"><div style="font-size:10px;color:#9b89a5;margin-top:6px">로컬 이미지는 브라우저 안에서만 미리 봅니다.</div>';
-else if(type==='video')a.innerHTML='<input class="field" id="mediaFile" type="file" accept="video/*"><div style="font-size:10px;color:#9b89a5;margin-top:6px">선택/hover 시 muted preview.</div>';
-else if(type==='link'||type==='youtube')a.innerHTML='<input class="field" id="urlField" placeholder="https://..." value="https://lovetree.example/memory"><div style="font-size:10px;color:#9b89a5;margin-top:6px">Prototype metadata parser · 실제 crawler 아님.</div>';
-else a.innerHTML='<textarea class="field" id="noteField" rows="3" placeholder="남기고 싶은 문장">좋아하게 된 이유를 잊고 싶지 않았어요.</textarea>'}
+if(type==='photo')a.innerHTML='<input class="field" id="mediaFile" type="file" accept="image/*" aria-label="그림 파일 고르기"><div class="mediaFieldNote">로컬 이미지는 브라우저 안에서만 미리 봅니다.</div>';
+else if(type==='video')a.innerHTML='<input class="field" id="mediaFile" type="file" accept="video/*" aria-label="영상 파일 고르기"><div class="mediaFieldNote">선택/hover 시 muted preview.</div>';
+else if(type==='link'||type==='youtube')a.innerHTML='<input class="field" id="urlField" placeholder="https://..." value="https://lovetree.example/memory" aria-label="링크 주소"><div class="mediaFieldNote">Prototype metadata parser · 실제 crawler 아님.</div>';
+else a.innerHTML='<textarea class="field" id="noteField" rows="3" placeholder="남기고 싶은 문장" aria-label="마음 한마디">좋아하게 된 이유를 잊고 싶지 않았어요.</textarea>'}
 
 function openAdd(){formFor(addType);
 $('#addModal').classList.add('open')}
@@ -347,9 +359,9 @@ if(!m)return;
 const _vi=titleInfo(m);$('#vTitle').textContent=_vi.main;
 let box=$('#viewerMedia');
 if(m.url)box.innerHTML=LTMedia.markup(m.url,m.title,m.mediaMetadata,m.id);
-else if(m.type==='video')box.innerHTML=`<video src="${m.video}" poster="${m.asset}" controls autoplay muted playsinline style="width:100%;max-height:420px;object-fit:contain"></video>`;
-else if(m.type==='note')box.innerHTML=`<div style="padding:40px;color:#f7edf8;font-size:22px;line-height:1.6">“${esc(m.memo)}”</div>`;
-else box.innerHTML=`<img src="${m.asset}" style="width:100%;max-height:420px;object-fit:cover">`;
+else if(m.type==='video')box.innerHTML=`<video src="${m.video}" poster="${m.asset}" controls autoplay muted playsinline class="viewerFitVideo"></video>`;
+else if(m.type==='note')box.innerHTML=`<div class="viewerNoteQuote">“${esc(m.memo)}”</div>`;
+else box.innerHTML=`<img src="${m.asset}" alt="${esc(m.title)}" class="viewerFitImg">`;
 $('#vMeta').innerHTML=(_vi.sub?'<div class="videoTitle">▶ '+esc(_vi.sub)+'</div>':'')+`${esc(LTLabels.type(m.originalType||m.type))} · ${esc(dateText(m.date))} · ${esc(m.emotion)}<br>출처: ${esc(m.source)}${m.url?`<br>URL: ${esc(m.url)}`:''}<br>마음 한마디: ${esc(m.memo)}`;
 $('#viewerModal').classList.add('open')}
 
@@ -394,15 +406,14 @@ $('#cinemaOverlay').classList.remove('active');
 $('#cinemaTitle').classList.remove('show');
 $('#cinemaCaption').classList.remove('show');
 $('#finalCTA').classList.remove('show');
-document.body.classList.remove('boardBloom');
+document.body.classList.remove('boardBloom','lt-bloom-glow');
 document.querySelectorAll('.card video').forEach(v=>{v.pause();v.currentTime=0});
 document.querySelectorAll('.card').forEach(c=>c.classList.remove('cinemaDim','cinemaFocus'));
 headerFade(false);
 fitAll(true)}
 
-function headerFade(on){document.querySelector('header').style.opacity=on?'.18':'1';
-document.querySelector('.toolbar').style.opacity=on?'0':'1';
-$('#cinemaBtn').style.opacity=on?'0':'1'}
+// #886: 시네마 동안 머리줄 흐림은 body.lt-cinema-fade 한 벌이 맡는다(board-extras의 값이 이긴다).
+function headerFade(on){document.body.classList.toggle('lt-cinema-fade',on)}
 
 let boardTouches=new Map(),pinch=null;
 viewport.addEventListener('pointerdown',e=>{if(cinema||e.target.closest('.card'))return;if(e.pointerType==='touch'){boardTouches.set(e.pointerId,{x:e.clientX,y:e.clientY});if(boardTouches.size===1){pan={x:e.clientX,y:e.clientY,vx:view.x,vy:view.y}}else if(boardTouches.size===2){let a=[...boardTouches.values()],dx=a[1].x-a[0].x,dy=a[1].y-a[0].y;pinch={dist:Math.hypot(dx,dy),z:view.z,x:view.x,y:view.y,cx:(a[0].x+a[1].x)/2,cy:(a[0].y+a[1].y)/2};pan=null}return}pan={x:e.clientX,y:e.clientY,vx:view.x,vy:view.y};viewport.setPointerCapture?.(e.pointerId);viewport.classList.add('panning')});
@@ -452,7 +463,7 @@ $('#minusBtn').onclick=()=>zoomAtCenter(Math.max(.38,view.z-.1));
 $('#plusBtn').onclick=()=>zoomAtCenter(Math.min(1.45,view.z+.1));
 $('#cinemaBtn').onclick=()=>startCinema(0);
 $('#walkAgain').onclick=()=>{cinema=false;
-document.body.classList.remove('boardBloom');
+document.body.classList.remove('boardBloom','lt-bloom-glow');
 $('#finalCTA').classList.remove('show');
 document.querySelectorAll('.card').forEach(c=>c.classList.remove('cinemaDim','cinemaFocus'));
 startCinema(0)}

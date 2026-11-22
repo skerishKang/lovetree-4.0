@@ -23,7 +23,13 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
  // #1025: [트리] [순간] 탭 — 주소 #explore/moments 는 새로고침·공유로 유지한다.
  const treeTab=dialog.querySelector('#community-tab-trees'),momentsTab=dialog.querySelector('#community-tab-moments');
  const treePanel=dialog.querySelector('#community-tree-panel'),momentsPanel=dialog.querySelector('#community-moments-panel');
- const moments=momentsPanel?mountMoments({panel:momentsPanel,onOpenShare,onAddToTree,notify,memberLogin,api}):null;
+ // #480 L13: 계정 설정의 날짜 표기. 넘겨받지 않으면 기본(dot) — 새 규칙을 만들지 않는다.
+ const dateStyle=()=>(typeof getDateStyle==='function'?getDateStyle():'dot');
+ // 하은 1회차(261116,#728 후속): 새벽(KST 0~9시, UTC 전날)에 담은 순간의 둘러보기 카드가
+ // '2026. 11. 15'(UTC 날짜 절단)로 나왔다. 예전 String(createdAt).slice(0,10) 절단 대신
+ // localDateOnly(#547 한 벌)로 기기 지역 날짜를 만들어 formatDisplayDate에 넘긴다.
+ const when=value=>formatDisplayDate(localDateOnly(value),dateStyle());
+ const moments=momentsPanel?mountMoments({panel:momentsPanel,onOpenShare,onAddToTree,notify,memberLogin,api,when}):null;
  let currentTab='trees',hashGuard=false;
  const writeHash=value=>{
   if(typeof history==='undefined'||typeof history.pushState!=='function'||typeof history.replaceState!=='function')return;
@@ -46,12 +52,6 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
   return [...seen.values()].sort((a,b)=>String(a.group).localeCompare(String(b.group),'ko'));
  };
  const message=text=>{feedback.textContent=text;const previewMessage=preview.querySelector('[data-community-preview-message]');if(previewMessage)previewMessage.textContent=text;};
- // #480 L13: 계정 설정의 날짜 표기. 넘겨받지 않으면 기본(dot) — 새 규칙을 만들지 않는다.
- const dateStyle=()=>(typeof getDateStyle==='function'?getDateStyle():'dot');
- // 하은 1회차(261116,#728 후속): 새벽(KST 0~9시, UTC 전날)에 담은 순간의 둘러보기 카드가
- // '2026. 11. 15'(UTC 날짜 절단)로 나왔다. 예전 String(createdAt).slice(0,10) 절단 대신
- // localDateOnly(#547 한 벌)로 기기 지역 날짜를 만들어 formatDisplayDate에 넘긴다.
- const when=value=>formatDisplayDate(localDateOnly(value),dateStyle());
  const loginMessage=answer=>answer.status===401?'로그인하면 이 기능을 사용할 수 있어요.':answer.message||'요청을 처리하지 못했어요.';
  // #824 결정 7: 3 미만 숫자는 보여 주지 않는다 — 라벨만 남긴다(0·1·2 모두 같은 규칙, 3부터 숫자가 보인다).
  // '이번 주 담은 사람 수'(결정 1)도 같은 규칙 — 3 이상일 때만 카드·미리보기에 한 줄로 따라온다.
@@ -368,10 +368,6 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
    selectTab(wantMoments?'moments':'trees',{writeHash:false});
    if(!wantMoments){load(false);loadPopularStages();}
   };
-  button.onclick=openPanel;
-  // 주소로 직접 들어온 경우(#explore/moments)에도 같은 보기를 연다.
-  // 셸의 첫 화면 적용(screens.mjs가 패널을 닫는다)이 끝난 뒤에 연다.
-  if(ENTER_MOMENTS||hashNow()==='#explore/moments')setTimeout(openPanel,0);
   if(typeof window!=='undefined'&&typeof window.addEventListener==='function')window.addEventListener('hashchange',()=>{
    if(hashGuard)return;
    if(hashNow()==='#explore/moments'){openPanel();selectTab('moments',{writeHash:false});}
@@ -494,4 +490,8 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
   renderPopularStages(answer?.ok?answer.items:[]);
  }
  popularList.append(el('p','community-stages-empty',POPULAR_STAGE_EMPTY));
+ button.onclick=openPanel;
+ button.hidden=false;
+ // 직접 들어온 주소와 연결 전에 접기 메뉴에서 고른 주소를 같은 길로 연다.
+ if(hashNow()==='#explore'||hashNow()==='#explore/moments')openPanel();
 }

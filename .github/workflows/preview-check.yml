@@ -25,6 +25,8 @@ jobs:
     timeout-minutes: 5
     outputs:
       changed: ${{ steps.diff.outputs.changed }}
+      # 지도는 추후 개발(11-22 대표 결정). 지도 대비·부채꼴 시험은 지도 파일이 바뀐 PR에서만 돈다.
+      map_changed: ${{ steps.diff.outputs.map_changed }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -35,7 +37,7 @@ jobs:
         run: |
           base='${{ github.event.pull_request.base.sha }}'
           head='${{ github.event.pull_request.head.sha }}'
-          git diff --name-only "$base...$head" > /tmp/changed-files.txt 2>/dev/null || { echo "diff 실패 — 바뀜으로 둔다"; echo "changed=true" >> "$GITHUB_OUTPUT"; exit 0; }
+          git diff --name-only "$base...$head" > /tmp/changed-files.txt 2>/dev/null || { echo "diff 실패 — 바뀜으로 둔다"; echo "changed=true" >> "$GITHUB_OUTPUT"; echo "map_changed=true" >> "$GITHUB_OUTPUT"; exit 0; }
           # 판정은 tools/ci/screen-changes.mjs가 한다. 화면 시험 목록은 이 워크플로의 화면 잡 구간에서
           # 자동으로 뽑는다(손으로 따로 적지 않는다) — 시험 파일은 화면 잡이 실제로 실행하는 파일과
           # 그 helpers가 바뀌었을 때만 화면 바뀜이다(이슈 947 — #958 같은 시험 정리 PR도 다 돌던 것을 줄인다).
@@ -219,6 +221,17 @@ jobs:
           npx vite build > /dev/null
           node --test --test-concurrency=1 tests/v41-932-937-board-legend.test.mjs tests/v41-bottom-links-850.test.mjs
           echo "보드 범례·바닥 링크 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+      # A-17(#1072): 그림 이름·단추 이름·입력 칸 이름 세 규칙 위반 0을 실제 화면(로그아웃 예시 5화면·의견 창 +
+      # 모의 로그인 보드·크게 보기·추가·수정 창·설정 프로필)에서 잰다. 바로 위 단계가 만든 빌드 결과를 쓴다. 건너뜀=실패.
+      - name: 접근성 이름 세 규칙 시험(건너뜀=실패 — A-17)
+        env:
+          LT_A17_REQUIRE: '1'
+        if: needs.screen-changes.outputs.changed == 'true'
+        run: |
+          start=$(date +%s)
+          test -f dist/v41/home.html || npx vite build > /dev/null
+          node --test --test-concurrency=1 tests/v41-a11y-views.test.mjs
+          echo "접근성 이름 세 규칙 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
 
       - name: 화면 변경 없으면 건너뜀을 남긴다
         if: always()
@@ -228,7 +241,8 @@ jobs:
           fi
   screen-home:
     name: 화면 시험 — 첫 화면
-    runs-on: ubuntu-latest
+    # 2026-11-22: 호스트 실행기 대기(동시 3개 안팎)를 피해 같은 저장소 PR은 CGI 자체 실행기에서 돈다(보드 잡과 같은 식).
+    runs-on: ${{ fromJSON((github.event.pull_request.head.repo.full_name == github.repository && vars.USE_CGI_RUNNER == '1') && '["self-hosted","Linux","X64","cgi"]' || '["ubuntu-latest"]') }}
     timeout-minutes: 12
     needs: screen-changes
     if: needs.screen-changes.outputs.changed == 'true'
@@ -237,11 +251,13 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
+          clean: true
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
       - uses: actions/cache@v4
+        if: runner.environment != 'self-hosted'
         with:
           path: ~/.cache/ms-playwright
           key: ms-playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
@@ -250,7 +266,10 @@ jobs:
         if: needs.screen-changes.outputs.changed == 'true'
         run: |
           npm i --no-save --no-package-lock playwright@$(node -p "require('./package-lock.json').packages['node_modules/playwright'].version")
-          if ls "$HOME/.cache/ms-playwright" 2>/dev/null | grep -q chromium; then
+          if [ "$RUNNER_ENVIRONMENT" = "self-hosted" ]; then
+            # 자체 실행기: 이 버전 Chromium이 있으면 받지 않고 끝난다(시스템 라이브러리는 미리 깔림, sudo 없음).
+            npx playwright install chromium
+          elif ls "$HOME/.cache/ms-playwright" 2>/dev/null | grep -q chromium; then
             echo "캐시된 Chromium 사용"
           else
             npx playwright install --with-deps chromium
@@ -355,6 +374,7 @@ jobs:
 
   screen-book:
     name: 화면 시험 — 책·감상
+    # 책 화면 잡은 글자 줄바꿈·페이지 넘침을 재므로 글꼴이 다른 CGI가 아니라 호스트에서 돈다(2026-11-22 CGI에서 넘침 실측이 달라 실패).
     runs-on: ubuntu-latest
     timeout-minutes: 12
     needs: screen-changes
@@ -364,11 +384,13 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
+          clean: true
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
       - uses: actions/cache@v4
+        if: runner.environment != 'self-hosted'
         with:
           path: ~/.cache/ms-playwright
           key: ms-playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
@@ -377,7 +399,10 @@ jobs:
         if: needs.screen-changes.outputs.changed == 'true'
         run: |
           npm i --no-save --no-package-lock playwright@$(node -p "require('./package-lock.json').packages['node_modules/playwright'].version")
-          if ls "$HOME/.cache/ms-playwright" 2>/dev/null | grep -q chromium; then
+          if [ "$RUNNER_ENVIRONMENT" = "self-hosted" ]; then
+            # 자체 실행기: 이 버전 Chromium이 있으면 받지 않고 끝난다(시스템 라이브러리는 미리 깔림, sudo 없음).
+            npx playwright install chromium
+          elif ls "$HOME/.cache/ms-playwright" 2>/dev/null | grep -q chromium; then
             echo "캐시된 Chromium 사용"
           else
             npx playwright install --with-deps chromium
@@ -439,7 +464,8 @@ jobs:
 
   screen-shell:
     name: 화면 시험 — 셸·창·둘러보기
-    runs-on: ubuntu-latest
+    # 2026-11-22: 호스트 실행기 대기(동시 3개 안팎)를 피해 같은 저장소 PR은 CGI 자체 실행기에서 돈다(보드 잡과 같은 식).
+    runs-on: ${{ fromJSON((github.event.pull_request.head.repo.full_name == github.repository && vars.USE_CGI_RUNNER == '1') && '["self-hosted","Linux","X64","cgi"]' || '["ubuntu-latest"]') }}
     timeout-minutes: 12
     needs: screen-changes
     if: needs.screen-changes.outputs.changed == 'true'
@@ -448,11 +474,13 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
+          clean: true
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
       - uses: actions/cache@v4
+        if: runner.environment != 'self-hosted'
         with:
           path: ~/.cache/ms-playwright
           key: ms-playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
@@ -461,7 +489,10 @@ jobs:
         if: needs.screen-changes.outputs.changed == 'true'
         run: |
           npm i --no-save --no-package-lock playwright@$(node -p "require('./package-lock.json').packages['node_modules/playwright'].version")
-          if ls "$HOME/.cache/ms-playwright" 2>/dev/null | grep -q chromium; then
+          if [ "$RUNNER_ENVIRONMENT" = "self-hosted" ]; then
+            # 자체 실행기: 이 버전 Chromium이 있으면 받지 않고 끝난다(시스템 라이브러리는 미리 깔림, sudo 없음).
+            npx playwright install chromium
+          elif ls "$HOME/.cache/ms-playwright" 2>/dev/null | grep -q chromium; then
             echo "캐시된 Chromium 사용"
           else
             npx playwright install --with-deps chromium
@@ -524,6 +555,16 @@ jobs:
           node --test --test-concurrency=1 tests/v41-account-settings.test.mjs tests/v41-header-tabs-mobile.test.mjs tests/v41-a11y-shell-names.test.mjs tests/v41-theme-ab.test.mjs tests/v41-shell-notice.test.mjs
           echo "셸·설정·테마 화면 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
 
+      - name: 색 토큰 계산 화면 시험(건너뜀=실패 — #886)
+        env:
+          LT_TOKEN_COLOR_886_REQUIRE: '1'
+        if: needs.screen-changes.outputs.changed == 'true'
+        run: |
+          start=$(date +%s)
+          npx vite build > /dev/null
+          node --test --test-concurrency=1 tests/v41-token-color-886.test.mjs
+          echo "색 토큰 계산 화면 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+
       # 이슈 952: 첫 화면(홈·궤도·설정 배선) — 카드 불투명·밝기 깊이·금빛 테두리(#429), ▶·no-referrer
       # 유튜브 썸네일 카드(#340), 설정의 카드 출처·움직임 배선(#380 5번), 같은 날짜 표기 되풀이
       # 새로고침 금지(#466 M2), 인기 카드 #share/ 이동(#379), 추가·둘러보기·안내 패널(#426·#635·#388)을
@@ -536,6 +577,18 @@ jobs:
           start=$(date +%s)
           node --test --test-concurrency=1 tests/updates-screen-611.test.mjs
           echo "새 소식 화면 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+
+      # #1098 3단계: 내 소식 화면 — 계정 단추 점(0이면 숨김)·계정 메뉴 입구·목록 창(최신순 묶음)·읽음 뒤
+      # 점 지움·불러오기 실패 안내 한 줄·키보드 열기·Esc 닫기·접근성 이름·폭 360·768·1280 × 밤/정원에서
+      # 점 위치·창 겹침을 실제 화면에서 잰다. 건너뜀=실패(크롬이 준비된 이 잡에서 돈다).
+      - name: 내 소식 화면 시험(건너뜀=실패 — #1098 3단계)
+        env:
+          LT_MY_NEWS_REQUIRE: '1'
+        if: needs.screen-changes.outputs.changed == 'true'
+        run: |
+          start=$(date +%s)
+          node --test --test-concurrency=1 tests/v41-my-news-screen-1098.test.mjs
+          echo "내 소식 화면 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
 
       # #611 후속: 390 에서 새 소식 카드가 책 화면 '순간 목차' 단추를 가리지 않는지(겹침 0)를
       # 실제 화면에서 잰다. 건너뜀=실패(크롬이 준비된 이 잡에서 돈다).
@@ -835,7 +888,8 @@ jobs:
           fi
   screen-reload:
     name: 화면 시험 — 저장 재적재
-    runs-on: ubuntu-latest
+    # 2026-11-22: 호스트 실행기 대기(동시 3개 안팎)를 피해 같은 저장소 PR은 CGI 자체 실행기에서 돈다(보드 잡과 같은 식).
+    runs-on: ${{ fromJSON((github.event.pull_request.head.repo.full_name == github.repository && vars.USE_CGI_RUNNER == '1') && '["self-hosted","Linux","X64","cgi"]' || '["ubuntu-latest"]') }}
     timeout-minutes: 12
     needs: screen-changes
     if: needs.screen-changes.outputs.changed == 'true'
@@ -844,11 +898,13 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
+          clean: true
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
       - uses: actions/cache@v4
+        if: runner.environment != 'self-hosted'
         with:
           path: ~/.cache/ms-playwright
           key: ms-playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
@@ -857,7 +913,10 @@ jobs:
         if: needs.screen-changes.outputs.changed == 'true'
         run: |
           npm i --no-save --no-package-lock playwright@$(node -p "require('./package-lock.json').packages['node_modules/playwright'].version")
-          if ls "$HOME/.cache/ms-playwright" 2>/dev/null | grep -q chromium; then
+          if [ "$RUNNER_ENVIRONMENT" = "self-hosted" ]; then
+            # 자체 실행기: 이 버전 Chromium이 있으면 받지 않고 끝난다(시스템 라이브러리는 미리 깔림, sudo 없음).
+            npx playwright install chromium
+          elif ls "$HOME/.cache/ms-playwright" 2>/dev/null | grep -q chromium; then
             echo "캐시된 Chromium 사용"
           else
             npx playwright install --with-deps chromium
@@ -940,10 +999,11 @@ jobs:
           fc-cache -f >/dev/null 2>&1 || true
           echo "한글 글꼴 $(fc-list :lang=ko | wc -l)개 · 대표 $(fc-match 'sans-serif:lang=ko' | head -1)"
           echo "한글 글꼴 준비 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+      # 지도는 추후 개발(11-22 대표 결정): 지도 파일이 안 바뀐 PR에서는 이 단계를 건너뛴다(같은 잡의 서재·순간 시험은 그대로 돈다).
       - name: 지도 실제 대비 시험(건너뜀=실패)
         env:
           LT_MAP_CONTRAST_REQUIRE: '1'
-        if: needs.screen-changes.outputs.changed == 'true'
+        if: needs.screen-changes.outputs.changed == 'true' && needs.screen-changes.outputs.map_changed == 'true'
         run: |
           start=$(date +%s)
           # #529: 이름표 대비는 실제로 그려진 한글 글자를 잰다 — 한글 글꼴은 앞의 '한글 글꼴 준비' 단계에서 둔다.
@@ -1146,6 +1206,7 @@ jobs:
           fi
   screen-book-screen:
     name: 화면 시험 — 책 대비·초점
+    # 책 화면 잡은 글자 줄바꿈·페이지 넘침을 재므로 글꼴이 다른 CGI가 아니라 호스트에서 돈다(2026-11-22 CGI에서 넘침 실측이 달라 실패).
     runs-on: ubuntu-latest
     timeout-minutes: 25
     needs: screen-changes
@@ -1155,11 +1216,13 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
+          clean: true
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
       - uses: actions/cache@v4
+        if: runner.environment != 'self-hosted'
         with:
           path: ~/.cache/ms-playwright
           key: ms-playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
@@ -1169,7 +1232,10 @@ jobs:
         run: |
           # 모듈은 항상 설치한다(캐시는 브라우저 바이너리에만 걸린다). 캐시가 있어도 모듈이 없으면 실행이 안 된다.
           npm i --no-save --no-package-lock playwright@$(node -p "require('./package-lock.json').packages['node_modules/playwright'].version")
-          if ls "$HOME/.cache/ms-playwright" 2>/dev/null | grep -q chromium; then
+          if [ "$RUNNER_ENVIRONMENT" = "self-hosted" ]; then
+            # 자체 실행기: 이 버전 Chromium이 있으면 받지 않고 끝난다(시스템 라이브러리는 미리 깔림, sudo 없음).
+            npx playwright install chromium
+          elif ls "$HOME/.cache/ms-playwright" 2>/dev/null | grep -q chromium; then
             echo "캐시된 Chromium 사용"
           else
             npx playwright install --with-deps chromium

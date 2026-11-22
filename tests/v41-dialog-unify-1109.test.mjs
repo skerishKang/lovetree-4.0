@@ -24,24 +24,33 @@ function sampleTree() {
 const otherTree = () => createTree({ subject: '다른 트리', title: '다른 트리', note: '', emotion: '설렘', date: '2026-11-20', url: '' }, '2026-11-20T00:00:00Z');
 const workspace = (tree) => JSON.stringify({ revision: 1, state: { version: 1, trees: [tree, otherTree()], prefs: {} }, subject: '시험계정', writeSubjectBound: true, savedAt: '2026-11-20T09:00:00.000Z' });
 
-async function withShell(tree, { width, height, theme }, fn) {
+async function withShell(tree, { width, height, theme, deferred = false, cached = deferred, hash = '' }, fn) {
   const server = await serve();
   const base = `http://127.0.0.1:${server.address().port}`;
   const browser = await chromium.launch({ headless: true });
   const ctx = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
+  const initial = JSON.parse(workspace(tree));
+  initial.subject = 'test-1109';
+  let release;
+  const response = deferred ? new Promise(resolve => { release = resolve; }) : Promise.resolve(initial);
   try {
+    if (cached) await ctx.addInitScript(payload => {
+      if (window !== window.top) return;
+      localStorage.setItem('lovetree.v41.login-subject', payload.subject);
+      localStorage.setItem('lovetree.v41.workspace-cache:' + payload.subject, JSON.stringify({ version: 1, subject: payload.subject, state: payload.state }));
+    }, initial);
     await ctx.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); } catch {} }, theme);
     await ctx.route('**://i.ytimg.com/**', (route) => route.fulfill({ status: 200, contentType: 'image/png', body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64') }));
     await ctx.route('**/api/**', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
-    await ctx.route('**/api/workspace**', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: workspace(tree) }));
+    await ctx.route('**/api/workspace**', async (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(await response) }));
     const page = await ctx.newPage();
     const errors = [];
     page.on('pageerror', (error) => errors.push(String(error.message || error)));
-    await page.goto(`${base}/v41/?account=1`, { waitUntil: 'load' });
-    await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
-    await page.locator('#discover-ask-no').click().catch(() => {});
-    await fn({ page, errors });
-  } finally { await browser.close(); server.close(); }
+    await page.goto(`${base}/v41/?account=1${hash}`, { waitUntil: 'load' });
+    if (!deferred || cached) await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
+    if (!deferred) await page.locator('#discover-ask-no').click().catch(() => {});
+    await fn({ page, errors, initial, release });
+  } finally { release?.(initial); await browser.close(); server.close(); }
 }
 
 const closeFacts = (root, selector) => root.locator(selector).evaluate((el) => {
@@ -166,5 +175,72 @@ test('#1109 다른 화면으로 가면 기존처럼 프레임이 바뀐다', { s
    try { return new URL(f.contentWindow.location.href).pathname.endsWith('/track32-bookshelf.html'); } catch { return false; }
   }, null, { timeout: 10000 });
   assert.deepEqual(errors, [], '페이지 오류 없음');
+ });
+});
+test('#1109 저장본 뒤 서버 기록이 도착해도 네 화면은 같은 문서에서 갱신한다', { skip: skip || undefined, timeout: 120000 }, async (t) => {
+ if (skip) { t.skip(skip); return; }
+ for (const view of ['home','book','board','shelf']) {
+  t.diagnostic(view);
+  const tree = sampleTree();
+  await withShell(tree, { width: 1440, height: 900, theme: 'night', deferred: true, hash: '#my/'+view+'?tree='+tree.id }, async ({ page, errors, initial, release }) => {
+   const files={home:'home.html',book:'track59-sketchbook.html',board:'track58-pinboard.html',shelf:'track32-bookshelf.html'};
+   await page.waitForFunction(file => {
+    const f=document.getElementById('view');
+    try{return !f.hidden&&f.contentWindow.location.pathname.endsWith(file)&&!!(f.contentDocument.getElementById('orbit')?.shadowRoot?.querySelector('.recent-card')||f.contentWindow.__TRACK59__||f.contentWindow.__LT58V11||f.contentDocument.querySelector('.book-card'));}catch{return false;}
+   }, files[view], {timeout:20000});
+   const active=await page.locator('#view').elementHandle();
+   const frame=await active.contentFrame();
+   const before=await frame.evaluate(view=>{
+    window.__sameDocument1109=true;
+    if(view==='home'){
+     const root=document.getElementById('orbit').shadowRoot;
+     const fonts=[...root.querySelectorAll('.recent-head,.recent-change')].map(el=>getComputedStyle(el).fontSize);
+     root.querySelector('[data-do=moments],[data-do=index]').click();
+     return fonts;
+    }
+    return [];
+   }, view);
+   if(view==='home')await frame.locator('.orbit-dialog[open]').waitFor({state:'attached'});
+   const changed=structuredClone(initial);
+   changed.revision=2;
+   changed.state.trees[0]=addMoment(tree,{title:'서버에서 도착한 순간',note:'새 기록',emotion:'설렘',date:'2026-11-22',url:view==='home'?'https://www.youtube.com/watch?v=abcdefghijk':''},tree.moments[0].id,'2026-11-22T00:00:00Z');
+   const added=changed.state.trees[0].moments.at(-1).id;
+   release(changed);
+   await page.waitForFunction(id=>window.LT41?.tree?.moments.some(m=>m.id===id),added,{timeout:20000});
+   await frame.waitForFunction(({view,id})=>{
+    if(view==='home')return document.getElementById('orbit').shadowRoot.querySelector('.recent-card strong')?.textContent==='서버에서 도착한 순간';
+    if(view==='book')return window.__TRACK59__?.getState().pageIds.includes(id);
+    if(view==='board')return !!document.querySelector('.card[data-id="'+id+'"]');
+    return [...document.querySelectorAll('.book-card-meta')].some(el=>el.textContent.includes('13개 순간'));
+   },{view,id:added},{timeout:20000});
+   assert.equal(await active.getAttribute('id'),'view',view+': 보이는 프레임이 그대로다');
+   assert.equal(await frame.evaluate(()=>window.__sameDocument1109),true,view+': 같은 문서다');
+   if(view==='home'){
+    const after=await frame.evaluate(()=>{
+     const root=document.getElementById('orbit').shadowRoot;
+     const dialog=root.querySelector('.orbit-dialog');
+     const rect=dialog.querySelector('[data-do=close]').getBoundingClientRect();
+     return {open:dialog.open,w:Math.round(rect.width),h:Math.round(rect.height),fonts:[...root.querySelectorAll('.recent-head,.recent-change')].map(el=>getComputedStyle(el).fontSize),counts:[...root.querySelectorAll('.home-count')].map(el=>el.textContent).join('|')};
+    });
+    assert.deepEqual({open:after.open,w:after.w,h:after.h},{open:true,w:44,h:44});
+    assert.deepEqual(after.fonts,before,'최근 순간 칩 글자 크기가 그대로다');
+    assert.match(after.counts,/순간 14/,'두 트리의 전체 순간 수가 늘었다');
+    assert.ok(await frame.locator('.recent-card .recent-thumb').count(),'서버에서 확인한 영상 미리보기도 보인다');
+   }
+   assert.deepEqual(errors,[],view+': 페이지 오류 없음');
+  });
+ }
+});
+
+test('#1109 저장본이 없는 회원 진입은 서버 응답 전 빈 첫 화면 문서를 열지 않는다', { skip: skip || undefined }, async (t) => {
+ if (skip) { t.skip(skip); return; }
+ await withShell(sampleTree(), { width: 390, height: 844, theme: 'night', deferred: true, cached: false }, async ({ page, errors, initial, release }) => {
+  await page.waitForTimeout(300);
+  assert.deepEqual(await page.evaluate(()=>[...document.querySelectorAll('#view,#view-next')].map(f=>f.contentWindow.location.href)),['about:blank','about:blank'],'기록을 받기 전에는 빈 문서를 먼저 열지 않는다');
+  release(initial);
+  await page.waitForFunction(()=>!!window.LT41?.trees?.length);
+  await page.waitForFunction(()=>!!document.getElementById('view').contentDocument?.getElementById('orbit')?.shadowRoot?.querySelector('.recent-card'));
+  assert.equal(await page.evaluate(()=>document.getElementById('view-next').contentWindow.location.href),'about:blank','기록으로 처음부터 한 장만 연다');
+  assert.deepEqual(errors,[],'페이지 오류 없음');
  });
 });
