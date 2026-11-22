@@ -1438,6 +1438,9 @@ jobs:
     if: always()
     needs: [screen-changes, screen-board, screen-home, screen-book, screen-reload, screen-shell, screen-map-a, screen-map-b, screen-book-screen, screen-audit-a, screen-audit-b, screen-audit-c, deploy]
     steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: tools/ci
       - name: 모든 화면 시험·배포 검사 결과 모으기
         env:
           RESULTS: ${{ toJSON(needs) }}
