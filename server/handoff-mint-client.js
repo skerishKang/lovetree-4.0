@@ -46,7 +46,11 @@ export function createHandoffMintClient({ url, callerSecret, productId, timeoutM
 
       const envelope = outcome.envelope;
       const code = envelope?.error?.code;
-      if (outcome.status === 401 && REJECTED.has(code)) throw rejected();
+      if (outcome.status === 401 && REJECTED.has(code)) {
+        // #1175: 거절 사유 코드만 한 줄 남긴다 — 표·상태·계정 값은 적지 않는다.
+        console.warn('[lovetree-login-rejected] mint', code);
+        throw rejected();
+      }
       if (outcome.status !== 200 || envelope?.ok !== true) throw unavailable();
 
       const minted = envelope.session;

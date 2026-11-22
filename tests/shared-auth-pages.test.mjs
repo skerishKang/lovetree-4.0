@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {MEMBER_LOGIN_URL,shouldLoadMemberRecords} from '../public/v41/member-entry.mjs';
 import { createSharedPagesAuth } from '../functions/_lib/shared-auth.mjs';
+import { createAuthPagesHandler } from '../functions/auth/[[path]].js';
 
 async function setup() {
   const keys = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
@@ -185,8 +186,20 @@ async function pagesEnv(overrides = {}) {
     LOVETREE_AUTH_CLIENT_PRIVATE_JWK: JSON.stringify(await crypto.subtle.exportKey('jwk', keys.privateKey)),
     LOVETREE_AUTH_CLIENT_KID: 'synthetic',
     LOVETREE_API_ORIGIN: 'https://storage.example',
+    // #1189: email_assertion 검증용 가짜 비밀(실제 값이 아님).
+    PADIEM_AUTH_EMAIL_ASSERTION_KEY_LOVETREE: 'test-assertion-secret',
     ...overrides
   };
+}
+
+// #1189: 토큰 교환 응답에 실을 email_assertion을 만든다.
+async function makeAssertion({ email, sub = 'sub_a', aud = 'lovetree', iat = 1000, exp = 1600, secret = 'test-assertion-secret' }) {
+  const enc = new TextEncoder();
+  const b64 = x => btoa(String.fromCharCode(...new Uint8Array(x))).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
+  const payload = b64(enc.encode(JSON.stringify({ sub, email: email.toLowerCase(), email_verified: true, aud, iat, exp })));
+  const key = await crypto.subtle.importKey('raw', enc.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const sig = b64(new Uint8Array(await crypto.subtle.sign('HMAC', key, enc.encode('v1.' + payload))));
+  return 'v1.' + payload + '.' + sig;
 }
 
 // 로그인 시작 → 콜백까지 한꺼번에 돌려준다.
@@ -199,7 +212,7 @@ async function callbackRound(auth, env) {
   return auth(new Request(callback, { headers: { cookie: begin.headers.get('set-cookie').split(';')[0] } }), env);
 }
 
-test('콜백은 프로필 이메일을 검증된 계정의 내부 저장소로 최선 노력으로 넘긴다', async () => {
+test('콜백은 검증된 이메일 서명을 내부 저장소로 최선 노력으로 넘긴다', async () => {
   const calls = [];
   const auth = createSharedPagesAuth({
     now: () => 1000,
@@ -207,7 +220,7 @@ test('콜백은 프로필 이메일을 검증된 계정의 내부 저장소로 �
     fetcher: async (url, init) => {
       calls.push({ url, init });
       if (url === 'https://auth.padiem.net/token') {
-        return Response.json({ access_token: 'access', refresh_token: 'refresh', profile: { email: 'Owner@Example.test' } });
+        return Response.json({ access_token: 'access', refresh_token: 'refresh', email_assertion: await makeAssertion({ email: 'Owner@Example.test' }) });
       }
       return Response.json({ ok: true });
     }
@@ -218,7 +231,7 @@ test('콜백은 프로필 이메일을 검증된 계정의 내부 저장소로 �
   assert.ok(push, '내부 저장소 호출이 있어야 한다');
   assert.equal(push.init.method, 'POST');
   assert.equal(push.init.headers.authorization, 'Bearer access');
-  assert.deepEqual(JSON.parse(push.init.body), { email: 'Owner@Example.test', canonical_subject_id: 'sub_a' });
+  assert.deepEqual(JSON.parse(push.init.body), { email: 'owner@example.test', canonical_subject_id: 'sub_a' });
 });
 
 test('프로필이 없으면 저장소를 더 부르지 않는다', async () => {
@@ -236,7 +249,7 @@ test('프로필이 없으면 저장소를 더 부르지 않는다', async () => 
   assert.deepEqual(urls, ['https://auth.padiem.net/token']);
 });
 
-test('프로필의 이메일이 빈 값이면 저장소를 부르지 않고 로그인은 성공한다', async () => {
+test('이메일 서명의 이메일이 빈 값이면 저장소를 부르지 않고 로그인은 성공한다', async () => {
   for (const empty of ['', '   ']) {
     const urls = [];
     const auth = createSharedPagesAuth({
@@ -244,7 +257,7 @@ test('프로필의 이메일이 빈 값이면 저장소를 부르지 않고 로�
       verify: async () => ({ accountId: 'sub_a' }),
       fetcher: async (url) => {
         urls.push(url);
-        return Response.json({ access_token: 'access', refresh_token: 'refresh', profile: { email: empty } });
+        return Response.json({ access_token: 'access', refresh_token: 'refresh', email_assertion: await makeAssertion({ email: empty }) });
       }
     });
     const done = await callbackRound(auth, await pagesEnv());
@@ -262,7 +275,7 @@ test('저장소 호출이 실패해도 로그인은 성공한다', async () => {
     fetcher: async (url) => {
       outcomes.push(url);
       if (url === 'https://auth.padiem.net/token') {
-        return Response.json({ access_token: 'access', refresh_token: 'refresh', profile: { email: 'a@b.test' } });
+        return Response.json({ access_token: 'access', refresh_token: 'refresh', email_assertion: await makeAssertion({ email: 'a@b.test' }) });
       }
       throw new Error('storage down');
     }
@@ -271,4 +284,76 @@ test('저장소 호출이 실패해도 로그인은 성공한다', async () => {
   assert.equal(done.status, 302);
   assert.match(done.headers.get('set-cookie'), /__Host-lovetree-access=access/);
   assert.equal(outcomes.filter((url) => url !== 'https://auth.padiem.net/token').length, 1);
+});
+
+test('#1175 콜백 거절은 옛 경로·새 경로 모두 날 글자 대신 안내 표지로 돌아간다', async () => {
+  const f = await setup();
+  const begin = await f.auth(new Request('https://lovetree-4-0.pages.dev/auth/login'), f.env);
+  const cookie = begin.headers.get('set-cookie').split(';')[0];
+  const shared = createAuthPagesHandler({ shared: f.auth, legacy: async () => new Response('legacy', { status: 401 }) });
+  const rejected = await shared({
+    request: new Request('https://lovetree-4-0.pages.dev/auth/callback?state=wrong&code=x', { headers: { cookie } }),
+    env: { ...f.env, LOVETREE_SHARED_AUTH_ENABLED: 'true' }
+  });
+  assert.equal(rejected.status, 302, '새 경로의 401도 이동으로 바꾼다');
+  assert.equal(rejected.headers.get('location'), '/v41/?loginNotice=1');
+  assert.equal(await rejected.text(), '', 'JSON을 브라우저에 보내지 않는다');
+
+  const legacy = createAuthPagesHandler({
+    legacy: async () => Response.json({ error: { code: 'login_handoff_rejected' } }, { status: 401 }),
+    shared: async () => { throw new Error('legacy 경로에서는 shared를 부르지 않는다'); }
+  });
+  const old = await legacy({ request: new Request('https://lovetree-4-0.pages.dev/auth/callback?state=wrong&code=x'), env: {} });
+  assert.equal(old.status, 302, '옛 프록시 경로의 401도 이동으로 바꾼다');
+  assert.equal(old.headers.get('location'), '/v41/?loginNotice=1');
+
+  const success = createAuthPagesHandler({
+    shared: async () => new Response(null, { status: 302, headers: { location: '/v41/' } }),
+    legacy: async () => new Response(null, { status: 302, headers: { location: '/v41/' } })
+  });
+  const ok = await success({
+    request: new Request('https://lovetree-4-0.pages.dev/auth/callback?state=ok&code=x', { headers: { cookie } }),
+    env: { ...f.env, LOVETREE_SHARED_AUTH_ENABLED: 'true' }
+  });
+  assert.equal(ok.status, 302);
+  assert.equal(ok.headers.get('location'), '/v41/', '성공 콜백은 그대로');
+});
+
+// #1189: email_assertion 검증 6종.
+test('email_assertion: 서명 일치·aud·만료·sub·필드 검증을 통과해야 이메일을 저장한다', async () => {
+  const env = await pagesEnv();
+  const now = 1000;
+  const good = await makeAssertion({ email: 'Owner@Example.test', sub: 'sub_a', iat: 1000, exp: 1600 });
+  const tampered = good.slice(0, -2) + (good.endsWith('AA') ? 'BB' : 'AA');
+  const cases = [
+    ['일치', good, 'sub_a', env, 'owner@example.test', true],
+    ['변조 서명', tampered, 'sub_a', env, null, false],
+    ['만료', await makeAssertion({ email: 'owner@example.test', sub: 'sub_a', iat: 100, exp: 700 }), 'sub_a', env, null, false],
+    ['aud 불일치', await makeAssertion({ email: 'owner@example.test', sub: 'sub_a', aud: 'other' }), 'sub_a', env, null, false],
+    ['sub 불일치', await makeAssertion({ email: 'owner@example.test', sub: 'sub_b' }), 'sub_a', env, null, false],
+    ['비밀 없음', good, 'sub_a', { ...env, PADIEM_AUTH_EMAIL_ASSERTION_KEY_LOVETREE: '' }, null, false]
+  ];
+  for (const [name, assertion, sub, envForCase, expectEmail, shouldStore] of cases) {
+    const calls = [];
+    const auth = createSharedPagesAuth({
+      now: () => now,
+      verify: async () => ({ accountId: sub }),
+      fetcher: async (url, init) => {
+        if (url === 'https://auth.padiem.net/token') {
+          return Response.json({ access_token: 'access', refresh_token: 'refresh', email_assertion: assertion });
+        }
+        calls.push({ url, init });
+        return Response.json({ ok: true });
+      }
+    });
+    const done = await callbackRound(auth, envForCase);
+    assert.equal(done.status, 302, `${name}: 로그인은 성공`);
+    const push = calls.find((c) => c.url === 'https://storage.example/internal/account/email');
+    if (shouldStore) {
+      assert.ok(push, `${name}: 저장소 호출`);
+      assert.equal(JSON.parse(push.init.body).email, expectEmail, `${name}: 검증된 이메일 저장`);
+    } else {
+      assert.equal(push, undefined, `${name}: 저장소 호출 없음`);
+    }
+  }
 });

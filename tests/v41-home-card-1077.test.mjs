@@ -80,23 +80,29 @@ test('#1077 390 로그아웃 첫 화면의 떠다니는 카드는 바닥 링크�
           }).filter(Boolean);
           const hit = (a, b) => Math.max(0, Math.min(a.r, b.r) - Math.max(a.l, b.l)) * Math.max(0, Math.min(a.b, b.b) - Math.max(a.t, b.t));
           let max = 0;
-          for (const c of all) {
-            const a = c.getAnimations().find((x) => x.id === 'lt-orbit');
-            if (!a) continue;
-            const d = a.effect.getTiming().duration;
+          // #1086: 공전은 WAAPI가 아니라 rAF에서 위치를 직접 쓴다 — 실제 그리기 경로로 48위상을 훑는다.
+          if (window.__LT_ORBIT_TEST__) {
             for (let k = 0; k < 48; k++) {
-              a.currentTime = k / 48 * d;
-              const el = c.querySelector('.surface img') || c.querySelector('.surface') || c;
-              const r = el.getBoundingClientRect(); let scale = 1; const t = getComputedStyle(el).transform;
-              if (t && t !== 'none') { const m = t.match(/^matrix\(([^)]+)\)/); if (m) { const v = m[1].split(',').map(Number); scale = Math.hypot(v[0], v[1]) || 1; } }
-              const cx = r.left + r.width / 2, cy = r.top + r.height / 2, w = r.width / scale, h = r.height / scale;
-              const box = { l: cx - w / 2, t: cy - h / 2, r: cx + w / 2, b: cy + h / 2 };
-              max = Math.max(max, zones.reduce((n, z) => n + hit(box, z), 0));
+              window.__LT_ORBIT_TEST__.seek(k / 48);
+              for (const c of all) {
+                const el = c.querySelector('.surface img') || c.querySelector('.surface') || c;
+                const r = el.getBoundingClientRect(); let scale = 1; const t = getComputedStyle(el).transform;
+                if (t && t !== 'none') { const m = t.match(/^matrix\(([^)]+)\)/); if (m) { const v = m[1].split(',').map(Number); scale = Math.hypot(v[0], v[1]) || 1; } }
+                const cx = r.left + r.width / 2, cy = r.top + r.height / 2, w = r.width / scale, h = r.height / scale;
+                const box = { l: cx - w / 2, t: cy - h / 2, r: cx + w / 2, b: cy + h / 2 };
+                max = Math.max(max, zones.reduce((n, z) => n + hit(box, z), 0));
+              }
             }
+            window.__LT_ORBIT_TEST__.restore();
           }
           return Math.round(max);
         });
         assert.ok(crossed > 0, `${theme}: 궤도 경로가 바닥 자리를 지난다(최대 교차 ${crossed}px²) — 빈손 통과가 아니다`);
+
+        // 위상은 위에서 restore()로 되돌렸다. 가드가 클래스를 반영하고 글꼴·그림이 실제로
+        // 그려진 다음부터 샘플을 모은다(첫 프레임에 카드가 아직 안 보이던 흔들림, #1191).
+        await page.evaluate(() => document.fonts.ready);
+        await frame.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
 
         const samples = [];
         for (let i = 0; i < 7; i += 1) { samples.push(await frame.evaluate(SAMPLE)); if (i < 6) await page.waitForTimeout(500); }

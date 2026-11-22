@@ -40,6 +40,8 @@ export function createFeedbackDialog({$, notify, getContext, show, openMyPosts, 
   const count = $('feedback-count');
   const send = $('feedback-send');
   const treeField = $('feedback-tree-field');
+  // #1072 A-16: 최근 오류 기록(최대 20건)을 '함께 보낼 정보'에서 끌 수 있다. 기록이 없으면 칸 자체를 숨긴다.
+  const reportField = $('feedback-report-field');
   const category = $('feedback-category');
   const title = $('feedback-title');
   const note = $('feedback-note');
@@ -60,6 +62,8 @@ export function createFeedbackDialog({$, notify, getContext, show, openMyPosts, 
     const out = {};
     for (const box of dialog.querySelectorAll('[data-ctx]')) {
       const key = box.dataset.ctx;
+      // #1072 A-16: 빈 목록(예: 아직 오류 기록이 없음)은 '함께 보낼 정보'에 실지 않는다.
+      if (Array.isArray(base[key]) && !base[key].length) continue;
       if (box.checked && base[key] !== undefined && base[key] !== null && base[key] !== '') out[key] = base[key];
     }
     return out;
@@ -82,6 +86,7 @@ export function createFeedbackDialog({$, notify, getContext, show, openMyPosts, 
     // 내 트리를 보던 중이 아니면(트리 id가 없으면) 트리 id 칸을 숨긴다.
     const base = (typeof getContext === 'function' ? getContext() : {}) || {};
     if (treeField) treeField.hidden = !base.treeId;
+    if (reportField) reportField.hidden = !(Array.isArray(base.recentErrors) && base.recentErrors.length);
   }
 
   function open() {

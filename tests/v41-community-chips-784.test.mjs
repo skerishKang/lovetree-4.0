@@ -678,7 +678,7 @@ testOrSkip('#1098 2단계: 판의 순간 목록 — 순간 카드에 그 순간�
       return { first: heads[0] || '', visible: !box.hidden };
     });
     assert.equal(drawer.visible, true, '누르면 그 순간의 댓글이 그 자리에서 펼쳐진다');
-    assert.match(drawer.first, /^AI 명예회원/, 'AI 명예회원 댓글은 트리 작성자 표시와 같은 방식으로 구분된다');
+    assert.match(drawer.first, /^AI 명예회원 · /, 'AI 명예회원 댓글 머리말과 이름은 · 로 나뉜다');
     // 댓글 쓰기 — 순간 단위 API(POST)로, 트리 댓글 묶음과 섞이지 않는다.
     const row = page.locator('#community-preview .community-moment[data-moment-id="m-1098-2-1"]');
     await row.locator('.community-comment-form textarea').fill('순간 댓글 새로');

@@ -13,6 +13,12 @@ import {
 
 const DEFAULT_NEXT = '/workspace';
 const TICKET = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
+const REJECTION_CODES = new Set(['invalid_login_state', 'login_state_replayed', 'invalid_login_evidence']);
+function rejectLogin(status, code, message) {
+  // #1175: 거절 사유 코드만 한 줄 남긴다 — 상태·표·계정 값은 적지 않는다.
+  if (REJECTION_CODES.has(code)) console.warn('[lovetree-login-rejected] callback', code);
+  throw new ApiError(status, code, message);
+}
 
 function parseCookies(header) {
   const out = {};
@@ -90,16 +96,16 @@ export function createLoginService({ productId, writer, provider, credentialSecr
 
     const state = readStateToken({ secret: credentialSecret, token: cookies[STATE_COOKIE], now: seconds(now()) });
     if (!state || !presented || !sameValue(state.state, presented)) {
-      throw new ApiError(401, 'invalid_login_state', '로그인 요청을 확인할 수 없었어요. 처음부터 다시 시도해 주세요.');
+      rejectLogin(401, 'invalid_login_state', '로그인 요청을 확인할 수 없었어요. 처음부터 다시 시도해 주세요.');
     }
     if (typeof code !== 'string' || !code || code.length > 1024) {
-      throw new ApiError(400, 'invalid_login_evidence', '로그인 응답을 읽을 수 없어요.');
+      rejectLogin(400, 'invalid_login_evidence', '로그인 응답을 읽을 수 없어요.');
     }
     // 상태를 여기서 원자적으로 소비한다. 두 인스턴스가 같은 상태를 동시에 잡아도
     // 진행하는 것은 하나뿐이고, 재시작 뒤에도 같은 상태는 다시 쓰이지 않는다.
     const first = await stateStore.consume({ value: state.state });
     if (!first) {
-      throw new ApiError(401, 'login_state_replayed', '이미 사용된 로그인 응답이에요. 처음부터 다시 시도해 주세요.');
+      rejectLogin(401, 'login_state_replayed', '이미 사용된 로그인 응답이에요. 처음부터 다시 시도해 주세요.');
     }
 
     let exchanged;
@@ -107,7 +113,7 @@ export function createLoginService({ productId, writer, provider, credentialSecr
     catch (error) { if (error instanceof ApiError) throw error; throw new ApiError(503, 'auth_unavailable', '로그인 확인을 하지 못했어요.'); }
     const ticket = exchanged?.handoffTicket;
     if (typeof ticket !== 'string' || !TICKET.test(ticket)) {
-      throw new ApiError(401, 'invalid_login_evidence', '로그인 확인을 하지 못했어요.');
+      rejectLogin(401, 'invalid_login_evidence', '로그인 확인을 하지 못했어요.');
     }
 
     // 표는 단일 사용이다. 표가 소비된 뒤에 발급이 실패하면 같은 표로 재시도하지 않는다 —

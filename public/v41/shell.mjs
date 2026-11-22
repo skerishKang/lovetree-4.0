@@ -3,9 +3,11 @@ import {memberLoginUrl,shouldLoadMemberRecords} from './member-entry.mjs';
 import {workspaceModel} from './workspace-model.mjs';
 import {createWorkspaceApi, setMemberRefreshStarted} from './api.mjs';
 import {createShareApi} from './share-api.mjs';
+import {createCommunityApi} from './community-api.mjs';
+import {mountMyNews} from './my-news.mjs';
 import {createMemberSession} from './member-session.mjs';
 import {hasPendingDraft} from './sync-controller.mjs';
-import {clearCachedWorkspace, readCachedWorkspace} from './workspace-cache.mjs';
+import {clearCachedWorkspace, readCachedWorkspace, readLoginSubject, forgetLoginSubject} from './workspace-cache.mjs';
 // #1026 E: 예시 데이터(1MB)는 정적으로 부르지 않는다 — 로그인 사용자의 화면 로딩을 막지 않게
 // 예시가 실제로 필요한 순간에만 동적으로 부른다(로그아웃 첫 화면, 예시 카드 열기, 예시 둘러보기).
 let exampleTree=null,examplePromise=null,exampleInitializing=false;
@@ -33,6 +35,8 @@ import {createTagSave} from './shell/tag-save.mjs';
 import {headerBadge, cleanupAvailable} from './inbox-model.mjs';
 import {createDialogs} from './shell/dialogs.mjs';
 import {createFeedbackDialog} from './feedback.mjs';
+// #1072 A-16: 화면 공용 오류 기록 — 저장 경로의 빈 catch를 여기서 기록한다.
+import {report} from './report.mjs';
 import {createFeedbackBoard} from './feedback-board.mjs';
 import {mountUpdates} from './updates.mjs';
 // #1026 E 2단계(A-06): 창을 열 때만 쓰는 모듈은 그때 받는다. 지연 프록시는 첫 메서드 호출에 모듈을
@@ -47,7 +51,8 @@ function lazyPanel(load){
 }
 import {connectionSignature} from './shell/panel-dirty.mjs';
 import {createLocation} from './shell/location.mjs';
-import {createNotifier, syncedNoticeText, newlyPublishedTrees} from './shell/notice.mjs';
+import {createNotifier, syncedNoticeText, newlyPublishedTrees, NOTICE_HIDE_MS} from './shell/notice.mjs';
+import {LOGIN_NOTICE_PARAM, LOGIN_NOTICE_TEXT, LOGIN_NOTICE_BUTTON, loginNoticeFrom} from './shell/login-notice.mjs';
 import {createSettings} from './shell/settings.mjs';
 import {createTreeMenu} from './shell/tree-menu.mjs';
 import {createConnections} from './shell/connections.mjs';
@@ -244,6 +249,8 @@ const takeBoardOpen=()=>{const v=boardOpenMoment;boardOpenMoment=null;return v};
 setMemberRefreshStarted(false);
 const shareApi=createShareApi();
 const accountApi=createWorkspaceApi();
+// #1098 3단계 내 소식 — #1159의 두 읽기 경로(/api/community/my-news·/unread-count)만 쓰는 전용 연결. 서버 변경 없음.
+const myNewsApi=createCommunityApi();
 // 로그인 시작·세션 연결은 shell/auth.mjs가 맡는다(#231 1-B③-1). 셸은 자기 상태를 넘기고 부르기만 한다.
 const shellAuth=createAuth({
   $,
@@ -589,7 +596,7 @@ const shellHeader=createHeader({
   // #368: 이메일을 불러오거나 지울 때마다 설정 "프로필" 표시도 같이 칠한다.
   onEmailChange:email=>paintSettingsProfile(email),
   // #465 4: 동그라미 깜빡임 — 계정 정보를 부르는 동안 저장본(#408)의 표시 이름으로 먼저 그린다.
-  getCachedName:()=>{try{return readCachedWorkspace(localStorage)?.state?.prefs?.displayName||''}catch{return ''}},
+  getCachedName:()=>{try{return readCachedWorkspace(localStorage,readLoginSubject(localStorage))?.state?.prefs?.displayName||''}catch{return ''}},
   // 이슈 644 2번: 아바타에 새 소식이 있으면 마우스 설명을 점 안내로 바꾼다.
   getAccountTip:()=>shellSettings.getAccountTip(),
   delegate:{syncTreeTips:()=>syncTreeTips()}
@@ -891,7 +898,7 @@ function memberStatus(status){
    b.textContent=a.name==='login'?'새 창에서 로그인':a.label;
    b.onclick=async()=>{
     if(a.name==='backup'){backup();return;}
-    if(a.name==='login'){window.open(memberLoginUrl(readTheme(localStorage)),'_blank','noopener,noreferrer');return;}
+    if(a.name==='login'){forgetLoginSubject(localStorage);/* A-18: 새 로그인은 확인된 계정이 없어지는 일 — 표식을 비우고 새 창으로 보낸다 */window.open(memberLoginUrl(readTheme(localStorage)),'_blank','noopener,noreferrer');return;}
     if(['pull','force'].includes(a.name)&&!confirm(a.name==='pull'
      ?'미저장 변경을 버리고 서버 기록을 불러올까요?'
      :'서버의 최신 기록으로 현재 입력을 덮어쓸까요? 다른 창의 변경이 사라질 수 있습니다.'))return;
@@ -906,7 +913,7 @@ function memberStatus(status){
  else if(status.phase==='synced'){
   // #984: 저장이 서버에서 확인되면(직전 미저장→synced) 열린 화면에 표지·이름 다시 그리기를 알린다.
   // 실패(rejected·offline·conflict·login)에서는 알리지 않는다 — 화면은 원래 표지를 그대로 두고 저장 안내 떠가 실패를 알린다.
-  if(previousDirty){try{for(const f of frames())f.contentWindow?.postMessage({type:'lt41-trees-saved'},location.origin);}catch{}}
+  if(previousDirty){try{for(const f of frames())f.contentWindow?.postMessage({type:'lt41-trees-saved'},location.origin);}catch(error){report(error, '저장 알림 보내기');}}
   // #549: 기록(순간)이 0개인 새 계정의 첫 안내는 '불러왔어요' 대신 첫 순간 안내로(문구는 notice.mjs 한 벌).
   // #905: 자동 저장이 성공하면 알리지 않는다 — 직전에 저장 안 됨이었다면(previousDirty) 방금 저장된 것이다.
   // 알림은 실패·오프라인·충돌(저장 안내 떠)과 사용자가 누른 큰 동작의 완료 확인만 띄운다.
@@ -960,9 +967,9 @@ async function startMember(){setMemberRefreshStarted(true);if(!leaveMember())ret
    const resolved=load({revision:0,state},'server',requested,saved);initialized=true;
    if(window.LT41)window.LT41.prefs=state.prefs;
    // #441 후속: 다른 기기의 첫 그림도 계정 날짜 표기를 따르도록, 로그인 때 기기 미러 캐시를 계정값으로 채운다.
-   try{localStorage.setItem('lt41.dateStyle',normalizeDateStyle(state.prefs?.dateStyle));}catch{}
+   try{localStorage.setItem('lt41.dateStyle',normalizeDateStyle(state.prefs?.dateStyle));}catch(error){report(error, '기기 설정 저장');}
    // 261116 PR 2: 첫 화면 카드 모드도 기기 미러를 계정값으로 채운다(첫 화면 문서는 계정 값을 늦게 알 수 있다).
-   try{localStorage.setItem('lt41.homeMoment',JSON.stringify(normalizeHomeMoment(state.prefs?.homeMoment)));}catch{}
+   try{localStorage.setItem('lt41.homeMoment',JSON.stringify(normalizeHomeMoment(state.prefs?.homeMoment)));}catch(error){report(error, '기기 설정 저장');}
    // #481: 제목 보기도 같은 이유로 기기 미러를 계정값으로 채운다.
    rememberTitleDisplay(state.prefs?.titleDisplay);
    paintTitleDisplayControls();
@@ -998,9 +1005,9 @@ $('account-entry').onclick=e=>{
 };
 $('account-avatar').onclick=e=>{
  e.stopPropagation();
- if($('account-popover').hidden){openAccountMenu(e.detail===0?'keyboard':'mouse');void shellSettings.getFeedbackBoard().refreshReplyDot();}else closeAccountMenu();
+ if($('account-popover').hidden){openAccountMenu(e.detail===0?'keyboard':'mouse');void shellSettings.getFeedbackBoard().refreshReplyDot();void shellSettings.refreshMyNewsCount?.();}else closeAccountMenu();
 };
-const shellSettings=createSettings({ $, notify, setTitleDisplay, openLoginStart, links, screenForView, choose, panel, show, frames, frameLoaded, hideFrames, closeAccountMenu, openAccountMenu, renderAccount, updateAccountControls, openAssets, openEditor, sample, backup, clear, startMember, leaveMember, openFallbackShell, writeLocation, load, flowNavigation, renderTreeMenu, requestBoardOpen, lastShelfTreeId, shellHeader, shellDialogs,  shareApi, accountApi, readTheme, writeTheme, normalizeAccentColor, normalizeDateStyle, normalizeStartPlace, normalizeShareView, normalizeHomeMoment,  readPageTurn, writePageTurn, frameMessage, displayTreeTitle, accountPresentation, createFeedbackDialog, createFeedbackBoard, mountUpdates, readWriteTab, writeWriteTab, clearCachedWorkspace, createWorkspaceApi, paintThemeControls, applyTheme, toggleTheme, paintBookDisplayControls, get member(){return member}, get model(){return model}, get current(){return current}, get source(){return source}, get motionPaused(){return motionPaused}, get loadGeneration(){return loadGeneration}, get handledHash(){return handledHash}, get activeShareId(){return activeShareId}, set member(v){member=v}, set model(v){model=v}, set current(v){current=v}, set source(v){source=v}, set motionPaused(v){motionPaused=v}, set loadGeneration(v){loadGeneration=v}, set handledHash(v){handledHash=v}, set activeShareId(v){activeShareId=v}
+const shellSettings=createSettings({ $, notify, setTitleDisplay, openLoginStart, links, screenForView, choose, panel, show, frames, frameLoaded, hideFrames, closeAccountMenu, openAccountMenu, renderAccount, updateAccountControls, openAssets, openEditor, sample, backup, clear, startMember, leaveMember, openFallbackShell, writeLocation, load, flowNavigation, renderTreeMenu, requestBoardOpen, lastShelfTreeId, shellHeader, shellDialogs,  shareApi, accountApi, myNewsApi, readTheme, writeTheme, normalizeAccentColor, normalizeDateStyle, normalizeStartPlace, normalizeShareView, normalizeHomeMoment,  readPageTurn, writePageTurn, frameMessage, displayTreeTitle, accountPresentation, createFeedbackDialog, createFeedbackBoard, mountUpdates, mountMyNews, readWriteTab, writeWriteTab, clearCachedWorkspace, forgetLoginSubject, createWorkspaceApi, paintThemeControls, applyTheme, toggleTheme, paintBookDisplayControls, get member(){return member}, get model(){return model}, get current(){return current}, get source(){return source}, get motionPaused(){return motionPaused}, get loadGeneration(){return loadGeneration}, get handledHash(){return handledHash}, get activeShareId(){return activeShareId}, set member(v){member=v}, set model(v){model=v}, set current(v){current=v}, set source(v){source=v}, set motionPaused(v){motionPaused=v}, set loadGeneration(v){loadGeneration=v}, set handledHash(v){handledHash=v}, set activeShareId(v){activeShareId=v}
  });
 const { showPublicRoute, applyAdvanced, applyDateStyleToFrame, applyPageTurnToFrame, applyNetworkViewToFrame, applyBoardThemeToFrame, syncBoardThemeToApp, quickTargetPreference, profileDirty, paintSettingsProfile, accountConfirmMatches, openAccountData, openAccountSettings, paintDateStyleControls, paintStartPlaceControls, paintShareControls, paintQuickTargetControls, paintNetworkViewControls, paintPageTurnControls, paintBoardThemeControls, paintTreeVisibilityList, paintSettingsUsage, loadTreeVisibility, paintTreeManagerVisibility, paintSettingsTab, focusSettingsSection, fillProfileForm, paintScreenControls, readAdvanced, advancedKey, currentDateStyle, currentPageTurn, sendToFrame, currentStartPlace, currentShareView, currentBoardTheme }=shellSettings;
 // #1094: 머리줄 묶음과 설정 창의 같은 data-book-display 두 칸이 하나의 길로 바뀌고 저장된다.
@@ -1042,6 +1049,19 @@ addEventListener('beforeunload',e=>{
 if(shouldLoadMemberRecords(location.search,document.cookie,location.hash)||shellIntake.pending())void startMember().catch(error=>openFallbackShell(error));
 // 로그아웃으로 다시 연 문서에서는 '로그인이 필요해요' 대신 이 안내를 한 번 띄운다.
 try{if(sessionStorage.getItem('lt41.logoutNotice')==='1'){sessionStorage.removeItem('lt41.logoutNotice');notify('로그아웃했어요.');}}catch{}
+// #1175: 로그인 콜백이 거절되면 서버가 JSON 대신 이 표지를 달아 /v41/로 보낸다.
+// 날 글자 대신 한 줄 안내와 다시 로그인 단추를 보여 주고, 표지는 주소에서 걷어 다시 뜨지 않게 한다.
+if(loginNoticeFrom(location.search)){
+ try{const clean=new URL(location.href);clean.searchParams.delete(LOGIN_NOTICE_PARAM);history.replaceState(null,'',clean.pathname+clean.search+clean.hash);}catch{}
+ // 첫 화면의 다른 안내(새 소식 띠·첫 트리 안내)보다 먼저 보인다 — 그 쪽이 뜨며 토스트를 감추지 못하게 한다.
+ noticeQueue.request('loginNotice',{
+  show:()=>{
+   notify(LOGIN_NOTICE_TEXT,{hold:true,action:{label:LOGIN_NOTICE_BUTTON,run:()=>openLoginStart('first')}});
+   setTimeout(()=>noticeQueue.release('loginNotice'),NOTICE_HIDE_MS+50);
+  },
+  hide:hideToast
+ });
+}
 
 
 

@@ -300,22 +300,25 @@ test('#1018 떠다니는 카드는 바닥 링크 줄·새 소식 카드 자리�
           const hit = (a, b) => Math.max(0, Math.min(a.r, b.r) - Math.max(a.l, b.l)) * Math.max(0, Math.min(a.b, b.b) - Math.max(a.t, b.t));
           let maxCross = 0;
           for (const c of cards) {
-            const a = c.getAnimations().find(x => x.id === 'lt-orbit');
-            if (!a) continue;
-            const d = a.effect.getTiming().duration;
-            let best = 0, bestT = 0;
+            // #1086: lt-orbit은 WAAPI 애니메이션이 아니라 rAF에서 transform을 직접 쓴다.
+            // 실제 그리기 경로(테스트용 seek)로 진행률 0~1을 훑어 궤도 경로의 최대 교차를 잰다.
+            if (!window.__LT_ORBIT_TEST__) continue;
+            let best = 0;
             for (let k = 0; k < 48; k++) {
-              a.currentTime = k / 48 * d;
+              window.__LT_ORBIT_TEST__.seek(k / 48);
               const r = rectOf(c);
               const area = zones.reduce((n, z) => n + hit(r, z), 0);
-              if (area > best) { best = area; bestT = k / 48 * d; }
+              if (area > best) best = area;
             }
-            a.currentTime = bestT;
             maxCross = Math.max(maxCross, best);
           }
+          window.__LT_ORBIT_TEST__.restore();
           return maxCross;
         });
         assert.ok(crossed > 0, `${width}·${theme}: 궤도 경로가 바닥 자리를 지난다(최대 교차 ${Math.round(crossed)}px²) — 빈손 통과가 아니다`);
+        // 위상을 바꾼 뒤 가드가 카드 숨김 클래스를 반영하고 글꼴·그림이 그려질 때까지 기다린다.
+        await h.page.evaluate(() => document.fonts.ready);
+        await h.frame.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
         await h.page.waitForTimeout(150);
         const samples = [];
         for (let i = 0; i < 7; i++) { samples.push(await h.frame.evaluate(SAMPLE1018)); if (i < 6) await h.page.waitForTimeout(500); }
