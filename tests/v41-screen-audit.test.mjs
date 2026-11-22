@@ -705,22 +705,33 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     await take(page4, '둘러보기');
     // #784: 반응 단추는 격자 카드에 없고, 카드를 열어야 미리보기에서 보인다.
     await page4.locator('.community-card').first().click();
+    // #1098 1단계(2026-11-22 대표 승인): '반응 남기기' 접힘을 ♡ 하나로 바꿨다 — 기준을 느슨하게 하지 않고 두 규칙을 모두 검사한다.
+    // ① 기본 줄에는 ♡([data-reaction-kind="heart"]) 하나만 보이고 다른 반응 칩은 0개다.
     await page4.waitForFunction(() => {
       const preview = document.getElementById('community-preview');
-      return preview?.open && preview.querySelector('.community-reaction-open');
+      return preview?.open && preview.querySelector('[data-reaction-kind="heart"]');
     }, null, { timeout: 8000 });
     await page4.waitForTimeout(400);
     const reactions = await page4.evaluate(() => {
       const preview = document.getElementById('community-preview');
+      const kinds = [...(preview?.querySelectorAll('[data-reaction-kind]') || [])].map((b) => b.dataset.reactionKind);
       return {
         previewOpen: Boolean(preview?.open),
-        open: preview?.querySelectorAll('.community-reaction-open').length || 0,
-        zeroChips: [...(preview?.querySelectorAll('.community-reaction') || [])].filter((b) => / 0$/.test(b.textContent.trim())).length
+        hearts: kinds.filter((kind) => kind === 'heart').length,
+        others: kinds.filter((kind) => kind !== 'heart').length
       };
     });
     assert.equal(reactions.previewOpen, true, '카드를 누르면 둘러보기 미리보기가 열린다');
-    assert.ok(reactions.open >= 1, '반응이 없으면 미리보기에서 반응 남기기 단추가 보인다');
-    assert.equal(reactions.zeroChips, 0, '0짜리 반응 칩은 보이지 않는다');
+    assert.equal(reactions.hearts, 1, '기본 줄에는 ♡(공감) 단추 하나만 보인다');
+    assert.equal(reactions.others, 0, '기본 줄에 다른 반응 칩은 0개다');
+    // ② 길게 누르면(0.45초 규칙) 나머지 여섯 종이 그 자리에서 펼쳐진다.
+    const heartBox = await page4.locator('#community-preview [data-reaction-kind="heart"]').boundingBox();
+    await page4.mouse.move(heartBox.x + heartBox.width / 2, heartBox.y + heartBox.height / 2);
+    await page4.mouse.down();
+    await page4.waitForFunction(() => document.querySelectorAll('#community-preview [data-reaction-kind]').length >= 7, null, { timeout: 8000 });
+    await page4.mouse.up();
+    const revealed = await page4.evaluate(() => [...document.querySelectorAll('#community-preview [data-reaction-kind]')].map((b) => b.dataset.reactionKind).sort());
+    assert.deepEqual(revealed, ['angry', 'heart', 'laugh', 'like', 'love', 'sad', 'wow'], '길게 누르면 나머지 6종까지 일곱 종이 모두 펼쳐진다');
     // #903: 가입 7일 미만이 담기를 누르면 서버 안내가 담기 단추 바로 다음 줄에 뜬다 —
     // 단추와 안내의 세로 거리를 1440·390에서 모두 12px 이하로 잰다(눈이 아니라 수치로).
     await ctx4.route('**/api/community/shares/*/favorite', (r) => r.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ error: { code: 'vote_too_new', message: '가입하고 7일이 지나면 투표할 수 있어요.' } }) }));
