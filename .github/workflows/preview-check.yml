@@ -49,6 +49,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     needs: screen-changes
+    if: needs.screen-changes.outputs.changed == 'true'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -220,6 +221,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     needs: screen-changes
+    if: needs.screen-changes.outputs.changed == 'true'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -346,6 +348,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     needs: screen-changes
+    if: needs.screen-changes.outputs.changed == 'true'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -429,6 +432,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     needs: screen-changes
+    if: needs.screen-changes.outputs.changed == 'true'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -561,6 +565,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     needs: screen-changes
+    if: needs.screen-changes.outputs.changed == 'true'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -648,6 +653,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     needs: screen-changes
+    if: needs.screen-changes.outputs.changed == 'true'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -735,6 +741,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     needs: screen-changes
+    if: needs.screen-changes.outputs.changed == 'true'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -821,6 +828,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     needs: screen-changes
+    if: needs.screen-changes.outputs.changed == 'true'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -865,6 +873,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     needs: screen-changes
+    if: needs.screen-changes.outputs.changed == 'true'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -980,6 +989,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     needs: screen-changes
+    if: needs.screen-changes.outputs.changed == 'true'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -1129,6 +1139,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     needs: screen-changes
+    if: needs.screen-changes.outputs.changed == 'true'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -1427,6 +1438,6 @@ jobs:
           echo "$RESULTS" | node -e '
             let t="";process.stdin.on("data",d=>t+=d).on("end",()=>{
               const needs=JSON.parse(t);let bad=0;
-              for(const [k,v] of Object.entries(needs)){console.log(`${k}: ${v.result}`);if(v.result!=="success")bad++;}
+              for(const [k,v] of Object.entries(needs)){console.log(`${k}: ${v.result}`);if(v.result!=="success"&&v.result!=="skipped")bad++;}
               if(bad){console.error(`실패·취소된 잡 ${bad}개`);process.exit(1);}
             });'
