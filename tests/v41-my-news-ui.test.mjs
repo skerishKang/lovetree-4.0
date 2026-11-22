@@ -160,6 +160,18 @@ test('점용 숫자 — 실패하면 지금 점을 바꾸지 않는다(모른다
   assert.deepEqual(painted, []);
 });
 
+test('점용 숫자 — community-api의 실제 응답 모양({ok, unreadCount})도 같은 길로 점이 된다', async () => {
+  const elements = {};
+  const $ = id => elements[id] || (elements[id] = { id, innerHTML: '', hidden: true, textContent: '' });
+  const painted = [];
+  const mount = mountMyNews({ $, showPanel: () => {}, fetchNews: async () => null, fetchCount: async () => ({ ok: true, status: 200, unreadCount: 3 }), getTrees: () => [], onCount: value => painted.push(value) });
+  assert.equal(await mount.refreshCount(), 3, '두 경로 응답의 unreadCount가 점용 숫자가 된다');
+  assert.deepEqual(painted, [3]);
+  const failed = mountMyNews({ $, showPanel: () => {}, fetchNews: async () => null, fetchCount: async () => ({ ok: false, status: 503, code: 'unavailable' }), getTrees: () => [], onCount: value => painted.push(value) });
+  assert.equal(await failed.refreshCount(), null, '실패 응답({ok:false})은 점을 바꾸지 않는다');
+  assert.deepEqual(painted, [3]);
+});
+
 test('빈 목록을 열어도 점은 0으로 지워진다(읽음 표시는 서버에 남았다)', async () => {
   const elements = {};
   const $ = id => elements[id] || (elements[id] = { id, innerHTML: '', hidden: true, textContent: '' });

@@ -77,12 +77,14 @@ export function mountMyNews({ $ = null, showPanel = null, fetchNews, fetchCount,
   const $id = id => (typeof $ === 'function' ? $(id) : doc?.getElementById?.(id)) || null;
   let lastCount = null;
   const paint = value => { lastCount = value; onCount(value); };
-  // 점용 숫자 — 실패하면(null) 점을 바꾸지 않는다(알 수 없다고 지우지 않는다). Number(null)은 0이라
+  // 점용 숫자 — 실패하면(null) 점을 바꾸지 않는다(알 수 없다고 0으로 두지 않는다). Number(null)은 0이라
   // 그대로 세면 실패를 '읽음 0'으로 잘못 그린다.
+  // community-api의 실제 응답({ok, unreadCount})도 같은 길로 받는다 — 숫자만 받으면 운영 길에서 점이 못 그려진다.
   async function refreshCount() {
     let value = null;
     try { value = await readCount(); } catch { value = null; }
-    const n = value === null || value === undefined ? NaN : Number(value);
+    const raw = value !== null && typeof value === 'object' ? value.unreadCount : value;
+    const n = raw === null || raw === undefined ? NaN : Number(raw);
     if (Number.isFinite(n) && n >= 0) paint(n);
     return Number.isFinite(n) && n >= 0 ? n : null;
   }
