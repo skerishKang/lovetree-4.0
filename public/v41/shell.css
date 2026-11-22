@@ -648,6 +648,7 @@ html[data-lt-theme=garden] .home-links .feedback-link:hover{color:var(--lt-ink)}
  body.lt-fab-ok[data-fab-lift="book"] .updates-card{bottom:calc(168px + env(safe-area-inset-bottom))}
  body.lt-fab-ok[data-fab-lift="board"] .updates-card{bottom:calc(132px + env(safe-area-inset-bottom))}
  body.lt-fab-ok[data-fab-lift="network"] .updates-card{bottom:calc(224px + env(safe-area-inset-bottom))}}
+ @media(max-width:520px){.updates-card{padding:0 10px;gap:8px;bottom:calc(max(10px, env(safe-area-inset-bottom)) + 66px)}body.lt-fab-ok .updates-card{bottom:calc(76px + env(safe-area-inset-bottom))}.updates-card-text{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
 /* 창(모달·패널)이 열려 있으면 아래 고정 요소는 모두 숨는다 — 닫으면 저절로 돌아온다(의견 #26 점검). */
 body:has(dialog[open]) .updates-card,body.lt-sheet-open .updates-card,
 body:has(dialog[open]) .home-links,body.lt-sheet-open .home-links{display:none}
