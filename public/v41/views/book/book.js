@@ -37,7 +37,7 @@ function syncViewButtons(){const s=single();const one=$('#singleViewBtn'),two=$(
 /* #537 9: 보기를 바꿔도 보던 순간을 그대로 둔다 — 두 장의 오른쪽 순간이면 한 장에서 그 순간, 한 장의 순간이면 그 순간이 든 묶음. */
 function setViewChoice(v){if(machineState!=='IDLE'){/* 넘기는 동안에는 모드를 바꾸지 않는다 — 잠깐 뒤 다시 시도한다. */setTimeout(()=>setViewChoice(v),120);return}const focus=LTDEMO.get()||'';viewChoice=v;try{localStorage.setItem(VIEW_KEY,v)}catch{}applyViewAttr();renderSpread(posOfMoment(focus),focus||null,false)}
 const allMoments=()=>SPREADS.flatMap((s,i)=>[{...s.left,spread:i,side:'left'},{...s.right,spread:i,side:'right'}]).filter(m=>!m.synthetic);
-function esc(s=''){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+const esc=globalThis.LTEscapeHtml; // A-15: 글자 막기 정본(html-escape.js) 한 벌
 function titleMainOf(m){try{const v=window.LTBookTitle?.view?.(m);return v?.main||m?.title||''}catch{return m?.title||''}}
 function titleSubOf(m){try{return window.LTBookTitle?.view?.(m)?.sub||''}catch{return ''}}
 function dateOf(v){try{return window.LTBookTitle?.date?.(v)||v||''}catch{return v||''}}
@@ -173,7 +173,10 @@ $('#detailClose').onclick=()=>setBookOpen($('#detail'),false);$('#openViewerBtn'
 
 /* V1.1 · Real Link 순간 input */
 function normalizeHttpUrl(raw){let v=String(raw||'').trim();if(!v)return null;if(!/^[a-zA-Z][a-zA-Z\d+.-]*:/.test(v))v='https://'+v;try{const u=new URL(v);if(!['http:','https:'].includes(u.protocol))return null;return u.href}catch{return null}}
-function youtubeId(raw){const n=normalizeHttpUrl(raw);if(!n)return null;try{const u=new URL(n);const d=(window.LTMedia&&typeof window.LTMedia.describe==='function')?window.LTMedia.describe(n):null;if(d&&d.kind==='youtube')return d.videoId||null;const h=u.hostname;if(h==='youtu.be'){const y=u.pathname.split('/').filter(Boolean)[0]||'';return /^[A-Za-z0-9_-]{11}$/.test(y)?y:null}if(['youtube.com','www.youtube.com','m.youtube.com','music.youtube.com'].includes(h)){if(u.pathname==='/watch'){const v=u.searchParams.get('v')||'';return /^[A-Za-z0-9_-]{11}$/.test(v)?v:null}const p=u.pathname.split('/').filter(Boolean);if(['shorts','live','embed'].includes(p[0]))return /^[A-Za-z0-9_-]{11}$/.test(p[1]||'')?p[1]:null}}catch{}return null}
+// #1059: 사본을 걷어내고 정본(youtube-id.mjs → globalThis.LTYouTubeId)을 부른다. 전역 스크립트 화면은 LTMedia를 거친다.
+function youtubeId(raw){const n=normalizeHttpUrl(raw);if(!n)return null;try{const direct=globalThis.LTYouTubeId?.youtubeIdFrom;if(direct)return direct(n, {allowThumbnail:false})||null;
+const d=(window.LTMedia&&typeof window.LTMedia.describe==='function')?window.LTMedia.describe(n):null;
+return (d&&d.kind==='youtube')?d.videoId||null:null}catch{return null}}
 function isYouTubeUrl(raw){return !!youtubeId(raw)}
 
 /* Index */
@@ -183,7 +186,8 @@ let archiveOpener=null;function closeArchive(){const panel=$('#archivePanel');pa
 /* 갈림길 고르는 창 — 맨 위 창 하나만 닫고, 초점은 연 책갈피로 돌려 준다. */
 let branchOpener=null,branchTargets=[],branchCurrentId='',branchExpanded=false,branchQuery='';
 function branchPathCount(id){const seen=new Set();const walk=x=>{for(const e of LTDEMO.edges){if(e.kind==='parent'&&e.from===x&&!seen.has(e.to)){seen.add(e.to);walk(e.to)}}};walk(id);return seen.size}
-function branchThumb(m){const id=youtubeId(m.url||m.externalUrl||'');if(id&&window.LTMedia?.youtubeThumbUrl)return `<img src="${esc(window.LTMedia.youtubeThumbUrl(id))}" referrerpolicy="no-referrer" alt="" loading="lazy">`;if(m.image)return `<img src="${esc(m.image)}" alt="" loading="lazy">`;return '✦'}
+// #1060: ytimg 주소는 정본(youtube-id.mjs)에 크기 옵션만 넘겨 만든다(책 모델·media-preview와 같은 값).
+function branchThumb(m){const id=youtubeId(m.url||m.externalUrl||'');if(id){const stage=globalThis.LTYouTubeId?.youtubeStageThumbUrl;const src=stage?stage(id,'hqdefault'):(window.LTMedia?.youtubeThumbUrl?window.LTMedia.youtubeThumbUrl(id):'');if(src)return `<img src="${esc(src)}" referrerpolicy="no-referrer" alt="" loading="lazy">`;}if(m.image)return `<img src="${esc(m.image)}" alt="" loading="lazy">`;return '✦'}
 function branchCardMarkup(m){const tone=window.LT59Model?LT59Model.emotionTone(m.emotion):1;const main=m.id===branchCurrentId;const cnt=branchPathCount(m.id);const countLine=cnt?`<span class="branch-count">순간 ${cnt}개가 이어짐</span>`:'';return `<button class="choice${main?' current-path':''}" data-branch-target="${posOfMoment(m.id)}" data-focus="${esc(m.id)}"><span class="branch-thumb" aria-hidden="true">${branchThumb(m)}</span><span class="branch-info"><span class="branch-kind">${main?'현재 경로 계속':'다른 경로'}</span><b>${esc(titleMainOf(m))}</b><span class="branch-meta"><span class="emotion-dot" data-tone="${tone}" aria-hidden="true"></span>${esc(m.emotion||'기록')} · ${esc(dateOf(m.date))}</span>${countLine}</span></button>`}
 function renderBranchChoices(){const box=$('#branchChoices');const q=branchQuery.trim().toLowerCase();const shown=q?branchTargets.filter(m=>titleMainOf(m).toLowerCase().includes(q)):branchTargets;const list=branchExpanded||q?shown:shown.slice(0,6);box.innerHTML=list.length?list.map(branchCardMarkup).join(''):`<p class="branch-empty">제목이 일치하는 길이 없어요.</p>`;const more=$('#branchMore');if(more){more.hidden=!(shown.length>6&&!q);more.textContent=`더 보기 · ${shown.length-6}개`}}
 function openBranch(){const s=currentSpread();if(!s.branch)return;const source=LTDEMO.moments.find(m=>m.id===s.branch.source);if(!source)return;const raw=LTDEMO.edges.filter(e=>e.kind==='parent'&&e.from===source.id).map(e=>LTDEMO.moments.find(m=>m.id===e.to)).filter(Boolean);if(!raw.length)return;branchTargets=[raw[0],...raw.slice(1).sort((a,b)=>String(a.date||'').localeCompare(String(b.date||'')))];branchCurrentId=raw[0].id;branchOpener=document.activeElement;branchExpanded=false;branchQuery='';$('#branchSearch').value='';$('#branchTitle').textContent=`${titleMainOf(source)}에서 이어진 길 ${branchTargets.length}개`;$('#branchSearchWrap').hidden=branchTargets.length<7;renderBranchChoices();setBookOpen($('#branchModal'),true);$('#branchClose').focus()}

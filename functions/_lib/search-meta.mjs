@@ -9,21 +9,21 @@
  *   같은 규칙(운영 주소 루트, 그 밖은 /v41/)을 따른다.
  */
 import { jsonError, upstreamOrigin } from './proxy.js';
+// A-11: 기본 카드 그림 주소도 썸네일 정본 한 벌에서 가져온다(출력 문자열 그대로).
+import { CARD_IMAGE_URL as CANONICAL_CARD_IMAGE_URL } from '../../public/v41/youtube-id.mjs';
 
 export const PRODUCTION_HOST = 'lovetree.padiem.net';
 // 기본 카드 그림. public/og/lovetree-card.png 로 배포되며 1200×630 이다.
 export const CARD_IMAGE_PATH = '/og/lovetree-card.png';
-export const CARD_IMAGE_URL = `https://${PRODUCTION_HOST}${CARD_IMAGE_PATH}`;
+export const CARD_IMAGE_URL = CANONICAL_CARD_IMAGE_URL;
 export const SITE_TITLE = '러브트리';
 export const SITE_TAGLINE = '좋아하는 순간을 모아 두는 곳';
 // 서버 share-service 의 SHARE_ID 와 같은 형식 검사. 주소 형식이 밖이면 서버까지 가지 않는다.
 export const SHARE_ID = /^[A-Za-z0-9_-]{20,64}$/;
 
-export function escapeHtml(value) {
-  return String(value ?? '').replace(/[&<>"']/g, (ch) => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-  }[ch]));
-}
+// A-15: 화면과 같은 글자 막기 정본 한 벌 — 쓰던 이름은 그대로 다시 내보낸다.
+import { escapeHtml } from '../../public/v41/html-escape.mjs';
+export { escapeHtml };
 
 // 카드·메타에 들어갈 문장은 한 줄로 줄인다(개행 제거, 너무 길면 말줄임).
 export function oneLine(value, max = 80) {

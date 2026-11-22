@@ -261,10 +261,11 @@ window.LT56Model = (() => {
     // 순간은 첫 순간부터 BFS 순서로 고리 위에 앉히고(형제가 이웃해 부채꼴로 읽힌다), 묶음 점은
     // 색·범례가 뜻하는 대상이 없어 화면에 내지 않는다(network.js가 hubs가 비었을 때 치운다).
     const tree = bfsOrder(moments, edgesOf(opts), opts.fanMin ?? 8);
-    if (tree.fanHeavy) return fanLayout(moments, box, opts, tree, { maxR, firstR, gap, hubR, inset });
+    if (!opts.forceGrid && tree.fanHeavy) return fanLayout(moments, box, opts, tree, { maxR, firstR, gap, hubR, inset });
     // #951 ②: 순간이 적으면(≤8) 묶음 칸으로 쪼개 화면 끝까지 벌리지 않고, 상자 가운데 작은 무리로 모은다.
     // 첫 순간은 가운데, 나머지는 반지름 r의 고리에 앉아 가장 먼 두 점도 2r ≤ 상한(기본 240px) 안에 든다.
-    if (n > 0 && n <= (opts.compactMax ?? 8)) return compactLayout(moments, box, opts, tree, { maxR, firstR, gap, hubR, inset });
+    // #1095: 꼬리표 묶음 보기는 forceGrid로 부채꼴 판정을 건너뛰고 칸 거품으로 그린다.
+    if (!opts.forceGrid && n > 0 && n <= (opts.compactMax ?? 8)) return compactLayout(moments, box, opts, tree, { maxR, firstR, gap, hubR, inset });
     // #869: 묶음 점(타원 가운데)부터 영역 안쪽 여백(가로·세로 10% 이상) 안에 앉힌다 — 묶음 칸이 상자 전체(작은 트리)이거나
     // 가장자리 칸이면 타원이 상자 끝까지 늘어나 노드가 모서리에 붙고 시작 순간에서 뻗는 선이 화면 끝·하단 링크 줄까지 갔다.
     // 묶음 점이 안쪽에 모이면 노드도 묶음 원·시작 노드 근처에 모인다.
@@ -504,6 +505,137 @@ window.LT56Model = (() => {
     return { points, center, radii, scale, sx, sy, levelOf, maxLevel, firstId, dotR: nodeR * k, firstDotR: firstR * k, minGap: minGap * scale };
   }
 
+  // #1095 묶음(꼬리표 무리): 같은 가수·노래·무대·멤버 꼬리표가 2개 이상 모일 때만 허브(거품)를 만든다.
+  // graph-model.mjs의 허브·1차 소속 규칙을 캔버스 한 벌로 옮긴 것 — 종류 우선순위 무대>노래>멤버>가수,
+  // 허브 종류는 가수·노래·무대·멤버만(활동기·감정·종류 없는 옛 꼬리표는 허브가 아니다), 표기 차이는
+  // tags.mjs tagKey와 같은 기준으로 하나로 센다(NFKC 소문자·따옴표·마침표·공백 정리).
+  const TAG_KIND_LABEL = { stage: '무대', song: '노래', member: '멤버', artist: '가수' };
+  const TAG_PREFIX_TO_ID = { '무대:': 'stage', '노래:': 'song', '멤버:': 'member', '가수:': 'artist', '활동기:': 'era', '감정:': 'emotion' };
+  const TAG_HUB_KINDS = ['stage', 'song', 'member', 'artist'];
+  const TAG_PRIMARY_ORDER = ['stage', 'song', 'member', 'artist'];
+  function tagKeyOf(text) {
+    return String(text ?? '').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().normalize('NFKC').toLowerCase().replace(/['’"“”._]/g, '').replace(/\s+/g, ' ').trim();
+  }
+  function parseTagOf(raw) {
+    const s = String(raw ?? '').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim();
+    if (!s) return null;
+    const prefixes = Object.keys(TAG_PREFIX_TO_ID).sort((a, b) => b.length - a.length);
+    const prefix = prefixes.find(p => s.startsWith(p) && s.length > p.length);
+    if (prefix) return { kindId: TAG_PREFIX_TO_ID[prefix], value: s.slice(prefix.length), raw: s };
+    return { kindId: null, value: s, raw: s };
+  }
+  function tagGroups(moments) {
+    const list = Array.isArray(moments) ? moments.filter(m => m && m.id) : [];
+    const groups = new Map();
+    for (const m of list) {
+      const seen = new Set();
+      for (const raw of (Array.isArray(m.keywords) ? m.keywords : [])) {
+        const t = parseTagOf(raw);
+        if (!t || !TAG_HUB_KINDS.includes(t.kindId)) continue;
+        const key = tagKeyOf(t.value);
+        if (!key) continue;
+        const id = t.kindId + ':' + key;
+        if (seen.has(id)) continue;
+        seen.add(id);
+        let g = groups.get(id);
+        if (!g) { g = { id, kindId: t.kindId, key, value: t.value, ids: [] }; groups.set(id, g); }
+        g.ids.push(m.id);
+      }
+    }
+    const hubs = [...groups.values()].filter(g => g.ids.length >= 2).sort((a, b) => {
+      const ka = TAG_HUB_KINDS.indexOf(a.kindId), kb = TAG_HUB_KINDS.indexOf(b.kindId);
+      if (ka !== kb) return ka - kb;
+      return a.key < b.key ? -1 : a.key > b.key ? 1 : 0;
+    });
+    const hubById = new Map(hubs.map(h => [h.id, h]));
+    const entries = list.map(m => {
+      const hubIds = [];
+      const seen = new Set();
+      for (const raw of (Array.isArray(m.keywords) ? m.keywords : [])) {
+        const t = parseTagOf(raw);
+        if (!t || !TAG_HUB_KINDS.includes(t.kindId)) continue;
+        const id = t.kindId + ':' + tagKeyOf(t.value);
+        if (seen.has(id) || !hubById.has(id)) continue;
+        seen.add(id);
+        hubIds.push(id);
+      }
+      let hubId = null;
+      for (const kindId of TAG_PRIMARY_ORDER) {
+        const hit = hubIds.find(id => id.startsWith(kindId + ':'));
+        if (hit) { hubId = hit; break; }
+      }
+      return { id: m.id, hubId };
+    });
+    const out = [];
+    for (const h of hubs) {
+      const ids = entries.filter(e => e.hubId === h.id).map(e => e.id);
+      if (!ids.length) continue;
+      out.push({ name: `${TAG_KIND_LABEL[h.kindId]} ${h.value}`, ids, kindId: h.kindId, key: h.key });
+    }
+    const shelf = entries.filter(e => !e.hubId).map(e => e.id);
+    if (shelf.length) out.push({ name: '아직 묶음에 안 든', ids: shelf, shelf: true });
+    if (!out.length && list.length) out.push({ name: '아직 묶음에 안 든', ids: list.map(m => m.id), shelf: true });
+    // 꼬리표가 없어 허브가 하나도 없으면 빈 안내를 화면이 보이게 빈 플래그를 덜어 준다.
+    return { groups: out, hubs: hubs.filter(h => entries.some(e => e.hubId === h.id)), empty: hubs.length === 0 };
+  }
+  // 꼬리표별 무리 거품 배치: 허브 칸을 거품 중심(gridFor)으로, 묶음 안 순간은 타원 위에 시간 순서로 앉힌다.
+  // forceGrid로 부채꼴·작은무리 shortcuts를 건너뛰어 41개 부채꼴 트리에서도 거품이 여러 개로 보인다(#1095).
+  function tagLayout(moments, opts = {}) {
+    const box = opts.box || { x: 0, y: 0, w: opts.width || 1200, h: opts.height || 800 };
+    const grouped = tagGroups(moments);
+    if (grouped.empty) {
+      const t = timeLayout(moments, { ...opts, box });
+      return { ...t, hubs: [], groups: grouped.groups, hubNames: [], empty: true, tag: true };
+    }
+    const groups = grouped.groups;
+    const lay = networkLayout(moments, { ...opts, box, forceGrid: true, groups: groups.map(g => g.ids), dotR: opts.dotR ?? 5, firstR: opts.firstR ?? 12, gap: opts.gap ?? 8, hubR: opts.hubR ?? 12 });
+    return { ...lay, groups, hubNames: groups.map(g => g.name), empty: false, tag: true, shelfFlags: groups.map(g => !!g.shelf) };
+  }
+  // #1095 시간 순: 담은 날짜(무대 날짜) 순서의 가로 한 줄. graph-model footprint와 같은 순서
+  // (오래된 것부터, 같은 날은 보드 순위·createdOrder·id 순)를 개수 없이 줄로만 그린다.
+  function timeOrder(moments) {
+    const list = (Array.isArray(moments) ? moments : []).filter(m => m && m.id);
+    const rankOf = m => {
+      const y = Number(m?.y);
+      return Number.isInteger(y) && y >= -10000 && y < -10000 + 7000 ? y - (-10000) : null;
+    };
+    return [...list].sort((a, b) => {
+      const da = String(a?.date || ''), db = String(b?.date || '');
+      if (da !== db) return da < db ? -1 : 1;
+      const ra = rankOf(a), rb = rankOf(b);
+      if (ra !== null && rb !== null) return ra !== rb ? ra - rb : (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+      if (ra !== null) return -1;
+      if (rb !== null) return 1;
+      const ca = Number(a?.createdOrder) || 0, cb = Number(b?.createdOrder) || 0;
+      return ca !== cb ? ca - cb : (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+    }).map(m => m.id);
+  }
+  function timeLayout(moments, opts = {}) {
+    const box = opts.box || { x: 0, y: 0, w: opts.width || 1200, h: opts.height || 800 };
+    const maxR = opts.dotR ?? 5, gap = opts.gap ?? 8, inset = opts.inset ?? 16;
+    const order = timeOrder(moments);
+    const n = order.length;
+    const y = box.y + box.h / 2;
+    const points = {};
+    if (n === 0) return { points, order, hubs: [], dotR: maxR, hubR: opts.hubR ?? 9, box, y, time: true };
+    const span = Math.max(40, box.w - 2 * (inset + maxR));
+    if (n === 1) points[order[0]] = { x: box.x + box.w / 2, y };
+    else {
+      const x0 = box.x + (box.w - span) / 2;
+      order.forEach((id, i) => { points[id] = { x: x0 + (span * i) / (n - 1), y }; });
+    }
+    let dotR = maxR;
+    const fits = r => {
+      for (let i = 1; i < n; i++) {
+        const a = points[order[i - 1]], b = points[order[i]];
+        if (Math.hypot(b.x - a.x, b.y - a.y) < r + r + gap) return false;
+      }
+      return true;
+    };
+    while (dotR > 2 && !fits(dotR)) dotR -= 0.25;
+    return { points, order, hubs: [], dotR, hubR: opts.hubR ?? 9, box, y, time: true };
+  }
+
   // #461 이름표 자리 고르기: 우선순위 순서대로, 상자 안 + 다른 이름표·점과 겹치지 않는 자리에만 붙인다(못 붙이면 뺀다).
   // cands: [{id, text, x, y, r, w, h, dir:{x,y}}] — dir은 바깥 방향(그쪽 자리를 먼저 본다). 점 기준 오른쪽·왼쪽·위·아래 네 자리.
   // obstacles: [{id, x, y, r}] 그려진 점·묶음 점. 결과: [{id, text, x, y, rect}] — x,y는 왼쪽 정렬 글자 기준선.
@@ -538,5 +670,5 @@ window.LT56Model = (() => {
     return out;
   }
 
-  return { branchPoint, groupSizeFor, shortTitle, clusterSpan, emotionGroups, monthGroups, pickGroups, labelTitle, fitBox, gridFor, bezierGeometry, routeEdges, bezierPoint, treeLevels, originPath, pathEmphasis, relationText, networkLayout, concentricLayout, placeLabels };
+  return { branchPoint, groupSizeFor, shortTitle, clusterSpan, emotionGroups, monthGroups, pickGroups, labelTitle, fitBox, gridFor, bezierGeometry, routeEdges, bezierPoint, treeLevels, originPath, pathEmphasis, relationText, networkLayout, concentricLayout, placeLabels, tagGroups, tagLayout, timeOrder, timeLayout };
 })();

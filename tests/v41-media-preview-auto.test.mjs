@@ -1,7 +1,9 @@
 import test from 'node:test';import assert from 'node:assert/strict';import vm from 'node:vm';import {readFileSync} from 'node:fs';
 import {embedUrl} from '../public/v41/book-usability.mjs';
+import '../public/v41/youtube-id.mjs'; // #1060: 정본이 등록한 globalThis.LTYouTubeId 를 vm 에도 넣는다.
+import '../public/v41/html-escape.mjs'; // A-15: 글자 막기 정본을 vm 에도 넣는다.
 // media-preview.js 는 클래식 스크립트(IIFE)라 vm 으로 읽어 window.LTMedia 를 본다(기존 시험과 같은 방법).
-const scope={window:{},URL,URLSearchParams};vm.runInNewContext(readFileSync(new URL('../public/v41/media-preview.js',import.meta.url),'utf8'),scope);const media=scope.window.LTMedia;
+const scope={window:{},URL,URLSearchParams,LTYouTubeId:globalThis.LTYouTubeId,LTEscapeHtml:globalThis.LTEscapeHtml};vm.runInNewContext(readFileSync(new URL('../public/v41/media-preview.js',import.meta.url),'utf8'),scope);const media=scope.window.LTMedia;
 const YT='https://www.youtube.com/watch?v=abc123DEF45&start=83';
 const PHOTO='https://example.test/a.png';
 const PRIVATE='https://lovetree-4-0.pages.dev/api/media/12345678-1234-4234-8234-123456789abc.png';

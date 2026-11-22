@@ -18,6 +18,8 @@ import { fakeEl } from './helpers/fake-dom.mjs';
 import { createQuickAdd } from '../public/v41/shell/quick-add.mjs';
 import { quickAdd, cacheMomentMediaMetadata, validateState } from '../public/v41/domain.mjs';
 import { quickTreeLineText, quickTreeAfterText, quickSubmitText, quickSavedTreeText } from '../public/v41/quick-add.mjs';
+import '../public/v41/youtube-id.mjs'; // #1060: 정본 등록을 vm 시험에도 적용한다.
+import '../public/v41/html-escape.mjs'; // A-15: 글자 막기 정본을 vm 에도 넣는다.
 
 // LTMedia.describe와 같은 모양의 최소 판정(화면이 실제로 쓰는 전역과 같은 계약).
 const describeLike = (url) => {
@@ -234,7 +236,8 @@ test('952 실행: 쉬운 추가 창은 처음에 담기가 막혀 있고, 안내
 });
 
 // ---- 이슈 638 ②: 주소 형태별 영상 ID (media-preview.js를 실제로 실행해 본다) ----
-const scope = { window: {}, URL, URLSearchParams };
+// #1060: 정본이 등록한 globalThis.LTYouTubeId 를 vm 에도 넣는다.
+const scope = { window: {}, URL, URLSearchParams, LTYouTubeId: globalThis.LTYouTubeId, LTEscapeHtml: globalThis.LTEscapeHtml };
 vm.runInNewContext(readFileSync(new URL('../public/v41/media-preview.js', import.meta.url), 'utf8'), scope);
 const media = scope.window.LTMedia;
 const VIDEO_ID = 'dQw4w9WgXcQ';

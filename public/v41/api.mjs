@@ -86,7 +86,7 @@ export function createWorkspaceApi({ fetchImpl = (...args) => globalThis.fetch(.
   }
 
   return {
-    uploadMedia: (file, subject, id, signal) => call('/api/media', {method:'POST', headers:{'content-type':file.type,'x-lovetree-subject':subject,'x-lovetree-upload-id':id},body:file}, {requestTimeout:60_000,signal}),
+    uploadMedia: (file, subject, id, signal, label) => { const headers={'content-type':file.type,'x-lovetree-subject':subject,'x-lovetree-upload-id':id}; if(label)headers['x-lovetree-file-name']=encodeURIComponent(String(label).slice(0,100)); return call('/api/media', {method:'POST', headers, body:file}, {requestTimeout:60_000,signal}); },
     listMedia: () => call('/api/media', {method:'GET'}),
     removeMedia: (name, subject) => call('/api/media/'+encodeURIComponent(name), {method:'DELETE',headers:{'x-lovetree-subject':subject}}),
     fetchMedia: name => call('/api/media/'+encodeURIComponent(name), {method:'GET'}, {binary:true,requestTimeout:60_000}),

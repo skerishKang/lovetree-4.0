@@ -6,7 +6,11 @@ import fs from 'node:fs';
 import { existsSync } from 'node:fs';
 import {
   readTheme, writeTheme, nextTheme, themeButtonLabel, themeButtonAriaLabel, themePressed,
-  appliedTheme, applyThemeAttribute, THEME_KEY
+  appliedTheme, applyThemeAttribute, THEME_KEY,
+  normalizeBookDisplay, readBookDisplay, writeBookDisplay, bookDisplayVisible,
+  bookDisplayLabel, bookDisplayAriaLabel, bookDisplayPressed, BOOK_DISPLAY_KEY,
+  normalizeShelfView, readShelfView, writeShelfView, shelfViewVisible,
+  shelfViewLabel, shelfViewAriaLabel, shelfViewPressed, SHELF_VIEW_KEY
 } from '../public/v41/header-state.mjs';
 
 
@@ -200,4 +204,44 @@ test('#1026 안쪽 네 문서는 첫 그림 전에 기기 테마와 판 선택�
       assert.equal(attrs.get('data-lt-board-theme')||null,['network','board'].includes(screen)?wantPlate:null,screen);
     }
   }
+});
+
+// #1094: 책/목록 보기 전환(테마와 같은 두 칸고르기). 기본은 책, 기기 미러는 날짜 표기·제목 보기와 같은 길이다.
+test('책/목록 보기는 기본 책, 미러 저장·반환, 서재·책에서만 보인다', () => {
+  assert.equal(BOOK_DISPLAY_KEY, 'lt41.bookDisplay');
+  assert.equal(normalizeBookDisplay('book'), 'book');
+  assert.equal(normalizeBookDisplay('list'), 'list');
+  for (const value of ['', 'shelf', 'BOOK', null, undefined, 1]) assert.equal(normalizeBookDisplay(value), 'book', JSON.stringify(value));
+  const storage = memoryStorage({});
+  assert.equal(readBookDisplay(storage), 'book', '저장 없으면 책이다');
+  assert.equal(writeBookDisplay(storage, 'list'), 'list');
+  assert.equal(storage.data[BOOK_DISPLAY_KEY], 'list');
+  assert.equal(readBookDisplay(storage), 'list', '다시 들어와도 기억된다');
+  assert.equal(readBookDisplay(brokenStorage()), 'book', '저장소가 막히면 책이다');
+  assert.equal(writeBookDisplay(brokenStorage(), 'list'), 'book', '저장 실패는 기본을 돌려준다');
+  for (const file of ['track32-bookshelf.html', 'track59-sketchbook.html']) assert.equal(bookDisplayVisible({ current: file }), true, file);
+  for (const file of ['track58-pinboard.html', 'track56-network.html', 'src064-orbit.html', 'first-journey.html', '']) assert.equal(bookDisplayVisible({ current: file }), false, file);
+  assert.equal(bookDisplayLabel('book'), '책');
+  assert.equal(bookDisplayLabel('list'), '목록');
+  assert.equal(bookDisplayLabel('엉뚱한값'), '책');
+  assert.equal(bookDisplayAriaLabel('book'), '책으로 보기');
+  assert.equal(bookDisplayAriaLabel('list'), '목록으로 보기');
+  assert.equal(bookDisplayPressed('book'), false);
+  assert.equal(bookDisplayPressed('list'), true);
+  // #1093: 서재 진열 방식도 같은 계약 — 기본 선반, 서재에서만 보인다.
+  assert.equal(readShelfView(memoryStorage({})), 'shelf', '저장 없으면 선반이다');
+  assert.equal(writeShelfView(storage, 'carousel'), 'carousel');
+  assert.equal(storage.data[SHELF_VIEW_KEY], 'carousel');
+  assert.equal(readShelfView(storage), 'carousel', '다시 들어와도 기억된다');
+  assert.equal(readShelfView(brokenStorage()), 'shelf', '저장소가 막히면 선반이다');
+  assert.equal(writeShelfView(brokenStorage(), 'carousel'), 'shelf', '저장 실패는 기본을 돌려준다');
+  assert.equal(normalizeShelfView('엉뚱한값'), 'shelf');
+  assert.equal(shelfViewVisible({ current: 'track32-bookshelf.html' }), true);
+  for (const file of ['track59-sketchbook.html', 'track58-pinboard.html', 'track56-network.html', 'src064-orbit.html', '']) assert.equal(shelfViewVisible({ current: file }), false, file);
+  assert.equal(shelfViewLabel('shelf'), '선반');
+  assert.equal(shelfViewLabel('carousel'), '회전');
+  assert.equal(shelfViewAriaLabel('shelf'), '선반 보기');
+  assert.equal(shelfViewAriaLabel('carousel'), '회전 책장 보기');
+  assert.equal(shelfViewPressed('shelf'), false);
+  assert.equal(shelfViewPressed('carousel'), true);
 });

@@ -13,6 +13,21 @@ import {createWorkspaceApi} from '../public/v41/api.mjs';
 const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jOasAAAAASUVORK5CYII=','base64');
 const A={productId:'lovetree-4-0',subjectId:'upload-test-A'},B={...A,subjectId:'upload-test-B'};
 async function setup(t,options={}){const directory=await mkdtemp(join(tmpdir(),'lt-media-'));t.after(()=>rm(directory,{recursive:true,force:true}));return {directory,store:createPrivateMediaStore({directory,...options})};}
+test('original file name is stored for display and unsafe values are cleaned',async t=>{
+ const {store}=await setup(t),named=await store.put(A,{id:randomUUID(),mime:'image/png',bytes:png,label:encodeURIComponent('내 무대 사진.png')});
+ assert.equal(named.label,'내 무대 사진.png');
+ const plain=await store.put(A,{id:randomUUID(),mime:'image/png',bytes:png});
+ const rows=(await store.list(A)).items;
+ assert.equal(rows.find(item=>item.id===plain.id).label,null);
+ assert.equal(rows.find(item=>item.id===named.id).label,'내 무대 사진.png');
+ const cross=await store.put(A,{id:randomUUID(),mime:'image/png',bytes:png,label:encodeURIComponent('..\\server\\secret.txt')});
+ assert.equal(cross.label,'secret.txt');
+ const tooLong=await store.put(A,{id:randomUUID(),mime:'image/png',bytes:png,label:'x'.repeat(200)});
+ assert.equal(tooLong.label?.length,100);
+ const ctrl=await store.put(A,{id:randomUUID(),mime:'image/png',bytes:png,label:encodeURIComponent('무\u0000대\u001f사\u007f진.png')});
+ assert.equal(ctrl.label,'무대사진.png');
+ await assert.rejects(store.put(A,{id:'../outside',mime:'image/png',bytes:png,label:'x' }),{status:400});
+});
 test('private media round trip, account/product isolation, restart and deletion',async t=>{
  const {directory,store}=await setup(t),id=randomUUID(),asset=await store.put(A,{id,mime:'image/png',bytes:png});
  assert.deepEqual((await store.get(A,asset.name)).bytes,png);
@@ -44,6 +59,19 @@ test('video bytes and MIME survive storage; corrupt/truncated files fail closed'
  assert.deepEqual(await store.get(A,asset.name),{mime:'video/mp4',bytes});
  const dir=join(directory,(await readdir(directory))[0]),path=join(dir,(await readdir(dir))[0]);const saved=await readFile(path);saved[saved.length-1]^=1;await writeFile(path,saved);
  await assert.rejects(store.get(A,asset.name),/checksum/);
+});
+test('a damaged asset is skipped: listing returns the rest and records the skipped count',async t=>{
+ const {directory,store}=await setup(t),good=await store.put(A,{id:randomUUID(),mime:'image/png',bytes:png});
+ const dir=join(directory,(await readdir(directory))[0]);
+ // 올리기 경로로는 만들 수 없는, 머리 정보가 틀린 손상 파일 한 개를 심는다.
+ await writeFile(join(dir,randomUUID()+'.asset'),Buffer.from('broken-header\nnot-an-asset'));
+ const listed=await store.list(A);
+ assert.equal(listed.items.length,1);assert.equal(listed.items[0].id,good.id);
+ assert.equal(listed.damagedCount,1,'건너뛴 손상 파일 개수를 기록한다');
+ // 올리기도 그대로 된다 — 손상 파일이 올리기 전체를 막지 않는다.
+ const second=await store.put(A,{id:randomUUID(),mime:'image/png',bytes:png});
+ assert.equal(second.id.length,36);
+ assert.equal((await store.list(A)).items.length,2);
 });
 test('HTTP boundary authenticates, binds subject and origin; unknown route/method closed; unavailable is honest',async t=>{
  const {store}=await setup(t),authenticate=async r=>r.headers?.user==='A'?A:r.headers?.user==='B'?B:null;

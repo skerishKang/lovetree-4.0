@@ -18,6 +18,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 globalThis.window = globalThis;
+import '../public/v41/html-escape.mjs'; // A-15: 글자 막기 정본을 먼저 등록한다.
 await import('../public/v41/views/board/board-model.js');
 const LT58Model = globalThis.LT58Model;
 
@@ -160,6 +161,50 @@ test('#601 화면: 카드는 훑기용 — 큰 썸네일·제목 2줄·감정·�
 // 그 결과는 이 파일 아래 실브라우저 시험이 직접 잰다 — 상세 판의 주 단추/더 보기 구성(#662 실제 좌표 클릭),
 // ＋/전체 보기 말풍선(13px·fixed), 마음 저장이 lt41-board-sync의 note로 가는지, 이어진 순간 카드 이동,
 // 날짜순/내 배치와 저장 자리(v41-board-order-619·stack-619 모델 시험)까지.
+
+// #1059 표 시험: 유튜브 주소 한 벌을 모든 진입 함수(정본·보드 화면)가 같은 id로 판정한다.
+const YT_CORPUS = [
+  'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+  'https://youtu.be/dQw4w9WgXcQ?t=42',
+  'https://www.youtube.com/shorts/dQw4w9WgXcQ',
+  'https://www.youtube.com/live/dQw4w9WgXcQ',
+  'https://www.youtube.com/embed/dQw4w9WgXcQ',
+  'http://m.youtube.com/watch?v=dQw4w9WgXcQ',
+  'https://music.youtube.com/watch?v=dQw4w9WgXcQ',
+  'https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=PL123',
+  'https://www.youtube.com/playlist?list=PL123',
+  'https://youtube.com.evil.test/watch?v=dQw4w9WgXcQ',
+  'https://user:kate@example.test/watch?v=dQw4w9WgXcQ',
+  'ftp://youtu.be/dQw4w9WgXcQ',
+  'https://www.youtube.com/shorts/abcdefghijkEXTRA',
+  'https://youtu.be/short',
+  'https://www.youtube.com/watch?v=toolongid123456',
+  'javascript:alert(1)'
+];
+
+test('#1059 화면: 보드 youtubeId 가 정본과 같은 판정이다(주소 표)', { skip: REQUIRE ? false : skip, timeout: 120000 }, async () => {
+  if (skip) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip}`);
+  const tree = starTree(2);
+  const server = await serve({ '/__host-1059.html': hostHTML(tree) });
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const { context, frame, problems } = await openHost(browser, `${base}/__host-1059.html`, { width: 1440, height: 900 });
+    const diffs = await frame.evaluate(async (corpus) => {
+      const { youtubeIdFrom } = await import('/v41/youtube-id.mjs');
+      const out = [];
+      for (const url of corpus) {
+        const a = youtubeId(url);
+        const b = youtubeIdFrom(url, { allowThumbnail: false });
+        if (a !== b) out.push(`${url} :: board=${a} canon=${b}`);
+      }
+      return out;
+    }, YT_CORPUS);
+    assert.deepEqual(diffs, [], `보드 youtubeId 와 정본이 같다 (${diffs.join(' | ')})`);
+    assert.equal(problems.length, 0, `화면 문제 없음 (${problems.join(' | ') || '없음'})`);
+    await context.close();
+  } finally { await browser.close(); server.close(); }
+});
 
 test('#601 화면: 옛 관계 배치 x·y가 남아도 처음은 날짜순 바둑판이다(근본 수리)', { skip: REQUIRE ? false : skip, timeout: 300000 }, async () => {
   if (skip) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip}`);
@@ -551,4 +596,79 @@ test('#662 화면: 상세 판의 행동 단추를 실제 좌표 클릭으로 누
       } finally { await context.close(); }
     }
   } finally { await browser.close(); server.close(); }
+});
+
+// #1058: 보내기가 던지면 조용히 넘기지 않고 보드 알림 줄에 실패를 알린다(소스 글자 검사 없음).
+test('#1058 보드 저장 보내기 실패 — 보드 알림 줄에 실패 문구가 보인다', { skip: REQUIRE ? false : skip, timeout: 180000 }, async () => {
+  if (skip) assert.fail(skip);
+  const server = await serve({ '/host1058.html': hostHTML(starTree(4)) });
+  const origin = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch({ headless: true });
+  try {
+    for (const [width, height] of [[1440, 900], [390, 844]]) {
+      const { context, page, frame, problems } = await openHost(browser, `${origin}/host1058.html`, { width, height });
+      try {
+        await frame.evaluate(() => {
+          window.toast('순간을 선택해 연결된 기록을 살펴보세요.');
+          window.__origPost = window.parent.postMessage;
+          window.parent.postMessage = () => { throw new Error('보내기 실패'); };
+        });
+        await frame.evaluate(() => window.persistBoard());
+        await frame.waitForTimeout(450);
+        const notice = await frame.evaluate(() => {
+          const el = document.getElementById('saveFail');
+          if (!el) return null;
+          const r = el.getBoundingClientRect();
+          const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+          const top = document.elementFromPoint(cx, cy);
+          const cs = getComputedStyle(el);
+          const lum = (c) => { const m = c.match(/[\d.]+/g) || []; const [r0,g0,b0] = m.map(Number); return 0.2126*r0 + 0.7152*g0 + 0.0722*b0; };
+          const bgL = lum(cs.backgroundColor), fgL = lum(cs.color);
+          const ratio = (Math.max(bgL,fgL) + 0.05) / (Math.min(bgL,fgL) + 0.05);
+          return { text: el.textContent.trim(), show: el.classList.contains('show'),
+            rect: { top: Math.round(r.top), bottom: Math.round(r.bottom), left: Math.round(r.left), right: Math.round(r.right), width: Math.round(r.width), height: Math.round(r.height) },
+            viewportH: innerHeight, viewportW: innerWidth,
+            topIsSelf: top === el || (top && el.contains(top)),
+            topTag: top ? top.tagName + '.' + top.className : '',
+            bg: cs.backgroundColor, color: cs.color, contrast: Math.round(ratio*100)/100,
+            opacity: Number(cs.opacity), pointerEvents: cs.pointerEvents, zIndex: cs.zIndex
+          };
+        });
+        const sent = await page.evaluate(() => (window.LT41_MESSAGES || []).filter((m) => m.type === 'lt41-board-sync').length);
+        console.log('#1058', width, JSON.stringify({ notice, sent }));
+        assert.ok(notice, `${width}: 실패 알림 요소가 있다`);
+        assert.equal(notice.show, true, `${width}: 보드 알림 줄이 떴다`);
+    assert.ok(/저장에 실패/.test(notice.text), `${width}: 실패 문구가 보인다 — ${notice.text}`);
+        assert.equal(notice.opacity, 1, `${width}: 알림이 불투명하다(opacity ${notice.opacity})`);
+        assert.ok(notice.rect.bottom <= notice.viewportH && notice.rect.top >= 0, `${width}: 알림이 화면 안에 있다(${notice.rect.top}..${notice.rect.bottom} / ${notice.viewportH})`);
+        assert.ok(notice.contrast >= 4.5, `${width}: 글자 대비 4.5:1 이상(${notice.contrast}:1, bg=${notice.bg}, fg=${notice.color})`);
+        assert.equal(notice.topIsSelf, true, `${width}: 알림 가운데가 가장 위 층에 있다(top=${notice.topTag})`);
+        // 5초 이상 보인다 — 0.5초 후에도 그대로인지 확인한다(전체 지속은 6000ms).
+        await frame.waitForTimeout(500);
+        assert.equal(await frame.evaluate(() => document.getElementById('saveFail')?.classList.contains('show')), true, `${width}: 0.5초 뒤에도 보인다(최소 5초)`);
+        assert.equal(sent, 0, `${width}: 보내지 못했으므로 동기화 메시지 없음`);
+        assert.deepEqual(problems, [], `${width}: 던진 예외가 밖으로 새지 않았다`);
+        // #1058 후속: 실패 알림이 떠 있는 동안 안내를 숨겨 보이는 겹침 넓이가 0이어야 한다.
+        const guide = await frame.evaluate(() => {
+          const a = document.getElementById('saveFail'), b = document.getElementById('toast');
+          const visibleRect = (el) => {
+            if (!el) return null;
+            const cs = getComputedStyle(el);
+            if (cs.display === 'none' || cs.visibility === 'hidden' || Number(cs.opacity) === 0) return null;
+            const r = el.getBoundingClientRect();
+            return { l: r.left, r: r.right, t: r.top, b: r.bottom };
+          };
+          const ra = visibleRect(a), rb = visibleRect(b);
+          const overlap = ra && rb ? Math.max(0, Math.min(ra.r, rb.r) - Math.max(ra.l, rb.l)) * Math.max(0, Math.min(ra.b, rb.b) - Math.max(ra.t, rb.t)) : 0;
+          return { overlap, guideShown: b ? b.classList.contains('show') : false };
+        });
+        console.log('#1058 guide', width, JSON.stringify(guide));
+        assert.equal(guide.guideShown, false, `${width}: 실패 알림이 떠 있는 동안 안내를 숨긴다`);
+        assert.equal(guide.overlap, 0, `${width}: 실패 알림과 안내의 보이는 겹침 넓이 0`);
+      } finally { await context.close(); }
+    }
+  } finally {
+    await browser.close();
+    await new Promise((ok) => server.close(ok));
+  }
 });

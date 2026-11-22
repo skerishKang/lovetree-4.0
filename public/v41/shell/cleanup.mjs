@@ -142,6 +142,8 @@ export function createCleanup(deps) {
       select.append(option);
     }
     $('cleanup-move-box').hidden = !targets.length;
+    // 아래 고정 줄에 옮기기 단추를 두었으므로 대상이 없으면 단추도 함께 숨긴다.
+    $('cleanup-move').hidden = !targets.length;
   }
   function pickedIds() {
     return [...$('cleanup-moments').querySelectorAll('input:checked')].map(box => box.value);

@@ -5,6 +5,7 @@ import {subjectHash} from '../server/account-service.js';
 import {createTree,addMoment} from '../src/domain.js';
 import {createShareRepo} from '../server/db/shares-postgres.js';
 import {createShareService} from '../server/share-service.js';
+import {createShareShowPendingRepo} from '../server/db/share-show-pending-postgres.js';
 import {createStageIndexRepo} from '../server/db/stage-index-postgres.js';
 import {createStageVoteRepo} from '../server/db/stage-votes-postgres.js';
 import {hasRealCustomersFromEnv} from '../server/db/ranking-policy-sql.js';
@@ -202,8 +203,9 @@ test('공개 무대 읽기는 원본 revision·소개·공개·별칭 숨김·�
       [productId, { version: 1, trees: [value] }, context.subjectId]);
     await replaceTree(tree);
     assert.deepEqual(await owners(), ['honor'], '미갱신 소속은 같은 내용이어도 현재 revision이 아니면 숨긴다');
-    const sharing = createShareService({ productId, shareRepo: shares, workspaceRepo: createWorkspaceRepo(pool), stageIndex: repo });
-    await sharing.syncSharesAfterSave(context.subjectId);
+    const sharing = createShareService({ productId, shareRepo: shares, workspaceRepo: createWorkspaceRepo(pool), stageIndex: repo, pendingShowSync: createShareShowPendingRepo(pool) });
+    await sharing.afterSave(context.subjectId);
+    await sharing.waitForShowSync();
     assert.deepEqual(await owners({ stageId }), ['honor', 'owner']);
     await replaceTree({ ...tree, moments: tree.moments.slice(0, 2) });
     await repo.reconcile(context);
@@ -680,5 +682,47 @@ test('명예회원 제외 설정은 순위의 공개자와 투표자를 구분�
     assert.deepEqual(treeCounts, hasRealCustomers ? { [regular.shareId]: 2 } : { [regular.shareId]: 3, [honor.shareId]: 3 });
     const weekly = await trees.weeklyVoteCounts({ productId, targetKind: 'tree', since: week.since });
     assert.equal(weekly[regular.shareId], hasRealCustomers ? 2 : 3);
+  }
+});
+
+// B-08(#1064): 트리 id는 화면이 정하므로 계정끼리 겹칠 수 있다(복원 기록). 둘러보기 질의는
+// (계정, 트리)로 묶어 한 행을 고르고 숨김도 (계정, 트리) 범위로만 판정한다.
+test('같은 tree_id를 가진 두 계정은 둘 다 소개되고 한쪽 숨김이 다른 쪽에 번지지 않는다', { skip }, async () => {
+  assertIsolatedTestDatabase(DATABASE_URL);
+  const pool = await createPool(DATABASE_URL, { max: 4 });
+  try {
+    await applySchema(pool);
+    const productId = 'lt-' + suffix();
+    const treeId = 'same-tree-' + suffix();
+    const shares = createShareRepo(pool);
+    const discover = createTreeDiscoverRepo(pool);
+    const shareIds = {};
+    for (const subjectId of ['owner-a', 'owner-b']) {
+      const shareId = ('share-' + subjectId + '-' + suffix()).slice(0, 40);
+      await pool.query('INSERT INTO lovetree_workspaces(product_id,subject_id,doc) VALUES($1,$2,$3)',
+        [productId, subjectId, { version: 1, trees: [{ id: treeId, moments: [{ id: 'm0' }, { id: 'm1' }, { id: 'm2' }] }] }]);
+      await shares.create({ productId, subjectId, shareId, treeId, entryMomentId: 'm0', view: 'book', momentCount: 3 });
+      await discover.set({ productId, subjectId, treeId, discover: true });
+      shareIds[subjectId] = shareId;
+    }
+    const repo = createCommunityRepo(pool);
+    // summaries는 {share:{…}} 모양, listDiscoverable은 행 자체(shareRow)를 돌려준다 — 도우미를 나눠 쓴다.
+    const subjectsOf = rows => rows.map(row => row.share.subjectId).sort();
+    const subjectIdsOf = rows => rows.map(row => row.subjectId).sort();
+    // 두 계정 모두 목록에 나온다 — tree_id 겹침으로 한쪽이 가려지지 않는다.
+    assert.deepEqual(subjectsOf(await repo.listDiscoverableSummaries({ productId, limit: 10 })), ['owner-a', 'owner-b']);
+    assert.deepEqual(subjectIdsOf(await repo.listDiscoverable({ productId, limit: 10 })), ['owner-a', 'owner-b']);
+    assert.deepEqual(await repo.discoverTotals({ productId }), { trees: 2, moments: 6 });
+    // 한쪽 숨김 — 그 계정만 목록에서 내려가고 같은 tree_id의 다른 계정에 번지지 않는다.
+    await pool.query('INSERT INTO lovetree_community_hidden_shares(product_id,share_id,hidden_by) VALUES($1,$2,$3)',
+      [productId, shareIds['owner-a'], 'moderator']);
+    assert.deepEqual(subjectsOf(await repo.listDiscoverableSummaries({ productId, limit: 10 })), ['owner-b']);
+    assert.deepEqual(subjectIdsOf(await repo.listDiscoverable({ productId, limit: 10 })), ['owner-b']);
+    assert.deepEqual(await repo.discoverTotals({ productId }), { trees: 1, moments: 3 });
+    // 숨김 제거 — 두 계정이 다시 나온다.
+    await pool.query('DELETE FROM lovetree_community_hidden_shares WHERE product_id=$1', [productId]);
+    assert.deepEqual(subjectsOf(await repo.listDiscoverableSummaries({ productId, limit: 10 })), ['owner-a', 'owner-b']);
+  } finally {
+    await pool.end();
   }
 });

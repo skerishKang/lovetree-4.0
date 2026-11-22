@@ -123,14 +123,3 @@ export function createAuthorityRelayClient({ url, callerSecret, timeoutMs = 2_50
     }
   };
 }
-
-export function createAuthorityClient({ env = process.env, fetchImpl, onUnavailable } = {}) {
-  return createAuthorityRelayClient({
-    url: env.LOVETREE_AUTHORITY_RELAY_URL ?? '',
-    callerSecret: env.LOVETREE_CALLER_SECRET ?? '',
-    timeoutMs: Number(env.LOVETREE_AUTHORITY_TIMEOUT_MS || 0) || undefined,
-    maxResponseBytes: Number(env.LOVETREE_AUTHORITY_MAX_RESPONSE_BYTES || 0) || undefined,
-    fetchImpl,
-    onUnavailable
-  });
-}

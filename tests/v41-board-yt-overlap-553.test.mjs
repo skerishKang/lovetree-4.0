@@ -15,6 +15,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 globalThis.window = globalThis;
+import '../public/v41/html-escape.mjs'; // A-15: 글자 막기 정본을 먼저 등록한다.
 await import('../public/v41/views/board/board-model.js');
 const LT58Model = globalThis.LT58Model;
 

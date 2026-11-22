@@ -1,9 +1,9 @@
 import { createHash } from 'node:crypto';
+import { isDeepStrictEqual } from 'node:util';
 import { EMPTY_STATE, MAX_TREES, validateState } from '../src/domain.js';
 import { ApiError } from './errors.js';
 
 const CLIENT_KEY = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
-const TREE_ID = /^[A-Za-z0-9_-]{1,80}$/;
 const GENERIC_DOCUMENT_MESSAGE = '기록 형식을 확인해 주세요.';
 
 // domain.js의 검증 오류 문구는 애초에 사용자에게 보여 주는 문구다. TypeError·RangeError처럼
@@ -76,16 +76,32 @@ function parseWriteInput(payload) {
   return { validated, expectedRevision, clientKey };
 }
 
-export function createWorkspaceService({ repo, productId, onCommit = null }) {
+// B-12(#1068): 저장 뒤 동기화가 바뀐 트리만 다시 쓰도록 이전 상태와 새 상태를 트리별로 비교한다.
+// 이전에 읽지 못했던(격리) 트리가 이번에 살아나면 새 트리로 센다 — 비교는 같은 검증을 통과한 상태끼리다.
+function changedTreeIdsOf(previous, next) {
+  const before = new Map((previous?.trees ?? []).map(tree => [tree.id, tree]));
+  const changed = [];
+  for (const tree of next.trees) {
+    if (!before.has(tree.id) || !isDeepStrictEqual(before.get(tree.id), tree)) changed.push(tree.id);
+  }
+  return changed;
+}
+
+export function createWorkspaceService({ repo, productId, onCommit = null, onAccess = null }) {
   // #538: 저장이 성공한 뒤 같은 훅에서 공유 행(자동 공개·moment_count)을 동기화한다.
-  // 저장 자체는 이미 끝났으므로 동기화 실패는 응답을 막지 않고 로그만 남긴다.
-  async function afterCommit(subjectId, doc) {
+  // B-12(#1068): 훅에 이번 저장에서 바뀐 트리 목록(changedTreeIds)도 넘긴다 — 동기화 질의 수를
+  // 바뀐 트리 수에 비례하게 줄이는 데 쓴다.
+  // #1163(2단계): 훅은 응답 전에 숨김(회수·소개 정리·색인 재조정)만 기다리고, 보임 동기화는
+  // 응답 뒤로 미룬다(실패하면 표식) — 저장 응답은 보임 동기화를 기다리지 않는다.
+  async function afterCommit(subjectId, doc, changedTreeIds) {
     if (!onCommit) return;
-    try { await onCommit({ subjectId, doc }); }
+    try { await onCommit({ subjectId, doc, changedTreeIds }); }
     catch { console.error('[lovetree-workspace] 저장 뒤 공유 동기화 실패'); }
   }
   return {
     async read(principal) {
+      // #1163: 조회 요청이 들어오면 실패 표식이 있는 보임 동기화를 응답 뒤에 다시 시도한다 — 응답을 기다리지 않는다.
+      if (onAccess) { try { onAccess({ subjectId: principal.subjectId }); } catch {} }
       const stored = await repo.load({ productId: principal.productId, subjectId: principal.subjectId });
       // subject는 검증된 주체 식별자만 되돌린다. 이 기기에 남은 미전송 기록이
       // 어느 계정의 것인지 다음 로그인에 가려 읽기 위한 최소 정보다.
@@ -121,42 +137,8 @@ export function createWorkspaceService({ repo, productId, onCommit = null }) {
       if (outcome.status === 'keyConflict') {
         throw new ApiError(409, 'client_key_conflict', '같은 요청 키로 다른 내용을 보내려 해요. 새 키로 다시 시도해 주세요.');
       }
-      await afterCommit(principal.subjectId, validated);
+      await afterCommit(principal.subjectId, validated, changedTreeIdsOf(scan ? scan.state : null, validated));
       return { revision: outcome.revision, savedAt: outcome.savedAt };
-    },
-
-    /**
-     * 작업공간 문서(트리) 하나를 지운다. 저장소는 principal.subjectId의 문서만 읽으므로
-     * 남의 문서에는 닿지 않고, 같은 revision CAS를 써서 경합도 기존 저장과 같은 방식으로 다룬다.
-     */
-    async deleteTree(principal, treeId) {
-      if (typeof treeId !== 'string' || !TREE_ID.test(treeId)) throw new ApiError(404, 'tree_not_found', '삭제할 트리를 찾을 수 없어요.');
-      const stored = await repo.load({ productId: principal.productId, subjectId: principal.subjectId });
-      if (!stored) throw new ApiError(404, 'tree_not_found', '삭제할 트리를 찾을 수 없어요.');
-      const scan = readStoredDocument(stored.doc);
-      if (!scan) throw new ApiError(500, 'stored_document_invalid', '보관된 기록을 읽을 수 없어요.');
-      if (!scan.state.trees.some(tree => tree.id === treeId)) throw new ApiError(404, 'tree_not_found', '삭제할 트리를 찾을 수 없어요.');
-      // #986: 지우는 것은 읽을 수 있는 트리 하나뿐이다 — 격리된 트리 원본은 그대로 남는다.
-      // 화면은 격리 트리를 볼 수 없으므로 삭제 대상이 되지 않고, 원본은 사용자가 새로 만든
-      // 같은 id 트리가 저장될 때만 비로소 자리를 내준다.
-      const next = { ...scan.state, trees: scan.state.trees.filter(tree => tree.id !== treeId) };
-      const doc = withQuarantinedTrees(next, scan.quarantined);
-      const outcome = await repo.commit({
-        productId: principal.productId,
-        subjectId: principal.subjectId,
-        doc,
-        expectedRevision: stored.revision,
-        clientKey: 'tree-delete-' + treeId + '-' + stored.revision,
-        requestHash: requestHashOf(next, stored.revision)
-      });
-      if (outcome.status === 'revisionConflict') {
-        throw new ApiError(409, 'revision_conflict', '다른 곳에서 먼저 저장했어요. 최신 기록을 불러온 뒤 다시 시도해 주세요.', { currentRevision: outcome.currentRevision });
-      }
-      if (outcome.status === 'keyConflict') {
-        throw new ApiError(409, 'client_key_conflict', '같은 요청 키로 다른 내용을 보내려 해요. 새 키로 다시 시도해 주세요.');
-      }
-      await afterCommit(principal.subjectId, next);
-      return { deleted: true, treeId, revision: outcome.revision, savedAt: outcome.savedAt };
     }
   };
 }

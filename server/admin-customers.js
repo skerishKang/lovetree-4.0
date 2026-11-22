@@ -1,3 +1,4 @@
+import { logServerError } from './error-log.js';
 import { ApiError } from './errors.js';
 import { parsePrincipal } from './principal.js';
 import { ROLE_ADMIN } from './admin-roles.js';
@@ -207,7 +208,7 @@ export function createAdminCustomersHandler({ authenticate, service, productId }
     try { return await handle(request); }
     catch (error) {
       if (error instanceof ApiError) return { status: error.status, body: { error: { code: error.code, message: error.message, ...(error.details || {}) } }, headers: NO_STORE };
-      console.error('[lovetree-admin-customers] request failed', { path: request?.path, method: request?.method });
+      logServerError(error, 'lovetree-admin-customers');
       return { status: 500, body: { error: { code: 'internal_error', message: '서버에서 처리하지 못했어요.' } }, headers: NO_STORE };
     }
   };

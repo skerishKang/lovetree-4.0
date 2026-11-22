@@ -376,3 +376,166 @@ test('#1026 마지막 순간 영상은 확인 전 실패를 보이지 않고 높
     }
   }finally{await browser.close()}
 });
+
+test('#1087 카드 바꾸기·숫자 두 줄·숫자 누르기', { skip: REQUIRE952 ? false : skip952, timeout: 180000 }, async () => {
+  if (skip952) assert.fail(skip952);
+  const at = i => '2026-11-' + String(i + 1).padStart(2, '0') + 'T00:00:00.000Z';
+  let tree = createTree({ subject: '팬 트리', title: '팬 트리', date: '2026-11-20', emotion: '설렘', note: '순간', url: '' }, at(0));
+  tree = addMoment(tree, { title: '둘째', note: '', emotion: '설렘', date: '2026-11-21', url: '' }, tree.moments[0].id, at(1));
+  let inbox = createTree({ subject: '팬 트리', title: '모아둔 순간', date: '2026-11-19', emotion: '설렘', note: '모음', url: '' }, at(0));
+  inbox = addMoment(inbox, { title: '모은 것', note: '', emotion: '설렘', date: '2026-11-20', url: '' }, inbox.moments[0].id, at(1));
+  inbox.inbox = true;
+  const workspace = { revision: 1, state: { version: 1, trees: [tree, inbox], prefs: {} }, subject: 'visual-audit-fake', writeSubjectBound: true, savedAt: at(2) };
+  const browser = await chromium952.launch({ headless: true });
+  try {
+    const h = await boot952(browser, { member: true, routes: {
+      '/api/workspace': route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(workspace) }),
+      '/api/shares': route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, shares: [{ id: 's'.repeat(24), treeId: tree.id, status: 'active' }] }) }),
+      '/api/community/stats': route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ trees: 11, moments: 42 }) })
+    } });
+    try {
+      const frame = h.frame;
+      await frame.locator('.home-count-line').first().waitFor({ state: 'visible', timeout: 15000 });
+      const groups = frame.locator('.home-action-group');
+      assert.equal(await groups.count(), 3);
+      for (const group of await groups.all()) assert.equal(await group.locator('.home-count-line').count(), 2, '단추마다 두 줄');
+      const texts = await groups.evaluateAll(es => es.map(e => [...e.querySelectorAll('.home-count-line')].map(row => row.textContent.trim())));
+      assert.deepEqual(texts, [['순간 4', '모아둔 2'], ['공개 트리 11', '공개 순간 42'], ['트리 2', '공개 트리 1']], JSON.stringify(texts));
+
+      await frame.locator('.recent-change').click();
+      await frame.locator('.recent-menu').waitFor({ state: 'visible', timeout: 5000 });
+      const items = await frame.locator('.recent-menu button').allTextContents();
+      assert.ok(items.some(text => text.includes('마지막에 담은 순간')) && items.some(text => text.includes('무작위')), '바꾸기 목록 ' + JSON.stringify(items));
+      const menuFit = await frame.locator('.recent-menu').evaluate(el => {
+        const list = el.querySelector('.recent-menu-list');
+        for (let i = 0; i < 20; i += 1) { const b = document.createElement('button'); b.textContent = '트리 ' + i; list.append(b); }
+        const r = el.getBoundingClientRect();
+        return { top: Math.round(r.top), bottom: Math.round(r.bottom), viewport: el.ownerDocument.documentElement.clientHeight, scrollable: list.scrollHeight > list.clientHeight };
+      });
+      assert.ok(menuFit.top >= 0 && menuFit.bottom <= menuFit.viewport, '목록이 화면 안에 있다: ' + JSON.stringify(menuFit));
+      assert.ok(menuFit.scrollable, '목록 안에서만 스크롤된다: ' + JSON.stringify(menuFit));
+      await h.page.keyboard.press('Escape');
+      assert.equal(await frame.locator('.recent-menu').count(), 0, 'Esc로 닫힌다');
+
+      await h.page.evaluate(() => { window.__msgs1087 = []; addEventListener('message', e => { if (e.data?.type) window.__msgs1087.push(e.data.type); }); });
+      await groups.nth(0).locator('.home-count button', { hasText: '순간 4' }).evaluate(el => el.click());
+      await frame.locator('.orbit-dialog .index-list').waitFor({ state: 'visible', timeout: 5000 });
+      await h.page.keyboard.press('Escape');
+      await frame.locator('.orbit-dialog[open]').waitFor({ state: 'detached', timeout: 5000 });
+      await groups.nth(0).locator('.home-count button', { hasText: '모아둔 2' }).evaluate(el => el.click());
+      await h.page.waitForFunction(() => window.__msgs1087.includes('lt41-cleanup'), null, { timeout: 5000 });
+      await groups.nth(1).locator('.home-count button', { hasText: '공개 트리 11' }).evaluate(el => el.click());
+      await groups.nth(1).locator('.home-count button', { hasText: '공개 순간 42' }).evaluate(el => el.click());
+      await h.page.waitForFunction(() => window.__msgs1087.filter(type => type === 'lt41-community').length >= 2, null, { timeout: 5000 });
+      await groups.nth(2).locator('.home-count button', { hasText: '트리 2' }).evaluate(el => el.click());
+      await groups.nth(2).locator('.home-count button', { hasText: '공개 트리 1' }).evaluate(el => el.click());
+      const navs = await h.page.evaluate(() => window.__msgs1087.filter(t => t === 'lt41-navigate').length);
+      assert.ok(navs >= 2, '트리 숫자 둘 → 서재 ' + navs);
+
+      await h.page.evaluate(() => document.querySelector('[data-home-moment="random"]').click());
+      await h.page.waitForFunction(() => window.__msgs1087.includes('lt41-home-moment'), null, { timeout: 5000 });
+    } finally { await close952(h); }
+  } finally { await browser.close(); }
+});
+
+test('#1087 390 새 소식 띠와 숫자 두 줄 겹침 0', { skip: REQUIRE952 ? false : skip952, timeout: 180000 }, async () => {
+  if (skip952) assert.fail(skip952);
+  const browser = await chromium952.launch({ headless: true });
+  try {
+    for (const theme of ['garden', 'night']) {
+      const at = i => '2026-11-' + String(i + 1).padStart(2, '0') + 'T00:00:00.000Z';
+      let tree = createTree({ subject: '팬 트리', title: '팬 트리', date: '2026-11-20', emotion: '설렘', note: 'n', url: 'https://www.youtube.com/shorts/a1111111111' }, at(0));
+      tree.moments[0].mediaMetadata = { vertical: true, width: 1080, height: 1920 };
+      tree.moments[0].image = 'https://i.ytimg.com/vi/a1111111111/oardefault.jpg';
+      tree.moments[0].youtubeThumb = true;
+      tree = addMoment(tree, { title: '둘째', note: '', emotion: '설렘', date: '2026-11-21', url: 'https://www.youtube.com/shorts/a1111111111' }, tree.moments[0].id, at(1));
+      tree.moments[1].mediaMetadata = { vertical: true, width: 1080, height: 1920 };
+      tree.moments[1].image = 'https://i.ytimg.com/vi/a1111111111/oardefault.jpg';
+      tree.moments[1].youtubeThumb = true;
+      let inbox = createTree({ subject: '팬 트리', title: '모아둔 순간', date: '2026-11-19', emotion: '설렘', note: '모음', url: '' }, at(0));
+      inbox = addMoment(inbox, { title: '모은 것', note: '', emotion: '설렘', date: '2026-11-20', url: '' }, inbox.moments[0].id, at(1));
+      inbox.inbox = true;
+      const workspace = { revision: 1, state: { version: 1, trees: [tree, inbox], prefs: {} }, subject: 'visual-audit-fake', writeSubjectBound: true, savedAt: at(2) };
+      const h = await boot952(browser, { member: true, width: 390, initStorage: { 'lt41.theme': theme }, routes: {
+        '/api/workspace': route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(workspace) }),
+        '/api/community/stats': route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ trees: 11, moments: 42 }) })
+      } });
+      try {
+        const frame = h.frame;
+        await frame.locator('.home-count-line').first().waitFor({ state: 'visible', timeout: 15000 });
+        const geo = await h.page.evaluate(() => {
+          const bandEl = document.getElementById('updates-card');
+          bandEl.hidden = false;
+          const band = bandEl.getBoundingClientRect();
+          const iframe = document.getElementById('view');
+          const off = iframe.getBoundingClientRect();
+          const root = iframe.contentDocument.querySelector('#orbit').shadowRoot;
+          const rows = [...root.querySelectorAll('.home-count-line')].map(row => {
+            const el = row.lastElementChild || row;
+            if (!el.textContent.trim()) return null;
+            const r = el.getBoundingClientRect();
+            return { text: el.textContent.trim(), left: Math.round(r.left + off.left), right: Math.round(r.right + off.left), top: Math.round((r.top + off.top) * 10) / 10, bottom: Math.round((r.bottom + off.top) * 10) / 10 };
+          }).filter(Boolean);
+          const links = document.querySelector('.home-links').getBoundingClientRect();
+          const area = r => Math.max(0, Math.min(band.right, r.right) - Math.max(band.left, r.left)) * Math.max(0, Math.min(band.bottom, r.bottom) - Math.max(band.top, r.top));
+          return { theme: localStorage.getItem('lt41.theme'), bandTop: Math.round(band.top), bandBottom: Math.round(band.bottom), rows, overlaps: rows.map(area), links: area(links) };
+        });
+        console.log('#1087 BAND', JSON.stringify(geo));
+        assert.ok(geo.rows.length >= 2, '두 줄 숫자가 실제로 그려진다: ' + JSON.stringify(geo));
+        assert.ok(geo.overlaps.every(v => Math.round(v) === 0), '띠와 숫자 두 줄 겹침 0: ' + JSON.stringify(geo));
+        assert.equal(Math.round(geo.links), 0, '띠와 바닥 링크 겹침 0: ' + JSON.stringify(geo));
+      } finally { await close952(h); }
+    }
+  } finally { await browser.close(); }
+});
+
+test('#1088 가운데 카드 누름은 화면 이동 없이 크게 보기를 연다', { skip: REQUIRE952 ? false : skip952, timeout: 180000 }, async () => {
+  if (skip952) assert.fail(skip952);
+  const at = i => '2026-11-' + String(i + 1).padStart(2, '0') + 'T00:00:00.000Z';
+  const tree = createTree({ subject: '팬 트리', title: '마지막 순간', date: '2026-11-20', emotion: '설렘', note: '순간', url: 'https://www.youtube.com/shorts/a1111111111' }, at(0));
+  tree.moments[0].mediaMetadata = { vertical: true, width: 1080, height: 1920 };
+  tree.moments[0].image = 'https://i.ytimg.com/vi/a1111111111/oardefault.jpg';
+  tree.moments[0].youtubeThumb = true;
+  const workspace = { revision: 1, state: { version: 1, trees: [tree], prefs: {} }, subject: 'visual-audit-fake', writeSubjectBound: true, savedAt: at(1) };
+  const browser = await chromium952.launch({ headless: true });
+  try {
+    const h = await boot952(browser, { member: true, width: 1440, routes: { '/api/workspace': route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(workspace) }) } });
+    try {
+      const frame = h.frame;
+      await frame.locator('.recent-card').waitFor({ state: 'visible', timeout: 15000 });
+      await h.page.evaluate(() => { window.__nav1088 = []; addEventListener('message', e => { if (['lt41-navigate', 'lt41-community', 'lt41-cleanup'].includes(e.data?.type)) window.__nav1088.push(e.data.type); }); });
+      const hashBefore = await h.page.evaluate(() => location.hash);
+      const viewer = frame.locator('#mediaViewerHome');
+      const open = async () => { await frame.locator('.recent-play').click(); await viewer.waitFor({ state: 'visible', timeout: 5000 }); };
+      await open();
+      assert.equal(await viewer.getAttribute('aria-hidden'), 'false', '크게 보기 열림');
+      const src = await frame.locator('#mediaVisualHome iframe').getAttribute('src');
+      assert.match(src, /a1111111111/, '영상 id');
+      assert.match(src, /autoplay=1/, '누름 안에서 재생 시작');
+      assert.ok(await frame.locator('#mediaBookHome').isVisible(), '책에서 이어 보기');
+      assert.ok(await frame.locator('#mediaExternalHome').isVisible(), '원본 보기');
+      assert.ok(await h.page.evaluate(() => getComputedStyle(document.getElementById('updates-card')).display === 'none'), '열린 동안 아래 띠가 숨는다');
+      assert.equal(await h.page.evaluate(() => location.hash), hashBefore, '주소 moved 0');
+      assert.deepEqual(await h.page.evaluate(() => window.__nav1088), [], '화면 이동 요청 0');
+      const focusAfterOpen = await frame.evaluate(() => document.querySelector('#orbit').shadowRoot.activeElement?.id || '');
+      assert.equal(focusAfterOpen, 'mediaCloseHome', '열면 닫기 단추에 초점');
+
+      await h.page.keyboard.press('Escape');
+      assert.equal(await viewer.getAttribute('aria-hidden'), 'true', 'Esc로 닫힘');
+      const focusAfterEsc = await frame.evaluate(() => document.querySelector('#orbit').shadowRoot.activeElement?.className || '');
+      assert.match(focusAfterEsc, /recent-card/, 'Esc 뒤 카드로 초점 복귀');
+
+      await open();
+      await frame.locator('#mediaCloseHome').click();
+      assert.equal(await viewer.getAttribute('aria-hidden'), 'true', '×로 닫힘');
+      const focusAfterX = await frame.evaluate(() => document.querySelector('#orbit').shadowRoot.activeElement?.className || '');
+      assert.match(focusAfterX, /recent-card/, '× 뒤 카드로 초점 복귀');
+
+      await open();
+      await viewer.evaluate(el => el.click());
+      assert.equal(await viewer.getAttribute('aria-hidden'), 'true', '바깥 누름으로 닫힘');
+      const focusAfterBackdrop = await frame.evaluate(() => document.querySelector('#orbit').shadowRoot.activeElement?.className || '');
+      assert.match(focusAfterBackdrop, /recent-card/, '바깥 누름 뒤 카드로 초점 복귀');
+    } finally { await close952(h); }
+  } finally { await browser.close(); }
+});

@@ -102,19 +102,24 @@ const spreads =Array.from({length:Math.ceil(moments.length/2)},(_,i)=>{const toP
     return Math.max(0, Math.round((end - start) / 86400000));
   }
 
+  // #1059: 사본을 걷어내고 정본(youtube-id.mjs → globalThis.LTYouTubeId)을 부른다. 전역 스크립트 화면은 LTMedia를 거친다.
   function youtubeVideoId(url) {
-    let parsed;
-    try { parsed = new URL(String(url ?? '')); } catch { return ''; }
-    const host = parsed.hostname.replace(/^www\./, '');
-    if (!['youtube.com', 'm.youtube.com', 'music.youtube.com', 'youtu.be'].includes(host)) return '';
-    if (host === 'youtu.be') {
-      const id = parsed.pathname.split('/').filter(Boolean)[0] || '';
-      return /^[A-Za-z0-9_-]{11}$/.test(id) ? id : '';
-    }
-    const v = parsed.searchParams.get('v') || '';
-    if (parsed.pathname === '/watch' && /^[A-Za-z0-9_-]{11}$/.test(v)) return v;
-    const shaped = parsed.pathname.match(/^\/(?:shorts|live|embed)\/([A-Za-z0-9_-]{11})/);
-    return shaped ? shaped[1] : '';
+    try {
+      const direct = globalThis.LTYouTubeId?.youtubeIdFrom;
+      if (direct) return direct(url, { allowThumbnail: false });
+      const described = (window.LTMedia && typeof window.LTMedia.describe === 'function') ? window.LTMedia.describe(String(url || '')) : null;
+      return (described && described.kind === 'youtube') ? described.videoId || '' : '';
+    } catch { return ''; }
+  }
+  // #1060: ytimg 주소 글자는 정본(youtube-id.mjs) 한 벌에서만 만든다. 전역 스크립트라 모듈이
+  // 등록한 LTYouTubeId를 먼저 보고, 없으면 종전처럼 LTMedia(describe 한 벌)를 거친다.
+  function stageThumb(id) {
+    try {
+      const direct = globalThis.LTYouTubeId?.youtubeStageThumbUrl;
+      if (direct) return direct(id, 'hqdefault');
+      const described = (window.LTMedia && typeof window.LTMedia.youtubeThumbUrl === 'function') ? window.LTMedia.youtubeThumbUrl(id) : null;
+      return described || '';
+    } catch { return ''; }
   }
   // 칸 썸네일: 사진·내 보관 파일은 그 주소, YouTube는 썸네일, 없으면 ''(화면은 감정 색 사각형).
   function journeyThumb(m) {
@@ -123,7 +128,7 @@ const spreads =Array.from({length:Math.ceil(moments.length/2)},(_,i)=>{const toP
     const url = String(m?.externalUrl || m?.url || '');
     if (/^\/api\/media\//.test(url)) return url;
     const id = youtubeVideoId(url);
-    return id ? `https://i.ytimg.com/vi/${id}/hqdefault.jpg` : '';
+    return id ? stageThumb(id) : '';
   }
 
   /**

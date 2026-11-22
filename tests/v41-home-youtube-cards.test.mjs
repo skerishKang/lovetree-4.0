@@ -4,12 +4,14 @@ import vm from 'node:vm';
 import {readFileSync} from 'node:fs';
 import {homeMomentCards} from '../v41/home-moments.js';
 import {homeCardsPlan} from '../v41/home-cards.js';
+import '../public/v41/youtube-id.mjs'; // #1060: 정본이 등록한 globalThis.LTYouTubeId 를 vm 에도 넣는다.
+import '../public/v41/html-escape.mjs'; // A-15: 글자 막기 정본을 vm 에도 넣는다.
 
 // #340(2026-11-10 CTO 결정): 내 기록(서버 기록·로그인 소유자)의 YouTube 순간을 첫 화면 썸네일 카드로 센다.
 // 판정·썸네일 주소는 media-preview의 autoLoadMedia·describe 한 벌을 재사용하므로, 시험도 그 실제 함수를
 // vm으로 직접 불러 쓴다(docs/TESTING.md — 동작은 함수 호출로). 예시·공유·파일 기록은 기존 규칙 그대로다.
 
-const scope = {window: {}, URL, URLSearchParams};
+const scope = {window: {}, URL, URLSearchParams, LTYouTubeId: globalThis.LTYouTubeId, LTEscapeHtml: globalThis.LTEscapeHtml};
 vm.runInNewContext(readFileSync(new URL('../public/v41/media-preview.js', import.meta.url), 'utf8'), scope);
 const media = scope.window.LTMedia;
 

@@ -13,7 +13,8 @@
  *   서버에 닿지 못했을 때는 중립 기본 카드(noindex)를 주고, 사람은 공유 주소로 보낸다(앱이 상태를 알려 준다).
  */
 import { jsonError, upstreamOrigin } from './proxy.js';
-import { YTIMG_HOST, youtubeIdFrom } from '../../public/v41/youtube-id.mjs';
+// #1060: 썸네일 주소 글자는 화면과 같은 정본(youtube-id.mjs) 한 벌에서만 만든다.
+import { safeYoutubeThumb, youtubeIdFrom, youtubeStageThumbUrl } from '../../public/v41/youtube-id.mjs';
 import {
   CARD_IMAGE_URL, PRODUCTION_HOST, SEARCH_OPEN, SHARE_ID, SITE_TAGLINE, SITE_TITLE,
   appHomeUrl, appShareUrl, escapeHtml, isBotUserAgent, isProductionHost, oneLine
@@ -29,24 +30,17 @@ const CANCELED_DESCRIPTION = '이 공유 주소는 더 이상 열리지 않아�
 const youtubeVideoId = youtubeIdFrom;
 export { youtubeVideoId };
 
-// 저장해 둔 썸네일 주소는 https + ytimg.com 만 받는다(임의 외부 호스트·사내 주소 차단).
-function safeSavedThumb(value) {
-  const raw = String(value ?? '').trim();
-  if (!raw || raw.length > 2048) return '';
-  let parsed;
-  try { parsed = new URL(raw); } catch { return ''; }
-  if (parsed.protocol !== 'https:' || parsed.username || parsed.password) return '';
-  return YTIMG_HOST.test(parsed.hostname) ? parsed.href : '';
-}
+// 저장 썸네일 검사·단계 주소 모두 정본(youtube-id.mjs)을 부른다(#1060).
+// https + ytimg.com 만 받는 규칙도 정본의 safeYoutubeThumb 한 벌이다(임의 외부 호스트·사내 주소 차단).
 
 // 카드 그림: 저장 썸네일 → 첫 순간 링크의 YouTube hqdefault → 기본 카드 그림.
 // /api/media/ 사진은 어떤 경로로도 나가지 않게 애초에 ytimg 주소만 허용한다.
 export function cardImageFor(moment) {
   if (!moment) return '';
-  const saved = safeSavedThumb(moment.mediaMetadata?.thumbnail);
+  const saved = safeYoutubeThumb(moment.mediaMetadata?.thumbnail);
   if (saved) return saved;
   const id = youtubeVideoId(moment.url);
-  return id ? `https://i.ytimg.com/vi/${id}/hqdefault.jpg` : '';
+  return id ? youtubeStageThumbUrl(id, 'hqdefault') : '';
 }
 
 // 서버 공개 공유 읽기(200 본문 {share, tree})에서 카드 내용을 뽑는다.

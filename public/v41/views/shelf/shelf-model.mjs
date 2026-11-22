@@ -3,8 +3,11 @@
 // 조건·문구·계산식 변경 0.
 import { normalizeCoverDesign, coverDesignPaletteIndex, coverModeOf } from '../../domain.mjs';
 import { thumbnailCandidates, thumbFallbackAttrs, fallbackCardMarkup } from '../../thumb-fallback.mjs';
+import { youtubeIdFrom } from '../../youtube-id.mjs';
 
-export const escapeShelf = (value) => String(value || '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' })[char]);
+// A-15: 글자 막기 정본(html-escape.mjs) 한 벌 — 쓰던 이름은 그대로 다시 내보낸다.
+import { escapeHtml } from '../../html-escape.mjs';
+export const escapeShelf = escapeHtml;
 
 // #212: 표지에 보이는 이름은 한 번만 쓴다. 자동 접미사(", 나의 순간들")는 표시 단계에서만 뺀다(tree-name.mjs).
 export const treeTitleOf = (value, namer) => (namer ? namer(value) : value);
@@ -200,10 +203,31 @@ export function shelfRowLayout(count, railWidth, { pitch = 200, cardW = 190, pad
   };
 }
 
+// #1093 회전 보기 — git 기록 3b56d9f8(#839 직전)의 책장 회전 배치를 되살린다.
+// 옛판은 고른 책을 가운데 두고 옆 책을 rotateY로 기울였지만, 일정 거리 밖 책은
+// alpha·pointer-events로 숨겨 눌을 수 없었고 드래그마다 모든 카드에 스타일을 다시 썼다(끊김).
+// 여기서는 모든 책을 끝까지 보이게 두고(가림 0), 누름마다 한 번만 좌표를 정한다.
+export function shelfRotationLayout(count, railWidth, { pitch = 200, cardW = 190, pad = 24 } = {}) {
+  const safeWidth = Math.max(railWidth || 0, cardW + pad);
+  const maxCenter = Math.max(0, count - 1);
+  return {
+    pitch, cardW, safeWidth, maxCenter,
+    // 고른 책이 레일 가운데에 온다. 좌표는 레일 가운데가 0.
+    xOf: (index, center) => (index - center) * pitch,
+    rotate: (index, center) => {
+      const distance = index - center;
+      return distance === 0 ? 0 : distance > 0 ? -22 : 22;
+    },
+    scale: (index, center) => index === center ? 1.06 : 1,
+    depth: (index, center) => index === center ? 0 : -Math.abs(index - center) * 40,
+    centerFor: (index, current = 0) => Math.max(0, Math.min(maxCenter, Number.isFinite(index) ? index : current))
+  };
+}
+
 // 책 안 페이지 표시와 화살표 상태.
 export function pageMeta(index, count) {
   return {
-    counter: 'PAGE ' + String(index + 1).padStart(2, '0') + ' / ' + String(count).padStart(2, '0'),
+    counter: String(index + 1).padStart(2, '0') + ' / ' + String(count).padStart(2, '0'),
     prevDisabled: index === 0,
     nextDisabled: index === count - 1
   };
@@ -216,24 +240,11 @@ export function pageTarget(index, count, direction, forcedIndex) {
   return next;
 }
 
+// #1059: 사본을 걷어내고 정본(youtube-id.mjs)을 부른다. describe 인자는 기존 규칙대로 먼저 본다.
 export function youtubeId(url, describe) {
-  let parsed;
-  try { parsed = new URL(String(url || '')); } catch (e) { return ''; }
-  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return '';
-  const hosts = ['youtube.com', 'www.youtube.com', 'm.youtube.com', 'music.youtube.com', 'youtu.be'];
-  if (hosts.indexOf(parsed.hostname) < 0) return '';
   const described = typeof describe === 'function' ? describe(String(url || '')) : null;
   if (described && described.kind === 'youtube') return described.videoId || '';
-  if (parsed.hostname === 'youtu.be') {
-    const id1 = parsed.pathname.split('/').filter(Boolean)[0] || '';
-    return /^[A-Za-z0-9_-]{11}$/.test(id1) ? id1 : '';
-  }
-  if (parsed.pathname === '/watch') {
-    const id2 = parsed.searchParams.get('v') || '';
-    return /^[A-Za-z0-9_-]{11}$/.test(id2) ? id2 : '';
-  }
-  const match = parsed.pathname.match(/^\/(shorts|live|embed)\/([^/?#]+)/);
-  return match && /^[A-Za-z0-9_-]{11}$/.test(match[2]) ? match[2] : '';
+  return youtubeIdFrom(url, { allowThumbnail: false });
 }
 
 // 책 안 두 쪽(왼쪽=지난 장, 오른쪽=지금 장) 마크업. 문구·클래스 이름은 원본 그대로.

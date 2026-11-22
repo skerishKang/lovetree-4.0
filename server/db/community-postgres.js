@@ -2,8 +2,9 @@ import { countedVoterSql, rankingOwnerSql } from './ranking-policy-sql.js';
 
 const iso=value=>value instanceof Date?value.toISOString():value?String(value):null;
 const shareRow=value=>value&&({shareId:value.share_id,subjectId:value.subject_id,treeId:value.tree_id,entryMomentId:value.entry_moment_id,view:value.initial_view,status:value.status,createdAt:iso(value.created_at)});
-const commentRow=value=>value&&({id:value.comment_id,shareId:value.share_id,subjectId:value.subject_id,body:value.body,status:value.status,createdAt:iso(value.created_at),updatedAt:iso(value.updated_at),editedAt:value.edited_at?iso(value.edited_at):null});
-const reportRow=value=>value&&({id:value.report_id,shareId:value.share_id,reporterSubjectId:value.reporter_subject_id,reason:value.reason,status:value.status,createdAt:iso(value.created_at),resolvedAt:iso(value.resolved_at),hidden:value.is_hidden===true||value.hidden===true});
+// #1098 2단계: 대상 칸(target_kind·moment_id)을 함께 내려준다. 기존 행(트리 단위)은 'tree'·빈 값이다.
+const commentRow=value=>value&&({id:value.comment_id,shareId:value.share_id,subjectId:value.subject_id,body:value.body,status:value.status,targetKind:value.target_kind||'tree',momentId:value.moment_id||'',createdAt:iso(value.created_at),updatedAt:iso(value.updated_at),editedAt:value.edited_at?iso(value.edited_at):null});
+const reportRow=value=>value&&({id:value.report_id,shareId:value.share_id,reporterSubjectId:value.reporter_subject_id,reason:value.reason,status:value.status,commentId:value.comment_id||null,createdAt:iso(value.created_at),resolvedAt:iso(value.resolved_at),hidden:value.is_hidden===true||value.hidden===true});
 
 export function createCommunityRepo(pool, { hasRealCustomers = false } = {}){
  const countedVoter = countedVoterSql(hasRealCustomers);
@@ -14,20 +15,21 @@ export function createCommunityRepo(pool, { hasRealCustomers = false } = {}){
   async discoverTotals({productId}){
    const {rows}=await pool.query(
     `WITH picked AS (
-       SELECT DISTINCT ON (s.tree_id) s.*
+       -- 트리 id는 계정끼리 겹칠 수 있다(복원 기록) — (계정, 트리)로 묶어 한 행을 고른다(B-08).
+       SELECT DISTINCT ON (s.subject_id, s.tree_id) s.*
        FROM lovetree_shares s
        WHERE s.product_id=$1 AND s.status='active' AND s.moment_count>=3
          AND EXISTS (
            SELECT 1 FROM lovetree_tree_discover d
            WHERE d.product_id=s.product_id AND d.subject_id=s.subject_id AND d.tree_id=s.tree_id AND d.discover=true
          )
-       ORDER BY s.tree_id,(s.origin='auto') DESC,s.created_at DESC,s.share_id DESC
+       ORDER BY s.subject_id, s.tree_id,(s.origin='auto') DESC,s.created_at DESC,s.share_id DESC
      )
      SELECT count(*)::int AS trees, COALESCE(sum(s.moment_count),0)::int AS moments
      FROM picked s
      WHERE NOT EXISTS (
        SELECT 1 FROM lovetree_shares s2
-       WHERE s2.product_id=s.product_id AND s2.tree_id=s.tree_id
+       WHERE s2.product_id=s.product_id AND s2.subject_id=s.subject_id AND s2.tree_id=s.tree_id
          AND EXISTS (SELECT 1 FROM lovetree_community_hidden_shares h WHERE h.product_id=s2.product_id AND h.share_id=s2.share_id)
      )
        AND NOT EXISTS (
@@ -46,13 +48,14 @@ export function createCommunityRepo(pool, { hasRealCustomers = false } = {}){
       (SELECT count(*)::int FROM lovetree_community_votes v
        WHERE v.product_id=s.product_id AND v.target_kind='tree' AND v.target_id=s.share_id
          AND v.voted_at >= $4 AND ($5::timestamptz IS NULL OR v.voted_at < $5) AND ${countedVoter}) AS week_votes`:'';
-   const baseOrder="COALESCE((SELECT max(created_at) FROM lovetree_community_comments WHERE product_id=s.product_id AND share_id=s.share_id AND status='visible'), s.created_at) DESC, s.created_at DESC, s.share_id DESC";
+   const baseOrder="COALESCE((SELECT max(created_at) FROM lovetree_community_comments WHERE product_id=s.product_id AND share_id=s.share_id AND target_kind='tree' AND status='visible'), s.created_at) DESC, s.created_at DESC, s.share_id DESC";
    const orderSql=(sort==='popular'&&weekSince)?`week_votes DESC, ${baseOrder}`:baseOrder;
    const rankOwners = sort === 'popular';
    const params=weekSince?[productId,viewerSubjectId,limit,weekSince,weekUntil]:[productId,viewerSubjectId,limit];
    const {rows}=await pool.query(
     `WITH picked AS (
-       SELECT DISTINCT ON (s.tree_id) s.*
+       -- 트리 id는 계정끼리 겹칠 수 있다(복원 기록) — (계정, 트리)로 묶어 한 행을 고른다(B-08).
+       SELECT DISTINCT ON (s.subject_id, s.tree_id) s.*
        FROM lovetree_shares s
        ${rankOwners ? 'LEFT JOIN lovetree_product_roles owner_role USING (product_id, subject_id)' : ''}
        WHERE s.product_id=$1 AND s.status='active' AND s.moment_count>=3
@@ -61,26 +64,26 @@ export function createCommunityRepo(pool, { hasRealCustomers = false } = {}){
            SELECT 1 FROM lovetree_tree_discover d
            WHERE d.product_id=s.product_id AND d.subject_id=s.subject_id AND d.tree_id=s.tree_id AND d.discover=true
          )
-       ORDER BY s.tree_id,(s.origin='auto') DESC,s.created_at DESC,s.share_id DESC
+       ORDER BY s.subject_id, s.tree_id,(s.origin='auto') DESC,s.created_at DESC,s.share_id DESC
      )
      SELECT s.*${weekSelect},
       (SELECT count(*)::int FROM lovetree_community_favorites WHERE product_id=s.product_id AND share_id=s.share_id) AS fav_count,
-      (SELECT count(*)::int FROM lovetree_community_comments WHERE product_id=s.product_id AND share_id=s.share_id AND status='visible') AS comment_count,
-      (SELECT max(created_at) FROM lovetree_community_comments WHERE product_id=s.product_id AND share_id=s.share_id AND status='visible') AS last_activity_at,
-      (SELECT count(*)::int FROM lovetree_community_reactions WHERE product_id=s.product_id AND share_id=s.share_id AND kind='heart') AS heart_count,
-      (SELECT count(*)::int FROM lovetree_community_reactions WHERE product_id=s.product_id AND share_id=s.share_id) AS reacts_count,
+      (SELECT count(*)::int FROM lovetree_community_comments WHERE product_id=s.product_id AND share_id=s.share_id AND target_kind='tree' AND status='visible') AS comment_count,
+      (SELECT max(created_at) FROM lovetree_community_comments WHERE product_id=s.product_id AND share_id=s.share_id AND target_kind='tree' AND status='visible') AS last_activity_at,
+      (SELECT count(*)::int FROM lovetree_community_reactions WHERE product_id=s.product_id AND share_id=s.share_id AND target_kind='tree' AND kind='heart') AS heart_count,
+      (SELECT count(*)::int FROM lovetree_community_reactions WHERE product_id=s.product_id AND share_id=s.share_id AND target_kind='tree') AS reacts_count,
       EXISTS(SELECT 1 FROM lovetree_community_favorites WHERE product_id=s.product_id AND share_id=s.share_id AND subject_id=$2) AS favored,
-      EXISTS(SELECT 1 FROM lovetree_community_reactions WHERE product_id=s.product_id AND share_id=s.share_id AND subject_id=$2 AND kind='heart') AS hearted,
+      EXISTS(SELECT 1 FROM lovetree_community_reactions WHERE product_id=s.product_id AND share_id=s.share_id AND subject_id=$2 AND target_kind='tree' AND kind='heart') AS hearted,
       (SELECT COALESCE(jsonb_object_agg(kind,kind_count),'{}'::jsonb) FROM (
         SELECT kind, count(*)::int AS kind_count FROM lovetree_community_reactions
-        WHERE product_id=s.product_id AND share_id=s.share_id GROUP BY kind
+        WHERE product_id=s.product_id AND share_id=s.share_id AND target_kind='tree' GROUP BY kind
       ) t) AS reactions_json,
       (SELECT COALESCE(array_agg(kind ORDER BY kind),'{}') FROM lovetree_community_reactions
-        WHERE product_id=s.product_id AND share_id=s.share_id AND subject_id=$2) AS mine_kinds
+        WHERE product_id=s.product_id AND share_id=s.share_id AND subject_id=$2 AND target_kind='tree') AS mine_kinds
      FROM picked s
      WHERE NOT EXISTS (
        SELECT 1 FROM lovetree_shares s2
-       WHERE s2.product_id=s.product_id AND s2.tree_id=s.tree_id
+       WHERE s2.product_id=s.product_id AND s2.subject_id=s.subject_id AND s2.tree_id=s.tree_id
          AND EXISTS (SELECT 1 FROM lovetree_community_hidden_shares h WHERE h.product_id=s2.product_id AND h.share_id=s2.share_id)
      )
        AND NOT EXISTS (
@@ -105,19 +108,20 @@ export function createCommunityRepo(pool, { hasRealCustomers = false } = {}){
   async listDiscoverable({productId,viewerSubjectId=null,limit=240}){
    const {rows}=await pool.query(
     `WITH picked AS (
-       SELECT DISTINCT ON (s.tree_id) s.*
+       -- 트리 id는 계정끼리 겹칠 수 있다(복원 기록) — (계정, 트리)로 묶어 한 행을 고른다(B-08).
+       SELECT DISTINCT ON (s.subject_id, s.tree_id) s.*
        FROM lovetree_shares s
        WHERE s.product_id=$1 AND s.status='active' AND s.moment_count>=3
          AND EXISTS (
            SELECT 1 FROM lovetree_tree_discover d
            WHERE d.product_id=s.product_id AND d.subject_id=s.subject_id AND d.tree_id=s.tree_id AND d.discover=true
          )
-       ORDER BY s.tree_id,(s.origin='auto') DESC,s.created_at DESC,s.share_id DESC
+       ORDER BY s.subject_id, s.tree_id,(s.origin='auto') DESC,s.created_at DESC,s.share_id DESC
      )
      SELECT s.* FROM picked s
      WHERE NOT EXISTS (
        SELECT 1 FROM lovetree_shares s2
-       WHERE s2.product_id=s.product_id AND s2.tree_id=s.tree_id
+       WHERE s2.product_id=s.product_id AND s2.subject_id=s.subject_id AND s2.tree_id=s.tree_id
          AND EXISTS (SELECT 1 FROM lovetree_community_hidden_shares h WHERE h.product_id=s2.product_id AND h.share_id=s2.share_id)
      )
        AND NOT EXISTS (
@@ -174,15 +178,15 @@ export function createCommunityRepo(pool, { hasRealCustomers = false } = {}){
    const {rows}=await pool.query(
     `SELECT
       (SELECT count(*)::int FROM lovetree_community_favorites WHERE product_id=$1 AND share_id=$2) AS favorites,
-      (SELECT count(*)::int FROM lovetree_community_reactions WHERE product_id=$1 AND share_id=$2 AND kind='heart') AS hearts,
-      (SELECT count(*)::int FROM lovetree_community_comments WHERE product_id=$1 AND share_id=$2 AND status='visible') AS comments,
+      (SELECT count(*)::int FROM lovetree_community_reactions WHERE product_id=$1 AND share_id=$2 AND target_kind='tree' AND kind='heart') AS hearts,
+      (SELECT count(*)::int FROM lovetree_community_comments WHERE product_id=$1 AND share_id=$2 AND target_kind='tree' AND status='visible') AS comments,
       EXISTS(SELECT 1 FROM lovetree_community_favorites WHERE product_id=$1 AND share_id=$2 AND subject_id=$3) AS favored,
-      EXISTS(SELECT 1 FROM lovetree_community_reactions WHERE product_id=$1 AND share_id=$2 AND subject_id=$3 AND kind='heart') AS hearted`,
+      EXISTS(SELECT 1 FROM lovetree_community_reactions WHERE product_id=$1 AND share_id=$2 AND subject_id=$3 AND target_kind='tree' AND kind='heart') AS hearted`,
     [productId,shareId,viewerSubjectId]
    );
    const row=rows[0]||{};
    const counts=await pool.query(
-    `SELECT kind,count(*)::int AS n FROM lovetree_community_reactions WHERE product_id=$1 AND share_id=$2 GROUP BY kind`,
+    `SELECT kind,count(*)::int AS n FROM lovetree_community_reactions WHERE product_id=$1 AND share_id=$2 AND target_kind='tree' GROUP BY kind`,
     [productId,shareId]
    );
    const reactions={heart:0,like:0,love:0,laugh:0,wow:0,sad:0,angry:0};
@@ -190,7 +194,7 @@ export function createCommunityRepo(pool, { hasRealCustomers = false } = {}){
    let mine=[];
    if(viewerSubjectId){
     const mineRows=await pool.query(
-     `SELECT kind FROM lovetree_community_reactions WHERE product_id=$1 AND share_id=$2 AND subject_id=$3 ORDER BY kind`,
+     `SELECT kind FROM lovetree_community_reactions WHERE product_id=$1 AND share_id=$2 AND subject_id=$3 AND target_kind='tree' ORDER BY kind`,
      [productId,shareId,viewerSubjectId]
     );
     mine=mineRows.rows.map(r=>r.kind);
@@ -236,8 +240,9 @@ export function createCommunityRepo(pool, { hasRealCustomers = false } = {}){
    return counts;
   },
   async setReaction({productId,shareId,subjectId,enabled,kind='heart'}){
+   // 트리 단위 행만 다룬다(대상 칸 기본값 'tree'·moment_id='') — 순간 반응 행은 moment-community-postgres.js 가 맡는다.
    if(enabled) await pool.query(`INSERT INTO lovetree_community_reactions(product_id,share_id,subject_id,kind) VALUES($1,$2,$3,$4) ON CONFLICT DO NOTHING`,[productId,shareId,subjectId,kind]);
-   else await pool.query(`DELETE FROM lovetree_community_reactions WHERE product_id=$1 AND share_id=$2 AND subject_id=$3 AND kind=$4`,[productId,shareId,subjectId,kind]);
+   else await pool.query(`DELETE FROM lovetree_community_reactions WHERE product_id=$1 AND share_id=$2 AND subject_id=$3 AND kind=$4 AND moment_id=''`,[productId,shareId,subjectId,kind]);
   },
   async isBlocked({productId,blockerSubjectId,blockedSubjectId}){
    const {rows}=await pool.query(
@@ -253,14 +258,15 @@ export function createCommunityRepo(pool, { hasRealCustomers = false } = {}){
    return !!(rows[0]?.blocked);
   },
   async listComments({productId,shareId,limit=50}){
-   const {rows}=await pool.query(`SELECT * FROM lovetree_community_comments WHERE product_id=$1 AND share_id=$2 AND status='visible' ORDER BY created_at DESC LIMIT $3`,[productId,shareId,limit]);
+   // 트리 단위 댓글만 — 순간 댓글(대상 칸 'moment')은 moment-community-postgres.js listMomentComments 가 맡는다.
+   const {rows}=await pool.query(`SELECT * FROM lovetree_community_comments WHERE product_id=$1 AND share_id=$2 AND target_kind='tree' AND status='visible' ORDER BY created_at DESC LIMIT $3`,[productId,shareId,limit]);
    return rows.map(commentRow);
   },
   async createComment(input){
    const {rows}=await pool.query(
-    `INSERT INTO lovetree_community_comments(product_id,comment_id,share_id,subject_id,body,client_key)
-     VALUES($1,$2,$3,$4,$5,$6)
-     ON CONFLICT(product_id,subject_id,client_key) DO UPDATE SET client_key=EXCLUDED.client_key
+    `INSERT INTO lovetree_community_comments(product_id,comment_id,share_id,subject_id,body,client_key,target_kind,moment_id)
+     VALUES($1,$2,$3,$4,$5,$6,'tree','')
+     ON CONFLICT(product_id,subject_id,client_key,target_kind,moment_id) DO UPDATE SET client_key=EXCLUDED.client_key
      RETURNING *`,
     [input.productId,input.commentId,input.shareId,input.subjectId,input.body,input.clientKey]
    );
@@ -290,11 +296,11 @@ export function createCommunityRepo(pool, { hasRealCustomers = false } = {}){
   },
   async createReport(input){
    const {rows}=await pool.query(
-    `INSERT INTO lovetree_community_reports(product_id,report_id,share_id,reporter_subject_id,reason,client_key)
-     VALUES($1,$2,$3,$4,$5,$6)
+    `INSERT INTO lovetree_community_reports(product_id,report_id,share_id,reporter_subject_id,reason,client_key,comment_id)
+     VALUES($1,$2,$3,$4,$5,$6,$7)
      ON CONFLICT(product_id,reporter_subject_id,client_key) DO UPDATE SET client_key=EXCLUDED.client_key
      RETURNING *`,
-    [input.productId,input.reportId,input.shareId,input.subjectId,input.reason,input.clientKey]
+    [input.productId,input.reportId,input.shareId,input.subjectId,input.reason,input.clientKey,input.commentId||null]
    );
    return reportRow(rows[0]);
   },
@@ -302,7 +308,8 @@ export function createCommunityRepo(pool, { hasRealCustomers = false } = {}){
    await pool.query(`INSERT INTO lovetree_community_blocks(product_id,blocker_subject_id,blocked_subject_id) VALUES($1,$2,$3) ON CONFLICT DO NOTHING`,[productId,blockerSubjectId,blockedSubjectId]);
   },
   async listReports({productId,limit=100}){
-   const {rows}=await pool.query(`SELECT r.*,EXISTS(SELECT 1 FROM lovetree_community_hidden_shares h WHERE h.product_id=r.product_id AND h.share_id=r.share_id) AS is_hidden FROM lovetree_community_reports r WHERE r.product_id=$1 ORDER BY r.created_at DESC LIMIT $2`,[productId,limit]);
+   // 순간 댓글 신고(comment_id 있음)는 트리 숨김이 아니라 그 댓글의 숨김 상태를 숨김 여부로 내려준다(#1098 2단계).
+   const {rows}=await pool.query(`SELECT r.*,CASE WHEN r.comment_id IS NOT NULL THEN EXISTS(SELECT 1 FROM lovetree_community_comments c WHERE c.product_id=r.product_id AND c.comment_id=r.comment_id AND c.status='hidden') ELSE EXISTS(SELECT 1 FROM lovetree_community_hidden_shares h WHERE h.product_id=r.product_id AND h.share_id=r.share_id) END AS is_hidden FROM lovetree_community_reports r WHERE r.product_id=$1 ORDER BY r.created_at DESC LIMIT $2`,[productId,limit]);
    return rows.map(reportRow);
   },
   async moderateReport({productId,reportId,status,visibility,actorSubjectId}){

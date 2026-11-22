@@ -49,6 +49,8 @@ export function createLocation(deps) {
     if (journeyRoute.action === 'open') { openFirstJourney({step: journeyRoute.step, route: true}); return; }
     if (journeyRoute.action === 'finished') { finishJourney(); return; }
     if (journeyRoute.action === 'leave') { leaveJourney(); return; }
+    // #1092: 둘러보기도 화면이다 — 주소(#explore·#explore/moments)로 돌아오면(뒤로·앞으로 가기) 둘러보기 화면을 연다.
+    if (/^#explore/.test(location.hash)) { deps.communityScreen?.openRoute(); return; }
     const route = parseSelectionRoute(location.hash);
     if (route.scope === 'public') { showPublicRoute(route); return; }
     setCurrent(screenForView(route.view)[1]);

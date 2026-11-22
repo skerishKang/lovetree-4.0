@@ -9,6 +9,8 @@ import { buildGraph, pathFor } from '../../graph-model.mjs';
 import { suggestForMoments } from '../../tags.mjs';
 import { videoKey } from '../../same-stage.mjs';
 import { applyThemeAttribute, readTheme } from '../../header-state.mjs';
+// #1060: 썸네일 주소는 정본(youtube-id.mjs)의 단계 함수로만 만든다. 그래프는 종전처럼 세로 구분 없이 hqdefault.
+import { youtubeStageThumbUrl } from '../../youtube-id.mjs';
 
 const KIND_LABEL = { stage: '무대', song: '노래', member: '멤버', artist: '가수' };
 const KIND_OWN = { stage: '이 무대의 내 순간들', song: '이 노래의 내 순간들', member: '이 멤버의 내 순간들', artist: '이 가수의 내 순간들' };
@@ -30,7 +32,7 @@ const rawMoments = (demo ? demo.moments : tree.moments || []).map(m => ({ ...m }
 const GRAPH = buildGraph(rawMoments.map(m => ({ ...m, keywords: Array.isArray(m.keywords) ? m.keywords : [] })));
 const MOMENT_OF = new Map(rawMoments.map((m) => [m.id, m]));
 const model = { graph: GRAPH, narrow: false, W: 0, H: 0 };
-let selected = GRAPH.moments.length ? { type: 'moment', id: GRAPH.footprint.order[0] } : { type: null };
+let selected = { type: null };
 let filterHub = null;
 let walkIndex = -1, walkTimer = null;
 
@@ -38,7 +40,7 @@ const thumbOf = (m) => {
   const t = m?.mediaMetadata?.thumbnail;
   if (t) return t;
   const key = videoKey(m?.url || '');
-  if (key) return `https://i.ytimg.com/vi/${key}/hqdefault.jpg`;
+  if (key) return youtubeStageThumbUrl(key, 'hqdefault');
   const demoImg = ctx.exampleMedia?.[m?.id]?.image;
   return demoImg || '';
 };
@@ -620,7 +622,8 @@ const goMapWithView = (v) => {
   try { parent.postMessage({ type: 'lt41-navigate', view: 'track56-network.html' }, location.origin); } catch {}
 };
 document.getElementById('gViewNet')?.addEventListener('click', () => goMapWithView('network'));
-document.getElementById('gViewConc')?.addEventListener('click', () => goMapWithView('concentric'));
+document.getElementById('gViewConc')?.addEventListener('click', () => goMapWithView('tag'));
+document.getElementById('gViewGraph')?.addEventListener('click', () => goMapWithView('time'));
 /* 제안 목록 — 선반 단추와 빈 판 안내 단추가 같은 한 길로 쓴다. 목록 제목도 실제 뜻으로 부른다
    (2026-11-16 CTO 지적: '꼬리표 없는'이 아니라 '아직 묶음에 안 든'이다). */
 function showSuggestions() {
@@ -658,7 +661,7 @@ window.addEventListener('message', (event) => {
   moment.keywords = Array.isArray(event.data.keywords) ? event.data.keywords : [];
   const rebuilt = buildGraph([...MOMENT_OF.values()].map((m) => ({ ...m, keywords: Array.isArray(m.keywords) ? m.keywords : [] })));
   model.graph = rebuilt;
-  if (!momentById(selected?.id)) selected = rebuilt.moments.length ? { type: 'moment', id: rebuilt.footprint.order[0] } : { type: null };
+  if (selected?.type === 'moment' && !momentById(selected?.id)) selected = { type: null };
   refresh();
 });
 

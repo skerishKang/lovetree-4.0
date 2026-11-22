@@ -16,7 +16,7 @@
 
 import { readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
-import { parseEnvFile } from './export-ai-customer-db.mjs';
+import { parseEnvFile } from './env-file.mjs';
 import { createPool } from '../server/db/postgres.js';
 import { createAdminRoleRepo } from '../server/db/admin-roles-postgres.js';
 import { createStageIndexRepo } from '../server/db/stage-index-postgres.js';

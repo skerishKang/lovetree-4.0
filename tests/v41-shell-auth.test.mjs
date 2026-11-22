@@ -3,9 +3,11 @@ import assert from 'node:assert/strict';
 // #231 1-B③-1: 옮긴 로그인 시작·세션 함수를 직접 불러 결과를 본다(최소 가짜 location·DOM).
 import { createAuth } from '../public/v41/shell/auth.mjs';
 
-function harness({ search = '', owned = false, writable = true } = {}) {
+function harness({ search = '', owned = false, writable = true, checkResults = [] } = {}) {
   const assigned = [];
   const replaced = [];
+  const checks = [...checkResults];
+  const seen = [];
   const els = {};
   const el = () => ({ hidden: false, textContent: '', setAttribute() {}, removeAttribute() {} });
   for (const id of ['account-entry', 'account-avatar']) els[id] = el();
@@ -24,7 +26,9 @@ function harness({ search = '', owned = false, writable = true } = {}) {
     notify: () => { notified += 1; },
     closeAccountMenu: () => { closed += 1; },
     openEditor: mode => { editor = mode; },
-    showScreen: file => { shown = file; }
+    showScreen: file => { shown = file; },
+    sleep: async () => {},
+    checkSession: async () => { const value = checks.length ? checks.shift() : false; seen.push(value); return value; }
   });
   const restore = () => {
     globalThis.location = saved.location;
@@ -34,7 +38,7 @@ function harness({ search = '', owned = false, writable = true } = {}) {
     if (saved.history === undefined) delete globalThis.history;
     if (saved.localStorage === undefined) delete globalThis.localStorage;
   };
-  return { auth, els, assigned, replaced, counts: () => ({ notified, closed }), editor: () => editor, shown: () => shown, restore };
+  return { auth, els, assigned, replaced, counts: () => ({ notified, closed }), checks: () => seen, editor: () => editor, shown: () => shown, restore };
 }
 
 test('주소의 의도(intent)를 읽고 주소에서는 지운다', () => {
@@ -82,10 +86,13 @@ test('startLogin은 테마와 의도를 담은 로그인 주소로 이동한다'
   }
 });
 
-test('401·만료는 로그아웃 화면으로 되돌리고 안내를 남긴다', () => {
-  const h = harness({ owned: true });
+test('401·만료는 로그아웃 화면으로 되돌리고 안내를 남긴다', async () => {
+  const h = harness({ owned: true, checkResults: [false, false] });
+  h.els['account-entry'].hidden = true;
+  h.els['account-avatar'].hidden = false;
   try {
-    h.auth.authRequired();
+    await h.auth.authRequired();
+    assert.deepEqual(h.checks(), [false, false], '2초·5초 두 번 세션을 다시 확인한다');
     assert.equal(h.els['account-entry'].hidden, false, '로그인 알약을 다시 보여 준다');
     assert.equal(h.els['account-entry'].textContent, '로그인');
     assert.equal(h.els['account-avatar'].hidden, true, '계정 동그라미는 숨긴다');
@@ -95,12 +102,28 @@ test('401·만료는 로그아웃 화면으로 되돌리고 안내를 남긴다'
     h.restore();
   }
   // 로그아웃 상태에서는 아무것도 바꾸지 않는다.
-  const out = harness({ owned: false });
+  const out = harness({ owned: false, checkResults: [false, false] });
   try {
-    out.auth.authRequired();
+    await out.auth.authRequired();
+    assert.deepEqual(out.checks(), [], '이미 로그아웃이면 다시 확인하지 않는다');
     assert.equal(out.counts().notified, 0);
   } finally {
     out.restore();
+  }
+});
+
+test('다시 확인 중 한 번이라도 성공하면 로그아웃으로 바꾸지 않는다', async () => {
+  const h = harness({ owned: true, checkResults: [false, true] });
+  h.els['account-entry'].hidden = true;
+  h.els['account-avatar'].hidden = false;
+  try {
+    await h.auth.authRequired();
+    assert.deepEqual(h.checks(), [false, true], '첫 확인이 401이어도 두 번째 성공에서 멈춘다');
+    assert.equal(h.els['account-entry'].hidden, true, '로그인 알약이 그대로다');
+    assert.equal(h.els['account-avatar'].hidden, false, '계정 동그라미가 남는다');
+    assert.deepEqual(h.counts(), { notified: 0, closed: 0 }, '안내도 계정 메뉴 닫기도 없다');
+  } finally {
+    h.restore();
   }
 });
 

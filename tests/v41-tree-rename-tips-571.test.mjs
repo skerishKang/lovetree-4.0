@@ -1,5 +1,5 @@
 // #571(#549-2 대표 결정 '나'): '첫 트리를 만들었어요' 안내의 첫 항목을 '트리 이름은 지금 바꿀 수 있어요'로
-// 바꾸고 [이름 바꾸기] 단추를 둔다(그림 E:\lovetree-qa\549\549-mock-na-390.png). 단추는 트리 관리 창의
+// 바꾸고 [이름 바꾸기] 단추를 둔다(그림 549-mock-na-390.png). 단추는 트리 관리 창의
 // 이름 칸을 바로 열고(openTreeManager가 이름 칸에 초점을 둔다), 이름을 바꾸면 머리줄 '트리: …'와
 // 트리 관리 창의 이름 칸을 바로 열고(openTreeManager가 이름 칸에 초점을 둔다), 이름을 바꾸면 머리줄 '트리: …'와
 // 트리 목록이 곧바로 바뀐다. 261118 대표 결정(#845 1단계)으로 창이 열려 있는 동안은 안내 판이 숨고
@@ -372,6 +372,9 @@ test('984 실행: 표지 — 저장 직후 서재·열린 책 반영, 실패하�
         });
         await page.goto(`${base}/v41/?account=1#my/shelf`, { waitUntil: 'load', timeout: 60000 });
         const frame = await findShelfFrame984(page, w);
+        // #1094: 기본(책) 방식은 서재에서 바로 책으로 가므로, 열린 책(목록)을 관찰하려면 상단 토글로 목록을 택한다.
+        await page.locator('#book-display-toggle [data-book-display="list"]').click();
+        await page.waitForFunction(() => window.LT41?.prefs?.bookDisplay === 'list', null, { timeout: 10000 });
         await frame.locator('.book-card button[data-book-id="tree1"]').click();
         await frame.waitForSelector('#readerScreen.active', { timeout: 10000 });
         const readerBefore = await frame.evaluate(() => document.getElementById('bookCoverFace')?.getAttribute('data-cover-design') || '');

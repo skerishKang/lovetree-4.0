@@ -2,10 +2,12 @@
 // 규칙·계산은 tag-model.mjs·tags.mjs 한 벌을 쓰고, 이 파일은 그리기·누르기만 한다.
 // 제안은 흐린 칩, 확정은 진한 칩이다. 누르면 확정·해제된다. 사용자가 확인하기 전에는 저장하지 않는다 —
 // 저장 호출은 onCommit(바뀐 keywords 전체, 지금 보고 있는 순간 id)으로 바깥에 맡기고, 이 파일은 저장 경로를 모른다.
-import { TAG_KINDS, parseTag } from './tags.mjs';
+import { TAG_KINDS, TAG_MAX_LENGTH, parseTag } from './tags.mjs';
 import { cardTags, chipText, tagLineChips, toggledKeywords, inputTag } from './tag-model.mjs';
+import { escapeHtml as esc } from './html-escape.mjs';
 
-const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+// A-20: 값 칸 한도는 저장 형식 '종류:값'의 24자에서 종류 표시를 뺀 값이다.
+export const valueLimit = (kindId) => TAG_MAX_LENGTH - (TAG_KINDS.find((k) => k.id === kindId)?.prefix.length || 0);
 const TOO_LONG_TEXT = '24자를 넘어요';
 // 직접 붙이기 칸의 갈래별 예시(261116 대표 지적 — '종류'·'값' 같은 낱말 대신 예시로 뜻을 알린다).
 // 순서는 tags.mjs의 TAG_KINDS를 따르고, 갈래 없이는 문장 꼬리표의 예다.
@@ -52,7 +54,7 @@ export function renderTagLine({ host, doc = document, moment, knownTags = [], wr
       : `<div class="lt-tagline-manual">${guide}`
           + `<div class="lt-tagline-input" role="group" aria-label="꼬리표 직접 붙이기">`
           + `<select class="lt-tagline-kind" aria-label="붙일 꼬리표의 갈래">${kinds}</select>`
-          + `<input class="lt-tagline-value" maxlength="24" autocomplete="off" placeholder="${esc(KIND_PLACEHOLDER[state.kind] || '')}" aria-label="붙일 꼬리표 내용">`
+          + `<input class="lt-tagline-value" maxlength="${valueLimit(state.kind)}" autocomplete="off" placeholder="${esc(KIND_PLACEHOLDER[state.kind] || '')}" aria-label="붙일 꼬리표 내용">`
           + `<button type="button" class="lt-tagline-add">붙이기</button></div></div>`;
     // '꼬리표' 낱말은 줄 안에 한 번만 보인다(#754 이후) — 빈 상태에서는 라벨을 숨기고
     // '아직 꼬리표가 없어요' 빈 문구만 그린다. 칩이 보일 때만 라벨이 나란히 붙는다.
@@ -186,7 +188,10 @@ export function renderTagLine({ host, doc = document, moment, knownTags = [], wr
     if (!select) return;
     state.kind = select.value;
     const input = host.querySelector('.lt-tagline-value');
-    if (input) input.placeholder = KIND_PLACEHOLDER[state.kind] || '';
+    if (input) {
+      input.placeholder = KIND_PLACEHOLDER[state.kind] || '';
+      input.maxLength = valueLimit(state.kind);
+    }
   }, when);
   host.addEventListener('keydown', (event) => {
     if (!alive()) return;
