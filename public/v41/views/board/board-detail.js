@@ -55,8 +55,6 @@
     }
     if(m.type==='video' && !m.videoSource) m.videoSource='local';
   });
-  // #1060: 정본 전역이 모듈로 늦게 등록되면 첫 스크립트에서 대표 주소가 비었다 — 등록 뒤 다시 채운다.
-  window.LTMedia?.onCanonical?.(()=>{for(const m of moments)if(m.type==='youtube')m.thumbnailUrl=ytMax(m.url);});
 
   const v11CardHTML=cardHTML;
   cardHTML=function(m){
