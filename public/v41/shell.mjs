@@ -957,7 +957,20 @@ async function startMember(){setMemberRefreshStarted(true);if(!leaveMember())ret
     let view=memberStartupView(active,route,saved,viewForFile(current));
     if(startPlace!=='resume'&&!route&&active?.scope!=='owner'&&!(active?.scope==='screen'&&active.explicit)&&!pending)view=startPlace==='shelf'?'shelf':'home';
     current=screenForView(view)[1];}
-   const resolved=load({revision:0,state},'server',requested,saved);initialized=true;
+   // #1109: 같은 화면·같은 트리의 배경 상태 반영은 프레임을 갈지 않는다.
+   // 화면이 이미 자기 상태를 들고 있으므로 모델과 창 안 값만 고치고, 기존 '트리 저장' 메시지로 다시 그리게 한다.
+   let resolved;
+   const projected=workspaceModel({revision:0,state});
+   const sameTree=!!window.LT41?.tree&&projected.trees.some(t=>t.id===window.LT41.tree.id);
+   if(initialized&&!meta&&!selection&&sameTree){
+    model=projected;
+    const tree=projected.trees.find(t=>t.id===window.LT41.tree.id);
+    window.LT41.tree=tree;window.LT41.trees=projected.trees;window.LT41.prefs=state.prefs;window.LT41.writable=source==='server'&&!!member?.snapshot().writable;
+    for(const f of frames()){try{f.contentWindow?.postMessage({type:'lt41-trees-saved'},location.origin)}catch{}}
+    resolved={position:{treeId:tree.id,momentId:window.LT41.momentId},treeMissing:false,momentMissing:false};
+   }else{
+    resolved=load({revision:0,state},'server',requested,saved);initialized=true;
+   }
    if(window.LT41)window.LT41.prefs=state.prefs;
    // #441 후속: 다른 기기의 첫 그림도 계정 날짜 표기를 따르도록, 로그인 때 기기 미러 캐시를 계정값으로 채운다.
    try{localStorage.setItem('lt41.dateStyle',normalizeDateStyle(state.prefs?.dateStyle));}catch{}

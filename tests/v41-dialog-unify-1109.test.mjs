@@ -110,3 +110,61 @@ test('#1109 두 창의 닫기 단추·덮개·폭이 같고 정리 창 아래 �
     });
   }
 });
+async function momentListFrame(page) {
+ for (const f of page.frames()) {
+  if (f === page.mainFrame()) continue;
+  const ok = await f.evaluate(() => document.documentElement.getBoundingClientRect().width > 0 && !!document.getElementById('orbit')?.shadowRoot?.querySelector('[data-do=moments],[data-do=index]')).catch(() => false);
+  if (ok) return f;
+ }
+ return null;
+}
+
+test('#1109 배경 상태 반영을 받아도 순간 목록 창이 열린 채로 남는다', { skip: skip || undefined }, async (t) => {
+ if (skip) { t.skip(skip); return; }
+ await withShell(sampleTree(), { width: 1440, height: 900, theme: 'night' }, async ({ page, errors }) => {
+  const frame = await momentListFrame(page);
+  assert.ok(frame, '첫 화면 프레임을 찾는다');
+  await frame.evaluate(() => document.getElementById('orbit').shadowRoot.querySelector('[data-do=moments],[data-do=index]').click());
+  await frame.locator('.orbit-dialog[open]').waitFor({ state: 'attached', timeout: 8000 });
+  await frame.evaluate(() => window.postMessage({ type: 'lt41-trees-saved' }, location.origin));
+  await page.waitForTimeout(300);
+  const facts = await frame.evaluate(() => {
+   const d = document.getElementById('orbit').shadowRoot.querySelector('.orbit-dialog');
+   const b = d?.querySelector('button[data-do="close"]');
+   const r = b?.getBoundingClientRect();
+   return { open: !!d?.open, w: r ? Math.round(r.width) : 0, h: r ? Math.round(r.height) : 0 };
+  });
+  assert.deepEqual(facts, { open: true, w: 44, h: 44 }, '창이 열린 채이고 닫기 단추 크기가 그대로다');
+  assert.deepEqual(errors, [], '페이지 오류 없음');
+ });
+});
+
+test('#1109 배경 상태 반영은 프레임을 갈지 않고 화면 숫자를 새 값으로 고친다', { skip: skip || undefined }, async (t) => {
+ if (skip) { t.skip(skip); return; }
+ await withShell(sampleTree(), { width: 1440, height: 900, theme: 'night' }, async ({ page, errors }) => {
+  const frame = await momentListFrame(page);
+  const before = await frame.evaluate(() => ({ url: location.href, text: [...document.getElementById('orbit').shadowRoot.querySelectorAll('.home-count')].map(n => n.textContent).join('|') }));
+  await page.evaluate(() => {
+   const tree = window.LT41.trees[0];
+   tree.moments.push({ id: 'bg-added', parentId: tree.moments[0].id, title: '다른 기기에서 담은 순간', note: '', emotion: '설렘', date: '2026-11-22', url: '', createdAt: '2026-11-22T00:00:00.000Z' });
+  });
+  await frame.evaluate(() => window.postMessage({ type: 'lt41-trees-saved' }, location.origin));
+  await page.waitForTimeout(300);
+  const after = await frame.evaluate(() => ({ url: location.href, text: [...document.getElementById('orbit').shadowRoot.querySelectorAll('.home-count')].map(n => n.textContent).join('|') }));
+  assert.equal(after.url, before.url, '프레임 주소가 그대로다(다시 띄우지 않음)');
+  assert.notEqual(after.text, before.text, '숫자가 새 상태로 바뀐다');
+  assert.deepEqual(errors, [], '페이지 오류 없음');
+ });
+});
+
+test('#1109 다른 화면으로 가면 기존처럼 프레임이 바뀐다', { skip: skip || undefined }, async (t) => {
+ if (skip) { t.skip(skip); return; }
+ await withShell(sampleTree(), { width: 1440, height: 900, theme: 'night' }, async ({ page, errors }) => {
+  await page.locator('[data-view="track32-bookshelf.html"]').click();
+  await page.waitForFunction(() => {
+   const f = document.getElementById('view');
+   try { return new URL(f.contentWindow.location.href).pathname.endsWith('/track32-bookshelf.html'); } catch { return false; }
+  }, null, { timeout: 10000 });
+  assert.deepEqual(errors, [], '페이지 오류 없음');
+ });
+});

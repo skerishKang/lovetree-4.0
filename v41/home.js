@@ -310,6 +310,23 @@ function showCount(key,items){
  }
  line.hidden=false;return line;
 }
+// #1109: 셸이 같은 화면에서 상태만 바꿨을 때 프레임을 다시 띄우지 않고 숫자·최근 순간만 제자리에서 고친다.
+function refreshCountsFromParent(){
+ const fresh=parent.LT41?.trees;
+ if(!Array.isArray(fresh))return false;
+ context.trees=fresh;
+ const inbox=fresh.find(t=>t?.inbox===true),inboxCount=inbox?.moments?.length||0;
+ const total=fresh.reduce((n,t)=>n+(t?.moments?.length||0),0);
+ if(!total)return true;
+ showCount('moments',[
+  {text:`순간 ${formatCount(total)}`,label:`내 순간 ${total}개 목록 열기`,action:openMoments},
+  inboxCount?{text:`모아둔 ${formatCount(inboxCount)}`,label:`모아둔 순간 ${inboxCount}개 정리하기`,action:()=>bridge.actions.cleanup()}:null
+ ]);
+ showCount('trees',[{text:`트리 ${formatCount(fresh.length)}`,label:`트리 ${fresh.length}개 서재 열기`,action:openTrees},null]);
+ const recent=fresh.flatMap(t=>t?.moments||[]).sort((a,b)=>String(b?.createdAt||'').localeCompare(String(a?.createdAt||'')))[0];
+ if(recent)orbit?.recent?.set(recent);
+ return true;
+}
 const inboxTree=(Array.isArray(context.trees)?context.trees:[]).find(t=>t?.inbox===true);
 const inboxCount=inboxTree?.moments?.length||0;
 const totalCount=momentList?.entries?.length||0;
@@ -374,8 +391,10 @@ const mobileFit=document.createElement('style');mobileFit.textContent='@media(ma
 addEventListener('message',event=>{
  if(event.origin!==location.origin)return;
  const type=event.data?.type;
-  if(type==='lt41-motion'){motionPaused=!!event.data.paused;orbit?.motion?.set?.(motionPaused);}
-  else if(type==='lt41-home-cards'){location.reload();}
+   if(type==='lt41-motion'){motionPaused=!!event.data.paused;orbit?.motion?.set?.(motionPaused);}
+   // #1109: 배경 상태 반영은 다시 띄우지 않고 지금 화면의 숫자·최근 순간만 고친다 — 열려 있는 창이 남는다.
+   else if(type==='lt41-trees-saved'){refreshCountsFromParent();}
+   else if(type==='lt41-home-cards'){location.reload();}
   else if(type==='lt41-home-moment-set'){setHomeMoment(event.data.value);}
 
  // #481: 제목 보기도 궤도가 그릴 때 값을 박아 두므로(orbit의 titleMode) 바뀌면 다시 떠야 한다.
