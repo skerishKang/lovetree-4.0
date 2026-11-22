@@ -36,7 +36,7 @@ export function createReader(deps) {
         var cover=$('#bookCoverFace');
         cover.style.setProperty('--cover',book.color);
         cover.style.setProperty('--cover-accent',book.accent);
-        cover.style.setProperty('--tilt','0deg');
+        // --tilt 기본값(0deg)과 같은 대입은 뺀다(#886) — 표지 면의 자세는 --cover-angle만 쓴다.
         // #256-3: 디자인 표지는 책장과 같은 판정(shelf-model coverChoice) 결과를 쓴다. 없으면 속성을 뺀다(기존 화면 변화 0).
         if(book.design)cover.setAttribute('data-cover-design',book.design);else cover.removeAttribute('data-cover-design');
         var coverMedia=$('#coverMedia');if(book.coverMedia){var cands=book.coverCandidates&&book.coverCandidates.length?book.coverCandidates:[book.coverMedia];coverMedia.setAttribute('data-lt-candidates',JSON.stringify(cands));coverMedia.setAttribute('data-lt-cand-index','0');coverMedia.setAttribute('data-lt-fallback-mode','cover');if(coverMedia.dataset)delete coverMedia.dataset.ltThumbSettled;coverMedia.src=book.coverMedia;coverMedia.hidden=false;}else{coverMedia.hidden=true;coverMedia.removeAttribute('src');coverMedia.removeAttribute('data-lt-candidates');}
@@ -67,7 +67,7 @@ export function createReader(deps) {
         $('#leftPage').innerHTML=leftMarkup(book,state.chapterIndex);
         $('#rightPage').innerHTML=rightMarkup(book,state.chapterIndex);
         $('#underPage').innerHTML=state.chapterIndex<book.chapters.length-1?rightMarkup(book,state.chapterIndex+1):rightMarkup(book,state.chapterIndex);
-        $('#underPage').style.display='none';
+        $('#underPage').classList.add('hidden');
         var meta=pageMeta(state.chapterIndex, book.chapters.length);
         $('#pageCounter').textContent=meta.counter;
         $('#prevPage').disabled=meta.prevDisabled;
@@ -150,8 +150,8 @@ export function createReader(deps) {
         document.body.appendChild(source);
         function place(rect){source.style.left=rect.left+'px';source.style.top=rect.top+'px';source.style.width=rect.width+'px';source.style.height=rect.height+'px';}
         place(fromRect);
-        source.style.transform='rotateY(-14deg) rotateZ(-1deg)';
-        requestAnimationFrame(function(){requestAnimationFrame(function(){place(toRect);source.style.transform='rotateY(0deg) rotateZ(0deg)';});});
+        source.classList.add('is-lifting');
+        requestAnimationFrame(function(){requestAnimationFrame(function(){place(toRect);source.classList.remove('is-lifting');source.classList.add('is-landed');});});
         var finished=false;
         function finish(){if(finished)return;finished=true;source.remove();if(done)done();}
         source.addEventListener('transitionend',finish,{once:true});
@@ -164,7 +164,7 @@ export function createReader(deps) {
         var display=shelfBookDisplay();
         // #1094 목록 방식: 중간 화면(표지 애니메이션)을 거치지 않고 표지+순간 목록을 곧바로 보인다.
         if(display==='list'){
-          $('#shelfScreen').style.display='none';
+          $('#shelfScreen').classList.add('is-covered');
           $('#shelfScreen').classList.remove('is-leaving');
           $('#readerScreen').classList.add('active');
           $('#readerScreen').classList.remove('is-preparing');
@@ -188,7 +188,7 @@ export function createReader(deps) {
           // (예전에는 넘어감을 기다리며 리더가 숨김(is-preparing)으로 남아, 표지 라이브 갱신도 볼 수 없었다).
           $('#readerScreen').classList.remove('is-preparing');
           if(LTDEMO.openBook){LTDEMO.openBook(book.chapters[state.chapterIndex].id,book.id);return;}
-          $('#shelfScreen').style.display='none';
+          $('#shelfScreen').classList.add('is-covered');
           $('#shelfScreen').classList.remove('is-leaving');
           window.scrollTo({top:0,behavior:'smooth'});
         });
@@ -202,7 +202,7 @@ export function createReader(deps) {
         renderReader();
         var sourceRect=$('#bookCoverFace').getBoundingClientRect();
         $('#readerScreen').classList.add('is-preparing');
-        $('#shelfScreen').style.display='block';
+        $('#shelfScreen').classList.remove('is-covered');
         renderShelf();
         var target=getShelfCard(state.shelfIndex);
         var targetRect=target?target.querySelector('.book-cover').getBoundingClientRect():null;
@@ -246,7 +246,7 @@ export function createReader(deps) {
         if(forward){
           $('#leftPage').innerHTML=leftMarkup(book,current);
           $('#rightPage').innerHTML=rightMarkup(book,next);
-          $('#underPage').style.display='block';
+          $('#underPage').classList.remove('hidden');
           $('#underPage').innerHTML=rightMarkup(book,next);
           $('#sheetFront').innerHTML=rightMarkup(book,current);
           $('#sheetBack').innerHTML=leftMarkup(book,next);
@@ -255,7 +255,7 @@ export function createReader(deps) {
         }else{
           $('#leftPage').innerHTML=leftMarkup(book,next);
           $('#rightPage').innerHTML=rightMarkup(book,next);
-          $('#underPage').style.display='none';
+          $('#underPage').classList.add('hidden');
           $('#sheetFront').innerHTML=leftMarkup(book,current);
           $('#sheetBack').innerHTML=rightMarkup(book,next);
           void sheet.offsetWidth;

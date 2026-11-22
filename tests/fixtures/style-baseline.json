@@ -16,25 +16,13 @@
       "important": 31,
       "inlineStyle": 0
     },
-    "public/v41/views/board/board-detail.js": {
-      "important": 0,
-      "inlineStyle": 15
-    },
     "public/v41/views/board/board-extra.css": {
       "important": 3,
       "inlineStyle": 0
     },
-    "public/v41/views/board/board-extras.js": {
-      "important": 0,
-      "inlineStyle": 21
-    },
     "public/v41/views/board/board.css": {
       "important": 12,
       "inlineStyle": 0
-    },
-    "public/v41/views/board/board.js": {
-      "important": 0,
-      "inlineStyle": 7
     },
     "public/v41/views/network/network.js": {
       "important": 0,

@@ -104,4 +104,38 @@ body[data-path-only="1"] .threadGroup:not(.selectedPath){opacity:.12}body[data-p
 html[data-lt-board-theme="night"]{--lt-thread-rose:#ff8fb3;--lt-thread-violet:#c4b0ff;--lt-thread-cyan:#8fd8ff;--lt-thread-amber:#ffd67d}
 .boardThemeSwitch{display:inline-flex;align-items:center;gap:2px;padding:2px;border-radius:12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1)}
 .themeSwitchBtn{height:34px;padding:0 11px;border-radius:9px;font-size:13px;font-weight:600}
-.themeSwitchBtn[aria-pressed="true"]{background:rgba(255,230,166,.18);color:#ffe6a6;box-shadow:inset 0 0 0 1px rgba(255,230,166,.45)}/* #504: 눌린 판은 aria-pressed로 알리고 같은 모양을 유지한다 */
+.themeSwitchBtn[aria-pressed="true"]{background:rgba(255,230,166,.18);color:#ffe6a6;box-shadow:inset 0 0 0 1px rgba(255,230,166,.45)}
+
+/* === #886: 화면 JS가 넣던 고정 인라인 스타일을 클래스로 옮긴다 — 실행 중 계산되는 값(좌표·회전·판 크기)만 인라인에 남긴다. === */
+/* 카드 자리: 좌표는 데이터라 CSS 변수(--card-x·--card-y)로 넘기고 CSS가 left·top을 꽂는다. 끌기·쌓기는 여전히 인라인 left·top으로 이긴다. */
+.card{left:var(--card-x,0px);top:var(--card-y,0px)}
+/* 판 이동 전환(applyView의 animated 값) */
+#world.lt-view-pan{transition:transform 1s cubic-bezier(.22,.8,.2,1)}
+/* 시네마 동안 머리줄·도구 줄·왼쪽 판 흐림(headerFade 값 — board-extras의 한 벌 기준) */
+body.lt-cinema-fade header{opacity:.12}
+body.lt-cinema-fade .toolbar{opacity:0}
+body.lt-cinema-fade #cinemaBtn{opacity:0}
+body.lt-cinema-fade #leftPanel{opacity:.07;pointer-events:none}
+body.lt-cinema-fade #themeBadge{opacity:.08}
+/* 시네마 만개 장면의 실 빛줄기 */
+body.lt-bloom-glow .threadGlow{opacity:.82}
+/* 저장 전 모습·수정 미리보기의 고정 글자·여백 — 아이디로 한 번 더 무게를 얹어 정원 테마의 .modal div 규칙보다 위에 선다(지금까지 인라인이 이기던 자리). */
+#composerPreview{margin-top:12px}
+#composerPreview .previewNote{background:#fff6dd;color:#4d3d50;padding:20px;font-size:16px}
+#editPreview .previewNote{background:#fff6dd;color:#4d3d50;padding:20px}
+#composerPreview .previewTypeRow{margin-top:12px;font-size:9px;color:#64566f}
+#editPreview .previewTypeRow{margin-top:10px;font-size:9px;color:#64566f}
+#composerPreview .previewTitle{margin:5px 0;color:#34283d}
+#editPreview .previewTitle{color:#34283d}
+#composerPreview .previewMemo,#editPreview .previewMemo{font-size:10px;color:#5d4f66}
+#editPreview .previewCard{margin-top:12px}
+/* 꼬리표 고르기·수정 창의 고정 여백·보조 글자 */
+.keywordPickerLead{margin-top:10px}
+.keywordAddRow{display:flex;gap:6px}
+.keywordAddBtn{margin-top:10px}
+.labelSpaced{margin-top:12px}
+#removePhoto{margin-top:7px}
+#formArea .mediaFieldNote{font-size:10px;color:#9b89a5;margin-top:6px}
+#editFields .editMediaNote{font-size:10px;color:#a995b1;margin:5px 0}
+#editFields .editMetaNote{font-size:10px;color:#94829e;margin-top:10px}
+#styleSection .ctaRow{margin-top:8px}/* #504: 눌린 판은 aria-pressed로 알리고 같은 모양을 유지한다 */
