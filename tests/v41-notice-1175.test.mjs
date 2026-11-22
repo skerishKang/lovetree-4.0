@@ -9,7 +9,8 @@ import { createLocation } from '../public/v41/shell/location.mjs';
 const read = p => readFileSync(new URL('../' + p, import.meta.url), 'utf8');
 const bookHtml = read('public/v41/views/track59-sketchbook.html');
 const shellCss = read('public/v41/shell.css');
-const shell = read('public/v41/shell.mjs');
+const memberRuntime = read('public/v41/shell/member-runtime.mjs');
+const navigationRuntime = read('public/v41/shell/navigation-runtime.mjs');
 
 function setup({ hash = '#home', handled = '', source = 'example', owned = false, shareId = null, current = 'src064-orbit.html' } = {}) {
   const calls = [];
@@ -94,10 +95,10 @@ test('#1175 ③ 창이 열려 있어도 알림은 머리글 아래에 둔다 —
 
 test('#1175 ③ 로그아웃 상태 시작의 저장 연결 확인(401)은 진입 알림을 띄우지 않는다', () => {
   // 로그인한 상태에서 세션이 만료된 뒤에만('in' 표시가 있을 때) 알림을 띄운다.
-  assert.match(shell, /status\.phase==='login'&&!status\.dirty&&document\.body\.dataset\.member==='in'\)notify\('로그인이 필요해요\.'/);
+  assert.match(memberRuntime, /status\.phase\s*===\s*'login'\s*&&\s*!\s*status\.dirty\s*&&\s*document\.body\.dataset\.member\s*===\s*'in'\s*\)\s*\(\s*0\s*,\s*ctx\.notify\s*\)\s*\(\s*'로그인이 필요해요\.'/);
 });
 
 test('#1175 ① share 잔여를 치우는 길은 남은 감상 안내도 함께 거둔다', () => {
-  assert.match(shell, /function leaveShare\(view\)\{hideToast\(\);void sample\(\{\},view\);\}/, '토스트를 거두고 예시 기록을 다시 싣는다');
-  assert.match(shell, /if\(file==='src064-orbit\.html'&&source==='share'\)\{leaveShare\(file\);return true;\}/, '로고 길에서 share 잔여를 치운다');
+  assert.match(memberRuntime, /function\s+leaveShare\s*\(\s*view\s*\)\s*\{\s*\(\s*0\s*,\s*ctx\.hideToast\s*\)\s*\(\s*\)\s*;\s*void\s+sample\s*\(\s*\{\s*\}\s*,\s*view\s*\)\s*;\s*\}/, '토스트를 거두고 예시 기록을 다시 싣는다');
+  assert.match(navigationRuntime, /if\s*\(\s*file\s*===\s*'src064-orbit\.html'\s*&&\s*ctx\.source\s*===\s*'share'\s*\)\s*\{\s*\(\s*0\s*,\s*ctx\.leaveShare\s*\)\s*\(\s*file\s*\)\s*;\s*return\s+true\s*;\s*\}/, '로고 길에서 share 잔여를 치운다');
 });

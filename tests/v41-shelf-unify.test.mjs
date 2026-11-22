@@ -176,7 +176,8 @@ test('#서재에서 새 트리를 만드는 입구는 오른쪽 단추 하나다
 
 // 261118 대표 지적 4: 이어 보기 띠가 테마를 따른다 — 정원에서도 검은 밤 카드로 남지 않는다.
 test('#서재 트리 0개 주소 진입도 서재 빈 화면으로 시작한다', () => {
-  const shellMjs = read('public/v41/shell.mjs');
-  const choose = shellMjs.slice(shellMjs.indexOf('function choose(id,momentId,skipShow=false)'), shellMjs.indexOf('function paintEmptyForScreen'));
-  assert.match(choose, /paintEmptyForScreen\(current\)/, '빈 판은 지금 화면의 빈 상태 문구로 칠한다');
+  const workspace = read('public/v41/shell/workspace-runtime.mjs');
+  const choose = workspace.match(/function\s+choose\s*\(\s*id\s*,\s*momentId\s*,\s*skipShow\s*=\s*false\s*\)([\s\S]*?)function\s+paintEmptyForScreen/);
+  assert.ok(choose, 'choose 함수가 빈 화면 처리 앞에 있다');
+  assert.match(choose[1], /paintEmptyForScreen\s*\(\s*ctx\.current\s*\)/, '빈 판은 지금 화면의 빈 상태 문구로 칠한다');
 });

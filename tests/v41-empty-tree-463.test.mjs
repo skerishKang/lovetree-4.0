@@ -10,37 +10,43 @@ import { readFileSync, existsSync } from 'node:fs';
 import { serve } from './helpers/screen-audit.mjs';
 
 const read = (p) => readFileSync(new URL('../' + p, import.meta.url), 'utf8');
-const shell = read('public/v41/shell.mjs');
+const workspaceRuntime = read('public/v41/shell/workspace-runtime.mjs');
+const memberRuntime = read('public/v41/shell/member-runtime.mjs');
+function emptyCopyBody() {
+  const match = workspaceRuntime.match(/function\s+paintEmptyCopy\s*\(\s*\)\s*\{([\s\S]*?)^\s*\}/m);
+  assert.ok(match, 'paintEmptyCopy 함수가 있어야 한다');
+  return match[1];
+}
 const index = read('public/v41/index.html');
 const identity = read('public/v41/identity.css');
 const home = read('v41/home.js');
 
 // ── ③ 빈 화면 문구·단추: 로그인(트리 0개)이면 '첫 트리 만들기'가 주 버튼 ──
 test('#463 트리 0개 빈 화면 문구는 처음 온 사람용 한 줄이고, 예시 안내를 밝힌다', () => {
-  const block = shell.slice(shell.indexOf('function paintEmptyCopy(){'));
-  const body = block.slice(0, block.indexOf('\n}\n'));
+  const body = emptyCopyBody();
   assert.match(body, /좋아하는 영상 주소 하나면 시작돼요/, '처음 온 사람용 한 줄(#463 고칠 방향)');
   assert.match(body, /지금 보이는 카드는 예시예요/, '떠 있는 카드가 예시라는 것을 밝힌다');
   assert.doesNotMatch(body, /예시를 둘러보거나 첫 트리를 만들어 보세요/, '옛 문구(다시 온 사람용)가 남아 있지 않다');
 });
 
 test('#463 로그인(트리 0개)에서는 "＋ 첫 트리 만들기"가 주 버튼, "예시 둘러보기"는 보조', () => {
-  const block = shell.slice(shell.indexOf('function paintEmptyCopy(){'));
-  const body = block.slice(0, block.indexOf('\n}\n'));
+  const body = emptyCopyBody();
   assert.match(body, /\+ 첫 트리 만들기|＋ 첫 트리 만들기/, '로그인 상태의 단추 이름');
   // 주 버튼 표시는 계정 상태에 따라 뒤집힌다.
-  assert.match(body, /empty-records'?\)\.classList\.toggle\('primary',owned\)|\$\('empty-records'\)\.classList\.toggle\('primary',owned\)/, '첫 트리 만들기가 주 버튼');
-  assert.match(body, /\$\('empty-sample'\)\.classList\.toggle\('primary',!owned\)/, '예시 둘러보기는 보조');
+  assert.match(body, /\(\s*0\s*,\s*ctx\.\$\s*\)\s*\(\s*'empty-records'\s*\)\s*\.\s*classList\s*\.\s*toggle\s*\(\s*'primary'\s*,\s*owned\s*\)/, '첫 트리 만들기가 주 버튼');
+  assert.match(body, /\(\s*0\s*,\s*ctx\.\$\s*\)\s*\(\s*'empty-sample'\s*\)\s*\.\s*classList\s*\.\s*toggle\s*\(\s*'primary'\s*,\s*!\s*owned\s*\)/, '예시 둘러보기는 보조');
 });
 
 
 test('#463 제목·강조는 상태 갱신에도 유지된다(단추 이름·주 버튼이 엇갈리지 않게)', () => {
   // refreshWrite 가 이름을 다시 쓰면 한 곳과 같은 글자여야 하고, 강조도 같이 유지되어야 한다.
-  assert.equal((shell.match(/＋ 첫 트리 만들기/g) || []).length >= 2, true, '이름이 두 자리에서 같게 쓰인다');
+  assert.match(emptyCopyBody(), /'empty-records'\s*\)\s*\.\s*textContent\s*=\s*owned\s*\?\s*'＋ 첫 트리 만들기'/);
+  assert.match(memberRuntime, /'empty-records'\s*\)\s*\.\s*textContent\s*=\s*status\.writable\s*\?\s*'＋ 첫 트리 만들기'/, '상태 갱신에서도 이름이 같다');
+  assert.match(memberRuntime, /'empty-records'\s*\)\s*\.\s*classList\s*\.\s*toggle\s*\(\s*'primary'\s*,\s*!!\s*status\.writable\s*\)/);
+  assert.match(memberRuntime, /'empty-sample'\s*\)\s*\.\s*classList\s*\.\s*toggle\s*\(\s*'primary'\s*,\s*!\s*status\.writable\s*\)/);
 });
 test('#463 로그아웃 문구·단추는 지금 그대로 둔다(2026-11-07 방침)', () => {
-  const block = shell.slice(shell.indexOf('function paintEmptyCopy(){'));
-  const body = block.slice(0, block.indexOf('\n}\n'));
+  const body = emptyCopyBody();
   assert.match(body, /'다시 펼칠 순간을 기다리고 있어요\.'/, '로그아웃 제목 그대로');
   assert.match(body, /'예시를 둘러보거나 로그인한 계정의 기록을 불러오세요\.'/, '로그아웃 문구 그대로');
   assert.match(body, /'내 기록 불러오기'/, '로그아웃 단추 이름 그대로');

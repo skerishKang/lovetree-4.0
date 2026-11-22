@@ -1,3 +1,4 @@
+// Accessibility styles intentionally override legacy screen-specific sizing, colors and motion; board/map styles are maintained separately.
 // 화면 접근성 어댑터. 원본 뷰의 구조·시각 결과는 바꾸지 않고,
 // 셸이 iframe을 불러온 뒤 이름·키보드·포커스만 보완한다.
 export const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]):not([type="hidden"]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';

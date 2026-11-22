@@ -67,8 +67,8 @@ test('refreshUnauthorized 진입부 canRefresh=false면 재시도 없이 401 반
 });
 
 test('shell.mjs는 공용 화면에서 게이트를 끄고 startMember에서 켠다',()=>{
-  const shell=readFileSync(new URL('../public/v41/shell.mjs',import.meta.url),'utf8');
-  const startLine=shell.split(/\r?\n/).find(line=>line.includes('async function startMember'));
-  assert.ok(startLine,'startMember 선언이 있어야 한다');
-  assert.match(startLine,/setMemberRefreshStarted\(true\)/);
+  const member=readFileSync(new URL('../public/v41/shell/member-runtime.mjs',import.meta.url),'utf8');
+  const session=readFileSync(new URL('../public/v41/shell/session-state.mjs',import.meta.url),'utf8');
+  assert.match(member,/async\s+function\s+startMember\s*\(\s*\)\s*\{\s*setMemberRefreshStarted\s*\(\s*true\s*\)/,'startMember 진입에서 게이트를 켠다');
+  assert.match(session,/setMemberRefreshStarted\s*\(\s*false\s*\)/,'공용 화면에서는 게이트를 끈다');
 });
