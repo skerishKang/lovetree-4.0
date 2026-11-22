@@ -72,7 +72,7 @@ function journeyHarness({ owned = true, writable = true, source = 'server', curr
   return {journey, els, posted, replacedUrls, shown, notices, panels, modal, state: () => ({current, handled}), restore: () => restore(saved)};
 }
 
-function messagesHarness({ owned = true, source = 'server', current = 'track59-sketchbook.html', model = {trees: [{id: 'tree1', moments: [{id: 'm1'}]}]} } = {}) {
+function messagesHarness({ owned = true, source = 'server', current = 'track59-sketchbook.html', model = {trees: [{id: 'tree1', moments: [{id: 'm1'}]}]}, applyImpl = null } = {}) {
   const saved = globals();
   const els = {};
   const events = {};
@@ -90,7 +90,8 @@ function messagesHarness({ owned = true, source = 'server', current = 'track59-s
   els['view'] = fakeElement({contentWindow: {postMessage: (message, origin) => calls.replies.push([message, origin])}});
 
   let ownedNow = owned;
-  const member = {snapshot: () => ({owned: ownedNow, writable: true, dirty: false}), apply: (...args) => calls.applies.push(args)};
+  // #1072 A-16: 저장이 실제로 실패하는 상황을 재현하기 위해 apply를 갈아 낄 수 있다.
+  const member = {snapshot: () => ({owned: ownedNow, writable: true, dirty: false}), apply: applyImpl ? applyImpl : (...args) => calls.applies.push(args)};
   const shareApi = {
     preview: async payload => { requests.push(['preview', payload]); return {ok: true, preview: {previewToken: 'tok-1', tree: {title: '윤슬', moments: [{title: '첫 순간', emotion: '설렘', date: '2026-11-01'}]}}}; },
     create: async payload => { requests.push(['create', payload]); return {ok: true, share: {id: 'share-1', view: 'book'}}; },
@@ -380,5 +381,24 @@ test('여정 단계 이동은 열린 여정이면 화면에 단계만 알린다'
     const message = h.posted.find(entry => entry[0]?.type === 'lt41-journey-goto');
     assert.equal(message[0].step, 3);
     assert.equal(message[1], 'https://lovetree-4-0.pages.dev');
+  } finally { h.restore(); }
+});
+
+// ---- #1072 A-16: 보드 저장 실패가 오류 기록(report)에 남는다 — 의견 보내기로 실리는 기록의 원천 ----
+import {reportEntries} from '../public/v41/report.mjs';
+
+test('보드 저장(lt41-board-sync)이 실패하면 오류 기록에 남고 화면에는 실패를 알린다', () => {
+  const h = messagesHarness({applyImpl: () => { throw new Error('서버가 저장을 거절했어요'); }});
+  try {
+    h.receive({type: 'lt41-board-sync', treeId: 'tree1', moments: [{id: 'm1', y: -10000}]});
+    assert.equal(h.calls.replies.length, 1, '화면으로 답을 보낸다');
+    assert.equal(h.calls.replies[0][0].ok, false, '답은 실패다');
+    const entries = reportEntries();
+    assert.ok(entries.length >= 1, '오류 기록이 남는다');
+    const last = entries.at(-1);
+    assert.equal(last.where, '보드 저장');
+    assert.equal(last.message, '서버가 저장을 거절했어요');
+    assert.ok(last.at, '시각이 기록된다');
+    assert.deepEqual(Object.keys(last).sort(), ['at', 'message', 'where'], '기록 한 건은 메시지·위치·시각뿐이다');
   } finally { h.restore(); }
 });

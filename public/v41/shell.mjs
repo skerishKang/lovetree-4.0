@@ -33,6 +33,8 @@ import {createTagSave} from './shell/tag-save.mjs';
 import {headerBadge, cleanupAvailable} from './inbox-model.mjs';
 import {createDialogs} from './shell/dialogs.mjs';
 import {createFeedbackDialog} from './feedback.mjs';
+// #1072 A-16: 화면 공용 오류 기록 — 저장 경로의 빈 catch를 여기서 기록한다.
+import {report} from './report.mjs';
 import {createFeedbackBoard} from './feedback-board.mjs';
 import {mountUpdates} from './updates.mjs';
 // #1026 E 2단계(A-06): 창을 열 때만 쓰는 모듈은 그때 받는다. 지연 프록시는 첫 메서드 호출에 모듈을
@@ -1102,7 +1104,7 @@ function memberStatus(status){
  else if(status.phase==='synced'){
   // #984: 저장이 서버에서 확인되면(직전 미저장→synced) 열린 화면에 표지·이름 다시 그리기를 알린다.
   // 실패(rejected·offline·conflict·login)에서는 알리지 않는다 — 화면은 원래 표지를 그대로 두고 저장 안내 떠가 실패를 알린다.
-  if(previousDirty){try{for(const f of frames())f.contentWindow?.postMessage({type:'lt41-trees-saved'},location.origin);}catch{}}
+  if(previousDirty){try{for(const f of frames())f.contentWindow?.postMessage({type:'lt41-trees-saved'},location.origin);}catch(error){report(error, '저장 알림 보내기');}}
   // #549: 기록(순간)이 0개인 새 계정의 첫 안내는 '불러왔어요' 대신 첫 순간 안내로(문구는 notice.mjs 한 벌).
   // #905: 자동 저장이 성공하면 알리지 않는다 — 직전에 저장 안 됨이었다면(previousDirty) 방금 저장된 것이다.
   // 알림은 실패·오프라인·충돌(저장 안내 떠)과 사용자가 누른 큰 동작의 완료 확인만 띄운다.
@@ -1156,9 +1158,9 @@ async function startMember(){setMemberRefreshStarted(true);if(!leaveMember())ret
    const resolved=load({revision:0,state},'server',requested,saved);initialized=true;
    if(window.LT41)window.LT41.prefs=state.prefs;
    // #441 후속: 다른 기기의 첫 그림도 계정 날짜 표기를 따르도록, 로그인 때 기기 미러 캐시를 계정값으로 채운다.
-   try{localStorage.setItem('lt41.dateStyle',normalizeDateStyle(state.prefs?.dateStyle));}catch{}
+   try{localStorage.setItem('lt41.dateStyle',normalizeDateStyle(state.prefs?.dateStyle));}catch(error){report(error, '기기 설정 저장');}
    // 261116 PR 2: 첫 화면 카드 모드도 기기 미러를 계정값으로 채운다(첫 화면 문서는 계정 값을 늦게 알 수 있다).
-   try{localStorage.setItem('lt41.homeMoment',JSON.stringify(normalizeHomeMoment(state.prefs?.homeMoment)));}catch{}
+   try{localStorage.setItem('lt41.homeMoment',JSON.stringify(normalizeHomeMoment(state.prefs?.homeMoment)));}catch(error){report(error, '기기 설정 저장');}
    // #481: 제목 보기도 같은 이유로 기기 미러를 계정값으로 채운다.
    rememberTitleDisplay(state.prefs?.titleDisplay);
    paintTitleDisplayControls();

@@ -162,7 +162,7 @@ function describe(value=''){
  const link=parseMomentLink(value);
  if(!link.openUrl)return {...link,kind:link.kind==='none'?'none':'invalid'};
  if(link.kind==='youtube')return {...link,loadUrl:youtubeThumbUrl(link.videoId,link.vertical),loadLabel:'영상 썸네일 불러오기'};
- const u=new URL(link.openUrl);let path=u.pathname;try{path=decodeURIComponent(path)}catch{}
+ const u=new URL(link.openUrl);let path=u.pathname;try{path=decodeURIComponent(path)}catch(e){globalThis.LT41Report?.report(e,'미디어 링크 주소 해석')}
  const kind=/\.(?:png|jpe?g|webp|avif|gif)$/i.test(path)?'photo':/\.(?:mp4|webm|ogv)$/i.test(path)?'video':'link';
  const privateFile=!!privateAssetName(u.href);
  if(privateFile)u.href=globalThis.location.origin+u.pathname;
@@ -331,7 +331,7 @@ async function playInPlace(root){
  const start=Number(root.dataset.ltStart||m.startSeconds||0);
  const rangeUsed=!fromStart&&end>start;
  let embed=null;
- try{const usability=await import('/v41/book-usability.mjs');embed=fromStart?usability.embedUrl(m.videoId,0):(rangeUsed?rangeEmbedUrl(m.videoId,start,end):usability.embedUrl(m.videoId,start));}catch{}
+ try{const usability=await import('/v41/book-usability.mjs');embed=fromStart?usability.embedUrl(m.videoId,0):(rangeUsed?rangeEmbedUrl(m.videoId,start,end):usability.embedUrl(m.videoId,start));}catch(e){globalThis.LT41Report?.report(e,'미디어 임베드 준비')}
  if(!embed){delete root.dataset.ltPlaying;if(status)status.textContent='바로 재생할 수 없어요. 아래 원본 링크에서 열어 주세요.';return;}
  // #792 2단계: 추가·고치기 창의 미리보기만 IFrame API로 재생 위치를 읽는다. 다른 화면은 지금 그대로다.
  const segmentEditor=!!root.closest('#moment-form');
@@ -430,7 +430,7 @@ async function openLightbox(url,title='',verticalHint=null){
  const alive=()=>lightbox===overlay;
  if(m.kind==='youtube'){
   let embed=null;
-  try{const usability=await import('/v41/book-usability.mjs');embed=usability.embedUrl(m.videoId,m.startSeconds)}catch{}
+  try{const usability=await import('/v41/book-usability.mjs');embed=usability.embedUrl(m.videoId,m.startSeconds)}catch(e){globalThis.LT41Report?.report(e,'미디어 임베드 준비')}
   if(!alive())return;
   if(!embed){stage.innerHTML='<p class="lt-lightbox-note">바로 재생할 수 없어요. 원본 링크에서 열어 주세요.</p>';return}
   const frame=document.createElement('iframe');

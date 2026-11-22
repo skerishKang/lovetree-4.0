@@ -230,3 +230,60 @@ test('#619-6 문서: updates.json 다음 버전(4.1.4)에 끼워 넣기 한 줄�
   assert.ok(next, '다음 버전 항목이 있다');
   assert.ok(next.items.some((i) => /끼워|사이/.test(i.text) && i.source === 'team'), '끼워 넣기 한 줄이 team 출처로 있다');
 });
+
+test('#1072 A-17 화면: 카드 앞으로·뒤로 단추로 순서를 바꾸고 초점이 단추에 남는다', { skip: REQUIRE ? false : skip, timeout: 300000 }, async () => {
+  if (skip) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip}`);
+  // 날짜순(초기 순서): s7→s0. s5(순위 2)의 '앞으로'를 누르면 s6(순위 1)과 자리를 바꾼다.
+  const tree = starTree(8);
+  const server = await serve({ '/__host-order-btn.html': hostHTML(tree) });
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const { context, page, frame, problems } = await openHost(browser, `${base}/__host-order-btn.html`, { width: 1440, height: 900 });
+    await frame.evaluate(() => document.querySelector('[data-board-mode="mine"]').click());
+    await page.waitForTimeout(900);
+    // 단추가 카드마다 있고, 이름은 카드 제목과 함께 '한 장 앞으로/뒤로'를 말한다.
+    const btns = await frame.evaluate(() => [...document.querySelectorAll('.orderBtn')].map((b) => ({ id: b.dataset.orderId, dir: b.dataset.orderDir, label: b.getAttribute('aria-label') })));
+    assert.equal(btns.length, 16, '카드 8장에 앞으로·뒤로 단추가 하나씩 있다');
+    const s5prev = btns.find((b) => b.id === 's5' && b.dir === 'prev');
+    assert.equal(s5prev.label, '모은 순간 6 카드를 한 장 앞으로', `단추 이름에 카드 제목이 들어간다: ${s5prev.label}`);
+    // '앞으로'를 누른다 — s5는 한 자리 앞으로(s6와 자리를 바꾼다), 나머지는 그대로다.
+    await frame.evaluate(() => document.querySelector('.orderBtn[data-order-id="s5"][data-order-dir="prev"]').click());
+    await page.waitForTimeout(900);
+    const sync = await page.evaluate(() => window.LT41_MESSAGES.filter((m) => m.type === 'lt41-board-sync').at(-1));
+    assert.ok(sync?.moments, '순서 저장 메시지가 간다');
+    const rank = new Map(sync.moments.map((m) => [m.id, m.y]));
+    assert.equal(rank.get('s5'), -10000 + 1, 's5는 한 자리 앞으로 간다');
+    assert.equal(rank.get('s6'), -10000 + 2, '밀린 s6은 한 자리 뒤로 간다');
+    assert.equal(rank.get('s7'), -10000 + 0, '맨 앞은 그대로다');
+    assert.equal(rank.get('s4'), -10000 + 3, 's4는 그대로다');
+    const focus = await frame.evaluate(() => { const a = document.activeElement; return a && a.classList.contains('orderBtn') ? { id: a.dataset.orderId, dir: a.dataset.orderDir } : null; });
+    assert.deepEqual(focus, { id: 's5', dir: 'prev' }, '옮긴 뒤에도 같은 단추에 초점이 남아 여러 장을 이어서 옮길 수 있다');
+    // '뒤로'를 다시 누르면 원래 자리로 돌아온다(되돌리기와 별개의 자리 이동).
+    await frame.evaluate(() => document.querySelector('.orderBtn[data-order-id="s5"][data-order-dir="next"]').click());
+    await page.waitForTimeout(900);
+    const sync2 = await page.evaluate(() => window.LT41_MESSAGES.filter((m) => m.type === 'lt41-board-sync').at(-1));
+    const rank2 = new Map(sync2.moments.map((m) => [m.id, m.y]));
+    assert.equal(rank2.get('s5'), -10000 + 2, '뒤로를 누르면 원래 순위로 돌아온다');
+    assert.equal(rank2.get('s6'), -10000 + 1, 's6도 원래 순위로 돌아온다');
+    const g = await geometry(frame);
+    assert.equal(g.pairs, 0, '순서를 옮긴 뒤에도 겹침 0');
+    assert.equal(problems.length, 0, `화면 문제 없음 (${problems.join(' | ') || '없음'})`);
+    await context.close();
+  } finally { await browser.close(); server.close(); }
+});
+
+test('#1072 A-17 화면: 공유·예시로 보는 읽기 전용 보드에는 순서 단추가 없다', { skip: REQUIRE ? false : skip, timeout: 300000 }, async () => {
+  if (skip) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip}`);
+  const tree = starTree(6);
+  const host = hostHTML(tree).replace('writable:true', 'writable:false').replace('owned:true', 'owned:false');
+  const server = await serve({ '/__host-order-readonly.html': host });
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const { context, frame } = await openHost(browser, `${base}/__host-order-readonly.html`, { width: 1440, height: 900 });
+    const count = await frame.evaluate(() => document.querySelectorAll('.orderBtn').length);
+    assert.equal(count, 0, '읽기 전용 보드에는 순서 단추를 만들지 않는다');
+    await context.close();
+  } finally { await browser.close(); server.close(); }
+});
