@@ -203,6 +203,27 @@ export function shelfRowLayout(count, railWidth, { pitch = 200, cardW = 190, pad
   };
 }
 
+// #1093 회전 보기 — git 기록 3b56d9f8(#839 직전)의 책장 회전 배치를 되살린다.
+// 옛판은 고른 책을 가운데 두고 옆 책을 rotateY로 기울였지만, 일정 거리 밖 책은
+// alpha·pointer-events로 숨겨 눌을 수 없었고 드래그마다 모든 카드에 스타일을 다시 썼다(끊김).
+// 여기서는 모든 책을 끝까지 보이게 두고(가림 0), 누름마다 한 번만 좌표를 정한다.
+export function shelfRotationLayout(count, railWidth, { pitch = 200, cardW = 190, pad = 24 } = {}) {
+  const safeWidth = Math.max(railWidth || 0, cardW + pad);
+  const maxCenter = Math.max(0, count - 1);
+  return {
+    pitch, cardW, safeWidth, maxCenter,
+    // 고른 책이 레일 가운데에 온다. 좌표는 레일 가운데가 0.
+    xOf: (index, center) => (index - center) * pitch,
+    rotate: (index, center) => {
+      const distance = index - center;
+      return distance === 0 ? 0 : distance > 0 ? -22 : 22;
+    },
+    scale: (index, center) => index === center ? 1.06 : 1,
+    depth: (index, center) => index === center ? 0 : -Math.abs(index - center) * 40,
+    centerFor: (index, current = 0) => Math.max(0, Math.min(maxCenter, Number.isFinite(index) ? index : current))
+  };
+}
+
 // 책 안 페이지 표시와 화살표 상태.
 export function pageMeta(index, count) {
   return {

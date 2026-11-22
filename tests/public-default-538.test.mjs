@@ -7,6 +7,7 @@ import { createTree, addMoment, removeMoment } from '../src/domain.js';
 import { createWorkspaceService } from '../server/workspace-service.js';
 import { createMemoryWorkspaceRepo } from '../server/testing/memory-workspace-repo.js';
 import { createMemoryShareRepo } from '../server/testing/memory-share-repo.js';
+import { createMemoryShareShowPendingRepo } from '../server/testing/memory-share-show-pending-repo.js';
 import { createMemoryTreeVisibilityRepo } from '../server/testing/memory-tree-visibility-repo.js';
 import { createMemoryTreeDiscoverRepo } from '../server/testing/memory-tree-discover-repo.js';
 import { createMemoryCommunityRepo } from '../server/testing/memory-community-repo.js';
@@ -39,13 +40,15 @@ async function setup({ roles = {}, stageIndex = null } = {}) {
     isDiscoverOn: (productId, subjectId, treeId) => discoverRepo.isOn(productId, subjectId, treeId)
   });
   let n = 0;
+  const pendingShowSync = createMemoryShareShowPendingRepo();
   const shareService = createShareService({
-    shareRepo, workspaceRepo, visibilityRepo, discoverRepo, stageIndex, productId: PRODUCT,
+    shareRepo, workspaceRepo, visibilityRepo, discoverRepo, stageIndex, pendingShowSync, productId: PRODUCT,
     makeId: () => String(++n).padStart(24, 'a')
   });
   const workspace = createWorkspaceService({
     repo: workspaceRepo, productId: PRODUCT,
-    onCommit: ({ subjectId, changedTreeIds }) => shareService.syncSharesAfterSave(subjectId, changedTreeIds)
+    onCommit: ({ subjectId, changedTreeIds }) => shareService.afterSave(subjectId, changedTreeIds),
+    onAccess: ({ subjectId }) => shareService.retryPendingVisibleSync(subjectId).catch(() => {})
   });
   const communityService = createCommunityService({
     communityRepo, shareRepo, workspaceRepo, visibilityRepo, stageIndex, productId: PRODUCT,
@@ -73,7 +76,7 @@ async function setup({ roles = {}, stageIndex = null } = {}) {
   // 둘러보기 소개 켜기(2026-11-16 대표 결정 — 기본 꼬짐, 고객이 켠다). 실제 API 경로를 그대로 밟는다.
   const discoverOn = async (tree, who = 'alice') =>
     request(shareHandle, 'PUT', `/api/trees/${tree.id}/discover`, { discover: true }, who);
-  return { workspace, workspaceRepo, shareRepo, visibilityRepo, discoverRepo, shareService, shareHandle, communityHandle, request, browse, discoverOn };
+  return { workspace, workspaceRepo, shareRepo, visibilityRepo, discoverRepo, shareService, shareHandle, communityHandle, request, browse, discoverOn, pendingShowSync, waitForShowSync: () => shareService.waitForShowSync() };
 }
 
 test('오래된 저장 요청을 재시도해도 현재 트리의 공유와 소개 동의가 유지된다', async () => {
@@ -81,9 +84,12 @@ test('오래된 저장 요청을 재시도해도 현재 트리의 공유와 소�
   const who = principal('alice'), oldTree = treeWithMoments(1), currentTree = treeWithMoments(3);
   const first = { state: { version: 1, trees: [oldTree] }, expectedRevision: 0, clientKey: 'old-seed' };
   await h.workspace.write(who, first);
+  await h.waitForShowSync();
   await h.workspace.write(who, { state: { version: 1, trees: [currentTree] }, expectedRevision: 1, clientKey: 'next-seed' });
+  await h.waitForShowSync();
   await h.discoverOn(currentTree);
   await h.workspace.write(who, first);
+  await h.waitForShowSync();
   const shares = await h.shareService.list('alice');
   assert.equal(shares.find(row => row.treeId === oldTree.id).status, 'revoked');
   assert.deepEqual(shares.filter(row => row.status === 'active').map(row => [row.treeId, row.discover]), [[currentTree.id, true]]);
@@ -112,7 +118,8 @@ test('무대 소속 갱신이 실패해도 저장·공개·회수·운영 숨김
     assert.equal(result.body.report.hidden, visibility === 'hidden');
   }
   await h.workspace.write(owner, { state: { version: 1, trees: [] }, expectedRevision: 1, clientKey: 'tree-gone' });
-  assert.deepEqual(calls, Array(8).fill(owner));
+  await h.waitForShowSync();
+  assert.deepEqual(calls, Array(10).fill(owner), '저장은 응답 전 색인 재조정 1회와 보임 반영 뒤 색인 재조정 1회를 쓴다');
   assert.equal(logger.mock.callCount(), calls.length);
   assert.ok(logger.mock.calls.every(call => call.arguments.length === 1 && !call.arguments[0].includes('test failure')));
 });
@@ -121,6 +128,7 @@ test('새 트리는 공개가 기본이다 — 공유 링크 없이 저장만으
   const h = await setup();
   const tree = treeWithMoments(3, { url: 'https://i.ytimg.com/vi/abc/hqdefault.jpg' });
   await h.workspace.write(principal('alice'), { state: { version: 1, trees: [tree] }, expectedRevision: 0, clientKey: 'seed-1' });
+  await h.waitForShowSync();
   const shares = await h.shareRepo.list({ productId: PRODUCT, subjectId: 'alice' });
   assert.equal(shares.length, 1);
   assert.equal(shares[0].origin, 'auto', '자동 공개 행');
@@ -135,6 +143,7 @@ test('둘러보기 소개는 기본 꺼짐 — 켜면 나오고 끄면 빠진다
   const h = await setup();
   const tree = treeWithMoments(3, { url: 'https://i.ytimg.com/vi/abc/hqdefault.jpg' });
   await h.workspace.write(principal('alice'), { state: { version: 1, trees: [tree] }, expectedRevision: 0, clientKey: 'seed-1' });
+  await h.waitForShowSync();
   // 기본값 확인: GET 은 꺼짐을 돌려준다.
   const before = await h.request(h.shareHandle, 'GET', `/api/trees/${tree.id}/discover`, null, 'alice');
   assert.equal(before.status, 200);
@@ -164,6 +173,7 @@ test('남의 트리 소개는 못 바꾼다 — 본인 트리만 켜고 끈다',
   const h = await setup();
   const tree = treeWithMoments(3);
   await h.workspace.write(principal('alice'), { state: { version: 1, trees: [tree] }, expectedRevision: 0, clientKey: 'seed-other' });
+  await h.waitForShowSync();
   const other = await h.request(h.shareHandle, 'PUT', `/api/trees/${tree.id}/discover`, { discover: true }, 'bob');
   assert.equal(other.status, 404, '남의 트리는 내 트리 목록에 없는 것과 같다(상태 노출 금지)');
   assert.deepEqual((await h.browse()).items, [], '남의 요청으로 켜지지 않는다');
@@ -173,6 +183,7 @@ test('tester 트리는 소개를 켜도 둘러보기에 나오지 않는다(#678
   const h = await setup({ roles: { alice: ROLE_TESTER } });
   const tree = treeWithMoments(3);
   await h.workspace.write(principal('alice'), { state: { version: 1, trees: [tree] }, expectedRevision: 0, clientKey: 'seed-tester' });
+  await h.waitForShowSync();
   const on = await h.discoverOn(tree);
   assert.equal(on.status, 200, '켜기 자체는 본인 트리라 허용된다');
   assert.deepEqual((await h.browse()).items, [], 'tester 트리는 켜도 목록에 나오지 않는다');
@@ -182,6 +193,7 @@ test('기존에 둘러보기에 나오던 트리는 migration(백필) 뒤에도 
   const h = await setup();
   const tree = treeWithMoments(3);
   await h.workspace.write(principal('alice'), { state: { version: 1, trees: [tree] }, expectedRevision: 0, clientKey: 'seed-backfill' });
+  await h.waitForShowSync();
   // migration tree-discover-optin-261116.sql 의 백필과 같은 자리 — '지금 나오던 트리'를 켜짐으로 채운다.
   // (메모리 모형에서는 백필 결과를 저장소에 직접 심는 것으로 같은 상태를 만든다.)
   await h.discoverRepo.set({ productId: PRODUCT, subjectId: 'alice', treeId: tree.id, discover: true });
@@ -194,10 +206,12 @@ test('순간 2개면 둘러보기에 나오지 않고, 3개부터 나온다 — 
   const h = await setup();
   let tree = treeWithMoments(2, { url: MEDIA });
   await h.workspace.write(principal('alice'), { state: { version: 1, trees: [tree] }, expectedRevision: 0, clientKey: 'seed-2' });
+  await h.waitForShowSync();
   await h.discoverOn(tree); // 이 시험은 나열 조건(3개 경계)을 보는 것 — 소개를 켠다
   assert.deepEqual((await h.browse()).items, [], '순간 2개는 소개 대상이 아니다');
   tree = addMoment(tree, { subject: '윤슬', title: '직접 찍은 순간', note: '사진만', emotion: '고마움', date: '2026-11-03', url: MEDIA }, tree.moments[0].id, CLOCK);
   await h.workspace.write(principal('alice'), { state: { version: 1, trees: [tree] }, expectedRevision: 1, clientKey: 'add-3' });
+  await h.waitForShowSync();
   const items = (await h.browse()).items;
   assert.equal(items.length, 1, '직접 올린 사진만 있는 순간도 순간 수에 센다');
   assert.equal(items[0].momentCount, 3);
@@ -208,6 +222,7 @@ test('비공개는 누구나 무료로 바꿀 수 있다 — 둘러보기·공�
   const h = await setup();
   const tree = treeWithMoments(3);
   await h.workspace.write(principal('alice'), { state: { version: 1, trees: [tree] }, expectedRevision: 0, clientKey: 'seed-3' });
+  await h.waitForShowSync();
   await h.discoverOn(tree); // 켠 뒤 비공개를 본다
   const [auto] = await h.shareRepo.list({ productId: PRODUCT, subjectId: 'alice' });
   assert.equal((await h.browse()).items.length, 1, '켜면 둘러보기에 나온다');
@@ -232,6 +247,7 @@ test('주인이 트리를 지우면 자동 공개도 즉시 내려간다', async
   const h = await setup();
   const tree = treeWithMoments(3);
   await h.workspace.write(principal('alice'), { state: { version: 1, trees: [tree] }, expectedRevision: 0, clientKey: 'seed-4' });
+  await h.waitForShowSync();
   await h.discoverOn(tree);
   const [auto] = await h.shareRepo.list({ productId: PRODUCT, subjectId: 'alice' });
   assert.equal((await h.browse()).items.length, 1);
@@ -248,6 +264,7 @@ test('주인이 지운 트리의 주인 만든 공유 행도 회수하고 소개
   const gone = treeWithMoments(3);
   const kept = treeWithMoments(3);
   await h.workspace.write(principal('alice'), { state: { version: 1, trees: [gone, kept] }, expectedRevision: 0, clientKey: 'seed-ghost' });
+  await h.waitForShowSync();
   // 두 트리 모두 소개를 켜고, 각각 주인이 만든 공유 링크를 하나씩 만든다.
   await h.discoverOn(gone);
   await h.discoverOn(kept);
@@ -285,6 +302,7 @@ test('moment_count는 저장 때마다 갱신된다 — 순간 추가·삭제·�
   const h = await setup();
   let tree = treeWithMoments(3);
   await h.workspace.write(principal('alice'), { state: { version: 1, trees: [tree] }, expectedRevision: 0, clientKey: 'seed-5' });
+  await h.waitForShowSync();
   await h.discoverOn(tree);
   // 주인이 만든 공유 링크도 같은 훅에서 moment_count 를 갱신받는다.
   const preview = await h.request(h.shareHandle, 'POST', '/api/shares/preview', { treeId: tree.id, entryMomentId: tree.moments[0].id, view: 'book' }, 'alice');
@@ -295,12 +313,14 @@ test('moment_count는 저장 때마다 갱신된다 — 순간 추가·삭제·�
 
   tree = removeMoment(tree, tree.moments.at(-1).id, CLOCK);
   await h.workspace.write(principal('alice'), { state: { version: 1, trees: [tree] }, expectedRevision: 1, clientKey: 'remove-1' });
+  await h.waitForShowSync();
   assert.equal((await h.shareRepo.load({ productId: PRODUCT, shareId: ownerId })).momentCount, 2, '삭제 뒤 2로 갱신');
   assert.deepEqual((await h.browse()).items, [], '2개가 되면 둘러보기에서 내려간다');
 
   tree = addMoment(tree, { subject: '윤슬', title: '다시 추가', note: '기록', emotion: '벅참', date: '2026-11-04', url: '' }, tree.moments[0].id, CLOCK);
   tree = addMoment(tree, { subject: '윤슬', title: '또 추가', note: '기록', emotion: '즐거움', date: '2026-11-05', url: '' }, tree.moments[0].id, CLOCK);
   await h.workspace.write(principal('alice'), { state: { version: 1, trees: [tree] }, expectedRevision: 2, clientKey: 'add-2' });
+  await h.waitForShowSync();
   assert.equal((await h.shareRepo.load({ productId: PRODUCT, shareId: ownerId })).momentCount, 4, '추가 뒤 4로 갱신');
   assert.equal((await h.browse()).items.length, 1, '다시 3개 이상이면 소개된다');
 });
@@ -309,6 +329,7 @@ test('신고 숨김·차단은 공개 기본에서도 그대로 막는다', asyn
   const h = await setup();
   const tree = treeWithMoments(3);
   await h.workspace.write(principal('alice'), { state: { version: 1, trees: [tree] }, expectedRevision: 0, clientKey: 'seed-6' });
+  await h.waitForShowSync();
   await h.discoverOn(tree);
   const [auto] = await h.shareRepo.list({ productId: PRODUCT, subjectId: 'alice' });
   const report = await h.request(h.communityHandle, 'POST', `/api/community/shares/${auto.shareId}/report`, { reason: '확인이 필요해요' }, 'bob', 'report-key-1');
@@ -323,6 +344,7 @@ test('공개 응답 어디에도 계정 이름·아이디·이메일이 없다',
   const h = await setup();
   const tree = treeWithMoments(3);
   await h.workspace.write(principal('alice'), { state: { version: 1, trees: [tree] }, expectedRevision: 0, clientKey: 'seed-7' });
+  await h.waitForShowSync();
   await h.discoverOn(tree);
   const browseBody = await h.browse();
   assert.equal(JSON.stringify(browseBody).includes('alice'), false, '둘러보기 카드에 아이디가 없다');
@@ -340,6 +362,7 @@ test('자동 공개 행은 둘러보기 스위치로 바꿀 수 없다(소개 �
   const h = await setup();
   const tree = treeWithMoments(3);
   await h.workspace.write(principal('alice'), { state: { version: 1, trees: [tree] }, expectedRevision: 0, clientKey: 'seed-8' });
+  await h.waitForShowSync();
   await h.discoverOn(tree);
   const [auto] = await h.shareRepo.list({ productId: PRODUCT, subjectId: 'alice' });
   const off = await h.request(h.shareHandle, 'DELETE', `/api/shares/${auto.shareId}/discovery`, null, 'alice');
@@ -371,6 +394,7 @@ test('격리 트리가 섞인 문서를 저장하면 격리 트리는 자동 공
   const grown = addMoment(good, { subject: '윤슬', title: '새 순간', note: '기록', emotion: '설렘', date: '2026-11-02', url: '' }, good.moments[0].id, CLOCK);
   const saved = await h.workspace.write(principal('alice'), { state: { version: 1, trees: [grown] }, expectedRevision: 1, clientKey: 'k-share' });
   assert.equal(saved.revision, 2);
+  await h.waitForShowSync();
 
   const rows = await h.shareRepo.list({ productId: PRODUCT, subjectId: 'alice' });
   const auto = rows.filter(row => row.origin === 'auto' && row.status === 'active');
@@ -385,6 +409,7 @@ test('#1046: 공유 취소 뒤 저장이 있어도 옛 자동 주소는 410으�
   const h = await setup();
   const tree = treeWithMoments(3);
   await h.workspace.write(principal('alice'), { state: { version: 1, trees: [tree] }, expectedRevision: 0, clientKey: 'seed-revoke-1046' });
+  await h.waitForShowSync();
   const [auto] = await h.shareRepo.list({ productId: PRODUCT, subjectId: 'alice' });
   assert.equal(auto.status, 'active', '처음엔 자동 공개가 열려 있다');
   const oldId = auto.shareId;
@@ -396,6 +421,7 @@ test('#1046: 공유 취소 뒤 저장이 있어도 옛 자동 주소는 410으�
   // 아무 저장이나 한 번 — 저장 뒤 동기화가 같은 주소를 다시 켜지 않는다.
   const grown = addMoment(tree, { subject: '윤슬', title: '새 순간', note: '기록', emotion: '위로', date: '2026-11-02', url: '' }, tree.moments[0].id, CLOCK);
   await h.workspace.write(principal('alice'), { state: { version: 1, trees: [grown] }, expectedRevision: 1, clientKey: 'save-after-revoke-1046' });
+  await h.waitForShowSync();
   const still = await h.shareRepo.load({ productId: PRODUCT, shareId: oldId });
   assert.equal(still.status, 'revoked', '저장 뒤에도 자동 행이 되살아나지 않는다');
   assert.ok(still.revokedAt, '주인이 내림 표식이 남는다');
