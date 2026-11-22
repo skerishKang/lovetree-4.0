@@ -186,7 +186,7 @@ const shareService = createShareService({
 const service = createWorkspaceService({
   repo,
   productId: LOVETREE_PRODUCT_ID,
-  onCommit: ({ subjectId }) => shareService.syncSharesAfterSave(subjectId)
+  onCommit: ({ subjectId, changedTreeIds }) => shareService.syncSharesAfterSave(subjectId, changedTreeIds)
 });
 const legacyAuthenticate = await buildAuthenticate();
 const authenticate = createSharedAccessAuth({ enabled: sharedAuthEnabled(LOVETREE_SHARED_AUTH_ENABLED), legacy: legacyAuthenticate });

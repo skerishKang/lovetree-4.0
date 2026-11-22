@@ -45,7 +45,7 @@ async function setup({ roles = {}, stageIndex = null } = {}) {
   });
   const workspace = createWorkspaceService({
     repo: workspaceRepo, productId: PRODUCT,
-    onCommit: ({ subjectId }) => shareService.syncSharesAfterSave(subjectId)
+    onCommit: ({ subjectId, changedTreeIds }) => shareService.syncSharesAfterSave(subjectId, changedTreeIds)
   });
   const communityService = createCommunityService({
     communityRepo, shareRepo, workspaceRepo, visibilityRepo, stageIndex, productId: PRODUCT,

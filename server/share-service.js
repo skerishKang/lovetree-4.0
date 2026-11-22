@@ -153,7 +153,14 @@ export function createShareService({ shareRepo, workspaceRepo, visibilityRepo = 
     // 새로 공유하지 않는다. 대신 격리 트리에 이미 공유·소개 행이 있으면 해제하지 않고 그대로 둔다 —
     // 사용자가 같은 id로 트리를 새로 저장해 다시 읽을 수 있게 되면 공유가 그대로 살아난다.
     // 문서 뼈대 자체를 읽지 못하면 아무것도 해제하지 않는다(한꺼번에 내리는 사고를 막는다).
-    async syncSharesAfterSave(subjectId) {
+    // B-12(#1068): 이번 저장에서 바뀐 트리 목록(changedTreeIds)을 받으면 갱신 질의를 그 트리로 좁혀
+    // 질의 수가 바뀐 트리 수에 비례하게 한다. 활성 공유 행이 없는 트리는 바뀌지 않았어도 다시 시도해
+    // 자동 공개 행을 채운다(옛 저장에서 만들기가 실패했으면 다음 저장에서 회복). 집합을 받지 않는
+    // 다른 호출처는 예전처럼 모든 트리를 갱신한다. 회수(revokeSharesNotIn)·소개 행 정리·무대 색인
+    // 재조정은 '숨겨야 하는' 변경이라 좁히지 않고 — 늦게 반영되면 숨긴 게 잠깐 보일 수 있으므로
+    // 저장 응답 전에 전체 대조로 끝낸다.
+    async syncSharesAfterSave(subjectId, changedTreeIds = null) {
+      const touched = changedTreeIds ? new Set(changedTreeIds) : null;
       async function sync(scan, shares, discover) {
         const trees = scan.state.trees;
         const existing = await shares.list({ productId, subjectId });
@@ -161,6 +168,7 @@ export function createShareService({ shareRepo, workspaceRepo, visibilityRepo = 
         for (const tree of trees) {
           const treeId = tree.id, momentCount = tree.moments.length;
           if (!momentCount) continue;
+          if (touched && !touched.has(treeId) && activeTrees.has(treeId)) continue;
           await shares.updateMomentCount({ productId, subjectId, treeId, momentCount });
           if (activeTrees.has(treeId)) continue;
           const entry = tree.moments.find(moment => moment.parentId === null) || tree.moments[0];
