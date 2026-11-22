@@ -221,6 +221,17 @@ jobs:
           npx vite build > /dev/null
           node --test --test-concurrency=1 tests/v41-932-937-board-legend.test.mjs tests/v41-bottom-links-850.test.mjs
           echo "보드 범례·바닥 링크 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+      # A-17(#1072): 그림 이름·단추 이름·입력 칸 이름 세 규칙 위반 0을 실제 화면(로그아웃 예시 5화면·의견 창 +
+      # 모의 로그인 보드·크게 보기·추가·수정 창·설정 프로필)에서 잰다. 바로 위 단계가 만든 빌드 결과를 쓴다. 건너뜀=실패.
+      - name: 접근성 이름 세 규칙 시험(건너뜀=실패 — A-17)
+        env:
+          LT_A17_REQUIRE: '1'
+        if: needs.screen-changes.outputs.changed == 'true'
+        run: |
+          start=$(date +%s)
+          test -f dist/v41/home.html || npx vite build > /dev/null
+          node --test --test-concurrency=1 tests/v41-a11y-views.test.mjs
+          echo "접근성 이름 세 규칙 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
 
       - name: 화면 변경 없으면 건너뜀을 남긴다
         if: always()

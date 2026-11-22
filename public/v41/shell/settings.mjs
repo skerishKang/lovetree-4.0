@@ -1,5 +1,7 @@
 // 설정·계정 창 — shell.mjs에서 코드 위치만 옮긴 모듈(#886). 동작·기준은 그대로다.
 // 상태는 deps의 getter로 받는다(모듈이 shell을 다시 import하지 않는다).
+// #1072 A-16: 의견 보내기의 '함께 보낼 정보'에 실릴 최근 오류 기록은 report.mjs 한 곳에서 가져온다.
+import {reportEntries} from '../report.mjs';
 export function createSettings(deps){
 const { $, notify, setTitleDisplay, openLoginStart, links, screenForView, choose, panel, show, frames, frameLoaded, hideFrames, closeAccountMenu, openAccountMenu, renderAccount, updateAccountControls, openAssets, openEditor, sample, backup, clear, startMember, leaveMember, openFallbackShell, writeLocation, load, flowNavigation, closePanels, renderTreeMenu, requestBoardOpen, lastShelfTreeId, shellHeader, shellDialogs,  shareApi, accountApi, readTheme, writeTheme, normalizeAccentColor, normalizeDateStyle, normalizeStartPlace, normalizeShareView, normalizeHomeMoment,  readPageTurn, writePageTurn, frameMessage, displayTreeTitle, accountPresentation, createFeedbackDialog, createFeedbackBoard, mountUpdates, readWriteTab, writeWriteTab, clearCachedWorkspace, createWorkspaceApi, paintThemeControls, applyTheme, toggleTheme, paintBookDisplayControls } = deps;
 const $on=(id,fn)=>{const el=$(id);if(el)el.onclick=fn;};
@@ -21,7 +23,9 @@ const themeToggleTop=$('theme-toggle');if(themeToggleTop)themeToggleTop.onclick=
   const owned=!!deps.member?.snapshot().owned;
   const screen=$('community-panel')?.open?'둘러보기':$('account-settings')?.open?'설정':(FEEDBACK_SCREEN[deps.current]||'첫 화면');
   const treeId=owned&&deps.source==='server'&&window.LT41?.tree?.id?String(window.LT41.tree.id):'';
-  return {screen,viewport:window.innerWidth+'x'+window.innerHeight,theme:readTheme(localStorage),version:'4.1',loggedIn:owned,treeId};
+  // #1072 A-16: 최근 오류 기록(최대 20건 — 메시지·위치·시각만)을 '함께 보낼 정보'로 실어 보낸다.
+  const recentErrors=reportEntries();
+  return {screen,viewport:window.innerWidth+'x'+window.innerHeight,theme:readTheme(localStorage),version:'4.1',loggedIn:owned,treeId,recentErrors};
  }
  const feedbackDialog=createFeedbackDialog({$,notify,getContext:feedbackContext,show:()=>panel('feedback-panel'),openMyPosts:()=>{shellDialogs.requestClose('feedback-panel');feedbackBoard.openMyPosts();}});
  // 2026-11-16 계정 메뉴 정리: 메뉴의 '의견 보내기' 칸을 없애고 내 의견 창 안에서 바로 보내게 했다.
