@@ -4,6 +4,7 @@ import {parsePrincipal} from './principal.js';
 import {createRateLimiter} from './rate-limit.js';
 import {ROLE_ADMIN, ROLE_AI_CUSTOMER} from './admin-roles.js';
 import {audienceForRole} from './ops-notify.js';
+import {OPS_INGEST_PATH} from './proxy-proof.js';
 
 /**
  * 고객 의견 창구 (#540) + 2차 관리자 게시판.
@@ -55,6 +56,17 @@ function jsonBody(request) {
 function clientKey(request) {
   const raw = String(request?.headers?.['x-lovetree-client-ip'] || '').trim();
   return /^[0-9A-Fa-f.:]{3,64}$/.test(raw) ? raw : 'anonymous';
+}
+
+function validateOpsEvent(event) {
+  const invalid=()=>{throw new ApiError(400,'invalid_event','운영센터 요청 형식을 확인해 주세요.');};
+  if(!event||typeof event!=='object'||Array.isArray(event)||typeof event.eventKey!=='string'||event.eventKey.length<16||event.eventKey.length>128||/[^A-Za-z0-9_-]/.test(event.eventKey)||!Number.isSafeInteger(event.feedbackId)||event.feedbackId<=0)invalid();
+  if(event.kind==='status'){
+    if(!isStatus(event.status))invalid();
+  }else if(event.kind==='reply'){
+    if(typeof event.replyId!=='string'||!event.replyId.trim()||event.replyId.includes('\0')||typeof event.body!=='string'||!event.body.trim()||event.body.includes('\0')||[...event.body].length>2000||typeof event.createdAt!=='string'||!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(event.createdAt)||!Number.isFinite(Date.parse(event.createdAt)))invalid();
+  }else invalid();
+  return event;
 }
 
 function sanitizeContext(input) {
@@ -120,6 +132,22 @@ export function createFeedbackService({feedbackRepo,productId,admin=null,opsNoti
    statuses:FEEDBACK_STATUSES,
    kinds:FEEDBACK_KINDS,
 
+   // 받음 기록과 쓰기는 한 거래로 묶고 정방향 보내기 함수를 거치지 않는다.
+   async ingestOpsEvent(input){
+    const event=validateOpsEvent(input);
+    return feedbackRepo.transaction(async client=>{
+      if(!await feedbackRepo.claimIngestEvent({productId,eventKey:event.eventKey},client))return {ok:true,duplicate:true};
+      const post=await feedbackRepo.get({productId,id:event.feedbackId},client);
+      if(!post||post.kind!=='opinion')throw new ApiError(404,'feedback_not_found','의견을 찾을 수 없어요.');
+      if(event.kind==='reply'){
+        await feedbackRepo.addReply({productId,postId:post.id,authorType:'customer',body:maskPersonal(event.body),opsReplyId:event.replyId,createdAt:event.createdAt},client);
+      }else{
+        await feedbackRepo.update({productId,id:post.id,status:event.status},client);
+      }
+      return {ok:true};
+    });
+   },
+
    /** 1차: 의견 보내기(로그인·로그아웃). */
    async submit({principal=null,request,category,body,context}={}){
     if(!isCategory(category))throw new ApiError(400,'category_invalid','어떤 의견인지 골라 주세요.');
@@ -184,7 +212,7 @@ export function createFeedbackService({feedbackRepo,productId,admin=null,opsNoti
       // #678 후속: 고객이 지운 덧붙임(status='deleted')은 목록에서 뺀다(커뮤니티 댓글과 같은 방식).
       // 고칠 수 있는지(mine·canEdit·canDelete)와 고쳤는지(edited)는 댓글의 publicComment처럼 알린다.
       item.replies=replies.filter(reply=>reply.authorType==='customer'&&reply.status!=='deleted')
-        .map(reply=>({...publicFollowup(reply,principal.subjectId),authorType:reply.authorType}));
+        .map(reply=>({...publicFollowup(reply,principal.subjectId),authorType:reply.authorType,...(reply.opsReplyId?{authorName:'운영센터'}:{})}));
      }else{
       item.replies=[];
      }
@@ -273,7 +301,7 @@ export function createFeedbackService({feedbackRepo,productId,admin=null,opsNoti
     await requireAdmin(principal);
     const row=await feedbackRepo.get({productId,id});
     if(!row)throw new ApiError(404,'feedback_not_found','글을 찾을 수 없어요.');
-    const replies=(await feedbackRepo.listReplies({productId,postId:row.id})).map(reply=>({...reply,fromCustomer:reply.authorType==='customer'&&reply.authorSubjectId===row.subjectId}));
+    const replies=(await feedbackRepo.listReplies({productId,postId:row.id})).map(reply=>({...reply,fromCustomer:reply.authorType==='customer'&&!!reply.authorSubjectId&&reply.authorSubjectId===row.subjectId}));
     const persona=row.subjectId?await feedbackRepo.getPersona({productId,subjectId:row.subjectId}):null;
     return {...boardRow(row),replies,persona};
    },
@@ -350,6 +378,14 @@ export function createFeedbackHandler({authenticate,service,productId}){
  }
  async function handle(request){
   const path=String(request?.path||''),method=request?.method||'GET',query=request?.query||new URLSearchParams();
+  if(path===OPS_INGEST_PATH&&method==='POST'){
+   const bytes=request.rawBody??Buffer.from(request.body||'','utf8');
+   if(request.bodyTooLarge||bytes.length>8192)throw new ApiError(400,'invalid_body','요청 본문 크기를 확인해 주세요.');
+   let event;
+   try {event=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes));}
+   catch {throw new ApiError(400,'invalid_json','요청 형식을 읽을 수 없어요.');}
+   return {status:200,body:await service.ingestOpsEvent(event),headers:NO_STORE};
+  }
   if(path==='/api/feedback'&&method==='POST'){
    const who=await optionalPrincipal(request);
    const body=jsonBody(request);

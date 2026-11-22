@@ -53,6 +53,18 @@ test('611 4번: 안 본 운영센터 답글만 센다(내 덧붙임은 빼고)',
   assert.equal(unreadReplyCount(null, new Set()), 0);
 });
 
+test('#1211: 받은 운영센터 답글은 이름과 본문을 표시하고 수정 단추가 없다', async()=>{
+  const posts=[{id:5,kind:'opinion',status:'fixed',body:'의견',replies:[{id:21,authorType:'customer',authorName:'운영센터',mine:false,canEdit:false,canDelete:false,body:'답글을 받았어요.'}]}];
+  const {board,els,restore}=mount(null,posts);
+  try{
+    await board.openMyPosts();
+    const html=els['myposts-list'].innerHTML;
+    assert.match(html,/<span>운영센터<\/span>/);
+    assert.match(html,/답글을 받았어요\./);
+    assert.doesNotMatch(html,/data-reply-edit=|data-reply-delete=/);
+  }finally{restore();}
+});
+
 test('611 4번: 열어 보면 사라진다 — 내 의견 목록의 숫자는 0으로 보고된다', async () => {
   const posts = [{id: 5, kind: 'opinion', status: 'fixed', issueNumber: '#608', displayTitle: '보드 날짜', body: '기력', createdAt: '2026-11-14T00:00:00Z', replies: [{id: 21, authorType: 'customer', mine: false, body: '봤어요'}]}];
   const {board, els, counts, restore} = mount(null, posts);

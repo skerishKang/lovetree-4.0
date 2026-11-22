@@ -524,10 +524,19 @@ CREATE TABLE IF NOT EXISTS lovetree_feedback_replies (
   body text NOT NULL CHECK (char_length(body) BETWEEN 1 AND 4000),
   status text NOT NULL DEFAULT 'visible' CHECK (status IN ('visible','deleted')),
   created_at timestamptz NOT NULL DEFAULT now(),
-  edited_at timestamptz
+  edited_at timestamptz,
+  ops_reply_id text
 );
 CREATE INDEX IF NOT EXISTS lovetree_feedback_replies_post_idx
   ON lovetree_feedback_replies (product_id, post_id, created_at);
+
+-- #1211: 운영센터에서 받은 일 키를 처리 결과와 같은 거래로 저장한다.
+CREATE TABLE IF NOT EXISTS lovetree_feedback_ingest_events (
+  product_id text NOT NULL,
+  event_key text NOT NULL CHECK (event_key ~ '^[A-Za-z0-9_-]{16,128}$'),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (product_id,event_key)
+);
 
 -- #1190: 공용 운영센터로 보낼 줄. 의견 id·종류·일 키를 묶어 같은 일을 두 번 넣지 않는다.
 CREATE TABLE IF NOT EXISTS lovetree_feedback_outbox (

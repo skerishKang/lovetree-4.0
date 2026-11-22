@@ -437,6 +437,45 @@ test('순간 줄은 제목·날짜·감정·꼬리표·주소·메모를 전부 
   assert.equal(momentRow(null), null);
 });
 
+test('#1211: 수신 답글과 상태는 한 번만 반영하고 고객에게 보이며 다시 보내지 않는다', async () => {
+  const feedbackRepo=createMemoryFeedbackRepo(),outbox=createMemoryFeedbackOutbox();
+  const service=createFeedbackService({feedbackRepo,productId:PRODUCT,outbox});
+  const saved=await service.submit({principal:principal('alice'),request:{headers:{}},category:'bug',body:'의견'});
+  const handle=createFeedbackHandler({authenticate:async()=>principal('alice'),service,productId:PRODUCT});
+  const event={eventKey:'ops_reply_1234567',feedbackId:saved.id,kind:'reply',replyId:'reply-123',body:'확인했습니다.',createdAt:'2026-11-23T00:00:00.000Z'};
+  const call=body=>handle({method:'POST',path:'/api/ops-feedback/ingest',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
+  for(const bad of [{eventKey:'short'},{feedbackId:String(saved.id)},{kind:'reply_edit'},{replyId:12},{body:'가'.repeat(2001)},{createdAt:'yesterday'},{kind:'status',status:'unknown'}]){
+    assert.equal((await call({...event,...bad})).status,400);
+  }
+  assert.equal((await handle({method:'POST',path:'/api/ops-feedback/ingest',headers:{},body:'{bad'})).status,400);
+  assert.equal((await handle({method:'POST',path:'/api/ops-feedback/ingest',headers:{},body:'x'.repeat(8193)})).status,400);
+  assert.equal((await call({...event,feedbackId:99999})).status,404);
+  const other=await feedbackRepo.create({productId:'other',category:'bug',body:'다른 제품'});
+  assert.equal((await call({...event,feedbackId:other.id})).status,404);
+  const journal=await feedbackRepo.create({productId:PRODUCT,kind:'journal',category:'other',body:'일지'});
+  assert.equal((await call({...event,feedbackId:journal.id})).status,404);
+  const first=await call(event);
+  assert.equal(first.status,200);
+  assert.deepEqual(first.body,{ok:true});
+  assert.deepEqual((await call(event)).body,{ok:true,duplicate:true});
+  const status={eventKey:'ops_status_123456',feedbackId:saved.id,kind:'status',status:'fixed'};
+  assert.deepEqual((await call(status)).body,{ok:true});
+  assert.deepEqual((await call(status)).body,{ok:true,duplicate:true});
+  for(const [i,value] of ['received','reviewing','later','closed','fixed'].entries()){
+    assert.deepEqual((await call({...status,eventKey:`ops_status_next_${i}`,status:value})).body,{ok:true});
+    assert.equal((await feedbackRepo.get({productId:PRODUCT,id:saved.id})).status,value);
+  }
+  assert.equal((await outbox.list()).length,1);
+  const mine=await handle({method:'GET',path:'/api/board/mine',headers:{}});
+  assert.equal(mine.status,200);
+  const post=mine.body.posts.find(p=>p.id===saved.id);
+  assert.equal(post.status,'fixed');
+  assert.equal(post.replies.length,1);
+  assert.deepEqual(post.replies.map(r=>[r.body,r.authorName,r.createdAt,r.mine,r.canEdit,r.canDelete]),[[event.body,'운영센터',event.createdAt,false,false,false]]);
+  assert.equal(feedbackRepo.replies[0].opsReplyId,event.replyId);
+  assert.equal(post.replies[0].opsReplyId,undefined);
+});
+
 test('1190: 새 의견을 저장하면 보낼 줄이 생기고 이메일·소개는 담지 않는다', async () => {
   const feedbackRepo=createMemoryFeedbackRepo();
   const outbox=createMemoryFeedbackOutbox({now:()=>1000});
