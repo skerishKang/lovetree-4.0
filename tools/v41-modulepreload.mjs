@@ -5,6 +5,8 @@
 // home.html(v41/home.html)은 vite 진입점이라 빌드가 번들+modulepreload를 자동 생성한다.
 // 그 목록은 시험이 빌드 결과로 검증한다(tools가 아닌 vite가 목록을 만든다).
 import fs from 'node:fs';
+import os from 'node:os';
+import assert from 'node:assert/strict';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
@@ -99,6 +101,52 @@ export function apply(html, files, href = f => f) {
   return html.replace('</title>', '</title>' + next);
 }
 
+// Vite emits the production HTML and its hashed dependency graph together.
+// Raw source fixtures keep the source preloads above; deployed shell/home
+// must instead match the exact static chunk graph, never the raw modules.
+export function builtGraph(dist) {
+  const manifest = JSON.parse(fs.readFileSync(path.join(dist, '.vite/manifest.json'), 'utf8'));
+  const chunks = new Map(JSON.parse(fs.readFileSync(path.join(dist, '.vite/v41-module-graph.json'), 'utf8'))
+    .map(chunk => [chunk.file, chunk]));
+  function entry(source, htmlFile) {
+    const main = manifest[source]?.file;
+    assert.ok(main && chunks.has(main), source + ': missing built entry');
+    const html = fs.readFileSync(path.join(dist, htmlFile), 'utf8');
+    assert.ok(!html.includes('modulepreload:start'), htmlFile + ': raw preload block');
+    const scripts = [...html.matchAll(/<script\b([^>]*)>/g)].map(m => m[1])
+      .filter(a => /\btype\s*=\s*["']module["']/.test(a))
+      .map(a => a.match(/\bsrc\s*=\s*["']([^"']+)["']/)?.[1]);
+    assert.deepEqual(scripts, ['/' + main], htmlFile + ': entry script');
+    const links = [...html.matchAll(/<link\b([^>]*)>/g)].map(m => m[1])
+      .filter(a => /\brel\s*=\s*["']modulepreload["']/.test(a))
+      .map(a => a.match(/\bhref\s*=\s*["']([^"']+)["']/)?.[1]);
+    const seen = new Set();
+    function visit(file) {
+      if (seen.has(file)) return;
+      seen.add(file);
+      assert.ok(chunks.has(file) && fs.existsSync(path.join(dist, file)), 'Missing chunk: ' + file);
+      for (const dep of chunks.get(file).imports) visit(dep);
+    }
+    visit(main);
+    const deps = [...seen].filter(file => file !== main).map(file => '/' + file).sort();
+    assert.deepEqual(links.sort(), deps, htmlFile + ': static hashed preloads');
+    const members = new Map();
+    for (const file of seen) {
+      for (const module of chunks.get(file).modules) {
+        if (!members.has(module)) members.set(module, new Set());
+        members.get(module).add(file);
+      }
+    }
+    return { main, chunks: seen, members };
+  }
+  const shell = entry('public/v41/index.html', 'v41/index.html');
+  const home = entry('v41/home.html', 'v41/home.html');
+  const shared = [...shell.members.keys()].filter(module => home.members.has(module)).sort();
+  const duplicates = shared.filter(module => new Set([...shell.members.get(module), ...home.members.get(module)]).size > 1);
+  assert.ok(shared.length > 0, 'Expected shell/home shared modules');
+  return { shell, home, shared, duplicates };
+}
+
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const check = process.argv.includes('--check');
   let drifted = false;
@@ -116,4 +164,16 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     }
   }
   if (drifted) process.exit(1);
+  if (check) {
+    const {build} = await import('vite');
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'lt400-built-'));
+    try {
+      await build({ root: repoRoot, logLevel: 'silent', build: {outDir: tmp, emptyOutDir: true} });
+      const graph = builtGraph(tmp);
+      assert.deepEqual(graph.duplicates, [], 'Shell/home duplicate modules');
+      console.log('Built shell/home preloads OK; shared modules:', graph.shared.length);
+    } finally {
+      fs.rmSync(tmp, {recursive: true, force: true});
+    }
+  }
 }

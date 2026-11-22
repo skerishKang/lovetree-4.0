@@ -6,7 +6,8 @@ import path from 'node:path';
 import zlib from 'node:zlib';
 import { createServer } from 'node:http';
 import { chromium } from 'playwright';
-import { collect, SCREENS } from './v41-modulepreload.mjs';
+import { createTree, addMoment } from '../public/v41/domain.mjs';
+import { collect, SCREENS, builtGraph } from './v41-modulepreload.mjs';
 
 const MIME = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
@@ -25,12 +26,12 @@ function arg(name, fallback) {
 const DIST = path.resolve(arg('dist', 'dist'));
 const LABEL = arg('label', '현재');
 const JSON_OUT = arg('json', '');
+const SLOW = process.argv.includes('--slow');
 
 function workspace() {
-  const t = { id: 't1', title: '측정 나무', moments: [
-    { id: 'm1', title: '첫 순간', date: '2026-01-01', emotion: '설렘', note: '가짜 기록', parentId: null, url: '', x: 100, y: 100, rot: 0, color: 'rose', keywords: [] },
-    { id: 'm2', title: '둘째 순간', date: '2026-01-02', emotion: '설렘', note: '가짜 기록', parentId: 'm1', url: '', x: 200, y: 150, rot: 0, color: 'sky', keywords: [] },
-  ], edges: [{ id: 'e1', kind: 'parent', from: 'm1', to: 'm2', reason: '' }] };
+  const input = { subject: '측정 나무', title: '첫 순간', date: '2026-01-01', emotion: '설렘', note: '가짜 기록' };
+  let t = createTree(input, '2026-01-01T00:00:00.000Z');
+  t = addMoment(t, { ...input, title: '둘째 순간', date: '2026-01-02' }, t.moments[0].id, '2026-01-02T00:00:00.000Z');
   return { revision: 1, state: { version: 1, trees: [t], prefs: {} }, subject: 'a21-measure', writeSubjectBound: true, savedAt: '2026-11-20T00:00:00.000Z' };
 }
 
@@ -64,7 +65,15 @@ function serve() {
 
 async function measure(base, browser, login, width, height) {
   const context = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
+  await context.addInitScript(() => {
+    window.__a21Shifts = [];
+    new PerformanceObserver(list => {
+      for (const entry of list.getEntries()) if (!entry.hadRecentInput) window.__a21Shifts.push(entry.value);
+    }).observe({ type: 'layout-shift', buffered: true });
+  });
   const page = await context.newPage();
+  const pageErrors = [];
+  page.on('pageerror', error => pageErrors.push(error.message));
   const url = login ? `${base}/v41/?account=1#home` : `${base}/v41/#home`;
   const ws = workspace();
   await page.route('**/api/**', async (route) => {
@@ -78,6 +87,10 @@ async function measure(base, browser, login, width, height) {
   });
   const client = await context.newCDPSession(page);
   await client.send('Network.enable');
+  if (SLOW) {
+    await client.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+    await client.send('Network.emulateNetworkConditions', { offline: false, latency: 150, downloadThroughput: 200000, uploadThroughput: 93750 });
+  }
   const reqInfo = new Map();
   client.on('Network.requestWillBeSent', (e) => {
     reqInfo.set(e.requestId, { url: e.request.url });
@@ -107,7 +120,20 @@ async function measure(base, browser, login, width, height) {
     const totalReq = snap.length;
     const totalBytes = snap.reduce((a, x) => a + (x.encoded || 0), 0);
     const list = snap.map((x) => { const u = new URL(x.url); return { path: u.pathname, encoded: x.encoded || 0 }; }).sort((a, b) => b.encoded - a.encoded);
-    return { login, width, height, requests: totalReq, bytes: totalBytes, list };
+    const state = await page.evaluate(() => ({
+      member: document.body.dataset.member,
+      source: document.body.dataset.recordSource,
+      treeCount: Number(document.body.dataset.treeCount || 0),
+      cls: (window.__a21Shifts || []).reduce((sum, n) => sum + n, 0)
+    }));
+    const home = frame ? await frame.evaluate(() => ({
+      orbit: !!document.querySelector('#orbit'),
+      cls: (window.__a21Shifts || []).reduce((sum, n) => sum + n, 0)
+    })) : null;
+    if (!home?.orbit || state.member !== (login ? 'in' : 'out') || (login && state.treeCount !== 1) || pageErrors.length) {
+      throw new Error('Invalid measurement: ' + JSON.stringify({ login, state, home, pageErrors }));
+    }
+    return { login, width, height, requests: totalReq, bytes: totalBytes, state, home, list };
   } finally {
     await context.close().catch(() => {});
   }
@@ -143,7 +169,9 @@ function staticDuplicates() {
 
 async function main() {
   if (!fs.existsSync(path.join(DIST, 'v41', 'home.html'))) throw new Error('빌드 결과가 없어 ' + DIST + ' 를 확인할 수 없습니다.');
-  const dups = staticDuplicates();
+  const graph = fs.existsSync(path.join(DIST, '.vite/v41-module-graph.json')) ? builtGraph(DIST) : null;
+  const dups = graph ? graph.duplicates : staticDuplicates();
+  if (graph) console.log('Shared modules (actual chunk membership)', graph.shared.length, graph.shared.join(','));
   console.log('겹치는 모듈(이론)', dups.length, dups.join(','));
   const server = await serve();
   const base = 'http://127.0.0.1:' + server.address().port;
@@ -162,7 +190,7 @@ async function main() {
     await browser.close().catch(() => {});
     server.close();
   }
-  const summary = { label: LABEL, dist: DIST, cases: results.map(({ list, ...rest }) => rest), duplicates: dups, lists: results.map((r) => ({ tag: (r.login ? '로그인 ' : '로그아웃 ') + r.width, list: r.list.slice(0, 20) })) };
+  const summary = { label: LABEL, dist: DIST, slow: SLOW, shared: graph?.shared ?? [], cases: results.map(({ list, ...rest }) => rest), duplicates: dups, lists: results.map((r) => ({ tag: (r.login ? '로그인 ' : '로그아웃 ') + r.width, list: r.list })) };
   if (JSON_OUT) fs.writeFileSync(JSON_OUT, JSON.stringify(summary, null, 2));
   console.log(JSON.stringify(summary.cases, null, 2));
 }
