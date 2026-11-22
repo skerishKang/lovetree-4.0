@@ -561,4 +561,146 @@ testOrSkip('#1098 1단계: ♡는 크게 하나 — 빠르게 누르면 공감 �
   }
 });
 
+// #1098 2단계: 판의 순간 목록 — 판 위쪽은 트리 숫자(1단계)를 유지하고, 목록의 순간 카드는 그 순간의 ♡·댓글 수를 보인다.
+// ♡ 누르기·댓글 쓰기는 순간 단위 API(서버 #1136), AI 명예회원 댓글은 트리 작성자 표시와 같은 방식으로 구분,
+// 막히면(횟수 제한 모의) 서버 응답 안내를 그대로 보여 주고 눌림 표시를 되돌려 화면이 깨지지 않게 한다.
+// 로그인 없이 모의 응답만 쓴다(실제 계정·비밀값 미사용).
+const MOMENT_TARGETS = { share: { shareId: 'r000000000000000000000a', treeId: 't-1098-2' }, tree: { id: 't-1098-2', title: '반응·댓글 있는 공개 트리', moments: [
+  { id: 'm-1098-2-1', title: '첫 순간', date: '2026-11-01', emotion: '설렘' },
+  { id: 'm-1098-2-2', title: '둘째 순간', date: '2026-11-02', emotion: '설렘' },
+  { id: 'm-1098-2-3', title: '셋째 순간', date: '2026-11-03', emotion: '설렘' },
+] } };
+const MOMENT_STATS = {
+  'm-1098-2-1': { hearts: 7, aiHearts: 2, comments: 4, hearted: false },
+  'm-1098-2-2': { hearts: 1, aiHearts: 0, comments: 0, hearted: false },
+  'm-1098-2-3': { hearts: 4, aiHearts: 0, comments: 2, hearted: true },
+};
+const MOMENT_COMMENTS = [
+  { id: 'mc-1', authorLabel: '기록한 사람', body: '이 순간을 처음 본 날의 기억이 나요.', createdAt: '2026-11-20T09:00:00.000Z', edited: false, aiTester: true },
+  { id: 'mc-2', authorLabel: '기록한 사람', body: '같은 무대 다녀온 사람으로서 공감해요.', createdAt: '2026-11-20T10:00:00.000Z', edited: false },
+];
+testOrSkip('#1098 2단계: 판의 순간 목록 — 순간 카드에 그 순간의 ♡·댓글 수(트리 숫자와 안 섞임), ♡ 누르기·댓글 쓰기는 순간 API, 서버 안내 그대로', async () => {
+  const server = createServer(async (req, res) => {
+    const clean = decodeURIComponent((req.url || '/').split('?')[0]);
+    if (clean === '/probe') { res.writeHead(200, { 'content-type': MIME['.html'] }); res.end(PROBE_HTML); return; }
+    const file = path.join(PUB, clean);
+    try {
+      const st = await stat(file);
+      if (!st.isFile()) { res.writeHead(404); res.end(); return; }
+      res.writeHead(200, { 'content-type': MIME[path.extname(file)] || 'application/octet-stream' });
+      createReadStream(file).pipe(res);
+    } catch { res.writeHead(404); res.end(); }
+  });
+  await new Promise((r) => server.listen(0, r));
+  const port = server.address().port;
+  const browser = await chromium.launch();
+  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  const json = (body) => ({ contentType: 'application/json', body: JSON.stringify(body) });
+  const momentStats = JSON.parse(JSON.stringify(MOMENT_STATS));
+  const momentComments = JSON.parse(JSON.stringify(MOMENT_COMMENTS));
+  let reactionCalls = [], commentCalls = 0, limitReaction = false;
+  try {
+    await page.route('**/api/**', (route) => {
+      const url = route.request().url();
+      const method = route.request().method();
+      if (/\/moments\/[^/]+\/comments$/.test(url)) {
+        if (method === 'POST') { commentCalls += 1; return route.fulfill(json({ comment: { id: 'mc-new-' + commentCalls, authorLabel: '나', body: '순간 댓글 새로', createdAt: '2026-11-20T11:00:00.000Z', edited: false } })); }
+        return route.fulfill(json({ comments: momentComments }));
+      }
+      if (/\/moments\/[^/]+\/reaction$/.test(url)) {
+        const momentId = decodeURIComponent(url.split('/moments/')[1].split('/reaction')[0]);
+        if (limitReaction) return route.fulfill({ status: 429, ...json({ error: { code: 'rate_limited', message: '조금 쉬었다가 다시 시도해 주세요.' } }) });
+        const enabled = method === 'PUT';
+        const stats = momentStats[momentId] || (momentStats[momentId] = { hearts: 0, aiHearts: 0, comments: 0, hearted: false });
+        stats.hearts += enabled ? 1 : -1; stats.hearted = enabled;
+        reactionCalls.push({ momentId, method });
+        return route.fulfill(json({ ...stats }));
+      }
+      const statsMatch = url.match(/\/moments\/([^/]+)$/);
+      if (statsMatch) return route.fulfill(json(momentStats[decodeURIComponent(statsMatch[1])] || { hearts: 0, aiHearts: 0, comments: 0, hearted: false }));
+      if (/\/api\/public\/shares\//.test(url)) return route.fulfill(json(MOMENT_TARGETS));
+      if (/\/comments$/.test(url)) return route.fulfill(json({ comments: COUNTS_COMMENTS }));
+      if (url.includes('/api/community/shares')) return route.fulfill(json({ items: COUNTS_CARDS, nextCursor: null, totalVisible: 1, groups: [], groupsAll: [] }));
+      return route.fulfill(json({ ok: true, items: [] }));
+    });
+    await openCountsPreview(page, port);
+    await page.waitForSelector('#community-preview .community-moment', { timeout: 5000 });
+    const state = await page.evaluate(() => {
+      const preview = document.getElementById('community-preview');
+      const rows = [...preview.querySelectorAll('.community-moment')].map((row) => ({
+        id: row.dataset.momentId,
+        title: row.querySelector('.community-moment-title')?.textContent || '',
+        glyph: row.querySelector('.community-moment-heart .community-moment-heart-glyph')?.textContent || '',
+        count: row.querySelector('.community-moment-heart .community-moment-count')?.textContent || '',
+        pressed: row.querySelector('.community-moment-heart')?.getAttribute('aria-pressed') || '',
+        aiBadge: Boolean(row.querySelector('.community-moment-heart .community-ai')),
+        commentsToggle: row.querySelector('.community-moment-comments-toggle')?.textContent.trim() || '',
+      }));
+      return {
+        rows,
+        metaText: preview.querySelector('.community-preview-meta')?.textContent || '',
+        treeComments: preview.querySelectorAll('.community-preview-comments .community-comment').length,
+        overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      };
+    });
+    assert.equal(state.rows.length, 3, `순간 목록에 공개 트리의 순간이 3장: ${JSON.stringify(state.rows)}`);
+    assert.equal(state.rows[0].title, '첫 순간', '목록은 공개 트리 읽기 순서를 따른다');
+    assert.equal(state.rows[0].glyph, '♡', '기본은 빈 하트');
+    assert.equal(state.rows[0].count, '7', '그 순간의 ♡ 수가 보인다(3 이상)');
+    assert.equal(state.rows[0].aiBadge, false, '♡ 단추에는 AI 배지를 두지 않는다 — 그 순간의 수만 보인다');
+    assert.equal(state.rows[0].commentsToggle, '댓글 4', '그 순간의 댓글 수가 보인다');
+    assert.equal(state.rows[1].count, '', '3 미만 ♡ 수는 숫자를 남기지 않는다(#824 결정 7 규칙)');
+    assert.equal(state.rows[1].commentsToggle, '댓글', '3 미만 댓글 수도 숫자를 남기지 않는다');
+    assert.equal(state.rows[2].pressed, 'true', '내가 누른 순간은 눌린 표시로 시작한다');
+    assert.doesNotMatch(state.metaText, /♡ 7|댓글 4/, '판 위쪽 한 줄 정보(트리 숫자)에 순간 수가 섞이지 않는다');
+    assert.match(state.metaText, /댓글 5/, '판 위쪽은 여전히 트리 댓글 수다');
+    assert.equal(state.treeComments, 3, '트리 댓글 묶음(1단계)은 그대로다');
+    assert.ok(state.overflow <= 1, `1440 가로 넉침 0: ${state.overflow}`);
+    // ♡ 누르기 — 순간 단위 API(PUT)로, 누른 순간 카드의 수만 바뀐다.
+    const firstHeart = page.locator('#community-preview .community-moment[data-moment-id="m-1098-2-1"] .community-moment-heart');
+    await firstHeart.click();
+    await page.waitForFunction(() => document.querySelector('#community-preview .community-moment[data-moment-id="m-1098-2-1"] .community-moment-heart .community-moment-count')?.textContent === '8', null, { timeout: 3000 });
+    assert.equal(reactionCalls.length, 1, '♡ 누르면 순간 반응 API를 한 번 부른다');
+    assert.equal(reactionCalls[0].momentId, 'm-1098-2-1', '순간 단위 API다(트리가 아닌 그 순간)');
+    assert.equal(await firstHeart.getAttribute('aria-pressed'), 'true', '눌림 표시');
+    assert.equal(await firstHeart.locator('.community-moment-heart-glyph').textContent(), '♥', '누른 하트는 채운 하트');
+    await firstHeart.click();
+    await page.waitForFunction(() => document.querySelector('#community-preview .community-moment[data-moment-id="m-1098-2-1"] .community-moment-heart .community-moment-count')?.textContent === '7', null, { timeout: 3000 });
+    assert.equal(await firstHeart.getAttribute('aria-pressed'), 'false', '다시 누르면 눌림이 풀린다');
+    assert.equal(reactionCalls.length, 2, '끄기도 순간 반응 API(DELETE)로 간다');
+    // 댓글 펼치기 — 순간 단위 API(트리 댓글과 다른 응답), AI 명예회원 머리말 구분.
+    const firstToggle = page.locator('#community-preview .community-moment[data-moment-id="m-1098-2-1"] .community-moment-comments-toggle');
+    await firstToggle.click();
+    await page.waitForFunction(() => document.querySelectorAll('#community-preview .community-moment[data-moment-id="m-1098-2-1"] .community-comment').length === 2, null, { timeout: 3000 });
+    const drawer = await page.evaluate(() => {
+      const box = document.querySelector('#community-preview .community-moment[data-moment-id="m-1098-2-1"] .community-moment-comments');
+      const heads = [...box.querySelectorAll('.community-comment small')].map((n) => n.textContent || '');
+      return { first: heads[0] || '', visible: !box.hidden };
+    });
+    assert.equal(drawer.visible, true, '누르면 그 순간의 댓글이 그 자리에서 펼쳐진다');
+    assert.match(drawer.first, /^AI 명예회원/, 'AI 명예회원 댓글은 트리 작성자 표시와 같은 방식으로 구분된다');
+    // 댓글 쓰기 — 순간 단위 API(POST)로, 트리 댓글 묶음과 섞이지 않는다.
+    const row = page.locator('#community-preview .community-moment[data-moment-id="m-1098-2-1"]');
+    await row.locator('.community-comment-form textarea').fill('순간 댓글 새로');
+    await row.locator('.community-comment-form button').click();
+    await page.waitForFunction(() => document.querySelectorAll('#community-preview .community-moment[data-moment-id="m-1098-2-1"] .community-comment').length === 3, null, { timeout: 3000 });
+    assert.equal(commentCalls, 1, '댓글 쓰기도 순간 단위 API를 부른다');
+    const treeAfter = await page.evaluate(() => document.querySelectorAll('#community-preview .community-preview-comments .community-comment').length);
+    assert.equal(treeAfter, 3, '순간 댓글을 써도 트리 댓글 묶음은 그대로다');
+    // 막히면(횟수 제한 모의 429) 서버 응답 안내를 그대로 보여 주고 눌림 표시를 되돌린다.
+    limitReaction = true;
+    await firstHeart.click();
+    await page.waitForFunction(() => {
+      const note = document.querySelector('#community-preview .community-moment[data-moment-id="m-1098-2-1"] .community-moment-note');
+      return note && !note.hidden && note.textContent.includes('조금 쉬었다가');
+    }, null, { timeout: 3000 });
+    assert.equal(await firstHeart.getAttribute('aria-pressed'), 'false', '막힌 요청은 눌림 표시를 되돌린다');
+    const overflow390 = await page.setViewportSize({ width: 390, height: 844 }).then(() => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth));
+    assert.ok(overflow390 <= 1, `390 가로 넉침 0: ${overflow390}`);
+  } finally {
+    await browser.close();
+    await new Promise((r) => server.close(r));
+  }
+});
+
 if (REQUIRE && skipReason) throw new Error('LT_COMMUNITY_784_REQUIRE=1 인데 화면 시험을 건너뛴다 — 깨진 채로 두지 않는다');
