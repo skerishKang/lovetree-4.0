@@ -142,6 +142,7 @@ function setBookDisplay(value){
  if(window.LT41)window.LT41.prefs=member.state().prefs;
  rememberBookDisplay(currentBookDisplay());
  paintBookDisplayControls();
+ try{$('view').contentWindow.postMessage({type:'lt41-book-display',value:currentBookDisplay()},location.origin)}catch{}
 }
 // #1093: 서재 진열 방식(선반/회전)도 같은 길로 저장하고, 서재 화면에 바로 알린다.
 function currentShelfView(){try{return normalizeShelfView(member?.state?.().prefs?.shelfView)}catch{return readShelfView(localStorage)}}
@@ -501,6 +502,8 @@ const shellMessages=createMessages({
   $,
   getCurrent:()=>current,
   setCurrent:file=>{current=file;},
+  // #1093: 390 도구 줄의 토글이 부모 저장 경로를 쓰게 한다.
+  setShelfView, setBookDisplay,
   getModel:()=>model,
   getSource:()=>source,
   getMember:()=>member,

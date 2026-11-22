@@ -602,6 +602,14 @@ addEventListener('message',e=>{if(e.data?.type!=='lt41-title-display')return;try
 // setPageTurnMode로만 값을 바꾼다(모르는 값은 book.js 쪽 기본 규칙으로 돌아간다).
 addEventListener('message',e=>{if(e.data?.type!=='lt41-page-turn')return;if(typeof window.setPageTurnMode==='function')window.setPageTurnMode(e.data.value);});
 addEventListener('message',e=>{if(e.data?.type!=='lt41-date-style')return;try{document.documentElement.setAttribute('data-lt-date-style',e.data.value==='dash'||e.data.value==='long'?e.data.value:'dot')}catch{}try{renderSpread(current,LTDEMO.get(),false)}catch{}if($b('#detail')?.classList.contains('open')&&selectedMomentId)showDetail(selectedMomentId);});
+// #1093: 390에서는 책/목록 토글도 화면 안 도구 줄에 둔다 — 부모 설정을 따라 칠하고 누르면 셸에 맡긴다.
+(function(){
+ var inline=document.getElementById('book-display-inline');if(!inline)return;
+ function paint(){var v='book';try{v=parent.LT41?.prefs?.bookDisplay||localStorage.getItem('lt41.bookDisplay')||'book'}catch{}for(var b of inline.querySelectorAll('[data-book-display]'))b.setAttribute('aria-checked',String(b.dataset.bookDisplay===v));}
+ paint();
+ for(var b of inline.querySelectorAll('[data-book-display]'))b.onclick=function(){try{parent.postMessage({type:'lt41-set-book-display',value:b.dataset.bookDisplay},location.origin)}catch{}};
+ addEventListener('message',function(e){if(e.data?.type==='lt41-book-display')paint();});
+})();
 // book-extra는 book.js 뒤에 불러오므로, 첫 렌더 제목을 한 벌 규칙으로 다시 그린다.
 // #379 후속: 재그림은 현재 선택 순간(LTDEMO.get())을 유지해, 펼침면 오른쪽 페이지의 순간을 열면
 // 왼쪽 페이지 순간으로 선택이 돌아가는 문제를 막는다(renderSpread의 land가 기본 true여 focusId 없으면 left.id로 재선택).

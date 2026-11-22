@@ -36,10 +36,12 @@ function flowNavigation(){
   // #1092 후속: 둘러보기는 서재 위에 뜨는 화면이라 현재 화면 값이 서재로 남는다 — 둘러보기 화면에서는 둘 다 접는다.
   const onCommunity=document.body.classList.contains('community-screen');
   const onShelf=getCurrent()==='track32-bookshelf.html';
+  // #1093: 390에서는 토글을 화면 안 도구 줄로 옮긴다 — 머리줄에서는 숨겨 한 줄(62px)을 유지한다.
+  const inlineToggles=matchMedia('(max-width:520px)').matches;
   const bookToggle=$('book-display-toggle');
-  if(bookToggle)bookToggle.hidden=!bookDisplayVisible({current:getCurrent()})||onShelf||onCommunity;
+  if(bookToggle)bookToggle.hidden=!bookDisplayVisible({current:getCurrent()})||onShelf||onCommunity||inlineToggles;
   const shelfToggle=$('shelf-view-toggle');
-  if(shelfToggle)shelfToggle.hidden=!shelfViewVisible({current:getCurrent()})||onCommunity;
+  if(shelfToggle)shelfToggle.hidden=!shelfViewVisible({current:getCurrent()})||onCommunity||inlineToggles;
   for(const b of document.querySelectorAll('nav>button'))b.hidden=publicReading;
   // 트리 선택은 뒤쪽 탭 묶음 바로 앞에 있고, 로그인 상태에서만 "트리: <이름> ▾"로 보여 준다.
   // 2026-11-18 13:49 대표 결정: 트리 선택은 모든 페이지에서 똑같이 보인다(서재 포함).
@@ -115,7 +117,9 @@ function openAccountMenu(via='keyboard'){const owned=!!getMember()?.snapshot().o
  function applyAccountRoles(){const j=$('account-journal');if(j)j.hidden=!aiCustomer;const opsGroup=$('account-ops-group');if(opsGroup)opsGroup.hidden=!isAdmin;const p=$('account-my-posts');if(p)p.hidden=false;}
 async function loadAccountEmail(){emailTried=true;const answer=await accountApi.account().catch(()=>null);if(!answer?.ok){emailTried=false;return;}if(answer.email)accountEmail=answer.email;aiCustomer=!!answer.aiCustomer;isAdmin=!!answer.admin;applyAccountRoles();renderAccount();}
 function updateAccountControls(){const owned=!!getMember()?.snapshot().owned;if(!owned){accountEmail='';emailTried=false;aiCustomer=false;isAdmin=false;}document.querySelectorAll('[data-guest-login]').forEach(x=>x.hidden=owned);$('server').hidden=!owned;$('logout').hidden=!owned;applyAccountRoles();renderAccount();if(owned&&!accountEmail&&!emailTried)void loadAccountEmail();}
-
+ 
+  // 창 폭이 바뀌면 390의 토글 자리를 다시 정한다(머리줄 ↔ 화면 안 도구 줄).
+  if(typeof addEventListener==='function')addEventListener('resize',()=>flowNavigation());
   return {
     flowNavigation,
     updateNavFade,

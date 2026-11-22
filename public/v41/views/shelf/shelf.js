@@ -37,6 +37,10 @@ import { createReader } from './shelf-reader.js';
         try { var m=localStorage.getItem('lt41.shelfView'); if(m==='shelf'||m==='carousel')return m; } catch {}
         return 'shelf';
       }
+      function paintShelfViewInline(){
+        var view=shelfView();
+        $$('#shelf-view-inline [data-shelf-view]').forEach(function(b){b.setAttribute('aria-checked',String(b.dataset.shelfView===view));});
+      }
       try {
         var saved = {};
         state.selectedId = null;
@@ -69,6 +73,7 @@ import { createReader } from './shelf-reader.js';
         state.shelfIndex=resolveShelfIndex(list, state.selectedId, state.shelfIndex);
         $('#resultCount').textContent='트리 '+list.length+'개';
          var viewport=$('#shelfViewport');if(viewport)viewport.dataset.shelfView=shelfView();
+         paintShelfViewInline();
         var railWidth=($('#shelfRail')&&$('#shelfRail').clientWidth)||0;
         // #944: 시작은 첫 책 왼쪽 끝이 책장 안쪽 여백. 고른 책이 뒤쪽이면 보이게만 최소로 민다.
         state.shelfOffset=shelfRowLayout(list.length, railWidth).offsetFor(state.shelfIndex, state.shelfOffset||0);
@@ -259,6 +264,7 @@ import { createReader } from './shelf-reader.js';
         var openNewTree=function(){parent.postMessage({type:'lt41-new-tree'},location.origin);};
         var openManageTree=function(id){parent.postMessage({type:'lt41-manage-tree',treeId:id},location.origin);};
         $('#shelfRail').addEventListener('click',function(event){var railManage=event.target.closest('[data-manage-id]');if(railManage)openManageTree(railManage.dataset.manageId);});
+       $$('#shelf-view-inline [data-shelf-view]').forEach(function(b){b.onclick=function(){try{parent.postMessage({type:'lt41-set-shelf-view',value:b.dataset.shelfView},location.origin)}catch{}};});
         $('#shelfNewTree').addEventListener('click',openNewTree);
         $('#shelfJump').addEventListener('click',function(){state.query='';state.filter='all';$('#searchInput').value='';$$('.filter').forEach(function(item){item.classList.toggle('active',item.dataset.filter==='all');});renderShelf();var book=getShelfCard(state.shelfIndex)?.querySelector('button[data-book-id]');if(book)openReader(book.dataset.bookId,book.closest('.book-card'));});
         $('#searchInput').addEventListener('input',function(event){state.query=event.target.value;renderShelf();});
