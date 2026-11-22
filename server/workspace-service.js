@@ -87,7 +87,7 @@ function changedTreeIdsOf(previous, next) {
   return changed;
 }
 
-export function createWorkspaceService({ repo, productId, onCommit = null }) {
+export function createWorkspaceService({ repo, productId, onCommit = null, onAfterResponse = null }) {
   // #538: 저장이 성공한 뒤 같은 훅에서 공유 행(자동 공개·moment_count)을 동기화한다.
   // 저장 자체는 이미 끝났으므로 동기화 실패는 응답을 막지 않고 로그만 남긴다.
   // B-12(#1068): 훅에 이번 저장에서 바뀐 트리 목록(changedTreeIds)도 넘긴다 — 동기화 질의 수를
@@ -97,21 +97,31 @@ export function createWorkspaceService({ repo, productId, onCommit = null }) {
     try { await onCommit({ subjectId, doc, changedTreeIds }); }
     catch { console.error('[lovetree-workspace] 저장 뒤 공유 동기화 실패'); }
   }
+  // 응답 문맥이 있으면 일을 넘기고(응답 뒤 실행), 없으면 즉시 끝낸다(이전 호출처 호환).
+  async function afterResponse(subjectId, task, context) {
+    if (!task) return;
+    if (context && Array.isArray(context.afterResponse)) { context.afterResponse.push(task); return; }
+    try { await task(); } catch { console.error('[lovetree-workspace] 응답 뒤 공유 동기화 실패'); }
+  }
   return {
-    async read(principal) {
+    async read(principal, context = null) {
       const stored = await repo.load({ productId: principal.productId, subjectId: principal.subjectId });
       // subject는 검증된 주체 식별자만 되돌린다. 이 기기에 남은 미전송 기록이
       // 어느 계정의 것인지 다음 로그인에 가려 읽기 위한 최소 정보다.
-      if (!stored) return { revision: 0, savedAt: null, state: EMPTY_STATE(), subject: principal.subjectId };
+      if (!stored) {
+        await afterResponse(principal.subjectId, onAfterResponse ? () => onAfterResponse({ subjectId: principal.subjectId, retry: true }) : null, context);
+        return { revision: 0, savedAt: null, state: EMPTY_STATE(), subject: principal.subjectId };
+      }
       const scan = readStoredDocument(stored.doc);
       if (!scan) throw new ApiError(500, 'stored_document_invalid', '보관된 기록을 읽을 수 없어요.');
       const body = { revision: stored.revision, savedAt: stored.savedAt, state: scan.state, subject: principal.subjectId };
       // 빠진(격리된) 트리는 개수만 알린다 — 원본 내용은 응답에 보내지 않는다.
       if (scan.quarantined.length) body.quarantined = scan.quarantined.length;
+      await afterResponse(principal.subjectId, onAfterResponse ? () => onAfterResponse({ subjectId: principal.subjectId, retry: true }) : null, context);
       return body;
     },
 
-    async write(principal, payload) {
+    async write(principal, payload, context = null) {
       const { validated, expectedRevision, clientKey } = parseWriteInput(payload);
       // 저장 본문은 지금처럼 전체 검사한다(어긋난 트리는 들어올 수 없다). 대신 저장할 때 서버에
       // 이미 보관된 격리 트리 원본을 손대지 않고 다시 붙여 보관한다 — 사용자가 저장해도 어긋난
@@ -134,7 +144,9 @@ export function createWorkspaceService({ repo, productId, onCommit = null }) {
       if (outcome.status === 'keyConflict') {
         throw new ApiError(409, 'client_key_conflict', '같은 요청 키로 다른 내용을 보내려 해요. 새 키로 다시 시도해 주세요.');
       }
-      await afterCommit(principal.subjectId, validated, changedTreeIdsOf(scan ? scan.state : null, validated));
+      const changedTreeIds = changedTreeIdsOf(scan ? scan.state : null, validated);
+      await afterCommit(principal.subjectId, validated, changedTreeIds);
+      await afterResponse(principal.subjectId, onAfterResponse ? () => onAfterResponse({ subjectId: principal.subjectId, changedTreeIds }) : null, context);
       return { revision: outcome.revision, savedAt: outcome.savedAt };
     }
   };

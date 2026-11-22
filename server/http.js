@@ -14,7 +14,7 @@ function errorBody(error) {
 const ACCOUNT_NO_STORE = { 'cache-control': 'private, no-store', 'x-content-type-options': 'nosniff' };
 
 export function createApiHandler({ authenticate, service, productId, admin = null, adminStats = null, account = null, accountDeleteAuthenticate = null, accountDeleteWorkflow = null, allowedOrigins = [], maxBodyBytes = DEFAULT_MAX_BODY_BYTES }) {
-  async function handle(request) {
+  async function handle(request, context = null) {
     const { method = 'GET', path = '', body = '' } = request ?? {};
     const text = typeof body === 'string' ? body : String(body);
     if (Buffer.byteLength(text, 'utf8') > maxBodyBytes) throw new ApiError(413, 'payload_too_large', '보내는 기록이 너무 커요. 일부만 나눠서 저장해 주세요.');
@@ -94,7 +94,7 @@ export function createApiHandler({ authenticate, service, productId, admin = nul
 
     if (path !== '/api/workspace') throw new ApiError(404, 'not_found', '요청을 찾을 수 없어요.');
     if (method === 'GET') {
-      const document = await service.read(principal);
+      const document = await service.read(principal, context);
       return { status: 200, body: request?.query?.get('features') === 'bound-writes' ? { ...document, writeSubjectBound: true } : document };
     }
     if (method === 'PUT') {
@@ -111,16 +111,20 @@ export function createApiHandler({ authenticate, service, productId, admin = nul
         const { expectedSubject, ...write } = payload;
         payload = write;
       }
-      return { status: 200, body: await service.write(principal, payload) };
+      return { status: 200, body: await service.write(principal, payload, context) };
     }
     throw new ApiError(405, 'method_not_allowed', '이 요청은 지원하지 않아요.');
   }
 
   return async function requestHandler(request) {
+    const afterResponse = [];
+    const context = { afterResponse };
     try {
-      const { status, body, headers } = await handle(request);
+      const { status, body, headers } = await handle(request, context);
       // 저장 경로의 응답 모양은 바꾸지 않는다 — 헤더는 실제로 붙인 자리만 지나간다.
-      return headers ? { status, body, headers } : { status, body };
+      const result = headers ? { status, body, headers } : { status, body };
+      Object.defineProperty(result, 'afterResponse', { value: afterResponse, enumerable: false });
+      return result;
     } catch (error) {
       if (error instanceof ApiError) return { status: error.status, body: errorBody(error) };
       logServerError(error, 'lovetree-storage');
@@ -161,5 +165,8 @@ export function createNodeHandler(requestHandler, { maxBodyBytes = DEFAULT_MAX_B
     if (res.destroyed) return;
     res.writeHead(result.status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', ...(result.headers ?? {}) });
     res.end(result.binary ?? JSON.stringify(result.body));
+    // 같은 요청 처리 안에서 응답을 보낸 뒤에만 보임 동기화를 돌린다(새 큐·작업자 없음).
+    const tasks = result.afterResponse || [];
+    if (tasks.length) void Promise.allSettled(tasks.map((task) => Promise.resolve().then(task)));
   };
 }

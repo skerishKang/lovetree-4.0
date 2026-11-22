@@ -57,8 +57,9 @@ function shareSummary(row) {
   return { id: row.shareId, treeId: row.treeId, entryMomentId: row.entryMomentId, view: row.view, status: row.status, createdAt: row.createdAt, revokedAt: row.revokedAt || null, discoverable: row.discoverable === true, discoverableAt: row.discoverableAt || null, origin: row.origin || 'owner', momentCount: Number(row.momentCount ?? 0) };
 }
 
-export function createShareService({ shareRepo, workspaceRepo, visibilityRepo = null, discoverRepo = null, admin = null, stageIndex = null, productId, makeId = () => randomBytes(18).toString('base64url') }) {
+export function createShareService({ shareRepo, workspaceRepo, visibilityRepo = null, discoverRepo = null, admin = null, stageIndex = null, pendingRepo = null, productId, makeId = () => randomBytes(18).toString('base64url') }) {
   const refreshStages = subjectId => refreshStageIndex(stageIndex, { productId, subjectId });
+  const inFlight = new Set();
   async function projection(subjectId, input) {
     if (!input || typeof input !== 'object' || !RECORD_ID.test(input.treeId || ''))
       throw new ApiError(400, 'invalid_share_request', '공유할 트리를 다시 선택해 주세요.');
@@ -91,6 +92,85 @@ export function createShareService({ shareRepo, workspaceRepo, visibilityRepo = 
     if (!doc.trees.some(tree => tree.id === treeId)) throw new ApiError(404, 'tree_not_found', '트리를 찾을 수 없어요.');
     return doc;
   }
+  async function syncShares(subjectId, changedTreeIds, visible, refresh = true) {
+    const touched = changedTreeIds ? new Set(changedTreeIds) : null;
+    async function sync(scan, shares, discover) {
+      const trees = scan.state.trees;
+      if (visible) {
+        const existing = await shares.list({ productId, subjectId });
+        const activeTrees = new Set(existing.filter(row => row.status === 'active').map(row => row.treeId));
+        for (const tree of trees) {
+          const treeId = tree.id, momentCount = tree.moments.length;
+          if (!momentCount) continue;
+          if (touched && !touched.has(treeId) && activeTrees.has(treeId)) continue;
+          await shares.updateMomentCount({ productId, subjectId, treeId, momentCount });
+          if (activeTrees.has(treeId)) continue;
+          const entry = tree.moments.find(moment => moment.parentId === null) || tree.moments[0];
+          await shares.upsertAutoShare({ productId, subjectId, shareId: makeId(), treeId, entryMomentId: entry.id, momentCount });
+        }
+      } else {
+        const keptIds = [...trees, ...scan.quarantined].map(tree => tree?.id).filter(id => typeof id === 'string');
+        await shares.revokeSharesNotIn({ productId, subjectId, treeIds: keptIds });
+        if (discover) await discover.deleteNotIn({ productId, subjectId, treeIds: keptIds });
+      }
+    }
+    const readScan = doc => readStoredDocument(doc);
+    if (shareRepo.withCurrentWorkspace) {
+      await shareRepo.withCurrentWorkspace({ productId, subjectId }, (doc, shares, discover) => {
+        const scan = readScan(doc);
+        if (scan) return sync(scan, shares, discover);
+      });
+    } else {
+      const stored = await workspaceRepo.load({ productId, subjectId });
+      const scan = stored ? readScan(stored.doc) : null;
+      if (scan) await sync(scan, shareRepo, discoverRepo);
+    }
+    if (refresh) await refreshStages(subjectId);
+  }
+
+  async function markPending(subjectId) {
+    if (!pendingRepo) return;
+    try { await pendingRepo.mark({ productId, subjectId }); }
+    catch { console.error('[lovetree-share] 실패 표식 기록 실패'); }
+  }
+
+  async function clearPending(subjectId) {
+    if (!pendingRepo) return;
+    try { await pendingRepo.clear({ productId, subjectId }); }
+    catch { console.error('[lovetree-share] 실패 표식 해제 실패'); }
+  }
+
+  async function runVisibleOnce(subjectId, changedTreeIds) {
+    const key = `${productId}|${subjectId}`;
+    if (inFlight.has(key)) return;
+    inFlight.add(key);
+    try {
+      await syncShares(subjectId, changedTreeIds, true);
+      await clearPending(subjectId);
+    } catch {
+      await markPending(subjectId);
+      console.error('[lovetree-share] 보임 동기화 실패 — 다음 요청에서 다시 시도');
+    } finally { inFlight.delete(key); }
+  }
+
+  async function syncSharesBeforeResponse(subjectId, changedTreeIds = null) {
+    await syncShares(subjectId, changedTreeIds, false);
+  }
+
+  async function syncSharesAfterResponse(subjectId, changedTreeIds = null) {
+    await runVisibleOnce(subjectId, changedTreeIds);
+  }
+
+  async function retrySharesAfterResponse(subjectId) {
+    if (!pendingRepo || !(await pendingRepo.has({ productId, subjectId }))) return;
+    await runVisibleOnce(subjectId, null);
+  }
+
+  async function syncSharesAfterSave(subjectId, changedTreeIds = null) {
+    await syncShares(subjectId, changedTreeIds, false, false);
+    await syncSharesAfterResponse(subjectId, changedTreeIds);
+  }
+
   return {
     projection,
     async create(subjectId, input) {
@@ -148,52 +228,11 @@ export function createShareService({ shareRepo, workspaceRepo, visibilityRepo = 
       if (await aiTesterFor({ admin, productId, subjectId: row.subjectId })) shared.aiTester = true;
       return shared;
     },
-    // #538: /api/workspace 저장 성공 뒤 같은 훅에서 부른다.
-    // ① 살아 있는 공유 행(주인 만든 행 포함)의 moment_count 를 갱신하고,
-    // ② 공유 행이 없는 트리(순간 1개 이상)에 자동 공개 행(origin='auto')을 만들며 — 주인이 취소한 행은 되살리지 않는다(#1046),
-    // ③ 문서에서 사라진 트리의 공유 행(자동·주인 모두)은 즉시 내리고, 그 트리의 소개 행도 지운다.
-    // #986 후속(CTO 결정): 자동 공유·순간 수 갱신의 대상은 읽을 수 있는 트리뿐이다 — 격리 트리는
-    // 새로 공유하지 않는다. 대신 격리 트리에 이미 공유·소개 행이 있으면 해제하지 않고 그대로 둔다 —
-    // 사용자가 같은 id로 트리를 새로 저장해 다시 읽을 수 있게 되면 공유가 그대로 살아난다.
-    // 문서 뼈대 자체를 읽지 못하면 아무것도 해제하지 않는다(한꺼번에 내리는 사고를 막는다).
-    // B-12(#1068): 이번 저장에서 바뀐 트리 목록(changedTreeIds)을 받으면 갱신 질의를 그 트리로 좁혀
-    // 질의 수가 바뀐 트리 수에 비례하게 한다. 활성 공유 행이 없는 트리는 바뀌지 않았어도 다시 시도해
-    // 자동 공개 행을 채운다(옛 저장에서 만들기가 실패했으면 다음 저장에서 회복). 집합을 받지 않는
-    // 다른 호출처는 예전처럼 모든 트리를 갱신한다. 회수(revokeSharesNotIn)·소개 행 정리·무대 색인
-    // 재조정은 '숨겨야 하는' 변경이라 좁히지 않고 — 늦게 반영되면 숨긴 게 잠깐 보일 수 있으므로
-    // 저장 응답 전에 전체 대조로 끝낸다.
-    async syncSharesAfterSave(subjectId, changedTreeIds = null) {
-      const touched = changedTreeIds ? new Set(changedTreeIds) : null;
-      async function sync(scan, shares, discover) {
-        const trees = scan.state.trees;
-        const existing = await shares.list({ productId, subjectId });
-        const activeTrees = new Set(existing.filter(row => row.status === 'active').map(row => row.treeId));
-        for (const tree of trees) {
-          const treeId = tree.id, momentCount = tree.moments.length;
-          if (!momentCount) continue;
-          if (touched && !touched.has(treeId) && activeTrees.has(treeId)) continue;
-          await shares.updateMomentCount({ productId, subjectId, treeId, momentCount });
-          if (activeTrees.has(treeId)) continue;
-          const entry = tree.moments.find(moment => moment.parentId === null) || tree.moments[0];
-          await shares.upsertAutoShare({ productId, subjectId, shareId: makeId(), treeId, entryMomentId: entry.id, momentCount });
-        }
-        const keptIds = [...trees, ...scan.quarantined].map(tree => tree?.id).filter(id => typeof id === 'string');
-        await shares.revokeSharesNotIn({ productId, subjectId, treeIds: keptIds });
-        if (discover) await discover.deleteNotIn({ productId, subjectId, treeIds: keptIds });
-      }
-      const readScan = doc => readStoredDocument(doc);
-      if (shareRepo.withCurrentWorkspace) {
-        await shareRepo.withCurrentWorkspace({ productId, subjectId }, (doc, shares, discover) => {
-          const scan = readScan(doc);
-          if (scan) return sync(scan, shares, discover);
-        });
-      } else {
-        const stored = await workspaceRepo.load({ productId, subjectId });
-        const scan = stored ? readScan(stored.doc) : null;
-        if (scan) await sync(scan, shareRepo, discoverRepo);
-      }
-      await refreshStages(subjectId);
-    },
+    // #1068 2단계(#1163): 숨김(회수·소개 정리·무대 색인 재조정)은 응답 전, 보임(순간 수·자동 공개 행·새 소속 추가)은 응답 뒤.
+    syncSharesBeforeResponse,
+    syncSharesAfterResponse,
+    retrySharesAfterResponse,
+    syncSharesAfterSave,
     // #538: 트리 공개 상태. 비공개는 누구나 무료로 바꿀 수 있다 — 본인 트리만 바꿀 수 있다(#830).
     // 응답에 소개 여부(discover)를 함께 돌려준다 — 화면이 두 값을 한 번에 본다.
     async setTreeVisibility(subjectId, treeId, visibility) {

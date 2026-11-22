@@ -553,3 +553,14 @@ CREATE INDEX IF NOT EXISTS lovetree_admin_customer_views_retention_idx
   ON lovetree_admin_customer_views (viewed_at, id);
 CREATE INDEX IF NOT EXISTS lovetree_admin_customer_views_customer_idx
   ON lovetree_admin_customer_views (product_id, customer_subject_id, viewed_at DESC);
+
+
+-- 보임 공유 동기화 실패 표식(#1163). 성공하면 즉시 지운다.
+CREATE TABLE IF NOT EXISTS lovetree_share_sync_pending (
+  product_id text NOT NULL,
+  subject_id text NOT NULL,
+  marked_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (product_id, subject_id)
+);
+CREATE INDEX IF NOT EXISTS lovetree_share_sync_pending_marked_idx
+  ON lovetree_share_sync_pending (product_id, marked_at);

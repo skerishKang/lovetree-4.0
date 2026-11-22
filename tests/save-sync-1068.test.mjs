@@ -9,6 +9,8 @@ import { createWorkspaceService } from '../server/workspace-service.js';
 import { createMemoryWorkspaceRepo } from '../server/testing/memory-workspace-repo.js';
 import { createMemoryShareRepo } from '../server/testing/memory-share-repo.js';
 import { createShareService } from '../server/share-service.js';
+import { createMemoryShareSyncPendingRepo } from '../server/testing/memory-share-sync-pending-repo.js';
+import { createMemoryTreeDiscoverRepo } from '../server/testing/memory-tree-discover-repo.js';
 import { ApiError } from '../server/errors.js';
 
 const PRODUCT = 'lovetree-test', CLOCK = '2026-11-01T00:00:00.000Z';
@@ -92,4 +94,85 @@ test('트리를 빼고 저장하면 응답 시점에 이미 공개가 막힌다 
     () => h.shareService.read(gone.shareId),
     error => error instanceof ApiError && error.status === 410
   );
+});
+
+
+// #1163(#1068 2단계): 숨김은 응답 전, 보임은 응답 뒤. 응답 뒤 일은 요청 문맥의 afterResponse 에 담긴다.
+async function setupDeferred({ failVisible = 0, delayVisible = 0 } = {}) {
+  const workspaceRepo = createMemoryWorkspaceRepo();
+  const inner = createMemoryShareRepo();
+  const discoverRepo = createMemoryTreeDiscoverRepo();
+  const pendingRepo = createMemoryShareSyncPendingRepo();
+  let left = failVisible;
+  const shareRepo = { ...inner, async updateMomentCount(input) {
+    if (left > 0) { left -= 1; throw new Error('보임 동기화 일부러 실패'); }
+    return inner.updateMomentCount(input);
+  } };
+  let n = 0;
+  const shareService = createShareService({
+    shareRepo, workspaceRepo, discoverRepo, pendingRepo, productId: PRODUCT,
+    makeId: () => String(++n).padStart(24, 'a')
+  });
+  const workspace = createWorkspaceService({
+    repo: workspaceRepo, productId: PRODUCT,
+    onCommit: ({ subjectId, changedTreeIds }) => shareService.syncSharesBeforeResponse(subjectId, changedTreeIds),
+    onAfterResponse: async ({ subjectId, changedTreeIds, retry }) => {
+      if (delayVisible) await new Promise((resolve) => setTimeout(resolve, delayVisible));
+      if (retry) return shareService.retrySharesAfterResponse(subjectId);
+      return shareService.syncSharesAfterResponse(subjectId, changedTreeIds);
+    }
+  });
+  return { workspace, shareRepo, discoverRepo, pendingRepo, shareService };
+}
+
+test('보임 동기화가 실패해도 저장 응답은 200이고, 다음 요청에서 다시 해서 반영된다(#1163 판정 1)', async () => {
+  const h = await setupDeferred({ failVisible: 1 });
+  const tree = treeWithMoments(2);
+  const first = { afterResponse: [] };
+  const saved = await h.workspace.write(principal('alice'), { state: { version: 1, trees: [tree] }, expectedRevision: 0, clientKey: 'after-1' }, first);
+  assert.equal(saved.revision, 1, '보임 동기화 전에 저장 응답이 나갔다');
+  assert.equal(first.afterResponse.length, 1, '보임 일이 응답 뒤로 넘어갔다');
+  await first.afterResponse[0]();
+  assert.equal(await h.pendingRepo.has({ productId: PRODUCT, subjectId: 'alice' }), true, '실패하면 계정 표식이 남는다');
+  assert.deepEqual(await h.shareRepo.list({ productId: PRODUCT, subjectId: 'alice' }), [], '아직 보임이 반영되지 않았다');
+
+  const second = { afterResponse: [] };
+  await h.workspace.read(principal('alice'), second);
+  assert.equal(second.afterResponse.length, 1, '표식이 있는 계정은 다음 조회에서 다시 시도한다');
+  await second.afterResponse[0]();
+  const rows = await h.shareRepo.list({ productId: PRODUCT, subjectId: 'alice' });
+  assert.equal(rows.length, 1, '다음 요청에서 자동 공개 행이 만들어졌다');
+  assert.equal(rows[0].momentCount, 2, '순간 수가 반영됐다');
+  assert.equal(await h.pendingRepo.has({ productId: PRODUCT, subjectId: 'alice' }), false, '성공하면 표식이 해제된다');
+});
+
+test('숨김 3가지는 응답 시점에 이미 반영돼 있다(#1163 판정 2)', async () => {
+  const h = await setupDeferred();
+  const a = treeWithMoments(2), b = treeWithMoments(3);
+  const context = { afterResponse: [] };
+  await h.workspace.write(principal('alice'), { state: { version: 1, trees: [a, b] }, expectedRevision: 0, clientKey: 'after-2' }, context);
+  await context.afterResponse[0]();
+  await h.discoverRepo.set({ productId: PRODUCT, subjectId: 'alice', treeId: b.id, discover: true });
+  const removed = (await h.shareRepo.list({ productId: PRODUCT, subjectId: 'alice' })).find(row => row.treeId === b.id);
+  assert.equal(removed.status, 'active');
+
+  const next = { afterResponse: [] };
+  await h.workspace.write(principal('alice'), { state: { version: 1, trees: [a] }, expectedRevision: 1, clientKey: 'after-2-remove' }, next);
+  // 응답 뒤 일을 돌리기 전에 이미 숨김은 끝나 있다.
+  assert.equal((await h.shareRepo.load({ productId: PRODUCT, shareId: removed.shareId })).status, 'revoked', '공유 회수가 응답 전에 끝났다');
+  assert.equal((await h.discoverRepo.get({ productId: PRODUCT, subjectId: 'alice', treeId: b.id })).discover, false, '소개 정리가 응답 전에 끝났다');
+  assert.equal(next.afterResponse.length, 1, '보임 일만 응답 뒤에 남았다');
+});
+
+test('보임 동기화에 가짜 지연을 넣어도 저장 응답 시간은 늘지 않는다(#1163 판정 3)', async () => {
+  const h = await setupDeferred({ delayVisible: 300 });
+  const tree = treeWithMoments(2);
+  const context = { afterResponse: [] };
+  const started = Date.now();
+  await h.workspace.write(principal('alice'), { state: { version: 1, trees: [tree] }, expectedRevision: 0, clientKey: 'after-3' }, context);
+  const saveMs = Date.now() - started;
+  assert.ok(saveMs < 200, `저장 응답이 지연을 기다리지 않았다(${saveMs}ms)`);
+  const later = Date.now();
+  await context.afterResponse[0]();
+  assert.ok(Date.now() - later >= 280, '응답 뒤 일은 실제로 지연된다');
 });

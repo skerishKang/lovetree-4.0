@@ -4,6 +4,7 @@ import { createServer } from 'node:http';
 import { pathToFileURL } from 'node:url';
 import { createPool, createWorkspaceRepo } from './db/postgres.js';
 import { createShareRepo } from './db/shares-postgres.js';
+import { createShareSyncPendingRepo } from './db/share-sync-pending-postgres.js';
 import { createStageIndexRepo } from './db/stage-index-postgres.js';
 import { createTreeVisibilityRepo } from './db/tree-visibility-postgres.js';
 import { createTreeDiscoverRepo } from './db/tree-discover-postgres.js';
@@ -167,6 +168,7 @@ const repo = createWorkspaceRepo(pool);
 // moment_count 를 동기화하고, 둘러보기 SQL 은 moment_count>=3 으로 거른다.
 // 비공개는 누구나 무료로 바꿀 수 있다 — 본인 트리만 바꿀 수 있다(#830).
 const shareRepo = createShareRepo(pool);
+const shareSyncPendingRepo = createShareSyncPendingRepo(pool);
 const stageIndex = createStageIndexRepo(pool);
 const visibilityRepo = createTreeVisibilityRepo(pool);
 // 둘러보기 소개 표시(2026-11-16 대표 결정 — 기본 꺼짐, 고객이 켠다. 무료). 켠 트리만 행이 쌓인다.
@@ -182,13 +184,17 @@ const shareService = createShareService({
   workspaceRepo: repo,
   visibilityRepo,
   discoverRepo,
+  pendingRepo: shareSyncPendingRepo,
   productId: LOVETREE_PRODUCT_ID,
   admin
 });
 const service = createWorkspaceService({
   repo,
   productId: LOVETREE_PRODUCT_ID,
-  onCommit: ({ subjectId, changedTreeIds }) => shareService.syncSharesAfterSave(subjectId, changedTreeIds)
+  onCommit: ({ subjectId, changedTreeIds }) => shareService.syncSharesBeforeResponse(subjectId, changedTreeIds),
+  onAfterResponse: (task) => task.retry
+    ? shareService.retrySharesAfterResponse(task.subjectId)
+    : shareService.syncSharesAfterResponse(task.subjectId, task.changedTreeIds)
 });
 const legacyAuthenticate = await buildAuthenticate();
 const authenticate = createSharedAccessAuth({ enabled: sharedAuthEnabled(LOVETREE_SHARED_AUTH_ENABLED), legacy: legacyAuthenticate });
