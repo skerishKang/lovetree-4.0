@@ -397,7 +397,7 @@ test('#314 회귀: 책 A(격자) → B(디자인 없음) → 다시 A를 연속�
 
     // 이전 책에서 남은 업로드 안내·파일이 새 책 창에 남지 않는다.
     h.coverSlotParts['[data-upload-status]'].textContent = '이전 책에서 올린 사진 안내';
-    h.coverSlotParts['[data-media-file]'].value = 'C:\fakepath\cover.png';
+    h.coverSlotParts['[data-media-file]'].value = '/fakepath/cover.png';
 
     open(TREE_B);
     assert.deepEqual(checked(), [''], 'B는 디자인이 없으므로 기본(빈 값) — 이전 책의 격자가 남지 않는다');
