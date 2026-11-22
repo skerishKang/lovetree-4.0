@@ -205,7 +205,7 @@ async function interactions({ page, frame, width }) {
   }
   await frame.locator('#overviewBtn').click();
   await frame.locator('#viewConc').click();
-  assert.equal(await frame.evaluate(() => window.__lt.state.view), 'concentric', '동심원형 전환');
+  assert.equal(await frame.evaluate(() => window.__lt.state.view), 'tag', '묶음 전환');
   await clickMapObject(frame, 'dot');
   await frame.locator('#detailClose').click();
   await frame.locator('#overviewBtn').click();

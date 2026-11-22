@@ -3,12 +3,14 @@
 # comp2(ssh → wsl)의 읽기 전용 판독기(tools/export-ai-customer-db.mjs)가 운영 DB에서 JSON 을 내보면
 # 이 스크립트가 그 JSON 으로 tools/export-ai-customer.mjs --from-json 을 돌려 거버넌스 md 를 쓴다.
 # 쿠키는 쓰지 않는다(2026-11-14 대표 결정). 비밀 값·DB 접속 문자열·이메일·subject 는 로그에 쓰지 않는다.
-# 실패하면 종료 코드 0 이 아니고, 로그 맨 윗줄에 이유 한 줄을 남긴다. 로그: E:\lovetree-qa\export-log\
+# 실패하면 종료 코드 0 이 아니고, 로그 맨 윗줄에 이유 한 줄을 남긴다. 로그: LOVETREE_EXPORT_LOG_DIR 폴더
 
 $ErrorActionPreference = 'Stop'
 
-$LogDir = 'E:\lovetree-qa\export-log'
-$ExportDir = 'G:\Ddrive\BatangD\task\workdiary\ai-revenue-lab-governance\러브트리\AI고객'
+$LogDir = $env:LOVETREE_EXPORT_LOG_DIR
+$ExportDir = $env:LOVETREE_EXPORT_DIR
+if (-not $LogDir) { throw 'LOVETREE_EXPORT_LOG_DIR 환경 변수를 지정해 주세요(내보내기 로그 폴더).' }
+if (-not $ExportDir) { throw 'LOVETREE_EXPORT_DIR 환경 변수를 지정해 주세요(거버넌스 md 폴더).' }
 $ReaderOnComp2 = '/opt/padiem/lovetree-api/tools/export-ai-customer-db.mjs'
 $MdScript = Join-Path $PSScriptRoot 'export-ai-customer.mjs'
 
@@ -33,9 +35,9 @@ try {
   # ssh 출력(UTF-8 JSON 을 base64 로) 디코딩을 고정한다.
   [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
-  $ssh = Resolve-First @('g:\Program Files\Git\usr\bin\ssh.exe', "$env:ProgramFiles\Git\usr\bin\ssh.exe", 'ssh')
+  $ssh = Resolve-First (@($env:LOVETREE_SSH_EXE, "$env:ProgramFiles\Git\usr\bin\ssh.exe", 'ssh') | Where-Object { $_ })
   if (-not $ssh) { throw 'ssh 클라이언트를 찾을 수 없습니다.' }
-  $node = Resolve-First @('C:\Users\limone\.codearts\runtimes\node\node.exe', 'node')
+  $node = Resolve-First (@($env:LOVETREE_NODE_EXE, 'node') | Where-Object { $_ })
   if (-not $node) { throw 'node 실행 파일을 찾을 수 없습니다.' }
   if (-not (Test-Path $MdScript)) { throw "md 스크립트가 없습니다: $MdScript" }
 

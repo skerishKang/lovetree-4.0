@@ -29,8 +29,8 @@ html[data-lt-theme="garden"] .g-frame{box-shadow:0 0 0 1px var(--lt-garden-edge)
 .g-head-note[hidden]{display:none}
 /* 2026-11-16 대표 결정: 지도의 보기 고르기와 같은 모양(네트워크 화면 .view-switch·.pill 규칙을 옮겨 온 것).
    눌린 보기 = 지금 화면. 그물형·동심원형을 고르면 지도로 돌아가 그 보기로 열린다. */
-.g-view-switch{display:inline-flex;gap:6px;flex:0 0 auto;pointer-events:auto}
-.g-view-switch .pill{height:36px;padding:0 13px;border-radius:999px;border:1px solid var(--lt-line);background:var(--lt-glass);font-size:13px;color:var(--lt-pearl);cursor:pointer;white-space:nowrap}
+.g-view-switch{display:inline-flex;gap:5px;flex:0 0 auto;pointer-events:auto;border-radius:999px;background:var(--lt-glass);box-shadow:inset 0 0 0 1px var(--lt-line)}
+.g-view-switch .pill{height:36px;padding:0 13px;border-radius:999px;border:none;background:transparent;font-size:13px;color:var(--lt-pearl);cursor:pointer;white-space:nowrap}
 .g-view-switch .pill:hover,.g-view-switch .pill:focus-visible{background:var(--lt-glass-strong);color:var(--lt-pearl)}
 .g-view-switch button[aria-pressed=true]{border-color:var(--lt-gold-line);color:var(--lt-gold);background:transparent;box-shadow:inset 0 0 0 1px var(--lt-gold-line)}
 html[data-lt-theme=garden] .g-view-switch button[aria-pressed=true]{color:var(--lt-gold-ink);background:var(--lt-glass-strong)}

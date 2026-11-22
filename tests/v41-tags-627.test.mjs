@@ -117,7 +117,7 @@ const TITLES = [
   ['잇지 \'마.피.아. In the morning\' 직캠 4K', ['song:마.피.아. In the morning']],
   ['콘서트 20241115 세븐틴 - 아낄없이', ['song:아낄없이', 'stage:콘서트'], '무대 꼬리표에는 날짜를 붙이지 않는다(2차 규칙)'],
   ['세븐틴 호시 직캠 \'아낄없이\' 991299', ['song:아낄없이'], '달·날이 실제 범위가 아닌 6자리는 날짜로 읽지 않는다'],
-  // 오늘 캡처(E:\lovetree-qa\lane\local2-627c)에서 온 실제 제목 3개:
+  // 임시 폴더에 남긴 캡처 자료에서 온 실제 제목 3개:
   ['[쇼챔 MIX직캠] RESCENE(리센느) - With | Show Champion | EP.618', ['artist:RESCENE', 'stage:쇼챔피언'], '영문(한글) 꼬꼬에서 가수를 영문으로 하나만, 파이프 섞인 덩어리는 노래로 제안하지 않는다'],
   ['[쇼챔 원픽캠 4K] RESCENE ZENA (리센느 제나) - With | Show Champion | EP.618 | 261111', ['artist:RESCENE', 'member:ZENA', 'stage:쇼챔피언'], '꼬꼬 짝의 낱말 수가 같으면 첫 낱말은 가수, 다음 낱말은 멤버다(2단계 그래프 보기 구분). 무대 값에서 날짜(261111)를 뗀다'],
   ['261114 하츠투하츠 지우 15-LOVE 직캠 4K60p MMA Hearts2Hearts fancam', ['artist:Hearts2Hearts', 'stage:멜론뮤직어워드'], '직캠·화질·무대가 섞인 덩어리에서는 노래를 제안하지 않는다(2차 규칙)'],

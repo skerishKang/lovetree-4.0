@@ -93,6 +93,73 @@ test('migrations apply cleanly to empty DB and are re-runnable', { skip }, async
       /check|violates/i
     );
 
+    // ③-2 #1098 2단계: 반응·댓글 표의 대상 칸(덧붙이기만) — 기존 방식 INSERT는 'tree'로 채워지고,
+    // 순간 행은 대상 조합이 PK/유일 제약으로 하나만 남는다(같은 요청 두 번 막기). 신고 표에는
+    // 순간 댓글 신고가 어떤 댓글인지 comment_id 칸으로 남는다.
+    const targetColumns = await pool.query(
+      `SELECT table_name, column_name
+         FROM information_schema.columns
+        WHERE table_name IN ('lovetree_community_reactions','lovetree_community_comments')
+          AND column_name IN ('target_kind','moment_id')
+        ORDER BY table_name, column_name`
+    );
+    assert.equal(targetColumns.rows.length, 4, '반응·댓글 표에 대상 칸(target_kind·moment_id)이 있어야 한다');
+    const reportColumn = await pool.query(
+      `SELECT column_name FROM information_schema.columns
+        WHERE table_name = 'lovetree_community_reports' AND column_name = 'comment_id'`
+    );
+    assert.equal(reportColumn.rows.length, 1, '신고 표에 comment_id 칸이 있어야 한다(순간 댓글 신고용)');
+    const momentPrimaryKey = await pool.query(
+      `SELECT pg_get_constraintdef(oid) AS def FROM pg_constraint
+        WHERE conname = 'lovetree_community_reactions_pkey'`
+    );
+    assert.match(String(momentPrimaryKey.rows[0]?.def), /moment_id/, '반응 PK는 moment_id를 포함해야 한다');
+    const seededTreeRow = await pool.query(
+      `INSERT INTO lovetree_community_reactions(product_id, share_id, subject_id, kind)
+       VALUES ($1, $2, 'reader', 'heart') RETURNING target_kind, moment_id`,
+      [productId, shareId]
+    );
+    assert.equal(seededTreeRow.rows[0].target_kind, 'tree', '기존 방식 INSERT(대상 칸 없음)는 tree로 채워진다');
+    assert.equal(seededTreeRow.rows[0].moment_id, '');
+    await pool.query(
+      `INSERT INTO lovetree_community_reactions(product_id, share_id, subject_id, kind, target_kind, moment_id)
+       VALUES ($1, $2, 'reader', 'heart', 'moment', 'm1')`,
+      [productId, shareId]
+    );
+    const momentReplay = await pool.query(
+      `INSERT INTO lovetree_community_reactions(product_id, share_id, subject_id, kind, target_kind, moment_id)
+       VALUES ($1, $2, 'reader', 'heart', 'moment', 'm1') ON CONFLICT DO NOTHING`,
+      [productId, shareId]
+    );
+    assert.equal(momentReplay.rowCount, 0, '같은 대상의 반응 재삽입은 무시되어야 한다(한 칸)');
+    await assert.rejects(
+      pool.query(
+        `INSERT INTO lovetree_community_reactions(product_id, share_id, subject_id, kind, target_kind, moment_id)
+         VALUES ($1, $2, 'reader', 'heart', 'moment', '')`,
+        [productId, shareId]
+      ),
+      /check|violates/i,
+      '순간 행에 빈 moment_id는 받지 않는다'
+    );
+    const commentInsert = `INSERT INTO lovetree_community_comments(product_id, comment_id, share_id, subject_id, body, client_key, target_kind, moment_id)
+      VALUES ($1, $2, $3, 'reader', $4, $5, $6, $7)`;
+    await pool.query(commentInsert, [productId, 'c-tree', shareId, '트리 댓글', 'dup-key', 'tree', '']);
+    await pool.query(commentInsert, [productId, 'c-moment', shareId, '순간 댓글', 'dup-key', 'moment', 'm1']);
+    await assert.rejects(
+      pool.query(commentInsert, [productId, 'c-moment-2', shareId, '같은 순간 같은 키', 'dup-key', 'moment', 'm1']),
+      /duplicate|unique/i,
+      '같은 대상·같은 키의 댓글은 한 행만 허용된다'
+    );
+    // ③-3 옛 3칸 유일 제약(UNIQUE (product_id, subject_id, client_key))은 남아 있으면 안 된다.
+    //    새로 깐 DB에서는 애초에 없어 이 단정이 자명하지만, 기존 표를 업그레이드하는 경로(아래 옛 모양 시험)가
+    //    진짜 검증이다. 여기서는 재적용 안전성까지 함께 단정한다.
+    const legacyUnique = await pool.query(
+      `SELECT conname FROM pg_constraint
+        WHERE conrelid = 'lovetree_community_comments'::regclass AND contype = 'u'
+          AND pg_get_constraintdef(oid) ~ '^UNIQUE \\(product_id, subject_id, client_key\\)$'`
+    );
+    assert.equal(legacyUnique.rows.length, 0, '옛 3칸 유일 제약은 지워져야 한다(남으면 같은 키의 트리·순간 댓글이 충돌한다)');
+
     // ④ 계정 이메일: 표가 스키마에 있고, 같은 계정에 다시 쓰면 덮어쓴다(업서트).
     const emailColumns = await pool.query(
       `SELECT column_name, is_nullable, data_type
@@ -362,3 +429,72 @@ for (const install of ['schema.sql', 'stage-schema-261119.sql']) {
     assert.deepEqual(votes.rows, [{ target_kind: 'tree', target_id: 'tree', voted_at: new Date(originalTime) }]);
   });
 }
+
+// #1098 2단계 뒷수습 — 운영에서 발견된 것의 재현 시험.
+// 옛 모양(자동 이름 유일 제약 — PostgreSQL이 63자로 잘라 '…_client_ke…'가 됨)의 댓글 표에
+// 마이그레이션 전체를 적용하면 옛 제약이 정의로 지워지는지 단정한다.
+// 이름을 추측해 지우던 첫 판은 이 경로에서 'does not exist, skipping'으로 넘어가 남았다.
+// 이 파일은 CI 전용 잡(빈 DB, --test-concurrency=1)에서 혼자 도니까 표를 다시 만들어도 안전하다.
+test('옛 모양 댓글 표에 마이그레이션을 적용하면 잘린 이름의 옛 유일 제약도 정의로 지워진다', { skip }, async () => {
+  assertIsolatedTestDatabase(DATABASE_URL);
+  const pool = await createPool(DATABASE_URL, { max: 1 });
+  try {
+    await pool.query('DROP TABLE IF EXISTS lovetree_community_comments');
+    await pool.query(`CREATE TABLE lovetree_community_comments (
+      product_id text NOT NULL,
+      comment_id text NOT NULL,
+      share_id text NOT NULL,
+      subject_id text NOT NULL,
+      body text NOT NULL CHECK (char_length(body) BETWEEN 1 AND 1000),
+      client_key text NOT NULL,
+      status text NOT NULL DEFAULT 'visible' CHECK (status IN ('visible','deleted','hidden')),
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now(),
+      edited_at timestamptz,
+      PRIMARY KEY (product_id, comment_id),
+      UNIQUE (product_id, subject_id, client_key)
+    )`);
+    const legacyDef = `SELECT conname FROM pg_constraint
+      WHERE conrelid = 'lovetree_community_comments'::regclass AND contype = 'u'
+        AND pg_get_constraintdef(oid) ~ '^UNIQUE \\(product_id, subject_id, client_key\\)$'`;
+    const before = await pool.query(legacyDef);
+    assert.equal(before.rows.length, 1, '옛 모양 표에는 3칸 유일 제약이 하나 있다');
+    assert.ok(before.rows[0].conname.startsWith('lovetree_community_comments_product_id_subject_id_client_'),
+      '자동 이름은 63자에 잘려 문서와 달라진다 — 이름이 아니라 정의로 찾아야 한다');
+
+    // 운영과 같은 순서: schema.sql(표가 있으니 CREATE는 건너뛰고 업그레이드 블록이 돈다) → migrations 전부.
+    const schemaSql = await readFile(SCHEMA_PATH, 'utf8');
+    await pool.query(schemaSql);
+    await applyAllMigrations(pool);
+
+    // 단정: 3칸 유일 제약 0개, 새 대상 제약 존재.
+    const after = await pool.query(legacyDef);
+    assert.equal(after.rows.length, 0, '옛 3칸 유일 제약은 정의로 지워져야 한다');
+    const target = await pool.query(`SELECT 1 FROM pg_constraint
+      WHERE conrelid = 'lovetree_community_comments'::regclass AND conname = 'lovetree_community_comments_client_target_key'`);
+    assert.equal(target.rows.length, 1, '대상 5칸 유일 제약이 있어야 한다');
+
+    // 같은 client_key로 트리·순간에 각각 쓰면 둘 다 저장된다(옛 제약이 남으면 두 번째가 유일 위반으로 실패한다).
+    const tag = Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
+    const productId = ('lt-' + tag).slice(0, 32);
+    const shareId = ('s' + tag).padEnd(24, 'x').slice(0, 24);
+    const both = `INSERT INTO lovetree_community_comments
+      (product_id, comment_id, share_id, subject_id, body, client_key, target_kind, moment_id)
+      VALUES ($1, $2, $3, 'reader', $4, 'same-key', $5, $6)`;
+    await pool.query(both, [productId, 'legacy-fix-tree', shareId, '트리 댓글', 'tree', '']);
+    await pool.query(both, [productId, 'legacy-fix-moment', shareId, '순간 댓글', 'moment', 'm1']);
+    const saved = await pool.query(
+      `SELECT count(*)::int AS n FROM lovetree_community_comments
+        WHERE product_id=$1 AND subject_id='reader' AND client_key='same-key'`,
+      [productId]
+    );
+    assert.equal(saved.rows[0].n, 2, '같은 키라도 대상이 다르면 둘 다 저장된다');
+
+    // 뒷정리: 표준 모양으로 되돌려 놓는다(같은 DB를 이어 쓰는 실행 보호).
+    await pool.query('DROP TABLE lovetree_community_comments');
+    await pool.query(schemaSql);
+    await applyAllMigrations(pool);
+  } finally {
+    await pool.end();
+  }
+});

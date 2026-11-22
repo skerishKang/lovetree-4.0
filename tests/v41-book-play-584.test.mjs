@@ -15,6 +15,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { FALLBACK_SECONDS, playbackItemOf, buildPlaybackQueue, stepPlayable, firstPlayable, playbackChipText, segmentReached, playbackStatusOf, STATUS_PLAYING, STATUS_PAUSED, STATUS_BUFFERING, STATUS_SKIPPED } from '../public/v41/playback-core.mjs';
@@ -542,7 +543,7 @@ test('26: 책을 열어 둔 채 트리를 바꾸면 책 제목·첫 카드·카�
   const { createTree: makeTree, addMoment: growTree } = await import('../public/v41/domain.mjs');
   const { serve: serveApp } = await import('./helpers/screen-audit.mjs');
   const { mkdirSync } = await import('node:fs');
-  const shotDir = process.env.LT_BOOK_SWITCH_SHOT_DIR || 'E:\\lovetree-qa\\local4\\책전환';
+  const shotDir = process.env.LT_BOOK_SWITCH_SHOT_DIR || path.join(tmpdir(), 'lt-book-switch-shots');
   mkdirSync(shotDir, { recursive: true });
   let a = makeTree({subject:'A',title:'A',note:'',emotion:'설렘',date:'2026-11-01',url:''},'2026-11-01T00:00:00Z');
   a = growTree(a,{title:'A 첫 순간',note:'',emotion:'설렘',date:'2026-11-01',url:''},a.moments[0].id,'2026-11-01T00:00:00Z');

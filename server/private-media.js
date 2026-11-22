@@ -1,3 +1,4 @@
+import { logServerError } from './error-log.js';
 // Private product media: canonical identity from the existing PADIEM authenticator.
 // Local single-process store; no public URLs, external fetching, or filename paths.
 import {createHash, randomUUID} from 'node:crypto';
@@ -42,14 +43,20 @@ export function createPrivateMediaStore({directory,quotaBytes=100*1024*1024,maxI
  const folder=p=>join(directory,digest(p.productId+'\0'+p.subjectId));
  async function serial(p,fn){const key=folder(p),before=queues.get(key)||Promise.resolve();let release;const gate=new Promise(r=>release=r);const tail=before.catch(()=>{}).then(()=>gate);queues.set(key,tail);await before.catch(()=>{});try{return await fn(key);}finally{release();if(queues.get(key)===tail)queues.delete(key);}}
  async function metadata(path){const f=await open(path,'r');try{const b=Buffer.alloc(4096);const {bytesRead}=await f.read(b,0,b.length,0),end=b.subarray(0,bytesRead).indexOf(10);if(end<0)throw Error('invalid asset');const m=JSON.parse(b.subarray(0,end).toString());const stat=await f.stat();if(!UUID.test(m.id)||types[m.mime]!==m.ext||!Number.isSafeInteger(m.size)||m.size<=0||m.size>MAX_MEDIA_BYTES||stat.size!==end+1+m.size)throw Error('invalid asset');return {...m,offset:end+1};}finally{await f.close();}}
- async function items(dir){let names;try{names=await readdir(dir);}catch(e){if(e.code==='ENOENT')return [];throw e;}return Promise.all(names.filter(n=>UUID.test(n.replace(/\.asset$/,''))&&n.endsWith('.asset')).map(async n=>metadata(join(dir,n))));}
+ // #1073 B-17: 머리 정보가 틀린 손상 파일 하나가 목록·올리기 전체를 막지 않게 — 손상 항목은 건너뛰고 개수를 센다.
+ // 읽는 사이 사라진 파일(ENOENT)은 손상이 아니라 그냥 건너뜀이다.
+ async function items(dir){let names;try{names=await readdir(dir);}catch(e){if(e.code==='ENOENT')return {rows:[],damaged:0};throw e;}
+  const settled=await Promise.allSettled(names.filter(n=>UUID.test(n.replace(/\.asset$/,''))&&n.endsWith('.asset')).map(n=>metadata(join(dir,n))));
+  const rows=settled.filter(r=>r.status==='fulfilled').map(r=>r.value);
+  const damaged=settled.filter(r=>r.status==='rejected'&&r.reason?.code!=='ENOENT').length;
+  return {rows,damaged};}
  const exposed=m=>({id:m.id,name:m.id+'.'+m.ext,mime:m.mime,size:m.size,createdAt:m.createdAt,label:m.label||null});
  return {
-  async list(p){return serial(p,async dir=>{const rows=await items(dir);return {items:rows.map(exposed).sort((a,b)=>b.createdAt.localeCompare(a.createdAt)),usedBytes:rows.reduce((n,m)=>n+m.size,0),quotaBytes,maxItems};});},
+  async list(p){return serial(p,async dir=>{const {rows,damaged}=await items(dir);return {items:rows.map(exposed).sort((a,b)=>b.createdAt.localeCompare(a.createdAt)),usedBytes:rows.reduce((n,m)=>n+m.size,0),quotaBytes,maxItems,damagedCount:damaged};});},
   async put(p,{id,mime,bytes,label=null}){if(!UUID.test(id||''))throw failure(400,'media_request_id',"파일 요청 번호가 올바르지 않아요.");const ext=checkFile(bytes,mime),hash=digest(bytes);
    return serial(p,async dir=>{await mkdir(dir,{recursive:true,mode:0o700});const path=join(dir,id+'.asset');let old;try{old=await metadata(path);}catch(e){if(e.code!=='ENOENT')throw e;}
     if(old){if(old.sha256!==hash||old.mime!==mime)throw failure(409,'media_request_conflict',"같은 요청 번호에 다른 파일이 있어요. 파일을 다시 선택해 주세요.");return exposed(old);}
-    const rows=await items(dir);if(rows.length>=maxItems||rows.reduce((n,m)=>n+m.size,0)+bytes.length>quotaBytes)throw failure(413,'media_quota',"파일 보관 한도에 도달했어요. 사용하지 않는 파일을 정리해 주세요.");
+    const {rows}=await items(dir);if(rows.length>=maxItems||rows.reduce((n,m)=>n+m.size,0)+bytes.length>quotaBytes)throw failure(413,'media_quota',"파일 보관 한도에 도달했어요. 사용하지 않는 파일을 정리해 주세요.");
     const cleanLabel=sanitizeLabel(label);const m={id,mime,ext,size:bytes.length,sha256:hash,createdAt:new Date().toISOString(),...(cleanLabel?{label:cleanLabel}:{})},tmp=join(dir,'.'+randomUUID()+'.tmp');
     try{await writeFile(tmp,Buffer.concat([Buffer.from(JSON.stringify(m)+'\n'),Buffer.from(bytes)]),{flag:'wx',mode:0o600});const f=await open(tmp,'r+');try{await f.sync();}finally{await f.close();}await link(tmp,path);}
     finally{await unlink(tmp).catch(e=>{if(e.code!=='ENOENT')throw e;});}
@@ -93,7 +100,7 @@ export function createMediaHandler({authenticate,productId,store,publicOrigin,ad
    if(item&&method==='GET'){const asset=await store.get(principal,path.slice(11));return {status:200,headers:{...headers,'content-type':asset.mime},binary:asset.bytes};}
    if(item&&method==='DELETE')body=await store.remove(principal,path.slice(11));
    return {status:200,headers,body:{...body,subject:principal.subjectId}};
-  }catch(e){return {status:e instanceof ApiError?e.status:503,headers,body:{error:{code:e instanceof ApiError?e.code:'media_unavailable',message:e instanceof ApiError?e.message:"파일 보관에 연결하지 못했어요. 다시 시도해 주세요."}}};}
+  }catch(e){if(!(e instanceof ApiError)||e.status>=500)logServerError(e,'lovetree-media');return {status:e instanceof ApiError?e.status:503,headers,body:{error:{code:e instanceof ApiError?e.code:'media_unavailable',message:e instanceof ApiError?e.message:"파일 보관에 연결하지 못했어요. 다시 시도해 주세요."}}};}
  };
 }
 

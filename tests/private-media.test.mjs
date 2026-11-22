@@ -60,6 +60,19 @@ test('video bytes and MIME survive storage; corrupt/truncated files fail closed'
  const dir=join(directory,(await readdir(directory))[0]),path=join(dir,(await readdir(dir))[0]);const saved=await readFile(path);saved[saved.length-1]^=1;await writeFile(path,saved);
  await assert.rejects(store.get(A,asset.name),/checksum/);
 });
+test('a damaged asset is skipped: listing returns the rest and records the skipped count',async t=>{
+ const {directory,store}=await setup(t),good=await store.put(A,{id:randomUUID(),mime:'image/png',bytes:png});
+ const dir=join(directory,(await readdir(directory))[0]);
+ // 올리기 경로로는 만들 수 없는, 머리 정보가 틀린 손상 파일 한 개를 심는다.
+ await writeFile(join(dir,randomUUID()+'.asset'),Buffer.from('broken-header\nnot-an-asset'));
+ const listed=await store.list(A);
+ assert.equal(listed.items.length,1);assert.equal(listed.items[0].id,good.id);
+ assert.equal(listed.damagedCount,1,'건너뛴 손상 파일 개수를 기록한다');
+ // 올리기도 그대로 된다 — 손상 파일이 올리기 전체를 막지 않는다.
+ const second=await store.put(A,{id:randomUUID(),mime:'image/png',bytes:png});
+ assert.equal(second.id.length,36);
+ assert.equal((await store.list(A)).items.length,2);
+});
 test('HTTP boundary authenticates, binds subject and origin; unknown route/method closed; unavailable is honest',async t=>{
  const {store}=await setup(t),authenticate=async r=>r.headers?.user==='A'?A:r.headers?.user==='B'?B:null;
  const handle=createMediaHandler({authenticate,productId:A.productId,store,publicOrigin:'https://front.test'});
