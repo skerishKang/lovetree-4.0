@@ -4,7 +4,7 @@ import {parsePrincipal} from './principal.js';
 import {createRateLimiter} from './rate-limit.js';
 import {projectSharedTree} from './share-service.js';
 import {refreshStageIndex} from './stage-index-refresh.js';
-import {ROLE_TESTER,isAiTesterRole} from './admin-roles.js';
+import {ROLE_TESTER,ROLE_UNKNOWN,isAiTesterRole} from './admin-roles.js';
 import {coverModeOf} from '../src/domain.js';
 // 꼬리표 판정은 화면과 같은 한 벌 — 서버에 규칙을 복사하지 않는다(#627 3단계 '다른 팬 보기').
 import {parseTag, tagKey, isChannelLikeArtist} from '../public/v41/tags.mjs';
@@ -34,6 +34,17 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
  // 속도 제한은 공용 한 벌(server/rate-limit.js)로 — 커뮤니티 창구는 1분 창을 쓴다(#1073 B-19).
  const limiter=createRateLimiter({now});
  const rate=(subjectId,kind,limit=20)=>limiter.rate(subjectId+'\0'+kind,limit);
+ // #1071: 역할 조회 실패를 '역할 없음'과 구분한 '모름'으로 받는다. 주인당 한 번만 묻고,
+ // 모름이면 공개 거름에서 닫고 기록을 한 줄 남긴다(목록·다른 팬 보기·세로 순간이 같은 규칙).
+ async function listedRole(subjectId,cache){
+  if(cache.has(subjectId))return cache.get(subjectId);
+  let role;
+  try{role=admin?await admin.roleFor({productId,subjectId},{unknownOnFailure:true}):null;}
+  catch{role=ROLE_UNKNOWN;}
+  if(role===ROLE_UNKNOWN)console.warn('[lovetree-community] 역할을 읽지 못해 공개 목록에서 제외');
+  cache.set(subjectId,role);
+  return role;
+ }
  let totalsCache=null;
  // 이번 주의 시작(월요일 0시, KST — #824 결정 4 '주 = 월~일 KST'). KST는 UTC+9 고정이라 서머타임
  // 보정이 없다. 주 규칙은 여기 한 곳에서만 계산한다 — SQL·화면에 복제하지 않는다.
@@ -167,26 +178,27 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
    // #611 3번: AI 명예회원 배지 비트 — 이번 한 번의 둘러보기 조회에서는 같은 주인이면 한 번만 묻는다.
    // #678 후속: 역할을 한 번만 물어 두고(주인당 한 번) 그 값으로 배지와 시험 계정 거름을 함께 판정한다.
    const roleCache=new Map();
-   const roleOf=admin?async subjectId=>{
-    if(!roleCache.has(subjectId))roleCache.set(subjectId,await admin.roleFor({productId,subjectId}));
-    return roleCache.get(subjectId);
-   }:null;
+   const roleOf=admin?async subjectId=>listedRole(subjectId,roleCache):null;
    const aiTesterLookup=roleOf?async subjectId=>isAiTesterRole(await roleOf(subjectId)):null;
-   const isTesterLookup=roleOf?async subjectId=>await roleOf(subjectId)===ROLE_TESTER:null;
+   // #1071: 시험 계정뿐 아니라 역할을 읽지 못한 주인도 공개 목록에서 뺀다.
+   const isHiddenLookup=roleOf?async subjectId=>{
+    const role=await roleOf(subjectId);
+    return role===ROLE_TESTER||role===ROLE_UNKNOWN;
+   }:null;
    let entries;
    if(typeof communityRepo.listDiscoverableSummaries==='function'){
     const {since,until}=votingWeek();
     const summaries=await communityRepo.listDiscoverableSummaries({productId,viewerSubjectId,limit:240,sort:sortKey,weekSince:since,weekUntil:until});
     entries=await Promise.all(summaries.map(async summary=>{
-     // 시험 계정(tester 역할) 트리는 둘러보기 목록·검색에서 뺀다(#678 후속 — 공유 링크 직접 열기는 그대로).
-     if(await isTesterLookup(summary.share.subjectId))return null;
+     // 시험 계정·역할 모름 트리는 둘러보기 목록·검색에서 뺀다(#678 후속·#1071 — 공유 링크 직접 열기는 그대로).
+     if(await isHiddenLookup(summary.share.subjectId))return null;
      const item=await card(summary.share,viewerSubjectId,summary.stats,summary.lastActivityAt,aiTesterLookup);
      return item;
     }));
    }else{
     const shares=await communityRepo.listDiscoverable({productId,viewerSubjectId,limit:240});
     entries=await Promise.all(shares.map(async share=>{
-     if(await isTesterLookup(share.subjectId))return null;
+     if(await isHiddenLookup(share.subjectId))return null;
      return card(share,viewerSubjectId,null,null,aiTesterLookup);
     }));
    }
@@ -237,9 +249,8 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
     if(!tree.moments.length)continue;
     // #678 후속: 역할을 주인당 한 번만 물어 두고, 시험 계정(tester 역할) 트리는 '다른 팬 보기' 목록에서
     // 뺀다(공유 링크 직접 열기 /t/<id>는 그대로). AI 명예회원 배지는 같은 판정으로 한 비트만 내린다.
-    let role=roles.get(share.subjectId);
-    if(role===undefined){role=admin?await admin.roleFor({productId,subjectId:share.subjectId}):null;roles.set(share.subjectId,role);}
-    if(role===ROLE_TESTER)continue;
+    const role=admin?await listedRole(share.subjectId,roles):null;
+    if(role===ROLE_TESTER||role===ROLE_UNKNOWN)continue;
     const aiTester=isAiTesterRole(role);
     for(const moment of tree.moments){
      if(!Array.isArray(moment.keywords)||!moment.keywords.some(matches))continue;
@@ -276,9 +287,8 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
     if(!stored)continue;
     let tree;
     try{tree=projectSharedTree(stored.doc,share.treeId).tree;}catch{continue;}
-    let role=roles.get(share.subjectId);
-    if(role===undefined){role=admin?await admin.roleFor({productId,subjectId:share.subjectId}):null;roles.set(share.subjectId,role);}
-    if(role===ROLE_TESTER)continue;
+    const role=admin?await listedRole(share.subjectId,roles):null;
+    if(role===ROLE_TESTER||role===ROLE_UNKNOWN)continue;
     const aiTester=isAiTesterRole(role);
     for(const moment of tree.moments){
      // 세로 판정값이 없는 옛 순간(isVerticalMoment=false)은 내보내지 않는다 — 화면에서 한 번 판정한 뒤 다시 요청한다.
