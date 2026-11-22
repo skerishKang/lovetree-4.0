@@ -20,7 +20,7 @@ export function mountScreenToolbar({ screen, titleFrom, tools = [] }) {
   const header = document.querySelector('header');
   const main = document.querySelector('main');
   if (main) main.prepend(bar); // 랜드마크 안에 둔다(화면 내용이 main 밖에 남지 않게).
-  else (header || document.body).after(bar);
+  if (!main) (header || document.body).after(bar);
 
   // 좌우 여백과 세로 자리는 상단 메뉴의 실제 계산값을 따른다(화면별 하드코딩 없음).
   const align = () => {
