@@ -74,7 +74,7 @@ export function markSeen(storage, version) {
   try { storage?.setItem?.(SEEN_KEY, version.trim()); } catch { /* 저장소가 없으면 이번 접속만 알린다 */ }
 }
 
-const esc = value => String(value ?? '').replace(/[&<>"]/g, ch => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[ch]));
+import { escapeHtml as esc } from './html-escape.mjs'; // A-15: 글자 막기 정본 한 벌
 
 /** 노트 목록을 쉬운 말 한 줄씩으로 그리는 조각. 버전·날짜·새로워진 것·고친 것·아직 준비 중 그대로만 쓴다.
  *  2026-11-17 대표 결정: AI 명예회원 출처는 항목 끝 이름표(하트 + '○○ 님', 13px)로만 붙이고,

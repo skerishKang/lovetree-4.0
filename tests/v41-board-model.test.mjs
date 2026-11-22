@@ -5,6 +5,7 @@ import fs from 'node:fs';
 
 // 화면과 같은 조건: 일반 스크립트가 window.LT58Model 하나를 남긴다.
 globalThis.window = globalThis;
+import '../public/v41/html-escape.mjs'; // A-15: 글자 막기 정본을 먼저 등록한다.
 await import('../public/v41/views/board/board-model.js');
 const M = globalThis.LT58Model;
 const BOARD = fs.readFileSync(new URL('../public/v41/views/board/board.js', import.meta.url), 'utf8');

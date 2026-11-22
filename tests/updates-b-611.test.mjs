@@ -70,6 +70,18 @@ test('611 4번: 열어 보면 사라진다 — 내 의견 목록의 숫자는 0�
   } finally { restore(); }
 });
 
+test('A-20: 의견 답글 시각도 날짜 표기 설정을 따른다', async () => {
+  const posts = [{id: 7, kind: 'opinion', status: 'closed', issueNumber: '#700', displayTitle: '날짜', body: '의견', createdAt: '2026-11-14T09:00:00Z', replies: [{id: 71, authorType: 'staff', mine: false, body: '답변'}]}];
+  const previous = globalThis.localStorage;
+  globalThis.localStorage = { getItem: (key) => (key === 'lt41.dateStyle' ? 'dash' : null) };
+  const {board, els, restore} = mount(null, posts);
+  try {
+    await board.openMyPosts();
+    assert.match(els['myposts-list'].innerHTML, /2026-11-14/, 'dash 표기가 답글 시각에도 적용된다');
+    assert.doesNotMatch(els['myposts-list'].innerHTML, /2026\. 11\. 14/, '기본 표기가 남지 않는다');
+  } finally { restore(); globalThis.localStorage = previous; }
+});
+
 test('611 4번: 반영 안 된 의견에는 새 소식 링크를 단지 않는다', async () => {
   const posts = [{id: 6, kind: 'opinion', status: 'reviewing', issueNumber: null, displayTitle: '아직', body: '기력', createdAt: '2026-11-14T00:00:00Z', replies: []}];
   const {board, els, restore} = mount(null, posts);

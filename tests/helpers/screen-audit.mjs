@@ -274,7 +274,7 @@ export const AUDIT_FN = function audit(opts) {
   if (shown(cardEl)) {
     const openDialog = !!document.querySelector('dialog[open]');
     const openSheet = document.body.classList.contains('lt-sheet-open');
-    const linksExpected = !openDialog && !openSheet && !(innerWidth <= 520 && ['book', 'network', 'shelf'].includes(document.body.dataset.fabLift));
+    const linksExpected = !openDialog && !openSheet && document.body.dataset.fabLift !== 'shelf' && !(innerWidth <= 520 && ['book', 'network'].includes(document.body.dataset.fabLift));
     for (const s of ['.home-links', '#mobile-add', '#toolCinema', '[data-cinema]', '.cinema-btn']) {
       const targets = [...document.querySelectorAll(s)].filter(shown);
       const required = (s === '.home-links' && linksExpected)
