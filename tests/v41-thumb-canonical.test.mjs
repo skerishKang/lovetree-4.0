@@ -160,3 +160,33 @@ test('#1060 남은 자리도 같은 단계 옵션으로 정본을 부른다(주�
   assert.match(read(files.graph), /youtubeStageThumbUrl\(key, 'hqdefault'\)/, '그래프는 세로 구분 없이 hq 옵션');
 });
 
+test('#1060 정본 등록 알림: 먼저 그린 카드의 빈 썸네일을 이벤트로 다시 채운다', () => {
+  const listeners = [];
+  const scope = {
+    window: { addEventListener: (type, fn) => { if (type === 'lt-youtube-id-ready') listeners.push(fn); } },
+    URL, URLSearchParams,
+    Event: class { constructor(type) { this.type = type; } },
+    dispatchEvent: (ev) => { for (const fn of listeners.slice()) fn(ev); return true; },
+  };
+  vm.runInNewContext(read('public/v41/media-preview.js'), scope);
+  const media = scope.window.LTMedia;
+  const video = `https://www.youtube.com/watch?v=${ID}`;
+  // 정본이 없을 때의 첫 그리기: 빈 주소지만 미리보기 자리는 남긴다(조용히 끝내지 않는다).
+  assert.match(media.markup(video, '제목', null, 'm1', { source: 'server', owned: true }), /class="lt-yt-preview"/);
+  const img = {
+    attrs: { src: '' },
+    dataset: { ltUrl: video, ltVertical: '1' },
+    getAttribute(key) { return this.attrs[key] ?? null; },
+    setAttribute(key, value) { this.attrs[key] = value; },
+    closest() { return null; }, querySelector() { return null; },
+  };
+  const box = { closest: () => ({ dataset: { ltUrl: video, ltVertical: '1' } }), querySelector: () => img };
+  scope.document = { querySelectorAll: (sel) => (sel.includes('.lt-yt-preview') ? [box] : []) };
+  // 정본 모듈을 실행하면 등록 알림이 한 번 오고, 세로 썸네일이 채워진다.
+  // 모듈 문법만 벗겨 같은 소스를 vm에서 실행한다(등록과 알림이 실제 코드에서 나오는지 본다).
+  vm.runInNewContext(read('public/v41/youtube-id.mjs').replace(/^export /gm, ''), scope);
+  assert.equal(scope.LTYouTubeId.youtubeStageThumbUrl(ID, 'oardefault'), `https://i.ytimg.com/vi/${ID}/oardefault.jpg`);
+  assert.equal(img.src, `https://i.ytimg.com/vi/${ID}/oardefault.jpg`, '알림을 받아 첫 그림의 썸네일을 다시 채운다');
+  assert.match(img.getAttribute('data-lt-candidates'), /oardefault/);
+});
+

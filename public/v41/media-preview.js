@@ -135,6 +135,40 @@ function stageThumb(videoId, stage) {
   const api = globalThis.LTYouTubeId || globalThis.LTThumbFallback;
   return api && typeof api.youtubeStageThumbUrl === 'function' ? api.youtubeStageThumbUrl(videoId, stage) : '';
 }
+// #1060: 정본 전역이 아직 없으면 빈 주소로 끝내지 않고, 등록 알림을 받은 뒤 다시 채운다.
+const pendingCanonical = [];
+function onCanonical(fn) {
+  const api = globalThis.LTYouTubeId || globalThis.LTThumbFallback;
+  if (api && typeof api.youtubeStageThumbUrl === 'function') fn();
+  else pendingCanonical.push(fn);
+}
+function refillPendingThumbs(root = (typeof document !== 'undefined' ? document : null)) {
+  if (!root?.querySelectorAll) return;
+  for (const box of root.querySelectorAll('.lt-media[data-lt-youtube="1"] .lt-yt-preview')) {
+    const host = box.closest('.lt-media'), img = box.querySelector('img');
+    if (!host || !img || img.getAttribute('src')) continue; // 이미 채워진 그림은 건드리지 않는다.
+    const info = describe(host.dataset.ltUrl || '');
+    if (info.kind !== 'youtube') continue;
+    const list = youtubeCandidates(info.videoId, host.dataset.ltVertical === '1', info.mediaMetadata || null);
+    img.src = list[0] || info.loadUrl;
+    img.setAttribute('data-lt-candidates', JSON.stringify(list));
+    img.setAttribute('data-lt-cand-index', '0');
+  }
+  // 보드 상세의 미리보기(hq·mq 단계)도 같은 정본으로 다시 채운다 — onerror 대체 값이 비지 않게.
+  for (const img of root.querySelectorAll('.ytThumbWrap img[data-stage]')) {
+    if (img.getAttribute('data-mq')) continue;
+    const info = describe(img.dataset.url || '');
+    if (info.kind !== 'youtube' || !info.videoId) continue;
+    const hq = stageThumb(info.videoId, 'hqdefault');
+    img.setAttribute('data-hq', hq);
+    img.setAttribute('data-mq', stageThumb(info.videoId, 'mqdefault'));
+    if (!img.getAttribute('src')) img.src = hq;
+  }
+  for (const fn of pendingCanonical.splice(0)) { try { fn(); } catch {} }
+}
+if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+  window.addEventListener('lt-youtube-id-ready', () => refillPendingThumbs());
+}
 function youtubeThumbUrl(videoId, vertical = false) {
   return stageThumb(videoId, vertical ? 'oardefault' : 'hqdefault');
 }
@@ -282,7 +316,8 @@ function markup(url,title='',mediaMetadata=null,momentId='',context=null,momentM
  // 실제 요청은 화면에 보일 때(IntersectionObserver) 한다 — 공유·예시는 #327 '누르기 전 외부 요청 0'을 그대로 유지.
  // #601: 보드 카드의 큰 썸네일 한 장 — 크게 보기·안내 글·원본 링크·두 번째 제목은 상세가 맡는다.
  const compact=!!opts?.compact;
- const canLoad=!!m.loadUrl&&(new URL(m.loadUrl).protocol==='https:'||m.privateFile);
+ // #1060: 정본 전역이 늦으면 YouTube loadUrl이 잠시 비어도 미리보기 자리는 만든다 — 등록 뒤 채운다.
+  const canLoad=m.kind==='youtube'?!!m.videoId:(!!m.loadUrl&&(new URL(m.loadUrl).protocol==='https:'||m.privateFile));
  const ctx=context||mediaContext();
  const ownedServer=autoLoadMedia(ctx.source,ctx.owned);
  const auto=canLoad&&m.kind==='youtube'&&ownedServer;
@@ -591,7 +626,7 @@ function queueWatchVanished(){ // 끌기·넘기기 동안 몰리는 바뀜마�
  if(vanishedWatchTimer)return;
  vanishedWatchTimer=setTimeout(()=>{vanishedWatchTimer=0;watchVanished();},300);
 }
-window.LTMedia={describe,markup,privateAssetName,autoLoadMedia,currentContext:mediaContext,youtubeThumbUrl,youtubeCandidates,verticalVideo,probeVertical,upgradeVerticals,openLightbox,closeLightbox,applyVanished,applyNoEmbed,scheduleVanishedCheck,checkVanished,watchVanished,setVideoStatusLoader(fn){videoStatusLoader=typeof fn==='function'?fn:null;}};
+window.LTMedia={describe,markup,privateAssetName,autoLoadMedia,currentContext:mediaContext,youtubeThumbUrl,youtubeCandidates,onCanonical,refillPendingThumbs,verticalVideo,probeVertical,upgradeVerticals,openLightbox,closeLightbox,applyVanished,applyNoEmbed,scheduleVanishedCheck,checkVanished,watchVanished,setVideoStatusLoader(fn){videoStatusLoader=typeof fn==='function'?fn:null;}};
 if(typeof document!=='undefined'){
  const cleanup=()=>{for(const [node,url] of ownedUrls)if(!node.isConnected){URL.revokeObjectURL(url);ownedUrls.delete(node);}};
  new MutationObserver(()=>{cleanup();queueWatchVanished();}).observe(document.documentElement,{childList:true,subtree:true});
