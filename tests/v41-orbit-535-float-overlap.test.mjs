@@ -186,7 +186,7 @@ s('#535 떠 있는 폭이 눈에 보이고, 동작 줄이기면 거의 멈춘다
     const moved = await frame.evaluate(async () => {
       const sr = document.querySelector('main#orbit').shadowRoot;
       // #942: 궤도는 90초로 빨라졌다 — 부유 폭만 재려면 궤도 애니메이션을 멈춘다.
-      for (const a of sr.getAnimations({ subtree: true })) if (a.id === 'lt-orbit') a.pause();
+      window.__LT_ORBIT_TEST__?.hold(true); // #1086: WAAPI lt-orbit 대신 JS 공전 루프를 멈춘다
       const cards = [...sr.querySelectorAll('.card')].filter((e) => getComputedStyle(e).display !== 'none');
       // 부유는 .lt-lift 층이 든다 — .card 겉사각형은 궤도 자리만 안다. 261118: 부유 층을 직접 잰다.
       const el = cards[3].querySelector('.lt-lift') || cards[3];
@@ -211,7 +211,7 @@ s('#535 떠 있는 폭이 눈에 보이고, 동작 줄이기면 거의 멈춘다
     const still = await openHome(browser, lib.base, { width: 1440, height: 900, member: 'in', reducedMotion: 'reduce' });
     const quiet = await still.frame.evaluate(async () => {
       const sr = document.querySelector('main#orbit').shadowRoot;
-      for (const a of sr.getAnimations({ subtree: true })) if (a.id === 'lt-orbit') a.pause();
+      window.__LT_ORBIT_TEST__?.hold(true); // #1086: WAAPI lt-orbit 대신 JS 공전 루프를 멈춘다
       const el = [...sr.querySelectorAll('.card')].filter((e) => getComputedStyle(e).display !== 'none')[3].querySelector('.lt-lift') || [...sr.querySelectorAll('.card')].filter((e) => getComputedStyle(e).display !== 'none')[3];
       const a = el.getBoundingClientRect(); const x0 = a.left + a.width / 2, y0 = a.top + a.height / 2;
       const t0 = performance.now();
@@ -412,10 +412,8 @@ s('#942 궤도는 한 방향으로 60~120초에 한 바퀴, 정지·튐 0, 클�
         }
         return { path: Math.round(path), maxStep: Math.round(maxStep), maxAt: Math.round(maxAt), angle: Number(angle.toFixed(3)), meanStep: Number((path / Math.max(1, pts.length - 1)).toFixed(2)) };
       });
-      const animAt = () => cards.map((c) => { const a = c.getAnimations().find((x) => x.id === 'lt-orbit'); return a ? [a.currentTime, a.effect.getTiming().duration, a.playbackRate] : null; });
-      const animStart = animAt();
+      // #1086: 공전은 WAAPI가 아니라 JS 루프 — 주기는 화면이 노출한 값으로 읽는다.
       const beforeMs = await run(6000);
-      const animEnd = animAt();
       const before = stats();
       const stylesAt = () => cards.map((c) => [c.style.transform || '', c.querySelector('.lt-move')?.style.transform || '']);
       const styleBefore = stylesAt();
@@ -426,7 +424,8 @@ s('#942 궤도는 한 방향으로 60~120초에 한 바퀴, 정지·튐 0, 클�
       series.forEach((s) => { s.length = 0; });
       const afterMs = await run(6000);
       const after = stats();
-      const period = animStart.map((a, i) => a && animEnd[i] ? Math.round(1000 * a[1] / (1000 * a[2]) / 1000) : 0);
+      const periodSec = window.__LT_ORBIT_TEST__ ? Math.round(window.__LT_ORBIT_TEST__.period() / 1000) : 0;
+      const period = cards.map(() => periodSec);
       return { cards: cards.length, beforeMs, afterMs, before, after, period, styleBefore, styleAfterClick };
     });
     if (CAP) {

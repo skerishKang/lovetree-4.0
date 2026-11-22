@@ -544,13 +544,13 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
    if(tf&&el.__orbitTf!==tf){el.__orbitTf=tf;el.style.transform=tf;}
   }};
   // #1086: 궤도 경로 검사용 — 지정 진행률로 카드를 그린다(실제 루프와 같은 orbitWrite 경로).
-  globalThis.__LT_ORBIT_TEST__={seek(t){for(let i=0;i<elements.length;i++){
+  globalThis.__LT_ORBIT_TEST__={period(){const w=layoutBox&&layoutBox.w<=650?ringsNarrow:rings;return Math.round(ORBIT_MS/(w[cards[0].ring].speed));},hold(on){if(on){orbitPause();stopOrbitLoop();}else{orbitResume();startOrbitLoop();}},seek(t){for(let i=0;i<elements.length;i++){
    const frames=orbitFrames[i],el=elements[i];if(!frames||!frames.length||!el)continue;
    if(el.__seekSaved===undefined)el.__seekSaved=el.style.transform;
    const tf=orbitTransform(frames,t);if(tf){el.style.transform=tf;}}
    return true;},restore(){for(const el of elements){if(el.__seekSaved!==undefined){el.style.transform=el.__seekSaved;el.__orbitTf=el.__seekSaved;delete el.__seekSaved;}}}};
   const orbitTick=(now)=>{if(!animRunning()){orbitRaf=0;return;}orbitWrite(now);orbitRaf=requestAnimationFrame(orbitTick);};
-  const startOrbitLoop=()=>{if(!orbitRaf){orbitRaf=requestAnimationFrame(orbitTick);}};
+  const startOrbitLoop=()=>{if(!orbitRaf){orbitWrite(performance.now());orbitRaf=requestAnimationFrame(orbitTick);}};
   const stopOrbitLoop=()=>{if(orbitRaf)cancelAnimationFrame(orbitRaf);orbitRaf=0;};
  // 카메라(패럴랙스): 가까운 카드가 더 크게 움직인다. 층마다 값을 넘겨 애니메이션 사이에 끼어든다.
  // 깊이별 계수에 쓰는 sc 는 카드가 궤도 한 바퀴에서 갖는 배율의 평균(카드마다 고정) — 흔들림 폭 차이는 눈에 띄지 않는다.
