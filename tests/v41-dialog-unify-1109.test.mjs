@@ -335,8 +335,9 @@ test('#1231 로그아웃 서재·책·보드·지도 빈 상태와 화면별 로
     const page=await ctx.newPage();
     const errors=[];page.on('pageerror',e=>errors.push(e.message));
     await page.goto(`${base}/v41/#home`,{waitUntil:'load'});
-    // 실제 401 판정이 끝난 로그아웃에서 탭을 누른다. 인증 확인 중 탭 유지 여부는 #1109가 별도로 잰다.
-    await page.waitForFunction(()=>document.documentElement.dataset.ltAuthPhase==='ready'&&document.documentElement.dataset.ltAuthHint==='out'&&document.body.dataset.member==='out'&&document.querySelector('#tree-views')?.hidden===false);
+    // 인증 표시가 먼저 확정되어도 비동기 예시 트리는 뒤늦게 화면을 다시 그릴 수 있다.
+    // 예시 데이터까지 준비된 로그아웃 상태에서 탭을 누른다(#1109는 인증 확인 중 탭 유지도 별도로 검사).
+    await page.waitForFunction(()=>document.documentElement.dataset.ltAuthPhase==='ready'&&document.documentElement.dataset.ltAuthHint==='out'&&document.body.dataset.member==='out'&&document.body.dataset.recordSource==='example'&&window.LT41?.source==='example'&&document.querySelector('#tree-views')?.hidden===false);
     const initial=await page.evaluate(()=>({member:document.body.dataset.member,views:[...document.querySelectorAll('#tree-views button[data-view]')].map(b=>b.textContent.trim()),header:document.querySelector('.app-header').getBoundingClientRect().height}));
     assert.equal(initial.member,'out',`${width}: 로그아웃`);
     assert.deepEqual(initial.views,['서재','책','보드','지도'],`${width}: 네 탭 그대로 유지`);
