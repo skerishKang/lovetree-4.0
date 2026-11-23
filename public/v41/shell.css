@@ -297,6 +297,14 @@ html[data-v41-screen=book] .tools .ui-btn::after,html[data-v41-screen=board] hea
  html:is([data-lt-shell-entry=shelf],[data-lt-shell-entry=book]) .app-header{flex-wrap:wrap}
  html:is([data-lt-shell-entry=shelf],[data-lt-shell-entry=book]) .app-header .main-nav{flex-basis:100%;order:3}
 }
+/* #1231: 390에서는 2행 예약을 적용하지 않는다. 기존 57px 한 줄 기준 유지.
+   보기 전환 단추는 같은 줄에서 공간을 나누어 쓰고, 탐색은 더보기에서도 제공한다. */
+@media(max-width:520px){
+ .app-header:has(.view-toggle:not([hidden]):not([data-lt-pending])),
+ html:is([data-lt-shell-entry=shelf],[data-lt-shell-entry=book]) .app-header{flex-wrap:nowrap}
+ .app-header:has(.view-toggle:not([hidden]):not([data-lt-pending])) .main-nav,
+ html:is([data-lt-shell-entry=shelf],[data-lt-shell-entry=book]) .app-header .main-nav{flex-basis:0;order:0;min-width:0}
+}
 @media(max-width:780px){
  .app-header{--nav-fade:28px}
  .app-header nav.fade-start{mask-image:linear-gradient(to right,transparent 0,#000 var(--nav-fade))}
