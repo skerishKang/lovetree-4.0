@@ -1,6 +1,23 @@
 // #1091: 상단 메뉴 아래 화면 도구 줄 한 벌. 책·보드가 각자 그리던 줄 대신 이 부품을 호출한다.
 // 서재는 #1154가 상단을 바꾸는 중이라 아직 붙이지 않는다.
-export function mountScreenToolbar({ screen, titleFrom, tools = [], initialBar = null }) {
+// #1247: 책·보드·지도 같은 트리 줄 — 왼쪽에 '← 서재'·트리 이름(크게)·작은 메타(순간 N개 · 마지막 M.D),
+// 오른쪽에 화면 도구, 맨 오른쪽에 공통 '▶ 이어 보기' 하나. 공용 코드는 이 벌 하나다.
+function treeMetaText() {
+  try {
+    const moments = window.LTDEMO?.moments || window.parent?.LT41?.tree?.moments || [];
+    const list = Array.isArray(moments) ? moments : [];
+    const dates = list.map(m => String(m?.date || '')).filter(Boolean).sort();
+    const last = dates.length ? dates[dates.length - 1] : '';
+    if (!list.length) return '순간 0개';
+    if (last) {
+      const parts = last.split('-');
+      const md = parts.length === 3 ? Number(parts[1]) + '.' + Number(parts[2]) : last;
+      return '순간 ' + list.length + '개 · 마지막 ' + md;
+    }
+    return '순간 ' + list.length + '개';
+  } catch { return ''; }
+}
+export function mountScreenToolbar({ screen, titleFrom, tools = [], initialBar = null, backEl = null, meta = false }) {
   // Adopt a pre-rendered toolbar when supplied, so the first paint already has its final layout.
   const bar = initialBar || document.createElement('div');
   bar.className = 'lt-screen-toolbar';
@@ -19,7 +36,18 @@ export function mountScreenToolbar({ screen, titleFrom, tools = [], initialBar =
   const menu = bar.querySelector('.lt-toolbar-menu') || document.createElement('div');
   menu.className = 'lt-toolbar-menu';
   menu.hidden = true;
-  if (!initialBar) bar.append(title, group, more, menu);
+  if (!initialBar) {
+    const left = document.createElement('div');
+    left.className = 'lt-toolbar-left';
+    if (backEl) left.append(backEl);
+    left.append(title);
+    if (meta) {
+      const metaEl = document.createElement('span');
+      metaEl.className = 'lt-toolbar-meta';
+      left.append(metaEl);
+    }
+    bar.append(left, group, more, menu);
+  }
   const header = document.querySelector('header');
   // 도구 줄과 본문은 같은 위치 기준을 쓰고, 서로의 자식이 되지 않는다.
   if (!initialBar) {
@@ -47,7 +75,11 @@ export function mountScreenToolbar({ screen, titleFrom, tools = [], initialBar =
   };
   align();
 
-  const sync = () => { title.textContent = (titleFrom?.textContent || '').trim(); };
+  const sync = () => {
+    title.textContent = (titleFrom?.textContent || '').trim();
+    const metaEl = bar.querySelector('.lt-toolbar-meta');
+    if (metaEl && meta) metaEl.textContent = treeMetaText();
+  };
   sync();
   if (titleFrom && typeof MutationObserver === 'function') {
     new MutationObserver(sync).observe(titleFrom, { childList: true, characterData: true, subtree: true });
@@ -56,6 +88,7 @@ export function mountScreenToolbar({ screen, titleFrom, tools = [], initialBar =
   for (const tool of tools) if (tool && tool.parentElement !== group) group.append(tool);
 
   let stashed = [];
+  const isPlay = (el) => /^(playAllBtn|cinemaBtn|mapPlayBtn)$/.test(el.id || '');
   const reflow = () => {
     align();
     for (const el of stashed) group.append(el);
@@ -64,14 +97,22 @@ export function mountScreenToolbar({ screen, titleFrom, tools = [], initialBar =
     menu.hidden = true;
     more.hidden = true;
     if (group.scrollWidth <= group.clientWidth) return;
+    // 맨 오른쪽 '▶ 이어 보기'는 좁은 화면에서도 줄 오른쪽에 남긴다 — 먼저 줄이는 건 화면 도구다.
     const items = [...group.children];
-    for (let i = items.length - 1; i >= 0; i -= 1) {
-      const el = items[i];
+    const rest = items.filter((el) => !isPlay(el));
+    const plays = items.filter((el) => isPlay(el));
+    for (let i = rest.length - 1; i >= 0; i -= 1) {
+      const el = rest[i];
       menu.prepend(el);
       stashed.unshift(el);
       if (group.scrollWidth <= group.clientWidth) break;
     }
-    more.hidden = false;
+    for (let i = plays.length - 1; i >= 0 && group.scrollWidth > group.clientWidth; i -= 1) {
+      const el = plays[i];
+      menu.prepend(el);
+      stashed.unshift(el);
+    }
+    more.hidden = stashed.length > 0;
   };
   more.addEventListener('click', () => { menu.hidden = !menu.hidden; });
   if (typeof ResizeObserver === 'function') {
