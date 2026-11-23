@@ -1,9 +1,10 @@
 name: "1204 screenshot evidence (temporary)"
 on:
-  push:
-    branches: [ai/com1-home-1204-261123]
+  pull_request:
+    branches: [main]
 jobs:
   screenshot-evidence:
+    if: github.event.pull_request.number == 1223
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
