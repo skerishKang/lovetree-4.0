@@ -175,32 +175,22 @@ function playInline(yt,media){
  cell.stage.append(frame);
  if(end>start)host.insertAdjacentHTML('beforeend','<button type="button" class="yt-from-start" data-yt-from-start="'+t(yt.dataset.ytPlay)+'">처음부터 보기</button>');
 }
-/* #791: 틱톡 — 공식 embed.js를 누를 때만 붙인다. 짧은 주소는 서버가 푼 id를 쓴다. */
-function playTiktokInline(btn){
- const id=window.LTMedia?.tiktokPlayerId?.(btn.dataset.ttPlay||'');
- const cite=btn.dataset.ttCite||'';
- if(!id||!cite)return false;
- const host=btn.parentElement;if(!host||host.querySelector('.tiktok-embed'))return true;
- const block=document.createElement('blockquote');
- block.className='tiktok-embed';block.setAttribute('cite',cite);block.setAttribute('data-video-id',id);
- const section=document.createElement('section');section.textContent=btn.dataset.ttTitle||'TikTok 영상';block.append(section);
- btn.replaceWith(block);
- window.LTMedia?.ensureTiktokEmbedScript?.(document);
- return true;
+/* #791: 공식 재생기 iframe을 직접 넣는다(섀도우 루트의 블록을 스크립트가 찾지 못한다). */
+function playOfficialInline(btn,src,title,className){
+ if(!src||!btn.parentElement||btn.parentElement.querySelector('iframe.lt-tt-frame,iframe.lt-ig-frame'))return !!src;
+ const frame=document.createElement('iframe');
+ frame.className=className;frame.src=src;frame.title=title;
+ frame.allow='accelerometer; autoplay; clipboard-write; encrypted-media; fullscreen; gyroscope; picture-in-picture; web-share';
+ frame.allowFullscreen=true;frame.setAttribute('referrerpolicy','strict-origin-when-cross-origin');
+ btn.replaceWith(frame);return true;
 }
-/* #791 2단계: 인스타그램 — 공식 embed.js를 누를 때만 한 번 붙인다. */
+function playTiktokInline(btn){
+ const src=window.LTMedia?.tiktokPlayerUrl?.(btn.dataset.ttPlay||'');
+ return playOfficialInline(btn,src,btn.dataset.ttTitle||'TikTok 영상','yt-frame is-vertical lt-tt-frame');
+}
 function playInstagramInline(btn){
- const code=btn.dataset.igPlay||'',cite=btn.dataset.igCite||'';
- if(!code||!cite)return false;
- const host=btn.parentElement;if(!host||host.querySelector('.instagram-media'))return true;
- const block=document.createElement('blockquote');
- block.className='instagram-media';
- block.setAttribute('data-instgrm-permalink',cite);
- block.setAttribute('data-instgrm-version','14');
- const section=document.createElement('section');section.textContent=btn.dataset.igTitle||'인스타그램 릴스';block.append(section);
- btn.replaceWith(block);
- window.LTMedia?.ensureInstagramEmbedScript?.(document);
- return true;
+ const src=window.LTMedia?.instagramPlayerUrl?.(btn.dataset.igPlay||'');
+ return playOfficialInline(btn,src,btn.dataset.igTitle||'인스타그램 릴스','yt-frame is-vertical lt-ig-frame');
 }
 document.addEventListener('pointerdown',e=>{
  if(!isPrimaryButton(e))return;

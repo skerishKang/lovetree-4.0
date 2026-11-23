@@ -2,8 +2,9 @@
 // 기본 예시의 인물 사진을 빌리지 않는다. 공식 썸네일이 없으면 플랫폼 표식이 있는 단색 카드로 둔다.
 import { hasPreviewExamples } from './host-context.mjs';
 
-const NBA = 'https://www.tiktok.com/@nba/video/7646985299326749983';
-const ENHYPEN = 'https://www.tiktok.com/@enhypen/video/7680930477414583573';
+// 실제 브라우저에서 재생 확인한 공개 영상(2026-11-23). 옛 예시 영상은 삭제되어 바꿨다.
+const NBA = 'https://www.tiktok.com/@nba/video/7709419447567551775';
+const ENHYPEN = 'https://www.tiktok.com/@enhypen/video/7697839765374143745';
 const REEL = 'https://www.instagram.com/reel/DR_TeHFCB9m/';
 
 export const PREVIEW_MOMENTS = [
@@ -16,7 +17,7 @@ export const PREVIEW_MOMENTS = [
     first: false, important: true, parentId: null, links: [],
     mediaMetadata: {
       title: 'NBA 순간 #농구', channel: 'nba', source: 'www.tiktok.com',
-      tiktokId: '7646985299326749983', tiktokAuthor: 'nba'
+      tiktokId: '7709419447567551775', tiktokAuthor: 'nba'
     }
   },
   {
@@ -28,7 +29,7 @@ export const PREVIEW_MOMENTS = [
     first: false, important: true, parentId: 'pv-tt-1', links: [],
     mediaMetadata: {
       title: 'ENHYPEN 무대 #ENHYPEN', channel: 'enhypen', source: 'www.tiktok.com',
-      tiktokId: '7680930477414583573', tiktokAuthor: 'enhypen'
+      tiktokId: '7697839765374143745', tiktokAuthor: 'enhypen'
     }
   },
   {
@@ -73,6 +74,17 @@ export function withPreviewExamples(tree, hostname = globalThis.location?.hostna
     result.demoData = { ...tree.demoData, moments: [...PREVIEW_MOMENTS.map((moment) => ({ ...moment })), ...demo] };
   }
   return result;
+}
+
+/** 틱톡 공식 oEmbed의 thumbnail_url을 카드 배경으로. 못 받으면 빈 문자열(단색 카드 유지). */
+export async function fetchTiktokPreviewThumbnail(url, fetchImpl = globalThis.fetch) {
+  try {
+    const answer = await fetchImpl(`https://www.tiktok.com/oembed?url=${encodeURIComponent(url)}&format=json`, { headers: { accept: 'application/json' } });
+    if (!answer?.ok) return '';
+    const data = await answer.json();
+    const raw = String(data?.thumbnail_url ?? '').trim();
+    return /^https:\/\//.test(raw) ? raw : '';
+  } catch { return ''; }
 }
 
 /** 첫 화면 앞줄 체험 카드 — 미리보기 체험 모드에서만 3개를 돌려준다. */

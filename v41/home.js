@@ -115,25 +115,15 @@ function openHomeViewer(moment,opener=null){
  vEl('mediaPlayHome').hidden=!canPlay;
  vEl('mediaPlayHome').onclick=()=>{
   const play=globalThis.LTMedia;
-  if(tiktok){
-   const id=play?.tiktokPlayerId?.(moment.mediaMetadata?.tiktokId||described.videoId);
-   if(!id)return;
-   const block=document.createElement('blockquote');block.className='tiktok-embed';
-   block.setAttribute('cite',described.openUrl||moment.url);block.setAttribute('data-video-id',id);
-   const section=document.createElement('section');section.textContent=moment.title||'TikTok 영상';block.append(section);
-   visual.querySelector('.tiktok-embed,.instagram-media,iframe')?.remove();img.hidden=true;vEl('mediaTypeBadgeHome').hidden=true;
-   visual.append(block);play?.ensureTiktokEmbedScript?.(document);vEl('mediaPlayHome').hidden=true;return;
-  }
-  if(instagram){
-   const code=described.shortcode||moment.mediaMetadata?.instagramShortcode;
-   if(!code)return;
-   const block=document.createElement('blockquote');block.className='instagram-media';
-   block.setAttribute('data-instgrm-permalink',described.openUrl||moment.url);block.setAttribute('data-instgrm-version','14');
-   const section=document.createElement('section');section.textContent=moment.title||'인스타그램 릴스';block.append(section);
-   visual.querySelector('.tiktok-embed,.instagram-media,iframe')?.remove();img.hidden=true;vEl('mediaTypeBadgeHome').hidden=true;
-   visual.append(block);play?.ensureInstagramEmbedScript?.(document);vEl('mediaPlayHome').hidden=true;
-  }
- };
+     const src=tiktok?play?.tiktokPlayerUrl?.(moment.mediaMetadata?.tiktokId||described.videoId):instagram?play?.instagramPlayerUrl?.(described.shortcode||moment.mediaMetadata?.instagramShortcode):'';
+   if(!src)return;
+   const frame=document.createElement('iframe');
+   frame.className='lt-official-frame';frame.src=src;frame.title=moment.title||(tiktok?'TikTok 영상':'인스타그램 릴스');
+   frame.allow='accelerometer; autoplay; clipboard-write; encrypted-media; fullscreen; gyroscope; picture-in-picture; web-share';
+   frame.allowFullscreen=true;frame.setAttribute('referrerpolicy','strict-origin-when-cross-origin');
+   visual.querySelector('iframe')?.remove();img.hidden=true;vEl('mediaTypeBadgeHome').hidden=true;
+   visual.append(frame);vEl('mediaPlayHome').hidden=true;
+};
  const book=vEl('mediaBookHome'),external=vEl('mediaExternalHome');
  book.onclick=()=>{closeHomeViewer();bridge.actions.openBook(moment.treeId,moment.id);};
  external.hidden=!moment.url;if(moment.url)external.href=moment.url;

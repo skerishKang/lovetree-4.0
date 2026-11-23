@@ -9,7 +9,7 @@ import {movedNotice} from '../../public/v41/inbox-model.mjs';
 import {tagFacets, filterMomentsByTags} from '../../public/v41/tag-filter.mjs';
 import {fallbackCardMarkup, thumbFallbackAttrs, needsFallbackCard, mountThumbFallback, VIDEO_UNAVAILABLE_TEXT, isVerticalMoment, youtubeIdFrom, thumbnailCandidates, isTiktokMoment} from '../../public/v41/thumb-fallback.mjs';
 import samples from './orbit-samples.json';
-import { previewSamples } from '../../public/v41/preview-examples.mjs';
+import { previewSamples, fetchTiktokPreviewThumbnail } from '../../public/v41/preview-examples.mjs';
 import compactOrbitImages from './orbit-compact.json';
 import {paintCardBitmap,cardPose,hitPose,hitProjective,sortPaintOrder} from './orbit-canvas.js';
 import {createOrbitGL} from './orbit-webgl.js';
@@ -68,7 +68,7 @@ extraCSS+=`.recent-head{position:relative;display:inline-flex;align-items:baseli
 // #791: 틱톡 최근 순간 카드의 작은 플랫폼 표식.
 extraCSS+=`.recent-tt-mark{position:absolute;top:10px;right:10px;z-index:2;padding:3px 9px;border-radius:999px;background:rgba(0,0,0,.55);color:#fff;font-size:11px;font-weight:700;letter-spacing:.06em;pointer-events:none}`;
 // #791: 체험 모드 앞줄 3장 — 궤도보다 앞, 가운데에 놓고 기본 예시 문구는 숨긴다.
-extraCSS+=`:host(.lt-preview-mode) .center h1,:host(.lt-preview-mode) .center .eyebrow,:host(.lt-preview-mode) .center>p,:host(.lt-preview-mode) .center .actions,:host(.lt-preview-mode) .center-note{display:none}.lt-preview-strip{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:3500;display:flex;gap:14px;align-items:stretch;justify-content:center;width:calc(100% - 32px);pointer-events:none}.lt-preview-card{position:relative;pointer-events:auto;box-sizing:border-box;width:180px;min-height:232px;display:flex;flex-direction:column;justify-content:flex-end;gap:10px;padding:14px;border:2px solid var(--lt-gold-deep);border-radius:14px;background:var(--lt-ink);color:var(--lt-paper);box-shadow:0 24px 60px rgba(0,0,0,.45)}.lt-preview-mark{align-self:flex-start;padding:3px 9px;border-radius:999px;border:1px solid var(--lt-gold-line);color:var(--lt-paper);font-size:11px;font-weight:700;letter-spacing:.06em}.lt-preview-title{font-size:14px;line-height:1.4;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}.lt-preview-play{pointer-events:auto;min-height:44px;min-width:44px;align-self:flex-start;border:1px solid var(--lt-gold-line);border-radius:999px;background:var(--lt-paper);color:var(--lt-ink);cursor:pointer;font-size:18px;line-height:1}.lt-preview-card .tiktok-embed,.lt-preview-card .instagram-media{position:absolute;inset:0;width:100%;height:100%;margin:0;overflow:auto;background:var(--lt-ink);color:var(--lt-paper)}@media(max-width:650px){.lt-preview-strip{gap:8px;width:calc(100% - 16px)}.lt-preview-card{width:calc((100% - 20px)/3);min-height:158px;padding:8px}.lt-preview-title{font-size:11px}.lt-preview-mark{font-size:9px;padding:2px 6px}.lt-preview-play{min-height:40px;min-width:40px}}`;
+extraCSS+=`:host(.lt-preview-mode) .center h1,:host(.lt-preview-mode) .center .eyebrow,:host(.lt-preview-mode) .center>p,:host(.lt-preview-mode) .center .actions,:host(.lt-preview-mode) .center-note{display:none}.lt-preview-strip{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:3500;display:flex;gap:14px;align-items:stretch;justify-content:center;width:calc(100% - 32px);pointer-events:none}.lt-preview-card{position:relative;pointer-events:auto;box-sizing:border-box;width:180px;min-height:232px;display:flex;flex-direction:column;justify-content:flex-end;gap:10px;padding:14px;border:2px solid var(--lt-gold-deep);border-radius:14px;background:var(--lt-ink);color:var(--lt-paper);box-shadow:0 24px 60px rgba(0,0,0,.45)}.lt-preview-card.has-thumb:before{content:'';position:absolute;inset:0;background-image:var(--lt-preview-bg);background-size:cover;background-position:center;opacity:.55;pointer-events:none}.lt-preview-card.has-thumb>*{position:relative;z-index:1}.lt-preview-mark{align-self:flex-start;padding:3px 9px;border-radius:999px;border:1px solid var(--lt-gold-line);color:var(--lt-paper);font-size:11px;font-weight:700;letter-spacing:.06em}.lt-preview-title{font-size:14px;line-height:1.4;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}.lt-preview-play{pointer-events:auto;min-height:44px;min-width:44px;align-self:flex-start;border:1px solid var(--lt-gold-line);border-radius:999px;background:var(--lt-paper);color:var(--lt-ink);cursor:pointer;font-size:18px;line-height:1}.lt-preview-card[data-lt-playing]{width:min(360px,86vw);min-height:min(460px,70vh);z-index:3600}.lt-preview-card iframe.lt-preview-frame{position:absolute;inset:0;width:100%;height:100%;border:0;border-radius:14px;background:var(--lt-ink)}@media(max-width:650px){.lt-preview-strip{gap:8px;width:calc(100% - 16px)}.lt-preview-card{width:calc((100% - 20px)/3);min-height:158px;padding:8px}.lt-preview-title{font-size:11px}.lt-preview-mark{font-size:9px;padding:2px 6px}.lt-preview-play{min-height:40px;min-width:40px}}`;
 extraCSS+=`.orbit-dialog:not(#guidePanel)::backdrop{background:rgba(3,3,7,.85);backdrop-filter:blur(12px)}.orbit-dialog:not(#guidePanel) .close{box-sizing:border-box;width:44px;height:44px;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;padding:0;border:1px solid #615364;border-radius:50%;background:#ffffff07;font-size:24px;line-height:1;color:inherit;position:absolute;right:12px;top:10px;z-index:7}@media(max-width:520px){.orbit-dialog:not(#guidePanel){width:100vw;max-width:none;height:100dvh;max-height:100dvh;inset:0;margin:0;border:0;border-radius:0}.orbit-dialog:not(#guidePanel) .close{top:8px;right:8px;background:#151118e6}}`;
 // #1077: 바닥 링크·새 소식 카드 자리를 지나는 예시 카드는 그 구간만 투명하게(자리와 장수는 유지).
 extraCSS+=`.card.lt-under-link{opacity:0}\n.card .surface .lt-orbit-texture{position:absolute;inset:0;width:100%;height:100%;display:block;object-fit:var(--fit,cover);object-position:var(--pos,50% 50%);transform:scale(1.02);pointer-events:none}\n.card.fitContain .surface .lt-orbit-texture{padding:7px;object-fit:contain;transform:scale(.94)}\n.card .surface.lt-textured img{opacity:0;filter:none}.card .surface:not(.lt-textured) img{filter:saturate(var(--sat,.66)) brightness(var(--bright,.86)) var(--lt-orbit-depth,brightness(1))}\n.card.memo .surface{filter:var(--lt-orbit-depth,brightness(1))}\n:host(:not([data-lt-busy])) .card:is(:hover,:focus-visible,.hovered) .surface.lt-textured .lt-orbit-texture{opacity:0}:host(:not([data-lt-busy])) .card:is(:hover,:focus-visible,.hovered) .surface.lt-textured img{opacity:1;filter:saturate(.9) brightness(1.06) var(--lt-orbit-depth,brightness(1))}\n.card::before,.card>.lt-shadow-hover,.card>.lt-shadow-busy{content:"";position:absolute;inset:-1px;border-radius:inherit;pointer-events:none;transition:opacity .18s;z-index:-1}\n.card::before{box-shadow:var(--lt-orbit-shadow);opacity:1}.card>.lt-shadow-hover{box-shadow:0 24px 60px rgba(0,0,0,.4),0 0 0 2px rgba(255,224,158,.75),0 0 26px rgba(238,190,104,.68);opacity:0}.card>.lt-shadow-busy{box-shadow:var(--lt-orbit-busy-shadow);opacity:0}\n.card.mine::before,.card.mine>.lt-shadow-hover,.card.mine>.lt-shadow-busy{inset:-3px}:host(:not([data-lt-busy])) .card:is(:hover,:focus-visible,.hovered)::before,:host([data-lt-busy]) .card::before{opacity:0}:host(:not([data-lt-busy])) .card:is(:hover,:focus-visible,.hovered)>.lt-shadow-hover,:host([data-lt-busy]) .card>.lt-shadow-busy{opacity:1}\n`;
@@ -171,6 +171,18 @@ export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSel
  const previewStripMarkup=previewStrip.length?`<div class="lt-preview-strip" role="group" aria-label="체험 영상">${previewStrip.map((c)=>`<div class="lt-preview-card" data-lt-preview-card="${esc(c.id)}"><span class="lt-preview-mark">${esc(c.platform)}</span><span class="lt-preview-title">${esc(c.shortTitle||c.title)}</span><button type="button" class="lt-preview-play" data-lt-preview-play="${esc(c.id)}" aria-label="바로 재생">▶</button></div>`).join('')}</div>`:'';
 if(previewStrip.length)host.classList.add('lt-preview-mode');
 performance.mark('m1');shadow.innerHTML=`<style>${originalCSS}${extraCSS}.auth-entry{white-space:nowrap}</style><section class="app" aria-label="${SERVICE} 첫 화면"><div class="topbar"><span class="brand">${SERVICE} · MEMORY ORBIT</span><div class="top-actions"><button class="menuBtn" data-do="index">순간 목록</button>${authHtml}</div></div><div class="world"></div><div class="center-scrim" aria-hidden="true"></div><div class="center" data-lt-keep-clear><div class="eyebrow">${titleDemo?'나의 첫 순간':'WELCOME BACK'}</div><h1>${titleDemo?'좋아하는 순간부터.':'다시, 그 순간으로.'}</h1><p>${titleDemo?'간직하고 싶은 장면에 마음을 남겨 보세요.<br>지금 떠오르는 순간 하나면 충분해요.':'기억은 아직 여기에서 이어지고 있어요.'}</p>${recentMoment?recentMarkup(recentMoment):''}<div class="actions"><button class="subtleBtn primary-cta" data-do="${titleDemo?'new':'continue'}">${titleDemo?NEW_TREE:'이어 보던 순간'}</button><button class="subtleBtn" data-do="${titleDemo?'continue':'new'}">${titleDemo?'예시 순간 감상':NEW_TREE}</button><button class="subtleBtn" data-do="trees">${GO_TREES}</button></div><p class="center-note${demo?' note-with-hint':''}"><span>${demo?(loggedIn===true?'뒤에 떠다니는 카드는 감상 예시예요':'감상 예시 · 내 기록에는 저장되지 않아요'):esc(recordNote??`${all.length}개의 순간 · 서버에 보관`)}</span>${demo?(loggedIn===true?'<span>·</span><span class="center-hint">눌러서 감상</span>':'<span class="center-hint">드래그 · 금테 카드를 눌러 감상</span>'):''}</p></div>${previewStripMarkup}</section><dialog class="orbit-dialog" aria-label="순간 감상"></dialog>`;
+ if(previewStrip.length){
+  for(const c of previewStrip){
+   if(c.platform!=='TIKTOK')continue;
+   void fetchTiktokPreviewThumbnail(c.url).then((thumb)=>{
+    if(!thumb)return;
+    const card=shadow.querySelector('[data-lt-preview-card="'+c.id+'"]');
+    if(!card)return;
+    card.style.setProperty('--lt-preview-bg','url("'+thumb+'")');
+    card.classList.add('has-thumb');
+   });
+  }
+ }
  const app=shadow.querySelector('.app'),world=shadow.querySelector('.world'),dialog=shadow.querySelector('dialog');
  // #1010: 예시 안내 줄 — 떠다니는 예시 카드가 숨는 좁은 화면에서는 함께 숨긴다(아래 배치에서 data-off를 묻는다).
  const centerNote=shadow.querySelector('.center-note');
@@ -406,31 +418,20 @@ const openRecent=()=>{if(!recentMoment)return;if(onOpen&&!recentMoment.example){
 let recentFrame=null;
 const toggleRecentPlay=btn=>{if(!recentMoment)return;const card=shadow.querySelector('.recent-card');if(!card)return;const media=card.querySelector('.recent-media');if(!media)return;if(recentFrame){recentFrame.remove();recentFrame=null;media.querySelector('img')?.removeAttribute('hidden');btn.setAttribute('aria-label','바로 재생');const glyph=btn.querySelector('span');if(glyph)glyph.textContent='▶';return;}
  const described=globalThis.LTMedia?.describe?.(recentMoment.url)||null;
- if(described?.kind==='tiktok'){
-  const id=globalThis.LTMedia.tiktokPlayerId?.(recentMoment.mediaMetadata?.tiktokId||described.videoId);
-  if(!id)return;
-  const block=document.createElement('blockquote');
-  block.className='tiktok-embed';
-  block.setAttribute('cite',described.openUrl||recentMoment.url);
-  block.setAttribute('data-video-id',id);
-  const section=document.createElement('section');section.textContent=mainOf(recentMoment)||'TikTok 영상';block.append(section);
-  media.querySelector('img')?.setAttribute('hidden','');media.append(block);recentFrame=block;
-  globalThis.LTMedia.ensureTiktokEmbedScript?.(document);
-  btn.setAttribute('aria-label','정지');const glyph=btn.querySelector('span');if(glyph)glyph.textContent='■';return;
- }
- if(described?.kind==='instagram'){
-  const code=described.shortcode||recentMoment.mediaMetadata?.instagramShortcode;
-  if(!code)return;
-  const block=document.createElement('blockquote');
-  block.className='instagram-media';
-  block.setAttribute('data-instgrm-permalink',described.openUrl||recentMoment.url);
-  block.setAttribute('data-instgrm-version','14');
-  const section=document.createElement('section');section.textContent=mainOf(recentMoment)||'인스타그램 릴스';block.append(section);
-  media.querySelector('img')?.setAttribute('hidden','');media.append(block);recentFrame=block;
-  globalThis.LTMedia.ensureInstagramEmbedScript?.(document);
-  btn.setAttribute('aria-label','정지');const glyph=btn.querySelector('span');if(glyph)glyph.textContent='■';return;
- }
- const id=youtubeIdFrom(recentMoment.url)||described?.videoId;
+   if(described?.kind==='tiktok'||described?.kind==='instagram'){
+   const src=described?.kind==='tiktok'
+    ? globalThis.LTMedia?.tiktokPlayerUrl?.(recentMoment.mediaMetadata?.tiktokId||described.videoId)
+    : globalThis.LTMedia?.instagramPlayerUrl?.(described.shortcode||recentMoment.mediaMetadata?.instagramShortcode);
+   if(!src)return;
+   const frame=document.createElement('iframe');
+   frame.className='recent-frame';frame.src=src;
+   frame.title=mainOf(recentMoment)||(described?.kind==='tiktok'?'TikTok 영상':'인스타그램 릴스');
+   frame.allow='accelerometer; autoplay; clipboard-write; encrypted-media; fullscreen; gyroscope; picture-in-picture; web-share';
+   frame.allowFullscreen=true;frame.setAttribute('referrerpolicy','strict-origin-when-cross-origin');
+   media.querySelector('img')?.setAttribute('hidden','');media.append(frame);recentFrame=frame;
+   btn.setAttribute('aria-label','정지');const glyph=btn.querySelector('span');if(glyph)glyph.textContent='■';return;
+  }
+const id=youtubeIdFrom(recentMoment.url)||described?.videoId;
  const embed=id?embedUrl(id):null;
  if(!embed)return;
  const frame=document.createElement('iframe');frame.className='recent-frame';frame.src=embed;frame.title=mainOf(recentMoment)||'YouTube 영상';frame.allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';frame.allowFullscreen=true;frame.setAttribute('referrerpolicy','strict-origin-when-cross-origin');media.querySelector('img')?.setAttribute('hidden','');media.append(frame);recentFrame=frame;btn.setAttribute('aria-label','정지');const glyph=btn.querySelector('span');if(glyph)glyph.textContent='■';};
@@ -439,21 +440,17 @@ const playPreviewCard=(btn)=>{
  if(!card||card.dataset.ltPlaying)return;
  const moment=previewStrip.find((m)=>m.id===id);if(!moment)return;
  const media=globalThis.LTMedia?.describe?.(moment.url);
+ const src=media?.kind==='tiktok'
+  ? globalThis.LTMedia?.tiktokPlayerUrl?.(moment.mediaMetadata?.tiktokId||media.videoId)
+  : globalThis.LTMedia?.instagramPlayerUrl?.(moment.mediaMetadata?.instagramShortcode||media?.shortcode);
+ if(!src)return;
  card.dataset.ltPlaying='1';
- const block=document.createElement('blockquote');
- if(media?.kind==='tiktok'){
-  block.className='tiktok-embed';
-  block.setAttribute('cite',moment.url);
-  block.setAttribute('data-video-id',moment.mediaMetadata?.tiktokId||media.videoId||'');
-  globalThis.LTMedia.ensureTiktokEmbedScript?.(document);
- }else{
-  block.className='instagram-media';
-  block.setAttribute('data-instgrm-permalink',moment.url);
-  block.setAttribute('data-instgrm-version','14');
-  globalThis.LTMedia.ensureInstagramEmbedScript?.(document);
- }
- const section=document.createElement('section');section.textContent=moment.shortTitle||moment.title;block.append(section);
- card.replaceChildren(block);
+ const frame=document.createElement('iframe');
+ frame.className='lt-preview-frame';frame.src=src;
+ frame.title=moment.shortTitle||moment.title;
+ frame.allow='accelerometer; autoplay; clipboard-write; encrypted-media; fullscreen; gyroscope; picture-in-picture; web-share';
+ frame.allowFullscreen=true;frame.setAttribute('referrerpolicy','strict-origin-when-cross-origin');
+ card.replaceChildren(frame);
 };
 shadow.addEventListener('click',e=>{const pv=e.target.closest('[data-lt-preview-play]');if(pv){e.stopPropagation();playPreviewCard(pv);return;}const play=e.target.closest('[data-recent-play]');if(play){e.stopPropagation();toggleRecentPlay(play);return;}const b=e.target.closest('button');if(!b){if(!e.target.closest?.('[data-lt-title-edit]')&&e.target.closest?.('[data-do=recent]'))openRecent();return;}if(b.dataset.next){if(suppressClickKey&&suppressClickKey===b.dataset.next){suppressClickKey='';return;}if(picking){const key=b.dataset.next;if(pickedKeys.has(key))pickedKeys.delete(key);else pickedKeys.add(key);index();return;}focus(findMoment(b.dataset.next));return;}switch(b.dataset.do){case'close':dialog.close();break;case'new':actions.requestMoment('new');break;case'trees':actions.navigate('trees');break;case'continue':focus(lastCard);break;case'index':index();break;case'recent':if(!e.target.closest?.('[data-lt-title-edit]'))openRecent();break;}},{signal});
  dialog.addEventListener('close',()=>{opener?.focus();syncMotion();schedule();tagSelected.clear();tagExpanded.clear();picking=false;pickedKeys.clear();moveMenuFor=null;suppressClickKey='';indexNotice=null;},{signal});

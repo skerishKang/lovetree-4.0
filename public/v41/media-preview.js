@@ -11,10 +11,9 @@ const TIKTOK_HOSTS = new Set(['www.tiktok.com', 'tiktok.com']);
 const TIKTOK_SHORT_HOSTS = new Set(['vm.tiktok.com', 'vt.tiktok.com']);
 const TIKTOK_VIDEO_ID = /^\d{15,25}$/;
 const TIKTOK_THUMB_HOST = /(?:^|\.)(?:tiktokcdn\.com|tiktok\.com)$/i;
-const TIKTOK_EMBED_SCRIPT = 'https://www.tiktok.com/embed.js';
+// #791: 공식 재생기는 iframe 주소를 직접 넣는다(섀도우 루트 안의 블록을 스크립트가 찾지 못한다).
 // #791 2단계: 인스타그램 릴스 — 썸네일이 없어 글 카드로 그리고, 공식 재생기는 누를 때만 붙인다.
 const INSTAGRAM_HOSTS = new Set(['www.instagram.com', 'instagram.com', 'instagr.am']);
-const INSTAGRAM_EMBED_SCRIPT = 'https://www.instagram.com/embed.js';
 function instagramCodeFromParsed(parsed) {
   if (!INSTAGRAM_HOSTS.has(parsed.hostname)) return '';
   const matched = (parsed.pathname || '').match(/^\/(?:reel|reels|p|tv)\/([A-Za-z0-9_-]{8,30})\/?$/);
@@ -24,15 +23,9 @@ function igShort(value, max = 80) {
   const chars = Array.from(String(value ?? '').replace(/\s+/g, ' ').trim());
   return chars.length > max ? chars.slice(0, max).join('') + '…' : chars.join('');
 }
-function ensureInstagramEmbedScript(doc = document) {
-  const found = doc.querySelector('script[data-lt-instagram-embed="1"]');
-  if (found) return found;
-  const script = doc.createElement('script');
-  script.src = INSTAGRAM_EMBED_SCRIPT;
-  script.async = true;
-  script.setAttribute('data-lt-instagram-embed', '1');
-  (doc.head || doc.documentElement).append(script);
-  return script;
+function instagramPlayerUrl(code) {
+  const id = String(code ?? '').trim();
+  return /^[A-Za-z0-9_-]{8,30}$/.test(id) ? `https://www.instagram.com/reel/${id}/embed` : '';
 }
 function tiktokVideoIdFromParsed(parsed) {
   if (TIKTOK_SHORT_HOSTS.has(parsed.hostname)) return '';
@@ -45,10 +38,15 @@ function tiktokHandleFromParsed(parsed) {
   const matched = (parsed.pathname || '').match(/^\/@([A-Za-z0-9_.]+)\/video\/\d{15,25}\/?$/);
   return matched ? matched[1] : '';
 }
-/** 틱톡 공식 재생기(embed.js가 그리는 블록)의 재생 id. 숫자 영상 id만 받는다. */
+/** 틱톡 재생 id와 공식 iframe 주소. 숫자 영상 id만 받는다. */
 function tiktokPlayerId(value) {
   const id = String(value ?? '').trim();
   return TIKTOK_VIDEO_ID.test(id) ? id : '';
+}
+function tiktokPlayerUrl(value) {
+  const id = tiktokPlayerId(value);
+  // oEmbed 쿼리 옵션을 붙이면 플레이어 오류가 난다 — 정본 player/v1 주소만 쓴다(실제 재생 확인).
+  return id ? `https://www.tiktok.com/player/v1/${id}` : '';
 }
 /** 저장된 썸네일은 https + 틱톡 CDN 도메인만 받는다(유튜브 썸네일 검사와 같은 자리). */
 function safeTiktokThumb(value) {
@@ -64,17 +62,7 @@ function tiktokThumbCandidates(mediaMetadata = null) {
   const local = globalThis.LTThumbFallback?.localOrPrivatePhoto?.({ image: mediaMetadata?.thumbnail, mediaMetadata });
   return [local, safeTiktokThumb(mediaMetadata?.thumbnail), safeTiktokThumb(mediaMetadata?.thumbnailUrl)].filter(Boolean);
 }
-/** embed.js는 누를 때만 한 번 붙인다(첫 화면 로드에 틱톡 스크립트 없음). */
-function ensureTiktokEmbedScript(doc = document) {
-  const found = doc.querySelector('script[data-lt-tiktok-embed="1"]');
-  if (found) return found;
-  const script = doc.createElement('script');
-  script.src = TIKTOK_EMBED_SCRIPT;
-  script.async = true;
-  script.setAttribute('data-lt-tiktok-embed', '1');
-  (doc.head || doc.documentElement).append(script);
-  return script;
-}
+
 
 /** '83' · '1:23' · '1:02:03' · '1h2m3s' · 한국어 단위까지 → 초. 0 이하·형식 외는 null. */
 function parseTimeToSeconds(value = '') {
@@ -453,41 +441,22 @@ async function playInPlace(root){
  if((m.kind!=='youtube'&&m.kind!=='tiktok'&&m.kind!=='instagram')||root.dataset.ltPlaying||root.dataset.ltVanished==='1')return;
  root.dataset.ltPlaying='1';
  const body=root.querySelector('.lt-media-body'),status=root.querySelector('.lt-media-status');
- // #791: 틱톡 — 공식 embed.js를 누를 때만 붙인다. 재생기는 틱톡이 블록을 iframe으로 바꾼다.
- if(m.kind==='tiktok'){
-   const id=tiktokPlayerId(root.dataset.ltTiktokId||m.videoId);
-   if(!id||!root.isConnected){delete root.dataset.ltPlaying;if(status&&!id)status.textContent='바로 재생할 수 없어요. 아래 원본 링크에서 열어 주세요.';return;}
-   const block=document.createElement('blockquote');
-   block.className='tiktok-embed';
-   block.setAttribute('cite',m.openUrl||root.dataset.ltUrl||'');
-   block.setAttribute('data-video-id',id);
-   const section=document.createElement('section');
-   section.textContent=root.dataset.ltTitle||'TikTok 영상';
-   block.append(section);
-   body.replaceChildren(block);
-   ensureTiktokEmbedScript(document);
+ // #791: 공식 재생기 iframe을 직접 넣는다(섀도우 루트의 블록을 스크립트가 찾지 못한다).
+if(m.kind==='tiktok'||m.kind==='instagram'){
+   const src=m.kind==='tiktok'?tiktokPlayerUrl(root.dataset.ltTiktokId||m.videoId):instagramPlayerUrl(root.dataset.ltInstagramCode||m.shortcode);
+   if(!src||!root.isConnected){delete root.dataset.ltPlaying;if(status&&!src)status.textContent='바로 재생할 수 없어요. 아래 원본 링크에서 열어 주세요.';return;}
+   const frame=document.createElement('iframe');
+   frame.className=m.kind==='tiktok'?'lt-yt-frame lt-tt-frame':'lt-yt-frame lt-ig-frame';
+   frame.src=src;frame.title=root.dataset.ltTitle||(m.kind==='tiktok'?'TikTok 영상':'인스타그램 릴스');
+   frame.allow='accelerometer; autoplay; clipboard-write; encrypted-media; fullscreen; gyroscope; picture-in-picture; web-share';
+   frame.allowFullscreen=true;
+   frame.setAttribute('referrerpolicy','strict-origin-when-cross-origin');
+   body.replaceChildren(frame);
    delete root.dataset.ltPlaying;
    if(status)status.textContent='재생 중이에요. 아래 원본 링크로도 열 수 있어요.';
    return;
  }
- // #791 2단계: 인스타그램 — 공식 embed.js를 누를 때만 한 번 붙인다.
- if(m.kind==='instagram'){
-   const code=root.dataset.ltInstagramCode||m.shortcode||'';
-   if(!code||!root.isConnected){delete root.dataset.ltPlaying;if(status&&!code)status.textContent='바로 재생할 수 없어요. 아래 원본 링크에서 열어 주세요.';return;}
-   const block=document.createElement('blockquote');
-   block.className='instagram-media';
-   block.setAttribute('data-instgrm-permalink',m.openUrl||root.dataset.ltUrl||'');
-   block.setAttribute('data-instgrm-version','14');
-   const section=document.createElement('section');
-   section.textContent=root.dataset.ltTitle||'인스타그램 릴스';
-   block.append(section);
-   body.replaceChildren(block);
-   ensureInstagramEmbedScript(document);
-   delete root.dataset.ltPlaying;
-   if(status)status.textContent='재생 중이에요. 아래 원본 링크로도 열 수 있어요.';
-   return;
- }
- // #792: 기억할 구간 — 순간의 시작·끝(카드가 들고 있는 저장 값)이 있으면 그 구간만 재생한다.
+// #792: 기억할 구간 — 순간의 시작·끝(카드가 들고 있는 저장 값)이 있으면 그 구간만 재생한다.
  // '처음부터 보기'를 누른 뒤엔 시작 시점도 없이 처음부터. 끝이 없으면 시작 시점부터.
  const fromStart=root.dataset.ltFromStart==='1';
  const end=Number(root.dataset.ltEnd||0);
@@ -613,34 +582,15 @@ async function openLightbox(url,title='',verticalHint=null,tiktokId=''){
  overlay.querySelector('.lt-lightbox-close').addEventListener('click',closeLightbox);
  overlay.querySelector('.lt-lightbox-close').focus();
  const alive=()=>lightbox===overlay;
- if(m.kind==='instagram'){
+ if(m.kind==='instagram'||m.kind==='tiktok'){
   if(!alive())return;
-  const code=m.shortcode||'';
-  if(!code){stage.innerHTML='<p class="lt-lightbox-note">바로 재생할 수 없어요. 원본 링크에서 열어 주세요.</p>';return;}
-  const block=document.createElement('blockquote');
-  block.className='instagram-media';
-  block.setAttribute('data-instgrm-permalink',m.openUrl||url||'');
-  block.setAttribute('data-instgrm-version','14');
-  const section=document.createElement('section');
-  section.textContent=title||'인스타그램 릴스';
-  block.append(section);
-  stage.replaceChildren(block);
-  ensureInstagramEmbedScript(document);
-  return;
- }
- if(m.kind==='tiktok'){
-  const id=tiktokPlayerId(tiktokId||m.videoId);
-  if(!alive())return;
-  if(!id){stage.innerHTML='<p class="lt-lightbox-note">바로 재생할 수 없어요. 원본 링크에서 열어 주세요.</p>';return;}
-  const block=document.createElement('blockquote');
-  block.className='tiktok-embed';
-  block.setAttribute('cite',m.openUrl||url||'');
-  block.setAttribute('data-video-id',id);
-  const section=document.createElement('section');
-  section.textContent=title||'TikTok 영상';
-  block.append(section);
-  stage.replaceChildren(block);
-  ensureTiktokEmbedScript(document);
+  const src=m.kind==='tiktok'?tiktokPlayerUrl(tiktokId||m.videoId):instagramPlayerUrl(m.shortcode);
+  if(!src){stage.innerHTML='<p class="lt-lightbox-note">바로 재생할 수 없어요. 원본 링크에서 열어 주세요.</p>';return;}
+  const frame=document.createElement('iframe');
+  frame.className='lt-lightbox-media';frame.src=src;frame.title=title||(m.kind==='tiktok'?'TikTok 영상':'인스타그램 릴스');
+  frame.allow='accelerometer; autoplay; clipboard-write; encrypted-media; fullscreen; gyroscope; picture-in-picture; web-share';
+  frame.allowFullscreen=true;frame.setAttribute('referrerpolicy','strict-origin-when-cross-origin');
+  stage.replaceChildren(frame);
   return;
  }
  if(m.kind==='youtube'){
@@ -807,7 +757,7 @@ function queueWatchVanished(){ // 끌기·넘기기 동안 몰리는 바뀜마�
  if(vanishedWatchTimer)return;
  vanishedWatchTimer=setTimeout(()=>{vanishedWatchTimer=0;watchVanished();},300);
 }
-window.LTMedia={describe,markup,privateAssetName,autoLoadMedia,currentContext:mediaContext,youtubeThumbUrl,youtubeCandidates,tiktokPlayerId,tiktokThumbCandidates,ensureTiktokEmbedScript,refreshTiktokThumb,ensureInstagramEmbedScript,verticalVideo,probeVertical,upgradeVerticals,openLightbox,closeLightbox,applyVanished,applyNoEmbed,scheduleVanishedCheck,checkVanished,watchVanished,setVideoStatusLoader(fn){videoStatusLoader=typeof fn==='function'?fn:null;}};
+window.LTMedia={describe,markup,privateAssetName,autoLoadMedia,currentContext:mediaContext,youtubeThumbUrl,youtubeCandidates,tiktokPlayerId,tiktokPlayerUrl,instagramPlayerUrl,tiktokThumbCandidates,refreshTiktokThumb,verticalVideo,probeVertical,upgradeVerticals,openLightbox,closeLightbox,applyVanished,applyNoEmbed,scheduleVanishedCheck,checkVanished,watchVanished,setVideoStatusLoader(fn){videoStatusLoader=typeof fn==='function'?fn:null;}};
 if(typeof document!=='undefined'){
  const cleanup=()=>{for(const [node,url] of ownedUrls)if(!node.isConnected){URL.revokeObjectURL(url);ownedUrls.delete(node);}};
  new MutationObserver(()=>{cleanup();queueWatchVanished();}).observe(document.documentElement,{childList:true,subtree:true});

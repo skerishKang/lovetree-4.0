@@ -74,14 +74,10 @@ test('틱톡 카드는 세로·플랫폼 표식·원본 열기 링크를 그리�
  assert.match(escaped,/&lt;img/);
 });
 
-test('공식 embed.js는 누를 때만 한 번 붙는다',()=>{
- const appended=[];
- const fakeDoc={head:{append(node){appended.push(node)}},querySelector(){return appended[0]||null},createElement(tag){return {tag,setAttribute(k,v){this[k]=v}}}};
- const script=ttMedia.ensureTiktokEmbedScript(fakeDoc);
- assert.equal(script.src,'https://www.tiktok.com/embed.js');
- assert.equal(appended.length,1);
- ttMedia.ensureTiktokEmbedScript(fakeDoc);
- assert.equal(appended.length,1,'중복으로 넣지 않는다');
+test('틱톡 공식 재생기 iframe 주소를 만든다(embed.js 없음)',()=>{
+ assert.equal(ttMedia.tiktokPlayerUrl(TT_ID),`https://www.tiktok.com/player/v1/${TT_ID}`);
+ assert.equal(ttMedia.tiktokPlayerUrl('not-a-number'),'');
+ assert.equal(ttMedia.ensureTiktokEmbedScript,undefined);
 });
 
 // #791 2단계: 인스타그램 릴스 — 주소·글 카드·늦은 재생기.
@@ -128,14 +124,10 @@ test('올린 그림이 있으면 릴스 카드도 세로 썸네일을 쓴다',()
  igScope.LTThumbFallback.localOrPrivatePhoto=()=>'';
 });
 
-test('인스타그램 공식 스크립트는 누를 때만 한 번 붙는다',()=>{
- const appended=[];
- const fakeDoc={head:{append(node){appended.push(node)}},querySelector(){return appended[0]||null},createElement(tag){return {tag,setAttribute(k,v){this[k]=v}}}};
- const script=igMedia.ensureInstagramEmbedScript(fakeDoc);
- assert.equal(script.src,'https://www.instagram.com/embed.js');
- assert.equal(appended.length,1);
- igMedia.ensureInstagramEmbedScript(fakeDoc);
- assert.equal(appended.length,1);
+test('인스타그램 릴스 공식 재생기 iframe 주소를 만든다(embed.js 없음)',()=>{
+ assert.equal(igMedia.instagramPlayerUrl(IG_CODE),`https://www.instagram.com/reel/${IG_CODE}/embed`);
+ assert.equal(igMedia.instagramPlayerUrl('x'),'');
+ assert.equal(igMedia.ensureInstagramEmbedScript,undefined);
 });
 
 test('시간이 지나 막힌 썸네일은 refresh 쿼리로 다시 받아 패널을 고친다',async()=>{
