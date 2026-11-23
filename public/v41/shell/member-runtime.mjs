@@ -97,7 +97,9 @@ export function createMemberRuntime(ctx){
        if(generation!==ctx.loadGeneration||!ctx.member?.snapshot().owned||ctx.syncedNoticeKeys.has(key))return;
        ctx.syncedNoticeKeys.add(key);
        ctx.noticeQueue.request('toast',{maxWait:5000,
-        show:()=>ctx.shellNotice.notifyOnce(text,key),
+        // #1223: 앞선 우선순위 안내에 밀려 지나간 synced 알림이 notifyOnce 기록에 막혀 다시 뜨지 않았다.
+        // 중복은 위의 syncedNoticeKeys가 이미 막으므로 일반 notify로 띄운다.
+        show:()=>ctx.shellNotice.notify(text),
         hide:ctx.hideToast
        });
       }).catch(error=>report(error,'새 소식 확인'));
