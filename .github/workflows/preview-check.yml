@@ -239,6 +239,39 @@ jobs:
           if [ "${{ needs.screen-changes.outputs.changed }}" != "true" ]; then
             echo "건너뜀(화면 변경 없음)" | tee -a "$GITHUB_STEP_SUMMARY"
           fi
+  # #1026: 보통/느림 5화면 x 인증 2 x 너비 2 = 40조건의 첫 머리줄/CLS 회귀
+  screen-header-first-paint:
+    name: 화면 시험 — 첫 머리줄 인증·CLS (#1026)
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    needs: screen-changes
+    if: needs.screen-changes.outputs.changed == 'true'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          clean: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ms-playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - name: 첫 머리줄 실제 렌더링 40조건 검사
+        env:
+          LT_HEADER_FLASH_FULL: '1'
+        run: |
+          npm ci --no-audit --no-fund
+          if ls "$HOME/.cache/ms-playwright" 2>/dev/null | grep -q chromium; then
+            echo "캐시된 Chromium 사용"
+          else
+            npx playwright install --with-deps chromium
+          fi
+          npm run build
+          node --test tests/v41-header-first-paint-1026.test.mjs
+
   screen-home:
     name: 화면 시험 — 첫 화면
     # 2026-11-22: 호스트 실행기 대기(동시 3개 안팎)를 피해 같은 저장소 PR은 CGI 자체 실행기에서 돈다(보드 잡과 같은 식).
