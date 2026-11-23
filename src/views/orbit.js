@@ -12,6 +12,7 @@ import samples from './orbit-samples.json';
 import compactOrbitImages from './orbit-compact.json';
 import {paintCardBitmap,cardPose,hitPose,hitProjective,sortPaintOrder} from './orbit-canvas.js';
 import {createOrbitGL} from './orbit-webgl.js';
+import {orbitHintSeen,rememberOrbitHint} from './orbit-hint-memory.js';
 import {escape as esc, orbitRecords, resume, remember} from './memory.js';
 import {SERVICE, GO_TREES, READ_BOOK, VIEW_TREE, NEW_TREE, BOOK_IS_READING} from '../terms.js';
 import {mediaLinkView} from '../media.js';
@@ -67,7 +68,7 @@ extraCSS+=`.card.lt-under-link{opacity:0}\n.card .surface .lt-orbit-texture{posi
 extraCSS+=`@keyframes lt-home-rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
 .center .lt-home-line{display:block}.center .lt-home-enter{animation:lt-home-rise 460ms cubic-bezier(.2,.7,.2,1) both;animation-delay:calc(var(--lt-home-order)*100ms)}
 @media(prefers-reduced-motion:reduce){.center .lt-home-enter{animation:none;opacity:1;transform:none}}
-.lt-orbit-tip{position:absolute;z-index:5;left:0;top:0;display:none;pointer-events:none;padding:7px 11px;border:1px solid var(--lt-gold-line);border-radius:999px;background:var(--lt-stage);color:var(--lt-pearl);font-size:12px;line-height:18px;white-space:nowrap;box-shadow:0 3px 12px var(--lt-gold-glow);transform:translate3d(var(--lt-tip-x,0px),var(--lt-tip-y,0px),0)}
+.lt-orbit-tip{position:absolute;z-index:5;left:0;top:0;display:none;pointer-events:none;padding:7px 11px;border:1px solid var(--lt-gold-line);border-radius:999px;background:var(--lt-stage);color:var(--lt-pearl);font-size:12px;line-height:18px;white-space:nowrap;contain:paint;will-change:transform;transform:translate3d(var(--lt-tip-x,0px),var(--lt-tip-y,0px),0)}
 .lt-orbit-tip[data-visible]{display:block}`;
 
 export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSelect=()=>{},recordNote=null,examples=[],onOpen=null,empty=false,titleDisplay='both',momentList=null,dateStyle='dot',prefs=null,initialPicking=false,initialNotice=null,homePin=null,loggedIn}) {
@@ -435,10 +436,8 @@ shadow.addEventListener('click',e=>{const play=e.target.closest('[data-recent-pl
  checkRecentVideo(shadow.querySelector('.recent-card'));
 // #1204: per-device first-use hint; failure to access storage must not block cards.
  const orbitTip=shadow.querySelector('.lt-orbit-tip');
- const TIP_KEY='lt41-orbit-card-opened';
- let tipDismissed=false,tipReady=false,tipLast=0,tipTarget=-1,tipPinned=false;
- try{tipDismissed=localStorage.getItem(TIP_KEY)==='1';}catch{}
- function dismissOrbitTip(){tipDismissed=true;orbitTip.removeAttribute('data-visible');try{localStorage.setItem(TIP_KEY,'1');}catch{}}
+ let tipDismissed=orbitHintSeen(),tipReady=false,tipLast=0,tipTarget=-1,tipPinned=false;
+ function dismissOrbitTip(){tipDismissed=true;orbitTip.removeAttribute('data-visible');rememberOrbitHint();}
  const tipTimer=setTimeout(()=>{tipReady=true;if(reduced)tipPinned=false;orbitWrite(performance.now());},1900);
  track(()=>clearTimeout(tipTimer));
 
@@ -671,7 +670,7 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
  const updateOrbitTip=(now)=>{
   if(!tipReady||tipDismissed||!spritesReady||!layoutBox){orbitTip.removeAttribute('data-visible');return;}
   if(reduced&&tipPinned)return;
-  if(now-tipLast<120)return;
+  if(now-tipLast<420)return;
   tipLast=now;
   const {w,h}=layoutBox,tw=105,th=34,ox=appBox?.left||0,oy=appBox?.top||0;
   const inside=(x,y)=>x>=4&&y>=4&&x+tw<=w-4&&y+th<=h-4;

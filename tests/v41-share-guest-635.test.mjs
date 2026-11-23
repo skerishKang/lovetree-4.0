@@ -475,10 +475,7 @@ test('#635 PR C 규칙(정적): 시작 입구·첫날 표기·크게 보기 대�
   /* #book-dup2: 여백 60→68px — 보라색 책 테두리(.book-cover)가 wrap 아래로 14px 내려와 60px로는
      테두리 아래끝이 링크 줄 위 11px(정원에서는 10px 겹침)이었다. 68px로 테두리 아래끝을 링크 줄 위 17px에 둔다. */
   assert.match(layout, /padding:24px 14px 68px/, '390 책 화면: 아래 고정 링크 줄과 책 테두리가 겹치지 않게 16px 이상 띄울 여백을 둔다');
-  const orbit = read('src/views/orbit.js');
-  assert.match(orbit, /<span class="center-hint">드래그 · 금테 카드를 눌러 감상<\/span>/, '첫 화면 안내는 안내 줄 옆에 함께 그린다');
-  assert.ok(!orbit.includes('<div class="hint">드래그'), '첫 화면 오른쪽 아래 고정 안내(링크 줄과 겹치던)는 치웠다');
-  assert.match(orbit, /\.center-note\{display:flex;flex-wrap:wrap/, '안내 줄은 단추 묶음 바로 아래에서 두 문장을 나란히 쓴다');
+  // #1204 removed the old two-line orbit guidance; its absence and spacing are browser-tested.
 });
 
 // 실제 셸(/v41/)을 여는 도우미 — 로그아웃 상태 그대로(예시 기록).

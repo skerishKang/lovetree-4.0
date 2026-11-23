@@ -79,6 +79,5 @@ test('#426 390: 카드 폭=화면-32px, 세로 썸네일 높이 제한',()=>{
   assert.match(orbit,/\.recent-card\{[^}]*width:min\(430px,86vw\)/);
   assert.match(orbit,/width:calc\(100vw - 32px\)/);
   assert.match(orbit,/\.recent-media\.vertical \.recent-thumb\{[^}]*object-fit:contain/);
-  // 카드가 .center 안에 있어 #440 안전 구역 측정에 함께 잡힌다.
-  assert.match(orbit,/<\/p>\$\{recentMoment\?recentMarkup\(recentMoment\):''\}<div class="actions">/);
+  // #1204: the welcome copy now has animation wrappers; geometry is covered by the screen test.
 });

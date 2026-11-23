@@ -658,7 +658,7 @@ test('#1204 첫 화면 순차 등장·안내 삭제·WebGL 말풍선·기억·�
           return {visible:tip.hasAttribute('data-visible'),x:tr.x,y:tr.y,closeToCard,
             overlaps:intersects(tr,cr)||intersects(tr,ar),pointer:getComputedStyle(tip).pointerEvents,
             labels:[...root.querySelectorAll('.card .surface')].map(e=>e.getAttribute('aria-label')),
-            notes:root.querySelectorAll('.center-note').length,
+            notes:root.querySelectorAll('.center-note').length,centerRect:{x:cr.x,y:cr.y,w:cr.width,h:cr.height},
             animations:[...root.querySelectorAll('.center .lt-home-enter')].map(e=>({delay:getComputedStyle(e).animationDelay,duration:getComputedStyle(e).animationDuration}))};
         });
         await h.frame.waitForFunction(()=>globalThis.__LT_ORBIT_TEST__?.canvasReady(),null,{timeout:20000});
@@ -678,6 +678,7 @@ test('#1204 첫 화면 순차 등장·안내 삭제·WebGL 말풍선·기억·�
           assert.equal(state.overlaps,false,'중앙 글자·단추와 겹치지 않는다');
           await h.page.waitForTimeout(440);
         }
+        assert.deepEqual((await inspect()).centerRect,opening.centerRect,'중앙 영역은 등장 전후에도 재배치되지 않는다');
         const {mkdirSync}=await import('node:fs');
         const capture=process.env.LT_HOME_1204_CAPTURE_DIR;
         if(capture){mkdirSync(capture,{recursive:true});await h.page.screenshot({path: `${capture}/home-1204-${width}-${theme}.png`});}
