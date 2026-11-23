@@ -196,6 +196,9 @@ html[data-lt-auth-phase=pending][data-lt-auth-hint=in] .app-header #account-avat
 html[data-lt-auth-phase=pending][data-lt-auth-hint=in] .app-header .tree-frame{display:flex}
 html[data-lt-auth-phase=pending][data-lt-auth-hint=in] .app-header #record-menu{display:flex;visibility:visible;pointer-events:none}
 html[data-lt-auth-phase=pending][data-lt-auth-hint=in] .app-header #tree-views{display:flex;visibility:visible;pointer-events:none}
+/* #1026: cached member picker stays in place while authentication is checked. */
+html[data-lt-auth-phase=pending][data-lt-auth-hint=in] .app-header nav #record-menu[hidden]{display:flex;visibility:visible;pointer-events:none}
+@media(max-width:780px){html[data-lt-auth-phase=pending][data-lt-auth-hint=in] .app-header #tree-views{display:none}}
 html[data-lt-auth-phase=pending] #mobile-add{visibility:hidden;pointer-events:none}
 /* #1026: 늦게 도착하는 글꼴의 한글 폭을 미리 맞춰 머리줄·안내 문구 이동을 줄인다. */
 @font-face{font-family:'LT UI Metric Fallback';src:local('Malgun Gothic');size-adjust:86%;font-display:swap}
