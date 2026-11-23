@@ -302,6 +302,18 @@ jobs:
           start=$(date +%s)
           node --test tests/v41-orbit-586-perf.test.mjs
           echo "첫 화면 끌기 성능 계약 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+      # 실제 하드웨어 성능 판정과 별개로 같은 헤드리스 환경의 기준 브랜치와 회귀를 비교한다.
+      - name: 첫 화면 궤도 헤드리스 회귀 방지(#1086, 건너뜀=실패)
+        env:
+          LT_ORBIT1086_REQUIRE: '1'
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        if: needs.screen-changes.outputs.changed == 'true'
+        run: |
+          baseline=$(mktemp -d "$RUNNER_TEMP/orbit-main.XXXXXX")
+          git archive "$BASE_SHA" | tar -x -C "$baseline"
+          npm ci --prefix "$baseline"
+          npm run build --prefix "$baseline" > /dev/null
+          LT_ORBIT1086_MAIN_DIST="$baseline/dist" node --test --test-concurrency=1 tests/v41-orbit-webgl-1086.test.mjs tests/v41-orbit-1086-perf.test.mjs
       # #537: 책의 한 장 보기가 순간 하나씩 넘어가는지, 넓은 화면에서 두 장 책의 한 쪽 크기·같은 높이로
       # 나오는지, 390 휴대폰 모양이 그대로인지를 실제 화면에서 잰다. 건너뜀=실패(크롬이 준비된 이 잡에서 돈다).
       - name: 첫 화면 화면 시험(건너뜀=실패 — 이슈 952)
