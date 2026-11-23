@@ -1,0 +1,21 @@
+name: "1204 screenshot evidence (temporary)"
+on:
+  push:
+    branches: [ai/com1-home-1204-261123]
+jobs:
+  screenshot-evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build
+      - name: Capture real theme toggle and persisted garden evidence
+        env:
+          LT_HOME_952_REQUIRE: "1"
+        run: node --test --test-name-pattern "실제 테마 전환" tests/v41-home-screen-952.test.mjs
