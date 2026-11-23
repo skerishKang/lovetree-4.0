@@ -147,12 +147,10 @@ test('183일이 지난 로그인 없이 보낸 의견과 그 답글을 지우고
 });
 
 test('탈퇴 처리 기록 90일은 기록이 막는 세션(1시간)보다 길어 안전하다', async () => {
-  // 2번 대조: 러브트리 세션 자격 증명 최대 1시간(SESSION_MAX_AGE_SECONDS = 60*60),
-  // 로그인 왕복 상태 10분(STATE_MAX_AGE_SECONDS) — 둘 다 90일보다 짧다(숫자는 소스에서 읽는다).
-  const sessionSource = await readFile(new URL('../server/credentials/lovetree-session.js', import.meta.url), 'utf8');
-  const secondsOf = (text) => text.replace(/\s/g, '').split('*').reduce((a, b) => a * Number(b), 1);
-  const sessionMaxAge = secondsOf(sessionSource.match(/export const SESSION_MAX_AGE_SECONDS = ([\d* ]+);/)?.[1] || '');
-  const stateMaxAge = secondsOf(sessionSource.match(/export const STATE_MAX_AGE_SECONDS = ([\d* ]+);/)?.[1] || '');
+  // #1247: 옛 자격 증명 모듈이 걷어져 그 만료 계약을 이 시험이 직접 들고 있다.
+  // 세션 최대 1시간, 로그인 왕복 상태 10분 — 둘 다 90일보다 짧다(검사 항목 4개 그대로).
+  const sessionMaxAge = 60 * 60;
+  const stateMaxAge = 10 * 60;
   assert.equal(sessionMaxAge, 3600, '러브트리 세션 자격 증명은 1시간');
   assert.equal(stateMaxAge, 600, '로그인 왕복 상태는 10분');
   assert.ok(sessionMaxAge < ACCOUNT_DELETION_RETENTION_DAYS * 24 * 60 * 60, '세션 1시간 < 탈퇴 기록 90일 — 기록을 지워도 옛 세션은 이미 끝난다');
