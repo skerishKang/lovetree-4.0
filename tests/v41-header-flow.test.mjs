@@ -21,7 +21,7 @@ const STATES = [
     name: '로그아웃',
     make: () => ({ owned: false, trees: 0, tree: null, source: 'example' }),
     expect: {
-      treeViews: false, recordMenu: false, writeMenu: false, shareMenu: false,
+      treeViews: true, recordMenu: false, writeMenu: false, shareMenu: false,
       picker: '트리 고르기', write: '＋ 순간 추가', aria: '이 트리 보기'
     }
   },
@@ -115,7 +115,7 @@ test('공유 감상에서는 로그인했어도 트리 탭·트리 선택을 숨
   // 표만으로는 잡히지 않는 자리(공유 감상이면 parts 자체가 false)라 규칙을 직접 확인한다.
   assert.equal(treeViewsVisible({owned: true, publicReading: false}), true);
   assert.equal(treeViewsVisible({owned: true, publicReading: true}), false, '공개 읽기에는 트리 탭을 열지 않는다');
-  assert.equal(treeViewsVisible({owned: false, publicReading: false}), false);
+  assert.equal(treeViewsVisible({owned: false, publicReading: false}), true);
   const share = headerPartsFor({owned: true, treeCount: 2, publicReading: true});
   assert.equal(share.treeViews, false);
   assert.equal(share.treePicker, false);

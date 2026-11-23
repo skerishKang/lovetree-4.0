@@ -32,6 +32,10 @@ const popular=mode==='popular'?await fetchPopularCards({limit:HOME_ORBIT_LIMIT})
 const mediaState=globalThis.LTMedia?.currentContext?.()||{source:'',owned:false};
 const youtube={describe:url=>globalThis.LTMedia?.describe?.(url)??null,auto:globalThis.LTMedia?.autoLoadMedia?.(mediaState.source,mediaState.owned)===true || (context.source==='server' && loggedIn && shellBody.dataset.member==='in')};
 const cardsPlan=homeCardsPlan({mode,loggedIn,context,popular,youtube});
+// 첫 화면이 셸의 기록을 다 받기 전에 그려지면 내 사진·영상 순간이 아직 없어 '예시만' 궤도로 시작한다(운영 11-24).
+// #1109 뒤로는 셸이 프레임을 다시 띄우지 않으므로, 기록이 도착했을 때 궤도 카드 구성이 달라지면 첫 화면만 다시 그린다.
+const cardsPlanKey=plan=>plan.kind+':'+plan.cards.map(c=>c?.id||c?.key||'').join(',');
+const initialCardsPlanKey=cardsPlanKey(cardsPlan);
 const cardTrees=cardsPlan.cards.length?[{id:'home-cards',title:'첫 화면 카드',moments:cardsPlan.cards}]:[];
 // #394: 순간 목록은 모든 트리의 순간을 최근 순으로 보는 곳. 트리 드롭다운의 "내 순간 전체 보기"로
 // 열릴 때는 셸이 남긴 요청(LT41_MOMENTS_OPEN)의 트리가 골라진 상태로 시작한다.
@@ -326,6 +330,13 @@ function refreshCountsFromParent(){
  const fresh=parent.LT41?.trees;
  if(!Array.isArray(fresh))return false;
  context.trees=fresh;
+ if(mode!=='example'&&mode!=='popular'){
+  const media=globalThis.LTMedia?.currentContext?.();
+  const nextYoutube={describe:youtube.describe,auto:globalThis.LTMedia?.autoLoadMedia?.(media?.source,media?.owned)===true||youtube.auto};
+  const next=homeCardsPlan({mode,loggedIn,context,popular,youtube:nextYoutube});
+  const anyDialogOpen=[...document.querySelectorAll('dialog')].some(d=>d.open)||[...(document.querySelector('#orbit')?.shadowRoot?.querySelectorAll('dialog')||[])].some(d=>d.open);
+  if(cardsPlanKey(next)!==initialCardsPlanKey&&!anyDialogOpen){location.reload();return true;}
+ }
  const inbox=fresh.find(t=>t?.inbox===true),inboxCount=inbox?.moments?.length||0;
  const total=fresh.reduce((n,t)=>n+(t?.moments?.length||0),0);
  if(!total)return true;

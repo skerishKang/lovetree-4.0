@@ -339,7 +339,8 @@ test('#1027 정원 이어 보기 카드의 종이색과 글 대비, 세로 영�
                 assert.equal(stats.fit,'cover');
                 assert.ok(stats.thumbW/stats.thumbH<=9/16+0.02&&stats.thumbW/stats.thumbH>=0.35, '세로 썸네일은 9:16 이하 폭(쇼츠 썸네일 양옆 띠는 잘라 냄): '+JSON.stringify(stats));
                 assert.ok(stats.thumbW<stats.width*0.4, '가운데 좁은 칸만 원래 썸네일, 나머지는 흐린 배경: '+JSON.stringify(stats));
-                assert.match(stats.blur,/blur\(18px\)/);
+                // 대표 11-24: 뒤에 같은 영상이 크고 흐리게 보여야 한다 — 2.8배·blur 6px(실제 약 17px). 3.6배·18px는 칸 전체가 한 색으로 뭉개졌다.
+                assert.match(stats.blur,/blur\(6px\)/);
                 assert.equal(stats.opacity,'0.7');
                 assert.ok(stats.bgImage.includes(stats.thumbSrc),'같은 썸네일을 CSS 변수로 깐다(#1084): '+JSON.stringify(stats));
               }
@@ -696,7 +697,10 @@ test('#1204 실제 테마 전환·저장값 및 가운데 빛 직선 경계 픽�
         assert.equal(state.frame,theme,'iframe document must follow actual theme');
         assert.equal(state.host,theme,'orbit must follow actual theme');
         assert.ok(state.box,JSON.stringify(state));
-        assert.ok(Math.abs(state.box.glow[2]-state.box.app[2])<=2&&Math.abs(state.box.glow[3]-state.box.app[3])<=2,'glow occupies entire app: '+JSON.stringify(state.box));
+        // 가운데 빛은 원래 크기 이내로 유지하고, 바깥 테두리의 빛 0은 아래 픽셀 검사로 확인한다.
+        assert.ok(state.box.glow[2]<=820&&state.box.glow[3]<=560&&
+          (width===1440 ? state.box.glow[2]<state.box.app[2] : state.box.glow[2]<=state.box.app[2]*1.04+2),
+          'glow stays in original bounded box: '+JSON.stringify(state.box));
         const capture=process.env.LT_HOME_1204_CAPTURE_DIR;
         if(capture){const {mkdirSync}=await import('node:fs');mkdirSync(capture,{recursive:true});await h.page.screenshot({path:`${capture}/home-1204-${width}-${theme}-${route}.png`});}
         // Render the computed live scrim into a separate, static pixel stage:
@@ -726,7 +730,7 @@ test('#1204 실제 테마 전환·저장값 및 가운데 빛 직선 경계 픽�
         const hline=Array.from({length:on.width},(_,x)=>delta(x,midY));
         const vline=Array.from({length:on.height},(_,y)=>delta(midX,y));
         // Screenshot pixels must show a fully feathered perimeter at every
-        // edge. Together with the live scrim == viewport rectangle assertion
+        // edge. Together with the original bounded scrim geometry assertion
         // above, this excludes the previous interior rectangular clipping
         // without treating isolated GPU/color-management pixels as a border.
         for(const fraction of [0,.25,.5,.75,1]){

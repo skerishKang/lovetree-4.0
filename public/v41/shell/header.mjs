@@ -5,6 +5,7 @@ import {hasPendingDraft} from '../sync-controller.mjs';
 import {accountPresentation,treePickerText,treePickerVisible,treePickerAriaLabel,treeViewsVisible,writeMenuLabel,headerPartsFor,bookDisplayVisible,shelfViewVisible} from '../header-state.mjs';
 import {normalizeAccentColor} from '../domain.mjs';
 import {displayTreeTitle} from '../tree-name.mjs';
+import {settleHeaderAuth} from './header-initial.mjs';
 
 export function createHeader(deps) {
   const {$} = deps;
@@ -26,8 +27,8 @@ function flowNavigation(){
   const owned=!!getMember()?.snapshot().owned;
   const reading=!!window.LT41&&['track59-sketchbook.html','track58-pinboard.html','track56-network.html'].includes(getCurrent());
   const publicReading=getSource()==='share';
-  // 트리 보기 탭은 로그인한 내 트리에서만 연다. 로그아웃이면 예시가 열려 있어도 숨긴다.
-  // #213 3번: 상태(out·in-empty·in-trees·share)마다 보이는 것만 남기고 나머지는 숨긴다(비활성 표시 없음).
+  // 대표 결정(2026-11-23): 서재·책·보드·지도 화면 탭은 로그인 여부·트리 개수와 무관하게 보인다.
+  // #213의 권한별 숨김은 트리 선택·쓰기·공유에만 적용하고 공유 읽기 탐색은 예외로 둔다.
   const parts=headerPartsFor({owned,treeCount:getModel()?.trees?.length||0,publicReading});
   const showTreeViews=treeViewsVisible({owned,phase:getMember()?.snapshot().phase,publicReading});
   $('tree-views').hidden=!showTreeViews;for(const b of $('tree-views').querySelectorAll('button')){b.disabled=false;b.title='';}
@@ -37,7 +38,8 @@ function flowNavigation(){
   const entryScreen={'track32-bookshelf.html':'shelf','track59-sketchbook.html':'book','track58-pinboard.html':'board'}[getCurrent()]||'';
   const entryRoot=document.documentElement;
   if(entryRoot?.dataset&&entryScreen)entryRoot.dataset.ltShellEntry=entryScreen;
-  else if(entryRoot?.dataset)delete entryRoot.dataset.ltShellEntry;
+  // #1231: 깊은 주소의 첫 그림 배치를 인증 확인 중 지우지 않는다. 지우면 서재·책 머리줄이 뒤늦게 40px 커져 CLS가 생긴다.
+  else if(entryRoot?.dataset && entryRoot.dataset.ltAuthPhase!=='pending')delete entryRoot.dataset.ltShellEntry;
   const onCommunity=document.body.classList.contains('community-screen');
   const onShelf=getCurrent()==='track32-bookshelf.html';
   // #1093: 서재 진열 토글만 390에서 화면 안 도구 줄로 옮긴다 — #1121 책 보기 토글의 자리·보임은 그대로다.
@@ -75,6 +77,9 @@ function flowNavigation(){
   /* 이슈 458: 화면마다 아래쪽에 이미 있는 단추·탭 높이가 다르므로 화면별로 단추를 얼마나 올릴지 셸 CSS가 쓴다. */
   document.body.dataset.fabLift={'track59-sketchbook.html':'book','track58-pinboard.html':'board','track56-network.html':'network','track32-bookshelf.html':'shelf'}[getCurrent()]||'';
   if(entryRoot?.dataset)delete entryRoot.dataset.ltHeaderPending;
+  const phase=getMember()?.snapshot()?.phase;
+  if(phase==='login'||phase==='synced')settleHeaderAuth(!!getMember()?.snapshot()?.owned);
+
   delegate.syncTreeTips();
   revealCurrentTab();
 }
