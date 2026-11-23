@@ -584,6 +584,7 @@ jobs:
       - name: 트리 드롭다운·인증 화면 시험(건너뜀=실패 — 이슈 970)
         env:
           LT_970_REQUIRE: '1'
+          LT_TOPMENU_REQUIRE: '1'
         if: needs.screen-changes.outputs.changed == 'true'
         run: |
           start=$(date +%s)
