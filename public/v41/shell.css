@@ -181,6 +181,22 @@ body.home-existing.lt-fab-ok #mobile-add{display:none}
 /* #1094 보기 방식 전환 묶음(책/목록) — 테마 단추 옆 두 칸고르기. 다음 이슈(#1093 선반/회전)도 같은 묶음을 쓴다. */
 .view-toggle{display:inline-flex;align-items:center;gap:0;padding:3px;border:1px solid rgba(255,255,255,.22);border-radius:var(--lt-r-pill);background:rgba(9,8,14,.62)}
 .view-toggle[hidden]{display:none}
+/* 인증 확인 전후 머리줄 높이 예약 */
+@media(min-width:781px){html[data-lt-auth-phase] .app-header{min-height:73px}}
+@media(max-width:780px){html[data-lt-auth-phase] .app-header{min-height:64px}html:is([data-lt-shell-entry=shelf],[data-lt-shell-entry=book]) .app-header{min-height:110px}}
+/* #1026: 인증이 확인되기 전에는 권한별 머리줄 요소를 숨긴다. 첫 배치부터 로그인/계정 단추의 자리를 예약한다. */
+html[data-lt-auth-phase=pending] .app-header .tree-frame,
+html[data-lt-auth-phase=pending] .app-header #tree-views,
+html[data-lt-auth-phase=pending] .app-header #write-menu,
+html[data-lt-auth-phase=pending] .app-header #share-menu{display:none}
+html[data-lt-auth-phase=pending] .app-header #account-entry{visibility:hidden;pointer-events:none}
+html[data-lt-auth-phase=pending][data-lt-auth-hint=out] .app-header #account-entry{visibility:visible;pointer-events:auto}
+html[data-lt-auth-phase=pending][data-lt-auth-hint=in] .app-header #account-entry{display:none}
+html[data-lt-auth-phase=pending][data-lt-auth-hint=in] .app-header #account-avatar[hidden]{display:flex;visibility:visible;pointer-events:none}
+html[data-lt-auth-phase=pending][data-lt-auth-hint=in] .app-header .tree-frame{display:flex}
+html[data-lt-auth-phase=pending][data-lt-auth-hint=in] .app-header #record-menu{display:flex;visibility:visible;pointer-events:none}
+html[data-lt-auth-phase=pending][data-lt-auth-hint=in] .app-header #tree-views{display:flex;visibility:visible;pointer-events:none}
+html[data-lt-auth-phase=pending] #mobile-add{visibility:hidden;pointer-events:none}
 /* #1026: 늦게 도착하는 글꼴의 한글 폭을 미리 맞춰 머리줄·안내 문구 이동을 줄인다. */
 @font-face{font-family:'LT UI Metric Fallback';src:local('Malgun Gothic');size-adjust:86%;font-display:swap}
 html:is([data-lt-shell-entry=shelf],[data-lt-shell-entry=book],[data-lt-shell-entry=board]) .header-actions,
