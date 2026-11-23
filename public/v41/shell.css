@@ -24,6 +24,10 @@ dialog[data-lt-panel=card]::backdrop{background:rgba(3,3,7,.85);backdrop-filter:
 .tree-views{display:flex;align-items:center;gap:4px;margin-left:12px;padding-left:12px;border-left:1px solid var(--line)}.tree-views>small{font-size:11px;white-space:nowrap;color:var(--muted);margin-right:5px}.tree-views[hidden],#connection-menu[hidden]{display:none}
 @media(max-width:780px){.tree-views{flex:0 0 auto;margin-left:4px;padding-left:4px;gap:0}.tree-views>small{display:none}.tree-views>button{padding:0 8px}.header-actions{min-width:0}.header-actions #write-menu{max-width:96px;overflow:hidden;text-overflow:ellipsis}}
 
+/* 방문자도 같은 머리줄을 쓰되 트리 고르기와 서재는 누르지 못하고 보이지 않는다. */
+body.share-visitor .tree-slot,body.share-visitor .tree-views>.visitor-hidden{display:none}
+/* 모바일의 책 보기 선택기가 보일 때는 내 화면과 같은 머리줄 높이를 유지한다. */
+@media(max-width:780px){body.share-visitor .app-header{min-height:62px}body.share-visitor .app-header:has(#book-display-toggle:not([hidden])){min-height:110px}}
 /* One tree label; the selected navigation tab already names the current view. */
 #view-context{flex:0 0 auto;display:flex;align-items:center;gap:10px;min-height:36px;padding:6px 24px;background:var(--lt-stage-2);color:var(--lt-pearl);border-bottom:1px solid var(--line);font-size:12px}
 #view-context[hidden]{display:none}

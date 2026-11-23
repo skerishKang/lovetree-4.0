@@ -202,7 +202,12 @@ export function createMemberRuntime(ctx){
   async function sample(selection={},view){if(!(0,ctx.pauseMember)())return;const tree=await (0,ctx.loadExampleTree)();++ctx.loadGeneration;if(view)ctx.current=view;(0,ctx.load)(null,'example',selection,{},tree);if(view)(0,ctx.writeLocation)();(0,ctx.$)('save-feedback').hidden=true;if((0,ctx.$)('account-settings').open)(0,ctx.$)('account-settings').close();}
 
   // #1175: 공유 화면 밖으로 나가는 길 한 벌 — share 잔여를 치우고 예시 첫 화면으로 돌아가며, 화면에 남은 '감상' 안내를 거둔다.
-  function leaveShare(view){(0,ctx.hideToast)();void sample({},view);}
+  function leaveShare(view){
+    (0,ctx.hideToast)();
+    // 남의 공유에서 로고·뒤로가기로 나가면 방문자 자신의 첫 화면/계정으로 돌아간다.
+    if(ctx.member?.snapshot().owned||ctx.visitorAccount){ctx.current=view||'src064-orbit.html';void (0,ctx.startMember)();}
+    else void sample({},view);
+  }
   Object.defineProperties(ctx,{
     startMember:{value:startMember},
     sample:{value:sample},

@@ -67,11 +67,11 @@ export function treePickerAriaLabel(options = {}) {
   return `${treePickerText(options)}, 트리 바꾸기`;
 }
 
-// 트리 보기 탭(기억책·기억 보드·관계 지도)은 로그인한 내 트리에서만 열린다.
-// 로그아웃 상태에서는 예시 트리가 열려 있어도 숨긴다(내 기록이 아니다).
+// 방문자는 내 책·보드·지도 화면의 공용 탭을 쓰고, 서재와 트리 선택·쓰기는 숨긴다.
+// 로그아웃 예시 화면은 별도 정책에 따라 탭을 숨긴다.
 export function treeViewsVisible({ owned = false, phase = '', publicReading = false } = {}) {
   // 회원 기록 확인 중이거나 일시적인 읽기 실패 상태에서도 화면 탐색은 가능하다.
-  return !publicReading && (owned || phase === 'checking' || phase === 'offline');
+  return publicReading || owned || phase === 'checking' || phase === 'offline';
 }
 
 // 상태별 헤더 노출(대표 결정 2026-11-08, #213 3번).
@@ -86,7 +86,7 @@ const HEADER_PARTS = Object.freeze({
   out: { account: 'login', browse: true, treePicker: false, treeViews: false, write: false, share: false },
   'in-empty': { account: 'avatar', browse: true, treePicker: true, treeViews: true, write: true, share: false },
   'in-trees': { account: 'avatar', browse: true, treePicker: true, treeViews: true, write: true, share: true },
-  share: { account: 'avatar', browse: true, treePicker: false, treeViews: false, write: false, share: false }
+  share: { account: 'login', browse: false, treePicker: false, treeViews: true, write: false, share: false }
 });
 
 export function headerParts(state) {

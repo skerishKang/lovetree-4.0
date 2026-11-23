@@ -46,7 +46,7 @@ const STATES = [
     name: '공유 감상',
     make: () => ({ owned: true, trees: 2, tree: { title: '리센느, 나의 순간들' }, source: 'share' }),
     expect: {
-      treeViews: false, recordMenu: false, writeMenu: false, shareMenu: false,
+      treeViews: true, recordMenu: false, writeMenu: false, shareMenu: false,
       picker: '리센느', write: '＋ 순간 추가', aria: '이 트리 보기'
     }
   }
@@ -111,13 +111,13 @@ test('어느 상태·화면에서도 비활성(disabled)으로 남기지 않고 
   }
 });
 
-test('공유 감상에서는 로그인했어도 트리 탭·트리 선택을 숨긴다(공개 읽기)', () => {
+test('방문자는 공용 책·보드·지도 탭을 사용하고 트리 선택·쓰기만 숨긴다', () => {
   // 표만으로는 잡히지 않는 자리(공유 감상이면 parts 자체가 false)라 규칙을 직접 확인한다.
   assert.equal(treeViewsVisible({owned: true, publicReading: false}), true);
-  assert.equal(treeViewsVisible({owned: true, publicReading: true}), false, '공개 읽기에는 트리 탭을 열지 않는다');
+  assert.equal(treeViewsVisible({owned: true, publicReading: true}), true, '방문자도 같은 책·보드·지도 탭을 사용한다');
   assert.equal(treeViewsVisible({owned: false, publicReading: false}), false);
   const share = headerPartsFor({owned: true, treeCount: 2, publicReading: true});
-  assert.equal(share.treeViews, false);
+  assert.equal(share.treeViews, true);
   assert.equal(share.treePicker, false);
 });
 

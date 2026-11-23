@@ -175,6 +175,7 @@ export function createNavigationRuntime(ctx){
       getModel:()=>ctx.model,
       getSource:()=>ctx.source,
       getCurrent:()=>ctx.current,
+      getVisitorAccount:()=>ctx.visitorAccount||null,
       accountApi:ctx.accountApi,
       // #368: 이메일을 불러오거나 지울 때마다 설정 "프로필" 표시도 같이 칠한다.
       onEmailChange:email=>(0,ctx.paintSettingsProfile)(email),

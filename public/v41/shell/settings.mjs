@@ -4,7 +4,7 @@ import { MSG } from '../frame-messages.mjs';
 // #1072 A-16: 의견 보내기의 '함께 보낼 정보'에 실릴 최근 오류 기록은 report.mjs 한 곳에서 가져온다.
 import {reportEntries} from '../report.mjs';
 export function createSettings(deps){
-const { $, notify, setTitleDisplay, openLoginStart, links, screenForView, choose, panel, show, frames, frameLoaded, hideFrames, closeAccountMenu, openAccountMenu, renderAccount, updateAccountControls, openAssets, openEditor, sample, backup, clear, startMember, leaveMember, openFallbackShell, writeLocation, load, flowNavigation, closePanels, renderTreeMenu, requestBoardOpen, lastShelfTreeId, shellHeader, shellDialogs,  shareApi, accountApi, myNewsApi, readTheme, writeTheme, normalizeAccentColor, normalizeDateStyle, normalizeStartPlace, normalizeShareView, normalizeHomeMoment,  readPageTurn, writePageTurn, frameMessage, displayTreeTitle, accountPresentation, createFeedbackDialog, createFeedbackBoard, mountUpdates, mountMyNews, readWriteTab, writeWriteTab, clearCachedWorkspace, forgetLoginSubject, createWorkspaceApi, paintThemeControls, applyTheme, toggleTheme, paintBookDisplayControls } = deps;
+const { $, notify, setTitleDisplay, openLoginStart, links, screenForView, choose, panel, show, frames, frameLoaded, hideFrames, closeAccountMenu, openAccountMenu, renderAccount, updateAccountControls, openAssets, openEditor, sample, backup, clear, startMember, leaveMember, pauseMember, openFallbackShell, writeLocation, load, flowNavigation, closePanels, renderTreeMenu, requestBoardOpen, lastShelfTreeId, shellHeader, shellDialogs,  shareApi, accountApi, myNewsApi, readTheme, writeTheme, normalizeAccentColor, normalizeDateStyle, normalizeStartPlace, normalizeShareView, normalizeHomeMoment,  readPageTurn, writePageTurn, frameMessage, displayTreeTitle, accountPresentation, createFeedbackDialog, createFeedbackBoard, mountUpdates, mountMyNews, readWriteTab, writeWriteTab, clearCachedWorkspace, forgetLoginSubject, createWorkspaceApi, paintThemeControls, applyTheme, toggleTheme, paintBookDisplayControls } = deps;
 const $on=(id,fn)=>{const el=$(id);if(el)el.onclick=fn;};
 function advancedKey(){try{return 'lt41.advanced.'+(deps.member?.snapshot().subject||'')}catch{return 'lt41.advanced.'}}
 function readAdvanced(){try{return localStorage.getItem(advancedKey())==='1'}catch{return false}}
@@ -522,9 +522,10 @@ function publicProblem(answer){
  const [title,detail]=messages[answer.code]||['공유 기록을 불러오지 못했어요.',answer.code==='timeout'?'서버 응답 시간이 초과됐어요. 다시 시도해 주세요.':'잠시 뒤 다시 시도해 주세요.'];$('empty').querySelector('h1').textContent=title;$('empty').querySelector('p').textContent=detail;links();
 }
 async function showPublicRoute(route){
- if(deps.member&&!leaveMember()){writeLocation('replace');return;}
+ // 로그인한 방문자의 계정 연결은 보존하고, 이 트리의 데이터만 읽기 전용으로 싣는다.
+ if(deps.member&&!(deps.member.snapshot().owned?pauseMember():leaveMember())){writeLocation('replace');return;}
  const generation=++deps.loadGeneration;
- deps.member=null;deps.activeShareId=route.shareId;
+ deps.activeShareId=route.shareId;
  deps.current=screenForView(['book','board','network'].includes(route.view)?route.view:'book')[1];
  deps.handledHash=location.hash;
  $('empty').querySelector('h1').textContent='공유된 순간을 펼치고 있어요.';
@@ -534,7 +535,12 @@ async function showPublicRoute(route){
  deps.activeShareId=answer.share.id;const view=['book','board','network'].includes(route.view)?route.view:answer.share.view;deps.current=screenForView(view)[1];load({revision:0,state:{version:1,trees:[answer.tree]}},'share',{treeId:answer.tree.id,momentId:answer.share.entryMomentId});
  // #891: 공유 주소가 특정 순간을 가리키면(시작 순간) 보드만 그 순간의 상세 판을 열어 보여 준다.
  if(view==='board'&&answer.share.entryMomentId)requestBoardOpen(answer.share.entryMomentId);
- deps.activeShareId=answer.share.id;show(deps.current,false);writeLocation('replace');notify('공개된 트리를 감상하는 화면이에요. 감상만 할 수 있어요.'+(answer.aiTester?' AI 명예회원이 만든 트리예요.':'')+(answer.omittedPrivateMedia?' 올린 사진 '+answer.omittedPrivateMedia+'장은 나만 볼 수 있어요.':''));
+ deps.activeShareId=answer.share.id;show(deps.current,false);writeLocation('replace');
+ // 기존 공개 읽기 API만 사용한다. 별도로 계정 화면을 불러오지 않고 로그인 표시만 확인한다.
+ if(!deps.member?.snapshot().owned)void accountApi.account().then(account=>{
+   if(generation===deps.loadGeneration&&deps.source==='share')deps.onVisitorAccount?.(account?.ok?account:null);
+ }).catch(()=>{});
+ notify('공개된 트리를 감상하는 화면이에요. 감상만 할 수 있어요.'+(answer.aiTester?' AI 명예회원이 만든 트리예요.':'')+(answer.omittedPrivateMedia?' 올린 사진 '+answer.omittedPrivateMedia+'장은 나만 볼 수 있어요.':''));
 }
 document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{if(b.dataset.view==='track32-bookshelf.html'&&!deps.memberViewsAvailable()){openLoginStart('shelf');return;}
  // 261118 대표 지적 2차 5: 서재 화면에서 콕·보드·지도는 마지막에 본 트리(서재 가운데 책의 트리)로 연다.
