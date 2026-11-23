@@ -953,7 +953,7 @@ html[data-lt-theme=garden] #share-form select,html[data-lt-theme=garden] #share-
 @media(max-width:420px){
  .app-header .main-nav{min-width:44px}
  .app-header .main-nav .tree-frame,.app-header .main-nav .tree-slot{max-width:100%;min-width:0}
- .app-header .main-nav #record-menu{width:100%;max-width:100%;min-width:0;overflow:hidden}
+ .app-header .main-nav #record-menu{width:100%;max-width:150px;min-width:0;overflow:hidden}
 }
 /* 261117: share-menu·header-overflow는 그리드 자동 배치에서 암시적 열을 만들어 390 헤더를 밀었다 —
    0폭 자리(1행 전체)에 박아 둔다. 실제 보기는 hidden 속성으로 여전히 동작한다. */
