@@ -23,8 +23,6 @@
   --tv-sub:var(--lt-muted);--tv-btn:rgba(255,255,255,.06);--tv-btn-on:var(--lt-gold-deep);
   --tv-btn-on-ink:var(--lt-stage);--tv-card-bg:var(--lt-glass);--tv-card-ink:var(--lt-pearl);
   --tv-card-line:var(--lt-gold-line);--tv-branch:var(--lt-gold-deep);
-  --tv-chip-bg:rgba(10,10,16,.9);--tv-chip-ink:var(--lt-pearl);
-  --tv-root-bg:var(--lt-gold-deep);--tv-root-ink:var(--lt-stage);
   --tv-bundle-bg:rgba(216,143,156,.16);--tv-bundle-ink:var(--lt-rose);
   --tv-shadow:0 12px 28px rgba(0,0,0,.45);
 }
@@ -34,8 +32,7 @@ html[data-lt-theme=garden]{
   --tv-sub:color-mix(in srgb,var(--lt-ink) 62%,transparent);
   --tv-btn:rgba(67,58,52,.06);--tv-btn-on:var(--lt-ink);--tv-btn-on-ink:var(--lt-paper);
   --tv-card-bg:var(--lt-paper);--tv-card-ink:var(--lt-ink);--tv-card-line:rgba(138,100,32,.55);
-  --tv-branch:var(--lt-gold-ink);--tv-chip-bg:rgba(245,239,226,.94);--tv-chip-ink:var(--lt-ink);
-  --tv-root-bg:var(--lt-ink);--tv-root-ink:var(--lt-paper);
+  --tv-branch:var(--lt-gold-ink);
   --tv-bundle-bg:rgba(189,93,114,.12);--tv-bundle-ink:var(--lt-rose-ink);
   --tv-shadow:0 12px 28px rgba(75,51,42,.16);
 }
@@ -64,7 +61,7 @@ body{background:var(--tv-page);color:var(--tv-bar-ink);font-family:var(--lt-ui);
 .tv-lines{position:absolute;left:0;top:0;width:1px;height:1px;overflow:visible;pointer-events:none}
 .tv-lines path{fill:none;stroke:var(--tv-branch);stroke-linecap:round}
 .tv-nodes{position:absolute;left:0;top:0}
-.tv-card,.tv-chip,.tv-bundle{
+.tv-card,.tv-bundle{
   position:absolute;left:var(--x);top:var(--y);width:var(--w);height:var(--h);
   border-radius:var(--lt-r-card);overflow:hidden;user-select:none
 }
@@ -72,23 +69,12 @@ body{background:var(--tv-page);color:var(--tv-bar-ink);font-family:var(--lt-ui);
   background:var(--tv-card-bg);border:1px solid var(--tv-card-line);
   box-shadow:var(--tv-shadow);color:var(--tv-card-ink);display:flex;flex-direction:column
 }
+.tv-root{border-color:var(--lt-gold-deep);box-shadow:0 0 0 2px var(--lt-gold-line),var(--tv-shadow)}
 .tv-thumb{height:var(--thumb-h);flex:0 0 var(--thumb-h);background:color-mix(in srgb,var(--tv-card-line) 22%,transparent);overflow:hidden}
 .tv-thumb img{display:block;width:100%;height:100%;object-fit:cover;pointer-events:none}
 .tv-cap{padding:4px 7px 5px;display:flex;flex-direction:column;gap:1px;min-height:0}
 .tv-date{font-size:9px;line-height:1.2;color:var(--tv-sub);white-space:nowrap}
 .tv-name{font-size:10px;line-height:1.2;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.tv-chip{
-  display:flex;align-items:center;justify-content:center;text-align:center;padding:0 5px;
-  background:var(--tv-chip-bg);border:1px solid var(--tv-card-line);color:var(--tv-chip-ink);
-  font-size:10px;line-height:1.2;line-break:keep-all;overflow-wrap:anywhere
-}
-.tv-root{
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
-  background:var(--tv-root-bg);color:var(--tv-root-ink);border-color:var(--tv-root-bg);
-  box-shadow:var(--tv-shadow);gap:1px
-}
-.tv-root b{font-size:13px;line-height:1.1;letter-spacing:.04em}
-.tv-root small{font-size:9px;line-height:1.1;opacity:.82}
 .tv-bundle{
   display:flex;align-items:center;justify-content:center;background:var(--tv-bundle-bg);
   border:1px dashed var(--tv-bundle-ink);color:var(--tv-bundle-ink);
@@ -110,12 +96,9 @@ body{background:var(--tv-page);color:var(--tv-bar-ink);font-family:var(--lt-ui);
   .tv-group button{min-height:30px;padding:4px 9px;font-size:11px}
   .tv-hint{margin-top:6px;font-size:10px}
   .tv-status{left:8px;bottom:8px;font-size:10px;max-width:calc(100% - 16px)}
-  .tv-date{font-size:10px}
-  .tv-name{font-size:11px}
-  .tv-chip{font-size:11px}
-  .tv-root b{font-size:14px}
-  .tv-root small{font-size:10px}
-  .tv-bundle{font-size:13px}
+  .tv-date{font-size:9px}
+  .tv-name{font-size:10px}
+  .tv-bundle{font-size:11px}
 }
 @media(prefers-reduced-motion:reduce){.tv-world{will-change:auto}}
 </style>
@@ -180,7 +163,9 @@ body{background:var(--tv-page);color:var(--tv-bar-ink);font-family:var(--lt-ui);
     '5월 13일','6월 21일','7월 29일','8월 16일','9월 8일','10월 4일','11월 2일','12월 6일'
   ];
   const img = (i) => '../example-media/ex' + String(i % 33 + 1).padStart(2, '0') + '.webp';
-  const leaf = (i) => ({ kind: 'leaf', title: TITLES[i], date: DATES[i], img: img(i) });
+  const moment = (i, extra) => Object.assign({ kind: 'moment', title: TITLES[i], date: DATES[i], img: img(i) }, extra || {});
+  const stem = (i) => moment(i, { trunk: true });
+  const rootMoment = () => Object.assign({ kind: 'root', trunk: true, title: TITLES[0], date: DATES[0], img: img(0) });
 
   const state = {
     set: 10,
@@ -194,12 +179,9 @@ body{background:var(--tv-page);color:var(--tv-bar-ink);font-family:var(--lt-ui);
 
   function params() {
     const q = new URLSearchParams(location.search);
-    const set = q.get('n');
-    const theme = q.get('theme');
-    const expanded = q.get('expanded');
-    if (set === '40') state.set = 40;
-    if (theme === 'garden' || theme === 'night') state.theme = theme;
-    state.expanded = expanded === '1';
+    if (q.get('n') === '40') state.set = 40;
+    if (q.get('theme') === 'garden' || q.get('theme') === 'night') state.theme = q.get('theme');
+    state.expanded = q.get('expanded') === '1';
   }
 
   function syncUrl() {
@@ -210,44 +192,56 @@ body{background:var(--tv-page);color:var(--tv-bar-ink);font-family:var(--lt-ui);
     history.replaceState(null, '', location.pathname + '?' + q.toString());
   }
 
-  // 한 순간에서 갈라진 27개를 담는다. 접힌 상태에서는 처음 3개만 카드로 보이고 나머지 24개는 묶음 가지가 된다.
+  // 이어진 순간은 부모가 다음 순간인 사슬이다. 줄기 위의 모든 칸도 순간 카드다.
   function treeData() {
-    const root = { kind: 'root', title: '첫 순간', date: '2024. 3. 14', children: [] };
     if (state.set === 10) {
-      root.children = [
-        { kind: 'branch', title: '처음 마주친 날', date: '3월 14일', children: [leaf(0), leaf(1), leaf(2)] },
-        { kind: 'branch', title: '함께 걷던 길', date: '5월 5일', children: [leaf(3), leaf(4), leaf(5), leaf(6)] },
-        { kind: 'branch', title: '지금 이 순간', date: '8월 8일', children: [leaf(7), leaf(8), leaf(9)] }
-      ];
-    } else {
-      const fork = { kind: 'branch', title: '갈림의 순간', date: '11월 18일', children: [] };
-      for (let i = 13; i < 40; i++) fork.children.push(leaf(i));
-      if (!state.expanded) {
-        const shown = fork.children.slice(0, 3);
-        fork.children = shown.concat([{ kind: 'bundle', title: '+24개', hidden: 24 }]);
-      } else {
-        fork.children.push({ kind: 'fold', title: '접기' });
-      }
-      root.children = [
-        { kind: 'branch', title: '작은 순간들', date: '3월 21일', children: [leaf(0), leaf(1), leaf(2), leaf(3), leaf(4), leaf(5)] },
-        { kind: 'branch', title: '함께한 날들', date: '6월 3일', children: [leaf(6), leaf(7), leaf(8), leaf(9), leaf(10)] },
-        { kind: 'branch', title: '기억에 남은 말', date: '9월 14일', children: [leaf(11), leaf(12)] },
-        fork
-      ];
+      const root = rootMoment();
+      const s1 = stem(1), s2 = stem(2), s3 = stem(3);
+      const side = moment(4); side.children = [moment(5)];
+      const b1 = moment(6); b1.children = [moment(7)];
+      const b2 = moment(8); b2.children = [moment(9)];
+      s2.children = [side, s3];
+      s3.children = [b1, b2];
+      s1.children = [s2];
+      root.children = [s1];
+      return root;
     }
-    return root;
+
+    const stemNodes = [rootMoment()];
+    for (let i = 1; i < 9; i++) stemNodes.push(stem(i));
+
+    const sideA = moment(9); sideA.children = [moment(10)];
+    stemNodes[2].children = [sideA];
+    stemNodes[4].children = [moment(11)];
+
+    const fork = moment(12);
+    const leaves = [];
+    for (let i = 13; i < 40; i++) leaves.push(moment(i));
+    fork.children = state.expanded
+      ? leaves.concat([{ kind: 'fold', title: '접기' }])
+      : leaves.slice(0, 3).concat([{ kind: 'bundle', title: '+24개', hidden: 24 }]);
+    stemNodes[6].children = [fork];
+
+    for (let i = 0; i < 8; i++) {
+      if (!stemNodes[i].children) stemNodes[i].children = [];
+      stemNodes[i].children.push(stemNodes[i + 1]);
+    }
+    return stemNodes[0];
   }
 
   function config() {
     const phone = stage.clientWidth <= 600;
     return phone
-      ? { root: [124, 52], branch: [120, 42], leaf: [148, 104], bundle: [84, 42], fold: [76, 40], gapX: 10, gapY: 20, thumb: 62, pad: 14, maxScale: 1.6, minScale: .72 }
-      : { root: [146, 58], branch: [132, 44], leaf: [158, 116], bundle: [86, 44], fold: [78, 42], gapX: 17, gapY: 28, thumb: 74, pad: 36, maxScale: 1.5, minScale: .12 };
+      ? { card: [104, 64], bundle: [70, 36], fold: [70, 36], gapX: 150, gapY: 120, offset: 72, thumb: 34, pad: 12, maxScale: 1.6, minScale: .12 }
+      : { card: [128, 74], bundle: [78, 40], fold: [78, 40], gapX: 180, gapY: 170, offset: 82, thumb: 44, pad: 28, maxScale: 1.5, minScale: .12 };
   }
 
-  function build(spec, parent) {
-    const n = Object.assign({}, spec, { parent, children: [], x: 0, y: 0, ax: 0, ay: 0 });
-    n.children = (spec.children || []).map((child) => build(child, n));
+  function build(spec, parent, depth) {
+    const n = Object.assign({}, spec, {
+      parent, depth, children: [], x: 0, y: 0, ax: 0, ay: 0,
+      cardSide: spec.trunk && depth > 0 ? (depth % 2 ? -1 : 1) : 0
+    });
+    n.children = (spec.children || []).map((child) => build(child, n, depth + 1));
     return n;
   }
 
@@ -272,7 +266,7 @@ body{background:var(--tv-page);color:var(--tv-bar-ink);font-family:var(--lt-ui);
   // 카드마다 크기가 다르므로 형제의 윤곽선이 겹치지 않게 옆으로 민다(가변 크기 정돈 트리 배치).
   function layout(root, cfg) {
     function sizes(n) {
-      const box = cfg[n.kind];
+      const box = n.kind === 'bundle' || n.kind === 'fold' ? cfg[n.kind] : cfg.card;
       n.w = box[0]; n.h = box[1];
       n.effH = n.h + (n.children.length ? cfg.gapY : 0);
       n.leaves = n.kind === 'bundle' ? n.hidden : n.kind === 'fold' ? 0 : (n.children.length ? n.children.reduce((sum, c) => sum + sizes(c), 0) : 1);
@@ -330,6 +324,43 @@ body{background:var(--tv-page);color:var(--tv-bar-ink);font-family:var(--lt-ui);
       for (const child of n.children) secondWalk(child, n.ax, n.ay);
     }
     secondWalk(root, 0, 0);
+
+    // 곁가지는 제자리에 두고 줄기 칸만 뿌리 세로선에 맞춘다. 곁가지끼리는 원래 배치 간격이 그대로 남는다.
+    const target = root.wx + root.w / 2;
+    function straighten(n) {
+      if (n.trunk && n.parent) {
+        n.ax += target - (n.wx + n.w / 2);
+        n.wx = n.ax;
+      }
+      for (const child of n.children) straighten(child);
+    }
+    straighten(root);
+
+    // 줄기를 세로선에 맞춘 뒤 같은 높이의 곁가지 카드가 닿으면 쪽가지 전체를 조금 더 민다.
+    const levels = new Map();
+    for (const n of allNodes(root, [])) {
+      const row = Math.round(n.wy);
+      if (!levels.has(row)) levels.set(row, []);
+      levels.get(row).push(n);
+    }
+    function moveSubtree(n, dx) {
+      n.ax += dx; n.wx = n.ax;
+      for (const c of n.children) moveSubtree(c, dx);
+    }
+    for (let pass = 0; pass < 3; pass++) {
+      for (const group of levels.values()) {
+        group.sort((a, b) => (a.wx + a.cardSide * cfg.offset) - (b.wx + b.cardSide * cfg.offset));
+        for (let i = 1; i < group.length; i++) {
+          const prev = group[i - 1], curr = group[i];
+          const prevRight = prev.wx + prev.cardSide * cfg.offset + prev.w;
+          const currLeft = curr.wx + curr.cardSide * cfg.offset;
+          if (prevRight <= currLeft + 4) continue;
+          const dx = prevRight - currLeft + 8;
+          if (curr.trunk && !prev.trunk) moveSubtree(prev, -dx);
+          else if (!curr.trunk) moveSubtree(curr, dx);
+        }
+      }
+    }
     return root;
   }
 
@@ -342,37 +373,47 @@ body{background:var(--tv-page);color:var(--tv-bar-ink);font-family:var(--lt-ui);
   function draw() {
     const cfg = config();
     state.cfg = cfg;
-    state.root = layout(build(treeData(), null), cfg);
+    state.root = layout(build(treeData(), null, 0), cfg);
     const list = allNodes(state.root, []);
 
     const paths = [];
     for (const n of list) {
+      const jx = n.wx + n.w / 2;
+      const width = 1.1 + 7.6 * Math.pow(n.leaves / state.root.leaves, .62);
+      const alpha = (0.52 + 0.38 * n.leaves / state.root.leaves).toFixed(2);
+      if (n.cardSide) {
+        // 줄기 양옆 카드까지 짧은 가지로 잇는다.
+        const cardLeft = n.wx + n.cardSide * cfg.offset;
+        const edge = n.cardSide > 0 ? cardLeft : cardLeft + n.w;
+        const cy = (n.wy + n.h / 2).toFixed(1);
+        paths.push(`<path d="M${jx.toFixed(1)},${cy} L${edge.toFixed(1)},${cy}" stroke-width="${(width * .45).toFixed(2)}" stroke-opacity="${alpha}"></path>`);
+      }
       if (!n.parent) continue;
       const p = n.parent;
       const sx = p.wx + p.w / 2, sy = p.wy;
-      const tx = n.wx + n.w / 2, ty = n.wy + n.h;
+      const tx = jx, ty = n.wy + n.h;
       const dy = Math.max(1, sy - ty);
-      const d = `M${sx.toFixed(1)},${sy.toFixed(1)} C${sx.toFixed(1)},${(sy - dy * .55).toFixed(1)} ${tx.toFixed(1)},${(ty + dy * .55).toFixed(1)} ${tx.toFixed(1)},${ty.toFixed(1)}`;
-      const width = 1.1 + 7.6 * Math.pow(n.leaves / state.root.leaves, .62);
-      paths.push(`<path d="${d}" stroke-width="${width.toFixed(2)}" stroke-opacity="${(0.52 + 0.38 * n.leaves / state.root.leaves).toFixed(2)}"></path>`);
+      // 곁가지는 비스듬히 뻗은 뒤 끝에서 위로 휘고, 줄기는 곧게 올라간다.
+      const c1 = n.trunk ? .55 : .38;
+      const c2 = n.trunk ? .55 : .68;
+      const d = `M${sx.toFixed(1)},${sy.toFixed(1)} C${sx.toFixed(1)},${(sy - dy * c1).toFixed(1)} ${tx.toFixed(1)},${(ty + dy * c2).toFixed(1)} ${tx.toFixed(1)},${ty.toFixed(1)}`;
+      paths.push(`<path d="${d}" stroke-width="${width.toFixed(2)}" stroke-opacity="${alpha}"></path>`);
     }
     lines.innerHTML = paths.join('');
 
     const cards = [];
     for (const n of list) {
-      const pos = `--x:${n.wx}px;--y:${n.wy}px;--w:${n.w}px;--h:${n.h}px;`;
-      if (n.kind === 'leaf') {
-        cards.push(`<div class="tv-card" data-pos="${pos}--thumb-h:${cfg.thumb}px" aria-label="${n.date} ${n.title}">` +
-          `<div class="tv-thumb"><img src="${n.img}" alt="" draggable="false"></div>` +
-          `<div class="tv-cap"><span class="tv-date">${n.date}</span><span class="tv-name">${n.title}</span></div></div>`);
-      } else if (n.kind === 'root') {
-        cards.push(`<div class="tv-card tv-root" data-pos="${pos}" aria-label="뿌리, 첫 순간"><b>첫 순간</b><small>${n.date}</small></div>`);
-      } else if (n.kind === 'bundle') {
+      const x = n.wx + n.cardSide * cfg.offset;
+      const pos = `--x:${x}px;--y:${n.wy}px;--w:${n.w}px;--h:${n.h}px;`;
+      if (n.kind === 'bundle') {
         cards.push(`<button type="button" class="tv-bundle" data-pos="${pos}" data-expand="1" aria-label="묶인 24개 순간 펼치기">+24개</button>`);
       } else if (n.kind === 'fold') {
         cards.push(`<button type="button" class="tv-bundle" data-pos="${pos}" data-fold="1" aria-label="27개 갈림 다시 묶기">접기</button>`);
       } else {
-        cards.push(`<div class="tv-chip" data-pos="${pos}" aria-label="${n.title}">${n.title}</div>`);
+        const cls = n.kind === 'root' ? 'tv-card tv-root' : 'tv-card';
+        cards.push(`<div class="${cls}" data-pos="${pos}--thumb-h:${cfg.thumb}px" aria-label="${n.date} ${n.title}">` +
+          `<div class="tv-thumb"><img src="${n.img}" alt="" draggable="false"></div>` +
+          `<div class="tv-cap"><span class="tv-date">${n.date}</span><span class="tv-name">${n.title}</span></div></div>`);
       }
     }
     nodes.innerHTML = cards.join('');
@@ -386,8 +427,10 @@ body{background:var(--tv-page);color:var(--tv-bar-ink);font-family:var(--lt-ui);
       }
       el.removeAttribute('data-pos');
     }
-    status.textContent = `순간 ${state.set}개 · ${state.theme === 'garden' ? '정원' : '밤'} · ` +
-      (state.set === 10 ? '갈림 3개' : state.expanded ? '27갈림 펼침' : '27갈림 중 24개 묶음 접힘');
+
+    const shape = state.set === 10 ? '줄기 4단 · 갈림 2곳' : '줄기 9단 · 갈림 3곳';
+    status.textContent = `순간 ${state.set}개 · ${state.theme === 'garden' ? '정원' : '밤'} · ${shape} · ` +
+      (state.set === 10 ? '27갈림 없음' : state.expanded ? '27갈림 펼침' : '27갈림 중 24개 묶음 접힘');
     document.querySelectorAll('[data-set]').forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.set) === state.set)));
     document.querySelectorAll('[data-theme]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.theme === state.theme)));
     document.documentElement.dataset.ltTheme = state.theme;
@@ -398,7 +441,8 @@ body{background:var(--tv-page);color:var(--tv-bar-ink);font-family:var(--lt-ui);
     const list = allNodes(state.root, []);
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
     for (const n of list) {
-      minX = Math.min(minX, n.wx); maxX = Math.max(maxX, n.wx + n.w);
+      const x = n.wx + n.cardSide * state.cfg.offset;
+      minX = Math.min(minX, x); maxX = Math.max(maxX, x + n.w);
       minY = Math.min(minY, n.wy); maxY = Math.max(maxY, n.wy + n.h);
     }
     return { minX, maxX, minY, maxY, cx: (minX + maxX) / 2, cy: (minY + maxY) / 2 };
@@ -415,10 +459,8 @@ body{background:var(--tv-page);color:var(--tv-bar-ink);font-family:var(--lt-ui);
     const scale = Math.max(state.cfg.minScale, Math.min(state.cfg.maxScale,
       (w - pad * 2) / Math.max(1, b.maxX - b.minX),
       (h - pad * 2) / Math.max(1, b.maxY - b.minY)));
-    // 좁은 화면에서 카드가 너무 작아지면 억지로 줄이지 않고 뿌리를 가운데 두고 옆으로 끌어 보게 한다.
-    const cx = scale > state.cfg.minScale + 1e-6 ? b.cx : state.root.wx + state.root.w / 2;
     state.scale = scale;
-    state.tx = w / 2 - cx * scale;
+    state.tx = w / 2 - b.cx * scale;
     state.ty = h / 2 - b.cy * scale;
     apply();
   }
