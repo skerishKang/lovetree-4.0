@@ -121,7 +121,7 @@ const geom = (frame) => frame.evaluate(() => {
     book: box(document.getElementById('bookWrap')),
     pages: { left: visible('leftPage'), right: visible('rightPage'), mobile: visible('mobilePage') },
     lensButton: visible('lensBtn'),
-    topbar: Math.round(document.querySelector('.topbar').getBoundingClientRect().height),
+    topbar: Math.round(document.querySelector('.lt-screen-toolbar').getBoundingClientRect().height),
     smallLine: !!document.querySelector('.mobile-support'),
     moment: document.querySelector('.page.right [data-moment], .mobile-content [data-moment]')?.dataset.moment || ''
   };
@@ -191,16 +191,22 @@ test('#537 실제 화면: 1440·390에서 한 장으로 끝까지 넘기면 모�
     const phone = await openBook(browser, base, 390, 844, 'single');
     const phoneGeom = await geom(phone.frame);
     const phoneWalk = await walkAll(phone.frame);
-    // #952: 폰 폭(600px 미만)에서는 두 장 단추를 숨긴다 — 화면에서 확인.
+    // 폰에서도 두 칸은 같은 크기로 표시하되, 한 장만 사용 가능하고 두 장은 비활성화한다.
     const phoneBtns = await phone.frame.evaluate(() => ({
       single: document.getElementById('singleViewBtn')?.hidden === false,
-      double: document.getElementById('doubleViewBtn')?.hidden === true
+      double: document.getElementById('doubleViewBtn')?.hidden === false,
+      doubleDisabled: document.getElementById('doubleViewBtn')?.disabled === true,
+      cellsEqual: (() => {
+        const one = document.getElementById('singleViewBtn').getBoundingClientRect();
+        const two = document.getElementById('doubleViewBtn').getBoundingClientRect();
+        return one.width > 0 && one.width === two.width && one.height === two.height;
+      })()
     }));
     await phone.ctx.close();
-    assert.deepEqual(phoneBtns, { single: true, double: true }, '폰 폭: 1장만 남기고 2장 단추를 숨긴다');
+    assert.deepEqual(phoneBtns, { single: true, double: true, doubleDisabled: true, cellsEqual: true }, '폰 폭: 같은 두 칸 중 1장만 선택할 수 있다');
     assert.equal(phoneGeom.state.shape, 'phone', '폰 폭은 휴대폰 모양');
     assert.deepEqual(phoneGeom.pages, { left: false, right: false, mobile: true }, '휴대폰 한 장은 mobile-page');
-    assert.equal(phoneGeom.topbar, 60, '휴대폰 머리줄 60px 그대로');
+    assert.equal(phoneGeom.topbar, 48, '휴대폰 공통 도구 줄 높이 48px');
     assert.ok(phoneGeom.book.w <= 430, '휴대폰 책 폭 그대로');
     assert.equal(phoneGeom.lensButton, false, '휴대폰에서는 돋보기 단추를 숨긴다');
     assert.equal(phoneGeom.smallLine, false, '작은 줄이 없다');

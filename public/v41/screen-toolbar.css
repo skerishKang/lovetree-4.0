@@ -48,7 +48,7 @@ html[data-v41-screen=book] .lt-screen-toolbar #bookTitleText{font:inherit;overfl
 html[data-v41-screen=book] .lt-screen-toolbar .tree-menu{top:calc(100% + 4px)}
 html[data-v41-screen=book] .stage{top:var(--lt-content-top)}
 html[data-book-shape=phone][data-v41-screen=book] .lt-screen-toolbar{position:relative;top:auto;margin-top:0}
-html[data-book-shape=phone][data-v41-screen=book] .lt-screen-toolbar .book-title{max-width:38%}
+html[data-book-shape=phone][data-v41-screen=book] .lt-screen-toolbar .book-title{max-width:32%}
 html[data-book-shape=phone][data-v41-screen=book] .stage{top:auto;min-height:calc(100dvh - var(--lt-content-top))}
 @media(min-width:601px){html[data-v41-screen=book] .stage{padding-top:18px}}
 @media(max-width:600px){
@@ -70,7 +70,7 @@ html[data-book-shape=phone][data-v41-screen=book] .stage{top:auto;min-height:cal
  display:flex;align-items:center;justify-content:center;box-sizing:border-box;
  width:100%;min-width:0;height:34px;min-height:34px;padding:0 7px;
  border:0;border-radius:var(--lt-r-pill);background:transparent;
- color:var(--lt-pearl);font:600 12px var(--lt-ui);line-height:1;
+ color:var(--lt-pearl);font:600 13px var(--lt-ui);line-height:1;
  box-shadow:none;transform:none;
 }
 .lt-toolbar-tools .view-toggle>button[aria-checked=true],
