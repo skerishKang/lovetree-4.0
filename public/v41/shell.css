@@ -26,8 +26,7 @@ dialog[data-lt-panel=card]::backdrop{background:rgba(3,3,7,.85);backdrop-filter:
 
 /* 방문자도 같은 머리줄을 쓰되 트리 고르기와 서재는 누르지 못하고 보이지 않는다. */
 body.share-visitor .tree-slot,body.share-visitor .tree-views>.visitor-hidden{display:none}
-/* 모바일의 책 보기 선택기가 보일 때는 내 화면과 같은 머리줄 높이를 유지한다. */
-@media(max-width:780px){body.share-visitor .app-header{min-height:62px}body.share-visitor .app-header:has(#book-display-toggle:not([hidden])){min-height:110px}}
+/* #1231 이후 내 화면도 390 한 줄(57px)이다 — 방문자 전용 높이를 두면 책 화면에서 110px로 밀린다. */
 /* One tree label; the selected navigation tab already names the current view. */
 #view-context{flex:0 0 auto;display:flex;align-items:center;gap:10px;min-height:36px;padding:6px 24px;background:var(--lt-stage-2);color:var(--lt-pearl);border-bottom:1px solid var(--line);font-size:12px}
 #view-context[hidden]{display:none}
