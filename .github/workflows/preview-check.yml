@@ -272,6 +272,77 @@ jobs:
           npm run build
           node --test tests/v41-header-first-paint-1026.test.mjs
 
+  screen-orbit:
+    name: 화면 시험 — 첫 화면 궤도(#1086)
+    # 2026-11-23: 기준 빌드 두 벌이 드는 #1086 비교를 첫 화면 잡에서 떼어 따로 돌린다(첫 화면 잡 12분 안에 끝나게).
+    # 2026-11-22: 호스트 실행기 대기(동시 3개 안팎)를 피해 같은 저장소 PR은 CGI 자체 실행기에서 돈다(보드 잡과 같은 식).
+    runs-on: ${{ fromJSON((github.event.pull_request.head.repo.full_name == github.repository && vars.USE_CGI_RUNNER == '1') && '["self-hosted","Linux","X64","cgi"]' || '["ubuntu-latest"]') }}
+    timeout-minutes: 12
+    needs: screen-changes
+    if: needs.screen-changes.outputs.changed == 'true'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          clean: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/cache@v4
+        if: runner.environment != 'self-hosted'
+        with:
+          path: ~/.cache/ms-playwright
+          key: ms-playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - name: 브라우저 준비(Playwright Chromium, 캐시)
+        id: browser
+        if: needs.screen-changes.outputs.changed == 'true'
+        run: |
+          npm i --no-save --no-package-lock playwright@$(node -p "require('./package-lock.json').packages['node_modules/playwright'].version")
+          if [ "$RUNNER_ENVIRONMENT" = "self-hosted" ]; then
+            # 자체 실행기: 이 버전 Chromium이 있으면 받지 않고 끝난다(시스템 라이브러리는 미리 깔림, sudo 없음).
+            npx playwright install chromium
+          elif ls "$HOME/.cache/ms-playwright" 2>/dev/null | grep -q chromium; then
+            echo "캐시된 Chromium 사용"
+          else
+            npx playwright install --with-deps chromium
+          fi
+          node -e "import('playwright-core').then(()=>console.log('playwright-core 확인')).catch(e=>{console.error(e.message);process.exit(1)})"
+      - name: 첫 화면 빌드
+        if: needs.screen-changes.outputs.changed == 'true'
+        run: npx vite build > /dev/null
+      # 실제 하드웨어 성능 판정과 별개로 같은 헤드리스 환경의 기준 브랜치와 회귀를 비교한다.
+      # 쌓임·깊이 대조 기준(기존 DOM 마지막 커밋, #1221 직전)은 고정 커밋이라 빌드 결과를 캐시해 잡 시간을 늘리지 않는다.
+      - name: 첫 화면 궤도 기존 DOM 기준 빌드 캐시(#1086)
+        id: orbit-dom-cache
+        if: needs.screen-changes.outputs.changed == 'true'
+        uses: actions/cache@v4
+        with:
+          path: .orbit-dom-dist
+          key: orbit-dom-dist-d9c3bfc5837366e525ed7d13b780769ce9392034
+      - name: 첫 화면 궤도 헤드리스 회귀 방지(#1086, 건너뜀=실패)
+        env:
+          LT_ORBIT1086_REQUIRE: '1'
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          DOM_SHA: d9c3bfc5837366e525ed7d13b780769ce9392034
+          DOM_CACHED: ${{ steps.orbit-dom-cache.outputs.cache-hit }}
+        if: needs.screen-changes.outputs.changed == 'true'
+        run: |
+          # 쌓임·깊이 대조는 기존 DOM 궤도가 기준이어야 한다. #1221 병합 뒤에는 기준 브랜치도 그림판이라
+          # 같은 그림판끼리 비교가 되므로, 기존 DOM 마지막 커밋(#1221 직전)을 고정 기준으로 쓴다.
+          # 성능 회귀 비교는 지금처럼 기준 브랜치와 한다. 캐시가 없으면 두 기준을 동시에 빌드한다.
+          build_at() { dir=$(mktemp -d "$RUNNER_TEMP/orbit-$2.XXXXXX"); git archive "$1" | tar -x -C "$dir"; npm ci --prefix "$dir" > /dev/null && npm run build --prefix "$dir" > /dev/null && echo "$dir" > "$RUNNER_TEMP/orbit-$2.path"; }
+          build_at "$BASE_SHA" main & main_pid=$!
+          if [ "$DOM_CACHED" != "true" ] || [ ! -f .orbit-dom-dist/v41/home.html ]; then
+            build_at "$DOM_SHA" dom
+            rm -rf .orbit-dom-dist && cp -r "$(cat "$RUNNER_TEMP/orbit-dom.path")/dist" .orbit-dom-dist
+          fi
+          wait "$main_pid"
+          baseline=$(cat "$RUNNER_TEMP/orbit-main.path")
+          LT_ORBIT1086_MAIN_DIST="$PWD/.orbit-dom-dist" node --test --test-concurrency=1 tests/v41-orbit-webgl-1086.test.mjs
+          LT_ORBIT1086_MAIN_DIST="$baseline/dist" node --test --test-concurrency=1 tests/v41-orbit-1086-perf.test.mjs
+
   screen-home:
     name: 화면 시험 — 첫 화면
     # 2026-11-22: 호스트 실행기 대기(동시 3개 안팎)를 피해 같은 저장소 PR은 CGI 자체 실행기에서 돈다(보드 잡과 같은 식).
@@ -335,18 +406,6 @@ jobs:
           start=$(date +%s)
           node --test tests/v41-orbit-586-perf.test.mjs
           echo "첫 화면 끌기 성능 계약 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
-      # 실제 하드웨어 성능 판정과 별개로 같은 헤드리스 환경의 기준 브랜치와 회귀를 비교한다.
-      - name: 첫 화면 궤도 헤드리스 회귀 방지(#1086, 건너뜀=실패)
-        env:
-          LT_ORBIT1086_REQUIRE: '1'
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-        if: needs.screen-changes.outputs.changed == 'true'
-        run: |
-          baseline=$(mktemp -d "$RUNNER_TEMP/orbit-main.XXXXXX")
-          git archive "$BASE_SHA" | tar -x -C "$baseline"
-          npm ci --prefix "$baseline"
-          npm run build --prefix "$baseline" > /dev/null
-          LT_ORBIT1086_MAIN_DIST="$baseline/dist" node --test --test-concurrency=1 tests/v41-orbit-webgl-1086.test.mjs tests/v41-orbit-1086-perf.test.mjs
       # #537: 책의 한 장 보기가 순간 하나씩 넘어가는지, 넓은 화면에서 두 장 책의 한 쪽 크기·같은 높이로
       # 나오는지, 390 휴대폰 모양이 그대로인지를 실제 화면에서 잰다. 건너뜀=실패(크롬이 준비된 이 잡에서 돈다).
       - name: 첫 화면 화면 시험(건너뜀=실패 — 이슈 952)
@@ -1550,7 +1609,7 @@ jobs:
     name: 미리보기 postdeploy(로그아웃)
     runs-on: ubuntu-latest
     if: always()
-    needs: [screen-changes, screen-board, screen-home, screen-book, screen-reload, screen-shell, screen-map-a, screen-map-b, screen-book-screen, screen-audit-a, screen-audit-b, screen-audit-c, deploy]
+    needs: [screen-changes, screen-board, screen-home, screen-orbit, screen-book, screen-reload, screen-shell, screen-map-a, screen-map-b, screen-book-screen, screen-audit-a, screen-audit-b, screen-audit-c, deploy]
     steps:
       - uses: actions/checkout@v4
         with:

@@ -49,7 +49,7 @@ test('#1069 화면 잡의 Playwright 버전은 잠금 파일에서 읽는다', (
   assert.ok(!/1\.49\.1/.test(workflow), '옛 하드코딩 버전이 남아 있지 않다');
   assert.ok(workflow.includes("hashFiles('package-lock.json')"), '캐시 키가 잠금 파일에서 유도된다');
   const installs = workflow.match(/playwright@\$\(node -p "require\('\.\/package-lock\.json'\)\.packages\['node_modules\/playwright'\]\.version"\)/g) || [];
-  assert.equal(installs.length, 12, `화면 잡 12곳이 모두 잠금 파일 버전을 쓴다(실측 ${installs.length})`);
+  assert.equal(installs.length, 13, `화면 잡 13곳(#1086 궤도 잡 분리 포함)이 모두 잠금 파일 버전을 쓴다(실측 ${installs.length})`);
   const actual = execFileSync(process.execPath, ['-p', "require('./package-lock.json').packages['node_modules/playwright'].version"], { cwd: new URL('..', import.meta.url), encoding: 'utf8' }).trim();
   assert.equal(actual, version, `실제로 읽힌 버전(${actual})이 잠금 파일(${version})과 같다`);
 });
