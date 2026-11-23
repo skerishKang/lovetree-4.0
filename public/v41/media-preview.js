@@ -479,9 +479,8 @@ async function refreshTiktokThumb(root){
    if(backdrop&&thumb)backdrop.style?.setProperty?.('--lt-tt-bg','url("'+thumb+'")');
    if(status)status.textContent=thumb?'썸네일을 다시 받았어요.':'썸네일을 아직 받지 못했어요. 원본 링크에서 확인해 주세요.';
    const momentId=root.dataset.ltMomentId;
-   if(thumb&&momentId&&window.parent!==window){
-    const type=globalThis.LT41_MSG?.mediaMetadata||'lt41-media-metadata';
-    window.parent.postMessage({type,momentId,url:root.dataset.ltUrl,mediaMetadata:{thumbnail:thumb,...(data.videoId?{tiktokId:data.videoId}:{})}},location.origin);
+   if(thumb&&momentId&&window.parent!==window&&globalThis.LT41_MSG?.mediaMetadata){
+    window.parent.postMessage({type:globalThis.LT41_MSG.mediaMetadata,momentId,url:root.dataset.ltUrl,mediaMetadata:{thumbnail:thumb,...(data.videoId?{tiktokId:data.videoId}:{})}},location.origin);
    }
   }
  }catch{if(root.isConnected&&status)status.textContent='썸네일을 다시 못 받았어요. 원본 링크에서 확인해 주세요.';}
