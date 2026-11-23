@@ -181,24 +181,18 @@ body.home-existing.lt-fab-ok #mobile-add{display:none}
 /* #1094 보기 방식 전환 묶음(책/목록) — 테마 단추 옆 두 칸고르기. 다음 이슈(#1093 선반/회전)도 같은 묶음을 쓴다. */
 .view-toggle{display:inline-flex;align-items:center;gap:0;padding:3px;border:1px solid rgba(255,255,255,.22);border-radius:var(--lt-r-pill);background:rgba(9,8,14,.62)}
 .view-toggle[hidden]{display:none}
-/* 인증 확인 전후 머리줄 높이 예약 */
-@media(min-width:781px){html[data-lt-auth-phase] .app-header{min-height:73px}}
-@media(max-width:780px){html[data-lt-auth-phase] .app-header{min-height:64px}html:is([data-lt-shell-entry=shelf],[data-lt-shell-entry=book]) .app-header{min-height:110px}}
+/* #1026: 기존 셸 머리줄 높이(390 약 57px)를 그대로 사용한다. */
 /* #1026: 인증이 확인되기 전에는 권한별 머리줄 요소를 숨긴다. 첫 배치부터 로그인/계정 단추의 자리를 예약한다. */
-html[data-lt-auth-phase=pending] .app-header .tree-frame,
-html[data-lt-auth-phase=pending] .app-header #tree-views,
+html[data-lt-auth-phase=pending] .app-header #record-menu{visibility:hidden;pointer-events:none}
 html[data-lt-auth-phase=pending] .app-header #write-menu,
 html[data-lt-auth-phase=pending] .app-header #share-menu{display:none}
 html[data-lt-auth-phase=pending] .app-header #account-entry{visibility:hidden;pointer-events:none}
 html[data-lt-auth-phase=pending][data-lt-auth-hint=out] .app-header #account-entry{visibility:visible;pointer-events:auto}
 html[data-lt-auth-phase=pending][data-lt-auth-hint=in] .app-header #account-entry{display:none}
 html[data-lt-auth-phase=pending][data-lt-auth-hint=in] .app-header #account-avatar[hidden]{display:flex;visibility:visible;pointer-events:none}
-html[data-lt-auth-phase=pending][data-lt-auth-hint=in] .app-header .tree-frame{display:flex}
 html[data-lt-auth-phase=pending][data-lt-auth-hint=in] .app-header #record-menu{display:flex;visibility:visible;pointer-events:none}
-html[data-lt-auth-phase=pending][data-lt-auth-hint=in] .app-header #tree-views{display:flex;visibility:visible;pointer-events:none}
 /* #1026: cached member picker stays in place while authentication is checked. */
 html[data-lt-auth-phase=pending][data-lt-auth-hint=in] .app-header nav #record-menu[hidden]{display:flex;visibility:visible;pointer-events:none}
-@media(max-width:780px){html[data-lt-auth-phase=pending][data-lt-auth-hint=in] .app-header #tree-views{display:none}}
 html[data-lt-auth-phase=pending] #mobile-add{visibility:hidden;pointer-events:none}
 /* #1026: 늦게 도착하는 글꼴의 한글 폭을 미리 맞춰 머리줄·안내 문구 이동을 줄인다. */
 @font-face{font-family:'LT UI Metric Fallback';src:local('Malgun Gothic');size-adjust:86%;font-display:swap}
@@ -207,7 +201,6 @@ html:is([data-lt-shell-entry=shelf],[data-lt-shell-entry=book],[data-lt-shell-en
 html:is([data-lt-shell-entry=shelf],[data-lt-shell-entry=book],[data-lt-shell-entry=board]) .home-links{font-family:'Pretendard Variable','LT UI Metric Fallback','Noto Sans KR',system-ui,sans-serif}
 /* 깊은 주소에서만 서버 권한 확인 전의 메뉴를 숨기고 첫 배치를 유지한다. */
 html[data-lt-header-pending] #record-menu,
-html[data-lt-header-pending] #tree-views,
 html[data-lt-header-pending] #write-menu{display:none}
 /* #1026: 첫 렌더링부터 서재·책 보기 단추의 최종 자리를 확보한다. */
 .view-toggle[data-lt-pending]{visibility:hidden;pointer-events:none}
@@ -681,7 +674,14 @@ html[data-lt-theme=garden] .home-links .feedback-link:hover{color:var(--lt-ink)}
    오른쪽 아래 ＋ 단추(#458, 56px·right 14px → 왼쪽 끝 320px)와 겹치지 않는다.
    첫 화면(body.home-screen)만 — 다른 화면의 링크 줄 규칙은 그대로 둔다. */
 @media(max-width:520px){.home-links a.feedback-link{display:none}}
-@media(max-width:520px){body.home-screen .home-links{flex-wrap:wrap;max-width:calc(100% - 150px)}body.home-screen .home-links a.feedback-link{display:inline-flex}body.home-screen .home-links .feedback-link{min-height:30px;padding:2px 8px}}
+/* #1026: font swap에도 네 하단 링크가 2×2 고정 칸을 떠나지 않도록 배치한다. */
+@media(max-width:520px){
+ body.home-screen .home-links{flex-wrap:wrap;width:min(290px,calc(100vw - 100px));max-width:none;height:62px;align-content:start;column-gap:0;row-gap:2px}
+ body.home-screen .home-links a.feedback-link{display:inline-flex}
+ body.home-screen .home-links .feedback-link{flex:0 0 50%;min-width:0;height:30px;min-height:30px;padding:2px 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ /* 계정 글꼴 폭이 달라져도 오른쪽 단추가 수평으로 이동하지 않는다. */
+ .app-header .account-slot{flex:0 0 66px;width:66px;justify-content:flex-end}
+}
 /* 390 지도·책·서재 목록: 조작 줄·책 테두리·'책 속의 트리' 상자와 겹치던 아래 링크 줄을 숨긴다(1440은 지금 자리).
    서재 목록은 프레임 안이 스크롤되므로 화면에 붙은 링크 줄이 지나가는 글자 위에 포개진다 — 책·지도와 같은 길로 숨긴다. */
 /* #1093: 여러 줄 선반 위에 화면에 붙은 링크가 포개지므로 서재는 폭과 무관하게 숨긴다. */
