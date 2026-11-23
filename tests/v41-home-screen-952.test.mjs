@@ -323,7 +323,7 @@ test('#1027 정원 이어 보기 카드의 종이색과 글 대비, 세로 영�
               const style = el => getComputedStyle(el);
               return {card:style(card).backgroundColor,media:style(media).backgroundColor,meta:style(meta).backgroundColor,
                 border:style(meta).borderTopWidth, width:media.getBoundingClientRect().width, metaWidth:meta.getBoundingClientRect().width,
-                height:media.getBoundingClientRect().height, fit:thumb && style(thumb).objectFit,
+                height:media.getBoundingClientRect().height, fit:thumb && style(thumb).objectFit, thumbW:thumb && thumb.getBoundingClientRect().width, thumbH:thumb && thumb.getBoundingClientRect().height,
                 blur:before.filter, opacity:before.opacity, bgImage:before.backgroundImage, thumbSrc:thumb && thumb.src,
                 colors:[...card.querySelectorAll('.recent-head,.recent-head-arrow,.recent-meta strong,.recent-meta small,.recent-memo')].map(e=>style(e).color)};
             });
@@ -335,7 +335,10 @@ test('#1027 정원 이어 보기 카드의 종이색과 글 대비, 세로 영�
               assert.ok(stats.colors.every(color=>contrast(color,stats.meta)>=4.5), JSON.stringify(stats));
               assert.ok(Math.abs(stats.width-stats.metaWidth)<1, JSON.stringify(stats));
               if (kind === 'vertical') {
-                assert.equal(stats.fit,'contain');
+                // #1084: 세로 영상은 16:9 칸 가운데에 9:16 크기로 놓고(cover), 양옆은 흐린 같은 썸네일이 카드 끝까지 채운다.
+                assert.equal(stats.fit,'cover');
+                assert.ok(stats.thumbW/stats.thumbH<=9/16+0.02&&stats.thumbW/stats.thumbH>=0.35, '세로 썸네일은 9:16 이하 폭(쇼츠 썸네일 양옆 띠는 잘라 냄): '+JSON.stringify(stats));
+                assert.ok(stats.thumbW<stats.width*0.4, '가운데 좁은 칸만 원래 썸네일, 나머지는 흐린 배경: '+JSON.stringify(stats));
                 assert.match(stats.blur,/blur\(18px\)/);
                 assert.equal(stats.opacity,'0.7');
                 assert.ok(stats.bgImage.includes(stats.thumbSrc),'같은 썸네일을 CSS 변수로 깐다(#1084): '+JSON.stringify(stats));
