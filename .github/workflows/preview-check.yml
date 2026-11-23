@@ -303,20 +303,34 @@ jobs:
           node --test tests/v41-orbit-586-perf.test.mjs
           echo "첫 화면 끌기 성능 계약 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
       # 실제 하드웨어 성능 판정과 별개로 같은 헤드리스 환경의 기준 브랜치와 회귀를 비교한다.
+      # 쌓임·깊이 대조 기준(기존 DOM 마지막 커밋, #1221 직전)은 고정 커밋이라 빌드 결과를 캐시해 잡 시간을 늘리지 않는다.
+      - name: 첫 화면 궤도 기존 DOM 기준 빌드 캐시(#1086)
+        id: orbit-dom-cache
+        if: needs.screen-changes.outputs.changed == 'true'
+        uses: actions/cache@v4
+        with:
+          path: .orbit-dom-dist
+          key: orbit-dom-dist-d9c3bfc5837366e525ed7d13b780769ce9392034
       - name: 첫 화면 궤도 헤드리스 회귀 방지(#1086, 건너뜀=실패)
         env:
           LT_ORBIT1086_REQUIRE: '1'
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          DOM_SHA: d9c3bfc5837366e525ed7d13b780769ce9392034
+          DOM_CACHED: ${{ steps.orbit-dom-cache.outputs.cache-hit }}
         if: needs.screen-changes.outputs.changed == 'true'
         run: |
           # 쌓임·깊이 대조는 기존 DOM 궤도가 기준이어야 한다. #1221 병합 뒤에는 기준 브랜치도 그림판이라
-          # 같은 그림판끼리 비교가 되므로, 기존 DOM 마지막 커밋(#1221 직전)을 고정 기준으로 따로 빌드한다.
-          # 성능 회귀 비교는 지금처럼 기준 브랜치와 한다.
-          DOM_SHA=d9c3bfc5837366e525ed7d13b780769ce9392034
-          build_at() { dir=$(mktemp -d "$RUNNER_TEMP/orbit-$2.XXXXXX"); git archive "$1" | tar -x -C "$dir"; npm ci --prefix "$dir" > /dev/null; npm run build --prefix "$dir" > /dev/null; echo "$dir"; }
-          baseline=$(build_at "$BASE_SHA" main)
-          dombase=$(build_at "$DOM_SHA" dom)
-          LT_ORBIT1086_MAIN_DIST="$dombase/dist" node --test --test-concurrency=1 tests/v41-orbit-webgl-1086.test.mjs
+          # 같은 그림판끼리 비교가 되므로, 기존 DOM 마지막 커밋(#1221 직전)을 고정 기준으로 쓴다.
+          # 성능 회귀 비교는 지금처럼 기준 브랜치와 한다. 캐시가 없으면 두 기준을 동시에 빌드한다.
+          build_at() { dir=$(mktemp -d "$RUNNER_TEMP/orbit-$2.XXXXXX"); git archive "$1" | tar -x -C "$dir"; npm ci --prefix "$dir" > /dev/null && npm run build --prefix "$dir" > /dev/null && echo "$dir" > "$RUNNER_TEMP/orbit-$2.path"; }
+          build_at "$BASE_SHA" main & main_pid=$!
+          if [ "$DOM_CACHED" != "true" ] || [ ! -f .orbit-dom-dist/v41/home.html ]; then
+            build_at "$DOM_SHA" dom
+            rm -rf .orbit-dom-dist && cp -r "$(cat "$RUNNER_TEMP/orbit-dom.path")/dist" .orbit-dom-dist
+          fi
+          wait "$main_pid"
+          baseline=$(cat "$RUNNER_TEMP/orbit-main.path")
+          LT_ORBIT1086_MAIN_DIST="$PWD/.orbit-dom-dist" node --test --test-concurrency=1 tests/v41-orbit-webgl-1086.test.mjs
           LT_ORBIT1086_MAIN_DIST="$baseline/dist" node --test --test-concurrency=1 tests/v41-orbit-1086-perf.test.mjs
       # #537: 책의 한 장 보기가 순간 하나씩 넘어가는지, 넓은 화면에서 두 장 책의 한 쪽 크기·같은 높이로
       # 나오는지, 390 휴대폰 모양이 그대로인지를 실제 화면에서 잰다. 건너뜀=실패(크롬이 준비된 이 잡에서 돈다).
