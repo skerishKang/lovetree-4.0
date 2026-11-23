@@ -231,10 +231,7 @@ guideDialog.addEventListener('click',e=>{
   if(!hasMoments)first.onclick=loggedIn?()=>bridge.actions.requestMoment('add'):bridge.actions.start;
 }
 // 예시 모드는 궤도의 기존 안내를 그대로 두고, 나머지는 계획의 문구를 쓴다(빈 문자열이면 숨김).
-if(cardsPlan.note!==null)shadow.querySelector('.center-note').textContent=cardsPlan.note;
-// 2026-11-08 접근성: 카드 출처 안내가 바뀌면 화면 낭독기가 알린다.
-shadow.querySelector('.center-note')?.setAttribute('aria-live','polite');
-shadow.querySelector('.center-note')?.setAttribute('role','status');
+// #1204: the bottom guidance row was removed; keep home actions initialization independent of it.
 // 261116 PR 2(대표 확정): 큰 제목 아래 둘째 줄 안내(옛 정리 알림·첫 순간 안내)는 치웠다 —
 // 그 자리(글귀 바로 아래)에 '+ 순간 추가' 단추(밝은 채움)가 온다. 로그인 상태만 — 로그아웃은 지금처럼 둔다.
 if(hasMoments){
