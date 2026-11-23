@@ -243,7 +243,7 @@ test('pathFor: 모르는 id·빈 선택은 빈 구간, 둘 다 넘기면 순간�
   assert.deepEqual(both, { segments: [['p1', 'p2']] }, '순간이 허브보다 구체적이다');
 });
 
-test('순간 300개: buildGraph는 30개에 비해 제곱으로 느려지지 않는다', () => {
+test('순간 300개: buildGraph는 30개에 비해 제곱으로 느려지지 않는다', (t) => {
   const moments = [];
   for (let i = 0; i < 300; i += 1) {
     const tags = [stage('무대 ' + (i % 30)), song('노래 ' + (i % 12)), artist('가수 ' + (i % 5))];
@@ -257,11 +257,12 @@ test('순간 300개: buildGraph는 30개에 비해 제곱으로 느려지지 않
   });
   assert.equal(graph.hubs.length, 30 + 12 + 5, '무대 30·노래 12·가수 5 허브');
   assert.equal(graph.moments.length, 300);
-  // 절대 ms 대신 같은 실행의 30개와 비교한다(#728 CI windows 러너 흔들림, #731).
-  assert.ok(ratio <= TIMING_RATIO_LIMIT, `300개/30개 비율 ${ratio.toFixed(1)}배 ≤ ${TIMING_RATIO_LIMIT}배 (30개 ${smallMs.toFixed(2)}ms · 300개 ${bigMs.toFixed(1)}ms)`);
-  assert.ok(bigMs <= TIMING_CEILING_MS, `300순간 계산 ${bigMs.toFixed(1)}ms ≤ ${TIMING_CEILING_MS}ms`);
+  // 판정은 실행기 부하와 무관한 입력 읽기 횟수로 한다(기준 25배 유지). 시간 비율은 진단용으로만 남긴다 —
+  // 0.5ms짜리 30개 기준이 바쁜 러너에서 흔들려 28배로 튀어 통과를 뒤집은 일이 있었다(#1248, #1234 후속).
   const counted = countRatio({ small: { fn: buildGraph, list: moments.slice(0, 30) }, big: { fn: buildGraph, list: moments } });
   assert.ok(counted.ratio <= TIMING_RATIO_LIMIT, `그래프 입력 읽기 300개/30개 ${counted.ratio.toFixed(1)}배 ≤ ${TIMING_RATIO_LIMIT}배 (${counted.smallCount} → ${counted.bigCount})`);
+  t.diagnostic(`시간 비율 ${ratio.toFixed(1)}배 (30개 ${smallMs.toFixed(2)}ms · 300개 ${bigMs.toFixed(1)}ms) — 판정은 입력 읽기 횟수로 함`);
+  assert.ok(bigMs <= TIMING_CEILING_MS, `300순간 계산 ${bigMs.toFixed(1)}ms ≤ ${TIMING_CEILING_MS}ms`);
   // 300개에서도 발자취는 한 줄: 구간 299개, 앞뒤 이웃이 맞다.
   assert.equal(graph.footprint.segments.length, 299);
   assert.equal(graph.footprint.order[0], 'm0');
@@ -309,7 +310,7 @@ test('같은 영상·같은 무대는 stacks 한 무더기 — leadId는 발자�
   assert.deepEqual(graph.footprint.order, ['v1', 'v2', 's1', 's2', 's3', 'o1', 'o2', 'u1']);
 });
 
-test('순간 300개(겹치는 영상·같은 무대 섞임): stacks는 30개에 비해 제곱으로 느려지지 않는다', () => {
+test('순간 300개(겹치는 영상·같은 무대 섞임): stacks는 30개에 비해 제곱으로 느려지지 않는다', (t) => {
   // 같은 영상끼리 같은 무대에 오도록 묶는다. 앞 30개도 같은 모양(영상 15개×2번, 무대 두 개)이라
   // 크기만 다른 두 입력을 비교한다(#1179 후속).
   const moments = [];
@@ -331,9 +332,10 @@ test('순간 300개(겹치는 영상·같은 무대 섞임): stacks는 30개에 
   assert.equal(graph.moments.filter((m) => m.stackId != null).length, 300, '모든 순간이 묶음에 든다');
   const videoKeys = new Set(graph.stacks.filter((s) => s.kind === 'same-video').map((s) => s.key));
   assert.ok(graph.moments.every((m) => videoKeys.has(m.stackId)), '두 종류에 모두 걸려도 stackId는 같은 영상 묶음 열쇠다');
-  // 절대 ms 대신 같은 실행의 30개와 비교한다(#728 CI windows 러너 흔들림, #731).
-  assert.ok(ratio <= TIMING_RATIO_LIMIT, `300개/30개 비율 ${ratio.toFixed(1)}배 ≤ ${TIMING_RATIO_LIMIT}배 (30개 ${smallMs.toFixed(2)}ms · 300개 ${bigMs.toFixed(1)}ms)`);
-  assert.ok(bigMs <= TIMING_CEILING_MS, `300순간 stacks 계산 ${bigMs.toFixed(1)}ms ≤ ${TIMING_CEILING_MS}ms`);
+  // 판정은 실행기 부하와 무관한 입력 읽기 횟수로 한다(기준 25배 유지). 시간 비율은 진단용으로만 남긴다 —
+  // 0.5ms짜리 30개 기준이 바쁜 러너에서 흔들려 28배로 튀어 통과를 뒤집은 일이 있었다(#1248, #1234 후속).
   const counted = countRatio({ small: { fn: buildGraph, list: moments.slice(0, 30) }, big: { fn: buildGraph, list: moments } });
   assert.ok(counted.ratio <= TIMING_RATIO_LIMIT, `묶음 입력 읽기 300개/30개 ${counted.ratio.toFixed(1)}배 ≤ ${TIMING_RATIO_LIMIT}배 (${counted.smallCount} → ${counted.bigCount})`);
+  t.diagnostic(`시간 비율 ${ratio.toFixed(1)}배 (30개 ${smallMs.toFixed(2)}ms · 300개 ${bigMs.toFixed(1)}ms) — 판정은 입력 읽기 횟수로 함`);
+  assert.ok(bigMs <= TIMING_CEILING_MS, `300순간 stacks 계산 ${bigMs.toFixed(1)}ms ≤ ${TIMING_CEILING_MS}ms`);
 });
