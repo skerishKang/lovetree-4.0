@@ -108,14 +108,14 @@ html[data-v41-screen=network] .top-actions .view-switch .pill{padding:0 5px;font
  html[data-v41-screen=network] .topbar{z-index:47}
  /* 묶음 상자를 없애 단추들이 topbar의 줄 나눔을 그대로 따르게 한다(둘째 줄 = 보기 세 단추). */
  html[data-v41-screen=network] .top-actions{display:contents}
- html[data-v41-screen=network] body .topbar-left{order:1;flex:1 1 auto;min-width:0;overflow:hidden}
- html[data-v41-screen=network] .tree-title{order:1;flex:1 1 auto;min-width:0;overflow:hidden}
- html[data-v41-screen=network] .tree-title-btn{flex:1 1 auto;min-width:0;max-width:100%;overflow:hidden}
- html[data-v41-screen=network] #treeTitleText{flex:1 1 auto;min-width:0;max-width:100%}
- html[data-v41-screen=network] #overviewBtn{order:2;margin-left:auto}
- html[data-v41-screen=network] .bgDrop{order:3}
- html[data-v41-screen=network] .view-switch{order:4;flex:1 0 100%;width:100%;display:flex;gap:4px}
- html[data-v41-screen=network] .top-actions .view-switch .pill{flex:1 1 0;min-width:0;padding:0 9px;font-size:13px;height:44px;min-height:44px;text-align:center}
+ html[data-v41-screen=network] body .topbar .topbar-left{order:1;flex:1 1 auto;min-width:0;overflow:hidden}
+ html[data-v41-screen=network] .topbar .tree-title{order:1;flex:1 1 auto;min-width:0;overflow:hidden}
+ html[data-v41-screen=network] .topbar .tree-title-btn{flex:1 1 auto;min-width:0;max-width:100%;overflow:hidden}
+ html[data-v41-screen=network] .topbar #treeTitleText{flex:1 1 auto;min-width:0;max-width:100%}
+ html[data-v41-screen=network] .topbar #overviewBtn{order:2;margin-left:auto}
+ html[data-v41-screen=network] .topbar .bgDrop{order:3}
+ html[data-v41-screen=network] .topbar .view-switch{order:4;flex:1 0 100%;width:100%;display:flex;gap:4px}
+ html[data-v41-screen=network] .topbar .top-actions .view-switch .pill{flex:1 1 0;min-width:0;padding:0 9px;font-size:13px;height:44px;min-height:44px;text-align:center}
 }
 @media(max-width:640px){
  /* #517: 내려온 도구 줄 아래에 순간 선택 패널이 오게 한다 — 패널 top은 measureInsets가 재어 넘긴

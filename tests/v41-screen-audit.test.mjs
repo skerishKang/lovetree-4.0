@@ -2998,6 +2998,13 @@ test('두 칸 전환: 책/목록·선반/회전·보드 같은 크기와 모서�
     const page=await ctx.newPage();
     try{
       await page.goto(base+url,{waitUntil:'load',timeout:15000});
+      // 공통 줄이 화면 도구를 접어 정리할 때까지 기다린 뒤 잰다(첫 그림 순간의 빈 칸은 화면 값이 아니다).
+      await page.waitForFunction((sel)=>{
+        const el=document.querySelector(sel);
+        if(!el)return false;
+        const bs=[...el.children].filter(n=>n.tagName==='BUTTON');
+        return bs.length===2&&bs.every(b=>b.getBoundingClientRect().width>0);
+      },selector,{timeout:10000});
       const data=await page.evaluate(({selector,reveal})=>{
         const parent=document.querySelector(selector);
         if(!parent)return null;
@@ -3037,6 +3044,15 @@ test('화면 전환 단추 중복 0: 서재·책·보드 1440·390 밤·정원',
       const target={shelf:'track32-bookshelf',book:'track59-sketchbook',board:'track58-pinboard'}[screen];
       try{return f?.contentWindow?.location?.pathname.includes(target)}catch{return false}
     },screen,{timeout:20000});
+     // 주소가 바뀐 뒤 줄이 만들어지기 전을 재지 않는다 — 공통 줄과 전환 단추가 생길 때까지 기다린다(원인 대기).
+     await page.waitForFunction(()=>{
+       const f=[...document.querySelectorAll('#view,#view-next')].find(f=>!f.hidden&&f.getClientRects().length>0);
+       try{
+         const doc=f?.contentDocument;
+         const bar=doc?.querySelector('.lt-screen-toolbar');
+         return !!bar&&!!bar.querySelector('.lt-toolbar-tools')&&doc.querySelectorAll('.view-toggle,.boardModeSwitch,.shelf-view-inline').length>0;
+       }catch{return false}
+     },null,{timeout:20000});
     const result=await page.evaluate(()=>{
       const frame=[...document.querySelectorAll('#view,#view-next')].find(f=>!f.hidden&&f.getClientRects().length>0);
       const inner=frame.contentDocument;
@@ -3058,8 +3074,8 @@ test('화면 전환 단추 중복 0: 서재·책·보드 1440·390 밤·정원',
       return {
         groups,
         shelfInside:visible(inner.getElementById('shelf-view-inline')),
-        bookInside:visible(inner.querySelector('.view-toggle')),
-        bookPages:visible(inner.querySelector('.view-toggle + .view-toggle, .view-toggle ~ .view-toggle')),
+        bookInside:visible(inner.getElementById('book-display-inline')),
+        bookPages:visible(inner.getElementById('book-view-toggle')),
         boardInside:visible(inner.querySelector('.boardModeSwitch'))
       };
     });

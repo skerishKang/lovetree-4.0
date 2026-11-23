@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 import { readFileSync } from 'node:fs';
 import { serve } from './helpers/screen-audit.mjs';
+import { createTree, addMoment } from '../public/v41/domain.mjs';
 let chromium, skip = false;
 try { ({ chromium } = await import('playwright')); if (!existsSync(chromium.executablePath())) skip = 'Playwright Chromium이 없어 건너뜀'; } catch { skip = 'playwright 없음'; }
 
@@ -49,7 +50,7 @@ test('화면 줄: 밝은 테마 이어 보기 띠 썸네일도 사진 순간으�
   assert.ok(shelf.includes('fallbackChapter'), '표지 사진이 없으면 사진 순간도 쓰러진다');
 });
 
-test('#1247 E2E: 세 화면 줄 높이·위치 같음, 이어 보기 하나, 트리 이름 한 번, 열 때 토스트 없음', { skip, timeout: 180000 }, async () => {
+test('화면 줄 E2E: 세 화면 줄 높이·위치 같음, 이어 보기 하나, 트리 이름 한 번, 열 때 토스트 없음', { skip, timeout: 180000 }, async () => {
   const tree = {
     id: 't1', title: '리센느', subject: '확인 대상',
     moments: [1, 2, 3].map((i) => ({ id: 'm' + i, title: '시험 순간 ' + i, date: '2026-11-0' + i, emotion: '설렘', note: '가짜 기록', url: '', type: 'photo', image: 'https://audit.invalid/p' + i + '.jpg', first: i === 1 })),
@@ -83,7 +84,11 @@ test('#1247 E2E: 세 화면 줄 높이·위치 같음, 이어 보기 하나, 트
           const visible = [...document.querySelectorAll('*')].filter((e) => { if (e.textContent.trim() !== '리센느') return false; const r = e.getBoundingClientRect(); return r.width > 2 && r.height > 2 && r.bottom > 0 && r.right > 0 && r.left < innerWidth && r.top < innerHeight && getComputedStyle(e).visibility !== 'hidden' && getComputedStyle(e).display !== 'none'; }).length;
           const inBar = [...bar.querySelectorAll('button')].filter((b) => /이어 보기/.test(b.textContent)).length;
           const inNav = [...document.querySelectorAll('.nav-pill button')].filter((b) => /이어 보기/.test(b.textContent)).length;
-          return { h: Math.round(r.height), top: Math.round(r.top), plays: inBar + (screenKind === 'book' && phoneShaped ? inNav : 0), nameCount: visible, toastVisible: !!document.querySelector('#toast.show, .toast.show') };
+          const buttons = [...bar.querySelectorAll('.lt-toolbar-tools button')].filter((b) => b.getClientRects().length > 0 && getComputedStyle(b).display !== 'none');
+          const heights = [...new Set(buttons.map((b) => Math.round(b.getBoundingClientRect().height)))];
+          const crossLine = buttons.filter((b) => { const q = b.getBoundingClientRect(); return q.top < r.top - 1 || q.bottom > r.bottom + 1; }).map((b) => b.id || b.className);
+          const back = bar.querySelector('.shelf-back');
+          return { h: Math.round(r.height), top: Math.round(r.top), plays: inBar + (screenKind === 'book' && phoneShaped ? inNav : 0), nameCount: visible, toastVisible: !!document.querySelector('#toast.show, .toast.show'), heights, crossLine, back: back ? back.textContent.trim() : null, backTarget: back ? back.getAttribute('href') : null };
         }, [screen, vp.width === 390]);
         const label = `${screen} ${vp.width}`;
         assert.equal(geo.top, 4, `${label}: 줄 위쪽 위치`);
@@ -91,9 +96,87 @@ test('#1247 E2E: 세 화면 줄 높이·위치 같음, 이어 보기 하나, 트
         assert.equal(geo.plays, 1, `${label}: 이어 보기 하나`);
         assert.equal(geo.nameCount, 1, `${label}: 트리 이름 한 번`);
         assert.equal(geo.toastVisible, false, `${label}: 열 때 안내 토스트 없음`);
+        assert.deepEqual(geo.heights, [36], `${label}: 도구 줄 단추 높이는 36px 하나`);
+        assert.deepEqual(geo.crossLine, [], `${label}: 선택 단추가 줄 아래 선을 넘지 않음`);
+        assert.equal(geo.back, '← 서재', `${label}: 공통 줄 왼쪽에 서재 이동이 있다`);
         await ctx.close();
       }
     }
+  } finally {
+    await browser.close();
+    await new Promise((r) => server.close(r));
+  }
+});
+
+function shellWorkspace() {
+  let tree = createTree({ subject: '시험', title: '시험 트리', note: '기록', emotion: '설렘', date: '2026-11-24', url: '' }, '2026-11-24T00:00:00.000Z');
+  tree = addMoment(tree, { subject: '시험', title: '두 번째 순간', note: '', emotion: '설렘', date: '2026-11-24', url: '' }, tree.moments[0].id, '2026-11-24T00:01:00.000Z');
+  return { revision: 1, state: { version: 1, trees: [tree], prefs: {} }, subject: '시험계정', writeSubjectBound: true, savedAt: '2026-11-24T00:02:00.000Z' };
+}
+
+const shownPath = (page) => page.evaluate(() => {
+  const frame = [...document.querySelectorAll('#view, #view-next')].find((f) => !f.hidden && f.getClientRects().length > 0);
+  try { return frame?.contentWindow?.location?.pathname || ''; } catch { return ''; }
+});
+
+test('화면 줄: ← 서재를 누르면 서재로 이동한다(1440)', { skip, timeout: 120000 }, async () => {
+  const workspace = shellWorkspace();
+  const server = await serve();
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    await ctx.addInitScript(() => { try { localStorage.setItem('lt41.tips.firstTree', '1'); } catch {} });
+    await ctx.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
+    await ctx.route('**/api/workspace**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(workspace) }));
+    const page = await ctx.newPage();
+    try {
+      await page.goto(base + '/v41/?account=1#my/book', { waitUntil: 'load', timeout: 20000 });
+      await page.waitForFunction(() => /track59-sketchbook/.test((() => {
+        const f = [...document.querySelectorAll('#view, #view-next')].find((x) => !x.hidden && x.getClientRects().length > 0);
+        try { return f?.contentWindow?.location?.pathname || ''; } catch { return ''; }
+      })()), null, { timeout: 20000 });
+      const clicked = await page.evaluate(() => {
+        const f = [...document.querySelectorAll('#view, #view-next')].find((x) => !x.hidden && x.getClientRects().length > 0);
+        const back = f?.contentDocument?.querySelector('.lt-screen-toolbar .shelf-back');
+        if (!back) return false;
+        back.click();
+        return true;
+      });
+      assert.equal(clicked, true, '공통 줄에 ← 서재가 있다');
+      await page.waitForFunction(() => /track32-bookshelf/.test((() => {
+        const f = [...document.querySelectorAll('#view, #view-next')].find((x) => !x.hidden && x.getClientRects().length > 0);
+        try { return f?.contentWindow?.location?.pathname || ''; } catch { return ''; }
+      })()), null, { timeout: 20000 });
+      assert.match(await shownPath(page), /track32-bookshelf/, '서재로 이동했다');
+    } finally { await ctx.close(); }
+  } finally {
+    await browser.close();
+    await new Promise((r) => server.close(r));
+  }
+});
+
+test('390 떠 있는 ＋ 단추와 의견 보내기 링크의 겹침 0', { skip, timeout: 120000 }, async () => {
+  const workspace = shellWorkspace();
+  const server = await serve();
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    await ctx.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
+    await ctx.route('**/api/workspace**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(workspace) }));
+    const page = await ctx.newPage();
+    try {
+      await page.goto(base + '/v41/?account=1#home', { waitUntil: 'load', timeout: 20000 });
+      await page.waitForFunction(() => document.body.classList.contains('lt-fab-ok') && !!document.getElementById('feedback-link')?.getClientRects().length, null, { timeout: 20000 });
+      const geo = await page.evaluate(() => {
+        const box = (el) => { const r = el.getBoundingClientRect(); return { left: r.left, right: r.right, top: r.top, bottom: r.bottom }; };
+        return { fab: box(document.getElementById('mobile-add')), link: box(document.getElementById('feedback-link')) };
+      });
+      const x = Math.max(0, Math.min(geo.fab.right, geo.link.right) - Math.max(geo.fab.left, geo.link.left));
+      const y = Math.max(0, Math.min(geo.fab.bottom, geo.link.bottom) - Math.max(geo.fab.top, geo.link.top));
+      assert.equal(x * y, 0, `떠 있는 단추가 의견 링크를 가린다(${x}×${y})`);
+    } finally { await ctx.close(); }
   } finally {
     await browser.close();
     await new Promise((r) => server.close(r));

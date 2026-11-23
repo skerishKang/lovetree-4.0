@@ -237,7 +237,7 @@ html[data-lt-theme=garden] .boardModeSwitch .modeSwitchBtn[aria-pressed="true"]{
 .boardThemeSwitch .switchLead{display:none}
 @media(max-width:580px){
   header{height:auto;min-height:56px;flex-wrap:wrap;padding-top:4px;padding-bottom:4px;row-gap:2px}
-  .boardModeSwitch{order:9;margin-left:auto}
+  header .boardModeSwitch{order:9;margin-left:auto}
   .boardModeSwitch .modeSwitchBtn{height:44px}
   /* 두 줄 머리줄의 아래끝은 ＋ 순간 추가가 둘째 줄로 내려오면 100px를 넘는다(로그인 화면 107px 실측) —
      고정 100px 대신 board-extras가 재는 머리줄 아래끝(--lt-board-frame-top)을 쓴다. */
@@ -246,7 +246,7 @@ html[data-lt-theme=garden] .boardModeSwitch .modeSwitchBtn[aria-pressed="true"]{
   header{background:linear-gradient(180deg,var(--lt-stage),var(--lt-stage-2))}
   html[data-lt-theme=garden] header{background:var(--lt-paper)}
   /* #662: 테마 표시를 머리줄 둘째 줄로 옮겼다(board-extras fitThemeBadge) — 흐름 안에 놓는다. */
-  .themeBadge{position:static;order:10;align-self:center;margin-left:6px}
+  header .themeBadge{position:static;order:10;align-self:center;margin-left:6px}
   .boardThemeSwitch .switchLead{display:inline;align-self:center;padding:0 1px 0 7px;font-size:12px;color:#cbbcd4}
   html[data-lt-theme=garden] .boardThemeSwitch .switchLead{color:var(--lt-muted)}
 }

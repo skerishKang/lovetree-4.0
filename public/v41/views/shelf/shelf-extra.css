@@ -52,7 +52,7 @@ html[data-v41-screen=shelf] .book-card .book-cover {
 /* ── 261118 대표 지적 6: 책장 한 줄을 무대 세로 가운데쯤에 세워 넘김 목록 위·아래 빈 공간을 나누고,
    바닥 고정 링크 줄(새 소식·의견 보내기…)과 선반·책이 겹치지 않게 아래 여백을 확보한다(링크 줄 44px + 여백). */
 html[data-v41-screen=shelf] .app{display:flex;flex-direction:column;padding-bottom:72px}
-html[data-v41-screen=shelf] .page{display:flex;flex-direction:column;flex:1 1 auto;width:100%}
+html[data-v41-screen=shelf] .page{display:flex;flex-direction:column;flex:1 1 auto;width:100%;margin-top:0;padding-top:0}
 /* 261118 대표 지적 2차: 이어 보기 띠는 위쪽에 붙이고(위 여백 24px 이내), 남은 세로 공간은 책장이 쓴다. */
 html[data-v41-screen=shelf] .shelf-screen{display:flex;flex-direction:column;justify-content:flex-start;flex:1 1 auto;min-height:0}
 html[data-v41-screen=shelf] .shelf-viewport{margin-top:12px;margin-bottom:auto}
@@ -271,7 +271,7 @@ html[data-v41-screen=shelf][data-lt-theme=garden] .book-card > .book-manage {
 }
 
 /* #972: 펼쳐 보기·검색·책장의 간격을 유지하며 세 요소를 함께 세로 가운데에 둔다. */
-html[data-v41-screen=shelf] .shelf-screen:has(.hero.strip-mode) .hero.strip-mode { margin-top: 12px; }
+html[data-v41-screen=shelf] .shelf-screen:has(.hero.strip-mode) .hero.strip-mode { margin-top: 0; }
 html[data-v41-screen=shelf] .shelf-screen:has(.hero.strip-mode) .shelf-viewport { margin-top: 0; margin-bottom: auto; }
 /* 책은 선반 위에 두고 표지·두 줄 이름표와 그림자에 필요한 높이만 남긴다. */
 html[data-v41-screen=shelf] .shelf-screen:has(.hero.strip-mode) .shelf-rail { height: 280px; }

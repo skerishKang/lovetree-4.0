@@ -91,6 +91,15 @@ export function mountScreenToolbar({ screen, titleFrom, tools = [], initialBar =
 
   let stashed = [];
   const isPlay = (el) => /^(playAllBtn|cinemaBtn|mapPlayBtn)$/.test(el.id || '');
+  // 오른쪽 정렬(group justify-content:flex-end)에서는 넘치는 칸이 왼쪽 밖으로 나가 scrollWidth에 잡히지 않는다.
+  // 보이는 단추 폭의 합으로 직접 재어 넘침을 판정한다(기준을 낮추지 않는다).
+  const fits = () => {
+    const items = [...group.children].filter((el) => !el.hidden && el.getClientRects().length > 0);
+    const style = getComputedStyle(group);
+    const gap = Number.parseFloat(style.columnGap || style.gap) || 0;
+    const used = items.reduce((sum, el) => sum + el.getBoundingClientRect().width, 0) + gap * Math.max(0, items.length - 1);
+    return used <= group.clientWidth + 1;
+  };
   reflow = () => {
     align();
     for (const el of stashed) group.append(el);
@@ -98,23 +107,30 @@ export function mountScreenToolbar({ screen, titleFrom, tools = [], initialBar =
     menu.replaceChildren();
     menu.hidden = true;
     more.hidden = true;
-    if (group.scrollWidth <= group.clientWidth) return;
-    // 맨 오른쪽 '▶ 이어 보기'는 좁은 화면에서도 줄 오른쪽에 남긴다 — 먼저 줄이는 건 화면 도구다.
+    if (fits()) return;
     const items = [...group.children];
-    const rest = items.filter((el) => !isPlay(el));
+    const order = new Map(items.map((el, i) => [el, i]));
     const plays = items.filter((el) => isPlay(el));
-    for (let i = rest.length - 1; i >= 0; i -= 1) {
-      const el = rest[i];
-      menu.prepend(el);
-      stashed.unshift(el);
-      if (group.scrollWidth <= group.clientWidth) break;
-    }
-    for (let i = plays.length - 1; i >= 0 && group.scrollWidth > group.clientWidth; i -= 1) {
+    // 보기 전환·검색·새 트리는 먼저 지킨다 — 줄여도 되는 화면 도구부터 접는다.
+    const essential = (el) => el.matches('.view-toggle, .shelf-view-inline, .boardModeSwitch, .view-switch, .search, #shelfNewTree');
+    const stash = (list) => {
+      for (let i = list.length - 1; i >= 0 && !fits(); i -= 1) {
+        const el = list[i];
+        menu.prepend(el);
+        stashed.unshift(el);
+      }
+    };
+    stash(items.filter((el) => !isPlay(el) && !essential(el)));
+    if (!fits()) stash(items.filter((el) => !isPlay(el) && essential(el)));
+    for (let i = plays.length - 1; i >= 0 && !fits(); i -= 1) {
       const el = plays[i];
       menu.prepend(el);
-      stashed.unshift(el);
+      // 이어 보기는 맨 오른쪽으로 돌아와야 한다 — 앞에 넣으면 되돌릴 때 제일 왼쪽으로 간다.
+      stashed.push(el);
     }
-    more.hidden = stashed.length > 0;
+    // 되돌릴 때 원래 순서를 지킨다.
+    stashed.sort((a, b) => (order.get(a) ?? 0) - (order.get(b) ?? 0));
+    more.hidden = stashed.length === 0;
   };
   more.addEventListener('click', () => { menu.hidden = !menu.hidden; });
   if (typeof ResizeObserver === 'function') {

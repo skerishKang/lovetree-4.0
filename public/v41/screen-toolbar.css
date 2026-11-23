@@ -11,7 +11,7 @@ html[data-v41-screen=shelf] .page{min-height:0}
 html[data-v41-screen=shelf] .shelf-controls{display:flex;flex:none;margin:0 0 2px}
 html[data-v41-screen=shelf] .shelf-controls .count{min-height:0}
 /* 머리 띠를 걷어낸 헤더는 화면에서 사라져야 한다 — 쓰기에서 display:flex를 주긴 하지만 hidden이 이긴다. */
-header[hidden]{display:none!important}
+header[hidden]{display:none}
 .lt-screen-toolbar{
   box-sizing:border-box;position:absolute;left:0;right:0;top:var(--lt-toolbar-top,66px);z-index:69;
   display:flex;align-items:center;gap:12px;height:var(--lt-toolbar-height);padding:0 var(--lt-toolbar-pad,24px);
@@ -32,7 +32,7 @@ html[data-v41-screen=book] .lt-toolbar-title,html[data-v41-screen=board] .lt-too
 .lt-toolbar-tools button[aria-pressed=true]{border-color:var(--lt-gold-line);color:var(--lt-gold)}
 .lt-toolbar-tools .view-toggle,.lt-toolbar-tools .boardModeSwitch,.lt-toolbar-tools .bgDrop{display:inline-flex;align-items:center;flex:none}
 .lt-toolbar-tools .view-toggle{border:1px solid var(--lt-line);border-radius:var(--lt-r-pill);overflow:hidden}
-.lt-toolbar-tools .boardModeSwitch{border:1px solid var(--lt-line);border-radius:var(--lt-r-pill);overflow:hidden;height:36px}
+.lt-toolbar-tools .boardModeSwitch{border:1px solid var(--lt-line);border-radius:var(--lt-r-pill);overflow:hidden;height:38px}
 .lt-toolbar-tools .cinemaBtn{position:static;flex:none;box-sizing:border-box;height:36px;min-height:36px;line-height:34px;padding:0 12px;width:auto;font-size:13px}
 .lt-toolbar-tools .view-toggle .ui-btn,.lt-toolbar-tools .boardModeSwitch .modeSwitchBtn{box-sizing:border-box;height:36px;min-height:36px;line-height:34px;padding:0 12px;font-size:13px}
 /* 좁은 화면의 '선택한 순간' 줄도 도구 줄 아래에 둔다(머리글 실측보다 줄을 우선). */
@@ -76,13 +76,13 @@ html[data-book-shape=phone][data-v41-screen=book] .stage{top:auto;min-height:cal
 /* 모든 두 칸 보기 전환: 두 칸에 같은 너비·높이·모서리를 부여한다. */
 .lt-toolbar-tools .view-toggle,.lt-toolbar-tools .shelf-view-inline,.lt-toolbar-tools .boardModeSwitch{
  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:stretch;
- flex:none;box-sizing:border-box;min-width:92px;height:36px;min-height:36px;
+ flex:none;box-sizing:border-box;min-width:92px;height:38px;min-height:38px;
  padding:0;border:1px solid var(--lt-line);border-radius:var(--lt-r-pill);
  background:var(--lt-glass-strong);overflow:hidden;
 }
 .lt-toolbar-tools .view-toggle>button,.lt-toolbar-tools .shelf-view-inline>button,.lt-toolbar-tools .boardModeSwitch>button{
  display:flex;align-items:center;justify-content:center;box-sizing:border-box;
- width:100%;min-width:0;height:34px;min-height:34px;padding:0 7px;
+ width:100%;min-width:0;height:36px;min-height:36px;padding:0 7px;
  border:0;border-radius:var(--lt-r-pill);background:transparent;
  color:var(--lt-pearl);font:600 13px var(--lt-ui);line-height:1;
  box-shadow:none;transform:none;
@@ -105,3 +105,23 @@ html[data-lt-theme=garden] .lt-toolbar-tools .boardModeSwitch>button:not([aria-p
 .lt-toolbar-tools .shelf-view-inline{display:grid}
 html[data-v41-screen=book] .lt-toolbar-tools #playAllBtn{order:10}
 @media(max-width:600px){.lt-toolbar-tools .view-toggle,.lt-toolbar-tools .shelf-view-inline,.lt-toolbar-tools .boardModeSwitch{min-width:84px}}
+
+/* 화면별 옛 머리줄 규칙이 공통 줄로 스며들지 않게 — 도구 줄은 한 높이·한 순서를 쓴다. */
+html[data-v41-screen] .lt-screen-toolbar .lt-toolbar-tools>*{order:0}
+html[data-v41-screen] .lt-screen-toolbar .lt-toolbar-tools>button:not(.desktop-only),
+html[data-v41-screen] .lt-screen-toolbar .lt-toolbar-tools select,
+html[data-v41-screen] .lt-screen-toolbar .lt-toolbar-tools .bgDrop>button,
+html[data-v41-screen] .lt-screen-toolbar .lt-toolbar-tools .view-switch>button{
+  box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;
+  height:36px;min-height:36px;line-height:1;
+}
+html[data-v41-screen] .lt-screen-toolbar .lt-toolbar-tools .view-switch{flex:0 0 auto;width:auto;flex-wrap:nowrap}
+html[data-v41-screen=board] .lt-screen-toolbar .lt-toolbar-tools>button.headbtn{height:36px;min-height:36px}
+html[data-v41-screen=board] .lt-screen-toolbar .lt-toolbar-tools .cinemaBtn{width:auto;padding:0 10px}
+@media(max-width:600px){
+  .lt-screen-toolbar{gap:8px;padding:0 10px}
+  .lt-toolbar-left{gap:4px}
+  .lt-toolbar-tools{gap:4px}
+  .lt-toolbar-tools .boardModeSwitch>button{padding:0 3px}
+  .lt-toolbar-tools .cinemaBtn{padding:0 6px}
+}
