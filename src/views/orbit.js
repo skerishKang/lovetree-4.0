@@ -68,7 +68,7 @@ extraCSS+=`.card.lt-under-link{opacity:0}\n.card .surface .lt-orbit-texture{posi
 extraCSS+=`@keyframes lt-home-rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
 .center .lt-home-line{display:block}.center .lt-home-enter{animation:lt-home-rise 460ms cubic-bezier(.2,.7,.2,1) both;animation-delay:calc(var(--lt-home-order)*100ms)}
 @media(prefers-reduced-motion:reduce){.center .lt-home-enter{animation:none;opacity:1;transform:none}}
-.lt-orbit-tip{position:absolute;z-index:5;left:0;top:0;display:none;pointer-events:none;padding:7px 11px;border:1px solid var(--lt-gold-line);border-radius:999px;background:var(--lt-stage);color:var(--lt-pearl);font-size:12px;line-height:18px;white-space:nowrap;contain:paint;will-change:transform;transform:translate3d(var(--lt-tip-x,0px),var(--lt-tip-y,0px),0)}
+.lt-orbit-tip{position:absolute;z-index:5;left:0;top:0;display:none;pointer-events:none;padding:7px 11px;border:1px solid var(--lt-gold-line);border-radius:999px;background:var(--lt-stage);color:var(--lt-pearl);font-size:12px;line-height:18px;white-space:nowrap;contain:paint;will-change:transform;transform:translate3d(0,0,0)}
 .lt-orbit-tip[data-visible]{display:block}`;
 
 export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSelect=()=>{},recordNote=null,examples=[],onOpen=null,empty=false,titleDisplay='both',momentList=null,dateStyle='dot',prefs=null,initialPicking=false,initialNotice=null,homePin=null,loggedIn}) {
@@ -693,9 +693,14 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
   }
   if(!selected){orbitTip.removeAttribute('data-visible');return;}
   tipTarget=selected.i;
-  orbitTip.style.setProperty('--lt-tip-x',selected.x.toFixed(1)+'px');
-  orbitTip.style.setProperty('--lt-tip-y',selected.y.toFixed(1)+'px');
-  orbitTip.setAttribute('data-visible','');
+  // One composited transform write, only when the projected card actually moved.
+  // Avoid re-applying [data-visible] every 420ms: that invalidates CSS styles.
+  const x=selected.x.toFixed(1),y=selected.y.toFixed(1);
+  if(orbitTip.__tipX!==x||orbitTip.__tipY!==y){
+   orbitTip.__tipX=x;orbitTip.__tipY=y;
+   orbitTip.style.transform=`translate3d(${x}px,${y}px,0)`;
+  }
+  if(!orbitTip.hasAttribute('data-visible'))orbitTip.setAttribute('data-visible','');
   if(reduced)tipPinned=true;
  };
 
