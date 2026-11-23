@@ -190,6 +190,19 @@ export const AUDIT_FN = function audit(opts) {
     if (cs.textOverflow === 'ellipsis' && cs.whiteSpace === 'nowrap') continue;
     if (el.scrollWidth > el.clientWidth + 1) clipped.push({ el: sel(el), text: el.textContent.trim().replace(/\s+/g, ' ').slice(0, 30), sw: el.scrollWidth, cw: el.clientWidth });
   }
+  // #777 3단계: 트리 카드의 날짜·제목 두 줄이 아래에서 잘리지 않는지 세로로도 잰다(축소해 글자를 숨긴 상태는 제외).
+  for (const card of document.querySelectorAll('#treeNodes .tv-card')) {
+    const cap = card.querySelector('.tv-cap');
+    if (!cap || !visible(cap)) continue;
+    const box = clipRect(card);
+    for (const line of cap.querySelectorAll('.tv-date,.tv-name')) {
+      if (!visible(line)) continue;
+      const r = line.getBoundingClientRect();
+      if (r.bottom > box.bottom - 1 || r.top < box.top + 1) {
+        clipped.push({ el: sel(line), text: line.textContent.trim().replace(/\s+/g, ' ').slice(0, 30), sw: Math.round(r.bottom), cw: Math.round(box.bottom) });
+      }
+    }
+  }
 
   // ④ 작은 글자 — 12px 미만 글자 0·단추 13px 미만 0(#548: 단추 판정은 요소 자신이 단추일 때).
   const small = [];

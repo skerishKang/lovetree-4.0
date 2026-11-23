@@ -1733,6 +1733,18 @@ test('#657 화면 공통 검사기: 주요 화면 18 상태 × 390·1440 × 밤�
     }));
     assert.ok(treeFacts.cards > 0 && treeFacts.toolbar, `트리 화면이 예시 카드와 도구 줄을 그린다: ${JSON.stringify(treeFacts)}`);
     assert.ok(!treeFacts.status.includes('undefined') && !treeFacts.status.includes('NaN'), '트리 상태에 흔적 값이 없다');
+    const firstView = await treeFrame.evaluate(() => ({
+      compact: document.getElementById('treeMain').dataset.compact,
+      scale: window.__LT41_TREE__.getScale(),
+      prefix: !!document.querySelector('.tree-prefix') && getComputedStyle(document.querySelector('.tree-prefix')).display !== 'none',
+      pad: getComputedStyle(document.querySelector('.lt-screen-toolbar')).paddingLeft
+    }));
+    assert.equal(firstView.compact, 'true', '처음 전체 보기에서는 카드에 사진만 보인다');
+    assert.equal(firstView.prefix, false, '트리 화면에서는 탭과 겹치는 고정 글자를 숨긴다');
+    assert.ok(parseFloat(firstView.pad) > 0, `도구 줄 왼쪽 여백이 있다: ${firstView.pad}`);
+    const zoomed = await treeFrame.evaluate(() => { window.__LT41_TREE__.zoom(4); window.__LT41_TREE__.zoom(4); return document.getElementById('treeMain').dataset.compact; });
+    assert.equal(zoomed, 'false', '확대하면 카드 글자가 다시 보인다');
+    await treePage.waitForTimeout(200);
     await take(treePage, '트리');
     await ctxTree.close();
     const graphCheck = await page7.evaluate(() => {
@@ -3007,14 +3019,23 @@ test('#777 트리 보기: 예시 사슬·카드 상세·방향키·맞춤과 200
       const frame = await frameOf(page, /track61-tree/);
       assert.ok(frame, `${width}: 트리 프레임이 열린다`);
       await frame.waitForSelector('.tv-card', { timeout: 15000 });
-      const first = await frame.evaluate(() => ({
-        cards: document.querySelectorAll('.tv-card').length,
-        width: Math.round(document.querySelector('.tv-card').getBoundingClientRect().width),
-        toolbar: !!document.querySelector('.lt-screen-toolbar')
-      }));
+      const first = await frame.evaluate(() => {
+        const stage = document.getElementById('treeMain').getBoundingClientRect();
+        const rects = [...document.querySelectorAll('.tv-card')].map((c) => c.getBoundingClientRect());
+        return {
+          cards: rects.length,
+          width: document.querySelector('.tv-card').offsetWidth,
+          rendered: Math.round(rects[0].width),
+          ratio: +((Math.max(...rects.map((r) => r.right)) - Math.min(...rects.map((r) => r.left))) / stage.width).toFixed(2),
+          compact: document.getElementById('treeMain').dataset.compact,
+          toolbar: !!document.querySelector('.lt-screen-toolbar')
+        };
+      });
       assert.equal(first.cards, 40, `${width}: 예시 40개가 카드로 보인다`);
-      assert.equal(first.width, expectedWidth, `${width}: 첫 화면 카드 폭`);
+      assert.equal(first.width, expectedWidth, `${width}: 카드 설계 폭`);
       assert.equal(first.toolbar, true, `${width}: 공통 도구 줄이 있다`);
+      assert.equal(first.compact, 'true', `${width}: 처음 전체 보기에서는 사진만 보인다`);
+      assert.ok(first.ratio > .5 && first.ratio <= 1, `${width}: 첫 화면에 나무 전체가 가로 ${Math.round(first.ratio * 100)}%로 들어온다`);
       await frame.locator('.tv-card').first().focus();
       const before = await frame.evaluate(() => document.activeElement?.getAttribute('aria-label'));
       await page.keyboard.press('ArrowDown');

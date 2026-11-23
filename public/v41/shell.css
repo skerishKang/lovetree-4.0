@@ -525,6 +525,8 @@ html[data-lt-theme=garden] #cleanup-panel input:not([type=checkbox]),html[data-l
 /* #1090: 트리 글자는 단추 밖 고정, 390에서는 자리가 좁아 숨긴다. */
 .tree-prefix{flex:0 0 auto;margin-right:8px;color:var(--lt-muted);font-size:12px;white-space:nowrap}
 @media(max-width:650px){.tree-prefix{display:none}}
+/* #777 3단계: 트리 화면에서는 탭 '트리'와 같은 글자가 옆에 또 보이지 않게 한다. 이름은 #source-label에만 둔다. */
+body[data-lt-tree-screen=true] .tree-prefix{display:none}
 nav #record-menu{min-height:40px;font-size:14px;letter-spacing:0;margin-left:0;padding:0 12px;border:1px solid var(--lt-line);border-left:0;border-radius:var(--lt-r-pill);background:var(--lt-glass)}
 @media(max-width:780px){nav #record-menu{font-size:14px}}
 nav .tree-frame{scroll-snap-align:center}

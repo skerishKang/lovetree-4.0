@@ -74,6 +74,8 @@ function flowNavigation(){
   document.body.classList.toggle('lt-fab-ok',!$('write-menu').hidden&&getSource()==='server'&&owned);
   /* 이슈 458: 화면마다 아래쪽에 이미 있는 단추·탭 높이가 다르므로 화면별로 단추를 얼마나 올릴지 셸 CSS가 쓴다. */
   document.body.dataset.fabLift={'track59-sketchbook.html':'book','track58-pinboard.html':'board','track56-network.html':'network','track32-bookshelf.html':'shelf','track61-tree.html':'tree'}[getCurrent()]||'';
+  // #777 3단계: 고정 접두 '트리'는 이름 자리가 아니라 탭 '트리'와 겹치는 글자라 트리 화면에서만 숨긴다.
+  document.body.dataset.ltTreeScreen=getCurrent()==='track61-tree.html'?'true':'false';
   delegate.syncTreeTips();
   revealCurrentTab();
 }

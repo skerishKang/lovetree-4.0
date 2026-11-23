@@ -79,8 +79,8 @@ function collapsedChildren(node, cfg) {
 function config() {
   const phone = stage.clientWidth <= 600;
   return phone
-    ? { card: [110, 80], bundle: [72, 38], gapX: 116, gapY: 104, offset: 58, thumb: 46, pad: 12, maxScale: 1.6, minScale: .1 }
-    : { card: [140, 96], bundle: [82, 40], gapX: 146, gapY: 130, offset: 74, thumb: 62, pad: 24, maxScale: 1.5, minScale: .1 };
+    ? { card: [110, 92], bundle: [72, 38], gapX: 1300, gapY: 104, offset: 58, thumb: 44, pad: 12, maxScale: 1.6, minScale: .05, compactAt: 80 }
+    : { card: [140, 108], bundle: [82, 40], gapX: 1300, gapY: 130, offset: 74, thumb: 60, pad: 24, maxScale: 1.5, minScale: .05, compactAt: 80 };
 }
 
 function build(spec, parent, depth, cfg) {
@@ -252,8 +252,10 @@ function draw() {
   status.textContent = state.root
     ? `순간 ${list.filter((n) => n.kind !== 'bundle').length}개 · ${state.tree.title || '트리'} · 뿌리에서 위로`
     : '이 트리에 아직 순간이 없어요.';
+  document.getElementById('treeTitleText').textContent = state.tree?.title || '트리';
   perf.drawMs = performance.now() - t0;
-  focusRoot();
+  // #777 3단계: 처음 화면도 맞춤(전체 보기)으로 연다.
+  fitAll();
 }
 
 function bounds() {
@@ -270,6 +272,9 @@ function bounds() {
 
 function apply() {
   const t = performance.now();
+  // 카드가 화면에서 80px보다 작아지면 사진만 남긴다. 확대하면 두 줄 글자가 다시 보인다.
+  const compact = state.cfg ? state.cfg.card[0] * state.scale < state.cfg.compactAt : false;
+  stage.dataset.compact = compact ? 'true' : 'false';
   world.style.transform = `translate(${state.tx}px,${state.ty}px) scale(${state.scale})`;
   const dt = performance.now() - t;
   perf.applyMs = dt;
@@ -428,6 +433,8 @@ window.__LT41_TREE__ = {
   getPerf: () => ({ ...perf }),
   fitAll,
   focusRoot,
+  zoom,
+  getScale: () => state.scale,
   cardCount: () => nodes.querySelectorAll('.tv-card').length,
   bundleCount: () => nodes.querySelectorAll('.tv-bundle').length
 };
