@@ -28,6 +28,9 @@ export function createScreens(deps) {
   // 2026-11-08 #211 화면 전환 깜빡임: 새 화면은 보이지 않는 두 번째 iframe에서 먼저 다 그린다.
   // 준비(load + 글꼴 준비)가 끝나면 두 장의 앞뒤만 바꾼다. 이전 화면은 그 순간까지 그대로 보인다.
   let viewToken = 0;
+  // #1231: 로그아웃 탭 클릭으로 연 개인 화면만 빈 상태로 유지한다.
+  // 예시를 직접 가리키는 기존 주소(#book 등)의 읽기 경로는 별도로 보존한다.
+  let guestTabSelected = false;
   // #996: 화면 교대 뒤 지연 비우기 타이머. 화면을 다시 바꾸면 앞 타이머를 취소하고,
   // 비우기 직전에 그 프레임이 다시 보이는 장이 되었는지 한 번 더 확인한다.
   let blankTimer = 0;
@@ -173,11 +176,15 @@ export function createScreens(deps) {
     closePanels?.();
     if ($('community-panel')?.open) $('community-panel').close();
     setCurrent(file);
+    // 화면 탭 클릭(write=true)과 직접 주소 복구(write=false)를 구분한다.
+    // 예시 데이터가 늦게 도착해도 클릭으로 연 빈 상태를 덮어쓰지 않는다.
+    if (!isGuest() || file === 'src064-orbit.html') guestTabSelected = false;
+    else if (write) guestTabSelected = true;
     flowNavigation();
     applyTheme();
-    if ((!hasTree() || isGuest()) && file !== 'src064-orbit.html') {
-      // 2026-11-23 대표 결정: 로그아웃 예시가 있어도 개인 화면은 빈 상태로 연다.
-      // 트리 0개 계정도 기존처럼 해당 화면의 빈 상태를 보여 주며 첫 화면으로 돌리지 않는다.
+    if ((!hasTree() || (isGuest() && guestTabSelected)) && file !== 'src064-orbit.html') {
+      // 2026-11-23 대표 결정: 로그아웃 탭 클릭은 예시 트리가 있어도 빈 상태로 연다.
+      // 트리 0개 계정도 해당 화면의 빈 상태를 유지하고 첫 화면으로 돌리지 않는다.
       document.body.classList.remove('home-screen');
       hideFrames();
       document.querySelectorAll('[data-view]').forEach(b => b.setAttribute('aria-current', String(b.dataset.view === file || (file === 'track60-graph.html' && b.dataset.view === 'track56-network.html'))));
