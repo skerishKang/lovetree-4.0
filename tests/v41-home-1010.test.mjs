@@ -392,3 +392,72 @@ test('지연 창 모듈 — 정리·꼬리표 첫 클릭으로 창이 열린다'
     }
   } finally { await browser.close(); }
 });
+
+// #791: '스크립트를 불렀다'가 아니라 '재생기가 실제로 보인다'를 확인한다(실제 브라우저).
+test('체험 카드 ▶를 누르면 공식 iframe이 화면에 보인다(1440·390)', { skip: skip1010, timeout: 180000 }, async () => {
+  const http = await import('node:http');
+  const path = await import('node:path');
+  const { readFileSync } = await import('node:fs');
+  const { fileURLToPath } = await import('node:url');
+  const rootPath = fileURLToPath(new URL('../dist/', import.meta.url));
+  const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp' };
+  const server = http.createServer((req, res) => {
+    const u = new URL(req.url, 'http://localhost');
+    let file = path.join(rootPath, decodeURIComponent(u.pathname));
+    if (u.pathname === '/v41/' || u.pathname === '/v41' || (u.pathname.startsWith('/v41/') && !path.extname(u.pathname))) file = path.join(rootPath, 'v41/index.html');
+    try { res.writeHead(200, { 'content-type': TYPES[path.extname(file)] || 'application/octet-stream' }); res.end(readFileSync(file)); }
+    catch { res.writeHead(404); res.end('not found'); }
+  });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const port = server.address().port;
+  const host = 'pv.lovetree-4-0.pages.dev';
+  const browser = await chromium1010.launch({ headless: true });
+  try {
+    for (const width of [1440, 390]) {
+      const context = await browser.newContext({ viewport: { width, height: width === 1440 ? 900 : 844 } });
+      await context.route(`https://${host}/**`, async (route) => {
+        const u = new URL(route.request().url());
+        if (u.pathname === '/api/account') return route.fulfill({ status: 401, contentType: 'application/json', body: '{"ok":false}' });
+        if (u.pathname.startsWith('/api/')) return route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"state":{"version":1,"trees":[]},"items":[],"shares":[]}' });
+        if (u.pathname.startsWith('/auth/')) return route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
+        const local = await fetch(`http://127.0.0.1:${port}${u.pathname}${u.search}`);
+        return route.fulfill({ status: local.status, contentType: local.headers.get('content-type') || 'application/octet-stream', body: Buffer.from(await local.arrayBuffer()) });
+      });
+      const page = await context.newPage();
+      await page.goto(`https://${host}/v41/?lt791=1`, { waitUntil: 'domcontentloaded' });
+      await page.waitForTimeout(3500);
+      const evalHome = async (fn, arg) => {
+        for (const frame of page.frames()) {
+          const value = await frame.evaluate(fn, arg).catch(() => null);
+          if (value) return value;
+        }
+        return null;
+      };
+      const stripCount = await evalHome(() => {
+        const root = [...document.querySelectorAll('*')].find((el) => el.shadowRoot)?.shadowRoot;
+        return root?.querySelectorAll('.lt-preview-card').length || 0;
+      });
+      assert.equal(stripCount, 3, width + ': 체험 카드 3장이 없다');
+      for (const [id, origin] of [['pv-tt-1', 'tiktok.com'], ['pv-ig-1', 'instagram.com']]) {
+        await evalHome((cardId) => {
+          const root = [...document.querySelectorAll('*')].find((el) => el.shadowRoot?.querySelector('[data-lt-preview-card="' + cardId + '"]'))?.shadowRoot;
+          const button = root?.querySelector('[data-lt-preview-card="' + cardId + '"] [data-lt-preview-play]');
+          if (!button) return false;
+          button.click();
+          return true;
+        }, id);
+        const player = await evalHome((cardId) => {
+          const root = [...document.querySelectorAll('*')].find((el) => el.shadowRoot?.querySelector('[data-lt-preview-card="' + cardId + '"]'))?.shadowRoot;
+          const frame = root?.querySelector('[data-lt-preview-card="' + cardId + '"] iframe');
+          if (!frame) return null;
+          const rect = frame.getBoundingClientRect();
+          return { src: frame.src, w: Math.round(rect.width), h: Math.round(rect.height) };
+        }, id);
+        assert.ok(player, width + '/' + id + ': 재생기 iframe이 없다');
+        assert.match(player.src, new RegExp(origin));
+        assert.ok(player.w > 0 && player.h > 0, width + '/' + id + ': 재생기 크기가 0이다');
+      }
+      await context.close();
+    }
+  } finally { await browser.close(); await new Promise((resolve) => server.close(resolve)); }
+});
