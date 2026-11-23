@@ -651,7 +651,8 @@ test('#1204 실제 테마 전환·저장값 및 가운데 빛 직선 경계 픽�
       pos+=len+12;
       if(tag==='IEND')break;
     }
-    const packed=inflateSync(Buffer.concat(parts)),stride=width*channels,rows=[],previous=new Uint8Array(stride);
+    const packed=inflateSync(Buffer.concat(parts)),stride=width*channels,rows=[];
+    let previous=new Uint8Array(stride);
     let offset=0;
     for(let y=0;y<height;y++){
       const filter=packed[offset++],row=new Uint8Array(stride);
