@@ -44,7 +44,7 @@ test('미리보기에서만 예시 트리에 틱톡 2개와 릴스 1개를 얹�
   assert.equal(preview.demoData.moments.length, 4);
   const tiktoks = preview.moments.filter((m) => String(m.url || '').includes('tiktok.com'));
   assert.equal(tiktoks.length, 2);
-  assert.ok(tiktoks.every((m) => m.mediaMetadata?.title && m.mediaMetadata?.thumbnail && m.mediaMetadata?.tiktokId));
+  assert.ok(tiktoks.every((m) => m.mediaMetadata?.title && m.mediaMetadata?.tiktokId && !m.mediaMetadata?.thumbnail));
   const reel = preview.moments.find((m) => m.id === 'pv-ig-1');
   assert.match(reel.url, /instagram\.com\/reel\//);
   assert.equal(reel.mediaMetadata.thumbnail, undefined, '릴스는 썸네일 없는 글 카드');
@@ -54,6 +54,22 @@ test('미리보기에서만 예시 트리에 틱톡 2개와 릴스 1개를 얹�
   assert.equal(PREVIEW_MOMENTS.every((m) => m.externalUrl === m.url), true, '보드도 링크를 읽을 수 있게');
 });
 
+test('체험 예시는 기본 예시 사진을 빌리지 않고 첫 순간 표시도 붙이지 않는다', () => {
+  const samples = JSON.parse(readFileSync(new URL('../src/views/orbit-samples.json', import.meta.url), 'utf8'));
+  assert.equal(samples.filter((m) => m.first === true).length, 1, '첫 순간 표시는 기본 예시 한 장만');
+  assert.equal(samples[0].title, '첫인상');
+  for (const moment of PREVIEW_MOMENTS) {
+    assert.equal(moment.first, false, moment.id);
+    assert.ok(!moment.image, '기본 예시 사진을 쓰지 않는다: ' + moment.id);
+    assert.ok(!moment.mediaMetadata?.thumbnail, '저장된 썸네일도 없다: ' + moment.id);
+    assert.ok(['TIKTOK', 'INSTAGRAM'].includes(moment.platform), moment.id);
+  }
+  for (const sample of previewSamples(PREVIEW, '?lt791=1')) {
+    assert.ok(!sample.image, '궤도 앞줄 카드도 기본 사진을 쓰지 않는다: ' + sample.id);
+    assert.equal(sample.first, false);
+  }
+});
+
 test('정적 예시 데이터에는 릴스·틱톡 주소가 없다(운영에 섞이지 않는다)', () => {
   const samples = readFileSync(new URL('../src/views/orbit-samples.json', import.meta.url), 'utf8');
   const example = readFileSync(new URL('../public/v41/example.mjs', import.meta.url), 'utf8');
@@ -61,6 +77,14 @@ test('정적 예시 데이터에는 릴스·틱톡 주소가 없다(운영에 �
     assert.doesNotMatch(source, /tiktok\.com/);
     assert.doesNotMatch(source, /instagram\.com/);
   }
+});
+
+test('첫 화면 앞줄은 체험 모드에서만 그리고 기본 궤도는 건드리지 않는다', () => {
+  const orbit = readFileSync(new URL('../src/views/orbit.js', import.meta.url), 'utf8');
+  assert.match(orbit, /const previewStripMarkup=previewStrip\.length\?/);
+  assert.match(orbit, /const exampleSamples = samples;/);
+  assert.match(orbit, /data-lt-preview-play/);
+  assert.match(orbit, /lt-preview-mode/);
 });
 
 test('미리보기 담기 안내는 플랫폼과 영상 번호만 보여 준다', () => {
