@@ -71,7 +71,7 @@ while (Date.now() < deadline) {
 }
 if (!previewUrl) reason = reason || '미리보기 주소를 찾지 못함';
 
-// 주소를 찾았으면 /api/* Functions가 붙었는지 확인한다(#337 실측: 배포 직후 404, #496: 그때 503도 준비 완료로 잘못 읽었다).
+// 주소를 찾았으면 Functions가 직접 답하는 준비 확인 경로가 붙었는지 본다(#1254 — 저장 API는 미리보기에 없다).
 // 상태는 셋이다: 'ready' | 'cold'(기한 안에 404·503만 = 아직 안 뜸) | null(주소 없음).
 // 'cold'는 검사를 막지 않고 지금처럼 진행하되, 판정 단계가 **환경 문제**로 나눠 적을 수 있게 남긴다.
 const ready = previewUrl
