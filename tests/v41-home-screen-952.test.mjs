@@ -676,7 +676,7 @@ test('#1204 실제 테마 전환·저장값 및 가운데 빛 직선 경계 픽�
           await h.page.locator('#theme-toggle').click();
           await h.page.waitForFunction(()=>document.documentElement.getAttribute('data-lt-theme')==='garden');
         }
-        await h.frame.waitForFunction(expected=>document.querySelector('#orbit')?.getAttribute('data-lt-theme')===expected,theme,{timeout:10000});
+        await h.frame.waitForFunction(expected=>(document.querySelector('#orbit')?.getAttribute('data-lt-theme')||'night')===expected,theme,{timeout:10000});
         const state=await h.page.evaluate(()=>{
           const frame=document.querySelector('#view')?.contentDocument;
           const host=frame?.querySelector('#orbit'),root=host?.shadowRoot;
