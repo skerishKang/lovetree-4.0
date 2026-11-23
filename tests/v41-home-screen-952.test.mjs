@@ -634,3 +634,93 @@ test('#1088 2단계 떠 있는 카드도 그 자리에서 크게 보기', { skip
     } finally { await close952(h); }
   } finally { await browser.close(); }
 });
+
+test('#1204 첫 화면 순차 등장·안내 삭제·WebGL 말풍선·기억·겹침·접근성', { skip: REQUIRE952 ? false : skip952, timeout: 180000 }, async () => {
+  if (skip952) assert.fail(skip952);
+  const browser = await chromium952.launch({headless:true});
+  try {
+    for (const width of [1440,390]) for (const theme of ['garden','night']) {
+      const h=await boot952(browser,{width,motion:'no-preference'});
+      try {
+        await h.frame.evaluate(theme=>document.querySelector('#orbit')?.setAttribute('data-lt-theme',theme),theme);
+        const inspect=()=>h.frame.evaluate(()=>{
+          const root=document.querySelector('#orbit').shadowRoot;
+          const tip=root.querySelector('.lt-orbit-tip'),center=root.querySelector('.center'),actions=center.querySelector('.actions');
+          const tr=tip.getBoundingClientRect(),cr=center.getBoundingClientRect(),ar=actions.getBoundingClientRect();
+          const intersects=(a,b)=>a.left<b.right&&a.right>b.left&&a.top<b.bottom&&a.bottom>b.top;
+          const poses=globalThis.__LT_ORBIT_TEST__?.poses()||[];
+          const host=document.querySelector('#orbit').getBoundingClientRect();
+          const closeToCard=poses.some(p=>p&&!p.hidden&&p.box&&(
+            // Orbit projections and the HTML hint share the same local canvas coordinates.
+            (tr.left-host.left>=p.box.l-125&&tr.left-host.left<=p.box.r+125)&&
+            (tr.top-host.top>=p.box.t-50&&tr.top-host.top<=p.box.b+50)
+          ));
+          return {visible:tip.hasAttribute('data-visible'),x:tr.x,y:tr.y,closeToCard,
+            overlaps:intersects(tr,cr)||intersects(tr,ar),pointer:getComputedStyle(tip).pointerEvents,
+            labels:[...root.querySelectorAll('.card .surface')].map(e=>e.getAttribute('aria-label')),
+            notes:root.querySelectorAll('.center-note').length,
+            animations:[...root.querySelectorAll('.center .lt-home-enter')].map(e=>({delay:getComputedStyle(e).animationDelay,duration:getComputedStyle(e).animationDuration}))};
+        });
+        await h.frame.waitForFunction(()=>globalThis.__LT_ORBIT_TEST__?.canvasReady(),null,{timeout:20000});
+        const opening=await inspect();
+        assert.equal(opening.notes,0,'두 안내 줄을 그리지 않는다');
+        assert.ok(opening.animations.length>=4,'머리말·제목·설명·단추가 차례로 나타난다');
+        const delays=opening.animations.map(a=>parseFloat(a.delay));
+        assert.ok(delays.every((v,i)=>i===0||v-delays[i-1]>=.08&&v-delays[i-1]<=.12),JSON.stringify(delays));
+        assert.ok(opening.animations.every(a=>parseFloat(a.duration)>=.4&&parseFloat(a.duration)<=.5));
+        assert.ok(opening.labels.length>0&&opening.labels.every(x=>x?.includes('눌러서 크게 보기')));
+        await h.frame.waitForFunction(()=>document.querySelector('#orbit')?.shadowRoot?.querySelector('.lt-orbit-tip')?.hasAttribute('data-visible'),null,{timeout:15000});
+        for (let sample=0;sample<3;sample++){
+          const state=await inspect();
+          assert.equal(state.visible,true);
+          assert.equal(state.pointer,'none');
+          assert.equal(state.closeToCard,true,'말풍선은 투영된 카드 곁에 있다: '+JSON.stringify(state));
+          assert.equal(state.overlaps,false,'중앙 글자·단추와 겹치지 않는다');
+          await h.page.waitForTimeout(440);
+        }
+        const {mkdirSync}=await import('node:fs');
+        const capture=process.env.LT_HOME_1204_CAPTURE_DIR;
+        if(capture){mkdirSync(capture,{recursive:true});await h.page.screenshot({path: `${capture}/home-1204-${width}-${theme}.png`});}
+        const clicked=await h.frame.evaluate(()=>{
+          const host=document.querySelector('#orbit'),root=host.shadowRoot;
+          const world=root.querySelector('.world'),board=[...world.querySelectorAll('.orbit-canvas')].find(e=>getComputedStyle(e).display!=='none');
+          const poses=globalThis.__LT_ORBIT_TEST__.poses();
+          if(!board)return {board:false};
+          const r=board.getBoundingClientRect();
+          let hit=null;
+          for(const p of poses){
+            if(!p||p.hidden||!p.box||p.box.r<0||p.box.l>world.clientWidth)continue;
+            for(const fx of [.3,.5,.7])for(const fy of [.3,.5,.7]){
+              const x=r.left+p.box.l+(p.box.r-p.box.l)*fx,y=r.top+p.box.t+(p.box.b-p.box.t)*fy;
+              board.dispatchEvent(new PointerEvent('pointermove',{bubbles:true,clientX:x,clientY:y,pointerId:1,pointerType:'mouse'}));
+              if(board.style.cursor==='pointer'){hit={x,y};break;}
+            }
+            if(hit)break;
+          }
+          if(!hit)return {board:true,position:false};
+          board.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,clientX:hit.x,clientY:hit.y,pointerId:1,pointerType:'mouse'}));
+          board.dispatchEvent(new MouseEvent('click',{bubbles:true,clientX:hit.x,clientY:hit.y,detail:1}));
+          return {board:true,position:true,stored:localStorage.getItem('lt41-orbit-card-opened')};
+        });
+        assert.equal(clicked.stored,'1','실제 캔버스 클릭 경로에서 기기에 기억한다: '+JSON.stringify(clicked));
+        assert.equal((await inspect()).visible,false,'누른 즉시 말풍선이 사라진다');
+        await h.page.reload({waitUntil:'load'});
+        await h.page.waitForTimeout(2400);
+        assert.equal(await h.page.frameLocator('#view').locator('.lt-orbit-tip').evaluate(e=>e.hasAttribute('data-visible')),false,'새로고침해도 말풍선이 나타나지 않는다');
+      } finally {await close952(h);}
+    }
+    const reduced=await boot952(browser,{width:390,motion:'reduce'});
+    try{
+      await reduced.frame.waitForFunction(()=>globalThis.__LT_ORBIT_TEST__?.canvasReady(),null,{timeout:20000});
+      await reduced.page.waitForTimeout(2400);
+      const snapshot=()=>reduced.frame.evaluate(()=>{
+        const root=document.querySelector('#orbit').shadowRoot,tip=root.querySelector('.lt-orbit-tip');
+        return {x:tip.getBoundingClientRect().x,y:tip.getBoundingClientRect().y,
+          styles:[...root.querySelectorAll('.center .lt-home-enter')].map(e=>({animation:getComputedStyle(e).animationName,opacity:getComputedStyle(e).opacity}))};
+      });
+      const first=await snapshot();await reduced.page.waitForTimeout(550);const next=await snapshot();
+      assert.deepEqual([next.x,next.y],[first.x,first.y],'움직임 줄이기에서는 말풍선 좌표 고정');
+      assert.ok(first.styles.every(x=>x.animation==='none'&&x.opacity==='1'));
+    }finally{await close952(reduced);}
+  }finally{await browser.close();}
+});

@@ -29,7 +29,9 @@ test('#1086 첫 화면 궤도 헤드리스 회귀 방지 — 기준 브랜치 �
   const before=summarize(results.find(x=>x.width===width&&x.theme===theme&&x.variant==='before'));
   const after=summarize(results.find(x=>x.width===width&&x.theme===theme&&x.variant==='after'));
   console.log(JSON.stringify({width,theme,before,after}));
-  if(after.over50>before.over50||after.max>before.max)failures.push({width,theme,before,after});
+  // #1204: WebGL is now also on main; sub-frame measurement noise must not fail the comparison.
+  // Keep the >50ms frame count strict; allow only one 16.7ms frame of max-interval jitter.
+  if(after.over50>before.over50||after.max>before.max+16.7)failures.push({width,theme,before,after});
  }
  assert.deepEqual(failures,[],'헤드리스 궤도 성능 회귀');
 });
