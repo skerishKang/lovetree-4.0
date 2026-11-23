@@ -297,7 +297,7 @@ test('#1109 회원 기록 확인 중과 읽기 실패에도 빈 화면 탐색을
     }
     await page.waitForFunction(wanted=>document.body.dataset.recordSource==='server'&&document.body.dataset.member===wanted,['empty','delayed'].includes(state)?'in':'out');
     if(state==='login'){
-     assert.equal(await page.locator('#tree-views').evaluate(e=>e.hidden),true,'인증 실패가 확정되면 회원 탭을 숨긴다');
+     assert.equal(await page.locator('#tree-views').evaluate(e=>e.hidden),false,'인증 실패 후에도 화면 탐색 탭은 유지한다(#1231)');
      continue;
     }
     await check('응답 후');
