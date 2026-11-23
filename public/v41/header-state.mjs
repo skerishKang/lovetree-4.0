@@ -337,7 +337,7 @@ export function shelfViewPressed(value) {
 // 2단계 범위: 공통 헤더·첫 화면·첫 여정은 B를 쓴다. 내 트리는 #212, 책은 2026-11-08 대표 확인으로 B를 받는다.
 // 기억 보드·관계 지도는 계속 A다(대표 결정: 책만 테마를 따라간다).
 export function appliedTheme(theme, view) {
-  return view === 'home' || view === 'journey' || view === 'shelf' || view === 'book' || view === 'board' || view === 'network' || view === 'graph' ? normalizeTheme(theme) : THEME_NIGHT;
+  return view === 'home' || view === 'journey' || view === 'shelf' || view === 'tree' || view === 'book' || view === 'board' || view === 'network' || view === 'graph' ? normalizeTheme(theme) : THEME_NIGHT;
 }
 
 // 속성 없음 = A. B일 때만 data-lt-theme=garden 을 붙인다.
