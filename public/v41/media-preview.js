@@ -604,4 +604,16 @@ if(typeof document!=='undefined'){
  document.addEventListener('pointerdown',e=>{if(e.target.closest?.('.lt-media')&&!e.target.closest?.('.card'))e.stopPropagation();},true);
  document.addEventListener('click',e=>{if(e.target.closest?.('[data-lt-title-edit]'))return;const root=e.target.closest?.('.lt-media');if(!root)return;e.stopImmediatePropagation();if(e.target.closest('[data-lt-expand]')){e.preventDefault();void openLightbox(root.dataset.ltUrl,root.dataset.ltTitle,root.hasAttribute('data-lt-vertical')?true:null);return;}if(e.target.closest('[data-lt-from-start]')){e.preventDefault();delete root.dataset.ltEnd;root.dataset.ltFromStart='1';void playInPlace(root);return;}if(e.target.closest('[data-lt-play]')){e.preventDefault();void playInPlace(root);return;}if(e.target.closest('[data-lt-load]')){e.preventDefault();load(root);}},true);
 }
+ // #1084 후속(운영 11-23): 세로 영상의 흐린 배경 그림은 가운데 썸네일의 첫 후보(oardefault)로 깔린다. 그 그림이 없는
+ // 영상은 YouTube가 120×90 회색 자리 그림을 돌려줘, 가운데는 다른 후보로 내려가도 배경만 회색이 된다.
+ // 가운데 썸네일이 실제로 불러온 그림으로 배경도 맞춘다(보드·책 공통).
+ const BACKDROP='.lt-vertical-backdrop img,.yt-vertical-backdrop img';
+ const syncBackdrop=img=>{
+  if(!(img instanceof HTMLImageElement))return;
+  const host=img.closest?.('[data-lt-thumb-host],.yt-play');if(!host)return;
+  const back=host.querySelector(BACKDROP);if(!back)return;
+  const main=img.matches(BACKDROP)?[...host.querySelectorAll('img')].find(x=>!x.matches(BACKDROP)&&x.naturalWidth>120):(img.naturalWidth>120?img:null);
+  if(main&&main.currentSrc&&back.src!==main.currentSrc&&(back.naturalWidth<=120||img===main))back.src=main.currentSrc;
+ };
+ if(typeof document!=='undefined')document.addEventListener('load',e=>syncBackdrop(e.target),true);
 })();
