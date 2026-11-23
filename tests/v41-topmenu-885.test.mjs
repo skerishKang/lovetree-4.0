@@ -40,9 +40,26 @@ test('상단 메뉴: 같은 글자 크기·테두리 0·세로선 0·현재 탭 
         await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
         await page.locator('#discover-ask-no').click().catch(() => {});
         const perScreen = {};
+        // 대표 11-23: 화면마다 머리줄 높이·단추 줄 높이가 달라 서재·책에서 단추와 아래 선이 내려와 보였다.
+        const headerGeom = () => page.evaluate(() => {
+          const h = document.querySelector('.app-header') || document.querySelector('header');
+          const record = document.getElementById('record-menu');
+          const label = document.getElementById('source-label');
+          const caret = record?.querySelector('svg');
+          const r = record?.getBoundingClientRect();
+          return {
+            headerH: Math.round(h.getBoundingClientRect().height),
+            tops: [...h.querySelectorAll('#tree-views > button, .header-actions > button, .header-actions > .view-toggle, .account-slot > *')]
+              .filter((e) => e.getClientRects().length).map((e) => Math.round(e.getBoundingClientRect().top + e.getBoundingClientRect().height / 2)),
+            caretRightGap: r && caret ? Math.round((r.right - caret.getBoundingClientRect().right) * 10) / 10 : null,
+            labelLeftGap: r && label ? Math.round((label.getBoundingClientRect().left - r.left) * 10) / 10 : null
+          };
+        });
+        const geoms = { home: await headerGeom() };
         for (const [name, hash] of SCREENS) {
           await page.evaluate((h) => { location.hash = h; }, hash);
           await page.waitForTimeout(900);
+          geoms[name] = await headerGeom();
           perScreen[name] = await page.evaluate(() => {
             const record = document.getElementById('record-menu');
             const tabs = [...document.querySelectorAll('#tree-views > button')];
@@ -67,6 +84,14 @@ test('상단 메뉴: 같은 글자 크기·테두리 0·세로선 0·현재 탭 
         assert.equal(base.current, 1, '현재 탭 1개');
         assert.equal(base.recordVisible, true, '서재에서 트리 단추 보임');
         assert.equal(xsStable, true, '4화면 탭 x 좌표 동일');
+        // 390은 서재·책에서 보기 전환이 둘째 줄로 내려가는 것이 정한 배치라 넓은 화면만 잰다.
+        const hs = width < 780 ? [0] : [...new Set(Object.values(geoms).map((g) => g.headerH))];
+        assert.equal(hs.length, 1, `${width}/${theme}: 첫 화면·서재·책·보드·지도 머리줄 높이가 같다 ${JSON.stringify(geoms)}`);
+        for (const [name, g] of width < 780 ? [] : Object.entries(geoms)) {
+          const mids = [...new Set(g.tops)];
+          assert.ok(Math.max(...mids) - Math.min(...mids) <= 1, `${width}/${theme}/${name}: 머리줄 탭·단추의 세로 가운데가 한 줄이다 ${JSON.stringify(g.tops)}`);
+          if (g.caretRightGap !== null) assert.ok(g.caretRightGap >= 11 && g.caretRightGap <= 15, `${width}/${theme}/${name}: 짧은 트리 이름에서도 ⌄는 단추 오른쪽 끝(여백 13±2) — ${g.caretRightGap}`);
+        }
         results.push({ width, theme, ...base, xsStable });
         if (SHOT) {
           mkdirSync(SHOT, { recursive: true });
