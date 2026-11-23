@@ -2820,7 +2820,9 @@ test('#1091: 서재·책·보드 화면 도구 줄의 계산값이 같고 390 �
       await page.waitForSelector('.lt-screen-toolbar', { timeout: 15000 });
       const value = await page.evaluate((name) => {
         const bar = document.querySelector('.lt-screen-toolbar');
-        const button = bar.querySelector('button');
+        // 제목 선택과 새 트리는 고유 단추이므로 공통 도구 단추의 기본 규격을 별도로 실측한다.
+        const button = document.createElement('button');
+        bar.querySelector('.lt-toolbar-tools').append(button);
         const barStyle = getComputedStyle(bar);
         const buttonStyle = getComputedStyle(button);
         const body = document.querySelector(name === 'book' ? '.stage' : name === 'board' ? '.boardFrame' : '.shelf-screen');
