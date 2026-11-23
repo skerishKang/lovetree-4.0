@@ -440,7 +440,7 @@ async function renderDetail(id) {
         const removed = r.status === 'deleted';
         const stateMark = removed ? ' · 고객이 지움' : (r.editedAt ? ' · 고객이 고침' : '');
         const stateTime = stateMark ? formatTime(r.editedAt || r.createdAt) : formatTime(r.createdAt);
-        return `<div class="lt-reply${removed ? ' is-deleted' : ''}" data-type="${r.authorType}"><div class="lt-reply-head"><span>${r.fromCustomer ? '고객 덧붙임' : (r.authorType === 'customer' ? '고객 답변' : '내부 메모')}${stateMark}</span><span>${escapeText(stateTime)}</span></div><p>${richParagraph(r.body)}</p></div>`;
+        return `<div class="lt-reply${removed ? ' is-deleted' : ''}" data-type="${r.authorType}"><div class="lt-reply-head"><span>${r.authorName === '운영센터' ? '운영센터' : r.fromCustomer ? '고객 덧붙임' : (r.authorType === 'customer' ? '고객 답변' : '내부 메모')}${stateMark}</span><span>${escapeText(stateTime)}</span></div><p>${richParagraph(r.body)}</p></div>`;
       }).join('')
     : '<p class="lt-empty">아직 답글이 없습니다.</p>';
   const author = post.subjectId

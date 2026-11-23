@@ -668,7 +668,7 @@ body[data-fab-lift=shelf] .home-links{display:none}
  body.lt-fab-ok[data-fab-lift="book"] .updates-card{bottom:calc(168px + env(safe-area-inset-bottom))}
  body.lt-fab-ok[data-fab-lift="board"] .updates-card{bottom:calc(132px + env(safe-area-inset-bottom))}
  body.lt-fab-ok[data-fab-lift="network"] .updates-card{bottom:calc(224px + env(safe-area-inset-bottom))}}
- @media(max-width:520px){.updates-card{padding:0 10px;gap:8px;bottom:calc(max(10px, env(safe-area-inset-bottom)) + 66px)}body.lt-fab-ok .updates-card{bottom:calc(76px + env(safe-area-inset-bottom))}.updates-card-text{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
+ @media(max-width:520px){.updates-card-actions{margin-left:auto}.updates-card-actions button{position:relative;min-height:38px}.updates-card-actions button:last-child{min-width:38px}.updates-card-actions button::after{content:'';position:absolute;inset:-4px}.updates-card{padding:3px 3px 3px 12px;gap:8px;bottom:calc(max(10px, env(safe-area-inset-bottom)) + 66px)}body.lt-fab-ok .updates-card{bottom:calc(76px + env(safe-area-inset-bottom))}.updates-card-text{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
 /* 창(모달·패널)이 열려 있으면 아래 고정 요소는 모두 숨는다 — 닫으면 저절로 돌아온다(의견 #26 점검). */
 body.lt-viewer-open .updates-card,body.lt-viewer-open .home-links,body.lt-viewer-open #toast,
 body:has(dialog[open]) .updates-card,body.lt-sheet-open .updates-card,

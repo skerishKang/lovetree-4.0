@@ -135,16 +135,56 @@ test('970 실행: 모아둔 순간 — 목록·누르면 맞는 상세·닫으�
     for (const width of [1440, 390]) {
       const ctx = await browser.newContext({viewport: {width, height: width === 390 ? 844 : 900}, reducedMotion: 'reduce'});
       await ctx.addInitScript(() => { try { localStorage.setItem('lt41.theme', 'night'); } catch {} });
+      // 재현용: LT_970_CPU_RATE=4 또는 6일 때만 CPU 제한과 준비 시점 기록을 켠다.
+      const rate = Number(process.env.LT_970_CPU_RATE || 0);
+      if (rate) await ctx.addInitScript(() => {
+        if (!location.pathname.endsWith('/track58-pinboard.html')) return;
+        const trace = (event, count) => console.log('LT970_TRACE ' + JSON.stringify({event, at: Date.now(), count}));
+        Object.defineProperty(window, 'LTDEMO', {configurable: true, set(value) {
+          Object.defineProperty(window, 'LTDEMO', {value, writable: true, configurable: true, enumerable: true});
+          trace('frame-data', value.moments.length);
+        }});
+        Object.defineProperty(window, 'LTMobileMoments', {configurable: true, set(mount) {
+          Object.defineProperty(window, 'LTMobileMoments', {configurable: true, writable: true, enumerable: true, value(params) {
+            trace('picker-render-start', params.moments.length);
+            const picker = mount(params);
+            trace('picker-dom-filled', document.querySelectorAll('.lt-moment-picker select option').length);
+            return picker;
+          }});
+        }});
+        const observer = new MutationObserver(() => {
+          const count = document.querySelectorAll('#cardLayer .card').length;
+          if (count) { trace('card-dom-filled', count); observer.disconnect(); }
+        });
+        observer.observe(document, {childList: true, subtree: true});
+      });
       await ctx.route('**://i.ytimg.com/**', (r) => r.fulfill({status: 200, contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="10" height="10" fill="#333"/></svg>'}));
       await ctx.route('**/api/**', (r) => r.fulfill({status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}'}));
       const state = {version: 1, trees: [other, box], prefs: {}};
       await ctx.route('**/api/workspace**', (r) => r.fulfill({status: 200, contentType: 'application/json', body: JSON.stringify({revision: 1, state, subject: '시험계정', writeSubjectBound: true, savedAt: '2026-11-18T09:00:00.000Z'})}));
       const page = await ctx.newPage();
+      if (rate) {
+        const cdp = await ctx.newCDPSession(page);
+        await cdp.send('Emulation.setCPUThrottlingRate', {rate});
+        page.on('response', r => {
+          if (new URL(r.url()).pathname === '/api/workspace') console.log('LT970_TRACE', JSON.stringify({event: 'workspace-response', at: Date.now(), width}));
+        });
+        page.on('console', message => {
+          if (message.text().startsWith('LT970_TRACE ')) console.log('LT970_TRACE', JSON.stringify({...JSON.parse(message.text().slice(12)), width}));
+        });
+      }
       await page.goto(`${origin}/v41/?account=1#my/board?tree=${box.id}`, {waitUntil: 'load', timeout: 60000});
       await page.waitForFunction(() => !!window.LT41?.trees?.length, null, {timeout: 20000});
       await page.locator('#discover-ask-no').click().catch(() => {});
-      // 보드 프레임이 순간 카드를 다 그릴 때까지 기다린다.
-      await page.waitForFunction((n) => [...document.querySelectorAll('iframe')].some((f) => { try { return /track58-pinboard/.test(f.contentWindow.location.href) && f.contentDocument.querySelectorAll('.card').length >= n; } catch { return false; } }), box.moments.length, {timeout: 20000});
+      // 보드 카드와 모바일 고르기 목록은 따로 그려지므로 둘 다 준비될 때까지 기다린다.
+      await page.waitForFunction(({n, mobile}) => [...document.querySelectorAll('iframe')].some((f) => {
+        try {
+          const doc = f.contentDocument;
+          return /track58-pinboard/.test(f.contentWindow.location.href)
+            && doc.querySelectorAll('.card').length >= n
+            && (!mobile || doc.querySelectorAll('.lt-moment-picker select option').length >= n);
+        } catch { return false; }
+      }), {n: box.moments.length, mobile: width === 390}, {timeout: 20000});
       const frame = page.frames().find((f) => /track58-pinboard/.test(f.url()));
       assert.ok(frame, `${width}: 보드 프레임이 열리지 않음`);
       assert.match(await page.evaluate(() => document.getElementById('source-label')?.textContent || ''), /모아둔 순간/, `${width}: 머리줄에 모아둔 순간 표시`);
@@ -170,7 +210,11 @@ test('970 실행: 모아둔 순간 — 목록·누르면 맞는 상세·닫으�
         assert.equal(focus.isCard, true, `${width}: 상세를 닫으면 초점이 연 카드로 돌아온다(지금 초점: ${focus.tag}#${focus.id})`);
       } else {
         // 휴대폰 목록: 고르기(select)에 순간 셋이 순서대로 있다.
-        const options = await frame.evaluate(() => [...document.querySelectorAll('.lt-moment-picker select option')].map((o) => o.value));
+        const options = await frame.evaluate(rate => {
+          const values = [...document.querySelectorAll('.lt-moment-picker select option')].map(o => o.value);
+          if (rate) console.log('LT970_TRACE ' + JSON.stringify({event: 'test-read', at: Date.now(), count: values.length, pickerPresent: !!document.querySelector('.lt-moment-picker')}));
+          return values;
+        }, rate);
         assert.deepEqual(options, box.moments.map((m) => m.id), `${width}: 고르기 목록에 모아둔 순간 셋`);
         await frame.selectOption('.lt-moment-picker select', target.id);
         await frame.click('.lt-moment-picker button');

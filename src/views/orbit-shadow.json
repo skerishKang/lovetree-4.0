@@ -1,0 +1,20 @@
+{
+  "128x166x11": {
+    "shadow": "rgba(75, 51, 42, 0.16) 0px 18px 40px 0px"
+  },
+  "180x232x14": {
+    "shadow": "rgba(75, 51, 42, 0.16) 0px 18px 40px 0px"
+  },
+  "226x292x16": {
+    "shadow": "rgba(75, 51, 42, 0.16) 0px 18px 40px 0px"
+  },
+  "92x120x11": {
+    "shadow": "rgba(75, 51, 42, 0.16) 0px 18px 40px 0px"
+  },
+  "132x172x14": {
+    "shadow": "rgba(75, 51, 42, 0.16) 0px 18px 40px 0px"
+  },
+  "168x218x16": {
+    "shadow": "rgba(75, 51, 42, 0.16) 0px 18px 40px 0px"
+  }
+}

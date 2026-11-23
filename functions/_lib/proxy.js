@@ -32,6 +32,8 @@ const STAGE_DETAIL = /^\/api\/community\/stages\/[A-Za-z0-9_-]{1,80}$/;
 const STAGE_VOTE = /^\/api\/community\/stages\/[A-Za-z0-9_-]{1,80}\/vote$/;
 const ADMIN_FEEDBACK_ITEM = /^\/api\/admin\/feedback\/[0-9]{1,20}$/;
 const ADMIN_FEEDBACK_REPLY = /^\/api\/admin\/feedback\/[0-9]{1,20}\/reply$/;
+const OPS_INGEST_PATH = '/api/ops-feedback/ingest';
+const OPS_INGEST_MAX_BYTES = 8192;
 const MY_POST_FOLLOWUP = /^\/api\/board\/mine\/[0-9]{1,20}\/followup$/;
 // #678 후속: 고객이 자기 덧붙임을 고치거나 지우는 경로(커뮤니티 댓글 항목 경로와 같은 모양).
 const MY_POST_FOLLOWUP_ITEM = /^\/api\/board\/mine\/[0-9]{1,20}\/followup\/[0-9]{1,20}$/;
@@ -72,6 +74,7 @@ const ALLOWED = new Map([
   // #1025: 공개 세로 순간 무작위 조회(GET만, 로그인 없이 읽는다).
   ['/api/public/moments', new Set(['GET'])],
   ['/api/feedback', new Set(['POST'])],
+  [OPS_INGEST_PATH, new Set(['POST'])],
   ['/api/board', new Set(['POST'])],
   ['/api/board/mine', new Set(['GET'])],
   ['/api/board/journal/today', new Set(['GET'])],
@@ -123,6 +126,59 @@ export function jsonError(status, code, message) {
 }
 
 class UpstreamTooLarge extends Error {}
+
+// 원문 바이트를 제한 안에서만 모은다. 문자열로 바꾸거나 JSON을 다시 만들지 않는다.
+async function readIngestBytes(request) {
+  if (Number(request.headers.get('content-length')) > OPS_INGEST_MAX_BYTES) return null;
+  if (!request.body) return new Uint8Array(0);
+  const reader = request.body.getReader();
+  const bytes = new Uint8Array(OPS_INGEST_MAX_BYTES);
+  let size = 0;
+  try {
+    while (true) {
+      const {done,value} = await reader.read();
+      if (done) return bytes.slice(0,size);
+      if (size + value.byteLength > bytes.byteLength) {
+        await reader.cancel().catch(() => {});
+        return null;
+      }
+      bytes.set(value,size);
+      size += value.byteLength;
+    }
+  } finally { reader.releaseLock(); }
+}
+
+const encoder = new TextEncoder();
+async function hmacKey(secret, usage) {
+  return crypto.subtle.importKey('raw', encoder.encode(secret), {name:'HMAC',hash:'SHA-256'}, false, [usage]);
+}
+function signedBytes(prefix, body) {
+  const head = encoder.encode(prefix);
+  const bytes = new Uint8Array(head.length + body.length);
+  bytes.set(head); bytes.set(body,head.length);
+  return bytes;
+}
+async function verifyOpsIngest(request, env, proxySecret) {
+  const secret = env?.LOVETREE_OPS_INGEST_SECRET;
+  if (typeof secret !== 'string' || !secret.trim() || proxySecret.length < 32) {
+    return {error:jsonError(503,'ingest_unavailable','운영센터 연결이 설정되지 않았어요.')};
+  }
+  const body = await readIngestBytes(request).catch(() => null);
+  if (body === null) return {error:jsonError(400,'invalid_body','요청 본문 크기나 형식을 확인해 주세요.')};
+  const site = request.headers.get('x-pd-site');
+  const timestamp = request.headers.get('x-pd-timestamp') || '';
+  const signature = request.headers.get('x-pd-signature') || '';
+  const time = Number(timestamp);
+  if (site !== 'lovetree' || !/^\d{1,16}$/.test(timestamp) || !Number.isSafeInteger(time) || Math.abs(Date.now()-time)>300_000 || !/^sha256=[0-9a-fA-F]{64}$/.test(signature)) {
+    return {error:jsonError(401,'invalid_signature','운영센터 요청을 확인할 수 없어요.')};
+  }
+  const received = Uint8Array.from(signature.slice(7).match(/../g), value => parseInt(value,16));
+  const valid = await crypto.subtle.verify('HMAC',await hmacKey(secret,'verify'),received,signedBytes(`${timestamp}\nlovetree\n`,body));
+  if (!valid) return {error:jsonError(401,'invalid_signature','운영센터 요청을 확인할 수 없어요.')};
+  // 외부 서명은 전달하지 않는다. 기존 프록시 비밀로 원문에 묶인 별도 증명을 만든다.
+  const marker = new Uint8Array(await crypto.subtle.sign('HMAC',await hmacKey(proxySecret,'sign'),signedBytes('lovetree:ops-feedback-ingest\n',body)));
+  return {body, marker:Array.from(marker,b=>b.toString(16).padStart(2,'0')).join('')};
+}
 
 // 기한은 헤더 수신이 아니라 **응답 본문 완료**까지 적용한다. 헤더만 오고 본문이 멈춘
 // 업스트림을 그대로 흘리면 클라이언트가 영원히 기다리므로, 읽기를 우리 손으로 끝낸다.
@@ -190,6 +246,13 @@ export function createProxy({ fetcher = (...args) => fetch(...args), timeoutMs =
     // 서버 요청 출처 확인용 공유 머리말 — 브라우저가 보낸 값과 같은 이름을 쓰지 않는다.
     const proof = typeof env?.LOVETREE_PROXY_SECRET === 'string' ? env.LOVETREE_PROXY_SECRET.trim() : '';
     if (proof) headers.set('x-lovetree-proxy-proof', proof);
+    let ingestBody;
+    if (incoming.pathname === OPS_INGEST_PATH) {
+      const verified = await verifyOpsIngest(request,env,proof);
+      if (verified.error) return verified.error;
+      ingestBody = verified.body;
+      headers.set('x-lovetree-ops-ingest-proof',verified.marker);
+    }
 
     // 타이머는 응답 본문까지 읽고 나서야 해제한다. 만료되면 업스트림 요청과 읽기를 함께 취소한다.
     const controller = new AbortController();
@@ -213,7 +276,7 @@ export function createProxy({ fetcher = (...args) => fetch(...args), timeoutMs =
           upstream = await fetcher(`${origin}${incoming.pathname}${incoming.search}`, {
             method: request.method,
             headers,
-            ...(sendsBody ? { body: request.body, duplex: 'half' } : {}),
+            ...(sendsBody ? { body: ingestBody ?? request.body, duplex: 'half' } : {}),
             redirect: 'manual',
             signal: controller.signal
           });
