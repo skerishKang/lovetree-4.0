@@ -68,8 +68,8 @@ extraCSS+=`.card.lt-under-link{opacity:0}\n.card .surface .lt-orbit-texture{posi
 extraCSS+=`@keyframes lt-home-rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
 .center .lt-home-line{display:block}.center .lt-home-enter{animation:lt-home-rise 460ms cubic-bezier(.2,.7,.2,1) both;animation-delay:calc(var(--lt-home-order)*100ms)}
 @media(prefers-reduced-motion:reduce){.center .lt-home-enter{animation:none;opacity:1;transform:none}}
-.lt-orbit-tip{position:absolute;z-index:5;left:0;top:0;display:none;pointer-events:none;padding:7px 11px;border:1px solid var(--lt-gold-line);border-radius:999px;background:var(--lt-stage);color:var(--lt-pearl);font-size:12px;line-height:18px;white-space:nowrap;contain:paint;will-change:transform;transform:translate3d(0,0,0)}
-.lt-orbit-tip[data-visible]{display:block}`;
+.lt-orbit-tip{position:absolute;z-index:5;left:0;top:0;opacity:0;pointer-events:none;padding:7px 11px;border:1px solid var(--lt-gold-line);border-radius:999px;background:var(--lt-stage);color:var(--lt-pearl);font-size:12px;line-height:18px;white-space:nowrap;contain:paint;will-change:transform,opacity;transform:translate3d(0,0,0)}
+.lt-orbit-tip[data-visible]{opacity:1}`;
 
 export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSelect=()=>{},recordNote=null,examples=[],onOpen=null,empty=false,titleDisplay='both',momentList=null,dateStyle='dot',prefs=null,initialPicking=false,initialNotice=null,homePin=null,loggedIn}) {
  performance.mark('m0');
@@ -668,9 +668,9 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
   updateOrbitTip(now);
  };
  const updateOrbitTip=(now)=>{
-  if(!tipReady||tipDismissed||!spritesReady||!layoutBox){orbitTip.removeAttribute('data-visible');return;}
+  if(!tipReady||tipDismissed||!spritesReady||!layoutBox){if(orbitTip.hasAttribute('data-visible'))orbitTip.removeAttribute('data-visible');return;}
   if(reduced&&tipPinned)return;
-  if(now-tipLast<420)return;
+  if(now-tipLast<900)return;
   tipLast=now;
   const {w,h}=layoutBox,tw=105,th=34,ox=appBox?.left||0,oy=appBox?.top||0;
   const inside=(x,y)=>x>=4&&y>=4&&x+tw<=w-4&&y+th<=h-4;
@@ -691,7 +691,7 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
    }
    if(selected)break;
   }
-  if(!selected){orbitTip.removeAttribute('data-visible');return;}
+  if(!selected){if(orbitTip.hasAttribute('data-visible'))orbitTip.removeAttribute('data-visible');return;}
   tipTarget=selected.i;
   // One composited transform write, only when the projected card actually moved.
   // Avoid re-applying [data-visible] every 420ms: that invalidates CSS styles.
