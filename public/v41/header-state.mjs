@@ -67,11 +67,11 @@ export function treePickerAriaLabel(options = {}) {
   return `${treePickerText(options)}, 트리 바꾸기`;
 }
 
-// 트리 보기 탭(기억책·기억 보드·관계 지도)은 로그인한 내 트리에서만 열린다.
-// 로그아웃 상태에서는 예시 트리가 열려 있어도 숨긴다(내 기록이 아니다).
+// #1231: 서재·책·보드·지도 화면 이동은 계정 권한과 무관한 탐색이다.
+// 트리 선택·쓰기와 달리 확인 중·오프라인·로그아웃에도 유지한다.
 export function treeViewsVisible({ owned = false, phase = '', publicReading = false } = {}) {
-  // 회원 기록 확인 중이거나 일시적인 읽기 실패 상태에서도 화면 탐색은 가능하다.
-  return !publicReading && (owned || phase === 'checking' || phase === 'offline');
+  // 공유 읽기는 별도 탐색이므로 기존 예외를 유지한다.
+  return !publicReading;
 }
 
 // 상태별 헤더 노출(대표 결정 2026-11-08, #213 3번).
