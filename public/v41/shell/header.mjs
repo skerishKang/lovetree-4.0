@@ -56,10 +56,10 @@ function flowNavigation(){
   // 로그아웃이면 "트리 고르기", 브라우저에만 남은 미저장 기록이 있으면 "저장 안 된 기록"이다.
   const pendingDraft=hasPendingDraft(sessionStorage,getMember()?.snapshot().subject||null);
   // 방문자에게는 트리 고르기와 서재를 숨기고 내 화면의 책·보드·지도 탭을 재사용한다.
-  const treeSlot=document.querySelector('.tree-slot');
+  const treeSlot=document.querySelector?.('.tree-slot');
   if(treeSlot){treeSlot.inert=publicReading;if(publicReading)treeSlot.setAttribute('aria-hidden','true');else treeSlot.removeAttribute('aria-hidden');}
   $('record-menu').hidden=!parts.treePicker||publicReading;
-  $('community-menu').hidden=!publicReading;
+  const communityMenu=$('community-menu');if(communityMenu)communityMenu.hidden=!publicReading;
   const pickerState={owned,treeTitle:displayTreeTitle(window.LT41?.tree.title||''),pendingDraft,treeCount:getModel()?.trees?.length||0};
   $('source-label').textContent=treePickerVisible(pickerState);
   $('record-menu').setAttribute('aria-label',treePickerAriaLabel(pickerState));
