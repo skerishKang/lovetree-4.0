@@ -41,7 +41,7 @@ test('#1026 5화면×로그인여부×1440·390×보통·느림: 첫 그림 이�
     const names=['#record-menu','#tree-views','#write-menu','#account-entry','#account-avatar','#mobile-more','#book-display-toggle','#shelf-view-toggle'];
     const snap=()=>{const node=document.querySelector('.app-header');if(!node)return;const visible=names.filter(sel=>{const e=document.querySelector(sel);if(!e||e.hidden)return false;const s=getComputedStyle(e),r=e.getBoundingClientRect();return s.visibility!=='hidden'&&s.display!=='none'&&Number(s.opacity)>.05&&r.width>0&&r.height>0});window.__firstHeaderFrames.push({t:performance.now(),visible})};
     const timer=setInterval(snap,100);window.__stopFirstHeader=()=>{clearInterval(timer);snap()};
-    new PerformanceObserver(list=>{for(const e of list.getEntries())if(!e.hadRecentInput)window.__firstHeaderShifts.push(e.value)}).observe({type:'layout-shift',buffered:true});
+    new PerformanceObserver(list=>{for(const e of list.getEntries())if(!e.hadRecentInput)window.__firstHeaderShifts.push({value:e.value,time:e.startTime,sources:(e.sources||[]).map(a=>({node:a.node?{tag:a.node.tagName||'',id:a.node.id||'',className:typeof a.node.className==='string'?a.node.className.slice(0,90):'',parent:a.node.parentElement?.id||a.node.parentElement?.className||''}:null,previous:a.previousRect?{x:a.previousRect.x,y:a.previousRect.y,width:a.previousRect.width,height:a.previousRect.height}:null,current:a.currentRect?{x:a.currentRect.x,y:a.currentRect.y,width:a.currentRect.width,height:a.currentRect.height}:null}))})}).observe({type:'layout-shift',buffered:true});
    });
    await ctx.route('**/api/**',async r=>{
     const p=new URL(r.request().url()).pathname;
@@ -70,8 +70,9 @@ test('#1026 5화면×로그인여부×1440·390×보통·느림: 첫 그림 이�
    assert.equal(result.phase,'ready',screen+' '+width+' '+speed+': 머리줄 확정');
    const frames=result.frames.filter(f=>f.t>=result.fcp),final=new Set(result.frames.at(-1).visible);
    const disappeared=[...new Set(frames.flatMap(f=>f.visible.filter(sel=>!final.has(sel))))];
-   const cls=result.shifts.reduce((a,b)=>a+b,0);
-   observed.push({screen,width,speed,auth,disappeared,cls});
+   const cls=result.shifts.reduce((a,b)=>a+b.value,0);
+   if(screen==='home'&&width===390&&speed==='normal'&&auth==='out')console.log('#1026 LAYOUT_SHIFT_SOURCES',JSON.stringify({screen,width,speed,auth,cls,shifts:result.shifts}));
+   observed.push({screen,width,speed,auth,disappeared,cls,...(cls>.01?{shifts:result.shifts}: {})});
    assert.deepEqual(disappeared,[],JSON.stringify(observed.at(-1)));
    assert.ok(cls<=.01,JSON.stringify(observed.at(-1)));
   }finally{await ctx.close()}
