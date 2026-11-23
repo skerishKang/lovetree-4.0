@@ -333,7 +333,7 @@ test('#1245 화면: 날짜순에서 끌면 내 배치로 바뀌고 점선 칸·�
         border: placeholder && getComputedStyle(placeholder).borderTopStyle,
         size: placeholder && { w: placeholder.offsetWidth, h: placeholder.offsetHeight },
         draggedSize: dragged && { w: dragged.offsetWidth, h: dragged.offsetHeight },
-        duration: dragged && getComputedStyle(document.querySelector('.card.shiftPreview')).transitionDuration,
+        duration: (() => { const moving = document.querySelector('.card.shiftPreview:not(.dragLift)'); return moving && getComputedStyle(moving).transitionDuration; })(),
         moved
       };
     }, before);
@@ -466,11 +466,13 @@ test('#1245 390px 손가락: 짧게 누르면 순간을 열고 끌면 빈 칸·�
       return {
         count: document.querySelectorAll('.boardDropPlaceholder').length,
         dashed: placeholder && getComputedStyle(placeholder).borderTopStyle === 'dashed',
+        duration: (() => { const moving = document.querySelector('.card.shiftPreview:not(.dragLift)'); return moving && getComputedStyle(moving).transitionDuration; })(),
         moved: [...document.querySelectorAll('#cardLayer .card.shiftPreview')].length
       };
     });
     assert.equal(preview.count, 1, '손가락 끄는 동안 빈 칸 하나가 보인다');
     assert.equal(preview.dashed, true, '빈 칸은 점선이다');
+    assert.match(preview.duration, /0\.2s/, '390px에서도 다른 카드는 약 200ms에 걸쳐 움직인다');
     assert.ok(preview.moved > 0, '다른 카드가 움직인다');
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
     await frame.locator('.boardOrderUndo').waitFor({ state: 'visible', timeout: 5000 });
