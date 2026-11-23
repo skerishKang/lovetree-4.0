@@ -5,7 +5,7 @@ import vm from 'node:vm';
 import { buildGraph, footprint, pathFor, ORDER_Y_BASE, ORDER_Y_RANGE } from '../public/v41/graph-model.mjs';
 import { makeTag } from '../public/v41/tags.mjs';
 import '../public/v41/html-escape.mjs'; // A-15: 글자 막기 정본을 vm 에도 넣는다.
-import { timingRatio, TIMING_RATIO_LIMIT, TIMING_CEILING_MS } from './helpers/timing-ratio.mjs';
+import { timingRatio, countRatio, TIMING_RATIO_LIMIT, TIMING_CEILING_MS } from './helpers/timing-ratio.mjs';
 
 // #627 2단계 PR2: 그래프 보기의 순수 규칙(buildGraph·footprint·pathFor)을 입력→출력으로만 본다.
 // 설계 문서 docs/GRAPH_VIEW_20261115.md §2. 소스 글자 검사는 하지 않는다(동작 시험만).
@@ -260,6 +260,8 @@ test('순간 300개: buildGraph는 30개에 비해 제곱으로 느려지지 않
   // 절대 ms 대신 같은 실행의 30개와 비교한다(#728 CI windows 러너 흔들림, #731).
   assert.ok(ratio <= TIMING_RATIO_LIMIT, `300개/30개 비율 ${ratio.toFixed(1)}배 ≤ ${TIMING_RATIO_LIMIT}배 (30개 ${smallMs.toFixed(2)}ms · 300개 ${bigMs.toFixed(1)}ms)`);
   assert.ok(bigMs <= TIMING_CEILING_MS, `300순간 계산 ${bigMs.toFixed(1)}ms ≤ ${TIMING_CEILING_MS}ms`);
+  const counted = countRatio({ small: { fn: buildGraph, list: moments.slice(0, 30) }, big: { fn: buildGraph, list: moments } });
+  assert.ok(counted.ratio <= TIMING_RATIO_LIMIT, `그래프 입력 읽기 300개/30개 ${counted.ratio.toFixed(1)}배 ≤ ${TIMING_RATIO_LIMIT}배 (${counted.smallCount} → ${counted.bigCount})`);
   // 300개에서도 발자취는 한 줄: 구간 299개, 앞뒤 이웃이 맞다.
   assert.equal(graph.footprint.segments.length, 299);
   assert.equal(graph.footprint.order[0], 'm0');
@@ -332,4 +334,6 @@ test('순간 300개(겹치는 영상·같은 무대 섞임): stacks는 30개에 
   // 절대 ms 대신 같은 실행의 30개와 비교한다(#728 CI windows 러너 흔들림, #731).
   assert.ok(ratio <= TIMING_RATIO_LIMIT, `300개/30개 비율 ${ratio.toFixed(1)}배 ≤ ${TIMING_RATIO_LIMIT}배 (30개 ${smallMs.toFixed(2)}ms · 300개 ${bigMs.toFixed(1)}ms)`);
   assert.ok(bigMs <= TIMING_CEILING_MS, `300순간 stacks 계산 ${bigMs.toFixed(1)}ms ≤ ${TIMING_CEILING_MS}ms`);
+  const counted = countRatio({ small: { fn: buildGraph, list: moments.slice(0, 30) }, big: { fn: buildGraph, list: moments } });
+  assert.ok(counted.ratio <= TIMING_RATIO_LIMIT, `묶음 입력 읽기 300개/30개 ${counted.ratio.toFixed(1)}배 ≤ ${TIMING_RATIO_LIMIT}배 (${counted.smallCount} → ${counted.bigCount})`);
 });
