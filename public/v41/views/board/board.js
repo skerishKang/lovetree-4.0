@@ -719,8 +719,9 @@ function boardSafeArea(expectDetail = false) {
       const r = pk.getBoundingClientRect();
       if (r.width) top = Math.max(top, r.bottom - vr.top + 12);
     }
+    // 이어 보기가 공통 도구 줄로 옮겨가면 더 이상 판 위에 떠 있지 않다 — 판 아래 여백을 차지하지 않는다.
     const cb = $('.cinemaBtn');
-    if (cb) {
+    if (cb && !cb.closest('.lt-screen-toolbar')) {
       const r = cb.getBoundingClientRect();
       if (r.width) bottom = Math.max(bottom, vr.bottom - r.top + 12);
     }

@@ -237,7 +237,7 @@ export async function measureMapPixelsInPage([png, overlaysArg]) {
 /** 겹침 사각형 — 스크린샷 직전에 frame.evaluate 로 부른다(measureMap 첫 줄). */
 // 좌표는 화면 기준(getBoundingClientRect)이고, 가림 격자로 옮길 때 캔버스 원점을 뺀다.
 export function overlayRectsInPage() {
-  return [...document.querySelectorAll('.topbar button,.mode-pill,.hero,.legend,.controls,.detail.open,.route-status.show,.toast.show,.edge-tip.show,.mobile-ribbon,.lt-moment-picker,.tag-empty') ]
+  return [...document.querySelectorAll('.topbar button,.lt-screen-toolbar button,.mode-pill,.hero,.legend,.controls,.detail.open,.route-status.show,.toast.show,.edge-tip.show,.mobile-ribbon,.lt-moment-picker,.tag-empty') ]
     .filter(el => { const r = el.getBoundingClientRect(), s = getComputedStyle(el); return r.width > 0 && r.height > 0 && s.visibility === 'visible' && Number(s.opacity) > .01; })
     .map(el => {
       const r = el.getBoundingClientRect();
@@ -268,7 +268,7 @@ export function measureMapDOMInPage() {
   const hex = c => '#' + c.slice(0, 3).map(v => Math.round(v).toString(16).padStart(2, '0')).join('');
   const stage = document.getElementById('stage'), canvas = stage.getContext('2d'), d = stage.width / stage.clientWidth;
   const roles = [
-    ['toolbar', '.topbar button, #modePill'], ['hint', '.hero p'],
+    ['toolbar', '.lt-screen-toolbar button, .topbar button, #modePill'], ['hint', '.hero p'],
     ['legend', '.legend h3, .legend-row'],
     // #951 ⑥: 큰 탐색 판은 숨었다 — 그 글자 대비는 아래 단추 줄('ribbon')이 맡는다(대상만 이동, 기준값 4.5 그대로).
     // #951 ⑤: 상세 판을 보드와 같은 틀로 바꿨다 — 칩·detail-block 대신 제목·마음·날짜·이어진 순간·아래 단추를 잰다.

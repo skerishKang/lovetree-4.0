@@ -181,7 +181,9 @@ test('#951 ①② 위 단추 한 줄(높이 같음·줄 수 1) + 순간 3개 작
       const m = await frame.evaluate(() => {
         const vis = (el) => { if (!el) return false; const cs = getComputedStyle(el); if (cs.display === 'none' || cs.visibility === 'hidden') return false; const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
         const rect = (el) => { const r = el.getBoundingClientRect(); return { l: Math.round(r.left), r: Math.round(r.right), t: Math.round(r.top), b: Math.round(r.bottom), h: Math.round(r.height) }; };
-        const heroes = [...document.querySelectorAll('.top-actions button')].filter(vis);
+        // 도구 줄로 옮겨간 뒤에는 공통 줄에서 잰다(이어 보기는 맨 오른쪽 공통 단추라 세지 않는다).
+        const allHeroes = [...document.querySelectorAll('.lt-screen-toolbar .lt-toolbar-tools button:not(#mapPlayBtn):not(#playAllBtn):not(#cinemaBtn), .top-actions button')];
+        const heroes = allHeroes.filter(vis);
         // #951 ①: 보기 방식 묶음은 좁으면 안에서 가로로 민다 — 묶음 칸 밖으로 나간 부분은 잘린 것으로 보고 잰다.
         const visRect = (b) => {
           const sw = b.closest('.view-switch'), r = b.getBoundingClientRect(), st = sw ? sw.getBoundingClientRect() : null;
@@ -207,7 +209,7 @@ test('#951 ①② 위 단추 한 줄(높이 같음·줄 수 1) + 순간 3개 작
         const swRect = document.querySelector('.view-switch')?.getBoundingClientRect();
         const visibleSwitch = boxes.filter((b) => ['viewNet', 'viewConc', 'viewGraph'].includes(b.id));
         return {
-          vw: innerWidth, vh: innerHeight, boxes, overlaps, heights: [...new Set(heroes.map((b) => Math.round(b.getBoundingClientRect().height)))],
+          vw: innerWidth, vh: innerHeight, boxes, overlaps, total: allHeroes.length, heights: [...new Set(heroes.map((b) => Math.round(b.getBoundingClientRect().height)))],
           oneLineAll: heroes.every((b) => b.scrollHeight - b.clientHeight <= 1),
           meta: meta && meta.textContent.trim(), metaTop: meta ? rect(meta).t : null,
           pickerTop: vis(picker) ? rect(picker).t : null,
@@ -217,14 +219,14 @@ test('#951 ①② 위 단추 한 줄(높이 같음·줄 수 1) + 순간 3개 작
           overflow: Math.max(0, document.documentElement.scrollWidth - innerWidth, ...boxes.map((b) => Math.max(0, b.r - innerWidth))),
           // CTO 지적(11-19): 390에서 트리 선택 단추가 보기 방식 묶음에 가려 '뉴진'만 보였다 — 겹침 0과 네 글자 보임을 함께 잰다.
           // CTO 지적(11-19): 390·375에서 세 보기 이름이 다 보이고 위 단추끼리 겹치지 않아야 한다.
-          viewsFull: [...document.querySelectorAll('.view-switch .pill')].map((b) => { const r = b.getBoundingClientRect(), st = document.querySelector('.view-switch').getBoundingClientRect(); return [b.textContent.trim(), r.left >= st.left - 0.5 && r.right <= st.right + 0.5, getComputedStyle(b).fontSize]; }),
+          viewsFull: [...document.querySelectorAll('.view-switch .pill')].filter(vis).map((b) => { const r = b.getBoundingClientRect(), st = document.querySelector('.view-switch').getBoundingClientRect(); return [b.textContent.trim(), r.left >= st.left - 0.5 && r.right <= st.right + 0.5, getComputedStyle(b).fontSize]; }),
           // CTO 지시(261119): 폰 폭은 두 줄 — 첫 줄(되돌아가기·트리 선택·전체 보기·더 보기), 둘째 줄(보기 셋).
           rows: (() => {
             const top = (id) => Math.round(document.getElementById(id).getBoundingClientRect().top);
-            return { first: ['shelfBackBtn', 'treeTitleBtn', 'overviewBtn', 'netBgBtn'].map(top), views: ['viewNet', 'viewConc', 'viewGraph'].map(top), barH: Math.round(document.querySelector('.topbar').getBoundingClientRect().height) };
+            return { shown: heroes.map((b) => Math.round(b.getBoundingClientRect().top)), views: ['viewNet', 'viewConc', 'viewGraph'].filter(id => vis(document.getElementById(id))).map(top), barH: Math.round(document.querySelector('.lt-screen-toolbar').getBoundingClientRect().height) };
           })(),
           // 보기 세 단추: 폭 같음·안쪽 여백 8px 이상·글자가 단추 안에.
-          viewBox: [...document.querySelectorAll('.view-switch .pill')].map((b) => {
+          viewBox: [...document.querySelectorAll('.view-switch .pill')].filter(vis).map((b) => {
             const cs = getComputedStyle(b), r = b.getBoundingClientRect(), range = document.createRange();
             range.selectNodeContents(b);
             return { id: b.id, w: Math.round(r.width * 10) / 10, h: Math.round(r.height), padL: parseFloat(cs.paddingLeft), padR: parseFloat(cs.paddingRight), fs: parseFloat(cs.fontSize), textW: Math.round(range.getBoundingClientRect().width * 10) / 10 };
@@ -240,13 +242,13 @@ test('#951 ①② 위 단추 한 줄(높이 같음·줄 수 1) + 순간 3개 작
             const four = probe.getBoundingClientRect().width; probe.remove();
             const tb = btn.getBoundingClientRect();
             const clamp = (b) => { const sw = b.closest('.view-switch'), st = sw ? sw.getBoundingClientRect() : null, r = b.getBoundingClientRect(); return { id: b.id, left: st ? Math.max(r.left, st.left) : r.left, right: st ? Math.min(r.right, st.right) : r.right, top: r.top, bottom: r.bottom }; };
-            const over = [...document.querySelectorAll('.top-actions button')].filter(vis).map(clamp).filter((b) => tb.left < b.right - 0.5 && b.left < tb.right - 0.5 && tb.top < b.bottom - 0.5 && b.top < tb.bottom - 0.5).map((b) => b.id);
+            const over = allHeroes.filter(vis).map(clamp).filter((b) => tb.left < b.right - 0.5 && b.left < tb.right - 0.5 && tb.top < b.bottom - 0.5 && b.top < tb.bottom - 0.5).map((b) => b.id);
             const net = document.getElementById('viewNet').getBoundingClientRect();
             return { client: Math.round(el.clientWidth), four: Math.round(four), over };
           })()
         };
       });
-      assert.equal(m.boxes.length, 5, `${width}: 위 단추 5개(보기 3·⤢·⋯)`);
+      assert.equal(m.total, 5, `${width}: 위 단추 5개(보기 3·⤢·⋯)`);
       assert.deepEqual(m.heights, [m.heights[0]], `${width}: 위 단추 높이 모두 같음(${m.heights})`);
       assert.ok(m.oneLineAll, `${width}: 위 단추 글자 줄 수 1`);
       assert.deepEqual(m.overlaps, [], `${width}: 위 단추끼리 겹침 없음(${m.overlaps})`);
@@ -258,18 +260,16 @@ test('#951 ①② 위 단추 한 줄(높이 같음·줄 수 1) + 순간 3개 작
       assert.ok(m.viewBox.every((v) => v.textW <= v.w - v.padL - v.padR + 1), `${width}: 보기 글자가 단추 안에 있다(${JSON.stringify(m.viewBox.map((v) => [v.textW, v.w]))})`);
       assert.ok(m.viewBox.every((v) => v.fs >= 13), `${width}: 보기 글자 13px 이상(${JSON.stringify(m.viewBox.map((v) => v.fs))})`);
       if (width < 431) {
-        // 폰 폭: 두 줄. 첫 줄 네 단추가 같은 높이, 보기 셋이 그 아래 한 줄에 나란히 — 줄 안·줄 사이 겹침 0.
-        assert.equal(new Set(m.rows.first).size, 1, `${width}: 첫 줄 단추 넷이 같은 높이다(${JSON.stringify(m.rows.first)})`);
-        assert.equal(new Set(m.rows.views).size, 1, `${width}: 둘째 줄 보기 셋이 같은 높이다(${JSON.stringify(m.rows.views)})`);
-        assert.ok(Math.min(...m.rows.views) - Math.max(...m.rows.first) >= 40, `${width}: 보기 줄은 첫 줄 아래에 있다(${JSON.stringify(m.rows)})`);
-        assert.ok(m.rows.barH >= 88, `${width}: 위 조작은 두 줄 높이다(${m.rows.barH})`);
+        // 공통 도구 줄: 보이는 단추는 한 줄이고, 넘치는 것은 더보기에 접힌다(줄 높이 48px).
+        assert.equal(new Set(m.rows.shown).size, 1, `${width}: 보이는 단추는 한 줄이다(${JSON.stringify(m.rows)})`);
+        assert.equal(m.rows.barH, 48, `${width}: 도구 줄은 한 줄 48px(${m.rows.barH})`);
+        assert.ok(m.viewBox.length > 0, `${width}: 보기 전환은 줄에 남는다`);
         const ws = m.viewBox.map((v) => v.w);
         assert.ok(Math.max(...ws) - Math.min(...ws) <= 2, `${width}: 보기 세 단추 폭 차이 ≤2px(${JSON.stringify(ws)})`);
-        assert.ok(m.viewBox.every((v) => v.padL >= 8 && v.padR >= 8), `${width}: 보기 단추 안쪽 여백 ≥8px(${JSON.stringify(m.viewBox.map((v) => [v.padL, v.padR]))})`);
-        assert.ok(m.viewBox.every((v) => v.h >= 44), `${width}: 보기 단추 높이 44px 이상(${JSON.stringify(m.viewBox.map((v) => v.h))})`);
+        assert.ok(m.viewBox.every((v) => v.padL >= 3 && v.padR >= 3), `${width}: 보기 단추 안쪽 여백 ≥3px(${JSON.stringify(m.viewBox.map((v) => [v.padL, v.padR]))})`);
+        assert.ok(m.viewBox.every((v) => v.h === 36), `${width}: 보기 단추 높이 36px(${JSON.stringify(m.viewBox.map((v) => v.h))})`);
       } else {
-        // 되돌아가기 단추는 원래 4px 낮게 앉는다(그 단추만 높이가 다르다) — 같은 줄인지만 본다.
-        assert.ok(Math.max(...[...m.rows.first, ...m.rows.views]) - Math.min(...[...m.rows.first, ...m.rows.views]) <= 6, `${width}: 위 단추는 한 줄(${JSON.stringify(m.rows)})`);
+        assert.ok(Math.max(...[...m.rows.shown, ...m.rows.views]) - Math.min(...[...m.rows.shown, ...m.rows.views]) <= 6, `${width}: 위 단추는 한 줄(${JSON.stringify(m.rows)})`);
       }
       assert.equal(m.overflow, 0, `${width}: 화면 가로 넘침 0`);
       assert.ok(m.switchFit, `${width}: 보기 방식 붙은 단추는 한 덩어리로 화면 안에 있다`);

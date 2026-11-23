@@ -531,6 +531,7 @@ jobs:
       - name: 화면 줄 정리 시험(세 화면 줄·서재 이동·떠 있는 단추)
         if: needs.screen-changes.outputs.changed == 'true'
         run: |
+          npx vite build > /dev/null
           node --test --test-concurrency=1 tests/v41-tree-line-view-row.test.mjs
 
       - name: 책 YouTube 재생·두 장 모드 시험(건너뜀=실패 — 이슈 584)

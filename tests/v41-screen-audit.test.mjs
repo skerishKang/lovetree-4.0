@@ -1566,13 +1566,10 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     const bookChips = await (await readyFrame(page6, /track59-sketchbook/, { why: '책 쪽 확정 꾀리표를 읽을 책 프레임' })).evaluate(() =>
       [...document.querySelectorAll('.moment-title .lt-tag-chip')].map((n) => n.textContent.trim()));
     assert.ok(bookChips.includes('Super Shy') && bookChips.includes('무대'), `책 쪽에 확정 꾀리표 칩이 그려져야 한다(실제: ${JSON.stringify(bookChips)})`);
-    // 보드 첫 진입 두 안내(390) — 셸 알림('내 기록을 불러왔어요.')과 보드 안내 말풍선('순간을 선택해…')이
-    // 같은 자리에 포개지지 않는다. 보드는 ≤700px에서 말풍선을 화면 아래 중앙(bottom 95px)에 띄우고,
-    // 셸 알림도 #666 규칙으로 아래 중앙(--lt-toast-bottom)에 뜬다. 보드는 셸 알림이 떠 있는 동안
-    // 기다렸다 말풍선을 띄운다 — 두 상자가 동시에 보이는 동안에는 겹침 면적이 0이어야 한다.
-    // 1440은 말풍선(오른쪽 아래)·알림(아래 중앙)이 다른 모서리라 기하학적으로 겹치지 않고, 선택 복원으로
-    // 상세 판이 열려 안내가 뜨지 않는 폭이어서 390에서만 잰다.
-    // 새 문맥으로 띄운다(저장된 보기·선택이 없어야 첫 진입 흐름 — 900ms 뒤 말풍선, 셸 알림은 약 3초 — 이 재현된다).
+    // 보드 첫 진입(390) — 셸 알림('내 기록을 불러왔어요.')은 그대로이고 보드 안내 말풍선은 이제 없다.
+    // 두 안내가 같은 자리에 포개지던 문제를 없애는 대신, 열 때 안내가 아예 뜨지 않는다.
+    // 1440은 예전에도 말풍선·알림이 다른 모서리라 기하학적으로 겹치지 않아 390에서만 잰다.
+    // 새 문맥으로 띄운다(저장된 보기·선택이 없어야 첫 진입 흐름이 재현된다).
     if (width === 390) {
       const ctxNotice = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
       await ctxNotice.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); } catch {} }, theme);
@@ -1601,9 +1598,7 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
           }
           return null;
         };
-        // 보드 안내는 셸 알림(약 3초)이 사라진 뒤 600ms마다 최대 10번 다시 시도해 뜬다(최대 약 7초).
-        // 고정 횟수로 재면 느린 기기에서 안내가 뜨기 전에 검사가 끝나 빈손 실패가 난다 —
-        // 두 안내를 모두 '실제로 본' 뒤에 끝내고, 못 보면 마지막 관찰 상태를 메시지에 남긴다.
+        // 셸 알림은 실제로 본 뒤, 보드 안내가 뜨지 않는지 한 번 더 지켜본다(빈손 통과 금지).
         const state = () => {
           const shell = document.getElementById('toast');
           const board = boardToast();
@@ -1616,8 +1611,8 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
           };
         };
         let sawShell = false, sawBoard = false, maxArea = 0, bothAt = -1, last = null, samples = 0;
-        const deadline = Date.now() + 15000;
-        while (Date.now() < deadline && !(sawShell && sawBoard)) {
+        const deadline = Date.now() + 15000, afterShell = Date.now() + 17000;
+        while (Date.now() < deadline || (sawShell && Date.now() < afterShell)) {
           last = state();
           if (last.shellUp) sawShell = true;
           if (last.boardUp) sawBoard = true;
@@ -1632,7 +1627,7 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
         return { sawShell, sawBoard, maxArea: Math.round(maxArea), bothAt, detail };
       });
       assert.ok(twoNotices.sawShell, `390 셸 알림(기록 불러오기 안내)이 떠 있는 자리를 본다(빈손 통과 금지) — ${twoNotices.detail}`);
-      assert.ok(twoNotices.sawBoard, `390 보드 안내 말풍선이 뜨는 자리를 본다(빈손 통과 금지) — ${twoNotices.detail}`);
+      assert.equal(twoNotices.sawBoard, false, `390 보드 첫 진입 안내 토스트가 없다 — ${twoNotices.detail}`);
       assert.equal(twoNotices.maxArea, 0, `390 셸 알림과 보드 안내 말풍선이 같은 자리에 포개지지 않는다(겹침 ${twoNotices.maxArea}px², 동시 노출: ${twoNotices.bothAt < 0 ? '없음' : twoNotices.bothAt + '번째 관찰'})`);
       await pageNotice.close();
       await ctxNotice.close();
@@ -2496,8 +2491,10 @@ test('#972 서재·책 상세·둘러보기·새 소식 화면 치수', { skip: 
           const rect = sel => el.querySelector(sel).getBoundingClientRect();
           const s = rect('.shelf-viewport'), c = rect('.shelf-controls'), h = rect('.resume-strip');
           const card = rect('.book-card'), cover = rect('.book-cover'), rail = rect('.shelf-rail'), base = rect('.shelf-base');
+          const bar = document.querySelector('.lt-screen-toolbar')?.getBoundingClientRect();
           return { count: el.querySelectorAll('.book-card').length, upper: c.top - h.bottom, lower: s.top - c.bottom,
-            balance: Math.abs(h.top - (innerHeight - s.bottom)), innerGap: cover.top - s.top,
+            barGap: bar ? Math.round(h.top - bar.bottom) : null,
+            innerGap: cover.top - s.top,
             cardToBase: base.top - card.bottom, firstLeft: card.left - rail.left,
             arrows: [...el.querySelectorAll('.shelf-arrow')].filter(n => !n.hidden).length,
             overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth };
@@ -2505,7 +2502,7 @@ test('#972 서재·책 상세·둘러보기·새 소식 화면 치수', { skip: 
         assert.equal(shelf.count, 1);
         assert.ok(shelf.upper >= 0 && shelf.upper <= 48, `${theme}/${width}: 펼쳐 보기 아래 여백 ${shelf.upper}px`);
         assert.ok(shelf.lower >= 0 && shelf.lower <= 24, `${theme}/${width}: 검색 아래 여백 ${shelf.lower}px`);
-        assert.ok(shelf.balance <= 40, `${theme}/${width}: 세 요소 묶음의 위·아래 여백 차이 ${shelf.balance}px`);
+        assert.ok(shelf.barGap !== null && shelf.barGap >= 0 && shelf.barGap <= 24, `${theme}/${width}: 이어 보기 띠는 도구 줄 아래에 붙는다(${shelf.barGap}px)`);
         assert.ok(shelf.innerGap >= 0 && shelf.innerGap <= 65, `${theme}/${width}: 책장 안 표지 위 여백 ${shelf.innerGap}px`);
         assert.ok(shelf.cardToBase >= -1 && shelf.cardToBase <= 8, `${theme}/${width}: 책과 선반 사이 ${shelf.cardToBase}px`);
         assert.ok(Math.abs(shelf.firstLeft) <= 4, `${theme}/${width}: 첫 책 왼쪽 오차 ${shelf.firstLeft}px`);
@@ -2678,7 +2675,7 @@ test('#987 보드 첫 줄과 모바일 셸 겹침·현재 표시', { skip: REQUI
         await frame.locator('#detail.open').waitFor();
         await page.waitForTimeout(600);
         const m = await frame.evaluate(() => {
-          const title = document.querySelector('.boardTitle').getBoundingClientRect(), vp = document.querySelector('#viewport').getBoundingClientRect(), btn = document.querySelector('#cinemaBtn').getBoundingClientRect();
+          const title = document.querySelector('.lt-screen-toolbar').getBoundingClientRect(), vp = document.querySelector('#viewport').getBoundingClientRect(), btn = document.querySelector('#cinemaBtn').getBoundingClientRect();
           const cards = [...document.querySelectorAll('.card[data-id]')].map(e => e.getBoundingClientRect());
           return { titleBottom: title.bottom, viewportTop: vp.top, firstTop: Math.min(...cards.map(r=>r.top)), overlap: Math.max(...cards.map(r=>Math.max(0,Math.min(r.right,btn.right,vp.right)-Math.max(r.left,btn.left,vp.left))*Math.max(0,Math.min(r.bottom,btn.bottom,vp.bottom)-Math.max(r.top,btn.top,vp.top)))), visible: cards.filter(r=>r.bottom>vp.top&&r.top<vp.bottom&&r.right>vp.left&&r.left<vp.right).length, horizontalFit: cards.filter(r=>r.left>=vp.left-1&&r.right<=vp.right+1).length };
         });
