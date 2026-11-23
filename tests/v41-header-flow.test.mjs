@@ -20,9 +20,9 @@ const SCREENS = [
 const STATES = [
   {
     name: '로그아웃',
-    make: () => ({ owned: false, trees: 1, tree: { title: '예시 트리' }, source: 'example' }),
+    make: () => ({ owned: false, trees: 0, tree: null, source: 'example' }),
     expect: {
-      treeViews: true, recordMenu: false, writeMenu: false, shareMenu: false,
+      treeViews: false, recordMenu: false, writeMenu: false, shareMenu: false,
       picker: '트리 고르기', write: '＋ 순간 추가', aria: '이 트리 보기'
     }
   },

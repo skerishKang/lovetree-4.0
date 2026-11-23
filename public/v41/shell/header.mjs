@@ -29,7 +29,11 @@ function flowNavigation(){
   // 트리 보기 탭은 로그인한 내 트리에서만 연다. 로그아웃이면 예시가 열려 있어도 숨긴다.
   // #213 3번: 상태(out·in-empty·in-trees·share)마다 보이는 것만 남기고 나머지는 숨긴다(비활성 표시 없음).
   const parts=headerPartsFor({owned,treeCount:getModel()?.trees?.length||0,publicReading});
-  const showTreeViews=treeViewsVisible({owned,phase:getMember()?.snapshot().phase,publicReading,example:getSource()==='example'&&!!window.LT41?.tree});
+  // #777 2단계: 로그인 없이 트리 보기를 시험하는 주소(#tree)에서만 예시 트리 탭을 연다.
+  // 일반 로그아웃 화면의 머리줄은 그대로라 배포 겉모습 비교도 깨지지 않는다.
+  const previewTree=getSource()==='example'&&!!window.LT41?.tree&&
+    (globalThis.location?.hash==='#tree'||new URLSearchParams(globalThis.location?.search||'').has('treePreview'));
+  const showTreeViews=treeViewsVisible({owned,phase:getMember()?.snapshot().phase,publicReading,example:previewTree});
   $('tree-views').hidden=!showTreeViews;for(const b of $('tree-views').querySelectorAll('button')){b.disabled=false;b.title='';}
   $('tree-views').setAttribute('aria-label','이 트리 보기');
   // #1094: 보기 방식(책/목록) 전환 묶음은 책 화면에서만, #1093 서재 진열 묶음은 서재 화면에서만 보인다.
