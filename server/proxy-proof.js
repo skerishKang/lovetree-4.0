@@ -65,7 +65,7 @@ export function proxyProofMismatchEntry(request, secret) {
 
 // 같은 내용이 한 주기 안에 되풀이되면 한 번만 남기고 횟수만 센다.
 // 주기가 지나 같은 내용이 다시 오면, 지난 묶음의 마지막 횟수를 먼저 남기고 새 묶음을 시작한다.
-export function createProxyProofMismatchLogger({ log = () => {}, windowMs = 60_000, now = () => Date.now() } = {}) {
+export function createProxyProofMismatchLogger({ log = () => {}, windowMs = 60_000, now = () => Date.now(), maxKeys = 200 } = {}) {
   const state = new Map();
   return function record(request, secret) {
     const entry = proxyProofMismatchEntry(request, secret);
@@ -74,6 +74,8 @@ export function createProxyProofMismatchLogger({ log = () => {}, windowMs = 60_0
     const prev = state.get(key);
     if (prev && at - prev.at < windowMs) { prev.count += 1; return; }
     if (prev) log({ ...prev.entry, 횟수: prev.count });
+    // 아무 경로나 보내 기록 표를 키우지 못하게 묶음 수를 제한한다. 넘치면 가장 오래된 묶음부터 뺀다.
+    if (!prev && state.size >= maxKeys) state.delete(state.keys().next().value);
     state.set(key, { at, count: 1, entry });
     log({ ...entry, 횟수: 1 });
     for (const [otherKey, other] of state) {

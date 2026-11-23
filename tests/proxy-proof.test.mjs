@@ -109,3 +109,11 @@ test('서버 요청 출처 확인: 내용이 다르면 따로 남는다', () => 
   assert.equal(logs.length, 2);
   assert.deepEqual(logs.map(e => e.경로), ['/api/workspace', '/api/youtube']);
 });
+
+test('어긋남 기록 묶음 수는 상한을 넘지 않는다', () => {
+  const logs = [];
+  const record = createProxyProofMismatchLogger({ log: e => logs.push(e), maxKeys: 3, now: () => 0 });
+  for (let i = 0; i < 10; i++) record({ path: `/api/p${i}`, headers: {} }, 'x'.repeat(40));
+  record({ path: '/api/p0', headers: {} }, 'x'.repeat(40));
+  assert.equal(logs.filter(e => e.경로 === '/api/p0').length, 2);
+});
