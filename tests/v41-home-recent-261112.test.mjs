@@ -78,7 +78,8 @@ test('#426 ▶ 재생은 누른 뒤에만 — 첫 화면이 열릴 때는 플레
 test('#426 390: 카드 폭=화면-32px, 세로 썸네일 높이 제한',()=>{
   assert.match(orbit,/\.recent-card\{[^}]*width:min\(430px,86vw\)/);
   assert.match(orbit,/width:calc\(100vw - 32px\)/);
-  assert.match(orbit,/\.recent-media\.vertical \.recent-thumb\{[^}]*object-fit:contain/);
+  assert.match(orbit,/\.recent-media\.vertical \.recent-thumb\{[^}]*object-fit:cover/);
+  assert.match(orbit,/\.recent-media\.vertical::before\{[^}]*transform:scale\(3\.6\)/);
   // 카드가 .center 안에 있어 #440 안전 구역 측정에 함께 잡힌다.
   assert.match(orbit,/<\/p>\$\{recentMoment\?recentMarkup\(recentMoment\):''\}<div class="actions">/);
 });
