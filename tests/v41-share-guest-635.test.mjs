@@ -475,10 +475,7 @@ test('#635 PR C 규칙(정적): 시작 입구·첫날 표기·크게 보기 대�
   /* #book-dup2: 여백 60→68px — 보라색 책 테두리(.book-cover)가 wrap 아래로 14px 내려와 60px로는
      테두리 아래끝이 링크 줄 위 11px(정원에서는 10px 겹침)이었다. 68px로 테두리 아래끝을 링크 줄 위 17px에 둔다. */
   assert.match(layout, /padding:24px 14px 68px/, '390 책 화면: 아래 고정 링크 줄과 책 테두리가 겹치지 않게 16px 이상 띄울 여백을 둔다');
-  const orbit = read('src/views/orbit.js');
-  assert.match(orbit, /<span class="center-hint">드래그 · 금테 카드를 눌러 감상<\/span>/, '첫 화면 안내는 안내 줄 옆에 함께 그린다');
-  assert.ok(!orbit.includes('<div class="hint">드래그'), '첫 화면 오른쪽 아래 고정 안내(링크 줄과 겹치던)는 치웠다');
-  assert.match(orbit, /\.center-note\{display:flex;flex-wrap:wrap/, '안내 줄은 단추 묶음 바로 아래에서 두 문장을 나란히 쓴다');
+  // #1204 removed the old two-line orbit guidance; its absence and spacing are browser-tested.
 });
 
 // 실제 셸(/v41/)을 여는 도우미 — 로그아웃 상태 그대로(예시 기록).
@@ -587,7 +584,7 @@ test('#635 PR C 화면: 메뉴 시작 입구·첫날 표기·크게 보기 대�
           await context.close();
         }
 
-        // 11-첫 화면. 안내(단추 묶음 바로 아래)와 고정 링크 줄이 겹치지 않고 16px 이상 떨어져 있다.
+        // 11-첫 화면. #1204 removed the guidance below the actions; action row and fixed links remain apart.
         {
           const { context, page, frame, problems } = await openShell(browser, base, '', { width, height, theme });
           assert.equal(problems.length, 0, `첫 화면 ${width}·${theme}: 화면 오류 ${problems.join(' | ')}`);
@@ -601,15 +598,14 @@ test('#635 PR C 화면: 메뉴 시작 입구·첫날 표기·크게 보기 대�
           });
           assert.equal(drawn.nf, false, `${width}·${theme}: 첫 화면이 404('nf')로 그려졌다 — 시험 서버가 dist(빌드 산출물)를 서빙하는지 확인`);
           assert.ok(drawn.cards > 0 || drawn.center, `${width}·${theme}: 첫 화면(궤도)이 그려지지 않았다(카드 0개)`);
-          const noteBox = await frame.locator('.center-note').first().boundingBox();
+          const noteBox = await frame.locator('.center .actions').first().boundingBox();
           const linksBox = await page.locator('.home-links').boundingBox();
-          assert.ok(noteBox && linksBox, `${width}·${theme}: 안내 줄·링크 줄 자리를 못 읽었다`);
+          assert.ok(noteBox && linksBox, `${width}·${theme}: 단추 줄·링크 줄 자리를 못 읽었다`);
           const gapHome = Math.round(linksBox.y - (noteBox.y + noteBox.height));
           const overlapHome = Math.max(0, Math.min(noteBox.y + noteBox.height, linksBox.y + linksBox.height) - Math.max(noteBox.y, linksBox.y));
-          assert.equal(overlapHome, 0, `${width}·${theme}: 첫 화면 안내와 링크 줄이 ${overlapHome}px 겹친다`);
-          assert.ok(gapHome >= 16, `${width}·${theme}: 첫 화면 안내와 링크 줄 사이가 ${gapHome}px다(16px 이상)`);
-          const hintPos = await frame.evaluate(() => { const root = document.getElementById('orbit'); const el = root && root.shadowRoot ? root.shadowRoot.querySelector('.center-hint') : document.querySelector('.center-hint'); return el ? getComputedStyle(el).position : '없음'; });
-          assert.equal(hintPos, 'static', `${width}·${theme}: 안내가 여전히 화면 아래 고정 자리다(${hintPos})`);
+          assert.equal(overlapHome, 0, `${width}·${theme}: 첫 화면 단추와 링크 줄이 ${overlapHome}px 겹친다`);
+          assert.ok(gapHome >= 16, `${width}·${theme}: 첫 화면 단추와 링크 줄 사이가 ${gapHome}px다(16px 이상)`);
+          assert.equal(await frame.locator('.center-note,.center-hint').count(), 0, `${width}·${theme}: 지운 안내 문구가 다시 나타났다`);
           // #book-dup. 새 소식 카드: 390에서 머리줄 바로 아래 자리는 '순간 목록'·테마 단추를 가렸다(실측 겹침 133×66px).
           // 이제 화면 아래, 링크 줄 위에 놓인다 — 어떤 단추와도 겹침 0. 1440 자리(오른쪽 아래)는 그대로다.
           {

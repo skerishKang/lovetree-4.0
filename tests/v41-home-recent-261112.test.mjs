@@ -80,6 +80,7 @@ test('#426 390: 카드 폭=화면-32px, 세로 썸네일 높이 제한',()=>{
   assert.match(orbit,/width:calc\(100vw - 32px\)/);
   assert.match(orbit,/\.recent-media\.vertical \.recent-thumb\{[^}]*object-fit:cover/);
   assert.match(orbit,/\.recent-media\.vertical::before\{[^}]*transform:scale\(2\.8\)/);
-  // 카드가 .center 안에 있어 #440 안전 구역 측정에 함께 잡힌다.
-  assert.match(orbit,/<\/p>\$\{recentMoment\?recentMarkup\(recentMoment\):''\}<div class="actions">/);
+  // #1204 순차 등장 래퍼와 기존 최근 카드·안전 영역 배치를 모두 검증한다.
+  assert.match(orbit,/<\/p>\$\{recentMoment\?recentMarkup\(recentMoment\):''\}<div class="actions lt-home-enter"/);
+
 });
