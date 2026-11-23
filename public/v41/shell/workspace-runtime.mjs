@@ -14,9 +14,9 @@ export function createWorkspaceRuntime(ctx){
 
   function showInFrame(url,title){return ctx.shellScreens.showInFrame(url,title);}
 
-  function show(file,write=true,treeKey=''){
+  function show(file,write=true,treeKey='',fromHeaderTab=false){
    if(file==='src064-orbit.html')ctx.shellStageLoading.start('home');else ctx.shellStageLoading.cancel();
-   return ctx.shellScreens.show(file,write,treeKey);
+   return ctx.shellScreens.show(file,write,treeKey,fromHeaderTab);
   }
 
   function frameLoaded(frame){return ctx.shellScreens.frameLoaded(frame);}
@@ -35,11 +35,23 @@ export function createWorkspaceRuntime(ctx){
   // 백업 파일 열기는 계정 없이 쓰는 입구라 로그인 상태에서는 숨긴다(로그아웃은 지금 그대로 둔다).
   // 2026-11-17 대표 결정: 트리 0개 계정이 서재·책·보드·지도탭을 열면 그 화면의 빈 상태를 보여 준다.
   function paintEmptyForScreen(file){
+    const empty=(0,ctx.$)('empty');
+    const owned=!!ctx.member?.snapshot().owned;
     const shelf=file==='track32-bookshelf.html';
-    if(shelf)(0,ctx.$)('empty').dataset.emptyView='shelf';else delete (0,ctx.$)('empty').dataset.emptyView;
-    (0,ctx.$)('empty').querySelector('h1').textContent=shelf?'아직 책장이 비어 있어요.':'아직 트리가 없어요.';
-    (0,ctx.$)('empty').querySelector('p').textContent=shelf?'첫 순간을 담으면 책장에 책이 꽂혀요.':'좋아하는 영상 주소 하나면 시작돼요.';
-    (0,ctx.$)('empty-records').textContent=shelf?'＋ 새 트리':'＋ 첫 순간 추가';
+    if(shelf&&owned)empty.dataset.emptyView='shelf';else delete empty.dataset.emptyView;
+    if(!owned){
+      // 2026-11-23: 로그아웃 탭은 예시 트리 대신 보드와 같은 빈 상태를 보여 준다.
+      const name=({'track32-bookshelf.html':'서재','track59-sketchbook.html':'책','track58-pinboard.html':'보드','track56-network.html':'지도','track60-graph.html':'지도'})[file]||'기록';
+      empty.dataset.emptyGuest='1';
+      empty.querySelector('h1').textContent=`로그인하면 내 ${name}${name==='책'?'이':'가'} 보여요`;
+      empty.querySelector('p').textContent='로그인한 계정의 기록을 이 화면에서 볼 수 있어요.';
+      (0,ctx.$)('empty-records').textContent='로그인';
+    }else{
+      delete empty.dataset.emptyGuest;
+      empty.querySelector('h1').textContent=shelf?'아직 책장이 비어 있어요.':'아직 트리가 없어요.';
+      empty.querySelector('p').textContent=shelf?'첫 순간을 담으면 책장에 책이 꽂혀요.':'좋아하는 영상 주소 하나면 시작돼요.';
+      (0,ctx.$)('empty-records').textContent=shelf?'＋ 새 트리':'＋ 첫 순간 추가';
+    }
     (0,ctx.$)('empty-records').hidden=false;(0,ctx.$)('empty-records').classList.add('primary');
     (0,ctx.$)('empty-sample').hidden=true;(0,ctx.$)('empty-file').hidden=true;
   }
@@ -47,6 +59,7 @@ export function createWorkspaceRuntime(ctx){
   function paintEmptyCopy(){
     const owned=!!ctx.member?.snapshot().owned;
     delete (0,ctx.$)('empty').dataset.emptyView;
+    delete (0,ctx.$)('empty').dataset.emptyGuest;
     (0,ctx.$)('empty').querySelector('h1').textContent=owned?'아직 트리가 없어요.':'다시 펼칠 순간을 기다리고 있어요.';
    // #463(2026-11-13): 트리 0개(로그인)는 처음 온 사람용 한 줄로. 예전 문구는 다시 온 사람용이었고
    // ("예시를 둘러보거나..."), 떠 있는 카드가 예시라는 것도 모호했다.

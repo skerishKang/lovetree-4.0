@@ -25,11 +25,11 @@ test('1. 상태는 로그아웃·로그인(트리 없음)·트리 있음·공유
   assert.equal(headerState({}), 'out', '아무것도 모를 때는 로그아웃으로 본다');
 });
 
-test('2. 로그아웃: 첫 화면·내 책장·둘러보기 + 로그인만 남고 트리 관련은 숨는다', () => {
+test('2. 로그아웃: 서재·책·보드·지도 탐색을 유지하고 트리 선택·쓰기·공유만 숨긴다', () => {
   const parts = headerPartsFor({owned: false, treeCount: 0});
   assert.deepEqual(
     {account: parts.account, browse: parts.browse, treePicker: parts.treePicker, treeViews: parts.treeViews, write: parts.write, share: parts.share},
-    {account: 'login', browse: true, treePicker: false, treeViews: false, write: false, share: false}
+    {account: 'login', browse: true, treePicker: false, treeViews: true, write: false, share: false}
   );
 });
 

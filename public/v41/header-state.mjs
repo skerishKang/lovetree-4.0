@@ -67,15 +67,15 @@ export function treePickerAriaLabel(options = {}) {
   return `${treePickerText(options)}, 트리 바꾸기`;
 }
 
-// 방문자는 내 책·보드·지도 화면의 공용 탭을 쓰고, 서재와 트리 선택·쓰기는 숨긴다.
-// 로그아웃 예시 화면은 별도 정책에 따라 탭을 숨긴다.
+// #1231 + #1236: 서재·책·보드·지도 화면 이동은 계정 권한과 무관한 탐색이다.
+// 로그아웃·확인 중·오프라인에도 유지하고, 방문자는 같은 책·보드·지도 탭을 쓴다.
 export function treeViewsVisible({ owned = false, phase = '', publicReading = false } = {}) {
-  // 회원 기록 확인 중이거나 일시적인 읽기 실패 상태에서도 화면 탐색은 가능하다.
-  return publicReading || owned || phase === 'checking' || phase === 'offline';
+  return true;
 }
 
-// 상태별 헤더 노출(대표 결정 2026-11-08, #213 3번).
-// "비활성으로 보이기" 대신 "아예 숨기기"로 정리한다: 로그아웃이면 트리 탭·트리 선택·순간 추가·공유가 없다.
+// #213(2026-11-08)의 권한별 메뉴 숨김은 트리 선택·순간 추가·공유에 적용한다.
+// 대표 결정(2026-11-23): 서재·책·보드·지도 탭은 로그인·로그아웃·트리 0개 모두 표시한다.
+// 공유 읽기는 개인 화면 탐색이 아니므로 별도 예외다.
 export function headerState({ owned = false, treeCount = 0, publicReading = false } = {}) {
   if (publicReading) return 'share';
   if (!owned) return 'out';
@@ -83,10 +83,10 @@ export function headerState({ owned = false, treeCount = 0, publicReading = fals
 }
 
 const HEADER_PARTS = Object.freeze({
-  out: { account: 'login', browse: true, treePicker: false, treeViews: false, write: false, share: false },
+  out: { account: 'login', browse: true, treePicker: false, treeViews: true, write: false, share: false },
   'in-empty': { account: 'avatar', browse: true, treePicker: true, treeViews: true, write: true, share: false },
   'in-trees': { account: 'avatar', browse: true, treePicker: true, treeViews: true, write: true, share: true },
-  share: { account: 'login', browse: false, treePicker: false, treeViews: true, write: false, share: false }
+  share: { account: 'login', browse: true, treePicker: false, treeViews: true, write: false, share: false }
 });
 
 export function headerParts(state) {

@@ -48,7 +48,7 @@ test('#426 썸네일은 공용 모듈(#435) 그대로 — 회색이면 글 카�
   assert.match(orbit,/\.recent-media\{[^}]*aspect-ratio:16\/9/);
   assert.match(orbit,/\.recent-media\.vertical\{[^}]*aspect-ratio:16\/9/);
   assert.match(orbit,/\$\{bgStyle\(candidates\[0\]\)\}/,'세로 배경 그림은 CSS 변수로 넘긴다(#1084)');
-  assert.match(orbit,/\.recent-media\.vertical::before\{[^}]*background-image:var\(--lt-recent-bg\)[^}]*filter:blur\(18px\)/,'같은 썸네일을 흐려 깐다(#1084)');
+  assert.match(orbit,/\.recent-media\.vertical::before\{[^}]*background-image:var\(--lt-recent-bg\)[^}]*filter:blur\(6px\)/,'같은 썸네일을 흐려 깐다(#1084)');
 });
 
 test('#426 카드 누르면 그 순간 열기 — 궤도 카드와 같은 onOpen 경로, Enter·Space도 같다',()=>{
@@ -79,7 +79,8 @@ test('#426 390: 카드 폭=화면-32px, 세로 썸네일 높이 제한',()=>{
   assert.match(orbit,/\.recent-card\{[^}]*width:min\(430px,86vw\)/);
   assert.match(orbit,/width:calc\(100vw - 32px\)/);
   assert.match(orbit,/\.recent-media\.vertical \.recent-thumb\{[^}]*object-fit:cover/);
-  assert.match(orbit,/\.recent-media\.vertical::before\{[^}]*transform:scale\(3\.6\)/);
-  // 카드가 .center 안에 있어 #440 안전 구역 측정에 함께 잡힌다.
-  assert.match(orbit,/<\/p>\$\{recentMoment\?recentMarkup\(recentMoment\):''\}<div class="actions">/);
+  assert.match(orbit,/\.recent-media\.vertical::before\{[^}]*transform:scale\(2\.8\)/);
+  // #1204 순차 등장 래퍼와 기존 최근 카드·안전 영역 배치를 모두 검증한다.
+  assert.match(orbit,/<\/p>\$\{recentMoment\?recentMarkup\(recentMoment\):''\}<div class="actions lt-home-enter"/);
+
 });

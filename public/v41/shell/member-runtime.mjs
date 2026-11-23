@@ -98,7 +98,7 @@ export function createMemberRuntime(ctx){
        ctx.syncedNoticeKeys.add(key);
        ctx.noticeQueue.request('toast',{maxWait:5000,
         // #1223: 앞선 우선순위 안내에 밀려 지나간 synced 알림이 notifyOnce 기록에 막혀 다시 뜨지 않았다.
-        // 중복은 위의 syncedNoticeKeys가 이미 막으므로 일반 notify로 띄운다.
+        // 중복은 위의 syncedNoticeKeys가 이미 막으므로 일반 notify로 띄운다(선점 뒤 대기열 재표시 허용).
         show:()=>ctx.shellNotice.notify(text),
         hide:ctx.hideToast
        });
@@ -125,7 +125,7 @@ export function createMemberRuntime(ctx){
    else if(!status.dirty&&status.phase==='offline')(0,ctx.notify)(status.detail||'내 기록을 불러오지 못했어요.');
    (0,ctx.$)('write-menu').textContent=status.dirty?'저장 안 됨' :'＋ 순간 추가';
    // #1109: 내 화면을 먼저 고른 경우 빈 판 안내를 회원 상태 알림이 덮지 않는다.
-   if(ctx.current!=='src064-orbit.html'&&!window.LT41&&ctx.source!=='share'&&!(0,ctx.$)('empty').hidden)(0,ctx.paintEmptyForScreen)(ctx.current);
+   if(ctx.current!=='src064-orbit.html'&&ctx.source!=='share'&&!(0,ctx.$)('empty').hidden&&(!window.LT41||(0,ctx.$)('empty').dataset.emptyGuest==='1'))(0,ctx.paintEmptyForScreen)(ctx.current);
    else{(0,ctx.$)('empty-records').textContent=status.writable?'＋ 첫 트리 만들기':'내 기록 불러오기';(0,ctx.$)('empty-records').classList.toggle('primary',!!status.writable);(0,ctx.$)('empty-sample').classList.toggle('primary',!status.writable);}
    ctx.previousDirty=status.dirty;(0,ctx.renderAccount)();(0,ctx.flowNavigation)();document.body.dataset.member=ctx.member?.snapshot().owned?'in':'out';document.body.dataset.treeCount=String(ctx.model?.trees?.length||0);(0,ctx.applyAdvanced)();
   }

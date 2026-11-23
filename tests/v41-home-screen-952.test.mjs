@@ -339,7 +339,8 @@ test('#1027 정원 이어 보기 카드의 종이색과 글 대비, 세로 영�
                 assert.equal(stats.fit,'cover');
                 assert.ok(stats.thumbW/stats.thumbH<=9/16+0.02&&stats.thumbW/stats.thumbH>=0.35, '세로 썸네일은 9:16 이하 폭(쇼츠 썸네일 양옆 띠는 잘라 냄): '+JSON.stringify(stats));
                 assert.ok(stats.thumbW<stats.width*0.4, '가운데 좁은 칸만 원래 썸네일, 나머지는 흐린 배경: '+JSON.stringify(stats));
-                assert.match(stats.blur,/blur\(18px\)/);
+                // 대표 11-24: 뒤에 같은 영상이 크고 흐리게 보여야 한다 — 2.8배·blur 6px(실제 약 17px). 3.6배·18px는 칸 전체가 한 색으로 뭉개졌다.
+                assert.match(stats.blur,/blur\(6px\)/);
                 assert.equal(stats.opacity,'0.7');
                 assert.ok(stats.bgImage.includes(stats.thumbSrc),'같은 썸네일을 CSS 변수로 깐다(#1084): '+JSON.stringify(stats));
               }
@@ -636,4 +637,214 @@ test('#1088 2단계 떠 있는 카드도 그 자리에서 크게 보기', { skip
       await h.page.keyboard.press('Escape');
     } finally { await close952(h); }
   } finally { await browser.close(); }
+});
+
+
+// #1204: Pixel regression for the glow over the orbit. Inspect the *real*
+// page theme toggle or a saved theme; never change just the iframe host.
+test('#1204 실제 테마 전환·저장값 및 가운데 빛 직선 경계 픽셀 검사', {skip: REQUIRE952 ? false : skip952, timeout: 180000}, async () => {
+  if (skip952) assert.fail(skip952);
+  const {inflateSync} = await import('node:zlib');
+  function rgbRows(png) {
+    assert.equal(png.subarray(1,4).toString(),'PNG');
+    let width=0,height=0,channels=0,pos=8,parts=[];
+    while(pos<png.length){
+      const len=png.readUInt32BE(pos),tag=png.toString('ascii',pos+4,pos+8),data=png.subarray(pos+8,pos+8+len);
+      if(tag==='IHDR'){width=data.readUInt32BE(0);height=data.readUInt32BE(4);assert.equal(data[8],8);channels=data[9]===6?4:data[9]===2?3:0;assert.ok(channels,'expected RGB/RGBA PNG');}
+      if(tag==='IDAT')parts.push(data);
+      pos+=len+12;
+      if(tag==='IEND')break;
+    }
+    const packed=inflateSync(Buffer.concat(parts)),stride=width*channels,rows=[];
+    let previous=new Uint8Array(stride);
+    let offset=0;
+    for(let y=0;y<height;y++){
+      const filter=packed[offset++],row=new Uint8Array(stride);
+      for(let i=0;i<stride;i++){
+        const raw=packed[offset++],left=i>=channels?row[i-channels]:0,up=previous[i],ul=i>=channels?previous[i-channels]:0;
+        const p=left+up-ul,pa=Math.abs(p-left),pb=Math.abs(p-up),pc=Math.abs(p-ul);
+        const predict=pa<=pb&&pa<=pc?left:pb<=pc?up:ul;
+        row[i]=(raw+(filter===1?left:filter===2?up:filter===3?Math.floor((left+up)/2):filter===4?predict:0))&255;
+      }
+      rows.push(row);previous=row;
+    }
+    return {width,height,pixel:(x,y)=>{const i=(y*0+Math.max(0,Math.min(width-1,x)))*channels,r=rows[Math.max(0,Math.min(height-1,y))];return [r[i],r[i+1],r[i+2]];}};
+  }
+  const browser=await chromium952.launch({headless:true});
+  try {
+    for(const width of [1440,390]) for(const theme of ['garden','night']) for(const route of ['stored','toggle']){
+      const initStorage=route==='stored'?{'lt41.theme':theme}:{'lt41.theme':'night'};
+      const h=await boot952(browser,{width,motion:'reduce',initStorage});
+      try {
+        if(route==='toggle'&&theme==='garden'){
+          await h.page.locator('#theme-toggle').click();
+          await h.page.waitForFunction(()=>document.documentElement.getAttribute('data-lt-theme')==='garden');
+        }
+        await h.frame.waitForFunction(expected=>(document.querySelector('#orbit')?.getAttribute('data-lt-theme')||'night')===expected,theme,{timeout:10000});
+        const state=await h.page.evaluate(()=>{
+          const frame=document.querySelector('#view')?.contentDocument;
+          const host=frame?.querySelector('#orbit'),root=host?.shadowRoot;
+          const app=root?.querySelector('.app'),scrim=root?.querySelector('.center-scrim');
+          const a=app?.getBoundingClientRect(),b=scrim?.getBoundingClientRect();
+          return {shell:document.documentElement.getAttribute('data-lt-theme')||'night',
+            frame:frame?.documentElement.getAttribute('data-lt-theme')||'night',
+            host:host?.getAttribute('data-lt-theme')||'night',
+            stage:getComputedStyle(app).backgroundImage,
+            glow:getComputedStyle(scrim).backgroundImage,
+            box:a&&b?{app:[a.x,a.y,a.width,a.height],glow:[b.x,b.y,b.width,b.height]}:null};
+        });
+        assert.equal(state.shell,theme,'shell header must follow actual theme');
+        assert.equal(state.frame,theme,'iframe document must follow actual theme');
+        assert.equal(state.host,theme,'orbit must follow actual theme');
+        assert.ok(state.box,JSON.stringify(state));
+        // 가운데 빛은 원래 크기 이내로 유지하고, 바깥 테두리의 빛 0은 아래 픽셀 검사로 확인한다.
+        assert.ok(state.box.glow[2]<=820&&state.box.glow[3]<=560&&
+          (width===1440 ? state.box.glow[2]<state.box.app[2] : state.box.glow[2]<=state.box.app[2]*1.04+2),
+          'glow stays in original bounded box: '+JSON.stringify(state.box));
+        const capture=process.env.LT_HOME_1204_CAPTURE_DIR;
+        if(capture){const {mkdirSync}=await import('node:fs');mkdirSync(capture,{recursive:true});await h.page.screenshot({path:`${capture}/home-1204-${width}-${theme}-${route}.png`});}
+        // Render the computed live scrim into a separate, static pixel stage:
+        // isolate the gradient from animated orbit canvases and GPU repaints.
+        // Keep the actual geometry, gradient, clip and mask properties.
+        await h.frame.evaluate(()=>{
+          const scrim=document.querySelector('#orbit').shadowRoot.querySelector('.center-scrim');
+          const computed=getComputedStyle(scrim),rect=scrim.getBoundingClientRect();
+          const stage=document.createElement('div');stage.id='lt1204-pixel-stage';
+          stage.style.cssText='position:fixed;inset:0;z-index:2147483647;background:#050509;pointer-events:none';
+          const overlay=document.createElement('div');overlay.id='lt1204-pixel-glow';
+          Object.assign(overlay.style,{position:'absolute',left:rect.left+'px',top:rect.top+'px',
+            width:rect.width+'px',height:rect.height+'px',backgroundImage:computed.backgroundImage,
+            backgroundRepeat:'no-repeat',borderRadius:computed.borderRadius,
+            maskImage:computed.maskImage,clipPath:computed.clipPath});
+          stage.append(overlay);document.body.append(stage);
+        });
+        const element=h.frame.locator('body');
+        const on=rgbRows(await element.screenshot({animations:'disabled'}));
+        await h.frame.evaluate(()=>document.querySelector('#lt1204-pixel-glow').style.display='none');
+        const off=rgbRows(await element.screenshot({animations:'disabled'}));
+        assert.equal(on.width,off.width);assert.equal(on.height,off.height);
+        const delta=(x,y)=>on.pixel(x,y).reduce((s,c,i)=>s+Math.abs(c-off.pixel(x,y)[i]),0);
+        const midX=Math.floor(on.width/2),midY=Math.floor(on.height/2);
+        // Rectangular clipping used to create a discontinuity on horizontal/
+        // vertical scanlines, whereas a feathered radial must change smoothly.
+        const hline=Array.from({length:on.width},(_,x)=>delta(x,midY));
+        const vline=Array.from({length:on.height},(_,y)=>delta(midX,y));
+        // Screenshot pixels must show a fully feathered perimeter at every
+        // edge. Together with the original bounded scrim geometry assertion
+        // above, this excludes the previous interior rectangular clipping
+        // without treating isolated GPU/color-management pixels as a border.
+        for(const fraction of [0,.25,.5,.75,1]){
+          const x=Math.round((on.width-1)*fraction),y=Math.round((on.height-1)*fraction);
+          assert.ok(delta(x,0)<=3&&delta(x,on.height-1)<=3,
+            'glow must fade at top/bottom: '+JSON.stringify({width,theme,route,x}));
+          assert.ok(delta(0,y)<=3&&delta(on.width-1,y)<=3,
+            'glow must fade at left/right: '+JSON.stringify({width,theme,route,y}));
+        }
+        if(theme==='garden')assert.ok(delta(midX,midY)>120,'garden center glow must be visible in rendered screenshot');
+      } finally {await close952(h);}
+    }
+  } finally {await browser.close();}
+});
+
+test('#1204 첫 화면 순차 등장·안내 삭제·WebGL 말풍선·기억·겹침·접근성', { skip: REQUIRE952 ? false : skip952, timeout: 180000 }, async () => {
+  if (skip952) assert.fail(skip952);
+  const browser = await chromium952.launch({headless:true});
+  try {
+    for (const width of [1440,390]) for (const theme of ['garden','night']) {
+      const h=await boot952(browser,{width,motion:'no-preference',initStorage:{'lt41.theme':theme}});
+      try {
+        const inspect=()=>h.frame.evaluate(()=>{
+          const root=document.querySelector('#orbit').shadowRoot;
+          const tip=root.querySelector('.lt-orbit-tip'),center=root.querySelector('.center'),actions=center.querySelector('.actions');
+          const tr=tip.getBoundingClientRect(),cr=center.getBoundingClientRect(),ar=actions.getBoundingClientRect();
+          const intersects=(a,b)=>a.left<b.right&&a.right>b.left&&a.top<b.bottom&&a.bottom>b.top;
+          const poses=globalThis.__LT_ORBIT_TEST__?.poses()||[];
+          const host=document.querySelector('#orbit').getBoundingClientRect();
+          const closeToCard=poses.some(p=>p&&!p.hidden&&p.box&&(
+            // Orbit projections and the HTML hint share the same local canvas coordinates.
+            (tr.left-host.left>=p.box.l-125&&tr.left-host.left<=p.box.r+125)&&
+            (tr.top-host.top>=p.box.t-50&&tr.top-host.top<=p.box.b+50)
+          ));
+          return {visible:tip.hasAttribute('data-visible'),x:tr.x,y:tr.y,closeToCard,
+            overlaps:intersects(tr,cr)||intersects(tr,ar),pointer:getComputedStyle(tip).pointerEvents,
+            labels:[...root.querySelectorAll('.card .surface')].map(e=>e.getAttribute('aria-label')),
+            notes:root.querySelectorAll('.center-note').length,centerRect:{x:cr.x,y:cr.y,w:cr.width,h:cr.height},
+            animations:[...root.querySelectorAll('.center .lt-home-enter')].map(e=>({delay:getComputedStyle(e).animationDelay,duration:getComputedStyle(e).animationDuration}))};
+        });
+        await h.frame.waitForFunction(()=>globalThis.__LT_ORBIT_TEST__?.canvasReady(),null,{timeout:20000});
+        await h.frame.locator('.center .actions .home-action-group').first().waitFor({state:'visible',timeout:15000});
+        const opening=await inspect();
+        assert.equal(opening.notes,0,'두 안내 줄을 그리지 않는다');
+        assert.ok(opening.animations.length>=4,'머리말·제목·설명·단추가 차례로 나타난다');
+        const delays=opening.animations.map(a=>parseFloat(a.delay));
+        assert.ok(delays.every((v,i)=>i===0||v-delays[i-1]>=.08&&v-delays[i-1]<=.12),JSON.stringify(delays));
+        assert.ok(opening.animations.every(a=>parseFloat(a.duration)>=.4&&parseFloat(a.duration)<=.5));
+        assert.ok(opening.labels.length>0&&opening.labels.every(x=>x?.includes('눌러서 크게 보기')));
+        await h.frame.waitForFunction(()=>document.querySelector('#orbit')?.shadowRoot?.querySelector('.lt-orbit-tip')?.hasAttribute('data-visible'),null,{timeout:15000});
+        for (let sample=0;sample<3;sample++){
+          const state=await inspect();
+          assert.equal(state.visible,true);
+          assert.equal(state.pointer,'none');
+          assert.equal(state.closeToCard,true,'말풍선은 투영된 카드 곁에 있다: '+JSON.stringify(state));
+          assert.equal(state.overlaps,false,'중앙 글자·단추와 겹치지 않는다');
+          await h.page.waitForTimeout(440);
+        }
+        // #1204: Scrub several real WebGL orbit phases, not just adjacent frames.
+        // The hint must hand off to an on-screen card instead of holding a rear card.
+        for (const phase of [0.2, 0.5, 0.8]) {
+          await h.frame.evaluate(t => globalThis.__LT_ORBIT_TEST__.seek(t), phase);
+          await h.page.waitForTimeout(1050);
+          const state=await inspect();
+          assert.equal(state.visible,true,'말풍선이 단계별로 앞 카드에 나타난다');
+          assert.equal(state.closeToCard,true,'투영 카드 곁에 남는다: '+JSON.stringify(state));
+          assert.equal(state.overlaps,false,'중앙 내용·단추를 가리지 않는다');
+        }
+        await h.frame.evaluate(()=>globalThis.__LT_ORBIT_TEST__.restore());
+        await h.page.waitForTimeout(1100);
+        assert.deepEqual((await inspect()).centerRect,opening.centerRect,'중앙 영역은 등장 전후에도 재배치되지 않는다');
+        const {mkdirSync}=await import('node:fs');
+        const capture=process.env.LT_HOME_1204_CAPTURE_DIR;
+        if(capture){mkdirSync(capture,{recursive:true});await h.page.screenshot({path: `${capture}/home-1204-${width}-${theme}.png`});}
+        const clicked=await h.frame.evaluate(()=>{
+          const host=document.querySelector('#orbit'),root=host.shadowRoot;
+          const world=root.querySelector('.world'),board=[...world.querySelectorAll('.orbit-canvas')].find(e=>getComputedStyle(e).display!=='none');
+          const poses=globalThis.__LT_ORBIT_TEST__.poses();
+          if(!board)return {board:false};
+          const r=board.getBoundingClientRect();
+          let hit=null;
+          for(const p of poses){
+            if(!p||p.hidden||!p.box||p.box.r<0||p.box.l>world.clientWidth)continue;
+            for(const fx of [.3,.5,.7])for(const fy of [.3,.5,.7]){
+              const x=r.left+p.box.l+(p.box.r-p.box.l)*fx,y=r.top+p.box.t+(p.box.b-p.box.t)*fy;
+              board.dispatchEvent(new PointerEvent('pointermove',{bubbles:true,clientX:x,clientY:y,pointerId:1,pointerType:'mouse'}));
+              if(board.style.cursor==='pointer'){hit={x,y};break;}
+            }
+            if(hit)break;
+          }
+          if(!hit)return {board:true,position:false};
+          board.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,clientX:hit.x,clientY:hit.y,pointerId:1,pointerType:'mouse'}));
+          board.dispatchEvent(new MouseEvent('click',{bubbles:true,clientX:hit.x,clientY:hit.y,detail:1}));
+          return {board:true,position:true,stored:localStorage.getItem('lt41-orbit-card-opened')};
+        });
+        assert.equal(clicked.stored,'1','실제 캔버스 클릭 경로에서 기기에 기억한다: '+JSON.stringify(clicked));
+        assert.equal((await inspect()).visible,false,'누른 즉시 말풍선이 사라진다');
+        await h.page.reload({waitUntil:'load'});
+        await h.page.waitForTimeout(2400);
+        assert.equal(await h.page.frameLocator('#view').locator('.lt-orbit-tip').evaluate(e=>e.hasAttribute('data-visible')),false,'새로고침해도 말풍선이 나타나지 않는다');
+      } finally {await close952(h);}
+    }
+    const reduced=await boot952(browser,{width:390,motion:'reduce'});
+    try{
+      await reduced.frame.waitForFunction(()=>globalThis.__LT_ORBIT_TEST__?.canvasReady(),null,{timeout:20000});
+      await reduced.page.waitForTimeout(2400);
+      const snapshot=()=>reduced.frame.evaluate(()=>{
+        const root=document.querySelector('#orbit').shadowRoot,tip=root.querySelector('.lt-orbit-tip');
+        return {x:tip.getBoundingClientRect().x,y:tip.getBoundingClientRect().y,
+          styles:[...root.querySelectorAll('.center .lt-home-enter')].map(e=>({animation:getComputedStyle(e).animationName,opacity:getComputedStyle(e).opacity}))};
+      });
+      const first=await snapshot();await reduced.page.waitForTimeout(550);const next=await snapshot();
+      assert.deepEqual([next.x,next.y],[first.x,first.y],'움직임 줄이기에서는 말풍선 좌표 고정');
+      assert.ok(first.styles.every(x=>x.animation==='none'&&x.opacity==='1'));
+    }finally{await close952(reduced);}
+  }finally{await browser.close();}
 });
