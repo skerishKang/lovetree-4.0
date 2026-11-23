@@ -31,7 +31,7 @@ function fakeEl(extra = {}) {
   return Object.assign(node, extra);
 }
 
-function harness({ source = 'server', owned = true, writable = true, current = 'track59-sketchbook.html', finePointer = true, applyImpl = null, attachFiles = null, clipboard = null, listTrees = null, saveTagsImpl = null } = {}) {
+function harness({ source = 'server', owned = true, writable = true, current = 'track59-sketchbook.html', finePointer = true, applyImpl = null, attachFiles = null, clipboard = null, listTrees = null, saveTagsImpl = null, previewHost = false } = {}) {
   const calls = { apply: [], notify: [], panel: [], choose: [], openEditor: [], login: [], resume: [], attach: [], writeOpen: [], writeShow: [], requestClose: [], reset: 0, saveTags: [] };
   const els = {};
   // #425: 고르기 창·빠른 추가·편집기가 한 창(write-panel)으로 합쳐졌다.
@@ -60,6 +60,8 @@ function harness({ source = 'server', owned = true, writable = true, current = '
       const v = String(url ?? '');
       const m = v.match(/youtube\.com\/watch\?v=([\w-]+)/) || v.match(/youtu\.be\/([\w-]+)/) || v.match(/youtube\.com\/shorts\/([\w-]+)/);
       if (m) return { kind: 'youtube', videoId: m[1], label: 'YouTube 영상', openUrl: `https://www.youtube.com/watch?v=${m[1]}`, loadUrl: `https://i.ytimg.com/vi/${m[1]}/hqdefault.jpg` };
+      const tt = v.match(/tiktok\.com\/@[^/]+\/video\/(\d{15,25})/);
+      if (tt) return { kind: 'tiktok', videoId: tt[1], label: 'TikTok 링크', openUrl: v, loadUrl: '' };
       try { const u = new URL(v); return ['http:', 'https:'].includes(u.protocol) ? { kind: 'link', label: u.hostname, openUrl: u.href } : { kind: 'invalid', openUrl: '' }; }
       catch { return { kind: 'none', openUrl: '' }; }
     }
@@ -93,7 +95,8 @@ function harness({ source = 'server', owned = true, writable = true, current = '
     saveTags: payload => { calls.saveTags.push(payload); if (saveTagsImpl) return saveTagsImpl(payload); return { ok: true, keywords: payload.keywords, changed: true }; },
     // 하은 2회차 ④ 재현: 안내판이 들고 있는 순간의 '지금 자리'를 찾을 때 쓴다(옮기기·지우기 흉내).
     ...(listTrees ? { listTrees } : {}),
-    ...(clipboard ? { readClipboard: clipboard } : {})
+    ...(clipboard ? { readClipboard: clipboard } : {}),
+    previewHost
   });
   const restore = () => { globalThis.LTMedia = saved.LTMedia; globalThis.Event = saved.Event; };
   return { api, els, calls, docListeners, editorMedia, quickMedia, uploadsCalls, restore };
@@ -248,6 +251,24 @@ test('저장: apply("quickAdd",{url}) 한 번 → ✓ 안내·지금 다듬기·
     assert.ok(h.els['quick-url'].focused, '초점을 유지한다');
     assert.equal(h.els['quick-submit'].disabled, true, '칸을 비우면 다시 흐림');
     assert.equal(h.els['quick-preview'].dataset.state, 'empty');
+  } finally { h.restore(); }
+});
+
+// #791: 미리보기에서는 담지 않고 알아본 결과(플랫폼·영상 번호)만 안내한다.
+test('미리보기 담기: 저장하지 않고 체험 안내와 알아본 결과만 보여 준다', () => {
+  const h = harness({ previewHost: true });
+  const tiktok = 'https://www.tiktok.com/@nba/video/7646985299326749983';
+  try {
+    h.els['write-panel'].open = true;
+    h.api.renderPreview();
+    h.els['quick-url'].value = tiktok;
+    h.els['quick-url'].listeners.input[0]();
+    h.els['quick-form'].onsubmit({ preventDefault() {} });
+    assert.deepEqual(h.calls.apply, [], '미리보기에서는 저장하지 않는다');
+    assert.match(h.els['quick-notice'].textContent, /^체험 — 실제 담기는 로그인 뒤 · TIKTOK · 영상 7646985299326749983$/);
+    assert.equal(h.els['quick-notice'].hidden, false);
+    assert.equal(h.els['quick-url'].value, tiktok, '입력칸을 지우지 않는다');
+    assert.ok(h.calls.notify.some((text) => text.includes('TIKTOK')));
   } finally { h.restore(); }
 });
 

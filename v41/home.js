@@ -97,22 +97,48 @@ function openHomeViewer(moment,opener=null){
  const orbitDialog=shadow.querySelector('dialog');if(orbitDialog?.open)orbitDialog.close();
  viewerOpener=opener||shadow.querySelector('.recent-card')||document.activeElement;
  const videoId=youtubeIdFrom(moment.url||'');
+ // #791: 미리보기 예시의 틱톡·릴스도 공식 재생기를 누를 때만 붙인다.
+ const described=(moment.url&&globalThis.LTMedia?.describe)?globalThis.LTMedia.describe(moment.url):null;
+ const tiktok=described?.kind==='tiktok',instagram=described?.kind==='instagram';
+ const canPlay=!!videoId||tiktok||instagram;
+ const platform=tiktok?'TikTok':instagram?'Instagram':videoId?'VIDEO':moment.image?'PHOTO':'MEMO';
  vEl('mediaTitleHome').textContent=moment.title||'';
  vEl('mediaMetaHome').textContent=[moment.date||'',moment.emotion||''].filter(Boolean).join(' · ');
  const why=vEl('mediaWhyHome'),whyRow=why.closest('.mediaWhy');
  why.textContent=moment.whyNext||'';whyRow.hidden=!why.textContent;
- vEl('mediaKickerHome').textContent=`MOMENT · ${videoId?'VIDEO':moment.image?'PHOTO':'MEMO'}`;
- vEl('mediaTypeBadgeHome').textContent=videoId?'VIDEO':moment.image?'PHOTO':'MEMO';
+ vEl('mediaKickerHome').textContent=`MOMENT · ${platform}`;
+ vEl('mediaTypeBadgeHome').textContent=platform;
  const img=vEl('mediaImageHome'),memo=vEl('mediaMemoHome');
- img.hidden=!!videoId||!moment.image;memo.hidden=!!videoId||!!moment.image;
+ img.hidden=!moment.image;memo.hidden=!!moment.image;
  if(moment.image)img.src=moment.image;
- if(!videoId&&!moment.image){vEl('mediaMemoBodyHome').textContent=moment.note||moment.title||'';vEl('mediaMemoDateHome').textContent=[moment.date||'',moment.emotion||''].filter(Boolean).join(' · ');}
- vEl('mediaPlayHome').hidden=!videoId;
+ if(!moment.image){vEl('mediaMemoBodyHome').textContent=moment.note||moment.title||'';vEl('mediaMemoDateHome').textContent=[moment.date||'',moment.emotion||''].filter(Boolean).join(' · ');}
+ vEl('mediaPlayHome').hidden=!canPlay;
+ vEl('mediaPlayHome').onclick=()=>{
+  const play=globalThis.LTMedia;
+  if(tiktok){
+   const id=play?.tiktokPlayerId?.(moment.mediaMetadata?.tiktokId||described.videoId);
+   if(!id)return;
+   const block=document.createElement('blockquote');block.className='tiktok-embed';
+   block.setAttribute('cite',described.openUrl||moment.url);block.setAttribute('data-video-id',id);
+   const section=document.createElement('section');section.textContent=moment.title||'TikTok 영상';block.append(section);
+   visual.querySelector('.tiktok-embed,.instagram-media,iframe')?.remove();img.hidden=true;vEl('mediaTypeBadgeHome').hidden=true;
+   visual.append(block);play?.ensureTiktokEmbedScript?.(document);vEl('mediaPlayHome').hidden=true;return;
+  }
+  if(instagram){
+   const code=described.shortcode||moment.mediaMetadata?.instagramShortcode;
+   if(!code)return;
+   const block=document.createElement('blockquote');block.className='instagram-media';
+   block.setAttribute('data-instgrm-permalink',described.openUrl||moment.url);block.setAttribute('data-instgrm-version','14');
+   const section=document.createElement('section');section.textContent=moment.title||'인스타그램 릴스';block.append(section);
+   visual.querySelector('.tiktok-embed,.instagram-media,iframe')?.remove();img.hidden=true;vEl('mediaTypeBadgeHome').hidden=true;
+   visual.append(block);play?.ensureInstagramEmbedScript?.(document);vEl('mediaPlayHome').hidden=true;
+  }
+ };
  const book=vEl('mediaBookHome'),external=vEl('mediaExternalHome');
  book.onclick=()=>{closeHomeViewer();bridge.actions.openBook(moment.treeId,moment.id);};
  external.hidden=!moment.url;if(moment.url)external.href=moment.url;
  const visual=vEl('mediaVisualHome');
- visual.querySelector('iframe')?.remove();
+ visual.querySelector('iframe,.tiktok-embed,.instagram-media')?.remove();vEl('mediaTypeBadgeHome').hidden=false;
  if(videoId){
   const frame=document.createElement('iframe');
   frame.src=`https://www.youtube-nocookie.com/embed/${encodeURIComponent(videoId)}?autoplay=1&mute=1&playsinline=1&controls=0&rel=0&modestbranding=1`;

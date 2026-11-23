@@ -9,15 +9,18 @@ import {movedNotice} from '../../public/v41/inbox-model.mjs';
 import {tagFacets, filterMomentsByTags} from '../../public/v41/tag-filter.mjs';
 import {fallbackCardMarkup, thumbFallbackAttrs, needsFallbackCard, mountThumbFallback, VIDEO_UNAVAILABLE_TEXT, isVerticalMoment, youtubeIdFrom, thumbnailCandidates, isTiktokMoment} from '../../public/v41/thumb-fallback.mjs';
 import samples from './orbit-samples.json';
+import { previewSamples } from '../../public/v41/preview-examples.mjs';
 import {escape as esc, orbitRecords, resume, remember} from './memory.js';
 import {SERVICE, GO_TREES, READ_BOOK, VIEW_TREE, NEW_TREE, BOOK_IS_READING} from '../terms.js';
 import {mediaLinkView} from '../media.js';
 import {createView} from './lifecycle.js';
 import {safeZoneOf, zoneOverlapArea} from '../../public/v41/orbit-safe-zone.mjs';
 
+// #791: 미리보기에서만 틱톡·릴스 예시를 얹는다(운영 주소에서는 원본 40개).
+const exampleSamples = [...previewSamples(globalThis.location?.hostname), ...samples];
 export const ORBIT_EXAMPLE = {
   id: 'orbit-example', title: '다시, 그 순간으로', subject: '감상 예시', updatedAt: '2026-01-01',
-  moments: samples.map((c,i) => ({id:c.id, title:c.title, note:c.memo || c.whyNext, emotion:c.emotion, date:c.date.replaceAll('.','-'), parentId:i?samples[i-1].id:null, relation:i?samples[i-1].whyNext:'', image:c.image, poster:c.type==='video', nextIds:[c.next,c.branch].filter(Boolean), createdAt:`2026-01-01T00:00:${String(i).padStart(2,'0')}Z`}))
+  moments: exampleSamples.map((c,i) => ({id:c.id, title:c.title, note:c.memo || c.whyNext, emotion:c.emotion, date:c.date.replaceAll('.','-'), parentId:i?exampleSamples[i-1].id:null, relation:i?exampleSamples[i-1].whyNext:'', image:c.image, poster:c.type==='video', url:c.url||'', externalUrl:c.externalUrl||'', youtubeThumb:c.youtubeThumb===true, mediaMetadata:c.mediaMetadata||null, nextIds:[c.next,c.branch].filter(Boolean), createdAt:`2026-01-01T00:00:${String(i).padStart(2,'0')}Z`}))
 };
 // #535: 카드끼리 겹침 줄이기 — 안쪽·바깥 링 반지름 간격을 조금 벌려 이웃 링 카드가 같은 자리에 몰리지 않게 한다.
 // 좁은 화면(w<=650)은 원래 반지름을 그대로 쓴다: 화면이 좁으면 벌린 반지름이 오히려 카드를 안전 구역 밖으로 밀어 숨긴다.
@@ -86,7 +89,7 @@ export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSel
  const memberCards=records.map((m,i)=>({...m,type:m.youtubeThumb&&m.image?'video':(m.image?'photo':'memo'),first:m.parentId===null,ring:Object.keys(rings)[i%5],baseAngle:i*2.399967,phaseOffset:i*.29,zOffset:(i%7-3)*28,tiltX:(i%5-2)*3.2,tiltY:(i%7-3)*4.2,tiltZ:(i%9-4)*1.8,sizeClass:i%3===0?'lg':'md'}));
   // #379: 채우는 예시 카드는 줄여서 궤도를 가볍게 — 내 카드가 먼저 채워진다.
   const fillers=demo?[]:(Array.isArray(examples)?examples:[]).slice(0,Math.max(0,24-memberCards.length)).map((c,extraIndex)=>{const i=memberCards.length+extraIndex;return {...c,key:'example-'+c.id,treeId:ORBIT_EXAMPLE.id,example:true,type:c.image?'photo':'memo',first:false,note:c.memo||c.whyNext,next:c.nextIds?.[0]||null,branch:c.nextIds?.[1]||null,ring:Object.keys(rings)[i%5],baseAngle:i*2.399967,phaseOffset:i*.29,zOffset:(i%7-3)*28,tiltX:(i%5-2)*3.2,tiltY:(i%7-3)*4.2,tiltZ:(i%9-4)*1.8,sizeClass:i%3===0?'lg':'md'};});
-  const all=demo?samples.map(c=>({...c,key:c.id,treeId:ORBIT_EXAMPLE.id,note:c.memo||c.whyNext})):[...memberCards,...fillers];
+  const all=demo?exampleSamples.map(c=>({...c,key:c.id,treeId:ORBIT_EXAMPLE.id,note:c.memo||c.whyNext})):[...memberCards,...fillers];
   // #394: 순간 목록은 모든 트리의 순간(최근 순)을 쓴다. 없으면(예시 판본) 기존 카드 목록을 그대로 쓴다.
   // 목록에서 연 순간의 앞·뒤 순서는 열기 전 목록 순서(트리 고르기 포함)를 그대로 따른다.
   let listFilter=momentList?.initialTreeId||'all';
@@ -395,6 +398,18 @@ const toggleRecentPlay=btn=>{if(!recentMoment)return;const card=shadow.querySele
   const section=document.createElement('section');section.textContent=mainOf(recentMoment)||'TikTok 영상';block.append(section);
   media.querySelector('img')?.setAttribute('hidden','');media.append(block);recentFrame=block;
   globalThis.LTMedia.ensureTiktokEmbedScript?.(document);
+  btn.setAttribute('aria-label','정지');const glyph=btn.querySelector('span');if(glyph)glyph.textContent='■';return;
+ }
+ if(described?.kind==='instagram'){
+  const code=described.shortcode||recentMoment.mediaMetadata?.instagramShortcode;
+  if(!code)return;
+  const block=document.createElement('blockquote');
+  block.className='instagram-media';
+  block.setAttribute('data-instgrm-permalink',described.openUrl||recentMoment.url);
+  block.setAttribute('data-instgrm-version','14');
+  const section=document.createElement('section');section.textContent=mainOf(recentMoment)||'인스타그램 릴스';block.append(section);
+  media.querySelector('img')?.setAttribute('hidden','');media.append(block);recentFrame=block;
+  globalThis.LTMedia.ensureInstagramEmbedScript?.(document);
   btn.setAttribute('aria-label','정지');const glyph=btn.querySelector('span');if(glyph)glyph.textContent='■';return;
  }
  const id=youtubeIdFrom(recentMoment.url)||described?.videoId;

@@ -5,7 +5,7 @@ import {mountPrivateUpload} from '../private-upload.mjs';
 import {fetchVideoTitle, fetchTikTokMetadata, fetchInstagramMetadata} from '../video-title.mjs';
 import {suggestMomentTitle} from '../domain.mjs';
 import {displayTreeTitle} from '../tree-name.mjs';
-import {extractDropUrl, hasDropPayload, firstImageFile, parseQuickUrl, dropRoute, previewState, previewTag, savedNoticeText, quickTreeLineText, quickTreeAfterText, quickSubmitText, quickSavedTreeText, QUICK_INBOX_LABEL, QUICK_EMPTY_ERROR, QUICK_INVALID_ERROR, DROP_LOGIN_NOTICE, DROP_READONLY_NOTICE, QUICK_PASTE_LABEL, QUICK_CLEAR_LABEL, QUICK_EMPTY_PREVIEW, QUICK_INVALID_PREVIEW, QUICK_PASTE_EMPTY, QUICK_PASTE_ERROR} from '../quick-add.mjs';
+import {extractDropUrl, hasDropPayload, firstImageFile, parseQuickUrl, dropRoute, previewState, previewTag, savedNoticeText, quickTreeLineText, quickTreeAfterText, quickSubmitText, quickSavedTreeText, QUICK_INBOX_LABEL, QUICK_EMPTY_ERROR, QUICK_INVALID_ERROR, DROP_LOGIN_NOTICE, DROP_READONLY_NOTICE, QUICK_PASTE_LABEL, QUICK_CLEAR_LABEL, QUICK_EMPTY_PREVIEW, QUICK_INVALID_PREVIEW, QUICK_PASTE_EMPTY, QUICK_PASTE_ERROR, quickPreviewNoticeText} from '../quick-add.mjs';
 // #876: 같은 영상 판정(quick-intake 한 벌)과 안내 창 날짜 표기(book-usability 한 벌) — 새 규칙을 만들지 않는다.
 import {findSameVideoInTree, treesWithSameVideo} from '../quick-intake.mjs';
 import {formatDisplayDate} from '../book-usability.mjs';
@@ -473,6 +473,14 @@ export function createQuickAdd(deps) {
   }
   function saveUrl(url, options = {}) {
     const parsed = parseQuickUrl(url, describe);
+    // #791: 미리보기에서는 담지 않고 알아본 결과만 보여 준다(운영 주소에서는 이 길 자체가 없다).
+    if (deps.previewHost === true) {
+      const platform = previewTag(parsed.value, parsed.kind);
+      const videoId = parsed.kind === 'tiktok' ? (tiktokCache.get(parsed.value)?.tiktokId || parsed.videoId) : parsed.videoId;
+      if ($('quick-notice')) { $('quick-notice').textContent = quickPreviewNoticeText(platform, videoId); $('quick-notice').hidden = false; }
+      deps.notify?.(quickPreviewNoticeText(platform, videoId));
+      return false;
+    }
     // #638: 담을 트리는 저장 시점에 정한다 — 창을 열지 않고 끌어다 놓기로 바로 담는 길에서도 지금 고른 트리에 담긴다.
     if (!quickTreeId || !treeChoices().some(tree => tree.id === quickTreeId)) quickTreeId = resolveQuickTreeId(treeChoices());
     // 이슈 671: '그 순간 다음에 담기' 목적지가 지금 고른 트리에 유효하면 저장에 함께 넘긴다.

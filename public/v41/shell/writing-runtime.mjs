@@ -10,6 +10,7 @@ import {createMessages, lastShelfTreeId} from "./messages.mjs";
 import {createTagSave} from "./tag-save.mjs";
 import {paintLoginLinks,paintThemeControls,applyTheme as applyThemeFor,toggleTheme as toggleThemeFor} from "./theme.mjs";
 import {thumbnailCandidates, coverFallbackAttrs, fallbackCardData, emotionToneOf, mountThumbFallback, ADD_TITLE_LABEL, VIDEO_UNAVAILABLE_TEXT} from "../thumb-fallback.mjs";
+import {isPagesPreviewHost} from "../host-context.mjs";
 
 export function createWritingRuntime(ctx){
   let shellWrite, shellVideoDup, uploads, shellPanels, shellTags, shellTagManager, shellQuick, shellIntake, shellCleanup, shellJourney, shellMessages;
@@ -150,7 +151,9 @@ export function createWritingRuntime(ctx){
       // #627 PR B: 담은 직후 안내의 꼬리표 줄이 눌렸을 때 — keywords만 기존 경로로 저장한다.
       saveTags:payload=>shellTags.save(payload),
       // 2026-11-16 대표 요청: 처음 고르는 트리 설정(지금 보고 있는 트리/늘 같은 트리) — 바로 아래 한 벌.
-      quickTargetPreference:()=>(0,ctx.quickTargetPreference)()
+      quickTargetPreference:()=>(0,ctx.quickTargetPreference)(),
+      // #791: 미리보기에서는 담지 않고 알아본 결과만 보여 준다.
+      previewHost:isPagesPreviewHost(globalThis.location?.hostname)
     });
 
     (0,ctx.$)('write-menu').onclick=()=>{if(ctx.source!=='server'&&ctx.member?.snapshot().owned){void (0,ctx.resumeMember)('write');return;}if(ctx.member?.snapshot().dirty){(0,ctx.explainSaveState)();return;}shellQuick.openWrite();};

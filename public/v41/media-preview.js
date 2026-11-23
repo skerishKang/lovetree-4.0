@@ -60,7 +60,9 @@ function safeTiktokThumb(value) {
   } catch { return ''; }
 }
 function tiktokThumbCandidates(mediaMetadata = null) {
-  return [safeTiktokThumb(mediaMetadata?.thumbnail), safeTiktokThumb(mediaMetadata?.thumbnailUrl)].filter(Boolean);
+  // 예시·올린 그림처럼 같은 출처 경로도 썸네일로 쓴다(공식 CDN 주소만 있는 게 아니다).
+  const local = globalThis.LTThumbFallback?.localOrPrivatePhoto?.({ image: mediaMetadata?.thumbnail, mediaMetadata });
+  return [local, safeTiktokThumb(mediaMetadata?.thumbnail), safeTiktokThumb(mediaMetadata?.thumbnailUrl)].filter(Boolean);
 }
 /** embed.js는 누를 때만 한 번 붙인다(첫 화면 로드에 틱톡 스크립트 없음). */
 function ensureTiktokEmbedScript(doc = document) {

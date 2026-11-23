@@ -17,6 +17,8 @@ export const QUICK_PASTE_EMPTY = '붙여 넣을 주소가 없어요.';
 export const QUICK_PASTE_ERROR = '주소를 읽지 못했어요. 직접 붙여 넣어 주세요.';
 export const DROP_LOGIN_NOTICE = '로그인한 뒤 순간을 담을 수 있어요.';
 export const DROP_READONLY_NOTICE = '서버 편집 연결이 아직 준비되지 않았어요. 기록은 안전하게 읽을 수 있습니다.';
+// #791 미리보기 체험: 담기는 동작은 로그인 뒤에만. 결과만 보여 준다.
+export const QUICK_PREVIEW_NOTICE = '체험 — 실제 담기는 로그인 뒤';
 // #638(고른 트리 우선): 담기 창의 트리 한 줄·단추·담은 안내는 고른 트리 이름을 따른다.
 // 트리가 0개일 때는 기본 트리('모아둔 순간')가 새로 만들어지므로 QUICK_INBOX_LABEL을 쓴다.
 export function quickTreeLineText(name) { return `${name}에 담겨요`; }
@@ -118,6 +120,13 @@ export function noticeSummary(title, max = 32) {
 }
 
 // 담은 뒤 안내: "✓ 담았어요 · 제목 요약". 제목이 없으면 담긴 사실만 남긴다.
+export function quickPreviewNoticeText(platform = '', videoId = '') {
+  const parts = [QUICK_PREVIEW_NOTICE];
+  if (platform) parts.push(platform);
+  if (videoId) parts.push('영상 ' + String(videoId).trim());
+  return parts.join(' · ');
+}
+
 export function savedNoticeText(title) {
   const summary = noticeSummary(title);
   return summary ? `✓ 담았어요 · ${summary}` : '✓ 담았어요';
