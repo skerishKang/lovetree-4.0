@@ -307,6 +307,14 @@ function normalizeVerticalMedia(value) {
   }
   return out;
 }
+// #791 2단계: 릴스 캡처 그림(업로드 경로가 만든 같은 출처 주소)만 썸네일로 남긴다.
+function safeSavedImage(value) {
+  const raw = String(value ?? '').trim();
+  if (!raw || raw.length > 2048) return '';
+  if (/^data:image\/(?:png|jpe?g|gif|webp);base64,[A-Za-z0-9+/=]+$/i.test(raw)) return raw;
+  if (/^\/api\/media\/[a-f0-9-]+\.(?:png|jpe?g|gif|webp)$/i.test(raw)) return raw;
+  return '';
+}
 function normalizeMediaMetadata(value, url) {
   if (value === undefined || value === null) return null;
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('미디어 정보를 확인해 주세요.');
@@ -317,13 +325,18 @@ function normalizeMediaMetadata(value, url) {
   // #791: 틱톡 — 짧은 주소를 서버가 푼 숫자 id와 @계정 이름을 함께 남긴다.
   const tiktokId = /^\d{15,25}$/.test(String(value.tiktokId ?? '').trim()) ? String(value.tiktokId).trim() : '';
   const tiktokAuthor = optionalText(value.tiktokAuthor, '미디어 작성자', 120);
-  if (!title && !channel && !thumbnail && !tiktokId && !tiktokAuthor && !Object.keys(vertical).length) return null;
+  // #791 2단계: 릴스 @계정과 짧은 코드(한도에 걸리면 빈 값).
+  const instagramAuthor = optionalText(value.instagramAuthor, '미디어 작성자', 120);
+  const instagramShortcode = /^[A-Za-z0-9_-]{8,30}$/.test(String(value.instagramShortcode ?? '').trim()) ? String(value.instagramShortcode).trim() : '';
+  if (!title && !channel && !thumbnail && !tiktokId && !tiktokAuthor && !instagramAuthor && !instagramShortcode && !Object.keys(vertical).length) return null;
   const source = url ? new URL(url).hostname : '';
   if (!source) return null;
   const result = {title, channel, source, ...vertical};
   if (thumbnail) result.thumbnail = thumbnail;
   if (tiktokId) result.tiktokId = tiktokId;
   if (tiktokAuthor) result.tiktokAuthor = tiktokAuthor;
+  if (instagramAuthor) result.instagramAuthor = instagramAuthor;
+  if (instagramShortcode) result.instagramShortcode = instagramShortcode;
   return result;
 }
 function shortened(value, max = 40) {
@@ -387,6 +400,9 @@ export function validateMomentInput(input) {
   // #792: 시작·끝 구간은 선택 값. 둘 다 없으면 키 자체를 넣지 않는다.
   const range = validateRange(input, url);
   const result = { title, note, emotion, date, relation, url, ...range };
+  // #791 2단계: 릴스 캡처 그림은 링크를 대체하지 않고 별도 썸네일로 남긴다.
+  const image = safeSavedImage(input.image);
+  if (image) result.image = image;
   if (mediaMetadata) result.mediaMetadata = mediaMetadata;
   return result;
 }

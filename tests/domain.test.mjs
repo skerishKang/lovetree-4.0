@@ -143,6 +143,24 @@ test('tiktok media metadata keeps title, id, author and a tiktok CDN thumbnail',
   assert.equal(bad.mediaMetadata, undefined);
 });
 
+// #791 2단계: 릴스 caption·@계정·코드와 올린 그림이 저장 계약을 통과한다.
+test('instagram caption metadata and an uploaded capture image survive validation', () => {
+  const url = 'https://www.instagram.com/reel/C0abc123XYZ/';
+  const moment = validateMomentInput({
+    ...input(''), url,
+    image: '/api/media/12345678-1234-4234-8234-123456789abc.png',
+    mediaMetadata: { title: '바다 순간 #ILLIT', channel: 'fan', instagramAuthor: 'fan', instagramShortcode: 'C0abc123XYZ' }
+  });
+  assert.equal(moment.title, '바다 순간 #ILLIT');
+  assert.equal(moment.image, '/api/media/12345678-1234-4234-8234-123456789abc.png');
+  assert.deepEqual(moment.mediaMetadata, {
+    title: '바다 순간 #ILLIT', channel: 'fan', source: 'www.instagram.com',
+    instagramAuthor: 'fan', instagramShortcode: 'C0abc123XYZ'
+  });
+  const bad = validateMomentInput({ ...input(''), url, image: 'https://evil.test/a.png' });
+  assert.equal(bad.image, undefined);
+});
+
 test('import creates fresh identities and never overwrites existing trees', () => {
   const first = createTree(input());
   const source = addMoment(first, input('두 번째'), first.moments[0].id);

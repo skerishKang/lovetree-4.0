@@ -87,6 +87,8 @@ export function previewState(parsed) {
   if (parsed.kind === 'youtube') return 'youtube';
   // #791: 틱톡은 저장 전에 제목을 받아 두고 세로 미리보기를 그린다.
   if (parsed.kind === 'tiktok') return 'tiktok';
+  // #791 2단계: 릴스는 도착 전 caption을 받아 글 카드로 미리본다.
+  if (parsed.kind === 'instagram') return 'instagram';
   return 'link';
 }
 
@@ -102,7 +104,9 @@ export function previewTag(url, kind = '') {
   }
   // #791: 틱톡 정본·짧은 주소는 모두 TIKTOK 꼬리표.
   if (host === 'tiktok.com' || host === 'vm.tiktok.com' || host === 'vt.tiktok.com') return 'TIKTOK';
-  return kind === 'youtube' ? 'YOUTUBE' : kind === 'tiktok' ? 'TIKTOK' : host;
+  // #791 2단계: 인스타그램 릴스와 짧은 공유 주소는 모두 INSTAGRAM 꼬리표.
+  if (host === 'instagram.com' || host === 'instagr.am') return 'INSTAGRAM';
+  return kind === 'youtube' ? 'YOUTUBE' : kind === 'tiktok' ? 'TIKTOK' : kind === 'instagram' ? 'INSTAGRAM' : host;
 }
 
 // 안내 줄 제목 요약: 한 줄로 접고 max자 뒤는 말줄임(안내 줄 높이가 고정이라서).

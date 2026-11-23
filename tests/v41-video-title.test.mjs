@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { suggestMomentTitle, quickAdd, validateState, EMPTY_STATE } from '../src/domain.js';
 import { suggestMomentTitle as suggestMjs, quickAdd as quickAddMjs, validateState as validateReader, EMPTY_STATE as EMPTY_STATE_MJS } from '../public/v41/domain.mjs';
 import { createMemberSession } from '../public/v41/member-session.mjs';
-import { fetchVideoTitle, fetchTikTokMetadata } from '../public/v41/video-title.mjs';
+import { fetchVideoTitle, fetchTikTokMetadata, fetchInstagramMetadata } from '../public/v41/video-title.mjs';
 
 // #344(2026-11-10 대표 요청): 자동 제목을 영상 제목으로 — 우선순위는 사용자 입력 > 영상 제목(oEmbed) >
 // 마음 한마디 첫 줄 > 기존 도메인 규칙. src/domain.js와 public/v41/domain.mjs 두 벌이 같은 규칙인지
@@ -144,6 +144,22 @@ test('fetchTikTokMetadata: 성공·실패·예외·refresh 요청을 안전하�
   const calls = [];
   await fetchTikTokMetadata(TIKTOK, async (url) => { calls.push(url); return ok(url); }, { refresh: true });
   assert.match(calls[0], /\/api\/tiktok\/oembed\?url=/);
+  assert.match(calls[0], /refresh=1/);
+});
+
+// #791 2단계: 릴스 oEmbed는 가짜 응답으로 처리하고, 429는 limited로 돌려 링크 저장을 막지 않는다.
+test('fetchInstagramMetadata: caption·@계정·코드와 429·실패를 안전하게 처리한다', async () => {
+  const REEL = 'https://www.instagram.com/reel/C0abc123XYZ/';
+  const ok = () => ({ ok: true, json: async () => ({ title: ' 바다 순간 #ILLIT ', authorName: 'fan', shortcode: 'C0abc123XYZ', thumbnailUrl: '', error: 'no' }) });
+  assert.deepEqual(await fetchInstagramMetadata(REEL, ok), { limited: false, title: '바다 순간 #ILLIT', authorName: 'fan', shortcode: 'C0abc123XYZ' });
+  const limited = await fetchInstagramMetadata(REEL, async () => ({ ok: false, status: 429, json: async () => ({ error: { code: 'instagram_rate_limited' } }) }));
+  assert.deepEqual(limited, { limited: true, shortcode: '', title: '', authorName: '' });
+  assert.equal(await fetchInstagramMetadata(REEL, async () => ({ ok: false, status: 502 })), null);
+  assert.equal(await fetchInstagramMetadata(REEL, async () => { throw new Error('network'); }), null);
+  assert.equal(await fetchInstagramMetadata('', ok), null);
+  const calls = [];
+  await fetchInstagramMetadata(REEL, async (url) => { calls.push(url); return ok(); }, { refresh: true });
+  assert.match(calls[0], /\/api\/instagram\/oembed\?url=/);
   assert.match(calls[0], /refresh=1/);
 });
 

@@ -11,6 +11,16 @@ const read = file => fs.readFileSync(new URL(`../${file}`, import.meta.url), 'ut
 const tree = (id, moments, extra = {}) => ({ id, title: extra.title ?? `${id} 트리`, moments, ...extra });
 const moment = (id, extra = {}) => ({ id, title: extra.title ?? `순간 ${id}`, note: '', emotion: '설렘', date: '2026. 11. 11.', createdAt: extra.createdAt ?? '2026-11-11T00:00:00Z', ...extra });
 
+// #791 2단계: 첫 화면 최근 카드로 릴스를 고르면 같은 트리의 다른 썸네일을 표지로 쓴다.
+test('릴스 항목은 같은 트리의 다른 썸네일을 표지로 쓰고 없으면 글 카드로 남는다', () => {
+  const reel = moment('ig', { title: '릴스 캡션 #ILLIT', url: 'https://www.instagram.com/reel/C0abc123XYZ/', createdAt: '2026-11-23T00:00:00Z' });
+  const other = moment('p', { title: '사진', image: '/media/other.jpg', createdAt: '2026-11-22T00:00:00Z' });
+  const withOther = momentListEntries({ trees: [tree('t1', [reel, other])], origin: 'https://lovetree.local' });
+  assert.equal(withOther.find((entry) => entry.id === 'ig').image, '/media/other.jpg');
+  const solo = momentListEntries({ trees: [tree('t1', [reel])], origin: 'https://lovetree.local' });
+  assert.equal(solo.find((entry) => entry.id === 'ig').image, '');
+});
+
 test('트리 고르기 칸: 모아둔 순간이 먼저고 이름은 정리 화면과 같은 한 벌(pickerLabel)을 쓴다', () => {
   const trees = [
     tree('t1', [moment('m1')], { title: '첫사랑, 나의 순간들' }),

@@ -188,6 +188,20 @@ function playTiktokInline(btn){
  window.LTMedia?.ensureTiktokEmbedScript?.(document);
  return true;
 }
+/* #791 2단계: 인스타그램 — 공식 embed.js를 누를 때만 한 번 붙인다. */
+function playInstagramInline(btn){
+ const code=btn.dataset.igPlay||'',cite=btn.dataset.igCite||'';
+ if(!code||!cite)return false;
+ const host=btn.parentElement;if(!host||host.querySelector('.instagram-media'))return true;
+ const block=document.createElement('blockquote');
+ block.className='instagram-media';
+ block.setAttribute('data-instgrm-permalink',cite);
+ block.setAttribute('data-instgrm-version','14');
+ const section=document.createElement('section');section.textContent=btn.dataset.igTitle||'인스타그램 릴스';block.append(section);
+ btn.replaceWith(block);
+ window.LTMedia?.ensureInstagramEmbedScript?.(document);
+ return true;
+}
 document.addEventListener('pointerdown',e=>{
  if(!isPrimaryButton(e))return;
  if(e.target.closest&&e.target.closest('[data-lt-title-edit]'))return;
@@ -201,6 +215,8 @@ document.addEventListener('pointerdown',e=>{
   cell.stage.append(frame);return}
  const tt=e.target.closest&&e.target.closest('[data-tt-play]');
  if(tt){e.preventDefault();e.stopPropagation();playTiktokInline(tt);return}
+ const ig=e.target.closest&&e.target.closest('[data-ig-play]');
+ if(ig){e.preventDefault();e.stopPropagation();playInstagramInline(ig);return}
  const yt=e.target.closest&&e.target.closest('[data-yt-play]');
  if(!yt||yt.querySelector('.lt-fallback-card'))return;
  e.preventDefault();e.stopPropagation();
@@ -224,6 +240,8 @@ document.addEventListener('click',e=>{
  /* 1. YouTube 그 자리 재생: 누른 뒤에만 iframe을 만든다(시작 시점 반영, referrerpolicy 엄격). */
  const tt=e.target.closest('[data-tt-play]');
  if(tt){e.preventDefault();e.stopPropagation();playTiktokInline(tt);return}
+ const ig=e.target.closest('[data-ig-play]');
+ if(ig){e.preventDefault();e.stopPropagation();playInstagramInline(ig);return}
  const yt=e.target.closest('[data-yt-play]');
  if(yt){if(yt.querySelector('.lt-fallback-card'))return;e.preventDefault();e.stopPropagation();if(!yt.parentElement||yt.parentElement.querySelector('iframe.yt-frame'))return;
   playInline(yt,{openUrl:'https://www.youtube.com/watch?v='+yt.dataset.ytPlay});return}
@@ -338,6 +356,19 @@ momentContent=function(m,compact=false){
    const piece='<div class="clipping moment" data-moment="'+t(safe.id)+'">'+
     '<button type="button" class="yt-play is-vertical tt-play" data-lt-thumb-host data-tt-play="'+t(id)+'" data-tt-cite="'+t(media.openUrl||safe.url)+'" data-tt-title="'+t(safe.title||'TikTok 영상')+'">'+
     face+'<span class="tt-mark" aria-hidden="true">TikTok</span>'+(author?'<span class="tt-author">@'+author+'</span>':'')+'<span class="yt-play-label">▶ 재생</span></button>'+
+    '<div class="media-links"><a class="media-source-link" href="'+t(media.openUrl)+'" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">원본에서 열기 ↗</a>'+
+    '<button type="button" data-yt-expand="'+t(safe.id)+'">크게 보기</button></div></div>';
+   return piece+paintTitle(safe);
+  }
+  // #791 2단계: 릴스는 썸네일이 없어 글 카드가 기본이다. 올린 그림이 있으면 그걸 썸네일로 쓴다.
+  if(media.kind==='instagram'){
+   const thumb=localThumb(safe)||'';
+   const author=t(safe.mediaMetadata?.instagramAuthor||safe.mediaMetadata?.channel||'');
+   const caption=t(String(safe.mediaMetadata?.title||safe.title||'인스타그램 릴스').slice(0,80));
+   const face=thumb?'<span class="ig-backdrop" aria-hidden="true" style="--lt-ig-bg:url('+t(thumb)+')"></span><img class="ig-thumb" src="'+t(thumb)+'" alt="" referrerpolicy="no-referrer" loading="lazy" decoding="async">':'';
+   const piece='<div class="clipping moment" data-moment="'+t(safe.id)+'">'+
+    '<button type="button" class="yt-play is-vertical tt-play ig-play'+(thumb?' has-image':'')+'" data-lt-thumb-host data-ig-play="'+t(media.shortcode||'')+'" data-ig-cite="'+t(media.openUrl||safe.url)+'" data-ig-title="'+t(safe.title||'인스타그램 릴스')+'">'+
+    face+'<span class="tt-mark" aria-hidden="true">Instagram</span>'+(author?'<span class="ig-author">@'+author+'</span>':'')+(thumb?'':'<span class="ig-caption">'+caption+'</span>')+'<span class="yt-play-label">▶ 재생</span></button>'+
     '<div class="media-links"><a class="media-source-link" href="'+t(media.openUrl)+'" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">원본에서 열기 ↗</a>'+
     '<button type="button" data-yt-expand="'+t(safe.id)+'">크게 보기</button></div></div>';
    return piece+paintTitle(safe);

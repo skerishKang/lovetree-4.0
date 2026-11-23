@@ -11,5 +11,6 @@ export function handlerForPath(path) {
  if (p.startsWith('/api/admin/customers')) return 'adminCustomers';
  if (p === '/api/youtube/oembed') return 'youtube';
   if (p === '/api/tiktok/oembed') return 'tiktok';
+  if (p === '/api/instagram/oembed') return 'instagram';
  return 'storage';
 }

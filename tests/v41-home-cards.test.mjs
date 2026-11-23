@@ -116,6 +116,18 @@ test('썸네일은 저장된 같은 출처·data 값만 쓰고 외부 이미지�
   assert.deepEqual(memos.map(c => c.id), ['external']);
 });
 
+// #791 2단계: 릴스는 썸네일이 없어 같은 트리의 다른 썸네일을 표지로 쓰고, 없으면 글 카드로 남는다.
+test('릴스 카드는 같은 트리의 다른 썸네일을 먼저 쓰고 없으면 이미지 없이 남는다', () => {
+  const reel = moment('reel', { url: 'https://www.instagram.com/reel/C0abc123XYZ/', mediaMetadata: { title: '릴스 캡션', instagramAuthor: 'fan' } });
+  const withOther = homeMomentCards(member([reel, photo('other')]));
+  const covered = [...withOther.photos, ...withOther.memos].find((card) => card.id === 'reel');
+  assert.ok(covered);
+  assert.equal(covered.image, '/media/other.jpg');
+  const solo = homeMomentCards(member([reel]));
+  const alone = [...solo.photos, ...solo.memos].find((card) => card.id === 'reel');
+  assert.equal(alone.image, '');
+});
+
 const PRIVATE_ORIGIN = 'https://lovetree-4-0.pages.dev';
 const privateUpload = (id, n, ext = 'png') => moment(id, {
   url: `${PRIVATE_ORIGIN}/api/media/0000000${n}-0000-4000-8000-00000000000${n}.${ext}`,

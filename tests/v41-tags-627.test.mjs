@@ -174,6 +174,12 @@ test('틱톡 제목과 해시태그에서 가수·노래를 제안한다', () =>
   assert.deepEqual(brief(suggestTagsFromTitle('뉴진스 (NewJeans) How Sweet #NewJeans #HowSweet')), ['artist:NewJeans']);
 });
 
+// #791 2단계: 릴스 캡션의 해시태그도 틱톡·유튜브와 같은 꼬리표 제안 규칙을 쓴다.
+test('릴스 캡션과 해시태그에서 가수·노래를 제안한다', () => {
+  assert.deepEqual(brief(suggestTagsFromTitle('바다 순간 #ILLIT #SuperShy')), ['artist:ILLIT']);
+  assert.deepEqual(brief(suggestTagsFromTitle('무대 직캠 #RIIZE #GetAGuitar')), ['artist:RIIZE']);
+});
+
 test('직캠 문맥의 괄호 크레딧(채널 이름)은 가수로 제안하지 않는다(AI 명예회원 알림)', () => {
   // 실제 사례: 괄호는 찍은 곳(채널) 크레딧이다 — 바로 앞 한국어가 '직캠'으로 끝나면 괄호 안 영문을 가수로 읽지 않는다.
   const { proposals } = suggestTagsFromTitle("[K-Choreo 8K] 라이즈 직캠 'Bag Bad Back' (RIIZE Choreography) @250523");

@@ -33,6 +33,7 @@ import { createFeedbackService, createFeedbackHandler } from './feedback-service
 import { createOpsNotifier } from './ops-notify.js';
 import { createYoutubeOembedHandler } from './youtube-oembed.js';
 import { createTiktokOembedHandler } from './tiktok-oembed.js';
+import { createInstagramOembedHandler } from './instagram-oembed.js';
 import { createPadiemAuthorityAuth } from './padiem-authority-auth.js';
 import { createSharedAccessAuth, sharedAuthEnabled } from './padiem-access-auth.mjs';
 import { createAuthorityRelayClient } from './authority-relay-transport.js';
@@ -309,6 +310,7 @@ const adminCustomersHandler = createAdminCustomersHandler({
 });
 const youtubeOembedHandler = createYoutubeOembedHandler({ authenticate: guardedAuthenticate, productId: LOVETREE_PRODUCT_ID });
 const tiktokOembedHandler = createTiktokOembedHandler({ authenticate: guardedAuthenticate, productId: LOVETREE_PRODUCT_ID });
+const instagramOembedHandler = createInstagramOembedHandler({ authenticate: guardedAuthenticate, productId: LOVETREE_PRODUCT_ID });
 const login = await buildLogin(pool);
 const mediaHandler = createMediaHandler({
  authenticate: guardedAuthenticate, productId: LOVETREE_PRODUCT_ID,
@@ -328,6 +330,7 @@ const handlers = {
   adminCustomers: (request) => adminCustomersHandler(request),
   youtube: (request) => youtubeOembedHandler(request),
   tiktok: (request) => tiktokOembedHandler(request),
+  instagram: (request) => instagramOembedHandler(request),
   storage: (request) => storageHandler(request)
 };
 const proxyProofLog = entry => console.warn('[lovetree-proxy-proof]', JSON.stringify(entry));

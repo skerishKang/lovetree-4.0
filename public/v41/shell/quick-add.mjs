@@ -2,7 +2,7 @@
 // 판정·문구·추출은 ../quick-add.mjs의 순수 함수가 맡고, 이 파일은 DOM만 만진다(docs/TESTING.md).
 // 저장은 로컬1 계약(member.apply('quickAdd', {url}))을 그대로 부른다 — 화면은 이름만 쓴다.
 import {mountPrivateUpload} from '../private-upload.mjs';
-import {fetchVideoTitle, fetchTikTokMetadata} from '../video-title.mjs';
+import {fetchVideoTitle, fetchTikTokMetadata, fetchInstagramMetadata} from '../video-title.mjs';
 import {suggestMomentTitle} from '../domain.mjs';
 import {displayTreeTitle} from '../tree-name.mjs';
 import {extractDropUrl, hasDropPayload, firstImageFile, parseQuickUrl, dropRoute, previewState, previewTag, savedNoticeText, quickTreeLineText, quickTreeAfterText, quickSubmitText, quickSavedTreeText, QUICK_INBOX_LABEL, QUICK_EMPTY_ERROR, QUICK_INVALID_ERROR, DROP_LOGIN_NOTICE, DROP_READONLY_NOTICE, QUICK_PASTE_LABEL, QUICK_CLEAR_LABEL, QUICK_EMPTY_PREVIEW, QUICK_INVALID_PREVIEW, QUICK_PASTE_EMPTY, QUICK_PASTE_ERROR} from '../quick-add.mjs';
@@ -23,6 +23,9 @@ export function createQuickAdd(deps) {
   let titleCache = new Map();
   // #791: 틱톡 oEmbed가 받아 둔 제목·id·작성자·썸네일(짧은 주소는 서버가 푼다).
   let tiktokCache = new Map();
+  // #791 2단계: 릴스 oEmbed 캐시와 한도(429) 대기 목록. 한도에 걸리면 링크만 담고 다음에 다시 조회한다.
+  let instagramCache = new Map();
+  let instagramLimited = new Set();
   let previewToken = 0;
   let quickTagLine = null;
   // #739: 담은 직후 꼬리표 줄 인스턴스는 한 개만 살아 있는다 — 다시 그릴 때(연속 담기)·안내를 비울 때
@@ -239,7 +242,7 @@ export function createQuickAdd(deps) {
   // 사진 저장 뒤 칸이 빈 상태에서도 켜져 '주소 없으면 흐림' 규칙이 깨지므로, 전송이 끝난 다음 한 번 다시 맞춘다.
   function syncSubmitState() {
     const state = previewState(parseQuickUrl($('quick-url').value, describe));
-    $('quick-submit').disabled = state !== 'youtube' && state !== 'tiktok' && state !== 'link';
+    $('quick-submit').disabled = state !== 'youtube' && state !== 'tiktok' && state !== 'instagram' && state !== 'link';
   }
 
   // 미리보기 카드: 상태 판정은 previewState, 꼬리표는 previewTag가 정한다(순수 함수).
@@ -256,7 +259,7 @@ export function createQuickAdd(deps) {
     preview.dataset.media = 'no';
     $('quick-paste').textContent = String(input.value ?? '').trim() ? QUICK_CLEAR_LABEL : QUICK_PASTE_LABEL;
     // 레거시 규칙 그대로: 담기 버튼은 저장 가능한 주소일 때만 눌린다(빈 칸·지원 안 함은 흐림).
-    $('quick-submit').disabled = state !== 'youtube' && state !== 'tiktok' && state !== 'link';
+    $('quick-submit').disabled = state !== 'youtube' && state !== 'tiktok' && state !== 'instagram' && state !== 'link';
     clearSavedNotice();
     $('quick-error').textContent = '';
     if (state === 'empty') {
@@ -295,6 +298,30 @@ export function createQuickAdd(deps) {
     if (state === 'youtube') void loadYouTubeTitle(parsed.videoId, title, token);
     // #791: 틱톡도 같은 자리에서 제목·id·@계정·썸네일을 받아 둔다(짧은 주소는 서버가 푼다).
     if (state === 'tiktok') void loadTikTokTitle(parsed.value, title, token);
+    // #791 2단계: 릴스도 같은 자리에서 caption·@계정을 받는다(한도면 링크만 담는다).
+    if (state === 'instagram') void loadInstagramTitle(parsed.value, title, token);
+  }
+
+  async function loadInstagramTitle(url, node, token) {
+    if (!url) return;
+    const cached = instagramCache.get(url);
+    if (cached) { if (node && cached.title) node.textContent = cached.title; return; }
+    const meta = await fetchInstagramMetadata(url, fetchImpl);
+    if (!meta || meta.limited) {
+      if (meta?.limited) instagramLimited.add(url);
+      return;
+    }
+    const saved = { title: meta.title || '', author: meta.authorName || '', shortcode: meta.shortcode || '' };
+    instagramCache.set(url, saved);
+    instagramLimited.delete(url);
+    if (saved.title) {
+      const mediaMetadata = { channel: saved.author };
+      if (saved.title) mediaMetadata.title = saved.title;
+      if (saved.shortcode) mediaMetadata.instagramShortcode = saved.shortcode;
+      if (saved.author) mediaMetadata.instagramAuthor = saved.author;
+      fillPendingTitle(url, saved.title, mediaMetadata);
+    }
+    if (node && token === previewToken && node.isConnected !== false && saved.title) node.textContent = saved.title;
   }
 
   async function loadTikTokTitle(url, node, token) {
@@ -414,6 +441,16 @@ export function createQuickAdd(deps) {
       if (meta.thumbnail) mediaMetadata.thumbnail = meta.thumbnail;
       return Object.keys(mediaMetadata).length ? { mediaMetadata } : {};
     }
+    // #791 2단계: 릴스는 caption·@계정·코드를 저장한다. 429로 못 받았으면 메타 없이 링크만 저장한다.
+    if (parsed.kind === 'instagram' && !instagramLimited.has(parsed.value)) {
+      const meta = instagramCache.get(parsed.value);
+      if (!meta) return {};
+      const mediaMetadata = {};
+      if (meta.title) mediaMetadata.title = meta.title;
+      if (meta.author) { mediaMetadata.channel = meta.author; mediaMetadata.instagramAuthor = meta.author; }
+      if (meta.shortcode) mediaMetadata.instagramShortcode = meta.shortcode;
+      return Object.keys(mediaMetadata).length ? { mediaMetadata } : {};
+    }
     return {};
   }
 
@@ -478,6 +515,11 @@ export function createQuickAdd(deps) {
     if (parsed.status === 'ok' && parsed.kind === 'tiktok' && !tiktokCache.has(parsed.value) && result?.treeId && result?.momentId) {
       pendingTitleFill = { treeId: result.treeId, momentId: result.momentId, videoId: parsed.value, url };
       void loadTikTokTitle(parsed.value, null, -1);
+    }
+    // #791 2단계: 릴스 메타가 늦게 오면(한도 포함) 방금 담은 순간에 다시 채운다. 저장은 이미 끝났다.
+    if (parsed.status === 'ok' && parsed.kind === 'instagram' && !instagramCache.has(parsed.value) && result?.treeId && result?.momentId) {
+      pendingTitleFill = { treeId: result.treeId, momentId: result.momentId, videoId: parsed.value, url };
+      void loadInstagramTitle(parsed.value, null, -1);
     }
     const savedTitle = savedTitleFor(url);
     if ($('write-panel').open) {

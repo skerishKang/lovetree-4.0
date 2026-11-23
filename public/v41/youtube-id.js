@@ -11,6 +11,8 @@
   const TIKTOK_SHORT_HOSTS = new Set(['vm.tiktok.com', 'vt.tiktok.com']);
   const TIKTOK_ID_RE = /^\d{15,25}$/;
   const TIKTOK_THUMB_HOST = /(?:^|\.)(?:tiktokcdn\.com|tiktok\.com)$/i;
+  // #791 2단계: 인스타그램 릴스 — 썸네일 없음, 올린 그림만 쓴다.
+  const INSTAGRAM_HOSTS = new Set(['www.instagram.com', 'instagram.com', 'instagr.am']);
   const trimText = (value) => (typeof value === 'string' ? value.trim() : '');
 
   function youtubeIdFrom(value, { allowThumbnail = true } = {}) {
@@ -89,9 +91,18 @@
     } catch { return false; }
   }
 
+  function isInstagramMoment(moment) {
+    const url = trimText(moment?.url) || trimText(moment?.externalUrl);
+    if (!url) return false;
+    try {
+      const parsed = new URL(url);
+      return INSTAGRAM_HOSTS.has(parsed.hostname.toLowerCase()) && /^\/(?:reel|reels|p|tv)\/[A-Za-z0-9_-]{8,30}\/?$/.test(parsed.pathname || '');
+    } catch { return false; }
+  }
+
   function isVerticalMoment(moment) {
-    // #791: 틱톡은 언제나 세로다(저장된 가로세로 값보다 주소가 먼저).
-    if (isTiktokMoment(moment)) return true;
+    // #791: 틱톡·릴스는 언제나 세로다(저장된 가로세로 값보다 주소가 먼저).
+    if (isTiktokMoment(moment) || isInstagramMoment(moment)) return true;
     const meta = moment?.mediaMetadata;
     if (typeof meta?.vertical === 'boolean') return meta.vertical;
     if (typeof meta?.width === 'number' && typeof meta?.height === 'number' && meta.width > 0 && meta.height > 0) return meta.height > meta.width;
@@ -111,6 +122,6 @@
   const mediaAssetUrl = (name, origin) => `${origin}${MEDIA_ASSET_PATH}${name}`;
 
   if (typeof globalThis !== 'undefined') {
-    globalThis.LTYouTubeId = { YOUTUBE_HOSTS, YTIMG_HOST, VIDEO_ID_RE, youtubeIdFrom, safeYoutubeThumb, youtubeStageThumbUrl, isVerticalMoment, TIKTOK_HOSTS, TIKTOK_SHORT_HOSTS, TIKTOK_ID_RE, tiktokIdFrom, safeTiktokThumb, isTiktokMoment, MEDIA_ASSET_PATH, CARD_IMAGE_URL, mediaAssetUrl };
+    globalThis.LTYouTubeId = { YOUTUBE_HOSTS, YTIMG_HOST, VIDEO_ID_RE, youtubeIdFrom, safeYoutubeThumb, youtubeStageThumbUrl, isVerticalMoment, TIKTOK_HOSTS, TIKTOK_SHORT_HOSTS, TIKTOK_ID_RE, tiktokIdFrom, safeTiktokThumb, isTiktokMoment, INSTAGRAM_HOSTS, isInstagramMoment, MEDIA_ASSET_PATH, CARD_IMAGE_URL, mediaAssetUrl };
   }
 })();

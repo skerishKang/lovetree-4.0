@@ -1,6 +1,6 @@
-import { fetchVideoTitle } from './video-title.mjs';
+import { fetchVideoTitle, fetchInstagramMetadata } from './video-title.mjs';
 import { isUserTitle } from './book-usability.mjs';
-import { youtubeIdFrom } from './youtube-id.mjs';
+import { youtubeIdFrom, isInstagramMoment } from './youtube-id.mjs';
 import { isAutoTitle } from './auto-title.mjs';
 
 // #347 후속 B: 예전 YouTube 순간의 영상 제목 채우기.
@@ -27,6 +27,11 @@ export function titleBackfillTargets(state) {
       // #678 후속(둘러보기 트리 재발): mediaMetadata가 이미 있어도 순간 제목이 자동 문구로 남은 경우를 잡는다.
       if (isUserTitle(moment.title)) continue; // 사용자가 직접 적은 제목은 절대 건드리지 않는다
       const videoId = youtubeVideoId(url);
+      // #791 2단계: 릴스는 한도(429)로 메타를 못 받은 뒤 다시 조회한다. 링크는 이미 저장돼 있다.
+      if (!videoId && isInstagramMoment({ url })) {
+        targets.push({ treeId: tree.id, momentId: moment.id, url, kind: 'instagram', key: keyOf(tree.id, moment.id) });
+        continue;
+      }
       if (!videoId) continue;
       targets.push({ treeId: tree.id, momentId: moment.id, url, videoId, key: keyOf(tree.id, moment.id) });
     }
@@ -45,6 +50,16 @@ export async function backfillVideoTitles({ state, source = 'server', apply, fet
   const items = [];
   for (const target of targets) {
     attempted.add(target.key);
+    if (target.kind === 'instagram') {
+      let meta = null;
+      try { meta = await fetchInstagramMetadata(target.url); } catch { meta = null; }
+      if (!meta || meta.limited || !meta.title) continue;
+      const mediaMetadata = { title: meta.title };
+      if (meta.authorName) { mediaMetadata.channel = meta.authorName; mediaMetadata.instagramAuthor = meta.authorName; }
+      if (meta.shortcode) mediaMetadata.instagramShortcode = meta.shortcode;
+      items.push({ treeId: target.treeId, momentId: target.momentId, url: target.url, mediaMetadata });
+      continue;
+    }
     let title = '';
     try { title = await fetchTitle(target.videoId); } catch { title = ''; }
     if (title) items.push({ treeId: target.treeId, momentId: target.momentId, url: target.url, mediaMetadata: { title } });

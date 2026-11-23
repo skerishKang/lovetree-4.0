@@ -5,7 +5,7 @@
 import { parseQuickUrl } from './quick-add.mjs';
 import { rangeFields } from './domain.mjs';
 import { videoKey } from './same-stage.mjs';
-import { fetchVideoTitle, fetchTikTokMetadata } from './video-title.mjs';
+import { fetchVideoTitle, fetchTikTokMetadata, fetchInstagramMetadata } from './video-title.mjs';
 
 // share_target params 가 싣고 오는 쿼리 이름(매니페스트와 한 벌).
 export const INTAKE_URL_PARAM = 'quickadd';
@@ -57,6 +57,16 @@ export async function resolveMediaMetadata(url, { describe, timeoutMs = INTAKE_T
       if (meta.videoId) mediaMetadata.tiktokId = meta.videoId;
       if (meta.author) mediaMetadata.tiktokAuthor = meta.author;
       if (meta.thumbnailUrl) mediaMetadata.thumbnail = meta.thumbnailUrl;
+      return Object.keys(mediaMetadata).length ? { mediaMetadata } : {};
+    }
+    // #791 2단계: 릴스도 caption·@계정을 받는다. 한도(429)면 빈 값 — 링크만 저장한다.
+    if (parsed.kind === 'instagram') {
+      const meta = await Promise.race([fetchInstagramMetadata(parsed.value, fetchImpl), timedOut]);
+      if (!meta || meta.limited) return {};
+      const mediaMetadata = {};
+      if (meta.title) mediaMetadata.title = meta.title;
+      if (meta.authorName) { mediaMetadata.channel = meta.authorName; mediaMetadata.instagramAuthor = meta.authorName; }
+      if (meta.shortcode) mediaMetadata.instagramShortcode = meta.shortcode;
       return Object.keys(mediaMetadata).length ? { mediaMetadata } : {};
     }
     return {};

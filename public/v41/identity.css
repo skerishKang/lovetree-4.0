@@ -127,6 +127,16 @@ html[data-lt-theme=garden] .lt-media-body button{color:var(--lt-paper)}
 .lt-tt-refresh{position:absolute;left:12px;bottom:8px;z-index:3;min-height:28px;padding:3px 9px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-pill);background:rgba(0,0,0,.45);color:var(--lt-paper);font-size:11px;cursor:pointer}
 .lt-tt-embed{display:block;width:100%;height:100%;overflow:auto;border-radius:8px}
 .lt-tt-preview .tiktok-embed{position:relative;z-index:4;width:100%;height:100%;margin:0;overflow:auto;background:var(--lt-ink);color:var(--lt-paper)}
+/* #791 2단계: 인스타그램 릴스는 썸네일이 없어 글 카드가 기본. 올린 그림이 있으면 세로 썸네일을 쓴다. */
+.lt-ig-card{position:relative;box-sizing:border-box;margin:0;width:100%;min-height:320px;max-height:420px;padding:56px 18px 64px;border-radius:8px;overflow:hidden;background:var(--lt-ink);color:var(--lt-paper);display:flex;flex-direction:column;justify-content:center}
+.lt-ig-card.has-image{aspect-ratio:9/16;max-height:none;padding:0}
+.lt-ig-backdrop{position:absolute;inset:-12px;background-image:var(--lt-ig-bg);background-size:cover;background-position:center;filter:blur(18px) brightness(.72);opacity:.86;transform:scale(1.06);pointer-events:none}
+.lt-ig-thumb{position:relative;z-index:1;display:block;width:100%;height:100%;object-fit:contain}
+.lt-ig-mark{position:absolute;top:10px;right:10px;z-index:2;padding:3px 9px;border-radius:var(--lt-r-pill);background:rgba(0,0,0,.55);color:var(--lt-paper);font-size:11px;font-weight:700;letter-spacing:.06em}
+.lt-ig-caption{position:relative;z-index:2;font-size:15px;line-height:1.5;overflow:hidden;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical}
+.lt-ig-author{position:absolute;left:12px;bottom:12px;z-index:2;font-size:12px;opacity:.85;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lt-ig-card .lt-yt-play{position:absolute;inset:0;z-index:3;place-items:center}
+.lt-ig-card .instagram-media{position:relative;z-index:4;width:100%;height:100%;margin:0;overflow:auto;background:var(--lt-ink);color:var(--lt-paper)}
 /* #393 2: 크게 보기 — 어두운 깔개 위 화면 가운데 크게(세로 높이 가득·가로 폭 가득). 바깥 클릭·Esc로 복귀. */
 .lt-lightbox{position:fixed;inset:0;z-index:400;display:grid;place-items:center;padding:24px;background:rgba(4,4,7,.93);backdrop-filter:blur(10px)}
 .lt-lightbox-stage{display:grid;place-items:center;max-width:100%;max-height:100%}

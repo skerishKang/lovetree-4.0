@@ -18,6 +18,9 @@ export const TIKTOK_ID_RE = canonical.TIKTOK_ID_RE;
 export const tiktokIdFrom = canonical.tiktokIdFrom;
 export const safeTiktokThumb = canonical.safeTiktokThumb;
 export const isTiktokMoment = canonical.isTiktokMoment;
+// #791 2단계: 릴스도 같은 정본에서 판정한다.
+export const INSTAGRAM_HOSTS = canonical.INSTAGRAM_HOSTS;
+export const isInstagramMoment = canonical.isInstagramMoment;
 export const MEDIA_ASSET_PATH = canonical.MEDIA_ASSET_PATH;
 export const CARD_IMAGE_URL = canonical.CARD_IMAGE_URL;
 export const mediaAssetUrl = canonical.mediaAssetUrl;

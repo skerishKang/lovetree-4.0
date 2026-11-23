@@ -84,6 +84,60 @@ test('공식 embed.js는 누를 때만 한 번 붙는다',()=>{
  assert.equal(appended.length,1,'중복으로 넣지 않는다');
 });
 
+// #791 2단계: 인스타그램 릴스 — 주소·글 카드·늦은 재생기.
+const IG_CODE='C0abc123XYZ';
+const IG_REEL=`https://www.instagram.com/reel/${IG_CODE}/`;
+const igScope={LT41_MSG:MSG,window:{},URL,URLSearchParams,LTYouTubeId:globalThis.LTYouTubeId,LTEscapeHtml:globalThis.LTEscapeHtml,location:{origin:'https://lovetree.local'},fetch:async()=>({ok:false}),LTThumbFallback:{localOrPrivatePhoto:()=>''}};
+igScope.window.parent=igScope.window;
+vm.runInNewContext(readFileSync(new URL('../public/v41/media-preview.js',import.meta.url),'utf8'),igScope);
+const igMedia=igScope.window.LTMedia;
+
+test('릴스 주소를 알아보고 서버 해석과 같은 코드를 쓴다',()=>{
+ for(const url of [IG_REEL,`https://www.instagram.com/reels/${IG_CODE}/`,`https://instagr.am/p/${IG_CODE}/`]){
+  const original=parseMomentLink(url),next=igMedia.describe(url);
+  assert.equal(next.kind,'instagram');
+  assert.equal(next.shortcode,IG_CODE);
+  assert.equal(next.openUrl,original.openUrl);
+  assert.equal(next.vertical,true);
+ }
+ assert.equal(igMedia.describe('https://www.instagram.com/explore/tags/x/').kind,'link');
+});
+
+test('썸네일 없는 릴스는 캡션·@계정·플랫폼 표식이 있는 글 카드로 그린다',()=>{
+ const meta={title:'바다 순간 #ILLIT #SuperShy',channel:'fan',instagramAuthor:'fan',instagramShortcode:IG_CODE};
+ const html=igMedia.markup(IG_REEL,'제목',meta,'m1');
+ assert.match(html,/data-lt-instagram="1"/);
+ assert.match(html,/lt-ig-card/);
+ assert.doesNotMatch(html,/has-image/);
+ assert.match(html,/lt-ig-mark[^>]*>Instagram/);
+ assert.match(html,/바다 순간 #ILLIT/);
+ assert.match(html,/@fan/);
+ assert.match(html,/data-lt-play/);
+ assert.match(html,/원본에서 열기/);
+ assert.match(html,/ ↗/);
+ assert.doesNotMatch(html,/embed\.js/);
+ assert.doesNotMatch(html,/instagram-media/);
+});
+
+test('올린 그림이 있으면 릴스 카드도 세로 썸네일을 쓴다',()=>{
+ igScope.LTThumbFallback.localOrPrivatePhoto=()=>'/api/media/12345678-1234-4234-8234-123456789abc.png';
+ const html=igMedia.markup(IG_REEL,'제목',{title:'캡션',instagramAuthor:'fan'},'m1');
+ assert.match(html,/has-image/);
+ assert.match(html,/lt-ig-thumb/);
+ assert.match(html,/--lt-ig-bg:url/);
+ igScope.LTThumbFallback.localOrPrivatePhoto=()=>'';
+});
+
+test('인스타그램 공식 스크립트는 누를 때만 한 번 붙는다',()=>{
+ const appended=[];
+ const fakeDoc={head:{append(node){appended.push(node)}},querySelector(){return appended[0]||null},createElement(tag){return {tag,setAttribute(k,v){this[k]=v}}}};
+ const script=igMedia.ensureInstagramEmbedScript(fakeDoc);
+ assert.equal(script.src,'https://www.instagram.com/embed.js');
+ assert.equal(appended.length,1);
+ igMedia.ensureInstagramEmbedScript(fakeDoc);
+ assert.equal(appended.length,1);
+});
+
 test('시간이 지나 막힌 썸네일은 refresh 쿼리로 다시 받아 패널을 고친다',async()=>{
  const status={textContent:''},img={src:'',dataset:{}},backdrop={style:{setProperty(k,v){this[k]=v}}};
  const root={dataset:{ltUrl:TT_CANONICAL,ltMomentId:'m1'},isConnected:true,querySelector(sel){return sel==='.lt-media-status'?status:sel==='.lt-tt-thumb'?img:sel==='.lt-tt-backdrop'?backdrop:null;}};
