@@ -22,7 +22,7 @@ const EXPECTED = new Map([
   ['/api/feedback', 'feedback'], ['/api/board', 'feedback'], ['/api/board/mine', 'feedback'],
   ['/api/board/journal/today', 'feedback'], ['/api/admin/feedback', 'feedback'],
   ['/api/admin/journals', 'feedback'], ['/api/admin/stats', 'storage'],
-  ['/api/youtube/oembed', 'youtube'], ['/api/admin/session', 'storage'], ['/api/admin/roles', 'storage'],
+  ['/api/youtube/oembed', 'youtube'], ['/api/tiktok/oembed', 'tiktok'], ['/api/admin/session', 'storage'], ['/api/admin/roles', 'storage'],
   ['/api/admin/customers', 'adminCustomers'], ['/api/admin/customers/views', 'adminCustomers'],
   ['/auth/login', 'auth'], ['/auth/callback', 'auth'], ['/auth/logout', 'auth']
 ]);

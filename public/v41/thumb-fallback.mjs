@@ -4,11 +4,11 @@ import { MSG } from './frame-messages.mjs';
 //      → hqdefault → mqdefault → 모두 회색(120×90)/실패면 글 카드 → 제목도 없으면 최소 카드.
 // 썸네일 그림은 우리 서버에 복사하지 않고 주소만 다룬다(저작권 원칙).
 import { userTitleText, formatDisplayDate } from './book-usability.mjs';
-import { YOUTUBE_HOSTS, YTIMG_HOST, youtubeIdFrom, safeYoutubeThumb, youtubeStageThumbUrl, isVerticalMoment } from './youtube-id.mjs';
+import { YOUTUBE_HOSTS, YTIMG_HOST, youtubeIdFrom, safeYoutubeThumb, youtubeStageThumbUrl, isVerticalMoment, TIKTOK_HOSTS, TIKTOK_SHORT_HOSTS, tiktokIdFrom, safeTiktokThumb, isTiktokMoment } from './youtube-id.mjs';
 
-// 유튜브 영상 id 판정은 한 벌(public/v41/youtube-id.mjs)을 쓴다 — 예전 복사본은 지웠다.
+// 유튜브·틱톡 영상 id 판정은 한 벌(public/v41/youtube-id.mjs)을 쓴다 — 예전 복사본은 지웠다.
 // 예전에 여기 있던 이름 그대로 다시 내보낸다(쓰던 곳의 주소가 바뀌지 않게).
-export { youtubeIdFrom, safeYoutubeThumb, youtubeStageThumbUrl, isVerticalMoment };
+export { youtubeIdFrom, safeYoutubeThumb, youtubeStageThumbUrl, isVerticalMoment, tiktokIdFrom, safeTiktokThumb, isTiktokMoment };
 
 export const GRAY_THUMB_WIDTH = 120;
 export const GRAY_THUMB_HEIGHT = 90;
@@ -27,7 +27,10 @@ export { escapeHtml };
 export function isVideoMoment(moment) {
   const url = trimText(moment?.url) || trimText(moment?.externalUrl);
   if (youtubeIdFrom(url)) return true;
+  // #791: 틱톡은 저장된 썸네일이 있어도 영상 카드다.
+  if (isTiktokMoment({ url })) return true;
   if (safeYoutubeThumb(moment?.mediaMetadata?.thumbnail || moment?.mediaMetadata?.thumbnailUrl)) return true;
+  if (safeTiktokThumb(moment?.mediaMetadata?.thumbnail || moment?.mediaMetadata?.thumbnailUrl)) return true;
   if (url) {
     try {
       const parsed = new URL(url, 'https://lovetree.local');
@@ -83,6 +86,11 @@ export function thumbnailCandidates(moment, { vertical = null, autoLoad = true, 
   const local = localOrPrivatePhoto(moment, currentOrigin);
   if (local) return [local];
   if (!autoLoad) return [];
+  // #791: 틱톡은 서버 oEmbed가 저장해 둔 썸네일 한 장만 쓴다(막히면 다시 받기로 갱신).
+  if (isTiktokMoment(moment)) {
+    const savedTiktok = safeTiktokThumb(moment?.mediaMetadata?.thumbnail || moment?.mediaMetadata?.thumbnailUrl);
+    return savedTiktok ? [savedTiktok] : [];
+  }
   const saved = safeYoutubeThumb(moment?.mediaMetadata?.thumbnail || moment?.mediaMetadata?.thumbnailUrl);
   const url = trimText(moment?.url) || trimText(moment?.externalUrl);
   const videoId = youtubeIdFrom(url) || youtubeIdFrom(saved);
@@ -127,6 +135,7 @@ export function siteNameOf(value) {
     if (!['http:', 'https:'].includes(parsed.protocol)) return '';
     const host = parsed.hostname.toLowerCase();
     if (YOUTUBE_HOSTS.has(host) || YTIMG_HOST.test(host)) return 'YouTube';
+    if (TIKTOK_HOSTS.has(host) || TIKTOK_SHORT_HOSTS.has(host)) return 'TikTok';
     return parsed.hostname.replace(/^www\./i, '');
   } catch {
     return '';

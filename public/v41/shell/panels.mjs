@@ -9,7 +9,7 @@ import {formatDisplayDate} from '../book-usability.mjs';
 import {localDateOnly} from '../local-date.mjs';
 import {displayTreeTitle} from '../tree-name.mjs';
 import {mountPrivateUpload} from '../private-upload.mjs';
-import {fetchVideoTitle} from '../video-title.mjs';
+import {fetchVideoTitle, fetchTikTokMetadata} from '../video-title.mjs';
 import {loadYouTubeIframeApi, createSegmentCapture} from '../segment-capture.mjs';
 
 // #934: 링크 칸에 열 수 없는 주소가 남았을 때의 안내 — 미리보기 경고('링크를 열 수 없어요')와
@@ -82,6 +82,8 @@ export function createPanels(deps) {
     try {
       const info = LTMedia.describe(moment.url);
       if (info.kind === 'youtube' && info.videoId && LTMedia.youtubeThumbUrl) return LTMedia.youtubeThumbUrl(info.videoId, !!info.vertical);
+      // #791: 틱톡은 저장된 썸네일 주소를 그대로 쓴다(새 요청 없이 그린다).
+      if (info.kind === 'tiktok' && LTMedia.tiktokThumbCandidates) return LTMedia.tiktokThumbCandidates(moment.mediaMetadata)[0] || '';
       if (info.kind === 'photo') return moment.url;
     } catch {}
     return '';
@@ -412,6 +414,9 @@ export function createPanels(deps) {
   const videoTitleCache = new Map();
   let editorVideoTitle = '';
   let editorVideoUrl = '';
+  // #791: 틱톡 oEmbed 미리보기 값(제목·id·@계정·썸네일).
+  const tiktokMetaCache = new Map();
+  let editorTikTokMeta = null;
   // #792 2단계: 영상을 보다가 지금 위치를 담는 재생기 연결. 주소·제목이 바뀌면 끊고 새로 잇는다.
   let segmentToken = 0, segmentPlayer = null, segmentCapture = null;
   function hideSegmentCapture() {
@@ -493,7 +498,7 @@ export function createPanels(deps) {
       open.target = '_blank';
       open.rel = 'noopener noreferrer';
       open.referrerPolicy = 'no-referrer';
-      open.textContent = (info.kind === 'youtube' ? 'YouTube에서 열기' : '원본 링크 열기') + ' ↗';
+      open.textContent = (info.kind === 'youtube' ? 'YouTube에서 열기' : info.kind === 'tiktok' ? '원본에서 열기' : '원본 링크 열기') + ' ↗';
       host.append(open);
     }
   }
@@ -524,16 +529,42 @@ export function createPanels(deps) {
     }
     // #344: 미리보기 때 서버 oEmbed 프록시로 영상 제목을 받아 둔다(실패는 조용히). 저장 시 mediaMetadata.title로 함께 넘긴다.
     editorVideoTitle = '';
+    editorTikTokMeta = null;
     editorVideoUrl = info.kind === 'youtube' && info.videoId ? url : '';
     if (editorVideoUrl) {
       const videoId = info.videoId;
       void fetchVideoTitle(videoId).then(title => { if (title && editorVideoUrl === url) { editorVideoTitle = title; videoTitleCache.set(videoId, title); } });
+    }
+    // #791: 틱톡은 제목·영상 id·@계정·썸네일을 미리 받아 저장값에 함께 넘긴다.
+    if (info.kind === 'tiktok') {
+      editorVideoUrl = url;
+      const known = tiktokMetaCache.get(url);
+      if (known) { editorTikTokMeta = known; if (known.title) editorVideoTitle = known.title; }
+      else void fetchTikTokMetadata(url).then(meta => {
+        if (!meta || editorVideoUrl !== url) return;
+        const saved = {
+          title: meta.title || '', tiktokId: meta.videoId || '',
+          tiktokAuthor: meta.author || '', thumbnail: meta.thumbnailUrl || ''
+        };
+        tiktokMetaCache.set(url, saved);
+        editorTikTokMeta = saved;
+        editorVideoTitle = saved.title;
+      });
     }
   }
   function editorMediaTitle() {
     if (!editorVideoUrl) return {};
     const url = $('moment-form').elements.url.value.trim();
     if (url !== editorVideoUrl) return {};
+    if (LTMedia.describe(url).kind === 'tiktok') {
+      const meta = editorTikTokMeta || {};
+      const mediaMetadata = {};
+      if (meta.title) mediaMetadata.title = meta.title;
+      if (meta.tiktokId) mediaMetadata.tiktokId = meta.tiktokId;
+      if (meta.tiktokAuthor) mediaMetadata.tiktokAuthor = meta.tiktokAuthor;
+      if (meta.thumbnail) mediaMetadata.thumbnail = meta.thumbnail;
+      return Object.keys(mediaMetadata).length ? { mediaMetadata } : {};
+    }
     return editorVideoTitle ? { mediaMetadata: { title: editorVideoTitle } } : {};
   }
   // 계정 메뉴·편집기 버튼은 셸이 열고, 이 파일은 폼 상태만 본다.

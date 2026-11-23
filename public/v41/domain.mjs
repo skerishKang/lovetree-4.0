@@ -286,7 +286,7 @@ function safeMediaThumbnail(value) {
   if (!trimmed) return '';
   try {
     const parsed = new URL(trimmed);
-    return parsed.protocol === 'https:' && !parsed.username && !parsed.password && /(?:^|\.)ytimg\.com$/i.test(parsed.hostname) ? parsed.href : '';
+    return parsed.protocol === 'https:' && !parsed.username && !parsed.password && /(?:^|\.)(?:ytimg\.com|tiktokcdn\.com|tiktok\.com)$/i.test(parsed.hostname) ? parsed.href : '';
   } catch {
     return '';
   }
@@ -314,11 +314,16 @@ function normalizeMediaMetadata(value, url) {
   const channel = optionalText(value.channel, '미디어 채널', 160);
   const thumbnail = safeMediaThumbnail(value.thumbnail);
   const vertical = normalizeVerticalMedia(value);
-  if (!title && !channel && !thumbnail && !Object.keys(vertical).length) return null;
+  // #791: 틱톡 — 짧은 주소를 서버가 푼 숫자 id와 @계정 이름을 함께 남긴다.
+  const tiktokId = /^\d{15,25}$/.test(String(value.tiktokId ?? '').trim()) ? String(value.tiktokId).trim() : '';
+  const tiktokAuthor = optionalText(value.tiktokAuthor, '미디어 작성자', 120);
+  if (!title && !channel && !thumbnail && !tiktokId && !tiktokAuthor && !Object.keys(vertical).length) return null;
   const source = url ? new URL(url).hostname : '';
   if (!source) return null;
   const result = {title, channel, source, ...vertical};
   if (thumbnail) result.thumbnail = thumbnail;
+  if (tiktokId) result.tiktokId = tiktokId;
+  if (tiktokAuthor) result.tiktokAuthor = tiktokAuthor;
   return result;
 }
 function shortened(value, max = 40) {

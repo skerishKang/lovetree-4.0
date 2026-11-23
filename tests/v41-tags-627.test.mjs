@@ -167,6 +167,13 @@ test('시상식·방송 이름에 붙은 연도는 가수로 제안하지 않는
   assert.deepEqual(suggestTagsFromTitle('MAMA2025').proposals.filter((p) => p.kindId === 'artist'), []);
 });
 
+// #791: 틱톡 제목·해시태그도 유튜브와 같은 꼬리표 제안 규칙을 그대로 쓴다(새 규칙 없음).
+test('틱톡 제목과 해시태그에서 가수·노래를 제안한다', () => {
+  assert.deepEqual(brief(suggestTagsFromTitle('#ILLIT #SuperShy 퍼포먼스 직캠')), ['artist:ILLIT']);
+  assert.deepEqual(brief(suggestTagsFromTitle('RIIZE (라이즈) ‘Get A Guitar’ tiktok #라이즈 #GetAGuitar')), ['artist:RIIZE', 'song:Get A Guitar']);
+  assert.deepEqual(brief(suggestTagsFromTitle('뉴진스 (NewJeans) How Sweet #NewJeans #HowSweet')), ['artist:NewJeans']);
+});
+
 test('직캠 문맥의 괄호 크레딧(채널 이름)은 가수로 제안하지 않는다(AI 명예회원 알림)', () => {
   // 실제 사례: 괄호는 찍은 곳(채널) 크레딧이다 — 바로 앞 한국어가 '직캠'으로 끝나면 괄호 안 영문을 가수로 읽지 않는다.
   const { proposals } = suggestTagsFromTitle("[K-Choreo 8K] 라이즈 직캠 'Bag Bad Back' (RIIZE Choreography) @250523");

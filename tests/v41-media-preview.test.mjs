@@ -32,3 +32,68 @@ test('private aliases fetch on the current official host without rewriting store
  }
  assert.equal(media.privateAssetName('https://lovetree-4-0.pages.dev'+path,'https://preview.test'),null);
 });
+
+// #791: 틱톡 — 주소 알아보기·세로 패널·늦은 재생기·썸네일 다시 받기.
+const TT_ID='7252913073450106158';
+const TT_CANONICAL=`https://www.tiktok.com/@tiktokofficial/video/${TT_ID}`;
+const TT_SHORT='https://vm.tiktok.com/ZGd3XTri5/';
+const ttScope={LT41_MSG:MSG,window:{},URL,URLSearchParams,LTYouTubeId:globalThis.LTYouTubeId,LTEscapeHtml:globalThis.LTEscapeHtml,location:{origin:'https://lovetree.local'},fetch:async()=>({ok:false})};
+ttScope.window.parent=ttScope.window;
+vm.runInNewContext(readFileSync(new URL('../public/v41/media-preview.js',import.meta.url),'utf8'),ttScope);
+const ttMedia=ttScope.window.LTMedia;
+
+test('틱톡 정본·짧은 주소를 알아보고 서버 해석과 같은 결과를 쓴다',()=>{
+ for(const url of [TT_CANONICAL,TT_SHORT]){
+  const original=parseMomentLink(url),next=ttMedia.describe(url);
+  assert.equal(next.kind,'tiktok');
+  assert.equal(next.openUrl,original.openUrl);
+  assert.equal(next.videoId,original.videoId);
+  assert.equal(next.vertical,true);
+ }
+ assert.equal(ttMedia.describe('https://www.tiktok.com/@x/photo/'+TT_ID).kind,'link');
+ assert.equal(ttMedia.describe('https://vm.tiktok.com.evil.test/ZGd3XTri5/').kind,'link');
+ assert.equal(ttMedia.tiktokPlayerId(TT_ID),TT_ID);
+ assert.equal(ttMedia.tiktokPlayerId('not-a-number'),'');
+});
+
+test('틱톡 카드는 세로·플랫폼 표식·원본 열기 링크를 그리고 재생기는 누르기 전에 없다',()=>{
+ const thumb='https://v16m-default.tiktokcdn.com/frame.jpg';
+ const html=ttMedia.markup(TT_CANONICAL,'제목',{thumbnail:thumb,tiktokId:TT_ID,tiktokAuthor:'tiktokofficial'},'m1');
+ assert.match(html,/data-lt-tiktok="1"/);
+ assert.match(html,/data-lt-vertical="1"/);
+ assert.match(html,/lt-tt-mark[^>]*>TikTok/);
+ assert.match(html,/lt-tt-backdrop/);
+ assert.match(html,/@tiktokofficial/);
+ assert.match(html,/원본에서 열기/);
+ assert.match(html,/ ↗/);
+ assert.match(html,/data-lt-play/);
+ assert.match(html,/data-lt-thumb-refresh/);
+ assert.doesNotMatch(html,/embed\.js/);
+ assert.doesNotMatch(html,/tiktok-embed/);
+ const escaped=ttMedia.markup(TT_CANONICAL,'"><img src=x onerror=alert(1)>');
+ assert.match(escaped,/&lt;img/);
+});
+
+test('공식 embed.js는 누를 때만 한 번 붙는다',()=>{
+ const appended=[];
+ const fakeDoc={head:{append(node){appended.push(node)}},querySelector(){return appended[0]||null},createElement(tag){return {tag,setAttribute(k,v){this[k]=v}}}};
+ const script=ttMedia.ensureTiktokEmbedScript(fakeDoc);
+ assert.equal(script.src,'https://www.tiktok.com/embed.js');
+ assert.equal(appended.length,1);
+ ttMedia.ensureTiktokEmbedScript(fakeDoc);
+ assert.equal(appended.length,1,'중복으로 넣지 않는다');
+});
+
+test('시간이 지나 막힌 썸네일은 refresh 쿼리로 다시 받아 패널을 고친다',async()=>{
+ const status={textContent:''},img={src:'',dataset:{}},backdrop={style:{setProperty(k,v){this[k]=v}}};
+ const root={dataset:{ltUrl:TT_CANONICAL,ltMomentId:'m1'},isConnected:true,querySelector(sel){return sel==='.lt-media-status'?status:sel==='.lt-tt-thumb'?img:sel==='.lt-tt-backdrop'?backdrop:null;}};
+ const calls=[];
+ ttScope.fetch=async(url)=>{calls.push(url);return {ok:true,json:async()=>({thumbnailUrl:'https://v16m-default.tiktokcdn.com/new.jpg',videoId:TT_ID})};};
+ await ttMedia.refreshTiktokThumb(root);
+ assert.equal(calls.length,1);
+ assert.match(calls[0],/\/api\/tiktok\/oembed\?url=/);
+ assert.match(calls[0],/refresh=1/);
+ assert.equal(img.src,'https://v16m-default.tiktokcdn.com/new.jpg');
+ assert.equal(backdrop.style['--lt-tt-bg'],'url("https://v16m-default.tiktokcdn.com/new.jpg")');
+ assert.equal(status.textContent,'썸네일을 다시 받았어요.');
+});

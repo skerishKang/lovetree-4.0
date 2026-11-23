@@ -11,6 +11,13 @@ export const youtubeIdFrom = canonical.youtubeIdFrom;
 export const safeYoutubeThumb = canonical.safeYoutubeThumb;
 export const youtubeStageThumbUrl = canonical.youtubeStageThumbUrl;
 export const isVerticalMoment = canonical.isVerticalMoment;
+// #791: 틱톡도 같은 정본에서 판정한다.
+export const TIKTOK_HOSTS = canonical.TIKTOK_HOSTS;
+export const TIKTOK_SHORT_HOSTS = canonical.TIKTOK_SHORT_HOSTS;
+export const TIKTOK_ID_RE = canonical.TIKTOK_ID_RE;
+export const tiktokIdFrom = canonical.tiktokIdFrom;
+export const safeTiktokThumb = canonical.safeTiktokThumb;
+export const isTiktokMoment = canonical.isTiktokMoment;
 export const MEDIA_ASSET_PATH = canonical.MEDIA_ASSET_PATH;
 export const CARD_IMAGE_URL = canonical.CARD_IMAGE_URL;
 export const mediaAssetUrl = canonical.mediaAssetUrl;

@@ -22,3 +22,29 @@ export async function fetchVideoTitle(videoId, fetchImpl = (...args) => globalTh
   const meta = await fetchVideoMetadata(videoId, fetchImpl);
   return meta?.title || '';
 }
+
+// 틱톡 영상 정보 한 벌(#791). 서버 틱톡 oEmbed 프록시(/api/tiktok/oembed)만 쓴다.
+// 짧은 주소(vm·vt)도 서버가 정본 id까지 풀어 준다. refresh=true면 캐시를 지우고 다시 받는다
+// (썸네일이 시간이 지나 막혔을 때 유튜브 썸네일 다시 받기와 같은 길). 실패는 조용히 null.
+export async function fetchTikTokMetadata(value, fetchImpl = (...args) => globalThis.fetch(...args), { refresh = false } = {}) {
+  const raw = String(value ?? '').trim();
+  if (!raw) return null;
+  try {
+    const query = '/api/tiktok/oembed?url=' + encodeURIComponent(raw) + (refresh ? '&refresh=1' : '');
+    const answer = await fetchImpl(query, { headers: { accept: 'application/json' } });
+    if (!answer?.ok) return null;
+    const data = await answer.json();
+    const title = typeof data?.title === 'string' ? data.title.trim() : '';
+    const authorName = typeof data?.authorName === 'string' ? data.authorName.trim() : '';
+    const thumbnailUrl = typeof data?.thumbnailUrl === 'string' ? data.thumbnailUrl.trim() : '';
+    const videoId = typeof data?.videoId === 'string' ? data.videoId.trim() : '';
+    // #791: @계정 이름 — 짧은 주소는 서버가 푼 정본 주소에서 온다.
+    const author = typeof data?.author === 'string' ? data.author.trim() : '';
+    const width = Number(data?.width) || 0;
+    const height = Number(data?.height) || 0;
+    if (!title && !authorName && !thumbnailUrl && !videoId && !author) return null;
+    return { title, authorName, thumbnailUrl, videoId, author, width, height };
+  } catch {
+    return null;
+  }
+}

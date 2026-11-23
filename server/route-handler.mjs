@@ -10,5 +10,6 @@ export function handlerForPath(path) {
  if (p === '/api/feedback' || p.startsWith('/api/admin/feedback') || p.startsWith('/api/admin/journals') || p === '/api/board' || p.startsWith('/api/board/') || p.startsWith('/api/admin/persona/')) return 'feedback';
  if (p.startsWith('/api/admin/customers')) return 'adminCustomers';
  if (p === '/api/youtube/oembed') return 'youtube';
+  if (p === '/api/tiktok/oembed') return 'tiktok';
  return 'storage';
 }

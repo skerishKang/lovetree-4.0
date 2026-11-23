@@ -79,12 +79,15 @@ export function parseQuickUrl(url, describe) {
   return { status: 'ok', kind: media.kind, value, videoId: media.videoId || '', label: media.label || '', thumb: media.loadUrl || '' };
 }
 
-// 미리보기 카드가 그릴 것: empty(빗금 안내) · invalid(같은 틀에 안내) · youtube · link.
+// 미리보기 카드가 그릴 것: empty(빗금 안내) · invalid(같은 틀에 안내) · youtube · tiktok · link.
 // 화면(shell/quick-add.mjs)은 이 판정만 보고 그리고, 시험은 표로 확인한다.
 export function previewState(parsed) {
   if (!parsed || parsed.status === 'empty') return 'empty';
   if (parsed.status !== 'ok') return 'invalid';
-  return parsed.kind === 'youtube' ? 'youtube' : 'link';
+  if (parsed.kind === 'youtube') return 'youtube';
+  // #791: 틱톡은 저장 전에 제목을 받아 두고 세로 미리보기를 그린다.
+  if (parsed.kind === 'tiktok') return 'tiktok';
+  return 'link';
 }
 
 // 금테 꼬리표: 어디서 온 주소인지 한눈에. YouTube는 Shorts·Live 모양까지 구분한다.
@@ -97,7 +100,9 @@ export function previewTag(url, kind = '') {
     const shape = (parsed.pathname.match(/^\/(shorts|live)\//) || [])[1];
     return shape ? `YOUTUBE · ${shape.toUpperCase()}` : 'YOUTUBE';
   }
-  return kind === 'youtube' ? 'YOUTUBE' : host;
+  // #791: 틱톡 정본·짧은 주소는 모두 TIKTOK 꼬리표.
+  if (host === 'tiktok.com' || host === 'vm.tiktok.com' || host === 'vt.tiktok.com') return 'TIKTOK';
+  return kind === 'youtube' ? 'YOUTUBE' : kind === 'tiktok' ? 'TIKTOK' : host;
 }
 
 // 안내 줄 제목 요약: 한 줄로 접고 max자 뒤는 말줄임(안내 줄 높이가 고정이라서).

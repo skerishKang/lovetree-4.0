@@ -80,7 +80,7 @@ function detailMarkup(m,showMeta=true){
  /* #815: 연결 이유는 적었을 때만 보인다(비면 아무것도 그리지 않는다). */
  const line=connectionLine(nextInfo?.title,nextInfo?.reason,{hideEmptyWhy:true});
  const rangeLine=formatRange(m.startSeconds,m.endSeconds);
- const open=m.url&&isYouTubeUrl(m.url)?'YouTube에서 열기 ↗':'원본 링크 열기 ↗';
+ const open=m.url&&isYouTubeUrl(m.url)?'YouTube에서 열기 ↗':(m.url&&window.LTMedia&&LTMedia.describe?.(m.url)?.kind==='tiktok'?'원본에서 열기 ↗':'원본 링크 열기 ↗');
  // #327 2부: 내 기록(서버)의 순간 상세에서 다른 트리로 옮길 수 있다. 공유·예시는 숨긴다.
  const canMove=(window.parent&&window.parent.LT41)?window.parent.LT41.source==='server':false;
  const view=titleViewFor(m);
@@ -175,6 +175,19 @@ function playInline(yt,media){
  cell.stage.append(frame);
  if(end>start)host.insertAdjacentHTML('beforeend','<button type="button" class="yt-from-start" data-yt-from-start="'+t(yt.dataset.ytPlay)+'">처음부터 보기</button>');
 }
+/* #791: 틱톡 — 공식 embed.js를 누를 때만 붙인다. 짧은 주소는 서버가 푼 id를 쓴다. */
+function playTiktokInline(btn){
+ const id=window.LTMedia?.tiktokPlayerId?.(btn.dataset.ttPlay||'');
+ const cite=btn.dataset.ttCite||'';
+ if(!id||!cite)return false;
+ const host=btn.parentElement;if(!host||host.querySelector('.tiktok-embed'))return true;
+ const block=document.createElement('blockquote');
+ block.className='tiktok-embed';block.setAttribute('cite',cite);block.setAttribute('data-video-id',id);
+ const section=document.createElement('section');section.textContent=btn.dataset.ttTitle||'TikTok 영상';block.append(section);
+ btn.replaceWith(block);
+ window.LTMedia?.ensureTiktokEmbedScript?.(document);
+ return true;
+}
 document.addEventListener('pointerdown',e=>{
  if(!isPrimaryButton(e))return;
  if(e.target.closest&&e.target.closest('[data-lt-title-edit]'))return;
@@ -186,6 +199,8 @@ document.addEventListener('pointerdown',e=>{
   // #833: '처음부터 보기' 재생 칸도 같은 모서리 단추를 둔다.
   const cell=mountExpandControls(host,{url:ytOpenUrl(fromStart.dataset.ytFromStart),openUrl:ytOpenUrl(fromStart.dataset.ytFromStart),lightbox:(u,ti,v)=>{window.LTMedia&&LTMedia.openLightbox(u,ti,v)}});
   cell.stage.append(frame);return}
+ const tt=e.target.closest&&e.target.closest('[data-tt-play]');
+ if(tt){e.preventDefault();e.stopPropagation();playTiktokInline(tt);return}
  const yt=e.target.closest&&e.target.closest('[data-yt-play]');
  if(!yt||yt.querySelector('.lt-fallback-card'))return;
  e.preventDefault();e.stopPropagation();
@@ -200,13 +215,15 @@ document.addEventListener('click',e=>{
  // #393 2: 크게 보기 — 어두운 깔개 위 화면 가운데 크게(세로 높이 가득·가로 폭 가득). 바깥 클릭·Esc로 책 복귀.
  const expand=e.target.closest('[data-yt-expand]');
  if(expand){e.preventDefault();e.stopPropagation();const m=metadataFor(expand.dataset.ytExpand);
-  if(m&&m.url&&window.LTMedia&&LTMedia.openLightbox)LTMedia.openLightbox(m.url,titleViewFor(m).main,LTMedia.verticalVideo(m.url,m.mediaMetadata));return}
+  if(m&&m.url&&window.LTMedia&&LTMedia.openLightbox)LTMedia.openLightbox(m.url,titleViewFor(m).main,LTMedia.verticalVideo(m.url,m.mediaMetadata),m.mediaMetadata?.tiktokId||'');return}
  const next=e.target.closest('[data-next-moment]');
  if(next){if(LTDEMO.readOnly)return;e.preventDefault();e.stopPropagation();requestNextMoment(next.dataset.nextMoment||selectedMomentId);return}
  // #393 5: 마지막 장의 다른 트리 표지 — 셸이 이미 듣고 있는 lt41-open-book(view-navigation의 openBook)으로 그 트리 책으로 간다.
  const openTree=e.target.closest('[data-open-tree]');
  if(openTree){e.preventDefault();e.stopPropagation();const momentId=openTree.dataset.openMoment,treeId=openTree.dataset.openTree;if(momentId&&treeId)LTDEMO.openBook(momentId,treeId);return}
  /* 1. YouTube 그 자리 재생: 누른 뒤에만 iframe을 만든다(시작 시점 반영, referrerpolicy 엄격). */
+ const tt=e.target.closest('[data-tt-play]');
+ if(tt){e.preventDefault();e.stopPropagation();playTiktokInline(tt);return}
  const yt=e.target.closest('[data-yt-play]');
  if(yt){if(yt.querySelector('.lt-fallback-card'))return;e.preventDefault();e.stopPropagation();if(!yt.parentElement||yt.parentElement.querySelector('iframe.yt-frame'))return;
   playInline(yt,{openUrl:'https://www.youtube.com/watch?v='+yt.dataset.ytPlay});return}
@@ -309,6 +326,19 @@ momentContent=function(m,compact=false){
     face+
     '<span class="yt-play-label">'+t(label)+'</span></button>'+
     '<div class="media-links"><a class="media-source-link" href="'+t(media.openUrl)+'" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">YouTube ↗</a>'+
+    '<button type="button" data-yt-expand="'+t(safe.id)+'">크게 보기</button></div></div>';
+   return piece+paintTitle(safe);
+  }
+  // #791: 틱톡 — 세로 썸네일(흐린 배경 채움) + 구석 표식 + 원본 열기. 재생기는 누를 때만.
+  if(media.kind==='tiktok'){
+   const thumb=(window.LTMedia?.tiktokThumbCandidates?.(safe.mediaMetadata)||[])[0]||'';
+   const id=(window.LTMedia?.tiktokPlayerId?.(safe.mediaMetadata?.tiktokId||media.videoId))||'';
+   const author=t(safe.mediaMetadata?.tiktokAuthor||'');
+   const face=thumb?'<span class="tt-backdrop" aria-hidden="true" style="--lt-tt-bg:url('+t(thumb)+')"></span><img class="tt-thumb" src="'+t(thumb)+'" alt="'+t(safe.title||'TikTok 영상 썸네일')+'" referrerpolicy="no-referrer" loading="lazy" decoding="async">':'';
+   const piece='<div class="clipping moment" data-moment="'+t(safe.id)+'">'+
+    '<button type="button" class="yt-play is-vertical tt-play" data-lt-thumb-host data-tt-play="'+t(id)+'" data-tt-cite="'+t(media.openUrl||safe.url)+'" data-tt-title="'+t(safe.title||'TikTok 영상')+'">'+
+    face+'<span class="tt-mark" aria-hidden="true">TikTok</span>'+(author?'<span class="tt-author">@'+author+'</span>':'')+'<span class="yt-play-label">▶ 재생</span></button>'+
+    '<div class="media-links"><a class="media-source-link" href="'+t(media.openUrl)+'" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">원본에서 열기 ↗</a>'+
     '<button type="button" data-yt-expand="'+t(safe.id)+'">크게 보기</button></div></div>';
    return piece+paintTitle(safe);
   }

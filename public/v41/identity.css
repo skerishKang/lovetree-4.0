@@ -117,6 +117,16 @@ html[data-lt-theme=garden] .lt-media-body button{color:var(--lt-paper)}
 .lt-media[data-lt-vertical="1"] .lt-media-body img{width:100%!important;height:100%!important;max-height:none!important;object-fit:contain!important}
 .lt-media[data-lt-vertical="1"] .lt-yt-frame{width:auto;height:100%;max-width:100%;aspect-ratio:9/16}
 .lt-media[data-lt-vertical="1"] .lt-media-body video{width:auto!important;height:100%!important;max-height:none!important;object-fit:contain!important}
+/* #791: 틱톡 세로 패널 — 저장된 썸네일을 흐린 배경으로 채우고 가운데는 원본 비율(쇼츠와 같은 모양). */
+.lt-tt-preview{position:relative;margin:0;width:100%;aspect-ratio:9/16;max-height:360px;border-radius:8px;overflow:hidden;background:var(--lt-ink)}
+.lt-media[data-lt-vertical="1"] .lt-tt-preview{height:100%;max-height:none}
+.lt-tt-backdrop{position:absolute;inset:-12px;background-image:var(--lt-tt-bg);background-size:cover;background-position:center;filter:blur(18px) brightness(.72);opacity:.86;transform:scale(1.06);pointer-events:none}
+.lt-tt-thumb{position:relative;z-index:1;display:block;width:100%;height:100%;object-fit:contain}
+.lt-tt-mark{position:absolute;top:10px;right:10px;z-index:2;padding:3px 9px;border-radius:var(--lt-r-pill);background:rgba(0,0,0,.55);color:var(--lt-paper);font-size:11px;font-weight:700;letter-spacing:.06em}
+.lt-tt-author{position:absolute;left:12px;right:12px;bottom:34px;z-index:2;color:var(--lt-paper);font-size:11px;line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;pointer-events:none}
+.lt-tt-refresh{position:absolute;left:12px;bottom:8px;z-index:3;min-height:28px;padding:3px 9px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-pill);background:rgba(0,0,0,.45);color:var(--lt-paper);font-size:11px;cursor:pointer}
+.lt-tt-embed{display:block;width:100%;height:100%;overflow:auto;border-radius:8px}
+.lt-tt-preview .tiktok-embed{position:relative;z-index:4;width:100%;height:100%;margin:0;overflow:auto;background:var(--lt-ink);color:var(--lt-paper)}
 /* #393 2: 크게 보기 — 어두운 깔개 위 화면 가운데 크게(세로 높이 가득·가로 폭 가득). 바깥 클릭·Esc로 복귀. */
 .lt-lightbox{position:fixed;inset:0;z-index:400;display:grid;place-items:center;padding:24px;background:rgba(4,4,7,.93);backdrop-filter:blur(10px)}
 .lt-lightbox-stage{display:grid;place-items:center;max-width:100%;max-height:100%}

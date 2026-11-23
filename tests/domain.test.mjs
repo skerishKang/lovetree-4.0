@@ -120,6 +120,29 @@ test('editing a moment to another link address drops the stale cached media meta
   const same = editMoment(tree, tree.moments[0].id, { ...input('같은 영상'), url: tree.moments[0].url });
   assert.deepEqual(same.moments[0].mediaMetadata, { title: '무대 영상', channel: '윤슬 채널', source: 'youtu.be' });
 });
+// #791: 틱톡 제목·영상 id·@계정·썸네일이 저장 계약을 그대로 통과한다(유튜브와 같은 규칙).
+test('tiktok media metadata keeps title, id, author and a tiktok CDN thumbnail', () => {
+  const url = 'https://vm.tiktok.com/ZGd3XTri5/';
+  const moment = validateMomentInput({
+    ...input(''),
+    url,
+    mediaMetadata: {
+      title: '짧은 주소로 담은 순간',
+      tiktokId: '7252913073450106158',
+      tiktokAuthor: 'tiktokofficial',
+      thumbnail: 'https://v16m-default.tiktokcdn.com/frame.jpg'
+    }
+  });
+  assert.equal(moment.title, '짧은 주소로 담은 순간');
+  assert.deepEqual(moment.mediaMetadata, {
+    title: '짧은 주소로 담은 순간', channel: '', source: 'vm.tiktok.com',
+    thumbnail: 'https://v16m-default.tiktokcdn.com/frame.jpg',
+    tiktokId: '7252913073450106158', tiktokAuthor: 'tiktokofficial'
+  });
+  const bad = validateMomentInput({ ...input(''), url, mediaMetadata: { thumbnail: 'https://evil.example/frame.jpg' } });
+  assert.equal(bad.mediaMetadata, undefined);
+});
+
 test('import creates fresh identities and never overwrites existing trees', () => {
   const first = createTree(input());
   const source = addMoment(first, input('두 번째'), first.moments[0].id);

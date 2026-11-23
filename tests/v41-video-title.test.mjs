@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { suggestMomentTitle, quickAdd, validateState, EMPTY_STATE } from '../src/domain.js';
 import { suggestMomentTitle as suggestMjs, quickAdd as quickAddMjs, validateState as validateReader, EMPTY_STATE as EMPTY_STATE_MJS } from '../public/v41/domain.mjs';
 import { createMemberSession } from '../public/v41/member-session.mjs';
-import { fetchVideoTitle } from '../public/v41/video-title.mjs';
+import { fetchVideoTitle, fetchTikTokMetadata } from '../public/v41/video-title.mjs';
 
 // #344(2026-11-10 대표 요청): 자동 제목을 영상 제목으로 — 우선순위는 사용자 입력 > 영상 제목(oEmbed) >
 // 마음 한마디 첫 줄 > 기존 도메인 규칙. src/domain.js와 public/v41/domain.mjs 두 벌이 같은 규칙인지
@@ -130,6 +130,21 @@ test('fetchVideoTitle: oEmbed 성공·실패·예외 모두 안전하다', async
   const counting = async () => { called += 1; return ok(); };
   assert.equal(await fetchVideoTitle('', counting), '');
   assert.equal(called, 0, '빈 videoId는 요청하지 않는다');
+});
+
+// #791: 틱톡 oEmbed 응답은 가짜로 처리하고, 제목·id·@계정·썸네일만 조용히 받는다.
+test('fetchTikTokMetadata: 성공·실패·예외·refresh 요청을 안전하게 처리한다', async () => {
+  const TIKTOK = 'https://www.tiktok.com/@tiktokofficial/video/7252913073450106158';
+  const ok = (url) => ({ ok: true, json: async () => ({ title: '  순간  ', authorName: 'tiktokofficial', thumbnailUrl: 'https://v16m-default.tiktokcdn.com/frame.jpg', videoId: '7252913073450106158', author: 'tiktokofficial', width: 325, height: 578, error: 'no' }) });
+  const got = await fetchTikTokMetadata(TIKTOK, ok);
+  assert.deepEqual(got, { title: '순간', authorName: 'tiktokofficial', thumbnailUrl: 'https://v16m-default.tiktokcdn.com/frame.jpg', videoId: '7252913073450106158', author: 'tiktokofficial', width: 325, height: 578 });
+  assert.equal(await fetchTikTokMetadata(TIKTOK, async () => ({ ok: false })), null);
+  assert.equal(await fetchTikTokMetadata(TIKTOK, async () => { throw new Error('network'); }), null);
+  assert.equal(await fetchTikTokMetadata('', ok), null);
+  const calls = [];
+  await fetchTikTokMetadata(TIKTOK, async (url) => { calls.push(url); return ok(url); }, { refresh: true });
+  assert.match(calls[0], /\/api\/tiktok\/oembed\?url=/);
+  assert.match(calls[0], /refresh=1/);
 });
 
 test('서버 경계(PUT→GET): 자동 제목·mediaMetadata가 저장 왕복을 살아 남는다', async () => {

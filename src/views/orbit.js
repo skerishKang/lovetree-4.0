@@ -7,7 +7,7 @@ import {localDaysBetween, relativeDayLabel} from '../../public/v41/local-date.mj
 import {filterMomentEntries, momentHeadTitle, orderedTrees} from '../../v41/moment-list.js';
 import {movedNotice} from '../../public/v41/inbox-model.mjs';
 import {tagFacets, filterMomentsByTags} from '../../public/v41/tag-filter.mjs';
-import {fallbackCardMarkup, thumbFallbackAttrs, needsFallbackCard, mountThumbFallback, VIDEO_UNAVAILABLE_TEXT, isVerticalMoment, youtubeIdFrom, thumbnailCandidates} from '../../public/v41/thumb-fallback.mjs';
+import {fallbackCardMarkup, thumbFallbackAttrs, needsFallbackCard, mountThumbFallback, VIDEO_UNAVAILABLE_TEXT, isVerticalMoment, youtubeIdFrom, thumbnailCandidates, isTiktokMoment} from '../../public/v41/thumb-fallback.mjs';
 import samples from './orbit-samples.json';
 import {escape as esc, orbitRecords, resume, remember} from './memory.js';
 import {SERVICE, GO_TREES, READ_BOOK, VIEW_TREE, NEW_TREE, BOOK_IS_READING} from '../terms.js';
@@ -56,6 +56,8 @@ extraCSS+=`.recent-card{pointer-events:auto;position:relative;display:block;widt
 // 261116 PR 2: 머리글 단추(카드 모드 고르기). 눈에 보이는 글자 12px 이상·대비 4.5:1 위, 누름 영역은 :after로 44px를 채운다(menuBtn과 같은 판). 카드 열림(recent-open)과 갈라진다 — 단추 자체가 위에 있어 그쪽이 눌린다.
 extraCSS+=`.recent-head{position:relative;display:inline-flex;align-items:baseline;gap:1px;min-height:24px;margin:-4px 0;padding:2px 0;border:0;background:none;cursor:pointer;font:inherit;font-size:13px;letter-spacing:.04em;color:#cdc5da;text-align:left;white-space:nowrap}.recent-head:after{content:'';position:absolute;inset:-10px -12px -10px -8px;border-radius:8px}.recent-head:focus-visible{outline:3px solid #e8b8c9;outline-offset:2px}.recent-head-arrow{font-size:12px;color:#a79db8}.recent-head:hover{color:#eee6f6}.recent-head-row{display:flex;align-items:center;justify-content:space-between;gap:10px}.recent-change{position:relative;min-height:24px;padding:2px 0;border:0;background:none;cursor:pointer;font:inherit;font-size:13px;color:#cdc5da;white-space:nowrap;text-decoration:underline;text-underline-offset:3px}.recent-change:after{content:'';position:absolute;inset:-10px -8px;border-radius:8px}.recent-change:hover{color:#eee6f6}.recent-change:focus-visible{outline:3px solid #e8b8c9;outline-offset:2px}:host([data-lt-theme=garden]) .recent-head,:host([data-lt-theme=garden]) .recent-change,:host([data-lt-theme=garden]) .recent-head-arrow{color:var(--lt-muted)}`;
 // #1109: 정리 창과 같은 닫기 단추·뒤 덮개·390 꽉 찬 창 규칙.
+// #791: 틱톡 최근 순간 카드의 작은 플랫폼 표식.
+extraCSS+=`.recent-tt-mark{position:absolute;top:10px;right:10px;z-index:2;padding:3px 9px;border-radius:999px;background:rgba(0,0,0,.55);color:#fff;font-size:11px;font-weight:700;letter-spacing:.06em;pointer-events:none}`;
 extraCSS+=`.orbit-dialog:not(#guidePanel)::backdrop{background:rgba(3,3,7,.85);backdrop-filter:blur(12px)}.orbit-dialog:not(#guidePanel) .close{box-sizing:border-box;width:44px;height:44px;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;padding:0;border:1px solid #615364;border-radius:50%;background:#ffffff07;font-size:24px;line-height:1;color:inherit;position:absolute;right:12px;top:10px;z-index:7}@media(max-width:520px){.orbit-dialog:not(#guidePanel){width:100vw;max-width:none;height:100dvh;max-height:100dvh;inset:0;margin:0;border:0;border-radius:0}.orbit-dialog:not(#guidePanel) .close{top:8px;right:8px;background:#151118e6}}`;
 // #1077: 바닥 링크·새 소식 카드 자리를 지나는 예시 카드는 그 구간만 투명하게(자리와 장수는 유지).
 extraCSS+=`.card.lt-under-link{opacity:0}`;
@@ -142,11 +144,12 @@ export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSel
   const vertical=isVerticalMoment(c);
   const videoId=c.youtubeThumb?youtubeIdFrom(c.url):'';
   const candidates=videoId?thumbnailCandidates(c,{autoLoad:true}):[];
+  const ttMark=isTiktokMoment(c)?'<span class="recent-tt-mark" aria-hidden="true">TikTok</span>':'';
   const bgStyle=src=>vertical&&src?` style="--lt-recent-bg:url('${esc(src)}')"`:'';
   const media=videoId&&candidates.length
    ?`<span class="recent-media${vertical?' vertical':''}"${bgStyle(candidates[0])} data-recent-video="${esc(videoId)}" data-recent-state="loading"><img class="recent-thumb" src="${esc(candidates[0])}" alt="" draggable="false"${thumbFallbackAttrs(c,{candidates,mode:'recent-video'})} referrerpolicy="no-referrer" decoding="async"><span class="recent-video-status" role="status">${VIDEO_UNAVAILABLE_TEXT}</span><button type="button" class="recent-play" data-recent-play aria-label="바로 재생"><span aria-hidden="true">▶</span></button></span>`
    :c.image
-   ?`<span class="recent-media${vertical?' vertical':''}"${bgStyle(c.image)}><img class="recent-thumb" src="${esc(c.image)}" alt="" draggable="false"${thumbFallbackAttrs(c,{candidates:c.thumbCandidates||[c.image],writable,variant:'orbit'})}${c.youtubeThumb?' referrerpolicy="no-referrer"':''} decoding="async">${c.youtubeThumb&&c.url?`<button type="button" class="recent-play" data-recent-play aria-label="바로 재생"><span aria-hidden="true">▶</span></button>`:''}</span>`
+   ?`<span class="recent-media${vertical?' vertical':''}"${bgStyle(c.image)}><img class="recent-thumb" src="${esc(c.image)}" alt="" draggable="false"${thumbFallbackAttrs(c,{candidates:c.thumbCandidates||[c.image],writable,variant:'orbit'})}${c.youtubeThumb?' referrerpolicy="no-referrer"':''} decoding="async">${ttMark}${c.youtubeThumb&&c.url?`<button type="button" class="recent-play" data-recent-play aria-label="바로 재생"><span aria-hidden="true">▶</span></button>`:''}</span>`
    :(!c.example&&needsFallbackCard(c,{autoLoad:false})?`<span class="recent-media recent-media--slot">${fallbackCardMarkup(c,{writable,variant:'orbit',dateStyle})}</span>`:`<span class="recent-media recent-media--memo"><span class="recent-memo">${esc(c.note||head)}</span></span>`);
   // #466 M6: 카드 전체를 role="button"으로 감싸면 안의 ▶ 재생 단추(또는 글 카드의 "제목 달기")가
   // 중첩 상호작용(axe nested-interactive)이 된다. 카드는 평범한 div로 두고, 뒤에 깔린 투명 단추
@@ -381,7 +384,20 @@ export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSel
 const openRecent=()=>{if(!recentMoment)return;if(onOpen&&!recentMoment.example){onOpen(recentMoment);return;}actions.openBook(recentMoment.treeId,recentMoment.id,demo);};
 let recentFrame=null;
 const toggleRecentPlay=btn=>{if(!recentMoment)return;const card=shadow.querySelector('.recent-card');if(!card)return;const media=card.querySelector('.recent-media');if(!media)return;if(recentFrame){recentFrame.remove();recentFrame=null;media.querySelector('img')?.removeAttribute('hidden');btn.setAttribute('aria-label','바로 재생');const glyph=btn.querySelector('span');if(glyph)glyph.textContent='▶';return;}
- const id=youtubeIdFrom(recentMoment.url)||(globalThis.LTMedia?.describe?.(recentMoment.url)||{}).videoId;
+ const described=globalThis.LTMedia?.describe?.(recentMoment.url)||null;
+ if(described?.kind==='tiktok'){
+  const id=globalThis.LTMedia.tiktokPlayerId?.(recentMoment.mediaMetadata?.tiktokId||described.videoId);
+  if(!id)return;
+  const block=document.createElement('blockquote');
+  block.className='tiktok-embed';
+  block.setAttribute('cite',described.openUrl||recentMoment.url);
+  block.setAttribute('data-video-id',id);
+  const section=document.createElement('section');section.textContent=mainOf(recentMoment)||'TikTok 영상';block.append(section);
+  media.querySelector('img')?.setAttribute('hidden','');media.append(block);recentFrame=block;
+  globalThis.LTMedia.ensureTiktokEmbedScript?.(document);
+  btn.setAttribute('aria-label','정지');const glyph=btn.querySelector('span');if(glyph)glyph.textContent='■';return;
+ }
+ const id=youtubeIdFrom(recentMoment.url)||described?.videoId;
  const embed=id?embedUrl(id):null;
  if(!embed)return;
  const frame=document.createElement('iframe');frame.className='recent-frame';frame.src=embed;frame.title=mainOf(recentMoment)||'YouTube 영상';frame.allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';frame.allowFullscreen=true;frame.setAttribute('referrerpolicy','strict-origin-when-cross-origin');media.querySelector('img')?.setAttribute('hidden','');media.append(frame);recentFrame=frame;btn.setAttribute('aria-label','정지');const glyph=btn.querySelector('span');if(glyph)glyph.textContent='■';};
