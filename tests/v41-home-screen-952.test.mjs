@@ -708,17 +708,24 @@ test('#1204 실제 테마 전환·저장값 및 가운데 빛 직선 경계 픽�
             console.log('LT1204PNG_PART '+width+' '+theme+' '+Math.floor(at/partSize)+' '+encoded.slice(at,at+partSize));
           console.log('LT1204PNG_END '+width+' '+theme);
         }
-        // Isolate scrim from cards and text: compare screenshots with the scrim
-        // shown/hidden. This tests rendered pixels, not only CSS declarations.
+        // Render the computed live scrim into a separate, static pixel stage:
+        // isolate the gradient from animated orbit canvases and GPU repaints.
+        // Keep the actual geometry, gradient, clip and mask properties.
         await h.frame.evaluate(()=>{
-          const root=document.querySelector('#orbit').shadowRoot;
-          const css=document.createElement('style');css.id='lt1204-pixel-isolation';
-          css.textContent='.app{background:#050509!important}.app:before{display:none!important}.app>*:not(.center-scrim){visibility:hidden!important}.center-scrim{visibility:visible!important}';
-          root.append(css);
+          const scrim=document.querySelector('#orbit').shadowRoot.querySelector('.center-scrim');
+          const computed=getComputedStyle(scrim),rect=scrim.getBoundingClientRect();
+          const stage=document.createElement('div');stage.id='lt1204-pixel-stage';
+          stage.style.cssText='position:fixed;inset:0;z-index:2147483647;background:#050509;pointer-events:none';
+          const overlay=document.createElement('div');overlay.id='lt1204-pixel-glow';
+          Object.assign(overlay.style,{position:'absolute',left:rect.left+'px',top:rect.top+'px',
+            width:rect.width+'px',height:rect.height+'px',backgroundImage:computed.backgroundImage,
+            backgroundRepeat:'no-repeat',borderRadius:computed.borderRadius,
+            maskImage:computed.maskImage,clipPath:computed.clipPath});
+          stage.append(overlay);document.body.append(stage);
         });
-        const element=h.frame.locator('#orbit');
+        const element=h.frame.locator('body');
         const on=rgbRows(await element.screenshot({animations:'disabled'}));
-        await h.frame.evaluate(()=>document.querySelector('#orbit').shadowRoot.querySelector('.center-scrim').style.setProperty('visibility','hidden','important'));
+        await h.frame.evaluate(()=>document.querySelector('#lt1204-pixel-glow').style.display='none');
         const off=rgbRows(await element.screenshot({animations:'disabled'}));
         assert.equal(on.width,off.width);assert.equal(on.height,off.height);
         const delta=(x,y)=>on.pixel(x,y).reduce((s,c,i)=>s+Math.abs(c-off.pixel(x,y)[i]),0);
