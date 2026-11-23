@@ -19,8 +19,11 @@ test('A: 예시를 둘러봐도 로그인한 계정은 남는다(메뉴가 사�
   assert.equal(parts.treePicker, true);
   assert.equal(parts.treeViews, true);
   assert.equal(parts.write, true);
-  // 로그아웃 예시는 지금대로(내 트리가 아니므로) 보이지 않는다 — #213 결정 유지.
-  assert.equal(headerPartsFor({owned: false, treeCount: 1}).treeViews, false);
+  // 2026-11-23 결정: 로그아웃 예시에도 화면 탐색은 보인다. 트리 선택·쓰기는 별도 권한으로 가린다.
+  const guest = headerPartsFor({owned: false, treeCount: 1});
+  assert.equal(guest.treeViews, true);
+  assert.equal(guest.treePicker, false);
+  assert.equal(guest.write, false);
 });
 
 test('B: 자세한 추가를 처음 보일 때 기본값과 기준값을 한 번 잡는다', () => {
