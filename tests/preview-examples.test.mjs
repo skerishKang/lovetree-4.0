@@ -20,6 +20,12 @@ test('미리보기 호스트만 알아본다 — 운영 주소는 절대 미리�
   assert.equal(isPagesPreviewHost(''), false);
 });
 
+test('화면과 서버의 운영 호스트 정의가 같다', async () => {
+  const { PRODUCTION_HOST: SERVER_HOST } = await import('../functions/_lib/search-meta.mjs');
+  const { PRODUCTION_HOST } = await import('../public/v41/host-context.mjs');
+  assert.equal(PRODUCTION_HOST, SERVER_HOST);
+});
+
 test('미리보기에서만 예시 트리에 틱톡 2개와 릴스 1개를 얹는다', () => {
   const demoData = { moments: [{ id: 'm01', title: '원본 예시' }] };
   const tree = { id: 'limone-example', moments: [{ id: 'm01', title: '원본 예시' }], edges: [], demoData };
