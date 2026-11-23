@@ -635,6 +635,94 @@ test('#1088 2단계 떠 있는 카드도 그 자리에서 크게 보기', { skip
   } finally { await browser.close(); }
 });
 
+
+// #1204: Pixel regression for the glow over the orbit. Inspect the *real*
+// page theme toggle or a saved theme; never change just the iframe host.
+test('#1204 실제 테마 전환·저장값 및 가운데 빛 직선 경계 픽셀 검사', {skip: REQUIRE952 ? false : skip952, timeout: 180000}, async () => {
+  if (skip952) assert.fail(skip952);
+  const {inflateSync} = await import('node:zlib');
+  function rgbRows(png) {
+    assert.equal(png.subarray(1,4).toString(),'PNG');
+    let width=0,height=0,channels=0,pos=8,parts=[];
+    while(pos<png.length){
+      const len=png.readUInt32BE(pos),tag=png.toString('ascii',pos+4,pos+8),data=png.subarray(pos+8,pos+8+len);
+      if(tag==='IHDR'){width=data.readUInt32BE(0);height=data.readUInt32BE(4);assert.equal(data[8],8);channels=data[9]===6?4:data[9]===2?3:0;assert.ok(channels,'expected RGB/RGBA PNG');}
+      if(tag==='IDAT')parts.push(data);
+      pos+=len+12;
+      if(tag==='IEND')break;
+    }
+    const packed=inflateSync(Buffer.concat(parts)),stride=width*channels,rows=[],previous=new Uint8Array(stride);
+    let offset=0;
+    for(let y=0;y<height;y++){
+      const filter=packed[offset++],row=new Uint8Array(stride);
+      for(let i=0;i<stride;i++){
+        const raw=packed[offset++],left=i>=channels?row[i-channels]:0,up=previous[i],ul=i>=channels?previous[i-channels]:0;
+        const p=left+up-ul,pa=Math.abs(p-left),pb=Math.abs(p-up),pc=Math.abs(p-ul);
+        const predict=pa<=pb&&pa<=pc?left:pb<=pc?up:ul;
+        row[i]=(raw+(filter===1?left:filter===2?up:filter===3?Math.floor((left+up)/2):filter===4?predict:0))&255;
+      }
+      rows.push(row);previous=row;
+    }
+    return {width,height,pixel:(x,y)=>{const i=(y*0+Math.max(0,Math.min(width-1,x)))*channels,r=rows[Math.max(0,Math.min(height-1,y))];return [r[i],r[i+1],r[i+2]];}};
+  }
+  const browser=await chromium952.launch({headless:true});
+  try {
+    for(const width of [1440,390]) for(const theme of ['garden','night']) for(const route of ['toggle','stored']){
+      const initStorage=route==='stored'?{'lt41.theme':theme}:{'lt41.theme':'night'};
+      const h=await boot952(browser,{width,motion:'reduce',initStorage});
+      try {
+        if(route==='toggle'&&theme==='garden'){
+          await h.page.locator('#theme-toggle').click();
+          await h.page.waitForFunction(()=>document.documentElement.getAttribute('data-lt-theme')==='garden');
+        }
+        await h.frame.waitForFunction(expected=>document.querySelector('#orbit')?.getAttribute('data-lt-theme')===expected,null,{timeout:10000}).catch(()=>{});
+        const state=await h.page.evaluate(()=>{
+          const frame=document.querySelector('#view')?.contentDocument;
+          const host=frame?.querySelector('#orbit'),root=host?.shadowRoot;
+          const app=root?.querySelector('.app'),scrim=root?.querySelector('.center-scrim');
+          const a=app?.getBoundingClientRect(),b=scrim?.getBoundingClientRect();
+          return {shell:document.documentElement.getAttribute('data-lt-theme')||'night',
+            frame:frame?.documentElement.getAttribute('data-lt-theme')||'night',
+            host:host?.getAttribute('data-lt-theme')||'night',
+            stage:getComputedStyle(app).backgroundImage,
+            glow:getComputedStyle(scrim).backgroundImage,
+            box:a&&b?{app:[a.x,a.y,a.width,a.height],glow:[b.x,b.y,b.width,b.height]}:null};
+        });
+        assert.equal(state.shell,theme,'shell header must follow actual theme');
+        assert.equal(state.frame,theme,'iframe document must follow actual theme');
+        assert.equal(state.host,theme,'orbit must follow actual theme');
+        assert.ok(state.box,JSON.stringify(state));
+        assert.ok(Math.abs(state.box.glow[2]-state.box.app[2])<=2&&Math.abs(state.box.glow[3]-state.box.app[3])<=2,'glow occupies entire app: '+JSON.stringify(state.box));
+        // Isolate scrim from cards and text: compare screenshots with the scrim
+        // shown/hidden. This tests rendered pixels, not only CSS declarations.
+        await h.frame.evaluate(()=>{
+          const root=document.querySelector('#orbit').shadowRoot;
+          const css=document.createElement('style');css.id='lt1204-pixel-isolation';
+          css.textContent='.app{background:#050509!important}.app:before{display:none!important}.app>*:not(.center-scrim){visibility:hidden!important}.center-scrim{visibility:visible!important}';
+          root.append(css);
+        });
+        const element=h.frame.locator('#orbit');
+        const on=rgbRows(await element.screenshot({animations:'disabled'}));
+        await h.frame.evaluate(()=>document.querySelector('#orbit').shadowRoot.querySelector('.center-scrim').style.visibility='hidden');
+        const off=rgbRows(await element.screenshot({animations:'disabled'}));
+        assert.equal(on.width,off.width);assert.equal(on.height,off.height);
+        const delta=(x,y)=>on.pixel(x,y).reduce((s,c,i)=>s+Math.abs(c-off.pixel(x,y)[i]),0);
+        const midX=Math.floor(on.width/2),midY=Math.floor(on.height/2);
+        // Rectangular clipping used to create a discontinuity on horizontal/
+        // vertical scanlines, whereas a feathered radial must change smoothly.
+        const hline=Array.from({length:on.width},(_,x)=>delta(x,midY));
+        const vline=Array.from({length:on.height},(_,y)=>delta(midX,y));
+        assert.ok(hline[0]<=3&&hline.at(-1)<=3&&vline[0]<=3&&vline.at(-1)<=3,'glow must fade to zero at every viewport edge');
+        for(const line of [hline,vline]){
+          for(let i=1;i<line.length;i++)
+            assert.ok(Math.abs(line[i]-line[i-1])<=15,'straight glow clipping boundary at '+i+' '+JSON.stringify({width,theme,route}));
+        }
+        if(theme==='garden')assert.ok(delta(midX,midY)>120,'garden center glow must be visible in rendered screenshot');
+      } finally {await close952(h);}
+    }
+  } finally {await browser.close();}
+});
+
 test('#1204 첫 화면 순차 등장·안내 삭제·WebGL 말풍선·기억·겹침·접근성', { skip: REQUIRE952 ? false : skip952, timeout: 180000 }, async () => {
   if (skip952) assert.fail(skip952);
   const browser = await chromium952.launch({headless:true});
