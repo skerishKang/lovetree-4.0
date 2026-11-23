@@ -2977,6 +2977,55 @@ test('#1026 무대 불러오는 중 표시 — 느림 표시·빠름 비표시·
   } finally { await browser.close(); await new Promise(resolve => server.close(resolve)); }
 });
 
+// #1026: 최초 진입의 셸 머리줄과 빈 화면 자리가 뒤늦게 밀리지 않는지 실제 렌더링으로 검증한다.
+test('#1026 서재·책·보드 390 첫 진입 CLS 0.01 이하', { skip: REQUIRE ? false : skip, timeout: 180000 }, async () => {
+  if (skip) assert.fail(skip);
+  const server = await serve();
+  const browser = await chromium.launch({ headless: true });
+  const base = 'http://127.0.0.1:' + server.address().port;
+  try {
+    const context = await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' });
+    await context.addInitScript(() => {
+      window.__firstLoadShifts1026 = [];
+      try {
+        const rect = r => ({ x: r.x, y: r.y, width: r.width, height: r.height });
+        new PerformanceObserver(list => {
+          for (const e of list.getEntries()) if (!e.hadRecentInput) {
+            window.__firstLoadShifts1026.push({
+              value: e.value, time: e.startTime,
+              sources: (e.sources || []).map(s => ({
+                node: s.node?.id || s.node?.className || s.node?.nodeName || '?',
+                previousRect: rect(s.previousRect), currentRect: rect(s.currentRect)
+              }))
+            });
+          }
+        }).observe({ type: 'layout-shift', buffered: true });
+      } catch {}
+    });
+    await context.route('**/api/**', route => route.fulfill({
+      status: 401, contentType: 'application/json', body: '{"error":"unauthorized"}'
+    }));
+    const page = await context.newPage();
+    for (const screen of ['shelf', 'book', 'board']) {
+      await page.goto(base + '/v41/?account=1#my/' + screen, { waitUntil: 'domcontentloaded' });
+      await page.waitForTimeout(2500);
+      const result = await page.evaluate(() => ({
+        screen: document.documentElement.dataset.ltShellEntry,
+        cls: (window.__firstLoadShifts1026 || []).reduce((sum, e) => sum + e.value, 0),
+        shifts: window.__firstLoadShifts1026 || [],
+        header: document.querySelector('.app-header')?.getBoundingClientRect().height,
+        stage: document.querySelector('#stage')?.getBoundingClientRect().height
+      }));
+      assert.equal(result.screen, screen, screen + ': 최초 경로가 첫 스타일에서 확인되어야 합니다');
+      assert.ok(result.stage > 0 && result.header > 0, screen + ': 실제 화면이 렌더링되어야 합니다');
+      assert.ok(result.cls <= 0.01, screen + ' 390 첫 진입 CLS ' + result.cls.toFixed(6) + ' > 0.01: ' + JSON.stringify(result.shifts.filter(e => e.value > 0.001)));
+    }
+    await context.close();
+  } finally {
+    await browser.close();
+    await new Promise(resolve => server.close(resolve));
+  }
+});
 
 // #1084: 로그인 첫 화면의 세로 쇼츠는 미디어 칸 양쪽에 원본 썸네일의 회색 여백을 남기면 안 된다.
 // 화면 전체 PNG의 실제 픽셀도 검사한다. 화면 크기와 대기 시간은 공통 시험 기준을 그대로 쓴다.
