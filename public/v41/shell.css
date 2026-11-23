@@ -1167,3 +1167,9 @@ dialog#account-assets .assets-detail-none{margin:0;font-size:13px;color:var(--lt
  #moment-form #delete-moment{font-size:0}
  #moment-form #delete-moment::before{content:'🗑';font-size:20px}
 }
+/* 대표 11-23: 서재·책에서만 머리줄 보기 전환(.view-toggle) 높이가 52px이라 머리줄이 8px 커지고 단추·아래 선이 내려왔다.
+   머리줄 안의 보기 전환은 다른 단추와 같은 44px로 맞춘다. 트리 단추의 ⌄는 이름 길이와 상관없이 오른쪽 끝에 둔다. */
+.header-actions .view-toggle{padding:0;height:44px}
+.header-actions .view-toggle .ui-btn,.header-actions .view-toggle>button{min-height:42px;height:42px}
+nav #record-menu{justify-content:space-between}
+nav #record-menu #source-label{flex:1 1 auto;text-align:left}
