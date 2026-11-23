@@ -38,7 +38,8 @@ function flowNavigation(){
   const entryScreen={'track32-bookshelf.html':'shelf','track59-sketchbook.html':'book','track58-pinboard.html':'board'}[getCurrent()]||'';
   const entryRoot=document.documentElement;
   if(entryRoot?.dataset&&entryScreen)entryRoot.dataset.ltShellEntry=entryScreen;
-  else if(entryRoot?.dataset)delete entryRoot.dataset.ltShellEntry;
+  // #1231: 깊은 주소의 첫 그림 배치를 인증 확인 중 지우지 않는다. 지우면 서재·책 머리줄이 뒤늦게 40px 커져 CLS가 생긴다.
+  else if(entryRoot?.dataset && entryRoot.dataset.ltAuthPhase!=='pending')delete entryRoot.dataset.ltShellEntry;
   const onCommunity=document.body.classList.contains('community-screen');
   const onShelf=getCurrent()==='track32-bookshelf.html';
   // #1093: 서재 진열 토글만 390에서 화면 안 도구 줄로 옮긴다 — #1121 책 보기 토글의 자리·보임은 그대로다.
