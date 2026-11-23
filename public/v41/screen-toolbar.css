@@ -40,7 +40,9 @@ html[data-v41-screen=board] .lt-moment-picker{top:calc(var(--lt-toolbar-top,60px
 /* 휴대폰에서는 돋보기(찾기)를 숨긴다 — 줄 안으로 옮겨도 이 규칙이 이긴다. */
 html[data-book-shape=phone] .lt-toolbar-tools .desktop-only{display:none}
 @media(max-width:600px){.lt-toolbar-tools .desktop-only{display:none}}
-.lt-toolbar-more{flex:none}
+.lt-toolbar-more{box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;flex:none;width:36px;height:36px;min-height:36px;padding:0;border:1px solid var(--lt-line);border-radius:var(--lt-r-pill);background:var(--lt-glass-strong);color:var(--lt-pearl);font:600 16px/1 var(--lt-ui);cursor:pointer}
+html[data-v41-screen] .lt-screen-toolbar .lt-toolbar-left .shelf-back{height:36px;min-height:36px;line-height:34px}
+html[data-v41-screen=board] .lt-screen-toolbar #shelfBackBtn{height:36px;min-height:36px}
 .lt-toolbar-menu{
   position:absolute;right:var(--lt-toolbar-pad,24px);top:var(--lt-toolbar-height);z-index:70;
   display:flex;flex-direction:column;gap:6px;padding:10px;border:1px solid var(--lt-line);
@@ -104,7 +106,7 @@ html[data-lt-theme=garden] .lt-toolbar-tools .boardModeSwitch>button:not([aria-p
 /* 서재 전환은 머리줄 토글이 걷어졌으므로 줄 안에 둔다 — 크기에 관계없이 한 벌만 보인다. */
 .lt-toolbar-tools .shelf-view-inline{display:grid}
 html[data-v41-screen=book] .lt-toolbar-tools #playAllBtn{order:10}
-@media(max-width:600px){.lt-toolbar-tools .view-toggle,.lt-toolbar-tools .shelf-view-inline,.lt-toolbar-tools .boardModeSwitch{min-width:84px}}
+@media(max-width:600px){.lt-toolbar-tools .view-toggle,.lt-toolbar-tools .shelf-view-inline{min-width:84px}.lt-toolbar-tools .boardModeSwitch{min-width:88px}}
 
 /* 화면별 옛 머리줄 규칙이 공통 줄로 스며들지 않게 — 도구 줄은 한 높이·한 순서를 쓴다. */
 html[data-v41-screen] .lt-screen-toolbar .lt-toolbar-tools>*{order:0}
@@ -117,11 +119,12 @@ html[data-v41-screen] .lt-screen-toolbar .lt-toolbar-tools .view-switch>button{
 }
 html[data-v41-screen] .lt-screen-toolbar .lt-toolbar-tools .view-switch{flex:0 0 auto;width:auto;flex-wrap:nowrap}
 html[data-v41-screen=board] .lt-screen-toolbar .lt-toolbar-tools>button.headbtn{height:36px;min-height:36px}
+html[data-v41-screen=board] .lt-screen-toolbar .lt-toolbar-tools #fitBtn{height:36px;min-height:36px}
 html[data-v41-screen=board] .lt-screen-toolbar .lt-toolbar-tools .cinemaBtn{width:auto;padding:0 10px}
 @media(max-width:600px){
   .lt-screen-toolbar{gap:8px;padding:0 10px}
   .lt-toolbar-left{gap:4px}
   .lt-toolbar-tools{gap:4px}
-  .lt-toolbar-tools .boardModeSwitch>button{padding:0 3px}
+  .lt-toolbar-tools .boardModeSwitch .modeSwitchBtn{padding:0}
   .lt-toolbar-tools .cinemaBtn{padding:0 6px}
 }

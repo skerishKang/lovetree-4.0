@@ -58,7 +58,9 @@ export function mountScreenToolbar({ screen, titleFrom, tools = [], initialBar =
   // 상단 메뉴의 실제 높이를 기준으로 하고 도구 줄 높이는 CSS 변수 하나를 쓴다.
   const align = () => {
     if (!header) return;
-    bar.style.setProperty('--lt-toolbar-pad', getComputedStyle(header).paddingLeft);
+    const headerPad = Number.parseFloat(getComputedStyle(header).paddingLeft) || 0;
+    const fallbackPad = matchMedia('(max-width:600px)').matches ? 10 : 24;
+    bar.style.setProperty('--lt-toolbar-pad', `${headerPad || fallbackPad}px`);
     const root = document.documentElement;
     // #886: the board's fixed header and first-paint positions are set in board.css.
     // Only its wrapping narrow header needs measurement; never overwrite desktop geometry.
@@ -97,7 +99,13 @@ export function mountScreenToolbar({ screen, titleFrom, tools = [], initialBar =
     const items = [...group.children].filter((el) => !el.hidden && el.getClientRects().length > 0);
     const style = getComputedStyle(group);
     const gap = Number.parseFloat(style.columnGap || style.gap) || 0;
-    const used = items.reduce((sum, el) => sum + el.getBoundingClientRect().width, 0) + gap * Math.max(0, items.length - 1);
+    const used = items.reduce((sum, el) => {
+      const rect = el.getBoundingClientRect();
+      const itemStyle = getComputedStyle(el);
+      const border = (Number.parseFloat(itemStyle.borderLeftWidth) || 0) + (Number.parseFloat(itemStyle.borderRightWidth) || 0);
+      const contentWidth = el.scrollWidth + border;
+      return sum + Math.max(rect.width, contentWidth);
+    }, 0) + gap * Math.max(0, items.length - 1);
     return used <= group.clientWidth + 1;
   };
   reflow = () => {
@@ -111,6 +119,9 @@ export function mountScreenToolbar({ screen, titleFrom, tools = [], initialBar =
     const items = [...group.children];
     const order = new Map(items.map((el, i) => [el, i]));
     const plays = items.filter((el) => isPlay(el));
+    // More button consumes row width. Show it before measuring stashed controls so
+    // the remaining buttons are fitted against the width users actually see.
+    more.hidden = false;
     // 보기 전환·검색·새 트리는 먼저 지킨다 — 줄여도 되는 화면 도구부터 접는다.
     const essential = (el) => el.matches('.view-toggle, .shelf-view-inline, .boardModeSwitch, .view-switch, .search, #shelfNewTree');
     const stash = (list) => {
