@@ -121,7 +121,12 @@ export function createQuickAdd(deps) {
     // 이미 열린 창에 끌어다 놓을 때는 손으로 고른 트리를 유지한다.
     if (fresh) quickTreeId = resolveQuickTreeId(treeChoices());
     renderTreeLine();
-    if (url) setQuickValue(url);
+    if (url) {
+      // 부팅 직후 화면 다시 그리기가 창을 닫으며 저장 확인을 묻지 않게 잠시 붙잡는다(#978 규칙 재사용).
+      deps.holdPanel?.('write-panel', true);
+      setTimeout(() => deps.holdPanel?.('write-panel', false), 1200);
+      setQuickValue(url);
+    }
     if (demoMode) {
       const hint = $('quick-install-hint');
       if (hint) hint.hidden = true;
