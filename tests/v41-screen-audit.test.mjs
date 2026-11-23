@@ -3107,9 +3107,7 @@ test('#1084 세로 영상 첫 화면의 미디어 칸에는 회색 여백이 없
             const info = await locator.evaluate(el => {
               const layer = el.querySelector('.yt-vertical-backdrop,.lt-vertical-backdrop');
               const pic = layer?.querySelector('img'), css = layer ? getComputedStyle(layer) : null, r = el.getBoundingClientRect();
-              // 책은 img 층, 보드·첫 화면 공용 미리보기는 배경 그림 층이다(그림 요소가 카드 밖으로 커지지 않게).
-              const bg = css && /url\(/.test(css.backgroundImage) ? css.backgroundImage : '';
-              return {image: pic?.currentSrc || bg, loaded: pic ? (pic.naturalWidth || 0) > 0 : !!bg, filter: css?.filter || '', width: r.width, height: r.height};
+              return {image: pic?.currentSrc || '', loaded: (pic?.naturalWidth || 0) > 0, filter: css?.filter || '', width: r.width, height: r.height};
             });
             assert.ok(info.loaded && info.image && info.filter.includes('blur('), slot + ': 세로 썸네일 배경이 이미지로 채워진다');
             const png = await locator.screenshot({animations: 'disabled'});
