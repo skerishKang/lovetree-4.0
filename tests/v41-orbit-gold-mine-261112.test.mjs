@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const orbit = readFileSync(new URL('../src/views/orbit.js', import.meta.url), 'utf8');
+const bitmap = readFileSync(new URL('../src/views/orbit-canvas.js', import.meta.url), 'utf8');
 const orbitCSS = readFileSync(new URL('../src/views/orbit-source.css', import.meta.url), 'utf8');
 const identity = readFileSync(new URL('../public/v41/identity.css', import.meta.url), 'utf8');
 
@@ -37,7 +38,8 @@ test('내 카드는 진한 금 테두리 3px + 은은한 금빛 바깥빛이다(
 test('정원에서도 .card.mine 규칙이 이긴다(구체성 0-3-1 > 정원 일반 규칙 0-2-1)', () => {
   const gardenMine = ruleOf(orbit, ':host([data-lt-theme=garden]) .card.mine{');
   assert.match(gardenMine, /border-color:var\(--lt-rose\)/, '정원 내 카드는 강조 장밋 테두리(일반 #98505e 1px와 색·두께 모두 다름)');
-  assert.match(gardenMine, /box-shadow:var\(--lt-garden-shadow\),0 0 0 1px var\(--lt-gold-line\),0 0 20px var\(--lt-gold-glow\)/, '정원 깊이 그림자 + 금빛 링·바깥빛');
+  assert.match(gardenMine, /--lt-orbit-shadow:var\(--lt-garden-shadow\),0 0 0 1px var\(--lt-gold-line\),0 0 20px var\(--lt-gold-glow\)/, '정원 깊이 그림자 + 금빛 링·바깥빛');
+  assert.match(ruleOf(orbit, '.card::before{'), /box-shadow:\s*var\(--lt-orbit-shadow\)/, '그림자 층에서 세 그림자를 모두 사용한다');
   assert.match(ruleOf(orbit, ':host([data-lt-theme=garden]) .recent-card{'), /border-color:var\(--lt-rose\)/, '마지막 순간 카드도 같은 장밋');
   // identity.css의 정원 일반 규칙(.card·.card.memo)보다 선택자가 길어 이긴다.
   assert.match(identity, /:host\(\[data-lt-theme=garden\]\) \.card\{border-color:var\(--lt-gold-deep\)/);
@@ -68,7 +70,9 @@ test('좁은 화면(≤650px)에서 마지막 순간 카드가 화면 안에 온
 
 test('불투명·blur 없음·밝기 깊이는 그대로 유지한다(#440 계약)', () => {
   assert.doesNotMatch(orbit, /el\.style\.opacity=/);
-  assert.match(orbit, /el.style.filter=depthFilter/);
+  assert.match(orbit, /el\.style\.setProperty\(\s*'--lt-orbit-depth'\s*,\s*depthFilter\s*\)/, '깊이 필터 값은 카드에서 한 번 정한다');
+  assert.match(bitmap, /rasterCtx\.filter\s*=\s*'brightness\('/, '합친 카드의 실제 밝기·흐림을 한 번 칠한다');
+  assert.match(bitmap, /rasterCtx\.drawImage\(\s*canvas\s*,\s*0\s*,\s*0\s*\)/, '그림·테두리·그림자를 함께 처리한다');
   // 카드 본체 규칙(.card·.card.mine·정원 .card.mine)에는 반투명·blur가 없다 — 캡션·hover 칩의 글자 투명도는 별개다.
   for (const [src, start] of [[orbitCSS, '.card{position:absolute'], [orbit, '.card.mine{'], [orbit, ':host([data-lt-theme=garden]) .card.mine{']]) {
     const body = ruleOf(src, start);
@@ -87,7 +91,8 @@ test('카드 3D 사선 잘림 방지: .world는 flat, 카드 transform은 각자
   assert.doesNotMatch(orbit, /transform:`translate3d/, '키프레임 카드 transform이 translate3d로 시작하지 않는다');
   assert.doesNotMatch(orbit, /setProperty\('transform',`translate3d/, '끌기 카드 transform이 translate3d로 시작하지 않는다');
   assert.match(orbit, /transform:`perspective\(1200px\) translate3d/, '키프레임 카드 transform이 perspective(1200px)로 시작한다');
-  assert.match(orbit, /setProperty\('transform',`perspective\(1200px\) translate3d/, '끌기 카드 transform이 perspective(1200px)로 시작한다');
+  assert.match(orbit, /const tf\s*=\s*`perspective\(1200px\) translate3d/, '끌기에도 같은 원근 행렬을 쓴다');
+  assert.match(orbit, /if\(spritesReady\)el\.__dragTf\s*=\s*tf;else el\.style\.setProperty\(\s*'transform'\s*,\s*tf\s*,\s*'important'\s*\)/, '그림판과 DOM 대체 경로가 같은 변환을 받는다');
   // 겹침 순서는 scale 큰(가까운) 카드가 위 — z-index를 깊이(z)가 아니라 화면 배율로 매긴다.
   assert.doesNotMatch(orbit, /zv=Math\.round\(\(1000\+z\)/, 'z-index를 깊이 z로 매기는 옛 식이 남아 있지 않다');
   assert.match(orbit, /zv=Math\.round\(drawScale\*1000\/64\)\*64/, 'z-index는 화면 배율(drawScale)의 64 단계 밴드로 매긴다');

@@ -250,15 +250,21 @@ test('#1010 390 바닥 링크 — 넷 모두 보이고 줄바꿈으로 왼쪽 �
 const SAMPLE1018 = () => {
   const root = document.getElementById('orbit')?.shadowRoot;
   const all = root ? [...root.querySelectorAll('button.card')] : [];
+  // #1086: 숨은 버튼의 이전 좌표가 아니라 실제 그림판의 투영 모서리를 읽는다.
+  const hook = window.__LT_ORBIT_TEST__, poses = hook.poses(), rasters = hook.rasterStats();
+  const origin = root.querySelector('.app').getBoundingClientRect();
   const rectOf = c => {
-    const inner = c.querySelector('.surface img') || c.querySelector('.surface') || c;
-    const r = inner.getBoundingClientRect();
-    let k = 1; const t = getComputedStyle(inner).transform;
-    if (t && t !== 'none') { const m = t.match(/^matrix\(([^)]+)\)/); if (m) { const v = m[1].split(',').map(Number); k = Math.hypot(v[0], v[1]) || 1; } }
-    const cx = r.left + r.width / 2, cy = r.top + r.height / 2, w = r.width / k, h = r.height / k;
-    return { l: cx - w / 2, t: cy - h / 2, r: cx + w / 2, b: cy + h / 2 };
+    const i = all.indexOf(c), p = poses[i], s = rasters[i];
+    if (!p || !s) return null;
+    const xs = [], ys = [];
+    for (const x of [-s.guardW/2, s.guardW/2]) for (const y of [-s.guardH/2, s.guardH/2]) {
+      const u=x+p.fx, v=y+p.fy, q=1-(p.zx*u+p.zy*v)/1200;
+      xs.push(origin.left+p.ox+(p.px+p.A*u+p.C*v)/q);
+      ys.push(origin.top+p.oy+(p.py+p.B*u+p.D*v)/q);
+    }
+    return { l: Math.min(...xs), t: Math.min(...ys), r: Math.max(...xs), b: Math.max(...ys) };
   };
-  const visible = all.filter(c => { const cs = getComputedStyle(c); return cs.display !== 'none' && cs.visibility !== 'hidden' && !c.classList.contains('off'); });
+  const visible = all.filter((c,i) => { const cs = getComputedStyle(c); return poses[i] && rasters[i] && !poses[i].hidden && cs.display !== 'none' && cs.visibility !== 'hidden' && !c.classList.contains('off'); });
   const shell = parent.document;
   const fr = frameElement?.getBoundingClientRect(); const ox = fr?.left || 0, oy = fr?.top || 0;
   const vis = el => { if (!el) return null; const cs = parent.getComputedStyle(el); if (cs.display === 'none' || cs.visibility === 'hidden') return null; const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 ? { l: r.left - ox, t: r.top - oy, r: r.right - ox, b: r.bottom - oy } : null; };
@@ -281,7 +287,7 @@ test('#1018 떠다니는 카드는 바닥 링크 줄·새 소식 카드 자리�
     for (const theme of ['night', 'garden']) for (const width of [1440, 1920]) {
       const h = await boot1010(browser, { width, theme, motion: true });
       try {
-        await h.frame.waitForFunction(() => { const r = document.getElementById('orbit')?.shadowRoot; return r && [...r.querySelectorAll('button.card')].some(c => !c.classList.contains('off') && getComputedStyle(c).display !== 'none'); }, null, { timeout: 20000 });
+        await h.frame.waitForFunction(() => { const r = document.getElementById('orbit')?.shadowRoot; return r && window.__LT_ORBIT_TEST__?.canvasReady() && [...r.querySelectorAll('button.card')].some(c => !c.classList.contains('off') && getComputedStyle(c).display !== 'none'); }, null, { timeout: 20000 });
         await h.page.waitForFunction(() => { const c = document.getElementById('updates-card'); return c && !c.hidden && c.getBoundingClientRect().width > 0; }, null, { timeout: 8000 });
         await h.page.waitForTimeout(1200);
         const crossed = await h.frame.evaluate(() => {
@@ -317,6 +323,7 @@ test('#1018 떠다니는 카드는 바닥 링크 줄·새 소식 카드 자리�
         await h.page.waitForTimeout(150);
         const samples = [];
         for (let i = 0; i < 7; i++) { samples.push(await h.frame.evaluate(SAMPLE1018)); if (i < 6) await h.page.waitForTimeout(500); }
+        assert.ok(samples.every(s => s.visible > 0), "매 표본에서 실제 카드가 보인다");
         const totalPairs = samples.reduce((n, s) => n + s.pairs, 0);
         const moved = samples[0].firstCenter && samples[6].firstCenter && Math.hypot(samples[0].firstCenter[0] - samples[6].firstCenter[0], samples[0].firstCenter[1] - samples[6].firstCenter[1]) > 3;
         console.log('#1018', width, theme, JSON.stringify({ crossed: Math.round(crossed), perSample: samples.map(s => s.pairs), visible: samples.map(s => s.visible), links: samples[0].links, updates: samples[0].updates, moved }));

@@ -36,6 +36,7 @@ const replyRow = value => value && ({
   postId: Number(value.post_id),
   authorType: value.author_type,
   authorSubjectId: value.author_subject_id || null,
+  ...(value.ops_reply_id ? {opsReplyId:value.ops_reply_id,authorName:'운영센터'} : {}),
   body: value.body,
   // #678 후속: 고객 덧붙임 고치기·지우기(커뮤니티 댓글과 같은 방식). migration 전 기존 배포에서도
   // 읽기가 깨지지 않게 칸이 없으면 기본값('visible'·null)으로 채운다.
@@ -121,15 +122,15 @@ export function createFeedbackRepo(pool) {
       return rows.map(feedbackRow);
     },
 
-    async get({ productId, id }) {
+    async get({ productId, id }, client) {
       const numeric = Number(id);
       if (!Number.isSafeInteger(numeric) || numeric <= 0) return null;
-      const { rows } = await pool.query(
+      const { rows } = await (client || pool).query(
         `SELECT f.*,
           (SELECT count(*)::int FROM lovetree_feedback_replies r WHERE r.product_id = f.product_id AND r.post_id = f.id) AS reply_count,
           (SELECT p.name FROM lovetree_ai_personas p WHERE p.product_id = f.product_id AND p.subject_id = f.subject_id) AS author_name,
           (SELECT r.role FROM lovetree_product_roles r WHERE r.product_id = f.product_id AND r.subject_id = f.subject_id) AS author_role
-         FROM lovetree_feedback f WHERE f.product_id = $1 AND f.id = $2`,
+         FROM lovetree_feedback f WHERE f.product_id = $1 AND f.id = $2${client ? ' FOR UPDATE OF f' : ''}`,
         [productId, numeric]
       );
       return rows[0] ? feedbackRow(rows[0]) : null;
@@ -179,11 +180,18 @@ export function createFeedbackRepo(pool) {
       return rows[0] ? feedbackRow(rows[0]) : null;
     },
 
-    async addReply({ productId, postId, authorType, authorSubjectId = null, body }, client) {
+    async claimIngestEvent({productId,eventKey},client) {
+      const {rowCount}=await client.query(
+        `INSERT INTO lovetree_feedback_ingest_events (product_id,event_key) VALUES ($1,$2)
+         ON CONFLICT (product_id,event_key) DO NOTHING`,[productId,eventKey]);
+      return rowCount===1;
+    },
+
+    async addReply({ productId, postId, authorType, authorSubjectId = null, body, opsReplyId = null, createdAt = null }, client) {
       const { rows } = await (client || pool).query(
-        `INSERT INTO lovetree_feedback_replies (product_id, post_id, author_type, author_subject_id, body)
-         VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-        [productId, Number(postId), authorType, authorSubjectId, body]
+        `INSERT INTO lovetree_feedback_replies (product_id, post_id, author_type, author_subject_id, body, ops_reply_id, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, COALESCE($7::timestamptz,now())) RETURNING *`,
+        [productId, Number(postId), authorType, authorSubjectId, body, opsReplyId, createdAt]
       );
       return replyRow(rows[0]);
     },

@@ -144,7 +144,7 @@ export function createFeedbackBoard({$, notify, show, showFull, onReplyCount, on
               ? `<span class="myposts-reply-tools"><button type="button" class="myposts-reply-btn" data-reply-edit="${esc(r.id)}">고치기</button><span class="myposts-reply-sep" aria-hidden="true">·</span><button type="button" class="myposts-reply-btn" data-reply-delete="${esc(r.id)}">지우기</button></span>`
               : '';
             const editedMark = r.edited === true ? '<span class="myposts-reply-edited">(고침)</span>' : '';
-            return `<div class="myposts-reply" data-reply-id="${esc(r.id)}"><div class="myposts-reply-head"><span>${r.mine ? '내 덧붙임' : '답변'}${editedMark}</span>${tools}</div><p>${esc(r.body)}</p></div>`;
+            return `<div class="myposts-reply" data-reply-id="${esc(r.id)}"><div class="myposts-reply-head"><span>${r.mine ? '내 덧붙임' : r.authorName === '운영센터' ? '운영센터' : '답변'}${editedMark}</span>${tools}</div><p>${esc(r.body)}</p></div>`;
           }).join('')}</div>`
         : '';
       const issue = (post.status === 'fixed' || post.status === 'closed') && post.issueNumber ? `<span class="myposts-issue">이슈 ${esc(post.issueNumber)}</span>` : '';

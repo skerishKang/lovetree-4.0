@@ -36,6 +36,26 @@ async function applyAllMigrations(pool) {
   }
 }
 
+test('#1211: 기존 답글 표에 수신 마이그레이션만 두 번 적용할 수 있다',{skip},async()=>{
+  assertIsolatedTestDatabase(DATABASE_URL);
+  const pool=await createPool(DATABASE_URL,{max:1});
+  const schema='ingest_'+randomUUID().replaceAll('-','');
+  try{
+    const client=await pool.connect();
+    try{
+      await client.query('BEGIN');
+      await client.query(`CREATE SCHEMA ${schema}`);
+      await client.query(`SET LOCAL search_path TO ${schema}`);
+      await client.query('CREATE TABLE lovetree_feedback_replies (id bigint PRIMARY KEY)');
+      await client.query('INSERT INTO lovetree_feedback_replies(id) VALUES (1)');
+      const sql=await readFile(new URL('../server/db/migrations/feedback-ingest-261123.sql',import.meta.url),'utf8');
+      await client.query(sql);await client.query(sql);
+      assert.equal((await client.query('SELECT ops_reply_id FROM lovetree_feedback_replies WHERE id=1')).rows[0].ops_reply_id,null);
+      assert.equal((await client.query('INSERT INTO lovetree_feedback_ingest_events(product_id,event_key) VALUES ($1,$2) RETURNING event_key',['lt','ops_migration_123456'])).rows[0].event_key,'ops_migration_123456');
+    }finally{await client.query('ROLLBACK');client.release();}
+  }finally{await pool.end();}
+});
+
 test('migrations apply cleanly to empty DB and are re-runnable', { skip }, async () => {
   assertIsolatedTestDatabase(DATABASE_URL);
   const pool = await createPool(DATABASE_URL, { max: 1 });
@@ -44,6 +64,16 @@ test('migrations apply cleanly to empty DB and are re-runnable', { skip }, async
     const schemaSql = await readFile(SCHEMA_PATH, 'utf8');
     await pool.query(schemaSql);
     await applyAllMigrations(pool);
+
+    const ingestColumns=await pool.query(`SELECT column_name FROM information_schema.columns WHERE table_name='lovetree_feedback_ingest_events' ORDER BY ordinal_position`);
+    assert.deepEqual(ingestColumns.rows.map(row=>row.column_name),['product_id','event_key','created_at']);
+    const replyIdColumn=await pool.query(`SELECT data_type FROM information_schema.columns WHERE table_name='lovetree_feedback_replies' AND column_name='ops_reply_id'`);
+    assert.equal(replyIdColumn.rows[0]?.data_type,'text');
+    const ingestProduct='lt-migrate-'+randomUUID();
+    const insertIngest='INSERT INTO lovetree_feedback_ingest_events(product_id,event_key) VALUES ($1,$2)';
+    await pool.query(insertIngest,[ingestProduct,'ops_migration_123456']);
+    await assert.rejects(pool.query(insertIngest,[ingestProduct,'ops_migration_123456']),e=>e.code==='23505');
+    await assert.rejects(pool.query(insertIngest,[ingestProduct,'short']),e=>e.code==='23514');
 
     // 재실행 안전성: 두 번째 적용도 실패 없이 같은 상태여야 한다
     await pool.query(schemaSql);

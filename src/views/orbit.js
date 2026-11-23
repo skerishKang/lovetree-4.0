@@ -9,6 +9,9 @@ import {movedNotice} from '../../public/v41/inbox-model.mjs';
 import {tagFacets, filterMomentsByTags} from '../../public/v41/tag-filter.mjs';
 import {fallbackCardMarkup, thumbFallbackAttrs, needsFallbackCard, mountThumbFallback, VIDEO_UNAVAILABLE_TEXT, isVerticalMoment, youtubeIdFrom, thumbnailCandidates} from '../../public/v41/thumb-fallback.mjs';
 import samples from './orbit-samples.json';
+import compactOrbitImages from './orbit-compact.json';
+import {paintCardBitmap,cardPose,hitPose,hitProjective,sortPaintOrder} from './orbit-canvas.js';
+import {createOrbitGL} from './orbit-webgl.js';
 import {escape as esc, orbitRecords, resume, remember} from './memory.js';
 import {SERVICE, GO_TREES, READ_BOOK, VIEW_TREE, NEW_TREE, BOOK_IS_READING} from '../terms.js';
 import {mediaLinkView} from '../media.js';
@@ -23,9 +26,9 @@ export const ORBIT_EXAMPLE = {
 // 좁은 화면(w<=650)은 원래 반지름을 그대로 쓴다: 화면이 좁으면 벌린 반지름이 오히려 카드를 안전 구역 밖으로 밀어 숨긴다.
 const rings={main:{rx:700,ry:330,zAmp:420,zBase:0,speed:1,band:0},inner:{rx:530,ry:250,zAmp:330,zBase:0,speed:1,band:0},outer:{rx:900,ry:420,zAmp:520,zBase:0,speed:1,band:0},upper:{rx:610,ry:290,zAmp:460,zBase:0,speed:1,band:0},lower:{rx:760,ry:350,zAmp:470,zBase:0,speed:1,band:0}};
 const ringsNarrow={main:{rx:700,ry:330,zAmp:420,zBase:0,speed:1,band:0},inner:{rx:520,ry:260,zAmp:330,zBase:0,speed:1,band:0},outer:{rx:900,ry:430,zAmp:520,zBase:0,speed:1,band:0},upper:{rx:610,ry:290,zAmp:460,zBase:0,speed:1,band:0},lower:{rx:760,ry:350,zAmp:470,zBase:0,speed:1,band:0}};
-let extraCSS=`:host{display:block;height:100dvh;min-height:540px;font-family:var(--ui,system-ui,sans-serif)}.app{height:100%;font-family:var(--ui,system-ui,sans-serif)}.card{text-align:left;padding:0;border:1px solid rgba(255,234,183,.30);box-shadow:0 24px 60px rgba(0,0,0,.38)}.card:after{content:'';position:absolute;inset:2px;border:1px solid rgba(255,234,183,.28);border-radius:inherit;pointer-events:none;transition:border-color .2s,box-shadow .2s}.card .surface{transition:transform .25s ease}/* #586: 끄는 동안(data-lt-busy)은 hover 모양을 바꾸지 않는다 — 카드 위를 지나치며 테두리·번짐·그림자가 계속
+let extraCSS=`:host{display:block;height:100dvh;min-height:540px;font-family:var(--ui,system-ui,sans-serif)}.app{height:100%;font-family:var(--ui,system-ui,sans-serif)}.card{text-align:left;padding:0;border:1px solid rgba(255,234,183,.30);--lt-orbit-shadow:0 24px 60px rgba(0,0,0,.38)}.card:after{content:'';position:absolute;inset:2px;border:1px solid rgba(255,234,183,.28);border-radius:inherit;pointer-events:none;transition:border-color .2s,box-shadow .2s}.card .surface{transition:transform .25s ease}/* #586: 끄는 동안(data-lt-busy)은 hover 모양을 바꾸지 않는다 — 카드 위를 지나치며 테두리·번짐·그림자가 계속
    바뀌어 다시 계산·다시 칠하는 일이 끌기를 버겁게 했다. 손을 떼면 원래 hover 모양으로 돌아온다. */
-:host(:not([data-lt-busy])) .card:hover,:host(:not([data-lt-busy])) .card:focus-visible{z-index:3000!important;border-color:#ffe6a6;box-shadow:0 24px 60px rgba(0,0,0,.4),0 0 0 2px rgba(255,224,158,.75),0 0 26px rgba(238,190,104,.68)}:host(:not([data-lt-busy])) .card:hover:after,:host(:not([data-lt-busy])) .card:focus-visible:after{border-color:#fff0c7;box-shadow:inset 0 0 18px rgba(255,221,150,.28)}:host(:not([data-lt-busy])) .card:hover .surface,:host(:not([data-lt-busy])) .card:focus-visible .surface{transform:scale(1.035)}:host(:not([data-lt-busy])) .card:hover img,:host(:not([data-lt-busy])) .card:focus-visible img{filter:saturate(.9) brightness(1.06)}@media(prefers-reduced-motion:reduce){.card,.card img,.card .caption,.card:after,.card .surface,.center,.focusLayer,.connectionPeek,.menuPanel,.drawer,.focusInfo,.closeFocus,.mediaViewer,.localNotice,.previewPlaying img,.mediaVisual.previewPlaying img{animation:none;transition:none}}.card.mine{border-width:3px;border-color:var(--lt-gold-deep);box-shadow:0 24px 60px rgba(0,0,0,.38),0 0 0 1px var(--lt-gold-line),0 0 20px var(--lt-gold-glow)}.card.mine:after{border-color:var(--lt-gold-line)}:host([data-lt-theme=garden]) .card.mine{border-color:var(--lt-rose);box-shadow:var(--lt-garden-shadow),0 0 0 1px var(--lt-gold-line),0 0 20px var(--lt-gold-glow)}:host([data-lt-theme=garden]) .recent-card{border-color:var(--lt-rose)}.card:focus-visible,button:focus-visible,a:focus-visible{outline:3px solid #e8b8c9;outline-offset:5px}.topbar{z-index:70;gap:16px}.topbar button{pointer-events:auto}.top-actions{display:flex;gap:20px;align-items:center}.center{pointer-events:none;max-width:90vw}.center .actions{pointer-events:none}.center .actions button{pointer-events:auto}.center h1{font-size:clamp(30px,4vw,54px)}.center p{line-height:1.8}.actions{flex-wrap:wrap}.subtleBtn{min-height:44px}.card.clash{visibility:hidden}.primary-cta{background:#eee7e0;color:#28212b;border-color:#eee7e0}.primary-cta:hover{background:#eee7e0;border-color:#eee7e0}:host([data-lt-theme=garden]) .center .primary-cta{background:#eee7e0;color:#28212b;border-color:#eee7e0}:host([data-lt-theme=garden]) .center .primary-cta:hover{background:#eee7e0;border-color:#eee7e0}.hint{pointer-events:none}.caption{pointer-events:none}.card .memoText{overflow:hidden;display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical;overflow-wrap:anywhere}.orbit-dialog{border:1px solid #564957;color:#eee7e9;background:#151118;border-radius:22px;width:min(900px,94vw);max-height:88dvh;padding:0;overflow:auto}.orbit-dialog::backdrop{background:#030307d9;backdrop-filter:blur(12px)}.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:30px;padding:42px}.detail-image{width:100%;height:390px;object-fit:contain;background:#08070a;border-radius:12px}.detail-image--vertical{display:block;width:auto;max-width:100%;aspect-ratio:9/16;margin:0 auto}.detail-paper{min-height:280px;background:#eae2d3;color:#4d3a40;padding:35px;font:24px/1.7 Georgia,serif;white-space:pre-wrap;overflow-wrap:anywhere;border-radius:8px;transform:rotate(-2deg)}.detail-copy h2{font-size:30px;line-height:1.3;overflow-wrap:anywhere}.detail-copy p{font-size:15px;line-height:1.9;white-space:pre-wrap;overflow-wrap:anywhere;color:#c8beca}.detail-copy small{color:#bd9cad}.detail-buttons{display:flex;flex-wrap:wrap;gap:9px;margin-top:20px}.detail-buttons button,.detail-buttons a,.close{padding:10px 14px;border:1px solid #615364;background:#302537;border-radius:99px;color:#eee3eb;text-decoration:none;cursor:pointer;min-height:44px}.media-unrecognized{display:block;margin-top:20px;padding:10px 14px;border:1px solid #615364;border-radius:10px;background:#241d2a;color:#c8beca;font-size:13px;line-height:1.8;overflow-wrap:anywhere}.close{position:absolute;right:12px;top:10px;z-index:7}.index-list{padding:56px 35px 35px;display:grid;gap:8px}.index-list h2{margin:8px 0 20px}.index-list button{text-align:left;border:1px solid #514454;background:#221b27;color:#eee5ed;padding:14px;border-radius:10px;cursor:pointer}.index-list small{display:block;color:#b9a4be;margin-top:6px}.center-scrim{position:absolute;z-index:10;left:50%;top:50%;width:min(820px,96vw);height:min(560px,74dvh);transform:translate(-50%,-50%);pointer-events:none;background:radial-gradient(ellipse 62% 58% at 50% 49%,rgba(3,3,8,.9) 0%,rgba(3,3,8,.78) 40%,rgba(3,3,8,.42) 68%,rgba(3,3,8,0) 100%)}.center{z-index:22}.center .center-note{margin:15px 0 0;font-size:13px;letter-spacing:0;line-height:1.7;color:#d4cee0}.menuBtn{pointer-events:auto;min-height:44px;padding:10px 15px;border:1px solid rgba(255,255,255,.22);border-radius:999px;background:rgba(9,8,14,.62);color:#ece7f1;font-size:11px;letter-spacing:.06em;backdrop-filter:blur(8px)}.menuBtn:hover{border-color:rgba(255,255,255,.44);background:rgba(255,255,255,.09)}.hint{font-size:13px;letter-spacing:.04em;color:#9c97a6}@media(max-width:650px){.center-scrim{width:min(560px,104vw);height:min(430px,56dvh);background:radial-gradient(ellipse 64% 58% at 50% 47%,rgba(3,3,8,.93) 0%,rgba(3,3,8,.84) 40%,rgba(3,3,8,.46) 70%,rgba(3,3,8,0) 100%)}.center .center-note{font-size:10px}.topbar{padding:14px 18px}.brand{font-size:9px;letter-spacing:.12em}.top-actions{gap:12px}.detail-grid{grid-template-columns:1fr;padding:48px 22px 24px;gap:14px}.detail-image{height:220px}.detail-paper{min-height:150px;padding:20px;font-size:20px}.detail-copy h2{font-size:24px}.center h1{font-size:30px}.hint{font-size:13px;bottom:18px;right:80px}/* 이슈 458: 셸 ＋ 단추(오른쪽 아래 56px) 자리를 비워 둔다 */.actions{gap:8px}.subtleBtn{padding:10px 12px;font-size:12px}.detail-copy p{font-size:14px}}@media(max-width:768px){.brand{font-size:12px}.menuBtn{font-size:14px}.subtleBtn{font-size:14px}.hint{font-size:14px}.center .center-note{font-size:14px}.eyebrow{font-size:12px}.focusActions button,.focusActions a{font-size:14px}.focusInfo .kicker{font-size:12px}.meta{font-size:14px}.why b{font-size:14px}.panelHead strong{font-size:14px}.media-unrecognized{font-size:14px}.card.video .playGlyph{font-size:12px}.card.video .duration{font-size:12px}.card.link .surface:after{font-size:12px}.card.memo .memoKicker{font-size:12px}.card.memo .memoFoot{font-size:12px}.card .caption{font-size:12px}.firstMark{font-size:12px}.index-list small{font-size:14px}}.index-filters{display:flex;flex-wrap:wrap;gap:8px;margin:-6px 0 20px}.indexFilter{padding:7px 14px;border:1px solid #514454;border-radius:999px;background:#221b27;color:#cfc3d6;font:inherit;font-size:13px;cursor:pointer;min-height:36px}.indexFilter.active{border-color:#e8b8c9;color:#fff;background:#3a2c40}.indexFilter:focus-visible{outline:3px solid #e8b8c9;outline-offset:2px}.index-empty{color:#b9a4be;font-size:14px;line-height:1.7;margin:6px 0 0}.indexTagTitle{margin:18px 0 0;font-size:12px;color:#bd9cad}.index-tag-filter{display:grid;gap:10px;margin:-6px 0 20px;padding:14px;border:1px solid #3a2c40;border-radius:12px;background:#1b1520}.indexTagPickedRow{display:flex;flex-wrap:wrap;gap:8px}.lt-tree-dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--lt-tree-dot,#8a7f8f);flex:0 0 auto}.lt-tree-tag{display:inline-flex;align-items:center;gap:5px}.indexFilter{display:inline-flex;align-items:center;gap:6px}.indexTagPicked{display:inline-flex;align-items:center;min-height:44px;padding:0 12px;border:1px solid #e8b8c9;border-radius:999px;background:#3a2c40;color:#fff;font:inherit;font-size:13px;cursor:pointer}.indexTagKind{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.indexTagKindName{min-width:52px;color:#bd9cad;font-size:12px}.indexTagChips{display:flex;flex-wrap:wrap;gap:8px}.indexTagChip{display:inline-flex;align-items:center;min-height:44px;padding:0 12px;border:1px solid #514454;border-radius:999px;background:#221b27;color:#cfc3d6;font:inherit;font-size:13px;cursor:pointer}.indexTagChip.active{border-color:#e8b8c9;color:#fff;background:#3a2c40}.indexTagMore{display:inline-flex;align-items:center;min-height:44px;padding:0 10px;border:0;background:none;color:#bd9cad;font:inherit;font-size:13px;cursor:pointer;text-decoration:underline}.indexTagChip:focus-visible,.indexTagMore:focus-visible,.indexTagPicked:focus-visible{outline:3px solid #e8b8c9;outline-offset:2px}.detail-grid{position:relative}.detail-nav{position:absolute;top:50%;transform:translateY(-50%);z-index:6;min-width:44px;min-height:44px;padding:8px 13px;border:1px solid #615364;border-radius:999px;background:#302537;color:#eee3eb;font:inherit;font-size:15px;cursor:pointer}.detail-nav--prev{left:10px}.detail-nav--next{right:10px}.detail-nav:disabled{opacity:.35;cursor:default}.detail-nav:focus-visible{outline:3px solid #e8b8c9;outline-offset:2px}.detail-nav-note{position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:6;margin:0;color:#bd9cad;font-size:12px}:host([data-lt-busy]) .card{will-change:transform,filter;box-shadow:0 14px 34px rgba(0,0,0,.34)}:host([data-lt-busy]) .card.mine{box-shadow:0 14px 34px rgba(0,0,0,.34),0 0 0 1px var(--lt-gold-line),0 0 12px var(--lt-gold-glow)}:host([data-lt-busy]) .card:after{box-shadow:none}:host([data-lt-busy]) .recent-card:hover,:host([data-lt-busy]) .recent-card:focus-within{border-color:var(--lt-gold-deep);box-shadow:0 24px 60px rgba(0,0,0,.38),0 0 0 1px var(--lt-gold-line),0 0 22px var(--lt-gold-glow);outline:none}:host([data-lt-theme=garden]) .recent-card:hover,:host([data-lt-theme=garden]) .recent-card:focus-within{border-color:var(--lt-rose)}:host([data-lt-busy]) .recent-card:hover:after,:host([data-lt-busy]) .recent-card:focus-within:after{border-color:var(--lt-gold-line)}
+:host(:not([data-lt-busy])) .card:hover,:host(:not([data-lt-busy])) .card:focus-visible{z-index:3000!important;border-color:#ffe6a6}:host(:not([data-lt-busy])) .card:hover:after,:host(:not([data-lt-busy])) .card:focus-visible:after{border-color:#fff0c7;box-shadow:inset 0 0 18px rgba(255,221,150,.28)}:host(:not([data-lt-busy])) .card:hover .surface,:host(:not([data-lt-busy])) .card:focus-visible .surface{transform:scale(1.035)}:host(:not([data-lt-busy])) .card:hover img,:host(:not([data-lt-busy])) .card:focus-visible img{filter:saturate(.9) brightness(1.06)}@media(prefers-reduced-motion:reduce){.card,.card img,.card .caption,.card:after,.card .surface,.center,.focusLayer,.connectionPeek,.menuPanel,.drawer,.focusInfo,.closeFocus,.mediaViewer,.localNotice,.previewPlaying img,.mediaVisual.previewPlaying img{animation:none;transition:none}}.card.mine{border-width:3px;border-color:var(--lt-gold-deep);--lt-orbit-shadow:0 24px 60px rgba(0,0,0,.38),0 0 0 1px var(--lt-gold-line),0 0 20px var(--lt-gold-glow)}.card.mine:after{border-color:var(--lt-gold-line)}:host([data-lt-theme=garden]) .card.mine{border-color:var(--lt-rose);--lt-orbit-shadow:var(--lt-garden-shadow),0 0 0 1px var(--lt-gold-line),0 0 20px var(--lt-gold-glow)}:host([data-lt-theme=garden]) .recent-card{border-color:var(--lt-rose)}.card:focus-visible,button:focus-visible,a:focus-visible{outline:3px solid #e8b8c9;outline-offset:5px}.topbar{z-index:70;gap:16px}.topbar button{pointer-events:auto}.top-actions{display:flex;gap:20px;align-items:center}.center{pointer-events:none;max-width:90vw}.center .actions{pointer-events:none}.center .actions button{pointer-events:auto}.center h1{font-size:clamp(30px,4vw,54px)}.center p{line-height:1.8}.actions{flex-wrap:wrap}.subtleBtn{min-height:44px}.card.clash{visibility:hidden}.primary-cta{background:#eee7e0;color:#28212b;border-color:#eee7e0}.primary-cta:hover{background:#eee7e0;border-color:#eee7e0}:host([data-lt-theme=garden]) .center .primary-cta{background:#eee7e0;color:#28212b;border-color:#eee7e0}:host([data-lt-theme=garden]) .center .primary-cta:hover{background:#eee7e0;border-color:#eee7e0}.hint{pointer-events:none}.caption{pointer-events:none}.card .memoText{overflow:hidden;display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical;overflow-wrap:anywhere}.orbit-dialog{border:1px solid #564957;color:#eee7e9;background:#151118;border-radius:22px;width:min(900px,94vw);max-height:88dvh;padding:0;overflow:auto}.orbit-dialog::backdrop{background:#030307d9;backdrop-filter:blur(12px)}.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:30px;padding:42px}.detail-image{width:100%;height:390px;object-fit:contain;background:#08070a;border-radius:12px}.detail-image--vertical{display:block;width:auto;max-width:100%;aspect-ratio:9/16;margin:0 auto}.detail-paper{min-height:280px;background:#eae2d3;color:#4d3a40;padding:35px;font:24px/1.7 Georgia,serif;white-space:pre-wrap;overflow-wrap:anywhere;border-radius:8px;transform:rotate(-2deg)}.detail-copy h2{font-size:30px;line-height:1.3;overflow-wrap:anywhere}.detail-copy p{font-size:15px;line-height:1.9;white-space:pre-wrap;overflow-wrap:anywhere;color:#c8beca}.detail-copy small{color:#bd9cad}.detail-buttons{display:flex;flex-wrap:wrap;gap:9px;margin-top:20px}.detail-buttons button,.detail-buttons a,.close{padding:10px 14px;border:1px solid #615364;background:#302537;border-radius:99px;color:#eee3eb;text-decoration:none;cursor:pointer;min-height:44px}.media-unrecognized{display:block;margin-top:20px;padding:10px 14px;border:1px solid #615364;border-radius:10px;background:#241d2a;color:#c8beca;font-size:13px;line-height:1.8;overflow-wrap:anywhere}.close{position:absolute;right:12px;top:10px;z-index:7}.index-list{padding:56px 35px 35px;display:grid;gap:8px}.index-list h2{margin:8px 0 20px}.index-list button{text-align:left;border:1px solid #514454;background:#221b27;color:#eee5ed;padding:14px;border-radius:10px;cursor:pointer}.index-list small{display:block;color:#b9a4be;margin-top:6px}.center-scrim{position:absolute;z-index:10;left:50%;top:50%;width:min(820px,96vw);height:min(560px,74dvh);transform:translate(-50%,-50%);pointer-events:none;background:radial-gradient(ellipse 62% 58% at 50% 49%,rgba(3,3,8,.9) 0%,rgba(3,3,8,.78) 40%,rgba(3,3,8,.42) 68%,rgba(3,3,8,0) 100%)}.center{z-index:22}.center .center-note{margin:15px 0 0;font-size:13px;letter-spacing:0;line-height:1.7;color:#d4cee0}.menuBtn{pointer-events:auto;min-height:44px;padding:10px 15px;border:1px solid rgba(255,255,255,.22);border-radius:999px;background:rgba(9,8,14,.62);color:#ece7f1;font-size:11px;letter-spacing:.06em;backdrop-filter:blur(8px)}.menuBtn:hover{border-color:rgba(255,255,255,.44);background:rgba(255,255,255,.09)}.hint{font-size:13px;letter-spacing:.04em;color:#9c97a6}@media(max-width:650px){.center-scrim{width:min(560px,104vw);height:min(430px,56dvh);background:radial-gradient(ellipse 64% 58% at 50% 47%,rgba(3,3,8,.93) 0%,rgba(3,3,8,.84) 40%,rgba(3,3,8,.46) 70%,rgba(3,3,8,0) 100%)}.center .center-note{font-size:10px}.topbar{padding:14px 18px}.brand{font-size:9px;letter-spacing:.12em}.top-actions{gap:12px}.detail-grid{grid-template-columns:1fr;padding:48px 22px 24px;gap:14px}.detail-image{height:220px}.detail-paper{min-height:150px;padding:20px;font-size:20px}.detail-copy h2{font-size:24px}.center h1{font-size:30px}.hint{font-size:13px;bottom:18px;right:80px}/* 이슈 458: 셸 ＋ 단추(오른쪽 아래 56px) 자리를 비워 둔다 */.actions{gap:8px}.subtleBtn{padding:10px 12px;font-size:12px}.detail-copy p{font-size:14px}}@media(max-width:768px){.brand{font-size:12px}.menuBtn{font-size:14px}.subtleBtn{font-size:14px}.hint{font-size:14px}.center .center-note{font-size:14px}.eyebrow{font-size:12px}.focusActions button,.focusActions a{font-size:14px}.focusInfo .kicker{font-size:12px}.meta{font-size:14px}.why b{font-size:14px}.panelHead strong{font-size:14px}.media-unrecognized{font-size:14px}.card.video .playGlyph{font-size:12px}.card.video .duration{font-size:12px}.card.link .surface:after{font-size:12px}.card.memo .memoKicker{font-size:12px}.card.memo .memoFoot{font-size:12px}.card .caption{font-size:12px}.firstMark{font-size:12px}.index-list small{font-size:14px}}.index-filters{display:flex;flex-wrap:wrap;gap:8px;margin:-6px 0 20px}.indexFilter{padding:7px 14px;border:1px solid #514454;border-radius:999px;background:#221b27;color:#cfc3d6;font:inherit;font-size:13px;cursor:pointer;min-height:36px}.indexFilter.active{border-color:#e8b8c9;color:#fff;background:#3a2c40}.indexFilter:focus-visible{outline:3px solid #e8b8c9;outline-offset:2px}.index-empty{color:#b9a4be;font-size:14px;line-height:1.7;margin:6px 0 0}.indexTagTitle{margin:18px 0 0;font-size:12px;color:#bd9cad}.index-tag-filter{display:grid;gap:10px;margin:-6px 0 20px;padding:14px;border:1px solid #3a2c40;border-radius:12px;background:#1b1520}.indexTagPickedRow{display:flex;flex-wrap:wrap;gap:8px}.lt-tree-dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--lt-tree-dot,#8a7f8f);flex:0 0 auto}.lt-tree-tag{display:inline-flex;align-items:center;gap:5px}.indexFilter{display:inline-flex;align-items:center;gap:6px}.indexTagPicked{display:inline-flex;align-items:center;min-height:44px;padding:0 12px;border:1px solid #e8b8c9;border-radius:999px;background:#3a2c40;color:#fff;font:inherit;font-size:13px;cursor:pointer}.indexTagKind{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.indexTagKindName{min-width:52px;color:#bd9cad;font-size:12px}.indexTagChips{display:flex;flex-wrap:wrap;gap:8px}.indexTagChip{display:inline-flex;align-items:center;min-height:44px;padding:0 12px;border:1px solid #514454;border-radius:999px;background:#221b27;color:#cfc3d6;font:inherit;font-size:13px;cursor:pointer}.indexTagChip.active{border-color:#e8b8c9;color:#fff;background:#3a2c40}.indexTagMore{display:inline-flex;align-items:center;min-height:44px;padding:0 10px;border:0;background:none;color:#bd9cad;font:inherit;font-size:13px;cursor:pointer;text-decoration:underline}.indexTagChip:focus-visible,.indexTagMore:focus-visible,.indexTagPicked:focus-visible{outline:3px solid #e8b8c9;outline-offset:2px}.detail-grid{position:relative}.detail-nav{position:absolute;top:50%;transform:translateY(-50%);z-index:6;min-width:44px;min-height:44px;padding:8px 13px;border:1px solid #615364;border-radius:999px;background:#302537;color:#eee3eb;font:inherit;font-size:15px;cursor:pointer}.detail-nav--prev{left:10px}.detail-nav--next{right:10px}.detail-nav:disabled{opacity:.35;cursor:default}.detail-nav:focus-visible{outline:3px solid #e8b8c9;outline-offset:2px}.detail-nav-note{position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:6;margin:0;color:#bd9cad;font-size:12px}:host([data-lt-busy]) .card{will-change:transform;--lt-orbit-busy-shadow:0 14px 34px rgba(0,0,0,.34)}:host([data-lt-busy]) .card.mine{--lt-orbit-busy-shadow:0 14px 34px rgba(0,0,0,.34),0 0 0 1px var(--lt-gold-line),0 0 12px var(--lt-gold-glow)}:host([data-lt-busy]) .card:after{box-shadow:none}:host([data-lt-busy]) .recent-card:hover,:host([data-lt-busy]) .recent-card:focus-within{border-color:var(--lt-gold-deep);box-shadow:0 24px 60px rgba(0,0,0,.38),0 0 0 1px var(--lt-gold-line),0 0 22px var(--lt-gold-glow);outline:none}:host([data-lt-theme=garden]) .recent-card:hover,:host([data-lt-theme=garden]) .recent-card:focus-within{border-color:var(--lt-rose)}:host([data-lt-busy]) .recent-card:hover:after,:host([data-lt-busy]) .recent-card:focus-within:after{border-color:var(--lt-gold-line)}
 /* 옮기기·칩 순서(2026-11-17): 고르기 칸·행별 옮기기·대상 메뉴·안내 줄·끌기 표시. 색은 이 찾의 기존 값(#514454·#e8b8c9 계열)을 쓴다. */
 .index-head-tools{display:inline-flex;gap:8px;margin-left:12px;vertical-align:middle}
 .indexPickToggle,.indexMovePicked{min-height:36px;padding:7px 14px;border-radius:999px;border:1px solid #514454;background:#221b27;color:#cfc3d6;font:inherit;font-size:13px;cursor:pointer}
@@ -43,7 +46,7 @@ let extraCSS=`:host{display:block;height:100dvh;min-height:540px;font-family:var
 .indexFilter.drop-ok{border-color:#e8b8c9;color:#fff;background:#3a2c40;box-shadow:0 0 0 2px #e8b8c9}
 .index-list .indexFilter{touch-action:none}
 .orbit-dialog.lt-dragging{cursor:grabbing}
-.orbit-dialog.lt-dragging [data-lt-moment-row]{pointer-events:none;opacity:.7}.index-empty{color:#b9a4be;font-size:14px;line-height:1.7;margin:6px 0 0}.indexTagTitle{margin:18px 0 0;font-size:12px;color:#bd9cad}.index-tag-filter{display:grid;gap:10px;margin:-6px 0 20px;padding:14px;border:1px solid #3a2c40;border-radius:12px;background:#1b1520}.indexTagPickedRow{display:flex;flex-wrap:wrap;gap:8px}.indexTagPicked{display:inline-flex;align-items:center;min-height:44px;padding:0 12px;border:1px solid #e8b8c9;border-radius:999px;background:#3a2c40;color:#fff;font:inherit;font-size:13px;cursor:pointer}.indexTagKind{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.indexTagKindName{min-width:52px;color:#bd9cad;font-size:12px}.indexTagChips{display:flex;flex-wrap:wrap;gap:8px}.indexTagChip{display:inline-flex;align-items:center;min-height:44px;padding:0 12px;border:1px solid #514454;border-radius:999px;background:#221b27;color:#cfc3d6;font:inherit;font-size:13px;cursor:pointer}.indexTagChip.active{border-color:#e8b8c9;color:#fff;background:#3a2c40}.indexTagMore{display:inline-flex;align-items:center;min-height:44px;padding:0 10px;border:0;background:none;color:#bd9cad;font:inherit;font-size:13px;cursor:pointer;text-decoration:underline}.indexTagChip:focus-visible,.indexTagMore:focus-visible,.indexTagPicked:focus-visible{outline:3px solid #e8b8c9;outline-offset:2px}.detail-grid{position:relative}.detail-nav{position:absolute;top:50%;transform:translateY(-50%);z-index:6;min-width:44px;min-height:44px;padding:8px 13px;border:1px solid #615364;border-radius:999px;background:#302537;color:#eee3eb;font:inherit;font-size:15px;cursor:pointer}.detail-nav--prev{left:10px}.detail-nav--next{right:10px}.detail-nav:disabled{opacity:.35;cursor:default}.detail-nav:focus-visible{outline:3px solid #e8b8c9;outline-offset:2px}.detail-nav-note{position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:6;margin:0;color:#bd9cad;font-size:12px}:host([data-lt-busy]) .card{will-change:transform,filter;box-shadow:0 14px 34px rgba(0,0,0,.34)}:host([data-lt-busy]) .card.mine{box-shadow:0 14px 34px rgba(0,0,0,.34),0 0 0 1px var(--lt-gold-line),0 0 12px var(--lt-gold-glow)}:host([data-lt-busy]) .card:after{box-shadow:none}:host([data-lt-busy]) .recent-card:hover,:host([data-lt-busy]) .recent-card:focus-within{border-color:var(--lt-gold-deep);box-shadow:0 24px 60px rgba(0,0,0,.38),0 0 0 1px var(--lt-gold-line),0 0 22px var(--lt-gold-glow);outline:none}:host([data-lt-theme=garden]) .recent-card:hover,:host([data-lt-theme=garden]) .recent-card:focus-within{border-color:var(--lt-rose)}:host([data-lt-busy]) .recent-card:hover:after,:host([data-lt-busy]) .recent-card:focus-within:after{border-color:var(--lt-gold-line)}`;
+.orbit-dialog.lt-dragging [data-lt-moment-row]{pointer-events:none;opacity:.7}.index-empty{color:#b9a4be;font-size:14px;line-height:1.7;margin:6px 0 0}.indexTagTitle{margin:18px 0 0;font-size:12px;color:#bd9cad}.index-tag-filter{display:grid;gap:10px;margin:-6px 0 20px;padding:14px;border:1px solid #3a2c40;border-radius:12px;background:#1b1520}.indexTagPickedRow{display:flex;flex-wrap:wrap;gap:8px}.indexTagPicked{display:inline-flex;align-items:center;min-height:44px;padding:0 12px;border:1px solid #e8b8c9;border-radius:999px;background:#3a2c40;color:#fff;font:inherit;font-size:13px;cursor:pointer}.indexTagKind{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.indexTagKindName{min-width:52px;color:#bd9cad;font-size:12px}.indexTagChips{display:flex;flex-wrap:wrap;gap:8px}.indexTagChip{display:inline-flex;align-items:center;min-height:44px;padding:0 12px;border:1px solid #514454;border-radius:999px;background:#221b27;color:#cfc3d6;font:inherit;font-size:13px;cursor:pointer}.indexTagChip.active{border-color:#e8b8c9;color:#fff;background:#3a2c40}.indexTagMore{display:inline-flex;align-items:center;min-height:44px;padding:0 10px;border:0;background:none;color:#bd9cad;font:inherit;font-size:13px;cursor:pointer;text-decoration:underline}.indexTagChip:focus-visible,.indexTagMore:focus-visible,.indexTagPicked:focus-visible{outline:3px solid #e8b8c9;outline-offset:2px}.detail-grid{position:relative}.detail-nav{position:absolute;top:50%;transform:translateY(-50%);z-index:6;min-width:44px;min-height:44px;padding:8px 13px;border:1px solid #615364;border-radius:999px;background:#302537;color:#eee3eb;font:inherit;font-size:15px;cursor:pointer}.detail-nav--prev{left:10px}.detail-nav--next{right:10px}.detail-nav:disabled{opacity:.35;cursor:default}.detail-nav:focus-visible{outline:3px solid #e8b8c9;outline-offset:2px}.detail-nav-note{position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:6;margin:0;color:#bd9cad;font-size:12px}:host([data-lt-busy]) .card{will-change:transform;--lt-orbit-busy-shadow:0 14px 34px rgba(0,0,0,.34)}:host([data-lt-busy]) .card.mine{--lt-orbit-busy-shadow:0 14px 34px rgba(0,0,0,.34),0 0 0 1px var(--lt-gold-line),0 0 12px var(--lt-gold-glow)}:host([data-lt-busy]) .card:after{box-shadow:none}:host([data-lt-busy]) .recent-card:hover,:host([data-lt-busy]) .recent-card:focus-within{border-color:var(--lt-gold-deep);box-shadow:0 24px 60px rgba(0,0,0,.38),0 0 0 1px var(--lt-gold-line),0 0 22px var(--lt-gold-glow);outline:none}:host([data-lt-theme=garden]) .recent-card:hover,:host([data-lt-theme=garden]) .recent-card:focus-within{border-color:var(--lt-rose)}:host([data-lt-busy]) .recent-card:hover:after,:host([data-lt-busy]) .recent-card:focus-within:after{border-color:var(--lt-gold-line)}`;
 
 extraCSS += '@media(min-width:651px){.detail-grid{padding-left:64px;padding-right:64px}}@media(max-width:650px){.detail-grid{padding-top:60px}.detail-nav{top:6px;transform:none}.detail-nav--prev{left:12px}.detail-nav--next{left:64px;right:auto}.detail-nav-note{top:20px}}';
 // #426: 최근 순간 카드 — 궤도의 금빛 내 카드(.card.mine)와 같은 결(테두리·이중선·금빛 번짐). 390에서는 폭=화면-32px, 세로 썸네일 높이 제한.
@@ -58,7 +61,7 @@ extraCSS+=`.recent-head{position:relative;display:inline-flex;align-items:baseli
 // #1109: 정리 창과 같은 닫기 단추·뒤 덮개·390 꽉 찬 창 규칙.
 extraCSS+=`.orbit-dialog:not(#guidePanel)::backdrop{background:rgba(3,3,7,.85);backdrop-filter:blur(12px)}.orbit-dialog:not(#guidePanel) .close{box-sizing:border-box;width:44px;height:44px;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;padding:0;border:1px solid #615364;border-radius:50%;background:#ffffff07;font-size:24px;line-height:1;color:inherit;position:absolute;right:12px;top:10px;z-index:7}@media(max-width:520px){.orbit-dialog:not(#guidePanel){width:100vw;max-width:none;height:100dvh;max-height:100dvh;inset:0;margin:0;border:0;border-radius:0}.orbit-dialog:not(#guidePanel) .close{top:8px;right:8px;background:#151118e6}}`;
 // #1077: 바닥 링크·새 소식 카드 자리를 지나는 예시 카드는 그 구간만 투명하게(자리와 장수는 유지).
-extraCSS+=`.card.lt-under-link{opacity:0}`;
+extraCSS+=`.card.lt-under-link{opacity:0}\n.card .surface .lt-orbit-texture{position:absolute;inset:0;width:100%;height:100%;display:block;object-fit:var(--fit,cover);object-position:var(--pos,50% 50%);transform:scale(1.02);pointer-events:none}\n.card.fitContain .surface .lt-orbit-texture{padding:7px;object-fit:contain;transform:scale(.94)}\n.card .surface.lt-textured img{opacity:0;filter:none}.card .surface:not(.lt-textured) img{filter:saturate(var(--sat,.66)) brightness(var(--bright,.86)) var(--lt-orbit-depth,brightness(1))}\n.card.memo .surface{filter:var(--lt-orbit-depth,brightness(1))}\n:host(:not([data-lt-busy])) .card:is(:hover,:focus-visible,.hovered) .surface.lt-textured .lt-orbit-texture{opacity:0}:host(:not([data-lt-busy])) .card:is(:hover,:focus-visible,.hovered) .surface.lt-textured img{opacity:1;filter:saturate(.9) brightness(1.06) var(--lt-orbit-depth,brightness(1))}\n.card::before,.card>.lt-shadow-hover,.card>.lt-shadow-busy{content:"";position:absolute;inset:-1px;border-radius:inherit;pointer-events:none;transition:opacity .18s;z-index:-1}\n.card::before{box-shadow:var(--lt-orbit-shadow);opacity:1}.card>.lt-shadow-hover{box-shadow:0 24px 60px rgba(0,0,0,.4),0 0 0 2px rgba(255,224,158,.75),0 0 26px rgba(238,190,104,.68);opacity:0}.card>.lt-shadow-busy{box-shadow:var(--lt-orbit-busy-shadow);opacity:0}\n.card.mine::before,.card.mine>.lt-shadow-hover,.card.mine>.lt-shadow-busy{inset:-3px}:host(:not([data-lt-busy])) .card:is(:hover,:focus-visible,.hovered)::before,:host([data-lt-busy]) .card::before{opacity:0}:host(:not([data-lt-busy])) .card:is(:hover,:focus-visible,.hovered)>.lt-shadow-hover,:host([data-lt-busy]) .card>.lt-shadow-busy{opacity:1}\n`;
 
 export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSelect=()=>{},recordNote=null,examples=[],onOpen=null,empty=false,titleDisplay='both',momentList=null,dateStyle='dot',prefs=null,initialPicking=false,initialNotice=null,homePin=null,loggedIn}) {
  performance.mark('m0');
@@ -158,6 +161,14 @@ export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSel
  const app=shadow.querySelector('.app'),world=shadow.querySelector('.world'),dialog=shadow.querySelector('dialog');
  // #1010: 예시 안내 줄 — 떠다니는 예시 카드가 숨는 좁은 화면에서는 함께 숨긴다(아래 배치에서 data-off를 묻는다).
  const centerNote=shadow.querySelector('.center-note');
+ const fallbackCanvas=document.createElement('canvas'),glCanvas=document.createElement('canvas');
+ let canvas=fallbackCanvas,renderer=null;
+ for(const board of [fallbackCanvas,glCanvas]){board.className='orbit-canvas';board.setAttribute('aria-hidden','true');}
+ const activateCanvas=board=>{if(canvas!==board){canvas.remove();canvas=board;}if(!canvas.isConnected)world.prepend(canvas);app.classList.toggle('lt-webgl-vignette',board===glCanvas&&world.classList.contains('lt-canvas')&&host.getAttribute('data-lt-theme')!=='garden');};
+ try{renderer=createOrbitGL(glCanvas);}catch{}
+ if(renderer)activateCanvas(glCanvas);else activateCanvas(fallbackCanvas);
+ const canvasStyle=document.createElement('style');canvasStyle.textContent='.app.lt-webgl-vignette::before{z-index:2}.orbit-canvas{position:absolute;inset:0;width:100%;height:100%;display:none;pointer-events:auto}.world.lt-canvas .orbit-canvas{display:block}.world.lt-canvas .card{opacity:0;will-change:auto;contain:none;pointer-events:none}.world.lt-canvas .card *{will-change:auto;pointer-events:none}';shadow.append(canvasStyle);
+ const canvasCtx=fallbackCanvas.getContext('2d');
  const reduceQuery=matchMedia('(prefers-reduced-motion: reduce)');let reduced=reduceQuery.matches,paused=reduced,phase=0,raf=0,previous=0,drag=null,moved=0,opener=null,spin=0,glide=0;
   // #942: 가리키기·클릭으로 배경이 움직이지 않게 카메라는 항상 중심(0,0)에 둔다. 회전은 끌 때만 phase 로 누적한다.
   let cameraTarget={x:0,y:0}, camera={x:0,y:0};
@@ -407,7 +418,7 @@ shadow.addEventListener('click',e=>{const play=e.target.closest('[data-recent-pl
  });
  track(disposeThumb);
  checkRecentVideo(shadow.querySelector('.recent-card'));
-performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElement('button');b.className=`card ${c.type} ${c.sizeClass}${c.example?' example':''}${c.source==='mine'?' mine':''}`;b.style.setProperty('--fit',c.fitMode==='contain'?'contain':'cover');;b.dataset.example=c.example?'1':'';b.setAttribute('tabindex','-1');b.setAttribute('aria-hidden','true');b.innerHTML=`<span class="lt-move"><span class="lt-lift"><span class="surface" data-lt-thumb-host>${c.image?`<img src="${esc(c.image)}" alt="" draggable="false" loading="lazy" decoding="async"${thumbFallbackAttrs(c,{candidates:c.thumbCandidates||[c.image],writable:!demo&&!c.example,variant:'orbit'})}${c.youtubeThumb?' referrerpolicy="no-referrer"':''}>`:(!demo&&!c.example&&needsFallbackCard(c,{autoLoad:false})?fallbackCardMarkup(c,{writable:!demo&&!c.example,variant:'orbit',dateStyle}):`<div class="memoKicker">${esc(dateOf(c))}</div><div class="memoText">${esc(mainOf(c))}</div><div class="memoFoot">${esc(c.emotion)}</div>`)}</span></span></span>${c.youtubeThumb&&c.image?'<span class="playGlyph" aria-hidden="true">▶</span>':''}${c.first?'<div class="firstMark">FIRST</div>':''}<div class="caption"><span>${esc(mainOf(c))}${subMarkup(c)}</span></div>`;
+performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElement('button');b.className=`card ${c.type} ${c.sizeClass}${c.example?' example':''}${c.source==='mine'?' mine':''}`;b.style.setProperty('--fit',c.fitMode==='contain'?'contain':'cover');;b.dataset.example=c.example?'1':'';b.setAttribute('tabindex','-1');b.setAttribute('aria-hidden','true');b.innerHTML=`<span class="lt-shadow-hover" aria-hidden="true"></span><span class="lt-shadow-busy" aria-hidden="true"></span><span class="lt-move"><span class="lt-lift"><span class="surface" data-lt-thumb-host>${c.image?`<img src="${esc(c.image)}" alt="" draggable="false" loading="lazy" decoding="async"${devicePixelRatio<=1&&compactOrbitImages[c.image]?` srcset="${esc(compactOrbitImages[c.image])}"`:''}${thumbFallbackAttrs(c,{candidates:c.thumbCandidates||[c.image],writable:!demo&&!c.example,variant:'orbit'})}${c.youtubeThumb?' referrerpolicy="no-referrer"':''}>`:(!demo&&!c.example&&needsFallbackCard(c,{autoLoad:false})?fallbackCardMarkup(c,{writable:!demo&&!c.example,variant:'orbit',dateStyle}):`<div class="memoKicker">${esc(dateOf(c))}</div><div class="memoText">${esc(mainOf(c))}</div><div class="memoFoot">${esc(c.emotion)}</div>`)}</span></span></span>${c.youtubeThumb&&c.image?'<span class="playGlyph" aria-hidden="true">▶</span>':''}${c.first?'<div class="firstMark">FIRST</div>':''}<div class="caption"><span>${esc(mainOf(c))}${subMarkup(c)}</span></div>`;
  // #593: 바깥 .card 는 자리(궤도 애니메이션)만 맡는다 — 실제로 눌리고 초점을 받는 것은 안쪽 .surface 다(중첩 단추 방지).
  const surface=b.querySelector('.surface'),surfaceLabel=b.querySelector('.caption span')?.textContent||mainOf(c)||'순간';
  surface.setAttribute('role','button');surface.setAttribute('tabindex','0');surface.setAttribute('aria-label',surfaceLabel);
@@ -433,13 +444,14 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
  let hoveredCard=null;
   const TWO_PI=Math.PI*2, ORBIT_MS=90000, ORBIT_STEPS=48, PHASE_STEP=.000018;
  const orbitAnims=cards.map(()=>null), floatAnims=cards.map(()=>null);
- const animRunning=()=>!paused&&!reduced&&!dialog.open&&!document.hidden;
+ let imagesReady=false,spritesReady=false;
+ const animRunning=()=>imagesReady&&spritesReady&&!paused&&!reduced&&!dialog.open&&!document.hidden;
  const floatDelay=cards.map((c,i)=>i*370);
  // 멈춤(동작 줄이기·보기 메뉴)·팝업·숨은 탭이면 애니메이션만 세운다. 멈출 때는 떠 있음 위상을 첫 자리(0·18px)로
  // 되돌려, 예전에 elapsed 가 0 에 얼어 있던 화면과 같은 자리를 보여 준다.
  // #1086 3차 완결: 진행률은 누적 dt가 아니라 전역 시작 시각 하나에서 계산한다.
  // 프레임이 느려도 위치는 실제 경과 시간을 따라가고, 멈춘 시간은 pausedTotal로 보정한다.
- let orbitRaf=0,orbitStart=performance.now(),pausedTotal=0,pausedAt=0,lastWriteAt=orbitStart;
+ let orbitRaf=0,orbitStart=performance.now(),pausedTotal=0,pausedAt=orbitStart,lastWriteAt=orbitStart;
  const orbitPause=()=>{if(!pausedAt)pausedAt=performance.now();};
  const orbitResume=()=>{if(pausedAt){pausedTotal+=performance.now()-pausedAt;pausedAt=0;}};
  const syncMotion=()=>{const rate=animRunning()?1:0;
@@ -459,14 +471,15 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
   const zs=safeZone?{l:safeZone.l-padX,t:safeZone.t-padY,r:safeZone.r+padX,b:safeZone.b+padY}:null;
   // 키프레임을 구울 때 placeCard 는 '지금 위상'의 판정 결과를 카드에 직접 쓴다(밝기·숨김). 굽는 동안의
   // 숨김은 화면 상태가 아니므로 되돌리고, 판정이 극단값으로 숨긴 표본은 직전 표본 자리를 그대로 쓴다.
-  let last=null,preferSide=null;
+  let last=null,preferSide=null,lastPaint=null;
   // #593: 표본 하나를 굽는다. 굽는 동안 placeCard 는 '지금 위상'의 판정 결과를 카드에 직접 쓰므로(밝기·숨김)
   // 숨김은 되돌리고, 판정이 극단값으로 숨긴 표본은 직전 표본 자리를 그대로 쓴다.
   const bake=(k)=>{const th=c.baseAngle+k/ORBIT_STEPS*TWO_PI+c.phaseOffset;let x=Math.cos(th)*cfg.rx,y=Math.sin(th)*cfg.ry+cfg.band,z=Math.sin(th+1.1+c.phaseOffset*4)*cfg.zAmp+cfg.zBase+c.zOffset;
    if(w<=650&&((!demo&&cards.length<=8)||(demo&&loggedIn===true)))return null; // 261117 대표 결정: 좁은 화면 소수 카드(≤8)는 궤도 카드를 숨긴다 — 표본 없음=noFit. 로그인 예시(mix-empty 포함)도 390에서 숨긴다(#780 후속)
    if(!demo&&cards.length<=8){const angle=i*TWO_PI/cards.length+k/ORBIT_STEPS*TWO_PI;x=Math.cos(angle)*Math.min(w*.34,420);y=Math.sin(angle)*Math.min(h*.3,250)+(i%2===0?80:-80);z=0;}
    const sc=Math.max(.18,Math.min(narrow?1.1:1.82,1050/(1050-z)));
-   const at=placeCard(elements[i],c,i,th,x,y,z,sc,w,h,fit,narrow,zs,warm,preferSide||last?.side)||last;
+   const next=placeCard(elements[i],c,i,th,x,y,z,sc,w,h,fit,narrow,zs,warm,preferSide||last?.side,true);
+   if(next)lastPaint=next;const at=next||last;
    if(!at)return null;last=at;at.k=k;at.th=th;return at;};
   const samples=[];
   const bakeSweep=()=>{last=null;const sides={t:0,b:0};samples.length=0;
@@ -514,7 +527,8 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
   if(out.length){out[0].offset=0;out[out.length-1].offset=1;}
   orbitKF[i]=out;
   // 261117 대표 결정: 표본이 하나도 없으면(noFit — 좁은 화면 소수 카드 궤도 숨김 포함) 굽는 동안의 숨김을 되돌리지 않는다.
-  const el0=elements[i];if(el0&&el0.classList.contains('off')&&i<cardCapFor(w)&&!noFit[i])el0.classList.remove('off');
+  const el0=elements[i];if(el0&&lastPaint&&el0.__z!==lastPaint.zv){el0.__z=lastPaint.zv;el0.style.zIndex=lastPaint.zv;}
+  if(el0&&el0.classList.contains('off')&&i<cardCapFor(w)&&!noFit[i])el0.classList.remove('off');
   return out;};
  // 좁은 화면 반지름 표가 다르므로 폭 대역이 바뀔 때만 궤도 애니메이션을 다시 건다(창 크기가 바뀔 때 몇 번).
  let orbitBand=null,orbitBox=null;
@@ -522,25 +536,114 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
  const noFit=[];
   // #1086 3차: lt-orbit CSS 애니메이션을 없애고 JS 한 곳에서 transform만 적는다.
   // 궤도 식·표본·보간은 orbitKeyframes가 만든 값을 그대로 쓰므로 모양·속도·시작 위치는 동일하다.
+  // #1086: 깊이와 채도가 달라질 때만 그림을 한 번 칠한 뒤, 움직이는 동안 완성된 그림을 쓴다.
+  const paintOrbitTexture=el=>{
+   if(!el||el.classList.contains('off')||!el.__depth)return;
+   const [fv,bv]=el.__depth,surface=el.querySelector('.surface'),img=surface?.querySelector('img');
+   const depthFilter='brightness('+fv+') blur('+bv+'px)';
+   if(el.__appliedDepth!==depthFilter){el.__appliedDepth=depthFilter;el.style.setProperty('--lt-orbit-depth',depthFilter);}
+   if(!img||!img.complete||!img.naturalWidth||!img.naturalHeight)return;
+   const key=[img.currentSrc,depthFilter,img.naturalWidth,img.naturalHeight,img.offsetWidth,img.offsetHeight].join('|');
+   if(el.__textureKey===key)return;orbitEvent("texture-start");
+   const canvas=surface.querySelector('.lt-orbit-texture')||document.createElement('canvas');
+   canvas.className='lt-orbit-texture';canvas.setAttribute('aria-hidden','true');
+   const w=img.naturalWidth,h=img.naturalHeight,cssScale=(el.classList.contains('fitContain')?Math.min:Math.max)(img.offsetWidth/w,img.offsetHeight/h)||1;
+   canvas.width=w;canvas.height=h;
+   try{
+    const ctx=canvas.getContext('2d');if(!ctx)return;
+    ctx.filter='saturate(.66) brightness(.86) brightness('+fv+') blur('+(Number(bv)/cssScale)+'px)';
+    ctx.drawImage(img,0,0,w,h);
+   }catch{surface.classList.remove('lt-textured');canvas.remove();return;}
+   if(!canvas.isConnected)surface.append(canvas);
+   surface.classList.add('lt-textured');el.__textureKey=key;orbitEvent("texture-end");
+  };
+  for(const el of elements){const img=el.querySelector('.surface img');if(img)img.addEventListener('load',()=>{paintOrbitTexture(el);if(spritesReady)void rebuildSprites(true);},{signal});}
   const orbitFrames=cards.map(()=>null);
+ const sprites=cards.map(()=>null),poses=cards.map(()=>null);
+ const floatOffset=(i,elapsed,out={x:0,y:0})=>{const duration=Math.round(1000*(11+(i%4)*1.7)),pos=((elapsed+floatDelay[i])%duration+duration)%duration/duration*4,k=Math.floor(pos),f=pos-k;let l=0,r=1;for(let n=0;n<9;n++){const t=(l+r)/2,u=1-t,x=3*u*u*t*.37+3*u*t*t*.63+t*t*t;if(x<f)l=t;else r=t;}const t=(l+r)/2,e=t*t*(3-2*t),a=k*Math.PI/2,b=(k+1)*Math.PI/2;out.x=11*(Math.sin(a)+(Math.sin(b)-Math.sin(a))*e);out.y=18*(Math.cos(a)+(Math.cos(b)-Math.cos(a))*e);return out;};let spriteOrder=[],spriteKey='',spriteEpoch=0,building=false,rebuildPending=false,hoverIndex=-1,focusIndex=-1,lastPoseAt=0;
+ const orderZ=new Int32Array(elements.length);
+ // 부모는 flat이고, 배치가 쓰는 카드 z-index와 가리킴·초점의 CSS 3000 우선순위가 전부다.
+ const syncPaintOrder=()=>{const busy=host.hasAttribute('data-lt-busy');for(const i of spriteOrder)orderZ[i]=!busy&&(i===hoverIndex||i===focusIndex)?3000:Number(elements[i].style.zIndex)||0;sortPaintOrder(spriteOrder,orderZ);};
+ const orbitEvent=name=>{if(globalThis.__LT_ORBIT_PROFILE__)performance.mark('orbit:event:'+name);};
+ const releaseSprites=()=>{for(const x of sprites)x?.image.close();};track(releaseSprites);
+ track(()=>renderer?.dispose());
+ glCanvas.addEventListener('webglcontextlost',e=>{e.preventDefault();renderer=null;activateCanvas(fallbackCanvas);if(layoutBox){fallbackCanvas.width=Math.ceil(layoutBox.w*(devicePixelRatio||1));fallbackCanvas.height=Math.ceil(layoutBox.h*(devicePixelRatio||1));}if(spritesReady)drawCanvas(performance.now());},{signal});
+ glCanvas.addEventListener('webglcontextrestored',async()=>{if(signal.aborted)return;try{
+  const next=createOrbitGL(glCanvas);if(!next)return;
+  const epoch=spriteEpoch,entries=sprites.map((sp,i)=>[i,sp]);
+  if(!await next.prepare(entries,signal,{...layoutBox,dpr:devicePixelRatio||1,theme:host.getAttribute("data-lt-theme")})||epoch!==spriteEpoch||signal.aborted){next.dispose();return;}
+  renderer=next;glCanvas.width=fallbackCanvas.width;glCanvas.height=fallbackCanvas.height;activateCanvas(glCanvas);if(spritesReady)drawCanvas(performance.now());
+ }catch{}},{signal});
+ const rebuildSprites=async(force=false)=>{
+  if(!imagesReady||!layoutBox||!canvasCtx||signal.aborted)return;if(building){rebuildPending=true;return;}
+  const {w,h}=layoutBox,dpr=devicePixelRatio||1,key=[w,h,dpr,host.getAttribute('data-lt-theme'),orbitBox].join('|');
+  if(!force&&spriteKey===key)return;building=true;orbitEvent("bitmap-start");const epoch=++spriteEpoch;
+  const active=elements.map((el,i)=>!el.classList.contains('off')&&orbitFrames[i]?.length?i:-1).filter(i=>i>=0);
+  if(!active.length){building=false;return;}
+  try{
+   const next=[];for(const i of active){if(spritesReady)await new Promise(resolve=>requestIdleCallback(resolve));if(signal.aborted)break;next.push([i,await paintCardBitmap(elements[i],dpr,false,floatOffset(i,0))]);}
+   if(signal.aborted||epoch!==spriteEpoch){for(const [,x] of next)x?.image.close();return;}
+   const currentRenderer=renderer;if(currentRenderer&&!await currentRenderer.prepare(next,signal,{w,h,dpr,theme:host.getAttribute("data-lt-theme")})&&renderer===currentRenderer){renderer.dispose();renderer=null;activateCanvas(fallbackCanvas);}
+   if(signal.aborted||epoch!==spriteEpoch){for(const [,x] of next)x?.image.close();return;}
+   orbitEvent("card-swap");releaseSprites();sprites.fill(null);for(const [i,x] of next)sprites[i]=x;
+   spriteOrder=active.filter(i=>sprites[i]);syncPaintOrder();
+   for(const board of [fallbackCanvas,glCanvas]){board.width=Math.ceil(w*dpr);board.height=Math.ceil(h*dpr);}spriteKey=key;
+   spritesReady=true;for(const a of floatAnims)a?.cancel();floatAnims.fill(null);world.classList.add('lt-canvas');activateCanvas(renderer?glCanvas:fallbackCanvas);
+   for(const el of elements){el.removeAttribute('aria-hidden');el.setAttribute('role','presentation');}
+   syncMotion();drawCanvas(performance.now());schedule();
+  }finally{orbitEvent("bitmap-end");building=false;if(rebuildPending&&!signal.aborted){rebuildPending=false;void rebuildSprites(true);}}
+ };
+ const spriteTheme=new MutationObserver(()=>{void rebuildSprites(true);});spriteTheme.observe(host,{attributes:true,attributeFilter:['data-lt-theme']});track(()=>spriteTheme.disconnect());
   const startOrbit=(i,w,h,warm)=>{const el=elements[i];if(!el)return;orbitAnims[i]?.cancel();orbitAnims[i]=null;
-   orbitFrames[i]=orbitKeyframes(i,w,h,warm);};
+   orbitFrames[i]=orbitKeyframes(i,w,h,warm).map(f=>({...f,values:(f.transform.match(NUM)||[]).map(Number),parts:f.transform.split(NUM)}));paintOrbitTexture(el);};
    // #1086: 숫자 토큰 앞이 ( / , / 공백 일 때만 보간한다 — translate3d의 '3'을 숫자로 읽어
    // 'translate3.00d'로 망가뜨리는 것을 막는다. perspective(1200px)는 첫 값으로 고정.
    const NUM=/(?<=[(, ])-?[\d.]+/g;
-   const lerpTransform=(a,b,t)=>{const na=(a.match(NUM)||[]).map(Number),nb=(b.match(NUM)||[]).map(Number);
-    let k=0;return a.replace(NUM,()=>{const v=na[k]+(nb[k]-na[k])*t;k+=1;return k===1?String(na[0]):v.toFixed(2);});};
+   const lerpTransform=(a,b,t)=>{let result=a.parts[0];for(let k=0;k<a.values.length;k++){const v=a.values[k]+(b.values[k]-a.values[k])*t;result+=(k===0?String(a.values[0]):v.toFixed(2))+a.parts[k+1];}return result;};
   const orbitTransform=(frames,t)=>{if(!frames||!frames.length)return null;
    if(t<=frames[0].offset)return frames[0].transform;
    for(let j=1;j<frames.length;j++){const b=frames[j];if(t<=b.offset){const a=frames[j-1],span=b.offset-a.offset||1;
-    return lerpTransform(a.transform,b.transform,(t-a.offset)/span);}}
+    return lerpTransform(a,b,(t-a.offset)/span);}}
    return frames[frames.length-1].transform;};
- const startFloat=(i)=>{const lift=elements[i]?.querySelector('.lt-lift');if(!lift)return;
+ const startFloat=(i)=>{if(spritesReady)return;const lift=elements[i]?.querySelector('.lt-lift');if(!lift)return;
   floatAnims[i]=lift.animate(floatKeyframes(),{duration:Math.round(1000*(11+(i%4)*1.7)),iterations:Infinity,id:'lt-float',delay:-floatDelay[i]});
   floatAnims[i].playbackRate=animRunning()?1:0;};
  // 애니메이션의 현재 시각을 phase 에 맞춘다(끌고 난 뒤 이어지는 자리가 튀지 않게).
   const syncOrbitTime=()=>{}; // #1086 3차: WAAPI 제거로 할 일 없음(끌기 복귀 시 자리는 JS 루프가 이어감).
-  const orbitWrite=(now)=>{lastWriteAt=now;for(let i=0;i<elements.length;i++){
+  const valuesAt=(frames,t,out)=>{if(t<=frames[0].offset)return frames[0].values;for(let j=1;j<frames.length;j++){const b=frames[j];if(t<=b.offset){const a=frames[j-1],f=(t-a.offset)/(b.offset-a.offset||1);for(let k=0;k<a.values.length;k++)out[k]=k===0?a.values[0]:Math.round((a.values[k]+(b.values[k]-a.values[k])*f)*100)/100;return out;}}return frames[frames.length-1].values;};
+ const fractionAt=(i,now)=>{const cfg=(layoutBox.w<=650?ringsNarrow:rings)[cards[i].ring];const elapsed=now-orbitStart-pausedTotal-(pausedAt?now-pausedAt:0);return ((elapsed/Math.round(ORBIT_MS/cfg.speed)+phase)%1+1)%1;};
+ const valuePool=elements.map(()=>new Float64Array(8)),floatPool=elements.map(()=>({x:0,y:0})),posePool=elements.map(()=>({a:0,b:0,c:0,d:0,x:0,y:0,box:{l:0,t:0,r:0,b:0}})),screenBox={l:0,t:0,r:0,b:0};
+ let zoneIdle=0,testSeek=null,testFloatActive=false,testFloatPaused=false;
+ const scheduleBottomZones=()=>{if(zoneIdle)return;zoneIdle=requestIdleCallback(()=>{zoneIdle=0;if(!signal.aborted)measureBottomZones();},{timeout:500});};
+ track(()=>{if(zoneIdle)cancelIdleCallback(zoneIdle);});
+ const drawCanvas=(now,seek=null)=>{if(!spritesReady||!layoutBox)return;lastPoseAt=now;seek=seek??testSeek;
+  const {w,h}=layoutBox,ratio=devicePixelRatio||1,elapsed=now-orbitStart-pausedTotal-(pausedAt?now-pausedAt:0);
+  if(renderer)renderer.begin();else{canvasCtx.setTransform(1,0,0,1,0,0);canvasCtx.clearRect(0,0,canvas.width,canvas.height);}
+  const zone=safeZone,ox=appBox?.left||0,oy=appBox?.top||0;
+  if(now-bottomZonesAt>500){scheduleBottomZones();bottomZonesAt=now;}
+  syncPaintOrder();
+  for(const i of spriteOrder){const el=elements[i],sprite=sprites[i],frames=orbitFrames[i];if(!sprite||!frames?.length||el.classList.contains('off'))continue;
+   const values=jsMode&&el.__dragTf?(el.__dragTf.match(NUM)||[]).map(Number):valuesAt(frames,seek??fractionAt(i,now),valuePool[i]);
+   const fp=floatOffset(i,testFloatPaused||(seek!==null&&!testFloatActive)||!animRunning()?0:elapsed,floatPool[i]);
+   const pose=cardPose(values,w,h,sprite.w,sprite.h,fp.x-sprite.offset.x,fp.y-sprite.offset.y,posePool[i]);
+   poses[i]=pose;const box=pose.box;
+   const gx=(Math.abs(pose.a)*sprite.guardW+Math.abs(pose.c)*sprite.guardH)/2,gy=(Math.abs(pose.b)*sprite.guardW+Math.abs(pose.d)*sprite.guardH)/2;
+   screenBox.l=pose.x-gx;screenBox.r=pose.x+gx;screenBox.t=pose.y-gy;screenBox.b=pose.y+gy;
+   const centerHit=zone&&zoneOverlapArea(zone,screenBox)>1;
+   screenBox.l+=ox;screenBox.t+=oy;screenBox.r+=ox;screenBox.b+=oy;
+   let bottomHit=false;if(demo||cards[i]?.example)for(const z of bottomZones)if(zoneOverlapArea(z,screenBox)>1){bottomHit=true;break;}
+   const under=bottomHit&&w<=650&&!centerHit,clash=!!(centerHit||(bottomHit&&w>650));pose.hidden=!!(under||clash);
+   if(el.classList.contains('clash')!==clash)el.classList.toggle('clash',clash);
+   if(el.classList.contains('lt-under-link')!==under)el.classList.toggle('lt-under-link',under);
+   const padX=(Math.abs(pose.a)+Math.abs(pose.c))*sprite.pad,padY=(Math.abs(pose.b)+Math.abs(pose.d))*sprite.pad;if(pose.hidden||box.r+padX<0||box.l-padX>w||box.b+padY<0||box.t-padY>h)continue;
+   if(renderer){renderer.draw(i,sprite,pose,w,h,i===focusIndex||i===hoverIndex);continue;}
+   const {a,b,c,d,x,y}=pose;canvasCtx.setTransform(a*ratio,b*ratio,c*ratio,d*ratio,x*ratio,y*ratio);
+   canvasCtx.drawImage(sprite.image,sprite.drawX,sprite.drawY,sprite.drawW,sprite.drawH);
+   if(i===focusIndex||i===hoverIndex){canvasCtx.strokeStyle='#ffe6a6';canvasCtx.lineWidth=2;canvasCtx.beginPath();canvasCtx.roundRect(-sprite.w/2,-sprite.h/2,sprite.w,sprite.h,12);canvasCtx.stroke();}
+  }
+ };
+ const syncDomPose=(i,t=null)=>{const el=elements[i],f=orbitFrames[i];if(!el||!f?.length)return;const tf=orbitTransform(f,t??testSeek??fractionAt(i,lastPoseAt||performance.now()));if(tf){el.style.transform=tf;el.__orbitTf=tf;}};
+ const orbitWrite=(now)=>{lastWriteAt=now;if(spritesReady){drawCanvas(now);return;}for(let i=0;i<elements.length;i++){
    const frames=orbitFrames[i],el=elements[i];if(!frames||!frames.length||!el||el.classList.contains('off'))continue;
    const cfg=(layoutBox&&layoutBox.w<=650?ringsNarrow:rings)[cards[i].ring];
    const elapsed=now-orbitStart-pausedTotal-(pausedAt?now-pausedAt:0);
@@ -549,24 +652,26 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
    if(tf&&el.__orbitTf!==tf){el.__orbitTf=tf;el.style.transform=tf;}
   }};
   // #1086: 궤도 경로 검사용 — 지정 진행률로 카드를 그린다(실제 루프와 같은 orbitWrite 경로).
-  globalThis.__LT_ORBIT_TEST__={lastWriteAt(){return lastWriteAt;},progress(now){const cfg=(layoutBox&&layoutBox.w<=650?ringsNarrow:rings)[cards[0].ring];const el=now-orbitStart-pausedTotal-(pausedAt?now-pausedAt:0);return ((el/Math.round(ORBIT_MS/cfg.speed))+phase)%1;},period(){const w=layoutBox&&layoutBox.w<=650?ringsNarrow:rings;return Math.round(ORBIT_MS/(w[cards[0].ring].speed));},hold(on){if(on){orbitPause();stopOrbitLoop();}else{orbitResume();startOrbitLoop();}},seek(t){for(let i=0;i<elements.length;i++){
+  globalThis.__LT_ORBIT_TEST__={lastWriteAt(){return lastWriteAt;},progress(now){const cfg=(layoutBox&&layoutBox.w<=650?ringsNarrow:rings)[cards[0].ring];const el=now-orbitStart-pausedTotal-(pausedAt?now-pausedAt:0);return ((el/Math.round(ORBIT_MS/cfg.speed))+phase)%1;},period(){const w=layoutBox&&layoutBox.w<=650?ringsNarrow:rings;return Math.round(ORBIT_MS/(w[cards[0].ring].speed));},hold(on){if(on){orbitPause();stopOrbitLoop();}else{testSeek=null;orbitResume();startOrbitLoop();}},seek(t){testSeek=t;for(let i=0;i<elements.length;i++){
    const frames=orbitFrames[i],el=elements[i];if(!frames||!frames.length||!el)continue;
    if(el.__seekSaved===undefined)el.__seekSaved=el.style.transform;
    const tf=orbitTransform(frames,t);if(tf){el.style.transform=tf;}}
-   return true;},restore(){for(const el of elements){if(el.__seekSaved!==undefined){el.style.transform=el.__seekSaved;el.__orbitTf=el.__seekSaved;delete el.__seekSaved;}}}};
+   if(spritesReady)drawCanvas(performance.now(),t);return true;},restore(){testSeek=null;for(const el of elements){if(el.__seekSaved!==undefined){el.style.transform=el.__seekSaved;el.__orbitTf=el.__seekSaved;delete el.__seekSaved;}}if(spritesReady)drawCanvas(performance.now());},freezeOrbit(t){testSeek=t;testFloatActive=true;},pauseFloat(){testFloatPaused=true;},syncDomPoses(){for(let i=0;i<elements.length;i++)syncDomPose(i);},canvasReady(){return spritesReady;},canvasSettled(){return spritesReady&&!building&&!rebuildPending&&!layoutPending&&!zoneIdle;},renderer(){return renderer?"webgl":"2d";},paintOrder(){return spriteOrder.slice();},blurStages(){return sprites.map((sp,i)=>sp?{i,css:sp.cssBlur,baked:sp.bakedBlur}:null);},poses(){return poses.map(p=>p?{...p,box:{...p.box}}:null);},rasterStats(){return sprites.map(sp=>sp?{alpha:sp.alpha,brightness:sp.brightness,blur:sp.cssBlur,bakedBlur:sp.bakedBlur,borderColor:sp.borderColor,borderWidth:sp.borderWidth,rimColor:sp.rimColor,rimWidth:sp.rimWidth,shadowRaster:sp.shadowRaster,baseAlpha:sp.baseAlpha,guardW:sp.guardW,guardH:sp.guardH,guardScale:sp.guardScale}:null);}};
   const orbitTick=(now)=>{if(!animRunning()){orbitRaf=0;return;}orbitWrite(now);orbitRaf=requestAnimationFrame(orbitTick);};
   const startOrbitLoop=()=>{if(!orbitRaf){orbitWrite(performance.now());orbitRaf=requestAnimationFrame(orbitTick);}};
   const stopOrbitLoop=()=>{if(orbitRaf)cancelAnimationFrame(orbitRaf);orbitRaf=0;};
  // 카메라(패럴랙스): 가까운 카드가 더 크게 움직인다. 층마다 값을 넘겨 애니메이션 사이에 끼어든다.
  // 깊이별 계수에 쓰는 sc 는 카드가 궤도 한 바퀴에서 갖는 배율의 평균(카드마다 고정) — 흔들림 폭 차이는 눈에 띄지 않는다.
  let avgScales=cards.map(()=>1);
- const camWrite=()=>{elements.forEach((el,i)=>{const move=el.querySelector('.lt-move');if(!move)return;const sc=avgScales[i];
+ const camWrite=()=>{if(spritesReady)return;elements.forEach((el,i)=>{const move=el.querySelector('.lt-move');if(!move)return;const sc=avgScales[i];
   const mx=(camera.x*(.45+sc*.3)).toFixed(2),my=(camera.y*(.38+sc*.24)).toFixed(2);
   if(move.__mx===mx&&move.__my===my)return;move.__mx=mx;move.__my=my;move.style.transform=`translate3d(${mx}px,${my}px,0)`;});};
 // 카드 한 장의 자리 계산 — 궤도 키프레임을 구울 때와 끄는 동안(JS 쓰기) 모두 이 함수를 쓴다.
  // 안전 구역 밀어내기(#429/#457/#491)는 카드 사각형을 회전·원근까지 투영해 가장 얇은 쪽으로 민다.
  // warm(2번째 배치부터) 전에는 재지 않은 값(카드 크기)이 없으므로 밀어내기를 하지 않는다 — 첫 그리기 보호(#400).
- function placeCard(el,c,i,th,x,y,z,sc,w,h,fit,narrow,zs,warm,prefer){
+ // 키프레임 준비 도중의 임시 z-index를 노출하지 않고 마지막 유효 표본을 한 번 반영한다.
+ function applyCardPaint(el,zv,depthFilter,fv,bv){if(el.__b!==depthFilter){el.__b=depthFilter;el.__depth=[fv,bv];el.style.setProperty("--lt-orbit-depth",depthFilter);el.__appliedDepth=depthFilter;}if(el.__z!==zv){el.__z=zv;el.style.zIndex=zv;}}
+ function placeCard(el,c,i,th,x,y,z,sc,w,h,fit,narrow,zs,warm,prefer,baking=false){
   let outSide=null;
   // #429 2/2: 폭별 상한을 넘는 카드는 숨긴다(가로 넘침·과밀 방지). 창이 넓어지면 다시 보인다.
   if(i>=cardCapFor(w)){el.classList.add('off');return;}
@@ -636,16 +741,16 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
   // filter 쓰기는 카드 전체 스타일 재계산을 부르므로 값이 같을 때 쓰면 안 된다.
   const fv=(Math.round((0.78+0.22*depth)*50)/50).toFixed(2),bv=(Math.round((1-depth)*2.2*50)/50).toFixed(2);
   const depthFilter=`brightness(${fv}) blur(${bv}px)`;
-  if(el.__b!==depthFilter){el.__b=depthFilter;el.style.filter=depthFilter;}
+
   // 사선 잘림 방지: .world를 flat으로 바꾸고 카드가 각자 perspective를 쓰므로, 겹침 순서도 깊이(z)가 아니라
   // 화면 배율로 매긴다 — scale 큰(가까운) 카드가 위. #586 계약은 그대로: z-index는 64 단계 밴드로 묶어
   // 궤도 굽기·끌기 자리 쓰기 때만 다시 쓴다(매 프레임이 아니다) — 밴드 안의 순서 오차는 배율(깊이) 차가 작아 눈에 띄지 않는다.
   const drawScale=sc*(!demo&&cards.length<=8?1:Math.max(.58,fit))*drawShrink;
-  const zv=Math.round(drawScale*1000/64)*64;if(el.__z!==zv){el.__z=zv;el.style.zIndex=zv;}
-  return {px,py,scale:drawScale,side:outSide,judge};
+  const zv=Math.round(drawScale*1000/64)*64;if(!baking)applyCardPaint(el,zv,depthFilter,fv,bv);
+  return {px,py,scale:drawScale,side:outSide,judge,zv,depthFilter,fv,bv};
  }
  // 배치(layout): 창 크기·안전 구역·좁은 화면 대역·예시 장수가 바뀔 때만 카드 자리를 다시 쓴다.
- function layout(){
+ function layout(){orbitEvent("layout");
   const w=app.clientWidth,h=app.clientHeight;
   if(safeZoneDirty){measureSafeZone();safeZoneDirty=false;}
   // #593: 카드 크기는 배치할 때마다 다시 잰다 — 첫 배치 때 크기 클래스(.lg/.sm)·글꼴이 아직 안 붙어
@@ -657,7 +762,7 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
   const cap=cardCapFor(w);
   // 궤도 애니메이션 — 폭 대역(좁은 화면 반지름 표)이나 안전 구역이 바뀌면 다시 굽고, 아니면 시각만 맞춘다.
   const band=w<=650?'narrow':'wide',boxKey=`${band}|${Math.round(w)}x${Math.round(h)}|${safeZone?`${Math.round(safeZone.l)},${Math.round(safeZone.t)},${Math.round(safeZone.r)},${Math.round(safeZone.b)}`:'-'}|${warmups}|${cards.map((c)=>c.sizeClass).join('')}`;
-  const needBake=orbitBox!==boxKey;
+  const needBake=orbitBox!==boxKey;let depthChanged=false;
   // #593: 지금 위상의 자리로 한 번 배치해 밝기·z-index(placeCard)를 쓰고, 떠 있음 애니메이션을 건다.
   // 유휴에는 이 배치를 다시 부르지 않는다 — 프레임마다 쓰던 style 쓰기가 사라진 자리다.
   const zs=safeZone?{l:safeZone.l-(w<=650?50:12),t:safeZone.t-(w<=650?50:12),r:safeZone.r+(w<=650?50:12),b:safeZone.b+(w<=650?50:12)}:null,fit=Math.min(1,w/780,h/850)*(w<=650?.5:1),narrow=w<=650;
@@ -673,16 +778,19 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
    if(!fewHide&&!demo&&cards.length<=8){const angle=i*Math.PI*2/cards.length+phase;x=Math.cos(angle)*Math.min(w*.34,420);y=Math.sin(angle)*Math.min(h*.3,250)+(i%2===0?80:-80);z=0;}
    const sc=Math.max(.18,Math.min(narrow?1.1:1.82,1050/(1050-z)));
    if(fewHide){elements[i].classList.add('off');noFit[i]=true;console.log('[few] hide',i,'of',cards.length);}
-   else{placeCard(elements[i],c,i,th,x,y,z,sc,w,h,fit,narrow,zs,warmups);
+   else{const el=elements[i],paint=placeCard(el,c,i,th,x,y,z,sc,w,h,fit,narrow,zs,warmups,undefined,!needBake);
+    // 같은 크기의 재배치에도 기존 DOM과 같은 쌓임 번호를 적용한다. 구운 그림은 다시 만들지 않는다.
+    if(!needBake&&paint){depthChanged=depthChanged||el.__b!==paint.depthFilter;applyCardPaint(el,paint.zv,paint.depthFilter,paint.fv,paint.bv);}
    if(noFit[i])elements[i].classList.add('off');else if(i<cap&&!floatAnims[i])startFloat(i);}});
    if(needBake){
     // #1026 E 2단계: 카드 48장의 궤도 애니메이션 굽기를 한 프레임에 다 하지 않고 여러 프레임에 나눈다.
     // 첫 자리·모양은 위 placeCard 가 이미 다 그렸으므로(화면 변화 0), WAAPI 붙임만 뒤로 미룬다.
     elements.forEach((el,i)=>{orbitKF[i]=null;});
     const total=Math.min(cap,elements.length),chunk=12;
-    for(let from=0;from<total;from+=chunk){const start=from;requestAnimationFrame(()=>{for(let i=start;i<Math.min(start+chunk,total);i++)startOrbit(i,w,h,warmups);if(animRunning())startOrbitLoop();orbitWrite(performance.now());});}
+    for(let from=0;from<total;from+=chunk){const start=from;requestAnimationFrame(()=>{for(let i=start;i<Math.min(start+chunk,total);i++)startOrbit(i,w,h,warmups);if(start+chunk>=total)void rebuildSprites();if(animRunning())startOrbitLoop();orbitWrite(performance.now());});}
     orbitBox=boxKey;
    }
+   if(spritesReady)syncPaintOrder();if(!needBake&&depthChanged&&(spritesReady||building))void rebuildSprites(true);
    orbitBand=band;
   camWrite();
   dragDraw();
@@ -707,11 +815,11 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
    const at=placeCard(el,c,i,th,x,y,z,sc,w,h,fit,narrow,zs,warmups);
    if(!at)return;
    // 애니메이션 transform 을 이기려면 !important — 유휴 때 굽은 키프레임과 같은 자리 식을 쓴다(카드가 각자 perspective를 쓴다).
-   el.style.setProperty('transform',`perspective(1200px) translate3d(${at.px.toFixed(2)}px,${at.py.toFixed(2)}px,0) scale(${at.scale.toFixed(4)}) rotateX(${(c.tiltX+Math.sin(th)*9).toFixed(2)}deg) rotateY(${(c.tiltY+Math.cos(th)*18).toFixed(2)}deg) rotateZ(${(c.tiltZ+Math.sin(th*.6)*7).toFixed(2)}deg)`,'important');});
+   const tf=`perspective(1200px) translate3d(${at.px.toFixed(2)}px,${at.py.toFixed(2)}px,0) scale(${at.scale.toFixed(4)}) rotateX(${(c.tiltX+Math.sin(th)*9).toFixed(2)}deg) rotateY(${(c.tiltY+Math.cos(th)*18).toFixed(2)}deg) rotateZ(${(c.tiltZ+Math.sin(th*.6)*7).toFixed(2)}deg)`;if(spritesReady)el.__dragTf=tf;else el.style.setProperty('transform',tf,'important');});
  }
- const dropJsWrite=()=>{elements.forEach(el=>{el.style.removeProperty('transform');});};
+ const dropJsWrite=()=>{elements.forEach(el=>{delete el.__dragTf;if(!spritesReady)el.style.removeProperty('transform');});};
  // 움직임이 멈춘 뒤: 손으로 쓴 자리를 걷고 애니메이션 시각을 phase 에 맞춘다(자리가 튀지 않게).
- const endJsMode=()=>{if(!jsMode)return;jsMode=false;dropJsWrite();syncOrbitTime();if(host.getAttribute('data-lt-busy'))setBusy(false);};
+ const endJsMode=()=>{if(!jsMode)return;jsMode=false;dropJsWrite();elements.forEach(paintOrbitTexture);syncOrbitTime();if(host.getAttribute('data-lt-busy'))setBusy(false);};
  const cameraSettling=()=>Math.abs(camera.x-cameraTarget.x)>.05||Math.abs(camera.y-cameraTarget.y)>.05;
  // #949: 판정은 그리기 전에 한다 — 카드를 놓는 그 rAF 안에서 다음 자리가 가운데 구역과 겹치는지 보고
  // 겹치면 그 프레임에서 숨긴다(clash=visibility:hidden, 사각형은 남아 구역 밖으로 나가면 다시 보인다).
@@ -723,27 +831,28 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
  // 예시 카드만 해당(내 카드는 그대로).
  // 0.5초마다 다시 재서 새 소식 카드가 늦게 뜨거나 링크 줄이 바뀌어도 따른다(매 프레임 재측정은 아니다 — #586 캐시).
  let bottomZones=[],bottomZonesAt=0;
- const measureBottomZones=()=>{bottomZones=[];
+ const measureBottomZones=()=>{orbitEvent("bottom-zone-start");bottomZones=[];
   try{
    const shell=parent.document,fr=frameElement?.getBoundingClientRect(),ox=fr?.left||0,oy=fr?.top||0;
    const add=el=>{if(!el)return;const cs=parent.getComputedStyle(el);if(cs.display==='none'||cs.visibility==='hidden')return;const r=el.getBoundingClientRect();if(r.width<1||r.height<1)return;
     bottomZones.push({l:r.left-ox-12,t:r.top-oy-12,r:r.right-ox+12,b:r.bottom-oy+12});};
    add(shell.querySelector('.home-links'));
-   add(shell.getElementById('updates-card'));
+   add(shell.getElementById('updates-card'));orbitEvent('bottom-zone-end');
   }catch{ /* 부모 문서를 읽을 수 없으면(다른 출처 등) 바닥 구역 없음 — 가운데 가드만 돈다 */ }
  };
- const guardClash=(now)=>{if(!safeZone||!appBox)return;
+ const guardClash=(now)=>{if(spritesReady||!safeZone||!appBox)return;
   if(now-bottomZonesAt>500){measureBottomZones();bottomZonesAt=now;}
   // 구역은 measureSafeZone 이 같은 함수(safeZoneOf)로 실측해 둔 값 — 매 프레임 다시 재지 않는다(#586 rect 캐시).
   const zone={l:safeZone.l+appBox.left,t:safeZone.t+appBox.top,r:safeZone.r+appBox.left,b:safeZone.b+appBox.top};
   // 진단(#949): 가드가 본 구역을 남긴다 — CI 실패 시 시험이 잰 구역과 비교한다.
   const key=`${Math.round(zone.l)},${Math.round(zone.t)},${Math.round(zone.r)},${Math.round(zone.b)}`;
   if(host.dataset.ltGuardZone!==key)host.dataset.ltGuardZone=key;
+  const changes=[],narrow=layoutBox?.w<=650;
   for(const [i,el] of elements.entries()){if(el.classList.contains('off'))continue;
-   const inner=el.querySelector('.surface img')||el.querySelector('.surface')||el;
+   const inner=el.__guardInner?.isConnected?el.__guardInner:(el.__guardInner=el.querySelector('.surface img')||el.querySelector('.surface')||el);
    const r=inner.getBoundingClientRect();
    // img 꾸밈 배율(transform:scale)은 카드 크기가 아니다 — 중심 기준으로 나눠 시험과 같은 사각형을 쓴다.
-   let k=1;const t=getComputedStyle(inner).transform;
+   let k=1;const img=inner.tagName==='IMG';const hovered=el.classList.contains('hovered')||el.matches(':hover,:focus-visible');const t=hovered?getComputedStyle(inner).transform:'none';if(img&&!hovered)k=el.classList.contains('fitContain') ? .94 : 1.02;
    if(t&&t!=='none'){const m=t.match(/^matrix\(([^)]+)\)/);if(m){const v=m[1].split(',').map(Number);k=Math.hypot(v[0],v[1])||1;}}
    const cx=r.left+r.width/2,cy=r.top+r.height/2,w=r.width/k,h=r.height/k;
    const box={l:cx-w/2,t:cy-h/2,r:cx+w/2,b:cy+h/2};
@@ -752,13 +861,15 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
    // #1077: 좁은 화면은 바닥 자리를 지나는 동안만 투명하게 — 궤도와 카드 수(9장 이상)는 그대로다.
    // 넓은 화면은 기존처럼 숨긴다(#1018).
    const bottomHit=w>=2&&h>=2&&exampleCard&&bottomZones.some(z=>zoneOverlapArea(z,box)>1);
-   if(bottomHit&&app.clientWidth<=650){
-    el.classList.toggle('clash',centerHit);
-    el.classList.toggle('lt-under-link',!centerHit);
-   }else{
-    el.classList.remove('lt-under-link');
-    el.classList.toggle('clash',centerHit||bottomHit);
-   }}};
+   const under=bottomHit&&narrow&&!centerHit;
+   const clash=centerHit||(bottomHit&&!narrow);
+   if(el.classList.contains('lt-under-link')!==under||el.classList.contains('clash')!==clash)changes.push({el,under,clash});
+  }
+  // #1086: 모든 카드의 사각형을 먼저 읽고, 실제로 달라진 표시만 한꺼번에 반영한다.
+  for(const {el,under,clash} of changes){
+   el.classList.toggle('lt-under-link',under);
+   el.classList.toggle('clash',clash);
+  }};
  let layoutPending=true;
  function frame(now){performance.mark('f'+warmups);raf=0;
   if(layoutPending||safeZoneDirty){layoutPending=false;layout();}
@@ -767,11 +878,19 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
   if(glide){phase+=glide*dt/16.7;glide*=Math.pow(.94,dt/16.7);if(Math.abs(glide)<.0004)glide=0;}
   dragDraw();
   if(!drag&&!glide)endJsMode();
-  guardClash(now);
-  if(!drag&&!glide&&!cameraSettling()&&!animRunning())return;
+  guardClash(now);if(spritesReady&&(drag||glide||!animRunning()))drawCanvas(now);
+  if(!drag&&!glide&&!cameraSettling()&&(!animRunning()||spritesReady))return;
   schedule();
  }
  function schedule(){if(!raf&&!document.hidden)raf=requestAnimationFrame(frame);}
+ const cardAt=(e)=>{const r=canvas.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top;for(let j=spriteOrder.length-1;j>=0;j--){const i=spriteOrder[j],p=poses[i],sp=sprites[i];if(p&&!p.hidden&&sp&&(renderer?hitProjective:hitPose)(p,sp.w,sp.h,x,y))return i;}return -1;};
+ for(const board of [fallbackCanvas,glCanvas]){board.addEventListener('pointermove',e=>{if(drag)return;hoverIndex=cardAt(e);canvas.style.cursor=hoverIndex>=0?'pointer':'';if(!animRunning())drawCanvas(performance.now());},{signal});
+ board.addEventListener('pointerleave',()=>{hoverIndex=-1;if(!animRunning())drawCanvas(performance.now());},{signal});
+ let pressed=-1;
+ board.addEventListener('pointerdown',e=>{pressed=cardAt(e);},{signal});
+ board.addEventListener('pointercancel',()=>{pressed=-1;},{signal});
+ board.addEventListener('click',()=>{const i=pressed;pressed=-1;if(moved>=9||i<0)return;syncDomPose(i);const surface=elements[i].querySelector('.surface');surface.focus({preventScroll:true});surface.click();},{signal});}
+ for(const [i,el] of elements.entries()){const surface=el.querySelector('.surface');surface.addEventListener('focus',()=>{focusIndex=i;syncDomPose(i);if(!animRunning())drawCanvas(performance.now());},{signal});surface.addEventListener('blur',()=>{focusIndex=-1;if(!animRunning())drawCanvas(performance.now());},{signal});surface.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();surface.click();}},{signal});}
  app.addEventListener('pointerdown',e=>{if(e.target.closest('.center,.topbar'))return;drag={x:e.clientX,id:e.pointerId,at:performance.now()};moved=0;spin=0;glide=0;},{signal});
  // 261118 대표 지적 4번(이슈 #884): 누르는 것만으로는 무대를 움직이지 않는다 — 카드가 잠깐 흔들렸다.
  // 실제로 누른 채 끌 때(6px 넘을 때)만 끌기 모드로 들어가 자리를 손으로 쓴다. 카드 클릭은 원래 동작 그대로.
@@ -821,7 +940,21 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
  // 낮은 주기 박동(초당 4회)만 남긴다 — 카드 style 은 쓰지 않으므로 스타일 재계산이 들지 않는다.
  layoutPending=true;schedule();
  // #1086: 동작 줄이기가 켜져도 정지 위치는 한 번 써서 카드가 보이게 한다. 설정 변경 시 루프를 켜고 끄고 위치를 다시 쓴다.
- if(animRunning())startOrbitLoop();else orbitWrite(performance.now());
+ orbitWrite(performance.now());
+ const prepareOrbitImages=async()=>{
+  const images=elements.flatMap(el=>[...el.querySelectorAll('.surface img')]);
+  await Promise.allSettled(images.map(async img=>{
+   // 숨은 접근성 카드의 지연 불러오기 속성은 그대로 두고 그림판용 원본만 미리 해독한다.
+   const source=new Image();source.referrerPolicy=img.referrerPolicy;
+   if(img.crossOrigin!==null)source.crossOrigin=img.crossOrigin;
+   const original=img.src;source.sizes=img.sizes;source.srcset=img.srcset;source.src=original;
+   await source.decode();if(img.src===original){img.__ltOrbitDecoded=source;img.__ltOrbitDecodedFrom=original;}
+  }));
+  if(signal.aborted)return;
+  elements.forEach(paintOrbitTexture);
+  imagesReady=true;void rebuildSprites();schedule();
+ };
+ void prepareOrbitImages();
  const onReduceChange=(e)=>{reduced=e.matches;syncMotion();orbitWrite(performance.now());};
  reduceQuery.addEventListener?.('change',onReduceChange);track(()=>reduceQuery.removeEventListener?.('change',onReduceChange));
  track(()=>cancelAnimationFrame(raf));track(()=>stopOrbitLoop());track(()=>orbitAnims.forEach(a=>a?.cancel()));track(()=>floatAnims.forEach(a=>a?.cancel()));track(()=>dialog.close());
