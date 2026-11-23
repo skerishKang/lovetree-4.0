@@ -190,20 +190,40 @@ test('#537 실제 화면: 1440·390에서 한 장으로 끝까지 넘기면 모�
     // 390: 휴대폰 모양은 그대로 — 좁은 책·60px 머리줄·돋보기 숨김, 순간 하나씩.
     const phone = await openBook(browser, base, 390, 844, 'single');
     const phoneGeom = await geom(phone.frame);
-    const phoneWalk = await walkAll(phone.frame);
     // 폰에서도 두 칸은 같은 크기로 표시하되, 한 장만 사용 가능하고 두 장은 비활성화한다.
     const phoneBtns = await phone.frame.evaluate(() => ({
-      single: document.getElementById('singleViewBtn')?.hidden === false,
-      double: document.getElementById('doubleViewBtn')?.hidden === false,
+      single: (() => { const b = document.getElementById('singleViewBtn'); return !!b && !b.hidden && b.getClientRects().length > 0 && getComputedStyle(b).visibility !== 'hidden'; })(),
+      double: (() => { const b = document.getElementById('doubleViewBtn'); return !!b && !b.hidden && b.getClientRects().length > 0 && getComputedStyle(b).visibility !== 'hidden'; })(),
       doubleDisabled: document.getElementById('doubleViewBtn')?.disabled === true,
       cellsEqual: (() => {
         const one = document.getElementById('singleViewBtn').getBoundingClientRect();
         const two = document.getElementById('doubleViewBtn').getBoundingClientRect();
         return one.width > 0 && one.width === two.width && one.height === two.height;
+      })(),
+      cells: (() => {
+        const one = document.getElementById('singleViewBtn').getBoundingClientRect();
+        const two = document.getElementById('doubleViewBtn').getBoundingClientRect();
+        return [one.width, one.height, two.width, two.height].map((n) => Math.round(n * 100) / 100);
+      })(),
+      placement: (() => {
+        const button = document.getElementById('singleViewBtn');
+        const box = (el) => { const r = el?.getBoundingClientRect(); return r ? [Math.round(r.left), Math.round(r.right), Math.round(r.top), Math.round(r.bottom)] : null; };
+        return {
+          inMore: !!button?.closest('.lt-toolbar-menu'),
+          menuHidden: document.querySelector('.lt-toolbar-menu')?.hidden ?? null,
+          titleBox: box(document.querySelector('.lt-toolbar-title')),
+          toolsBox: box(document.querySelector('.lt-toolbar-tools')),
+          toggleBox: box(button?.parentElement),
+          moreHidden: document.querySelector('.lt-toolbar-more')?.hidden ?? null
+        };
       })()
     }));
+    assert.equal(phoneBtns.single, true, `폰 폭: 1장 단추가 보인다(${JSON.stringify(phoneBtns)})`);
+    assert.equal(phoneBtns.double, true, `폰 폭: 2장 단추가 보인다(${JSON.stringify(phoneBtns)})`);
+    assert.equal(phoneBtns.doubleDisabled, true, '폰 폭: 2장은 비활성이다');
+    assert.equal(phoneBtns.cellsEqual, true, `폰 폭: 두 칸 크기가 같다(${JSON.stringify(phoneBtns)})`);
+    const phoneWalk = await walkAll(phone.frame);
     await phone.ctx.close();
-    assert.deepEqual(phoneBtns, { single: true, double: true, doubleDisabled: true, cellsEqual: true }, '폰 폭: 같은 두 칸 중 1장만 선택할 수 있다');
     assert.equal(phoneGeom.state.shape, 'phone', '폰 폭은 휴대폰 모양');
     assert.deepEqual(phoneGeom.pages, { left: false, right: false, mobile: true }, '휴대폰 한 장은 mobile-page');
     assert.equal(phoneGeom.topbar, 48, '휴대폰 공통 도구 줄 높이 48px');
@@ -302,9 +322,10 @@ test('#book-dup 실제 화면: 메모 장에서 제목·본문을 두 번 쓰지
     assert.equal(phoneMemo.keepsEmotion, true, '아래 제목 줄에 감정이 남아 있어야 한다');
 
     // 390 머리줄: 20자가 넘는 트리 이름도 '목차' 단추와 겹치지 않고 말줄임(…)으로 끊긴다.
+    const longName = '좋아하는 순간들이 이어지는 우리의 오래된 기록 저장소';
+    await phone.frame.evaluate((name) => { document.getElementById('bookTitleText').textContent = name; }, longName);
+    await phone.frame.waitForFunction((name) => document.querySelector('.lt-toolbar-title')?.textContent === name, longName, { timeout: 5000 });
     const head = await phone.frame.evaluate(() => {
-      const el = document.getElementById('bookTitleText');
-      el.textContent = '좋아하는 순간들이 이어지는 우리의 오래된 기록 저장소';
       const box = (q) => { const b = document.querySelector(q)?.getBoundingClientRect(); return b ? { l: b.left, r: b.right } : null; };
       const title = box('.lt-toolbar-left'), index = box('#archiveBtn');
       const span = document.querySelector('.lt-toolbar-title');

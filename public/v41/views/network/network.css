@@ -214,8 +214,10 @@ body[data-lt-view=concentric] .progress-rail{display:none}
    identity.css의 도구 줄 알약 규칙(어두운 알약)보다 구체적이어야 보인다. */
 html[data-v41-screen=network] .top-actions .view-switch .pill[aria-pressed=true],
 html[data-v41-screen=network] .lt-screen-toolbar .lt-toolbar-tools .view-switch .pill[aria-pressed=true],
+html[data-v41-screen=network] .lt-screen-toolbar .lt-toolbar-menu .view-switch .pill[aria-pressed=true],
 html[data-lt-theme=garden][data-v41-screen=network] .top-actions .view-switch .pill[aria-pressed=true],
-html[data-lt-theme=garden][data-v41-screen=network] .lt-screen-toolbar .lt-toolbar-tools .view-switch .pill[aria-pressed=true]{background:var(--lt-primary);border-color:var(--lt-primary);color:var(--lt-primary-ink);box-shadow:none}
+html[data-lt-theme=garden][data-v41-screen=network] .lt-screen-toolbar .lt-toolbar-tools .view-switch .pill[aria-pressed=true],
+html[data-lt-theme=garden][data-v41-screen=network] .lt-screen-toolbar .lt-toolbar-menu .view-switch .pill[aria-pressed=true]{background:var(--lt-primary);border-color:var(--lt-primary);color:var(--lt-primary-ink);box-shadow:none}
 /* 범례 행: 색 점 + "01 첫인상부터 7개" */
 .legend-row .swatch{flex:0 0 auto}
 
@@ -269,14 +271,17 @@ html[data-v41-screen=network][data-lt-board-theme=night] body .hero.dim{opacity:
 html[data-v41-screen=network][data-lt-board-theme=night] body :is(.pill,.mode-pill,.mini,.action,.close,.tree-title-btn,.branch-options button,.lt-moment-picker select,.lt-moment-picker button,.mobile-ribbon button,.chip,.detail-block){background:var(--lt-map-control);border-color:var(--lt-map-ui-border);color:var(--lt-map-ui-text);box-shadow:none}
 html[data-v41-screen=network][data-lt-board-theme=night] body .top-actions .pill{background:var(--lt-map-control);border-color:var(--lt-map-ui-border);color:var(--lt-map-ui-text)}
 html[data-v41-screen=network][data-lt-board-theme=night] body .top-actions .view-switch,
-html[data-v41-screen=network][data-lt-board-theme=night] body .lt-screen-toolbar .lt-toolbar-tools .view-switch{background:var(--lt-map-control);box-shadow:inset 0 0 0 1px var(--lt-map-ui-border)}
+html[data-v41-screen=network][data-lt-board-theme=night] body .lt-screen-toolbar .lt-toolbar-tools .view-switch,
+html[data-v41-screen=network][data-lt-board-theme=night] body .lt-screen-toolbar .lt-toolbar-menu .view-switch{background:var(--lt-map-control);box-shadow:inset 0 0 0 1px var(--lt-map-ui-border)}
 html[data-v41-screen=network][data-lt-board-theme=night] body .top-actions .view-switch .pill,
-html[data-v41-screen=network][data-lt-board-theme=night] body .lt-screen-toolbar .lt-toolbar-tools .view-switch .pill{background:transparent;border:none;box-shadow:none}
+html[data-v41-screen=network][data-lt-board-theme=night] body .lt-screen-toolbar .lt-toolbar-tools .view-switch .pill,
+html[data-v41-screen=network][data-lt-board-theme=night] body .lt-screen-toolbar .lt-toolbar-menu .view-switch .pill{background:transparent;border:none;box-shadow:none}
 html[data-v41-screen=network][data-lt-board-theme=night] body :is(.pill,.mini,.action,.close,.tree-title-btn,.branch-options button,.lt-moment-picker button):hover,
 html[data-v41-screen=network][data-lt-board-theme=night] body .top-actions .pill:hover,
 html[data-v41-screen=network][data-lt-board-theme=night] body .tree-menu .tree-item:hover{background:var(--lt-map-control-hover);color:var(--lt-map-ui-text)}
 html[data-v41-screen=network][data-lt-board-theme=night] body .top-actions .view-switch .pill[aria-pressed=true],
 html[data-v41-screen=network][data-lt-board-theme=night] body .lt-screen-toolbar .lt-toolbar-tools .view-switch .pill[aria-pressed=true],
+html[data-v41-screen=network][data-lt-board-theme=night] body .lt-screen-toolbar .lt-toolbar-menu .view-switch .pill[aria-pressed=true],
 html[data-v41-screen=network][data-lt-board-theme=night] body :is(.action.primary,.mobile-ribbon button.active,.mobile-ribbon button.origin,.lt-moment-picker .primary){background:var(--lt-map-ui-accent);border-color:var(--lt-map-ui-accent);color:var(--lt-map-ui-accent-ink)}
 html[data-v41-screen=network][data-lt-board-theme=night] body .tree-menu .tree-check{color:var(--lt-map-ui-accent)}
 html[data-v41-screen=network][data-lt-board-theme=night] body :is(button,select):focus-visible{outline:2px solid var(--lt-map-ui-accent);outline-offset:2px}

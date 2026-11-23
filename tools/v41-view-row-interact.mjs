@@ -6,7 +6,7 @@ import { serve } from '../tests/helpers/screen-audit.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TREE = {
-  id: 't1', title: '리센느', subject: '확인 대상',
+  id: 't1', title: '시험용', subject: '확인 대상',
   moments: [1, 2, 3, 4, 5].map((i) => ({
     id: 'm' + i, title: '시험 순간 ' + i, date: '2026-11-0' + i, emotion: '설렘',
     note: '화면 확인용 가짜 기록', url: i === 3 ? 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' : i <= 2 ? 'https://audit.invalid/photo' + i + '.jpg' : '',

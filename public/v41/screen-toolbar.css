@@ -21,7 +21,7 @@ header[hidden]{display:none}
 .lt-toolbar-left .shelf-back{flex:none;box-sizing:border-box;height:36px;min-height:36px;line-height:34px;padding:0 12px;border:1px solid var(--lt-line);border-radius:var(--lt-r-pill);background:var(--lt-glass-strong);color:var(--lt-pearl);font-family:var(--lt-ui);font-size:13px;white-space:nowrap;cursor:pointer}
 .lt-toolbar-left .shelf-back:hover,.lt-toolbar-left .shelf-back:focus-visible{border-color:var(--lt-gold-line);color:var(--lt-gold)}
 .lt-toolbar-meta{flex:none;font-size:12px;opacity:.72;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.lt-toolbar-title{flex:1 1 60px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;font-weight:600}
+.lt-toolbar-title{flex:1 1 60px;min-width:0;margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;font-weight:600}
 html[data-v41-screen=book] .lt-toolbar-title,html[data-v41-screen=board] .lt-toolbar-title,html[data-v41-screen=network] .lt-toolbar-title{font-size:16px;font-weight:700;letter-spacing:-.01em}
 .lt-toolbar-tools{flex:1 1 auto;display:flex;align-items:center;justify-content:flex-end;gap:7px;min-width:0;overflow:hidden}
 .lt-toolbar-tools button,.lt-toolbar-tools select,.lt-toolbar-menu button{
@@ -70,6 +70,7 @@ html[data-book-shape=phone][data-v41-screen=book] .stage{top:auto;min-height:cal
   html[data-v41-screen=board]{--lt-toolbar-pad:12px}
   html[data-v41-screen=network]{--lt-toolbar-pad:12px}
   html[data-v41-screen=shelf]{--lt-toolbar-pad:12px}
+  html[data-v41-screen=book] .lt-screen-toolbar .lt-toolbar-title{flex:0 1 64px;max-width:64px}
   .lt-toolbar-left{gap:6px}
   .lt-toolbar-meta{display:none}
   html[data-v41-screen=book] .lt-toolbar-title,html[data-v41-screen=board] .lt-toolbar-title,html[data-v41-screen=network] .lt-toolbar-title{font-size:15px}
@@ -118,6 +119,8 @@ html[data-v41-screen] .lt-screen-toolbar .lt-toolbar-tools .view-switch>button{
   height:36px;min-height:36px;line-height:1;
 }
 html[data-v41-screen] .lt-screen-toolbar .lt-toolbar-tools .view-switch{flex:0 0 auto;width:auto;flex-wrap:nowrap}
+html[data-v41-screen=network] .lt-screen-toolbar .view-switch{box-sizing:border-box;display:flex;flex:0 0 200px;width:200px;min-width:200px}
+html[data-v41-screen=network] .lt-screen-toolbar .view-switch .pill{flex:1 1 0;min-width:0;padding:0 5px;text-align:center}
 html[data-v41-screen=board] .lt-screen-toolbar .lt-toolbar-tools>button.headbtn{height:36px;min-height:36px}
 html[data-v41-screen=board] .lt-screen-toolbar .lt-toolbar-tools #fitBtn{height:36px;min-height:36px}
 html[data-v41-screen=board] .lt-screen-toolbar .lt-toolbar-tools .cinemaBtn{width:auto;padding:0 10px}

@@ -246,7 +246,8 @@ test('조작 버튼 히트박스는 44x44 이상이다(렌더링 ::after 터치 
   await frame.click('.card[data-id="s1"]');
   await frame.waitForFunction(() => document.querySelector('.card.selected')?.dataset.id === 's1', null, { timeout: 5000 });
   await page.waitForTimeout(500);
-  const TARGETS = ['#minusBtn', '#plusBtn', '#resetBtn', '#openMoment', '#detailYtLink', '#cinemaFromMoment', '#dHeartSave', '#toolCinema', '#toolFit', '#detailClose'];
+  // #1249: 이어 보기는 공통 도구 줄로 이동했다 — 같은 44×44 터치 기준으로 그 단추를 잰다.
+  const TARGETS = ['#minusBtn', '#plusBtn', '#resetBtn', '#openMoment', '#detailYtLink', '#cinemaFromMoment', '#dHeartSave', '#cinemaBtn', '#toolFit', '#detailClose'];
   const hits = await frame.evaluate((sels) => sels.map((sel) => {
     const el = document.querySelector(sel); if (!el) return { sel, missing: true };
     const r = el.getBoundingClientRect(); const af = getComputedStyle(el, '::after');

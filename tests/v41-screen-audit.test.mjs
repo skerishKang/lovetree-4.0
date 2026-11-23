@@ -604,9 +604,9 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
       const frame = [...document.querySelectorAll('iframe')].find((f) => { try { return /track56-network/.test(f.contentWindow.location.href); } catch { return false; } });
       if (!frame) return null;
       const doc = frame.contentDocument;
-      const bar = doc.querySelector('.topbar');
+      const bar = doc.querySelector('.lt-screen-toolbar');
       const switchBtns = [...doc.querySelectorAll('.view-switch .pill')];
-      const btns = [...doc.querySelectorAll('.top-actions button')].filter((b) => b.getBoundingClientRect().width > 0);
+      const btns = [...doc.querySelectorAll('.lt-screen-toolbar .lt-toolbar-tools button, .lt-screen-toolbar .lt-toolbar-menu button, .lt-screen-toolbar .lt-toolbar-more')].filter((b) => b.getBoundingClientRect().width > 0);
       const rects = btns.map((b) => b.getBoundingClientRect());
       const pairTexts = [];
       for (let i = 0; i < rects.length; i++) for (let j = i + 1; j < rects.length; j++) {

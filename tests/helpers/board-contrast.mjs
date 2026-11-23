@@ -127,7 +127,7 @@ export function measureBoardCardsInPage() {
     probe(sample, `first cardStyle-${s}`);
     probe(noteSample, `noteCard cardStyle-${s}`);
   }
-  const title = [...document.querySelectorAll('.boardTitle h1, .boardTitle p')].map((el) => {
+  const title = [...document.querySelectorAll('.lt-screen-toolbar .lt-toolbar-title, .lt-screen-toolbar .lt-toolbar-meta')].map((el) => {
     const fg = parseColors(getComputedStyle(el).color)[0];
     let worst = null;
     for (const bg of surface) { const f = over(fg, bg); const r = ratio(f, bg); if (!worst || r < worst.ratio) worst = { ratio: Math.round(r * 100) / 100, fg: hex(f), bg: hex(bg) }; }
