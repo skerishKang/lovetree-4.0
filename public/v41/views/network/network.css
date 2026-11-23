@@ -388,3 +388,13 @@ html[data-v41-screen=network][data-lt-board-theme=night] body .detailPlayer{back
 .connect-undo[hidden]{display:none}
 .connect-undo button{min-height:32px;padding:0 12px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-pill);background:transparent;color:var(--lt-gold);font:inherit;font-size:13px;white-space:nowrap}
 @media(max-width:640px){.connect-sheet{top:calc(var(--lt-map-toolbar-bottom,140px) + 4px)}}
+
+/* 미리보기 전용 체험: 실제 저장 경로를 부르지 않고 화면 모델만 바꾼다. */
+.demo-banner{
+  position:absolute;left:50%;top:calc(var(--lt-toolbar-top,78px) + var(--lt-toolbar-height,48px) + 2px);transform:translateX(-50%);z-index:73;
+  padding:5px 16px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-pill);
+  background:var(--lt-glass-strong);color:var(--lt-gold);font-family:var(--lt-ui);font-size:12px;white-space:nowrap;
+  backdrop-filter:blur(16px)
+}
+.demo-banner[hidden]{display:none}
+.lt-toolbar-tools .demo-toggle[aria-pressed=true]{border-color:var(--lt-gold-line);color:var(--lt-gold)}

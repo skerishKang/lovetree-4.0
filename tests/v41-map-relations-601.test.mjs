@@ -26,9 +26,14 @@ try {
   if (!existsSync(chromium.executablePath())) skip = 'Playwright Chromium이 없어 지도 관계 시험을 건너뜀';
 } catch { skip = 'playwright 패키지가 없어 지도 관계 시험을 건너뜀'; }
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.woff2': 'font/woff2' };
-async function serve() {
+async function serve(extraRoutes = {}) {
   const server = createServer(async (req, res) => {
     const clean = decodeURIComponent((req.url || '/').split('?')[0]);
+    if (extraRoutes[clean]) {
+      res.writeHead(200, {'content-type': 'text/html; charset=utf-8'});
+      res.end(extraRoutes[clean]);
+      return;
+    }
     for (const file of [path.join(ROOT, clean), path.join(ROOT, clean, 'index.html')]) {
       if (path.relative(ROOT, file).startsWith('..')) continue;
       try {
@@ -457,5 +462,133 @@ test('#1096 지도 잇기 — 끔 끌기 0회, 켬 옮기기·잇기·끊기 각
     assert.equal(await frame.evaluate(() => window.__doc1096), 'alive', '390 잇기 뒤에도 같은 문서(재적재 0)');
     assert.equal(navs.length, 0, `저장 흐름에서 화면 파일 항해는 0회여야 한다(실측 ${navs.length})`);
     await ctx.close();
+  } finally { await browser.close(); server.close(); }
+});
+
+// #1096 이어서: 미리보기(호스트가 *.lovetree-4-0.pages.dev)에서 로그아웃 예시 트리를 열 때만 체험을 쓴다.
+test('#1096 체험 — 미리보기 예시 지도에서만 켜지고, 저장 없이 화면 모델만 바뀌며 새로고침하면 되돌아온다', { skip: skip || !REQUIRE ? skip || 'LT_MAP_RELATIONS_REQUIRE=1 일 때 실행' : false, timeout: 240000 }, async () => {
+  if (skip) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip}`);
+  const CLOCK = '2026-11-01T00:00:00Z';
+  const ids = ['m1', 'm2', 'm3', 'm4', 'm5'];
+  const tree = {
+    id: 'demo-tree', title: '예시 지도', subject: '시험',
+    moments: ids.map((id, i) => ({id, title: `순간 ${id}`, date: `2026-11-0${i + 1}`, emotion: '설렘', note: '', url: '', parentId: i === 0 ? null : (id === 'm5' ? 'm1' : ids[i - 1]), relation: '', links: [], createdAt: CLOCK})),
+    edges: [
+      {kind: 'parent', from: 'm1', to: 'm2', reason: ''},
+      {kind: 'parent', from: 'm2', to: 'm3', reason: ''},
+      {kind: 'parent', from: 'm3', to: 'm4', reason: ''},
+      {kind: 'parent', from: 'm1', to: 'm5', reason: ''}
+    ]
+  };
+  const host = (source, writable, owned) => `<!doctype html><html lang="ko"><head><meta charset="utf-8"></head><body><script>window.LT41=${JSON.stringify({source, writable, owned, momentId: 'm1', prefs: {}, tree, trees: [tree]})};</script><iframe src="/v41/views/track56-network.html" style="position:fixed;inset:0;width:100vw;height:100vh;border:0"></iframe></body></html>`;
+  const server = await serve({
+    '/demo-host.html': host('example', false, false),
+    '/login-host.html': host('server', true, true)
+  });
+  const port = server.address().port;
+  const browser = await chromium.launch();
+  try {
+    const open = async (hostname, file) => {
+      const ctx = await browser.newContext({viewport: {width: 1440, height: 900}, reducedMotion: 'reduce', locale: 'ko-KR'});
+      await ctx.route('**/*', async route => {
+        const req = route.request(), u = new URL(req.url());
+        const simulated = u.hostname === 'lovetree.padiem.net' || u.hostname === 'lovetree-4-0.pages.dev' || u.hostname.endsWith('.lovetree-4-0.pages.dev');
+        if (!simulated) { await route.continue(); return; }
+        const local = new URL(req.url());
+        local.hostname = '127.0.0.1';
+        local.port = String(port);
+        const res = await fetch(local, {method: req.method(), headers: req.headers()});
+        await route.fulfill({status: res.status, contentType: res.headers.get('content-type') || 'text/plain', body: Buffer.from(await res.arrayBuffer())});
+      });
+      const page = await ctx.newPage();
+      await page.addInitScript(() => {
+        window.__saves = [];
+        addEventListener('message', e => { if (e.data?.type === 'lt41-map-relation-save') window.__saves.push(e.data); });
+      });
+      await page.goto(`http://${hostname}:${port}/${file}`, {waitUntil: 'load'});
+      const frame = page.frames().find(f => /track56-network/.test(f.url()));
+      assert.ok(frame, `${hostname}: 지도 프레임이 열린다`);
+      await frame.waitForFunction(() => window.__lt?.dots?.().length > 0, null, {timeout: 20000});
+      await page.waitForTimeout(500);
+      return {ctx, page, frame};
+    };
+    const preview = await open('preview.lovetree-4-0.pages.dev', 'demo-host.html');
+    try {
+      const initial = await preview.frame.evaluate(() => ({
+        demo: window.__lt.connect(),
+        demoButton: !document.getElementById('demoToggle').hidden,
+        connectButton: !document.getElementById('connectToggle').hidden
+      }));
+      assert.equal(initial.demo.available, true, '미리보기 + 로그아웃 예시 트리에서 체험이 가능하다');
+      assert.equal(initial.demoButton, true, '도구 줄에 잇기 체험 단추가 보인다');
+      assert.equal(initial.connectButton, false, '읽기 전용 예시에는 실제 잇기 단추가 없다');
+      const box = await (await preview.frame.frameElement()).boundingBox();
+      const point = async id => {
+        const d = await preview.frame.evaluate(x => window.__lt.dots().find(p => p.id === x), id);
+        assert.ok(d, `점 ${id}`);
+        return {x: box.x + d.x, y: box.y + d.y};
+      };
+      const readModel = () => preview.frame.evaluate(() => ({
+        parent: window.LTDEMO.moments.find(m => m.id === 'm4').parentId,
+        edges: window.LTDEMO.edges.map(e => `${e.kind}:${e.from}>${e.to}`)
+      }));
+      const before = await readModel();
+
+      await preview.frame.click('#demoToggle');
+      assert.equal(await preview.frame.evaluate(() => window.__lt.connect().banner), true, '화면 위쪽에 체험 띠가뜬다');
+
+      // 옮기기
+      let a = await point('m4'), b = await point('m5');
+      await preview.page.mouse.click(a.x, a.y);
+      await preview.page.mouse.click(b.x, b.y);
+      await preview.frame.waitForSelector('#connectSheet:not([hidden])', {timeout: 5000});
+      await preview.frame.click('#connectReparent');
+      await preview.page.waitForTimeout(400);
+      assert.equal((await readModel()).parent, 'm5', '체험에서 이전 순간이 화면 모델만 바뀐다');
+
+      // 잇기
+      a = await point('m2'); b = await point('m5');
+      await preview.page.mouse.click(a.x, a.y);
+      await preview.page.mouse.click(b.x, b.y);
+      await preview.frame.waitForSelector('#connectSheet:not([hidden])', {timeout: 5000});
+      await preview.frame.click('#connectLink');
+      await preview.page.waitForTimeout(400);
+      assert.ok((await readModel()).edges.includes('related:m2>m5'), '체험에서 관련 연결이 화면에만 생긴다');
+
+      // 끊기
+      const onEdge = await preview.frame.evaluate(() => window.__lt.edgePoint('m2', 'm5'));
+      assert.ok(onEdge, '방금 이은 선이 그려진다');
+      await preview.page.mouse.click(box.x + onEdge.x, box.y + onEdge.y);
+      await preview.frame.waitForSelector('#connectSheet:not([hidden])', {timeout: 5000});
+      assert.equal((await preview.frame.evaluate(() => window.__lt.sheet())).mode, 'related');
+      await preview.frame.click('#connectCut');
+      await preview.page.waitForTimeout(400);
+      assert.ok(!(await readModel()).edges.includes('related:m2>m5'), '체험에서 관련 연결이 화면에서만 끊긴다');
+
+      assert.deepEqual(await preview.page.evaluate(() => window.__saves), [], '체험은 저장 요청 0회');
+      assert.equal((await readModel()).edges.filter(x => x.startsWith('parent:')).length, before.edges.filter(x => x.startsWith('parent:')).length, '부모 선 개수는 그대로다');
+
+      await preview.page.reload({waitUntil: 'load'});
+      const fresh = preview.page.frames().find(f => /track56-network/.test(f.url()));
+      assert.ok(fresh, '새로고침 뒤 지도 프레임');
+      await fresh.waitForFunction(() => window.__lt?.dots?.().length > 0, null, {timeout: 20000});
+      await preview.page.waitForTimeout(400);
+      assert.equal(await fresh.evaluate(() => window.LTDEMO.moments.find(m => m.id === 'm4').parentId), 'm3', '새로고침하면 원래 연결로 돌아온다');
+      assert.equal(await fresh.evaluate(() => window.__lt.connect().mode), false, '새로고침하면 체험이 꺼진다');
+      assert.equal(await fresh.evaluate(() => document.getElementById('demoBanner').hidden), true, '새로고침하면 체험 띠가 사라진다');
+    } finally { await preview.ctx.close(); }
+
+    const prod = await open('lovetree.padiem.net', 'demo-host.html');
+    try {
+      assert.equal(await prod.frame.evaluate(() => window.__lt.connect().available), false, '운영 주소에서는 체험이 불가능하다');
+      assert.equal(await prod.frame.evaluate(() => document.getElementById('demoToggle').hidden), true, '운영 주소에는 체험 단추가 없다');
+    } finally { await prod.ctx.close(); }
+
+    const logged = await open('preview.lovetree-4-0.pages.dev', 'login-host.html');
+    try {
+      assert.equal(await logged.frame.evaluate(() => window.__lt.connect().available), false, '로그인·쓰기 가능한 트리에서는 체험이 불가능하다');
+      assert.equal(await logged.frame.evaluate(() => document.getElementById('demoToggle').hidden), true, '로그인 상태에는 체험 단추가 없다');
+      assert.equal(await logged.frame.evaluate(() => document.getElementById('connectToggle').hidden), false, '대신 실제 잇기 단추가 보인다');
+    } finally { await logged.ctx.close(); }
   } finally { await browser.close(); server.close(); }
 });

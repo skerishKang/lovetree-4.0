@@ -561,6 +561,8 @@
     hoverEdge: null,
     // #1096: 잇기 켜기 — 끄면 끌기는 화면 이동만, 켜면 점 끌기·두 번 누르기·선 누르기로 연결을 바꾼다.
     connectMode: false,
+    demoMode: false,
+    demoAvailable: false,
     connectFrom: null,
     connectDrag: null,
     connectBusy: false,
@@ -568,6 +570,26 @@
     connectUndo: null,
     connectUndoTimer: null
   };
+  /* #1096 이어서: 미리보기 호스트 + 로그아웃 예시 트리에서만 체험을 허용한다.
+     운영 주소( lovetree.padiem.net )나 로그인·쓰기 가능한 트리에서는 절대 켜지지 않는다. */
+  const parentHost = (() => {
+    try { return window.parent !== window ? window.parent.location.hostname : location.hostname; }
+    catch (error) { return location.hostname; }
+  })();
+  const parentContext = (() => {
+    try { return window.parent !== window ? window.parent.LT41 || null : null; }
+    catch (error) { return null; }
+  })();
+  state.demoAvailable = !!(
+    /^([a-z0-9-]+\.)?lovetree-4-0\.pages\.dev$/i.test(parentHost) &&
+    window.parent !== window &&
+    parentContext?.source === 'example' &&
+    !parentContext.writable &&
+    !parentContext.owned &&
+    LTDEMO.source === 'example' &&
+    !LTDEMO.writable
+  );
+
   let vw = 0,
     vh = 0,
     last = performance.now();
@@ -2447,7 +2469,7 @@
   function openConnectSheet(sourceId, targetId) {
     const sheet = $('connectSheet');
     if (!sheet) return;
-    if (!LTDEMO.writable || LTDEMO.readOnly) {
+    if ((!LTDEMO.writable || LTDEMO.readOnly) && !(state.demoMode && state.demoAvailable)) {
       toast('읽어 보는 화면에서는 연결을 바꿀 수 없어요.');
       return;
     }
@@ -2469,7 +2491,7 @@
   function openEdgeSheet(edge) {
     const sheet = $('connectSheet');
     if (!sheet || !edge?.a || !edge?.b) return;
-    if (!LTDEMO.writable || LTDEMO.readOnly) {
+    if ((!LTDEMO.writable || LTDEMO.readOnly) && !(state.demoMode && state.demoAvailable)) {
       toast('읽어 보는 화면에서는 연결을 바꿀 수 없어요.');
       return;
     }
@@ -2501,9 +2523,51 @@
     $('connectUndo').hidden = false;
     state.connectUndoTimer = setTimeout(() => hideUndo(), 8000);
   }
+  /* 미리보기 체험: 부모 트리·저장 경로를 건드리지 않고 화면이 든 모델만 고친다.
+     새로고침하면 셸이 넘긴 예시 트리를 다시 읽으므로 원래대로 돌아간다. */
+  function demoApply(action, sourceId, targetId, relation) {
+    if (!state.demoAvailable || !state.demoMode) return false;
+    const moments = LTDEMO.moments,
+      edges = LTDEMO.edges;
+    if (action === 'reparent') {
+      const m = moments.find(x => x.id === sourceId);
+      if (!m) return false;
+      m.parentId = targetId;
+      m.relation = relation || '';
+      const at = edges.findIndex(x => x.kind === 'parent' && x.to === sourceId);
+      const edge = {kind: 'parent', from: targetId, to: sourceId, reason: relation || ''};
+      if (at >= 0) edges.splice(at, 1, edge);
+      else edges.push(edge);
+    } else if (action === 'link') {
+      const paired = x => x.kind === 'related' &&
+        ((x.from === sourceId && x.to === targetId) || (x.from === targetId && x.to === sourceId));
+      if (!edges.some(paired)) edges.push({kind: 'related', from: sourceId, to: targetId});
+    } else if (action === 'unlink') {
+      const at = edges.findIndex(x => x.kind === 'related' &&
+        ((x.from === sourceId && x.to === targetId) || (x.from === targetId && x.to === sourceId)));
+      if (at < 0) return false;
+      edges.splice(at, 1);
+    } else return false;
+    rebuildFromModel();
+    return true;
+  }
   function requestRelation(action, sourceId, targetId, relation, undo) {
+    if (state.connectBusy) {
+      toast('방금 바꾼 것을 반영하고 있어요.');
+      return;
+    }
+    if (state.demoMode) {
+      if (!state.demoAvailable || !demoApply(action, sourceId, targetId, relation)) {
+        toast('체험에서 바꾸지 못했어요.');
+        return;
+      }
+      closeConnectSheet();
+      if (!undo) hideUndo();
+      if (undo) showUndo(undo);
+      return;
+    }
     const type = globalThis.LT41_MSG?.mapRelationSave;
-    if (state.connectBusy || !type || window.parent === window || !LTDEMO.writable) {
+    if (!type || window.parent === window || !LTDEMO.writable) {
       toast('여기서는 연결을 바꿀 수 없어요.');
       return;
     }
@@ -2571,6 +2635,23 @@
     );
   });
   if (LTDEMO.readOnly || !LTDEMO.writable) $('connectToggle').hidden = true;
+  $('demoToggle').hidden = !state.demoAvailable;
+  $('demoToggle')?.addEventListener('click', () => {
+    if (!state.demoAvailable) return;
+    state.demoMode = !state.demoMode;
+    state.connectMode = state.demoMode;
+    state.connectFrom = null;
+    $('demoToggle').setAttribute('aria-pressed', String(state.demoMode));
+    canvas.classList.toggle('is-connect', state.demoMode);
+    $('demoBanner').hidden = !state.demoMode;
+    hideUndo();
+    closeConnectSheet();
+    toast(
+      state.demoMode
+        ? '체험 중 — 저장되지 않아요. 점을 끌어 잇거나 옮겨 보세요.'
+        : '체험을 끝냈어요.'
+    );
+  });
   addEventListener('message', e => {
     if (e.origin !== location.origin || e.source !== window.parent) return;
     if (e.data?.type !== globalThis.LT41_MSG.mapRelationSaved) return;
@@ -2824,6 +2905,9 @@
   window.__lt = {
     connect: () => ({
       mode: state.connectMode,
+      demo: state.demoMode,
+      available: state.demoAvailable,
+      banner: !$('demoBanner').hidden,
       from: state.connectFrom,
       busy: state.connectBusy,
       undo: !!state.connectUndo
@@ -2999,14 +3083,7 @@
    lt41-moments-saved로 알린다 — 지도를 다시 띄우지 않고 점·선·묶음을 부모 LT41.tree에서 다시 읽어
    결정적 배치로 같은 자리에 다시 그린다. 고른 순간·보기·배율·열린 상세 판은 그대로 둔다(재적재 0).
    실제 기록(서버 트리) 기준 — 예시·공유는 읽기 전용이라 이 알림이 오지 않는다. */
-  addEventListener('message', e => {
-    if (
-      e.origin !== location.origin ||
-      e.source !== window.parent ||
-      e.data?.type !== globalThis.LT41_MSG.momentsSaved
-    )
-      return;
-    if (typeof LTDEMO.refresh !== 'function' || !LTDEMO.refresh()) return;
+  function rebuildFromModel() {
     const selId = state.selected?.id || null,
       detailOpen = $('detail').classList.contains('open');
     const view = state.view,
@@ -3149,5 +3226,15 @@
     setupMobileRibbon();
     paintViewButtons();
     scheduleDraw();
+  }
+  addEventListener('message', e => {
+    if (
+      e.origin !== location.origin ||
+      e.source !== window.parent ||
+      e.data?.type !== globalThis.LT41_MSG.momentsSaved
+    )
+      return;
+    if (typeof LTDEMO.refresh !== 'function' || !LTDEMO.refresh()) return;
+    rebuildFromModel();
   });
 })();
