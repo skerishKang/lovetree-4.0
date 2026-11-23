@@ -13,3 +13,10 @@ export function isPagesPreviewHost(hostname = globalThis.location?.hostname || '
   if (!host || isProductionHost(host)) return false;
   return host === PREVIEW_ROOT_HOST || host.endsWith(PREVIEW_HOST_SUFFIX);
 }
+
+// 미리보기 배포 자동 검사도 같은 호스트를 쓴다. 사람이 체험을 켤 때만 예시를 얹는다.
+// 운영 주소에서는 질의 값과 무관하게 절대 켜지지 않는다.
+export function hasPreviewExamples(hostname = globalThis.location?.hostname || '', search = globalThis.location?.search || '') {
+  if (!isPagesPreviewHost(hostname)) return false;
+  try { return new URLSearchParams(String(search ?? '')).get('lt791') === '1'; } catch { return false; }
+}

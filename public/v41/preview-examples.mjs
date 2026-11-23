@@ -1,6 +1,6 @@
 // #791: 미리보기 주소에서만 보이는 체험 예시. 운영 주소에서는 절대 추가하지 않는다.
 // 로그아웃 예시 트리(책·보드)와 첫 화면 예시 카드에 같은 순간 3개를 얹는다.
-import { isPagesPreviewHost } from './host-context.mjs';
+import { hasPreviewExamples } from './host-context.mjs';
 
 const NBA = 'https://www.tiktok.com/@nba/video/7646985299326749983';
 const ENHYPEN = 'https://www.tiktok.com/@enhypen/video/7680930477414583573';
@@ -61,8 +61,8 @@ export const PREVIEW_SAMPLES = PREVIEW_MOMENTS.map((moment, index) => ({
 }));
 
 /** 책·보드 예시 트리에만 미리보기 순간을 얹는다. 운영 주소에서는 원본을 그대로 돌려준다. */
-export function withPreviewExamples(tree, hostname = globalThis.location?.hostname || '') {
-  if (!tree || !isPagesPreviewHost(hostname)) return tree;
+export function withPreviewExamples(tree, hostname = globalThis.location?.hostname || '', search = globalThis.location?.search || '') {
+  if (!tree || !hasPreviewExamples(hostname, search)) return tree;
   // 앞에 넣어야 첫 화면·책·보드에서 바로 보인다(예시 카드는 뒤쪽을 잘라 내므로).
   const base = (tree.moments || []).map((moment, index) => index === 0 ? { ...moment, first: false, parentId: 'pv-ig-1' } : { ...moment });
   const moments = [...PREVIEW_MOMENTS.map((moment) => ({ ...moment })), ...base];
@@ -75,6 +75,6 @@ export function withPreviewExamples(tree, hostname = globalThis.location?.hostna
 }
 
 /** 첫 화면 예시 카드 배열 — 미리보기에서만 3개를 더한다. */
-export function previewSamples(hostname = globalThis.location?.hostname || '') {
-  return isPagesPreviewHost(hostname) ? PREVIEW_SAMPLES.map((sample) => ({ ...sample })) : [];
+export function previewSamples(hostname = globalThis.location?.hostname || '', search = globalThis.location?.search || '') {
+  return hasPreviewExamples(hostname, search) ? PREVIEW_SAMPLES.map((sample) => ({ ...sample })) : [];
 }

@@ -20,7 +20,10 @@ import {createView} from './lifecycle.js';
 import {safeZoneOf, zoneOverlapArea} from '../../public/v41/orbit-safe-zone.mjs';
 
 // #791: 미리보기에서만 틱톡·릴스 예시를 얹는다(운영 주소에서는 원본 40개).
-const exampleSamples = [...previewSamples(globalThis.location?.hostname), ...samples];
+// 첫 화면은 셸의 질의 값을 아이프레임에서도 읽는다(아이프레임 주소에는 플래그가 없다).
+const parentSearch = globalThis.parent?.location?.search || '';
+const previewSearch = String(parentSearch).includes('lt791=1') ? parentSearch : (globalThis.location?.search || '');
+const exampleSamples = [...previewSamples(globalThis.location?.hostname || globalThis.parent?.location?.hostname, previewSearch), ...samples];
 export const ORBIT_EXAMPLE = {
   id: 'orbit-example', title: '다시, 그 순간으로', subject: '감상 예시', updatedAt: '2026-01-01',
   moments: exampleSamples.map((c,i) => ({id:c.id, title:c.title, note:c.memo || c.whyNext, emotion:c.emotion, date:c.date.replaceAll('.','-'), parentId:i?exampleSamples[i-1].id:null, relation:i?exampleSamples[i-1].whyNext:'', image:c.image, poster:c.type==='video', url:c.url||'', externalUrl:c.externalUrl||'', youtubeThumb:c.youtubeThumb===true, mediaMetadata:c.mediaMetadata||null, nextIds:[c.next,c.branch].filter(Boolean), createdAt:`2026-01-01T00:00:${String(i).padStart(2,'0')}Z`}))
