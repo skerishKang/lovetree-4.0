@@ -41,6 +41,7 @@ import { fromBearer, fromCookie } from './session-credential.js';
 import { unconfiguredAuth } from './auth.js';
 import { createMemoryLoginStateStore, createPostgresLoginStateStore } from './login-state-store.js';
 import { createHandoffMintClient } from './handoff-mint-client.js';
+import { countAuthorityReads, countMint, countWriteCall } from './legacy-call-log.js';
 import { ApiError } from './errors.js';
 import { createAccountRepo } from './db/account-postgres.js';
 import { createAccountDeleteRpcRepo } from './db/account-delete-rpc-postgres.js';
@@ -113,7 +114,7 @@ async function buildAuthenticate() {
   }
   return createPadiemAuthorityAuth({
     credential,
-    authority: createAuthorityRelayClient({ url: LOVETREE_AUTHORITY_RELAY_URL, callerSecret: LOVETREE_CALLER_SECRET, timeoutMs: Number(LOVETREE_AUTHORITY_TIMEOUT_MS || 0) || undefined }),
+    authority: countAuthorityReads(createAuthorityRelayClient({ url: LOVETREE_AUTHORITY_RELAY_URL, callerSecret: LOVETREE_CALLER_SECRET, timeoutMs: Number(LOVETREE_AUTHORITY_TIMEOUT_MS || 0) || undefined })),
     productId: LOVETREE_PRODUCT_ID
   });
 }
@@ -133,14 +134,14 @@ async function buildLogin(pool) {
 
   const writeModule = await loadModule(LOVETREE_AUTHORITY_WRITE_TRANSPORT, 'LOVETREE_AUTHORITY_WRITE_TRANSPORT');
   const providerModule = await loadModule(LOVETREE_LOGIN_PROVIDER_MODULE, 'LOVETREE_LOGIN_PROVIDER_MODULE');
-  const call = writeModule.createAuthorityWriteCall?.(process.env);
+  const call = countWriteCall(writeModule.createAuthorityWriteCall?.(process.env));
   const provider = providerModule.createLoginProvider?.({ env: process.env, productId: LOVETREE_PRODUCT_ID });
   if (typeof call !== 'function') throw new Error('write transport가 createAuthorityWriteCall(env) → call(method, payload)를 내보내야 합니다.');
   if (!provider || typeof provider.authorizationUrl !== 'function' || typeof provider.exchangeCode !== 'function') {
     throw new Error('login provider가 authorizationUrl·exchangeCode를 내보내야 합니다.');
   }
   const mint = LOVETREE_MINT_URL
-    ? createHandoffMintClient({ url: LOVETREE_MINT_URL, callerSecret: LOVETREE_CALLER_SECRET, productId: LOVETREE_PRODUCT_ID, timeoutMs: Number(LOVETREE_AUTHORITY_TIMEOUT_MS || 0) || undefined })
+    ? countMint(createHandoffMintClient({ url: LOVETREE_MINT_URL, callerSecret: LOVETREE_CALLER_SECRET, productId: LOVETREE_PRODUCT_ID, timeoutMs: Number(LOVETREE_AUTHORITY_TIMEOUT_MS || 0) || undefined }))
     : undefined;
   return createLoginService({
     productId: LOVETREE_PRODUCT_ID,
