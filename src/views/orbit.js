@@ -679,13 +679,14 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
    const absolute={l:x+ox,t:y+oy,r:x+tw+ox,b:y+th+oy};
    return !bottomZones.some(z=>zoneOverlapArea(z,absolute)>0);
   };
-  const frontOrder=spriteOrder.slice().reverse();
-  // Follow the same card while it remains in the front third of the WebGL paint order.
-  // Once it rotates behind the front cards, choose another visible front-facing card.
-  const staysFront=tipTarget>=0&&frontOrder.indexOf(tipTarget)>=0&&frontOrder.indexOf(tipTarget)<Math.max(1,Math.ceil(frontOrder.length/3));
-  const candidates=staysFront?[tipTarget,...frontOrder.filter(i=>i!==tipTarget)]:frontOrder;
+  // Reuse the WebGL paint order without allocating/reversing/filtering arrays.
+  // Keep a current card only while it stays in the front third; hand off once behind.
+  const frontCut=spriteOrder.length-Math.max(1,Math.ceil(spriteOrder.length/3));
+  const keepTarget=tipTarget>=0&&spriteOrder.indexOf(tipTarget)>=frontCut;
   let selected=null;
-  for(const i of candidates){
+  for(let order=-1;order<spriteOrder.length;order++){
+   const i=order<0?(keepTarget?tipTarget:-1):spriteOrder[spriteOrder.length-1-order];
+   if(i<0||(order>=0&&keepTarget&&i===tipTarget))continue;
    const p=poses[i],sp=sprites[i];
    if(!p||!sp||p.hidden||!elements[i]||elements[i].classList.contains('off'))continue;
    const b=p.box;
