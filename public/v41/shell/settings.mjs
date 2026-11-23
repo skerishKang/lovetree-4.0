@@ -1,4 +1,5 @@
 import { MSG } from '../frame-messages.mjs';
+import { loginUrlWithTheme } from '../header-state.mjs';
 // 설정·계정 창 — shell.mjs에서 코드 위치만 옮긴 모듈(#886). 동작·기준은 그대로다.
 // 상태는 deps의 getter로 받는다(모듈이 shell을 다시 import하지 않는다).
 // #1072 A-16: 의견 보내기의 '함께 보낼 정보'에 실릴 최근 오류 기록은 report.mjs 한 곳에서 가져온다.
@@ -161,7 +162,14 @@ document.addEventListener('click',e=>{
  if(!e.target.closest('.account-slot'))closeAccountMenu();
 });
 // #368: 빈 화면의 "내 기록 불러오기" — 로그아웃이면 로그인으로, 읽기 전용이면 설정 "내 데이터"로, 평소엔 순간 추가(새 트리)로.
-$('empty-records').onclick=()=>{if(!deps.member?.snapshot().owned){openLoginStart('first');return;}deps.member.snapshot().writable?openEditor():openAccountData();};
+$('empty-records').onclick=()=>{if(!deps.member?.snapshot().owned){
+  if($('empty').dataset.emptyGuest==='1'){
+   // 2026-11-23: 서재·책·보드·지도에서 로그인해도 같은 화면으로 돌아온다.
+   const next='/v41/'+(location.hash||'#home');
+   location.assign(loginUrlWithTheme(`/auth/login?next=${encodeURIComponent(next)}`,readTheme(localStorage)));
+  }else openLoginStart('first');
+  return;
+ }deps.member.snapshot().writable?openEditor():openAccountData();};
 $('empty-sample').onclick=sample;
 $('sample').onclick=sample;$('clear').onclick=()=>{if(!leaveMember())return;++deps.loadGeneration;clear();$('save-feedback').hidden=true;$('file').value='';if($('account-settings').open)$('account-settings').close();};
 $('server').onclick=()=>{void startMember().catch(error=>openFallbackShell(error));};

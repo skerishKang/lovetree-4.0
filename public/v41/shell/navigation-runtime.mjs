@@ -193,6 +193,7 @@ export function createNavigationRuntime(ctx){
       setCurrent:file=>{ctx.current=file;},
       getSource:()=>ctx.source,
       hasTree:()=>!!window.LT41,
+      isGuest:()=>!ctx.member?.snapshot().owned && ctx.source!=='share',
       takeNetworkOpen:ctx.takeNetworkOpen,
       takeBoardOpen:ctx.takeBoardOpen,
       // #1026 E: 로그아웃 예시를 동적으로 받는 동안에는 사용자가 연 창을 닫지 않는다.

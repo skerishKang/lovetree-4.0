@@ -11,6 +11,7 @@ export function createScreens(deps) {
     setCurrent,
     getSource,
     hasTree,
+    isGuest = () => false,
     flowNavigation,
     paintEmptyForScreen,
     paintEmptyCopy,
@@ -174,8 +175,9 @@ export function createScreens(deps) {
     setCurrent(file);
     flowNavigation();
     applyTheme();
-    if (!hasTree() && file !== 'src064-orbit.html') {
-      // 2026-11-17 대표 결정: 트리 0개여도 서재·책·보드·지도탭은 그대로 열린다 — 첫 화면으로 되돌리지 않는다.
+    if ((!hasTree() || isGuest()) && file !== 'src064-orbit.html') {
+      // 2026-11-23 대표 결정: 로그아웃 예시가 있어도 개인 화면은 빈 상태로 연다.
+      // 트리 0개 계정도 기존처럼 해당 화면의 빈 상태를 보여 주며 첫 화면으로 돌리지 않는다.
       document.body.classList.remove('home-screen');
       hideFrames();
       document.querySelectorAll('[data-view]').forEach(b => b.setAttribute('aria-current', String(b.dataset.view === file || (file === 'track60-graph.html' && b.dataset.view === 'track56-network.html'))));

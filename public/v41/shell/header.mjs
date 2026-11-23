@@ -27,8 +27,8 @@ function flowNavigation(){
   const owned=!!getMember()?.snapshot().owned;
   const reading=!!window.LT41&&['track59-sketchbook.html','track58-pinboard.html','track56-network.html'].includes(getCurrent());
   const publicReading=getSource()==='share';
-  // 트리 보기 탭은 로그인한 내 트리에서만 연다. 로그아웃이면 예시가 열려 있어도 숨긴다.
-  // #213 3번: 상태(out·in-empty·in-trees·share)마다 보이는 것만 남기고 나머지는 숨긴다(비활성 표시 없음).
+  // 대표 결정(2026-11-23): 서재·책·보드·지도 화면 탭은 로그인 여부·트리 개수와 무관하게 보인다.
+  // #213의 권한별 숨김은 트리 선택·쓰기·공유에만 적용하고 공유 읽기 탐색은 예외로 둔다.
   const parts=headerPartsFor({owned,treeCount:getModel()?.trees?.length||0,publicReading});
   const showTreeViews=treeViewsVisible({owned,phase:getMember()?.snapshot().phase,publicReading});
   $('tree-views').hidden=!showTreeViews;for(const b of $('tree-views').querySelectorAll('button')){b.disabled=false;b.title='';}

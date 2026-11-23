@@ -74,8 +74,9 @@ export function treeViewsVisible({ owned = false, phase = '', publicReading = fa
   return !publicReading;
 }
 
-// 상태별 헤더 노출(대표 결정 2026-11-08, #213 3번).
-// "비활성으로 보이기" 대신 "아예 숨기기"로 정리한다: 로그아웃이면 트리 탭·트리 선택·순간 추가·공유가 없다.
+// #213(2026-11-08)의 권한별 메뉴 숨김은 트리 선택·순간 추가·공유에 적용한다.
+// 대표 결정(2026-11-23): 서재·책·보드·지도 탭은 로그인·로그아웃·트리 0개 모두 표시한다.
+// 공유 읽기는 개인 화면 탐색이 아니므로 별도 예외다.
 export function headerState({ owned = false, treeCount = 0, publicReading = false } = {}) {
   if (publicReading) return 'share';
   if (!owned) return 'out';
@@ -83,7 +84,7 @@ export function headerState({ owned = false, treeCount = 0, publicReading = fals
 }
 
 const HEADER_PARTS = Object.freeze({
-  out: { account: 'login', browse: true, treePicker: false, treeViews: false, write: false, share: false },
+  out: { account: 'login', browse: true, treePicker: false, treeViews: true, write: false, share: false },
   'in-empty': { account: 'avatar', browse: true, treePicker: true, treeViews: true, write: true, share: false },
   'in-trees': { account: 'avatar', browse: true, treePicker: true, treeViews: true, write: true, share: true },
   share: { account: 'avatar', browse: true, treePicker: false, treeViews: false, write: false, share: false }

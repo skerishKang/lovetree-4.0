@@ -913,7 +913,11 @@ async function checkVisualTokens(page, target, opts, stamp) {
         // 셸이 적어 둔 상태(#222). 기대값은 이 값으로 제품 함수에서 계산한다.
         member: document.body.dataset.member || '',
         treeCount: Number(document.body.dataset.treeCount || (window.LT41?.trees?.length ?? 0)) || 0,
-        viewHidden: !fr || fr.hidden || getComputedStyle(fr).display === 'none'
+        viewHidden: !fr || fr.hidden || getComputedStyle(fr).display === 'none',
+        emptyVisible: vis(document.getElementById('empty')),
+        emptyTitle: (document.querySelector('#empty h1')?.textContent || '').trim(),
+        emptyAction: (document.getElementById('empty-records')?.textContent || '').trim(),
+        emptyGuest: document.getElementById('empty')?.dataset.emptyGuest === '1'
       };
     });
     let inner = null;
@@ -926,13 +930,28 @@ async function checkVisualTokens(page, target, opts, stamp) {
       })).catch(() => null);
     }
     seen.push({ id: s.id, top, inner });
-    if (s.id !== 'home' && top.viewHidden && top.avatarVisible) {
-      record(`visual-${s.id}`, 'visual', 'skip', `${s.id}: 로그인·트리 없음이라 안쪽 화면이 열리지 않음(로그아웃 실행에서 검사)`, { top });
-      continue;
+    if (s.id !== 'home' && top.viewHidden && top.emptyVisible) {
+      // 2026-11-23: 로그아웃이면 화면별 빈 상태 + 로그인 버튼을 정상 화면으로 검사한다.
+      if (top.member === 'out' || top.loginVisible) {
+        const name = {shelf:'서재',book:'책',board:'보드',network:'지도'}[s.id] || '기록';
+        const expected = `로그인하면 내 ${name}${name==='책'?'이':'가'} 보여요`;
+        const problems = [];
+        if (top.home) problems.push('빈 상태인데 첫 화면으로 돌아감');
+        if (top.treeViewsHidden) problems.push('로그아웃 화면 탐색 탭이 숨음');
+        if (!top.treePickerHidden || !top.writeMenuHidden) problems.push('로그아웃 권한 메뉴 노출');
+        if (!top.emptyGuest || top.emptyTitle !== expected) problems.push(`빈 상태 제목 ${top.emptyTitle} (기대 ${expected})`);
+        if (top.emptyAction !== '로그인') problems.push(`빈 상태 단추 ${top.emptyAction} (기대 로그인)`);
+        record(`visual-${s.id}`, 'visual', problems.length ? 'fail' : 'pass', problems.join('; ') || `로그아웃 ${s.id} 빈 상태·로그인`, {top});
+        continue;
+      }
+      if (top.avatarVisible) {
+        record(`visual-${s.id}`, 'visual', 'skip', `${s.id}: 로그인·트리 없음이라 안쪽 화면이 열리지 않음(별도 화면 검사)`, {top});
+        continue;
+      }
     }
     const problems = [];
-    // #213 3번: 로그아웃(out)은 트리 선택·트리 보기가 없고, 로그인해도 트리가 없으면(in-empty) 같은 모양이다.
-    // 트리가 있을 때(in-trees)만 트리 선택 + 책·보드·지도가 붙는다. 기대값은 header-state.mjs 가 계산한다.
+    // 2026-11-23: 계정과 무관하게 서재·책·보드·지도 탭을 유지한다(공유 읽기 제외).
+    // 트리 선택·순간 추가·공유만 권한에 따라 숨긴다. 기대값은 header-state.mjs가 계산한다.
     const owned = top.member ? top.member === 'in' : !top.loginVisible;
     const headerExpected = headerExpectation({ owned, treeCount: top.treeCount });
     const expectedTabs = headerExpected.tabs;
