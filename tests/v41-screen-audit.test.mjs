@@ -1716,7 +1716,11 @@ test('#657 화면 공통 검사기: 주요 화면 18 상태 × 390·1440 × 밤�
     await take(page7, '그래프 보기');
 
     // #777 2단계: 트리 보기 — 예시 트리로 로그인 없이 같은 검사 기준을 돌린다.
-    const treePage = await context.newPage();
+    const ctxTree = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
+    await ctxTree.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); } catch {} }, theme);
+    await ctxTree.route('**://i.ytimg.com/**', THUMB);
+    await ctxTree.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
+    const treePage = await ctxTree.newPage();
     await treePage.goto(`${base}/v41/#tree`, { waitUntil: 'domcontentloaded' });
     const treeFrame = await frameOf(treePage, /track61-tree/);
     assert.ok(treeFrame, '트리 프레임이 열린다');
@@ -1730,7 +1734,7 @@ test('#657 화면 공통 검사기: 주요 화면 18 상태 × 390·1440 × 밤�
     assert.ok(treeFacts.cards > 0 && treeFacts.toolbar, `트리 화면이 예시 카드와 도구 줄을 그린다: ${JSON.stringify(treeFacts)}`);
     assert.ok(!treeFacts.status.includes('undefined') && !treeFacts.status.includes('NaN'), '트리 상태에 흔적 값이 없다');
     await take(treePage, '트리');
-    await treePage.close();
+    await ctxTree.close();
     const graphCheck = await page7.evaluate(() => {
       const f = [...document.querySelectorAll('iframe')].at(-1);
       const doc = f.contentDocument;
