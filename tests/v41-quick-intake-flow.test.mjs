@@ -45,12 +45,15 @@ function strictDescribe(value) {
   return { kind: 'link', original: value, label: parsed.hostname.replace(/^www\./, ''), openUrl: parsed.href };
 }
 
-function setup({ member, source = 'server', browser = fakeBrowser(), describe = strictDescribe, storage, fetchImpl, titleWaitMs, videoDup } = {}) {
+function setup({ member, source = 'server', browser = fakeBrowser(), describe = strictDescribe, storage, fetchImpl, titleWaitMs, videoDup, openQuickWithUrl, isDemo } = {}) {
   const notifies = [];
   const logins = [];
+  const opened = [];
   const doc = fakeDocument();
   const state = { source };
   const intake = createQuickIntake({
+    openQuickWithUrl: openQuickWithUrl ? (url, options) => { opened.push([url, options]); openQuickWithUrl(url, options); } : undefined,
+    isDemo,
     document: doc,
     getMember: () => member,
     getSource: () => state.source,
@@ -64,7 +67,7 @@ function setup({ member, source = 'server', browser = fakeBrowser(), describe = 
     titleWaitMs,
     videoDup,
   });
-  return { intake, doc, notifies, logins, state, ...browser, member };
+  return { intake, doc, notifies, logins, opened, state, ...browser, member };
 }
 
 // LTMedia.describe처럼 YouTube를 알아보는 최소 판정 — 저장 전 제목 확보 시험용.
@@ -411,4 +414,53 @@ test('제목: 세션 확정 전에는 oEmbed도 부르지 않고, 확정 뒤에 
   run.intake.flush();
   assert.ok(await until(() => member.calls.applied.length > 0));
   assert.deepEqual(member.calls.applied, [['quickAdd', { url: YT, mediaMetadata: { title: '영상 제목' } }]]);
+});
+
+// #788 공유로 받은 주소는 바로 저장하지 않고 쉬운 추가 창을 채워 연다.
+test('공유 진입(text에 주소): 로그인 상태면 주소가 채워진 쉬운 추가 창을 열고 저장하지 않는다', () => {
+  const member = memberFixture();
+  const browser = fakeBrowser({ search: `?${INTAKE_TEXT_PARAM}=영상+https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3Dabc12345678` });
+  const run = setup({ member, browser, openQuickWithUrl: () => {} });
+  run.intake.flush();
+  assert.deepEqual(run.opened, [['https://www.youtube.com/watch?v=abc12345678', { demo: false }]]);
+  assert.deepEqual(member.calls.applied, [], '공유는 창을 열고 끝 — 저장은 사용자가 누를 때');
+  assert.equal(run.intake.pending(), null);
+});
+
+test('공유 진입(url에 주소): text보다 url을 먼저 읽어 창에 채운다', () => {
+  const member = memberFixture();
+  const browser = fakeBrowser({ search: `?quickadd=${encodeURIComponent('https://www.tiktok.com/@fan/video/123')}&${INTAKE_TEXT_PARAM}=https%3A%2F%2Fother.test%2Fx` });
+  const run = setup({ member, browser, openQuickWithUrl: () => {} });
+  run.intake.flush();
+  assert.deepEqual(run.opened, [['https://www.tiktok.com/@fan/video/123', { demo: false }]]);
+});
+
+test('공유 진입: 로그인 전에는 주소를 보관하고, 돌아와서 같은 창을 연다', () => {
+  const url = 'https://b.test/1';
+  const storage = memoryStorage();
+  const away = memberFixture({ owned: false, writable: false, phase: 'login' });
+  const first = setup({ member: away, source: 'server', storage, browser: fakeBrowser({ search: `?quickadd=${encodeURIComponent(url)}` }) });
+  first.intake.flush();
+  assert.deepEqual(first.logins, [undefined], '로그인은 한 번만 시작');
+  assert.equal(first.intake.pending()?.url, url, '주소를 잃지 않는다');
+
+  const back = memberFixture({ owned: true, writable: true, phase: 'synced' });
+  const second = setup({ member: back, source: 'file', storage, openQuickWithUrl: () => {} });
+  second.intake.flush();
+  second.state.source = 'server';
+  second.intake.flush();
+  assert.deepEqual(second.opened, [[url, { demo: false }]], '로그인 뒤 같은 주소가 채워진 창을 연다');
+  assert.deepEqual(back.calls.applied, [], '돌아와도 자동 저장하지 않는다');
+  assert.equal(second.intake.pending(), null);
+});
+
+test('미리보기 공유 진입: 체험으로 창을 채우고 저장·로그인도 하지 않는다', () => {
+  const member = memberFixture({ owned: false, writable: false, phase: 'checking' });
+  const browser = fakeBrowser({ search: `?${INTAKE_TEXT_PARAM}=%EC%A0%9C%EB%AA%A9+https%3A%2F%2Fa.test%2Fx` });
+  const run = setup({ member, browser, source: 'example', isDemo: () => true, openQuickWithUrl: () => {} });
+  run.intake.flush();
+  assert.deepEqual(run.opened, [['https://a.test/x', { demo: true }]]);
+  assert.deepEqual(run.logins, [], '미리보기에서는 로그인으로 보내지 않는다');
+  assert.deepEqual(member.calls.applied, [], '미리보기에서는 저장하지 않는다');
+  assert.equal(run.intake.pending(), null);
 });

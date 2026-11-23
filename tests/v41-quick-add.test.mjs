@@ -12,7 +12,7 @@ import {
   QUICK_INBOX_LABEL, QUICK_SAVED_TEXT, QUICK_REFINE_LABEL, DROP_VEIL_TEXT,
   QUICK_EMPTY_ERROR, QUICK_INVALID_ERROR, DROP_LOGIN_NOTICE, DROP_READONLY_NOTICE,
   QUICK_PASTE_LABEL, QUICK_CLEAR_LABEL, QUICK_EMPTY_PREVIEW, QUICK_INVALID_PREVIEW,
-  QUICK_PASTE_EMPTY, QUICK_PASTE_ERROR
+  QUICK_PASTE_EMPTY, QUICK_PASTE_ERROR, INSTALL_HINT_KEY, INSTALL_HINT_TEXT, SHARE_DEMO_NOTICE
 } from '../public/v41/quick-add.mjs';
 import vm from 'node:vm';
 import { fakeEl } from './helpers/fake-dom.mjs';
@@ -322,7 +322,7 @@ test('#638 backfillTitles(cacheMomentMediaMetadata)는 title을 건드리지 않
 const URL_OK = 'https://m.youtube.com/watch?v=abc12345678&t=76&si=xyz';
 const VIDEO_TITLE = '테스트 영상 제목';
 
-function harness638({ trees = [inboxTree, secondTree], currentTreeId = 't-second', applyImpl = null, fetchImpl = null, writeTab = 'easy', quickTarget = null } = {}) {
+function harness638({ trees = [inboxTree, secondTree], currentTreeId = 't-second', applyImpl = null, fetchImpl = null, writeTab = 'easy', quickTarget = null, hintStorage, userAgent, standalone } = {}) {
   // 하은 2회차 ③ 재현을 위해 문자열 대신 함수도 받는다 — 트리를 바꾸고 다시 여는 시험에서 쓴다.
   const nowTreeId = () => (typeof currentTreeId === 'function' ? currentTreeId() : currentTreeId);
   const calls = { apply: [], notify: [], editors: [], hold: [] };
@@ -364,6 +364,9 @@ function harness638({ trees = [inboxTree, secondTree], currentTreeId = 't-second
     // 2026-11-16 대표 요청: 쉬운 추가로 담을 곳 설정(늘 같은 트리) — 셸이 넘기는 한 벌을 흉내 낸다.
     quickTargetPreference: () => quickTarget,
     isFinePointer: () => false,
+    hintStorage,
+    userAgent,
+    standalone,
     fetchImpl: titleFetch
   });
   return { api, els, calls, resolveTitle: value => resolveTitle(value) };
@@ -682,4 +685,49 @@ test('952/1001 최종 실행: 쉬운 추가 뒤 자동 제목 보정 — 같은 
     assert.ok(await bookFrame.evaluate(id => !!document.querySelector(`[data-moment="${id}"]`), added.id), '새 순간이 같은 책 문서에 그려진다(재적재 없이)');
     await ctx.close();
   } finally { await browser.close(); server.close(); }
+});
+
+// #788 공유 주소를 창에 채우고, 체험에서는 저장하지 않는다. 설치 안내는 조건 맞을 때만 한 줄.
+test('#788 공유 주소로 쉬운 추가 창을 열고 체험에서는 저장하지 않는다', () => {
+  const url = 'https://www.youtube.com/watch?v=abc12345678';
+  const real = harness638();
+  real.api.openQuick(url);
+  assert.equal(real.els['quick-url'].value, url, '주소가 채워진다');
+  assert.equal(real.els['quick-demo-note'].hidden, true, '실제 담기에서는 체험 줄이 없다');
+
+  const demo = harness638();
+  demo.api.openQuick(url, { demo: true });
+  assert.equal(demo.els['quick-url'].value, url);
+  assert.equal(demo.els['quick-demo-note'].hidden, false);
+  assert.ok(String(demo.els['quick-demo-note'].textContent).includes(SHARE_DEMO_NOTICE));
+  demo.api.submitQuick({ preventDefault() {} });
+  assert.deepEqual(demo.calls.apply, [], '체험에서는 저장하지 않는다');
+  assert.ok(demo.calls.notify.some((line) => String(line).includes('체험에서는')), '제출하면 체험 안내를 띄운다');
+});
+
+test('#788 홈 화면 추가 안내는 안드로이드 크롬·설치 전에 처음 세 번만 보인다', () => {
+  const agent = 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Chrome/120.0 Mobile Safari/537.36';
+  const file = new Map();
+  const storage = {
+    getItem: (key) => (file.has(key) ? file.get(key) : null),
+    setItem: (key, value) => file.set(key, String(value)),
+    removeItem: (key) => file.delete(key)
+  };
+  for (let i = 0; i < 3; i++) {
+    const h = harness638({ hintStorage: storage, userAgent: agent, standalone: false });
+    h.api.openQuick();
+    assert.equal(h.els['quick-install-hint'].hidden, false, `${i + 1}번째는 보인다`);
+    assert.equal(h.els['quick-install-hint'].textContent, INSTALL_HINT_TEXT);
+  }
+  assert.equal(storage.getItem(INSTALL_HINT_KEY), '3', '세 번 보여준 것을 기억한다');
+  const fourth = harness638({ hintStorage: storage, userAgent: agent, standalone: false });
+  fourth.api.openQuick();
+  assert.equal(fourth.els['quick-install-hint'].hidden, true, '네 번째는 숨는다');
+
+  const iphone = harness638({ hintStorage: storage, userAgent: 'Mozilla/5.0 (iPhone) Version/17.0 Mobile Safari/604.1', standalone: false });
+  iphone.api.openQuick();
+  assert.equal(iphone.els['quick-install-hint'].hidden, true, '아이폰은 숨는다');
+  const installed = harness638({ hintStorage: storage, userAgent: agent, standalone: true });
+  installed.api.openQuick();
+  assert.equal(installed.els['quick-install-hint'].hidden, true, '이미 설치했으면 숨는다');
 });

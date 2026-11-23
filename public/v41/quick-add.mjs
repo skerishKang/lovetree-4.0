@@ -128,3 +128,28 @@ export function dropRoute({ source = 'example', owned = false, writable = false,
   if (editorOpen) return { kind: 'editor', target: 'editor', veil: '놓으면 이 순간의 주소 칸에 들어가요' };
   return { kind: 'quick', target: 'quick', veil: DROP_VEIL_TEXT };
 }
+
+// #788 미리보기 체험: 서버가 없는 미리보기에서만 공유 주소를 창에 채워 보여준다.
+// 운영 주소(lovetree.padiem.net)에서는 절대 켜지지 않는다.
+export const SHARE_DEMO_NOTICE = '체험 — 실제 담기는 로그인 뒤';
+export const SHARE_DEMO_SUBMIT_NOTICE = '체험에서는 담기지 않아요. 로그인한 뒤 다시 시도해 주세요.';
+export function isShareDemoHost(hostname = '') {
+  const host = String(hostname ?? '').toLowerCase();
+  return host === 'localhost' || host === '127.0.0.1' || host.endsWith('.pages.dev');
+}
+export function shareDemoWanted({ hostname = '', source = '', owned = false } = {}) {
+  return isShareDemoHost(hostname) && source !== 'server' && owned !== true;
+}
+
+// #788 홈 화면 추가 안내: 안드로이드 크롬에서만, 설치 전이고 아직 세 번 미만일 때.
+export const INSTALL_HINT_KEY = 'lt41.installHintShown';
+export const INSTALL_HINT_MAX = 3;
+export const INSTALL_HINT_TEXT = '홈 화면에 추가하면 공유로 바로 담을 수 있어요.';
+export function isAndroidChrome(userAgent = '') {
+  const ua = String(userAgent ?? '');
+  return /Android/i.test(ua) && /Chrome\//i.test(ua)
+    && !/(EdgA|OPR|Firefox|SamsungBrowser)/i.test(ua);
+}
+export function installHintWanted({ userAgent = '', standalone = false, count = 0 } = {}) {
+  return isAndroidChrome(userAgent) && standalone !== true && Number(count) < INSTALL_HINT_MAX;
+}

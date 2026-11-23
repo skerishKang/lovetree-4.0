@@ -5,7 +5,7 @@ import {mountPrivateUpload} from '../private-upload.mjs';
 import {fetchVideoTitle} from '../video-title.mjs';
 import {suggestMomentTitle} from '../domain.mjs';
 import {displayTreeTitle} from '../tree-name.mjs';
-import {extractDropUrl, hasDropPayload, firstImageFile, parseQuickUrl, dropRoute, previewState, previewTag, savedNoticeText, quickTreeLineText, quickTreeAfterText, quickSubmitText, quickSavedTreeText, QUICK_INBOX_LABEL, QUICK_EMPTY_ERROR, QUICK_INVALID_ERROR, DROP_LOGIN_NOTICE, DROP_READONLY_NOTICE, QUICK_PASTE_LABEL, QUICK_CLEAR_LABEL, QUICK_EMPTY_PREVIEW, QUICK_INVALID_PREVIEW, QUICK_PASTE_EMPTY, QUICK_PASTE_ERROR} from '../quick-add.mjs';
+import {extractDropUrl, hasDropPayload, firstImageFile, parseQuickUrl, dropRoute, previewState, previewTag, savedNoticeText, quickTreeLineText, quickTreeAfterText, quickSubmitText, quickSavedTreeText, QUICK_INBOX_LABEL, QUICK_EMPTY_ERROR, QUICK_INVALID_ERROR, DROP_LOGIN_NOTICE, DROP_READONLY_NOTICE, QUICK_PASTE_LABEL, QUICK_CLEAR_LABEL, QUICK_EMPTY_PREVIEW, QUICK_INVALID_PREVIEW, QUICK_PASTE_EMPTY, QUICK_PASTE_ERROR, SHARE_DEMO_NOTICE, SHARE_DEMO_SUBMIT_NOTICE, INSTALL_HINT_KEY, INSTALL_HINT_TEXT, installHintWanted} from '../quick-add.mjs';
 // #876: 같은 영상 판정(quick-intake 한 벌)과 안내 창 날짜 표기(book-usability 한 벌) — 새 규칙을 만들지 않는다.
 import {findSameVideoInTree, treesWithSameVideo} from '../quick-intake.mjs';
 import {formatDisplayDate} from '../book-usability.mjs';
@@ -33,6 +33,8 @@ export function createQuickAdd(deps) {
   // 이슈 671: '그 순간 다음에 담기' 목적지 — 책의 '다음 순간 추가'가 lt41-write로 넘긴 {treeId, parentId}.
   // 창을 새로 열 때마다 다시 정하고(없으면 지운다), 저장 뒤에도 지운다.
   let quickTarget = null;
+  // #788: 미리보기 체험으로 연 창에서는 값을 보여주기만 하고 저장하지 않는다.
+  let demoMode = false;
 
   function snapshot() { return deps.getMember()?.snapshot() || {}; }
 
@@ -50,6 +52,9 @@ export function createQuickAdd(deps) {
   // 이슈 671: 목적지(treeId·parentId)가 오면 그 트리·그 순간 다음에 담기로 준비한다. 먼저 보일 탭이
   // '자세한 추가'면 편집기의 이어 담기 규칙(setEditorMode('add', parentId))을 그대로 쓴다.
   function openWrite(target = {}) {
+    demoMode = false;
+    const demoNote = $('quick-demo-note');
+    if (demoNote) demoNote.hidden = true;
     if (!ensureWritable()) return;
     deps.resetEditorBaseline?.();
     const parent = validTargetParent(target);
@@ -82,9 +87,32 @@ export function createQuickAdd(deps) {
     if (!tree || !moment) return null;
     return { treeId: tree.id, id: moment.id, title: deps.momentTitle?.(moment) || moment.title || '' };
   }
+  // #788: 설치 안내는 안드로이드 크롬·설치 전·처음 세 번만, 쉬운 추가 창 아래 한 줄로 띄운다.
+  const hintStore = deps.hintStorage || globalThis.localStorage;
+  function installHintCount() {
+    try { return Number(hintStore?.getItem(INSTALL_HINT_KEY) || 0) || 0; } catch { return 0; }
+  }
+  function maybeShowInstallHint() {
+    const line = $('quick-install-hint');
+    if (!line) return;
+    const agent = deps.userAgent || globalThis.navigator?.userAgent || '';
+    const standalone = deps.standalone === undefined
+      ? !!globalThis.matchMedia?.('(display-mode: standalone)').matches || globalThis.navigator?.standalone === true
+      : deps.standalone === true;
+    const wanted = installHintWanted({ userAgent: agent, standalone, count: installHintCount() });
+    line.hidden = !wanted;
+    if (!wanted) return;
+    line.textContent = INSTALL_HINT_TEXT;
+    try { hintStore?.setItem(INSTALL_HINT_KEY, String(installHintCount() + 1)); } catch { /* 저장 못 해도 안내는 띄운다 */ }
+  }
+
   // 쉬운 추가 탭으로 연다(끌어다 놓기·'지금 다듬기'처럼 쉬운 추가로 되돌아오는 길).
-  function openQuick() {
-    if (!ensureWritable()) return;
+  // #788: 공유로 들어온 주소를 받으면 그 값을 칸에 채운 채 연다(체험 모드에서는 저장하지 않는다).
+  function openQuick(url = '', options = {}) {
+    demoMode = options.demo === true;
+    const note = $('quick-demo-note');
+    if (note) { note.hidden = !demoMode; note.textContent = demoMode ? SHARE_DEMO_NOTICE : ''; }
+    if (!demoMode && !ensureWritable()) return;
     const fresh = !$('write-panel').open;
     deps.resetEditorBaseline?.();
     quickTarget = null; // 끌어다 놓기·붙여넣기 입구에는 '그 순간 다음' 목적지가 없다(이슈 671).
@@ -93,6 +121,13 @@ export function createQuickAdd(deps) {
     // 이미 열린 창에 끌어다 놓을 때는 손으로 고른 트리를 유지한다.
     if (fresh) quickTreeId = resolveQuickTreeId(treeChoices());
     renderTreeLine();
+    if (url) setQuickValue(url);
+    if (demoMode) {
+      const hint = $('quick-install-hint');
+      if (hint) hint.hidden = true;
+    } else {
+      maybeShowInstallHint();
+    }
   }
   function resetQuick() {
     $('quick-url').value = '';
@@ -359,6 +394,7 @@ export function createQuickAdd(deps) {
 
   function submitQuick(event) {
     event?.preventDefault?.();
+    if (demoMode) { deps.notify?.(SHARE_DEMO_SUBMIT_NOTICE); return; }
     const parsed = parseQuickUrl($('quick-url').value, describe);
     if (parsed.status !== 'ok') {
       $('quick-error').textContent = parsed.status === 'empty' ? QUICK_EMPTY_ERROR : QUICK_INVALID_ERROR;

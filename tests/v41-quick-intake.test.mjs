@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 // 빠른 담기 입구의 순수 계산: 파라미터 소비·추출·분류·중복 판정·세션 보관 (docs/TESTING.md).
 // DOM 배선은 tests/v41-quick-intake-flow.test.mjs가 가짜 객체로 직접 부른다.
 import {
@@ -8,6 +9,10 @@ import {
   findSameVideoInTree, treesWithSameVideo, createPendingSlot,
   resolveMediaMetadata, INTAKE_TITLE_WAIT_MS,
 } from '../public/v41/quick-intake.mjs';
+import {
+  isShareDemoHost, shareDemoWanted, isAndroidChrome, installHintWanted,
+  INSTALL_HINT_MAX, SHARE_DEMO_NOTICE,
+} from '../public/v41/quick-add.mjs';
 
 // LTMedia.describe와 같은 모양의 최소 판정(화면이 실제로 쓰는 전역과 같은 계약).
 const describeLike = (url) => {
@@ -204,4 +209,62 @@ test('resolveMediaMetadata: YouTube가 아니면 oEmbed를 부르지 않는다',
   assert.deepEqual(await resolveMediaMetadata('https://example.com/a', { describe: describeYouTube, fetchImpl }), {});
   assert.deepEqual(await resolveMediaMetadata('그냥 글자', { describe: describeYouTube, fetchImpl }), {});
   assert.equal(called, 0);
+});
+
+// #788 매니페스트·미리보기 체험·설치 안내 (순수 판정만 — DOM 배선은 흐름 시험에서 본다).
+test('매니페스트: 설치 조건과 share_target이 /v41/에서 title·text·url을 받는다', () => {
+  const m = JSON.parse(readFileSync(new URL('../public/v41/manifest.webmanifest', import.meta.url), 'utf8'));
+  assert.equal(m.name, 'LoveTree');
+  assert.equal(m.short_name, '러브트리');
+  assert.equal(m.display, 'standalone');
+  assert.equal(m.start_url, '/v41/');
+  assert.equal(m.theme_color, '#040407');
+  assert.equal(m.background_color, '#040407');
+  assert.ok(m.icons.some((icon) => icon.sizes === '192x192'), '192 아이콘');
+  assert.ok(m.icons.some((icon) => icon.sizes === '512x512'), '512 아이콘');
+  const st = m.share_target;
+  assert.equal(st.method, 'GET');
+  const action = new URL(st.action.startsWith('/') ? st.action : `/v41/${st.action}`, 'https://lovetree-4-0.pages.dev');
+  assert.equal(action.pathname, '/v41/', '공유 착지 경로는 매니페스트 scope 안');
+  assert.deepEqual(Object.keys(st.params).sort(), ['text', 'title', 'url']);
+  assert.equal(st.params.title, INTAKE_TITLE_PARAM);
+  assert.equal(st.params.text, INTAKE_TEXT_PARAM);
+  assert.equal(st.params.url, INTAKE_URL_PARAM);
+});
+
+test('share_target 주소 찾기: 유튜브·틱톡·릴스 주소가 text에만 와도 찾는다', () => {
+  const urls = [
+    'https://www.youtube.com/watch?v=abc12345678',
+    'https://youtu.be/abc12345678',
+    'https://www.tiktok.com/@fan/video/123456789',
+    'https://www.instagram.com/reel/abc123xyz/'
+  ];
+  for (const url of urls) {
+    assert.equal(resolveIntakeCandidate({ url: '', text: `이거 담아줘 ${url} 부탁해`, title: '영상' }), url, url);
+    assert.equal(resolveIntakeCandidate({ url, text: '', title: '' }), url, url);
+  }
+});
+
+test('미리보기 체험: 서버 없는 미리보기에서만 켜지고 운영에서는 절대 켜지지 않는다', () => {
+  assert.ok(SHARE_DEMO_NOTICE.includes('체험'));
+  assert.equal(isShareDemoHost('lovetree-4-0.pages.dev'), true);
+  assert.equal(isShareDemoHost('abc123.lovetree-4-0.pages.dev'), true);
+  assert.equal(isShareDemoHost('localhost'), true);
+  assert.equal(isShareDemoHost('127.0.0.1'), true);
+  assert.equal(isShareDemoHost('lovetree.padiem.net'), false);
+  assert.equal(shareDemoWanted({ hostname: 'abc.lovetree-4-0.pages.dev', source: 'example', owned: false }), true);
+  assert.equal(shareDemoWanted({ hostname: 'abc.lovetree-4-0.pages.dev', source: 'server', owned: true }), false, '서버 기록이 있으면 체험이 아니다');
+  assert.equal(shareDemoWanted({ hostname: 'lovetree.padiem.net', source: 'example', owned: false }), false, '운영에서는 절대 켜지지 않는다');
+});
+
+test('홈 화면 추가 안내: 안드로이드 크롬·설치 전·처음 세 번만 노출한다', () => {
+  const android = 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Chrome/120.0 Mobile Safari/537.36';
+  assert.equal(isAndroidChrome(android), true);
+  assert.equal(isAndroidChrome('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Version/17.0 Mobile Safari/604.1'), false);
+  assert.equal(isAndroidChrome('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0 Safari/537.36'), false);
+  assert.equal(isAndroidChrome('Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 EdgA/120.0 Mobile Safari/537.36'), false);
+  for (const count of [0, 1, 2]) assert.equal(installHintWanted({ userAgent: android, standalone: false, count }), true);
+  assert.equal(installHintWanted({ userAgent: android, standalone: false, count: INSTALL_HINT_MAX }), false);
+  assert.equal(installHintWanted({ userAgent: android, standalone: true, count: 0 }), false);
+  assert.equal(installHintWanted({ userAgent: 'Mozilla/5.0 (iPhone) AppleWebKit/605.1.15 Version/17.0 Mobile Safari/604.1', count: 0 }), false);
 });
