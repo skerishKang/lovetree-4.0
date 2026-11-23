@@ -3008,6 +3008,11 @@ test('두 칸 전환: 책/목록·선반/회전·보드 같은 크기와 모서�
       },{selector,reveal});
       assert.ok(data,width+'/'+theme+'/'+selector+' 전환 없음');
       assert.equal(data.buttons.length,2);
+      if(selector==='#shelf-view-inline' && width>520){
+        assert.equal(data.group.height,0,width+'/'+theme+' 서재 도구 줄의 중복 전환은 숨긴다');
+        assert.equal(data.buttons[0].width,0,width+'/'+theme+' 서재 중복 단추가 다시 표시됨');
+        continue;
+      }
       assert.ok(data.buttons[0].width>0&&data.buttons[0].height>0,width+'/'+theme+'/'+selector+' 빈 칸');
       assert.deepEqual(data.buttons[0],data.buttons[1],width+'/'+theme+'/'+selector+' 두 칸 치수');
     }finally{await page.close()}
@@ -3015,6 +3020,67 @@ test('두 칸 전환: 책/목록·선반/회전·보드 같은 크기와 모서�
   }finally{await ctx.close()}
  }
  }finally{await browser.close();await new Promise(r=>server.close(r))}
+});
+
+// 화면 전체(머리줄 + 현재 보이는 책/서재/보드 iframe)를 함께 보며 같은 전환 두 벌을 금지한다.
+test('화면 전환 단추 중복 0: 서재·책·보드 1440·390 밤·정원', {skip, timeout:180000}, async()=>{
+ const server=await serve();
+ const base='http://127.0.0.1:'+server.address().port;
+ const browser=await chromium.launch({headless:true});
+ const workspace={revision:1,state:{version:1,trees:[firstTree],prefs:{}},subject:'시험계정',writeSubjectBound:true,savedAt:'2026-11-23T00:00:00.000Z'};
+ try{
+  for(const [width,height] of [[1440,900],[390,844]])for(const theme of ['night','garden'])for(const screen of ['shelf','book','board']){
+   const ctx=await browser.newContext({viewport:{width,height},reducedMotion:'reduce'});
+   await ctx.addInitScript(t=>{localStorage.setItem('lt41.theme',t);localStorage.setItem('lt41.tips.firstTree','1')},theme);
+   await ctx.route('**/api/**',r=>r.fulfill({status:200,contentType:'application/json',body:'{"ok":true,"items":[]}'}));
+   await ctx.route('**/api/workspace**',r=>r.fulfill({status:200,contentType:'application/json',body:JSON.stringify(workspace)}));
+   const page=await ctx.newPage();
+   try{
+    await page.goto(base+'/v41/?account=1#my/'+screen,{waitUntil:'load',timeout:20000});
+    await page.waitForFunction(screen=>{
+      const f=[...document.querySelectorAll('#view,#view-next')].find(f=>!f.hidden&&f.getClientRects().length>0);
+      const target={shelf:'track32-bookshelf',book:'track59-sketchbook',board:'track58-pinboard'}[screen];
+      try{return f?.contentWindow?.location?.pathname.includes(target)}catch{return false}
+    },screen,{timeout:20000});
+    const result=await page.evaluate(()=>{
+      const frame=[...document.querySelectorAll('#view,#view-next')].find(f=>!f.hidden&&f.getClientRects().length>0);
+      const inner=frame.contentDocument;
+      const visible=el=>{
+        if(!el||el.hidden||el.getClientRects().length===0)return false;
+        const box=el.getBoundingClientRect();
+        if(box.width===0||box.height===0)return false;
+        for(let n=el;n;n=n.parentElement){
+          const st=n.ownerDocument.defaultView.getComputedStyle(n);
+          if(st.display==='none'||st.visibility==='hidden'||st.opacity==='0')return false;
+        }
+        return true;
+      };
+      const groups=[...document.querySelectorAll('.view-toggle,.boardModeSwitch,.shelf-view-inline'),
+                    ...inner.querySelectorAll('.view-toggle,.boardModeSwitch,.shelf-view-inline')]
+        .filter(el=>visible(el))
+        .map(el=>[...el.children].filter(x=>x.tagName==='BUTTON').map(x=>x.textContent.trim()).join('|'))
+        .filter(Boolean);
+      return {
+        groups,
+        shelfHeader:visible(document.getElementById('shelf-view-toggle')),
+        shelfInside:visible(inner.getElementById('shelf-view-inline')),
+        bookHeader:visible(document.getElementById('book-display-toggle')),
+        bookInside:visible(inner.querySelector('.view-toggle')),
+        boardInside:visible(inner.querySelector('.boardModeSwitch'))
+      };
+    });
+    const prefix=width+'/'+theme+'/'+screen;
+    assert.equal(new Set(result.groups).size,result.groups.length,prefix+' 같은 전환이 두 곳에 보인다: '+JSON.stringify(result.groups));
+    if(screen==='shelf'){
+      assert.equal(result.shelfHeader,width===1440,prefix+' 머리줄 전환 보임 규칙');
+      assert.equal(result.shelfInside,width===390,prefix+' 도구 줄 전환 보임 규칙');
+      assert.equal(result.groups.filter(s=>s==='선반|회전').length,1,prefix+' 서재 전환 단추는 반드시 한 벌');
+    }
+    if(screen==='book')assert.equal(result.bookInside,true,prefix+' 책의 1장/2장 전환 유지');
+    if(screen==='board')assert.equal(result.boardInside,true,prefix+' 보드 전환 유지');
+   }finally{await ctx.close()}
+  }
+ }finally{await browser.close();await new Promise(resolve=>server.close(resolve))}
 });
 
 // #1026: 최초 진입의 셸 머리줄과 빈 화면 자리가 뒤늦게 밀리지 않는지 실제 렌더링으로 검증한다.

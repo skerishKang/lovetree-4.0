@@ -87,5 +87,8 @@ html[data-book-shape=phone][data-v41-screen=book] .stage{top:auto;min-height:cal
 html[data-lt-theme=garden] .lt-toolbar-tools .view-toggle>button:not([aria-checked=true]):not([aria-pressed=true]),
 html[data-lt-theme=garden] .lt-toolbar-tools .shelf-view-inline>button:not([aria-checked=true]),
 html[data-lt-theme=garden] .lt-toolbar-tools .boardModeSwitch>button:not([aria-pressed=true]){color:var(--lt-ink)}
+/* 서재는 넓은 화면에서 머리줄 전환만 표시하고, 520px 이하는 도구 줄 전환만 표시한다. */
+.lt-toolbar-tools .shelf-view-inline{display:none}
+@media(max-width:520px){.lt-toolbar-tools .shelf-view-inline{display:grid}}
 html[data-v41-screen=book] .lt-toolbar-tools #playAllBtn{order:10}
 @media(max-width:600px){.lt-toolbar-tools .view-toggle,.lt-toolbar-tools .shelf-view-inline,.lt-toolbar-tools .boardModeSwitch{min-width:84px}}
