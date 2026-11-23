@@ -171,6 +171,8 @@ test('상단 메뉴 261119: 트리 단추 폭·⌄ 자리·목록 규칙·메뉴
         const ccs = cur ? getComputedStyle(cur) : null;
         return {
           recordW: Math.round(r.width), recordMax: parseFloat(getComputedStyle(record).maxWidth) || 0,
+          recordWidth: parseFloat(getComputedStyle(record).width) || 0,
+          paddingRight: parseFloat(getComputedStyle(record).paddingRight) || 0,
           caretRightGap: Math.round((r.right - caret.right) * 10) / 10,
           labelClipped: label.scrollWidth > label.clientWidth + 1,
           frameBg: fcs.backgroundColor, frameBorder: parseFloat(fcs.borderTopWidth) || 0,
@@ -182,8 +184,14 @@ test('상단 메뉴 261119: 트리 단추 폭·⌄ 자리·목록 규칙·메뉴
           currentCount: tabs.filter((b) => b.getAttribute('aria-current') === 'true').length
         };
       });
-      assert.ok(bar.caretRightGap >= 11 && bar.caretRightGap <= 15, `${width}: ⌄ 오른쪽 여백 ${bar.caretRightGap}px 는 13±2`);
-      assert.ok(bar.recordW <= bar.recordMax + 1, `${width}: 단추 폭 ${bar.recordW} ≤ 최대 ${bar.recordMax}`);
+      // ⌄는 단추 오른쪽 끝에 붙는다 — 여백은 그 폭의 단추 안쪽 여백(padding-right)을 따른다.
+      // 넓은 화면은 12px(고정 폭 180), 좁은 화면은 8px라서 기대값을 너비마다 따로 잰다.
+      assert.ok(bar.caretRightGap >= bar.paddingRight - 1 && bar.caretRightGap <= bar.paddingRight + 3,
+        `${width}: ⌄ 오른쪽 여백 ${bar.caretRightGap}px 는 단추 안쪽 여백 ${bar.paddingRight}px 기준`);
+      // 넓은 화면은 max-width:none 대신 폭 180px로 고정된다 — 고정 폭이 상한이다.
+      const recordLimit = bar.recordMax || bar.recordWidth;
+      assert.ok(recordLimit > 0 && bar.recordW <= recordLimit + 1,
+        `${width}: 단추 폭 ${bar.recordW} ≤ ${bar.recordMax ? '최대' : '고정 폭'} ${recordLimit}`);
       assert.equal(bar.labelClipped, true, `${width}: 긴 이름은 말줄임(글자가 칸을 넘지 않는다)`);
       assert.equal(bar.frameBg, 'rgba(0, 0, 0, 0)', `${width}: 탭을 감싸는 판 배경 없음`);
       assert.equal(bar.frameBorder, 0, `${width}: 탭을 감싸는 판 테두리 없음`);
