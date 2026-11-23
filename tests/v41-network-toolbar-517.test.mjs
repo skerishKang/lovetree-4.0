@@ -236,7 +236,8 @@ test('#951 ①② 위 단추 한 줄(높이 같음·줄 수 1) + 순간 3개 작
           // 되돌아가기 화살표는 하나(글자 + ::before) — 예전 폰 규칙이 화살표를 하나 더 그려 '←←'가 됐다.
           back: (() => { const b = document.getElementById('shelfBackBtn'), before = getComputedStyle(b, '::before').content || ''; return { text: b.textContent.trim(), glyphs: (b.textContent.match(/←/g) || []).length + (before.includes('←') ? 1 : 0), before }; })(),
           title: (() => {
-            const el = document.getElementById('treeTitleText'), btn = document.getElementById('treeTitleBtn');
+            // #1096: 트리 이름은 도구 줄 제목 한 곳에만 — 이름 폭도 그 제목으로 잰다.
+            const el = document.querySelector('.lt-toolbar-title'), btn = document.getElementById('treeTitleBtn');
             const cs = getComputedStyle(el), probe = document.createElement('span');
             probe.style.cssText = `position:absolute;visibility:hidden;white-space:pre;font:${cs.font}`;
             probe.textContent = (el.textContent || '').trim().slice(0, 4);
@@ -257,7 +258,8 @@ test('#951 ①② 위 단추 한 줄(높이 같음·줄 수 1) + 순간 3개 작
       assert.deepEqual(m.title.over, [], `${width}: 트리 선택이 위 단추에 가리지 않는다(${m.title.over})`);
       assert.deepEqual(m.viewsFull.map((v) => v[1]), [true, true, true], `${width}: 보기 방식 세 이름이 다 보인다(${JSON.stringify(m.viewsFull)})`);
       assert.deepEqual(m.viewsFull.map((v) => parseFloat(v[2]) >= 13), [true, true, true], `${width}: 보기 방식 글자는 13px 이상이다(${JSON.stringify(m.viewsFull)})`);
-      assert.ok(m.title.client >= m.title.four, `${width}: 트리 이름 네 글자 이상 보인다(보이는 폭 ${m.title.client} ≥ 네 글자 ${m.title.four})`);
+      // 390에서는 좁은 줄에 단추를 다 담기 위해 제목을 접는다 — 이름 폭 단언은 넓은 화면에서만.
+      if (width > 600) assert.ok(m.title.client >= m.title.four, `${width}: 트리 이름 네 글자 이상 보인다(보이는 폭 ${m.title.client} ≥ 네 글자 ${m.title.four})`);
       assert.equal(m.back.glyphs, 1, `${width}: 되돌아가기 화살표는 하나다(${JSON.stringify(m.back)})`);
       assert.ok(m.viewBox.every((v) => v.textW <= v.w - v.padL - v.padR + 1), `${width}: 보기 글자가 단추 안에 있다(${JSON.stringify(m.viewBox.map((v) => [v.textW, v.w]))})`);
       assert.ok(m.viewBox.every((v) => v.fs >= 13), `${width}: 보기 글자 13px 이상(${JSON.stringify(m.viewBox.map((v) => v.fs))})`);

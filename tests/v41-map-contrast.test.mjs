@@ -126,3 +126,45 @@ test('지도 실제 대비: 앱 2 × 판 2 × 1440·390, 두 보기·선택 상�
     await new Promise(resolve => server.close(resolve));
   }
 });
+
+test('정원 묶음 선 색은 묶음마다 다르고 바탕 대비 3:1 이상', { skip: REQUIRE ? false : skip, timeout: 120000 }, async () => {
+  if (skip) assert.fail(`미리보기 검사에서 건너뜀이 실패다 — ${skip}`);
+  const server = await serve(ROOT), base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch();
+  try {
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce', locale: 'ko-KR' });
+    await ctx.addInitScript(() => {
+      localStorage.setItem('lt41.theme', 'garden');
+      localStorage.setItem('lt41.boardTheme', 'paper');
+    });
+    const page = await ctx.newPage();
+    await page.goto(`${base}/v41/#network`, { waitUntil: 'load' });
+    const frame = page.frames().find(f => /track56-network/.test(f.url()));
+    assert.ok(frame, '지도 프레임이 열린다');
+    await frame.waitForFunction(() => window.__lt?.palette?.().length === 6, null, { timeout: 20000 });
+    const data = await frame.evaluate(() => {
+      const cs = getComputedStyle(document.documentElement);
+      return {
+        theme: document.documentElement.getAttribute('data-lt-theme'),
+        plate: document.documentElement.getAttribute('data-lt-board-theme'),
+        colors: window.__lt.palette(),
+        bg: (cs.getPropertyValue('--lt-map-bg-top') || '#fbfaf8').trim()
+      };
+    });
+    assert.equal(data.theme, 'garden');
+    assert.notEqual(data.plate, 'night');
+    assert.equal(new Set(data.colors).size, 6, `묶음마다 색이 다르다: ${data.colors.join(', ')}`);
+    const lum = hex => {
+      const c = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255)
+        .map(v => v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+      return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+    };
+    const bg = lum(data.bg);
+    const ratios = data.colors.map(color => {
+      const l = lum(color);
+      return Math.round(((Math.max(l, bg) + 0.05) / (Math.min(l, bg) + 0.05)) * 100) / 100;
+    });
+    assert.ok(ratios.every(r => r >= 3), `정원 묶음 색 대비 3:1 미달: ${data.colors.map((c, i) => `${c}=${ratios[i]}`).join(', ')} (바탕 ${data.bg})`);
+    await ctx.close();
+  } finally { await browser.close(); await new Promise(resolve => server.close(resolve)); }
+});

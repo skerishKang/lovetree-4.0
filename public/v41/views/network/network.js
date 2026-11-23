@@ -1623,21 +1623,20 @@
       B = w2s(b.x, b.y);
     if (!visible(A, 220) && !visible(B, 220)) return;
     const rawAlpha = edgeAlpha(e),
-      al = paintAlpha(rawAlpha, 'edge-alpha-min');
+      dim = state.mode !== 'OVERVIEW' && rawAlpha < 0.5,
+      al = paintAlpha(rawAlpha, 'edge-alpha-min') *
+        (dim && document.documentElement.getAttribute('data-lt-theme') === 'garden' ? 0.88 : 1);
     if (state.mobile && al < 0.05) return;
     const selected = edgeSelected(e),
+      /* #1096: 흐린 선도 회색으로 바꾸지 않고 자기 묶음 색을 조금만 낮춰 쓴다(고른 선은 두께·빛으로 강조). */
       baseColor =
-        state.mode !== 'OVERVIEW' && rawAlpha < 0.5
-          ? paint('context')
-          : selected
-            ? e.kind === 'origin'
-              ? PALETTE()[Math.max(0, (e.originGroup || 1) - 1)]
-              : colorOf(a)
-            : e.kind === 'related'
-              ? paint('related')
-              : e.kind === 'parent'
-                ? colorOf(a)
-                : paint('edge'),
+        selected
+          ? e.kind === 'origin'
+            ? PALETTE()[Math.max(0, (e.originGroup || 1) - 1)]
+            : colorOf(a)
+          : e.kind === 'related'
+            ? paint('related')
+            : colorOf(a),
       rgb = hexRgb(baseColor);
     ctx.strokeStyle = `rgba(${rgb.join(',')},${al})`;
     ctx.lineWidth =
@@ -1679,8 +1678,11 @@
     const p = w2s(n.x, n.y);
     if (!visible(p, 90)) return;
     const rawAlpha = nodeAlpha(n),
-      al = paintAlpha(rawAlpha, 'node-alpha-min'),
-      nodeColor = state.mode !== 'OVERVIEW' && rawAlpha < 0.5 ? paint('context') : colorOf(n),
+      dim = state.mode !== 'OVERVIEW' && rawAlpha < 0.5,
+      al = paintAlpha(rawAlpha, 'node-alpha-min') *
+        (dim && document.documentElement.getAttribute('data-lt-theme') === 'garden' ? 0.88 : 1),
+      /* #1096: 흐린 점도 자기 묶음 색으로 — 정원에서 회색 점이 섞이지 않는다. */
+      nodeColor = colorOf(n),
       rgb = hexRgb(nodeColor),
       sel = state.selected?.id === n.id || state.play?.currentId === n.id,
       hov = state.hover?.id === n.id;
@@ -2903,6 +2905,7 @@
     edgeKinds: edges.reduce((a, e) => ((a[e.kind] = (a[e.kind] || 0) + 1), a), {})
   };
   window.__lt = {
+    palette: () => PALETTE().slice(),
     connect: () => ({
       mode: state.connectMode,
       demo: state.demoMode,
