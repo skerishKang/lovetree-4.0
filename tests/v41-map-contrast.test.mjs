@@ -139,6 +139,7 @@ test('정원 묶음 선 색은 묶음마다 다르고 바탕 대비 3:1 이상',
     });
     const page = await ctx.newPage();
     await page.goto(`${base}/v41/#network`, { waitUntil: 'load' });
+    await page.waitForFunction(() => [...document.querySelectorAll('iframe')].some(f => f.contentWindow?.__lt?.dots?.().length > 0), null, { timeout: 30000, polling: 100 });
     const frame = page.frames().find(f => /track56-network/.test(f.url()));
     assert.ok(frame, '지도 프레임이 열린다');
     await frame.waitForFunction(() => window.__lt?.palette?.().length === 6, null, { timeout: 20000 });
