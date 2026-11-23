@@ -77,11 +77,11 @@ function harness({ owned = false, trees = 0, tree = null, source = 'example', cu
   return { header, els, store, tips: () => tips, setOwned: (value) => { ownedState = value; }, restore };
 }
 
-test('flowNavigation: 로그아웃이면 트리 탭을 숨기고 "트리 고르기"를 보여 준다', () => {
+test('flowNavigation: 로그아웃에서도 화면 탭을 유지하고 트리 선택만 숨긴다', () => {
   const h = harness({ owned: false, trees: 0, tree: null });
   try {
     h.header.flowNavigation();
-    assert.equal(h.els['tree-views'].hidden, true, '트리 보기 탭 숨김');
+    assert.equal(h.els['tree-views'].hidden, false, '서재·책·보드·지도 화면 탐색 유지(#1231)');
     // #222: 로그아웃은 트리 선택도 숨긴다(글자는 다음 로그인을 위해 '트리 고르기'로 남겨 둔다).
     assert.equal(h.els['record-menu'].hidden, true, '트리 선택은 숨김');
     assert.equal(h.els['source-label'].textContent, '트리 고르기');
