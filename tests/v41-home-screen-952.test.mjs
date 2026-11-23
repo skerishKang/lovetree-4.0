@@ -694,6 +694,8 @@ test('#1204 실제 테마 전환·저장값 및 가운데 빛 직선 경계 픽�
         assert.equal(state.host,theme,'orbit must follow actual theme');
         assert.ok(state.box,JSON.stringify(state));
         assert.ok(Math.abs(state.box.glow[2]-state.box.app[2])<=2&&Math.abs(state.box.glow[3]-state.box.app[3])<=2,'glow occupies entire app: '+JSON.stringify(state.box));
+        const capture=process.env.LT_HOME_1204_CAPTURE_DIR;
+        if(capture){const {mkdirSync}=await import('node:fs');mkdirSync(capture,{recursive:true});await h.page.screenshot({path:`${capture}/home-1204-${width}-${theme}-${route}.png`});}
         // Isolate scrim from cards and text: compare screenshots with the scrim
         // shown/hidden. This tests rendered pixels, not only CSS declarations.
         await h.frame.evaluate(()=>{
@@ -704,7 +706,7 @@ test('#1204 실제 테마 전환·저장값 및 가운데 빛 직선 경계 픽�
         });
         const element=h.frame.locator('#orbit');
         const on=rgbRows(await element.screenshot({animations:'disabled'}));
-        await h.frame.evaluate(()=>document.querySelector('#orbit').shadowRoot.querySelector('.center-scrim').style.visibility='hidden');
+        await h.frame.evaluate(()=>document.querySelector('#orbit').shadowRoot.querySelector('.center-scrim').style.setProperty('visibility','hidden','important'));
         const off=rgbRows(await element.screenshot({animations:'disabled'}));
         assert.equal(on.width,off.width);assert.equal(on.height,off.height);
         const delta=(x,y)=>on.pixel(x,y).reduce((s,c,i)=>s+Math.abs(c-off.pixel(x,y)[i]),0);
@@ -729,9 +731,8 @@ test('#1204 첫 화면 순차 등장·안내 삭제·WebGL 말풍선·기억·�
   const browser = await chromium952.launch({headless:true});
   try {
     for (const width of [1440,390]) for (const theme of ['garden','night']) {
-      const h=await boot952(browser,{width,motion:'no-preference'});
+      const h=await boot952(browser,{width,motion:'no-preference',initStorage:{'lt41.theme':theme}});
       try {
-        await h.frame.evaluate(theme=>document.querySelector('#orbit')?.setAttribute('data-lt-theme',theme),theme);
         const inspect=()=>h.frame.evaluate(()=>{
           const root=document.querySelector('#orbit').shadowRoot;
           const tip=root.querySelector('.lt-orbit-tip'),center=root.querySelector('.center'),actions=center.querySelector('.actions');
