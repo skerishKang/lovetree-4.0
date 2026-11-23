@@ -182,6 +182,10 @@ body.home-existing.lt-fab-ok #mobile-add{display:none}
 .view-toggle{display:inline-flex;align-items:center;gap:0;padding:3px;border:1px solid rgba(255,255,255,.22);border-radius:var(--lt-r-pill);background:rgba(9,8,14,.62)}
 .view-toggle[hidden]{display:none}
 /* #1026: 기존 셸 머리줄 높이(390 약 57px)를 그대로 사용한다. */
+/* #1231: 예전 2행 머리줄의 nav 위 2px·아래 7px 여백을 없앤다.
+   인증 전에 감춰 둔 트리 단추(높이 40px)가 있어도 헤더는 57px로 일정하다. */
+@media(max-width:780px){.app-header .main-nav{padding-top:0;padding-bottom:0}}
+
 /* #1026: 인증이 확인되기 전에는 권한별 머리줄 요소를 숨긴다. 첫 배치부터 로그인/계정 단추의 자리를 예약한다. */
 html[data-lt-auth-phase=pending] .app-header #record-menu{visibility:hidden;pointer-events:none}
 html[data-lt-auth-phase=pending] .app-header #write-menu,
