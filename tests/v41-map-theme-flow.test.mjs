@@ -72,7 +72,7 @@ async function fingerprint(frame) {
     const pixels = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
     const digest = await crypto.subtle.digest('SHA-256', pixels);
     const canvas = [...new Uint8Array(digest)].map(n => n.toString(16).padStart(2, '0')).join('');
-    const surfaces = ['.legend', '.controls', '.detail', '.top-actions .pill', '.hero p'].map(sel => {
+    const surfaces = ['.legend', '.controls', '.detail', '.lt-toolbar-tools .pill', '.hero p'].map(sel => {
       const cs = getComputedStyle(document.querySelector(sel));
       return [sel, cs.color, cs.backgroundColor, cs.backgroundImage, cs.borderColor];
     });

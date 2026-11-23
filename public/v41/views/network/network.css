@@ -121,6 +121,8 @@ html[data-v41-screen=network] .lt-toolbar-tools .view-switch .pill{padding:0 9px
  /* #517: 내려온 도구 줄 아래에 순간 선택 패널이 오게 한다 — 패널 top은 measureInsets가 재어 넘긴
     머리 아래 끝(--lt-picker-top)을 따른다(도구 줄이 한 줄이든 두 줄이든 겹침 0). */
  html[data-v41-screen=network] .lt-moment-picker{top:var(--lt-picker-top,118px)}
+ /* #1096: 지도 배치 계산값(--lt-picker-top)은 그대로 두고, 선택 패널만 공통 도구 줄 아래에 얹는다. */
+ html[data-v41-screen=network] .lt-moment-picker{top:calc(var(--lt-toolbar-top,78px) + var(--lt-toolbar-height,48px) + 4px)}
  /* #517 후속: 390 동심원에서 안내 문구가 지도 링 위에 투명 배경으로 얹혀 글자 대비가 1.62~2.83:1로 떨어졌다.
     여백을 줄이면 위의 선택 패널과 겹치므로, 안내 문구에 판 바탕을 주어 지도 위에서도 읽히게 한다(밤·정원 같은 규칙). */
  .hero p{display:inline-block;padding:2px 10px;border-radius:999px;background:var(--lt-map-bg-top)}

@@ -704,9 +704,12 @@
       right = box(document.querySelector('.progress-rail')),
       bottom = box(document.querySelector('.mobile-ribbon'));
     const topbarBottom = box(document.querySelector('.topbar'))?.bottom;
-    /* #1096: 공통 도구 줄이 붙으면 그 아래가 순간 선택 패널의 자리다(줄이 붙기 전에는 예전 값 유지). */
-    const toolbarBottom = box(document.querySelector('.lt-screen-toolbar'))?.bottom;
-    const pickerTop = toolbarBottom ? toolbarBottom + 4 : (topbarBottom || 102) + 22;
+    /* #1096: 공통 도구 줄의 자리는 CSS 값으로 잰다. 줄이 붙는 시점·판 전환 전후의 실측 차이로
+       같은 지도가 6~12px 어긋나던 것을 막는다(바로 바꾼 판 = 저장 후 처음 연 판). */
+    const rootStyle = getComputedStyle(document.documentElement);
+    const toolbarTop = parseFloat(rootStyle.getPropertyValue('--lt-toolbar-top')) || 0;
+    const toolbarHeight = parseFloat(rootStyle.getPropertyValue('--lt-toolbar-height')) || 0;
+    const pickerTop = toolbarTop ? toolbarTop + toolbarHeight - 2 : (topbarBottom || 102) + 22;
     document.documentElement.style.setProperty('--lt-picker-top', pickerTop.toFixed(0) + 'px');
     /* #951 ⑤: 좁은 화면에서 상세 시트가 아래 묶음 단추 줄을 덮지 않게 그 줄 높이를 재어 넘긴다. */
     document.documentElement.style.setProperty(
