@@ -168,6 +168,15 @@ export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSel
  };
  performance.mark('m1');shadow.innerHTML=`<style>${originalCSS}${extraCSS}.auth-entry{white-space:nowrap}</style><section class="app" aria-label="${SERVICE} 첫 화면"><div class="topbar"><span class="brand">${SERVICE} · MEMORY ORBIT</span><div class="top-actions"><button class="menuBtn" data-do="index">순간 목록</button>${authHtml}</div></div><div class="world"></div><div class="center-scrim" aria-hidden="true"></div><div class="center" data-lt-keep-clear><div class="eyebrow">${titleDemo?'나의 첫 순간':'WELCOME BACK'}</div><h1>${titleDemo?'좋아하는 순간부터.':'다시, 그 순간으로.'}</h1><p>${titleDemo?'간직하고 싶은 장면에 마음을 남겨 보세요.<br>지금 떠오르는 순간 하나면 충분해요.':'기억은 아직 여기에서 이어지고 있어요.'}</p>${recentMoment?recentMarkup(recentMoment):''}<div class="actions"><button class="subtleBtn primary-cta" data-do="${titleDemo?'new':'continue'}">${titleDemo?NEW_TREE:'이어 보던 순간'}</button><button class="subtleBtn" data-do="${titleDemo?'continue':'new'}">${titleDemo?'예시 순간 감상':NEW_TREE}</button><button class="subtleBtn" data-do="trees">${GO_TREES}</button></div><p class="center-note${demo?' note-with-hint':''}"><span>${demo?(loggedIn===true?'뒤에 떠다니는 카드는 감상 예시예요':'감상 예시 · 내 기록에는 저장되지 않아요'):esc(recordNote??`${all.length}개의 순간 · 서버에 보관`)}</span>${demo?(loggedIn===true?'<span>·</span><span class="center-hint">눌러서 감상</span>':'<span class="center-hint">드래그 · 금테 카드를 눌러 감상</span>'):''}</p></div></section><dialog class="orbit-dialog" aria-label="순간 감상"></dialog>`;
  const app=shadow.querySelector('.app'),world=shadow.querySelector('.world'),dialog=shadow.querySelector('dialog');
+ // #1084 후속(운영 11-23): 세로 영상의 흐린 배경은 처음 후보(oardefault)로 깔리는데, 그 그림이 없는 영상은 YouTube가
+ // 120×90 회색 자리 그림을 돌려줘 칸 전체가 회색이 된다. 가운데 썸네일이 후보를 내려가며 실제로 불러온 그림으로 배경도 바꾼다.
+ const followThumb=img=>{
+  if(!(img instanceof HTMLImageElement)||!img.currentSrc||img.naturalWidth<=120)return;
+  const host=img.closest('.recent-media.vertical')||img.closest('.index-row-thumb.is-vertical')||img.closest('.detail-vertical-stage');
+  if(!host)return;
+  host.style.setProperty(host.classList.contains('recent-media')?'--lt-recent-bg':'--lt-orbit-thumb','url("'+img.currentSrc.replace(/"/g,'%22')+'")');
+ };
+ shadow.addEventListener('load',e=>followThumb(e.target),true);
  // #1010: 예시 안내 줄 — 떠다니는 예시 카드가 숨는 좁은 화면에서는 함께 숨긴다(아래 배치에서 data-off를 묻는다).
  const centerNote=shadow.querySelector('.center-note');
  const fallbackCanvas=document.createElement('canvas'),glCanvas=document.createElement('canvas');
