@@ -1,6 +1,6 @@
 // #1091: 상단 메뉴 아래 화면 도구 줄 한 벌. 책·보드가 각자 그리던 줄 대신 이 부품을 호출한다.
 // 서재는 #1154가 상단을 바꾸는 중이라 아직 붙이지 않는다.
-// #1247: 책·보드·지도 같은 트리 줄 — 왼쪽에 '← 서재'·트리 이름(크게)·작은 메타(순간 N개 · 마지막 M.D),
+// 책·보드·지도 같은 트리 줄 — 왼쪽에 '← 서재'·트리 이름(크게)·작은 메타(순간 N개 · 마지막 M.D),
 // 오른쪽에 화면 도구, 맨 오른쪽에 공통 '▶ 이어 보기' 하나. 공용 코드는 이 벌 하나다.
 function treeMetaText() {
   try {
@@ -75,10 +75,12 @@ export function mountScreenToolbar({ screen, titleFrom, tools = [], initialBar =
   };
   align();
 
+  let reflow = () => {};
   const sync = () => {
     title.textContent = (titleFrom?.textContent || '').trim();
     const metaEl = bar.querySelector('.lt-toolbar-meta');
     if (metaEl && meta) metaEl.textContent = treeMetaText();
+    if (typeof reflow === 'function') reflow();
   };
   sync();
   if (titleFrom && typeof MutationObserver === 'function') {
@@ -89,7 +91,7 @@ export function mountScreenToolbar({ screen, titleFrom, tools = [], initialBar =
 
   let stashed = [];
   const isPlay = (el) => /^(playAllBtn|cinemaBtn|mapPlayBtn)$/.test(el.id || '');
-  const reflow = () => {
+  reflow = () => {
     align();
     for (const el of stashed) group.append(el);
     stashed = [];

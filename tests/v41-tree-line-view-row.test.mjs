@@ -1,4 +1,4 @@
-// #1247: 책·보드·지도 같은 트리 줄, 이어 보기 하나, 트리 이름 한 번, 열 때 안내 토스트 없음.
+// 화면 줄: 책·보드·지도 같은 트리 줄, 이어 보기 하나, 트리 이름 한 번, 열 때 안내 토스트 없음.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
@@ -9,13 +9,13 @@ try { ({ chromium } = await import('playwright')); if (!existsSync(chromium.exec
 
 const read = (p) => readFileSync(new URL('../' + p, import.meta.url), 'utf8');
 
-test('#1247: 셸 머리줄에서 보기 토글을 걷어냈다', () => {
+test('화면 줄: 셸 머리줄에서 보기 토글을 걷어냈다', () => {
   const html = read('public/v41/index.html');
   assert.ok(!html.includes('id="book-display-toggle"'), '책 보기 토글은 머리줄에 없어야 한다');
   assert.ok(!html.includes('id="shelf-view-toggle"'), '서재 토글은 머리줄에 없어야 한다');
 });
 
-test('#1247: 책·보드·지도 트리 줄은 공용 부품 하나로 만든다', () => {
+test('화면 줄: 책·보드·지도 트리 줄은 공용 부품 하나로 만든다', () => {
   const bar = read('public/v41/screen-toolbar.mjs');
   assert.ok(bar.includes('backEl') && bar.includes('lt-toolbar-left') && bar.includes('treeMetaText'), '공용 부품에 왼쪽 묶음과 메타를 둔다');
   for (const f of ['public/v41/views/track59-sketchbook.html', 'public/v41/views/track58-pinboard.html', 'public/v41/views/track56-network.html']) {
@@ -24,7 +24,7 @@ test('#1247: 책·보드·지도 트리 줄은 공용 부품 하나로 만든다
   }
 });
 
-test('#1247: 보드는 머리 띠·기억 보드 제목을 걷어내고 빈 보드일 때만 안내 한 줄을 둔다', () => {
+test('화면 줄: 보드는 머리 띠·기억 보드 제목을 걷어내고 빈 보드일 때만 안내 한 줄을 둔다', () => {
   const html = read('public/v41/views/track58-pinboard.html');
   assert.ok(!html.includes('boardTitle'), '기억 보드 제목·설명은 없어야 한다');
   assert.ok(html.includes('id="boardEmptyGuide"'), '빈 보드 안내 한 줄이 있다');
@@ -32,19 +32,19 @@ test('#1247: 보드는 머리 띠·기억 보드 제목을 걷어내고 빈 보�
   assert.ok(!html.includes('▶ 시네마 보기'), '띠 너머 시네마 보기 이름은 없어야 한다');
 });
 
-test('#1247: 보드 첫 진입 안내 토스트를 없앴다', () => {
+test('화면 줄: 보드 첫 진입 안내 토스트를 없앴다', () => {
   const ex = read('public/v41/views/board/board-extras.js');
   assert.ok(!ex.includes('boardGuide'), '처음 안내 말풍선은 없어야 한다');
   assert.ok(!ex.includes('순간을 선택해 연결된 기록을 살펴보세요'), '안내 문구도 없어야 한다');
 });
 
-test('#1247: 사진 표지에는 제목을 올리지 않고 표지 아래 두 줄을 쓴다', () => {
+test('화면 줄: 사진 표지에는 제목을 올리지 않고 표지 아래 두 줄을 쓴다', () => {
   const shelf = read('public/v41/views/shelf/shelf.js');
   assert.ok(shelf.includes("book.coverMedia?'':"), '사진 표지면 제목을 그리지 않는다');
   assert.ok(shelf.includes('book-card-meta-title') && shelf.includes('book-card-meta-date'), '표지 아래 두 줄이 있다');
 });
 
-test('#1247: 밝은 테마 이어 보기 띠 썸네일도 사진 순간으로 채운다', () => {
+test('화면 줄: 밝은 테마 이어 보기 띠 썸네일도 사진 순간으로 채운다', () => {
   const shelf = read('public/v41/views/shelf/shelf.js');
   assert.ok(shelf.includes('fallbackChapter'), '표지 사진이 없으면 사진 순간도 쓰러진다');
 });
@@ -77,12 +77,14 @@ test('#1247 E2E: 세 화면 줄 높이·위치 같음, 이어 보기 하나, 트
         await page.goto(`${base}/${screen}-host.html`, { waitUntil: 'load', timeout: 20000 });
         await page.waitForTimeout(2000);
         const frame = page.frames().find((f) => f !== page.mainFrame());
-        const geo = await frame.evaluate(() => {
+        const geo = await frame.evaluate(([screenKind, phoneShaped]) => {
           const bar = document.querySelector('.lt-screen-toolbar');
           const r = bar.getBoundingClientRect();
           const visible = [...document.querySelectorAll('*')].filter((e) => { if (e.textContent.trim() !== '리센느') return false; const r = e.getBoundingClientRect(); return r.width > 2 && r.height > 2 && r.bottom > 0 && r.right > 0 && r.left < innerWidth && r.top < innerHeight && getComputedStyle(e).visibility !== 'hidden' && getComputedStyle(e).display !== 'none'; }).length;
-          return { h: Math.round(r.height), top: Math.round(r.top), plays: [...bar.querySelectorAll('button')].filter((b) => /이어 보기/.test(b.textContent)).length, nameCount: visible, toastVisible: !!document.querySelector('#toast.show, .toast.show') };
-        });
+          const inBar = [...bar.querySelectorAll('button')].filter((b) => /이어 보기/.test(b.textContent)).length;
+          const inNav = [...document.querySelectorAll('.nav-pill button')].filter((b) => /이어 보기/.test(b.textContent)).length;
+          return { h: Math.round(r.height), top: Math.round(r.top), plays: inBar + (screenKind === 'book' && phoneShaped ? inNav : 0), nameCount: visible, toastVisible: !!document.querySelector('#toast.show, .toast.show') };
+        }, [screen, vp.width === 390]);
         const label = `${screen} ${vp.width}`;
         assert.equal(geo.top, 4, `${label}: 줄 위쪽 위치`);
         assert.equal(geo.h, vp.width === 390 ? 48 : 52, `${label}: 줄 높이`);

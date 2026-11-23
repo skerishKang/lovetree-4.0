@@ -55,7 +55,7 @@ html[data-v41-screen=shelf] .app{display:flex;flex-direction:column;padding-bott
 html[data-v41-screen=shelf] .page{display:flex;flex-direction:column;flex:1 1 auto;width:100%}
 /* 261118 대표 지적 2차: 이어 보기 띠는 위쪽에 붙이고(위 여백 24px 이내), 남은 세로 공간은 책장이 쓴다. */
 html[data-v41-screen=shelf] .shelf-screen{display:flex;flex-direction:column;justify-content:flex-start;flex:1 1 auto;min-height:0}
-html[data-v41-screen=shelf] .shelf-viewport{margin-top:auto;margin-bottom:auto}
+html[data-v41-screen=shelf] .shelf-viewport{margin-top:12px;margin-bottom:auto}
 
 /* ── 261118 대표 지적 3차: 보이는 갈색 막대는 .shelf-base(wood gradient)다. 카드 높이를 내용에 맞춰
    표지 바로 아래 설명이 오고 카드 아랫단(설명 글자 아래)이 막대 윗면에 닿게 한다 — 카드 안 빈 칸이 빔으로 보였던 원인. */
@@ -271,7 +271,7 @@ html[data-v41-screen=shelf][data-lt-theme=garden] .book-card > .book-manage {
 }
 
 /* #972: 펼쳐 보기·검색·책장의 간격을 유지하며 세 요소를 함께 세로 가운데에 둔다. */
-html[data-v41-screen=shelf] .shelf-screen:has(.hero.strip-mode) .hero.strip-mode { margin-top: auto; }
+html[data-v41-screen=shelf] .shelf-screen:has(.hero.strip-mode) .hero.strip-mode { margin-top: 12px; }
 html[data-v41-screen=shelf] .shelf-screen:has(.hero.strip-mode) .shelf-viewport { margin-top: 0; margin-bottom: auto; }
 /* 책은 선반 위에 두고 표지·두 줄 이름표와 그림자에 필요한 높이만 남긴다. */
 html[data-v41-screen=shelf] .shelf-screen:has(.hero.strip-mode) .shelf-rail { height: 280px; }

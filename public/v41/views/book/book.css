@@ -37,7 +37,7 @@ body:before{content:"MEMORY\A SKETCHBOOK";white-space:pre;position:fixed;left:3.
 .view-toggle{display:inline-flex;flex:none}
 .view-toggle .ui-btn{min-height:44px}
 .view-toggle .ui-btn[aria-pressed=true]{background:var(--gold);border-color:var(--gold);color:#fff}
-@media(max-width:599px){#doubleViewBtn{display:none}}
+
 .ui-btn{border:1px solid rgba(255,255,255,.13);background:rgba(255,255,255,.055);color:#f5ece6;border-radius:999px;padding:8px 12px;cursor:pointer;transition:.18s}
 .ui-btn:hover,.ui-btn.active{background:rgba(205,137,163,.15);border-color:rgba(228,189,203,.4);transform:translateY(-1px)}
 .shelf-back{margin-right:auto;min-height:44px;padding:8px 14px;flex:0 0 auto}

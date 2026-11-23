@@ -1,4 +1,4 @@
-// #1247 상호작용 확인: 책·보드·지도 '▶ 이어 보기' 누르기 + 서재 간격 재기.
+// 화면 줄 상호작용 확인: 책·보드·지도 '▶ 이어 보기' 누르기 + 서재 간격 재기.
 import { chromium } from 'playwright';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -43,7 +43,7 @@ try {
     await page.goto(`${base}/${screen}-host.html`, { waitUntil: 'load', timeout: 20000 }).catch(() => {});
     const frame = page.frames().find((f) => f !== page.mainFrame());
     await page.waitForTimeout(2000);
-    // 줄 높이·위치 비교用
+    // 줄 높이·위치 비교용
     const geo = await frame.evaluate(() => {
       const bar = document.querySelector('.lt-screen-toolbar');
       const r = bar.getBoundingClientRect();

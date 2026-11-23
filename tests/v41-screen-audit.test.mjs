@@ -2820,7 +2820,9 @@ test('#1091: 서재·책·보드 화면 도구 줄의 계산값이 같고 390 �
       await page.waitForSelector('.lt-screen-toolbar', { timeout: 15000 });
       const value = await page.evaluate((name) => {
         const bar = document.querySelector('.lt-screen-toolbar');
-        const button = bar.querySelector('button');
+        // 제목 선택과 새 트리는 고유 단추이므로 공통 도구 단추의 기본 규격을 별도로 실측한다.
+        const button = document.createElement('button');
+        bar.querySelector('.lt-toolbar-tools').append(button);
         const barStyle = getComputedStyle(bar);
         const buttonStyle = getComputedStyle(button);
         const body = document.querySelector(name === 'book' ? '.stage' : name === 'board' ? '.boardFrame' : '.shelf-screen');
@@ -2837,14 +2839,14 @@ test('#1091: 서재·책·보드 화면 도구 줄의 계산값이 같고 390 �
       return value;
     };
     for (const [width, theme] of [[1440, 'night'], [1440, 'garden'], [390, 'night'], [390, 'garden']]) {
-      const values = [];
-      for (const screen of ['book', 'board', 'shelf']) values.push(await measure(screen, width, theme));
-      assert.deepEqual(values[0], values[1], `${width}·${theme}에서 책·보드 줄 계산값이 다르다`);
-      assert.deepEqual(values[0], values[2], `${width}·${theme}에서 책·서재 줄 계산값이 다르다`);
-      for (const value of values) {
+      const values = {};
+      for (const screen of ['book', 'board', 'shelf']) values[screen] = await measure(screen, width, theme);
+      assert.deepEqual({ ...values.book, shelfBack: undefined }, { ...values.board, shelfBack: undefined }, `${width}·${theme}에서 책·보드 줄 계산값이 다르다`);
+      assert.deepEqual({ ...values.book, shelfBack: undefined }, { ...values.shelf, shelfBack: undefined }, `${width}·${theme}에서 책·서재 줄 계산값이 다르다`);
+      for (const [screen, value] of Object.entries(values)) {
         assert.equal(value.height, width === 390 ? '48px' : '52px');
         assert.equal(value.buttonHeight, '36px');
-        assert.equal(value.shelfBack, false, '← 서재 단추가 남아 있다');
+        assert.equal(value.shelfBack, screen !== 'shelf', '공통 줄 왼쪽에 ← 서재가 있다');
         assert.equal(value.covered, false, '화면 본문이 도구 줄에 가려졌다');
       }
     }
@@ -2975,6 +2977,107 @@ test('#1026 무대 불러오는 중 표시 — 느림 표시·빠름 비표시·
       } finally { await ctx.close(); }
     }
   } finally { await browser.close(); await new Promise(resolve => server.close(resolve)); }
+});
+
+
+test('두 칸 전환: 책/목록·선반/회전·보드 같은 크기와 모서리(1440·390)', {skip, timeout:180000}, async()=>{
+ const server=await serve();const base='http://127.0.0.1:'+server.address().port;
+ const browser=await chromium.launch({headless:true});
+ try{
+ for(const width of [1440,390])for(const theme of ['night','garden']){
+  const ctx=await browser.newContext({viewport:{width,height:width===390?844:900}});
+  await ctx.addInitScript(t=>localStorage.setItem('lt41.theme',t),theme);
+  try{
+   const configs=[
+    ['/v41/views/track59-sketchbook.html','#book-display-inline',false],
+    ['/v41/views/track59-sketchbook.html','#book-view-toggle',false],
+    ['/v41/views/track32-bookshelf.html','#shelf-view-inline',false],
+    ['/v41/views/track58-pinboard.html','.boardModeSwitch',false]
+   ];
+   for(const [url,selector,reveal] of configs){
+    const page=await ctx.newPage();
+    try{
+      await page.goto(base+url,{waitUntil:'load',timeout:15000});
+      const data=await page.evaluate(({selector,reveal})=>{
+        const parent=document.querySelector(selector);
+        if(!parent)return null;
+        if(reveal)parent.hidden=false;
+        const buttons=[...parent.children].filter(n=>n.tagName==='BUTTON');
+        const measure=(el)=>{const r=el.getBoundingClientRect(),s=getComputedStyle(el);return {width:r.width,height:r.height,radius:s.borderRadius}};
+        return {group:measure(parent),buttons:buttons.map(measure)};
+      },{selector,reveal});
+      assert.ok(data,width+'/'+theme+'/'+selector+' 전환 없음');
+      assert.equal(data.buttons.length,2);
+      assert.ok(data.buttons[0].width>0&&data.buttons[0].height>0,width+'/'+theme+'/'+selector+' 빈 칸');
+      assert.deepEqual(data.buttons[0],data.buttons[1],width+'/'+theme+'/'+selector+' 두 칸 치수');
+    }finally{await page.close()}
+   }
+  }finally{await ctx.close()}
+ }
+ }finally{await browser.close();await new Promise(r=>server.close(r))}
+});
+
+// 화면 전체(머리줄 + 현재 보이는 책/서재/보드 iframe)를 함께 보며 같은 전환 두 벌을 금지한다.
+test('화면 전환 단추 중복 0: 서재·책·보드 1440·390 밤·정원', {skip, timeout:180000}, async()=>{
+ const server=await serve();
+ const base='http://127.0.0.1:'+server.address().port;
+ const browser=await chromium.launch({headless:true});
+ const workspace={revision:1,state:{version:1,trees:[firstTree],prefs:{}},subject:'시험계정',writeSubjectBound:true,savedAt:'2026-11-23T00:00:00.000Z'};
+ try{
+  for(const [width,height] of [[1440,900],[390,844]])for(const theme of ['night','garden'])for(const screen of ['shelf','book','board']){
+   const ctx=await browser.newContext({viewport:{width,height},reducedMotion:'reduce'});
+   await ctx.addInitScript(t=>{localStorage.setItem('lt41.theme',t);localStorage.setItem('lt41.tips.firstTree','1')},theme);
+   await ctx.route('**/api/**',r=>r.fulfill({status:200,contentType:'application/json',body:'{"ok":true,"items":[]}'}));
+   await ctx.route('**/api/workspace**',r=>r.fulfill({status:200,contentType:'application/json',body:JSON.stringify(workspace)}));
+   const page=await ctx.newPage();
+   try{
+    await page.goto(base+'/v41/?account=1#my/'+screen,{waitUntil:'load',timeout:20000});
+    await page.waitForFunction(screen=>{
+      const f=[...document.querySelectorAll('#view,#view-next')].find(f=>!f.hidden&&f.getClientRects().length>0);
+      const target={shelf:'track32-bookshelf',book:'track59-sketchbook',board:'track58-pinboard'}[screen];
+      try{return f?.contentWindow?.location?.pathname.includes(target)}catch{return false}
+    },screen,{timeout:20000});
+    const result=await page.evaluate(()=>{
+      const frame=[...document.querySelectorAll('#view,#view-next')].find(f=>!f.hidden&&f.getClientRects().length>0);
+      const inner=frame.contentDocument;
+      const visible=el=>{
+        if(!el||el.hidden||el.getClientRects().length===0)return false;
+        const box=el.getBoundingClientRect();
+        if(box.width===0||box.height===0)return false;
+        for(let n=el;n;n=n.parentElement){
+          const st=n.ownerDocument.defaultView.getComputedStyle(n);
+          if(st.display==='none'||st.visibility==='hidden'||st.opacity==='0')return false;
+        }
+        return true;
+      };
+      const groups=[...document.querySelectorAll('.view-toggle,.boardModeSwitch,.shelf-view-inline'),
+                    ...inner.querySelectorAll('.view-toggle,.boardModeSwitch,.shelf-view-inline')]
+        .filter(el=>visible(el))
+        .map(el=>[...el.children].filter(x=>x.tagName==='BUTTON').map(x=>x.textContent.trim()).join('|'))
+        .filter(Boolean);
+      return {
+        groups,
+        shelfInside:visible(inner.getElementById('shelf-view-inline')),
+        bookInside:visible(inner.querySelector('.view-toggle')),
+        bookPages:visible(inner.querySelector('.view-toggle + .view-toggle, .view-toggle ~ .view-toggle')),
+        boardInside:visible(inner.querySelector('.boardModeSwitch'))
+      };
+    });
+    const prefix=width+'/'+theme+'/'+screen;
+    assert.equal(new Set(result.groups).size,result.groups.length,prefix+' 같은 전환이 두 곳에 보인다: '+JSON.stringify(result.groups));
+    if(screen==='shelf'){
+      assert.equal(result.shelfInside,true,prefix+' 도구 줄 전환 보임(머리줄 토글은 걷어냈다)');
+      assert.equal(result.groups.filter(s=>s==='선반|회전').length,1,prefix+' 서재 전환 단추는 반드시 한 벌');
+    }
+    if(screen==='book'){
+      assert.equal(result.bookInside,true,prefix+' 책의 책/목록 전환 유지');
+      assert.equal(result.groups.filter(s=>s==='1장|2장').length,1,prefix+' 책의 1장/2장 전환 유지');
+      assert.equal(result.groups.filter(s=>s==='책|목록').length,1,prefix+' 책/목록 전환 한 벌');
+    }
+    if(screen==='board')assert.equal(result.boardInside,true,prefix+' 보드 전환 유지');
+   }finally{await ctx.close()}
+  }
+ }finally{await browser.close();await new Promise(resolve=>server.close(resolve))}
 });
 
 // #1026: 최초 진입의 셸 머리줄과 빈 화면 자리가 뒤늦게 밀리지 않는지 실제 렌더링으로 검증한다.

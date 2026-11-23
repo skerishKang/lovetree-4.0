@@ -1,4 +1,4 @@
-// #1247 캡처: 서재·책·보드·지도 × 1440·390 × 밝은/밤 — 직접 눈으로 확인.
+// 화면 줄 캡처: 서재·책·보드·지도 × 1440·390 × 밝은/밤 — 직접 눈으로 확인.
 import { chromium } from 'playwright';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -6,7 +6,7 @@ import { serve } from '../tests/helpers/screen-audit.mjs';
 import { mkdir } from 'node:fs/promises';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const OUT = path.resolve(process.argv[2] || path.join(__dirname, 'captures-1247'));
+const OUT = path.resolve(process.argv[2] || path.join(__dirname, 'captures-view-row'));
 await mkdir(OUT, { recursive: true });
 
 const TREE = {
