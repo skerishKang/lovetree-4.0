@@ -237,6 +237,7 @@ export function createWritingRuntime(ctx){
       getModel:()=>ctx.model,
       getSource:()=>ctx.source,
       getMember:()=>ctx.member,
+      requestBookOpen:id=>(0,ctx.requestBookOpen)(id),
       // #480 L13: 공유 목록·공유 미리보기의 날짜도 계정 설정 한 벌을 따른다(책·보드·지도·첫 화면과 같음).
       getDateStyle:()=>(0,ctx.currentDateStyle)(),
       shareApi:ctx.shareApi,

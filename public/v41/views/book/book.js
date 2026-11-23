@@ -215,6 +215,8 @@ applyViewAttr();
 $('#singleViewBtn').onclick=()=>setViewChoice('single');
 $('#doubleViewBtn').onclick=()=>setViewChoice('double');
 renderSpread(posOfMoment(LTDEMO.get()),LTDEMO.get(),true);setTimeout(syncLensClone,120);
+/* #777 2단계: 트리 보기의 카드에서 온 요청은 셸이 ?open=<순간>을 붙여 준다 — 책의 기존 상세를 그대로 연다. */
+setTimeout(()=>{try{const openId=new URLSearchParams(location.search).get('open');if(openId&&LTDEMO.moments.some(m=>m.id===openId))showDetail(openId)}catch{}},100);
 // #627: 꼬리표 칩 규칙(tag-line.mjs)이 클래식 스크립트 뒤에 도착한다 — 페이지를 한 번 다시 그려 칩을 붙인다.
 addEventListener('lt41-tagline-ready',()=>{if(machineState==='IDLE'&&!document.fullscreenElement)renderSpread(current,null,false)});
 window.__TRACK59__={playbackMoments:()=>allMoments(),getState:()=>({current,machineState,lensOn,recent:[...recent],detail:$('#detail').classList.contains('open'),viewer:$('#viewer').classList.contains('open'),archive:$('#archivePanel').classList.contains('open'),branch:$('#branchModal').classList.contains('open'),page:current,total:pageCount(),pageIds:pageSteps().map(x=>x.id),shape:narrow()?'phone':'wide',mobile:single(),view:single()?'single':'double'}),turnNext:()=>autoTurn('next'),turnPrev:()=>autoTurn('prev'),jump:(i,id)=>renderSpread(i,id,false),jumpToMoment:id=>renderSpread(posOfMoment(id),id,false),pageSteps,pageCount,posOfMoment,momentAtPos,currentSpread,spreadOfPos,setView:setViewChoice,showDetail,openArchive,openBranch,closeBranch,meta:metadataFor,normalizeHttpUrl,youtubeId,rejudgeOverflow:()=>markOverflowPages()};

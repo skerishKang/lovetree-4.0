@@ -9,7 +9,7 @@ import {createStageLoading} from "./stage-loading.mjs";
 import {createAuth} from "./auth.mjs";
 
 export function createSessionState(ctx){
-  let initialRoute, model, current, source, loadGeneration, previousDirty, member, handledHash, activeShareId, resumeAfterStart, shellStageLoading, shellCommunityScreen, networkOpenMoment, requestNetworkOpen, takeNetworkOpen, boardOpenMoment, requestBoardOpen, takeBoardOpen, shareApi, accountApi, myNewsApi, shellAuth;
+  let initialRoute, model, current, source, loadGeneration, previousDirty, member, handledHash, activeShareId, resumeAfterStart, shellStageLoading, shellCommunityScreen, networkOpenMoment, requestNetworkOpen, takeNetworkOpen, boardOpenMoment, requestBoardOpen, takeBoardOpen, bookOpenMoment, requestBookOpen, takeBookOpen, shareApi, accountApi, myNewsApi, shellAuth;
   function startLogin(intent=''){return shellAuth.startLogin(intent);}
 
   function openLoginStart(intent='first'){return shellAuth.openLoginStart(intent);}
@@ -30,6 +30,8 @@ export function createSessionState(ctx){
     takeNetworkOpen:{get:()=>takeNetworkOpen,set:value=>{takeNetworkOpen=value;}},
     requestBoardOpen:{get:()=>requestBoardOpen,set:value=>{requestBoardOpen=value;}},
     takeBoardOpen:{get:()=>takeBoardOpen,set:value=>{takeBoardOpen=value;}},
+    requestBookOpen:{get:()=>requestBookOpen,set:value=>{requestBookOpen=value;}},
+    takeBookOpen:{get:()=>takeBookOpen,set:value=>{takeBookOpen=value;}},
     shareApi:{get:()=>shareApi,set:value=>{shareApi=value;}},
     accountApi:{get:()=>accountApi,set:value=>{accountApi=value;}},
     myNewsApi:{get:()=>myNewsApi,set:value=>{myNewsApi=value;}},
@@ -66,6 +68,13 @@ export function createSessionState(ctx){
     requestBoardOpen=id=>{boardOpenMoment=id||null};
 
     takeBoardOpen=()=>{const v=boardOpenMoment;boardOpenMoment=null;return v};
+
+    // #777 2단계: 트리 보기에서 순간 카드를 누르면 책 화면의 기존 상세를 그 순간으로 연다.
+    bookOpenMoment=null;
+
+    requestBookOpen=id=>{bookOpenMoment=id||null};
+
+    takeBookOpen=()=>{const v=bookOpenMoment;bookOpenMoment=null;return v};
 
     setMemberRefreshStarted(false);
 

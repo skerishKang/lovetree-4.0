@@ -4,6 +4,7 @@ html{--lt-toolbar-height:52px;--lt-content-top:calc(var(--lt-toolbar-top,66px) +
 html[data-v41-screen=book]{--lt-toolbar-top:70px;--lt-toolbar-pad:28px}
 html[data-v41-screen=board]{--lt-toolbar-pad:24px}
 html[data-v41-screen=shelf]{--lt-toolbar-top:82px;--lt-toolbar-pad:18px}
+html[data-v41-screen=tree]{--lt-toolbar-top:70px;--lt-toolbar-pad:24px}
 /* 서재는 도구 줄을 실제 흐름에 넣고, 책 수는 이어 보기 띠 아래에 남긴다. */
 html[data-v41-screen=shelf] .lt-screen-toolbar{position:relative;top:auto;margin-top:4px;flex:none}
 html[data-v41-screen=shelf] .page{min-height:0}
@@ -48,4 +49,5 @@ html[data-book-shape=phone][data-v41-screen=book] .stage{top:auto;min-height:cal
   html[data-v41-screen=book]{--lt-toolbar-pad:12px;--lt-toolbar-top:60px}
   html[data-v41-screen=board]{--lt-toolbar-pad:12px}
   html[data-v41-screen=shelf]{--lt-toolbar-pad:12px}
+  html[data-v41-screen=tree]{--lt-toolbar-top:60px;--lt-toolbar-pad:12px}
 }

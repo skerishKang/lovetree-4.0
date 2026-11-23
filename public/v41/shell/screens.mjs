@@ -21,6 +21,7 @@ export function createScreens(deps) {
     closePanels,
     syncTips,
     takeBoardOpen,
+    takeBookOpen,
     onFrameReady
   } = deps;
 
@@ -197,11 +198,14 @@ export function createScreens(deps) {
     // 요청은 한 번 쓰면 지운다(다른 화면을 먼저 보여 줬으면 끝난 요청이다).
     const openMoment = takeNetworkOpen?.() ?? null;
     const openBoardMoment = takeBoardOpen?.() ?? null;
+    const openBookMoment = takeBookOpen?.() ?? null;
     const url = new URL(screenUrl(file, getSource(), location.origin));
     if (treeKey) url.searchParams.set('tree', treeKey);
     if (file === 'track56-network.html' && openMoment) url.searchParams.set('open', openMoment);
     // #891: 보드는 주소가 특정 순간을 가리켰을 때만 ?open=을 붙인다 — 판 자동 열림의 한 벌 판정.
     if (file === 'track58-pinboard.html' && openBoardMoment) url.searchParams.set('open', openBoardMoment);
+    // #777 2단계: 트리 보기에서 온 순간은 책 화면이 그 순간의 상세를 바로 연다.
+    if (file === 'track59-sketchbook.html' && openBookMoment) url.searchParams.set('open', openBookMoment);
     showInFrame(url.href, '러브트리 · ' + screenTitle(file));
     if (write) writeLocation();
     links();

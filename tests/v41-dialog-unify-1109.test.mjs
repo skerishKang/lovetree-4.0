@@ -274,7 +274,7 @@ test('#1109 회원 기록 확인 중과 읽기 실패에도 빈 화면 탐색을
     const facts=async()=>{
      if(width===390&&await page.locator('#header-overflow').isHidden())await page.locator('#mobile-more').click();
      return page.evaluate(()=>{
-      const menu=innerWidth<=780,labels=['서재','책','보드','지도'];
+      const menu=innerWidth<=780,labels=['서재','트리','책','보드','지도'];
       const nodes=[...document.querySelectorAll(menu?'#header-overflow button':'#tree-views button[data-view]')].filter(b=>labels.includes(b.textContent.trim()));
       const nav=document.querySelector('#tree-views');
       return {hidden:nav.hidden,display:getComputedStyle(nav).display,member:document.body.dataset.member,source:document.body.dataset.recordSource,buttons:nodes.map(b=>{const r=b.getBoundingClientRect();return {text:b.textContent.trim(),w:r.width,h:r.height}})};
@@ -283,7 +283,7 @@ test('#1109 회원 기록 확인 중과 읽기 실패에도 빈 화면 탐색을
     const check=async(stage)=>{
      const row=await facts();console.log('# 빈 화면 탐색',width,state,stage,JSON.stringify(row));
      assert.equal(row.hidden,false,`${width}/${state}/${stage}: 회원 탭이 숨지 않는다`);
-     assert.equal(row.buttons.length,4);
+     assert.equal(row.buttons.length,5);
      assert.ok(row.buttons.every(b=>b.w>0&&b.h>0),JSON.stringify(row.buttons));
     };
     if(state==='delayed'||state==='offline'){

@@ -100,6 +100,7 @@ export function createNavigationRuntime(ctx){
       leaveShare:view=>(0,ctx.leaveShare)(view),
       requestNetworkOpen:ctx.requestNetworkOpen,
       requestBoardOpen:ctx.requestBoardOpen,
+      requestBookOpen:ctx.requestBookOpen,
       journey:ctx.shellJourney,
       gotoJourneyStep:step=>(0,ctx.gotoJourneyStep)(step),
       openFirstJourney:options=>(0,ctx.openFirstJourney)(options),
@@ -195,6 +196,7 @@ export function createNavigationRuntime(ctx){
       hasTree:()=>!!window.LT41,
       takeNetworkOpen:ctx.takeNetworkOpen,
       takeBoardOpen:ctx.takeBoardOpen,
+      takeBookOpen:ctx.takeBookOpen,
       // #1026 E: 로그아웃 예시를 동적으로 받는 동안에는 사용자가 연 창을 닫지 않는다.
       closePanels:()=>{if(ctx.exampleInitializing)return;shellDialogs.closePanels();},
       // 이슈 933: 화면을 옮긴 뒤 안내 판을 다시 맞춘다 — 첫 여정(새 트리 만들기)에서는 띄우지 않는다.

@@ -22,6 +22,7 @@ export function createNavigationMenu(ctx){
    add('첫 화면',()=>document.querySelector('.brand').click(),ctx.current==='src064-orbit.html');
    add('둘러보기',()=>(0,ctx.$)('community-menu').click());
    add('서재',()=>{(0,ctx.memberViewsAvailable)()?(0,ctx.show)('track32-bookshelf.html'):(0,ctx.openLoginStart)('shelf')},ctx.current==='track32-bookshelf.html');
+   add('트리',()=>{(0,ctx.memberViewsAvailable)()?(0,ctx.show)('track61-tree.html'):(0,ctx.openLoginStart)('tree')},ctx.current==='track61-tree.html');
    // 2026-11-17 대표 결정: 트리 0개여도 네 화면이 모두 열리므로 접기 메뉴에서도 책·보드·지도를 늘 둔다.
    add('책',()=>(0,ctx.show)('track59-sketchbook.html'),ctx.current==='track59-sketchbook.html');
    add('보드',()=>(0,ctx.show)('track58-pinboard.html'),ctx.current==='track58-pinboard.html');

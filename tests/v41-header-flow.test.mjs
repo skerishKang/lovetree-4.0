@@ -10,6 +10,7 @@ import { treeViewsVisible, headerPartsFor } from '../public/v41/header-state.mjs
 const SCREENS = [
   ['첫 화면', 'src064-orbit.html', false],
   ['내 책장', 'track32-bookshelf.html', false],
+  ['트리', 'track61-tree.html', true],
   ['기억책', 'track59-sketchbook.html', true],
   ['기억 보드', 'track58-pinboard.html', true],
   ['관계 지도', 'track56-network.html', true]
@@ -19,9 +20,9 @@ const SCREENS = [
 const STATES = [
   {
     name: '로그아웃',
-    make: () => ({ owned: false, trees: 0, tree: null, source: 'example' }),
+    make: () => ({ owned: false, trees: 1, tree: { title: '예시 트리' }, source: 'example' }),
     expect: {
-      treeViews: false, recordMenu: false, writeMenu: false, shareMenu: false,
+      treeViews: true, recordMenu: false, writeMenu: false, shareMenu: false,
       picker: '트리 고르기', write: '＋ 순간 추가', aria: '이 트리 보기'
     }
   },
@@ -52,7 +53,7 @@ const STATES = [
   }
 ];
 
-test('상태 4 × 화면 5: 보이는 버튼·문구·접근성 이름이 표대로다', () => {
+test('상태 4 × 화면 6: 보이는 버튼·문구·접근성 이름이 표대로다', () => {
   const table = [];
   for (const state of STATES) {
     for (const [label, file, reading] of SCREENS) {
@@ -79,7 +80,7 @@ test('상태 4 × 화면 5: 보이는 버튼·문구·접근성 이름이 표대
       }
     }
   }
-  assert.equal(table.length, 20, '상태 4 × 화면 5 = 20칸을 모두 확인한다');
+  assert.equal(table.length, 24, '상태 4 × 화면 6 = 24칸을 모두 확인한다');
 });
 
 test('#942 트리가 있어도 순간이 없으면 첫 화면 추가 단추만 숨긴다', () => {
@@ -116,6 +117,7 @@ test('공유 감상에서는 로그인했어도 트리 탭·트리 선택을 숨
   assert.equal(treeViewsVisible({owned: true, publicReading: false}), true);
   assert.equal(treeViewsVisible({owned: true, publicReading: true}), false, '공개 읽기에는 트리 탭을 열지 않는다');
   assert.equal(treeViewsVisible({owned: false, publicReading: false}), false);
+  assert.equal(treeViewsVisible({owned: false, publicReading: false, example: true}), true, '예시 트리를 보는 로그아웃 상태에는 트리 보기를 연다');
   const share = headerPartsFor({owned: true, treeCount: 2, publicReading: true});
   assert.equal(share.treeViews, false);
   assert.equal(share.treePicker, false);

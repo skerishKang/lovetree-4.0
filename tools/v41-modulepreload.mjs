@@ -23,6 +23,7 @@ export const SCREENS = [
   {name: 'network', html: 'public/v41/views/track56-network.html', href: f => '/v41/' + f},
   {name: 'graph', html: 'public/v41/views/graph/track60-graph.html', href: f => '/v41/' + f},
   {name: 'shelf', html: 'public/v41/views/track32-bookshelf.html', href: f => '/v41/' + f},
+  {name: 'tree', html: 'public/v41/views/track61-tree.html', href: f => '/v41/' + f},
 ];
 
 // 정적 import/export ... from '...' 와 import '...' 만 본다(동적 import()는 필요할 때 부르므로 제외).

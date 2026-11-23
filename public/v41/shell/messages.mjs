@@ -22,6 +22,7 @@ export function createMessages(deps) {
   const getModel = deps.getModel;
   const getSource = deps.getSource;
   const getMember = deps.getMember;
+  const requestBookOpen = deps.requestBookOpen || (() => {});
   // #480 L13: 계정 설정의 날짜 표기. 셸이 넘겨 주지 않으면 기본(dot)으로 적는다 — 새로 만드는 규칙 아님.
   const getDateStyle = deps.getDateStyle || (() => 'dot');
   const shareApi = deps.shareApi;
@@ -197,6 +198,8 @@ export function createMessages(deps) {
     // 261117 고객 의견: 첫 화면 둘째 줄 '모아둔 순간 N개 정리하기' — 모아둔 순간 정리 창을 연다(옮기기와 별개).
     if (data?.type === MSG.cleanup && getSource() === 'server') { openCleanup({}); return; }
     if (data?.type === MSG.openBook && getModel()?.trees.some(t => t.id === data.treeId && t.moments.some(m => m.id === data.id))) {
+      // #777 2단계: 트리 보기의 카드에서 온 요청이면 책 화면의 기존 상세를 그 순간으로 연다.
+      if (data.fromTree) requestBookOpen(data.id);
       setCurrent('track59-sketchbook.html'); choose(data.treeId, data.id); writeLocation();
     }
     // #810: 서재 ⋯ — 그 트리로 고른 뒤 기존 트리 관리 창을 연다(새 창 만들지 않음). 없는 트리는 무시한다.

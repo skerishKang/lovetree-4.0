@@ -473,7 +473,7 @@ const readyFrame = async (page, test_, { root = null, view = null, timeout = 450
   assert.fail(`${why} 실패 — ${detail} (최대 ${timeout / 1000}초). 현재 프레임 URL: [${frameUrls(page).join(' | ')}]`);
 };
 
-test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤·정원에서 겹침·잘림·흔적 값·작은 글자가 0이다', { skip: REQUIRE ? false : skip, timeout: 900000 }, async () => {
+test('#657 화면 공통 검사기: 주요 화면 18 상태 × 390·1440 × 밤·정원에서 겹침·잘림·흔적 값·작은 글자가 0이다', { skip: REQUIRE ? false : skip, timeout: 900000 }, async () => {
   if (skip) assert.fail(`미리보기 검사에서는 건너뜀이 실패다 — ${skip}`);
   const server = await serve({ '/share-host.html': shareHost, '/home-host.html': homeHost, '/graph-host.html': graphHost });
   const base = `http://127.0.0.1:${server.address().port}`;
@@ -1714,6 +1714,23 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     assert.deepEqual(graphSwitch.pressed, ['false', 'false', 'true'], '현재 보기(그래프)만 aria-pressed=true');
     assert.equal(graphSwitch.overflow, 0, `그래프 머리줄에서 가로 넘침 0(실제 ${graphSwitch.overflow})`);
     await take(page7, '그래프 보기');
+
+    // #777 2단계: 트리 보기 — 예시 트리로 로그인 없이 같은 검사 기준을 돌린다.
+    const treePage = await context.newPage();
+    await treePage.goto(`${base}/v41/#tree`, { waitUntil: 'domcontentloaded' });
+    const treeFrame = await frameOf(treePage, /track61-tree/);
+    assert.ok(treeFrame, '트리 프레임이 열린다');
+    await treeFrame.waitForSelector('.tv-card', { timeout: 15000 });
+    await treePage.waitForTimeout(700);
+    const treeFacts = await treeFrame.evaluate(() => ({
+      cards: document.querySelectorAll('.tv-card').length,
+      toolbar: !!document.querySelector('.lt-screen-toolbar'),
+      status: document.getElementById('treeStatus')?.textContent || ''
+    }));
+    assert.ok(treeFacts.cards > 0 && treeFacts.toolbar, `트리 화면이 예시 카드와 도구 줄을 그린다: ${JSON.stringify(treeFacts)}`);
+    assert.ok(!treeFacts.status.includes('undefined') && !treeFacts.status.includes('NaN'), '트리 상태에 흔적 값이 없다');
+    await take(treePage, '트리');
+    await treePage.close();
     const graphCheck = await page7.evaluate(() => {
       const f = [...document.querySelectorAll('iframe')].at(-1);
       const doc = f.contentDocument;
@@ -2260,10 +2277,10 @@ test('#657 후속 261117: 상단 탭 글자 통일과 고른 탭 칸 높이(390�
         await page.waitForFunction(() => !document.getElementById('tree-views')?.hidden, null, { timeout: 10000 });
         const fonts = await page.evaluate(() => {
           const style = (sel) => { const s = getComputedStyle(document.querySelector(sel)); return { size: s.fontSize, weight: s.fontWeight, color: s.color }; };
-          const topViews = ['track32-bookshelf.html', 'track59-sketchbook.html', 'track58-pinboard.html', 'track56-network.html'];
+          const topViews = ['track32-bookshelf.html', 'track61-tree.html', 'track59-sketchbook.html', 'track58-pinboard.html', 'track56-network.html'];
           return { browse: style('#community-menu'), picker: style('#record-menu'), tabs: [...document.querySelectorAll('#tree-views button[data-view]')].filter((b) => topViews.includes(b.dataset.view)).map((b) => ({ view: b.dataset.view, size: getComputedStyle(b).fontSize, weight: getComputedStyle(b).fontWeight, color: getComputedStyle(b).color, current: b.getAttribute('aria-current') === 'true' })) };
         });
-        assert.equal(fonts.tabs.length, 4, `${width}/${theme}: 탭 4개`);
+        assert.equal(fonts.tabs.length, 5, `${width}/${theme}: 탭 5개`);
         // 261118 대표 결정 2차 5: 묶음(서재·책·보드·지도)은 글자 14px·같은 굵기로 통일한다 — 둘러보기·트리 고르기는 묶음 밖 13px다.
         // 390에서는 묶음이 접혀 보이지 않으므로(접기 메뉴가 대신 열린다) 글자 크기는 펼친 폭에서만 잰다.
         if (width !== 390) {
@@ -2275,8 +2292,8 @@ test('#657 후속 261117: 상단 탭 글자 통일과 고른 탭 칸 높이(390�
         const unselected = fonts.tabs.filter((t) => !t.current);
         assert.ok(unselected.length >= 3, `${width}/${theme}: 고르지 않은 탭 3개 이상`);
         for (const tab of unselected) assert.equal(tab.color, unselected[0].color, `${width}/${theme}/${tab.view}: 탭 글자색 RGB ${tab.color} = ${unselected[0].color}`);
-        const labels = { 'track32-bookshelf.html': '서재', 'track59-sketchbook.html': '책', 'track58-pinboard.html': '보드', 'track56-network.html': '지도' };
-        for (const view of ['track32-bookshelf.html', 'track59-sketchbook.html', 'track58-pinboard.html', 'track56-network.html']) {
+        const labels = { 'track32-bookshelf.html': '서재', 'track61-tree.html': '트리', 'track59-sketchbook.html': '책', 'track58-pinboard.html': '보드', 'track56-network.html': '지도' };
+        for (const view of ['track32-bookshelf.html', 'track61-tree.html', 'track59-sketchbook.html', 'track58-pinboard.html', 'track56-network.html']) {
           if (width === 390) {
             await page.locator('#mobile-more').click();
             await page.locator('#header-overflow button').filter({ hasText: new RegExp('^' + labels[view] + '$') }).evaluate((el) => el.click());
@@ -2326,7 +2343,7 @@ test('#657 후속 261117: 상단 탭 글자 통일과 고른 탭 칸 높이(390�
   }
 });
 // 2026-11-17 대표 결정: 트리 0개 계정에서도 서재·책·보드·지도 탭이 보이고 각 화면의 빈 상태가 뜬다.
-test('#657 후속 261117: 트리 0개 계정의 탭 4개와 화면별 빈 상태(390·1440 × 정원·밤)', { skip: REQUIRE ? false : skip, timeout: 240000 }, async () => {
+test('#657 후속 261117: 트리 0개 계정의 탭 5개와 화면별 빈 상태(390·1440 × 정원·밤)', { skip: REQUIRE ? false : skip, timeout: 240000 }, async () => {
   const server = await serve();
   const base = `http://127.0.0.1:${server.address().port}`;
   const browser = await chromium.launch();
@@ -2348,7 +2365,7 @@ test('#657 후속 261117: 트리 0개 계정의 탭 4개와 화면별 빈 상태
           const chain=[];for(let e=document.querySelector('#tree-views button[data-view]');e;e=e.parentElement){const s=getComputedStyle(e),r=e.getBoundingClientRect();chain.push({id:e.id,tag:e.tagName,cls:e.className,hidden:e.hidden,display:s.display,visibility:s.visibility,w:r.width,h:r.height,data:{...e.dataset}})}
           return {chain,member:document.body.dataset.member,source:document.body.dataset.recordSource,treeCount:document.body.dataset.treeCount,loading:!document.getElementById('stage-loading')?.hidden};
         })));
-        const labels = { 'track32-bookshelf.html': '서재', 'track59-sketchbook.html': '책', 'track58-pinboard.html': '보드', 'track56-network.html': '지도' };
+        const labels = { 'track32-bookshelf.html': '서재', 'track61-tree.html': '트리', 'track59-sketchbook.html': '책', 'track58-pinboard.html': '보드', 'track56-network.html': '지도' };
         const openMore = async () => {
           if (width !== 390) return;
           const open = await page.locator('#header-overflow').evaluate((el) => el.classList.contains('is-open') && !el.hidden);
@@ -2367,7 +2384,7 @@ test('#657 후속 261117: 트리 0개 계정의 탭 4개와 화면별 빈 상태
           });
           return { buttons, folded, overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth, themeButtons: document.querySelectorAll('#theme-toggle').length };
         }, Object.values(labels));
-        assert.equal(tabs.buttons.length, 4, `${width}/${theme}: 탭 4개 — ${JSON.stringify(tabs.buttons)}`);
+        assert.equal(tabs.buttons.length, 5, `${width}/${theme}: 탭 5개 — ${JSON.stringify(tabs.buttons)}`);
         assert.ok(tabs.buttons.every((b) => b.w > 0 && b.h > 0), `${width}/${theme}: 탭 rect>0 — ${JSON.stringify(tabs.buttons)}`);
         assert.ok(tabs.overflow <= 0, `${width}/${theme}: 가로 넘침 ${tabs.overflow}px`);
         assert.equal(tabs.themeButtons, 1, `${width}/${theme}: 머리줄 테마 단추 1개`);
@@ -2375,6 +2392,7 @@ test('#657 후속 261117: 트리 0개 계정의 탭 4개와 화면별 빈 상태
         assert.equal(unselectedColors.length, 1, `${width}/${theme}: 고르지 않은 탭 글자색 RGB 같음 — ${JSON.stringify(tabs.buttons)}`);
         for (const [view, heading, action] of [
           ['track32-bookshelf.html', '아직 책장이 비어 있어요.', '＋ 새 트리'],
+          ['track61-tree.html', '아직 트리가 없어요.', '＋ 첫 순간 추가'],
           ['track59-sketchbook.html', '아직 트리가 없어요.', '＋ 첫 순간 추가'],
           ['track58-pinboard.html', '아직 트리가 없어요.', '＋ 첫 순간 추가'],
           ['track56-network.html', '아직 트리가 없어요.', '＋ 첫 순간 추가']
@@ -2403,11 +2421,11 @@ test('#657 후속 261117: 트리 0개 계정의 탭 4개와 화면별 빈 상태
               rectsOk: targets.every(([, t]) => t && t.w > 0 && t.h > 0),
               overlaps: targets.flatMap(([tn, t]) => blockers.map(([bn, b]) => [tn + '/' + bn, overlap(t, b)])),
               current: folded
-              ? Object.keys({ 'track32-bookshelf.html': '서재', 'track59-sketchbook.html': '책', 'track58-pinboard.html': '보드', 'track56-network.html': '지도' }).find((v) => { const b = [...document.querySelectorAll('#header-overflow button')].find((x) => x.getAttribute('aria-current') === 'true'); return b && b.textContent.trim() === { 'track32-bookshelf.html': '서재', 'track59-sketchbook.html': '책', 'track58-pinboard.html': '보드', 'track56-network.html': '지도' }[v]; }) || ''
+              ? Object.keys({ 'track32-bookshelf.html': '서재', 'track61-tree.html': '트리', 'track59-sketchbook.html': '책', 'track58-pinboard.html': '보드', 'track56-network.html': '지도' }).find((v) => { const b = [...document.querySelectorAll('#header-overflow button')].find((x) => x.getAttribute('aria-current') === 'true'); return b && b.textContent.trim() === { 'track32-bookshelf.html': '서재', 'track61-tree.html': '트리', 'track59-sketchbook.html': '책', 'track58-pinboard.html': '보드', 'track56-network.html': '지도' }[v]; }) || ''
               : document.querySelector('#tree-views button[aria-current="true"]')?.dataset.view || ''
             };
           }, tabs.folded);
-          assert.equal(state.hash, '#' + { 'track32-bookshelf.html': 'shelf', 'track59-sketchbook.html': 'book', 'track58-pinboard.html': 'board', 'track56-network.html': 'network' }[view], `${width}/${theme}/${view}: 주소가 탭에 남는다`);
+          assert.equal(state.hash, '#' + { 'track32-bookshelf.html': 'shelf', 'track61-tree.html': 'tree', 'track59-sketchbook.html': 'book', 'track58-pinboard.html': 'board', 'track56-network.html': 'network' }[view], `${width}/${theme}/${view}: 주소가 탭에 남는다`);
           assert.equal(state.home, false, `${width}/${theme}/${view}: 첫 화면으로 튕기지 않는다`);
           assert.ok(state.emptyShown, `${width}/${theme}/${view}: 빈 상태가 보인다`);
           assert.equal(state.heading, heading, `${width}/${theme}/${view}: 빈 상태 문구`);
@@ -2446,7 +2464,7 @@ test('#657 후속 261117: 트리 있는 계정의 탭 글자색도 같다(정원
       await page.waitForTimeout(200);
       const colors = await page.evaluate(() => {
         const nodes = innerWidth <= 780
-          ? [...document.querySelectorAll('#header-overflow button')].filter((b) => ['서재', '책', '보드', '지도'].includes(b.textContent.trim()))
+          ? [...document.querySelectorAll('#header-overflow button')].filter((b) => ['서재', '트리', '책', '보드', '지도'].includes(b.textContent.trim()))
           : [...document.querySelectorAll('#tree-views button[data-view]')];
         return nodes.filter((b) => b.getAttribute('aria-current') !== 'true').map((b) => getComputedStyle(b).color);
       });
@@ -2798,12 +2816,12 @@ test('#1093 선반 40권 아래 링크와 책 겹침 0', { skip: REQUIRE ? false
     }
   } finally { await browser.close(); await new Promise((r) => server.close(r)); }
 });
-test('#1091: 서재·책·보드 화면 도구 줄의 계산값이 같고 390 머리줄은 한 줄이다', { skip: !!skip, timeout: 180000 }, async () => {
+test('#1091: 서재·트리·책·보드 화면 도구 줄의 계산값이 같고 390 머리줄은 한 줄이다', { skip: !!skip, timeout: 180000 }, async () => {
   const server = await serve();
   const base = `http://127.0.0.1:${server.address().port}`;
   const browser = await chromium.launch({ headless: true });
-  const files = { book: 'track59-sketchbook.html', board: 'track58-pinboard.html', shelf: 'track32-bookshelf.html' };
-  const content = { book: '.stage', board: '.boardFrame', shelf: '.shelf-screen' };
+  const files = { book: 'track59-sketchbook.html', board: 'track58-pinboard.html', shelf: 'track32-bookshelf.html', tree: 'track61-tree.html' };
+  const content = { book: '.stage', board: '.boardFrame', shelf: '.shelf-screen', tree: '#treeMain' };
   try {
     const measure = async (screen, width, theme) => {
       const ctx = await browser.newContext({ viewport: { width, height: 900 } });
@@ -2811,12 +2829,12 @@ test('#1091: 서재·책·보드 화면 도구 줄의 계산값이 같고 390 �
       const page = await ctx.newPage();
       await page.goto(`${base}/v41/views/${files[screen]}`, { waitUntil: 'load' });
       await page.waitForSelector('.lt-screen-toolbar', { timeout: 15000 });
-      const value = await page.evaluate((name) => {
+      const value = await page.evaluate(([name, bodySelector]) => {
         const bar = document.querySelector('.lt-screen-toolbar');
         const button = bar.querySelector('button');
         const barStyle = getComputedStyle(bar);
         const buttonStyle = getComputedStyle(button);
-        const body = document.querySelector(name === 'book' ? '.stage' : name === 'board' ? '.boardFrame' : '.shelf-screen');
+        const body = document.querySelector(bodySelector);
         return {
           height: barStyle.height,
           background: barStyle.backgroundColor,
@@ -2825,15 +2843,16 @@ test('#1091: 서재·책·보드 화면 도구 줄의 계산값이 같고 390 �
           shelfBack: !!document.getElementById('shelfBackBtn'),
           covered: !!body && bar.getBoundingClientRect().bottom > body.getBoundingClientRect().top
         };
-      }, screen);
+      }, [screen, content[screen]]);
       await ctx.close();
       return value;
     };
     for (const [width, theme] of [[1440, 'night'], [1440, 'garden'], [390, 'night'], [390, 'garden']]) {
       const values = [];
-      for (const screen of ['book', 'board', 'shelf']) values.push(await measure(screen, width, theme));
+      for (const screen of ['book', 'board', 'shelf', 'tree']) values.push(await measure(screen, width, theme));
       assert.deepEqual(values[0], values[1], `${width}·${theme}에서 책·보드 줄 계산값이 다르다`);
       assert.deepEqual(values[0], values[2], `${width}·${theme}에서 책·서재 줄 계산값이 다르다`);
+      assert.deepEqual(values[0], values[3], `${width}·${theme}에서 책·트리 줄 계산값이 다르다`);
       for (const value of values) {
         assert.equal(value.height, width === 390 ? '48px' : '52px');
         assert.equal(value.buttonHeight, '36px');
@@ -2968,4 +2987,80 @@ test('#1026 무대 불러오는 중 표시 — 느림 표시·빠름 비표시·
       } finally { await ctx.close(); }
     }
   } finally { await browser.close(); await new Promise(resolve => server.close(resolve)); }
+});
+
+// #777 2단계: 트리 화면 동작과 대용량 성능(화면에서 잰 값만 본다).
+test('#777 트리 보기: 예시 사슬·카드 상세·방향키·맞춤과 200 순간 성능', { skip: !!skip, timeout: 240000 }, async () => {
+  const server = await serve();
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch({ headless: true });
+  try {
+    for (const [width, height, expectedWidth] of [[1440, 900, 140], [390, 844, 110]]) {
+      const ctx = await browser.newContext({ viewport: { width, height } });
+      await ctx.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); } catch {} }, 'night');
+      const page = await ctx.newPage();
+      await page.goto(`${base}/v41/#tree`, { waitUntil: 'domcontentloaded' });
+      const frame = await frameOf(page, /track61-tree/);
+      assert.ok(frame, `${width}: 트리 프레임이 열린다`);
+      await frame.waitForSelector('.tv-card', { timeout: 15000 });
+      const first = await frame.evaluate(() => ({
+        cards: document.querySelectorAll('.tv-card').length,
+        width: Math.round(document.querySelector('.tv-card').getBoundingClientRect().width),
+        toolbar: !!document.querySelector('.lt-screen-toolbar')
+      }));
+      assert.equal(first.cards, 40, `${width}: 예시 40개가 카드로 보인다`);
+      assert.equal(first.width, expectedWidth, `${width}: 첫 화면 카드 폭`);
+      assert.equal(first.toolbar, true, `${width}: 공통 도구 줄이 있다`);
+      await frame.locator('.tv-card').first().focus();
+      const before = await frame.evaluate(() => document.activeElement?.getAttribute('aria-label'));
+      await page.keyboard.press('ArrowDown');
+      const after = await frame.evaluate(() => document.activeElement?.getAttribute('aria-label'));
+      assert.ok(after && after !== before && after.startsWith('깊이 '), `${width}: 방향키로 다음 순간 카드로 옮긴다`);
+      const target = await frame.locator('.tv-card').nth(2).getAttribute('aria-label');
+      await frame.locator('.tv-card').nth(2).click();
+      const book = await frameOf(page, /track59-sketchbook/);
+      assert.ok(book, `${width}: 같은 창에서 책 화면으로 바뀐다`);
+      await book.waitForFunction(() => !!document.querySelector('#detailSide')?.textContent?.trim(), null, { timeout: 10000 });
+      const detail = await book.evaluate(() => ({
+        hidden: document.querySelector('#detailSide')?.hidden,
+        title: document.querySelector('#detailSide #detailTitle')?.textContent || ''
+      }));
+      assert.equal(detail.hidden, false, `${width}: 기존 상세가 열린다`);
+      assert.ok(target.includes(detail.title), `${width}: 누른 순간의 상세다`);
+      assert.equal(page.context().pages().length, 1, `${width}: 새 창을 만들지 않는다`);
+      await ctx.close();
+    }
+
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const page = await ctx.newPage();
+    await page.goto(`${base}/v41/#tree`, { waitUntil: 'domcontentloaded' });
+    const frame = await frameOf(page, /track61-tree/);
+    await frame.waitForSelector('.tv-card', { timeout: 15000 });
+    const perf = await frame.evaluate(() => {
+      const api = window.__LT41_TREE__;
+      api.loadTree({ id: 'empty', title: '빈 트리', moments: [], edges: [] });
+      const empty = api.cardCount();
+      api.loadTree({ id: 'one', title: '한 순간', moments: [{ id: 'x1', title: '혼자', date: '3월 14일', parentId: null, first: true }], edges: [] });
+      const single = api.cardCount();
+      const moments = [], edges = [];
+      for (let i = 1; i <= 200; i++) {
+        moments.push({ id: 'b' + i, title: '순간 ' + i, date: '4월 ' + i, parentId: i === 1 ? null : 'b' + (i - 1), first: i === 1 });
+        if (i > 1) edges.push({ kind: 'parent', from: 'b' + (i - 1), to: 'b' + i });
+      }
+      api.loadTree({ id: 'bench', title: '성능', moments, edges });
+      return { empty, single, count: api.cardCount(), drawMs: api.getPerf().drawMs };
+    });
+    assert.equal(perf.empty, 0, '빈 트리에서는 카드가 없다');
+    assert.equal(perf.single, 1, '순간 1개는 카드 한 장이다');
+    assert.equal(perf.count, 200, '200개가 모두 그려진다');
+    assert.ok(perf.drawMs < 1000, `첫 그림 1초 안: ${perf.drawMs}ms`);
+    await page.mouse.move(700, 500); await page.mouse.down();
+    for (let i = 0; i < 24; i++) await page.mouse.move(700 + i * 8, 500 + i * 4);
+    await page.mouse.up();
+    await page.waitForTimeout(200);
+    const drag = await frame.evaluate(() => { const p = window.__LT41_TREE__.getPerf(); return { applyCount: p.applyCount, over50: p.over50 }; });
+    assert.ok(drag.applyCount > 0, '끌기가 화면을 옮겼다');
+    assert.equal(drag.over50, 0, `끌기 중 50ms 초과 0개: ${drag.over50}`);
+    await ctx.close();
+  } finally { await browser.close(); await new Promise((r) => server.close(r)); }
 });

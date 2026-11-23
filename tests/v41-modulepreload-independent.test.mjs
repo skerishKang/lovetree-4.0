@@ -19,7 +19,8 @@ const SCREENS = [
   { name: 'book', html: 'public/v41/views/track59-sketchbook.html', dir: 'views' },
   { name: 'board', html: 'public/v41/views/track58-pinboard.html', dir: 'views' },
   { name: 'network', html: 'public/v41/views/track56-network.html', dir: 'views' },
-  { name: 'shelf', html: 'public/v41/views/track32-bookshelf.html', dir: 'views' }
+  { name: 'shelf', html: 'public/v41/views/track32-bookshelf.html', dir: 'views' },
+  { name: 'tree', html: 'public/v41/views/track61-tree.html', dir: 'views' }
 ];
 
 /** HTML의 <script> 태그를 순서대로 훑어 (속성, 본문)을 돌려준다(정규식 백트래킹 없이). */

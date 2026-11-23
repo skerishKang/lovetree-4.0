@@ -148,6 +148,8 @@ html[data-v41-screen=network]{--bg:var(--lt-paper);--bg2:#efe7d9;--rose:var(--lt
 html[data-v41-screen=network] .action.primary{background:linear-gradient(135deg,#8f7fc0,#c9748a);box-shadow:0 9px 24px rgba(120,90,120,.2)}
 /* 내 책장(Track32): 종이는 유지, 로즈와 어두운 무대만 첫 화면 토큰으로. */
 html[data-v41-screen=shelf]{--rose:var(--lt-rose);--rose-deep:var(--lt-rose-ink);--night:var(--lt-stage);--night-2:var(--lt-stage-2)}
+/* #777 2단계 트리 보기: 첫 화면의 무대·금테 토큰을 그대로 쓴다. */
+html[data-v41-screen=tree]{--bg:var(--lt-stage);--bg2:var(--lt-stage-2);--gold:var(--lt-gold-deep);--rose:var(--lt-rose);--violet:var(--lt-violet);--cyan:var(--lt-blue);--amber:var(--lt-gold)}
 html[data-v41-screen=shelf] .reader-stage{background:radial-gradient(circle at 53% 42%,rgba(152,111,121,.22),transparent 26%),radial-gradient(circle at 22% 85%,rgba(77,117,122,.16),transparent 32%),linear-gradient(135deg,#17121f,#040407 85%)}
 /* 어댑터가 만든 선택 상태는 금테 한 줄로 통일한다(원본 예술 요소 제외). */
 html[data-v41-screen=board] .themeBtn.active,html[data-v41-screen=board] .styleMini.active{border-color:var(--lt-gold);box-shadow:0 0 14px rgba(238,190,104,.22)}
