@@ -305,7 +305,7 @@ function markup(url,title='',mediaMetadata=null,momentId='',context=null,momentM
  const body=auto
   // 내 기록: 썸네일을 처음부터 보여 준다(no-referrer·lazy). 재생 표시는 썸네일 전체를 덮는 단추라
   // 썸네일 아무 곳이나 눌러도 그 자리에서 재생한다. autoplay 는 누른 뒤 만들어지는 embed 주소에만 있다.
-  ?'<figure class="lt-yt-preview"'+(vertical?' style="--lt-vertical-thumb:url(&quot;'+esc(previewSrc)+'&quot;)"':'')+' data-lt-thumb-host><img src="'+esc(previewSrc)+'" alt="'+esc(title||'YouTube 영상 썸네일')+'"'+previewFallback+' referrerpolicy="no-referrer" loading="lazy" decoding="async"><button type="button" class="lt-yt-play" data-lt-play aria-label="바로 재생"><span aria-hidden="true">▶</span></button></figure>'+cached
+  ?'<figure class="lt-yt-preview" data-lt-thumb-host>'+(vertical?'<span class="lt-vertical-backdrop" aria-hidden="true"><img src="'+esc(previewSrc)+'" alt="" referrerpolicy="no-referrer" loading="lazy" decoding="async"></span>':'')+'<img src="'+esc(previewSrc)+'" alt="'+esc(title||'YouTube 영상 썸네일')+'"'+previewFallback+' referrerpolicy="no-referrer" loading="lazy" decoding="async"><button type="button" class="lt-yt-play" data-lt-play aria-label="바로 재생"><span aria-hidden="true">▶</span></button></figure>'+cached
   :(linkCard?linkCard:(canLoad?'<button type="button" data-lt-load>'+esc(m.loadLabel)+'</button>':'<span>'+esc(m.label)+'</span>')+cached);
  const status=compact?'':(auto?'재생을 누르면 여기서 바로 재생해요.':(canLoad?'불러오기를 누르면 원본 사이트에 연결됩니다.':'원본 사이트에서 확인할 수 있어요.'));
  // #393 2: 크게 보기 — 영상을 어두운 깔개 위 화면 가운데 크게 연다(바깥 클릭·Esc로 복귀).

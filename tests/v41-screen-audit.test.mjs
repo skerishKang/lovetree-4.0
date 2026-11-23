@@ -3033,6 +3033,7 @@ test('#1084 세로 영상 첫 화면의 미디어 칸에는 회색 여백이 없
             await page.frameLocator('#view').locator('#mediaViewerHome.open iframe').waitFor({state: 'attached', timeout: 10000});
             assert.equal(await page.frameLocator('#view').locator('#mediaViewerHome').getAttribute('aria-hidden'), 'false', '재생 뷰어가 열린다');
           }
+          if (process.env.LT_1084_CAPTURE_DIR) await page.screenshot({path: join(process.env.LT_1084_CAPTURE_DIR, `${playing ? 'playing' : 'after'}-${width}-${theme}.png`), animations: 'disabled'});
           const snap = await (playing ? page.frameLocator('#view').locator('#mediaViewerHome .mediaVisual') : media).screenshot({animations: 'disabled'});
           const pixels = await page.evaluate(async data => {
             const bmp = await createImageBitmap(await (await fetch('data:image/png;base64,' + data)).blob());
@@ -3075,6 +3076,7 @@ test('#1084 세로 영상 첫 화면의 미디어 칸에는 회색 여백이 없
               ? '.orbit-dialog[open] .index-row-thumb.is-vertical'
               : '.orbit-dialog[open] .detail-vertical-stage');
             await locator.waitFor({state: 'visible', timeout: 15000});
+            if (process.env.LT_1084_CAPTURE_DIR) await page.screenshot({path: join(process.env.LT_1084_CAPTURE_DIR, `${slot}-after-${width}-${theme}.png`), animations: 'disabled'});
             const info = await locator.evaluate(el => {
               const bg = getComputedStyle(el, '::before'), r = el.getBoundingClientRect();
               return {image: bg.backgroundImage, filter: bg.filter, width: r.width, height: r.height};
@@ -3101,11 +3103,13 @@ test('#1084 세로 영상 첫 화면의 미디어 칸에는 회색 여백이 없
             await page.evaluate(({id, slot}) => { location.hash = 'my/' + slot + '?tree=' + id; }, {id: tree.id, slot});
             const locator = page.frameLocator('#view').locator(slot === 'book' ? '#rightPage .yt-play.is-remote-vertical' : '.lt-media[data-lt-vertical="1"] .lt-yt-preview');
             await locator.waitFor({state: 'visible', timeout: 15000});
+            if (process.env.LT_1084_CAPTURE_DIR) await page.screenshot({path: join(process.env.LT_1084_CAPTURE_DIR, `${slot}-after-${width}-${theme}.png`), animations: 'disabled'});
             const info = await locator.evaluate(el => {
-              const css = getComputedStyle(el, '::before'), r = el.getBoundingClientRect();
-              return {image: css.backgroundImage, filter: css.filter, width: r.width, height: r.height};
+              const layer = el.querySelector('.yt-vertical-backdrop,.lt-vertical-backdrop');
+              const pic = layer?.querySelector('img'), css = layer ? getComputedStyle(layer) : null, r = el.getBoundingClientRect();
+              return {image: pic?.currentSrc || '', loaded: (pic?.naturalWidth || 0) > 0, filter: css?.filter || '', width: r.width, height: r.height};
             });
-            assert.ok(info.image.includes('url(') && info.filter.includes('blur('), slot + ': 흐린 세로 썸네일 배경 유지');
+            assert.ok(info.loaded && info.image && info.filter.includes('blur('), slot + ': 세로 썸네일 배경이 이미지로 채워진다');
             const png = await locator.screenshot({animations: 'disabled'});
             const count = await page.evaluate(async b64 => {
               const blob = await (await fetch('data:image/png;base64,' + b64)).blob();
