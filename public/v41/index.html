@@ -7,6 +7,9 @@ html[data-lt-auth-phase=pending][data-lt-auth-hint=out] .app-header #account-ent
 html[data-lt-auth-phase=pending][data-lt-auth-hint=in] .app-header #account-entry{display:none}
 html[data-lt-auth-phase=pending][data-lt-auth-hint=in] .app-header #account-avatar[hidden]{display:flex;visibility:visible}
 html[data-lt-auth-phase=pending][data-lt-auth-hint=in] .app-header .tree-frame,html[data-lt-auth-phase=pending][data-lt-auth-hint=in] .app-header #tree-views{display:flex}
+/* #1026: cached member picker stays in place while authentication is checked. */
+html[data-lt-auth-phase=pending][data-lt-auth-hint=in] .app-header nav #record-menu[hidden]{display:flex;visibility:visible;pointer-events:none}
+@media(max-width:780px){html[data-lt-auth-phase=pending][data-lt-auth-hint=in] .app-header #tree-views{display:none}}
 html[data-lt-auth-phase=pending][data-lt-auth-hint=in] .app-header #record-menu{display:flex}
 @media(min-width:781px){html[data-lt-auth-phase] .app-header{min-height:73px}}
 @media(max-width:780px){html[data-lt-auth-phase] .app-header{min-height:64px}html:is([data-lt-shell-entry=shelf],[data-lt-shell-entry=book]) .app-header{min-height:110px}}
