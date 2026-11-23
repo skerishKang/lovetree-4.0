@@ -30,8 +30,9 @@ function expectedThemeAttribute(view) {
 // 로그아웃 3 · 로그인+트리 없음 3 · 로그인+트리 있음 7 이라 고정값으로는 상태를 가릴 수 없다.
 let headerPartsFor = null;
 let treePickerText = null;
+let treeViewsVisible = null;
 try {
-  ({ headerPartsFor, treePickerText } = await import(new URL('../../public/v41/header-state.mjs', import.meta.url).href));
+  ({ headerPartsFor, treePickerText, treeViewsVisible } = await import(new URL('../../public/v41/header-state.mjs', import.meta.url).href));
 } catch {
   headerPartsFor = null;
   treePickerText = null;
@@ -41,10 +42,10 @@ const BASE_HEADER_TABS = 0;
 function headerExpectation({ owned = false, treeCount = 0, publicReading = false } = {}) {
   if (!headerPartsFor) {
     const state = owned ? (Number(treeCount) > 0 ? 'in-trees' : 'in-empty') : 'out';
-    return { state, treePicker: state === 'in-trees', treeViews: state === 'in-trees', write: owned, tabs: state === 'in-trees' ? 6 : 0, source: 'fallback' };
+    return { state, treePicker: owned, treeViews: !publicReading, write: owned, tabs: publicReading ? 0 : (owned ? 6 : 5), source: 'fallback' };
   }
   const parts = headerPartsFor({ owned, treeCount, publicReading });
-  const tabs = BASE_HEADER_TABS + (parts.treePicker ? 1 : 0) + (parts.treeViews ? 5 : 0);
+  const tabs = BASE_HEADER_TABS + (parts.treePicker ? 1 : 0) + ((treeViewsVisible ? treeViewsVisible({ owned, publicReading }) : parts.treeViews) ? 5 : 0);
   return { ...parts, tabs, source: 'public/v41/header-state.mjs' };
 }
 function expectedPickerLabel({ owned, treeTitle = '', pendingDraft = false } = {}) {
@@ -936,14 +937,14 @@ async function checkVisualTokens(page, target, opts, stamp) {
     const headerExpected = headerExpectation({ owned, treeCount: top.treeCount });
     const expectedTabs = headerExpected.tabs;
     if (headerExpected.state === 'out') {
-      if (!top.treeViewsHidden) problems.push('로그아웃인데 트리 보기 탭이 보임');
+      if (top.treeViewsHidden) problems.push('로그아웃인데 화면 탐색 탭이 숨음');
       if (!top.treePickerHidden) problems.push('로그아웃인데 트리 선택이 보임');
       if (!top.writeMenuHidden) problems.push('로그아웃인데 순간 남기기 버튼이 보임');
       const label = expectedPickerLabel({ owned: false });
       if (![label, '저장 안 된 기록'].includes(top.recordLabel)) problems.push(`로그아웃 트리 선택 글자 "${top.recordLabel}" (기대 "${label}")`);
     } else if (headerExpected.state === 'in-empty') {
-      if (!top.treeViewsHidden) problems.push('트리 없는 로그인인데 트리 보기 탭이 보임');
-      if (!top.treePickerHidden) problems.push('트리 없는 로그인인데 트리 선택이 보임');
+      if (top.treeViewsHidden) problems.push('트리 없는 로그인인데 화면 탐색 탭이 숨음');
+      if (top.treePickerHidden) problems.push('트리 없는 로그인인데 트리 고르기가 숨음');
       if (s.id !== 'home' && top.writeMenuHidden) problems.push('트리 없는 로그인인데 순간 남기기 버튼이 숨겨짐');
       const label = expectedPickerLabel({ owned: true });
       if (![label, '저장 안 된 기록'].includes(top.recordLabel)) problems.push(`트리 없는 로그인 트리 선택 글자 "${top.recordLabel}" (기대 "${label}")`);
