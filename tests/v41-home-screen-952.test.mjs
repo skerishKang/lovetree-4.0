@@ -696,6 +696,18 @@ test('#1204 실제 테마 전환·저장값 및 가운데 빛 직선 경계 픽�
         assert.ok(Math.abs(state.box.glow[2]-state.box.app[2])<=2&&Math.abs(state.box.glow[3]-state.box.app[3])<=2,'glow occupies entire app: '+JSON.stringify(state.box));
         const capture=process.env.LT_HOME_1204_CAPTURE_DIR;
         if(capture){const {mkdirSync}=await import('node:fs');mkdirSync(capture,{recursive:true});await h.page.screenshot({path:`${capture}/home-1204-${width}-${theme}-${route}.png`});}
+        // Temporary #1204 CI evidence transfer: the COM1 remote session has
+        // exhausted its quota. Emit only the two new garden PNGs in bounded
+        // base64 chunks so they can be copied to lovetree-sc without putting
+        // binary captures in the application repository.
+        if(process.env.GITHUB_ACTIONS==='true'&&route==='stored'&&theme==='garden'){
+          const capturePng=await h.page.screenshot({type:'png'});
+          const encoded=capturePng.toString('base64'),partSize=12000;
+          console.log('LT1204PNG_BEGIN '+width+' '+theme+' '+encoded.length);
+          for(let at=0;at<encoded.length;at+=partSize)
+            console.log('LT1204PNG_PART '+width+' '+theme+' '+Math.floor(at/partSize)+' '+encoded.slice(at,at+partSize));
+          console.log('LT1204PNG_END '+width+' '+theme);
+        }
         // Isolate scrim from cards and text: compare screenshots with the scrim
         // shown/hidden. This tests rendered pixels, not only CSS declarations.
         await h.frame.evaluate(()=>{
