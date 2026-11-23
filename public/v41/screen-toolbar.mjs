@@ -1,6 +1,6 @@
 // #1091: 상단 메뉴 아래 화면 도구 줄 한 벌. 책·보드가 각자 그리던 줄 대신 이 부품을 호출한다.
 // 서재는 #1154가 상단을 바꾸는 중이라 아직 붙이지 않는다.
-export function mountScreenToolbar({ screen, titleFrom, tools = [], initialBar = null }) {
+export function mountScreenToolbar({ screen, titleFrom, titleControl = null, tools = [], initialBar = null }) {
   // Adopt a pre-rendered toolbar when supplied, so the first paint already has its final layout.
   const bar = initialBar || document.createElement('div');
   bar.className = 'lt-screen-toolbar';
@@ -47,9 +47,10 @@ export function mountScreenToolbar({ screen, titleFrom, tools = [], initialBar =
   };
   align();
 
-  const sync = () => { title.textContent = (titleFrom?.textContent || '').trim(); };
+  if (titleControl) title.replaceWith(titleControl);
+  const sync = () => { if (!titleControl) title.textContent = (titleFrom?.textContent || '').trim(); };
   sync();
-  if (titleFrom && typeof MutationObserver === 'function') {
+  if (!titleControl && titleFrom && typeof MutationObserver === 'function') {
     new MutationObserver(sync).observe(titleFrom, { childList: true, characterData: true, subtree: true });
   }
 

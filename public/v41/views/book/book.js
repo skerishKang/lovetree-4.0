@@ -33,7 +33,7 @@ let viewChoice=storedView();
 function narrow(){return innerWidth<600}
 function single(){return narrow()||(viewChoice??defaultView())==='single'}
 function applyViewAttr(){document.documentElement.dataset.bookView=single()?'single':'double';document.documentElement.dataset.bookShape=narrow()?'phone':'wide';syncViewButtons()}
-function syncViewButtons(){const s=single();const one=$('#singleViewBtn'),two=$('#doubleViewBtn');if(one)one.setAttribute('aria-pressed',String(s));if(two)two.setAttribute('aria-pressed',String(!s));if(two)two.hidden=narrow()}
+function syncViewButtons(){const s=single();const one=$('#singleViewBtn'),two=$('#doubleViewBtn');if(one)one.setAttribute('aria-pressed',String(s));if(two)two.setAttribute('aria-pressed',String(!s));if(two){two.hidden=false;two.disabled=narrow();two.setAttribute('aria-label',narrow()?'2장 — 넓은 화면에서 사용 가능':'2장 — 펼친 책처럼 두 쪽 보기')}}
 /* #537 9: 보기를 바꿔도 보던 순간을 그대로 둔다 — 두 장의 오른쪽 순간이면 한 장에서 그 순간, 한 장의 순간이면 그 순간이 든 묶음. */
 function setViewChoice(v){if(machineState!=='IDLE'){/* 넘기는 동안에는 모드를 바꾸지 않는다 — 잠깐 뒤 다시 시도한다. */setTimeout(()=>setViewChoice(v),120);return}const focus=LTDEMO.get()||'';viewChoice=v;try{localStorage.setItem(VIEW_KEY,v)}catch{}applyViewAttr();renderSpread(posOfMoment(focus),focus||null,false)}
 const allMoments=()=>SPREADS.flatMap((s,i)=>[{...s.left,spread:i,side:'left'},{...s.right,spread:i,side:'right'}]).filter(m=>!m.synthetic);

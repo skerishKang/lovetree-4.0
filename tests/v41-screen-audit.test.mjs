@@ -2976,3 +2976,41 @@ test('#1026 무대 불러오는 중 표시 — 느림 표시·빠름 비표시·
     }
   } finally { await browser.close(); await new Promise(resolve => server.close(resolve)); }
 });
+
+
+test('두 칸 전환: 책/목록·선반/회전·보드 같은 크기와 모서리(1440·390)', {skip, timeout:180000}, async()=>{
+ const server=await serve();const base='http://127.0.0.1:'+server.address().port;
+ const browser=await chromium.launch({headless:true});
+ try{
+ for(const width of [1440,390])for(const theme of ['night','garden']){
+  const ctx=await browser.newContext({viewport:{width,height:width===390?844:900}});
+  await ctx.addInitScript(t=>localStorage.setItem('lt41.theme',t),theme);
+  try{
+   const configs=[
+    ['/v41/', '#book-display-toggle',true],
+    ['/v41/', '#shelf-view-toggle',true],
+    ['/v41/views/track32-bookshelf.html','#shelf-view-inline',false],
+    ['/v41/views/track58-pinboard.html','.boardModeSwitch',false]
+   ];
+   for(const [url,selector,reveal] of configs){
+    const page=await ctx.newPage();
+    try{
+      await page.goto(base+url,{waitUntil:'load',timeout:15000});
+      const data=await page.evaluate(({selector,reveal})=>{
+        const parent=document.querySelector(selector);
+        if(!parent)return null;
+        if(reveal)parent.hidden=false;
+        const buttons=[...parent.children].filter(n=>n.tagName==='BUTTON');
+        const measure=(el)=>{const r=el.getBoundingClientRect(),s=getComputedStyle(el);return {width:r.width,height:r.height,radius:s.borderRadius}};
+        return {group:measure(parent),buttons:buttons.map(measure)};
+      },{selector,reveal});
+      assert.ok(data,width+'/'+theme+'/'+selector+' 전환 없음');
+      assert.equal(data.buttons.length,2);
+      assert.ok(data.buttons[0].width>0&&data.buttons[0].height>0,width+'/'+theme+'/'+selector+' 빈 칸');
+      assert.deepEqual(data.buttons[0],data.buttons[1],width+'/'+theme+'/'+selector+' 두 칸 치수');
+    }finally{await page.close()}
+   }
+  }finally{await ctx.close()}
+ }
+ }finally{await browser.close();await new Promise(r=>server.close(r))}
+});

@@ -1,5 +1,5 @@
 // #792 3단계: 책의 YouTube 순간을 책 순서대로 이어 보는 화면.
-// 첫 재생은 '이어 보기'를 누른 사용자 동작으로 시작하고, 그다음 순간부터는 같은 재생기에서 이어 간다.
+// 첫 재생은 '차례로 재생'를 누른 사용자 동작으로 시작하고, 그다음 순간부터는 같은 재생기에서 이어 간다.
 import {formatRange} from '/v41/domain.mjs';
 import {loadYouTubeIframeApi} from '/v41/segment-capture.mjs';
 import {buildPlaybackQueue, stepPlayable, firstPlayable, playbackChipText, segmentReached, playbackStatusOf, STATUS_PLAYING, STATUS_BUFFERING, STATUS_SKIPPED} from '/v41/playback-core.mjs';
@@ -298,17 +298,17 @@ function updateAvailability() {
   if (!items.length && open) closePlayback();
 }
 
-// 390에서는 머리줄 도구가 넘치지 않도록 '이어 보기'를 책 아래 이동 줄로 옮긴다.
+// 390에서는 머리줄 도구가 넘치지 않도록 '차례로 재생'를 책 아래 이동 줄로 옮긴다.
 function placePlayButton() {
   const phone = document.documentElement.dataset.bookShape === 'phone';
-  const tools = document.querySelector('.topbar .tools');
+  const tools = document.querySelector('.lt-toolbar-tools');
   const nav = document.querySelector('.nav-pill');
   if (phone && nav && playAllBtn.parentElement !== nav) {
     playAllBtn.classList.add('playback-launch');
     nav.append(playAllBtn);
   } else if (!phone && tools && playAllBtn.parentElement !== tools) {
     playAllBtn.classList.remove('playback-launch');
-    tools.prepend(playAllBtn);
+    tools.append(playAllBtn);
   }
 }
 
@@ -352,6 +352,6 @@ function wire() {
   }
 }
 
-// YouTube IFrame API를 미리 받아 두어 첫 '이어 보기' 클릭이 사용자 동작 안에서 시작되게 한다.
+// YouTube IFrame API를 미리 받아 두어 첫 '차례로 재생' 클릭이 사용자 동작 안에서 시작되게 한다.
 void loadYouTubeIframeApi().catch(() => {});
 wire();

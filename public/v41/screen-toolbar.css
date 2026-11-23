@@ -1,7 +1,7 @@
 /* #1091: 상단 메뉴 아래 화면 도구 줄 — 책·보드가 같은 부품을 쓴다. 서재는 #1154 병합 뒤 붙인다.
    색은 모두 --lt-* 토큰만 쓴다(화면별 하드코딩 금지). */
 html{--lt-toolbar-height:52px;--lt-content-top:calc(var(--lt-toolbar-top,66px) + var(--lt-toolbar-height))}
-html[data-v41-screen=book]{--lt-toolbar-top:70px;--lt-toolbar-pad:28px}
+html[data-v41-screen=book]{--lt-toolbar-top:0px;--lt-toolbar-pad:28px}
 html[data-v41-screen=board]{--lt-toolbar-pad:24px}
 html[data-v41-screen=shelf]{--lt-toolbar-top:82px;--lt-toolbar-pad:18px}
 /* 서재는 도구 줄을 실제 흐름에 넣고, 책 수는 이어 보기 띠 아래에 남긴다. */
@@ -38,14 +38,54 @@ html[data-book-shape=phone] .lt-toolbar-tools .desktop-only{display:none}
 .lt-toolbar-menu[hidden]{display:none}
 .lt-toolbar-more[hidden]{display:none}
 /* 줄이 생긴 만큼 화면 본문을 아래로 내려 첫 줄·이동 단추가 가리지 않게 한다. */
+/* 책의 중복 제목 띠를 없애고 트리 선택 기능은 도구 줄 제목에 그대로 둔다. */
+html[data-v41-screen=book] .topbar{display:none}
+html[data-v41-screen=book] .lt-screen-toolbar{top:0}
+html[data-v41-screen=book] .lt-screen-toolbar .book-title{flex:0 1 auto;min-width:0;max-width:45%;position:relative}
+html[data-v41-screen=book] .lt-screen-toolbar .book-title-btn{box-sizing:border-box;display:inline-flex;align-items:center;min-width:0;max-width:100%;min-height:44px;padding:0 8px;color:var(--lt-pearl);font:600 14px var(--lt-ui)}
+html[data-v41-screen=book][data-lt-theme=garden] .lt-screen-toolbar .book-title-btn{color:var(--lt-ink)}
+html[data-v41-screen=book] .lt-screen-toolbar #bookTitleText{font:inherit;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+html[data-v41-screen=book] .lt-screen-toolbar .tree-menu{top:calc(100% + 4px)}
 html[data-v41-screen=book] .stage{top:var(--lt-content-top)}
-html[data-book-shape=phone][data-v41-screen=book] .lt-screen-toolbar{position:relative;top:auto;margin-top:4px}
+html[data-book-shape=phone][data-v41-screen=book] .lt-screen-toolbar{position:relative;top:auto;margin-top:0}
+html[data-book-shape=phone][data-v41-screen=book] .lt-screen-toolbar .book-title{max-width:38%}
 html[data-book-shape=phone][data-v41-screen=book] .stage{top:auto;min-height:calc(100dvh - var(--lt-content-top))}
 @media(min-width:601px){html[data-v41-screen=book] .stage{padding-top:18px}}
 @media(max-width:600px){
   html{--lt-toolbar-height:48px}
   .lt-screen-toolbar{padding:0 12px}
-  html[data-v41-screen=book]{--lt-toolbar-pad:12px;--lt-toolbar-top:60px}
+  html[data-v41-screen=book]{--lt-toolbar-pad:12px;--lt-toolbar-top:0px}
   html[data-v41-screen=board]{--lt-toolbar-pad:12px}
   html[data-v41-screen=shelf]{--lt-toolbar-pad:12px}
 }
+
+/* 모든 두 칸 보기 전환: 두 칸에 같은 너비·높이·모서리를 부여한다. */
+.lt-toolbar-tools .view-toggle,.lt-toolbar-tools .shelf-view-inline,.lt-toolbar-tools .boardModeSwitch{
+ display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:stretch;
+ flex:none;box-sizing:border-box;min-width:92px;height:36px;min-height:36px;
+ padding:0;border:1px solid var(--lt-line);border-radius:var(--lt-r-pill);
+ background:var(--lt-glass-strong);overflow:hidden;
+}
+.lt-toolbar-tools .view-toggle>button,.lt-toolbar-tools .shelf-view-inline>button,.lt-toolbar-tools .boardModeSwitch>button{
+ display:flex;align-items:center;justify-content:center;box-sizing:border-box;
+ width:100%;min-width:0;height:34px;min-height:34px;padding:0 7px;
+ border:0;border-radius:var(--lt-r-pill);background:transparent;
+ color:var(--lt-pearl);font:600 12px var(--lt-ui);line-height:1;
+ box-shadow:none;transform:none;
+}
+.lt-toolbar-tools .view-toggle>button[aria-checked=true],
+.lt-toolbar-tools .view-toggle>button[aria-pressed=true],
+.lt-toolbar-tools .shelf-view-inline>button[aria-checked=true],
+.lt-toolbar-tools .boardModeSwitch>button[aria-pressed=true]{
+ background:var(--lt-primary);color:var(--lt-primary-ink);border:0;
+}
+.lt-toolbar-tools .view-toggle>button:not([aria-checked=true]):not([aria-pressed=true]),
+.lt-toolbar-tools .shelf-view-inline>button:not([aria-checked=true]),
+.lt-toolbar-tools .boardModeSwitch>button:not([aria-pressed=true]){
+ background:transparent;color:var(--lt-pearl);border:0;
+}
+html[data-lt-theme=garden] .lt-toolbar-tools .view-toggle>button:not([aria-checked=true]):not([aria-pressed=true]),
+html[data-lt-theme=garden] .lt-toolbar-tools .shelf-view-inline>button:not([aria-checked=true]),
+html[data-lt-theme=garden] .lt-toolbar-tools .boardModeSwitch>button:not([aria-pressed=true]){color:var(--lt-ink)}
+html[data-v41-screen=book] .lt-toolbar-tools #playAllBtn{order:10}
+@media(max-width:600px){.lt-toolbar-tools .view-toggle,.lt-toolbar-tools .shelf-view-inline,.lt-toolbar-tools .boardModeSwitch{min-width:84px}}
