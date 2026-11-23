@@ -185,6 +185,21 @@ body.home-existing.lt-fab-ok #mobile-add{display:none}
 /* #1094 보기 방식 전환 묶음(책/목록) — 테마 단추 옆 두 칸고르기. 다음 이슈(#1093 선반/회전)도 같은 묶음을 쓴다. */
 .view-toggle{display:inline-flex;align-items:center;gap:0;padding:3px;border:1px solid rgba(255,255,255,.22);border-radius:var(--lt-r-pill);background:rgba(9,8,14,.62)}
 .view-toggle[hidden]{display:none}
+/* #1026: 늦게 도착하는 글꼴의 한글 폭을 미리 맞춰 머리줄·안내 문구 이동을 줄인다. */
+@font-face{font-family:'LT UI Metric Fallback';src:local('Malgun Gothic');size-adjust:86%;font-display:swap}
+html:is([data-lt-shell-entry=shelf],[data-lt-shell-entry=book],[data-lt-shell-entry=board]) .header-actions,
+html:is([data-lt-shell-entry=shelf],[data-lt-shell-entry=book],[data-lt-shell-entry=board]) #empty,
+html:is([data-lt-shell-entry=shelf],[data-lt-shell-entry=book],[data-lt-shell-entry=board]) .home-links{font-family:'Pretendard Variable','LT UI Metric Fallback','Noto Sans KR',system-ui,sans-serif}
+/* 깊은 주소에서만 서버 권한 확인 전의 메뉴를 숨기고 첫 배치를 유지한다. */
+html[data-lt-header-pending] #record-menu,
+html[data-lt-header-pending] #tree-views,
+html[data-lt-header-pending] #write-menu{display:none}
+/* #1026: 첫 렌더링부터 서재·책 보기 단추의 최종 자리를 확보한다. */
+.view-toggle[data-lt-pending]{visibility:hidden;pointer-events:none}
+#book-display-toggle[data-lt-pending],#shelf-view-toggle[data-lt-pending]{display:none}
+html[data-lt-shell-entry=shelf] #book-display-toggle[data-lt-pending],html[data-lt-shell-entry=book] #book-display-toggle[data-lt-pending]{display:inline-flex}
+@media(min-width:521px){html[data-lt-shell-entry=shelf] #shelf-view-toggle[data-lt-pending]{display:inline-flex}}
+
 .view-toggle button{min-height:44px;padding:0 12px;border:0;border-radius:var(--lt-r-pill);background:transparent;color:#ece7f1;font-size:13px;letter-spacing:.02em;white-space:nowrap}
 .view-toggle button:hover{background:rgba(255,255,255,.09)}
 .view-toggle button[aria-checked="true"]{background:var(--lt-primary);color:var(--lt-primary-ink)}
@@ -251,12 +266,17 @@ html[data-v41-screen=book] .tools .ui-btn::after,html[data-v41-screen=board] hea
 }
 /* 책/목록 토글(상단 단추)이 보일 때만 머리줄을 감아 트리 줄을 온전히 남긴다. */
 @media(max-width:780px){
- .app-header:has(.view-toggle:not([hidden])){flex-wrap:wrap}
- .app-header:has(.view-toggle:not([hidden])) .main-nav{flex-basis:100%;order:3}
+ .app-header:has(.view-toggle:not([hidden]):not([data-lt-pending])){flex-wrap:wrap}
+ .app-header:has(.view-toggle:not([hidden]):not([data-lt-pending])) .main-nav{flex-basis:100%;order:3}
  /* 머리줄이 두 줄이 되면 트리 팝오버도 그 아래에서 열린다. */
- .app-header:has(.view-toggle:not([hidden])) .tree-popover{top:108px}
+ .app-header:has(.view-toggle:not([hidden]):not([data-lt-pending])) .tree-popover{top:108px}
 }
 /* 넘치는 쪽 끝의 페이드. 스크롤 위치에 따라 켜고 끄는 클래스는 shell.mjs가 붙인다. */
+/* #1026: 깊은 링크에서 첫 그림부터 최종 머리줄 행을 예약한다. */
+@media(max-width:780px){
+ html:is([data-lt-shell-entry=shelf],[data-lt-shell-entry=book]) .app-header{flex-wrap:wrap}
+ html:is([data-lt-shell-entry=shelf],[data-lt-shell-entry=book]) .app-header .main-nav{flex-basis:100%;order:3}
+}
 @media(max-width:780px){
  .app-header{--nav-fade:28px}
  .app-header nav.fade-start{mask-image:linear-gradient(to right,transparent 0,#000 var(--nav-fade))}

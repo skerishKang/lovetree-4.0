@@ -2976,3 +2976,205 @@ test('#1026 무대 불러오는 중 표시 — 느림 표시·빠름 비표시·
     }
   } finally { await browser.close(); await new Promise(resolve => server.close(resolve)); }
 });
+
+// #1026: 최초 진입의 셸 머리줄과 빈 화면 자리가 뒤늦게 밀리지 않는지 실제 렌더링으로 검증한다.
+test('#1026 서재·책·보드 390 첫 진입 CLS 0.01 이하', { skip: REQUIRE ? false : skip, timeout: 180000 }, async () => {
+  if (skip) assert.fail(skip);
+  const server = await serve();
+  const browser = await chromium.launch({ headless: true });
+  const base = 'http://127.0.0.1:' + server.address().port;
+  try {
+    const context = await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' });
+    await context.addInitScript(() => {
+      window.__firstLoadShifts1026 = [];
+      try {
+        const rect = r => ({ x: r.x, y: r.y, width: r.width, height: r.height });
+        new PerformanceObserver(list => {
+          for (const e of list.getEntries()) if (!e.hadRecentInput) {
+            window.__firstLoadShifts1026.push({
+              value: e.value, time: e.startTime,
+              sources: (e.sources || []).map(s => ({
+                node: s.node?.id || s.node?.className || s.node?.nodeName || '?',
+                previousRect: rect(s.previousRect), currentRect: rect(s.currentRect)
+              }))
+            });
+          }
+        }).observe({ type: 'layout-shift', buffered: true });
+      } catch {}
+    });
+    await context.route('**/api/**', route => route.fulfill({
+      status: 401, contentType: 'application/json', body: '{"error":"unauthorized"}'
+    }));
+    const page = await context.newPage();
+    for (const screen of ['shelf', 'book', 'board']) {
+      await page.goto(base + '/v41/?account=1#my/' + screen, { waitUntil: 'domcontentloaded' });
+      await page.waitForTimeout(2500);
+      const result = await page.evaluate(() => ({
+        screen: document.documentElement.dataset.ltShellEntry,
+        cls: (window.__firstLoadShifts1026 || []).reduce((sum, e) => sum + e.value, 0),
+        shifts: window.__firstLoadShifts1026 || [],
+        header: document.querySelector('.app-header')?.getBoundingClientRect().height,
+        stage: document.querySelector('#stage')?.getBoundingClientRect().height
+      }));
+      assert.equal(result.screen, screen, screen + ': 최초 경로가 첫 스타일에서 확인되어야 합니다');
+      assert.ok(result.stage > 0 && result.header > 0, screen + ': 실제 화면이 렌더링되어야 합니다');
+      assert.ok(result.cls <= 0.01, screen + ' 390 첫 진입 CLS ' + result.cls.toFixed(6) + ' > 0.01: ' + JSON.stringify(result.shifts.filter(e => e.value > 0.001)));
+    }
+    await context.close();
+  } finally {
+    await browser.close();
+    await new Promise(resolve => server.close(resolve));
+  }
+});
+
+// #1084: 로그인 첫 화면의 세로 쇼츠는 미디어 칸 양쪽에 원본 썸네일의 회색 여백을 남기면 안 된다.
+// 화면 전체 PNG의 실제 픽셀도 검사한다. 화면 크기와 대기 시간은 공통 시험 기준을 그대로 쓴다.
+test('#1084 세로 영상 첫 화면의 미디어 칸에는 회색 여백이 없다(정원·밤, 390·1440, 재생 전후)', {skip: REQUIRE ? false : skip, timeout: 90000}, async () => {
+  if (skip) assert.fail(skip);
+  const input = {subject: '세로 영상 확인', title: '첫 사진', date: '2026-11-20', emotion: '기쁨', note: '기록', url: ''};
+  let tree = createTree(input, '2026-11-20T10:00:00.000Z');
+  tree = addMoment(tree, {...input, title: '세로 쇼츠 마지막 순간', date: '2026-11-23', url: 'https://www.youtube.com/shorts/9NXOCr-T8LU'}, tree.moments[0].id, '2026-11-23T10:00:00.000Z');
+  const workspace = {revision: 1, state: {version: 1, trees: [tree], prefs: {displayName: '시험 계정'}}, subject: 'visual-audit-fake', writeSubjectBound: true, savedAt: '2026-11-23T10:00:00.000Z'};
+  // 회청색으로 레터박싱된 가로 썸네일: 가운데에만 세로 영상이 있는 실제 실패 조건.
+  const thumb = '<svg xmlns="http://www.w3.org/2000/svg" width="480" height="360"><defs><linearGradient id="g" x2="0" y2="1"><stop stop-color="#2e81a5"/><stop offset=".5" stop-color="#edb24d"/><stop offset="1" stop-color="#783e83"/></linearGradient></defs><rect width="480" height="360" fill="#465267"/><rect x="165" width="150" height="360" fill="url(#g)"/><circle cx="240" cy="130" r="53" fill="#e4f5ed"/><path d="M170 320 L240 195 L310 320" fill="#e14b60"/></svg>';
+  const server = await serve(), base = 'http://127.0.0.1:' + server.address().port;
+  const browser = await chromium.launch({headless: true});
+  try {
+    for (const theme of ['garden', 'night']) for (const width of [1440, 390]) {
+      const ctx = await browser.newContext({viewport: {width, height: width === 390 ? 844 : 900}, reducedMotion: 'reduce', deviceScaleFactor: 1});
+      try {
+        await ctx.addInitScript(t => {
+          localStorage.setItem('lt41.theme', t);
+          localStorage.setItem('lt41.tips.firstTree', '1');
+          localStorage.setItem('lt41.home.cards', 'mine');
+        }, theme);
+        await ctx.route('**/*', r => {
+          const url = new URL(r.request().url());
+          if (url.hostname === 'i.ytimg.com') return r.fulfill({status: 200, contentType: 'image/svg+xml', body: thumb});
+          if (url.origin !== base) return r.abort();
+          if (url.pathname === '/api/workspace') return r.fulfill({status: 200, json: workspace});
+          if (url.pathname === '/api/community/stats') return r.fulfill({status: 200, json: {trees: 8, moments: 21}});
+          if (url.pathname.startsWith('/api/')) return r.fulfill({status: 200, json: {ok: true, items: []}});
+          return r.continue();
+        });
+        const page = await ctx.newPage();
+        await page.goto(base + '/v41/?account=1#home', {waitUntil: 'load'});
+        await page.waitForFunction(() => window.LT41?.trees?.length === 1, null, {timeout: 15000});
+        const ask = page.locator('#discover-ask-no');
+        if (await ask.isVisible().catch(() => false)) await ask.click();
+        const media = page.frameLocator('#view').locator('.recent-media.vertical');
+        await media.locator('.recent-thumb').waitFor({state: 'visible', timeout: 15000});
+        await page.waitForFunction(() => {
+          const m = document.querySelector('#view')?.contentDocument?.getElementById('orbit')?.shadowRoot?.querySelector('.recent-media.vertical');
+          return m?.dataset.recentState === 'ready' && m.querySelector('img')?.naturalWidth > 0;
+        }, null, {timeout: 15000});
+        const geometry = await page.evaluate(() => {
+          const m = document.querySelector('#view').contentDocument.getElementById('orbit').shadowRoot.querySelector('.recent-media.vertical');
+          const doc = m.ownerDocument, pre = doc.defaultView.getComputedStyle(m, '::before'), r = m.getBoundingClientRect();
+          return {media: [r.width, r.height], background: doc.defaultView.getComputedStyle(m).backgroundColor, pseudo: {width: Number.parseFloat(pre.width), height: Number.parseFloat(pre.height), image: pre.backgroundImage, blur: pre.filter}, imageFit: doc.defaultView.getComputedStyle(m.querySelector('img')).objectFit};
+        });
+        assert.ok(geometry.pseudo.image.includes('url(') && geometry.pseudo.blur.includes('blur('), '세로 썸네일 흐림 층이 있어야 한다');
+        assert.ok(geometry.pseudo.width >= geometry.media[0] && geometry.pseudo.height >= geometry.media[1], '흐림 층이 미디어 칸 전체를 덮는다: ' + JSON.stringify(geometry));
+        for (const playing of [false, true]) {
+          if (playing) {
+            await media.locator('[data-recent-play]').click();
+            // 첫 화면의 재생 단추는 카드 위에 전체 미디어 뷰어를 연다.
+            await page.frameLocator('#view').locator('#mediaViewerHome.open iframe').waitFor({state: 'attached', timeout: 10000});
+            assert.equal(await page.frameLocator('#view').locator('#mediaViewerHome').getAttribute('aria-hidden'), 'false', '재생 뷰어가 열린다');
+          }
+          if (process.env.LT_1084_CAPTURE_DIR) await page.screenshot({path: join(process.env.LT_1084_CAPTURE_DIR, `${playing ? 'playing' : 'after'}-${width}-${theme}.png`), animations: 'disabled'});
+          const snap = await (playing ? page.frameLocator('#view').locator('#mediaViewerHome .mediaVisual') : media).screenshot({animations: 'disabled'});
+          const pixels = await page.evaluate(async data => {
+            const bmp = await createImageBitmap(await (await fetch('data:image/png;base64,' + data)).blob());
+            const canvas = new OffscreenCanvas(bmp.width, bmp.height), cx = canvas.getContext('2d');
+            cx.drawImage(bmp, 0, 0);
+            const rgba = cx.getImageData(0, 0, bmp.width, bmp.height).data;
+            let gray = 0; const samples = [];
+            for (let y = Math.floor(bmp.height * .4); y < Math.ceil(bmp.height * .6); y++) {
+              for (let x = 5; x < bmp.width - 5; x++) {
+                const i = (y * bmp.width + x) * 4;
+                const [r,g,b] = [rgba[i], rgba[i+1], rgba[i+2]];
+                // 재현 썸네일의 회청색 띠 (#465267) 및 흐림·혼합된 회청색.
+                if (b > r + 5 && g > r + 2 && b > g + 4) {
+                  gray++; if (samples.length < 3) samples.push({x,y,r,g,b});
+                }
+              }
+            }
+            return {gray, samples};
+          }, snap.toString('base64'));
+          console.log('#1084', width, theme, playing ? '재생' : '재생 전', JSON.stringify({geometry, pixels}));
+          assert.equal(pixels.gray, 0, width + ' ' + theme + ' ' + (playing ? '재생' : '재생 전') + ': 미디어 칸의 회청색 픽셀 0 (현재 ' + pixels.gray + ', ' + JSON.stringify(pixels.samples) + ')');
+        }
+        // 공용 책·보드 렌더러도 가로 썸네일의 회색 여백을 다시 노출하지 않는다.
+        if (theme === 'night' && width === 1440) {
+          await page.frameLocator('#view').locator('#mediaCloseHome').click();
+
+          // 순간 목록과 궤도 카드 상세도 같은 썸네일을 사용한다.
+          await page.evaluate(() => {
+            const root = document.querySelector('#view').contentDocument.getElementById('orbit').shadowRoot;
+            root.querySelector('[data-do=moments]').click();
+          });
+          for (const slot of ['moment-list', 'orbit-detail']) {
+            if (slot === 'orbit-detail') {
+              await page.evaluate(() => {
+                const root = document.querySelector('#view').contentDocument.getElementById('orbit').shadowRoot;
+                root.querySelector('.orbit-dialog[open] [data-next]').click();
+              });
+            }
+            const locator = page.frameLocator('#view').locator(slot === 'moment-list'
+              ? '.orbit-dialog[open] .index-row-thumb.is-vertical'
+              : '.orbit-dialog[open] .detail-vertical-stage');
+            await locator.waitFor({state: 'visible', timeout: 15000});
+            if (process.env.LT_1084_CAPTURE_DIR) await page.screenshot({path: join(process.env.LT_1084_CAPTURE_DIR, `${slot}-after-${width}-${theme}.png`), animations: 'disabled'});
+            const info = await locator.evaluate(el => {
+              const bg = getComputedStyle(el, '::before'), r = el.getBoundingClientRect();
+              return {image: bg.backgroundImage, filter: bg.filter, width: r.width, height: r.height};
+            });
+            assert.ok(info.image.includes('url(') && info.filter.includes('blur('), slot + ': 흐린 배경 사용');
+            const png = await locator.screenshot({animations: 'disabled'});
+            const count = await page.evaluate(async b64 => {
+              const blob = await (await fetch('data:image/png;base64,' + b64)).blob();
+              const bmp = await createImageBitmap(blob), cv = new OffscreenCanvas(bmp.width, bmp.height), cx = cv.getContext('2d');
+              cx.drawImage(bmp, 0, 0);
+              const pix = cx.getImageData(0, 0, bmp.width, bmp.height).data; let gray = 0;
+              for(let y=Math.floor(bmp.height*.4);y<Math.ceil(bmp.height*.6);y++)
+                for(let x=5;x<bmp.width-5;x++){const i=(y*bmp.width+x)*4, r=pix[i],g=pix[i+1],b=pix[i+2];if(b>r+5&&g>r+2&&b>g+4)gray++}
+              return gray;
+            }, png.toString('base64'));
+            console.log('#1084 공용', slot, JSON.stringify({...info, gray: count}));
+            assert.equal(count, 0, slot + ': 미디어 칸 회청색 픽셀 0');
+          }
+          await page.evaluate(() => {
+            const root = document.querySelector('#view').contentDocument.getElementById('orbit').shadowRoot;
+            root.querySelector('.orbit-dialog[open] [data-do=close]').click();
+          });
+          for (const slot of ['book', 'board']) {
+            await page.evaluate(({id, slot}) => { location.hash = 'my/' + slot + '?tree=' + id; }, {id: tree.id, slot});
+            const locator = page.frameLocator('#view').locator(slot === 'book' ? '#rightPage .yt-play.is-remote-vertical' : '.lt-media[data-lt-vertical="1"] .lt-yt-preview');
+            await locator.waitFor({state: 'visible', timeout: 15000});
+            if (process.env.LT_1084_CAPTURE_DIR) await page.screenshot({path: join(process.env.LT_1084_CAPTURE_DIR, `${slot}-after-${width}-${theme}.png`), animations: 'disabled'});
+            const info = await locator.evaluate(el => {
+              const layer = el.querySelector('.yt-vertical-backdrop,.lt-vertical-backdrop');
+              const pic = layer?.querySelector('img'), css = layer ? getComputedStyle(layer) : null, r = el.getBoundingClientRect();
+              return {image: pic?.currentSrc || '', loaded: (pic?.naturalWidth || 0) > 0, filter: css?.filter || '', width: r.width, height: r.height};
+            });
+            assert.ok(info.loaded && info.image && info.filter.includes('blur('), slot + ': 세로 썸네일 배경이 이미지로 채워진다');
+            const png = await locator.screenshot({animations: 'disabled'});
+            const count = await page.evaluate(async b64 => {
+              const blob = await (await fetch('data:image/png;base64,' + b64)).blob();
+              const bmp = await createImageBitmap(blob), cv = new OffscreenCanvas(bmp.width, bmp.height), cx = cv.getContext('2d');
+              cx.drawImage(bmp, 0, 0);
+              const pix = cx.getImageData(0, 0, bmp.width, bmp.height).data; let gray = 0;
+              for(let y=Math.floor(bmp.height*.4);y<Math.ceil(bmp.height*.6);y++)
+                for(let x=5;x<bmp.width-5;x++){const i=(y*bmp.width+x)*4, r=pix[i],g=pix[i+1],b=pix[i+2];if(b>r+5&&g>r+2&&b>g+4)gray++}
+              return gray;
+            }, png.toString('base64'));
+            console.log('#1084 공용', slot, JSON.stringify({...info, gray:count}));
+            assert.equal(count, 0, slot + ': 미디어 칸 회청색 픽셀 0');
+          }
+        }
+        await page.close();
+      } finally { await ctx.close(); }
+    }
+  } finally { await browser.close(); await new Promise(ok => server.close(ok)); }
+});
