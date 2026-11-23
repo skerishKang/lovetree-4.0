@@ -339,7 +339,8 @@ test('#1027 정원 이어 보기 카드의 종이색과 글 대비, 세로 영�
                 assert.equal(stats.fit,'cover');
                 assert.ok(stats.thumbW/stats.thumbH<=9/16+0.02&&stats.thumbW/stats.thumbH>=0.35, '세로 썸네일은 9:16 이하 폭(쇼츠 썸네일 양옆 띠는 잘라 냄): '+JSON.stringify(stats));
                 assert.ok(stats.thumbW<stats.width*0.4, '가운데 좁은 칸만 원래 썸네일, 나머지는 흐린 배경: '+JSON.stringify(stats));
-                assert.match(stats.blur,/blur\(18px\)/);
+                // 대표 11-24: 뒤에 같은 영상이 크고 흐리게 보여야 한다 — 2.8배·blur 6px(실제 약 17px). 3.6배·18px는 칸 전체가 한 색으로 뭉개졌다.
+                assert.match(stats.blur,/blur\(6px\)/);
                 assert.equal(stats.opacity,'0.7');
                 assert.ok(stats.bgImage.includes(stats.thumbSrc),'같은 썸네일을 CSS 변수로 깐다(#1084): '+JSON.stringify(stats));
               }
