@@ -184,6 +184,15 @@ export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSel
   description.innerHTML=lines.map((line,i)=>`<span class="lt-home-line lt-home-enter" style="--lt-home-order:${2+i}">${line}</span>`).join('');
  }
 
+ // #1084 후속(운영 11-23): 세로 영상의 흐린 배경은 처음 후보(oardefault)로 깔리는데, 그 그림이 없는 영상은 YouTube가
+ // 120×90 회색 자리 그림을 돌려줘 칸 전체가 회색이 된다. 가운데 썸네일이 후보를 내려가며 실제로 불러온 그림으로 배경도 바꾼다.
+ const followThumb=img=>{
+  if(!(img instanceof HTMLImageElement)||!img.currentSrc||img.naturalWidth<=120)return;
+  const host=img.closest('.recent-media.vertical')||img.closest('.index-row-thumb.is-vertical')||img.closest('.detail-vertical-stage');
+  if(!host)return;
+  host.style.setProperty(host.classList.contains('recent-media')?'--lt-recent-bg':'--lt-orbit-thumb','url("'+img.currentSrc.replace(/"/g,'%22')+'")');
+ };
+ shadow.addEventListener('load',e=>followThumb(e.target),true);
  // #1010: 예시 안내 줄 — 떠다니는 예시 카드가 숨는 좁은 화면에서는 함께 숨긴다(아래 배치에서 data-off를 묻는다).
  const centerNote=shadow.querySelector('.center-note');
  const fallbackCanvas=document.createElement('canvas'),glCanvas=document.createElement('canvas');
