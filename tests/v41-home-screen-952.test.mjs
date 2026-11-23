@@ -679,6 +679,18 @@ test('#1204 첫 화면 순차 등장·안내 삭제·WebGL 말풍선·기억·�
           assert.equal(state.overlaps,false,'중앙 글자·단추와 겹치지 않는다');
           await h.page.waitForTimeout(440);
         }
+        // #1204: Scrub several real WebGL orbit phases, not just adjacent frames.
+        // The hint must hand off to an on-screen card instead of holding a rear card.
+        for (const phase of [0.2, 0.5, 0.8]) {
+          await h.frame.evaluate(t => globalThis.__LT_ORBIT_TEST__.seek(t), phase);
+          await h.page.waitForTimeout(1050);
+          const state=await inspect();
+          assert.equal(state.visible,true,'말풍선이 단계별로 앞 카드에 나타난다');
+          assert.equal(state.closeToCard,true,'투영 카드 곁에 남는다: '+JSON.stringify(state));
+          assert.equal(state.overlaps,false,'중앙 내용·단추를 가리지 않는다');
+        }
+        await h.frame.evaluate(()=>globalThis.__LT_ORBIT_TEST__.restore());
+        await h.page.waitForTimeout(1100);
         assert.deepEqual((await inspect()).centerRect,opening.centerRect,'중앙 영역은 등장 전후에도 재배치되지 않는다');
         const {mkdirSync}=await import('node:fs');
         const capture=process.env.LT_HOME_1204_CAPTURE_DIR;
