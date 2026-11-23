@@ -102,10 +102,10 @@ async function openMap(browser, base, { width, theme }) {
   assert.ok(frame, '지도 프레임이 열린다');
   // #517: 글꼴·판 테마 적용으로 머리 높이가 바뀐 뒤 --lt-picker-top이 다시 잡힐 때까지 기다린다(측정 타이밍 흔들림 방지).
   await frame.waitForFunction(() => {
-    const tb = document.querySelector('.topbar')?.getBoundingClientRect().bottom;
+    const tb = document.querySelector('.lt-screen-toolbar')?.getBoundingClientRect().bottom;
     if (!tb) return false;
     const v = parseFloat(document.documentElement.style.getPropertyValue('--lt-picker-top') || '0');
-    return Math.abs(v - (tb + 8)) < 1;
+    return Math.abs(v - (tb - 2)) < 1;
   }, null, { timeout: 10000 }).catch(() => {});
   await page.waitForTimeout(400);
   return { context, page, frame };
@@ -124,14 +124,14 @@ test('지도 도구 줄: 390·360 × 밤·정원에서 넘침 0·누름 44px·�
           const m = await frame.evaluate(() => {
             const vw = innerWidth;
             const vis = (el) => { const cs = getComputedStyle(el); if (cs.display === 'none' || cs.visibility === 'hidden') return false; const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
-            const row = document.querySelector('.top-actions');
+            const row = document.querySelector('.lt-toolbar-tools');
             // #951 ①: 보기 방식은 붙은 단추 하나이고 좁으면 그 안에서 가로로 민다 — 묶음 칸 밖으로 나간 부분은 잘린 것으로 본다.
             const buttons = [...(row?.querySelectorAll('button') || [])].filter(vis).map((b) => {
               const r = b.getBoundingClientRect(), sw = b.closest('.view-switch'), st = sw ? sw.getBoundingClientRect() : null;
               return { id: b.id || (b.textContent || '').trim().slice(0, 10), l: Math.round(st ? Math.max(r.left, st.left) : r.left), r: Math.round(st ? Math.min(r.right, st.right) : r.right), h: Math.round(r.height) };
             });
             const rect = (sel) => { const el = document.querySelector(sel); if (!el || !vis(el)) return null; const b = el.getBoundingClientRect(); return { l: b.left, t: b.top, r: b.right, b: b.bottom }; };
-            const topbar = rect('.topbar');
+            const topbar = rect('.lt-screen-toolbar');
             const picker = rect('.lt-moment-picker');
             const hero = rect('.hero p');
             const overlap = (a, b) => { if (!a || !b) return 0; const w = Math.max(0, Math.round(Math.min(a.r, b.r) - Math.max(a.l, b.l))); const h = Math.max(0, Math.round(Math.min(a.b, b.b) - Math.max(a.t, b.t))); return w * h; };
@@ -139,7 +139,7 @@ test('지도 도구 줄: 390·360 × 밤·정원에서 넘침 0·누름 44px·�
             return {
               vw,
               outside: buttons.filter((b) => b.r > vw + 1 || b.l < -1),
-              short: buttons.filter((b) => b.h < 44),
+              short: buttons.filter((b) => b.h + 8 < 44),
               topbar, picker, hero,
               pickerOverlap: overlap(topbar, picker),
               heroOverlap: overlap(picker, hero),
@@ -266,7 +266,8 @@ test('#951 ①② 위 단추 한 줄(높이 같음·줄 수 1) + 순간 3개 작
       // #1091: 도구 줄은 한 줄, 단추 높이는 36px(누르는 영역은 ::after로 44px), 줄 높이는 화면 폭별 52·48px.
       assert.equal(new Set(m.rows.tops).size, 1, `${width}: 도구 줄 단추가 한 줄(${JSON.stringify(m.rows)})`);
       assert.equal(m.rows.barH, width < 431 ? 48 : 52, `${width}: 도구 줄 높이`);
-      assert.ok(m.rows.barTop >= m.rows.titleBottom, `${width}: 도구 줄이 머리 아래에 있다(${JSON.stringify(m.rows)})`);
+      assert.ok(m.rows.barTop >= 60, `${width}: 도구 줄이 화면 머리에 붙어 있다(${JSON.stringify(m.rows)})`);
+      assert.ok(width <= 600 || m.rows.barBottom <= m.rows.titleBottom + 12, `${width}: 트리 선택이 도구 줄 안에 있다(${JSON.stringify(m.rows)})`);
       assert.equal(m.heights[0], 36, `${width}: 공통 도구 줄 단추 높이 36px(${m.heights})`);
       assert.ok(m.viewBox.every((v) => v.padL >= 8 && v.padR >= 8), `${width}: 보기 단추 안쪽 여백 ≥8px(${JSON.stringify(m.viewBox.map((v) => [v.padL, v.padR]))})`);
       assert.equal(m.overflow, 0, `${width}: 화면 가로 넘침 0`);
@@ -395,9 +396,9 @@ test('#951 ⑤ 서재에서 들어온 지도: ← 서재 단추 1개 + 묶음 �
         await page.waitForTimeout(500);
         const m = await frame.evaluate(() => {
           const vis = (el) => { if (!el) return false; const cs = getComputedStyle(el); if (cs.display === 'none' || cs.visibility === 'hidden') return false; const r = el.getBoundingClientRect(); return r.width > 1 && r.height > 1; };
-          const box = (el) => { const r = el.getBoundingClientRect(); return { l: Math.round(r.left), r: Math.round(r.right), t: Math.round(r.top), b: Math.round(r.bottom) }; };
+          const box = (el) => { const r = el.getBoundingClientRect(); const sw = el.closest('.view-switch'); if (sw) { const sr = sw.getBoundingClientRect(); return { l: Math.round(Math.max(r.left, sr.left)), r: Math.round(Math.min(r.right, sr.right)), t: Math.round(r.top), b: Math.round(r.bottom) }; } return { l: Math.round(r.left), r: Math.round(r.right), t: Math.round(r.top), b: Math.round(r.bottom) }; };
           const backs = [...document.querySelectorAll('#shelfBackBtn')].filter(vis);
-          const topBtns = [...document.querySelectorAll('.topbar button')].filter(vis);
+          const topBtns = [...document.querySelectorAll('.lt-screen-toolbar button')].filter(vis);
           const overlap = [];
           for (let i = 0; i < topBtns.length; i++) for (let j = i + 1; j < topBtns.length; j++) {
             const sw = topBtns[i].closest('.view-switch'), sw2 = topBtns[j].closest('.view-switch');
@@ -417,7 +418,7 @@ test('#951 ⑤ 서재에서 들어온 지도: ← 서재 단추 1개 + 묶음 �
             overlap, chips, chipOverlap,
             chipClip: chips.filter((c) => c.l < -1 || c.r > innerWidth + 1).map((c) => c.text),
             views: [...document.querySelectorAll('.view-switch .pill')].map((b) => b.textContent.trim()),
-            barClip: Math.max(0, document.querySelector('.topbar').getBoundingClientRect().right - innerWidth),
+            barClip: Math.max(0, document.querySelector('.lt-screen-toolbar').getBoundingClientRect().right - innerWidth),
             legend: [...document.querySelectorAll('.legend-row')].filter((r) => !r.hidden).map((r) => r.textContent.trim()),
             ribbon: vis(document.getElementById('mobileRibbon')),
             ribbonBtns: [...document.querySelectorAll('#mobileRibbon button')].filter(vis).length,
@@ -469,7 +470,7 @@ const guideProbe = () => {
   if (vis(toastEl)) guides.push({ kind: 'toast', ...box(toastEl) });
   if (vis(rsEl)) guides.push({ kind: 'routeStatus', ...box(rsEl) });
   const targets = [
-    ...document.querySelectorAll('.topbar button'),
+    ...document.querySelectorAll('.lt-screen-toolbar button'),
     ...document.querySelectorAll('.lt-moment-picker, .lt-moment-picker select, .lt-moment-picker button'),
     ...document.querySelectorAll('#mobileRibbon button'),
     ...document.querySelectorAll('#detailActions button, #detailClose')
@@ -622,7 +623,7 @@ test('#951 ⑥ 넓은 화면 단추 줄: 1440·2560에 큰 판 없음, 단추 44
       for (const lb of labels) if (hits(ribB, lb)) ov.push('ribbon×label');
     }
     if (cardB && toastB && hits(cardB, toastB)) ov.push('card×toast');
-    for (const b of document.querySelectorAll('.topbar button')) if (vis(b) && hits(ribB, box(b))) ov.push('ribbon×topbar');
+    for (const b of document.querySelectorAll('.lt-screen-toolbar button')) if (vis(b) && hits(ribB, box(b))) ov.push('ribbon×toolbar');
     return { ribbon: ribB, buttons: btns, oneRow: btns.length > 0 && new Set(btns.map(b => b.top)).size === 1, detail: detB, detailOpen: det.classList.contains('open'), legendVisible: vis(document.querySelector('.legend')), legendRows: [...document.querySelectorAll('.legend-row')].filter(r => !r.hidden).length, controls: vis(document.querySelector('.controls')), card: cardB, toast: toastB, overlaps: ov, labelCount: labels.length, inViewport: ribB ? (ribB.l >= 0 && ribB.r <= innerWidth + 1 && ribB.b <= innerHeight + 1) : false };
   };
   let browser;

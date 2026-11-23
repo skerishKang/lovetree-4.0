@@ -1679,9 +1679,9 @@
     if (!visible(p, 90)) return;
     const rawAlpha = nodeAlpha(n),
       dim = state.mode !== 'OVERVIEW' && rawAlpha < 0.5,
-      al = paintAlpha(rawAlpha, 'node-alpha-min') *
-        (dim && document.documentElement.getAttribute('data-lt-theme') === 'garden' ? 0.88 : 1),
-      /* #1096: 흐린 점도 자기 묶음 색으로 — 정원에서 회색 점이 섞이지 않는다. */
+      /* #1096: 흐린 점도 자기 묶음 색으로 — 정원에서 회색 점이 섞이지 않는다.
+         흐림(×0.88)은 node-alpha-min 바닥 아래로 내리지 않는다(390 정원에서 흐릿한 점이 바탕 대비 3:1을 깨던 자리). */
+      al = paintAlpha(dim && document.documentElement.getAttribute('data-lt-theme') === 'garden' ? rawAlpha * 0.88 : rawAlpha, 'node-alpha-min'),
       nodeColor = colorOf(n),
       rgb = hexRgb(nodeColor),
       sel = state.selected?.id === n.id || state.play?.currentId === n.id,
@@ -1733,6 +1733,10 @@
       ctx.beginPath();
       ctx.arc(p.x, p.y, Math.max(1.5, r), 0, Math.PI * 2);
       ctx.fill();
+      /* #1096: 묶음(꼬리표) 보기의 작은 점은 묶음 바탕과 붙어 sep — 종이 테가 있어야 점이 바탕과 3:1 이상 떨어진다. */
+      if (state.view === 'tag' && !sel && n.kind === 'moment' && r < 5 && document.documentElement.getAttribute('data-lt-board-theme') !== 'night') {
+        ctx.strokeStyle = 'rgb(109,96,90)'; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.arc(p.x, p.y, Math.max(1.5, r) - 0.8, 0, Math.PI * 2); ctx.stroke();
+      }
       if (n.kind === 'anchor' || n.level === 0) ctx.stroke();
     }
     ctx.shadowBlur = 0;

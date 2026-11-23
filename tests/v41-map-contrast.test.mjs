@@ -127,16 +127,22 @@ test('지도 실제 대비: 앱 2 × 판 2 × 1440·390, 두 보기·선택 상�
   }
 });
 
-test('정원 묶음 선 색은 묶음마다 다르고 바탕 대비 3:1 이상', { skip: REQUIRE ? false : skip, timeout: 120000 }, async () => {
+test('묵음 선 색은 묶음마다 다르고 정원·밤 바탕 대비 3:1 이상', { skip: REQUIRE ? false : skip, timeout: 120000 }, async () => {
   if (skip) assert.fail(`미리보기 검사에서 건너뜀이 실패다 — ${skip}`);
   const server = await serve(ROOT), base = `http://127.0.0.1:${server.address().port}`;
   const browser = await chromium.launch();
+  await bundleColorCheck(browser, base, 'garden', 'paper');
+  await bundleColorCheck(browser, base, 'night', 'night');
+  await browser.close();
+  await new Promise(resolve => server.close(resolve));
+});
+async function bundleColorCheck(browser, base, theme, plate) {
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce', locale: 'ko-KR' });
   try {
-    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce', locale: 'ko-KR' });
-    await ctx.addInitScript(() => {
-      localStorage.setItem('lt41.theme', 'garden');
-      localStorage.setItem('lt41.boardTheme', 'paper');
-    });
+    await ctx.addInitScript(({ theme, plate }) => {
+      localStorage.setItem('lt41.theme', theme);
+      localStorage.setItem('lt41.boardTheme', plate);
+    }, { theme, plate });
     const page = await ctx.newPage();
     await page.goto(`${base}/v41/#network`, { waitUntil: 'load' });
     await page.waitForFunction(() => [...document.querySelectorAll('iframe')].some(f => f.contentWindow?.__lt?.dots?.().length > 0), null, { timeout: 30000, polling: 100 });
@@ -152,8 +158,9 @@ test('정원 묶음 선 색은 묶음마다 다르고 바탕 대비 3:1 이상',
         bg: (cs.getPropertyValue('--lt-map-bg-top') || '#fbfaf8').trim()
       };
     });
-    assert.equal(data.theme, 'garden');
-    assert.notEqual(data.plate, 'night');
+    assert.equal(data.theme, theme === 'night' ? null : theme, 'night 테마는 속성 없이 기본값으로 그려진다');
+    if (theme === 'garden') assert.notEqual(data.plate, 'night');
+    else assert.equal(data.plate, plate);
     assert.equal(new Set(data.colors).size, 6, `묶음마다 색이 다르다: ${data.colors.join(', ')}`);
     const lum = hex => {
       const c = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255)
@@ -165,7 +172,6 @@ test('정원 묶음 선 색은 묶음마다 다르고 바탕 대비 3:1 이상',
       const l = lum(color);
       return Math.round(((Math.max(l, bg) + 0.05) / (Math.min(l, bg) + 0.05)) * 100) / 100;
     });
-    assert.ok(ratios.every(r => r >= 3), `정원 묶음 색 대비 3:1 미달: ${data.colors.map((c, i) => `${c}=${ratios[i]}`).join(', ')} (바탕 ${data.bg})`);
-    await ctx.close();
-  } finally { await browser.close(); await new Promise(resolve => server.close(resolve)); }
-});
+    assert.ok(ratios.every(r => r >= 3), `${theme} 묶음 색 대비 3:1 미달: ${data.colors.map((c, i) => `${c}=${ratios[i]}`).join(', ')} (바탕 ${data.bg})`);
+  } finally { await ctx.close(); }
+}

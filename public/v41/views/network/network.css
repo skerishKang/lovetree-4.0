@@ -1,5 +1,6 @@
 /* #1096: 공통 도구 줄 아래에서 지도 요소들이 시작한다. 줄 높이는 screen-toolbar.css 한 벌을 쓴다. */
-html[data-v41-screen=network]{--lt-map-toolbar-bottom:calc(var(--lt-toolbar-top,88px) + var(--lt-toolbar-height,52px))}
+html[data-v41-screen=network]{--lt-toolbar-top:70px;--lt-map-toolbar-bottom:calc(var(--lt-toolbar-top,88px) + var(--lt-toolbar-height,52px))}
+@media(max-width:600px){html[data-v41-screen=network]{--lt-toolbar-top:60px}}
 :root{
   color-scheme:light;
   --bg:#f8f5f2;--bg2:#f2f0f6;--ink:#27242e;--muted:#716d79;
@@ -20,6 +21,16 @@ button{font:inherit;color:inherit;cursor:pointer}
 .top-actions{pointer-events:auto}
 /* #1096: 트리 이름은 도구 줄 제목 한 곳에만 — 머리 알약은 트리 고르기 동작만 남긴다. */
 html[data-v41-screen=network] .tree-title-btn #treeTitleText{display:none}
+/* 도구 줄 왼쪽의 '← 서재'·트리 고르기 — 공통 도구 줄 단추(높이 36)와 같은 크기로 둔다. */
+.lt-screen-toolbar > .shelf-back,.lt-screen-toolbar > .tree-title > .tree-title-btn{height:36px;min-height:36px;line-height:34px;padding:0 12px;border:1px solid var(--lt-line);border-radius:var(--lt-r-pill);background:var(--lt-glass-strong);color:var(--lt-pearl);font-family:var(--lt-ui);font-size:13px;white-space:nowrap}
+.lt-screen-toolbar > .tree-title{position:relative;display:inline-flex;flex:none}
+/* 390에서는 셸 머리줄의 트리 선택이 이미 있어 도구 줄 안의 트리 단추를 접는다 — 않 그러면 보기 방식 셋째 이름이 줄 밖으로 밀린다. */
+@media(max-width:600px){html[data-v41-screen=network] .lt-screen-toolbar > .tree-title{display:none}html[data-v41-screen=network] .lt-screen-toolbar{padding:0 8px}html[data-v41-screen=network] .lt-screen-toolbar .lt-toolbar-tools > button{padding:0 6px}html[data-v41-screen=network] .lt-screen-toolbar > .shelf-back{width:30px;padding:0 6px;overflow:hidden;text-overflow:clip}}
+@media(max-width:600px){html[data-v41-screen=network] .lt-screen-toolbar > .shelf-back{padding:0 8px}html[data-v41-screen=network] .lt-screen-toolbar .lt-toolbar-tools{gap:5px}html[data-v41-screen=network] .lt-screen-toolbar .lt-toolbar-tools .view-switch .pill{padding:0 9px}
+@media(max-width:600px){html[data-v41-screen=network] .lt-screen-toolbar .lt-toolbar-tools > button{padding:0 8px}}}
+/* 도구 줄 왼쪽의 '← 서재'·트리 고르기 — 밤 판에서는 밤 판 단추 규칙(밝은 글자)을 쓴다. */
+html[data-v41-screen="network"][data-lt-board-theme=night] .lt-screen-toolbar > .shelf-back,
+html[data-v41-screen="network"][data-lt-board-theme=night] .lt-screen-toolbar > .tree-title > .tree-title-btn{background:var(--lt-map-control);border-color:var(--lt-map-ui-border);color:var(--lt-map-ui-text)}
 .lt-toolbar-meta{padding:0;border:0;background:none;color:var(--lt-muted);font-family:var(--lt-ui);font-size:13px;line-height:16px;white-space:nowrap;cursor:pointer}
 .lt-toolbar-meta:hover,.lt-toolbar-meta:focus-visible{color:var(--lt-pearl)}
 /* 좁은 줄에서는 단추 모양·간격을 다른 화면과 같게 유지하기 위해 작은 글씨만 접는다. */
