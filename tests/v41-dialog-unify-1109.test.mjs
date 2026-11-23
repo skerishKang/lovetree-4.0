@@ -335,7 +335,8 @@ test('#1231 로그아웃 서재·책·보드·지도 빈 상태와 화면별 로
     const page=await ctx.newPage();
     const errors=[];page.on('pageerror',e=>errors.push(e.message));
     await page.goto(`${base}/v41/#home`,{waitUntil:'load'});
-    await page.waitForFunction(()=>document.querySelector('#tree-views')?.hidden===false);
+    // 실제 401 판정이 끝난 로그아웃에서 탭을 누른다. 인증 확인 중 탭 유지 여부는 #1109가 별도로 잰다.
+    await page.waitForFunction(()=>document.documentElement.dataset.ltAuthPhase==='ready'&&document.documentElement.dataset.ltAuthHint==='out'&&document.body.dataset.member==='out'&&document.querySelector('#tree-views')?.hidden===false);
     const initial=await page.evaluate(()=>({member:document.body.dataset.member,views:[...document.querySelectorAll('#tree-views button[data-view]')].map(b=>b.textContent.trim()),header:document.querySelector('.app-header').getBoundingClientRect().height}));
     assert.equal(initial.member,'out',`${width}: 로그아웃`);
     assert.deepEqual(initial.views,['서재','책','보드','지도'],`${width}: 네 탭 그대로 유지`);
@@ -348,7 +349,10 @@ test('#1231 로그아웃 서재·책·보드·지도 빈 상태와 화면별 로
       await page.locator('#header-overflow [role=menuitem]').filter({hasText:new RegExp(`^${name}$`)}).click();
      }else await page.locator(`#tree-views [data-view="${file}"]`).click();
      const expected=`로그인하면 내 ${name}${name==='책'?'이':'가'} 보여요`;
-     await page.waitForFunction(title=>document.querySelector('#empty h1')?.textContent===title,expected);
+     await page.waitForFunction(title=>document.querySelector('#empty h1')?.textContent===title,expected).catch(async error=>{
+       const state=await page.evaluate(()=>({hash:location.hash,title:document.querySelector('#empty h1')?.textContent,emptyHidden:document.getElementById('empty')?.hidden,guest:document.getElementById('empty')?.dataset.emptyGuest,member:document.body.dataset.member,source:document.body.dataset.recordSource,auth:document.documentElement.dataset.ltAuthPhase,frame:document.getElementById('view')?.getAttribute('src'),current:[...document.querySelectorAll('[data-view][aria-current=true]')].map(x=>x.textContent)}));
+       throw new Error(`${width}/${name}: ${error.message} — ${JSON.stringify(state)}`);
+     });
      const state=await page.evaluate(()=>({hash:location.hash,home:document.body.classList.contains('home-screen'),visible:!document.getElementById('empty').hidden,guest:document.getElementById('empty').dataset.emptyGuest,button:document.getElementById('empty-records').textContent.trim(),loginVisible:!!document.querySelector('#account-entry')?.getClientRects().length,tabHidden:document.getElementById('tree-views').hidden,current:[...document.querySelectorAll('#tree-views button[data-view]')].filter(b=>b.getAttribute('aria-current')==='true').map(b=>b.textContent.trim())}));
      assert.equal(state.hash,'#'+key,`${width}/${name}: 화면 주소 유지`);
      assert.equal(state.home,false,`${width}/${name}: 첫 화면으로 되돌아가지 않음`);

@@ -14,9 +14,9 @@ export function createWorkspaceRuntime(ctx){
 
   function showInFrame(url,title){return ctx.shellScreens.showInFrame(url,title);}
 
-  function show(file,write=true,treeKey=''){
+  function show(file,write=true,treeKey='',fromHeaderTab=false){
    if(file==='src064-orbit.html')ctx.shellStageLoading.start('home');else ctx.shellStageLoading.cancel();
-   return ctx.shellScreens.show(file,write,treeKey);
+   return ctx.shellScreens.show(file,write,treeKey,fromHeaderTab);
   }
 
   function frameLoaded(frame){return ctx.shellScreens.frameLoaded(frame);}

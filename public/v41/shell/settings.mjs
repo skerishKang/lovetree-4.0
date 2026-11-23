@@ -544,7 +544,8 @@ async function showPublicRoute(route){
  if(view==='board'&&answer.share.entryMomentId)requestBoardOpen(answer.share.entryMomentId);
  deps.activeShareId=answer.share.id;show(deps.current,false);writeLocation('replace');notify('공개된 트리를 감상하는 화면이에요. 감상만 할 수 있어요.'+(answer.aiTester?' AI 명예회원이 만든 트리예요.':'')+(answer.omittedPrivateMedia?' 올린 사진 '+answer.omittedPrivateMedia+'장은 나만 볼 수 있어요.':''));
 }
-document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{if(b.dataset.view==='track32-bookshelf.html'&&!deps.memberViewsAvailable()){openLoginStart('shelf');return;}
+document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{
+ // 2026-11-23: 로그아웃 서재 탭도 로그인으로 즉시 이동시키지 않고 빈 상태에서 로그인 단추를 안내한다.
  // 261118 대표 지적 2차 5: 서재 화면에서 콕·보드·지도는 마지막에 본 트리(서재 가운데 책의 트리)로 연다.
  if(deps.current==='track32-bookshelf.html'&&b.dataset.view!=='track32-bookshelf.html'){const treeId=lastShelfTreeId();
   if(treeId&&deps.model?.trees?.some(t=>t.id===treeId)&&window.LT41?.tree?.id!==treeId){deps.current=b.dataset.view;choose(treeId);writeLocation();return;}}
