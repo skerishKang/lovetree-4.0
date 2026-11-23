@@ -33,22 +33,21 @@ const measureHome = async (frame, { worst = false } = {}) => {
     const sr = document.querySelector('main#orbit').shadowRoot;
     const c = sr.querySelector('.center');
     const zone = c ? window.__ltZoneOf(c.getBoundingClientRect(), sr.querySelector('.app').getBoundingClientRect()) : null;
-    const visible = [...sr.querySelectorAll('.card')].filter((el) => {
-      if (getComputedStyle(el).display === 'none' || el.classList.contains('clash')) return false;
-      const r = el.getBoundingClientRect();
-      return r.width >= 2 && r.right >= 0 && r.bottom >= 0 && r.left <= innerWidth && r.top <= innerHeight;
-    });
-    // 카드 사각형은 안쪽 img(실제로 그려진 크기)로 잰다 — img 의 꾸밈 배율(transform:scale)은 카드 크기가
-    // 아니므로 중심 기준으로 나눠 카드 크기로 되돌린다(button.card 는 3D 변환 직후 0×0 인 일이 있다).
-    const rects = visible.map((el) => {
-      const inner = el.querySelector('.surface img') || el.querySelector('.surface') || el;
-      const r = inner.getBoundingClientRect();
-      let k = 1;
-      const t = getComputedStyle(inner).transform;
-      if (t && t !== 'none') { const m = t.match(/^matrix\(([^)]+)\)/); if (m) { const v = m[1].split(',').map(Number); k = Math.hypot(v[0], v[1]) || 1; } }
-      const cx = r.left + r.width / 2, cy = r.top + r.height / 2, w = r.width / k, h = r.height / k;
-      return { l: cx - w / 2, t: cy - h / 2, r: cx + w / 2, b: cy + h / 2 };
-    });
+    const nodes = [...sr.querySelectorAll('.card')], hook=globalThis.__LT_ORBIT_TEST__, poses=hook?.poses()||[], rasters=hook?.rasterStats()||[];
+    const origin=sr.querySelector('.app').getBoundingClientRect(),visible=[],rects=[];
+    for(let i=0;i<nodes.length;i++){
+      const el=nodes[i],p=poses[i],s=rasters[i];
+      if(!p||!s||el.classList.contains('clash')||getComputedStyle(el).display==='none')continue;
+      const xs=[],ys=[];
+      for(const x of [-s.guardW/2,s.guardW/2])for(const y of [-s.guardH/2,s.guardH/2]){
+        const u=x+p.fx,v=y+p.fy,q=1-(p.zx*u+p.zy*v)/1200;
+        xs.push(origin.left+p.ox+(p.px+p.A*u+p.C*v)/q);
+        ys.push(origin.top+p.oy+(p.py+p.B*u+p.D*v)/q);
+      }
+      const r={l:Math.min(...xs),t:Math.min(...ys),r:Math.max(...xs),b:Math.max(...ys)};
+      if(r.r-r.l<2||r.r<0||r.b<0||r.l>innerWidth||r.t>innerHeight)continue;
+      visible.push(el);rects.push(r);
+    }
     let pairs = 0, area = 0;
     for (let i = 0; i < rects.length; i++) for (let j = i + 1; j < rects.length; j++) {
       const a = rects[i], b = rects[j];
@@ -159,6 +158,7 @@ const openHome = async (browser, base, { width, height, member, reducedMotion = 
   assert.ok(frame, '첫 화면 안쪽 문서가 열린다');
   await page.waitForTimeout(2500);
   await forceShadowFont(frame);
+  await frame.waitForFunction(() => { const sr=document.querySelector('#orbit')?.shadowRoot;return !sr?.querySelector('.card:not(.off)') || globalThis.__LT_ORBIT_TEST__?.canvasReady(); });
   return { context, page, frame };
 };
 
@@ -186,15 +186,13 @@ s('#535 떠 있는 폭이 눈에 보이고, 동작 줄이기면 거의 멈춘다
     const moved = await frame.evaluate(async () => {
       const sr = document.querySelector('main#orbit').shadowRoot;
       // #942: 궤도는 90초로 빨라졌다 — 부유 폭만 재려면 궤도 애니메이션을 멈춘다.
-      window.__LT_ORBIT_TEST__?.hold(true); // #1086: WAAPI lt-orbit 대신 JS 공전 루프를 멈춘다
-      const cards = [...sr.querySelectorAll('.card')].filter((e) => getComputedStyle(e).display !== 'none');
-      // 부유는 .lt-lift 층이 든다 — .card 겉사각형은 궤도 자리만 안다. 261118: 부유 층을 직접 잰다.
-      const el = cards[3].querySelector('.lt-lift') || cards[3];
+      const hook=globalThis.__LT_ORBIT_TEST__;hook.freezeOrbit(hook.progress(hook.lastWriteAt()));
+      const index=3;
       const pts = []; const t0 = performance.now();
       await new Promise((done) => {
         const tick = () => {
-          const b = el.getBoundingClientRect();
-          pts.push([b.left + b.width / 2, b.top + b.height / 2]);
+          const b = hook.poses()[index].box;
+          pts.push([(b.l+b.r)/2,(b.t+b.b)/2]);
           if (performance.now() - t0 < 24000) requestAnimationFrame(tick); else done();
         };
         tick();
@@ -211,13 +209,12 @@ s('#535 떠 있는 폭이 눈에 보이고, 동작 줄이기면 거의 멈춘다
     const still = await openHome(browser, lib.base, { width: 1440, height: 900, member: 'in', reducedMotion: 'reduce' });
     const quiet = await still.frame.evaluate(async () => {
       const sr = document.querySelector('main#orbit').shadowRoot;
-      window.__LT_ORBIT_TEST__?.hold(true); // #1086: WAAPI lt-orbit 대신 JS 공전 루프를 멈춘다
-      const el = [...sr.querySelectorAll('.card')].filter((e) => getComputedStyle(e).display !== 'none')[3].querySelector('.lt-lift') || [...sr.querySelectorAll('.card')].filter((e) => getComputedStyle(e).display !== 'none')[3];
-      const a = el.getBoundingClientRect(); const x0 = a.left + a.width / 2, y0 = a.top + a.height / 2;
+      const hook=globalThis.__LT_ORBIT_TEST__;hook.hold(true);
+      const a=hook.poses()[3].box,x0=(a.l+a.r)/2,y0=(a.t+a.b)/2;
       const t0 = performance.now();
       await new Promise((done) => { const tick = () => { if (performance.now() - t0 < 3000) requestAnimationFrame(tick); else done(); }; tick(); });
-      const b = el.getBoundingClientRect();
-      return Math.round(Math.hypot(b.left + b.width / 2 - x0, b.top + b.height / 2 - y0));
+      const b=hook.poses()[3].box;
+      return Math.round(Math.hypot((b.l+b.r)/2-x0,(b.t+b.b)/2-y0));
     });
     await still.context.close();
 
@@ -349,17 +346,17 @@ s('#535 끄는 동안만 레이어를 승격하고, 손을 떼면 관성으로 �
     await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: 320, y: 760, button: 'left', clickCount: 1, pointerType: 'mouse' });
     for (let i = 1; i <= 12; i++) await cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 320 + i * 18, y: 760, button: 'left', buttons: 1, pointerType: 'mouse' });
     assert.equal(await busy(), '1', '끄는 동안 data-lt-busy 가 켜진다(레이어 승격·번짐 경량)');
-    const will = await frame.evaluate(() => getComputedStyle(document.querySelector('main#orbit').shadowRoot.querySelector('.card')).willChange);
-    assert.match(will, /transform/, '끄는 동안 transform 레이어를 미리 승격한다');
+    const layers=await frame.evaluate(()=>{const sr=document.querySelector('#orbit').shadowRoot;return {visible:[...sr.querySelectorAll('canvas.orbit-canvas')].filter(e=>getComputedStyle(e).display!=='none').length,cards:[...sr.querySelectorAll('.card')].map(e=>getComputedStyle(e).willChange)};});
+    assert.equal(layers.visible,1,'움직이는 그림판은 한 장이다');
+    assert.ok(layers.cards.every(x=>x==='auto'),'개별 카드는 따로 합성하지 않는다');
     await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: 536, y: 760, button: 'left', clickCount: 1, pointerType: 'mouse' });
     // 관성으로 조금 더 돈다 — 뗀 직후 0.4초 동안 카드가 계속 움직인다.
     const glide = await frame.evaluate(async () => {
       const sr = document.querySelector('main#orbit').shadowRoot;
-      const el = [...sr.querySelectorAll('.card')].filter((e) => getComputedStyle(e).display !== 'none')[2];
-      const a = el.getBoundingClientRect(); const x0 = a.left + a.width / 2;
+      const hook=globalThis.__LT_ORBIT_TEST__,a=hook.poses()[2].box,x0=(a.l+a.r)/2;
       await new Promise((r) => setTimeout(r, 400));
-      const b = el.getBoundingClientRect();
-      return Math.round(Math.abs(b.left + b.width / 2 - x0));
+      const b=hook.poses()[2].box;
+      return Math.round(Math.abs((b.l+b.r)/2-x0));
     });
     await page.waitForTimeout(2200);
     assert.equal(await busy(), null, '손을 떼고 멈추면 표시를 지워 멈춘 화면 모양을 되돌린다');
@@ -382,7 +379,8 @@ s('#942 궤도는 한 방향으로 60~120초에 한 바퀴, 정지·튐 0, 클�
       const root = document.querySelector('main#orbit').shadowRoot;
       const cards = [...root.querySelectorAll('button.card')].filter((c) => getComputedStyle(c).display !== 'none');
       // 부유(lt-float)는 #535이 따로 재는 움직임 — 클릭으로 생기는 궤도 움직임만 보려고 표본 동안 멈춘다.
-      for (const a of root.getAnimations({ subtree: true })) if (a.id === 'lt-float') a.pause();
+      const hook=globalThis.__LT_ORBIT_TEST__;hook.pauseFloat();
+      const indexes=cards.map(c=>[...root.querySelectorAll('button.card')].indexOf(c));
       const cx = innerWidth / 2, cy = innerHeight / 2;
       const series = cards.map(() => []);
       // 표본 시각은 애니메이션 시계(currentTime)로 찍는다 — setInterval 이 늦게 오면 벽시계 간격이
@@ -391,10 +389,10 @@ s('#942 궤도는 한 방향으로 60~120초에 한 바퀴, 정지·튐 0, 클�
       // 실제 중심과 '그 시각에 있어야 할 중심'을 함께 기록해 차이를 튐으로 판정한다(기준 13px 그대로).
       const sample = () => {
         const t = performance.now();
-        const actual = cards.map((c) => { const r = c.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; });
-        window.__LT_ORBIT_TEST__.seek(window.__LT_ORBIT_TEST__.progress(window.__LT_ORBIT_TEST__.lastWriteAt()));
-        const expected = cards.map((c) => { const r = c.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; });
-        window.__LT_ORBIT_TEST__.restore();
+        const origin=root.querySelector('.orbit-canvas').getBoundingClientRect();
+        const poses=hook.poses(), actual=indexes.map(i=>{const b=poses[i].box;return [origin.left+(b.l+b.r)/2,origin.top+(b.t+b.b)/2];});
+        hook.syncDomPoses();
+        const expected=cards.map(c=>{const r=c.getBoundingClientRect();return [r.left+r.width/2,r.top+r.height/2];});
         cards.forEach((c, i) => series[i].push([t, actual[i][0], actual[i][1], expected[i][0], expected[i][1]]));
       };
       const run = async (ms) => {
@@ -409,22 +407,22 @@ s('#942 궤도는 한 방향으로 60~120초에 한 바퀴, 정지·튐 0, 클�
         return performance.now() - t0;
       };
       const stats = () => series.map((pts) => {
-        let path = 0, maxStep = 0, maxAt = 0, angle = 0;
+        let path = 0, maxStep = 0, maxAt = 0, angle = 0, maxCoordinates;
         for (let i = 1; i < pts.length; i++) {
           const dx = pts[i][1] - pts[i - 1][1], dy = pts[i][2] - pts[i - 1][2];
           path += Math.hypot(dx, dy);
           const deviation = Math.hypot(pts[i][1] - pts[i][3], pts[i][2] - pts[i][4]);
-          if (deviation > maxStep) { maxStep = deviation; maxAt = pts[i][0]; }
+          if (deviation > maxStep) { maxStep = deviation; maxAt = pts[i][0]; maxCoordinates=pts[i].slice(1); }
           const a0 = Math.atan2(pts[i - 1][2] - cy, pts[i - 1][1] - cx), a1 = Math.atan2(pts[i][2] - cy, pts[i][1] - cx);
           let d = a1 - a0; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI;
           angle += d;
         }
-        return { path: Math.round(path), maxStep: Math.round(maxStep), maxAt: Math.round(maxAt), angle: Number(angle.toFixed(3)), meanStep: Number((path / Math.max(1, pts.length - 1)).toFixed(2)) };
+        return { path: Math.round(path), maxStep: Math.round(maxStep), maxCoordinates, maxAt: Math.round(maxAt), angle: Number(angle.toFixed(3)), meanStep: Number((path / Math.max(1, pts.length - 1)).toFixed(2)) };
       });
       // #1086: 공전은 WAAPI가 아니라 JS 루프 — 주기는 화면이 노출한 값으로 읽는다.
       const beforeMs = await run(6000);
       const before = stats();
-      const stylesAt = () => cards.map((c) => [c.style.transform || '', c.querySelector('.lt-move')?.style.transform || '']);
+      const stylesAt = () => indexes.map(i=>{const p=hook.poses()[i];return [p.px,p.py,p.A,p.B,p.C,p.D];});
       const styleBefore = stylesAt();
       const app = root.querySelector('.app');
       app.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerId: 1, clientX: 30, clientY: 400 }));
@@ -445,7 +443,8 @@ s('#942 궤도는 한 방향으로 60~120초에 한 바퀴, 정지·튐 0, 클�
     const signs = new Set(moving.map((row) => Math.sign(row.angle)));
     const periods = [...new Set(measured.period.filter(Boolean))];
     const report = { cards: measured.cards, moving: moving.length, periods, maxJump: Math.max(...measured.before.map((row) => row.maxStep)), signs: [...signs], clickStyleChanged: measured.styleBefore.filter((v, i) => JSON.stringify(v) !== JSON.stringify(measured.styleAfterClick[i])).length };
-    console.log('ORBIT_942', JSON.stringify(report));
+    console.log('ORBIT_942', JSON.stringify(report),JSON.stringify(measured.before.filter(row=>row.maxStep>=10)));
+
     assert.equal(moving.length, measured.cards, `정지 카드 0(실제 ${measured.cards - moving.length}장)`);
     assert.equal(signs.size, 1, '모든 카드가 같은 방향');
     assert.ok(periods.length === 1 && periods[0] >= 60 && periods[0] <= 120, `한 바퀴 60~120초(실제 ${periods.join(',')})`);
@@ -469,6 +468,7 @@ s('#942 모든 자리 lg 카드도 가운데를 침범하지 않는다(390·1440
       assert.ok(frame, `${w}: 첫 화면이 열린다`);
       await page.waitForTimeout(3000);
       await forceShadowFont(frame);
+      await frame.waitForFunction(() => globalThis.__LT_ORBIT_TEST__?.canvasReady());
       // #949: 겹침 시험과 같은 구역 함수·안쪽 img 사각형으로 잰다.
       const d = await measureHome(frame);
       console.log('WORST_LG', w, JSON.stringify({ cards: d.cards, lg: d.lg, center: d.centerRect ? [d.centerRect.l, d.centerRect.t, d.centerRect.r, d.centerRect.b] : null, zone: d.zone, intruders: d.intruders }));

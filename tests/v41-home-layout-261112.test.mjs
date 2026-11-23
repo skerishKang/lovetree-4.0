@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const orbit = readFileSync(new URL('../src/views/orbit.js', import.meta.url), 'utf8');
+const bitmap = readFileSync(new URL('../src/views/orbit-canvas.js', import.meta.url), 'utf8');
 const orbitCSS = readFileSync(new URL('../src/views/orbit-source.css', import.meta.url), 'utf8');
 const community = readFileSync(new URL('../public/v41/community-panel.mjs', import.meta.url), 'utf8');
 
@@ -43,7 +44,9 @@ test('카드는 언제나 불투명하고, 크기·밝기·흐림으로 깊이�
     assert.doesNotMatch(body, /mix-blend/, `mix-blend 없음: ${sel.trim().slice(0,40)}`);
     assert.doesNotMatch(body, /blur/, `blur 없음: ${sel.trim().slice(0,40)}`);
   }
-  assert.match(orbit, /el\.style\.filter=depthFilter/, '깊이는 filter 변수로 한 번만 쓴다');
+  assert.match(orbit, /el\.style\.setProperty\(\s*'--lt-orbit-depth'\s*,\s*depthFilter\s*\)/, '깊이 필터 값은 카드에서 한 번 정한다');
+  assert.match(bitmap, /rasterCtx\.filter\s*=\s*'brightness\('/, '합친 카드의 실제 밝기·흐림을 한 번 칠한다');
+  assert.match(bitmap, /rasterCtx\.drawImage\(\s*canvas\s*,\s*0\s*,\s*0\s*\)/, '그림·테두리·그림자를 함께 처리한다');
   assert.match(orbit, /brightness\(\$\{fv\}\) blur\(\$\{bv\}px\)/, '깊이 = 밝기 + 흐림');
   assert.match(orbit, /0\.78\+0\.22\*depth/, '뒤쪽 카드는 밝기 0.78까지');
   assert.match(orbit, /\(1-depth\)\*2\.2/, '뒤쪽 카드는 흐림 2.2px까지');

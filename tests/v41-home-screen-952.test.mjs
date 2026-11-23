@@ -93,14 +93,19 @@ test('#429 첫 화면 카드는 언제나 불투명하고, 깊이는 밝기 필�
     for (const member of [false, true]) {
       const h = await boot952(browser, { member, motion: 'no-preference' });
       try {
-        const cards = await cardStats(h.frame.locator('.card'));
+        await h.frame.waitForFunction(() => globalThis.__LT_ORBIT_TEST__?.canvasReady());
+        const cards = await h.frame.evaluate(async () => {
+          const hook=globalThis.__LT_ORBIT_TEST__;
+          const nodes=[...document.querySelector('#orbit').shadowRoot.querySelectorAll('.card')];
+          return hook.rasterStats().map((s,i)=>s&&({...s,mine:nodes[i].classList.contains('mine')})).filter(Boolean);
+        });
         assert.ok(cards.length > 0, `${member ? '회원' : '예시'} 궤도에 카드가 그려진다`);
-        assert.ok(cards.every(c => c.opacity === '1'), '카드는 인라인으로 불투명도를 낮추지 않는다(전: 예시 카드가 반투명했던 #429 결함)');
-        assert.ok(cards.some(c => c.filter.includes('brightness')), '깊이는 밝기(brightness) 필터로 낸다');
+        assert.ok(cards.every(c => c.baseAlpha === 255 && (c.alpha === 255 || c.alpha === null)) && cards.some(c => c.alpha === 255), '카드는 인라인으로 불투명도를 낮추지 않는다(전: 예시 카드가 반투명했던 #429 결함)');
+        assert.ok(cards.some(c => c.brightness < 1) && cards.every(c => c.brightness > 0 && c.brightness <= 1 && c.bakedBlur === c.blur), '깊이는 밝기(brightness) 필터로 낸다');
         if (member) {
           const mine = cards.filter(c => c.mine);
           assert.ok(mine.length > 0, '내 카드가 궤도에 있다');
-          assert.ok(mine.every(c => c.borderWidth === '3px' && c.border === 'rgb(230, 177, 76)'), '내 카드는 금빛 테두리(--lt-gold-deep)다: ' + JSON.stringify(mine[0]));
+          assert.ok(mine.every(c => c.borderWidth === 3 && c.borderColor === 'rgb(230, 177, 76)' && c.rimWidth === 1), '내 카드는 금빛 테두리(--lt-gold-deep)다: ' + JSON.stringify(mine[0]));
         }
       } finally { await close952(h); }
     }
@@ -178,7 +183,8 @@ test('#380 5번 설정의 움직임 스위치: 첫 화면에 lt41-motion이 닿�
     const h = await boot952(browser, { member: true, motion: 'no-preference' });
     try {
       await h.frame.evaluate(() => { window.__motion = []; addEventListener('message', e => { if (e.data?.type === 'lt41-motion') window.__motion.push(!!e.data.paused); }); });
-      const cardY = () => h.frame.locator('.card').first().evaluate(e => e.getBoundingClientRect().y);
+      await h.frame.waitForFunction(() => globalThis.__LT_ORBIT_TEST__?.canvasReady());
+      const cardY = () => h.frame.evaluate(() => globalThis.__LT_ORBIT_TEST__.poses().find(p=>p&&!p.hidden).y);
       const moving = async () => { const a = await cardY(); await h.page.waitForTimeout(400); return Math.abs(await cardY() - a) > 0.5; };
       assert.equal(await moving(), true, '움직임이 켜져 있으면 카드가 움직인다');
       await h.page.click('#account-avatar');
@@ -584,9 +590,26 @@ test('#1088 2단계 떠 있는 카드도 그 자리에서 크게 보기', { skip
 
       const surface = frame.locator('.card.video .surface').first();
       const label = await surface.evaluate(el => el.getAttribute('aria-label') || '');
-      const point = await surface.evaluate(el => { const r = el.getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; });
-      await surface.click();
-      await viewer.waitFor({ state: 'visible', timeout: 5000 });
+      const expectedTitle = await surface.evaluate(el => el.closest('.card').querySelector('.caption span').firstChild.textContent);
+      assert.ok(expectedTitle, '대상 영상 카드 제목');
+      await frame.waitForFunction(() => globalThis.__LT_ORBIT_TEST__?.canvasSettled());
+      const point = await surface.evaluate(el => {
+        const root=el.getRootNode(),canvas=root.querySelector('.orbit-canvas'),orbit=globalThis.__LT_ORBIT_TEST__;
+        const cards=[...root.querySelectorAll('.card')],index=cards.indexOf(el.closest('.card')),r=canvas.getBoundingClientRect();
+        orbit.hold(true);
+        for(let step=0;step<48;step++){
+          orbit.seek(step/48);const poses=orbit.poses(),p=poses[index];
+          if(!p||p.hidden||p.x<8||p.y<8||p.x>r.width-8||p.y>r.height-8)continue;
+          if(poses.some((v,i)=>i!==index&&v&&!v.hidden&&v.box.l<=p.x&&v.box.r>=p.x&&v.box.t<=p.y&&v.box.b>=p.y))continue;
+          const x=r.left+p.x,y=r.top+p.y;if(root.elementFromPoint(x,y)===canvas)return {x,y};
+        }return null;
+      });
+      assert.ok(point,'대상 영상 카드가 그려진 실제 좌표');
+      const iframe = await (await frame.frameElement()).boundingBox();
+      assert.ok(iframe,'첫 화면 틀 좌표');
+      await h.page.mouse.click(iframe.x+point.x,iframe.y+point.y);
+      await frame.locator('#mediaViewerHome[aria-hidden="false"]').waitFor({ state: 'visible', timeout: 5000 });
+      assert.equal(await frame.locator('#mediaTitleHome').textContent(),expectedTitle,'첫 클릭에 대상 카드가 열린다');
       const topmost = await frame.evaluate(({ x, y }) => {
         const root = document.querySelector('#orbit').shadowRoot;
         const hit = root.elementFromPoint(x, y);
@@ -601,6 +624,13 @@ test('#1088 2단계 떠 있는 카드도 그 자리에서 크게 보기', { skip
       await h.page.keyboard.press('Escape');
       const focused = await frame.evaluate(() => document.querySelector('#orbit').shadowRoot.activeElement?.getAttribute('aria-label') || '');
       assert.equal(focused, label, '떠 있는 카드로 초점 복귀');
+      await h.page.keyboard.press('Shift+Tab');
+      await h.page.keyboard.press('Tab');
+      assert.equal(await frame.evaluate(() => document.querySelector('#orbit').shadowRoot.activeElement?.getAttribute('aria-label') || ''),label,'탭으로 동일 카드 초점');
+      await h.page.keyboard.press('Enter');
+      await frame.locator('#mediaViewerHome[aria-hidden="false"]').waitFor({state:'visible',timeout:5000});
+      assert.equal(await frame.locator('#mediaTitleHome').textContent(),expectedTitle,'키보드로 동일 카드 열기');
+      await h.page.keyboard.press('Escape');
     } finally { await close952(h); }
   } finally { await browser.close(); }
 });
