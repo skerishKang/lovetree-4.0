@@ -668,7 +668,7 @@ test('#1204 실제 테마 전환·저장값 및 가운데 빛 직선 경계 픽�
   }
   const browser=await chromium952.launch({headless:true});
   try {
-    for(const width of [1440,390]) for(const theme of ['garden','night']) for(const route of ['toggle','stored']){
+    for(const width of [1440,390]) for(const theme of ['garden','night']) for(const route of ['stored','toggle']){
       const initStorage=route==='stored'?{'lt41.theme':theme}:{'lt41.theme':'night'};
       const h=await boot952(browser,{width,motion:'reduce',initStorage});
       try {
