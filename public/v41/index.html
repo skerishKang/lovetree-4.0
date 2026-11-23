@@ -190,4 +190,4 @@
 <div class="button-row"><button type="button" class="primary" data-close="feedback-panel" id="feedback-done-close">닫기</button></div>
 </div>
 </dialog>
-<script src="/v41/frame-messages.js"></script><script src="html-escape.js"></script><script src="media-preview.js"></script><script>if('serviceWorker' in navigator){addEventListener('load',function(){navigator.serviceWorker.register('/v41/sw.js',{scope:'/v41/'}).catch(function(){})})}</script><script type="module" src="shell.mjs"></script></body></html>
+<script src="/v41/frame-messages.js"></script><script src="html-escape.js"></script><script src="media-preview.js"></script><script>if('serviceWorker' in navigator){addEventListener('load',function(){function register(){navigator.serviceWorker.register('/v41/sw.js',{scope:'/v41/'}).catch(function(){})}if('requestIdleCallback' in window)requestIdleCallback(register,{timeout:8000});else setTimeout(register,5000)})}</script><script type="module" src="shell.mjs"></script></body></html>
