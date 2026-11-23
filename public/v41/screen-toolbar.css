@@ -3,6 +3,10 @@
 html{--lt-toolbar-height:52px;--lt-content-top:calc(var(--lt-toolbar-top,66px) + var(--lt-toolbar-height))}
 html[data-v41-screen=book]{--lt-toolbar-top:70px;--lt-toolbar-pad:28px}
 html[data-v41-screen=board]{--lt-toolbar-pad:24px}
+/* #1096: 지도도 책·보드와 같은 줄 — 높이·바탕·단추 모양은 아래 한 벌을 그대로 쓴다. */
+html[data-v41-screen=network]{--lt-toolbar-pad:18px}
+/* 지도는 머리에 트리 제목이 이미 있으므로 좁은 줄에서는 같은 글자를 또 쓰지 않는다. */
+@media(max-width:600px){html[data-v41-screen=network] .lt-toolbar-title{display:none}}
 html[data-v41-screen=shelf]{--lt-toolbar-top:82px;--lt-toolbar-pad:18px}
 /* 서재는 도구 줄을 실제 흐름에 넣고, 책 수는 이어 보기 띠 아래에 남긴다. */
 html[data-v41-screen=shelf] .lt-screen-toolbar{position:relative;top:auto;margin-top:4px;flex:none}
@@ -47,5 +51,6 @@ html[data-book-shape=phone][data-v41-screen=book] .stage{top:auto;min-height:cal
   .lt-screen-toolbar{padding:0 12px}
   html[data-v41-screen=book]{--lt-toolbar-pad:12px;--lt-toolbar-top:60px}
   html[data-v41-screen=board]{--lt-toolbar-pad:12px}
+  html[data-v41-screen=network]{--lt-toolbar-pad:12px}
   html[data-v41-screen=shelf]{--lt-toolbar-pad:12px}
 }

@@ -558,7 +558,15 @@
     view: 'network',
     pathIds: new Set(),
     pathEdges: new Set(),
-    hoverEdge: null
+    hoverEdge: null,
+    // #1096: 잇기 켜기 — 끄면 끌기는 화면 이동만, 켜면 점 끌기·두 번 누르기·선 누르기로 연결을 바꾼다.
+    connectMode: false,
+    connectFrom: null,
+    connectDrag: null,
+    connectBusy: false,
+    connectPending: null,
+    connectUndo: null,
+    connectUndoTimer: null
   };
   let vw = 0,
     vh = 0,
@@ -696,10 +704,9 @@
       right = box(document.querySelector('.progress-rail')),
       bottom = box(document.querySelector('.mobile-ribbon'));
     const topbarBottom = box(document.querySelector('.topbar'))?.bottom;
-    /* #951 ①: 위 단추 줄 아래 작은 글자('순간 N · 이어진 선 N')가 앉을 자리(4px 아래·높이 16px + 2px 숨 = 22px)를 늘 비워 둔다.
-    잰 글자 높이에 기대지 않는다 — 글자가 늦게 채워지면 그때마다 판 위 여백이 달라져 같은 판이 다르게 그려졌다.
-    값은 순간 고르기 줄보다 먼저 정하고(그 줄이 그 자리에 서도록), 그 뒤에 재야 재는 값이 흔들리지 않는다. */
-    const pickerTop = (topbarBottom || 102) + 22;
+    /* #1096: 공통 도구 줄이 붙으면 그 아래가 순간 선택 패널의 자리다(줄이 붙기 전에는 예전 값 유지). */
+    const toolbarBottom = box(document.querySelector('.lt-screen-toolbar'))?.bottom;
+    const pickerTop = toolbarBottom ? toolbarBottom + 4 : (topbarBottom || 102) + 22;
     document.documentElement.style.setProperty('--lt-picker-top', pickerTop.toFixed(0) + 'px');
     /* #951 ⑤: 좁은 화면에서 상세 시트가 아래 묶음 단추 줄을 덮지 않게 그 줄 높이를 재어 넘긴다. */
     document.documentElement.style.setProperty(
@@ -727,7 +734,7 @@
     판에 가려진 자리에 고른 순간이 놓이지 않도록 오른쪽 여백으로 판을 비켜 준다. 좁은 화면은 아래 시트라 그대로 덮는다. */
     const detailOpen = vw > 980 && !!document.querySelector('#detail.open'),
       detailInset = detailOpen ? 446 : 0;
-    const tops = ['.topbar', '.hero p'].map(s => box(document.querySelector(s))).filter(Boolean);
+    const tops = ['.topbar', '.lt-screen-toolbar', '.hero p'].map(s => box(document.querySelector(s))).filter(Boolean);
     return {
       top:
         Math.max(0, ...tops.map(r => r.bottom), picker ? pickerTop + picker.height + 4 : 0) +
@@ -2399,16 +2406,205 @@
     }
     return best;
   }
+  /* #1096: 잇기 — 점을 다른 점에 놓으면 '옮기기 / 관련 연결' 중 하나만 고른다.
+     저장은 셸의 기존 reparent·link·unlink 길을 부르고, 알림을 받아 같은 문서에서 다시 그린다. */
+  let sheetFrom = null;
+  const nameOf = id => LTDEMO.moments.find(m => m.id === id)?.title || '순간';
+  function loopReason(sourceId, targetId) {
+    const moments = LTDEMO.moments;
+    const src = moments.find(m => m.id === sourceId);
+    if (!src) return '순간을 찾지 못했어요.';
+    if (src.parentId === null) return '트리의 시작 순간은 이전 순간을 바꿀 수 없어요.';
+    if (sourceId === targetId) return '자기 자신은 이전 순간으로 정할 수 없어요.';
+    const blocked = new Set([sourceId]);
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const m of moments)
+        if (m.parentId && blocked.has(m.parentId) && !blocked.has(m.id)) {
+          blocked.add(m.id);
+          changed = true;
+        }
+    }
+    return blocked.has(targetId) ? '자기 자신이나 이어진 다음 순간은 이전 순간으로 정할 수 없어요.' : '';
+  }
+  function closeConnectSheet() {
+    const sheet = $('connectSheet');
+    if (!sheet) return;
+    sheet.hidden = true;
+    delete sheet.dataset.mode;
+    sheetFrom = null;
+    $('connectReparent').hidden = false;
+    $('connectReparent').disabled = false;
+    $('connectLink').hidden = false;
+    $('connectCut').hidden = true;
+    $('connectWhyRow').hidden = false;
+    $('connectWhy').value = '';
+  }
+  function openConnectSheet(sourceId, targetId) {
+    const sheet = $('connectSheet');
+    if (!sheet) return;
+    if (!LTDEMO.writable || LTDEMO.readOnly) {
+      toast('읽어 보는 화면에서는 연결을 바꿀 수 없어요.');
+      return;
+    }
+    sheetFrom = {source: sourceId, target: targetId};
+    sheet.dataset.mode = 'point';
+    $('connectTitle').textContent = '연결을 바꿉니다';
+    $('connectPair').textContent = `${nameOf(sourceId)} → ${nameOf(targetId)}`;
+    $('connectReparent').hidden = false;
+    $('connectLink').hidden = false;
+    $('connectCut').hidden = true;
+    $('connectWhyRow').hidden = false;
+    $('connectWhy').value = '';
+    const reason = loopReason(sourceId, targetId);
+    $('connectReparent').disabled = !!reason;
+    $('connectNote').textContent = reason || '바꾼 뒤 한 번 되돌릴 수 있어요.';
+    sheet.hidden = false;
+    (reason ? $('connectLink') : $('connectReparent')).focus?.();
+  }
+  function openEdgeSheet(edge) {
+    const sheet = $('connectSheet');
+    if (!sheet || !edge?.a || !edge?.b) return;
+    if (!LTDEMO.writable || LTDEMO.readOnly) {
+      toast('읽어 보는 화면에서는 연결을 바꿀 수 없어요.');
+      return;
+    }
+    sheetFrom = {edge};
+    const related = edge.kind === 'related';
+    sheet.dataset.mode = related ? 'related' : 'parent';
+    $('connectTitle').textContent = related ? '연결 끊기' : '이어진 길의 선';
+    $('connectPair').textContent = `${nameOf(edge.a)} ↔ ${nameOf(edge.b)}`;
+    $('connectReparent').hidden = true;
+    $('connectLink').hidden = true;
+    $('connectCut').hidden = !related;
+    $('connectCut').disabled = false;
+    $('connectWhyRow').hidden = true;
+    $('connectNote').textContent = related
+      ? '관련 연결만 끊어요. 바꾼 뒤 한 번 되돌릴 수 있어요.'
+      : '이어진 길의 부모 선은 이전 순간 바꾸기로만 바꿀 수 있어요. 점을 끌어 다시 골라 주세요.';
+    sheet.hidden = false;
+    (related ? $('connectCut') : $('connectClose')).focus?.();
+  }
+  function hideUndo() {
+    clearTimeout(state.connectUndoTimer);
+    state.connectUndo = null;
+    $('connectUndo').hidden = true;
+  }
+  function showUndo(undo) {
+    hideUndo();
+    state.connectUndo = undo;
+    $('connectUndoText').textContent = undo.label;
+    $('connectUndo').hidden = false;
+    state.connectUndoTimer = setTimeout(() => hideUndo(), 8000);
+  }
+  function requestRelation(action, sourceId, targetId, relation, undo) {
+    const type = globalThis.LT41_MSG?.mapRelationSave;
+    if (state.connectBusy || !type || window.parent === window || !LTDEMO.writable) {
+      toast('여기서는 연결을 바꿀 수 없어요.');
+      return;
+    }
+    if (!undo) hideUndo();
+    state.connectBusy = true;
+    state.connectPending = {action, sourceId, targetId, undo};
+    try {
+      window.parent.postMessage(
+        {type, action, treeId: LTDEMO.treeId, momentId: sourceId, targetId, relation: relation || ''},
+        location.origin
+      );
+    } catch (error) {
+      state.connectBusy = false;
+      state.connectPending = null;
+      toast('연결 변경을 보내지 못했어요.');
+    }
+  }
+  $('connectReparent')?.addEventListener('click', () => {
+    if (!sheetFrom?.source) return;
+    const reason = loopReason(sheetFrom.source, sheetFrom.target);
+    if (reason) {
+      toast(reason);
+      return;
+    }
+    const src = LTDEMO.moments.find(m => m.id === sheetFrom.source);
+    const undo = {
+      action: 'reparent', sourceId: sheetFrom.source, targetId: src.parentId,
+      relation: src.relation || '', label: '이전 순간을 옮겼어요'
+    };
+    requestRelation('reparent', sheetFrom.source, sheetFrom.target, $('connectWhy').value.trim(), undo);
+  });
+  $('connectLink')?.addEventListener('click', () => {
+    if (!sheetFrom?.source) return;
+    const undo = {
+      action: 'unlink', sourceId: sheetFrom.source, targetId: sheetFrom.target,
+      label: '관련 연결을 이었어요'
+    };
+    requestRelation('link', sheetFrom.source, sheetFrom.target, '', undo);
+  });
+  $('connectCut')?.addEventListener('click', () => {
+    if (!sheetFrom?.edge) return;
+    const undo = {
+      action: 'link', sourceId: sheetFrom.edge.a, targetId: sheetFrom.edge.b,
+      label: '관련 연결을 끊었어요'
+    };
+    requestRelation('unlink', sheetFrom.edge.a, sheetFrom.edge.b, '', undo);
+  });
+  $('connectClose')?.addEventListener('click', closeConnectSheet);
+  $('connectUndoBtn')?.addEventListener('click', () => {
+    const undo = state.connectUndo;
+    if (!undo) return;
+    hideUndo();
+    requestRelation(undo.action, undo.sourceId, undo.targetId, undo.relation || '', null);
+  });
+  $('connectToggle')?.addEventListener('click', () => {
+    state.connectMode = !state.connectMode;
+    state.connectFrom = null;
+    $('connectToggle').setAttribute('aria-pressed', String(state.connectMode));
+    canvas.classList.toggle('is-connect', state.connectMode);
+    closeConnectSheet();
+    toast(
+      state.connectMode
+        ? '잇기를 켰어요. 점을 다른 점 위로 끌어 놓거나 두 번 눌러 주세요.'
+        : '잇기를 껐어요. 이제 끌기는 화면 이동이에요.'
+    );
+  });
+  if (LTDEMO.readOnly || !LTDEMO.writable) $('connectToggle').hidden = true;
+  addEventListener('message', e => {
+    if (e.origin !== location.origin || e.source !== window.parent) return;
+    if (e.data?.type !== globalThis.LT41_MSG.mapRelationSaved) return;
+    state.connectBusy = false;
+    closeConnectSheet();
+    if (e.data.ok !== true) {
+      state.connectPending = null;
+      toast(e.data.error || '연결을 바꾸지 못했어요.');
+      return;
+    }
+    const pending = state.connectPending;
+    state.connectPending = null;
+    if (pending?.undo) showUndo(pending.undo);
+  });
+
   canvas.addEventListener('pointerdown', e => {
+    const h = state.connectMode && !state.connectBusy ? hitTest(e.clientX, e.clientY) : null;
+    if (h?.kind === 'moment') {
+      state.connectDrag = {id: h.id, x: e.clientX, y: e.clientY, moved: false};
+      try { canvas.setPointerCapture(e.pointerId); } catch (error) {}
+      hideEdgeTip();
+      return;
+    }
     state.drag = true;
     state.lastX = e.clientX;
     state.lastY = e.clientY;
     state.downX = e.clientX;
     state.downY = e.clientY;
-    canvas.setPointerCapture(e.pointerId);
+    try { canvas.setPointerCapture(e.pointerId); } catch (error) {}
     hideEdgeTip();
   });
   canvas.addEventListener('pointermove', e => {
+    if (state.connectDrag) {
+      const d = state.connectDrag;
+      if (Math.hypot(e.clientX - d.x, e.clientY - d.y) > 7) d.moved = true;
+      return;
+    }
     if (state.drag) {
       state.tx += e.clientX - state.lastX;
       state.ty += e.clientY - state.lastY;
@@ -2442,6 +2638,26 @@
     scheduleDraw();
   });
   canvas.addEventListener('pointerup', e => {
+    if (state.connectDrag) {
+      const d = state.connectDrag;
+      state.connectDrag = null;
+      const h = hitTest(e.clientX, e.clientY);
+      if (d.moved) {
+        if (h?.kind === 'moment' && h.id !== d.id) openConnectSheet(d.id, h.id);
+        else {
+          state.connectFrom = null;
+          toast('다른 점 위에 놓아 주세요.');
+        }
+      } else if (!state.connectFrom || state.connectFrom === d.id) {
+        state.connectFrom = d.id;
+        toast('여기에 잇기 — 대상 점을 눌러 주세요.');
+      } else {
+        const from = state.connectFrom;
+        state.connectFrom = null;
+        openConnectSheet(from, d.id);
+      }
+      return;
+    }
     const dx = Math.abs(e.clientX - state.downX),
       dy = Math.abs(e.clientY - state.downY);
     state.drag = false;
@@ -2462,7 +2678,10 @@
       } else if (h?.kind === 'anchor') selectCluster(CLUSTERS[h.cluster]);
       else {
         const he = edgeAt(e.clientX, e.clientY);
-        if (he && LT56Model.relationText(he)) paintEdgeTip(he, e.clientX, e.clientY, true);
+        if (state.connectMode && he) {
+          state.connectFrom = null;
+          openEdgeSheet(he);
+        } else if (he && LT56Model.relationText(he)) paintEdgeTip(he, e.clientX, e.clientY, true);
         else {
           hideEdgeTip();
           if (state.selected) clearSelection();
@@ -2472,6 +2691,7 @@
   });
   canvas.addEventListener('pointercancel', () => {
     state.drag = false;
+    state.connectDrag = null;
     hideEdgeTip();
     scheduleDraw();
   });
@@ -2599,6 +2819,29 @@
     edgeKinds: edges.reduce((a, e) => ((a[e.kind] = (a[e.kind] || 0) + 1), a), {})
   };
   window.__lt = {
+    connect: () => ({
+      mode: state.connectMode,
+      from: state.connectFrom,
+      busy: state.connectBusy,
+      undo: !!state.connectUndo
+    }),
+    edgePoint: (a, b) => {
+      const e = edges.find(x => x.kind === 'related' && x.a === a && x.b === b);
+      if (!e || !byId[e.a] || !byId[e.b]) return null;
+      const q = pointBezier(bezierGeometry(byId[e.a], byId[e.b], e), 0.5),
+        p = w2s(q.x, q.y);
+      return {x: p.x, y: p.y};
+    },
+    sheet: () => {
+      const s = $('connectSheet');
+      return {
+        open: !s.hidden,
+        mode: s.dataset.mode || '',
+        note: $('connectNote').textContent,
+        reparentDisabled: $('connectReparent').disabled,
+        title: $('connectTitle').textContent
+      };
+    },
     edgeLen: () =>
       edges
         .filter(e => byId[e.a] && byId[e.b])

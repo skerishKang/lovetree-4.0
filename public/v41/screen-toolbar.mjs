@@ -30,7 +30,9 @@ export function mountScreenToolbar({ screen, titleFrom, tools = [], initialBar =
   // 상단 메뉴의 실제 높이를 기준으로 하고 도구 줄 높이는 CSS 변수 하나를 쓴다.
   const align = () => {
     if (!header) return;
-    bar.style.setProperty('--lt-toolbar-pad', getComputedStyle(header).paddingLeft);
+    // 지도 머리에는 좌우 여백이 없어 실측값을 쓰면 단추가 화면 끝에 붙는다 — 지도는 CSS 값을 쓴다.
+    if (screen === 'network') bar.style.removeProperty('--lt-toolbar-pad');
+    else bar.style.setProperty('--lt-toolbar-pad', getComputedStyle(header).paddingLeft);
     const root = document.documentElement;
     // #886: the board's fixed header and first-paint positions are set in board.css.
     // Only its wrapping narrow header needs measurement; never overwrite desktop geometry.
@@ -42,7 +44,9 @@ export function mountScreenToolbar({ screen, titleFrom, tools = [], initialBar =
       if (header.offsetHeight > 0) root.style.setProperty('--lt-toolbar-top', `${header.offsetHeight + 4}px`);
       return;
     }
-    const bottom = Math.round(header.getBoundingClientRect().bottom) + 4;
+    // 지도는 머리 아래 작은 글자('순간 N · 이어진 선 N')가 먼저 오므로 그 자리를 비워 둔다.
+    const gap = screen === 'network' ? 26 : 4;
+    const bottom = Math.round(header.getBoundingClientRect().bottom) + gap;
     root.style.setProperty('--lt-toolbar-top', `${bottom}px`);
   };
   align();
@@ -77,7 +81,7 @@ export function mountScreenToolbar({ screen, titleFrom, tools = [], initialBar =
   if (typeof ResizeObserver === 'function') {
     const observer = new ResizeObserver(reflow);
     observer.observe(bar);
-    if (screen === 'board' && header) observer.observe(header);
+    if ((screen === 'board' || screen === 'network') && header) observer.observe(header);
   } else window.addEventListener('resize', reflow);
   reflow();
 
