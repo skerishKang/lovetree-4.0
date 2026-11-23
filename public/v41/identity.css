@@ -238,6 +238,21 @@ html[data-lt-theme=garden] .tree-frame button{color:var(--lt-ink)}
 html[data-lt-theme=garden] .header-actions #header-overflow{background:var(--lt-glass-strong);border-color:var(--lt-line)}
 html[data-lt-theme=garden] body,html[data-lt-theme=garden] .app-header{transition:background-color .28s ease,color .28s ease,border-color .28s ease}
 @media(prefers-reduced-motion:reduce){html[data-lt-theme=garden] body,html[data-lt-theme=garden] .app-header{transition:none}}
+/* #1204: the scrim must occupy the whole viewport. A smaller rectangle with
+   an ellipse larger than half its own width produces a nonzero alpha at the
+   rectangular box edge, visibly clipping the light over passing orbit cards. */
+:host .center-scrim {
+  inset:0;
+  left:0;
+  top:0;
+  width:100%;
+  height:100%;
+  transform:none;
+  background:radial-gradient(ellipse 43% 42% at 50% 50%,rgba(3,3,8,.9) 0%,rgba(3,3,8,.78) 38%,rgba(3,3,8,.42) 65%,rgba(3,3,8,0) 100%);
+}
+:host([data-lt-theme=garden]) .center-scrim {
+  background:radial-gradient(ellipse 43% 42% at 50% 50%,rgba(247,240,232,.92) 0%,rgba(247,240,232,.72) 40%,rgba(247,240,232,0) 100%);
+}
 /* 첫 화면 정원: 궤도 배치·움직임·카메라를 그대로 두고 색만 바꾼다. 이 파일은 첫 화면 그림자 루트에도 들어가므로 :host를 쓴다. */
 :host([data-lt-theme=garden]) .app{background:radial-gradient(circle at 50% 46%,var(--lt-stage-2) 0%,var(--lt-stage) 52%,var(--lt-stage) 100%)}
 /* 261118 대표 지적 1번(이슈 884): 가장자리를 어둡게 깐 비네트가 바닥에 회색 띠를 만들었다 — 거둬서
