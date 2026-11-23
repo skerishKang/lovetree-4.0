@@ -662,6 +662,7 @@ test('#1204 첫 화면 순차 등장·안내 삭제·WebGL 말풍선·기억·�
             animations:[...root.querySelectorAll('.center .lt-home-enter')].map(e=>({delay:getComputedStyle(e).animationDelay,duration:getComputedStyle(e).animationDuration}))};
         });
         await h.frame.waitForFunction(()=>globalThis.__LT_ORBIT_TEST__?.canvasReady(),null,{timeout:20000});
+        await h.frame.locator('.center .actions .home-action-group').first().waitFor({state:'visible',timeout:15000});
         const opening=await inspect();
         assert.equal(opening.notes,0,'두 안내 줄을 그리지 않는다');
         assert.ok(opening.animations.length>=4,'머리말·제목·설명·단추가 차례로 나타난다');
