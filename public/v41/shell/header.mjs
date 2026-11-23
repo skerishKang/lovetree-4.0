@@ -27,11 +27,20 @@ function flowNavigation(){
   const owned=!!getMember()?.snapshot().owned;
   const reading=!!window.LT41&&['track59-sketchbook.html','track58-pinboard.html','track56-network.html'].includes(getCurrent());
   const publicReading=getSource()==='share';
-  // 대표 결정(2026-11-23): 서재·책·보드·지도 화면 탭은 로그인 여부·트리 개수와 무관하게 보인다.
-  // #213의 권한별 숨김은 트리 선택·쓰기·공유에만 적용하고 공유 읽기 탐색은 예외로 둔다.
+  document.body.classList.toggle('share-visitor',publicReading);
+  // 대표 결정(2026-11-23) + #1236: 서재·책·보드·지도 화면 탭은 로그인 여부·트리 개수와
+  // 무관하게 보인다. #213의 권한별 숨김은 트리 선택·쓰기·공유에만 적용한다.
+  // 방문자는 서재만 따로 숨기고 책·보드·지도 탭을 그대로 쓴다.
   const parts=headerPartsFor({owned,treeCount:getModel()?.trees?.length||0,publicReading});
   const showTreeViews=treeViewsVisible({owned,phase:getMember()?.snapshot().phase,publicReading});
-  $('tree-views').hidden=!showTreeViews;for(const b of $('tree-views').querySelectorAll('button')){b.disabled=false;b.title='';}
+  $('tree-views').hidden=!showTreeViews;
+  for(const b of $('tree-views').querySelectorAll('button[data-view]')){
+    const visitorHidden=publicReading&&b.dataset.view==='track32-bookshelf.html';
+    b.classList.toggle('visitor-hidden',visitorHidden);
+    b.inert=visitorHidden;
+    if(visitorHidden)b.setAttribute('aria-hidden','true');else b.removeAttribute('aria-hidden');
+    b.disabled=false;b.title='';
+  }
   $('tree-views').setAttribute('aria-label','이 트리 보기');
   // #1094: 보기 방식(책/목록) 전환 묶음은 책 화면에서만, #1093 서재 진열 묶음은 서재 화면에서만 보인다.
   // #1092 후속: 둘러보기는 서재 위에 뜨는 화면이라 현재 화면 값이 서재로 남는다 — 둘러보기 화면에서는 둘 다 접는다.
@@ -53,7 +62,12 @@ function flowNavigation(){
   // 2026-11-18 13:49 대표 결정: 트리 선택은 모든 페이지에서 똑같이 보인다(서재 포함).
   // 로그아웃이면 "트리 고르기", 브라우저에만 남은 미저장 기록이 있으면 "저장 안 된 기록"이다.
   const pendingDraft=hasPendingDraft(sessionStorage,getMember()?.snapshot().subject||null);
+  // 방문자에게는 트리 고르기와 서재를 숨기고 내 화면의 책·보드·지도 탭을 재사용한다.
+  const treeSlot=document.querySelector?.('.tree-slot');
+  if(treeSlot){treeSlot.inert=publicReading;if(publicReading)treeSlot.setAttribute('aria-hidden','true');else treeSlot.removeAttribute('aria-hidden');}
   $('record-menu').hidden=!parts.treePicker||publicReading;
+  // #1092: 둘러보기 단추는 community-panel.mjs가 표시한다. 여기서 다시 숨기면 로그인·로그아웃·방문자
+  // 모두 둘러보기 탭을 잃는다 — 좁은 화면은 shell.css가 접기 메뉴로 접으므로 이곳에서는 건드리지 않는다.
   const pickerState={owned,treeTitle:displayTreeTitle(window.LT41?.tree.title||''),pendingDraft,treeCount:getModel()?.trees?.length||0};
   $('source-label').textContent=treePickerVisible(pickerState);
   $('record-menu').setAttribute('aria-label',treePickerAriaLabel(pickerState));
@@ -103,7 +117,10 @@ function revealCurrentTab(){
 }
 if(navBar){navBar.addEventListener('scroll',updateNavFade,{passive:true});addEventListener('resize',()=>revealCurrentTab());}
 function closeAccountMenu(){const pop=$('account-popover');if(!pop||pop.hidden)return;pop.hidden=true;$('account-avatar').setAttribute('aria-expanded','false');}
-function renderAccount(){const owned=!!getMember()?.snapshot().owned;
+function renderAccount(){
+ const visitor=getSource()==='share'?deps.getVisitorAccount?.():null;
+ const owned=!!getMember()?.snapshot().owned||!!visitor;
+ if(visitor?.email&&!accountEmail)accountEmail=visitor.email;
  // #368 2차: 동그라미 글자는 표시 이름 첫 글자 → 이메일 첫 글자 → 나, 색은 계정 설정 칸의 고른 색(없으면 기본색).
  const prefs=(()=>{try{return getMember()?.state?.()?.prefs||{}}catch{return {}}})();
  const view=accountPresentation({owned,email:accountEmail,name:prefs.displayName||deps.getCachedName?.()||''});
@@ -116,7 +133,12 @@ function renderAccount(){const owned=!!getMember()?.snapshot().owned;
  const mailEl=$('account-email');mailEl.textContent=view.label;mailEl.title=view.label;rememberLetter(shown);}
   // #368: 설정 "프로필" 묶음도 같은 이메일 값을 쓴다(셸이 넘긴 콜백).
   deps.onEmailChange?.(accountEmail);}
-function openAccountMenu(via='keyboard'){const owned=!!getMember()?.snapshot().owned;if(!owned){return;}if($('toast'))$('toast').hidden=true;const pop=$('account-popover');pop.hidden=false;pop.dataset.ltOpenedBy=via;$('account-avatar').setAttribute('aria-expanded','true');pop.querySelector('button:not([hidden])')?.focus();if(!accountEmail&&!emailTried)void loadAccountEmail();}
+function openAccountMenu(via='keyboard'){
+ const owned=!!getMember()?.snapshot().owned;
+ if(!owned&&getSource()==='share'&&deps.getVisitorAccount?.()){
+   location.hash='#my/home';return; // 실제 계정 화면에서 기존 계정 메뉴를 사용한다.
+ }
+ if(!owned){return;}if($('toast'))$('toast').hidden=true;const pop=$('account-popover');pop.hidden=false;pop.dataset.ltOpenedBy=via;$('account-avatar').setAttribute('aria-expanded','true');pop.querySelector('button:not([hidden])')?.focus();if(!accountEmail&&!emailTried)void loadAccountEmail();}
 // #368 보완 1·2: 이메일을 메뉴를 열 때가 아니라 로그인 직후 불러와 동그라미·라벨이 처음부터 이메일을 쓰게 한다.
 // 한 번 시험한 뒤에는 성공해도(이메일 없는 계정) 다시 부르지 않고, 실패했을 때만 다시 시험한다.
  let emailTried=false;
@@ -126,7 +148,7 @@ function openAccountMenu(via='keyboard'){const owned=!!getMember()?.snapshot().o
  // 관리자에게는 구분선 아래 '운영' 묶음(운영센터, /admin.html). 관리자가 아니면 운영 묶음이 보이지 않는다.
  function applyAccountRoles(){const j=$('account-journal');if(j)j.hidden=!aiCustomer;const opsGroup=$('account-ops-group');if(opsGroup)opsGroup.hidden=!isAdmin;const p=$('account-my-posts');if(p)p.hidden=false;}
 async function loadAccountEmail(){emailTried=true;const answer=await accountApi.account().catch(()=>null);if(!answer?.ok){emailTried=false;return;}if(answer.email)accountEmail=answer.email;aiCustomer=!!answer.aiCustomer;isAdmin=!!answer.admin;applyAccountRoles();renderAccount();}
-function updateAccountControls(){const owned=!!getMember()?.snapshot().owned;if(!owned){accountEmail='';emailTried=false;aiCustomer=false;isAdmin=false;}document.querySelectorAll('[data-guest-login]').forEach(x=>x.hidden=owned);$('server').hidden=!owned;$('logout').hidden=!owned;applyAccountRoles();renderAccount();if(owned&&!accountEmail&&!emailTried)void loadAccountEmail();}
+function updateAccountControls(){const owned=!!getMember()?.snapshot().owned||getSource()==='share'&&!!deps.getVisitorAccount?.();if(!owned){accountEmail='';emailTried=false;aiCustomer=false;isAdmin=false;}document.querySelectorAll('[data-guest-login]').forEach(x=>x.hidden=owned);$('server').hidden=!owned;$('logout').hidden=!owned;applyAccountRoles();renderAccount();if(owned&&!accountEmail&&!emailTried)void loadAccountEmail();}
  
   // 창 폭이 바뀌면 390의 토글 자리를 다시 정한다(머리줄 ↔ 화면 안 도구 줄).
   if(typeof addEventListener==='function')addEventListener('resize',()=>flowNavigation());

@@ -178,8 +178,8 @@ test('status·Location·Set-Cookie 를 그대로 돌려준다', async () => {
     headers: [
       ['location', '/'],
       ['content-type', 'text/plain; charset=utf-8'],
-      ['set-cookie', 'lovetree_session=abc; Path=/; Max-Age=3600; SameSite=Lax; HttpOnly'],
-      ['set-cookie', 'lovetree_oauth_state=; Path=/; Max-Age=0; SameSite=Lax; HttpOnly']
+      ['set-cookie', '__Host-lovetree-access=abc; Path=/; Max-Age=3600; SameSite=Lax; Secure; HttpOnly'],
+      ['set-cookie', 'lovetree_auth_state=; Path=/; Max-Age=0; SameSite=Lax; HttpOnly']
     ]
   }));
   const response = await onRequest(createProxy({ fetcher }), 'https://lovetree.example/auth/callback?code=lovt_1&state=s1');
@@ -187,8 +187,8 @@ test('status·Location·Set-Cookie 를 그대로 돌려준다', async () => {
   assert.equal(response.headers.get('location'), '/');
   const cookies = response.headers.getSetCookie();
   assert.equal(cookies.length, 2);
-  assert.match(cookies[0], /^lovetree_session=abc;/);
-  assert.match(cookies[1], /^lovetree_oauth_state=;/);
+  assert.match(cookies[0], /^__Host-lovetree-access=abc;/);
+  assert.match(cookies[1], /^lovetree_auth_state=;/);
 });
 
 test('사용자 요청으로 업스트림 목적지를 바꿀 수 없다', async () => {

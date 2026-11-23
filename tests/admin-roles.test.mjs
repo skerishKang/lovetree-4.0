@@ -11,7 +11,6 @@ import { createMemoryStatsRepo } from '../server/testing/memory-stats-repo.js';
 import { createMemoryAccountRepo } from '../server/testing/memory-account-repo.js';
 import { createMemoryShareRepo } from '../server/testing/memory-share-repo.js';
 import { createMemoryTreeVisibilityRepo } from '../server/testing/memory-tree-visibility-repo.js';
-import { createPadiemAuthorityAuth } from '../server/padiem-authority-auth.js';
 import { ApiError } from '../server/errors.js';
 
 const PRODUCT = 'lovetree-4-0';
@@ -19,14 +18,17 @@ const ADMIN_SUBJECT = `sub_${'a'.repeat(32)}`;
 const MEMBER_SUBJECT = `sub_${'b'.repeat(32)}`;
 const FUTURE = '2999-01-01T00:00:00.000Z';
 
-// 세션 토큰 → 확인된 신원. 만료·폐기는 권위가 닫는 방향으로만 답한다(중계 클라이언트와 같은 코드를 던진다).
-function authorityStub(sessions) {
-  return {
-    async resolveIdentity({ sessionId }) {
-      const row = sessions.get(sessionId);
-      if (!row || row.state === 'revoked') throw new ApiError(401, 'unauthenticated', '로그인 확인을 하지 못했어요.');
-      return { sessionId, productId: row.productId, subjectId: row.subjectId, expiresAt: row.expiresAt };
+// #1247: 옛 권위 경로 대신 시험용 가짜 인증. 세션 표의 상태를 그대로 반영해
+// 미인증·만료·폐기·다른 제품 세션을 같은 401로 닫는다(검사 항목은 그대로).
+function fakeAuthenticate(sessions) {
+  return async (request) => {
+    const cookie = String(request?.headers?.cookie ?? '');
+    const match = /(?:^|;\s*)lt_test_auth=([^;]+)/.exec(cookie);
+    const row = match ? sessions.get(match[1]) : null;
+    if (!row || row.state === 'revoked' || row.productId !== PRODUCT || !(Date.parse(row.expiresAt) > Date.now())) {
+      throw new ApiError(401, 'unauthenticated', '로그인 확인을 하지 못했어요.');
     }
+    return Object.freeze({ productId: PRODUCT, subjectId: row.subjectId });
   };
 }
 
@@ -34,14 +36,7 @@ function build({
   sessions = new Map(), roleStore = createModelAdminRoleStore(), withAdmin = true,
   shareRepo = null, visibilityRepo = null, statsNow = null
 } = {}) {
-  const credential = {
-    async verify(request) {
-      const cookie = String(request?.headers?.cookie ?? '');
-      const match = /(?:^|;\s*)lovetree_session=([^;]+)/.exec(cookie);
-      return match ? { sessionId: match[1] } : null;
-    }
-  };
-  const authenticate = createPadiemAuthorityAuth({ credential, authority: authorityStub(sessions), productId: PRODUCT });
+  const authenticate = fakeAuthenticate(sessions);
   const admin = withAdmin ? createAdminRoleService({ store: roleStore, productId: PRODUCT }) : null;
   const repo = createMemoryWorkspaceRepo();
   // #655 2차: 숫자 세기는 실제 저장 경로로 쌓은 메모리 저장소를 그대로 읽는다(숫자를 손으로 넣지 않는다).
@@ -57,7 +52,7 @@ function build({
   const service = createWorkspaceService({ repo, productId: PRODUCT });
   const handleFor = (statsService) => createApiHandler({ authenticate, service, productId: PRODUCT, admin, adminStats: statsService });
   const handle = handleFor(adminStats);
-  const as = (sessionId) => ({ headers: { cookie: `lovetree_session=${sessionId}` } });
+  const as = (sessionId) => ({ headers: { cookie: `lt_test_auth=${sessionId}` } });
   // 숫자 시험용: 저장 경로(문서 쓰기)와 다른 집계 서비스를 끼운 핸들러.
   let writes = 0;
   const writeDoc = (subjectId, doc) => repo.commit({ productId: PRODUCT, subjectId, doc, expectedRevision: 0, clientKey: `stats-${subjectId}-${++writes}`, requestHash: 'a'.repeat(64) });

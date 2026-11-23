@@ -97,8 +97,9 @@ export function createMemberRuntime(ctx){
        if(generation!==ctx.loadGeneration||!ctx.member?.snapshot().owned||ctx.syncedNoticeKeys.has(key))return;
        ctx.syncedNoticeKeys.add(key);
        ctx.noticeQueue.request('toast',{maxWait:5000,
-        // syncedNoticeKeys가 요청 중복을 막는다. 우선순위 선점 후 대기열이 다시 보여 줄 때는 재표시를 허용한다.
-         show:()=>ctx.shellNotice.notify(text),
+        // #1223: 앞선 우선순위 안내에 밀려 지나간 synced 알림이 notifyOnce 기록에 막혀 다시 뜨지 않았다.
+        // 중복은 위의 syncedNoticeKeys가 이미 막으므로 일반 notify로 띄운다(선점 뒤 대기열 재표시 허용).
+        show:()=>ctx.shellNotice.notify(text),
         hide:ctx.hideToast
        });
       }).catch(error=>report(error,'새 소식 확인'));
@@ -203,7 +204,12 @@ export function createMemberRuntime(ctx){
   async function sample(selection={},view){if(!(0,ctx.pauseMember)())return;const tree=await (0,ctx.loadExampleTree)();++ctx.loadGeneration;if(view)ctx.current=view;(0,ctx.load)(null,'example',selection,{},tree);if(view)(0,ctx.writeLocation)();(0,ctx.$)('save-feedback').hidden=true;if((0,ctx.$)('account-settings').open)(0,ctx.$)('account-settings').close();}
 
   // #1175: 공유 화면 밖으로 나가는 길 한 벌 — share 잔여를 치우고 예시 첫 화면으로 돌아가며, 화면에 남은 '감상' 안내를 거둔다.
-  function leaveShare(view){(0,ctx.hideToast)();void sample({},view);}
+  function leaveShare(view){
+    (0,ctx.hideToast)();
+    // 남의 공유에서 로고·뒤로가기로 나가면 방문자 자신의 첫 화면/계정으로 돌아간다.
+    if(ctx.member?.snapshot().owned||ctx.visitorAccount){ctx.current=view||'src064-orbit.html';void (0,ctx.startMember)();}
+    else void sample({},view);
+  }
   Object.defineProperties(ctx,{
     startMember:{value:startMember},
     sample:{value:sample},

@@ -15,14 +15,16 @@ export function createNavigationMenu(ctx){
    const add=(label,click,mark)=>{const b=document.createElement('button');b.type='button';b.setAttribute('role','menuitem');b.textContent=label;if(mark)b.setAttribute('aria-current','true');b.onclick=()=>{closeMore();click()};moreMenu.append(b)};
    // #635 PR C: 로그아웃 상태 메뉴(≡) 맨 위에 시작 입구 — 첫 화면의 '첫 순간 추가'와 같은 시작 흐름(openLoginStart('first'))으로 간다.
    // 로그인 상태 메뉴는 바꾸지 않는다.
-   if(!ctx.member?.snapshot().owned)add('내 러브트리 시작하기',()=>(0,ctx.openLoginStart)('first'));
+   if(ctx.source!=='share')
+    if(!ctx.member?.snapshot().owned)add('내 러브트리 시작하기',()=>(0,ctx.openLoginStart)('first'));
    // #380 2번: 접기 메뉴도 맨 위 메뉴와 같은 구조 — 첫 화면(로고)·둘러보기 · 서재·책·보드·지도 · 순간 추가.
    // 261117 대표 확정: 서재가 탭 줄 [서재][책][보드][지도]의 첫 자리 — 접기 메뉴도 같은 순서를 미러한다.
    // #458: 지금 보고 있는 화면 항목에 aria-current를 남긴다(메뉴를 열 때마다 다시 만들어 지금 상태를 반영한다).
    add('첫 화면',()=>document.querySelector('.brand').click(),ctx.current==='src064-orbit.html');
    add('둘러보기',()=>(0,ctx.$)('community-menu').click());
    // 2026-11-23: 모바일 접기 메뉴도 머리줄 탭과 같은 동작 — 로그아웃이면 해당 빈 화면을 연다.
-   add('서재',()=>(0,ctx.show)('track32-bookshelf.html',true,'',true),ctx.current==='track32-bookshelf.html');
+   // 방문자에게는 서재가 없으므로 접기 메뉴에서도 숨긴다.
+   if(ctx.source!=='share')add('서재',()=>(0,ctx.show)('track32-bookshelf.html',true,'',true),ctx.current==='track32-bookshelf.html');
    // 2026-11-17 대표 결정: 트리 0개여도 네 화면이 모두 열리므로 접기 메뉴에서도 책·보드·지도를 늘 둔다.
    add('책',()=>(0,ctx.show)('track59-sketchbook.html',true,'',true),ctx.current==='track59-sketchbook.html');
    add('보드',()=>(0,ctx.show)('track58-pinboard.html',true,'',true),ctx.current==='track58-pinboard.html');

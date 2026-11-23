@@ -136,7 +136,7 @@ export function createMessages(deps) {
       window.LT41.momentId = data.id; links(); writeLocation();
     }
     // #315: 공유 감상(share)은 읽기 전용이다. 안쪽 화면의 버튼 정리를 통과한 쓰기 메시지가 남아도 여기서 막는다(이중).
-    if (data?.type === MSG.newTree) { openNewTree(); return; }
+    if (data?.type === MSG.newTree) { if (getSource() !== 'share') openNewTree(); return; }
     if (data?.type === MSG.write && getSource() === 'share') return;
     if (data?.type === MSG.write && data.mode === 'edit' && data.momentId) {
       const targetTree = data.treeId

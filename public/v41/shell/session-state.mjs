@@ -9,7 +9,7 @@ import {createStageLoading} from "./stage-loading.mjs";
 import {createAuth} from "./auth.mjs";
 
 export function createSessionState(ctx){
-  let initialRoute, model, current, source, loadGeneration, previousDirty, member, handledHash, activeShareId, resumeAfterStart, shellStageLoading, shellCommunityScreen, networkOpenMoment, requestNetworkOpen, takeNetworkOpen, boardOpenMoment, requestBoardOpen, takeBoardOpen, shareApi, accountApi, myNewsApi, shellAuth;
+  let initialRoute, model, current, source, loadGeneration, previousDirty, member, visitorAccount, handledHash, activeShareId, resumeAfterStart, shellStageLoading, shellCommunityScreen, networkOpenMoment, requestNetworkOpen, takeNetworkOpen, boardOpenMoment, requestBoardOpen, takeBoardOpen, shareApi, accountApi, myNewsApi, shellAuth;
   function startLogin(intent=''){return shellAuth.startLogin(intent);}
 
   function openLoginStart(intent='first'){return shellAuth.openLoginStart(intent);}
@@ -21,6 +21,7 @@ export function createSessionState(ctx){
     loadGeneration:{get:()=>loadGeneration,set:value=>{loadGeneration=value;}},
     previousDirty:{get:()=>previousDirty,set:value=>{previousDirty=value;}},
     member:{get:()=>member,set:value=>{member=value;}},
+    visitorAccount:{get:()=>visitorAccount,set:value=>{visitorAccount=value;}},
     handledHash:{get:()=>handledHash,set:value=>{handledHash=value;}},
     activeShareId:{get:()=>activeShareId,set:value=>{activeShareId=value;}},
     resumeAfterStart:{get:()=>resumeAfterStart,set:value=>{resumeAfterStart=value;}},
@@ -41,7 +42,7 @@ export function createSessionState(ctx){
     // 열기·닫기·주소는 shell/community-screen.mjs 한 곳에서 바꾼다(창 모듈 community-panel.mjs는 그대로).
     initialRoute=parseSelectionRoute(location.hash);
 
-    model=null,current=screenForView(initialRoute.view)[1],source='example',loadGeneration=0,previousDirty=false,member=null,handledHash=null,activeShareId=null,resumeAfterStart=null;
+    model=null,current=screenForView(initialRoute.view)[1],source='example',loadGeneration=0,previousDirty=false,member=null,visitorAccount=null,handledHash=null,activeShareId=null,resumeAfterStart=null;
 
     // #1092: 둘러보기 화면 — 창 모듈의 showModal 호출을 비모달 화면 열기로 바꾸고, 닫을 때 #explore 주소 기록을 지킨다.
     // #1026: 0.8초 안에 내용이 오지 않으면 무대에 불러오는 중을 띄운다(움직임 끄기 설정은 표시할 때 읽는다).
