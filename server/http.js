@@ -3,6 +3,7 @@ import { MAX_MEDIA_BYTES } from './private-media.js';
 import { ApiError } from './errors.js';
 import { ROLE_ADMIN } from './admin-roles.js';
 import { parsePrincipal } from './principal.js';
+import { OPS_INGEST_PATH } from './proxy-proof.js';
 
 export const DEFAULT_MAX_BODY_BYTES = 4 * 1024 * 1024;
 
@@ -132,7 +133,8 @@ export function createApiHandler({ authenticate, service, productId, admin = nul
 export function createNodeHandler(requestHandler, { maxBodyBytes = DEFAULT_MAX_BODY_BYTES, afterResponse = null } = {}) {
   return async function nodeHandler(req, res) {
     const media = /^\/api\/media(?:\/|$)/.test(String(req.url).split('?')[0]);
-    const limit = media ? MAX_MEDIA_BYTES : maxBodyBytes;
+    const ingest = String(req.url).split('?')[0] === OPS_INGEST_PATH;
+    const limit = media ? MAX_MEDIA_BYTES : ingest ? 8192 : maxBodyBytes;
     const chunks = [];
     let size = 0;
     let aborted = false;
@@ -157,7 +159,8 @@ export function createNodeHandler(requestHandler, { maxBodyBytes = DEFAULT_MAX_B
       res.end(JSON.stringify({ error: { code: 'invalid_path', message: '요청 경로를 읽을 수 없어요.' } }));
       return;
     }
-    const result = await requestHandler({ method: req.method, path, query, headers: req.headers, body: media ? '' : Buffer.concat(chunks).toString('utf8'), ...(media ? { rawBody: Buffer.concat(chunks), bodyTooLarge: size > limit } : {}) });
+    const bytes = Buffer.concat(chunks);
+    const result = await requestHandler({ method: req.method, path, query, headers: req.headers, body: media ? '' : bytes.toString('utf8'), ...(media || path === OPS_INGEST_PATH ? { rawBody: bytes, bodyTooLarge: size > limit } : {}) });
     if (res.destroyed) return;
     res.writeHead(result.status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', ...(result.headers ?? {}) });
     res.end(result.binary ?? JSON.stringify(result.body));

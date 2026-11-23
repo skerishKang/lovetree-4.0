@@ -5,8 +5,48 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createProxy, upstreamOrigin, DEFAULT_RESPONSE_LIMIT_BYTES } from '../functions/_lib/proxy.js';
 import { DEFAULT_MAX_BODY_BYTES } from '../server/http.js';
+import { createHmac } from 'node:crypto';
+import { verifyProxyProof } from '../server/proxy-proof.js';
 
 const UPSTREAM = 'https://api.lovetree.example';
+
+test('#1211: 서명된 원문만 전달하고 수신 증명은 프록시가 만든다', async () => {
+  const secret = 'fixture-ingest', proof = 'p'.repeat(48), path = '/api/ops-feedback/ingest';
+  const raw = '{\n  "body": "한글", "kind": "reply"\n}';
+  const timestamp = String(Date.now());
+  const sign = (time, site, body) => 'sha256=' + createHmac('sha256', secret).update(`${time}\n${site}\n`).update(body).digest('hex');
+  const cases = [
+    ['정상', raw, timestamp, 'lovetree', sign(timestamp,'lovetree',raw), 200],
+    ['본문 변경', raw+' ', timestamp, 'lovetree', sign(timestamp,'lovetree',raw), 401],
+    ['오래된 시각', raw, String(+timestamp-301000), 'lovetree', sign(String(+timestamp-301000),'lovetree',raw), 401],
+    ['미래 시각', raw, String(+timestamp+301000), 'lovetree', sign(String(+timestamp+301000),'lovetree',raw), 401],
+    ['다른 사이트', raw, timestamp, 'other', sign(timestamp,'other',raw), 401],
+    ['서명 모양 오류', raw, timestamp, 'lovetree', 'sha256=bad', 401],
+    ['8KB 경계', raw.padEnd(8192-4,' '), timestamp, 'lovetree', sign(timestamp,'lovetree',raw.padEnd(8192-4,' ')), 200],
+    ['8KB 초과', '가'.repeat(2731), timestamp, 'lovetree', sign(timestamp,'lovetree','가'.repeat(2731)), 400],
+  ];
+  for (const [label, body, time, site, signature, status] of cases) {
+    const fetcher = recorder(new Response('{"ok":true}', {headers:{'content-type':'application/json'}}));
+    const response = await onRequest(createProxy({fetcher}), 'https://lovetree.example'+path, {method:'POST',body,headers:{'content-type':'application/json','x-pd-site':site,'x-pd-timestamp':time,'x-pd-signature':signature,'x-lovetree-ops-ingest-proof':'forged'}}, {LOVETREE_OPS_INGEST_SECRET:secret,LOVETREE_PROXY_SECRET:proof});
+    assert.equal(response.status,status,label);
+    assert.equal(fetcher.calls.length,status===200?1:0,label);
+    if(status===200){
+      const call=fetcher.calls[0];
+      assert.equal(call.body,body);
+      assert.equal(call.headers['x-pd-signature'],undefined);
+      assert.equal(verifyProxyProof({path,headers:call.headers,body:call.body},{secret:proof}).ok,true);
+      assert.equal(verifyProxyProof({path,headers:call.headers,body:call.body+' '},{secret:proof}).ok,false);
+    }
+  }
+  const fetcher=recorder(new Response('{}'));
+  const init={method:'POST',body:raw,headers:{'x-pd-site':'lovetree','x-pd-timestamp':timestamp,'x-pd-signature':sign(timestamp,'lovetree',raw)}};
+  assert.equal((await onRequest(createProxy({fetcher}),'https://lovetree.example'+path,init,{LOVETREE_PROXY_SECRET:proof})).status,503);
+  assert.equal((await onRequest(createProxy({fetcher}),'https://lovetree.example'+path,init,{LOVETREE_OPS_INGEST_SECRET:secret})).status,503);
+  assert.equal(fetcher.calls.length,0);
+  const other=recorder(new Response('{}',{headers:{'content-type':'application/json'}}));
+  await onRequest(createProxy({fetcher:other}),'https://lovetree.example/api/feedback',{method:'POST',body:'{}',headers:{'x-lovetree-ops-ingest-proof':'forged'}},{LOVETREE_PROXY_SECRET:proof});
+  assert.equal(other.calls[0].headers['x-lovetree-ops-ingest-proof'],undefined);
+});
 
 test('무대 조회와 투표만 전달하고 담기 해제의 빈 204를 보존한다', async () => {
   const share='s'.repeat(24), base='https://lovetree.example';

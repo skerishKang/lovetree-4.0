@@ -19,7 +19,7 @@ const EXPECTED = new Map([
   ['/api/community/me/favorites', 'community'], ['/api/community/admin/reports', 'community'],
   ['/api/community/my-news', 'community'], ['/api/community/my-news/unread-count', 'community'],
   ['/api/public/tag-moments', 'community'], ['/api/public/moments', 'community'],
-  ['/api/feedback', 'feedback'], ['/api/board', 'feedback'], ['/api/board/mine', 'feedback'],
+  ['/api/feedback', 'feedback'], ['/api/ops-feedback/ingest', 'feedback'], ['/api/board', 'feedback'], ['/api/board/mine', 'feedback'],
   ['/api/board/journal/today', 'feedback'], ['/api/admin/feedback', 'feedback'],
   ['/api/admin/journals', 'feedback'], ['/api/admin/stats', 'storage'],
   ['/api/youtube/oembed', 'youtube'], ['/api/tiktok/oembed', 'tiktok'], ['/api/instagram/oembed', 'instagram'], ['/api/admin/session', 'storage'], ['/api/admin/roles', 'storage'],

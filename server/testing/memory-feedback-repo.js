@@ -5,6 +5,8 @@ export function createMemoryFeedbackRepo() {
   const rows = [];
   const replies = [];
   const personas = new Map();
+  const ingestKeys = new Set();
+  let transactionTail = Promise.resolve();
   let nextId = 1, nextReplyId = 1;
 
   function replyCount(postId) { return replies.filter(r => r.postId === Number(postId)).length; }
@@ -13,8 +15,20 @@ export function createMemoryFeedbackRepo() {
   return {
     rows,
     replies,
-    // #1190: 시험용이라 트랜잭션 대신 같은 저장소를 그대로 넘긴다(계약만 맞춘다).
-    async transaction(fn) { return fn(this); },
+    async transaction(fn) {
+      const run=transactionTail.then(async()=>{
+        const beforeRows=rows.map(clone),beforeReplies=replies.map(r=>({...r})),beforeKeys=new Set(ingestKeys);
+        try{return await fn(this);}
+        catch(error){rows.splice(0,rows.length,...beforeRows);replies.splice(0,replies.length,...beforeReplies);ingestKeys.clear();for(const key of beforeKeys)ingestKeys.add(key);throw error;}
+      });
+      transactionTail=run.catch(()=>{});
+      return run;
+    },
+    async claimIngestEvent({productId,eventKey}) {
+      const key=JSON.stringify([productId,eventKey]);
+      if(ingestKeys.has(key))return false;
+      ingestKeys.add(key);return true;
+    },
     async create({productId, subjectId = null, kind = 'opinion', category, title = null, body, score = null, context = {}, journalDate = null}) {
       const row = {
         id: nextId++, productId, subjectId, kind, category, title, body,
@@ -70,8 +84,8 @@ export function createMemoryFeedbackRepo() {
       row.updatedAt = '2026-11-14T00:01:00.000Z';
       return {...clone(row), replyCount: replyCount(row.id), authorName: authorName(row.subjectId), authorRole: row.subjectId && personas.has(row.subjectId) ? 'ai_customer' : null};
     },
-    async addReply({productId, postId, authorType, authorSubjectId = null, body}) {
-      const reply = {id: nextReplyId++, productId, postId: Number(postId), authorType, authorSubjectId, body, status: 'visible', createdAt: '2026-11-14T00:02:00.000Z', editedAt: null};
+    async addReply({productId, postId, authorType, authorSubjectId = null, body, opsReplyId = null, createdAt = null}) {
+      const reply = {id: nextReplyId++, productId, postId: Number(postId), authorType, authorSubjectId, body, status: 'visible', createdAt: createdAt??'2026-11-14T00:02:00.000Z', editedAt: null,...(opsReplyId?{opsReplyId,authorName:'운영센터'}:{})};
       replies.push(reply);
       return {...reply};
     },

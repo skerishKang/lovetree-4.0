@@ -18,13 +18,19 @@ const THUMB = (route) => route.fulfill({ status: 200, contentType: 'image/png', 
 const SAMPLE = () => {
   const root = document.getElementById('orbit')?.shadowRoot;
   const all = root ? [...root.querySelectorAll('button.card')] : [];
-  const rectOf = (c) => {
-    const inner = c.querySelector('.surface img') || c.querySelector('.surface') || c;
-    const r = inner.getBoundingClientRect();
-    let k = 1; const t = getComputedStyle(inner).transform;
-    if (t && t !== 'none') { const m = t.match(/^matrix\(([^)]+)\)/); if (m) { const v = m[1].split(',').map(Number); k = Math.hypot(v[0], v[1]) || 1; } }
-    const cx = r.left + r.width / 2, cy = r.top + r.height / 2, w = r.width / k, h = r.height / k;
-    return { l: cx - w / 2, t: cy - h / 2, r: cx + w / 2, b: cy + h / 2 };
+  // #1086: 숨은 단추의 위치 대신 실제 그림판의 원근 좌표와 투명도를 읽는다.
+  const hook = window.__LT_ORBIT_TEST__, poses = hook.poses(), rasters = hook.rasterStats();
+  const origin = root.querySelector('.app').getBoundingClientRect();
+  const rectOf = c => {
+    const i = all.indexOf(c), p = poses[i], s = rasters[i];
+    if (!p || !s) return null;
+    const xs = [], ys = [];
+    for (const x of [-s.guardW/2, s.guardW/2]) for (const y of [-s.guardH/2, s.guardH/2]) {
+      const u=x+p.fx, v=y+p.fy, q=1-(p.zx*u+p.zy*v)/1200;
+      xs.push(origin.left+p.ox+(p.px+p.A*u+p.C*v)/q);
+      ys.push(origin.top+p.oy+(p.py+p.B*u+p.D*v)/q);
+    }
+    return { l: Math.min(...xs), t: Math.min(...ys), r: Math.max(...xs), b: Math.max(...ys) };
   };
   const shell = parent.document, fr = frameElement?.getBoundingClientRect(), ox = fr?.left || 0, oy = fr?.top || 0;
   const zone = (el) => {
@@ -38,7 +44,7 @@ const SAMPLE = () => {
   const hit = (a, b) => Math.max(0, Math.min(a.r, b.r) - Math.max(a.l, b.l)) * Math.max(0, Math.min(a.b, b.b) - Math.max(a.t, b.t));
   const visible = all.filter((c) => { const cs = getComputedStyle(c); return cs.display !== 'none' && cs.visibility !== 'hidden' && !c.classList.contains('off'); });
   // 바닥 자리를 지나는 동안 투명해진 카드는 글자를 덮지 않는다 — '가리는 카드'만 교차로 센다.
-  const opaque = visible.filter((c) => Number(getComputedStyle(c).opacity) > 0.05);
+  const opaque = visible.filter(c => { const i = all.indexOf(c); return poses[i] && rasters[i] && !poses[i].hidden && rasters[i].alpha > 0.05; });
   let pairs = 0;
   for (const box of opaque.map(rectOf)) for (const z of zones) if (hit(box, z) > 1) pairs += 1;
   const first = opaque[0] ? rectOf(opaque[0]) : null;
@@ -68,7 +74,7 @@ test('#1077 390 로그아웃 첫 화면의 떠다니는 카드는 바닥 링크�
           if (ok) { frame = f; break; }
         }
         assert.ok(frame, `${theme}: 첫 화면 프레임을 찾는다`);
-        await frame.waitForFunction(() => { const r = document.getElementById('orbit')?.shadowRoot; return r && [...r.querySelectorAll('button.card')].some((c) => !c.classList.contains('off')); }, null, { timeout: 15000 });
+        await frame.waitForFunction(() => { const r = document.getElementById('orbit')?.shadowRoot; return r && window.__LT_ORBIT_TEST__?.canvasReady() && [...r.querySelectorAll('button.card')].some((c) => !c.classList.contains('off')); }, null, { timeout: 15000 });
 
         // 빈손 통과 금지: 카드를 바닥 구역을 가장 많이 지나는 위상에 놓아 경로 자체가 겹치는지 확인한다.
         const crossed = await frame.evaluate(() => {
