@@ -1,4 +1,3 @@
-import { createProxy } from '../_lib/proxy.js';
 import { createSharedPagesAuth } from '../_lib/shared-auth.mjs';
 
 // #1175: 로그인 콜백이 거절되면 JSON을 브라우저에 그대로 보여 주지 않고 첫 화면으로 보낸다.
@@ -10,14 +9,17 @@ function callbackFailureRedirect(response, path) {
   return new Response(null, { status: 302, headers: { location: LOGIN_FAILURE_NEXT, 'cache-control': 'no-store' } });
 }
 
-export function createAuthPagesHandler({ legacy = createProxy(), shared = createSharedPagesAuth() } = {}) {
+// #7944(대표 결정 11-24): 옛 로그인 경로(API 프록시 → lovetree-auth-caller)를 걷어 냈다.
+// 로그인·콜백·새로고침·로그아웃은 모두 공용 로그인(shared)이 맡는다. 확인용 쿠키 없이 들어온 옛 콜백은
+// 첫 화면의 로그인 안내로 보낸다(다시 로그인하면 공용 로그인으로 이어진다).
+export function createAuthPagesHandler({ shared = createSharedPagesAuth() } = {}) {
   return async function onRequest(context) {
     const path = new URL(context.request.url).pathname;
     const run = async () => {
-      if (context.env?.LOVETREE_SHARED_AUTH_ENABLED !== 'true') return legacy(context);
       const cookie = context.request.headers.get('cookie') || '';
-      if (path === '/auth/callback' && !/(?:^|;\s*)lovetree_auth_state=/.test(cookie)) return legacy(context);
-      if (path === '/auth/logout' && !/(?:^|;\s*)lovetree_refresh=/.test(cookie)) return legacy(context);
+      if (path === '/auth/callback' && !/(?:^|;\s*)lovetree_auth_state=/.test(cookie)) {
+        return new Response(null, { status: 302, headers: { location: LOGIN_FAILURE_NEXT, 'cache-control': 'no-store' } });
+      }
       return shared(context.request, context.env);
     };
     return callbackFailureRedirect(await run(), path);
