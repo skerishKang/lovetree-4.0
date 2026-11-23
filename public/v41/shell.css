@@ -1226,7 +1226,6 @@ dialog#account-assets .assets-detail-none{margin:0;font-size:13px;color:var(--lt
 /* #1231: 360~390 너비에서 책 보기 전환 버튼이 있는 한 줄 머리줄의 트리 선택 클릭 영역 확보. */
 @media(max-width:390px){
   .app-header .brand{flex:0 0 28px;width:28px;min-width:28px}
-  .app-header .brand-word{font-size:0;letter-spacing:0}
-  .app-header .brand-word::before{content:'LT';font-size:13px;letter-spacing:0}
-  .app-header .brand-word small{display:none}
+  .app-header .brand-word{display:none}
+  .app-header .brand::before{content:'LT';font-size:13px;letter-spacing:0}
 }
