@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { verifyProxyProof, logProxyProofStartup, PROXY_PROOF_HEADER } from '../server/proxy-proof.js';
+import { verifyProxyProof, logProxyProofStartup, proxyProofLogPath, proxyProofMismatchEntry, createProxyProofMismatchLogger, PROXY_PROOF_HEADER } from '../server/proxy-proof.js';
 
 const SECRET = 's'.repeat(48);
 const req = (headers = {}, path = '/api/workspace') => ({ path, headers });
@@ -52,4 +52,60 @@ test('서버 요청 출처 확인: 비밀 없음 기록은 시작 때 한 번, �
 
 test('서버 요청 출처 확인: 내부 경로는 자체 서명 검사를 쓴다', () => {
   assert.deepEqual(verifyProxyProof(req({}, '/internal/account/email'), { secret: SECRET, enforce: true }), { ok: true, reason: 'internal' });
+});
+
+test('서버 요청 출처 확인: 기록 경로는 첫 두 마디까지만 남긴다', () => {
+  assert.equal(proxyProofLogPath('/api/workspace'), '/api/workspace');
+  assert.equal(proxyProofLogPath('/api/youtube/oembed?x=1'), '/api/youtube');
+  assert.equal(proxyProofLogPath('/api/admin/customers/sub_123/media/a.png'), '/api/admin');
+  assert.equal(proxyProofLogPath('/'), '/');
+});
+
+test('서버 요청 출처 확인: 어긋남 기록에는 경로와 머리말 유무·길이 비교만 남는다', () => {
+  assert.deepEqual(proxyProofMismatchEntry(req({}, '/api/youtube/oembed?x=1'), SECRET), {
+    result: 'mismatch', 경로: '/api/youtube', 머리말: '없음'
+  });
+  assert.deepEqual(proxyProofMismatchEntry(req({ [PROXY_PROOF_HEADER]: 'x'.repeat(16) }, '/api/workspace'), SECRET), {
+    result: 'mismatch', 경로: '/api/workspace', 머리말: '있음', 길이: '다름'
+  });
+  assert.deepEqual(proxyProofMismatchEntry(req({ [PROXY_PROOF_HEADER]: 'x'.repeat(SECRET.length) }, '/api/workspace'), SECRET), {
+    result: 'mismatch', 경로: '/api/workspace', 머리말: '있음', 길이: '같음'
+  });
+});
+
+test('서버 요청 출처 확인: 비밀값과 머리말 값·길이 숫자는 기록에 들어가지 않는다', () => {
+  const wrong = 'y'.repeat(SECRET.length);
+  const text = JSON.stringify(proxyProofMismatchEntry(req({ [PROXY_PROOF_HEADER]: wrong }, '/api/workspace'), SECRET));
+  assert.equal(text.includes(SECRET), false);
+  assert.equal(text.includes(wrong), false);
+  assert.equal(text.includes(String(SECRET.length)), false);
+});
+
+test('서버 요청 출처 확인: 같은 내용은 1분 안에 한 번만 남기고 횟수를 센다', () => {
+  const logs = [];
+  let clock = 1000;
+  const record = createProxyProofMismatchLogger({ log: e => logs.push(e), now: () => clock });
+  const request = req({}, '/api/workspace');
+  for (let i = 0; i < 3; i += 1) record(request, SECRET);
+  assert.equal(logs.length, 1);
+  assert.deepEqual(logs[0], { result: 'mismatch', 경로: '/api/workspace', 머리말: '없음', 횟수: 1 });
+
+  clock += 59_000;
+  record(request, SECRET);
+  assert.equal(logs.length, 1, '1분이 지나기 전에는 계속 묶인다');
+
+  clock += 1_000;
+  record(request, SECRET);
+  assert.equal(logs.length, 3, '지난 묶음의 횟수와 새 묶음을 각각 남긴다');
+  assert.deepEqual(logs[1], { result: 'mismatch', 경로: '/api/workspace', 머리말: '없음', 횟수: 4 });
+  assert.deepEqual(logs[2], { result: 'mismatch', 경로: '/api/workspace', 머리말: '없음', 횟수: 1 });
+});
+
+test('서버 요청 출처 확인: 내용이 다르면 따로 남는다', () => {
+  const logs = [];
+  const record = createProxyProofMismatchLogger({ log: e => logs.push(e) });
+  record(req({}, '/api/workspace'), SECRET);
+  record(req({}, '/api/youtube'), SECRET);
+  assert.equal(logs.length, 2);
+  assert.deepEqual(logs.map(e => e.경로), ['/api/workspace', '/api/youtube']);
 });
