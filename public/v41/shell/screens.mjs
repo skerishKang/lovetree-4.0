@@ -168,7 +168,7 @@ export function createScreens(deps) {
   }
 
   // treeKey: 트리를 바꿀 때 프레임 주소를 달리해 반드시 새 문서로 띄운다(#26 — 같은 주소면 옛 트리 내용이 남았다).
-  function show(file, write = true, treeKey = '') {
+  function show(file, write = true, treeKey = '', fromHeaderTab = false) {
     // show()는 화면 파일 이름을 받는다(화면 키가 아니다). 목록에서 그대로 찾는다.
     const screen = screens.find(s => s[1] === file);
     if (!screen) return;
@@ -176,10 +176,10 @@ export function createScreens(deps) {
     closePanels?.();
     if ($('community-panel')?.open) $('community-panel').close();
     setCurrent(file);
-    // 화면 탭 클릭(write=true)과 직접 주소 복구(write=false)를 구분한다.
-    // 예시 데이터가 늦게 도착해도 클릭으로 연 빈 상태를 덮어쓰지 않는다.
+    // 탭에서 연 개인 화면만 빈 상태로 유지한다. 지도 상세 → 책 등 내부 이동은
+    // 기존 예시 감상 경로를 그대로 쓰며, 인증·예시 데이터 지연으로도 탭 빈 상태를 덮지 않는다.
     if (!isGuest() || file === 'src064-orbit.html') guestTabSelected = false;
-    else if (write) guestTabSelected = true;
+    else if (fromHeaderTab) guestTabSelected = true;
     flowNavigation();
     applyTheme();
     if ((!hasTree() || (isGuest() && guestTabSelected)) && file !== 'src064-orbit.html') {
