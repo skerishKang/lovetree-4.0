@@ -106,10 +106,10 @@ test('390 보드: 읽기 전용 표시가 순간 선택 패널에 가려지지 �
           const w = Math.max(0, Math.round(Math.min(b.right, p.right) - Math.max(b.left, p.left)));
           const h = Math.max(0, Math.round(Math.min(b.bottom, p.bottom) - Math.max(b.top, p.top)));
           const hit = document.elementFromPoint((b.left + b.right) / 2, (b.top + b.bottom) / 2);
-          return { found: true, overlap: w * h, hitInsidePicker: hit ? !!picker.contains(hit) : null, badgeText: badge.textContent.trim() };
+          return { found: true, overlap: w * h, hitInsidePicker: hit ? !!picker.contains(hit) : null, badgeText: badge.textContent.trim(), badgeBox: { top: b.top, bottom: b.bottom, left: b.left, right: b.right }, pickerBox: { top: p.top, bottom: p.bottom, left: p.left, right: p.right }, pickerTop: getComputedStyle(picker).top, pickerTopVariable: getComputedStyle(document.documentElement).getPropertyValue('--lt-board-picker-top').trim(), toolbarBottom: document.querySelector('.lt-screen-toolbar')?.getBoundingClientRect().bottom, headerBottom: document.querySelector('header')?.getBoundingClientRect().bottom };
         });
         assert.equal(m.found, true, `${theme}/${plate}: 표시·패널이 모두 있다`);
-        assert.equal(m.overlap, 0, `${theme}/${plate}: 표시와 선택 패널 겹침(전: 96×11)`);
+        assert.equal(m.overlap, 0, `${theme}/${plate}: 표시와 선택 패널 겹침(전: 96×11) ${JSON.stringify(m)}`);
         assert.equal(m.hitInsidePicker, false, `${theme}/${plate}: 표시가 패널 뒤에 있지 않다`);
         assert.equal(m.badgeText.includes('읽기 전용'), true, `${theme}/${plate}: 표시 문구가 유지된다`);
         await context.close();

@@ -36,7 +36,7 @@ html[data-v41-screen=book] .lt-toolbar-title,html[data-v41-screen=board] .lt-too
 .lt-toolbar-tools .cinemaBtn{position:static;flex:none;box-sizing:border-box;height:36px;min-height:36px;line-height:34px;padding:0 12px;width:auto;font-size:13px}
 .lt-toolbar-tools .view-toggle .ui-btn,.lt-toolbar-tools .boardModeSwitch .modeSwitchBtn{box-sizing:border-box;height:36px;min-height:36px;line-height:34px;padding:0 12px;font-size:13px}
 /* 좁은 화면의 '선택한 순간' 줄도 도구 줄 아래에 둔다(머리글 실측보다 줄을 우선). */
-html[data-v41-screen=board] .lt-moment-picker{top:calc(var(--lt-toolbar-top,60px) + var(--lt-toolbar-height,48px) + 7px)}
+html[data-v41-screen=board] .lt-moment-picker{top:var(--lt-board-picker-top,calc(var(--lt-toolbar-top,60px) + var(--lt-toolbar-height,48px) + 7px))}
 /* 휴대폰에서는 돋보기(찾기)를 숨긴다 — 줄 안으로 옮겨도 이 규칙이 이긴다. */
 html[data-book-shape=phone] .lt-toolbar-tools .desktop-only{display:none}
 @media(max-width:600px){.lt-toolbar-tools .desktop-only{display:none}}

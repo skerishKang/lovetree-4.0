@@ -1378,7 +1378,7 @@ addEventListener('lt-date-style-changed', () => {
 function syncMomentPickerTop() {
   const head = document.querySelector('header');
   const badge = document.getElementById('themeBadge');
-  const bottoms = [head, document.querySelector('.lt-screen-toolbar')]
+  const bottoms = [head, document.querySelector('.lt-screen-toolbar'), badge]
     .filter(Boolean)
     .map(el => el.getBoundingClientRect().bottom);
   const bottom = bottoms.length ? Math.max(...bottoms) : 0;
