@@ -40,9 +40,26 @@ test('상단 메뉴: 같은 글자 크기·테두리 0·세로선 0·현재 탭 
         await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
         await page.locator('#discover-ask-no').click().catch(() => {});
         const perScreen = {};
+        // 대표 11-23: 화면마다 머리줄 높이·단추 줄 높이가 달라 서재·책에서 단추와 아래 선이 내려와 보였다.
+        const headerGeom = () => page.evaluate(() => {
+          const h = document.querySelector('.app-header') || document.querySelector('header');
+          const record = document.getElementById('record-menu');
+          const label = document.getElementById('source-label');
+          const caret = record?.querySelector('svg');
+          const r = record?.getBoundingClientRect();
+          return {
+            headerH: Math.round(h.getBoundingClientRect().height),
+            tops: [...h.querySelectorAll('#tree-views > button, .header-actions > button, .header-actions > .view-toggle, .account-slot > *')]
+              .filter((e) => e.getClientRects().length).map((e) => Math.round(e.getBoundingClientRect().top + e.getBoundingClientRect().height / 2)),
+            caretRightGap: r && caret ? Math.round((r.right - caret.getBoundingClientRect().right) * 10) / 10 : null,
+            labelLeftGap: r && label ? Math.round((label.getBoundingClientRect().left - r.left) * 10) / 10 : null
+          };
+        });
+        const geoms = { home: await headerGeom() };
         for (const [name, hash] of SCREENS) {
           await page.evaluate((h) => { location.hash = h; }, hash);
           await page.waitForTimeout(900);
+          geoms[name] = await headerGeom();
           perScreen[name] = await page.evaluate(() => {
             const record = document.getElementById('record-menu');
             const tabs = [...document.querySelectorAll('#tree-views > button')];
@@ -67,6 +84,14 @@ test('상단 메뉴: 같은 글자 크기·테두리 0·세로선 0·현재 탭 
         assert.equal(base.current, 1, '현재 탭 1개');
         assert.equal(base.recordVisible, true, '서재에서 트리 단추 보임');
         assert.equal(xsStable, true, '4화면 탭 x 좌표 동일');
+        // 390은 서재·책에서 보기 전환이 둘째 줄로 내려가는 것이 정한 배치라 넓은 화면만 잰다.
+        const hs = width < 780 ? [0] : [...new Set(Object.values(geoms).map((g) => g.headerH))];
+        assert.equal(hs.length, 1, `${width}/${theme}: 첫 화면·서재·책·보드·지도 머리줄 높이가 같다 ${JSON.stringify(geoms)}`);
+        for (const [name, g] of width < 780 ? [] : Object.entries(geoms)) {
+          const mids = [...new Set(g.tops)];
+          assert.ok(Math.max(...mids) - Math.min(...mids) <= 1, `${width}/${theme}/${name}: 머리줄 탭·단추의 세로 가운데가 한 줄이다 ${JSON.stringify(g.tops)}`);
+          if (g.caretRightGap !== null) assert.ok(g.caretRightGap >= 11 && g.caretRightGap <= 15, `${width}/${theme}/${name}: 짧은 트리 이름에서도 ⌄는 단추 오른쪽 끝(여백 13±2) — ${g.caretRightGap}`);
+        }
         results.push({ width, theme, ...base, xsStable });
         if (SHOT) {
           mkdirSync(SHOT, { recursive: true });
@@ -146,6 +171,8 @@ test('상단 메뉴 261119: 트리 단추 폭·⌄ 자리·목록 규칙·메뉴
         const ccs = cur ? getComputedStyle(cur) : null;
         return {
           recordW: Math.round(r.width), recordMax: parseFloat(getComputedStyle(record).maxWidth) || 0,
+          recordWidth: parseFloat(getComputedStyle(record).width) || 0,
+          paddingRight: parseFloat(getComputedStyle(record).paddingRight) || 0,
           caretRightGap: Math.round((r.right - caret.right) * 10) / 10,
           labelClipped: label.scrollWidth > label.clientWidth + 1,
           frameBg: fcs.backgroundColor, frameBorder: parseFloat(fcs.borderTopWidth) || 0,
@@ -157,8 +184,14 @@ test('상단 메뉴 261119: 트리 단추 폭·⌄ 자리·목록 규칙·메뉴
           currentCount: tabs.filter((b) => b.getAttribute('aria-current') === 'true').length
         };
       });
-      assert.ok(bar.caretRightGap >= 11 && bar.caretRightGap <= 15, `${width}: ⌄ 오른쪽 여백 ${bar.caretRightGap}px 는 13±2`);
-      assert.ok(bar.recordW <= bar.recordMax + 1, `${width}: 단추 폭 ${bar.recordW} ≤ 최대 ${bar.recordMax}`);
+      // ⌄는 단추 오른쪽 끝에 붙는다 — 여백은 그 폭의 단추 안쪽 여백(padding-right)을 따른다.
+      // 넓은 화면은 12px(고정 폭 180), 좁은 화면은 8px라서 기대값을 너비마다 따로 잰다.
+      assert.ok(bar.caretRightGap >= bar.paddingRight - 1 && bar.caretRightGap <= bar.paddingRight + 3,
+        `${width}: ⌄ 오른쪽 여백 ${bar.caretRightGap}px 는 단추 안쪽 여백 ${bar.paddingRight}px 기준`);
+      // 넓은 화면은 max-width:none 대신 폭 180px로 고정된다 — 고정 폭이 상한이다.
+      const recordLimit = bar.recordMax || bar.recordWidth;
+      assert.ok(recordLimit > 0 && bar.recordW <= recordLimit + 1,
+        `${width}: 단추 폭 ${bar.recordW} ≤ ${bar.recordMax ? '최대' : '고정 폭'} ${recordLimit}`);
       assert.equal(bar.labelClipped, true, `${width}: 긴 이름은 말줄임(글자가 칸을 넘지 않는다)`);
       assert.equal(bar.frameBg, 'rgba(0, 0, 0, 0)', `${width}: 탭을 감싸는 판 배경 없음`);
       assert.equal(bar.frameBorder, 0, `${width}: 탭을 감싸는 판 테두리 없음`);
