@@ -49,10 +49,14 @@ export async function compareOrbit({main,current,headed=false,out,only,variants=
    return await body(page,frame);
   }finally{await context.close();}
  };
- const measure=async(page,frame,width,theme,variant)=>{
-  const groups=[],attempts=[];
+ // #1229: 기준·변경본을 묶음 하나씩 번갈아 잰다(before 1 → after 1 → before 2 …). 같은 실행기의 부하 변화를 양쪽이 나눠 갖게 한다.
+ // 판정 기준(초과 수·최대 간격 비교)은 그대로다.
+ const pending={};
+ const measure=async(page,frame,width,theme,variant,first=0,count=3)=>{
+  const key=width+'-'+theme+'-'+variant,slot=pending[key]||(pending[key]={groups:[],attempts:[],advanced:0});
+  const groups=slot.groups,attempts=slot.attempts;
   const initial=await frame.evaluate(()=>globalThis.__LT_ORBIT_TEST__.lastWriteAt());
-  for(let i=0;i<3;i++){
+  for(let i=first;i<first+count;i++){
    for(let attempt=1;;attempt++){
     if(headed){await page.bringToFront();visibleWindow();}
     const traceKey=width+"-"+theme+"-"+variant+"-"+(i+1)+"-"+attempt;
@@ -81,8 +85,9 @@ export async function compareOrbit({main,current,headed=false,out,only,variants=
     assert.ok(headed&&attempt<3,'가시성 또는 백그라운드 프레임 제한으로 측정 무효');
    }
   }
-  const advanced=await frame.evaluate(()=>globalThis.__LT_ORBIT_TEST__.lastWriteAt())-initial;
-  assert.ok(advanced>=30000,'실제 궤도 30초 동안 움직임 확인');
+  slot.advanced+=await frame.evaluate(()=>globalThis.__LT_ORBIT_TEST__.lastWriteAt())-initial;
+  if(groups.length<3)return;
+  assert.ok(slot.advanced>=30000,'실제 궤도 30초 동안 움직임 확인');
   const result={width,theme,variant,groups};results.push(result);console.log(JSON.stringify(result));
   if(out){await writeFile(path.join(out,width+'-'+theme+'-'+variant+'.json'),JSON.stringify({result,attempts}));await writeFile(path.join(out,'results.json'),JSON.stringify(results,null,2));}
  };
@@ -149,10 +154,8 @@ export async function compareOrbit({main,current,headed=false,out,only,variants=
    }finally{await p.close();}
   }
   for(const [width,height,theme] of combinations.filter(x=>!only||only.split(',').includes(x[0]+'-'+x[2]))){
-   for(const variant of variants){
-    if(!captureOnly)await boot(width,height,theme,variant,'no-preference',(p,f)=>measure(p,f,width,theme,variant));
-    if(out&&!measureOnly)await boot(width,height,theme,variant,'reduce',(p,f)=>capture(p,f,width,height,theme,variant));
-   }
+   if(!captureOnly)for(let g=0;g<3;g++)for(const variant of variants)await boot(width,height,theme,variant,'no-preference',(p,f)=>measure(p,f,width,theme,variant,g,1));
+   if(out&&!measureOnly)for(const variant of variants)await boot(width,height,theme,variant,'reduce',(p,f)=>capture(p,f,width,height,theme,variant));
    if(out&&!measureOnly&&variants.length===2){
     const a=captures[width+'-'+theme+'-before'],b=captures[width+'-'+theme+'-after'];
     assert.equal(a.phase,b.phase);assert.equal(a.floatTime,b.floatTime);
