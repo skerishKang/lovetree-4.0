@@ -411,7 +411,7 @@ test('#1087 카드 바꾸기·숫자 두 줄·숫자 누르기', { skip: REQUIRE
       assert.equal(await groups.count(), 3);
       for (const group of await groups.all()) assert.equal(await group.locator('.home-count-line').count(), 2, '단추마다 두 줄');
       const texts = await groups.evaluateAll(es => es.map(e => [...e.querySelectorAll('.home-count-line')].map(row => row.textContent.trim())));
-      assert.deepEqual(texts, [['순간 4', '모아둔 2'], ['공개 트리 11', '공개 순간 42'], ['트리 2', '공개 트리 1']], JSON.stringify(texts));
+      assert.deepEqual(texts, [['순간 4', '정리 전 2'], ['공개 트리 11', '공개 순간 42'], ['트리 2', '공개 트리 1']], JSON.stringify(texts));
 
       await frame.locator('.recent-change').click();
       await frame.locator('.recent-menu').waitFor({ state: 'visible', timeout: 5000 });
@@ -433,7 +433,7 @@ test('#1087 카드 바꾸기·숫자 두 줄·숫자 누르기', { skip: REQUIRE
       await frame.locator('.orbit-dialog .index-list').waitFor({ state: 'visible', timeout: 5000 });
       await h.page.keyboard.press('Escape');
       await frame.locator('.orbit-dialog[open]').waitFor({ state: 'detached', timeout: 5000 });
-      await groups.nth(0).locator('.home-count button', { hasText: '모아둔 2' }).evaluate(el => el.click());
+      await groups.nth(0).locator('.home-count button', { hasText: '정리 전 2' }).evaluate(el => el.click());
       await h.page.waitForFunction(() => window.__msgs1087.includes('lt41-cleanup'), null, { timeout: 5000 });
       await groups.nth(1).locator('.home-count button', { hasText: '공개 트리 11' }).evaluate(el => el.click());
       await groups.nth(1).locator('.home-count button', { hasText: '공개 순간 42' }).evaluate(el => el.click());

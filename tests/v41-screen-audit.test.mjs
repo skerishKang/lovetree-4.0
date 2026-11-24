@@ -99,7 +99,7 @@ test('#942 첫 화면 추가 단추와 숫자 묶음', { skip: REQUIRE ? false :
     let tree=createTree(input(0),clock(0));for(let i=1;i<count;i++)tree=addMoment(tree,input(i),tree.moments[0].id,clock(i));
     return tree;
   };
-  const trees=[make('좋아하는 순간들',8),make('여름',3),make('함께 부른 노래',3)];
+  const trees=[make('좋아하는 순간들',8),make('여름',3),{...make('함께 부른 노래',3),inbox:true}];
   const workspace={revision:1,state:{version:1,trees,prefs:{displayName:'화면검사 시험계정'}},subject:'visual-audit-fake',writeSubjectBound:true,savedAt:'2026-11-20T00:00:00.000Z'};
   const share={id:'audit-share-000000000001',treeId:trees[0].id,view:'book',status:'active',origin:'manual',createdAt:'2026-11-20T00:00:00.000Z'};
   const readHome = member => {
@@ -122,16 +122,21 @@ test('#942 첫 화면 추가 단추와 숫자 묶음', { skip: REQUIRE ? false :
     };
     const buttons = [...root.querySelectorAll('.center .actions > .subtleBtn,.center .actions > .home-action-group > .subtleBtn')].map(e => {
       const s = doc.defaultView.getComputedStyle(e);
-      return { text: e.textContent.trim(), bg: s.backgroundColor, border: s.borderTopWidth };
+      const icon=e.querySelector('svg.home-compass'), ir=icon?.getBoundingClientRect();
+      return { text:e.textContent.trim(),bg:s.backgroundColor,border:s.borderTopWidth,borderColor:s.borderTopColor,borderStyle:s.borderTopStyle,radius:parseFloat(s.borderTopLeftRadius),ink:s.color,icon:!!icon&&ir.width>0&&ir.height>0&&icon.getAttribute('aria-hidden')==='true'&&icon.getAttribute('fill')==='none'&&icon.getAttribute('stroke')==='currentColor' };
     });
     const headers = [...document.querySelectorAll('#write-menu,#mobile-add')].map(e => ({ id: e.id, visible: !!e.getClientRects().length }));
     const head = measure(document.getElementById('write-menu')), fab = measure(document.getElementById('mobile-add'));
     const add = root.querySelector('.home-add-top'), top = add ? measure(add) : null;
     const groups = [...root.querySelectorAll('.home-action-group')].map(e => {
       const b=e.querySelector('.subtleBtn'),n=e.querySelector('.home-count'),r=e.getBoundingClientRect(),br=b.getBoundingClientRect(),nr=n.getBoundingClientRect();
-      const range=doc.createRange();range.selectNodeContents(n);const tr=range.getBoundingClientRect();
       const lines=[...n.querySelectorAll('.home-count-line')].map(row=>row.textContent.trim());
-      return {label:b.textContent.trim(),count:n.hidden?'':lines.join('|'),x:r.x,y:r.y,w:r.width,h:r.height,inner:n.hidden?null:nr.top-br.bottom,center:n.hidden?null:(tr.left+tr.width/2)-(br.left+br.width/2),font:parseFloat(doc.defaultView.getComputedStyle(n).fontSize),overflow:n.hidden?0:Math.max(0,tr.right-br.right,br.left-tr.left)};
+      const rows=[...n.querySelectorAll('.home-count-item')].map(item=>{
+        const label=item.querySelector('.home-count-name'),value=item.querySelector('.home-count-value');
+        const lr=label.getBoundingClientRect(),vr=value.getBoundingClientRect(),ls=doc.defaultView.getComputedStyle(label),vs=doc.defaultView.getComputedStyle(value);
+        return {name:label.textContent,value:value.textContent,left:lr.left-br.left,right:br.right-vr.right,gap:vr.left-lr.right,dy:Math.abs(lr.top-vr.top),labelColor:ls.color,valueColor:vs.color,muted:ls.getPropertyValue('--lt-muted').trim(),pearl:vs.getPropertyValue('--lt-pearl').trim(),weight:parseInt(vs.fontWeight),numeric:vs.fontVariantNumeric,nowrap:vs.whiteSpace};
+      });
+      return {label:b.textContent.trim(),count:n.hidden?'':lines.join('|'),x:r.x,y:r.y,w:r.width,h:r.height,inner:n.hidden?null:nr.top-br.bottom,font:parseFloat(doc.defaultView.getComputedStyle(n).fontSize),widthDiff:Math.abs(nr.width-br.width),rows};
     });
     return { buttons, headers, head, fab, top, groups };
   };
@@ -148,7 +153,7 @@ test('#942 첫 화면 추가 단추와 숫자 묶음', { skip: REQUIRE ? false :
           if(u.origin!==base)return u.hostname==='i.ytimg.com'||u.hostname==='audit.invalid'?THUMB(r):r.abort();
           if(u.pathname==='/api/workspace'&&signedIn)return r.fulfill({status:200,json:{...workspace,state:{...workspace.state,trees:member?trees:[]}}});
           if(u.pathname==='/api/shares'&&member)return r.fulfill({status:200,json:{ok:true,items:[share],shares:[share]}});
-          if(u.pathname==='/api/community/stats')return r.fulfill({status:200,json:{trees:17,moments:123}});
+          if(u.pathname==='/api/community/stats')return r.fulfill({status:200,json:{trees:17,moments:1234}});
           if(u.pathname.startsWith('/api/'))return r.fulfill({status:200,json:{ok:true,items:[]}});
           return r.continue();
         });
@@ -171,6 +176,17 @@ test('#942 첫 화면 추가 단추와 숫자 묶음', { skip: REQUIRE ? false :
         console.log('#942',key,JSON.stringify(values));
         if(dest){
           if(width===1440)await page.frameLocator('#view').locator('.card:not(.off):not(.clash)').first().waitFor({state:'visible',timeout:8000});
+          // Capture the fully revealed center, not a transient animation frame.
+          await page.waitForFunction(()=>{
+            const f=document.getElementById('view'),root=f?.contentDocument?.getElementById('orbit')?.shadowRoot;
+            const center=root?.querySelector('.center'),actions=center?.querySelector('.actions');
+            if(!actions)return false;
+            const win=f.contentWindow;
+            return [center,actions,...center.querySelectorAll('.lt-home-enter,.home-action-group,.home-count-item')].every(e=>{
+              const s=win.getComputedStyle(e);
+              return Number(s.opacity)>=.99&&s.visibility==='visible'&&e.getAnimations().every(a=>a.playState==='finished'||a.playState==='idle');
+            });
+          },null,{timeout:10000});
           await page.screenshot({path:join(dest,'home-'+key+'.png'),animations:'allow'});
         }
         const rose=theme==='night'?'rgb(180, 87, 107)':'rgb(152, 80, 94)';
@@ -181,11 +197,27 @@ test('#942 첫 화면 추가 단추와 숫자 묶음', { skip: REQUIRE ? false :
         check(head.visible===(member&&width===1440)&&!fab.visible&&!!top?.visible===member,key+' 추가 단추 위치');
         check(JSON.stringify(buttons.map(b=>b.text))===JSON.stringify(member?['순간 목록','둘러보기','서재']:['＋ 첫 순간 추가','둘러보기','어떻게 쓰나요']),key+' 가운데 순서');
         const light=theme==='night'?'rgb(238, 233, 224)':'rgb(255, 253, 248)';
-        check(member?buttons.every(b=>b.bg===light):buttons[0]?.bg===rose,key+' 자주색 하나·나머지는 밝은 단추(#1084) '+JSON.stringify(buttons.map(b=>b.bg)));
-        check(buttons.slice(member?0:1).every(b=>b.bg===light&&b.border!=='0px'),key+' 밝은 바탕·얇은 테두리 '+JSON.stringify(buttons));
+        check(member?buttons[0]?.bg===light:buttons[0]?.bg===rose,key+' 첫 단추의 기존 색 '+JSON.stringify(buttons[0]));
+        check(buttons[2]?.bg===light&&buttons[2].border!=='0px',key+' 셋째 밝은 단추 '+JSON.stringify(buttons[2]));
+        const explore=buttons[1];
+        check(explore.bg==='rgba(0, 0, 0, 0)'&&explore.border==='1px'&&explore.borderStyle==='solid'&&explore.radius>=22&&explore.icon&&explore.ink!==rose,key+' 둘러보기 투명·테두리·선 나침반 '+JSON.stringify(explore));
+        check(!buttons[0].icon&&!buttons[2].icon&&explore.bg!==buttons[0].bg&&explore.bg!==buttons[2].bg,key+' 둘러보기만 다른 모양');
+        const exploreLocator=page.frameLocator('#view').locator('.center .actions [data-do=community]');
+        const hoverStyle=()=>exploreLocator.evaluate(e=>{const s=getComputedStyle(e);return {bg:s.backgroundColor,border:s.borderTopColor}});
+        await exploreLocator.hover();
+        const hovered=await hoverStyle();
+        check(hovered.bg!==explore.bg&&hovered.border!==explore.borderColor,key+' 둘러보기 올림 강조 '+JSON.stringify(hovered));
+        await page.mouse.move(0,0);
+        check((await hoverStyle()).bg===explore.bg,key+' 올림 해제 뒤 다시 투명');
         check(groups.length===3,key+' 묶음 3개');
-         check(JSON.stringify(groups.map(g=>g.count))===JSON.stringify(member?['순간 14|','공개 트리 17|공개 순간 123','트리 3|공개 트리 1']:['',(signedIn?'':'예시 ')+'공개 트리 17|순간 123','']),key+' 숫자 귀속');
-        for(const g of groups.filter(g=>g.count))check(g.inner>=4&&g.inner<=6&&Math.abs(g.center)<=2&&g.font>=12&&g.overflow<=1,key+' 숫자 간격 '+JSON.stringify(g));
+         check(JSON.stringify(groups.map(g=>g.count))===JSON.stringify(member?['순간 14|정리 전 3','공개 트리 17|공개 순간 1.2k','트리 3|공개 트리 1']:['',(signedIn?'':'예시 ')+'공개 트리 17|순간 1.2k','']),key+' 숫자 귀속');
+        for(const g of groups.filter(g=>g.count)){
+          check(g.inner>=4&&g.inner<=6&&g.font>=12&&g.widthDiff<=1,key+' 숫자 표 폭·간격 '+JSON.stringify(g));
+          for(const row of g.rows){
+            check(Math.abs(row.left)<=1&&Math.abs(row.right)<=1&&row.gap>=3&&row.dy<=1&&row.nowrap==='nowrap',key+' 이름 왼쪽·숫자 오른쪽·한 줄 '+JSON.stringify(row));
+            check(row.weight>=700&&row.numeric.includes('tabular-nums')&&row.valueColor!==rose&&row.valueColor===(theme==='night'?'rgb(245, 241, 233)':'rgb(64, 53, 54)')&&row.labelColor===(theme==='night'?'rgb(155, 152, 166)':'rgb(111, 96, 90)'),key+' 숫자 굵기·색·고정폭 '+JSON.stringify(row));
+          }
+        }
         for(let i=1;i<groups.length;i++){
           const a=groups[i-1],b=groups[i],gap=Math.abs(a.y-b.y)<2?b.x-a.x-a.w:b.y-a.y-a.h;
           check(gap>=Math.max(width===1440?16:14,3*5),key+' 묶음 간격 '+gap);
@@ -193,6 +225,69 @@ test('#942 첫 화면 추가 단추와 숫자 묶음', { skip: REQUIRE ? false :
       }finally{await ctx.close()}
     }
   }finally{await browser.close();await new Promise(r=>server.close(r))}
+  assert.deepEqual(failures,[]);
+});
+
+// #1246·#1026: delayed public statistics and font loading must not move the action group.
+test('#1246 첫 화면 단추 첫 표시 뒤 배치 고정', { skip: REQUIRE ? false : skip, timeout: 180000 }, async () => {
+  if (skip) assert.fail(skip);
+  const server=await serve(),base='http://127.0.0.1:'+server.address().port;
+  const browser=await chromium.launch({headless:true});
+  const tree=createTree({subject:'시험 트리',title:'시험 순간',date:'2026-11-20',emotion:'설렘',note:'가짜 기록'});
+  const failures=[];
+  try {
+    for(const width of [390,1440]) for(const kind of ['guest','empty','member']){
+      const member=kind==='member',signedIn=kind!=='guest',key=width+'-'+kind;
+      const ctx=await browser.newContext({viewport:{width,height:width===390?844:900},reducedMotion:'no-preference'});
+      let releaseStats;const statsGate=new Promise(r=>releaseStats=r);
+      let releaseFonts;const fontGate=new Promise(r=>releaseFonts=r);
+      try {
+        await ctx.addInitScript(()=>{
+          try{localStorage.setItem('lt41.theme','night');localStorage.setItem('lt41.tips.firstTree','1')}catch{}
+          if(window!==top)return;
+          const rows=window.__homeActionFrames=[];
+          const tick=()=>{
+            try{
+              const f=document.getElementById('view'),root=f?.contentDocument?.getElementById('orbit')?.shadowRoot;
+              const a=root?.querySelector('.center .actions'),c=root?.querySelector('.center'),bs=[...a?.querySelectorAll('.home-action-group > button')||[]];
+              if(f?.checkVisibility()&&a&&bs.length===3){
+                const w=f.contentWindow,style=w.getComputedStyle(a),r=a.getBoundingClientRect(),cr=c.getBoundingClientRect();
+                if(Number(style.opacity)>0&&r.width&&r.height){
+                  const translate=style.transform==='none'?0:new DOMMatrixReadOnly(style.transform).m42;
+                  const br=bs.map(b=>b.getBoundingClientRect());
+                  rows.push({height:r.height,top:r.top-translate,centerTop:cr.top,lines:new Set(br.map(b=>Math.round(b.top))).size,labels:bs.map(b=>b.textContent.trim()).join('|'),filled:!!a.querySelector('[data-do=community] + .home-count .home-count-value')});
+                }
+              }
+            }catch{}
+            requestAnimationFrame(tick);
+          };
+          requestAnimationFrame(tick);
+        });
+        await ctx.route('**/*',async r=>{
+          const u=new URL(r.request().url());
+          if(u.origin!==base)return r.abort();
+          if(r.request().resourceType()==='font'){await fontGate;return r.continue();}
+          if(u.pathname==='/api/workspace'&&signedIn){await new Promise(ok=>setTimeout(ok,300));return r.fulfill({status:200,json:{revision:1,state:{version:1,trees:member?[tree]:[],prefs:{}},subject:'visual-audit-fake',writeSubjectBound:true,savedAt:'2026-11-20T00:00:00.000Z'}});}
+          if(u.pathname==='/api/community/stats'){await statsGate;return r.fulfill({status:200,json:{trees:17,moments:1234}});}
+          if(u.pathname.startsWith('/api/'))return r.fulfill({status:200,json:{ok:true,items:[]}});
+          return r.continue();
+        });
+        const page=await ctx.newPage();
+        await page.goto(base+'/v41/'+(signedIn?'?account=1':'')+'#home',{waitUntil:'domcontentloaded'});
+        // Do not wait for fonts or counts before measuring the first visible group.
+        await page.waitForFunction(()=>window.__homeActionFrames.length>0,null,{timeout:15000});
+        await page.waitForTimeout(3000);releaseFonts();releaseStats();
+        await page.waitForFunction(()=>window.__homeActionFrames.some(r=>r.filled),null,{timeout:10000});
+        await page.waitForTimeout(700);
+        const rows=await page.evaluate(()=>window.__homeActionFrames);
+        const first=rows[0],last=rows.at(-1),expected=width===390&&!member?3:1;
+        const delta=k=>Math.max(...rows.map(r=>r[k]))-Math.min(...rows.map(r=>r[k]));
+        const result={key,samples:rows.length,first,last,heightDelta:delta('height'),topDelta:delta('top'),centerDelta:delta('centerTop'),lines:[...new Set(rows.map(r=>r.lines))],labels:[...new Set(rows.map(r=>r.labels))]};
+        console.log('#1246 FIRST',JSON.stringify(result));
+        if(first.filled||!last.filled||result.lines.length!==1||result.lines[0]!==expected||result.labels.length!==1||result.heightDelta>8||result.topDelta>8||result.centerDelta>8)failures.push(result);
+      }finally{releaseFonts();releaseStats();await ctx.close();}
+    }
+  }finally{await browser.close();await new Promise(r=>server.close(r));}
   assert.deepEqual(failures,[]);
 });
 
