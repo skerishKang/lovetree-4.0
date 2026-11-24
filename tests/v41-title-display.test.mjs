@@ -13,7 +13,8 @@ const TABLE = [
   { mine: '', video: '', main: { both: '', mine: '', video: '' }, sub: { both: '', mine: '', video: '' } },
   { mine: AUTO, video: '영상 제목', main: { both: '영상 제목', mine: '영상 제목', video: '영상 제목' }, sub: { both: '', mine: '', video: '' }, auto: true },
   { mine: AUTO, video: '', main: { both: '', mine: '', video: '' }, sub: { both: '', mine: '', video: '' }, auto: true },
-  { mine: '영상 제목', video: '영상 제목', main: { both: '영상 제목', mine: '영상 제목', video: '영상 제목' }, sub: { both: '', mine: '', video: '' }, auto: true }
+  { mine: '영상 제목', video: '영상 제목', main: { both: '영상 제목', mine: '영상 제목', video: '영상 제목' }, sub: { both: '', mine: '', video: '' }, auto: true },
+  { mine: 'super shy — official mv', video: 'Super Shy — Official MV', main: { both: 'Super Shy — Official MV', mine: 'Super Shy — Official MV', video: 'Super Shy — Official MV' }, sub: { both: '', mine: '', video: '' }, auto: true }
 ];
 
 test('0. 제목 보기 설정 값: both·mine·video만, 모르는 값은 both', () => {

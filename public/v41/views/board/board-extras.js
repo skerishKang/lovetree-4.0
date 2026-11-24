@@ -202,6 +202,7 @@ if (cardLayer && !cardLayer.dataset.noNativeDrag) {
 const _renderCardsV1 = renderCards;
 renderCards = function () {
   cardLayer.innerHTML = moments.map(cardHTML).join('');
+  mobilePicker?.refresh?.();
   cardLayer.querySelectorAll('.card').forEach(el => bindCardV11(el));
   // #894: 카드 안의 그림·링크 기본 끌기를 막는다 — 끌기가 보드 밖(셸)으로 새어 나가 '놓으면 담아요' 판이 떴다.
   cardLayer.querySelectorAll('.card img,.card a').forEach(x => {

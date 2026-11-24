@@ -37,7 +37,8 @@ import {titleView,formatDisplayDate,normalizeTitleDisplay} from '/v41/book-usabi
 (()=>{const tools=document.createElement('button');tools.id='mobileTools';tools.className='headbtn primary mobileTools';tools.textContent='도구';tools.setAttribute('aria-expanded','false');document.querySelector('.lt-toolbar-tools').append(tools);tools.onclick=()=>{const panel=document.getElementById('leftPanel');const open=panel.classList.toggle('mobileOpen');tools.setAttribute('aria-expanded',String(open));document.getElementById('detail').classList.remove('open');};const originalClose=document.getElementById('leftCollapse').onclick;document.getElementById('leftCollapse').onclick=()=>{originalClose();tools.setAttribute('aria-expanded',String(document.getElementById('leftPanel').classList.contains('mobileOpen')));};})();
 </script>
 <script>
-mobilePicker=LTMobileMoments({moments:LTDEMO.moments,selected:LTDEMO.get(),onSelect:id=>{focusBoardMoment(id,false);document.getElementById('detail').classList.remove('open');},onOpen:id=>selectMoment(id,true),openLabel:'책 열기',tone:'dark'});
+mobilePicker=LTMobileMoments({moments:LTDEMO.moments,selected:LTDEMO.get(),titleForMoment:m=>titleMain(m),onSelect:id=>{focusBoardMoment(id,false);document.getElementById('detail').classList.remove('open');},onOpen:id=>selectMoment(id,true),openLabel:'책 열기',tone:'dark'});
+if(window.LTTitle)mobilePicker.refresh();addEventListener('lt-title-ready',()=>mobilePicker?.refresh?.());
 /* #267: 탐색 판은 board.js가 첫 맞춤을 한 뒤에 생긴다 — 판 자리를 비켜 둔 맞춤으로 다시 잡는다(좁은 판만). */
 if(innerWidth<700&&typeof boardStartView==='function')boardStartView();
 addEventListener('resize',()=>{if(innerWidth<700&&!cinema)boardResizeMobile();});

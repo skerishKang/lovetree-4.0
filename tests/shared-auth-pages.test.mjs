@@ -239,11 +239,13 @@ test('콜백은 검증된 이메일 서명을 내부 저장소로 최선 노력�
       return Response.json({ ok: true });
     }
   });
-  const done = await callbackRound(auth, await pagesEnv());
+  const proof = 'p'.repeat(48);
+  const done = await callbackRound(auth, await pagesEnv({ LOVETREE_PROXY_SECRET: proof }));
   assert.equal(done.status, 302);
   const push = calls.find((call) => call.url === 'https://storage.example/internal/account/email');
   assert.ok(push, '내부 저장소 호출이 있어야 한다');
   assert.equal(push.init.method, 'POST');
+  assert.equal(push.init.headers['x-lovetree-proxy-proof'], proof);
   assert.equal(push.init.headers.authorization, 'Bearer access');
   assert.deepEqual(JSON.parse(push.init.body), { email: 'owner@example.test', canonical_subject_id: 'sub_a' });
 });
