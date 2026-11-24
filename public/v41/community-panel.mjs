@@ -251,7 +251,7 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
    image.src=url;if(image.complete&&image.naturalWidth)ready(image);
    art.append(image);cover.append(art);
   }else cover.append(el('span','community-cover-fallback',item.cover?.title||'공개된 순간'));
-  if(item.aiTester===true)cover.append(el('span','community-cover-badge community-ai','AI 명예회원'));
+  if(item.aiTester===true)cover.append(el('span','community-cover-badge community-ai','✦ AI 명예회원'));
   cover.append(el('span','community-cover-badge community-count',`순간 ${item.momentCount}`));
   return cover;
  }
