@@ -953,3 +953,74 @@ test('방문자 공용 화면: 1440·390 책·보드·지도, 옛 공유 주소,
     server.close();
   }
 });
+
+test('#1259 방문자 책 첫 안내가 제목과 크게 보기 영상 조작부를 가리지 않는다', {skip:REQUIRE?false:skip,timeout:90000}, async()=>{
+ if(skip)assert.fail(skip);
+ const server=await serve(),base='http://127.0.0.1:'+server.address().port;
+ const shareId='visitor-notice-1259-fixture',time='2026-11-24T00:00:00.000Z';
+ const fixture={...tree,subject:'시험 트리',coverMomentId:'',coverDesign:'',inbox:false,createdAt:time,updatedAt:time,moments:tree.moments.map((m,i)=>({...m,createdAt:time,links:[],...(i===0?{title:'세로 영상과 함께 남긴 첫 순간',url:'https://www.youtube.com/shorts/dQw4w9WgXcQ',mediaMetadata:{title:'시험 세로 영상',vertical:true}}:{})}))};
+ let browser;
+ try{
+  browser=await chromium.launch({headless:true});
+  for(const [width,height] of [[1440,900],[390,844]])for(const theme of ['garden','night']){
+   const context=await browser.newContext({viewport:{width,height},reducedMotion:'reduce'});
+   const key=width+'-'+theme;
+   try{
+    await context.addInitScript(t=>{localStorage.setItem('lt41.theme',t)},theme);
+    await context.route('**/*',r=>{
+     const u=new URL(r.request().url());
+     if(u.origin!==base){
+      if(u.hostname.includes('youtube')&&u.pathname.startsWith('/embed/'))return r.fulfill({contentType:'text/html',body:'<!doctype html><html lang="ko"><meta charset="utf-8"><style>body{margin:0;background:#24212b;color:#fff;display:grid;place-items:center;height:100vh}footer{position:absolute;bottom:0;left:0;right:0;padding:12px;background:#131018}</style><body><main>시험용 세로 영상</main><footer id="controls">▶　0:01 / 0:16　━━━━━━</footer></body></html>'});
+      if(u.hostname==='i.ytimg.com')return r.fulfill({contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="180" height="320"><rect width="180" height="320" fill="#51404e"/><circle cx="90" cy="160" r="35" fill="#e9d3bd"/></svg>'});
+      return r.abort();
+     }
+     if(u.pathname==='/api/public/shares/'+shareId)return r.fulfill({json:{ok:true,share:{id:shareId,view:'book',entryMomentId:'m1'},tree:fixture,aiTester:true}});
+     if(u.pathname==='/api/account')return r.fulfill({status:401,json:{ok:false,error:{code:'not_logged_in'}}});
+     if(u.pathname.startsWith('/api/'))return r.fulfill({json:{ok:true,items:[],shares:[]}});
+     return r.continue();
+    });
+    const p=await context.newPage();await p.goto(base+'/v41/#share/'+shareId+'/book',{waitUntil:'domcontentloaded'});
+    await p.waitForFunction(()=>window.LT41?.source==='share'&&!document.querySelector('#view').hidden&&!!document.querySelector('#view').contentDocument?.querySelector('.moment-title'),null,{timeout:15000});
+    const f=p.frameLocator('#view'),toast=p.locator('#toast');
+    await toast.filter({hasText:'공개된 트리를 감상하는 화면이에요'}).waitFor({state:'visible'});
+    const measure=()=>p.evaluate(()=>{
+     const t=document.querySelector('#toast'),f=document.querySelector('#view'),d=f.contentDocument;
+     const box=(e,dx=0,dy=0)=>{const r=e.getBoundingClientRect();return {left:r.left+dx,right:r.right+dx,top:r.top+dy,bottom:r.bottom+dy,width:r.width,height:r.height}};
+     const shown=e=>!!e&&e.checkVisibility({checkOpacity:true,checkVisibilityCSS:true});
+     const tr=shown(t)?box(t):null,fr=box(f);
+     const titles=[...d.querySelectorAll('.moment-title')].filter(shown).map(e=>box(e,fr.left,fr.top));
+     const media=d.querySelector('.lt-lightbox-media');
+     const mr=shown(media)?box(media,fr.left,fr.top):null;
+     const intersection=(a,b)=>a&&b?Math.max(0,Math.min(a.right,b.right)-Math.max(a.left,b.left))*Math.max(0,Math.min(a.bottom,b.bottom)-Math.max(a.top,b.top)):0;
+     const nav=d.querySelector(".nav-pill");const nr=shown(nav)?box(nav,fr.left,fr.top):null;
+     return {nav:nr,notice:tr,frame:fr,titles,titleOverlap:titles.map(r=>intersection(tr,r)),frameOverlap:intersection(tr,fr),media:mr,mediaOverlap:intersection(tr,mr),hidden:t.hidden};
+    });
+    assert.equal(await f.locator('.story-tip').count(),0,key+' 방문자 쓰기 안내 0개');
+    assert.equal(await p.evaluate(()=>localStorage.getItem('lt41.tips.bookStory')),null,key+' 방문자는 내 기록의 최초 안내 상태를 소비하지 않는다');
+    const book=await measure();
+    assert.ok(book.notice&&book.titles.length,key+' 첫 안내와 제목이 실제로 표시된다');
+    assert.equal(book.frameOverlap,0,key+' 책 화면과 안내의 교차 면적 0: '+JSON.stringify(book));
+    assert.ok(book.titleOverlap.every(x=>x===0),key+' 제목 교차 면적 0');
+    if(width===390){
+     assert.ok(book.nav&&book.nav.bottom<=book.frame.bottom+0.5,key+' 페이지 이동 줄 전체 표시: '+JSON.stringify(book));
+     const next=f.locator('.nav-pill #nextBtn');
+     const target=await next.evaluate(e=>{const r=e.getBoundingClientRect();return {w:r.width,h:r.height,hit:e.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2))}});
+     assert.ok(target.w>=44&&target.h>=44&&target.hit,key+' 페이지 이동 단추 실제 클릭 영역: '+JSON.stringify(target));
+    }
+    await shot(p,'1259-'+key+'-book');
+    await f.locator('[data-yt-expand]:visible').first().click({timeout:3000});
+    await f.locator('.lt-lightbox-media').waitFor({state:'visible'});
+    await p.waitForFunction(()=>document.body.classList.contains('lt-book-lightbox-open'),null,{timeout:2000});
+    const video=await measure();
+    assert.ok(video.media,key+' 영상 재생 칸 표시');
+    assert.equal(video.hidden,false,key+' 안내 시간 안에 크게 보기 검사');
+    assert.equal(video.notice,null,key+' 크게 보기 중 첫 안내 숨김');
+    assert.equal(video.mediaOverlap,0,key+' 재생 조작부를 포함한 영상 영역 교차 면적 0');
+    await shot(p,'1259-'+key+'-vertical');
+    await f.locator('.lt-lightbox-close').click();
+    await p.waitForFunction(()=>!document.body.classList.contains('lt-book-lightbox-open'),null,{timeout:2000});
+    console.log('#1259',key,'제목 교차 0, 영상 교차 0');
+   }finally{await context.close()}
+  }
+ }finally{await browser?.close();server.close()}
+});
