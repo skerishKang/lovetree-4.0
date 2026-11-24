@@ -492,8 +492,9 @@ selectMoment = function (id, open = true) {
     const _st = LT58Model.detailButtonState(ins, outs);
     const _cin = $('#cinemaFromMoment');
     if (_cin) {
-      _cin.disabled = _st.nextDisabled;
-      _cin.title = _st.nextDisabled ? '이 순간에서 이어진 길이 없어요' : '';
+      // 다음 연결이 없어도 선택한 순간 자체는 감상할 수 있다.
+      _cin.disabled = !m;
+      _cin.title = _st.nextDisabled ? '이 순간을 감상합니다' : '';
     }
     // 'YouTube에서 열기' — 원본 주소가 있을 때만 보인다.
     // #891: 'YouTube ↗'는 단추가 아니라 영상 바로 아래 작은 링크(#836와 같은 모양) — 원본 주소가 있을 때만 보인다.
