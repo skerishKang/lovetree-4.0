@@ -136,7 +136,8 @@ test('#1273 7번 둘러보기: AI 명예회원 배지를 사람 회원과 구분
   const moments = fs.readFileSync(new URL('../public/v41/community-moments.mjs', import.meta.url), 'utf8');
   const shellCss = fs.readFileSync(new URL('../public/v41/shell.css', import.meta.url), 'utf8');
   const momentsCss = fs.readFileSync(new URL('../public/v41/community.css', import.meta.url), 'utf8');
-  assert.match(panel, /community-ai','✦ AI 명예회원'/, '트리 카드 배지에 별 표식');
+  // #1330: 두 배지를 한 줄로 합쳐도 별 표식은 유지한다.
+  assert.match(panel, /✦ AI · [\s\S]{0,12}순간/, '트리 카드 배지에 별 표식');
   assert.match(moments, /moments-ai','✦ AI 명예회원'/, '순간 카드 배지에 별 표식');
   assert.match(shellCss, /community-cover-badge\.community-ai\{[^}]*var\(--lt-rose\)/, '카드 배지는 장미 토큰');
   assert.match(momentsCss, /\.moments-ai\{[^}]*var\(--lt-rose\)/, '순간 배지도 장미 토큰');
