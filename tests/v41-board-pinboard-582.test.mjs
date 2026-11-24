@@ -338,3 +338,68 @@ test('#1026 동작: 그림 지연 도착에도 카드 top 변화 0, 보드 CLS 0
     assert.ok(cls <= 0.01, `보드 CLS ${cls.toFixed(6)}가 0.01을 넘었다`);
   } finally { await browser.close(); server.close(); }
 });
+
+
+test('#1249 390에서 모든 카드가 판 안에 있음: 밝은·밤, 스크롤로 5장 모두 접근', { skip: REQUIRE ? false : skip, timeout: 120000 }, async () => {
+  const tree = starTree(5);
+  tree.moments = tree.moments.map((m,i)=>({...m,date:'2026-11-0'+(i+1),type:i<3?'photo':'memo',url:'',image:i<3?'https://audit.invalid/photo'+i+'.jpg':'',first:i===0}));
+  const server = await serve({'/scroll-host.html':hostHTML(tree)});
+  const base = 'http://127.0.0.1:'+server.address().port;
+  const browser = await chromium.launch();
+  try {
+    for (const theme of ['garden','night']) {
+      const ctx=await browser.newContext({viewport:{width:390,height:844},hasTouch:true,reducedMotion:'reduce'});
+      try {
+        await ctx.addInitScript(t=>localStorage.setItem('lt41.theme',t),theme);
+        await ctx.route('**/*',r=>{
+          const u=new URL(r.request().url());
+          if(u.origin===base && u.pathname.startsWith('/api/')) return r.fulfill({status:200,json:{ok:true,items:[]}});
+          if(u.origin===base) return r.continue();
+          if(u.hostname==='audit.invalid') return r.fulfill({contentType:'image/svg+xml',body:YT_THUMB_SVG});
+          return r.abort();
+        });
+        const page=await ctx.newPage();
+        await page.goto(base+'/scroll-host.html',{waitUntil:'load'});
+        const frame=page.frames().find(f=>f!==page.mainFrame());
+        await frame.waitForFunction(()=>document.querySelectorAll('#cardLayer .card').length===5 && document.getElementById('viewport').classList.contains('board-scroll'));
+        const read=()=>frame.evaluate(()=>{
+          const vp=document.getElementById('viewport'),vr=vp.getBoundingClientRect(),sr=document.querySelector('.surface').getBoundingClientRect();
+          const picker=document.querySelector('.lt-moment-picker');
+          const safeTop=Math.max(vr.top,picker?.getBoundingClientRect().bottom||0);
+          return {height:vp.clientHeight,scrollHeight:vp.scrollHeight,scrollTop:vp.scrollTop,scrollWidth:vp.scrollWidth,width:vp.clientWidth,
+            cards:[...document.querySelectorAll('#cardLayer .card')].map(e=>{
+              const r=e.getBoundingClientRect();
+              return {id:e.dataset.id,top:e.offsetTop,contentTop:r.top-vr.top+vp.scrollTop,contentBottom:r.bottom-vr.top+vp.scrollTop,
+                inside:r.top>=sr.top-1&&r.bottom<=sr.bottom+1&&r.left>=sr.left-1&&r.right<=sr.right+1&&r.left>=vr.left-1&&r.right<=vr.right+1,
+                visible:r.top>=safeTop-1&&r.bottom<=vr.bottom+1};
+            })};
+        });
+        let first=await read();
+        assert.equal(first.scrollTop,0,theme+' 첫 카드부터 표시');
+        assert.ok(first.scrollHeight>first.height,theme+' 실제 세로 스크롤 길이');
+        assert.ok(first.scrollWidth<=first.width,theme+' 가로 넘침 0');
+        assert.equal(first.cards.filter(c=>c.visible).length,2,theme+' 첫 화면에 카드 두 장');
+        assert.equal(first.cards.filter(c=>c.inside&&c.contentTop>=0&&c.contentBottom<=first.scrollHeight+1).length,5,theme+' 모든 카드가 판과 스크롤 범위 안');
+        const reached=new Set(first.cards.filter(c=>c.visible).map(c=>c.id));
+        await page.mouse.move(30,550);
+        while (first.scrollTop<first.scrollHeight-first.height-1) {
+          const before=first.scrollTop;
+          await page.mouse.wheel(0,260);
+          await frame.waitForFunction(y=>document.getElementById('viewport').scrollTop>y,before);
+          first=await read();
+          for(const c of first.cards) if(c.visible) reached.add(c.id);
+        }
+        assert.equal(reached.size,5,theme+' 실제 휠로 카드 5장 모두 접근');
+        assert.ok(first.cards.find(c=>c.id===tree.moments[0].id).visible,theme+' 맨 아래 마지막 카드');
+        // 휴대폰 손가락으로도 카드 위에서 스크롤할 수 있어야 한다.
+        await frame.evaluate(()=>document.getElementById('viewport').scrollTop=0);
+        const cdp=await ctx.newCDPSession(page);
+        await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:195,y:330}]});
+        for(const y of [300,260,220,180]) await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:195,y}]});
+        await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+        await frame.waitForFunction(()=>document.getElementById('viewport').scrollTop>0);
+        console.log('#1249',theme,JSON.stringify({판높이:first.height,스크롤높이:first.scrollHeight,카드top:first.cards.map(c=>c.top),도달:reached.size,끝:first.scrollTop}));
+      } finally {await ctx.close();}
+    }
+  } finally {await browser.close();await new Promise(r=>server.close(r));}
+});

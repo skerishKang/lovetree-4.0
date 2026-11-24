@@ -165,3 +165,9 @@ body.lt-bloom-glow .threadGlow{opacity:.82}
 @media(max-width:699px){
   html[data-v41-screen=board] .card:not(.dragLift):not(.dropSettle):not(.landing){transform:none}
 }
+
+/* #1249: 휴대폰 판은 실제 세로 스크롤 범위 안에 모든 카드를 둔다. */
+#boardScrollSpace{display:contents}
+#viewport.board-scroll{overflow-x:hidden;overflow-y:auto;touch-action:pan-y;overscroll-behavior-y:contain;scrollbar-width:thin}
+#viewport.board-scroll #boardScrollSpace{display:block;position:relative;width:100%;overflow:clip}
+#viewport.board-scroll:not(.board-scroll-editing) .card{touch-action:pan-y}

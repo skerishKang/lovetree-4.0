@@ -210,6 +210,7 @@ renderCards = function () {
   });
   if (selected) selectMoment(selected, false);
   applyFilters();
+  if (mobileBoardScroll() && viewport.classList.contains('board-scroll')) applyView(false);
 };
 function applyDecorMotion() {
   // #536: 휠 확대는 #346 판정의 입력에 없던 것이라 같은 한 벌로 따로 묶는다(이동·드래그 판정은 그대로).
@@ -264,7 +265,7 @@ function bindCardV11(el) {
       e.target.classList.contains('pin')
     )
       return;
-    if (cinema) return;
+    if (cinema || (mobileBoardScroll() && e.pointerType === 'touch' && boardMode !== 'mine')) return;
     if (typeof dragGuard === 'function' && !dragGuard()) return;
     e.stopPropagation();
     snapshot();
@@ -275,6 +276,10 @@ function bindCardV11(el) {
     moved = false;
     el.classList.add('dragLift');
     el.setPointerCapture?.(e.pointerId);
+  });
+  el.addEventListener('click', e => {
+    if (mobileBoardScroll() && e.pointerType === 'touch' && boardMode !== 'mine' &&
+        !e.target.closest('button,input,textarea,select,video')) selectMoment(id, true);
   });
   el.addEventListener('pointermove', e => {
     if (!drag || drag.id !== id) return;
