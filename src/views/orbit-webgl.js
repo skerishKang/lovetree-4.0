@@ -23,7 +23,7 @@ void main(){
   vec2 p=abs((vUV-0.5)*uSize)-(uSize*0.5-12.0);
   float distance=length(max(p,0.0))+min(max(p.x,p.y),0.0)-12.0;
   float alpha=1.0-smoothstep(0.5,1.5,abs(distance));
-  gl_FragColor=vec4(vec3(1.0,0.902,0.651)*alpha,alpha*uPulse);
+  gl_FragColor=vec4(vec3(1.0,0.902,0.651)*alpha*uPulse,alpha*uPulse);
  }else gl_FragColor=texture2D(uTexture,vUV);
  if(uShade>0.5)gl_FragColor.rgb*=1.0-texture2D(uVignette,gl_FragCoord.xy/uViewport).a;
 }`;

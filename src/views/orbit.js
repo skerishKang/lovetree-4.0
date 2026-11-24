@@ -695,7 +695,7 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
    for(const board of [fallbackCanvas,glCanvas]){board.width=Math.ceil(w*dpr);board.height=Math.ceil(h*dpr);}spriteKey=key;
    spritesReady=true;for(const a of floatAnims)a?.cancel();floatAnims.fill(null);world.classList.add('lt-canvas');activateCanvas(renderer?glCanvas:fallbackCanvas);
    for(const el of elements){el.removeAttribute('aria-hidden');el.setAttribute('role','presentation');}
-   syncMotion();drawCanvas(performance.now());schedule();
+   syncMotion();drawCanvas(performance.now());if(revealed)activateCardHint();schedule();
   }finally{orbitEvent("bitmap-end");building=false;if(rebuildPending&&!signal.aborted){rebuildPending=false;void rebuildSprites(true);}}
  };
  const queueHintSpriteRefresh=()=>{
@@ -799,7 +799,7 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
     const anim=el.animate([{transform:`translate3d(${from}px,${y}px,0) scale(${scale}) rotate(${tilt}deg)`},{transform:`translate3d(${to}px,${y}px,0) scale(${scale}) rotate(${tilt}deg)`}],{duration,iterations:Infinity,easing:'linear',delay:-slot*duration});
     el.__ribbonDuration=duration;el.style.zIndex=String(20-i);ribbonAnims[i]=anim;
    });
-   elements.slice(8).forEach(el=>el.classList.add('off'));syncRibbonMotion();
+   elements.slice(8).forEach(el=>el.classList.add('off'));syncRibbonMotion();if(revealed)activateCardHint();
   }else{
    if(spritesReady)world.classList.add('lt-canvas');orbitKF.fill(null);orbitBox=null;noFit.length=0;
   }
@@ -815,13 +815,14 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
   }
   selectCardHint(best);
  };
+ const ribbonPhase=a=>a?((((a.currentTime||0)-(a.effect?.getTiming().delay||0))/(elements[0]?.__ribbonDuration||96000))%1+1)%1:0;
   // #1086: 궤도 경로 검사용 — 지정 진행률로 카드를 그린다(실제 루프와 같은 orbitWrite 경로).
   globalThis.__LT_ORBIT_TEST__={
    lastWriteAt(){return lastWriteAt;},hintIndex(){return hintCardIndex;},ribbonTime(){return ribbonAnims[0]?.currentTime||0;},ribbonAdvanced(initial){return (ribbonAnims[0]?.currentTime||0)-initial;},
-   progress(now){if(layoutMode==='ribbon')return ((ribbonAnims[0]?.currentTime||0)/(elements[0]?.__ribbonDuration||96000)%1+1)%1;const cfg=orbitRings(layoutBox?.w||0,layoutBox?.h||0)[cards[0].ring];const elapsed=now-orbitStart-pausedTotal-(pausedAt?now-pausedAt:0);return ((elapsed/Math.round(ORBIT_MS/cfg.speed))+phase)%1;},
+   progress(now){if(layoutMode==='ribbon')return ribbonPhase(ribbonAnims[0]);const cfg=orbitRings(layoutBox?.w||0,layoutBox?.h||0)[cards[0].ring];const elapsed=now-orbitStart-pausedTotal-(pausedAt?now-pausedAt:0);return ((elapsed/Math.round(ORBIT_MS/cfg.speed))+phase)%1;},
    period(){if(layoutMode==='ribbon')return elements[0]?.__ribbonDuration||96000;const cfg=orbitRings(layoutBox?.w||0,layoutBox?.h||0)[cards[0].ring];return Math.round(ORBIT_MS/cfg.speed);},
    hold(on){if(layoutMode==='ribbon'){if(on)ribbonAnims.forEach(a=>a?.pause());else{ribbonSeek=null;syncRibbonMotion();}return;}if(on){orbitPause();stopOrbitLoop();}else{testSeek=null;orbitResume();startOrbitLoop();}},
-   seek(t){if(layoutMode==='ribbon'){ribbonSeek=t;ribbonAnims.forEach(a=>{if(a){a.pause();a.currentTime=t*(elements[0]?.__ribbonDuration||96000);}});return true;}testSeek=t;for(let i=0;i<elements.length;i++){
+   seek(t){if(layoutMode==='ribbon'){ribbonSeek=t;ribbonAnims.forEach(a=>{if(a){a.pause();a.currentTime=t*(elements[0]?.__ribbonDuration||96000)+(a.effect?.getTiming().delay||0);}});return true;}testSeek=t;for(let i=0;i<elements.length;i++){
     const frames=orbitFrames[i],el=elements[i];if(!frames||!frames.length||!el)continue;
     if(el.__seekSaved===undefined)el.__seekSaved=el.style.transform;
     const tf=orbitTransform(frames,t);if(tf){el.style.transform=tf;}}
@@ -861,7 +862,7 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
    // 판정 사각형은 '실제 카드 중심' 둘레로만 부풀린다 — 부푼 크기로 중심까지 옮기면 모델이 실제보다
    // 12·20px 어긋나, 아래로 민 카드가 실제로는 20px 더 위(=가운데 구역 안)에 서게 된다(실측 4px 침범).
    const Cx0=w/2+px+base.w/2,Cy0=h/2+py+base.h/2;
-   const cScale=narrow?sc*Math.max(.58,fit):sc*(h<=500?Math.max(.58,fit):1);
+   const cScale=(narrow||h<=500)?sc*(!demo&&cards.length<=8?1:Math.max(.58,fit)):sc;
    let minX=1e9,maxX=-1e9,minY=1e9,maxY=-1e9;
    for(const corner of [[-1,-1],[1,-1],[-1,1],[1,1]]){
     const X=size.w/2*corner[0],Y=size.h/2*corner[1];
