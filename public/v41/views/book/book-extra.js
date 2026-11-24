@@ -182,6 +182,7 @@ function playOfficialInline(btn,src,title,className){
  frame.className=className;frame.src=src;frame.title=title;
  frame.allow='accelerometer; autoplay; clipboard-write; encrypted-media; fullscreen; gyroscope; picture-in-picture; web-share';
  frame.allowFullscreen=true;frame.setAttribute('referrerpolicy','strict-origin-when-cross-origin');
+ if(btn.hasAttribute('data-tt-play'))window.LTMedia.watchTiktokFrame(frame,btn.dataset.ttCite);
  btn.replaceWith(frame);return true;
 }
 function playTiktokInline(btn){
@@ -658,7 +659,8 @@ addEventListener('message',e=>{if(e.data?.type!==MSG.titleDisplay||!isShellMessa
 // #368 2차: 설정의 페이지 넘김(종이처럼/부드럽게)이 바뀌면 다음 넘김부터 적용한다. book.js가 노출한
 // setPageTurnMode로만 값을 바꾼다(모르는 값은 book.js 쪽 기본 규칙으로 돌아간다).
 addEventListener('message',e=>{if(e.data?.type!==MSG.pageTurn||!isShellMessage(e))return;if(typeof window.setPageTurnMode==='function')window.setPageTurnMode(e.data.value);});
-addEventListener('message',e=>{if(e.data?.type!==MSG.dateStyle||!isShellMessage(e))return;try{document.documentElement.setAttribute('data-lt-date-style',e.data.value==='dash'||e.data.value==='long'?e.data.value:'dot')}catch{}try{renderSpread(current,LTDEMO.get(),false)}catch{}if($b('#detail')?.classList.contains('open')&&selectedMomentId)showDetail(selectedMomentId);});
+let paintedDateStyle=ltDateStyle();
+addEventListener('message',e=>{if(e.data?.type!==MSG.dateStyle||!isShellMessage(e))return;const next=e.data.value==='dash'||e.data.value==='long'?e.data.value:'dot';try{document.documentElement.setAttribute('data-lt-date-style',next)}catch{}if(next===paintedDateStyle)return;paintedDateStyle=next;try{renderSpread(current,LTDEMO.get(),false)}catch{}if($b('#detail')?.classList.contains('open')&&selectedMomentId)showDetail(selectedMomentId);});
 // book-extra는 book.js 뒤에 불러오므로, 첫 렌더 제목을 한 벌 규칙으로 다시 그린다.
 // #379 후속: 재그림은 현재 선택 순간(LTDEMO.get())을 유지해, 펼침면 오른쪽 페이지의 순간을 열면
 // 왼쪽 페이지 순간으로 선택이 돌아가는 문제를 막는다(renderSpread의 land가 기본 true여 focusId 없으면 left.id로 재선택).

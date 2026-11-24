@@ -202,7 +202,6 @@ if(previewStrip.length)host.classList.add('lt-preview-mode');
    });
   }
  }
-origin/main
  const app=shadow.querySelector('.app'),world=shadow.querySelector('.world'),dialog=shadow.querySelector('dialog');
  shadow.querySelector('.center')?.setAttribute('data-lt-home-wait','');
  // Separate the two descriptive lines without inserting or removing any layout box.
@@ -454,7 +453,7 @@ origin/main
  // #426: 최근 순간 카드 — 본문을 누르면(클릭·Enter·Space) 그 순간을 연다(궤도 카드와 같은 onOpen 경로). ▶는 카드 안 재생/정지로 구분하고, 플레이어는 누른 뒤에만 만든다(첫 화면 열 때 YouTube 요청 0건).
 const openRecent=()=>{if(!recentMoment)return;if(onOpen&&!recentMoment.example){onOpen(recentMoment);return;}actions.openBook(recentMoment.treeId,recentMoment.id,demo);};
 let recentFrame=null;
-const toggleRecentPlay=btn=>{if(!recentMoment)return;const card=shadow.querySelector('.recent-card');if(!card)return;const media=card.querySelector('.recent-media');if(!media)return;if(recentFrame){recentFrame.remove();recentFrame=null;media.querySelector('img')?.removeAttribute('hidden');btn.setAttribute('aria-label','바로 재생');const glyph=btn.querySelector('span');if(glyph)glyph.textContent='▶';return;}
+const toggleRecentPlay=btn=>{if(!recentMoment)return;const card=shadow.querySelector('.recent-card');if(!card)return;const media=card.querySelector('.recent-media');if(!media)return;if(recentFrame){recentFrame.remove();media.querySelector('[data-lt-tiktok-error]')?.remove();recentFrame=null;media.querySelector('img')?.removeAttribute('hidden');btn.setAttribute('aria-label','바로 재생');const glyph=btn.querySelector('span');if(glyph)glyph.textContent='▶';return;}
  const described=globalThis.LTMedia?.describe?.(recentMoment.url)||null;
    if(described?.kind==='tiktok'||described?.kind==='instagram'){
    const src=described?.kind==='tiktok'
@@ -466,6 +465,7 @@ const toggleRecentPlay=btn=>{if(!recentMoment)return;const card=shadow.querySele
    frame.title=mainOf(recentMoment)||(described?.kind==='tiktok'?'TikTok 영상':'인스타그램 릴스');
    frame.allow='accelerometer; autoplay; clipboard-write; encrypted-media; fullscreen; gyroscope; picture-in-picture; web-share';
    frame.allowFullscreen=true;frame.setAttribute('referrerpolicy','strict-origin-when-cross-origin');
+   if(described.kind==='tiktok')globalThis.LTMedia.watchTiktokFrame(frame,recentMoment.url);
    media.querySelector('img')?.setAttribute('hidden','');media.append(frame);recentFrame=frame;
    btn.setAttribute('aria-label','정지');const glyph=btn.querySelector('span');if(glyph)glyph.textContent='■';return;
   }
@@ -488,6 +488,7 @@ const playPreviewCard=(btn)=>{
  frame.title=moment.shortTitle||moment.title;
  frame.allow='accelerometer; autoplay; clipboard-write; encrypted-media; fullscreen; gyroscope; picture-in-picture; web-share';
  frame.allowFullscreen=true;frame.setAttribute('referrerpolicy','strict-origin-when-cross-origin');
+ if(media?.kind==='tiktok')globalThis.LTMedia.watchTiktokFrame(frame,moment.url);
  card.replaceChildren(frame);
 };
 shadow.addEventListener('click',e=>{const pv=e.target.closest('[data-lt-preview-play]');if(pv){e.stopPropagation();playPreviewCard(pv);return;}const play=e.target.closest('[data-recent-play]');if(play){e.stopPropagation();toggleRecentPlay(play);return;}const b=e.target.closest('button');if(!b){if(!e.target.closest?.('[data-lt-title-edit]')&&e.target.closest?.('[data-do=recent]'))openRecent();return;}if(b.dataset.next){if(suppressClickKey&&suppressClickKey===b.dataset.next){suppressClickKey='';return;}if(picking){const key=b.dataset.next;if(pickedKeys.has(key))pickedKeys.delete(key);else pickedKeys.add(key);index();return;}focus(findMoment(b.dataset.next));return;}switch(b.dataset.do){case'close':dialog.close();break;case'new':actions.requestMoment('new');break;case'trees':actions.navigate('trees');break;case'continue':focus(lastCard);break;case'index':index();break;case'recent':if(!e.target.closest?.('[data-lt-title-edit]'))openRecent();break;}},{signal});
@@ -1135,7 +1136,7 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
  // 261116 PR 2: 홈(v41/home.js)이 쓰는 좁은 출구 둘. recent.set — 모드가 바뀌면 카드 한 장을 같은 결(recentMarkup)로 갈아끼운다(header가 null이면 '마지막 순간 · N일 전' 기본 문구).
  // index — 순간 목록을 특정 트리 고른 상태로 열게 한다('모아둔' 줄). 재생 중 프레임은 갈아끼우면서 함께 거둔다.
  dispose.recent={set(moment,header=null){if(!moment)return;recentMoment=moment;recentHeader=(typeof header==='string'&&header)?header:null;
-  if(recentFrame){recentFrame.remove();recentFrame=null;}
+  if(recentFrame){recentFrame.remove();media.querySelector('[data-lt-tiktok-error]')?.remove();recentFrame=null;}
   const card=shadow.querySelector('.recent-card');if(!card)return;
   const wrap=document.createElement('div');wrap.innerHTML=recentMarkup(recentMoment);
   const next=wrap.firstElementChild;if(next){card.replaceWith(next);checkRecentVideo(next);}}};

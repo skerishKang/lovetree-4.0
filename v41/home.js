@@ -90,7 +90,7 @@ shadow.querySelector('.recent-card')?.setAttribute('tabindex','0');
 let viewerOpener=null;
 function closeHomeViewer(){
  if(!viewer.classList.contains('open'))return;
- viewer.querySelector('iframe')?.remove();
+ viewer.querySelector('iframe,[data-lt-tiktok-error]')?.remove();
  viewer.classList.remove('open');viewer.setAttribute('aria-hidden','true');
  try{parent.postMessage({type:MSG.viewer,open:false},location.origin)}catch{}
  vEl('mediaImageHome').hidden=true;vEl('mediaMemoHome').hidden=true;
@@ -126,13 +126,14 @@ function openHomeViewer(moment,opener=null){
    frame.allow='accelerometer; autoplay; clipboard-write; encrypted-media; fullscreen; gyroscope; picture-in-picture; web-share';
    frame.allowFullscreen=true;frame.setAttribute('referrerpolicy','strict-origin-when-cross-origin');
    visual.querySelector('iframe')?.remove();img.hidden=true;vEl('mediaTypeBadgeHome').hidden=true;
+   if(tiktok)play.watchTiktokFrame(frame,moment.url);
    visual.append(frame);vEl('mediaPlayHome').hidden=true;
 };
  const book=vEl('mediaBookHome'),external=vEl('mediaExternalHome');
  book.onclick=()=>{closeHomeViewer();bridge.actions.openBook(moment.treeId,moment.id);};
  external.hidden=!moment.url;if(moment.url)external.href=moment.url;
  const visual=vEl('mediaVisualHome');
- visual.querySelector('iframe,.tiktok-embed,.instagram-media')?.remove();vEl('mediaTypeBadgeHome').hidden=false;
+ visual.querySelector('iframe,.tiktok-embed,.instagram-media,[data-lt-tiktok-error]')?.remove();vEl('mediaTypeBadgeHome').hidden=false;
  if(videoId){
   const frame=document.createElement('iframe');
   frame.src=`https://www.youtube-nocookie.com/embed/${encodeURIComponent(videoId)}?autoplay=1&mute=1&playsinline=1&controls=0&rel=0&modestbranding=1`;

@@ -43,10 +43,30 @@ function tiktokPlayerId(value) {
   const id = String(value ?? '').trim();
   return TIKTOK_VIDEO_ID.test(id) ? id : '';
 }
+const tiktokFrames=new Map();
+// 공식 메시지는 실제로 등록한 재생 칸의 창과 출처가 모두 맞을 때만 처리한다.
+function watchTiktokFrame(frame,originalUrl){
+ const link=describe(originalUrl);
+ if(link.kind!=='tiktok')return;
+ tiktokFrames.set(frame,link.openUrl);
+}
+function tiktokPlayerMessage(event){
+ if(event.origin!=='https://www.tiktok.com'||event.data?.['x-tiktok-player']!==true||event.data.type!=='onPlayerError')return;
+ const code=event.data.value?.errorCode;
+ if(![1001,2001,3001].includes(code))return; // 3002: 공식 재생기의 수동 재생 단추를 유지한다.
+ for(const [frame,url] of tiktokFrames){
+  if(!frame.isConnected){tiktokFrames.delete(frame);continue;}
+  if(event.source!==frame.contentWindow)continue;
+  const note=frame.ownerDocument.createElement('p');note.className='lt-lightbox-note';note.setAttribute('data-lt-tiktok-error','');note.setAttribute('role','status');
+  note.textContent='틱톡에서 영상을 재생하지 못했어요. ';
+  const a=frame.ownerDocument.createElement('a');a.href=url;a.target='_blank';a.rel='noopener noreferrer';a.textContent='원본에서 열기 ↗';note.append(a);
+  tiktokFrames.delete(frame);frame.replaceWith(note);break;
+ }
+}
 function tiktokPlayerUrl(value) {
   const id = tiktokPlayerId(value);
-  // oEmbed 쿼리 옵션을 붙이면 플레이어 오류가 난다 — 정본 player/v1 주소만 쓴다(실제 재생 확인).
-  return id ? `https://www.tiktok.com/player/v1/${id}` : '';
+  // #791: 누른 뒤에만 공식 재생기를 열고 공식 autoplay 옵션을 쓴다.
+  return id ? `https://www.tiktok.com/player/v1/${id}?autoplay=1` : '';
 }
 /** 저장된 썸네일은 https + 틱톡 CDN 도메인만 받는다(유튜브 썸네일 검사와 같은 자리). */
 function safeTiktokThumb(value) {
@@ -451,9 +471,10 @@ if(m.kind==='tiktok'||m.kind==='instagram'){
    frame.allow='accelerometer; autoplay; clipboard-write; encrypted-media; fullscreen; gyroscope; picture-in-picture; web-share';
    frame.allowFullscreen=true;
    frame.setAttribute('referrerpolicy','strict-origin-when-cross-origin');
+   if(m.kind==='tiktok')watchTiktokFrame(frame,m.openUrl);
    body.replaceChildren(frame);
    delete root.dataset.ltPlaying;
-   if(status)status.textContent='재생 중이에요. 아래 원본 링크로도 열 수 있어요.';
+   if(status)status.textContent=m.kind==='tiktok'?'공식 재생기를 열었어요. 아래 원본 링크로도 열 수 있어요.':'재생 중이에요. 아래 원본 링크로도 열 수 있어요.';
    return;
  }
 // #792: 기억할 구간 — 순간의 시작·끝(카드가 들고 있는 저장 값)이 있으면 그 구간만 재생한다.
@@ -590,6 +611,7 @@ async function openLightbox(url,title='',verticalHint=null,tiktokId=''){
   frame.className='lt-lightbox-media';frame.src=src;frame.title=title||(m.kind==='tiktok'?'TikTok 영상':'인스타그램 릴스');
   frame.allow='accelerometer; autoplay; clipboard-write; encrypted-media; fullscreen; gyroscope; picture-in-picture; web-share';
   frame.allowFullscreen=true;frame.setAttribute('referrerpolicy','strict-origin-when-cross-origin');
+  if(m.kind==='tiktok')watchTiktokFrame(frame,m.openUrl);
   stage.replaceChildren(frame);
   return;
  }
@@ -757,9 +779,10 @@ function queueWatchVanished(){ // 끌기·넘기기 동안 몰리는 바뀜마�
  if(vanishedWatchTimer)return;
  vanishedWatchTimer=setTimeout(()=>{vanishedWatchTimer=0;watchVanished();},300);
 }
-window.LTMedia={describe,markup,privateAssetName,autoLoadMedia,currentContext:mediaContext,youtubeThumbUrl,youtubeCandidates,tiktokPlayerId,tiktokPlayerUrl,instagramPlayerUrl,tiktokThumbCandidates,refreshTiktokThumb,verticalVideo,probeVertical,upgradeVerticals,openLightbox,closeLightbox,applyVanished,applyNoEmbed,scheduleVanishedCheck,checkVanished,watchVanished,setVideoStatusLoader(fn){videoStatusLoader=typeof fn==='function'?fn:null;}};
+window.LTMedia={describe,markup,privateAssetName,autoLoadMedia,currentContext:mediaContext,youtubeThumbUrl,youtubeCandidates,tiktokPlayerId,tiktokPlayerUrl,watchTiktokFrame,instagramPlayerUrl,tiktokThumbCandidates,refreshTiktokThumb,verticalVideo,probeVertical,upgradeVerticals,openLightbox,closeLightbox,applyVanished,applyNoEmbed,scheduleVanishedCheck,checkVanished,watchVanished,setVideoStatusLoader(fn){videoStatusLoader=typeof fn==='function'?fn:null;}};
 if(typeof document!=='undefined'){
- const cleanup=()=>{for(const [node,url] of ownedUrls)if(!node.isConnected){URL.revokeObjectURL(url);ownedUrls.delete(node);}};
+ addEventListener('message',tiktokPlayerMessage);
+ const cleanup=()=>{for(const node of tiktokFrames.keys())if(!node.isConnected)tiktokFrames.delete(node);for(const [node,url] of ownedUrls)if(!node.isConnected){URL.revokeObjectURL(url);ownedUrls.delete(node);}};
  new MutationObserver(()=>{cleanup();queueWatchVanished();}).observe(document.documentElement,{childList:true,subtree:true});
  addEventListener('pagehide',()=>{for(const url of ownedUrls.values())URL.revokeObjectURL(url);ownedUrls.clear();});
  // 끊겼던 연결이 돌아오면 unknown으로 되돌려 둔 카드를 다시 묻는다.

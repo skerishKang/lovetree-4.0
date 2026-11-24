@@ -75,7 +75,7 @@ test('틱톡 카드는 세로·플랫폼 표식·원본 열기 링크를 그리�
 });
 
 test('틱톡 공식 재생기 iframe 주소를 만든다(embed.js 없음)',()=>{
- assert.equal(ttMedia.tiktokPlayerUrl(TT_ID),`https://www.tiktok.com/player/v1/${TT_ID}`);
+ assert.equal(ttMedia.tiktokPlayerUrl(TT_ID),`https://www.tiktok.com/player/v1/${TT_ID}?autoplay=1`);
  assert.equal(ttMedia.tiktokPlayerUrl('not-a-number'),'');
  assert.equal(ttMedia.ensureTiktokEmbedScript,undefined);
 });
