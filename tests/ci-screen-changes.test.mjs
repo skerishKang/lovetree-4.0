@@ -103,7 +103,7 @@ test('화면 잡 고르기: 보드만 바뀌면 보드 잡, 공용 파일이 섞
   assert.equal(selectJobs(['tests/helpers/screen-audit.mjs'], jobs, screen, helpers), 'all', 'helpers는 전부');
   assert.equal(selectJobs(['src/views/orbit.js'], jobs, screen, helpers), 'all');
   assert.equal(selectJobs(['.github/workflows/preview-check.yml'], jobs, screen, helpers), 'all', '워크플로가 바뀌면 전부');
-  assert.equal(selectJobs(['tests/v41-screen-audit.test.mjs'], jobs, screen, helpers), '', '공통 검사기 시험만 바뀌면 고를 잡 없음(공통 검사기는 늘 돈다)');
+  assert.equal(selectJobs(['tests/v41-screen-audit.test.mjs'], jobs, screen, helpers), 'none', '공통 검사기 시험만 바뀌면 고를 잡 없음(빈 값 아님)');
 });
 
 test('결과 모으기: 고르지 않은 화면 잡의 건너뜀만 통과', async () => {
@@ -115,4 +115,8 @@ test('결과 모으기: 고르지 않은 화면 잡의 건너뜀만 통과', asy
   assert.equal(bad.ok, false, '고른 잡이 건너뛰면 실패');
   const all = checkScreenResults({ 'screen-changes': gate('all'), 'screen-book': { result: 'skipped' }, deploy: { result: 'success' } });
   assert.equal(all.ok, false, '전부일 때 건너뜀은 실패');
+  const old = checkScreenResults({ 'screen-changes': gate(''), 'screen-book': { result: 'skipped' }, deploy: { result: 'success' } });
+  assert.equal(old.ok, false, 'jobs가 빈 값(옛 가지 판정 도구)이면 건너뜀은 실패');
+  const none = checkScreenResults({ 'screen-changes': gate('none'), 'screen-book': { result: 'skipped' }, deploy: { result: 'success' } });
+  assert.equal(none.ok, true, "'none'이면 고른 잡이 없어 건너뜀 통과");
 });

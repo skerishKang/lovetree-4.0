@@ -91,7 +91,9 @@ export function selectJobs(changedFiles, jobTests, screenTests, screenHelpers) {
     if (area) { picked.add(area[1]); continue; }
     return 'all';
   }
-  return SELECTABLE_JOBS.filter((j) => picked.has(j)).join(',');
+  // 고른 잡이 하나도 없으면 빈 값이 아니라 'none'으로 적는다. 빈 값은 '판정 도구가 jobs를 몰랐다'(옛 가지)로 보고
+  // 워크플로·결과 모음이 전부 돌린다 — 최신 main을 받지 않은 가지에서 화면 잡이 조용히 다 건너뛰어지지 않게.
+  return SELECTABLE_JOBS.filter((j) => picked.has(j)).join(',') || 'none';
 }
 
 export function classify(changedFiles, screenTests, screenHelpers) {

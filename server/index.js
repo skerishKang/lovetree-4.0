@@ -54,6 +54,7 @@ const {
   LOVETREE_IDENTITY_RPC_SECRET = '',
  LOVETREE_FEEDBACK_OUTBOX_URL = '',
  LOVETREE_FEEDBACK_OUTBOX_SECRET = '',
+ LOVETREE_FEEDBACK_OUTBOX_SEND_NAME = '',
   PORT = ''
 } = process.env;
 
@@ -183,6 +184,7 @@ const communityHandler = createMyNewsHandler({
 // 핸들러가 401을 '로그아웃'으로 받아들인다.
 const opsNotify = createOpsNotifier();
 const feedbackRepo = createFeedbackRepo(pool);
+const adminCustomersRepoForNames = createAdminCustomersRepo(pool);
 const feedbackOutbox = createFeedbackOutboxRepo(pool);
 const feedbackOutboxDispatcher = createFeedbackOutboxDispatcher({
   outbox: feedbackOutbox,
@@ -191,7 +193,13 @@ const feedbackOutboxDispatcher = createFeedbackOutboxDispatcher({
 });
 const feedbackHandler = createFeedbackHandler({
  authenticate: guardedAuthenticate,
- service: createFeedbackService({ feedbackRepo, productId: LOVETREE_PRODUCT_ID, admin, opsNotify, outbox: feedbackOutbox }),
+ service: createFeedbackService({
+  feedbackRepo, productId: LOVETREE_PRODUCT_ID, admin, opsNotify, outbox: feedbackOutbox,
+  // 받는 운영센터가 보낸 사람 닉네임 항목을 받을 수 있게 된 뒤에만 켠다(받는 쪽은 모르는 항목을 거절한다).
+  nameOf: LOVETREE_FEEDBACK_OUTBOX_SEND_NAME === '1'
+   ? (subjectId) => adminCustomersRepoForNames.displayNameOf({ productId: LOVETREE_PRODUCT_ID, subjectId })
+   : null
+ }),
  productId: LOVETREE_PRODUCT_ID
 });
 // 운영센터 고객 정보(261116 대표 결정) — 읽기만 한다. 자세히 판을 열 때 열람 기록을 남기고,

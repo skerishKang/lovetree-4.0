@@ -561,3 +561,35 @@ test('#1273 6번: 의견 보내기 응답에 목록을 바로 채울 저장 값�
   assert.equal(res.body.body, '방금 보낸 의견');
   assert.ok(res.body.createdAt, '목록의 날짜 줄에 쓸 시각이 있다');
 });
+
+test('운영센터 보낸 사람 닉네임: nameOf가 있을 때만 accountName을 담고, 없으면 항목 자체가 없다', async () => {
+  const admin={roleFor:async value=>value?.subjectId==='ai'?'ai_customer':null};
+  // 켜지 않았을 때(받는 쪽이 아직 모름): accountName 항목이 아예 없다.
+  {
+    const feedbackRepo=createMemoryFeedbackRepo(),outbox=createMemoryFeedbackOutbox({now:()=>1000});
+    const service=createFeedbackService({feedbackRepo,productId:PRODUCT,admin,outbox,now:()=>1000});
+    await service.submit({principal:principal('ai'),request:{headers:{}},category:'bug',body:'의견',context:{}});
+    assert.equal('accountName' in (await outbox.list())[0].payload,false);
+  }
+  // 켰을 때: 닉네임을 담고, 제어 문자는 빼고 60자로 자른다. 덧붙임에도 담는다.
+  {
+    const feedbackRepo=createMemoryFeedbackRepo(),outbox=createMemoryFeedbackOutbox({now:()=>1000});
+    const names={ai:'시험\u0007닉'+'가'.repeat(80)};
+    const service=createFeedbackService({feedbackRepo,productId:PRODUCT,admin,outbox,now:()=>1000,nameOf:async id=>names[id]});
+    const saved=await service.submit({principal:principal('ai'),request:{headers:{}},category:'bug',body:'의견',context:{}});
+    const first=(await outbox.list())[0].payload;
+    assert.equal(first.accountName.length,60);
+    assert.ok(first.accountName.startsWith('시험닉'));
+    assert.equal(first.email,undefined);
+    await service.append({principal:principal('ai'),id:saved.id,body:'덧붙임'});
+    const rows=await outbox.list();
+    assert.ok(rows.some(row=>row.payload.event==='append'&&row.payload.accountName===first.accountName));
+  }
+  // 이름을 못 찾거나 조회가 실패하면 항목 없이 보낸다(보내기를 막지 않는다).
+  {
+    const feedbackRepo=createMemoryFeedbackRepo(),outbox=createMemoryFeedbackOutbox({now:()=>1000});
+    const service=createFeedbackService({feedbackRepo,productId:PRODUCT,admin,outbox,now:()=>1000,nameOf:async()=>{throw new Error('db');}});
+    await service.submit({principal:principal('ai'),request:{headers:{}},category:'bug',body:'의견',context:{}});
+    assert.equal('accountName' in (await outbox.list())[0].payload,false);
+  }
+});
