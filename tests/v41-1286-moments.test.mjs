@@ -324,3 +324,66 @@ test('#1332 다시 방문하면 작은 알약으로 안내한다', { skip: REQUI
     }
   } finally { await browser.close(); }
 });
+
+
+test('#1332 확인: 알약은 글자 묶음·밀기 안내와 겹치지 않고 가운데 아래에 있다', { skip: REQUIRE ? false : skip, timeout: 240000 }, async () => {
+  if (skip) assert.fail(skip);
+  const browser = await chromium.launch({ headless: true });
+  try {
+    for (const theme of ['night', 'garden']) {
+      const h = await boot(browser, {
+        width: 390, height: 844, theme,
+        init: () => { try { localStorage.removeItem('lt41.momentSwipeSeen'); } catch {} }
+      });
+      try {
+        const box = await h.page.evaluate(() => {
+          const panel = document.querySelector('#community-moments-panel');
+          const rect = (sel) => panel.querySelector(sel)?.getBoundingClientRect().toJSON() || null;
+          return {
+            pill: rect('.moments-sound-pill'),
+            overlay: rect('.moments-overlay'),
+            hint: rect('.moments-swipe-hint'),
+            media: rect('.moments-media'),
+            hintHidden: panel.querySelector('.moments-swipe-hint')?.hidden
+          };
+        });
+        assert.ok(box.pill && box.overlay && box.media, `${theme}: 요소가 있다`);
+        assert.equal(box.hintHidden, false, `${theme}: 밀기 안내가 떠 있다`);
+        const overlaps = (a, b) => !!a && !!b && a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+        assert.equal(overlaps(box.pill, box.overlay), false, `${theme}: 글자 묶음과 겹침 0`);
+        assert.equal(overlaps(box.pill, box.hint), false, `${theme}: 밀기 안내와 겹침 0`);
+        assert.ok(box.pill.top > box.media.top + box.media.height / 2, `${theme}: 영상 가운데 아래`);
+        assert.ok(box.overlay.top - box.pill.bottom >= 11, `${theme}: 글자 묶음 윗변 12px 위`);
+      } finally { await h.ctx.close(); await new Promise((r) => h.server.close(r)); }
+    }
+  } finally { await browser.close(); }
+});
+
+test('#1332 확인: 유튜브가 음소거로 되돌리면 알약이 다시 보인다', { skip: REQUIRE ? false : skip, timeout: 240000 }, async () => {
+  if (skip) assert.fail(skip);
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const h = await boot(browser, { width: 390, height: 844, theme: 'night' });
+    try {
+      const pill = h.page.locator('#community-moments-panel .moments-sound-pill');
+      await pill.click();
+      assert.equal(await pill.isVisible(), false, '누르면 사라진다');
+      await h.page.evaluate(() => {
+        const frame = document.querySelector('#community-moments-panel .moments-frame');
+        window.dispatchEvent(new MessageEvent('message', {
+          data: JSON.stringify({ event: 'infoDelivery', info: { muted: true } }),
+          source: frame.contentWindow
+        }));
+      });
+      assert.equal(await pill.isVisible(), true, '음소거로 돌아가면 다시 보인다');
+      await h.page.evaluate(() => {
+        const frame = document.querySelector('#community-moments-panel .moments-frame');
+        window.dispatchEvent(new MessageEvent('message', {
+          data: JSON.stringify({ event: 'infoDelivery', info: { muted: false } }),
+          source: frame.contentWindow
+        }));
+      });
+      assert.equal(await pill.isVisible(), false, '소리 켜짐을 알리면 다시 숨는다');
+    } finally { await h.ctx.close(); await new Promise((r) => h.server.close(r)); }
+  } finally { await browser.close(); }
+});
