@@ -48,7 +48,7 @@ html,body{height:100%;margin:0}
 body{background:var(--lt-stage);color:var(--lt-pearl);font-family:var(--lt-ui);overflow:hidden;-webkit-text-size-adjust:100%}
 
 /* 위 줄: 시험용 고르개 */
-.ts-bar{position:fixed;inset:0 0 auto 0;z-index:5;min-height:var(--ts-bar-h);display:flex;align-items:center;gap:8px 14px;flex-wrap:wrap;
+.ts-bar{position:fixed;inset:0 0 auto 0;z-index:5;min-height:56px;display:flex;align-items:center;gap:8px 14px;flex-wrap:wrap;
   padding:8px max(16px,env(safe-area-inset-right)) 8px max(16px,env(safe-area-inset-left));
   background:var(--lt-glass-strong);border-bottom:1px solid var(--lt-line)}
 .ts-name{display:flex;align-items:baseline;gap:10px;margin:0 auto 0 0;font-size:15px;font-weight:600;letter-spacing:.02em;white-space:nowrap}
@@ -296,17 +296,15 @@ function drawWood(layout, style) {
     state.ribbons.set(e.to, ribbon.d);
     limbs.append(svg('path', 'ts-limb' + (e.kind === 'moment' ? '' : ' is-bundle'), { d: ribbon.d }));
     if (w[1] >= 7) {
-      // 굵은 가지에만 결 한 줄(시안 ②에서만 보인다).
+      // 굵은 가지에만 왼쪽 가장자리에 밝은 결 한 줄(시안 ②에서만 보인다) — 둥근 줄기처럼 보이게.
       const pts = branchPoints(e, style.curve, 14);
-      limbs.append(svg('path', 'ts-grain', { d: 'M' + pts.map((p) => `${(p[0] - w[1] * 0.18).toFixed(1)} ${p[1].toFixed(1)}`).join('L'), 'stroke-width': Math.max(1, w[1] * 0.12).toFixed(1) }));
+      limbs.append(svg('path', 'ts-grain', { d: 'M' + pts.map((p) => `${(p[0] - w[1] * 0.3).toFixed(1)} ${p[1].toFixed(1)}`).join('L'), 'stroke-width': Math.max(1, w[1] * 0.07).toFixed(1) }));
     }
     if (e.kind === 'moment' && e.size === 1) {
-      // 장식 잎: 가지 끝(더 이어지지 않는 순간)에만 두 장. 카드 아래에 깔려 구조를 가리지 않는다.
-      const pts = branchPoints(e, style.curve, 10);
-      for (const [at, side] of [[7, 1], [9, -1]]) {
-        const [x, y] = pts[at];
-        leaves.append(svg('path', 'ts-leaf', { d: 'M0 0C4 -7 13 -8 18 -2C12 3 4 4 0 0Z', transform: `translate(${x.toFixed(1)} ${y.toFixed(1)}) rotate(${side > 0 ? -28 : 208}) scale(${state.sizes === SIZES.narrow ? 0.8 : 1})` }));
-      }
+      // 장식 잎: 가지 끝(더 이어지지 않는 순간)의 카드 바로 아래에만 두 장. 카드보다 아래 층에 그려 구조를 가리지 않는다.
+      const k = state.sizes === SIZES.narrow ? 0.8 : 1;
+      leaves.append(svg('path', 'ts-leaf', { d: 'M0 0C4 -7 13 -8 18 -2C12 3 4 4 0 0Z', transform: `translate(${e.x1.toFixed(1)} ${(e.y1 + 15).toFixed(1)}) rotate(-32) scale(${k})` }));
+      leaves.append(svg('path', 'ts-leaf', { d: 'M0 0C4 -7 13 -8 18 -2C12 3 4 4 0 0Z', transform: `translate(${e.x1.toFixed(1)} ${(e.y1 + 24).toFixed(1)}) rotate(212) scale(${k * 0.85})` }));
     }
   }
   layers.limbs.replaceChildren(limbs);
@@ -351,7 +349,8 @@ function tell() {
   note.replaceChildren();
   if (picked) {
     const m = picked.moment;
-    note.append(el('b', '', m.title), el('span', '', `${m.date} · ${m.emotion} · 뿌리에서 ${picked.depth + 1}번째 순간 · 이 순간 위로 ${picked.size - 1}개`));
+    const above = picked.size - 1;
+    note.append(el('b', '', m.title || '제목 없음'), el('span', '', `${m.date} · ${m.emotion} · 뿌리에서 ${picked.depth + 1}번째 순간 · ${above ? '위로 ' + above + '개 더 이어짐' : '가지 끝'}`));
     return;
   }
   note.append(el('b', '', `순간 ${L.visible}/${L.total}개`));
