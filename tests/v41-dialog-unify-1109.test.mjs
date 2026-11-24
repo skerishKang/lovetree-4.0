@@ -319,6 +319,7 @@ test('#1231 로그아웃 서재·책·보드·지도 빈 상태와 화면별 로
  const browser=await chromium.launch({headless:true});
  const cases=[
   ['서재','track32-bookshelf.html','shelf'],
+  ['트리','track61-tree.html','tree'],
   ['책','track59-sketchbook.html','book'],
   ['보드','track58-pinboard.html','board'],
   ['지도','track56-network.html','network']
@@ -340,7 +341,7 @@ test('#1231 로그아웃 서재·책·보드·지도 빈 상태와 화면별 로
     await page.waitForFunction(()=>document.documentElement.dataset.ltAuthPhase==='ready'&&document.documentElement.dataset.ltAuthHint==='out'&&document.body.dataset.member==='out'&&document.body.dataset.recordSource==='example'&&window.LT41?.source==='example'&&document.querySelector('#tree-views')?.hidden===false);
     const initial=await page.evaluate(()=>({member:document.body.dataset.member,views:[...document.querySelectorAll('#tree-views button[data-view]')].map(b=>b.textContent.trim()),header:document.querySelector('.app-header').getBoundingClientRect().height}));
     assert.equal(initial.member,'out',`${width}: 로그아웃`);
-    assert.deepEqual(initial.views,['서재','책','보드','지도'],`${width}: 네 탭 그대로 유지`);
+    assert.deepEqual(initial.views,['서재','트리','책','보드','지도'],`${width}: 다섯 탭 그대로 유지`);
     if(width===390)assert.ok(initial.header<=62,`${width}: 기존 모바일 한 줄 높이`);
     else assert.ok(initial.header>=56,`${width}: 데스크톱 머리줄 높이 유지`);
     if(dest)await page.locator('.app-header').screenshot({path:join(dest,`guest-header-${width}.png`),animations:'disabled'});
