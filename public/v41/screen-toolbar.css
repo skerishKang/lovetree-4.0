@@ -6,9 +6,8 @@ html[data-v41-screen=board]{--lt-toolbar-pad:24px}
 html[data-v41-screen=network]{--lt-toolbar-pad:24px}
 html[data-v41-screen=shelf]{--lt-toolbar-top:82px;--lt-toolbar-pad:18px}
 /* 서재는 도구 줄을 실제 흐름에 넣고, 책 수는 이어 보기 띠 아래에 남긴다. */
-html[data-v41-screen=shelf] .lt-screen-toolbar{position:relative;top:auto;margin-top:4px;flex:none;margin-inline:-18px}
-html[data-v41-screen=shelf] .app{padding-top:0}
-@media(max-width:600px){html[data-v41-screen=shelf] .lt-screen-toolbar{margin-inline:-8px}}
+html[data-v41-screen=shelf] .lt-screen-toolbar{position:relative;top:auto;margin-top:-10px;margin-bottom:14px;flex:none;margin-inline:-18px}
+@media(max-width:600px){html[data-v41-screen=shelf] .lt-screen-toolbar{margin-inline:-8px;margin-top:-4px;margin-bottom:8px}}
 html[data-v41-screen=shelf] .page{min-height:0}
 html[data-v41-screen=shelf] .shelf-controls{display:flex;flex:none;margin:0 0 2px}
 html[data-v41-screen=shelf] .shelf-controls .count{min-height:0}
