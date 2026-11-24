@@ -9,7 +9,11 @@ import {
   isBookmarkFile, parseBookmarkHtml, classifyBookmarkUrl, cleanBookmarkTitle, bookmarkDate, folderLabel,
   collectBookmarkVideos, readBookmarkVideos, folderGroups, foundSummaryText,
   existingVideoTrees, defaultPicked, scopeState, pickScope, pickOne, createTitleQueue, pickedCountText,
+  NEW_TREE_VALUE, importOrder, saveBlockText, momentInputFor, saveBookmarkVideos, waitForSync, progressText, savedSummaryText,
+  SYNC_DONE, SYNC_PENDING, SYNC_FAILED, SAVE_FAILED_TEXT,
 } from '../public/v41/bookmark-import.mjs';
+import { createMemberSession } from '../public/v41/member-session.mjs';
+import { createTree, addMoment, latestMomentId, validateState, MAX_MOMENTS, MAX_TREES } from '../public/v41/domain.mjs';
 
 const fixture = (name) => readFileSync(new URL(`./fixtures/bookmarks/${name}.html`, import.meta.url), 'utf8');
 const NOW = new Date(2026, 10, 24, 12, 0, 0);
@@ -343,4 +347,177 @@ test('제목 줄 멈추기: 줄을 비우고 지금 받던 하나만 끝낸다. 
   release();
   await again;
   assert.deepEqual(calls, ['a', 'b']);
+});
+
+// ---- 4단계: 담을 트리 고르기와 한 번에 저장 ----
+// 저장은 실제 저장 세션(createMemberSession)에 가짜 서버만 붙여 확인한다 — 기존 저장 경로(member.apply → PUT) 그대로다.
+const CLOCK = '2026-11-01T00:00:00.000Z';
+function seedTree(count, subject = '첫 트리') {
+  let tree = createTree({ subject, title: '시작 순간', note: '', date: '2026-11-01', url: '' }, CLOCK);
+  for (let i = 1; i < count; i += 1) tree = addMoment(tree, { title: `순간 ${i}`, note: '', date: '2026-11-02', url: '' }, tree.moments[0].id, CLOCK);
+  return tree;
+}
+async function startSession(trees) {
+  const writes = [];
+  const session = createMemberSession({
+    api: {
+      get: async () => ({ ok: true, status: 200, revision: 1, subject: 'trial-subject', writeSubjectBound: true, state: { version: 1, trees } }),
+      put: async (body) => { writes.push(body); return { ok: true, status: 200, revision: writes.length + 1 }; },
+      logout: async () => ({ ok: true, status: 200 }),
+    },
+    delay: () => Promise.resolve(),
+    draftStorage: null,
+    cacheStorage: null,
+  });
+  await session.start();
+  return { session, writes };
+}
+const picked = (rows) => rows.map(([n, date, title]) => video(n, { date, dated: true, title: title ?? `북마크 제목 ${n}` }));
+
+test('담는 순서는 북마크한 날이 이른 것부터, 같은 날은 파일 순서', () => {
+  const videos = picked([[1, '2024-05-01'], [2, '2024-03-15'], [3, '2024-05-01'], [4, '2023-12-31'], [5, '2024-03-15']]);
+  assert.deepEqual(importOrder(videos).map((v) => v.id), ['b4', 'b2', 'b5', 'b1', 'b3']);
+  assert.deepEqual(importOrder(null), []);
+});
+
+test('담기 전 판정 표: 고른 것·새 트리 이름·트리 수·트리에 남은 자리', () => {
+  const full = { id: 'full', moments: Array(MAX_MOMENTS).fill({}) };
+  const near = { id: 'near', moments: Array(MAX_MOMENTS - 2).fill({}) };
+  const roomy = { id: 'roomy', moments: Array(5).fill({}) };
+  const trees = [full, near, roomy];
+  const rows = [
+    [{ count: 0, target: 'roomy', trees }, '담을 영상을 골라 주세요.'],
+    [{ count: 3, target: 'roomy', trees }, ''],
+    [{ count: 2, target: 'near', trees }, ''],
+    [{ count: 3, target: 'near', trees }, `이 트리에는 2개만 더 담을 수 있어요(한 트리에 ${MAX_MOMENTS}개까지). 고른 영상을 줄이거나 다른 트리를 골라 주세요.`],
+    [{ count: 1, target: 'full', trees }, `이 트리는 가득 찼어요(한 트리에 ${MAX_MOMENTS}개까지). 다른 트리를 골라 주세요.`],
+    [{ count: 1, target: 'gone', trees }, '담을 트리를 골라 주세요.'],
+    [{ count: 1, target: NEW_TREE_VALUE, trees, newName: '' }, '새 트리 이름을 적어 주세요.'],
+    [{ count: 1, target: NEW_TREE_VALUE, trees, newName: '   ' }, '새 트리 이름을 적어 주세요.'],
+    [{ count: 1, target: NEW_TREE_VALUE, trees, newName: '가'.repeat(61) }, '트리 이름은 60자까지 적을 수 있어요.'],
+    [{ count: 1, target: NEW_TREE_VALUE, trees, newName: '가'.repeat(60) }, ''],
+    [{ count: 1, target: NEW_TREE_VALUE, trees: Array(MAX_TREES).fill(roomy), newName: '새 트리' }, `트리는 ${MAX_TREES}개까지 만들 수 있어요.`],
+    [{ count: 200, target: NEW_TREE_VALUE, trees: [], newName: '새 트리' }, ''],
+  ];
+  for (const [input, want] of rows) assert.equal(saveBlockText(input), want, JSON.stringify({ ...input, trees: undefined }));
+});
+
+test('순간 저장 입력: 받은 영상 제목 → 북마크 제목(80자) → 주소만', () => {
+  const base = video(1, { date: '2024-03-15', title: '북마크 제목' });
+  assert.deepEqual(momentInputFor(base, ' 영상 제목 '), { url: base.url, date: '2024-03-15', mediaMetadata: { title: '영상 제목' } }, '쉬운 추가와 같은 모양');
+  assert.deepEqual(momentInputFor(base, ''), { url: base.url, date: '2024-03-15', title: '북마크 제목' });
+  const long = momentInputFor({ ...base, title: '가'.repeat(200) }, '');
+  assert.equal(long.title.length, 80, '도메인의 80자 규칙 그대로');
+  assert.ok(long.title.endsWith('…'));
+  assert.deepEqual(momentInputFor({ ...base, title: '' }, ''), { url: base.url, date: '2024-03-15' }, '제목이 없으면 기존 자동 제목 규칙에 맡긴다');
+});
+
+test('이미 있는 트리에 담기: 순간 수가 고른 만큼 늘고, 날짜는 북마크한 날, 가장 최근 순간 다음에 날짜순으로 이어진다', async () => {
+  const tree = seedTree(3);
+  const anchor = latestMomentId(tree);
+  const { session, writes } = await startSession([tree]);
+  const videos = picked([[1, '2024-05-01'], [2, '2024-03-15'], [3, '2024-04-08', '']]);
+  const progress = [];
+  const outcome = await saveBookmarkVideos({
+    videos,
+    target: { treeId: tree.id, afterMomentId: anchor },
+    apply: (...args) => session.apply(...args),
+    titleFor: async (v) => (v.id === 'b1' ? '받은 영상 제목' : ''),
+    onProgress: (p) => progress.push([p.done, p.total, p.video?.id || null]),
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  const grown = session.state().trees.find((t) => t.id === tree.id);
+  assert.equal(grown.moments.length, 6, '3개 + 고른 3개');
+  assert.deepEqual([outcome.treeId, outcome.saved.length, outcome.failed.length], [tree.id, 3, 0]);
+  const added = grown.moments.slice(3);
+  assert.deepEqual(added.map((m) => [m.date, m.url, m.title]), [
+    ['2024-03-15', videos[1].url, '북마크 제목 2'],
+    ['2024-04-08', videos[2].url, 'youtube.com에서 간직한 순간'],
+    ['2024-05-01', videos[0].url, '받은 영상 제목'],
+  ], '날짜순, 제목은 받은 영상 제목 → 북마크 제목 → 자동 제목');
+  assert.deepEqual(added.map((m) => m.parentId), [anchor, added[0].id, added[1].id], '앞 순간 다음에 한 줄로 잇는다');
+  assert.equal(added[2].mediaMetadata?.title, '받은 영상 제목', '받은 제목은 쉬운 추가처럼 영상 정보로 남는다');
+  assert.equal(added[0].mediaMetadata, undefined, '북마크 제목은 순간 제목으로만 쓴다');
+  assert.deepEqual(outcome.saved.map((item) => item.momentId), added.map((m) => m.id));
+  assert.equal(outcome.lastMomentId, added[2].id);
+  assert.deepEqual(progress, [[0, 3, 'b2'], [1, 3, 'b3'], [2, 3, 'b1'], [3, 3, null]], '하나 담기 전마다, 그리고 끝에 한 번');
+  // 기존 저장 경로로 서버에 간다: 마지막 PUT의 그 트리 순간 수가 같다.
+  assert.equal(writes.at(-1)?.state?.trees.find((t) => t.id === tree.id)?.moments.length, 6, '저장 뒤 트리 순간 수');
+  assert.doesNotThrow(() => validateState(session.state()));
+  session.dispose();
+});
+
+test('새 트리에 담기: 가장 이른 영상으로 트리를 만들고 나머지를 잇는다', async () => {
+  const { session, writes } = await startSession([seedTree(2)]);
+  const videos = picked([[1, '2024-05-01'], [2, '2024-03-15'], [3, '2024-04-08']]);
+  const outcome = await saveBookmarkVideos({ videos, target: { newName: '  가짜 직캠 모음  ' }, apply: (...args) => session.apply(...args) });
+  await new Promise((resolve) => setImmediate(resolve));
+  const state = session.state();
+  assert.equal(state.trees.length, 2);
+  const made = state.trees.find((t) => t.id === outcome.treeId);
+  assert.deepEqual([made.subject, made.title, made.inbox, made.moments.length], ['가짜 직캠 모음', '가짜 직캠 모음', false, 3]);
+  assert.deepEqual(made.moments.map((m) => [m.date, m.parentId === null ? 'root' : m.parentId]), [['2024-03-15', 'root'], ['2024-04-08', made.moments[0].id], ['2024-05-01', made.moments[1].id]]);
+  assert.equal(state.trees[0].moments.length, 2, '다른 트리는 그대로');
+  assert.equal(writes.at(-1)?.state?.trees.find((t) => t.id === made.id)?.moments.length, 3, '저장 뒤 새 트리 순간 수');
+  session.dispose();
+});
+
+test('담지 못한 것은 멈추지 않고 실패 목록에 까닭과 함께 적는다(한 트리 한도)', async () => {
+  const tree = seedTree(MAX_MOMENTS - 1);
+  const { session } = await startSession([tree]);
+  const videos = picked([[1, '2024-03-15'], [2, '2024-04-08'], [3, '2024-05-01']]);
+  const outcome = await saveBookmarkVideos({ videos, target: { treeId: tree.id, afterMomentId: latestMomentId(tree) }, apply: (...args) => session.apply(...args) });
+  assert.deepEqual(outcome.saved.map((item) => item.video.id), ['b1']);
+  assert.deepEqual(outcome.failed.map((item) => [item.video.id, item.reason]), [['b2', `한 트리에는 ${MAX_MOMENTS}개의 순간까지 담을 수 있어요.`], ['b3', `한 트리에는 ${MAX_MOMENTS}개의 순간까지 담을 수 있어요.`]]);
+  assert.equal(session.state().trees[0].moments.length, MAX_MOMENTS);
+  session.dispose();
+  // 까닭 없는 실패·제목 조회 실패도 담기를 멈추지 않는다.
+  let calls = 0;
+  const odd = await saveBookmarkVideos({
+    videos,
+    target: { treeId: 't', afterMomentId: 'm' },
+    apply: () => { calls += 1; if (calls === 2) throw {}; return { treeId: 't', momentId: `m${calls}` }; },
+    titleFor: async () => { throw new Error('조회 실패'); },
+  });
+  assert.deepEqual([odd.saved.length, odd.failed.map((item) => item.reason)], [2, [SAVE_FAILED_TEXT]]);
+});
+
+test('새 트리 만들기가 실패하면 다음 영상으로 다시 만들어 본다', async () => {
+  const videos = picked([[1, '2024-03-15'], [2, '2024-04-08'], [3, '2024-05-01']]);
+  const calls = [];
+  const outcome = await saveBookmarkVideos({
+    videos,
+    target: { newName: '새 트리' },
+    apply: (action, input, selection, hint) => {
+      calls.push([action, selection?.treeId || '', selection?.momentId || '', hint ? Object.keys(hint).filter((key) => hint[key]).join('+') : '']);
+      if (calls.length === 1) throw new Error('만들지 못했어요');
+      return { treeId: 'made', momentId: `m${calls.length}` };
+    },
+  });
+  // 새 트리는 화면을 그 트리로 다시 띄우는 기존 길 그대로, 그 뒤 더하기는 모델만 고친다(열린 화면을 순간마다 다시 그리지 않는다).
+  assert.deepEqual(calls, [['new', '', '', ''], ['new', '', '', ''], ['add', 'made', 'm2', 'moment+story']]);
+  assert.deepEqual([outcome.treeId, outcome.saved.length, outcome.failed.map((item) => item.reason)], ['made', 2, ['만들지 못했어요']]);
+});
+
+test('서버 저장 기다림 표: 저장됨·실패·기다림 상한', async () => {
+  const run = async (snaps, options = {}) => {
+    let i = 0, waits = 0;
+    const result = await waitForSync(() => snaps[Math.min(i++, snaps.length - 1)], { timeoutMs: 1000, pollMs: 250, wait: async () => { waits += 1; }, ...options });
+    return [result, waits];
+  };
+  assert.deepEqual(await run([{ dirty: false, phase: 'synced' }]), [SYNC_DONE, 0]);
+  assert.deepEqual(await run([{ dirty: true, phase: 'syncing' }, { dirty: true, phase: 'syncing' }, { dirty: false, phase: 'synced' }]), [SYNC_DONE, 2]);
+  for (const phase of ['offline', 'rejected', 'conflict', 'login']) assert.deepEqual(await run([{ dirty: true, phase: 'syncing' }, { dirty: true, phase }]), [SYNC_FAILED, 1], phase);
+  assert.deepEqual(await run([{ dirty: true, phase: 'syncing' }]), [SYNC_PENDING, 4], '상한(1초)까지 네 번 기다리고 멈춘다');
+  assert.deepEqual(await run([null]), [SYNC_PENDING, 4], '상태를 못 읽어도 끝없이 돌지 않는다');
+  assert.deepEqual(await waitForSync(() => { throw new Error('읽기 실패'); }, { timeoutMs: 0, wait: async () => {} }), SYNC_PENDING);
+});
+
+test('진행 표시와 마친 뒤 한 줄 문구', () => {
+  assert.equal(progressText(0, 37), '0 / 37');
+  assert.equal(progressText(12, 37), '12 / 37');
+  assert.equal(progressText(40, 37), '37 / 37');
+  assert.equal(savedSummaryText({ saved: 34, treeName: '가짜 직캠 모음' }), '✓ 34개를 ‘가짜 직캠 모음’에 담았어요');
+  assert.equal(savedSummaryText({ saved: 2 }), '✓ 2개를 담았어요');
+  assert.equal(savedSummaryText({ saved: 0, treeName: '트리' }), '담지 못했어요.');
 });

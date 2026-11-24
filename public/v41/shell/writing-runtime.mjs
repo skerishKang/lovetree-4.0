@@ -166,7 +166,16 @@ export function createWritingRuntime(ctx){
       onModalShown:()=>(0,ctx.tipsFollowDialogs)(),
       // 트리 목록은 쉬운 추가와 같은 재료(window.LT41)에서 읽고, 날짜 표기는 계정 설정 한 벌을 따른다.
       listTrees:()=>(Array.isArray(window.LT41?.trees)?window.LT41.trees:[]),
-      dateStyle:()=>(0,ctx.currentDateStyle)()
+      dateStyle:()=>(0,ctx.currentDateStyle)(),
+      // 처음 고르는 트리는 쉬운 추가와 같은 한 벌(늘 같은 트리 설정 → 지금 보는 트리).
+      currentTreeId:()=>window.LT41?.tree?.id||'',
+      quickTargetPreference:()=>(0,ctx.quickTargetPreference)(),
+      // #978과 같은 길: 담는 동안 화면 다시 그리기·다른 창이 이 창을 닫지 못하게 붙잡는다.
+      holdPanel:(id,on)=>ctx.shellDialogs.holdPanel(id,on),
+      // 담은 뒤 뒤에 열린 화면을 지금 트리 그대로 한 번 다시 그린다(담는 동안은 모델만 바꾼다).
+      refreshScreen:()=>{const id=window.LT41?.tree?.id;if(id)(0,ctx.choose)(id,window.LT41.momentId);},
+      // '트리 보러 가기': 담은 트리의 책을 연다(messages.mjs의 책 열기와 같은 길).
+      openBook:(treeId,momentId)=>{ctx.current='track59-sketchbook.html';(0,ctx.choose)(treeId,momentId);(0,ctx.writeLocation)();}
     })));
     mountBookmarkEntry({$:ctx.$,onOpen:()=>shellBookmarkImport.open()});
 

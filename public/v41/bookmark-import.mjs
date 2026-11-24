@@ -6,6 +6,7 @@
 import { youtubeIdFrom, YOUTUBE_HOSTS } from './youtube-id.mjs';
 import { isSameVideoMoment } from './quick-intake.mjs';
 import { localDateOnly } from './local-date.mjs';
+import { MAX_MOMENTS, MAX_TREES, suggestMomentTitle } from './domain.mjs';
 
 // 파일 크기 상한: 크롬·엣지는 북마크마다 아이콘 그림을 글자로 함께 적어 파일이 몇 MB까지 커진다.
 export const BOOKMARK_FILE_MAX_BYTES = 20 * 1024 * 1024;
@@ -362,4 +363,121 @@ export function createTitleQueue({ fetchTitle, limit = 200, gapMs = 0, onTitle =
 /** 고른 수 안내. */
 export function pickedCountText(count) {
   return count > 0 ? `${count}개 고름` : '고른 영상이 없어요';
+}
+
+// ---- 4단계: 담을 트리 고르기와 한 번에 저장 ----
+// 저장은 기존 길 그대로다: 순간 하나마다 member.apply('add' | 'new')를 부른다(새 저장 경로·서버 변경 없음).
+
+export const NEW_TREE_VALUE = '__new__';
+// 순간을 하나 더할 때마다 열린 화면을 다시 그리지 않는다 — 모델만 고치는 기존 표시(#1001 한마디 저장과 같은 길)를 쓰고,
+// 다 담은 뒤 화면 쪽이 한 번만 다시 그린다. 그래야 200개를 담아도 뒤 화면이 200번 다시 그려지지 않고, 보던 자리도 그대로다.
+const MODEL_ONLY = Object.freeze({ moment: true, story: true });
+export const TREE_NAME_MAX = 60;
+export const SAVE_FAILED_TEXT = '담지 못했어요.';
+
+/** 담는 순서: 북마크한 날이 이른 것부터, 같은 날은 파일 순서. 날짜가 없어 오늘로 담는 것은 자연히 뒤에 온다. */
+export function importOrder(videos) {
+  return (Array.isArray(videos) ? videos : [])
+    .map((video, index) => ({ video, index }))
+    .sort((a, b) => String(a.video.date).localeCompare(String(b.video.date)) || a.index - b.index)
+    .map((entry) => entry.video);
+}
+
+/**
+ * 담기 전에 막아야 할 까닭(없으면 ''). 한도 문구는 기존 도메인 한도(MAX_MOMENTS·MAX_TREES)를 그대로 쓴다.
+ * target: 트리 id 또는 NEW_TREE_VALUE, newName: 새 트리 이름.
+ */
+export function saveBlockText({ count = 0, target = '', trees = [], newName = '' } = {}) {
+  if (count <= 0) return '담을 영상을 골라 주세요.';
+  if (target === NEW_TREE_VALUE) {
+    const name = String(newName ?? '').trim();
+    if (!name) return '새 트리 이름을 적어 주세요.';
+    if (name.length > TREE_NAME_MAX) return `트리 이름은 ${TREE_NAME_MAX}자까지 적을 수 있어요.`;
+    if (trees.length >= MAX_TREES) return `트리는 ${MAX_TREES}개까지 만들 수 있어요.`;
+    return '';
+  }
+  const tree = trees.find((item) => item?.id === target);
+  if (!tree) return '담을 트리를 골라 주세요.';
+  const room = MAX_MOMENTS - (tree.moments?.length || 0);
+  if (room <= 0) return `이 트리는 가득 찼어요(한 트리에 ${MAX_MOMENTS}개까지). 다른 트리를 골라 주세요.`;
+  if (count > room) return `이 트리에는 ${room}개만 더 담을 수 있어요(한 트리에 ${MAX_MOMENTS}개까지). 고른 영상을 줄이거나 다른 트리를 골라 주세요.`;
+  return '';
+}
+
+/**
+ * 순간 하나의 저장 입력. 쉬운 추가와 같은 모양(주소 + 받아 둔 영상 제목)에 북마크한 날을 더한다.
+ * 영상 제목을 받지 못했으면 북마크 제목을 순간 제목으로 쓴다(80자 자르기는 도메인 규칙 suggestMomentTitle 그대로).
+ * 둘 다 없으면 주소만 넘겨 기존 자동 제목 규칙에 맡긴다.
+ */
+export function momentInputFor(video, videoTitle = '') {
+  const input = { url: video.url, date: video.date };
+  const fetched = String(videoTitle || '').trim();
+  if (fetched) return { ...input, mediaMetadata: { title: fetched } };
+  const own = video.title ? suggestMomentTitle({ mediaMetadata: { title: video.title } }) : '';
+  return own ? { ...input, title: own } : input;
+}
+
+/**
+ * 고른 영상을 한 트리에 차례로 담는다.
+ * - target: { treeId, afterMomentId }(이미 있는 트리 — afterMomentId는 기존 규칙의 '가장 최근 순간') 또는 { newName }(새 트리).
+ * - 날짜순으로 담고, 방금 담은 순간 다음에 이어 붙인다(쉬운 추가를 하나씩 한 것과 같은 한 줄).
+ * - 새 트리는 첫 영상으로 만들고(apply('new')), 나머지는 그 트리에 잇는다. 하나가 실패해도 멈추지 않고 실패 목록에 적는다.
+ * - titleFor(video)는 영상 제목(없으면 '')을 돌려준다. onProgress({ done, total, video })는 하나 담기 전후에 불린다.
+ */
+export async function saveBookmarkVideos({ videos, target = {}, apply, titleFor = async () => '', onProgress = () => {}, pause = () => Promise.resolve() } = {}) {
+  const ordered = importOrder(videos);
+  let treeId = target.treeId || '';
+  let parentId = treeId ? (target.afterMomentId || '') : '';
+  const saved = [];
+  const failed = [];
+  for (let index = 0; index < ordered.length; index += 1) {
+    const video = ordered[index];
+    onProgress({ done: index, total: ordered.length, video });
+    await pause();
+    let videoTitle = '';
+    try { videoTitle = String((await titleFor(video)) || ''); } catch { videoTitle = ''; }
+    const input = momentInputFor(video, videoTitle);
+    try {
+      const result = treeId
+        ? apply('add', input, { treeId, momentId: parentId }, MODEL_ONLY)
+        : apply('new', { subject: String(target.newName ?? '').trim(), ...input });
+      treeId = result.treeId;
+      parentId = result.momentId;
+      saved.push({ video, momentId: result.momentId });
+    } catch (error) {
+      failed.push({ video, reason: typeof error?.message === 'string' && error.message ? error.message : SAVE_FAILED_TEXT });
+    }
+  }
+  onProgress({ done: ordered.length, total: ordered.length, video: null });
+  return { treeId, lastMomentId: parentId, saved, failed };
+}
+
+export const SYNC_DONE = 'synced';
+export const SYNC_PENDING = 'pending';
+export const SYNC_FAILED = 'failed';
+/**
+ * 담은 것이 서버에 저장됐는지 기다려 본다(기존 저장 상태 값만 읽는다 — 저장을 따로 보내지 않는다).
+ * 저장됨(synced)·아직 보내는 중(pending, 기다림 상한 초과)·저장 실패(failed: offline·rejected·conflict·login).
+ */
+export async function waitForSync(snapshot, { timeoutMs = 15000, pollMs = 250, wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms)) } = {}) {
+  for (let waited = 0; ; waited += pollMs) {
+    let snap = null;
+    try { snap = snapshot(); } catch { snap = null; }
+    const phase = String(snap?.phase ?? '');
+    if (['offline', 'rejected', 'conflict', 'login'].includes(phase)) return SYNC_FAILED;
+    if (snap && !snap.dirty && phase === 'synced') return SYNC_DONE;
+    if (waited >= timeoutMs) return SYNC_PENDING;
+    await wait(pollMs);
+  }
+}
+
+/** 진행 표시 글자 'N / 전체'. */
+export function progressText(done, total) {
+  return `${Math.min(done, total)} / ${total}`;
+}
+
+/** 마친 뒤 한 줄: 몇 개를 어느 트리에 담았는지(하나도 못 담았으면 그 사실만). */
+export function savedSummaryText({ saved = 0, treeName = '' } = {}) {
+  if (saved <= 0) return '담지 못했어요.';
+  return treeName ? `✓ ${saved}개를 ‘${treeName}’에 담았어요` : `✓ ${saved}개를 담았어요`;
 }

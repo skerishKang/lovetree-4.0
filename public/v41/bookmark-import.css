@@ -53,9 +53,48 @@ html[data-lt-theme=garden] .bmi .bmi-error{color:var(--lt-rose-ink)}
 .bmi-item.is-existing .bmi-title{color:var(--lt-muted)}
 .bmi-item.is-existing .bmi-thumb{opacity:.6}
 
+/* 아래 고정 줄: 담을 트리와 담기 단추 */
+.bmi-foot{flex:0 0 auto;padding:12px 2px 18px;border-top:1px solid var(--lt-line);background:var(--lt-glass-strong)}
+.bmi-foot-row{display:flex;align-items:flex-end;gap:12px}
+.bmi-target{flex:1;min-width:0;display:grid;gap:6px}
+.bmi-target label{font-size:12px;color:var(--lt-muted)}
+.bmi-target select,.bmi-target input{display:block;width:100%;min-height:48px;padding:10px 12px;border:1px solid color-mix(in srgb,var(--lt-pearl) 26%,transparent);border-radius:12px;background:color-mix(in srgb,var(--lt-pearl) 4%,transparent);color:var(--lt-pearl);font-size:15px;line-height:1.4}
+.bmi-target select option{background:var(--lt-stage-2);color:var(--lt-pearl)}
+.bmi-target input::placeholder{color:var(--lt-muted)}
+.bmi .bmi-save{flex:0 0 auto;min-width:132px}
+.bmi .bmi-foot-error{margin:0 0 10px}
+
+/* 담는 중 */
+.bmi-saving{padding:28px 4px 8px;text-align:center}
+.bmi .bmi-saving-title{margin:0;font-size:17px;font-weight:600;color:var(--lt-pearl)}
+.bmi-progress{height:10px;margin:18px 0 10px;border-radius:var(--lt-r-pill);background:color-mix(in srgb,var(--lt-pearl) 12%,transparent);overflow:hidden}
+.bmi-progress-fill{display:block;width:var(--bmi-progress,0%);height:100%;border-radius:inherit;background:var(--lt-gold);transition:width .2s ease}
+.bmi .bmi-progress-count{margin:0;font-size:15px;font-weight:600;color:var(--lt-pearl);font-variant-numeric:tabular-nums}
+.bmi .bmi-progress-now{min-height:24px;margin:4px 0 14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* 마침 */
+.bmi-done{padding:22px 4px 8px}
+.bmi .bmi-done-title{margin:0;font-size:18px;font-weight:600;line-height:1.5;color:var(--lt-pearl);outline:none}
+.bmi .bmi-done-hint{margin:8px 0 0}
+.bmi .bmi-done-note{margin:8px 0 0;font-weight:400}
+.bmi-failed{margin-top:18px;padding:14px;border:1px solid var(--lt-line);border-radius:var(--lt-r-card)}
+.bmi-failed-title{margin:0 0 8px;color:var(--lt-pearl)}
+.bmi-failed-list{display:grid;gap:8px;max-height:240px;margin:0;padding:0;overflow:auto;list-style:none}
+.bmi-failed-list li{display:grid;gap:2px;font-size:13px;line-height:1.6}
+.bmi-failed-name{color:var(--lt-pearl);overflow-wrap:anywhere}
+.bmi-failed-why{color:var(--lt-rose)}
+html[data-lt-theme=garden] .bmi-failed-why{color:var(--lt-rose-ink)}
+.bmi .button-row button{padding:10px 18px;border-color:color-mix(in srgb,var(--lt-pearl) 26%,transparent);font-size:14px;color:var(--lt-pearl)}
+.bmi .button-row .primary{border-color:var(--lt-primary);color:var(--lt-primary-ink)}
+.bmi-done-actions{margin-top:22px}
+@media(prefers-reduced-motion:reduce){.bmi-progress-fill{transition:none}}
+
 @media(max-width:520px){
  #bookmark-import-panel{width:100vw}
  .bmi-thumb{width:80px}
+ .bmi-foot-row{flex-direction:column;align-items:stretch}
+ .bmi .bmi-save{width:100%}
+ .bmi-foot{padding-bottom:calc(14px + env(safe-area-inset-bottom))}
  .bmi-item{padding:8px 12px;gap:10px}
  .bmi-help-list li{grid-template-columns:1fr;gap:0}
 }
