@@ -160,3 +160,8 @@ body.lt-bloom-glow .threadGlow{opacity:.82}
 #editFields .editMediaNote{font-size:10px;color:#a995b1;margin:5px 0}
 #editFields .editMetaNote{font-size:10px;color:#94829e;margin-top:10px}
 #styleSection .ctaRow{margin-top:8px}/* #504: 눌린 판은 aria-pressed로 알리고 같은 모양을 유지한다 */
+
+/* #1249: 한 열로 배치하는 휴대폰에서는 카드 경계를 곧게 유지한다. */
+@media(max-width:699px){
+  html[data-v41-screen=board] .card:not(.dragLift):not(.dropSettle):not(.landing){transform:none}
+}
