@@ -228,6 +228,69 @@ test('#942 첫 화면 추가 단추와 숫자 묶음', { skip: REQUIRE ? false :
   assert.deepEqual(failures,[]);
 });
 
+// #1246·#1026: delayed public statistics and font loading must not move the action group.
+test('#1246 첫 화면 단추 첫 표시 뒤 배치 고정', { skip: REQUIRE ? false : skip, timeout: 180000 }, async () => {
+  if (skip) assert.fail(skip);
+  const server=await serve(),base='http://127.0.0.1:'+server.address().port;
+  const browser=await chromium.launch({headless:true});
+  const tree=createTree({subject:'시험 트리',title:'시험 순간',date:'2026-11-20',emotion:'설렘',note:'가짜 기록'});
+  const failures=[];
+  try {
+    for(const width of [390,1440]) for(const kind of ['guest','empty','member']){
+      const member=kind==='member',signedIn=kind!=='guest',key=width+'-'+kind;
+      const ctx=await browser.newContext({viewport:{width,height:width===390?844:900},reducedMotion:'no-preference'});
+      let releaseStats;const statsGate=new Promise(r=>releaseStats=r);
+      let releaseFonts;const fontGate=new Promise(r=>releaseFonts=r);
+      try {
+        await ctx.addInitScript(()=>{
+          try{localStorage.setItem('lt41.theme','night');localStorage.setItem('lt41.tips.firstTree','1')}catch{}
+          if(window!==top)return;
+          const rows=window.__homeActionFrames=[];
+          const tick=()=>{
+            try{
+              const f=document.getElementById('view'),root=f?.contentDocument?.getElementById('orbit')?.shadowRoot;
+              const a=root?.querySelector('.center .actions'),c=root?.querySelector('.center'),bs=[...a?.querySelectorAll('.home-action-group > button')||[]];
+              if(f?.checkVisibility()&&a&&bs.length===3){
+                const w=f.contentWindow,style=w.getComputedStyle(a),r=a.getBoundingClientRect(),cr=c.getBoundingClientRect();
+                if(Number(style.opacity)>0&&r.width&&r.height){
+                  const translate=style.transform==='none'?0:new DOMMatrixReadOnly(style.transform).m42;
+                  const br=bs.map(b=>b.getBoundingClientRect());
+                  rows.push({height:r.height,top:r.top-translate,centerTop:cr.top,lines:new Set(br.map(b=>Math.round(b.top))).size,labels:bs.map(b=>b.textContent.trim()).join('|'),filled:!!a.querySelector('[data-do=community] + .home-count .home-count-value')});
+                }
+              }
+            }catch{}
+            requestAnimationFrame(tick);
+          };
+          requestAnimationFrame(tick);
+        });
+        await ctx.route('**/*',async r=>{
+          const u=new URL(r.request().url());
+          if(u.origin!==base)return r.abort();
+          if(r.request().resourceType()==='font'){await fontGate;return r.continue();}
+          if(u.pathname==='/api/workspace'&&signedIn){await new Promise(ok=>setTimeout(ok,300));return r.fulfill({status:200,json:{revision:1,state:{version:1,trees:member?[tree]:[],prefs:{}},subject:'visual-audit-fake',writeSubjectBound:true,savedAt:'2026-11-20T00:00:00.000Z'}});}
+          if(u.pathname==='/api/community/stats'){await statsGate;return r.fulfill({status:200,json:{trees:17,moments:1234}});}
+          if(u.pathname.startsWith('/api/'))return r.fulfill({status:200,json:{ok:true,items:[]}});
+          return r.continue();
+        });
+        const page=await ctx.newPage();
+        await page.goto(base+'/v41/'+(signedIn?'?account=1':'')+'#home',{waitUntil:'domcontentloaded'});
+        // Do not wait for fonts or counts before measuring the first visible group.
+        await page.waitForFunction(()=>window.__homeActionFrames.length>0,null,{timeout:15000});
+        await page.waitForTimeout(3000);releaseFonts();releaseStats();
+        await page.waitForFunction(()=>window.__homeActionFrames.some(r=>r.filled),null,{timeout:10000});
+        await page.waitForTimeout(700);
+        const rows=await page.evaluate(()=>window.__homeActionFrames);
+        const first=rows[0],last=rows.at(-1),expected=width===390&&!member?3:1;
+        const delta=k=>Math.max(...rows.map(r=>r[k]))-Math.min(...rows.map(r=>r[k]));
+        const result={key,samples:rows.length,first,last,heightDelta:delta('height'),topDelta:delta('top'),centerDelta:delta('centerTop'),lines:[...new Set(rows.map(r=>r.lines))],labels:[...new Set(rows.map(r=>r.labels))]};
+        console.log('#1246 FIRST',JSON.stringify(result));
+        if(first.filled||!last.filled||result.lines.length!==1||result.lines[0]!==expected||result.labels.length!==1||result.heightDelta>8||result.topDelta>8||result.centerDelta>8)failures.push(result);
+      }finally{releaseFonts();releaseStats();await ctx.close();}
+    }
+  }finally{await browser.close();await new Promise(r=>server.close(r));}
+  assert.deepEqual(failures,[]);
+});
+
 // #987: 공유·설정 창은 실제로 열린 상태에서 폭, 위치, 대비와 선택 표시를 잰다.
 test('#987 공유 창 폭·단추·대비와 설정 정렬·동그라미·배치', { skip: REQUIRE ? false : skip, timeout: 240000 }, async () => {
   if (skip) assert.fail(skip);

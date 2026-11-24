@@ -317,6 +317,8 @@ for(const button of centerButtons){
  const group=document.createElement('div');group.className='home-action-group';
  button.before(group);group.append(button);
  const line=document.createElement('div');line.className='home-count';line.hidden=true;line.setAttribute('data-lt-keep-clear','');
+ // #1246: reserve both public-stat rows before the request completes, including on failure.
+ if(button.dataset.do==='community')line.setAttribute('data-reserve','');
  group.append(line);countLines.set(button.dataset.do,line);
 }
 function countItem(name,count,label,action){
@@ -413,12 +415,13 @@ if(hasMoments){
  }catch{ /* 집계를 받지 못하면 해당 줄만 숨긴다. */ }finally{clearTimeout(timer);}})();
 const infoStyle=document.createElement('style');
 infoStyle.textContent=`.home-add-top{margin-top:12px;font-size:15px}@media(max-width:650px){.home-add-top{font-size:14px}}
-.center .actions{gap:18px;align-items:flex-start}
+.center .actions{gap:18px;align-items:flex-start;flex-wrap:nowrap}
 .center .actions .home-action-group{flex:1 1 0%;max-width:176px;min-width:0;display:flex;flex-direction:column;align-items:stretch;gap:5px}
-.center .actions .home-action-group .subtleBtn{flex:none;width:100%;max-width:none}
+.center .actions .home-action-group .subtleBtn{flex:none;width:100%;max-width:none;box-sizing:border-box;height:44px;white-space:nowrap;overflow-wrap:normal}
 .home-count{display:block;font-size:12px;line-height:16px;min-height:32px;white-space:nowrap;color:var(--lt-muted)}
 .home-count-line{display:block;min-height:16px;line-height:16px}
 .home-count[hidden]{display:none}
+.home-count[data-reserve][hidden]{display:block;visibility:hidden}
 .home-count-item{display:flex;align-items:baseline;justify-content:space-between;gap:4px;width:100%;min-width:0;white-space:nowrap}
 .home-count-name{color:var(--lt-muted);text-align:left}
 .home-count-value{color:var(--lt-pearl);font-weight:700;font-variant-numeric:tabular-nums;text-align:right}
