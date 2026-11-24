@@ -609,9 +609,12 @@ test('#1294 둘러보기 트리·순간 탭과 미리보기·그룹 찾기 뒤�
  try{
  for(const [width,height] of [[390,844],[1440,900]]){
   const h=await bootExploreTab(browser,{width,height,theme:'night'});
+  let cdp;
   try{
    await openExploreTab(h.page,width);
    const page=h.page;
+   cdp=await page.context().newCDPSession(page);
+   await cdp.send('Emulation.setCPUThrottlingRate',{rate:width===1440?6:1});
    await page.waitForSelector('#community-list .community-card');
    const back=async()=>{await page.goBack();await page.waitForTimeout(110);};
    const navState=()=>page.evaluate(()=>({hash:location.hash,trees:!document.getElementById('community-tree-panel').hidden,moments:!document.getElementById('community-moments-panel').hidden}));
@@ -643,9 +646,12 @@ test('#1294 둘러보기 트리·순간 탭과 미리보기·그룹 찾기 뒤�
    assert.equal(await page.locator('#community-group-find').evaluate(el=>el.open),false,width+' 그룹 찾기 복귀');
    assert.deepEqual(await navState(),home,width+' 그룹 찾기 후 화면');
    // 감상 화면 이동은 별도 URL이며 뒤로 가기 한 번에 둘러보기 미리보기를 복원한다.
+   const sharedTree=exploreTree(1);
+   await page.route('**/api/public/shares/*',async route=>{if(width===1440)await new Promise(resolve=>setTimeout(resolve,700));await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({ok:true,share:{id:EXPLORE_CARD(0).shareId,view:'book',entryMomentId:sharedTree.moments[0].id},tree:sharedTree})});});
    await page.locator('#community-list .community-card').first().click();
    await page.locator('.community-preview-open').click();
    await page.waitForFunction(()=>location.hash.startsWith('#share/'),null,{timeout:15000});
+   if(width===390)await page.waitForFunction(()=>document.body.dataset.recordSource==='share'&&document.getElementById('empty')?.hidden,null,{timeout:15000});
    await back();
    assert.equal((await navState()).hash,'#explore',width+' 공유 감상에서 뒤로 가기 주소');
    assert.equal(await page.locator('#community-panel').evaluate(el=>el.open),true,width+' 공유 감상에서 둘러보기 복귀');
@@ -653,7 +659,7 @@ test('#1294 둘러보기 트리·순간 탭과 미리보기·그룹 찾기 뒤�
    assert.equal(await page.locator('#community-preview').evaluate(el=>el.open),true,width+' 공유 감상에서 미리보기 상태 복원');
 
    console.log('#1294 TREES',width,'OK');
-  }finally{await h.ctx.close();await new Promise(ok=>h.server.close(ok));}
+  }finally{await cdp?.detach();await h.ctx.close();await new Promise(ok=>h.server.close(ok));}
  }
  }finally{await browser.close();}
 });
