@@ -286,7 +286,9 @@ function markup(url,title='',mediaMetadata=null,momentId='',context=null,momentM
   const canLoad=!!m.loadUrl&&(new URL(m.loadUrl).protocol==='https:'||m.privateFile);
  const ctx=context||mediaContext();
  const ownedServer=autoLoadMedia(ctx.source,ctx.owned);
- const auto=canLoad&&m.kind==='youtube'&&ownedServer;
+ // #1259: 공개 보드의 표지만 책과 같은 유튜브 후보를 표시한다. 외부 사진과 예시·파일 기록은 기존 동의 규칙을 유지한다.
+ const visitorCover=ctx.source==='share'&&opts?.visitorYoutubeCover===true;
+ const auto=canLoad&&m.kind==='youtube'&&(ownedServer||visitorCover);
  const vertical=verticalVideo(url,mediaMetadata);
  const caption=[mediaMetadata?.title,mediaMetadata?.channel,mediaMetadata?.source].filter(value=>typeof value==='string'&&value.trim()).join(' · ');
  const cached=(caption&&!compact)?'<p class="lt-media-title">'+esc(caption)+'</p>':'';
@@ -313,7 +315,7 @@ function markup(url,title='',mediaMetadata=null,momentId='',context=null,momentM
  // #792: 기억할 구간 표 — 순간의 시작·끝(저장 값)이 있을 때만 작은 한 줄을 보인다. 재생은 그 구간만(data-lt-end).
  const rangeText=(m.kind==='youtube'&&momentMeta)?formatRange(momentMeta.startSeconds,momentMeta.endSeconds):'';
  const rangeLine=rangeText?'<div class="lt-media-range"><span class="lt-media-range-mark" aria-hidden="true">기억할 구간</span><strong>'+esc(rangeText)+'</strong></div>':'';
- let html = '<div class="lt-media" data-lt-url="'+esc(url)+'" data-lt-title="'+esc(title)+'"'+(momentId?' data-lt-moment-id="'+esc(momentId)+'"':'')+(m.kind==='youtube'?' data-lt-youtube="1"':'')+(auto?' data-lt-auto="1"':'')+(vertical?' data-lt-vertical="1"':'')+(momentMeta&&Number(momentMeta.endSeconds)>0?' data-lt-end="'+Number(momentMeta.endSeconds)+'"':'')+(momentMeta&&Number(momentMeta.startSeconds)>0?' data-lt-start="'+Number(momentMeta.startSeconds)+'"':'')+'>'+expand+'<div class="lt-media-body">'+body+'</div>'+rangeLine+(compact?'':'<p class="lt-media-status" role="status">'+status+'</p><a href="'+esc(m.openUrl)+'" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">'+esc(m.kind==='youtube'?m.actionLabel+(m.startSeconds?' · 시작 '+formatStart(m.startSeconds):''):'원본 링크 열기')+' ↗</a>')+'</div>';
+ let html = '<div class="lt-media" data-lt-url="'+esc(url)+'" data-lt-title="'+esc(title)+'"'+(momentId?' data-lt-moment-id="'+esc(momentId)+'"':'')+(m.kind==='youtube'?' data-lt-youtube="1"':'')+(auto&&ownedServer?' data-lt-auto="1"':'')+(vertical?' data-lt-vertical="1"':'')+(momentMeta&&Number(momentMeta.endSeconds)>0?' data-lt-end="'+Number(momentMeta.endSeconds)+'"':'')+(momentMeta&&Number(momentMeta.startSeconds)>0?' data-lt-start="'+Number(momentMeta.startSeconds)+'"':'')+'>'+expand+'<div class="lt-media-body">'+body+'</div>'+rangeLine+(compact?'':'<p class="lt-media-status" role="status">'+status+'</p><a href="'+esc(m.openUrl)+'" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">'+esc(m.kind==='youtube'?m.actionLabel+(m.startSeconds?' · 시작 '+formatStart(m.startSeconds):''):'원본 링크 열기')+' ↗</a>')+'</div>';
  if(m.privateFile)html=html.replace('불러오기를 누르면 원본 사이트에 연결됩니다.','내 계정에 보관한 파일입니다. 불러오기를 눌러 확인하세요.').replace(/<a href=[\s\S]*?<\/a>/,'');
  return html;
 }
