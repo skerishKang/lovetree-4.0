@@ -987,6 +987,8 @@ test('#1259 방문자 책 첫 안내가 제목과 크게 보기 영상 조작부
      const intersection=(a,b)=>a&&b?Math.max(0,Math.min(a.right,b.right)-Math.max(a.left,b.left))*Math.max(0,Math.min(a.bottom,b.bottom)-Math.max(a.top,b.top)):0;
      return {notice:tr,frame:fr,titles,titleOverlap:titles.map(r=>intersection(tr,r)),frameOverlap:intersection(tr,fr),media:mr,mediaOverlap:intersection(tr,mr),hidden:t.hidden};
     });
+    assert.equal(await f.locator('.story-tip').count(),0,key+' 방문자 쓰기 안내 0개');
+    assert.equal(await p.evaluate(()=>localStorage.getItem('lt41.tips.bookStory')),null,key+' 방문자는 내 기록의 최초 안내 상태를 소비하지 않는다');
     const book=await measure();
     assert.ok(book.notice&&book.titles.length,key+' 첫 안내와 제목이 실제로 표시된다');
     assert.equal(book.frameOverlap,0,key+' 책 화면과 안내의 교차 면적 0: '+JSON.stringify(book));
