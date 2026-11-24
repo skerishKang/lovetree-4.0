@@ -355,7 +355,7 @@ function refreshCountsFromParent(){
  if(!total)return true;
  showCount('moments',[
   {name:`순간`,count:total,label:`내 순간 ${total}개 목록 열기`,action:openMoments},
-  inboxCount?{name:`모아둔`,count:inboxCount,label:`모아둔 순간 ${inboxCount}개 정리하기`,action:()=>bridge.actions.cleanup()}:null
+  inboxCount?{name:`정리 전`,count:inboxCount,label:`정리 전 순간 ${inboxCount}개 정리하기`,action:()=>bridge.actions.cleanup()}:null
  ]);
  const publicRow=countLines.get('trees')?.lastElementChild;
  const treeCount=showCount('trees',[{name:`트리`,count:fresh.length,label:`트리 ${fresh.length}개 서재 열기`,action:openTrees},null]);
@@ -378,7 +378,7 @@ const openTrees=()=>bridge.actions.navigate('trees');
 if(hasMoments){
  showCount('moments',[
   {name:`순간`,count:totalCount,label:`내 순간 ${totalCount}개 목록 열기`,action:openMoments},
-  inboxCount?{name:`모아둔`,count:inboxCount,label:`모아둔 순간 ${inboxCount}개 정리하기`,action:()=>bridge.actions.cleanup()}:null
+  inboxCount?{name:`정리 전`,count:inboxCount,label:`정리 전 순간 ${inboxCount}개 정리하기`,action:()=>bridge.actions.cleanup()}:null
  ]);
  showCount('trees',[
   {name:`트리`,count:momentList?.trees?.length||0,label:`트리 ${momentList?.trees?.length||0}개 서재 열기`,action:openTrees},

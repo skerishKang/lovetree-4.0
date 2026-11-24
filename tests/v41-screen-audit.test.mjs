@@ -176,6 +176,17 @@ test('#942 첫 화면 추가 단추와 숫자 묶음', { skip: REQUIRE ? false :
         console.log('#942',key,JSON.stringify(values));
         if(dest){
           if(width===1440)await page.frameLocator('#view').locator('.card:not(.off):not(.clash)').first().waitFor({state:'visible',timeout:8000});
+          // Capture the fully revealed center, not a transient animation frame.
+          await page.waitForFunction(()=>{
+            const f=document.getElementById('view'),root=f?.contentDocument?.getElementById('orbit')?.shadowRoot;
+            const center=root?.querySelector('.center'),actions=center?.querySelector('.actions');
+            if(!actions)return false;
+            const win=f.contentWindow;
+            return [center,actions,...center.querySelectorAll('.lt-home-enter,.home-action-group,.home-count-item')].every(e=>{
+              const s=win.getComputedStyle(e);
+              return Number(s.opacity)>=.99&&s.visibility==='visible'&&e.getAnimations().every(a=>a.playState==='finished'||a.playState==='idle');
+            });
+          },null,{timeout:10000});
           await page.screenshot({path:join(dest,'home-'+key+'.png'),animations:'allow'});
         }
         const rose=theme==='night'?'rgb(180, 87, 107)':'rgb(152, 80, 94)';
@@ -199,7 +210,7 @@ test('#942 첫 화면 추가 단추와 숫자 묶음', { skip: REQUIRE ? false :
         await page.mouse.move(0,0);
         check((await hoverStyle()).bg===explore.bg,key+' 올림 해제 뒤 다시 투명');
         check(groups.length===3,key+' 묶음 3개');
-         check(JSON.stringify(groups.map(g=>g.count))===JSON.stringify(member?['순간 14|모아둔 3','공개 트리 17|공개 순간 1.2k','트리 3|공개 트리 1']:['',(signedIn?'':'예시 ')+'공개 트리 17|순간 1.2k','']),key+' 숫자 귀속');
+         check(JSON.stringify(groups.map(g=>g.count))===JSON.stringify(member?['순간 14|정리 전 3','공개 트리 17|공개 순간 1.2k','트리 3|공개 트리 1']:['',(signedIn?'':'예시 ')+'공개 트리 17|순간 1.2k','']),key+' 숫자 귀속');
         for(const g of groups.filter(g=>g.count)){
           check(g.inner>=4&&g.inner<=6&&g.font>=12&&g.widthDiff<=1,key+' 숫자 표 폭·간격 '+JSON.stringify(g));
           for(const row of g.rows){
