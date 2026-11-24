@@ -257,9 +257,9 @@ async function capture(argv) {
   const manifest = [];
   let count = 0;
   let unstable = 0;
-  // 2026-11-24: 캡처 전체 상한(기본 6분). 넘으면 남은 장은 찍지 않고 '시간 초과로 건너뜀'으로 남긴다.
+  // 2026-11-24: 캡처 전체 상한(기본 5분). 넘으면 남은 장은 찍지 않고 '시간 초과로 건너뜀'으로 남긴다.
   // 겉모습 비교는 알림용이라, 일부 장만 비교되더라도 잡 전체가 늘어지는 것보다 낫다.
-  const budgetMs = Number(options.budget || process.env.LT_VISUAL_BUDGET_MS || 360000);
+  const budgetMs = Number(options.budget || process.env.LT_VISUAL_BUDGET_MS || 300000);
   const stopAt = Date.now() + budgetMs;
   let skipped = 0;
   try {
