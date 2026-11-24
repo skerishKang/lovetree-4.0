@@ -1,8 +1,4 @@
 /* === V1.2 FOCUSED REVISION: ACTUAL YOUTUBE MEDIA + MOBILE HARDENING === */
-/* #619-6: 끼워 넣기 자리 표시 — 들어갈 카드의 앞(왼쪽) 또는 뒤(오른쪽)에 테두리를 두른다. */
-.card.insert-target{box-shadow:0 0 0 3px var(--lt-accent, #d9a05b);outline:none}
-.card.insert-target::after{content:"";position:absolute;top:-4px;bottom:-4px;left:-9px;width:4px;border-radius:2px;background:var(--lt-accent, #d9a05b)}
-.card.insert-after::after{left:auto;right:-9px}
 .ytThumbWrap{position:relative;width:100%;height:100%;overflow:hidden;background:#17111f;display:grid;place-items:center}
 .ytThumbWrap>img{width:100%;height:100%;object-fit:cover;display:block}
 .ytLoadState{position:absolute;left:8px;right:8px;bottom:8px;z-index:3;padding:6px 8px;border-radius:9px;background:rgba(20,13,29,.78);color:#f0e7f6;font-size:9px;letter-spacing:.02em;backdrop-filter:blur(8px);pointer-events:none}
@@ -230,6 +226,9 @@ html[data-lt-theme=garden] .boardThemeSwitch .themeSwitchBtn[aria-pressed="true"
 html[data-lt-theme=garden] .boardModeSwitch{border-color:var(--lt-line);background:var(--lt-paper)}
 html[data-lt-theme=garden] .boardModeSwitch .modeSwitchBtn{color:var(--lt-muted)}
 html[data-lt-theme=garden] .boardModeSwitch .modeSwitchBtn[aria-pressed="true"]{background:rgba(64,44,38,.1);color:var(--lt-ink)}
+.boardModeSwitch .boardResetOrderBtn{height:36px;min-height:0;padding:0 10px;border:0;border-left:1px solid var(--lt-line);border-radius:0;background:transparent;color:inherit;font-size:13px;white-space:nowrap;box-shadow:none}
+@media(max-width:760px){.boardModeSwitch .boardResetOrderBtn{height:44px;padding:0 8px}}
+html[data-lt-theme=garden] .boardModeSwitch .boardResetOrderBtn{color:var(--lt-muted);border-left-color:var(--lt-line)}
 @media(max-width:760px){.boardModeSwitch .modeSwitchBtn{padding:0 7px;font-size:13px;position:relative}.boardModeSwitch .modeSwitchBtn::after{content:"";position:absolute;inset:-3px -2px}}
 /* #601: 좁은 폭(≤700px)에서는 머리글 한 줄에 다 담기지 않아 겹친다 — 배치 전환을 둘째 줄로 내리고,
    판이 시작하는 위치를 그 만큼 내린다(#421과 같은 좁은 폭 규칙). */
@@ -333,9 +332,15 @@ html[data-lt-theme=garden] .ytLinkRow a{color:var(--lt-link,#3b5bdb)}
 /* 보드 무대에서는 글자 선택·기본 끌기를 하지 않는다 — 카드를 끌 때 그림·글자가 따라 나오지 않고,
    끌기가 셸로 새어 나가 '놓으면 담아요' 판이 뜨지 않는다. 입력칸은 무대 밖 판에 있어 그대로 선택된다. */
 #viewport{user-select:none;-webkit-user-select:none}
-/* '내 배치' 끌기 중 다른 카드 실시간 비켜주기(#894) — 180ms 전환, 움직임 끄기면 즉시. */
-.card.shiftPreview{transition:left .18s ease,top .18s ease}
+/* 끌기 중 자리 미리보기와 카드 이동 — 200ms 전환, 움직임 끄기면 즉시. */
+.boardDropPlaceholder{position:absolute;z-index:1;box-sizing:border-box;border:2px dashed var(--lt-gold-line);border-radius:19px;background:transparent;pointer-events:none;transform:rotate(var(--rot,0deg));transition:left .2s ease,top .2s ease,width .2s ease,height .2s ease,transform .2s ease}
+.card.shiftPreview{transition:left .2s ease,top .2s ease}
+.card.dropSettle{transition:left .2s ease,top .2s ease}
 #cardLayer.motion-off .card.shiftPreview{transition:none}
+#cardLayer.motion-off .boardDropPlaceholder{transition:none}
+#toast.boardOrderToast{display:flex;align-items:center;gap:10px;pointer-events:auto}
+#toast .boardOrderUndo{min-height:44px;padding:0 10px;border:1px solid currentColor;border-radius:10px;background:transparent;color:inherit;font:inherit;font-weight:700;cursor:pointer;white-space:nowrap}
+.saveFail:not(.show){pointer-events:none}
 
 /* #886 항목 3: track58-pinboard.html의 <style> 블록을 이 파일 끝으로 옮겼다.
    원래 이 파일 바로 뒤(모바일 배치 → 터치 타깃 순)에 있었으므로 끝에 붙여 캐스케이드 순서를 보존한다. */
