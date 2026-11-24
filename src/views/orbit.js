@@ -85,7 +85,7 @@ extraCSS+=`@keyframes lt-home-rise{from{opacity:0;transform:translateY(12px)}to{
 @media(prefers-reduced-motion:reduce){.center .lt-home-enter{animation:none;opacity:1;transform:none}}
 .card.lt-first-frame{visibility:hidden}
 .center[data-lt-home-wait] .lt-home-enter{animation-play-state:paused;opacity:0}
-.lt-card-tip{position:absolute;z-index:4;left:50%;bottom:8px;transform:translateX(-50%);padding:3px 7px;border:1px solid var(--lt-gold-line);border-radius:999px;background:var(--lt-stage);color:var(--lt-pearl);font-size:10px;line-height:14px;white-space:nowrap;pointer-events:none;opacity:0}
+.lt-card-tip{position:absolute;z-index:4;left:50%;bottom:8px;transform:translateX(-50%);padding:3px 7px;border:1px solid var(--lt-gold-line);border-radius:999px;background:var(--lt-stage);color:var(--lt-pearl);font-size:12px;line-height:16px;white-space:nowrap;pointer-events:none;opacity:0}
 .world.lt-hint-ready .lt-card-tip{opacity:1}
 .world.lt-hint-ready .card.lt-card-hint:after{animation:lt-card-pulse 1.2s ease-in-out 2}
 @keyframes lt-card-pulse{0%,100%{border-color:var(--lt-gold-line);box-shadow:none}50%{border-color:var(--lt-gold);box-shadow:0 0 0 2px var(--lt-gold-line),0 0 18px var(--lt-gold-glow)}}
