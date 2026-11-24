@@ -712,7 +712,7 @@ html[data-lt-theme=garden] .home-links .feedback-link:hover{color:var(--lt-ink)}
 @media(max-width:520px){
  body.home-screen .home-links{flex-wrap:nowrap;align-self:flex-start;width:min(296px,calc(100vw - 94px));max-width:none;height:44px;margin-left:12px;align-content:center;column-gap:0;row-gap:0}
  body.home-screen .home-links a.feedback-link{display:inline-flex}
- body.home-screen .home-links .feedback-link{flex:0 0 auto;min-width:0;height:44px;min-height:44px;padding:2px 4px;font-size:12px;letter-spacing:0;white-space:nowrap;overflow:visible}
+ body.home-screen .home-links .feedback-link{flex:0 0 auto;min-width:0;height:44px;min-height:44px;padding:2px 4px;font-size:13px;letter-spacing:0;white-space:nowrap;overflow:visible}
  /* 계정 글꼴 폭이 달라져도 오른쪽 단추가 수평으로 이동하지 않는다. */
  .app-header .account-slot{flex:0 0 66px;width:66px;justify-content:flex-end}
 }
