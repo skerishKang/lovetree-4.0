@@ -530,6 +530,7 @@ function publicProblem(answer){
  const [title,detail]=messages[answer.code]||['공유 기록을 불러오지 못했어요.',answer.code==='timeout'?'서버 응답 시간이 초과됐어요. 다시 시도해 주세요.':'잠시 뒤 다시 시도해 주세요.'];$('empty').querySelector('h1').textContent=title;$('empty').querySelector('p').textContent=detail;links();
 }
 async function showPublicRoute(route){
+ const requestedHash=location.hash;
  // 로그인한 방문자의 계정 연결은 보존하고, 이 트리의 데이터만 읽기 전용으로 싣는다.
  if(deps.member&&!(deps.member.snapshot().owned?pauseMember():leaveMember())){writeLocation('replace');return;}
  const generation=++deps.loadGeneration;
@@ -539,7 +540,7 @@ async function showPublicRoute(route){
  $('empty').querySelector('h1').textContent='공유된 순간을 펼치고 있어요.';
  $('empty').querySelector('p').textContent='소유자가 공개한 트리 한 개만 확인합니다.';
  $('empty-sample').hidden=true;$('empty-records').hidden=true;$('view').hidden=true;$('empty').hidden=false;
- const answer=await shareApi.read(route.shareId||'');if(generation!==deps.loadGeneration)return;if(!answer.ok){publicProblem(answer);return;}
+ const answer=await shareApi.read(route.shareId||'');if(generation!==deps.loadGeneration||location.hash!==requestedHash)return;if(!answer.ok){publicProblem(answer);return;}
  deps.activeShareId=answer.share.id;const view=['tree','book','board','network'].includes(route.view)?route.view:answer.share.view;deps.current=screenForView(view)[1];load({revision:0,state:{version:1,trees:[answer.tree]}},'share',{treeId:answer.tree.id,momentId:answer.share.entryMomentId});
  // #891: 공유 주소가 특정 순간을 가리키면(시작 순간) 보드만 그 순간의 상세 판을 열어 보여 준다.
  if(view==='board'&&answer.share.entryMomentId)requestBoardOpen(answer.share.entryMomentId);

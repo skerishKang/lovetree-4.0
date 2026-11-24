@@ -123,6 +123,10 @@ function renderAccount(){
  if(visitor?.email&&!accountEmail)accountEmail=visitor.email;
  // #368 2차: 동그라미 글자는 표시 이름 첫 글자 → 이메일 첫 글자 → 나, 색은 계정 설정 칸의 고른 색(없으면 기본색).
  const prefs=(()=>{try{return getMember()?.state?.()?.prefs||{}}catch{return {}}})();
+ // #1320: 로그인 확인 중에는 '로그인' 글자를 보여 주지 않는다. 자리는 그대로 두어 옆 단추가 밀리지 않는다.
+ const checking=getMember()?.snapshot()?.phase==='checking'&&getSource()!=='share'&&!visitor;
+ const rootDataset=globalThis.document?.documentElement?.dataset;
+ if(rootDataset){if(checking)rootDataset.ltAuthChecking='1';else delete rootDataset.ltAuthChecking;}
  const view=accountPresentation({owned,email:accountEmail,name:prefs.displayName||deps.getCachedName?.()||''});
  const accent=owned?normalizeAccentColor(prefs.accentColor):'';
  const login=$('account-entry'),avatar=$('account-avatar');

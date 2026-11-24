@@ -247,7 +247,25 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin,a
   if(!frame?.contentWindow)return false;
   try{frame.contentWindow.postMessage(JSON.stringify({event:'command',func,args}),YT_ORIGIN);return true;}catch{return false;}
  };
+ // 휴대폰에서는 iframe 문서가 뜬 뒤에도 플레이어 준비가 늦어, 한 번 보낸 재생 명령이 버려진다.
+ // 재생이 실제로 시작됐다는 신호(상태 1)가 올 때까지 짧은 간격으로 듣기·음소거·재생을 다시 보낸다(최대 8초).
+ function kickPlay(frame){
+  if(frame!==currentFrame)return; // 미리 띄운 다음 영상은 넘겨 왔을 때 시작한다.
+  clearInterval(frame._ltKick);
+  let tries=0;
+  const send=()=>{
+   if(!frame.isConnected||frame!==currentFrame||stage.dataset.ltPlaying==='1'||tries++>=32){clearInterval(frame._ltKick);return;}
+   try{frame.contentWindow?.postMessage('{"event":"listening"}',YT_ORIGIN);}catch{}
+   // 소리를 켠 채로는 휴대폰이 자동 재생을 막는다 — 2초 안에 시작하지 않으면 음소거로 시작한다.
+   if(!unmuted||tries>8)command(frame,'mute');
+   command(frame,'playVideo');
+   stage.dataset.ltAutoplay='1';
+  };
+  send();
+  frame._ltKick=setInterval(send,250);
+ }
  function clearFrames(){
+  for(const frame of frames)clearInterval(frame._ltKick);
   // 앞 영상을 먼저 멈추고 지운다 — DOM에서만 빼면 소리가 남는 경우가 있다.
   if(currentFrame)command(currentFrame,'pauseVideo');
   for(const frame of frames){frame.onload=null;frame.src='about:blank';frame.remove();}
@@ -266,8 +284,7 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin,a
   //에이피아이가 켜진 iframe은 주소의 autoplay=1만으로 시작하지 않으므로 준비 뒤 playVideo를 보낸다.
   frame.onload=()=>{
    frame.classList.add('is-ready');
-   try{frame.contentWindow?.postMessage('{"event":"listening"}',YT_ORIGIN);}catch{}
-   setTimeout(()=>{if(frame.isConnected&&frame===currentFrame){command(frame,'mute');command(frame,'playVideo');stage.dataset.ltAutoplay='1';}},120);
+   kickPlay(frame);
   };
   frames.push(frame);
   return frame;
@@ -359,6 +376,7 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin,a
   if(data?.event==='infoDelivery'&&data.info&&typeof data.info==='object'){
     const info=data.info;const duration=Number(info.duration),time=Number(info.currentTime);
     if(Number.isFinite(duration)&&duration>0&&Number.isFinite(time)){const value=Math.max(0,Math.min(100,time/duration*100));playerProgress.value=value;progress.dataset.ltProgress=String(Math.round(value));}
+    if(info.playerState===1){media.classList.add('is-playing');stage.dataset.ltPlaying='1';}
     if(typeof info.muted==='boolean'){unmuted=!info.muted;mute.textContent=unmuted?'소리 끄기':'소리 켜기';mute.setAttribute('aria-label',mute.textContent);stage.dataset.ltMomentsMuted=String(!unmuted);}
   }
   if(data?.event==='onStateChange'){
@@ -394,6 +412,7 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin,a
   media.addEventListener('click',event=>{
    if(event.target.closest('button'))return;
    if(!currentFrame)return;
+   clearInterval(currentFrame._ltKick); // 사람이 누른 뒤에는 자동 재생 재시도를 멈춘다.
    const playing=stage.dataset.ltPlaying==='1';
    command(currentFrame,playing?'pauseVideo':'playVideo');
    stage.dataset.ltPlaying=playing?'0':'1';

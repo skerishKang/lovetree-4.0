@@ -9,8 +9,11 @@ let ltPopstateTop = null;
 if (typeof globalThis.addEventListener === 'function') {
   globalThis.addEventListener('popstate', () => {
     const doc = globalThis.document;
-    const modals = doc ? [...doc.querySelectorAll('dialog[open]')].filter(d => d.matches(':modal')) : [];
-    ltPopstateTop = modals[modals.length - 1] || null;
+    const open = doc ? [...doc.querySelectorAll('dialog[open]')] : [];
+    const modals = open.filter(d => d.matches(':modal'));
+    // #1296: 새 소식 같은 비모달 창도 뒤로 가기로 닫는다 — 맨 위 창으로 함께 기억한다.
+    const nonModalPanel = open.find(d => d.id === 'updates-panel');
+    ltPopstateTop = modals[modals.length - 1] || nonModalPanel || null;
   }, true);
 }
 
@@ -300,7 +303,13 @@ export function createDialogs(deps) {
     view.HTMLDialogElement.prototype.show = function (...args) {
       const front = busyDialogs().filter(d => d !== this).pop() || null;
       if (front && !STACK_ALLOWED.has(this.id)) requestPanelClose(front.id);
-      return showOriginal.apply(this, args);
+      const result = showOriginal.apply(this, args);
+      // #1296: 비모달 창도 '창 열기'다 — 주소가 그대로인 기록 한 칸을 쌓아 뒤로 가기로 닫게 한다.
+      if (this.id === 'updates-panel' && this.open && !dialogGuard) {
+        view.history.pushState({ lt41Dialog: true }, '');
+        dialogGuard = true;
+      }
+      return result;
     };
     view.addEventListener('popstate', () => {
       const top = ltPopstateTop;

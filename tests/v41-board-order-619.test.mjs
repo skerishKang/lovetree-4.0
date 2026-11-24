@@ -126,12 +126,13 @@ const hostHTMLWithSaveReplies = (tree, { saveOk = true } = {}) =>
 
 const YT_THUMB_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1200"><rect width="1600" height="1200" fill="#8a7a92"/><path d="M700 350 L700 850 L1050 600 Z" fill="#fff"/></svg>';
 
-async function openHost(browser, url, { width, height, touch = false }) {
+async function openHost(browser, url, { width, height, touch = false, theme = '' }) {
   const context = await browser.newContext({
     viewport: { width, height },
     reducedMotion: 'reduce',
     ...(touch ? { hasTouch: true, isMobile: true } : {})
   });
+  if (theme) await context.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); } catch {} }, theme);
   await context.route('**/i.ytimg.com/**', (route) => route.fulfill({ contentType: 'image/svg+xml', body: YT_THUMB_SVG }));
   const problems = [];
   const page = await context.newPage();
@@ -586,4 +587,105 @@ test('#1273 공통 확인 창 연결과 기본 창 미사용(코드 검사)', ()
   assert.match(board, /LT41Confirm/);
   assert.ok(html.indexOf('/v41/confirm-dialog.js') > 0, '보드가 공통 확인 창을 읽는다');
   assert.ok(html.indexOf('/v41/confirm-dialog.js') < html.indexOf('/v41/views/board/board.js'), '확인 창이 보드보다 먼저 온다');
+});
+
+
+test('#1321 화면: 넓은 화면의 빈 판 안내는 자리가 넉넉할 때만 보인다', { skip: REQUIRE ? false : skip, timeout: 300000 }, async () => {
+  if (skip) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip}`);
+  const server = await serve({
+    '/__host-board-hint-3.html': hostHTMLWithSaveReplies(starTree(3)),
+    '/__host-board-hint-30.html': hostHTMLWithSaveReplies(starTree(30))
+  });
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch({ headless: true });
+  try {
+    for (const theme of ['night', 'garden']) {
+      for (const count of [3, 30]) {
+        const { context, frame, problems } = await openHost(browser, `${base}/__host-board-hint-${count}.html`, { width: 1440, height: 900, theme });
+        const hint = await frame.evaluate(() => {
+          const el = document.getElementById('boardEmptyHint');
+          if (!el) return null;
+          const s = getComputedStyle(el);
+          return {
+            hidden: el.hidden,
+            text: el.textContent.trim(),
+            pointerEvents: s.pointerEvents,
+            borderStyle: s.borderTopStyle,
+            borderColor: s.borderTopColor,
+            count: document.querySelectorAll('#boardEmptyHint').length
+          };
+        });
+        assert.deepEqual(problems, [], `${theme}/${count}: 화면 오류 없음`);
+        assert.ok(hint, `${theme}/${count}: 안내 요소가 있다`);
+        assert.equal(hint.count, 1, `${theme}/${count}: 안내는 하나다`);
+        assert.equal(hint.hidden, count === 30, `${theme}/${count}: 3장은 보이고 30장은 숨는다`);
+        if (count === 3) {
+          assert.equal(hint.text, '순간을 끌어 여기에 놓아 보세요', `${theme}: 안내 문구`);
+          assert.equal(hint.pointerEvents, 'none', `${theme}: 누르기에 영향을 주지 않는다`);
+          assert.equal(hint.borderStyle, 'dashed', `${theme}: 점선 테두리`);
+        }
+        await context.close();
+      }
+    }
+  } finally { await browser.close(); server.close(); }
+});
+
+test('#1321 화면: 끄는 동안 점선이 진해지고 놓으면 돌아온다', { skip: REQUIRE ? false : skip, timeout: 300000 }, async () => {
+  if (skip) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip}`);
+  const server = await serve({ '/__host-board-hint-drag.html': hostHTMLWithSaveReplies(starTree(3)) });
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const { context, page, frame } = await openHost(browser, `${base}/__host-board-hint-drag.html`, { width: 1440, height: 900, theme: 'night' });
+    const before = await frame.evaluate(() => getComputedStyle(document.getElementById('boardEmptyHint')).borderTopColor);
+    const box = await frame.locator('#cardLayer .card').first().boundingBox();
+    assert.ok(box, '끌 카드가 있다');
+    await page.mouse.move(box.x + 48, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + 108, box.y + box.height / 2 + 40, { steps: 8 });
+    await page.waitForTimeout(200);
+    const during = await frame.evaluate(() => ({
+      dragging: document.body.classList.contains('board-hint-drag'),
+      color: getComputedStyle(document.getElementById('boardEmptyHint')).borderTopColor
+    }));
+    assert.equal(during.dragging, true, '끄는 동안 표시한다');
+    assert.notEqual(during.color, before, '점선 색이 진해진다');
+    await page.mouse.up();
+    await page.waitForTimeout(200);
+    const after = await frame.evaluate(() => ({
+      dragging: document.body.classList.contains('board-hint-drag'),
+      color: getComputedStyle(document.getElementById('boardEmptyHint')).borderTopColor
+    }));
+    assert.equal(after.dragging, false, '놓으면 표시가 사라진다');
+    assert.notEqual(after.color, during.color, '놓으면 강조 색이 풀린다');
+    await context.close();
+  } finally { await browser.close(); server.close(); }
+});
+
+test('#1321 화면: 390와 공유 보기에는 안내가 없다', { skip: REQUIRE ? false : skip, timeout: 300000 }, async () => {
+  if (skip) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip}`);
+  const shareTree = starTree(3);
+  const shareHost = hostHTML(shareTree)
+    .replace('data-member="in"', 'data-member="out"')
+    .replace('source:\'server\',writable:true,owned:true', 'source:\'share\',writable:false,owned:false');
+  const server = await serve({
+    '/__host-board-hint-390.html': hostHTMLWithSaveReplies(starTree(3)),
+    '/__host-board-hint-share.html': shareHost
+  });
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch({ headless: true });
+  try {
+    for (const [label, url, vp] of [
+      ['390', `${base}/__host-board-hint-390.html`, { width: 390, height: 844, touch: true }],
+      ['공유 보기', `${base}/__host-board-hint-share.html`, { width: 1440, height: 900 }]
+    ]) {
+      const { context, frame } = await openHost(browser, url, vp);
+      const hidden = await frame.evaluate(() => {
+        const el = document.getElementById('boardEmptyHint');
+        return !el || el.hidden;
+      });
+      assert.equal(hidden, true, `${label}: 안내가 보이지 않는다`);
+      await context.close();
+    }
+  } finally { await browser.close(); server.close(); }
 });

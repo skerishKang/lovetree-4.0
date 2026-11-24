@@ -347,6 +347,7 @@ function placeStacked() {
 // 날짜순·내 배치 모두 쌓기 배치다(순서만 다르다). 전환·처음 열기·창 크기 변경이 함께 쓴다.
 function placeAll() {
   placeStacked();
+  updateEmptyHint();
 }
 // #619-6: 끼워 넣기 — 끄는 동안 자리를 보이기 위해 끌고 있는 카드를 뺀 나머지 카드를 현재 순서로 다시 쌓은 자리다.
 function insertCells(excludeId) {
@@ -751,6 +752,7 @@ function renderCards() {
   cardLayer.innerHTML = moments.map(cardHTML).join('');
   cardLayer.querySelectorAll('.card').forEach(el => bindCard(el));
   settlePlacedCards();
+  if (typeof updateEmptyHint === 'function') updateEmptyHint();
   if (selected) selectMoment(selected, false);
 }
 
@@ -800,6 +802,7 @@ viewport.addEventListener('scroll', () => {
 }, { passive: true });
 function applyView(animated = false) {
   growBoard();
+  updateEmptyHint();
   const scroll = mobileBoardScroll();
   const space = $('#boardScrollSpace');
   viewport.classList.toggle('board-scroll', scroll);
@@ -850,6 +853,38 @@ function boardCards() {
     let el = cardLayer.querySelector(`[data-id="${m.id}"]`);
     return { id: m.id, x: m.x, y: m.y, w: el?.offsetWidth || 242, h: el?.offsetHeight || 260 };
   });
+}
+// #1321: 카드 묶음 아래 빈 판이 240px 이상일 때만 점선 자리를 보여 준다.
+// 판 높이는 그대로 두고, 자리 표시는 얹기만 한다. 쓰기 가능·넓은 화면·시네마 밖에서만 쓴다.
+function updateEmptyHint() {
+  // 카드를 다시 그리면 안내도 함께 지워진다 — 그릴 때마다 다시 붙인다.
+  let emptyHint = document.getElementById('boardEmptyHint');
+  if (!emptyHint) {
+    emptyHint = document.createElement('div');
+    emptyHint.id = 'boardEmptyHint';
+    emptyHint.className = 'board-empty-hint';
+    emptyHint.setAttribute('aria-hidden', 'true');
+    emptyHint.innerHTML = '<span>순간을 끌어 여기에 놓아 보세요</span>';
+    emptyHint.hidden = true;
+    cardLayer.appendChild(emptyHint);
+  }
+  if (!boardSaveEnabled() || mobileBoardScroll() || cinema || !moments.length) {
+    emptyHint.hidden = true;
+    return;
+  }
+  const cards = boardCards();
+  if (!cards.length) { emptyHint.hidden = true; return; }
+  const left = Math.min(...cards.map((c) => c.x));
+  const right = Math.max(...cards.map((c) => c.x + c.w));
+  const bottom = Math.max(...cards.map((c) => c.y + c.h));
+  // 무대 안쪽 여백 48px는 CSS의 .surface inset과 같은 값이다(새 상수를 만들지 않는다).
+  const free = worldSize.h - 48 - bottom - 24;
+  if (free < 240) { emptyHint.hidden = true; return; }
+  emptyHint.hidden = false;
+  emptyHint.style.left = left + 'px';
+  emptyHint.style.top = bottom + 24 + 'px';
+  emptyHint.style.width = Math.max(520, right - left) + 'px';
+  emptyHint.style.height = Math.min(free, 320) + 'px';
 }
 // 보이는 칸: 왼쪽 도구 창·오른쪽 상세 창(열려 있거나 곧 열릴 때)을 뺀 자리. 좁은 화면(760 미만)은 두 창이 아래에서 올라오므로 빼지 않는다.
 function boardSafeArea(expectDetail = false) {
