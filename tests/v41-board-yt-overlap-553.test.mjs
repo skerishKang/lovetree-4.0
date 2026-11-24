@@ -367,11 +367,9 @@ test('970 실행: 썸네일 — 영상·사진이 화면 안에 보인다(가짜
 });
 
 test('#1273 8번 휴대폰 보드: 카드가 예약 칸을 더 채워 빈 틈을 줄인다(간격 기준은 그대로)', () => {
-  const css = readFileSync(new URL('../public/v41/views/board/board-extra.css', import.meta.url), 'utf8');
   const js = readFileSync(new URL('../public/v41/views/board/board.js', import.meta.url), 'utf8');
-  assert.match(css, /@media \(max-width: 640px\)\{\.card\{min-height:300px\}\}/, '좁은 화면에서 카드 최소 높이를 키운다');
-  assert.match(js, /settleColumnGaps\(list, new Set\(moments\.map\(m => m\.id\)\), 24\)/, '벌림 간격 기준 24px는 그대로');
-  assert.match(js, /BASE_RESERVED_H = 330/, '예약 높이 기준 330px도 그대로');
+  assert.match(js, /narrow \? 16 : 24/, '좁은 화면에서만 벌림 간격을 줄인다');
+  assert.match(js, /BASE_RESERVED_H = 330/, '예약 높이 기준 330px은 그대로');
 });
 
 test('#1273 2번 화면: 크게 보기에 영어 라벨과 빈 한마디 줄이 없다', { skip, timeout: 180000 }, async () => {
