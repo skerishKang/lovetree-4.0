@@ -735,7 +735,7 @@ function dateText(v) {
 function cardHTML(m) {
   let media = '';
   if (m.url)
-    media = LTMedia.markup(m.url, m.title, m.mediaMetadata, m.id, null, null, { compact: true });
+    media = LTMedia.markup(m.url, m.title, m.mediaMetadata, m.id, null, null, { compact: true, visitorYoutubeCover: true });
   else if (m.type === 'note') media = `<div class="noteText">“${esc(m.cardMemo || m.memo)}”</div>`;
   else if (m.type === 'video')
     media = `<div class="media"><video muted playsinline loop poster="${m.asset}" src="${m.video}"></video><span class="playBadge">▶</span><span class="duration">${m.duration || '00:03'}</span></div>`;

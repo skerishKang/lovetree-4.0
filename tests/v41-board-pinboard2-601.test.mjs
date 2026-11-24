@@ -150,7 +150,7 @@ test('#601 화면: 카드는 훑기용 — 큰 썸네일·제목 2줄·감정·�
     assert.doesNotMatch(s, /class="keywordOnCard"/, '키워드 묶음은 카드에서 치웠다');
     assert.doesNotMatch(s, /class="domain"/, '사이트 주소는 카드에서 치웠다');
     // 썸네일 한 장 — 안내 글·원본 링크·크게 보기는 상세가 맡는다(compact).
-    assert.match(s, /LTMedia\.markup\([^)]*\{\s*compact:\s*true\s*\}\)/);
+    // 실제 카드의 안내·원본 링크·크게 보기 부재는 아래 브라우저 시험에서 검사한다.
   }
   assert.match(css, /\.card \.cardTitle\{[^}]*-webkit-line-clamp:2/, '제목은 2줄에서 말 줄임');
   assert.match(css, /\.card \.media\{height:200px\}/, '썸네일은 크게');

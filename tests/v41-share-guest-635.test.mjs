@@ -1027,3 +1027,113 @@ test('#1259 방문자 책 첫 안내가 제목과 크게 보기 영상 조작부
   }
  }finally{await browser?.close();server.close()}
 });
+
+
+test('#1259 방문자 보드 유튜브 표지는 자동 표시하고 외부 사진은 동의를 기다린다', {skip:REQUIRE?false:skip,timeout:90000}, async()=>{
+ if(skip)assert.fail(skip);
+ const server=await serve(),base='http://127.0.0.1:'+server.address().port;
+ const shareId='visitor-board-1259-fixture',time='2026-11-24T00:00:00.000Z';
+ const fixture={...tree,subject:'시험 트리',createdAt:time,updatedAt:time,moments:tree.moments.map((m,i)=>({...m,createdAt:time,links:[],...(i===1?{url:'https://www.youtube.com/shorts/abc123DEF45',mediaMetadata:{title:'세로 영상',vertical:true}}:i===2?{url:'https://external.test/photo.png'}:{})}))};
+ let browser;
+ try{
+  browser=await chromium.launch({headless:true});
+  for(const [width,height] of [[1440,900],[390,844]])for(const theme of ['garden','night']){
+   const context=await browser.newContext({viewport:{width,height},reducedMotion:'reduce'});
+   const external=[],yt=[],writes=[],key=width+'-'+theme;
+   try{
+    await context.addInitScript(t=>localStorage.setItem('lt41.theme',t),theme);
+    await context.route('**/*',r=>{
+     const u=new URL(r.request().url());
+     if(u.origin!==base){
+      if(u.hostname==='i.ytimg.com'){
+       yt.push(u.href);
+       const vertical=u.pathname.includes('oardefault'),w=vertical?180:480,h=vertical?320:360;
+       return r.fulfill({contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="'+w+'" height="'+h+'"><rect width="100%" height="100%" fill="#51404e"/><circle cx="'+w/2+'" cy="'+h/2+'" r="45" fill="#e9d3bd"/></svg>'});
+      }
+      if(u.hostname==='external.test')external.push(u.href);
+      return r.abort();
+     }
+     if(u.pathname.startsWith('/api/')&&!['GET','HEAD','OPTIONS'].includes(r.request().method()))writes.push(u.pathname);
+     if(u.pathname==='/api/public/shares/'+shareId)return r.fulfill({json:{ok:true,share:{id:shareId,view:'board',entryMomentId:'m1'},tree:fixture}});
+     if(u.pathname==='/api/account')return r.fulfill({status:401,json:{ok:false,error:{code:'not_logged_in'}}});
+     if(u.pathname.startsWith('/api/'))return r.fulfill({json:{ok:true,items:[],shares:[]}});
+     return r.continue();
+    });
+    const p=await context.newPage();await p.goto(base+'/v41/#share/'+shareId+'/board',{waitUntil:'domcontentloaded'});
+    await p.waitForFunction(()=>window.LT41?.source==='share'&&!document.querySelector('#view').hidden&&document.querySelector('#view').contentDocument?.querySelectorAll('#cardLayer .card').length===3,null,{timeout:15000});
+    const f=p.frameLocator('#view');
+    for(const id of ['m1','m2']){
+     const card=f.locator('.card[data-id="'+id+'"]');
+     const img=card.locator('.lt-yt-preview > img');
+     assert.equal(await img.count(),1,key+' '+id+' 카드 내용: '+await card.innerHTML());
+     await img.scrollIntoViewIfNeeded();
+     await img.evaluate(e=>e.decode());
+     assert.ok(await img.evaluate(e=>e.complete&&e.naturalWidth>120&&e.naturalHeight>90),key+' '+id+' 썸네일 표시');
+     assert.equal(await card.locator('[data-lt-load]').count(),0,key+' 빈 표지 0');
+     assert.equal(await card.locator('[data-lt-auto]').count(),0,key+' 소유자 전용 확인 제외');
+    }
+    assert.equal(await f.locator('.card[data-id="m3"] [data-lt-load]').count(),1,key+' 외부 사진 동의 유지');
+    assert.equal(await f.locator('.card[data-id="m3"] img').count(),0,key+' 외부 사진 자동 표시 없음');
+    assert.equal(external.length,0,key+' 외부 사진 요청 0');
+    assert.ok(yt.some(u=>u.includes('dQw4w9WgXcQ'))&&yt.some(u=>u.includes('abc123DEF45')),key+' 두 영상 표지 요청');
+    assert.deepEqual(writes,[],key+' 공유 보기 쓰기 0');
+    await f.locator('.card[data-id="m1"]').scrollIntoViewIfNeeded();
+    await p.evaluate(()=>{const toast=document.querySelector('#toast');if(toast)toast.hidden=true;});
+    await shot(p,'1259-'+key+'-board');
+    console.log('#1259',key,'유튜브 표지 2, 빈 표지 0, 외부 사진 요청 0');
+   }finally{await context.close()}
+  }
+ }finally{await browser?.close();server.close()}
+});
+
+
+test('#1259 방문자 지도 시작 제목과 실제 연결선 교차 0', {skip:REQUIRE?false:skip,timeout:90000}, async()=>{
+ if(skip)assert.fail(skip);
+ const server=await serve(),base='http://127.0.0.1:'+server.address().port;
+ const shareId='visitor-map-1259-fixture',time='2026-11-24T00:00:00.000Z';
+ const fixture={...tree,subject:'시험 트리',createdAt:time,updatedAt:time,moments:tree.moments.map((m,i)=>({...m,createdAt:time,links:[],...(i===0?{title:'처음 함께 듣고 오래 기억하고 싶었던 특별한 순간의 이야기',mediaMetadata:null}:i===1?{url:'https://www.youtube.com/shorts/abc123DEF45',mediaMetadata:{title:'세로 영상',vertical:true}}:{})}))};
+ let browser;
+ try{
+  browser=await chromium.launch({headless:true});
+  for(const [width,height] of [[1440,900],[390,844]])for(const theme of ['garden','night']){
+   const context=await browser.newContext({viewport:{width,height},reducedMotion:'reduce'});
+   const key=width+'-'+theme;
+   try{
+    await context.addInitScript(t=>{localStorage.setItem('lt41.theme',t);localStorage.setItem('lt41.boardTheme',t==='garden'?'paper':'night')},theme);
+    await context.route('**/*',r=>{
+     const u=new URL(r.request().url());
+     if(u.origin!==base){
+      if(u.hostname==='i.ytimg.com')return r.fulfill({headers:{'access-control-allow-origin':'*'},contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="480" height="360"><rect width="100%" height="100%" fill="#51404e"/><circle cx="240" cy="180" r="45" fill="#e9d3bd"/></svg>'});
+      return r.abort();
+     }
+     if(u.pathname==='/api/public/shares/'+shareId)return r.fulfill({json:{ok:true,share:{id:shareId,view:'network',entryMomentId:'m1'},tree:fixture}});
+     if(u.pathname==='/api/account')return r.fulfill({status:401,json:{ok:false,error:{code:'not_logged_in'}}});
+     if(u.pathname.startsWith('/api/'))return r.fulfill({json:{ok:true,items:[],shares:[]}});
+     return r.continue();
+    });
+    const p=await context.newPage();await p.goto(base+'/v41/#share/'+shareId+'/network',{waitUntil:'domcontentloaded'});
+    await p.waitForFunction(()=>window.LT41?.source==='share'&&!document.querySelector('#view').hidden&&document.querySelector('#view').contentWindow?.__lt?.labels().length>0,null,{timeout:15000});
+    await p.evaluate(()=>{const toast=document.querySelector('#toast');if(toast)toast.hidden=true;});
+    await p.waitForTimeout(400);
+    const result=await p.evaluate(()=>{
+     const w=document.querySelector('#view').contentWindow,lt=w.__lt;
+     const label=lt.labels().find(l=>l.id===lt.FIRST?.id||l.text.startsWith('여기서 시작'));
+     if(!label)return {label:null,labels:lt.labels(),first:lt.FIRST?.id,segments:lt.edgeSegments().length};
+     const r=label.rect;
+     // 실제 렌더링 선분을 촘촘하게 샘플링하여 상자 내부에 진입하는지 독립 검증.
+     const hits=lt.edgeSegments().filter(e=>{
+      for(let i=0;i<=100;i++){const t=i/100,x=e.a.x+(e.b.x-e.a.x)*t,y=e.a.y+(e.b.y-e.a.y)*t;
+       if(x>=r.l-e.pad&&x<=r.r+e.pad&&y>=r.t-e.pad&&y<=r.b+e.pad)return true;
+      }return false;
+     });
+     return {label,segments:lt.edgeSegments().length,hits:hits.length};
+    });
+    assert.ok(result.label,key+' 시작 제목 표시: '+JSON.stringify(result));
+    assert.ok(result.segments>0,key+' 실제 연결선 표시');
+    assert.equal(result.hits,0,key+' 교차 0: '+JSON.stringify(result));
+    await shot(p,'1259-'+key+'-network');
+    console.log('#1259',key,'시작 제목 표시, 연결선 교차 0');
+   }finally{await context.close()}
+  }
+ }finally{await browser?.close();server.close()}
+});
