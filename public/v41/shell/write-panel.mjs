@@ -55,6 +55,58 @@ export function mountBookmarkEntry({ $, document: doc = globalThis.document, onO
   return button;
 }
 
+// #822 6단계: 처음 온 팬 안내 — 트리가 아직 없는 내 계정의 빈 화면(빈 서재, 첫 순간 안내)에 같은 한 줄을 둔다.
+// 빈 화면 마크업(index.html #empty)은 건드리지 않고 여기서 한 줄을 붙인다. 모양은 가져오기 창과 같은 스타일 한 장을
+// 쓰므로, 줄을 처음 보일 때 그 한 장을 싣고 다 실린 뒤에 보인다(셸 첫 화면이 받는 파일은 늘지 않는다).
+// 돌려주는 show(on)을 빈 화면을 그리는 곳(workspace-runtime paintEmptyForScreen)이 부른다.
+export const BOOKMARK_STYLE_HREF = '/v41/bookmark-import.css';
+const bookmarkStyles = new WeakMap();
+export function ensureBookmarkStyle(doc = globalThis.document) {
+  if (!doc?.createElement) return Promise.resolve();
+  if (bookmarkStyles.has(doc)) return bookmarkStyles.get(doc);
+  const ready = new Promise((resolve) => {
+    let done = false;
+    const finish = () => { if (!done) { done = true; resolve(); } };
+    const link = doc.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = BOOKMARK_STYLE_HREF;
+    link.addEventListener('load', finish);
+    link.addEventListener('error', finish);
+    setTimeout(finish, 1500);
+    (doc.head || doc.body).append(link);
+  });
+  bookmarkStyles.set(doc, ready);
+  return ready;
+}
+export const BOOKMARK_EMPTY_ID = 'empty-bookmark-open';
+export function mountEmptyBookmarkEntry({ $, document: doc = globalThis.document, onOpen, ensureStyle = () => ensureBookmarkStyle(doc) } = {}) {
+  const host = $?.('empty');
+  if (!host?.append || !doc?.createElement) return { show() {} };
+  const line = doc.createElement('p');
+  line.className = 'empty-bookmark';
+  line.hidden = true;
+  const lead = doc.createElement('span');
+  lead.textContent = `${BOOKMARK_ENTRY_LEAD} `;
+  const button = doc.createElement('button');
+  button.type = 'button';
+  button.id = BOOKMARK_EMPTY_ID;
+  button.textContent = BOOKMARK_ENTRY_LABEL;
+  button.addEventListener('click', () => { onOpen?.(); });
+  line.append(lead, button);
+  host.append(line);
+  let wanted = false;
+  return {
+    line,
+    button,
+    // 보이라는 말이 오면 스타일을 싣고 나서 보인다. 그 사이에 숨기라는 말이 오면 보이지 않는다.
+    show(on) {
+      wanted = !!on;
+      if (!wanted) { line.hidden = true; return Promise.resolve(); }
+      return Promise.resolve(ensureStyle()).then(() => { line.hidden = !wanted; });
+    }
+  };
+}
+
 export function createWritePanel(deps) {
   const $ = deps.$;
   const storage = deps.storage || globalThis.localStorage;

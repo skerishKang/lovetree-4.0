@@ -10,7 +10,7 @@ import {
   collectBookmarkVideos, readBookmarkVideos, folderGroups, foundSummaryText,
   existingVideoTrees, defaultPicked, scopeState, pickScope, pickOne, createTitleQueue, pickedCountText,
   NEW_TREE_VALUE, importOrder, saveBlockText, momentInputFor, saveBookmarkVideos, waitForSync, progressText, savedSummaryText,
-  SYNC_DONE, SYNC_PENDING, SYNC_FAILED, SAVE_FAILED_TEXT,
+  SYNC_DONE, SYNC_PENDING, SYNC_FAILED, SAVE_FAILED_TEXT, BOOKMARK_IMPORT_MAX, limitNoteText, limitRefusedText,
 } from '../public/v41/bookmark-import.mjs';
 import { createMemberSession } from '../public/v41/member-session.mjs';
 import { createTree, addMoment, latestMomentId, validateState, MAX_MOMENTS, MAX_TREES } from '../public/v41/domain.mjs';
@@ -520,4 +520,31 @@ test('진행 표시와 마친 뒤 한 줄 문구', () => {
   assert.equal(savedSummaryText({ saved: 34, treeName: '가짜 직캠 모음' }), '✓ 34개를 ‘가짜 직캠 모음’에 담았어요');
   assert.equal(savedSummaryText({ saved: 2 }), '✓ 2개를 담았어요');
   assert.equal(savedSummaryText({ saved: 0, treeName: '트리' }), '담지 못했어요.');
+});
+
+// ---- 5단계: 한 번에 200개 상한 ----
+
+test('한 번에 담는 상한은 200개다: 넘으면 앞에서부터 200개만 골라 두고, 나눠 담으라고 알린다', () => {
+  assert.equal(BOOKMARK_IMPORT_MAX, 200);
+  const many = Array.from({ length: 230 }, (_, i) => video(i + 1));
+  const existing = new Map([['b3', '트리'], ['b150', '트리']]);
+  const first = defaultPicked(many, existing, BOOKMARK_IMPORT_MAX);
+  assert.equal(first.length, 200);
+  assert.deepEqual([first[0], first[2], first.at(-1)], ['b1', 'b4', 'b202'], '이미 있음(b3·b150)을 건너뛰고 파일 순서대로 200개');
+  // 전체 고르기를 눌러도 200개에서 멈추고, 못 고른 수를 알려 준다.
+  const all = pickScope(many, existing, new Set(), true, BOOKMARK_IMPORT_MAX);
+  assert.deepEqual([all.picked.size, all.clipped], [200, 28]);
+  assert.deepEqual(pickOne(all.picked, 'b230', true, BOOKMARK_IMPORT_MAX).refused, true);
+  // 안내 문구.
+  assert.equal(limitNoteText(200), '');
+  assert.equal(limitNoteText(37), '');
+  assert.equal(limitNoteText(228), '새 영상이 228개예요. 한 번에 200개까지 담을 수 있어서 먼저 200개를 골라 두었어요. 담고 나면 남은 영상을 이어서 고를 수 있어요.');
+  assert.equal(limitRefusedText(), '한 번에 200개까지 담을 수 있어요. 지금 고른 것을 먼저 담고, 남은 영상은 이어서 담아 주세요.');
+  assert.equal(pickedCountText(200, BOOKMARK_IMPORT_MAX), '200개 고름 · 한 번에 200개까지');
+  assert.equal(pickedCountText(199, BOOKMARK_IMPORT_MAX), '199개 고름');
+  assert.equal(pickedCountText(0, BOOKMARK_IMPORT_MAX), '고른 영상이 없어요');
+  // 상한을 넘는 수는 담기 전 판정에서도 막는다.
+  assert.equal(saveBlockText({ count: 201, target: NEW_TREE_VALUE, trees: [], newName: '새 트리' }), limitRefusedText());
+  assert.equal(saveBlockText({ count: 200, target: NEW_TREE_VALUE, trees: [], newName: '새 트리' }), '');
+  assert.equal(saveBlockText({ count: 4, target: NEW_TREE_VALUE, trees: [], newName: '새 트리', max: 3 }), limitRefusedText(3));
 });

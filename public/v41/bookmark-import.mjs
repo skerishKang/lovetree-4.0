@@ -8,6 +8,8 @@ import { isSameVideoMoment } from './quick-intake.mjs';
 import { localDateOnly } from './local-date.mjs';
 import { MAX_MOMENTS, MAX_TREES, suggestMomentTitle } from './domain.mjs';
 
+// 한 번에 담는 수의 상한. 넘는 만큼은 나눠서 담는다(담은 것은 '이미 있음'이 되어 다음 차례에 자동으로 빠진다).
+export const BOOKMARK_IMPORT_MAX = 200;
 // 파일 크기 상한: 크롬·엣지는 북마크마다 아이콘 그림을 글자로 함께 적어 파일이 몇 MB까지 커진다.
 export const BOOKMARK_FILE_MAX_BYTES = 20 * 1024 * 1024;
 // 읽는 북마크 수 상한(안전판) — 넘으면 앞에서부터 이만큼만 읽고 알린다.
@@ -360,9 +362,23 @@ export function createTitleQueue({ fetchTitle, limit = 200, gapMs = 0, onTitle =
   };
 }
 
-/** 고른 수 안내. */
-export function pickedCountText(count) {
-  return count > 0 ? `${count}개 고름` : '고른 영상이 없어요';
+/** 고른 수 안내. 상한이 찼으면 그 사실을 함께 말한다. */
+export function pickedCountText(count, max = Infinity) {
+  if (count <= 0) return '고른 영상이 없어요';
+  return count >= max ? `${count}개 고름 · 한 번에 ${max}개까지` : `${count}개 고름`;
+}
+
+// ---- 5단계: 한 번에 담는 수의 상한 ----
+
+/** 새 영상이 상한보다 많을 때 미리보기에 늘 보이는 안내(상한 이하면 ''). */
+export function limitNoteText(freshCount, max = BOOKMARK_IMPORT_MAX) {
+  if (freshCount <= max) return '';
+  return `새 영상이 ${freshCount}개예요. 한 번에 ${max}개까지 담을 수 있어서 먼저 ${max}개를 골라 두었어요. 담고 나면 남은 영상을 이어서 고를 수 있어요.`;
+}
+
+/** 상한이 차서 더 고르지 못했을 때의 안내. */
+export function limitRefusedText(max = BOOKMARK_IMPORT_MAX) {
+  return `한 번에 ${max}개까지 담을 수 있어요. 지금 고른 것을 먼저 담고, 남은 영상은 이어서 담아 주세요.`;
 }
 
 // ---- 4단계: 담을 트리 고르기와 한 번에 저장 ----
@@ -387,8 +403,9 @@ export function importOrder(videos) {
  * 담기 전에 막아야 할 까닭(없으면 ''). 한도 문구는 기존 도메인 한도(MAX_MOMENTS·MAX_TREES)를 그대로 쓴다.
  * target: 트리 id 또는 NEW_TREE_VALUE, newName: 새 트리 이름.
  */
-export function saveBlockText({ count = 0, target = '', trees = [], newName = '' } = {}) {
+export function saveBlockText({ count = 0, target = '', trees = [], newName = '', max = BOOKMARK_IMPORT_MAX } = {}) {
   if (count <= 0) return '담을 영상을 골라 주세요.';
+  if (count > max) return limitRefusedText(max);
   if (target === NEW_TREE_VALUE) {
     const name = String(newName ?? '').trim();
     if (!name) return '새 트리 이름을 적어 주세요.';

@@ -716,6 +716,19 @@ jobs:
           node --test --test-concurrency=1 tests/v41-logo-home.test.mjs tests/v41-frame-blank-996.test.mjs
           echo "로고 복귀·빠른 재전환 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
 
+      # #822 1단계: 북마크에서 가져오기 — 입구·미리보기 목록·진행·완료·빈 서재 한 줄을 1440·390 × 밤/정원에서
+      # 넘침·글자 크기·누름 크기·겹침·대비로 재고, 북마크 파일이 서버로 가지 않는지와 저장 뒤 순간 수를 본다.
+      # 건너뜀=실패(크롬이 준비된 이 잡에서 돈다).
+      - name: 북마크에서 가져오기 화면 시험(건너뜀=실패 — #822)
+        env:
+          LT_BOOKMARK_IMPORT_REQUIRE: '1'
+        if: needs.screen-changes.outputs.changed == 'true'
+        run: |
+          start=$(date +%s)
+          npx vite build > /dev/null
+          node --test --test-concurrency=1 tests/v41-bookmark-import-screen.test.mjs
+          echo "북마크에서 가져오기 화면 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+
       # B-04: 쓰기 창·쉬운 추가·새 트리 시험 연결(건너뜀=실패).
       - name: 쓰기 창·간격·새 트리 시험(건너뜀=실패 — #868·#850·#1018)
         env:

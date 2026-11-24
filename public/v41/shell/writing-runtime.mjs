@@ -4,7 +4,7 @@ import {titleView, withoutAutoTitle} from "../book-usability.mjs";
 import {screens,screenForView,viewForFile,themedViewFor} from "./navigation.mjs";
 import {createPanels} from "./panels.mjs";
 import {createQuickAdd} from "./quick-add.mjs";
-import {createWritePanel, readWriteTab, writeWriteTab, mountBookmarkEntry} from "./write-panel.mjs";
+import {createWritePanel, readWriteTab, writeWriteTab, mountBookmarkEntry, mountEmptyBookmarkEntry} from "./write-panel.mjs";
 import {createQuickIntake} from "./quick-intake.mjs";
 import {createMessages, lastShelfTreeId} from "./messages.mjs";
 import {createTagSave} from "./tag-save.mjs";
@@ -12,7 +12,7 @@ import {paintLoginLinks,paintThemeControls,applyTheme as applyThemeFor,toggleThe
 import {thumbnailCandidates, coverFallbackAttrs, fallbackCardData, emotionToneOf, mountThumbFallback, ADD_TITLE_LABEL, VIDEO_UNAVAILABLE_TEXT} from "../thumb-fallback.mjs";
 
 export function createWritingRuntime(ctx){
-  let shellWrite, shellVideoDup, uploads, shellPanels, shellTags, shellTagManager, shellQuick, shellIntake, shellCleanup, shellJourney, shellMessages, shellBookmarkImport;
+  let shellWrite, shellVideoDup, uploads, shellPanels, shellTags, shellTagManager, shellQuick, shellIntake, shellCleanup, shellJourney, shellMessages, shellBookmarkImport, bookmarkEmptyEntry;
   function openEditor(mode,parentId=''){
     // 2026-11-16 대표 요청: 자세한 추가도 쉬운 추가와 같은 기본 트리를 쓴다 — 늘 같은 트리를 골랐고
     // 지금 트리와 다르면 그 트리를 고른 뒤 연다(에디터 안내 줄이 그 트리를 가리킨다). 목적지 순간이
@@ -48,6 +48,7 @@ export function createWritingRuntime(ctx){
     openEditor:{value:openEditor},
     shellTagManager:{get:()=>shellTagManager,set:value=>{shellTagManager=value;}},
     shellQuick:{get:()=>shellQuick,set:value=>{shellQuick=value;}},
+    bookmarkEmptyEntry:{get:()=>bookmarkEmptyEntry},
     shellIntake:{get:()=>shellIntake,set:value=>{shellIntake=value;}},
     shellCleanup:{get:()=>shellCleanup,set:value=>{shellCleanup=value;}},
     shellJourney:{get:()=>shellJourney,set:value=>{shellJourney=value;}},
@@ -178,6 +179,9 @@ export function createWritingRuntime(ctx){
       openBook:(treeId,momentId)=>{ctx.current='track59-sketchbook.html';(0,ctx.choose)(treeId,momentId);(0,ctx.writeLocation)();}
     })));
     mountBookmarkEntry({$:ctx.$,onOpen:()=>shellBookmarkImport.open()});
+    // #822 6단계: 처음 온 팬 안내 — 트리가 없는 내 계정의 빈 화면(빈 서재·첫 순간 안내)에 같은 입구 한 줄.
+    // 보일지 말지는 빈 화면을 그리는 곳(workspace-runtime paintEmptyForScreen)이 정한다.
+    bookmarkEmptyEntry=mountEmptyBookmarkEntry({$:ctx.$,onOpen:()=>shellBookmarkImport.open()});
 
     (0,ctx.$)('write-menu').onclick=()=>{if(ctx.source!=='server'&&ctx.member?.snapshot().owned){void (0,ctx.resumeMember)('write');return;}if(ctx.member?.snapshot().dirty){(0,ctx.explainSaveState)();return;}shellQuick.openWrite();};
 

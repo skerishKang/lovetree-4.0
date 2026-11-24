@@ -4,8 +4,8 @@ import { readFileSync } from 'node:fs';
 // #822 1단계 북마크에서 가져오기: 창 연결은 createBookmarkImport를 가짜 DOM으로 직접 불러 본다(docs/TESTING.md).
 // 판정·추출 계산은 tests/v41-bookmark-import.test.mjs가 표로 고정한다. 시험 자료는 가짜 북마크 파일뿐이다.
 import { createBookmarkImport, BOOKMARK_PANEL_ID, BOOKMARK_TEXT, noVideoText, saveLabel, failedTitle, continueLabel } from '../public/v41/shell/bookmark-import.mjs';
-import { mountBookmarkEntry, BOOKMARK_ENTRY_ID, BOOKMARK_ENTRY_LABEL, BOOKMARK_ENTRY_LEAD } from '../public/v41/shell/write-panel.mjs';
-import { BOOKMARK_FILE_MAX_BYTES, NEW_TREE_VALUE } from '../public/v41/bookmark-import.mjs';
+import { mountBookmarkEntry, mountEmptyBookmarkEntry, ensureBookmarkStyle, BOOKMARK_ENTRY_ID, BOOKMARK_EMPTY_ID, BOOKMARK_ENTRY_LABEL, BOOKMARK_ENTRY_LEAD, BOOKMARK_STYLE_HREF } from '../public/v41/shell/write-panel.mjs';
+import { BOOKMARK_FILE_MAX_BYTES, NEW_TREE_VALUE, limitNoteText, limitRefusedText } from '../public/v41/bookmark-import.mjs';
 import { createMemberSession } from '../public/v41/member-session.mjs';
 import { createTree, addMoment, latestMomentId, MAX_MOMENTS } from '../public/v41/domain.mjs';
 import { DROP_READONLY_NOTICE } from '../public/v41/quick-add.mjs';
@@ -21,7 +21,7 @@ const TREES = () => [
 ];
 
 function harness({ source = 'server', owned = true, writable = true, finePointer = true, trees = TREES(), titleLimit, titleOf = (id) => `영상 제목 ${id.slice(-4)}`, dateStyle = 'dot',
-  session = null, currentTreeId = '', preference = null, pause = () => Promise.resolve(), titleWaitMs } = {}) {
+  session = null, currentTreeId = '', preference = null, pause = () => Promise.resolve(), titleWaitMs, maxPick } = {}) {
   const doc = fakeDocument();
   const calls = { notify: [], login: [], resume: [], settings: 0, shown: 0, fetch: [], hold: [], refresh: 0, openBook: [] };
   const member = session || { snapshot: () => ({ owned, writable, subject: 'sub_test', dirty: false }) };
@@ -54,6 +54,7 @@ function harness({ source = 'server', owned = true, writable = true, finePointer
     syncWaitMs: 50,
     window: fakeWindow,
     ...(titleWaitMs === undefined ? {} : { titleWaitMs }),
+    ...(maxPick === undefined ? {} : { maxPick }),
     ...(titleLimit === undefined ? {} : { titleLimit }),
     // 영상 제목 조회(서버 oEmbed 프록시) 흉내 — 부른 주소를 모두 적어 둔다.
     fetchImpl: async (url) => {
@@ -638,4 +639,117 @@ test('저장 때 제목: 받아 둔 것은 다시 묻지 않고, 없는 것만 �
   const titlesSaved = session.state().trees[0].moments.slice(1).map((m) => m.title);
   assert.deepEqual(titlesSaved, ['영상 제목 00', '북마크 제목 1', '영상 제목 02', '북마크 제목 3', '북마크 제목 4', '북마크 제목 5', '북마크 제목 6', '북마크 제목 7'], '못 받은 것은 북마크 제목으로 담는다');
   session.dispose();
+});
+
+// ---- 5단계: 한 번에 200개 상한 ----
+const manyBookmarks = (count) => '<!DOCTYPE NETSCAPE-Bookmark-file-1>\n<DL><p>\n'
+  + ['앞 폴더', '뒤 폴더'].map((folder, f) => `<DT><H3>${folder}</H3>\n<DL><p>\n` + Array.from({ length: count / 2 }, (_, i) => { const n = f * (count / 2) + i; return `<DT><A HREF="https://youtu.be/FAKE${String(n).padStart(7, '0')}" ADD_DATE="${1690000000 + n * 86400}">북마크 제목 ${n}</A>`; }).join('\n') + '\n</DL><p>').join('\n')
+  + '\n</DL><p>';
+
+test('한 번에 200개까지: 230개면 200개만 골라 두고 안내하며, 담은 뒤 남은 30개를 이어서 담는다', async () => {
+  const { session, writes } = await startSession([seedTree('첫 트리')]);
+  const h = harness({ session, titleLimit: 0, titleOf: () => null, titleWaitMs: 1 });
+  await h.api.open();
+  await h.api.readFile(fileOf(manyBookmarks(230)));
+  assert.equal(h.api.state().picked.length, 200, '기본 상한 200');
+  assert.deepEqual([h.api.state().picked[0], h.api.state().picked.at(-1)], ['b0', 'b199'], '파일 앞에서부터');
+  assert.equal(h.refs.count.textContent, '200개 고름 · 한 번에 200개까지');
+  assert.deepEqual([h.refs.limit.hidden, h.refs.limit.textContent], [false, limitNoteText(230)]);
+  assert.deepEqual([h.refs.all.checked, h.refs.all.indeterminate], [false, true], '전체 칸은 일부 고름');
+  assert.equal(h.refs.save.textContent, saveLabel(200));
+  // 201번째는 고르지 않고 까닭을 알린다. 칸은 다시 꺼진다.
+  const all = boxes(h);
+  all[210].checked = true; all[210].dispatch('change', {});
+  assert.equal(all[210].checked, false);
+  assert.equal(h.api.state().picked.length, 200);
+  assert.equal(h.refs.limit.textContent, limitRefusedText());
+  // 하나를 풀면 다른 하나를 고를 수 있고, 안내는 처음 것으로 돌아온다.
+  all[0].checked = false; all[0].dispatch('change', {});
+  assert.equal(h.refs.limit.textContent, limitNoteText(230));
+  all[210].checked = true; all[210].dispatch('change', {});
+  assert.deepEqual([all[210].checked, h.api.state().picked.length], [true, 200]);
+  // 뒤 폴더 전체를 켜도 200에서 멈추고 알린다.
+  const groupBoxes = h.refs.groups.children.map((group) => group.children[0].children[0]);
+  groupBoxes[1].checked = true; groupBoxes[1].dispatch('change', {});
+  assert.equal(h.api.state().picked.length, 200);
+  assert.equal(h.refs.limit.textContent, limitRefusedText());
+  // 담기: 200개가 한 트리에 담긴다.
+  await h.api.startSave();
+  assert.equal(session.state().trees[0].moments.length, 201, '저장 뒤 트리 순간 수 1 + 200');
+  assert.equal(h.refs.doneTitle.textContent, '✓ 200개를 ‘첫 트리’에 담았어요');
+  assert.equal(h.refs.more.textContent, continueLabel(30));
+  // 이어서 고르기: 남은 30개만 골라져 있고, 상한 안내는 사라진다.
+  h.refs.more.click();
+  assert.equal(h.api.state().picked.length, 30);
+  assert.deepEqual([h.refs.count.textContent, h.refs.limit.hidden], ['30개 고름', true]);
+  await h.api.startSave();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(session.state().trees[0].moments.length, 231, '나눠 담은 뒤 1 + 230');
+  assert.equal(writes.at(-1).state.trees[0].moments.length, 231, '서버로 간 마지막 저장에도 231개');
+  assert.equal(h.refs.more.hidden, true);
+  // 같은 영상이 두 번 담기지 않았다.
+  const urls = session.state().trees[0].moments.map((m) => m.url).filter(Boolean);
+  assert.equal(new Set(urls).size, 230);
+  session.dispose();
+});
+
+test('상한은 고를 때마다 지킨다(작은 상한으로 본 표)', async () => {
+  const h = await previewWith({ trees: [], maxPick: 2 });
+  assert.deepEqual(h.api.state().picked, ['b0', 'b1']);
+  assert.equal(h.refs.count.textContent, '2개 고름 · 한 번에 2개까지');
+  assert.equal(h.refs.limit.textContent, limitNoteText(4, 2));
+  h.refs.all.checked = true; h.refs.all.dispatch('change', {});
+  assert.deepEqual([h.api.state().picked.length, h.refs.limit.textContent], [2, limitRefusedText(2)], '전체 고르기도 상한에서 멈춘다');
+  // 상한 이하 파일에서는 안내가 없다.
+  const small = await previewWith({ trees: [] });
+  assert.deepEqual([small.refs.limit.hidden, small.refs.count.textContent], [true, '4개 고름']);
+});
+
+// ---- 6단계: 처음 온 팬 안내 ----
+
+test('빈 화면의 입구 한 줄: 보이라고 하면 스타일을 실은 뒤에 보이고, 누르면 여는 일만 부른다', async () => {
+  const doc = fakeDocument();
+  const empty = doc.createElement('div');
+  let opened = 0, release = null, styles = 0;
+  const entry = mountEmptyBookmarkEntry({
+    $: (id) => (id === 'empty' ? empty : null),
+    document: doc,
+    onOpen: () => { opened += 1; },
+    ensureStyle: () => { styles += 1; return new Promise((resolve) => { release = resolve; }); },
+  });
+  assert.equal(empty.children.length, 1);
+  assert.equal(entry.line.hidden, true, '처음에는 숨겨 둔다');
+  assert.equal(`${entry.line.children[0].textContent}${entry.button.textContent}`, `${BOOKMARK_ENTRY_LEAD} ${BOOKMARK_ENTRY_LABEL}`, '순간 추가 창의 입구와 같은 문구');
+  assert.deepEqual([entry.button.id, entry.button.type], [BOOKMARK_EMPTY_ID, 'button']);
+  const showing = entry.show(true);
+  assert.deepEqual([entry.line.hidden, styles], [true, 1], '스타일이 실리기 전에는 보이지 않는다');
+  release();
+  await showing;
+  assert.equal(entry.line.hidden, false);
+  entry.button.click();
+  assert.equal(opened, 1);
+  await entry.show(false);
+  assert.equal(entry.line.hidden, true);
+  // 스타일을 싣는 사이에 숨기라는 말이 오면 보이지 않는다(로그아웃·트리 생김).
+  const late = entry.show(true);
+  void entry.show(false);
+  release();
+  await late;
+  assert.equal(entry.line.hidden, true);
+  // 빈 화면이 없으면 아무것도 만들지 않고, show는 조용히 넘어간다.
+  const none = mountEmptyBookmarkEntry({ $: () => null, document: doc });
+  assert.doesNotThrow(() => none.show(true));
+});
+
+test('스타일 한 장은 문서마다 한 번만 싣는다', async () => {
+  const doc = fakeDocument();
+  const first = ensureBookmarkStyle(doc);
+  const second = ensureBookmarkStyle(doc);
+  assert.equal(first, second);
+  const links = doc.head.children.filter((node) => node.tagName === 'LINK');
+  assert.equal(links.length, 1);
+  assert.deepEqual([links[0].rel, links[0].href], ['stylesheet', BOOKMARK_STYLE_HREF]);
+  links[0].dispatch('load', {});
+  await first;
+  await ensureBookmarkStyle(null);
 });

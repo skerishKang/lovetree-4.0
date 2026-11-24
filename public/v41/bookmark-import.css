@@ -53,6 +53,8 @@ html[data-lt-theme=garden] .bmi .bmi-error{color:var(--lt-rose-ink)}
 .bmi-item.is-existing .bmi-title{color:var(--lt-muted)}
 .bmi-item.is-existing .bmi-thumb{opacity:.6}
 
+.bmi .bmi-limit{margin:8px 0 0;padding:8px 14px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-card);color:var(--lt-pearl)}
+
 /* 아래 고정 줄: 담을 트리와 담기 단추 */
 .bmi-foot{flex:0 0 auto;padding:12px 2px 18px;border-top:1px solid var(--lt-line);background:var(--lt-glass-strong)}
 .bmi-foot-row{display:flex;align-items:flex-end;gap:12px}
@@ -88,6 +90,11 @@ html[data-lt-theme=garden] .bmi-failed-why{color:var(--lt-rose-ink)}
 .bmi .button-row .primary{border-color:var(--lt-primary);color:var(--lt-primary-ink)}
 .bmi-done-actions{margin-top:22px}
 @media(prefers-reduced-motion:reduce){.bmi-progress-fill{transition:none}}
+
+/* 처음 온 팬 안내: 트리가 없는 빈 화면(빈 서재·첫 순간 안내)의 한 줄. 빈 화면의 단추 모양(#empty button) 대신 글자 단추로 둔다. */
+#empty .empty-bookmark{margin:18px 0 0;font-size:13px;word-break:keep-all}
+#empty .empty-bookmark[hidden]{display:none}
+#empty .empty-bookmark button{min-height:44px;margin:0;padding:0 4px;border:0;border-radius:0;background:none;color:var(--lt-gold);font-size:13px;text-decoration:underline;text-underline-offset:3px}
 
 @media(max-width:520px){
  #bookmark-import-panel{width:100vw}

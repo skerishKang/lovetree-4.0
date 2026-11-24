@@ -7,8 +7,11 @@ import {
   BOOKMARK_FILE_MAX_BYTES, READ_NOT_BOOKMARK, readBookmarkVideos, foundSummaryText, folderGroups,
   existingVideoTrees, defaultPicked, scopeState, pickScope, pickOne, createTitleQueue, pickedCountText,
   NEW_TREE_VALUE, TREE_NAME_MAX, saveBlockText, saveBookmarkVideos, waitForSync, progressText, savedSummaryText, SYNC_DONE, SYNC_FAILED,
+  BOOKMARK_IMPORT_MAX, limitNoteText, limitRefusedText,
 } from '../bookmark-import.mjs';
 import { DROP_READONLY_NOTICE } from '../quick-add.mjs';
+// 스타일 한 장은 빈 화면의 입구 한 줄과 함께 쓴다 — 싣는 일은 한 곳(write-panel.mjs)에서만 한다.
+import { ensureBookmarkStyle } from './write-panel.mjs';
 // 썸네일 주소·영상 제목·날짜 표기·트리 이름은 기존 한 벌을 그대로 쓴다(새 규칙을 만들지 않는다).
 import { youtubeStageThumbUrl } from '../youtube-id.mjs';
 import { fetchVideoTitle } from '../video-title.mjs';
@@ -19,7 +22,6 @@ import { latestMomentId } from '../domain.mjs';
 import { INTAKE_TITLE_WAIT_MS } from '../quick-intake.mjs';
 
 export const BOOKMARK_PANEL_ID = 'bookmark-import-panel';
-export const BOOKMARK_STYLE_HREF = '/v41/bookmark-import.css';
 
 export const BOOKMARK_TEXT = Object.freeze({
   eyebrow: '순간 추가',
@@ -95,6 +97,8 @@ export function createBookmarkImport(deps = {}) {
   const isFinePointer = deps.isFinePointer || (() => globalThis.matchMedia?.('(pointer:fine)').matches === true);
   const fetchImpl = deps.fetchImpl || ((...args) => globalThis.fetch(...args));
   const pause = deps.pause || (() => new Promise((resolve) => setTimeout(resolve, 0)));
+  // 한 번에 담는 수의 상한(#822 5단계). 넘게는 고를 수 없고, 담은 뒤 남은 것을 이어서 고른다.
+  const maxPick = deps.maxPick ?? BOOKMARK_IMPORT_MAX;
   // view: start(파일 고르기) → preview(미리보기·고르기) → saving(담는 중) → done(마침)
   const state = { view: 'start', result: null, reading: false, existing: new Map(), picked: new Set(), target: '', outcome: null };
   let opener = null;
@@ -125,22 +129,8 @@ export function createBookmarkImport(deps = {}) {
     return node;
   }
 
-  // ---- 스타일 한 장: 처음 열 때 싣고, 다 실릴 때까지 잠깐 기다렸다가 창을 띄운다(맨몸으로 번쩍이지 않게). ----
-  let styleReady = null;
-  function ensureStyle() {
-    if (deps.ensureStyle) return Promise.resolve(deps.ensureStyle());
-    if (styleReady) return styleReady;
-    styleReady = new Promise((resolve) => {
-      let done = false;
-      const finish = () => { if (!done) { done = true; resolve(); } };
-      const link = make('link', { rel: 'stylesheet', href: BOOKMARK_STYLE_HREF });
-      link.addEventListener('load', finish);
-      link.addEventListener('error', finish);
-      setTimeout(finish, 1500);
-      (doc.head || doc.body).append(link);
-    });
-    return styleReady;
-  }
+  // 스타일 한 장: 처음 열 때 싣고, 다 실릴 때까지 잠깐 기다렸다가 창을 띄운다(맨몸으로 번쩍이지 않게).
+  const ensureStyle = () => Promise.resolve(deps.ensureStyle ? deps.ensureStyle() : ensureBookmarkStyle(doc));
 
   // ---- 창 마크업 ----
   const refs = {};
@@ -167,6 +157,7 @@ export function createBookmarkImport(deps = {}) {
   refs.another = make('button', { type: 'button', class: 'bmi-link', text: BOOKMARK_TEXT.another });
   refs.all = make('input', { type: 'checkbox', id: 'bookmark-import-all' });
   refs.count = make('span', { class: 'bmi-count', role: 'status' });
+  refs.limit = make('p', { class: 'bmi-limit', role: 'status', hidden: true });
   refs.groups = make('div', { class: 'bmi-groups', role: 'group', 'aria-label': BOOKMARK_TEXT.listTitle });
   refs.preview = make('div', { class: 'bmi-preview', hidden: true },
     make('div', { class: 'bmi-summary-row' }, refs.summary, refs.another),
@@ -174,6 +165,7 @@ export function createBookmarkImport(deps = {}) {
     make('div', { class: 'bmi-toolbar' },
       make('label', { class: 'bmi-check bmi-all' }, refs.all, make('span', { text: BOOKMARK_TEXT.pickAll })),
       refs.count),
+    refs.limit,
     refs.groups);
   // 담는 중
   refs.progressBar = make('div', { class: 'bmi-progress', role: 'progressbar', 'aria-labelledby': 'bookmark-import-saving-title', 'aria-valuemin': '0' }, make('span', { class: 'bmi-progress-fill' }));
@@ -284,10 +276,17 @@ export function createBookmarkImport(deps = {}) {
     for (const row of rows.values()) row.box.checked = state.picked.has(row.video.id);
     for (const group of groups) paintScope(group.box, group.videos);
     paintScope(refs.all, state.result?.videos || []);
-    refs.count.textContent = pickedCountText(state.picked.size);
+    refs.count.textContent = pickedCountText(state.picked.size, maxPick);
+    paintLimit('');
     refs.save.textContent = saveLabel(state.picked.size);
     refs.save.disabled = state.picked.size === 0;
     refs.footError.textContent = '';
+  }
+  // 상한 안내: 방금 더 고르지 못했으면 그 까닭을, 아니면 새 영상이 상한보다 많을 때의 안내를 보여 준다.
+  function paintLimit(refused) {
+    const fresh = (state.result?.videos || []).length - state.existing.size;
+    refs.limit.textContent = refused || limitNoteText(fresh, maxPick);
+    refs.limit.hidden = !refs.limit.textContent;
   }
   // 고른 영상의 제목만 차례로 받는다(기존 oEmbed 경로, 한 번에 하나·상한).
   function askTitles() {
@@ -295,13 +294,17 @@ export function createBookmarkImport(deps = {}) {
     void titles.add(wanted);
   }
   function togglePick(video, on) {
-    state.picked = pickOne(state.picked, video.id, on).picked;
-    syncPicks();
+    const next = pickOne(state.picked, video.id, on, maxPick);
+    state.picked = next.picked;
+    syncPicks(); // 상한에 걸려 못 고른 칸은 여기서 다시 꺼진다
+    if (next.refused) paintLimit(limitRefusedText(maxPick));
     if (on) askTitles();
   }
   function toggleScope(videos, on) {
-    state.picked = pickScope(videos, state.existing, state.picked, on).picked;
+    const next = pickScope(videos, state.existing, state.picked, on, maxPick);
+    state.picked = next.picked;
     syncPicks();
+    if (next.clipped) paintLimit(limitRefusedText(maxPick));
     if (on) askTitles();
   }
 
@@ -310,7 +313,7 @@ export function createBookmarkImport(deps = {}) {
     state.result = result;
     state.view = 'preview';
     state.existing = existingVideoTrees(result.videos, listTrees(), treeName);
-    state.picked = new Set(defaultPicked(result.videos, state.existing));
+    state.picked = new Set(defaultPicked(result.videos, state.existing, maxPick));
     state.target = '';
     state.outcome = null;
     refs.newName.value = '';
@@ -416,7 +419,7 @@ export function createBookmarkImport(deps = {}) {
     if (tree) state.target = tree.id;
     // 담은 영상은 이제 '이미 있음'이다 — 목록을 다시 가려 두면 이어서 고를 때 남은 것만 골라진다.
     state.existing = existingVideoTrees(state.result.videos, trees, treeName);
-    state.picked = new Set(defaultPicked(state.result.videos, state.existing));
+    state.picked = new Set(defaultPicked(state.result.videos, state.existing, maxPick));
     state.view = 'done';
     renderList();
     render();
@@ -428,7 +431,7 @@ export function createBookmarkImport(deps = {}) {
     if (state.view !== 'preview' || !state.result) return null;
     const trees = listTrees();
     const newName = String(refs.newName.value ?? '').trim();
-    const blocked = saveBlockText({ count: state.picked.size, target: state.target, trees, newName });
+    const blocked = saveBlockText({ count: state.picked.size, target: state.target, trees, newName, max: maxPick });
     if (blocked) {
       refs.footError.textContent = blocked;
       if (state.target === NEW_TREE_VALUE && (!newName || newName.length > TREE_NAME_MAX)) refs.newName.focus?.();
