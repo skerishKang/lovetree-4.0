@@ -269,3 +269,36 @@ test('6. 화면: 판 제목(기억 보드·설명 줄)은 무대 밖 고정 머�
   await page.waitForTimeout(1200);
   assert.ok(await left() >= 24, `전체 보기 뒤 제목 왼편 ${(await left())}px — 24px 이상`);
 });
+
+test('7. 화면: 390px 고르기 칸은 순간 상세와 같은 원래 제목을 보여주고 갱신 뒤에도 따라간다', { skip: REQUIRE ? false : skip }, async (t) => {
+  const tree = chainTree(3);
+  tree.moments[0].title = 'super shy — official mv';
+  tree.moments[0].mediaMetadata = { title: 'Super Shy — Official MV' };
+  tree.moments[1].title = 'BTS 직캠 · Super Shy — 한글';
+  const browser = await chromium.launch();
+  const server = await serve({ '/host.html': hostHTML(tree) });
+  t.after(async () => { await context.close().catch(() => {}); await browser.close(); server.close(); });
+  const { context, page, frame, problems } = await openHost(browser, `http://127.0.0.1:${server.address().port}/host.html`, { width: 390, height: 844 });
+  assert.deepEqual(problems, [], '화면 오류 없음: ' + problems.join(' | '));
+
+  const optionLabels = () => frame.$$eval('.lt-moment-picker select option', options => options.map(option => option.textContent));
+  assert.deepEqual(await optionLabels(), [
+    '1. Super Shy — Official MV',
+    '2. BTS 직캠 · Super Shy — 한글',
+    '3. 순간 3'
+  ], '고르기 칸은 상세의 표시 제목과 대소문자·한글이 같은 원래 글자를 보여준다');
+  assert.equal(await frame.$eval('.lt-moment-picker select', select => getComputedStyle(select).textTransform), 'none', 'CSS가 제목 대소문자를 바꾸지 않는다');
+
+  await frame.selectOption('.lt-moment-picker select', 'm1');
+  await frame.click('.lt-moment-picker button');
+  await frame.waitForFunction(() => document.getElementById('detail')?.classList.contains('open'), null, { timeout: 5000 });
+  assert.equal(await frame.$eval('#dTitle', title => title.textContent), 'Super Shy — Official MV', '여는 순간의 상세 제목과 고르기 칸 글자가 같다');
+
+  const changed = 'BTS 직캠 · SUPER SHY — 한글';
+  await page.evaluate(title => {
+    window.LT41.tree.moments.find(moment => moment.id === 'm2').title = title;
+    document.querySelector('iframe').contentWindow.postMessage({ type: 'lt41-trees-saved', background: true }, location.origin);
+  }, changed);
+  await frame.waitForFunction(title => [...document.querySelectorAll('.lt-moment-picker select option')].some(option => option.textContent === `2. ${title}`), changed, { timeout: 5000 });
+  assert.equal((await optionLabels())[1], `2. ${changed}`, '서버 기록이 갱신되면 고르기 칸도 새 원래 제목으로 바뀐다');
+});
