@@ -31,6 +31,82 @@ export function viewportBox(vv) {
   return {top: Number.isFinite(top) && top > 0 ? Math.round(top) : 0, height: Math.round(height)};
 }
 
+// #822 1단계: 쉬운 추가 탭 맨 아래의 '북마크에서 가져오기' 입구 한 줄. 가져오기 창과 한 벌로 붙였다 떼기 쉽게
+// 마크업을 index.html에 두지 않고 여기서 만든다. 모양은 기존 안내 줄(quick-drop-hint)·글자 단추(quick-refine)
+// 클래스를 그대로 쓴다. 누르면 onOpen만 부른다 — 창 모듈은 그때 받는다(shell/bookmark-import.mjs).
+export const BOOKMARK_ENTRY_ID = 'bookmark-import-open';
+export const BOOKMARK_ENTRY_LEAD = '이미 모아 둔 영상이 있나요?';
+export const BOOKMARK_ENTRY_LABEL = '북마크에서 가져오기';
+export function mountBookmarkEntry({ $, document: doc = globalThis.document, onOpen } = {}) {
+  const host = $?.('write-easy');
+  if (!host?.append || !doc?.createElement) return null;
+  const line = doc.createElement('p');
+  line.className = 'quick-drop-hint bookmark-entry';
+  const lead = doc.createElement('span');
+  lead.textContent = `${BOOKMARK_ENTRY_LEAD} `;
+  const button = doc.createElement('button');
+  button.type = 'button';
+  button.id = BOOKMARK_ENTRY_ID;
+  button.className = 'quick-refine';
+  button.textContent = BOOKMARK_ENTRY_LABEL;
+  button.addEventListener('click', () => { onOpen?.(); });
+  line.append(lead, button);
+  host.append(line);
+  return button;
+}
+
+// #822 6단계: 처음 온 팬 안내 — 트리가 아직 없는 내 계정의 빈 화면(빈 서재, 첫 순간 안내)에 같은 한 줄을 둔다.
+// 빈 화면 마크업(index.html #empty)은 건드리지 않고 여기서 한 줄을 붙인다. 모양은 가져오기 창과 같은 스타일 한 장을
+// 쓰므로, 줄을 처음 보일 때 그 한 장을 싣고 다 실린 뒤에 보인다(셸 첫 화면이 받는 파일은 늘지 않는다).
+// 돌려주는 show(on)을 빈 화면을 그리는 곳(workspace-runtime paintEmptyForScreen)이 부른다.
+export const BOOKMARK_STYLE_HREF = '/v41/bookmark-import.css';
+const bookmarkStyles = new WeakMap();
+export function ensureBookmarkStyle(doc = globalThis.document) {
+  if (!doc?.createElement) return Promise.resolve();
+  if (bookmarkStyles.has(doc)) return bookmarkStyles.get(doc);
+  const ready = new Promise((resolve) => {
+    let done = false;
+    const finish = () => { if (!done) { done = true; resolve(); } };
+    const link = doc.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = BOOKMARK_STYLE_HREF;
+    link.addEventListener('load', finish);
+    link.addEventListener('error', finish);
+    setTimeout(finish, 1500);
+    (doc.head || doc.body).append(link);
+  });
+  bookmarkStyles.set(doc, ready);
+  return ready;
+}
+export const BOOKMARK_EMPTY_ID = 'empty-bookmark-open';
+export function mountEmptyBookmarkEntry({ $, document: doc = globalThis.document, onOpen, ensureStyle = () => ensureBookmarkStyle(doc) } = {}) {
+  const host = $?.('empty');
+  if (!host?.append || !doc?.createElement) return { show() {} };
+  const line = doc.createElement('p');
+  line.className = 'empty-bookmark';
+  line.hidden = true;
+  const lead = doc.createElement('span');
+  lead.textContent = `${BOOKMARK_ENTRY_LEAD} `;
+  const button = doc.createElement('button');
+  button.type = 'button';
+  button.id = BOOKMARK_EMPTY_ID;
+  button.textContent = BOOKMARK_ENTRY_LABEL;
+  button.addEventListener('click', () => { onOpen?.(); });
+  line.append(lead, button);
+  host.append(line);
+  let wanted = false;
+  return {
+    line,
+    button,
+    // 보이라는 말이 오면 스타일을 싣고 나서 보인다. 그 사이에 숨기라는 말이 오면 보이지 않는다.
+    show(on) {
+      wanted = !!on;
+      if (!wanted) { line.hidden = true; return Promise.resolve(); }
+      return Promise.resolve(ensureStyle()).then(() => { line.hidden = !wanted; });
+    }
+  };
+}
+
 export function createWritePanel(deps) {
   const $ = deps.$;
   const storage = deps.storage || globalThis.localStorage;

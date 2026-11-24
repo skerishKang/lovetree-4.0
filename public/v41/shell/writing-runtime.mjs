@@ -4,7 +4,7 @@ import {titleView, withoutAutoTitle} from "../book-usability.mjs";
 import {screens,screenForView,viewForFile,themedViewFor} from "./navigation.mjs";
 import {createPanels} from "./panels.mjs";
 import {createQuickAdd} from "./quick-add.mjs";
-import {createWritePanel, readWriteTab, writeWriteTab} from "./write-panel.mjs";
+import {createWritePanel, readWriteTab, writeWriteTab, mountBookmarkEntry, mountEmptyBookmarkEntry} from "./write-panel.mjs";
 import {createQuickIntake} from "./quick-intake.mjs";
 import {createMessages, lastShelfTreeId} from "./messages.mjs";
 import {createTagSave} from "./tag-save.mjs";
@@ -12,7 +12,7 @@ import {paintLoginLinks,paintThemeControls,applyTheme as applyThemeFor,toggleThe
 import {thumbnailCandidates, coverFallbackAttrs, fallbackCardData, emotionToneOf, mountThumbFallback, ADD_TITLE_LABEL, VIDEO_UNAVAILABLE_TEXT} from "../thumb-fallback.mjs";
 
 export function createWritingRuntime(ctx){
-  let shellWrite, shellVideoDup, uploads, shellPanels, shellTags, shellTagManager, shellQuick, shellIntake, shellCleanup, shellJourney, shellMessages;
+  let shellWrite, shellVideoDup, uploads, shellPanels, shellTags, shellTagManager, shellQuick, shellIntake, shellCleanup, shellJourney, shellMessages, shellBookmarkImport, bookmarkEmptyEntry;
   function openEditor(mode,parentId=''){
     // 2026-11-16 대표 요청: 자세한 추가도 쉬운 추가와 같은 기본 트리를 쓴다 — 늘 같은 트리를 골랐고
     // 지금 트리와 다르면 그 트리를 고른 뒤 연다(에디터 안내 줄이 그 트리를 가리킨다). 목적지 순간이
@@ -48,6 +48,7 @@ export function createWritingRuntime(ctx){
     openEditor:{value:openEditor},
     shellTagManager:{get:()=>shellTagManager,set:value=>{shellTagManager=value;}},
     shellQuick:{get:()=>shellQuick,set:value=>{shellQuick=value;}},
+    bookmarkEmptyEntry:{get:()=>bookmarkEmptyEntry},
     shellIntake:{get:()=>shellIntake,set:value=>{shellIntake=value;}},
     shellCleanup:{get:()=>shellCleanup,set:value=>{shellCleanup=value;}},
     shellJourney:{get:()=>shellJourney,set:value=>{shellJourney=value;}},
@@ -152,6 +153,35 @@ export function createWritingRuntime(ctx){
       // 2026-11-16 대표 요청: 처음 고르는 트리 설정(지금 보고 있는 트리/늘 같은 트리) — 바로 아래 한 벌.
       quickTargetPreference:()=>(0,ctx.quickTargetPreference)()
     });
+
+    // #822 1단계: 북마크에서 가져오기 — 창 모듈은 처음 누를 때 받는다(lazyPanel). 입구 한 줄은 쉬운 추가 탭 아래에 둔다.
+    // 열리면 공통 창 규칙(#933 한 장)대로 순간 추가 창을 닫고 그 자리에 뜬다.
+    shellBookmarkImport=(0,ctx.lazyPanel)(()=>import('./bookmark-import.mjs').then(m=>m.createBookmarkImport({
+      $:ctx.$,
+      getMember:()=>ctx.member,
+      getSource:()=>ctx.source,
+      notify:text=>(0,ctx.notify)(text),
+      openSettingsData:intent=>(0,ctx.openAccountData)(intent),
+      resumeMember:intent=>(0,ctx.resumeMember)(intent),
+      openLoginStart:intent=>(0,ctx.openLoginStart)(intent),
+      onModalShown:()=>(0,ctx.tipsFollowDialogs)(),
+      // 트리 목록은 쉬운 추가와 같은 재료(window.LT41)에서 읽고, 날짜 표기는 계정 설정 한 벌을 따른다.
+      listTrees:()=>(Array.isArray(window.LT41?.trees)?window.LT41.trees:[]),
+      dateStyle:()=>(0,ctx.currentDateStyle)(),
+      // 처음 고르는 트리는 쉬운 추가와 같은 한 벌(늘 같은 트리 설정 → 지금 보는 트리).
+      currentTreeId:()=>window.LT41?.tree?.id||'',
+      quickTargetPreference:()=>(0,ctx.quickTargetPreference)(),
+      // #978과 같은 길: 담는 동안 화면 다시 그리기·다른 창이 이 창을 닫지 못하게 붙잡는다.
+      holdPanel:(id,on)=>ctx.shellDialogs.holdPanel(id,on),
+      // 담은 뒤 뒤에 열린 화면을 지금 트리 그대로 한 번 다시 그린다(담는 동안은 모델만 바꾼다).
+      refreshScreen:()=>{const id=window.LT41?.tree?.id;if(id)(0,ctx.choose)(id,window.LT41.momentId);},
+      // '트리 보러 가기': 담은 트리의 책을 연다(messages.mjs의 책 열기와 같은 길).
+      openBook:(treeId,momentId)=>{ctx.current='track59-sketchbook.html';(0,ctx.choose)(treeId,momentId);(0,ctx.writeLocation)();}
+    })));
+    mountBookmarkEntry({$:ctx.$,onOpen:()=>shellBookmarkImport.open()});
+    // #822 6단계: 처음 온 팬 안내 — 트리가 없는 내 계정의 빈 화면(빈 서재·첫 순간 안내)에 같은 입구 한 줄.
+    // 보일지 말지는 빈 화면을 그리는 곳(workspace-runtime paintEmptyForScreen)이 정한다.
+    bookmarkEmptyEntry=mountEmptyBookmarkEntry({$:ctx.$,onOpen:()=>shellBookmarkImport.open()});
 
     (0,ctx.$)('write-menu').onclick=()=>{if(ctx.source!=='server'&&ctx.member?.snapshot().owned){void (0,ctx.resumeMember)('write');return;}if(ctx.member?.snapshot().dirty){(0,ctx.explainSaveState)();return;}shellQuick.openWrite();};
 
