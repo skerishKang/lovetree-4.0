@@ -62,7 +62,7 @@ jobs:
     runs-on: ${{ fromJSON((github.event.pull_request.head.repo.full_name == github.repository && vars.USE_CGI_RUNNER == '1') && '["self-hosted","Linux","X64","cgi"]' || '["ubuntu-latest"]') }}
     timeout-minutes: 25
     needs: screen-changes
-    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-board,'))
+    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || needs.screen-changes.outputs.jobs == '' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-board,'))
     steps:
       - uses: actions/checkout@v4
         with:
@@ -263,7 +263,7 @@ jobs:
     runs-on: ${{ fromJSON((github.event.pull_request.head.repo.full_name == github.repository && vars.USE_CGI_RUNNER == '1') && '["self-hosted","Linux","X64","cgi"]' || '["ubuntu-latest"]') }}
     timeout-minutes: 12
     needs: screen-changes
-    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-home,'))
+    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || needs.screen-changes.outputs.jobs == '' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-home,'))
     steps:
       - uses: actions/checkout@v4
         with:
@@ -391,7 +391,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     needs: screen-changes
-    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-book,'))
+    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || needs.screen-changes.outputs.jobs == '' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-book,'))
     steps:
       - uses: actions/checkout@v4
         with:
@@ -488,7 +488,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     needs: screen-changes
-    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-shell,'))
+    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || needs.screen-changes.outputs.jobs == '' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-shell,'))
     steps:
       - uses: actions/checkout@v4
         with:
@@ -927,7 +927,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     needs: screen-changes
-    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-reload,'))
+    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || needs.screen-changes.outputs.jobs == '' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-reload,'))
     steps:
       - uses: actions/checkout@v4
         with:
@@ -1245,7 +1245,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     needs: screen-changes
-    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-book-screen,'))
+    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || needs.screen-changes.outputs.jobs == '' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-book-screen,'))
     steps:
       - uses: actions/checkout@v4
         with:
