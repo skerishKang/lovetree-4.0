@@ -44,7 +44,6 @@ html[data-lt-theme=garden] #context-kind{color:var(--lt-rose-ink)}
 /* #1285 5번: 순간 고르기 칸의 작은 표지와 주 단추 강조 — 기존 토큰만 쓴다. */
 #share-moment-thumb{width:44px;height:56px;object-fit:cover;border:1px solid var(--lt-gold-line);border-radius:6px;margin-top:8px}
 #share-panel .button-row .primary:not([disabled]){border-color:var(--lt-gold-line);font-weight:700}
-#share-panel .button-row button:not(.primary):not([disabled]){color:var(--lt-muted)}
 .share-warning{margin:16px 0;padding:14px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-card);background:rgba(255,230,166,.06)}.share-warning p{margin:6px 0 0}.share-url{display:flex;gap:8px}.share-url input{flex:1;min-width:0}.share-url button{flex:0 0 auto}.share-item{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line)}.share-item small{display:block;color:var(--muted);margin-top:4px}.share-item button{min-height:44px}.share-item-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.share-item-actions button{min-width:112px}.share-revoked{opacity:.62}#share-preview-moments{max-height:220px;overflow:auto;padding-left:22px}#share-preview-moments li{margin:8px 0;color:#e8dce4}
 /* #369: 단계를 눈에 보이게 — ① 고르기 ② 미리보기 ③ 링크 만들기, 다음에 할 일 안내. */
 .share-steps{display:flex;gap:8px;margin:14px 0 0;padding:0;list-style:none}
@@ -618,7 +617,7 @@ nav .tree-frame{scroll-snap-align:center}
 .tree-check{color:var(--lt-gold);font-weight:800}
 .tree-foot{display:grid;gap:3px;margin-top:6px;padding-top:6px;border-top:1px solid var(--lt-line)}
 /* #1285 6번: 묶음 구분선과 위험 동작 표시 — 기존 토큰만 쓴다. */
-.tree-group-divider{height:1px;margin:5px 9px;background:var(--lt-line)}
+.tree-group-divider{height:1px;margin:2px 9px;background:var(--lt-line)}
 .tree-foot .tree-danger .tree-name{color:var(--lt-rose)}
 .tree-foot .tree-danger:hover,.tree-foot .tree-danger:focus-visible{background:rgba(200,110,121,.12)}
 .tree-foot button{min-height:44px;text-align:left;border:0;border-radius:10px;background:none;color:var(--lt-pearl);padding:0 9px;font-size:13px}
