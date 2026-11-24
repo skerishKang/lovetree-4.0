@@ -92,7 +92,8 @@ export function createLocation(deps) {
       }, '', location.hash);
     }
     if (location.hash !== hash) history[mode === 'replace' ? 'replaceState' : 'pushState'](state, '', hash);
-    else if (mode === 'replace') history.replaceState(state, '', hash);
+    // 같은 주소에서는 담긴 상태가 달라졌을 때만 바꾼다(#1297 '같은 주소는 바꾸지 않음'과 #1292 보드 상태 기록을 함께 지킨다).
+    else if (mode === 'replace' && JSON.stringify(globalThis.history?.state ?? null) !== JSON.stringify(state ?? null)) history.replaceState(state, '', hash);
     else if (detailChanged) history.pushState(state, '', hash);
     handledBoardDetail = !!state?.lt41BoardDetail;
     handledBoardPanel = '';
