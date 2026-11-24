@@ -47,10 +47,10 @@ const BASE_HEADER_TABS = 0;
 function headerExpectation({ owned = false, treeCount = 0, publicReading = false } = {}) {
   if (!headerPartsFor) {
     const state = owned ? (Number(treeCount) > 0 ? 'in-trees' : 'in-empty') : 'out';
-    return { state, treePicker: owned, treeViews: !publicReading, write: owned, tabs: publicReading ? 0 : (owned ? 6 : 5), source: 'fallback' };
+    return { state, treePicker: owned, treeViews: !publicReading, write: owned, tabs: publicReading ? 0 : (owned ? 7 : 6), source: 'fallback' };
   }
   const parts = headerPartsFor({ owned, treeCount, publicReading });
-  const tabs = BASE_HEADER_TABS + (parts.treePicker ? 1 : 0) + ((treeViewsVisible ? treeViewsVisible({ owned, publicReading }) : parts.treeViews) ? 5 : 0);
+  const tabs = BASE_HEADER_TABS + (parts.treePicker ? 1 : 0) + ((treeViewsVisible ? treeViewsVisible({ owned, publicReading }) : parts.treeViews) ? 6 : 0);
   return { ...parts, tabs, source: 'public/v41/header-state.mjs' };
 }
 function expectedPickerLabel({ owned, treeTitle = '', pendingDraft = false } = {}) {
