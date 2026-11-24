@@ -1,0 +1,231 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+// #822 1단계 북마크에서 가져오기: 판정·추출 계산은 함수를 직접 불러 표로 확인한다(docs/TESTING.md).
+// 창 연결은 tests/v41-bookmark-import-flow.test.mjs가 createBookmarkImport를 가짜 DOM으로 직접 부른다.
+// 시험 자료는 네 브라우저 형식의 가짜 북마크 파일(tests/fixtures/bookmarks)이다 — 실제 북마크는 쓰지 않는다.
+import {
+  BOOKMARK_SCAN_MAX, NO_FOLDER_LABEL, UNNAMED_FOLDER_LABEL, READ_NOT_BOOKMARK, READ_NO_VIDEO,
+  isBookmarkFile, parseBookmarkHtml, classifyBookmarkUrl, cleanBookmarkTitle, bookmarkDate, folderLabel,
+  collectBookmarkVideos, readBookmarkVideos, folderGroups, foundSummaryText,
+} from '../public/v41/bookmark-import.mjs';
+
+const fixture = (name) => readFileSync(new URL(`./fixtures/bookmarks/${name}.html`, import.meta.url), 'utf8');
+const NOW = new Date(2026, 10, 24, 12, 0, 0);
+const pad = (n) => String(n).padStart(2, '0');
+// 기대 날짜는 시험 기기의 시간대에서 직접 계산한다(구현의 localDateOnly를 다시 부르지 않는다).
+const localDate = (seconds) => { const d = new Date(seconds * 1000); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
+const TODAY = '2026-11-24';
+
+const HEAD = '<!DOCTYPE NETSCAPE-Bookmark-file-1>\n<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=UTF-8">\n<TITLE>Bookmarks</TITLE>\n<H1>Bookmarks</H1>\n';
+const fileOf = (body) => `${HEAD}<DL><p>\n${body}\n</DL><p>\n`;
+const anchor = (href, title = '가짜 영상', date = '1710471600') => `<DT><A HREF="${href}" ADD_DATE="${date}">${title}</A>`;
+
+test('네 브라우저 형식에서 유튜브 영상만 고르고 폴더 이름·제목·날짜를 함께 꺼낸다', () => {
+  const rows = [
+    // [파일, 영상 id 순서, 폴더 이름 순서, 재생목록, 채널, 같은 영상, 전체 북마크]
+    ['chrome', ['FAKEvid0001', 'FAKEvid0002', 'FAKEvid0003', 'FAKEvid0004'], ['북마크바', '북마크바 › 직캠 모음', '북마크바 › 직캠 모음', NO_FOLDER_LABEL], 1, 1, 1, 9],
+    ['edge', ['FAKEvid0011', 'FAKEvid0012', 'FAKEvid0013', 'FAKEvid0014'], ['즐겨찾기 모음', '즐겨찾기 모음', '즐겨찾기 모음', '즐겨찾기 모음'], 0, 1, 1, 8],
+    ['firefox', ['FAKEvid0101', 'FAKEvid0102', 'FAKEvid0103', 'FAKEvid0104'], [NO_FOLDER_LABEL, '북마크 도구 모음 › 무대', '북마크 도구 모음 › 무대', '기타 북마크'], 1, 1, 0, 7],
+    ['safari', ['FAKEvid0201', 'FAKEvid0202', 'FAKEvid0203', 'FAKEvid0204'], ['즐겨찾기', '즐겨찾기 › 콘서트', NO_FOLDER_LABEL, '읽기 목록'], 0, 1, 1, 7],
+  ];
+  for (const [name, ids, folders, playlists, channels, duplicates, total] of rows) {
+    const read = readBookmarkVideos(fixture(name), { now: NOW });
+    assert.equal(read.ok, true, `${name}: 읽기 성공`);
+    assert.deepEqual(read.videos.map((v) => v.videoId), ids, `${name}: 유튜브 영상만, 파일 순서대로, 같은 영상은 한 번`);
+    assert.deepEqual(read.videos.map((v) => v.folder), folders, `${name}: 폴더 이름`);
+    assert.equal(read.playlistCount, playlists, `${name}: 재생목록 개수`);
+    assert.equal(read.channelCount, channels, `${name}: 채널 개수`);
+    assert.equal(read.duplicateCount, duplicates, `${name}: 같은 영상 개수`);
+    assert.equal(read.bookmarkCount, total, `${name}: 읽은 북마크 수`);
+    assert.equal(read.truncated, false);
+    assert.deepEqual(read.videos.map((v) => v.id), ['b0', 'b1', 'b2', 'b3'], `${name}: 항목 이름표는 차례대로`);
+    for (const video of read.videos) assert.ok(!/youtube$/i.test(video.title) && video.title.length > 0, `${name}: 제목에서 ' - YouTube' 꼬리를 뗀다 (${video.title})`);
+  }
+});
+
+test('순간 날짜는 북마크 추가 날짜를 쓰고, 없으면(사파리) 오늘이다', () => {
+  const chrome = readBookmarkVideos(fixture('chrome'), { now: NOW });
+  assert.deepEqual(chrome.videos.map((v) => [v.date, v.dated]), [1710471600, 1712545200, 1714532400, 1717210800].map((s) => [localDate(s), true]));
+  const safari = readBookmarkVideos(fixture('safari'), { now: NOW });
+  assert.deepEqual(safari.videos.map((v) => [v.date, v.dated]), Array(4).fill([TODAY, false]));
+});
+
+test('북마크 추가 날짜 → 순간 날짜 표', () => {
+  const noon = Math.floor(new Date(2024, 2, 15, 12, 0, 0).getTime() / 1000);
+  const rows = [
+    [String(noon), '2024-03-15', true, '초'],
+    [String(noon * 1000), '2024-03-15', true, '천분의 일 초로 적힌 값'],
+    [String(noon * 1000000), '2024-03-15', true, '백만분의 일 초로 적힌 값'],
+    ['', TODAY, false, '없음'],
+    [undefined, TODAY, false, '없음(undefined)'],
+    ['0', TODAY, false, '0'],
+    ['1', TODAY, false, '유튜브가 생기기 전'],
+    ['abc', TODAY, false, '숫자가 아님'],
+    ['-5', TODAY, false, '음수'],
+    [String(Math.floor(NOW.getTime() / 1000) + 3 * 86400), TODAY, false, '앞날'],
+  ];
+  for (const [input, date, dated, why] of rows) assert.deepEqual(bookmarkDate(input, NOW), { date, dated }, why);
+});
+
+test('주소 가르기 표: 영상(watch·youtu.be·shorts·live·embed)만 영상이고 재생목록·채널은 따로 센다', () => {
+  const rows = [
+    ['https://www.youtube.com/watch?v=FAKEvid0001', 'video', 'FAKEvid0001'],
+    ['https://youtu.be/FAKEvid0002?t=42', 'video', 'FAKEvid0002'],
+    ['https://www.youtube.com/shorts/FAKEvid0003', 'video', 'FAKEvid0003'],
+    ['https://www.youtube.com/live/FAKEvid0014', 'video', 'FAKEvid0014'],
+    ['https://www.youtube.com/embed/FAKEvid0104', 'video', 'FAKEvid0104'],
+    ['https://m.youtube.com/watch?v=FAKEvid0012', 'video', 'FAKEvid0012'],
+    ['https://music.youtube.com/watch?v=FAKEvid0011', 'video', 'FAKEvid0011'],
+    ['http://www.youtube.com/watch?v=FAKEvid0013', 'video', 'FAKEvid0013'],
+    ['https://www.youtube.com/watch?v=FAKEvid0004&list=PLfake01&index=2', 'video', 'FAKEvid0004'],
+    ['https://www.youtube.com/playlist?list=PLfake01', 'playlist', ''],
+    ['https://www.youtube.com/watch?list=PLfake01', 'playlist', ''],
+    ['https://music.youtube.com/playlist?list=PLfake01', 'playlist', ''],
+    ['https://www.youtube.com/@fakechannel', 'channel', ''],
+    ['https://www.youtube.com/@fakechannel/videos', 'channel', ''],
+    ['https://www.youtube.com/channel/UCfake000000000000000001', 'channel', ''],
+    ['https://www.youtube.com/c/FakeChannelName', 'channel', ''],
+    ['https://www.youtube.com/user/fakeuser', 'channel', ''],
+    ['https://www.youtube.com/', 'other', ''],
+    ['https://www.youtube.com/results?search_query=fake', 'other', ''],
+    ['https://www.youtube.com/watch?v=short', 'other', ''],
+    ['https://youtube.com.evil.example/watch?v=FAKEvid0001', 'other', ''],
+    ['https://example.test/watch?v=FAKEvid0001', 'other', ''],
+    ['https://user:pw@www.youtube.com/watch?v=FAKEvid0001', 'other', ''],
+    ['https://i.ytimg.com/vi/FAKEvid0001/hqdefault.jpg', 'other', ''],
+    ['place:sort=8&maxResults=10', 'other', ''],
+    ['javascript:alert(1)', 'other', ''],
+    ['', 'other', ''],
+    [`https://www.youtube.com/watch?v=FAKEvid0001&x=${'a'.repeat(2100)}`, 'other', ''],
+  ];
+  for (const [href, kind, videoId] of rows) {
+    const found = classifyBookmarkUrl(href);
+    assert.equal(found.kind, kind, href.slice(0, 80));
+    assert.equal(found.videoId, videoId, href.slice(0, 80));
+  }
+});
+
+test('북마크 제목 손질 표', () => {
+  const rows = [
+    ['(3) 봄 무대 직캠 4K - YouTube', '봄 무대 직캠 4K'],
+    ['(99+) 봄 무대 - YouTube', '봄 무대'],
+    ['첫 음반 타이틀곡 - YouTube Music', '첫 음반 타이틀곡'],
+    ['여름 축제 – YouTube', '여름 축제'],
+    ['  줄바꿈\n 섞인   제목 - YouTube ', '줄바꿈 섞인 제목'],
+    ['(2024) 연말 무대', '(2024) 연말 무대'],
+    ['(3) 내가 붙인 이름', '(3) 내가 붙인 이름'],
+    ['내가 붙인 이름', '내가 붙인 이름'],
+    ['YouTube', ''],
+    ['https://www.youtube.com/watch?v=FAKEvid0001', ''],
+    ['', ''],
+    [undefined, ''],
+  ];
+  for (const [raw, want] of rows) assert.equal(cleanBookmarkTitle(raw), want, String(raw));
+});
+
+test('같은 영상은 주소 모양이 달라도 한 번만, 구간이 다르면 다른 장면으로 남긴다(#876 규칙)', () => {
+  const text = fileOf([
+    anchor('https://www.youtube.com/watch?v=FAKEvid0001', '첫 북마크'),
+    anchor('https://youtu.be/FAKEvid0001', '짧은 주소'),
+    anchor('https://www.youtube.com/shorts/FAKEvid0001', '쇼츠 주소'),
+    anchor('https://www.youtube.com/watch?v=FAKEvid0001&t=90', '90초부터'),
+    anchor('https://youtu.be/FAKEvid0001?t=90', '90초부터 짧은 주소'),
+  ].join('\n'));
+  const read = readBookmarkVideos(text, { now: NOW });
+  assert.deepEqual(read.videos.map((v) => v.title), ['첫 북마크', '90초부터']);
+  assert.equal(read.duplicateCount, 3);
+});
+
+test('북마크 파일이 아니면 읽지 않고, 영상이 없으면 까닭과 개수를 돌려준다', () => {
+  const page = '<!doctype html><html><body><a href="https://www.youtube.com/watch?v=FAKEvid0001">영상</a></body></html>';
+  assert.equal(isBookmarkFile(page), false);
+  const refused = readBookmarkVideos(page, { now: NOW });
+  assert.deepEqual([refused.ok, refused.reason, refused.videos.length], [false, READ_NOT_BOOKMARK, 0]);
+  for (const blank of ['', null, undefined, '{"roots":{}}']) assert.equal(readBookmarkVideos(blank).reason, READ_NOT_BOOKMARK);
+  const none = readBookmarkVideos(fileOf([anchor('https://example.test/'), anchor('https://www.youtube.com/playlist?list=PLfake01'), anchor('https://www.youtube.com/@fake')].join('\n')), { now: NOW });
+  assert.deepEqual([none.ok, none.reason, none.playlistCount, none.channelCount, none.bookmarkCount], [false, READ_NO_VIDEO, 1, 1, 3]);
+  assert.equal(isBookmarkFile(`﻿\n\t${HEAD}`), true, '앞에 빈칸·표식이 있어도 북마크 파일이다');
+  assert.equal(isBookmarkFile('<!doctype netscape-bookmark-file-1>'), true, '대소문자를 가리지 않는다');
+});
+
+test('어긋난 구조도 멈추지 않고 읽는다: 닫히지 않은 꼬리표·속성 안의 >·글자 표기·이름 없는 폴더', () => {
+  const text = `${HEAD}<DL><p>
+    <DT><H3 ADD_DATE="1">가수 &amp; 무대 &#44032;&#x1F600;</H3>
+    <DL><p>
+      <DT><A HREF="https://www.youtube.com/watch?v=FAKEvid0301&amp;t=5" ICON="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg'></svg>" ADD_DATE="1710471600">꺾쇠 &lt;b&gt; <b>굵게</b> &quot;따옴표&quot;</A>
+      <DT><A HREF='https://youtu.be/FAKEvid0302' ADD_DATE=1710471601>따옴표 없는 속성
+      <DT><A HREF="https://youtu.be/FAKEvid0303">닫히지 않고 폴더가 닫힘
+    </DL><p>
+    <DT><H3></H3>
+    <DL><p>
+      <DT><A HREF="https://youtu.be/FAKEvid0304">이름 없는 폴더 안</A>
+    </DL><p>
+    <DT><H3>목록 없이 끝난 폴더</H3>
+    <DT><A HREF="https://youtu.be/FAKEvid0305">그다음 북마크</A>
+    </DL></DL></DL>
+    <DT><A HREF="https://youtu.be/FAKEvid0306">남는 닫기 뒤</A>`;
+  const read = readBookmarkVideos(text, { now: NOW });
+  assert.deepEqual(read.videos.map((v) => [v.videoId, v.title, v.folder]), [
+    ['FAKEvid0301', '꺾쇠 <b> 굵게 "따옴표"', '가수 & 무대 가😀'],
+    ['FAKEvid0302', '따옴표 없는 속성', '가수 & 무대 가😀'],
+    ['FAKEvid0303', '닫히지 않고 폴더가 닫힘', '가수 & 무대 가😀'],
+    ['FAKEvid0304', '이름 없는 폴더 안', UNNAMED_FOLDER_LABEL],
+    ['FAKEvid0305', '그다음 북마크', NO_FOLDER_LABEL],
+    ['FAKEvid0306', '남는 닫기 뒤', NO_FOLDER_LABEL],
+  ]);
+  assert.equal(read.videos[0].url, 'https://www.youtube.com/watch?v=FAKEvid0301&t=5', '주소의 &amp;는 &로 읽는다');
+  assert.equal(read.videos[1].dated, true, '따옴표 없는 ADD_DATE도 읽는다');
+});
+
+test('폴더는 깊이 들어가도 바깥부터 차례로 잇고, 폴더별 묶음은 처음 나온 순서를 지킨다', () => {
+  const nested = (depth, inner) => depth ? `<DT><H3>단계${depth}</H3>\n<DL><p>\n${nested(depth - 1, inner)}\n</DL><p>` : inner;
+  const text = fileOf([
+    anchor('https://youtu.be/FAKEvid0401', '바깥 하나'),
+    nested(3, anchor('https://youtu.be/FAKEvid0402', '깊은 곳')),
+    anchor('https://youtu.be/FAKEvid0403', '바깥 둘'),
+    `<DT><H3>단계3</H3>\n<DL><p>\n${anchor('https://youtu.be/FAKEvid0404', '같은 이름의 다른 폴더')}\n</DL><p>`,
+  ].join('\n'));
+  const read = readBookmarkVideos(text, { now: NOW });
+  assert.deepEqual(read.videos.map((v) => v.folderPath), [[], ['단계3', '단계2', '단계1'], [], ['단계3']]);
+  const groups = folderGroups(read.videos);
+  assert.deepEqual(groups.map((g) => [g.label, g.videos.map((v) => v.videoId)]), [
+    [NO_FOLDER_LABEL, ['FAKEvid0401', 'FAKEvid0403']],
+    ['단계3 › 단계2 › 단계1', ['FAKEvid0402']],
+    ['단계3', ['FAKEvid0404']],
+  ]);
+  assert.equal(folderLabel([]), NO_FOLDER_LABEL);
+  assert.equal(folderLabel(['가', '', '나']), '가 › 나');
+});
+
+test('북마크가 아주 많으면 상한까지만 읽고 알린다', () => {
+  const many = Array.from({ length: BOOKMARK_SCAN_MAX + 5 }, (_, i) => `<DT><A HREF="https://example.test/${i}">글 ${i}</A>`);
+  many[10] = anchor('https://youtu.be/FAKEvid0501', '앞쪽 영상');
+  many[BOOKMARK_SCAN_MAX + 2] = anchor('https://youtu.be/FAKEvid0502', '상한 뒤 영상');
+  const parsed = parseBookmarkHtml(fileOf(many.join('\n')));
+  assert.equal(parsed.entries.length, BOOKMARK_SCAN_MAX);
+  assert.equal(parsed.truncated, true);
+  const read = readBookmarkVideos(fileOf(many.join('\n')), { now: NOW });
+  assert.deepEqual([read.ok, read.truncated, read.videos.map((v) => v.videoId)], [true, true, ['FAKEvid0501']]);
+});
+
+test('찾은 것 요약 문구: 개수만 말하고, 없는 항목은 말하지 않는다', () => {
+  const videos = (n) => Array.from({ length: n }, () => ({}));
+  const rows = [
+    [{ videos: videos(4) }, '유튜브 영상 4개를 찾았어요.'],
+    [{ videos: videos(4), playlistCount: 2 }, '유튜브 영상 4개를 찾았어요. 재생목록 2개는 이번에는 담지 않아요.'],
+    [{ videos: videos(4), channelCount: 5 }, '유튜브 영상 4개를 찾았어요. 채널 5개는 이번에는 담지 않아요.'],
+    [{ videos: videos(37), playlistCount: 2, channelCount: 5, duplicateCount: 3 }, '유튜브 영상 37개를 찾았어요. 재생목록 2개·채널 5개는 이번에는 담지 않아요. 같은 영상 3개는 하나로 모았어요.'],
+  ];
+  for (const [input, want] of rows) assert.equal(foundSummaryText(input), want);
+});
+
+test('유튜브가 아닌 북마크의 주소·제목은 결과에 남지 않는다', () => {
+  const read = readBookmarkVideos(fixture('chrome'), { now: NOW });
+  const dump = JSON.stringify(read);
+  for (const secret of ['example.test', '가짜 소식', '가짜 채널', '무대 모음', 'PLfake']) {
+    if (secret === 'PLfake') { assert.equal(read.videos.filter((v) => v.url.includes(secret)).length, 1, '재생목록 안의 영상 주소는 영상으로 남는다'); continue; }
+    assert.ok(!dump.includes(secret), `${secret} 은(는) 결과에 없어야 한다`);
+  }
+  assert.equal(collectBookmarkVideos(null).videos.length, 0);
+});

@@ -31,6 +31,30 @@ export function viewportBox(vv) {
   return {top: Number.isFinite(top) && top > 0 ? Math.round(top) : 0, height: Math.round(height)};
 }
 
+// #822 1단계: 쉬운 추가 탭 맨 아래의 '북마크에서 가져오기' 입구 한 줄. 가져오기 창과 한 벌로 붙였다 떼기 쉽게
+// 마크업을 index.html에 두지 않고 여기서 만든다. 모양은 기존 안내 줄(quick-drop-hint)·글자 단추(quick-refine)
+// 클래스를 그대로 쓴다. 누르면 onOpen만 부른다 — 창 모듈은 그때 받는다(shell/bookmark-import.mjs).
+export const BOOKMARK_ENTRY_ID = 'bookmark-import-open';
+export const BOOKMARK_ENTRY_LEAD = '이미 모아 둔 영상이 있나요?';
+export const BOOKMARK_ENTRY_LABEL = '북마크에서 가져오기';
+export function mountBookmarkEntry({ $, document: doc = globalThis.document, onOpen } = {}) {
+  const host = $?.('write-easy');
+  if (!host?.append || !doc?.createElement) return null;
+  const line = doc.createElement('p');
+  line.className = 'quick-drop-hint bookmark-entry';
+  const lead = doc.createElement('span');
+  lead.textContent = `${BOOKMARK_ENTRY_LEAD} `;
+  const button = doc.createElement('button');
+  button.type = 'button';
+  button.id = BOOKMARK_ENTRY_ID;
+  button.className = 'quick-refine';
+  button.textContent = BOOKMARK_ENTRY_LABEL;
+  button.addEventListener('click', () => { onOpen?.(); });
+  line.append(lead, button);
+  host.append(line);
+  return button;
+}
+
 export function createWritePanel(deps) {
   const $ = deps.$;
   const storage = deps.storage || globalThis.localStorage;

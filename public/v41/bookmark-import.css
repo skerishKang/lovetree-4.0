@@ -1,0 +1,40 @@
+/* #822 1단계: 북마크에서 가져오기 창. 창을 처음 열 때 shell/bookmark-import.mjs가 이 한 장을 싣는다.
+   색·모서리는 identity.css의 --lt-* 토큰만 쓴다(밤·정원 두 테마가 같은 규칙을 탄다). 틀은 공통 가운데 카드(data-lt-panel=card). */
+#bookmark-import-panel{width:min(720px,94vw)}
+#bookmark-import-panel[open]{display:flex;flex-direction:column;overflow:hidden;padding-bottom:0}
+.bmi .eyebrow{color:var(--lt-gold)}
+.bmi-scroll{flex:1 1 auto;min-height:0;overflow:auto;overscroll-behavior:contain;padding:2px 2px 22px}
+.bmi input[type=file]{display:none}
+.bmi [hidden]{display:none}
+.bmi p,.bmi li,.bmi summary{word-break:keep-all;overflow-wrap:anywhere}
+
+/* 처음: 파일 고르기 */
+.bmi-drop{display:flex;flex-direction:column;align-items:center;gap:10px;margin-top:14px;padding:28px 18px;border:1px dashed var(--lt-gold-line);border-radius:var(--lt-r-card);background:var(--lt-stage-2);text-align:center}
+.bmi .primary{min-height:48px;padding:0 24px;border:1px solid var(--lt-primary);border-radius:var(--lt-r-pill);background:var(--lt-primary);color:var(--lt-primary-ink);font-size:15px;font-weight:600}
+.bmi .bmi-pick-hint{margin:0}
+.bmi-status:empty,.bmi-error:empty{display:none}
+.bmi .bmi-status{margin:12px 0 0;color:var(--lt-pearl)}
+.bmi .bmi-error{margin:12px 0 0;color:var(--lt-rose);font-weight:600}
+html[data-lt-theme=garden] .bmi .bmi-error{color:var(--lt-rose-ink)}
+.bmi-help{margin-top:20px;padding-top:6px}
+.bmi-help summary{color:var(--lt-pearl)}
+.bmi-help-list{display:grid;gap:8px;margin:4px 0 0;padding:0;list-style:none}
+.bmi-help-list li{display:grid;grid-template-columns:92px minmax(0,1fr);gap:10px;font-size:13px;line-height:1.7;color:var(--lt-muted)}
+.bmi-help-list strong{font-weight:600;color:var(--lt-pearl)}
+.bmi-facts{display:grid;gap:4px;margin:18px 0 0;padding:14px 0 0 18px;border-top:1px solid var(--lt-line);font-size:13px;line-height:1.7;color:var(--lt-muted)}
+
+/* 찾은 것 요약 */
+.bmi-summary-row{display:flex;align-items:flex-start;gap:12px;margin-top:10px}
+.bmi .bmi-summary{flex:1;min-width:0;margin:0;font-size:14px;line-height:1.7;color:var(--lt-pearl)}
+.bmi-link{flex:0 0 auto;min-height:44px;padding:0 4px;border:0;background:none;color:var(--lt-gold);font-size:13px;white-space:nowrap}
+.bmi-link:hover{text-decoration:underline}
+.bmi .bmi-note{margin:6px 0 0}
+.bmi-folders{display:grid;gap:6px;margin:14px 0 0;padding:0;list-style:none}
+.bmi-folders li{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:44px;padding:8px 14px;border:1px solid var(--lt-line);border-radius:var(--lt-r-card);font-size:14px;color:var(--lt-pearl)}
+.bmi-folder-name{min-width:0;overflow-wrap:anywhere}
+.bmi-folder-count{flex:0 0 auto;color:var(--lt-muted);font-size:13px;font-variant-numeric:tabular-nums}
+
+@media(max-width:520px){
+ #bookmark-import-panel{width:100vw}
+ .bmi-help-list li{grid-template-columns:1fr;gap:0}
+}
