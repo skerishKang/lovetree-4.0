@@ -14,7 +14,8 @@ export function checkScreenResults(needs = {}) {
     } else if (result === 'skipped') {
       // 2026-11-24: 한 화면만 바뀐 PR은 고른 잡 밖의 화면 잡을 건너뛴다. 고르지 않은 잡의 건너뜀만 통과다.
       const jobs = gate?.outputs?.jobs;
-      const notPicked = changed === 'true' && jobs !== undefined && jobs !== 'all' && !String(jobs).split(',').includes(name);
+      // 빈 값·없음은 옛 판정 도구(jobs를 모름)라 전부 돌았어야 한다 — 건너뜀을 통과시키지 않는다.
+      const notPicked = changed === 'true' && typeof jobs === 'string' && jobs !== '' && jobs !== 'all' && !jobs.split(',').includes(name);
       if (changed !== 'false' && !notPicked) failures.push(`${name}이 바뀜 판정 ${changed}에서 건너뛰었다`);
     } else if (result !== 'success') {
       failures.push(`${name}이 성공하지 않았다(${result})`);
