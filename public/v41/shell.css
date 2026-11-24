@@ -164,11 +164,10 @@ nav #record-menu:hover{background:rgba(255,255,255,.06);border-radius:var(--lt-r
 nav #record-menu #source-label{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 nav #record-menu svg{flex:0 0 auto;opacity:.7}
 nav #record-menu[hidden]{display:none}
-/* 주 버튼은 #write-menu 하나뿐. 금색 강조는 기존 토큰만 쓴다. */
-.header-actions #write-menu.primary-action{background:rgba(255,230,166,.1);border-color:var(--lt-gold-line);color:var(--lt-gold);box-shadow:inset 0 0 0 1px rgba(255,230,166,.18)}
-.header-actions #write-menu.primary-action:hover{background:rgba(255,230,166,.16);border-color:var(--lt-gold);color:var(--lt-gold)}
-/* 첫 화면은 가운데 추가 단추만 강조 — 머리줄은 밝은 테두리, 모바일 ＋는 숨긴다(#1084). */
-body.home-existing .header-actions #write-menu.primary-action,body.home-existing .header-actions #write-menu.primary-action:hover{background:var(--lt-paper);border-color:var(--lt-line-paper);color:var(--lt-ink);box-shadow:none}
+/* #1246: 같은 순간 추가 동작은 모든 화면에서 같은 장미색을 사용한다. */
+html .header-actions #write-menu.primary-action,html .header-actions #write-menu.primary-action:hover{
+ background:var(--lt-cta-rose);border-color:var(--lt-cta-rose);color:var(--lt-cta-white);box-shadow:none
+}
 body.home-existing.lt-fab-ok #mobile-add{display:none}
 /* 로그인·로그아웃 모두 같은 머리줄 테마 단추(#776 규칙) — 44px 원형, 값은 lt41.theme 공유. */
 #theme-toggle{width:44px;height:44px;min-width:44px;min-height:44px;padding:0;border-radius:50%;border:1px solid var(--line);background:rgba(255,255,255,.05);color:var(--lt-gold);font-size:17px;line-height:1;display:inline-flex;align-items:center;justify-content:center}
@@ -207,7 +206,6 @@ html[data-lt-auth-phase=pending] #mobile-add{visibility:hidden;pointer-events:no
  html[data-lt-auth-phase] .app-header .tree-slot{flex:0 0 208px;width:208px}
  html[data-lt-auth-phase] .app-header .account-slot{flex:0 0 80px;width:80px;justify-content:flex-end}
  html[data-lt-auth-phase] .app-header #write-menu{flex:0 0 122px;width:122px}
- html[data-lt-auth-phase] .app-header #write-menu[hidden]{display:flex;visibility:hidden;pointer-events:none}
 }
 /* #1026: 늦게 도착하는 글꼴의 한글 폭을 미리 맞춰 머리줄·안내 문구 이동을 줄인다. */
 @font-face{font-family:'LT UI Metric Fallback';src:local('Malgun Gothic');size-adjust:86%;font-display:swap}
@@ -566,7 +564,7 @@ html[data-lt-theme=garden] #cleanup-panel input:not([type=checkbox]),html[data-l
 /* 탭은 글자 링크다 — 누름 영역은 44px, hover는 옅은 바탕·진한 글자색. */
 .tree-frame .tree-views>button{min-height:44px;align-self:center;border:0;border-radius:8px;padding:0 12px;background:none;font-size:14px;font-weight:400;color:var(--lt-muted)}
 .tree-frame .tree-views>button:hover,.tree-frame .tree-views>button:focus-visible{background:rgba(255,255,255,.07)}
-.tree-frame .tree-views>button#community-menu{border-left:1px solid var(--line);margin-left:8px}
+
 /* 261119 대표 결정: 탭을 감싸는 판을 없앤다 — 판 배경·테두리·안쪽 여백 0, 탭은 글자 링크다(판 배경 없음). */
 .tree-frame{display:flex;align-items:center;flex:0 0 auto;margin-left:6px}
 /* 이슈 421 2회차: 트리 선택·보기 탭이 모두 숨겨진 상태(로그아웃·트리 없음·공유)에서는 빈 틀이 점으로 남지 않게 틀 자체를 숨긴다. */
@@ -652,7 +650,7 @@ nav .tree-frame{scroll-snap-align:center}
    공유·예시 화면·로그아웃·읽기 전용·창(dialog)이 열려 있을 때·화상 키보드가 올라올 때는 숨긴다. 781px 이상에는 영향이 없다. */
 #mobile-add{display:none}
 @media(max-width:780px){
- #mobile-add{position:fixed;right:14px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:40;width:56px;height:56px;display:none;align-items:center;justify-content:center;border-radius:50%;border:1px solid var(--lt-gold-line);background:var(--lt-primary);color:var(--lt-primary-ink);font-size:26px;line-height:1;box-shadow:0 10px 30px #0008;cursor:pointer}
+ #mobile-add{position:fixed;right:14px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:40;width:56px;height:56px;display:none;align-items:center;justify-content:center;border-radius:50%;border:1px solid var(--lt-cta-rose);background:var(--lt-cta-rose);color:var(--lt-cta-white);font-size:26px;line-height:1;box-shadow:0 10px 30px #0008;cursor:pointer}
  body.lt-fab-ok #mobile-add{display:flex}
  body.lt-fab-ok:has(dialog[open]) #mobile-add{display:none}
  body.lt-fab-ok.lt-kbd #mobile-add{display:none}
@@ -1248,6 +1246,44 @@ nav #record-menu #source-label{flex:1 1 auto;text-align:left}
 .header-actions .view-toggle>button[aria-checked=true]{background:var(--lt-primary);color:var(--lt-primary-ink)}
 html[data-lt-theme=garden] .header-actions .view-toggle>button:not([aria-checked=true]){color:var(--lt-ink)}
 @media(max-width:780px){.header-actions .view-toggle{min-width:84px}}
+
+/* #1246: 공개 트리 입구는 탭이 아니라 첫 화면과 같은 선 나침반·투명 테두리 단추다. */
+@media(min-width:781px){
+html .tree-frame .tree-views>button#community-menu{
+ display:inline-flex;align-items:center;justify-content:center;gap:6px;flex:none;
+ min-height:44px;padding:0 12px;margin-left:8px;border:1px solid var(--lt-line);
+ border-radius:var(--lt-r-pill);background:transparent;box-shadow:none;
+ color:var(--lt-muted);text-decoration:none
+}
+html .tree-frame .tree-views>button#community-menu:is(:hover,:focus-visible,[aria-current=true]){
+ border-color:var(--lt-pearl);color:var(--lt-pearl);background:transparent;text-decoration:none;box-shadow:none
+}
+html .tree-frame .tree-views>button#community-menu[aria-current=true]{font-weight:600}
+#community-menu .header-compass{width:15px;height:15px;flex:none}
+}
+
+
+/* #1246: 권한 단추가 없어도 칸은 그대로 둔다. 숨긴 단추는 초점·클릭 대상이 아니다. */
+.app-header .tree-slot{min-height:40px}
+.app-header .tree-slot:has(>#record-menu[hidden])>.tree-prefix,
+html[data-lt-auth-phase=pending] .app-header .tree-prefix{visibility:hidden}
+@media(min-width:781px){
+ .app-header .brand{flex:0 0 112px;width:112px}
+ .app-header .header-actions{display:grid;grid-template-columns:44px 122px 80px;align-items:center}
+ .app-header .header-actions>#theme-toggle{grid-column:1;grid-row:1}
+ .app-header .header-actions>#write-menu{grid-column:2;grid-row:1;width:122px}
+ .app-header .header-actions>.account-slot{grid-column:3;grid-row:1;width:80px;justify-content:flex-end}
+ .app-header .tree-slot{flex:0 0 208px;width:208px}
+ .app-header .tree-prefix{flex:0 0 21px;width:21px;margin-right:8px}
+ .app-header .tree-frame .tree-views{display:grid;grid-template-columns:56px 44px 56px 56px 104px;gap:2px}
+ .app-header .tree-frame .tree-views>button[data-view]{padding-inline:0;width:100%}
+ .app-header .tree-frame .tree-views>button#community-menu{width:96px;padding-inline:0}
+ .app-header .account-slot>#account-entry{width:72px}
+}
+@media(max-width:780px){
+ .app-header .account-slot>#account-entry{width:56px}
+ .app-header .tree-frame .tree-slot{min-height:40px}
+}
 
 /* #1259-2: 방문자 책 첫 안내만 문서 흐름의 별도 칸을 사용한다. 보드 안내와 머리줄은 그대로. */
 body[data-record-source=share][data-fab-lift=book] #toast[data-visitor-intro]:not([hidden]){
