@@ -131,3 +131,12 @@ html[data-v41-screen=board] .lt-screen-toolbar .lt-toolbar-tools .cinemaBtn{widt
   .lt-toolbar-tools .boardModeSwitch .modeSwitchBtn{padding:0}
   .lt-toolbar-tools .cinemaBtn{padding:0 6px}
 }
+
+/* #1249: 공통 줄은 판의 종이/밤 선택과 독립된 앱 테마를 따른다. */
+html[data-v41-screen=network]:not([data-lt-board-theme=night]) .lt-screen-toolbar .pill:not([aria-pressed=true]){
+  color:var(--lt-pearl);
+}
+
+html[data-v41-screen=network]:not([data-lt-board-theme=night]) .lt-screen-toolbar .view-switch{
+  background:var(--lt-glass-strong);box-shadow:inset 0 0 0 1px var(--lt-line);
+}
