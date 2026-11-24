@@ -412,6 +412,9 @@ test('#951 ⑤ 서재에서 들어온 지도: ← 서재 단추 1개 + 묶음 �
         assert.ok(frame, `${width}/${n}: 지도 프레임이 열린다`);
         await frame.waitForFunction(() => (window.__lt?.dots?.()?.length || 0) > 0, null, { timeout: 20000 });
         await page.waitForTimeout(500);
+        // #1249: 휴대폰 묶음 단추는 한 줄의 더 보기에서 열고 기존 검사를 그대로 한다.
+        const more = frame.locator('#mobileRibbon .ribbon-more');
+        if (await more.isVisible()) await more.click();
         const m = await frame.evaluate(() => {
           const vis = (el) => { if (!el) return false; const cs = getComputedStyle(el); if (cs.display === 'none' || cs.visibility === 'hidden') return false; const r = el.getBoundingClientRect(); return r.width > 1 && r.height > 1; };
           const box = (el) => { const r = el.getBoundingClientRect(); return { l: Math.round(r.left), r: Math.round(r.right), t: Math.round(r.top), b: Math.round(r.bottom) }; };

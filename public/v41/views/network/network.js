@@ -668,6 +668,41 @@
     } else {
       addFit();
     }
+    // #1249: 휴대폰에서는 묶음 선택을 한 개의 메뉴로 묶고 전체 맞춤을 항상 노출한다.
+    const chips = [...r.querySelectorAll('button[data-i]')];
+    if (chips.length) {
+      const more = document.createElement('button');
+      more.className = 'ribbon-more';
+      more.type = 'button';
+      more.textContent = '…';
+      more.setAttribute('aria-label', '묶음 선택');
+      more.setAttribute('aria-expanded', 'false');
+      more.setAttribute('aria-controls', 'ribbonGroups');
+      const groups = document.createElement('div');
+      groups.id = 'ribbonGroups';
+      groups.className = 'ribbon-groups';
+      const close = () => {
+        groups.classList.remove('is-open');
+        more.setAttribute('aria-expanded', 'false');
+      };
+      more.onclick = () => {
+        const open = groups.classList.toggle('is-open');
+        more.setAttribute('aria-expanded', String(open));
+        if (open) groups.querySelector('button')?.focus();
+      };
+      groups.addEventListener('keydown', e => {
+        if (e.key === 'Escape') { close(); more.focus(); }
+      });
+      r.insertBefore(more, chips[0]);
+      r.insertBefore(groups, chips[0]);
+      for (const chip of chips) {
+        groups.append(chip);
+        chip.addEventListener('click', () => {
+          close();
+          if (more.getClientRects().length) more.focus();
+        });
+      }
+    }
     syncRibbon();
   }
   function syncRibbon() {

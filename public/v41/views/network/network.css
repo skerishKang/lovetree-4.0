@@ -366,3 +366,21 @@ html[data-v41-screen=network][data-lt-board-theme=night] body .detailPlayer{back
 /* 좁은 화면 시트에서는 사진이 판을 다 차지하지 않게 줄인다 — 제목·마음·날짜·이어진 순간이 한눈에 들어온다.
    (파일 끝에 둔다 — 위의 .detailPlayer img 기본값보다 나중에 읽혀야 이긴다.) */
 @media(max-width:640px){.detailPlayer img,.detailPlayer video{max-height:124px}}
+
+/* #1249: 넓은 화면은 묶음 단추를 그대로, 좁은 화면은 별도 묶음 선택 메뉴. */
+.mobile-ribbon .ribbon-more{display:none}
+.ribbon-groups{display:contents}
+@media(max-width:640px){
+  html[data-v41-screen=network] .mobile-ribbon{flex-wrap:nowrap;align-items:center;gap:4px;overflow:visible}
+  html[data-v41-screen=network] .mobile-ribbon>button{min-width:44px;min-height:44px;height:44px;padding:0 8px}
+  html[data-v41-screen=network] .mobile-ribbon .ribbon-more{display:block}
+  html[data-v41-screen=network] .ribbon-groups{display:none}
+  html[data-v41-screen=network] .ribbon-groups.is-open{
+    display:flex;flex-direction:column;align-items:stretch;gap:4px;
+    position:absolute;left:0;right:0;bottom:calc(100% + 8px);padding:8px;
+    max-height:40vh;overflow:auto;border:1px solid var(--lt-line);
+    border-radius:16px;background:var(--lt-glass-strong);color:var(--lt-pearl);
+  }
+  html[data-v41-screen=network] .ribbon-groups button{min-height:44px;white-space:normal;text-align:left}
+  html[data-v41-screen=network][data-lt-board-theme=night] body .ribbon-groups{background:var(--lt-map-panel);border-color:var(--lt-map-ui-border);color:var(--lt-map-ui-text)}
+}

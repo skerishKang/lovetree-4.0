@@ -412,3 +412,51 @@ test('#1249 서재 검색칸: 390 안내 글자 전체 표시, 검색 동작, �
     }
   }finally{await browser.close();await new Promise(r=>server.close(r));}
 });
+
+
+test('#1249 지도 390: 하단 한 줄, 전체 맞춤 유지, 묶음 선택 가능', { skip, timeout: 120000 }, async () => {
+  const tree={id:'t1',title:'시험용',moments:[1,2,3,4,5,6].map(i=>({id:'m'+i,title:'시험 순간 '+i,type:'memo',date:'2026-0'+i+'-01',note:'가짜 기록',first:i===1})),edges:[]};
+  const host=`<html><body style="margin:0" data-member="in" data-record-source="server"><script>window.LT41=${JSON.stringify({source:'server',writable:true,owned:true,momentId:'m1',prefs:{},tree,trees:[tree]})};</script><iframe src="/v41/views/track56-network.html" style="position:fixed;inset:0;width:100vw;height:100vh;border:0"></iframe></body></html>`;
+  const server=await serve({'/map-ribbon-host.html':host}),base='http://127.0.0.1:'+server.address().port;
+  const browser=await chromium.launch({headless:true});
+  try{
+    for(const theme of ['garden','night']) for(const width of [360,390]){
+      const ctx=await browser.newContext({viewport:{width,height:844}});
+      try{
+        await ctx.addInitScript(t=>localStorage.setItem('lt41.theme',t),theme);
+        await ctx.route('**/*',r=>{const u=new URL(r.request().url());if(u.origin!==base)return r.abort();if(u.pathname.startsWith('/api/'))return r.fulfill({status:200,json:{ok:true,items:[]}});return r.continue();});
+        const page=await ctx.newPage();
+        await page.goto(base+'/map-ribbon-host.html',{waitUntil:'load',timeout:20000});
+        const frame=page.frames().find(f=>f!==page.mainFrame());
+        await frame.waitForFunction(()=>window.__lt?.dots?.()?.length>0);
+        const read=()=>frame.evaluate(()=>{
+          const r=document.getElementById('mobileRibbon'),rr=r.getBoundingClientRect();
+          const buttons=[...r.querySelectorAll(':scope>button')].filter(b=>b.getClientRects().length).map(b=>{
+            const a=b.getBoundingClientRect(),s=getComputedStyle(b);
+            const range=document.createRange();range.selectNodeContents(b);
+            return {label:b.textContent,top:a.top,height:a.height,width:a.width,inside:a.left>=rr.left&&a.right<=rr.right&&a.bottom<=rr.bottom,clipped:range.getBoundingClientRect().width>b.clientWidth-parseFloat(s.paddingLeft)-parseFloat(s.paddingRight)+1};
+          });
+          return {height:rr.height,overflow:r.scrollWidth-r.clientWidth,buttons,rows:new Set(buttons.map(b=>b.top)).size,docOverflow:document.documentElement.scrollWidth-innerWidth};
+        });
+        const m=await read(),label=theme+'/'+width;
+        console.log(label,JSON.stringify(m));
+        assert.equal(m.rows,1,label+' 한 줄');
+        assert.equal(m.overflow,0,label+' 줄 가로 넘침 0');
+        assert.equal(m.docOverflow,0,label+' 화면 가로 넘침 0');
+        assert.ok(m.buttons.some(b=>b.label==='전체 맞춤'),label+' 전체 맞춤 노출');
+        assert.ok(m.buttons.every(b=>b.inside&&!b.clipped&&b.height>=44&&b.width>=44),label+' 단추 잘림 0 및 44px');
+        const more=frame.locator('.ribbon-more');
+        if(await more.isVisible()){
+          await more.click();
+          const chip=frame.locator('.ribbon-groups button[data-i]').first();
+          await chip.waitFor({state:'visible'});
+          await chip.click();
+          assert.equal(await more.getAttribute('aria-expanded'),'false');
+          assert.equal(await frame.locator('.ribbon-groups').isVisible(),false);
+        }
+        await frame.locator('#mobileRibbon button').filter({hasText:'전체 맞춤'}).click();
+        assert.equal((await read()).rows,1);
+      }finally{await ctx.close();}
+    }
+  }finally{await browser.close();await new Promise(r=>server.close(r));}
+});
