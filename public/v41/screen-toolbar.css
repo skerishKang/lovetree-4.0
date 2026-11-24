@@ -189,3 +189,5 @@ html[data-v41-screen=network] .lt-screen-toolbar :is(.lt-toolbar-tools,.lt-toolb
 html[data-v41-screen=network] .lt-screen-toolbar :is(.lt-toolbar-tools,.lt-toolbar-menu) .view-switch .pill[aria-pressed=true]{
   background:var(--lt-primary);color:var(--lt-primary-ink);
 }
+
+html[data-v41-screen=network] body .lt-screen-toolbar :is(.lt-toolbar-tools,.lt-toolbar-menu) :is(#overviewBtn,#netBgBtn){background:var(--lt-glass-strong);border-color:var(--lt-line);color:var(--lt-pearl);box-shadow:none}
