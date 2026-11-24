@@ -331,6 +331,10 @@ $('zoomOut').addEventListener('click', () => { glide(); zoomAt(1 / 1.3, ...cente
 
 const data=window.LTDEMO;
 const detail=$('treeDetail');
+// #1295: 순간 상세도 '순간 열기'다 — 주소가 그대로인 기록을 쌓고 뒤로 가기로 닫는다.
+let detailGuard=false;
+detail.addEventListener('close',()=>{detailGuard=false;});
+addEventListener('popstate',()=>{if(detail.open)detail.close();});
 const titleSource=el('span','',data.title||'트리');
 mountScreenToolbar({screen:'tree',titleFrom:titleSource,initialBar:document.querySelector('.lt-screen-toolbar'),tools:['goRoot','goFit','zoomOut','zoomIn'].map($)});
 function openDetail(id){
@@ -340,7 +344,10 @@ function openDetail(id){
  const host=$('treeDetailMedia');host.replaceChildren();
  const src=thumbnailCandidates(m,{autoLoad:data.source==='server'})[0];
  if(src){const img=el('img');img.alt='';img.src=src;img.addEventListener('error',()=>img.remove(),{once:true});host.append(img);}
- if(!detail.open)detail.showModal();
+ if(!detail.open){
+  detail.showModal();
+  if(!detailGuard){try{history.pushState({ltTreeDetail:1},'');detailGuard=true;}catch{}}
+ }
 }
 $('treeDetailClose').addEventListener('click',()=>detail.close());
 $('openMoment').addEventListener('click',()=>{if(state.pick)parent.postMessage({type:MSG.openBook,treeId:data.treeId,id:state.pick},location.origin);});

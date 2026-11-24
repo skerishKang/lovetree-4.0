@@ -380,3 +380,39 @@ test('#1231 로그아웃 서재·책·보드·지도 빈 상태와 화면별 로
   }
  }finally{await browser.close();await new Promise(resolve=>server.close(resolve))}
 });
+
+test('#1295 트리 보기: 순간 상세는 기록하고 보기 조작은 넣지 않는다(390·1440)', { skip: skip || undefined, timeout: 180000 }, async () => {
+ if(skip)assert.fail(skip);
+ const server=await serve(),base=`http://127.0.0.1:${server.address().port}`;
+ const browser=await chromium.launch({headless:true});
+ try{
+  for(const [width,height] of [[1440,900],[390,844]]){
+   const ctx=await browser.newContext({viewport:{width,height},reducedMotion:'reduce'});
+   try{
+    await ctx.route('**/api/**',r=>r.fulfill({status:401,contentType:'application/json',body:'{"ok":false,"code":"unauthenticated"}'}));
+    const page=await ctx.newPage();
+    await page.goto(`${base}/v41/#tree`,{waitUntil:'load'});
+    await page.waitForSelector('#view',{state:'attached'});
+    const frame=page.frameLocator('#view');
+    await frame.locator('[data-id="m01"]').waitFor({state:'visible',timeout:15000});
+    const before=await page.evaluate(()=>history.length);
+    await frame.locator('[data-id="m01"]').click();
+    await frame.locator('#treeDetail[open]').waitFor({state:'visible',timeout:5000});
+    assert.equal(await page.evaluate(()=>history.length),before+1,`${width}: 순간 열기는 기록한다`);
+    assert.equal(await page.evaluate(()=>location.hash),'#tree','주소는 그대로');
+    const view=page.frames().find(f=>f!==page.mainFrame());
+    await view.evaluate(()=>history.back());
+    await page.waitForTimeout(300);
+    assert.equal(await frame.locator('#treeDetail').evaluate(e=>e.open),false,`${width}: 뒤로 가면 상세가 닫힌다`);
+    assert.equal(await page.evaluate(()=>location.hash),'#tree','화면은 그대로');
+    // 확대·축소·전체 맞춤·묶음 펼침은 보기 옵션 — 기록이 늘지 않는다.
+    const beforeOptions=await page.evaluate(()=>history.length);
+    await frame.locator('#zoomIn').click().catch(()=>{});
+    await frame.locator('#zoomOut').click().catch(()=>{});
+    await frame.locator('#goFit').click().catch(()=>{});
+    await frame.locator('[data-id="m01:bundle"]').click().catch(()=>{});
+    assert.equal(await page.evaluate(()=>history.length),beforeOptions,`${width}: 보기 옵션은 기록하지 않는다`);
+   }finally{await ctx.close();}
+  }
+ }finally{await browser.close();await new Promise(r=>server.close(r));}
+});
