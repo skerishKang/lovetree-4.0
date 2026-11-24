@@ -58,6 +58,11 @@ const RECORD_VIEW_SQL = `
 INSERT INTO lovetree_admin_customer_views (product_id, customer_subject_id, admin_subject_id, viewed_at)
 VALUES ($1, $2, $3, now())`;
 
+const DISPLAY_NAME_SQL = `
+SELECT COALESCE(w.doc->'prefs'->>'displayName', '') AS display_name
+FROM lovetree_workspaces w
+WHERE w.product_id = $1 AND w.subject_id = $2`;
+
 const RECENT_VIEWS_SQL = `
 SELECT v.id, v.customer_subject_id, v.admin_subject_id, v.viewed_at,
        COALESCE(e.email, '') AS email,
@@ -106,6 +111,12 @@ export function createAdminCustomersRepo(pool) {
 
     async recordView({ productId, customerSubjectId, adminSubjectId }) {
       await pool.query(RECORD_VIEW_SQL, [productId, customerSubjectId, adminSubjectId]);
+    },
+
+    // 운영센터로 넘기는 의견의 보낸 사람 표시 이름(닉네임). 이메일은 꺼내지 않는다.
+    async displayNameOf({ productId, subjectId }) {
+      const { rows } = await pool.query(DISPLAY_NAME_SQL, [productId, subjectId]);
+      return rows[0]?.display_name || '';
     },
 
     async recentViews({ productId, limit = 20 }) {
