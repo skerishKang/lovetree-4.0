@@ -12,6 +12,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createMemberSession } from '../public/v41/member-session.mjs';
 import { validateState } from '../public/v41/domain.mjs';
+await import('../public/v41/views/board/viewer-meta.js');
 
 const ROOT = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
 const PUB = path.join(ROOT, 'public');
@@ -360,4 +361,30 @@ test('#1044 화면: 보드에서 저장한 뒤 셸 모델에 구간·만든 시�
   assert.equal(saved.note, '', '화면 저장 뒤 빈 한마디 유지');
   assert.deepEqual(problems, [], `화면 문제 없음 (${problems.join(' | ') || '없음'})`);
   await context.close();
+});
+
+test('#1273 2번 크게 보기: 영어 라벨 없이 한국어로 그리고 빈 값 줄은 숨긴다', () => {
+  const html = read('public/v41/views/track58-pinboard.html');
+  assert.match(html, /순간 크게 보기/, '뷰어 제목은 한국어');
+  assert.doesNotMatch(html, /VIEWER · PROVENANCE PRESERVED/);
+  assert.doesNotMatch(html, /EDIT 순간 · PROVENANCE PRESERVED/);
+  for (const file of ['board.js', 'board-extras.js', 'board-detail.js']) {
+    const src = read(`public/v41/views/board/${file}`);
+    assert.ok(src.includes('window.viewerMetaHTML'), `${file}: 공통 메타 함수를 쓴다`);
+    assert.doesNotMatch(src, /Keywords:/, `${file}: 영어 꼬리표 라벨 없음`);
+    assert.doesNotMatch(src, /<br>URL:/, `${file}: 영어 주소 라벨 없음`);
+    assert.doesNotMatch(src, /videoSource[^)]*toUpperCase\(\)/, `${file}: 뷰어의 개발용 표식 대문자화 없음`);
+  }
+  const build = globalThis.viewerMetaHTML;
+  assert.equal(typeof build, 'function');
+  const full = build({ head: '사진 · 2026-11-24 · 설렘', source: '내 기록', url: 'https://example.test/v', keywords: ['가수:BTS'], memo: '좋아요', mediaTitle: '노래 제목' });
+  assert.match(full, /출처: 내 기록/);
+  assert.match(full, /주소: https:\/\/example\.test\/v/);
+  assert.match(full, /꼬리표: #가수:BTS/);
+  assert.match(full, /마음 한마디: 좋아요/);
+  assert.doesNotMatch(full, /Keywords:|URL:|Source:|Note:/);
+  const empty = build({ head: '사진 · 2026-11-24 · 설렘', source: '', url: '', keywords: [], memo: '' });
+  assert.doesNotMatch(empty, /마음 한마디/, '빈 한마디 줄은 아예 만들지 않는다');
+  assert.doesNotMatch(empty, /꼬리표/, '빈 꼬리표 줄도 숨긴다');
+  assert.doesNotMatch(empty, /출처:|주소:/);
 });

@@ -1085,3 +1085,54 @@ test('책 도구 줄: 중복 제목 없음·이어 보기·두 칸 동일 치수
     }
   } finally {await browser.close();}
 });
+
+test('#1288 휴대폰에서는 올림·초점 말풍선을 끄고 돌아오면 남은 것을 감춘다', async () => {
+  await import('../public/v41/hover-tip.js');
+  const api = globalThis.LTHoverTip;
+  assert.equal(typeof api.isHoverDevice, 'function');
+  assert.equal(api.isHoverDevice(() => true), true, '마우스가 있는 기기');
+  assert.equal(api.isHoverDevice(() => false), false, '마우스 없는 기기');
+  assert.equal(api.isHoverDevice(() => { throw new Error('없음'); }), false, '물음 확인이 실패하면 끈다');
+  const bubbles = [{ hidden: false }, { hidden: true }];
+  api.hideHoverTips({ querySelectorAll: () => bubbles });
+  assert.deepEqual(bubbles.map((b) => b.hidden), [true, true], '모든 말풍선을 감춘다');
+  for (const file of ['public/v41/views/book/book-extra.js', 'public/v41/views/board/board-extras.js']) {
+    const src = read(file);
+    assert.match(src, /!window\.LTHoverTip\.isHoverDevice\(\)/, `${file}: 올림·초점 말풍선을 기기로 가른다`);
+    assert.match(src, /window\.LTHoverTip\.mountHoverTipGuard\(document\)/, `${file}: 돌아올 때 감추는 장치를 단다`);
+  }
+  for (const page of ['public/v41/views/track59-sketchbook.html', 'public/v41/views/track58-pinboard.html']) {
+    assert.match(read(page), /\/v41\/hover-tip\.js/, `${page}: 공통 가드를 먼저 불러온다`);
+  }
+  assert.match(read('public/v41/views/board/board-extra.css'), /@media \(hover: none\)\{\.card \.cardOrder\{opacity:1/, '보드 순서 단추는 터치에서 늘 보인다');
+  assert.match(read('public/v41/views/book/book-usability.css'), /@media \(hover: none\)/, '책 고치기 단추는 터치에서 늘 보인다');
+});
+
+test('#1288 그림만 있는 단추는 접근 이름이 있다(예외는 이유와 함께)', () => {
+  // 정적 문서에서 글자 없이 그림만 있는 단추를 찾는다. 예외는 접근 이름을 붙이는 시점과 이유를 적는다.
+  const ALLOW = {
+    'account-avatar': '로그인 상태에서 셸이 aria-label과 첫 글자를 붙인다',
+    'branchTab': '갈림길이 생길 때 book.js가 aria-label을 붙인다'
+  };
+  const pages = [
+    'public/v41/index.html', 'public/v41/views/track32-bookshelf.html',
+    'public/v41/views/track59-sketchbook.html', 'public/v41/views/track58-pinboard.html',
+    'public/v41/views/track56-network.html'
+  ];
+  const iconOnly = [];
+  for (const page of pages) {
+    for (const m of read(page).matchAll(/<button\b([^>]*)>([\s\S]*?)<\/button>/g)) {
+      const attrs = m[1];
+      const text = m[2].replace(/<[^>]*>/g, '').trim();
+      if (text || /aria-label=/.test(attrs)) continue;
+      const id = (attrs.match(/id="([^"]+)"/) || [])[1] || '';
+      if (!(id in ALLOW)) iconOnly.push(`${page}: ${id || attrs.slice(0, 40)}`);
+    }
+  }
+  assert.deepEqual(iconOnly, [], `글자·접근 이름 없는 단추 0: ${iconOnly.join(' | ')}`);
+  for (const [id, reason] of Object.entries(ALLOW)) assert.ok(reason.length > 0, `${id}: 예외 이유가 있다`);
+  // 그림 단추가 동적으로 생기는 곳도 접근 이름을 붙인다.
+  assert.match(read('public/v41/views/book/book-extra.js'), /aria-label','돋보기'/, '돋보기 접근 이름');
+  assert.match(read('public/v41/views/track56-network.html'), /aria-label="전체 맞춤"[^>]*>⤢/, '전체 맞춤 접근 이름');
+  assert.match(read('public/v41/views/track56-network.html'), /aria-label="더 보기"[^>]*>⋯/, '더 보기 접근 이름');
+});
