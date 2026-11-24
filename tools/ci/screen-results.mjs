@@ -12,7 +12,10 @@ export function checkScreenResults(needs = {}) {
     } else if (name === 'deploy') {
       if (result !== 'success') failures.push(`${name}이 성공하지 않았다(${result})`);
     } else if (result === 'skipped') {
-      if (changed !== 'false') failures.push(`${name}이 바뀜 판정 ${changed}에서 건너뛰었다`);
+      // 2026-11-24: 한 화면만 바뀐 PR은 고른 잡 밖의 화면 잡을 건너뛴다. 고르지 않은 잡의 건너뜀만 통과다.
+      const jobs = gate?.outputs?.jobs;
+      const notPicked = changed === 'true' && jobs !== undefined && jobs !== 'all' && !String(jobs).split(',').includes(name);
+      if (changed !== 'false' && !notPicked) failures.push(`${name}이 바뀜 판정 ${changed}에서 건너뛰었다`);
     } else if (result !== 'success') {
       failures.push(`${name}이 성공하지 않았다(${result})`);
     }
