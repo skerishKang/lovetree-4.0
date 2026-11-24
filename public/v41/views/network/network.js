@@ -763,13 +763,17 @@
     const detailOpen = vw > 980 && !!document.querySelector('#detail.open'),
       detailInset = detailOpen ? 446 : 0;
     const tops = ['.topbar', '.hero p'].map(s => box(document.querySelector(s))).filter(Boolean);
+    const topInset = Math.max(0, ...tops.map(r => r.bottom), picker ? pickerTop + picker.height + 4 : 0) +
+      (state.mobile ? 30 : 0);
+    const bottomInset = bottom ? vh - bottom.top : 0;
+    // #1249: 한 줄 도구로 줄어든 아래 여백을 보완해 지도 중심이 화면 아래로 쏠리지 않게 한다.
+    // 짧은 화면에서도 실제 조작 줄과 겹치지 않는 범위에서만 배치 영역을 조정한다.
+    const balance = state.mobile ? Math.min(topInset - vh * .16, vh - topInset - 152) : 0;
     return {
-      top:
-        Math.max(0, ...tops.map(r => r.bottom), picker ? pickerTop + picker.height + 4 : 0) +
-        (state.mobile ? 30 : 0),
+      top: topInset,
       left: left ? left.right : 0,
       right: Math.max(right ? vw - right.left : 0, detailInset),
-      bottom: bottom ? vh - bottom.top : 0
+      bottom: Math.max(bottomInset, balance)
     };
   }
   function layoutNetwork() {

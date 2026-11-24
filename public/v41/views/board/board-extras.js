@@ -277,7 +277,7 @@ function bindCardV11(el) {
       e.target.classList.contains('pin')
     )
       return;
-    if (cinema || (mobileBoardScroll() && e.pointerType === 'touch' && boardMode !== 'mine')) return;
+    if (cinema) return;
     if (typeof dragGuard === 'function' && !dragGuard()) return;
     e.stopPropagation();
     dragOrigin = typeof captureBoardOrderState === 'function' ? captureBoardOrderState() : null;
@@ -290,12 +290,20 @@ function bindCardV11(el) {
     el.classList.add('dragLift');
     el.setPointerCapture?.(e.pointerId);
   });
-  el.addEventListener('click', e => {
-    if (mobileBoardScroll() && e.pointerType === 'touch' && boardMode !== 'mine' &&
-        !e.target.closest('button,input,textarea,select,video')) selectMoment(id, true);
-  });
+  // 브라우저가 손짓을 세로 스크롤로 확정하기 전 가로 배치 이동만 선점한다.
+  el.addEventListener('touchmove', e => {
+    if (!mobileBoardScroll() || drag?.id !== id || !down || e.touches.length !== 1) return;
+    const t = e.touches[0];
+    const dx = Math.abs(t.clientX - down.x), dy = Math.abs(t.clientY - down.y);
+    if (moved || (dx > 4 && dx >= dy)) {
+      if (e.cancelable) e.preventDefault();
+    }
+  }, { passive: false });
   el.addEventListener('pointermove', e => {
     if (!drag || drag.id !== id) return;
+    // #1249: 날짜순 카드의 세로 손짓은 스크롤, 가로 손짓은 #1245 배치 이동으로 이어진다.
+    if (!moved && down && mobileBoardScroll() && e.pointerType === 'touch' &&
+        boardMode !== 'mine' && Math.abs(e.clientY - down.y) > Math.abs(e.clientX - down.x)) return;
     if (!moved && down && Math.hypot(e.clientX - down.x, e.clientY - down.y) > 4) {
       moved = true;
       if (typeof snapshot === 'function') dragSnapshot = snapshot();
