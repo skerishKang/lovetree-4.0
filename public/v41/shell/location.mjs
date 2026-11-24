@@ -101,8 +101,9 @@ export function createLocation(deps) {
   }
 
   function applyBrowserLocation() {
-    const detailOpen = !!globalThis.history?.state?.lt41BoardDetail;
-    const panel = globalThis.history?.state?.lt58Panel || '';
+    const historyState = globalThis.history?.state;
+    const detailOpen = historyState?.lt58Board ? !!historyState.lt41BoardDetail : parseSelectionRoute(location.hash).view === 'board';
+    const panel = historyState?.lt58Panel || '';
     if (location.hash === deps.getHandled() && detailOpen === handledBoardDetail && panel === handledBoardPanel) return;
     handledBoardDetail = detailOpen;
     handledBoardPanel = panel;
