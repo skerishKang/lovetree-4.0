@@ -1463,6 +1463,8 @@ jobs:
         if: steps.preview.outputs.url != '' && steps.changes.outputs.ui == 'true'
         id: capture-before
         continue-on-error: true
+        # 2026-11-24: 캡처가 끝나지 않는 화면에서 15분 넘게 잡을 붙잡았다. 도구 안 상한(6분)에 더해 단계도 8분에서 끊는다.
+        timeout-minutes: 8
         env:
           LOVETREE_POSTDEPLOY_BROWSER: chromium
         run: |
@@ -1478,6 +1480,8 @@ jobs:
         if: steps.preview.outputs.url != '' && steps.changes.outputs.ui == 'true'
         id: capture-after
         continue-on-error: true
+        # 2026-11-24: 캡처가 끝나지 않는 화면에서 15분 넘게 잡을 붙잡았다. 도구 안 상한(6분)에 더해 단계도 8분에서 끊는다.
+        timeout-minutes: 8
         env:
           LOVETREE_POSTDEPLOY_BROWSER: chromium
         run: |
