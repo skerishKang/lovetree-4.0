@@ -278,3 +278,40 @@ test('390 떠 있는 ＋ 단추와 의견 보내기 링크의 겹침 0', { skip,
     await new Promise((r) => server.close(r));
   }
 });
+
+test('휴대폰 책: 초기화 순서와 관계없이 이어 보기는 아래 줄에 남는다', { skip }, async () => {
+  const server = await serve({ '/book-toolbar-order.html': `<!doctype html><html data-v41-screen="book"><head>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <link rel="stylesheet" href="/v41/identity.css"><link rel="stylesheet" href="/v41/screen-toolbar.css">
+    </head><body><header hidden><span id="sourceTitle">시험용 책</span>
+    <div id="display" class="view-toggle"><button>책</button><button>목록</button></div>
+    <div id="shape" class="view-toggle"><button>1장</button><button>2장</button></div>
+    </header><nav class="nav-pill"><button id="playAllBtn">이어 보기</button></nav>
+    <script type="module">import {mountScreenToolbar} from '/v41/screen-toolbar.mjs';
+    mountScreenToolbar({screen:'book',titleFrom:document.getElementById('sourceTitle'),
+      tools:['display','shape','playAllBtn'].map(id=>document.getElementById(id))});
+    </script></body></html>` });
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+    await page.goto('http://127.0.0.1:' + server.address().port + '/book-toolbar-order.html', { waitUntil: 'load' });
+    await page.locator('.lt-screen-toolbar').waitFor();
+    const check = async () => {
+      assert.equal(await page.locator('.nav-pill > #playAllBtn').count(), 1);
+      assert.equal(await page.locator('.lt-screen-toolbar #playAllBtn').count(), 0);
+      for (const id of ['display', 'shape']) {
+        assert.equal(await page.locator('.lt-toolbar-tools #' + id + ' > button:visible').count(), 2);
+      }
+    };
+    await check();
+    await page.evaluate(() => {
+      document.documentElement.dataset.bookShape = 'phone';
+      document.getElementById('sourceTitle').textContent = '긴 제목의 시험용 책';
+    });
+    await page.waitForFunction(() => document.querySelector('.lt-toolbar-title').textContent === '긴 제목의 시험용 책');
+    await check();
+  } finally {
+    await browser.close();
+    server.close();
+  }
+});

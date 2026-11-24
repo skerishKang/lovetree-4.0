@@ -89,7 +89,17 @@ export function mountScreenToolbar({ screen, titleFrom, tools = [], initialBar =
     new MutationObserver(sync).observe(titleFrom, { childList: true, characterData: true, subtree: true });
   }
 
+  // 휴대폰 책의 재생 단추는 아래 이동 줄에 둔다. 모듈 실행 순서와 무관하게 유지한다.
+  const bookPlay = screen === 'book' ? tools.find(el => el?.id === 'playAllBtn') : null;
+  const keepBookPhonePlay = () => {
+    const nav = document.querySelector('.nav-pill');
+    if (bookPlay && nav && matchMedia('(max-width:599px)').matches) {
+      bookPlay.classList.add('playback-launch');
+      if (bookPlay.parentElement !== nav) nav.append(bookPlay);
+    }
+  };
   for (const tool of tools) if (tool && tool.parentElement !== group) group.append(tool);
+  keepBookPhonePlay();
 
   let stashed = [];
   const isPlay = (el) => /^(playAllBtn|cinemaBtn|mapPlayBtn)$/.test(el.id || '');
@@ -110,7 +120,8 @@ export function mountScreenToolbar({ screen, titleFrom, tools = [], initialBar =
   };
   reflow = () => {
     align();
-    for (const el of stashed) group.append(el);
+    for (const el of stashed) if (el.parentElement === menu) group.append(el);
+    keepBookPhonePlay();
     stashed = [];
     menu.replaceChildren();
     menu.hidden = true;
@@ -144,6 +155,9 @@ export function mountScreenToolbar({ screen, titleFrom, tools = [], initialBar =
     more.hidden = stashed.length === 0;
   };
   more.addEventListener('click', () => { menu.hidden = !menu.hidden; });
+  if (bookPlay && typeof MutationObserver === 'function') {
+    new MutationObserver(reflow).observe(document.documentElement, {attributes: true, attributeFilter: ['data-book-shape']});
+  }
   if (typeof ResizeObserver === 'function') {
     const observer = new ResizeObserver(reflow);
     observer.observe(bar);
