@@ -45,9 +45,11 @@ function showTip(el){
 }
 function hideTip(){tipTarget=null;clearTimeout(tipTimer);const bubble=$b('#lt-tip-bubble');if(bubble)bubble.hidden=true}
 function mountTips(){
- document.addEventListener('mouseover',e=>{const el=e.target.closest?.('[data-lt-tip]');if(el)showTip(el)});
+ // #1288: 휴대폰(마우스 없는 기기)에서는 올림·초점 말풍선을 띄우지 않는다. 돌아온 뒤 남는 것도 감춘다.
+ window.LTHoverTip.mountHoverTipGuard(document);
+ document.addEventListener('mouseover',e=>{if(!window.LTHoverTip.isHoverDevice())return;const el=e.target.closest?.('[data-lt-tip]');if(el)showTip(el)});
  document.addEventListener('mouseout',e=>{if(tipTarget&&(!e.relatedTarget||!tipTarget.contains(e.relatedTarget)))hideTip()});
- document.addEventListener('focusin',e=>{const el=e.target.closest?.('[data-lt-tip]');if(el)showTip(el)});
+ document.addEventListener('focusin',e=>{if(!window.LTHoverTip.isHoverDevice())return;const el=e.target.closest?.('[data-lt-tip]');if(el)showTip(el)});
  document.addEventListener('focusout',()=>hideTip());
  addEventListener('scroll',hideTip,true);
  document.addEventListener('keydown',e=>{if(e.key==='Escape')hideTip()});

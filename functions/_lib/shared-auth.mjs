@@ -1,5 +1,5 @@
 import { createVerifier } from './padiem-access-verify.mjs';
-import { upstreamOrigin } from './proxy.js';
+import { upstreamOrigin, proxyProofHeaders } from './proxy.js';
 const AUTH = 'https://auth.padiem.net';
 const CLIENT = 'lovetree-4-0';
 const CALLBACKS = ['https://lovetree-4-0.pages.dev/auth/callback', 'https://lovetree.padiem.net/auth/callback'];
@@ -65,7 +65,7 @@ export async function recordAccountEmail(env, fetcher, tokens, verified, now) {
       : undefined;
     const response = await fetcher(`${origin}${ACCOUNT_EMAIL_PATH}`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', authorization: `Bearer ${tokens.access_token}`, ...(typeof env?.LOVETREE_PROXY_SECRET === 'string' && env.LOVETREE_PROXY_SECRET.trim() ? { 'x-lovetree-proxy-proof': env.LOVETREE_PROXY_SECRET.trim() } : {}) },
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${tokens.access_token}`, ...proxyProofHeaders(env) },
       body: JSON.stringify({ email, canonical_subject_id: accountId }),
       redirect: 'manual',
       ...(signal ? { signal } : {})
