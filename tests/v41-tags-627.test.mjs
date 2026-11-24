@@ -1045,3 +1045,28 @@ test('#37: 순간을 바꾸면 되돌리기 알림을 거둔다', () => {
   assert.equal(String(host.innerHTML).includes('꼬리표를 뺐어요'), false, '다른 순간의 알림을 가져 가지 않는다');
   assert.equal(line.momentId, 'm2');
 });
+
+
+// #1273 1번 — 곡명이 가수로 제안되던 문제. 실제 공식 뮤직비디오 제목 형태를 표로 고정한다.
+test('가수·곡명 구분: 대문자 한 단어·한글 곡명·괄호 병기·꼬리 표시', () => {
+  const cases = [
+    ['BTS (방탄소년단) FIRE (불타오르네) Official MV', ['artist:BTS', 'song:FIRE']],
+    ['BTS (방탄소년단) 봄날', ['artist:BTS', 'song:봄날']],
+    ['BTS (방탄소년단) 피 땀 눈물', ['artist:BTS', 'song:피 땀 눈물']],
+    ['BTS (방탄소년단) Dynamite Official MV', ['artist:BTS', 'song:Dynamite']],
+    ['BTS FIRE (불타오르네) Official MV', ['artist:BTS', 'song:FIRE']],
+    ['방탄소년단 FIRE Official MV', ['song:FIRE']],
+    ['BTS (방탄소년단) FIRE M/V', ['artist:BTS', 'song:FIRE']],
+    ['BTS (방탄소년단) FIRE Official Music Video', ['artist:BTS', 'song:FIRE']],
+    ['BTS FIRE Official MV', ['song:FIRE']],
+    ['뉴진스 (NewJeans) How Sweet Official MV', ['artist:NewJeans', 'song:How Sweet']],
+    ['TWICE "CHEER UP" M/V', ['artist:TWICE', 'song:CHEER UP']],
+    ['BTS (방탄소년단) "피 땀 눈물 (Blood Sweat & Tears)" Official MV', ['artist:BTS', 'song:피 땀 눈물']],
+  ];
+  assert.ok(cases.length >= 10, '실제 제목 형태 10개 이상');
+  for (const [title, expected] of cases) {
+    const got = brief(suggestTagsFromTitle(title));
+    assert.deepEqual(got, expected, title);
+    assert.ok(!got.some((s) => s.startsWith('artist:FIRE')), '곡명 FIRE를 가수로 권하지 않는다: ' + title);
+  }
+});
