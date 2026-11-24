@@ -766,7 +766,7 @@ function keywordPickerHTML(prefix, selected = []) {
   /* #736: 켜진 칩은 저장 순서 그대로(고정·커스텀 섞여도 원래 순서) — 저장 때 순서도 보존된다. 고정 목록 나머지는 그 뒤에. */ const offFixed =
     LT_KEYWORDS.filter(k => !sel.includes(k));
   const btn = (k, on, custom) =>
-    `<button type="button" class="keywordBtn ${on ? 'on' : ''}${custom ? ' is-custom-tag' : ''}" data-key="${custom ? esc(k) : k}"${custom ? ` title="누르면 꼬리표를 뗀다"` : ''}>${custom ? esc(tagChipText(k)) : k}</button>`;
+    `<button type="button" class="keywordBtn ${on ? 'on' : ''}${custom ? ' is-custom-tag' : ''}" data-key="${custom ? esc(k) : k}"${custom ? ` aria-label="${esc(tagChipText(k))} · 누르면 꼬리표를 뗀다"` : ''}>${custom ? esc(tagChipText(k)) : k}</button>`;
   return `<div class="label keywordPickerLead">KEYWORDS · 다중선택</div><div class="keywordPicker" id="${prefix}KeywordPicker">${sel.map(k => btn(k, true, !LT_KEYWORDS.includes(k))).join('')}${offFixed.map(k => btn(k, false, false)).join('')}</div><div class="keywordAddRow"><input class="field" id="${prefix}CustomKeyword" placeholder="커스텀 키워드 추가" aria-label="새 꼬리표 추가"><button type="button" class="miniBtn keywordAddBtn" id="${prefix}AddKeyword">추가</button></div>`;
 }
 function styleFieldsHTML(prefix, m = {}) {
@@ -1510,7 +1510,10 @@ function hideBoardTip() {
   const bubble = document.getElementById('lt-tip-bubble');
   if (bubble) bubble.hidden = true;
 }
+// #1288: 휴대폰에서는 올림·초점 말풍선을 띄우지 않고, 페이지로 돌아오면 남은 것을 감춘다.
+window.LTHoverTip.mountHoverTipGuard(document);
 document.addEventListener('mouseover', e => {
+  if (!window.LTHoverTip.isHoverDevice()) return;
   const el = e.target.closest?.('[data-lt-tip]');
   if (el) showBoardTip(el);
 });
@@ -1518,6 +1521,7 @@ document.addEventListener('mouseout', e => {
   if (tipTarget && (!e.relatedTarget || !tipTarget.contains(e.relatedTarget))) hideBoardTip();
 });
 document.addEventListener('focusin', e => {
+  if (!window.LTHoverTip.isHoverDevice()) return;
   const el = e.target.closest?.('[data-lt-tip]');
   if (el) showBoardTip(el);
 });
