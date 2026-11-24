@@ -199,7 +199,8 @@ test('#1010 숫자 두 줄 — 순간 N / 정리 전 M이 겹치지 않고 각�
   } finally { await browser.close(); }
 });
 
-test('#1010 390 바닥 링크 — 넷 모두 보이고 줄바꿈으로 왼쪽 아래에, ＋ 단추와 겹치지 않는다', { skip: REQUIRE1010 ? false : skip1010, timeout: 180000 }, async () => {
+// #1284 대표 결정(PR #1300): 링크는 숫자판 아래 본문 흐름에 놓는다. 1~2줄(높이 66px 이하)을 허용하며 #535의 카드 9장을 유지한다.
+test('#1010 390 본문 링크 — 넷 모두 보이고 높이 66px 이하이며 ＋ 단추와 겹치지 않는다', { skip: REQUIRE1010 ? false : skip1010, timeout: 180000 }, async () => {
   if (skip1010) assert.fail(skip1010);
   const browser = await chromium1010.launch({ headless: true });
   try {
@@ -209,7 +210,7 @@ test('#1010 390 바닥 링크 — 넷 모두 보이고 줄바꿈으로 왼쪽 �
         const row = document.querySelector('.home-links');
         const items = [...row.querySelectorAll('.feedback-link')].map(el => {
           const r = el.getBoundingClientRect();
-          return { label: el.textContent, visible: r.width > 0 && r.height > 0, top: Math.round(r.top), left: Math.round(r.left), right: Math.round(r.right) };
+          return { label: el.textContent, visible: r.width > 0 && r.height > 0, top: r.top, bottom: r.bottom, left: r.left, right: r.right };
         });
         const rowRect = row.getBoundingClientRect();
         const fab = document.getElementById('mobile-add');
@@ -220,10 +221,9 @@ test('#1010 390 바닥 링크 — 넷 모두 보이고 줄바꿈으로 왼쪽 �
       });
       const labels = links.items.filter(i => i.visible).map(i => i.label);
       for (const want of ['새 소식', '의견 보내기', '개인정보 처리방침', '이용약관']) {
-        assert.ok(labels.includes(want), `390 첫 화면 바닥에 "${want}" 링크가 있다: ` + JSON.stringify(labels));
+        assert.ok(labels.includes(want), `390 첫 화면 본문에 "${want}" 링크가 있다: ` + JSON.stringify(labels));
       }
-      assert.ok(links.rowH >= 56 && links.rowH <= 66, `링크가 두 줄로 카드 아래 자리에 들어간다(줄 높이 ${links.rowH}px — 66px 안)`);
-      assert.ok(links.rowTop >= links.viewportH - 76, `링크 줄이 새 소식 카드 자리(아래 76px) 아래에 있다(윗변 ${links.rowTop}px / ${links.viewportH - 76}px)`);
+      assert.ok(links.rowH > 0 && links.rowH <= 66, `링크는 1~2줄로 보이고 높이 66px 이하(${links.rowH}px)`);
       assert.ok(!links.overlap, '링크 줄이 오른쪽 아래 ＋ 단추와 겹치지 않는다');
       assert.ok(!links.fabVisible, '첫 화면에서는 ＋가 가운데만 남는다(#1084)');
       if (links.fabVisible) assert.ok(links.rowRight <= links.fabLeft, `링크 줄이 ＋ 단추 왼쪽 끝(${links.fabLeft}px)을 넘지 않는다(끝 ${links.rowRight}px)`);
