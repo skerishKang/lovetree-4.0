@@ -99,7 +99,7 @@ test('#942 첫 화면 추가 단추와 숫자 묶음', { skip: REQUIRE ? false :
     let tree=createTree(input(0),clock(0));for(let i=1;i<count;i++)tree=addMoment(tree,input(i),tree.moments[0].id,clock(i));
     return tree;
   };
-  const trees=[make('좋아하는 순간들',8),make('여름',3),make('함께 부른 노래',3)];
+  const trees=[make('좋아하는 순간들',8),make('여름',3),{...make('함께 부른 노래',3),inbox:true}];
   const workspace={revision:1,state:{version:1,trees,prefs:{displayName:'화면검사 시험계정'}},subject:'visual-audit-fake',writeSubjectBound:true,savedAt:'2026-11-20T00:00:00.000Z'};
   const share={id:'audit-share-000000000001',treeId:trees[0].id,view:'book',status:'active',origin:'manual',createdAt:'2026-11-20T00:00:00.000Z'};
   const readHome = member => {
@@ -130,9 +130,13 @@ test('#942 첫 화면 추가 단추와 숫자 묶음', { skip: REQUIRE ? false :
     const add = root.querySelector('.home-add-top'), top = add ? measure(add) : null;
     const groups = [...root.querySelectorAll('.home-action-group')].map(e => {
       const b=e.querySelector('.subtleBtn'),n=e.querySelector('.home-count'),r=e.getBoundingClientRect(),br=b.getBoundingClientRect(),nr=n.getBoundingClientRect();
-      const range=doc.createRange();range.selectNodeContents(n);const tr=range.getBoundingClientRect();
       const lines=[...n.querySelectorAll('.home-count-line')].map(row=>row.textContent.trim());
-      return {label:b.textContent.trim(),count:n.hidden?'':lines.join('|'),x:r.x,y:r.y,w:r.width,h:r.height,inner:n.hidden?null:nr.top-br.bottom,center:n.hidden?null:(tr.left+tr.width/2)-(br.left+br.width/2),font:parseFloat(doc.defaultView.getComputedStyle(n).fontSize),overflow:n.hidden?0:Math.max(0,tr.right-br.right,br.left-tr.left)};
+      const rows=[...n.querySelectorAll('.home-count-item')].map(item=>{
+        const label=item.querySelector('.home-count-name'),value=item.querySelector('.home-count-value');
+        const lr=label.getBoundingClientRect(),vr=value.getBoundingClientRect(),ls=doc.defaultView.getComputedStyle(label),vs=doc.defaultView.getComputedStyle(value);
+        return {name:label.textContent,value:value.textContent,left:lr.left-br.left,right:br.right-vr.right,gap:vr.left-lr.right,dy:Math.abs(lr.top-vr.top),labelColor:ls.color,valueColor:vs.color,muted:ls.getPropertyValue('--lt-muted').trim(),pearl:vs.getPropertyValue('--lt-pearl').trim(),weight:parseInt(vs.fontWeight),numeric:vs.fontVariantNumeric,nowrap:vs.whiteSpace};
+      });
+      return {label:b.textContent.trim(),count:n.hidden?'':lines.join('|'),x:r.x,y:r.y,w:r.width,h:r.height,inner:n.hidden?null:nr.top-br.bottom,font:parseFloat(doc.defaultView.getComputedStyle(n).fontSize),widthDiff:Math.abs(nr.width-br.width),rows};
     });
     return { buttons, headers, head, fab, top, groups };
   };
@@ -149,7 +153,7 @@ test('#942 첫 화면 추가 단추와 숫자 묶음', { skip: REQUIRE ? false :
           if(u.origin!==base)return u.hostname==='i.ytimg.com'||u.hostname==='audit.invalid'?THUMB(r):r.abort();
           if(u.pathname==='/api/workspace'&&signedIn)return r.fulfill({status:200,json:{...workspace,state:{...workspace.state,trees:member?trees:[]}}});
           if(u.pathname==='/api/shares'&&member)return r.fulfill({status:200,json:{ok:true,items:[share],shares:[share]}});
-          if(u.pathname==='/api/community/stats')return r.fulfill({status:200,json:{trees:17,moments:123}});
+          if(u.pathname==='/api/community/stats')return r.fulfill({status:200,json:{trees:17,moments:1234}});
           if(u.pathname.startsWith('/api/'))return r.fulfill({status:200,json:{ok:true,items:[]}});
           return r.continue();
         });
@@ -195,8 +199,14 @@ test('#942 첫 화면 추가 단추와 숫자 묶음', { skip: REQUIRE ? false :
         await page.mouse.move(0,0);
         check((await hoverStyle()).bg===explore.bg,key+' 올림 해제 뒤 다시 투명');
         check(groups.length===3,key+' 묶음 3개');
-         check(JSON.stringify(groups.map(g=>g.count))===JSON.stringify(member?['순간 14|','공개 트리 17|공개 순간 123','트리 3|공개 트리 1']:['',(signedIn?'':'예시 ')+'공개 트리 17|순간 123','']),key+' 숫자 귀속');
-        for(const g of groups.filter(g=>g.count))check(g.inner>=4&&g.inner<=6&&Math.abs(g.center)<=2&&g.font>=12&&g.overflow<=1,key+' 숫자 간격 '+JSON.stringify(g));
+         check(JSON.stringify(groups.map(g=>g.count))===JSON.stringify(member?['순간 14|모아둔 3','공개 트리 17|공개 순간 1.2k','트리 3|공개 트리 1']:['',(signedIn?'':'예시 ')+'공개 트리 17|순간 1.2k','']),key+' 숫자 귀속');
+        for(const g of groups.filter(g=>g.count)){
+          check(g.inner>=4&&g.inner<=6&&g.font>=12&&g.widthDiff<=1,key+' 숫자 표 폭·간격 '+JSON.stringify(g));
+          for(const row of g.rows){
+            check(Math.abs(row.left)<=1&&Math.abs(row.right)<=1&&row.gap>=3&&row.dy<=1&&row.nowrap==='nowrap',key+' 이름 왼쪽·숫자 오른쪽·한 줄 '+JSON.stringify(row));
+            check(row.weight>=700&&row.numeric.includes('tabular-nums')&&row.valueColor!==rose&&row.valueColor===(theme==='night'?'rgb(245, 241, 233)':'rgb(64, 53, 54)')&&row.labelColor===(theme==='night'?'rgb(155, 152, 166)':'rgb(111, 96, 90)'),key+' 숫자 굵기·색·고정폭 '+JSON.stringify(row));
+          }
+        }
         for(let i=1;i<groups.length;i++){
           const a=groups[i-1],b=groups[i],gap=Math.abs(a.y-b.y)<2?b.x-a.x-a.w:b.y-a.y-a.h;
           check(gap>=Math.max(width===1440?16:14,3*5),key+' 묶음 간격 '+gap);
