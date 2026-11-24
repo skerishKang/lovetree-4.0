@@ -548,7 +548,7 @@ async function showPublicRoute(route){
  if(!deps.member?.snapshot().owned)void accountApi.account().then(account=>{
    if(generation===deps.loadGeneration&&deps.source==='share')deps.onVisitorAccount?.(account?.ok?account:null);
  }).catch(()=>{});
- notify('공개된 트리를 감상하는 화면이에요. 감상만 할 수 있어요.'+(answer.aiTester?' AI 명예회원이 만든 트리예요.':'')+(answer.omittedPrivateMedia?' 올린 사진 '+answer.omittedPrivateMedia+'장은 나만 볼 수 있어요.':''));
+ notify('공개된 트리를 감상하는 화면이에요. 감상만 할 수 있어요.'+(answer.aiTester?' AI 명예회원이 만든 트리예요.':'')+(answer.omittedPrivateMedia?' 올린 사진 '+answer.omittedPrivateMedia+'장은 나만 볼 수 있어요.':''),{visitorIntro:true});
 }
 document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{
  // 2026-11-23: 로그아웃 서재 탭도 로그인으로 즉시 이동시키지 않고 빈 상태에서 로그인 단추를 안내한다.

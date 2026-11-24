@@ -108,14 +108,14 @@ html[data-v41-screen=network] .top-actions .view-switch .pill{padding:0 5px;font
  html[data-v41-screen=network] .topbar{z-index:47}
  /* 묶음 상자를 없애 단추들이 topbar의 줄 나눔을 그대로 따르게 한다(둘째 줄 = 보기 세 단추). */
  html[data-v41-screen=network] .top-actions{display:contents}
- html[data-v41-screen=network] body .topbar-left{order:1;flex:1 1 auto;min-width:0;overflow:hidden}
- html[data-v41-screen=network] .tree-title{order:1;flex:1 1 auto;min-width:0;overflow:hidden}
- html[data-v41-screen=network] .tree-title-btn{flex:1 1 auto;min-width:0;max-width:100%;overflow:hidden}
- html[data-v41-screen=network] #treeTitleText{flex:1 1 auto;min-width:0;max-width:100%}
- html[data-v41-screen=network] #overviewBtn{order:2;margin-left:auto}
- html[data-v41-screen=network] .bgDrop{order:3}
- html[data-v41-screen=network] .view-switch{order:4;flex:1 0 100%;width:100%;display:flex;gap:4px}
- html[data-v41-screen=network] .top-actions .view-switch .pill{flex:1 1 0;min-width:0;padding:0 9px;font-size:13px;height:44px;min-height:44px;text-align:center}
+ html[data-v41-screen=network] body .topbar .topbar-left{order:1;flex:1 1 auto;min-width:0;overflow:hidden}
+ html[data-v41-screen=network] .topbar .tree-title{order:1;flex:1 1 auto;min-width:0;overflow:hidden}
+ html[data-v41-screen=network] .topbar .tree-title-btn{flex:1 1 auto;min-width:0;max-width:100%;overflow:hidden}
+ html[data-v41-screen=network] .topbar #treeTitleText{flex:1 1 auto;min-width:0;max-width:100%}
+ html[data-v41-screen=network] .topbar #overviewBtn{order:2;margin-left:auto}
+ html[data-v41-screen=network] .topbar .bgDrop{order:3}
+ html[data-v41-screen=network] .topbar .view-switch{order:4;flex:1 0 100%;width:100%;display:flex;gap:4px}
+ html[data-v41-screen=network] .topbar .top-actions .view-switch .pill{flex:1 1 0;min-width:0;padding:0 9px;font-size:13px;height:44px;min-height:44px;text-align:center}
 }
 @media(max-width:640px){
  /* #517: 내려온 도구 줄 아래에 순간 선택 패널이 오게 한다 — 패널 top은 measureInsets가 재어 넘긴
@@ -213,7 +213,11 @@ body[data-lt-view=concentric] .progress-rail{display:none}
 /* 지금 고른 보기(그물형/동심원형)는 다른 화면의 눌린 버튼과 같은 토큰(--lt-primary)으로 채운다.
    identity.css의 도구 줄 알약 규칙(어두운 알약)보다 구체적이어야 보인다. */
 html[data-v41-screen=network] .top-actions .view-switch .pill[aria-pressed=true],
-html[data-lt-theme=garden][data-v41-screen=network] .top-actions .view-switch .pill[aria-pressed=true]{background:var(--lt-primary);border-color:var(--lt-primary);color:var(--lt-primary-ink);box-shadow:none}
+html[data-v41-screen=network] .lt-screen-toolbar .lt-toolbar-tools .view-switch .pill[aria-pressed=true],
+html[data-v41-screen=network] .lt-screen-toolbar .lt-toolbar-menu .view-switch .pill[aria-pressed=true],
+html[data-lt-theme=garden][data-v41-screen=network] .top-actions .view-switch .pill[aria-pressed=true],
+html[data-lt-theme=garden][data-v41-screen=network] .lt-screen-toolbar .lt-toolbar-tools .view-switch .pill[aria-pressed=true],
+html[data-lt-theme=garden][data-v41-screen=network] .lt-screen-toolbar .lt-toolbar-menu .view-switch .pill[aria-pressed=true]{background:var(--lt-primary);border-color:var(--lt-primary);color:var(--lt-primary-ink);box-shadow:none}
 /* 범례 행: 색 점 + "01 첫인상부터 7개" */
 .legend-row .swatch{flex:0 0 auto}
 
@@ -266,12 +270,18 @@ html[data-v41-screen=network][data-lt-board-theme=night] body :is(.hero p,.hero 
 html[data-v41-screen=network][data-lt-board-theme=night] body .hero.dim{opacity:1}
 html[data-v41-screen=network][data-lt-board-theme=night] body :is(.pill,.mode-pill,.mini,.action,.close,.tree-title-btn,.branch-options button,.lt-moment-picker select,.lt-moment-picker button,.mobile-ribbon button,.chip,.detail-block){background:var(--lt-map-control);border-color:var(--lt-map-ui-border);color:var(--lt-map-ui-text);box-shadow:none}
 html[data-v41-screen=network][data-lt-board-theme=night] body .top-actions .pill{background:var(--lt-map-control);border-color:var(--lt-map-ui-border);color:var(--lt-map-ui-text)}
-html[data-v41-screen=network][data-lt-board-theme=night] body .top-actions .view-switch{background:var(--lt-map-control);box-shadow:inset 0 0 0 1px var(--lt-map-ui-border)}
-html[data-v41-screen=network][data-lt-board-theme=night] body .top-actions .view-switch .pill{background:transparent;border:none;box-shadow:none}
+html[data-v41-screen=network][data-lt-board-theme=night] body .top-actions .view-switch,
+html[data-v41-screen=network][data-lt-board-theme=night] body .lt-screen-toolbar .lt-toolbar-tools .view-switch,
+html[data-v41-screen=network][data-lt-board-theme=night] body .lt-screen-toolbar .lt-toolbar-menu .view-switch{background:var(--lt-map-control);box-shadow:inset 0 0 0 1px var(--lt-map-ui-border)}
+html[data-v41-screen=network][data-lt-board-theme=night] body .top-actions .view-switch .pill,
+html[data-v41-screen=network][data-lt-board-theme=night] body .lt-screen-toolbar .lt-toolbar-tools .view-switch .pill,
+html[data-v41-screen=network][data-lt-board-theme=night] body .lt-screen-toolbar .lt-toolbar-menu .view-switch .pill{background:transparent;border:none;box-shadow:none}
 html[data-v41-screen=network][data-lt-board-theme=night] body :is(.pill,.mini,.action,.close,.tree-title-btn,.branch-options button,.lt-moment-picker button):hover,
 html[data-v41-screen=network][data-lt-board-theme=night] body .top-actions .pill:hover,
 html[data-v41-screen=network][data-lt-board-theme=night] body .tree-menu .tree-item:hover{background:var(--lt-map-control-hover);color:var(--lt-map-ui-text)}
 html[data-v41-screen=network][data-lt-board-theme=night] body .top-actions .view-switch .pill[aria-pressed=true],
+html[data-v41-screen=network][data-lt-board-theme=night] body .lt-screen-toolbar .lt-toolbar-tools .view-switch .pill[aria-pressed=true],
+html[data-v41-screen=network][data-lt-board-theme=night] body .lt-screen-toolbar .lt-toolbar-menu .view-switch .pill[aria-pressed=true],
 html[data-v41-screen=network][data-lt-board-theme=night] body :is(.action.primary,.mobile-ribbon button.active,.mobile-ribbon button.origin,.lt-moment-picker .primary){background:var(--lt-map-ui-accent);border-color:var(--lt-map-ui-accent);color:var(--lt-map-ui-accent-ink)}
 html[data-v41-screen=network][data-lt-board-theme=night] body .tree-menu .tree-check{color:var(--lt-map-ui-accent)}
 html[data-v41-screen=network][data-lt-board-theme=night] body :is(button,select):focus-visible{outline:2px solid var(--lt-map-ui-accent);outline-offset:2px}
@@ -356,3 +366,21 @@ html[data-v41-screen=network][data-lt-board-theme=night] body .detailPlayer{back
 /* 좁은 화면 시트에서는 사진이 판을 다 차지하지 않게 줄인다 — 제목·마음·날짜·이어진 순간이 한눈에 들어온다.
    (파일 끝에 둔다 — 위의 .detailPlayer img 기본값보다 나중에 읽혀야 이긴다.) */
 @media(max-width:640px){.detailPlayer img,.detailPlayer video{max-height:124px}}
+
+/* #1249: 넓은 화면은 묶음 단추를 그대로, 좁은 화면은 별도 묶음 선택 메뉴. */
+.mobile-ribbon .ribbon-more{display:none}
+.ribbon-groups{display:contents}
+@media(max-width:640px){
+  html[data-v41-screen=network] .mobile-ribbon{flex-wrap:nowrap;align-items:center;gap:4px;overflow:visible}
+  html[data-v41-screen=network] .mobile-ribbon>button{min-width:44px;min-height:44px;height:44px;padding:0 8px}
+  html[data-v41-screen=network] .mobile-ribbon .ribbon-more{display:block}
+  html[data-v41-screen=network] .ribbon-groups{display:none}
+  html[data-v41-screen=network] .ribbon-groups.is-open{
+    display:flex;flex-direction:column;align-items:stretch;gap:4px;
+    position:absolute;left:0;right:0;bottom:calc(100% + 8px);padding:8px;
+    max-height:40vh;overflow:auto;border:1px solid var(--lt-line);
+    border-radius:16px;background:var(--lt-glass-strong);color:var(--lt-pearl);
+  }
+  html[data-v41-screen=network] .ribbon-groups button{min-height:44px;white-space:normal;text-align:left}
+  html[data-v41-screen=network][data-lt-board-theme=night] body .ribbon-groups{background:var(--lt-map-panel);border-color:var(--lt-map-ui-border);color:var(--lt-map-ui-text)}
+}

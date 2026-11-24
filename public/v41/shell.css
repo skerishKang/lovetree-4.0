@@ -1238,3 +1238,20 @@ dialog#account-assets .assets-detail-none{margin:0;font-size:13px;color:var(--lt
 .header-actions .view-toggle .ui-btn,.header-actions .view-toggle>button{min-height:42px;height:42px}
 nav #record-menu{justify-content:space-between}
 nav #record-menu #source-label{flex:1 1 auto;text-align:left}
+
+/* 머리줄 책/목록·선반/회전 전환도 두 칸 치수를 통일한다. */
+.header-actions .view-toggle{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:stretch;min-width:96px;height:44px;min-height:44px;padding:0;overflow:hidden;border-color:var(--lt-line);background:var(--lt-glass-strong)}
+.header-actions .view-toggle[hidden]{display:none}
+.header-actions .view-toggle>button{box-sizing:border-box;width:100%;height:42px;min-height:42px;padding:0 8px;border:0;border-radius:var(--lt-r-pill);background:transparent;color:var(--lt-pearl);font:600 13px var(--lt-ui)}
+.header-actions .view-toggle>button[aria-checked=true]{background:var(--lt-primary);color:var(--lt-primary-ink)}
+html[data-lt-theme=garden] .header-actions .view-toggle>button:not([aria-checked=true]){color:var(--lt-ink)}
+@media(max-width:780px){.header-actions .view-toggle{min-width:84px}}
+
+/* #1259-2: 방문자 책 첫 안내만 문서 흐름의 별도 칸을 사용한다. 보드 안내와 머리줄은 그대로. */
+body[data-record-source=share][data-fab-lift=book] #toast[data-visitor-intro]:not([hidden]){
+ position:relative;flex:0 0 auto;inset:auto;transform:none;margin:4px auto 54px;
+}
+@media(max-width:520px){
+ body[data-record-source=share][data-fab-lift=book] #toast[data-visitor-intro]:not([hidden]){margin:2px auto max(2px,env(safe-area-inset-bottom));padding:6px 10px;line-height:1.4}
+}
+body[data-record-source=share][data-fab-lift=book].lt-book-lightbox-open #toast[data-visitor-intro]{display:none}

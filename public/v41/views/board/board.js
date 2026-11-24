@@ -407,6 +407,7 @@ function commitInsert(id, index, { before = captureBoardOrderState(), snapshot: 
   else {
     placeAll();
     settlePlacedCards();
+    if (mobileBoardScroll()) applyView(false);
   }
   if (exampleBoard) {
     persistBoard();
@@ -449,6 +450,7 @@ function moveCardOrder(id, dir) {
   else {
     placeAll();
     settlePlacedCards();
+    if (mobileBoardScroll()) applyView(false);
   }
   persistBoard();
   return true;
@@ -771,8 +773,50 @@ function settlePlacedCards() {
   if (changed) rerenderThreads();
 }
 
+let mobileBoardBaseY = 0;
+function mobileBoardScroll() { return innerWidth < 700 && !cinema; }
+function mobileBoardBounds() {
+  const cards = boardCards();
+  if (!cards.length) return null;
+  return {
+    top: Math.min(...cards.map(c => c.y)),
+    bottom: Math.max(...cards.map(c => c.y + c.h)),
+    left: Math.min(...cards.map(c => c.x)),
+    right: Math.max(...cards.map(c => c.x + c.w))
+  };
+}
+function boardResizeMobile() {
+  placeAll();
+  const bounds = mobileBoardBounds();
+  if (bounds) view.x = viewport.clientWidth / 2 - (bounds.left + bounds.right) * view.z / 2;
+  applyView(false);
+}
+viewport.addEventListener('scroll', () => {
+  if (viewport.classList.contains('board-scroll')) view.y = mobileBoardBaseY - viewport.scrollTop;
+}, { passive: true });
 function applyView(animated = false) {
   growBoard();
+  const scroll = mobileBoardScroll();
+  const space = $('#boardScrollSpace');
+  viewport.classList.toggle('board-scroll', scroll);
+  viewport.classList.toggle('board-scroll-editing', scroll && boardMode === 'mine');
+  if (scroll) {
+    const bounds = mobileBoardBounds(), safe = boardSafeArea();
+    if (bounds) {
+      mobileBoardBaseY = safe.y - bounds.top * view.z;
+      if (viewMode === 'fit') mobileBoardBaseY = Math.max(mobileBoardBaseY, view.y);
+      // 실제 카드 끝을 지나 빈 판이 끝없이 이어지지 않도록 스크롤 길이를 정한다.
+      space.style.height = Math.max(viewport.clientHeight, Math.ceil(mobileBoardBaseY + bounds.bottom * view.z + (viewport.clientHeight - safe.y - safe.h) + 24)) + 'px';
+      world.classList.remove('lt-view-pan');
+      world.style.transform = `translate(${view.x}px,${mobileBoardBaseY}px) scale(${view.z})`;
+      viewport.scrollTop = Math.max(0, mobileBoardBaseY - view.y);
+      view.y = mobileBoardBaseY - viewport.scrollTop;
+      $('#zoomLabel').textContent = Math.round(view.z * 100) + '%';
+      return;
+    }
+  }
+  space.style.height = '';
+  viewport.scrollTop = 0;
   world.classList.toggle('lt-view-pan', animated);
   world.style.transform = `translate(${view.x}px,${view.y}px) scale(${view.z})`;
   $('#zoomLabel').textContent = Math.round(view.z * 100) + '%';
@@ -829,8 +873,9 @@ function boardSafeArea(expectDetail = false) {
       const r = pk.getBoundingClientRect();
       if (r.width) top = Math.max(top, r.bottom - vr.top + 12);
     }
+    // 이어 보기가 공통 도구 줄로 옮겨가면 더 이상 판 위에 떠 있지 않다 — 판 아래 여백을 차지하지 않는다.
     const cb = $('.cinemaBtn');
-    if (cb) {
+    if (cb && !cb.closest('.lt-screen-toolbar')) {
       const r = cb.getBoundingClientRect();
       if (r.width) bottom = Math.max(bottom, vr.bottom - r.top + 12);
     }
@@ -882,15 +927,20 @@ function noteUserView() {
 }
 // #490: 화면 전환(두 장 앞뒤 바꿈)에서는 이 문서가 숨은 프레임(폭 0)에서 먼저 뜬다. 그때 한 맞춤을 '전체 보기'로
 // 기억하면 드러난 뒤 resize가 맞춤(55%)을 다시 적용해 처음 80%·기억한 자리가 무시됐다 → 처음 자리 대기로 둔다.
-// #662(CTO 지시): 좁은 판(<700)에서도 전체 맞춤은 순간이 많으면 카드를 손톱만 하게 몰아 넣는다 — 예전처럼 지금(또는 첫)
-// 순간 카드가 읽히는 배율(카드 폭 ≥ 화면의 6할)로 크게 보이게 초점을 맞춘다. 머리글·탐색 판 비켜 두기는
-// focusBoardMoment가 판 아래끝을 실측해 해준다(#662). 초점 보기는 캔버스 설계상 이웃 카드가 도구 밑으로 슬라이드된다 —
-// 검사기는 보드의 도구×캔버스 겹침을 설계대로 제외하고 대신 '작은카드' 기준으로 읽히는 배율을 지킨다.
+// #1249: 휴대폰 일반 진입은 첫 카드부터 100% 크기로 실제 스크롤한다.
+// 명시적으로 선택한 순간으로 진입할 때는 그 카드로 이동하되 모든 카드에 닿을 수 있다.
 function boardStartView() {
   if (innerWidth < 700) {
-    if (typeof focusBoardMoment === 'function') focusBoardMoment(LTDEMO.get(), false);
-    else fitAll(false);
+    const bounds = mobileBoardBounds();
     viewMode = 'start';
+    const openId = new URLSearchParams(location.search).get('open');
+    if (openId && typeof focusBoardMoment === 'function') focusBoardMoment(openId, false);
+    else if (bounds) {
+      view.z = 1;
+      view.x = viewport.clientWidth / 2 - (bounds.left + bounds.right) / 2;
+      view.y = boardSafeArea().y - bounds.top;
+      applyView(false);
+    } else fitAll(false);
     return;
   }
   let vw = viewport.clientWidth,
@@ -1410,7 +1460,7 @@ function headerFade(on) {
 let boardTouches = new Map(),
   pinch = null;
 viewport.addEventListener('pointerdown', e => {
-  if (cinema || e.target.closest('.card,button,a,input,textarea,select')) return;
+  if (cinema || mobileBoardScroll() || e.target.closest('.card,button,a,input,textarea,select')) return;
   if (e.pointerType === 'touch') {
     boardTouches.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (boardTouches.size === 1) {
@@ -1495,7 +1545,7 @@ function zoomDecorPause() {
 viewport.addEventListener(
   'wheel',
   e => {
-    if (cinema) return;
+    if (cinema || mobileBoardScroll()) return;
     e.preventDefault();
     let before = screenToWorld(e.clientX, e.clientY),
       factor = Math.exp(-e.deltaY * 0.0012),

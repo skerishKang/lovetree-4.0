@@ -67,6 +67,11 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
           clean: true
+      # 같은 CGI 컴퓨터의 자체 실행기 여러 개가 홈의 npm 캐시를 함께 쓰면 동시에 받다가 깨진다
+      # (2026-11-24: EINTEGRITY·ENOENT로 시험 전에 실패). 자체 실행기에서는 실행기마다 캐시 폴더를 따로 둔다.
+      - name: 실행기별 npm 캐시 폴더(자체 실행기)
+        if: runner.environment == 'self-hosted'
+        run: echo "npm_config_cache=$HOME/.npm-runner-$RUNNER_NAME" >> "$GITHUB_ENV"
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -293,6 +298,11 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
           clean: true
+      # 같은 CGI 컴퓨터의 자체 실행기 여러 개가 홈의 npm 캐시를 함께 쓰면 동시에 받다가 깨진다
+      # (2026-11-24: EINTEGRITY·ENOENT로 시험 전에 실패). 자체 실행기에서는 실행기마다 캐시 폴더를 따로 둔다.
+      - name: 실행기별 npm 캐시 폴더(자체 실행기)
+        if: runner.environment == 'self-hosted'
+        run: echo "npm_config_cache=$HOME/.npm-runner-$RUNNER_NAME" >> "$GITHUB_ENV"
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -363,6 +373,11 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
           clean: true
+      # 같은 CGI 컴퓨터의 자체 실행기 여러 개가 홈의 npm 캐시를 함께 쓰면 동시에 받다가 깨진다
+      # (2026-11-24: EINTEGRITY·ENOENT로 시험 전에 실패). 자체 실행기에서는 실행기마다 캐시 폴더를 따로 둔다.
+      - name: 실행기별 npm 캐시 폴더(자체 실행기)
+        if: runner.environment == 'self-hosted'
+        run: echo "npm_config_cache=$HOME/.npm-runner-$RUNNER_NAME" >> "$GITHUB_ENV"
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -527,6 +542,12 @@ jobs:
           start=$(date +%s)
           node --test --test-concurrency=1 tests/v41-book-single-537.test.mjs
           echo "책 한 장 보기 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 화면 줄 정리 시험(세 화면 줄·서재 이동·떠 있는 단추)
+        if: needs.screen-changes.outputs.changed == 'true'
+        run: |
+          npx vite build > /dev/null
+          node --test --test-concurrency=1 tests/v41-tree-line-view-row.test.mjs
 
       - name: 책 YouTube 재생·두 장 모드 시험(건너뜀=실패 — 이슈 584)
         env:

@@ -56,7 +56,6 @@ html[data-lt-theme=garden] .panelTitle,html[data-lt-theme=garden] .panelHead{col
 html[data-lt-theme=garden] .toolbar button,html[data-lt-theme=garden] .miniBtn,html[data-lt-theme=garden] .themeBtn,html[data-lt-theme=garden] .styleMini,html[data-lt-theme=garden] .keywordBtn{
  background:rgba(255,253,248,.9);border-color:var(--lt-line);color:var(--lt-ink)}
 html[data-lt-theme=garden] .miniBtn.accent,html[data-lt-theme=garden] .themeBtn.active{background:rgba(200,110,121,.14);border-color:var(--lt-gold-line);color:var(--lt-gold-ink)}
-html[data-lt-theme=garden] .cinemaBtn{background:var(--lt-primary);color:var(--lt-primary-ink);box-shadow:0 12px 36px rgba(75,51,42,.18)}
 html[data-lt-theme=garden] .modal{background:var(--lt-paper);color:var(--lt-ink);border-color:var(--lt-line)}
 html[data-lt-theme=garden] .modalShade{background:rgba(75,51,42,.28)}
 html[data-lt-theme=garden] .toast{background:var(--lt-glass-strong);border-color:var(--lt-line);color:var(--lt-ink)}
@@ -236,7 +235,7 @@ html[data-lt-theme=garden] .boardModeSwitch .boardResetOrderBtn{color:var(--lt-m
 .boardThemeSwitch .switchLead{display:none}
 @media(max-width:580px){
   header{height:auto;min-height:56px;flex-wrap:wrap;padding-top:4px;padding-bottom:4px;row-gap:2px}
-  .boardModeSwitch{order:9;margin-left:auto}
+  header .boardModeSwitch{order:9;margin-left:auto}
   .boardModeSwitch .modeSwitchBtn{height:44px}
   /* 두 줄 머리줄의 아래끝은 ＋ 순간 추가가 둘째 줄로 내려오면 100px를 넘는다(로그인 화면 107px 실측) —
      고정 100px 대신 board-extras가 재는 머리줄 아래끝(--lt-board-frame-top)을 쓴다. */
@@ -245,7 +244,7 @@ html[data-lt-theme=garden] .boardModeSwitch .boardResetOrderBtn{color:var(--lt-m
   header{background:linear-gradient(180deg,var(--lt-stage),var(--lt-stage-2))}
   html[data-lt-theme=garden] header{background:var(--lt-paper)}
   /* #662: 테마 표시를 머리줄 둘째 줄로 옮겼다(board-extras fitThemeBadge) — 흐름 안에 놓는다. */
-  .themeBadge{position:static;order:10;align-self:center;margin-left:6px}
+  header .themeBadge{position:static;order:10;align-self:center;margin-left:6px}
   .boardThemeSwitch .switchLead{display:inline;align-self:center;padding:0 1px 0 7px;font-size:12px;color:#cbbcd4}
   html[data-lt-theme=garden] .boardThemeSwitch .switchLead{color:var(--lt-muted)}
 }
@@ -353,12 +352,12 @@ html[data-lt-theme=garden] .ytLinkRow a{color:var(--lt-link,#3b5bdb)}
 @media(max-width:760px){.mobileTools{display:block;min-height:44px}.leftPanel:not(.mobileOpen){display:none}.leftPanel.mobileOpen{top:64px;bottom:auto;max-height:calc(100% - 140px);transform:none;z-index:60}.detail{bottom:72px;max-height:48%;}.toolbar{z-index:58}.tool,.collapseBtn{min-width:44px;min-height:44px}.cinemaBtn{bottom:14px;min-height:44px}.detail .close{min-width:44px;min-height:44px}/* #520: 읽기 전용(예시·공유)에서는 addBtn에 hidden 속성이 붙는다 — 강제 표시가 hidden을 이기지 않게 :not([hidden]). */.headbtn.primary:not([hidden]){display:block;min-height:44px}}
 /* 터치 타깃 — 원 track58-pinboard.html <style id="lt-touch-targets">. */
 /* 2026-11-08 터치 타깃: 보이는 모양은 그대로 두고 ::after로 누르는 영역만 44px 이상으로 넓힌다. */
-#minusBtn,#plusBtn,#resetBtn,#openMoment,#detailYtLink,#cinemaFromMoment,#dHeartSave,.modeSwitchBtn,#toolCinema,#toolFit{position:relative}
+#minusBtn,#plusBtn,#resetBtn,#openMoment,#detailYtLink,#cinemaFromMoment,#dHeartSave,.modeSwitchBtn,#toolCinema,#toolFit,#cinemaBtn{position:relative}
 /* #421: 닫기(×) 단추는 board.css의 position:absolute(오른쪽 위)를 지켜야 한다. relative로
    덮어 쓰면 ×가 "순간 상세" 글자 위에 앉는다. absolute여도 ::after 터치 영역은 그대로 동작한다. */
 #minusBtn::after{content:"";position:absolute;inset:-3px -5px}
 #plusBtn::after{content:"";position:absolute;inset:-3px -2px}
-#resetBtn::after,#openMoment::after,#detailYtLink::after,#cinemaFromMoment::after,#dHeartSave::after,#toolCinema::after,#toolFit::after{content:"";position:absolute;inset:-5px 0}
+#resetBtn::after,#openMoment::after,#detailYtLink::after,#cinemaFromMoment::after,#dHeartSave::after,#toolCinema::after,#toolFit::after,#cinemaBtn::after{content:"";position:absolute;inset:-5px 0}
 #detailClose::after{content:"";position:absolute;inset:-11px}
 
 /* #1072 A-17: 카드 순서 단추 — 키보드(탭)로도 '내 배치' 순서를 바꾼다.

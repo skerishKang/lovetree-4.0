@@ -2,20 +2,22 @@
 /* #1026 묶음 C: 판 시작 자리를 첫 스타일시트에서 최종값으로 잡는다. 뒤에 오는 추가 스타일·글꼴이 늦어도 안 밀린다. */
 /* #886: reserve the final board geometry in the first stylesheet, before screen tools mount. */
 html[data-v41-screen=board]{
-  --lt-board-header-height:66px;
+  --lt-board-header-height:0px;
   --lt-toolbar-top:calc(var(--lt-board-header-height) + 4px);
   --lt-toolbar-height:52px;
-  --lt-board-frame-top:calc(var(--lt-toolbar-top) + var(--lt-toolbar-height) + 80px)
+  --lt-board-frame-top:calc(var(--lt-toolbar-top) + var(--lt-toolbar-height) + 8px)
 }
 @media(min-width:701px){
   html[data-v41-screen=board] .themeBadge,
   html[data-v41-screen=board] .detail,
   html[data-v41-screen=board] .leftPanel{top:calc(var(--lt-toolbar-top) + var(--lt-toolbar-height) + 8px)}
 }
+html[data-v41-screen=board] .boardEmptyGuide{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:5;color:var(--muted);font-size:13px;white-space:nowrap;pointer-events:none}
+html[data-v41-screen=board][data-lt-theme=garden] .boardEmptyGuide{color:var(--lt-muted)}
 html[data-v41-screen=board] .boardTitle{top:calc(var(--lt-toolbar-top) + var(--lt-toolbar-height) + 8px)}
 @media(max-width:700px){
   html[data-v41-screen=board]{
-    --lt-board-header-height:56px;
+    --lt-board-header-height:0px;
     --lt-board-frame-top:calc(var(--lt-toolbar-top) + var(--lt-toolbar-height))
   }
 }
@@ -158,3 +160,14 @@ body.lt-bloom-glow .threadGlow{opacity:.82}
 #editFields .editMediaNote{font-size:10px;color:#a995b1;margin:5px 0}
 #editFields .editMetaNote{font-size:10px;color:#94829e;margin-top:10px}
 #styleSection .ctaRow{margin-top:8px}/* #504: 눌린 판은 aria-pressed로 알리고 같은 모양을 유지한다 */
+
+/* #1249: 한 열로 배치하는 휴대폰에서는 카드 경계를 곧게 유지한다. */
+@media(max-width:699px){
+  html[data-v41-screen=board] .card:not(.dragLift):not(.dropSettle):not(.landing){transform:none}
+}
+
+/* #1249: 휴대폰 판은 실제 세로 스크롤 범위 안에 모든 카드를 둔다. */
+#boardScrollSpace{display:contents}
+#viewport.board-scroll{overflow-x:hidden;overflow-y:auto;touch-action:pan-y;overscroll-behavior-y:contain;scrollbar-width:thin}
+#viewport.board-scroll #boardScrollSpace{display:block;position:relative;width:100%;overflow:clip}
+#viewport.board-scroll:not(.board-scroll-editing) .card{touch-action:pan-y}

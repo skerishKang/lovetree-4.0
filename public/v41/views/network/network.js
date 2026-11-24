@@ -668,6 +668,41 @@
     } else {
       addFit();
     }
+    // #1249: 휴대폰에서는 묶음 선택을 한 개의 메뉴로 묶고 전체 맞춤을 항상 노출한다.
+    const chips = [...r.querySelectorAll('button[data-i]')];
+    if (chips.length) {
+      const more = document.createElement('button');
+      more.className = 'ribbon-more';
+      more.type = 'button';
+      more.textContent = '…';
+      more.setAttribute('aria-label', '묶음 선택');
+      more.setAttribute('aria-expanded', 'false');
+      more.setAttribute('aria-controls', 'ribbonGroups');
+      const groups = document.createElement('div');
+      groups.id = 'ribbonGroups';
+      groups.className = 'ribbon-groups';
+      const close = () => {
+        groups.classList.remove('is-open');
+        more.setAttribute('aria-expanded', 'false');
+      };
+      more.onclick = () => {
+        const open = groups.classList.toggle('is-open');
+        more.setAttribute('aria-expanded', String(open));
+        if (open) groups.querySelector('button')?.focus();
+      };
+      groups.addEventListener('keydown', e => {
+        if (e.key === 'Escape') { close(); more.focus(); }
+      });
+      r.insertBefore(more, chips[0]);
+      r.insertBefore(groups, chips[0]);
+      for (const chip of chips) {
+        groups.append(chip);
+        chip.addEventListener('click', () => {
+          close();
+          if (more.getClientRects().length) more.focus();
+        });
+      }
+    }
     syncRibbon();
   }
   function syncRibbon() {
@@ -728,13 +763,17 @@
     const detailOpen = vw > 980 && !!document.querySelector('#detail.open'),
       detailInset = detailOpen ? 446 : 0;
     const tops = ['.topbar', '.hero p'].map(s => box(document.querySelector(s))).filter(Boolean);
+    const topInset = Math.max(0, ...tops.map(r => r.bottom), picker ? pickerTop + picker.height + 4 : 0) +
+      (state.mobile ? 30 : 0);
+    const bottomInset = bottom ? vh - bottom.top : 0;
+    // #1249: 한 줄 도구로 줄어든 아래 여백을 보완해 지도 중심이 화면 아래로 쏠리지 않게 한다.
+    // 짧은 화면에서도 실제 조작 줄과 겹치지 않는 범위에서만 배치 영역을 조정한다.
+    const balance = state.mobile ? Math.min(topInset - vh * .16, vh - topInset - 152) : 0;
     return {
-      top:
-        Math.max(0, ...tops.map(r => r.bottom), picker ? pickerTop + picker.height + 4 : 0) +
-        (state.mobile ? 30 : 0),
+      top: topInset,
       left: left ? left.right : 0,
       right: Math.max(right ? vw - right.left : 0, detailInset),
-      bottom: bottom ? vh - bottom.top : 0
+      bottom: Math.max(bottomInset, balance)
     };
   }
   function layoutNetwork() {
@@ -1649,7 +1688,11 @@
     const rawAlpha = nodeAlpha(n),
       al = paintAlpha(rawAlpha, 'node-alpha-min'),
       nodeColor = state.mode !== 'OVERVIEW' && rawAlpha < 0.5 ? paint('context') : colorOf(n),
-      rgb = hexRgb(nodeColor),
+      // 작은 꼬리표 점은 밝은 판에서 가장자리 혼합으로 대비가 약해진다.
+      // 점을 그리는 색만 진하게 하여 묶음 색의 관계와 공용 토큰을 유지한다.
+      rgb = hexRgb(nodeColor).map(v =>
+        state.mobile && state.view === 'tag' && readPlate() === 'paper' ? Math.round(v * 0.85) : v
+      ),
       sel = state.selected?.id === n.id || state.play?.currentId === n.id,
       hov = state.hover?.id === n.id;
     let r = dotRadius(n);

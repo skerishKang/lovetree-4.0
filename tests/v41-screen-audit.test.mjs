@@ -699,9 +699,9 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
       const frame = [...document.querySelectorAll('iframe')].find((f) => { try { return /track56-network/.test(f.contentWindow.location.href); } catch { return false; } });
       if (!frame) return null;
       const doc = frame.contentDocument;
-      const bar = doc.querySelector('.topbar');
+      const bar = doc.querySelector('.lt-screen-toolbar');
       const switchBtns = [...doc.querySelectorAll('.view-switch .pill')];
-      const btns = [...doc.querySelectorAll('.top-actions button')].filter((b) => b.getBoundingClientRect().width > 0);
+      const btns = [...doc.querySelectorAll('.lt-screen-toolbar .lt-toolbar-tools button, .lt-screen-toolbar .lt-toolbar-menu button, .lt-screen-toolbar .lt-toolbar-more')].filter((b) => b.getBoundingClientRect().width > 0);
       const rects = btns.map((b) => b.getBoundingClientRect());
       const pairTexts = [];
       for (let i = 0; i < rects.length; i++) for (let j = i + 1; j < rects.length; j++) {
@@ -1661,13 +1661,10 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     const bookChips = await (await readyFrame(page6, /track59-sketchbook/, { why: '책 쪽 확정 꾀리표를 읽을 책 프레임' })).evaluate(() =>
       [...document.querySelectorAll('.moment-title .lt-tag-chip')].map((n) => n.textContent.trim()));
     assert.ok(bookChips.includes('Super Shy') && bookChips.includes('무대'), `책 쪽에 확정 꾀리표 칩이 그려져야 한다(실제: ${JSON.stringify(bookChips)})`);
-    // 보드 첫 진입 두 안내(390) — 셸 알림('내 기록을 불러왔어요.')과 보드 안내 말풍선('순간을 선택해…')이
-    // 같은 자리에 포개지지 않는다. 보드는 ≤700px에서 말풍선을 화면 아래 중앙(bottom 95px)에 띄우고,
-    // 셸 알림도 #666 규칙으로 아래 중앙(--lt-toast-bottom)에 뜬다. 보드는 셸 알림이 떠 있는 동안
-    // 기다렸다 말풍선을 띄운다 — 두 상자가 동시에 보이는 동안에는 겹침 면적이 0이어야 한다.
-    // 1440은 말풍선(오른쪽 아래)·알림(아래 중앙)이 다른 모서리라 기하학적으로 겹치지 않고, 선택 복원으로
-    // 상세 판이 열려 안내가 뜨지 않는 폭이어서 390에서만 잰다.
-    // 새 문맥으로 띄운다(저장된 보기·선택이 없어야 첫 진입 흐름 — 900ms 뒤 말풍선, 셸 알림은 약 3초 — 이 재현된다).
+    // 보드 첫 진입(390) — 셸 알림('내 기록을 불러왔어요.')은 그대로이고 보드 안내 말풍선은 이제 없다.
+    // 두 안내가 같은 자리에 포개지던 문제를 없애는 대신, 열 때 안내가 아예 뜨지 않는다.
+    // 1440은 예전에도 말풍선·알림이 다른 모서리라 기하학적으로 겹치지 않아 390에서만 잰다.
+    // 새 문맥으로 띄운다(저장된 보기·선택이 없어야 첫 진입 흐름이 재현된다).
     if (width === 390) {
       const ctxNotice = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
       await ctxNotice.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); } catch {} }, theme);
@@ -1696,9 +1693,7 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
           }
           return null;
         };
-        // 보드 안내는 셸 알림(약 3초)이 사라진 뒤 600ms마다 최대 10번 다시 시도해 뜬다(최대 약 7초).
-        // 고정 횟수로 재면 느린 기기에서 안내가 뜨기 전에 검사가 끝나 빈손 실패가 난다 —
-        // 두 안내를 모두 '실제로 본' 뒤에 끝내고, 못 보면 마지막 관찰 상태를 메시지에 남긴다.
+        // 셸 알림은 실제로 본 뒤, 보드 안내가 뜨지 않는지 한 번 더 지켜본다(빈손 통과 금지).
         const state = () => {
           const shell = document.getElementById('toast');
           const board = boardToast();
@@ -1711,8 +1706,8 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
           };
         };
         let sawShell = false, sawBoard = false, maxArea = 0, bothAt = -1, last = null, samples = 0;
-        const deadline = Date.now() + 15000;
-        while (Date.now() < deadline && !(sawShell && sawBoard)) {
+        const deadline = Date.now() + 15000, afterShell = Date.now() + 17000;
+        while (Date.now() < deadline || (sawShell && Date.now() < afterShell)) {
           last = state();
           if (last.shellUp) sawShell = true;
           if (last.boardUp) sawBoard = true;
@@ -1727,7 +1722,7 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
         return { sawShell, sawBoard, maxArea: Math.round(maxArea), bothAt, detail };
       });
       assert.ok(twoNotices.sawShell, `390 셸 알림(기록 불러오기 안내)이 떠 있는 자리를 본다(빈손 통과 금지) — ${twoNotices.detail}`);
-      assert.ok(twoNotices.sawBoard, `390 보드 안내 말풍선이 뜨는 자리를 본다(빈손 통과 금지) — ${twoNotices.detail}`);
+      assert.equal(twoNotices.sawBoard, false, `390 보드 첫 진입 안내 토스트가 없다 — ${twoNotices.detail}`);
       assert.equal(twoNotices.maxArea, 0, `390 셸 알림과 보드 안내 말풍선이 같은 자리에 포개지지 않는다(겹침 ${twoNotices.maxArea}px², 동시 노출: ${twoNotices.bothAt < 0 ? '없음' : twoNotices.bothAt + '번째 관찰'})`);
       await pageNotice.close();
       await ctxNotice.close();
@@ -2591,8 +2586,10 @@ test('#972 서재·책 상세·둘러보기·새 소식 화면 치수', { skip: 
           const rect = sel => el.querySelector(sel).getBoundingClientRect();
           const s = rect('.shelf-viewport'), c = rect('.shelf-controls'), h = rect('.resume-strip');
           const card = rect('.book-card'), cover = rect('.book-cover'), rail = rect('.shelf-rail'), base = rect('.shelf-base');
+          const bar = document.querySelector('.lt-screen-toolbar')?.getBoundingClientRect();
           return { count: el.querySelectorAll('.book-card').length, upper: c.top - h.bottom, lower: s.top - c.bottom,
-            balance: Math.abs(h.top - (innerHeight - s.bottom)), innerGap: cover.top - s.top,
+            barGap: bar ? Math.round(h.top - bar.bottom) : null,
+            innerGap: cover.top - s.top,
             cardToBase: base.top - card.bottom, firstLeft: card.left - rail.left,
             arrows: [...el.querySelectorAll('.shelf-arrow')].filter(n => !n.hidden).length,
             overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth };
@@ -2600,7 +2597,7 @@ test('#972 서재·책 상세·둘러보기·새 소식 화면 치수', { skip: 
         assert.equal(shelf.count, 1);
         assert.ok(shelf.upper >= 0 && shelf.upper <= 48, `${theme}/${width}: 펼쳐 보기 아래 여백 ${shelf.upper}px`);
         assert.ok(shelf.lower >= 0 && shelf.lower <= 24, `${theme}/${width}: 검색 아래 여백 ${shelf.lower}px`);
-        assert.ok(shelf.balance <= 40, `${theme}/${width}: 세 요소 묶음의 위·아래 여백 차이 ${shelf.balance}px`);
+        assert.ok(shelf.barGap !== null && shelf.barGap >= 0 && shelf.barGap <= 24, `${theme}/${width}: 이어 보기 띠는 도구 줄 아래에 붙는다(${shelf.barGap}px)`);
         assert.ok(shelf.innerGap >= 0 && shelf.innerGap <= 65, `${theme}/${width}: 책장 안 표지 위 여백 ${shelf.innerGap}px`);
         assert.ok(shelf.cardToBase >= -1 && shelf.cardToBase <= 8, `${theme}/${width}: 책과 선반 사이 ${shelf.cardToBase}px`);
         assert.ok(Math.abs(shelf.firstLeft) <= 4, `${theme}/${width}: 첫 책 왼쪽 오차 ${shelf.firstLeft}px`);
@@ -2773,7 +2770,7 @@ test('#987 보드 첫 줄과 모바일 셸 겹침·현재 표시', { skip: REQUI
         await frame.locator('#detail.open').waitFor();
         await page.waitForTimeout(600);
         const m = await frame.evaluate(() => {
-          const title = document.querySelector('.boardTitle').getBoundingClientRect(), vp = document.querySelector('#viewport').getBoundingClientRect(), btn = document.querySelector('#cinemaBtn').getBoundingClientRect();
+          const title = document.querySelector('.lt-screen-toolbar').getBoundingClientRect(), vp = document.querySelector('#viewport').getBoundingClientRect(), btn = document.querySelector('#cinemaBtn').getBoundingClientRect();
           const cards = [...document.querySelectorAll('.card[data-id]')].map(e => e.getBoundingClientRect());
           return { titleBottom: title.bottom, viewportTop: vp.top, firstTop: Math.min(...cards.map(r=>r.top)), overlap: Math.max(...cards.map(r=>Math.max(0,Math.min(r.right,btn.right,vp.right)-Math.max(r.left,btn.left,vp.left))*Math.max(0,Math.min(r.bottom,btn.bottom,vp.bottom)-Math.max(r.top,btn.top,vp.top)))), visible: cards.filter(r=>r.bottom>vp.top&&r.top<vp.bottom&&r.right>vp.left&&r.left<vp.right).length, horizontalFit: cards.filter(r=>r.left>=vp.left-1&&r.right<=vp.right+1).length };
         });
@@ -2915,7 +2912,9 @@ test('#1091: 서재·책·보드 화면 도구 줄의 계산값이 같고 390 �
       await page.waitForSelector('.lt-screen-toolbar', { timeout: 15000 });
       const value = await page.evaluate((name) => {
         const bar = document.querySelector('.lt-screen-toolbar');
-        const button = bar.querySelector('button');
+        // 제목 선택과 새 트리는 고유 단추이므로 공통 도구 단추의 기본 규격을 별도로 실측한다.
+        const button = document.createElement('button');
+        bar.querySelector('.lt-toolbar-tools').append(button);
         const barStyle = getComputedStyle(bar);
         const buttonStyle = getComputedStyle(button);
         const body = document.querySelector(name === 'book' ? '.stage' : name === 'board' ? '.boardFrame' : '.shelf-screen');
@@ -2932,14 +2931,14 @@ test('#1091: 서재·책·보드 화면 도구 줄의 계산값이 같고 390 �
       return value;
     };
     for (const [width, theme] of [[1440, 'night'], [1440, 'garden'], [390, 'night'], [390, 'garden']]) {
-      const values = [];
-      for (const screen of ['book', 'board', 'shelf']) values.push(await measure(screen, width, theme));
-      assert.deepEqual(values[0], values[1], `${width}·${theme}에서 책·보드 줄 계산값이 다르다`);
-      assert.deepEqual(values[0], values[2], `${width}·${theme}에서 책·서재 줄 계산값이 다르다`);
-      for (const value of values) {
+      const values = {};
+      for (const screen of ['book', 'board', 'shelf']) values[screen] = await measure(screen, width, theme);
+      assert.deepEqual({ ...values.book, shelfBack: undefined }, { ...values.board, shelfBack: undefined }, `${width}·${theme}에서 책·보드 줄 계산값이 다르다`);
+      assert.deepEqual({ ...values.book, shelfBack: undefined }, { ...values.shelf, shelfBack: undefined }, `${width}·${theme}에서 책·서재 줄 계산값이 다르다`);
+      for (const [screen, value] of Object.entries(values)) {
         assert.equal(value.height, width === 390 ? '48px' : '52px');
         assert.equal(value.buttonHeight, '36px');
-        assert.equal(value.shelfBack, false, '← 서재 단추가 남아 있다');
+        assert.equal(value.shelfBack, screen !== 'shelf', '공통 줄 왼쪽에 ← 서재가 있다');
         assert.equal(value.covered, false, '화면 본문이 도구 줄에 가려졌다');
       }
     }
@@ -3070,6 +3069,123 @@ test('#1026 무대 불러오는 중 표시 — 느림 표시·빠름 비표시·
       } finally { await ctx.close(); }
     }
   } finally { await browser.close(); await new Promise(resolve => server.close(resolve)); }
+});
+
+
+test('두 칸 전환: 책/목록·선반/회전·보드 같은 크기와 모서리(1440·390)', {skip, timeout:180000}, async()=>{
+ const server=await serve();const base='http://127.0.0.1:'+server.address().port;
+ const browser=await chromium.launch({headless:true});
+ try{
+ for(const width of [1440,390])for(const theme of ['night','garden']){
+  const ctx=await browser.newContext({viewport:{width,height:width===390?844:900}});
+  await ctx.addInitScript(t=>localStorage.setItem('lt41.theme',t),theme);
+  try{
+   const configs=[
+    ['/v41/views/track59-sketchbook.html','#book-display-inline',false],
+    ['/v41/views/track59-sketchbook.html','#book-view-toggle',false],
+    ['/v41/views/track32-bookshelf.html','#shelf-view-inline',false],
+    ['/v41/views/track58-pinboard.html','.boardModeSwitch',false]
+   ];
+   for(const [url,selector,reveal] of configs){
+    const page=await ctx.newPage();
+    try{
+      await page.goto(base+url,{waitUntil:'load',timeout:15000});
+      // 공통 줄이 화면 도구를 접어 정리할 때까지 기다린 뒤 잰다(첫 그림 순간의 빈 칸은 화면 값이 아니다).
+      await page.waitForFunction((sel)=>{
+        const el=document.querySelector(sel);
+        if(!el)return false;
+        const bs=[...el.children].filter(n=>n.tagName==='BUTTON');
+        return bs.length===2&&bs.every(b=>b.getBoundingClientRect().width>0);
+      },selector,{timeout:10000});
+      const data=await page.evaluate(({selector,reveal})=>{
+        const parent=document.querySelector(selector);
+        if(!parent)return null;
+        if(reveal)parent.hidden=false;
+        const buttons=[...parent.children].filter(n=>n.tagName==='BUTTON');
+        const measure=(el)=>{const r=el.getBoundingClientRect(),s=getComputedStyle(el);return {width:r.width,height:r.height,radius:s.borderRadius}};
+        return {group:measure(parent),buttons:buttons.map(measure)};
+      },{selector,reveal});
+      assert.ok(data,width+'/'+theme+'/'+selector+' 전환 없음');
+      assert.equal(data.buttons.length,2);
+      assert.ok(data.buttons[0].width>0&&data.buttons[0].height>0,width+'/'+theme+'/'+selector+' 빈 칸');
+      assert.deepEqual(data.buttons[0],data.buttons[1],width+'/'+theme+'/'+selector+' 두 칸 치수');
+    }finally{await page.close()}
+   }
+  }finally{await ctx.close()}
+ }
+ }finally{await browser.close();await new Promise(r=>server.close(r))}
+});
+
+// 화면 전체(머리줄 + 현재 보이는 책/서재/보드 iframe)를 함께 보며 같은 전환 두 벌을 금지한다.
+test('화면 전환 단추 중복 0: 서재·책·보드 1440·390 밤·정원', {skip, timeout:180000}, async()=>{
+ const server=await serve();
+ const base='http://127.0.0.1:'+server.address().port;
+ const browser=await chromium.launch({headless:true});
+ const workspace={revision:1,state:{version:1,trees:[firstTree],prefs:{}},subject:'시험계정',writeSubjectBound:true,savedAt:'2026-11-23T00:00:00.000Z'};
+ try{
+  for(const [width,height] of [[1440,900],[390,844]])for(const theme of ['night','garden'])for(const screen of ['shelf','book','board']){
+   const ctx=await browser.newContext({viewport:{width,height},reducedMotion:'reduce'});
+   await ctx.addInitScript(t=>{localStorage.setItem('lt41.theme',t);localStorage.setItem('lt41.tips.firstTree','1')},theme);
+   await ctx.route('**/api/**',r=>r.fulfill({status:200,contentType:'application/json',body:'{"ok":true,"items":[]}'}));
+   await ctx.route('**/api/workspace**',r=>r.fulfill({status:200,contentType:'application/json',body:JSON.stringify(workspace)}));
+   const page=await ctx.newPage();
+   try{
+    await page.goto(base+'/v41/?account=1#my/'+screen,{waitUntil:'load',timeout:20000});
+    await page.waitForFunction(screen=>{
+      const f=[...document.querySelectorAll('#view,#view-next')].find(f=>!f.hidden&&f.getClientRects().length>0);
+      const target={shelf:'track32-bookshelf',book:'track59-sketchbook',board:'track58-pinboard'}[screen];
+      try{return f?.contentWindow?.location?.pathname.includes(target)}catch{return false}
+    },screen,{timeout:20000});
+     // 주소가 바뀐 뒤 줄이 만들어지기 전을 재지 않는다 — 공통 줄과 전환 단추가 생길 때까지 기다린다(원인 대기).
+     await page.waitForFunction(()=>{
+       const f=[...document.querySelectorAll('#view,#view-next')].find(f=>!f.hidden&&f.getClientRects().length>0);
+       try{
+         const doc=f?.contentDocument;
+         const bar=doc?.querySelector('.lt-screen-toolbar');
+         return !!bar&&!!bar.querySelector('.lt-toolbar-tools')&&doc.querySelectorAll('.view-toggle,.boardModeSwitch,.shelf-view-inline').length>0;
+       }catch{return false}
+     },null,{timeout:20000});
+    const result=await page.evaluate(()=>{
+      const frame=[...document.querySelectorAll('#view,#view-next')].find(f=>!f.hidden&&f.getClientRects().length>0);
+      const inner=frame.contentDocument;
+      const visible=el=>{
+        if(!el||el.hidden||el.getClientRects().length===0)return false;
+        const box=el.getBoundingClientRect();
+        if(box.width===0||box.height===0)return false;
+        for(let n=el;n;n=n.parentElement){
+          const st=n.ownerDocument.defaultView.getComputedStyle(n);
+          if(st.display==='none'||st.visibility==='hidden'||st.opacity==='0')return false;
+        }
+        return true;
+      };
+      const groups=[...document.querySelectorAll('.view-toggle,.boardModeSwitch,.shelf-view-inline'),
+                    ...inner.querySelectorAll('.view-toggle,.boardModeSwitch,.shelf-view-inline')]
+        .filter(el=>visible(el))
+        .map(el=>[...el.children].filter(x=>x.tagName==='BUTTON').map(x=>x.textContent.trim()).join('|'))
+        .filter(Boolean);
+      return {
+        groups,
+        shelfInside:visible(inner.getElementById('shelf-view-inline')),
+        bookInside:visible(inner.getElementById('book-display-inline')),
+        bookPages:visible(inner.getElementById('book-view-toggle')),
+        boardInside:visible(inner.querySelector('.boardModeSwitch'))
+      };
+    });
+    const prefix=width+'/'+theme+'/'+screen;
+    assert.equal(new Set(result.groups).size,result.groups.length,prefix+' 같은 전환이 두 곳에 보인다: '+JSON.stringify(result.groups));
+    if(screen==='shelf'){
+      assert.equal(result.shelfInside,true,prefix+' 도구 줄 전환 보임(머리줄 토글은 걷어냈다)');
+      assert.equal(result.groups.filter(s=>s==='선반|회전').length,1,prefix+' 서재 전환 단추는 반드시 한 벌');
+    }
+    if(screen==='book'){
+      assert.equal(result.bookInside,true,prefix+' 책의 책/목록 전환 유지');
+      assert.equal(result.groups.filter(s=>s==='1장|2장').length,1,prefix+' 책의 1장/2장 전환 유지');
+      assert.equal(result.groups.filter(s=>s==='책|목록').length,1,prefix+' 책/목록 전환 한 벌');
+    }
+    if(screen==='board')assert.equal(result.boardInside,true,prefix+' 보드 전환 유지');
+   }finally{await ctx.close()}
+  }
+ }finally{await browser.close();await new Promise(resolve=>server.close(resolve))}
 });
 
 // #1026: 최초 진입의 셸 머리줄과 빈 화면 자리가 뒤늦게 밀리지 않는지 실제 렌더링으로 검증한다.
