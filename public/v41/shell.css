@@ -615,9 +615,9 @@ nav .tree-frame{scroll-snap-align:center}
 .tree-name{min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
 .tree-count{font-size:11px;color:var(--lt-muted);white-space:nowrap}
 .tree-check{color:var(--lt-gold);font-weight:800}
-.tree-foot{display:grid;gap:3px;margin-top:6px;padding-top:6px;border-top:1px solid var(--lt-line)}
+.tree-foot{display:grid;gap:3px;margin-top:4px;padding-top:4px;border-top:1px solid var(--lt-line)}
 /* #1285 6번: 묶음 구분선과 위험 동작 표시 — 기존 토큰만 쓴다. */
-.tree-group-divider{height:1px;margin:2px 9px;background:var(--lt-line)}
+.tree-group-divider{height:1px;margin:0 9px;background:var(--lt-line)}
 .tree-foot .tree-danger .tree-name{color:var(--lt-rose)}
 .tree-foot .tree-danger:hover,.tree-foot .tree-danger:focus-visible{background:rgba(200,110,121,.12)}
 .tree-foot button{min-height:44px;text-align:left;border:0;border-radius:10px;background:none;color:var(--lt-pearl);padding:0 9px;font-size:13px}
