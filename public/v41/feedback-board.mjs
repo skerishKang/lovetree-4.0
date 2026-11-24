@@ -81,8 +81,8 @@ export function createFeedbackBoard({$, notify, show, showFull, onReplyCount, on
   }
   async function waitForSession() {
    for (let i = 0; i < 40; i++) {
-    const value = phase();
-    if (value && value !== 'checking') return;
+    // 확인 중이라는 값이 있을 때만 기다린다(값이 없는 환경에서는 바로 본다).
+    if (phase() !== 'checking') return;
     await new Promise(resolve => setTimeout(resolve, 100));
    }
   }
