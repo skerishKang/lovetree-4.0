@@ -1,20 +1,22 @@
-// 미리보기 배포는 정적 자산이 먼저 열리고 /api/* Functions는 잠시 뒤 붙는다(#337 실측:
-// 배포 직후 검사에서 /api/community/shares·/api/youtube/oembed가 404, 같은 배포가 수십 분 뒤 503).
-// 그 404 창에 검사가 들어가면 예외 목록으로도 넘기지 못하는 진짜 실패가 된다. 그래서 미리보기 주소를
-// 찾은 뒤 허용 목록 안 경로 하나(/api/account)가 404가 아닌 응답(401 등)을 줄 때까지 짧게 기다린다.
-// 404를 성공으로 세지 않는다 — 허용 목록에서 404를 넘기면 진짜 고장을 가린다(2026-11-09 CTO 결정).
+// Functions가 직접 답하는 준비 확인 경로를 본다(#1254). 예전에는 저장 API를 거치는 계정 확인
+// 경로를 봤는데, PR 미리보기에는 저장 API 주소가 설정돼 있지 않아 그 경로가 늘 503이었다.
+// 그 때문에 배포가 다 떴는데도 준비 상태가 'cold'로 고정됐다. 저장소에 기대지 않는
+// Functions 라우팅 응답(robots.txt)을 보면 미리보기에서도 준비 여부를 제대로 읽을 수 있다.
+// 404를 성공으로 세지 않는다 — 라우팅이 아직 안 붙은 상태를 넘기면 진짜 고장을 가린다(2026-11-09 CTO 결정).
 //
 // #496(2026-11-13): 503도 **아직 안 뜬 것**으로 본다. 예전에는 "404가 아니면 준비됨"이라 배포 직후의
 // 503을 준비 완료로 읽었고, 그 상태로 채점에 들어가 환경 문제와 제품 결함이 같은 빨강이 됐다.
-// #493 실패 2건(e102493·9a1488a)이 정확히 그 모양이었다 — "1번째 시도에서 응답 503" 뒤 채점.
+// 시도 횟수·간격·기한은 바꾸지 않는다 — 주소만 저장 API가 아닌 쪽으로 바꾼다.
 //
 // 상태 셋으로 답한다(호출자가 요약에 나눠 적는다):
-//   'ready'  — Functions가 응답한다(401·403·200 등). 채점해도 된다.
+//   'ready'  — Functions가 응답한다(200·401·403 등). 채점해도 된다.
 //   'cold'   — 기한 안에 404/503만 봤다(또는 계속 오류). **환경 준비 안 됨**이지 제품 결함이 아니다.
 //   null     — 주소가 없어 확인할 것도 없다.
 // 시간이 넘으면 검사를 막지 않고 지금처럼 진행한다. 호출자가 요약에 한 줄을 남긴다.
 export const READY_TIMEOUT_MS = 60_000;
 export const READY_INTERVAL_MS = 3000;
+// Functions가 직접 답하는 정적·라우팅 응답 — 저장 API(/api/*)를 거치지 않는다.
+export const READY_PATH = '/robots.txt';
 
 // '아직 안 뜬' 응답 — 이 코드가 오면 준비된 것이 아니라 더 기다린다.
 // 404: Functions 라우트가 아직 안 붙었다(#337 실측). 502·503·504: 엣지/게이트웨이가 뒷단을 못 찾는다.
@@ -44,7 +46,7 @@ export async function functionsReady(previewUrl, { fetcher = (...args) => fetch(
     try {
       // 한 번의 요청이 멈춰도 기한을 넘기지 않도록 남은 기한만큼 상한을 둔다.
       const signal = typeof AbortSignal?.timeout === 'function' && remaining > 0 ? AbortSignal.timeout(Math.max(remaining, 1)) : undefined;
-      const res = await fetcher(`${previewUrl}/api/account`, { headers: { accept: 'application/json' }, redirect: 'manual', signal });
+      const res = await fetcher(`${previewUrl}${READY_PATH}`, { headers: { accept: 'text/plain' }, redirect: 'manual', signal });
       seen.add(res.status);
       if (!isNotYetUp(res.status)) {
         log(`Functions 준비 확인: ${attempts}번째 시도(${now() - startedAt}ms 경과)에서 응답 ${res.status}`);
@@ -59,6 +61,6 @@ export async function functionsReady(previewUrl, { fetcher = (...args) => fetch(
     await sleep(intervalMs);
   }
   const saw = [...seen].sort().join('·') || '응답 없음';
-  log(`Functions 준비 확인 실패: ${attempts}번 시도(${now() - startedAt}ms 경과)했지만 /api/account가 응답하지 않았다(본 응답: ${saw}) — 환경 준비 안 됨`);
+  log(`Functions 준비 확인 실패: ${attempts}번 시도(${now() - startedAt}ms 경과)했지만 Functions가 응답하지 않았다(본 응답: ${saw}) — 환경 준비 안 됨`);
   return 'cold';
 }

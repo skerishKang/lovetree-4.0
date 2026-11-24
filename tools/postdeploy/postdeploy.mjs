@@ -6,6 +6,11 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { FRAME_LOAD_COUNTER, FRAME_RELOAD_LIMIT, HOME_CARD_STATE, RELOAD_SCREENS, reloadCheckId } from './frame-reload.mjs';
+import { PREVIEW_SKIP_DETAIL, isPreviewTarget, previewSkippedConsoleErrors } from './preview-target.mjs';
+
+// #1254: 대상 주소가 *.pages.dev 미리보기 별칭이면 저장 API에 기대는 확인을 하지 않는다.
+// 운영 주소에서는 아래 분기들이 전부 지금처럼 동작한다.
+let previewTarget = false;
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 // 러너에는 Google Chrome이 없을 수 있다. LOVETREE_POSTDEPLOY_BROWSER=chromium 이면 함께 설치한
@@ -268,6 +273,8 @@ async function accountPassword(opts) {
 }
 
 async function sessionLoggedIn(page, timeout) {
+  // 미리보기에는 저장 API가 없어 이 확인이 늘 503이다. 요청 자체를 하지 않고 비로그인으로 본다(#1254).
+  if (previewTarget) return false;
   try {
     const res = await page.request.get(new URL('/api/workspace', page.url()).href, {
       timeout,
@@ -456,6 +463,10 @@ async function autoLogin(page, opts, target) {
 }
 
 async function probeLogin(page, timeout) {
+  if (previewTarget) {
+    record('session-probe', 'auth', 'skip', PREVIEW_SKIP_DETAIL);
+    return {};
+  }
   const paths = ['/api/account', '/api/lovetree/account', '/api/session', '/api/workspace'];
   const out = {};
   for (const p of paths) {
@@ -548,6 +559,12 @@ async function readCommunity(page) {
 }
 
 async function checkCommunity(page, opts) {
+  // 공유 목록·집계는 저장 API를 읽는다 — 미리보기에서는 시작도 하지 않는다(#1254).
+  if (previewTarget) {
+    record('community-cards', 'community', 'skip', PREVIEW_SKIP_DETAIL);
+    record('browse-aggregates', 'community', 'skip', PREVIEW_SKIP_DETAIL);
+    return null;
+  }
   const { opened } = await openCommunity(page, opts);
   if (!opened) {
     record('community-open', 'community', 'fail', '#community-menu 로 둘러보기 대화상자를 열지 못함');
@@ -2031,6 +2048,11 @@ async function checkThemeRoundTrip(page, base, opts, stamp) {
 }
 
 async function checkYoutubeEndpoint(page, videoId) {
+  // oEmbed 확인도 저장 API를 거친다 — 미리보기에서는 503을 실패로 세지 않고 확인 자체를 건너뛴다(#1254).
+  if (previewTarget) {
+    record('youtube-oembed', 'youtube', 'skip', PREVIEW_SKIP_DETAIL);
+    return { loggedIn: false, result: { status: 0 } };
+  }
   const result = await page.evaluate(async (id) => {
     const res = await fetch(`/api/youtube/oembed?v=${encodeURIComponent(id)}`, {
       headers: { accept: 'application/json' },
@@ -2362,6 +2384,8 @@ async function main() {
     console.error(`주소 형식이 올바르지 않습니다: ${opts.target}`);
     return 1;
   }
+  previewTarget = isPreviewTarget(target);
+  if (previewTarget) record('storage-api', 'api', 'skip', PREVIEW_SKIP_DETAIL);
 
   await mkdir(opts.out, { recursive: true });
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -2461,14 +2485,20 @@ async function main() {
       await page.setViewportSize({ width: 1440, height: 900 }).catch(() => {});
       oembed = await checkYoutubeEndpoint(page, opts.youtube);
       if (oembed.loggedIn) await checkYoutubeCaption(page, opts.youtube);
-      else record('youtube-caption', 'youtube', 'skip', '비로그인 상태라 YouTube 캡션 확인을 건너뜀');
+      else record('youtube-caption', 'youtube', 'skip', previewTarget ? PREVIEW_SKIP_DETAIL : '비로그인 상태라 YouTube 캡션 확인을 건너뜀');
 
       if (opts.write) await writeChecks(page, opts);
       else record('write', 'write', 'skip', '쓰기 검사는 기본 꺼짐(--write --share <id> 로 실행)');
       }
     }
 
-    const fatalConsole = consoleErrors.filter((text) => !isIgnorableConsoleError(text));
+    // 미리보기에서는 저장 API가 없어서 난 503 콘솔 줄만 제외한다(확인 자체는 skip으로 남는다).
+    // 저장 API가 아닌 곳의 503은 여기서 걸러지지 않아 그대로 실패다(#1254).
+    const storageConsoleSkipped = previewSkippedConsoleErrors(consoleErrors, target.href);
+    if (storageConsoleSkipped.length) {
+      record('console-storage-503', 'api', 'skip', PREVIEW_SKIP_DETAIL, { lines: storageConsoleSkipped.length });
+    }
+    const fatalConsole = consoleErrors.filter((text) => !isIgnorableConsoleError(text) && !storageConsoleSkipped.includes(text));
     const consoleOk = fatalConsole.length === 0 && pageErrors.length === 0;
     record('console-errors', 'console', consoleOk ? 'pass' : 'fail',
       consoleOk ? `콘솔 오류 0 (무시 ${consoleErrors.length - fatalConsole.length}건)` : `콘솔 ${fatalConsole.length}건 / 페이지 오류 ${pageErrors.length}건`,
