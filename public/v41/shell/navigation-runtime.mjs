@@ -91,7 +91,7 @@ export function createNavigationRuntime(ctx){
       setHandled:hash=>{ctx.handledHash=hash;},
       communityScreen:ctx.shellCommunityScreen,
       show:(file,write)=>(0,ctx.show)(file,write),
-      choose:(id,momentId)=>(0,ctx.choose)(id,momentId),
+      choose:(id,momentId,skipShow)=>(0,ctx.choose)(id,momentId,skipShow),
       links:(...args)=>(0,ctx.links)(...args),
       notify:text=>(0,ctx.notify)(text),
       startMember:()=>(0,ctx.startMember)(),
