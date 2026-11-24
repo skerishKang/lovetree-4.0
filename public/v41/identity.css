@@ -277,6 +277,20 @@ html[data-lt-theme=garden] body,html[data-lt-theme=garden] .app-header{transitio
 :host .center .actions .subtleBtn:hover,:host .center .actions .subtleBtn:active{filter:brightness(.94)}
 :host([data-lt-theme=garden]) .center .actions .subtleBtn{background:var(--lt-paper);color:var(--lt-ink);border-color:var(--lt-line-paper)}
 :host .center .actions .primary-cta,:host .center .actions .primary-cta:hover,:host([data-lt-theme=garden]) .center .actions .primary-cta,:host([data-lt-theme=garden]) .center .actions .primary-cta:hover{background:var(--lt-cta-rose);border-color:var(--lt-cta-rose);color:var(--lt-cta-white)}
+/* #1246: 첫 화면 둘러보기만 채움 없는 나침반 단추. */
+:host .center .actions .subtleBtn[data-do=community],
+:host([data-lt-theme=garden]) .center .actions .subtleBtn[data-do=community]{
+ display:inline-flex;align-items:center;justify-content:center;gap:5px;white-space:nowrap;
+ background:transparent;border:1px solid color-mix(in srgb,var(--lt-pearl) 55%,transparent);
+ border-radius:var(--lt-r-pill);color:var(--lt-pearl);filter:none
+}
+:host .center .actions .subtleBtn[data-do=community]:hover,
+:host .center .actions .subtleBtn[data-do=community]:active,
+:host([data-lt-theme=garden]) .center .actions .subtleBtn[data-do=community]:hover,
+:host([data-lt-theme=garden]) .center .actions .subtleBtn[data-do=community]:active{
+ background:color-mix(in srgb,var(--lt-pearl) 9%,transparent);border-color:var(--lt-pearl);filter:none
+}
+:host .center .actions .home-compass{width:15px;height:15px;flex:none}
 :host([data-lt-theme=garden]) .hint,:host([data-lt-theme=garden]) .caption{color:var(--lt-muted);text-shadow:none}
 :host([data-lt-theme=garden]) .firstMark{border-color:var(--lt-rose);background:rgba(255,253,248,.86);color:var(--lt-ink);box-shadow:none}
 :host([data-lt-theme=garden]) .orbit-dialog{background:var(--lt-paper);border-color:rgba(119,91,82,.3);color:var(--lt-ink)}

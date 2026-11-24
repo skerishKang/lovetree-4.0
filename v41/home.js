@@ -180,6 +180,16 @@ shadow.append(cardUI);
 // 로그인 전이면 지금 두 줄 그대로, 로그인 후면 상태에 따라 큰 제목 아래 둘째 줄도 함께 갱신한다(아래 상태 블록).
 const centerButtons=[...shadow.querySelectorAll('.center .actions button')];
 const centerPlan=applyHomeCenter(centerButtons,presentation.centerState);
+// #1246: the public-tree entrance has its own outline compass, not a filled action.
+const exploreButton=centerButtons.find(button=>button.dataset.do==='community');
+if(exploreButton){
+ const ns='http://www.w3.org/2000/svg';
+ const compass=document.createElementNS(ns,'svg');
+ for(const [key,value] of Object.entries({viewBox:'0 0 24 24','aria-hidden':'true',focusable:'false',class:'home-compass',fill:'none',stroke:'currentColor','stroke-width':'1.7','stroke-linecap':'round','stroke-linejoin':'round'}))compass.setAttribute(key,value);
+ const circle=document.createElementNS(ns,'circle');circle.setAttribute('cx','12');circle.setAttribute('cy','12');circle.setAttribute('r','9');
+ const needle=document.createElementNS(ns,'path');needle.setAttribute('d','M16 8l-2.5 5.5L8 16l2.5-5.5L16 8Z');
+ compass.append(circle,needle);exploreButton.prepend(compass);
+}
 const byDo=name=>centerButtons.find(b=>b.dataset.do===name);
 // 보이는 버튼 수를 표시한다(위 버튼 폭 규칙이 쓴다). 로그인 세트는 390에서도 한 줄(data-inline — 옛 세로 쌓기는 로그아웃만).
 const actionsRow=shadow.querySelector('.center .actions');

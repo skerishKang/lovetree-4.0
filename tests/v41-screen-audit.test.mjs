@@ -122,7 +122,8 @@ test('#942 첫 화면 추가 단추와 숫자 묶음', { skip: REQUIRE ? false :
     };
     const buttons = [...root.querySelectorAll('.center .actions > .subtleBtn,.center .actions > .home-action-group > .subtleBtn')].map(e => {
       const s = doc.defaultView.getComputedStyle(e);
-      return { text: e.textContent.trim(), bg: s.backgroundColor, border: s.borderTopWidth };
+      const icon=e.querySelector('svg.home-compass'), ir=icon?.getBoundingClientRect();
+      return { text:e.textContent.trim(),bg:s.backgroundColor,border:s.borderTopWidth,borderColor:s.borderTopColor,borderStyle:s.borderTopStyle,radius:parseFloat(s.borderTopLeftRadius),ink:s.color,icon:!!icon&&ir.width>0&&ir.height>0&&icon.getAttribute('aria-hidden')==='true'&&icon.getAttribute('fill')==='none'&&icon.getAttribute('stroke')==='currentColor' };
     });
     const headers = [...document.querySelectorAll('#write-menu,#mobile-add')].map(e => ({ id: e.id, visible: !!e.getClientRects().length }));
     const head = measure(document.getElementById('write-menu')), fab = measure(document.getElementById('mobile-add'));
@@ -181,8 +182,18 @@ test('#942 첫 화면 추가 단추와 숫자 묶음', { skip: REQUIRE ? false :
         check(head.visible===(member&&width===1440)&&!fab.visible&&!!top?.visible===member,key+' 추가 단추 위치');
         check(JSON.stringify(buttons.map(b=>b.text))===JSON.stringify(member?['순간 목록','둘러보기','서재']:['＋ 첫 순간 추가','둘러보기','어떻게 쓰나요']),key+' 가운데 순서');
         const light=theme==='night'?'rgb(238, 233, 224)':'rgb(255, 253, 248)';
-        check(member?buttons.every(b=>b.bg===light):buttons[0]?.bg===rose,key+' 자주색 하나·나머지는 밝은 단추(#1084) '+JSON.stringify(buttons.map(b=>b.bg)));
-        check(buttons.slice(member?0:1).every(b=>b.bg===light&&b.border!=='0px'),key+' 밝은 바탕·얇은 테두리 '+JSON.stringify(buttons));
+        check(member?buttons[0]?.bg===light:buttons[0]?.bg===rose,key+' 첫 단추의 기존 색 '+JSON.stringify(buttons[0]));
+        check(buttons[2]?.bg===light&&buttons[2].border!=='0px',key+' 셋째 밝은 단추 '+JSON.stringify(buttons[2]));
+        const explore=buttons[1];
+        check(explore.bg==='rgba(0, 0, 0, 0)'&&explore.border==='1px'&&explore.borderStyle==='solid'&&explore.radius>=22&&explore.icon&&explore.ink!==rose,key+' 둘러보기 투명·테두리·선 나침반 '+JSON.stringify(explore));
+        check(!buttons[0].icon&&!buttons[2].icon&&explore.bg!==buttons[0].bg&&explore.bg!==buttons[2].bg,key+' 둘러보기만 다른 모양');
+        const exploreLocator=page.frameLocator('#view').locator('.center .actions [data-do=community]');
+        const hoverStyle=()=>exploreLocator.evaluate(e=>{const s=getComputedStyle(e);return {bg:s.backgroundColor,border:s.borderTopColor}});
+        await exploreLocator.hover();
+        const hovered=await hoverStyle();
+        check(hovered.bg!==explore.bg&&hovered.border!==explore.borderColor,key+' 둘러보기 올림 강조 '+JSON.stringify(hovered));
+        await page.mouse.move(0,0);
+        check((await hoverStyle()).bg===explore.bg,key+' 올림 해제 뒤 다시 투명');
         check(groups.length===3,key+' 묶음 3개');
          check(JSON.stringify(groups.map(g=>g.count))===JSON.stringify(member?['순간 14|','공개 트리 17|공개 순간 123','트리 3|공개 트리 1']:['',(signedIn?'':'예시 ')+'공개 트리 17|순간 123','']),key+' 숫자 귀속');
         for(const g of groups.filter(g=>g.count))check(g.inner>=4&&g.inner<=6&&Math.abs(g.center)<=2&&g.font>=12&&g.overflow<=1,key+' 숫자 간격 '+JSON.stringify(g));
