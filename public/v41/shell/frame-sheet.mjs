@@ -39,7 +39,8 @@ export function createFrameSheet(ctx){
       const doc=cur&&cur.contentDocument;
       const dialogOpen=!!doc&&hasOpenDialog(doc);
       document.body.classList.toggle('lt-sheet-open',!!doc&&hasOpenLayer(doc));
-      document.body.classList.toggle('lt-frame-dialog-open',dialogOpen);};
+      document.body.classList.toggle('lt-frame-dialog-open',dialogOpen);
+      document.body.classList.toggle('lt-book-lightbox-open',!!doc&&!!doc.querySelector('.lt-lightbox'));};
     observeTree(d);
     sheetObservers.set(frame,observer);
     sync();

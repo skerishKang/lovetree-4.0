@@ -1246,3 +1246,12 @@ nav #record-menu #source-label{flex:1 1 auto;text-align:left}
 .header-actions .view-toggle>button[aria-checked=true]{background:var(--lt-primary);color:var(--lt-primary-ink)}
 html[data-lt-theme=garden] .header-actions .view-toggle>button:not([aria-checked=true]){color:var(--lt-ink)}
 @media(max-width:780px){.header-actions .view-toggle{min-width:84px}}
+
+/* #1259-2: 방문자 책 첫 안내만 문서 흐름의 별도 칸을 사용한다. 보드 안내와 머리줄은 그대로. */
+body[data-record-source=share][data-fab-lift=book] #toast[data-visitor-intro]:not([hidden]){
+ position:relative;flex:0 0 auto;inset:auto;transform:none;margin:4px auto 54px;
+}
+@media(max-width:520px){
+ body[data-record-source=share][data-fab-lift=book] #toast[data-visitor-intro]:not([hidden]){margin:2px auto max(2px,env(safe-area-inset-bottom));padding:6px 10px;line-height:1.4}
+}
+body[data-record-source=share][data-fab-lift=book].lt-book-lightbox-open #toast[data-visitor-intro]{display:none}

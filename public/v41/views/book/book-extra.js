@@ -374,8 +374,8 @@ renderSpread=function(idx,focusId=null,land=true){
 /* 연결 한마디는 두 페이지의 가운데에 둔다. 빈 관계는 입력 버튼으로, 저장된 관계는 다시 편집할 수 있는 문장으로 보인다. */
 const STORY_TIP_KEY='lt41.tips.bookStory';
 let storyTipOpen=false,storyRequest=null;
-try{storyTipOpen=LTDEMO.moments.length>=2&&localStorage.getItem(STORY_TIP_KEY)!=='1';if(storyTipOpen)localStorage.setItem(STORY_TIP_KEY,'1')}catch{storyTipOpen=LTDEMO.moments.length>=2}
-function storyTipMarkup(){return storyTipOpen?'<div class="story-tip" role="note"><span>두 순간 사이에 한마디를 남기면, 책이 이야기처럼 이어져요. 안 적어도 괜찮아요.</span><button type="button" data-story-tip-dismiss>알겠어요</button></div>':''}
+try{storyTipOpen=!LTDEMO.readOnly&&LTDEMO.moments.length>=2&&localStorage.getItem(STORY_TIP_KEY)!=='1';if(storyTipOpen)localStorage.setItem(STORY_TIP_KEY,'1')}catch{storyTipOpen=!LTDEMO.readOnly&&LTDEMO.moments.length>=2}
+function storyTipMarkup(){return !LTDEMO.readOnly&&storyTipOpen?'<div class="story-tip" role="note"><span>두 순간 사이에 한마디를 남기면, 책이 이야기처럼 이어져요. 안 적어도 괜찮아요.</span><button type="button" data-story-tip-dismiss>알겠어요</button></div>':''}
 updateConnectionSummary=function(id){
  const next=nextMomentOf(id),host=$b('#whyMargin'),tipHost=$b('#storyTipHost'),momentId=String(id||'');
  if(!host)return;
