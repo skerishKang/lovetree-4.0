@@ -30,7 +30,7 @@ export function createFeedbackApi({fetchImpl = (...args) => fetch(...args)} = {}
 
 // getContext(): {screen, viewport, theme, version, loggedIn, treeId} — 셸이 넘긴다.
 // show(): 창을 여는 함수(셸의 공통 틀 panel()).
-export function createFeedbackDialog({$, notify, getContext, show, openMyPosts, api = createFeedbackApi()}) {
+export function createFeedbackDialog({$, notify, getContext, show, openMyPosts, onSent, api = createFeedbackApi()}) {
   const dialog = $('feedback-panel');
   if (!dialog) return {open() {}};
   const form = $('feedback-form');
@@ -130,6 +130,8 @@ export function createFeedbackDialog({$, notify, getContext, show, openMyPosts, 
     if (doneLoggedIn) doneLoggedIn.hidden = !signed;
     if (doneLoggedOut) doneLoggedOut.hidden = signed;
     done.querySelector('.button-row .primary')?.focus();
+    // #1273 6번: 응답에 담긴 새 의견을 '내 의견' 목록에 곧바로 넣는다(다시 부르기 전에도 보인다).
+    if (typeof onSent === 'function') onSent({id: result.id, status: result.status, createdAt: result.createdAt, kind: result.kind || 'opinion', category: result.category || kind, title: result.title, body: result.body || text});
     if (typeof notify === 'function') notify('의견을 보냈어요. 고마워요.');
   });
 

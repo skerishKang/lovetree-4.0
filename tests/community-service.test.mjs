@@ -887,3 +887,24 @@ test('같은 tree_id의 두 계정은 둘 다 소개되고 한쪽 숨김이 다�
  await call(handle,'PATCH',`/api/community/admin/reports/${report.body.report.id}`,{account:'admin',body:{status:'dismissed',visibility:'visible'}});
  assert.deepEqual(idsOf(await call(handle,'GET','/api/community/shares')),[s1.shareId,s2.shareId].sort());
 });
+
+test('#1273 5번: 첫 화면 공개 트리 숫자와 둘러보기 목록은 같은 자료에서 같은 기준으로 센다', async () => {
+  const three = (prefix) => [1, 2, 3].map(i => ({title: prefix + i, date: '2026-11-0' + i, url: TAG_URL, keywords: ['가수:RESCENE']}));
+  const data = await tagSetup({
+    accounts: [
+      {subject: 't1', trees: [{title: '시험 계정 트리', moments: three('시험')}]},
+      {subject: 'a1', trees: [{title: '명예회원 트리', moments: three('명예')}]},
+      {subject: 'h1', trees: [{title: '일반 트리', moments: three('일반')}]}
+    ],
+    aiSubjects: ['a1'],
+    testerSubjects: ['t1']
+  });
+  const stats = await call(data.handle, 'GET', '/api/community/stats');
+  const list = await call(data.handle, 'GET', '/api/community/shares');
+  assert.equal(stats.status, 200);
+  assert.equal(list.status, 200);
+  assert.equal(stats.body.trees, list.body.totalVisible, '집계와 목록 수가 같다');
+  assert.equal(stats.body.trees, 2, '시험 계정 트리는 둘 다에서 빠진다');
+  assert.equal(stats.body.moments, 6, '순간 수도 같은 기준으로 센다');
+  assert.deepEqual(list.body.items.map(item => item.title), ['명예회원 트리', '일반 트리']);
+});
