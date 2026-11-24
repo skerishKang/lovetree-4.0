@@ -517,7 +517,10 @@ test('#1246 모든 화면의 순간 추가만 장미색·둘러보기 테두리'
         });
         let idleExplore;
         for(const [name,hash] of [['home','#home'],...SCREENS,['community','#explore']]){
-          if(name==='community')await page.locator('#community-menu').click();
+          if(name==='community'){
+            if(width===390){await page.locator('#mobile-more').click();await page.locator('#header-overflow button').filter({hasText:/^둘러보기$/}).click();}
+            else await page.locator('#community-menu').click();
+          }
           else await page.evaluate(h=>location.hash=h,hash);
           await page.mouse.move(2,300);
           if(name==='community')await page.waitForFunction(()=>document.body.classList.contains('community-screen'));
@@ -531,6 +534,12 @@ test('#1246 모든 화면의 순간 추가만 장미색·둘러보기 테두리'
           if(width===1440)assert.equal(m.head.visible,true,key+' 머리줄 순간 추가 표시');
           else if(!['home','community'].includes(name))assert.equal(m.fab.visible,true,key+' 휴대폰 순간 추가 표시');
           const e=m.explore;
+          if(width===390){
+            assert.equal(e.visible,false,key+' 둘러보기는 더보기 안으로 접힘');
+            await page.locator('#mobile-more').click();
+            await page.locator('#header-overflow button').filter({hasText:/^둘러보기$/}).waitFor({state:'visible'});
+            await page.locator('#mobile-more').click();
+          }else{
           assert.ok(e.visible&&e.icon&&e.inside&&e.hit&&e.pickerOverlap===0,key+' 둘러보기 아이콘·실제 누름 영역·겹침 0 '+JSON.stringify(e));
           assert.ok(e.width>=44&&e.height>=44,key+' 둘러보기 44px 누름 영역');
           assert.equal(e.bg,'rgba(0, 0, 0, 0)',key+' 투명 배경');
@@ -539,12 +548,13 @@ test('#1246 모든 화면의 순간 추가만 장미색·둘러보기 테두리'
           assert.ok(e.radius>=22,key+' 둥근 단추');
           assert.equal(e.deco,'none',key+' 밑줄 없음');
           assert.equal(e.labelVisible,width===1440,key+' 넓은 화면만 글자 표시');
+          }
           assert.equal(e.current,name==='community',key+' 현재 둘러보기 표시');
           assert.ok(m.tabs.every(t=>t.border==='0px'),key+' 내 트리 탭은 테두리 없음');
           assert.equal(m.overflow,0,key+' 가로 넘침 0');
           if(width===390)assert.equal(m.headerHeight,57,key+' 머리줄 57px');
           if(name==='home')idleExplore=e;
-          if(name==='community'){
+          if(name==='community'&&width===1440){
             assert.notEqual(e.borderColor,idleExplore.borderColor,key+' 현재 테두리 강조');
             assert.notEqual(e.ink,idleExplore.ink,key+' 현재 글자 강조');
             assert.ok(Number(e.weight)>Number(idleExplore.weight),key+' 현재 글자 굵기');

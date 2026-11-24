@@ -634,7 +634,7 @@ nav .tree-frame{scroll-snap-align:center}
  .tree-frame{margin-left:0;padding:0;border:0;background:none}
  .app-header{display:flex;min-height:56px;padding:6px 10px;gap:6px;flex-wrap:nowrap}
  .main-nav{flex:0 0 auto}
- body .main-nav .tree-views>button[data-view]{display:none}
+ body .main-nav #community-menu,body .main-nav .tree-views{display:none}
  body .header-actions #write-menu{display:none}
  /* 이슈 457 3번: .main-nav가 더 안 자라(flex:0 0 auto) 트리 틀이 없으면(로그인·트리 0개) nav 내용이
     줄어 계정·☰가 로고 바로 옆에 붙는다. 오른쪽 끝에 고정해 트리 틀 유무와 상관없이 같은 자리에 있게 한다. */
@@ -1246,6 +1246,7 @@ html[data-lt-theme=garden] .header-actions .view-toggle>button:not([aria-checked
 @media(max-width:780px){.header-actions .view-toggle{min-width:84px}}
 
 /* #1246: 공개 트리 입구는 탭이 아니라 첫 화면과 같은 선 나침반·투명 테두리 단추다. */
+@media(min-width:781px){
 html .tree-frame .tree-views>button#community-menu{
  display:inline-flex;align-items:center;justify-content:center;gap:6px;flex:none;
  min-height:44px;padding:0 12px;margin-left:8px;border:1px solid var(--lt-line);
@@ -1257,12 +1258,8 @@ html .tree-frame .tree-views>button#community-menu:is(:hover,:focus-visible,[ari
 }
 html .tree-frame .tree-views>button#community-menu[aria-current=true]{font-weight:600}
 #community-menu .header-compass{width:15px;height:15px;flex:none}
-@media(max-width:780px){
- body .main-nav .tree-views{display:flex;flex:none}
- html .tree-frame .tree-views>button#community-menu{width:44px;min-width:44px;padding:0;margin-left:2px}
- #community-menu .community-menu-label{display:none}
- #community-menu .header-compass{width:19px;height:19px}
 }
+
 
 /* #1246: 권한 단추가 없어도 칸은 그대로 둔다. 숨긴 단추는 초점·클릭 대상이 아니다. */
 .app-header .tree-slot{min-height:40px}
@@ -1282,7 +1279,6 @@ html[data-lt-auth-phase=pending] .app-header .tree-prefix{visibility:hidden}
  .app-header .account-slot>#account-entry{width:72px}
 }
 @media(max-width:780px){
- .app-header .tree-frame .tree-views{width:46px;flex:0 0 46px}
  .app-header .account-slot>#account-entry{width:56px}
  .app-header .tree-frame .tree-slot{min-height:40px}
 }
