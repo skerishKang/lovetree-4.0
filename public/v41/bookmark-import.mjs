@@ -231,3 +231,135 @@ export function foundSummaryText({ videos = [], playlistCount = 0, channelCount 
   if (duplicateCount) parts.push(`같은 영상 ${duplicateCount}개는 하나로 모았어요.`);
   return parts.join(' ');
 }
+
+// ---- 3단계: 미리보기 목록의 계산(이미 담은 영상·고르기·제목 줄) ----
+
+/**
+ * 이미 담은 영상 찾기: 내 트리 어디에든 같은 영상·같은 장면(#876 판정 한 벌)이 있으면 그 트리 이름을 돌려준다.
+ * 돌려주는 값: Map(영상 이름표 → 트리 이름). 구간이 다른 같은 영상은 다른 장면이라 '이미 있음'이 아니다.
+ */
+export function existingVideoTrees(videos, trees, nameOf = (tree) => String(tree?.title || tree?.subject || '')) {
+  const index = new Map();
+  for (const tree of Array.isArray(trees) ? trees : []) {
+    for (const moment of tree?.moments || []) {
+      const key = youtubeIdFrom(moment?.url);
+      if (!key) continue;
+      if (!index.has(key)) index.set(key, []);
+      index.get(key).push({ moment, tree });
+    }
+  }
+  const found = new Map();
+  for (const video of Array.isArray(videos) ? videos : []) {
+    const hit = (index.get(video.videoId) || []).find(({ moment }) => isSameVideoMoment(moment, video.url));
+    if (hit) found.set(video.id, nameOf(hit.tree));
+  }
+  return found;
+}
+
+/** 처음 고름: 이미 담은 영상은 빼고, 파일 순서대로 max개까지. */
+export function defaultPicked(videos, existing, max = Infinity) {
+  const picked = [];
+  for (const video of Array.isArray(videos) ? videos : []) {
+    if (existing.has(video.id)) continue;
+    if (picked.length >= max) break;
+    picked.push(video.id);
+  }
+  return picked;
+}
+
+/**
+ * 묶음(전체·폴더) 고르기 칸의 모양. 새 영상(이미 있음이 아닌 것)을 기준으로 본다:
+ * 모두 골랐으면 checked, 일부만이거나 이미 있음만 손으로 골랐으면 mixed, 새 영상이 없으면 empty.
+ */
+export function scopeState(videos, existing, picked) {
+  let total = 0, on = 0, extra = 0;
+  for (const video of Array.isArray(videos) ? videos : []) {
+    const chosen = picked.has(video.id);
+    if (existing.has(video.id)) { if (chosen) extra += 1; continue; }
+    total += 1;
+    if (chosen) on += 1;
+  }
+  return { total, on, checked: total > 0 && on === total, mixed: (on > 0 && on < total) || (on === 0 && extra > 0), empty: total === 0 };
+}
+
+/**
+ * 묶음 고르기: 켜면 그 묶음의 새 영상을 max개가 찰 때까지 차례로 고르고(못 고른 수는 clipped),
+ * 끄면 그 묶음에서 고른 것을 모두 푼다(손으로 고른 이미 있음까지).
+ */
+export function pickScope(videos, existing, picked, on, max = Infinity) {
+  const next = new Set(picked);
+  let clipped = 0;
+  for (const video of Array.isArray(videos) ? videos : []) {
+    if (!on) { next.delete(video.id); continue; }
+    if (existing.has(video.id) || next.has(video.id)) continue;
+    if (next.size >= max) { clipped += 1; continue; }
+    next.add(video.id);
+  }
+  return { picked: next, clipped };
+}
+
+/** 하나 고르기: 상한이 찼으면 더 고르지 않는다(refused). 풀기는 언제나 된다. */
+export function pickOne(picked, id, on, max = Infinity) {
+  const next = new Set(picked);
+  if (!on) { next.delete(id); return { picked: next, refused: false }; }
+  if (next.has(id)) return { picked: next, refused: false };
+  if (next.size >= max) return { picked: next, refused: true };
+  next.add(id);
+  return { picked: next, refused: false };
+}
+
+/**
+ * 영상 제목을 차례로 받는 줄. 조회는 기존 경로(video-title.mjs → 서버 oEmbed 프록시)를 그대로 받아 쓴다(fetchTitle).
+ * 한꺼번에 몰아 부르지 않는다 — 한 번에 하나씩, 사이를 gapMs만큼 띄우고, 이 줄이 부르는 횟수는 limit까지다.
+ * 받은 제목은 기억해 같은 영상을 다시 부르지 않는다(받지 못한 것도 '' 로 기억한다).
+ */
+export function createTitleQueue({ fetchTitle, limit = 200, gapMs = 0, onTitle = () => {}, wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms)) } = {}) {
+  const known = new Map();
+  const waiting = [];
+  const queued = new Set();
+  let asked = 0, running = false, stopped = false;
+  async function run() {
+    if (running) return;
+    running = true;
+    while (!stopped && waiting.length && asked < limit) {
+      const id = waiting.shift();
+      queued.delete(id);
+      if (known.has(id)) continue;
+      asked += 1;
+      let title = '';
+      try { title = String((await fetchTitle(id)) || '').trim(); } catch { title = ''; }
+      known.set(id, title);
+      onTitle(id, title);
+      if (gapMs > 0 && waiting.length && !stopped && asked < limit) await wait(gapMs);
+    }
+    running = false;
+  }
+  return {
+    /** 받을 영상 id들을 줄 뒤에 세운다(이미 알거나 줄에 있으면 건너뜀). */
+    add(ids) {
+      for (const id of Array.isArray(ids) ? ids : []) {
+        if (!id || known.has(id) || queued.has(id)) continue;
+        queued.add(id);
+        waiting.push(id);
+      }
+      stopped = false;
+      return run();
+    },
+    /** 줄을 비우고 멈춘다(창을 닫을 때). 지금 받고 있는 하나는 끝까지 받는다. */
+    stop() { stopped = true; waiting.length = 0; queued.clear(); },
+    /** 저장 쪽이 직접 받은 제목도 여기 적어 둔다 — 같은 영상을 두 번 묻지 않게. */
+    remember(id, title) { if (id) known.set(id, String(title || '').trim()); },
+    title: (id) => known.get(id) || '',
+    has: (id) => known.has(id),
+    asked: () => asked,
+    /** 상한까지 다 불렀는가 — 더는 제목이 오지 않는다. */
+    exhausted: () => asked >= limit,
+    waiting: () => waiting.length,
+    idle: () => !running,
+  };
+}
+
+/** 고른 수 안내. */
+export function pickedCountText(count) {
+  return count > 0 ? `${count}개 고름` : '고른 영상이 없어요';
+}

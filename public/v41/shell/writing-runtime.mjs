@@ -163,7 +163,10 @@ export function createWritingRuntime(ctx){
       openSettingsData:intent=>(0,ctx.openAccountData)(intent),
       resumeMember:intent=>(0,ctx.resumeMember)(intent),
       openLoginStart:intent=>(0,ctx.openLoginStart)(intent),
-      onModalShown:()=>(0,ctx.tipsFollowDialogs)()
+      onModalShown:()=>(0,ctx.tipsFollowDialogs)(),
+      // 트리 목록은 쉬운 추가와 같은 재료(window.LT41)에서 읽고, 날짜 표기는 계정 설정 한 벌을 따른다.
+      listTrees:()=>(Array.isArray(window.LT41?.trees)?window.LT41.trees:[]),
+      dateStyle:()=>(0,ctx.currentDateStyle)()
     })));
     mountBookmarkEntry({$:ctx.$,onOpen:()=>shellBookmarkImport.open()});
 

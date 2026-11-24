@@ -3,8 +3,16 @@
 // 창은 처음 열 때 만든다 — 셸 첫 화면이 받는 파일을 늘리지 않으려고 마크업은 여기서 만들고,
 // 스타일은 bookmark-import.css 한 장을 그때 싣는다. 북마크에서 온 글자는 textContent로만 넣는다.
 // 북마크 파일은 이 브라우저 안에서만 읽는다(서버로 보내는 요청이 없다). 읽은 뒤 파일 내용은 붙들지 않는다.
-import { BOOKMARK_FILE_MAX_BYTES, READ_NOT_BOOKMARK, readBookmarkVideos, foundSummaryText, folderGroups } from '../bookmark-import.mjs';
+import {
+  BOOKMARK_FILE_MAX_BYTES, READ_NOT_BOOKMARK, readBookmarkVideos, foundSummaryText, folderGroups,
+  existingVideoTrees, defaultPicked, scopeState, pickScope, pickOne, createTitleQueue, pickedCountText,
+} from '../bookmark-import.mjs';
 import { DROP_READONLY_NOTICE } from '../quick-add.mjs';
+// 썸네일 주소·영상 제목·날짜 표기·트리 이름은 기존 한 벌을 그대로 쓴다(새 규칙을 만들지 않는다).
+import { youtubeStageThumbUrl } from '../youtube-id.mjs';
+import { fetchVideoTitle } from '../video-title.mjs';
+import { formatDisplayDate } from '../book-usability.mjs';
+import { displayTreeTitle } from '../tree-name.mjs';
 
 export const BOOKMARK_PANEL_ID = 'bookmark-import-panel';
 export const BOOKMARK_STYLE_HREF = '/v41/bookmark-import.css';
@@ -36,8 +44,17 @@ export const BOOKMARK_TEXT = Object.freeze({
   noVideo: '이 북마크 파일에는 유튜브 영상 주소가 없어요.',
   truncated: '북마크가 아주 많아 앞에서부터 읽을 수 있는 만큼만 읽었어요.',
   another: '다른 파일 고르기',
-  foldersTitle: '폴더별로 찾은 영상',
+  listTitle: '찾은 유튜브 영상',
+  pickAll: '전체 고르기',
+  exists: '이미 있음',
+  noTitle: '제목 없는 영상',
+  titlePending: '제목을 확인하고 있어요…',
+  undated: '오늘 날짜로 담아요',
 });
+
+// 제목 조회(기존 oEmbed 경로)는 한 번에 하나씩, 사이를 띄우고, 파일 하나에 이 횟수까지만 부른다.
+export const TITLE_FETCH_LIMIT = 200;
+export const TITLE_FETCH_GAP_MS = 120;
 
 /** 영상은 없고 재생목록·채널만 있을 때의 안내 — 왜 담을 것이 없는지 개수로 알려 준다. */
 export function noVideoText({ playlistCount = 0, channelCount = 0 } = {}) {
@@ -51,8 +68,22 @@ export function createBookmarkImport(deps = {}) {
   const doc = deps.document || globalThis.document;
   const $ = deps.$ || ((id) => doc.getElementById(id));
   const isFinePointer = deps.isFinePointer || (() => globalThis.matchMedia?.('(pointer:fine)').matches === true);
-  const state = { view: 'start', result: null, reading: false };
+  const fetchImpl = deps.fetchImpl || ((...args) => globalThis.fetch(...args));
+  const state = { view: 'start', result: null, reading: false, existing: new Map(), picked: new Set() };
   let opener = null;
+  // 미리보기 목록의 노드 장부: 고를 때마다 목록을 다시 그리지 않고 칸·글자만 고친다.
+  let rows = new Map();       // 영상 이름표 → { box, title, video }
+  let rowsByVideo = new Map(); // 유튜브 영상 id → [row]
+  let groups = [];            // [{ box, videos }]
+  const treeName = (tree) => displayTreeTitle(String(tree?.title || tree?.subject || '') || '트리');
+  const listTrees = () => { const trees = deps.listTrees?.(); return Array.isArray(trees) ? trees : []; };
+  const titles = createTitleQueue({
+    fetchTitle: (videoId) => fetchVideoTitle(videoId, fetchImpl),
+    limit: deps.titleLimit ?? TITLE_FETCH_LIMIT,
+    gapMs: deps.titleGapMs ?? TITLE_FETCH_GAP_MS,
+    // 받은 제목을 그 영상의 줄에 넣는다. 상한까지 다 불렀으면 '확인 중'으로 남은 줄도 한 번 고쳐 그린다.
+    onTitle: (videoId) => { for (const row of titles.exhausted() ? rows.values() : rowsByVideo.get(videoId) || []) paintTitle(row); },
+  });
 
   function make(tag, props = {}, ...children) {
     const node = doc.createElement(tag);
@@ -107,11 +138,16 @@ export function createBookmarkImport(deps = {}) {
   refs.summary = make('p', { class: 'bmi-summary', role: 'status' });
   refs.note = make('p', { class: 'bmi-note' });
   refs.another = make('button', { type: 'button', class: 'bmi-link', text: BOOKMARK_TEXT.another });
-  refs.folders = make('ul', { class: 'bmi-folders', 'aria-label': BOOKMARK_TEXT.foldersTitle });
+  refs.all = make('input', { type: 'checkbox', id: 'bookmark-import-all' });
+  refs.count = make('span', { class: 'bmi-count', role: 'status' });
+  refs.groups = make('div', { class: 'bmi-groups', role: 'group', 'aria-label': BOOKMARK_TEXT.listTitle });
   refs.preview = make('div', { class: 'bmi-preview', hidden: true },
     make('div', { class: 'bmi-summary-row' }, refs.summary, refs.another),
     refs.note,
-    refs.folders);
+    make('div', { class: 'bmi-toolbar' },
+      make('label', { class: 'bmi-check bmi-all' }, refs.all, make('span', { text: BOOKMARK_TEXT.pickAll })),
+      refs.count),
+    refs.groups);
   refs.scroll = make('div', { class: 'bmi-scroll' }, refs.start, refs.preview);
   const dialog = make('dialog', { id: BOOKMARK_PANEL_ID, class: 'bmi', 'data-lt-panel': 'card', 'aria-labelledby': 'bookmark-import-title' },
     make('div', { class: 'panel-heading' },
@@ -132,11 +168,89 @@ export function createBookmarkImport(deps = {}) {
 
   function setError(text) { refs.error.textContent = text || ''; }
 
-  function renderFolders() {
-    const groups = folderGroups(state.result?.videos || []);
-    refs.folders.replaceChildren(...groups.map((group) => make('li', {},
-      make('span', { class: 'bmi-folder-name', text: group.label }),
-      make('span', { class: 'bmi-folder-count', text: `${group.videos.length}개` }))));
+  // ---- 미리보기 목록 ----
+  function titleOf(row) {
+    return titles.title(row.video.videoId) || row.video.title || (titles.has(row.video.videoId) || titles.exhausted() ? BOOKMARK_TEXT.noTitle : BOOKMARK_TEXT.titlePending);
+  }
+  function paintTitle(row) { row.title.textContent = titleOf(row); }
+  function dateText(video) {
+    return video.dated ? formatDisplayDate(video.date, deps.dateStyle?.()) : BOOKMARK_TEXT.undated;
+  }
+
+  function buildItem(video) {
+    const box = make('input', { type: 'checkbox' });
+    box.checked = state.picked.has(video.id);
+    const image = make('img', { class: 'bmi-thumb-img', alt: '', loading: 'lazy', decoding: 'async', referrerpolicy: 'no-referrer', src: youtubeStageThumbUrl(video.videoId, 'mqdefault') });
+    const thumb = make('span', { class: 'bmi-thumb', 'aria-hidden': 'true' }, image);
+    // 썸네일을 못 받으면(없어진 영상 등) 깨진 그림 대신 빈 칸을 둔다.
+    image.addEventListener('error', () => { image.hidden = true; thumb.classList.add('is-missing'); });
+    const title = make('span', { class: 'bmi-title' });
+    const meta = make('span', { class: 'bmi-meta' }, make('span', { class: 'bmi-date', text: dateText(video) }));
+    const existsIn = state.existing.get(video.id);
+    if (existsIn !== undefined) meta.append(make('span', { class: 'bmi-badge', text: existsIn ? `${BOOKMARK_TEXT.exists} · ${existsIn}` : BOOKMARK_TEXT.exists }));
+    const row = { box, title, video };
+    paintTitle(row);
+    box.addEventListener('change', () => { togglePick(video, box.checked); });
+    rows.set(video.id, row);
+    if (!rowsByVideo.has(video.videoId)) rowsByVideo.set(video.videoId, []);
+    rowsByVideo.get(video.videoId).push(row);
+    return make('li', {}, make('label', { class: `bmi-item${existsIn !== undefined ? ' is-existing' : ''}` }, box, thumb, make('span', { class: 'bmi-text' }, title, meta)));
+  }
+
+  function renderList() {
+    rows = new Map();
+    rowsByVideo = new Map();
+    groups = folderGroups(state.result?.videos || []).map((group) => {
+      const box = make('input', { type: 'checkbox', 'aria-label': `${group.label} 폴더의 영상 모두 고르기` });
+      box.addEventListener('change', () => { toggleScope(group.videos, box.checked); });
+      const node = make('div', { class: 'bmi-group' },
+        make('label', { class: 'bmi-check bmi-group-head' }, box,
+          make('span', { class: 'bmi-folder-name', text: group.label }),
+          make('span', { class: 'bmi-folder-count', text: `${group.videos.length}개` })),
+        make('ul', { class: 'bmi-items' }, ...group.videos.map(buildItem)));
+      return { box, videos: group.videos, node };
+    });
+    refs.groups.replaceChildren(...groups.map((group) => group.node));
+  }
+
+  function paintScope(box, videos) {
+    const scope = scopeState(videos, state.existing, state.picked);
+    box.checked = scope.checked;
+    box.indeterminate = scope.mixed;
+    box.disabled = scope.empty;
+  }
+  // 고름이 바뀐 뒤: 칸 모양과 고른 수만 고친다(목록은 다시 그리지 않는다).
+  function syncPicks() {
+    for (const row of rows.values()) row.box.checked = state.picked.has(row.video.id);
+    for (const group of groups) paintScope(group.box, group.videos);
+    paintScope(refs.all, state.result?.videos || []);
+    refs.count.textContent = pickedCountText(state.picked.size);
+  }
+  // 고른 영상의 제목만 차례로 받는다(기존 oEmbed 경로, 한 번에 하나·상한).
+  function askTitles() {
+    const wanted = (state.result?.videos || []).filter((video) => state.picked.has(video.id)).map((video) => video.videoId);
+    void titles.add(wanted);
+  }
+  function togglePick(video, on) {
+    state.picked = pickOne(state.picked, video.id, on).picked;
+    syncPicks();
+    if (on) askTitles();
+  }
+  function toggleScope(videos, on) {
+    state.picked = pickScope(videos, state.existing, state.picked, on).picked;
+    syncPicks();
+    if (on) askTitles();
+  }
+
+  // 새 목록을 받았을 때: 이미 담은 영상을 가려 표시하고, 나머지를 처음 고름으로 둔다.
+  function startPreview(result) {
+    state.result = result;
+    state.view = 'preview';
+    state.existing = existingVideoTrees(result.videos, listTrees(), treeName);
+    state.picked = new Set(defaultPicked(result.videos, state.existing));
+    renderList();
+    render();
+    askTitles();
   }
 
   function render() {
@@ -150,7 +264,7 @@ export function createBookmarkImport(deps = {}) {
     refs.summary.textContent = foundSummaryText(state.result);
     refs.note.textContent = state.result.truncated ? BOOKMARK_TEXT.truncated : '';
     refs.note.hidden = !state.result.truncated;
-    renderFolders();
+    syncPicks();
   }
 
   // 파일 하나를 읽어 유튜브 영상 목록으로 바꾼다. 읽은 글자는 이 함수 밖으로 나가지 않는다.
@@ -166,9 +280,7 @@ export function createBookmarkImport(deps = {}) {
     state.reading = false;
     if (!result) { render(); setError(BOOKMARK_TEXT.unreadable); return false; }
     if (!result.ok) { render(); setError(result.reason === READ_NOT_BOOKMARK ? BOOKMARK_TEXT.notBookmark : noVideoText(result)); return false; }
-    state.result = result;
-    state.view = 'preview';
-    render();
+    startPreview(result);
     refs.another.focus?.();
     return true;
   }
@@ -176,6 +288,10 @@ export function createBookmarkImport(deps = {}) {
   function showStart() {
     state.view = 'start';
     state.result = null;
+    state.existing = new Map();
+    state.picked = new Set();
+    titles.stop();
+    refs.groups.replaceChildren();
     setError('');
     render();
     refs.pick.focus?.();
@@ -190,6 +306,7 @@ export function createBookmarkImport(deps = {}) {
       deps.onModalShown?.();
     }
     render();
+    if (state.view === 'preview') askTitles();
     (state.view === 'preview' ? refs.another : refs.pick).focus?.();
     return true;
   }
@@ -204,6 +321,7 @@ export function createBookmarkImport(deps = {}) {
     void readFile(file);
   });
   refs.another.addEventListener('click', showStart);
+  refs.all.addEventListener('change', () => { toggleScope(state.result?.videos || [], refs.all.checked); });
   // 끌어다 놓기: 이 창 위에서는 셸의 '주소 끌어다 놓기'(quick-add mountDrop)가 받지 않게 여기서 멈춘다.
   const hasFiles = (event) => Array.from(event?.dataTransfer?.types || []).includes('Files');
   for (const type of ['dragenter', 'dragover']) {
@@ -228,11 +346,12 @@ export function createBookmarkImport(deps = {}) {
   });
   // 닫히면 연 단추로 초점을 돌려준다. 연 단추가 안 보이면(순간 추가 창이 함께 닫힘) 머리줄의 순간 추가 단추로.
   dialog.addEventListener('close', () => {
+    titles.stop(); // 닫힌 창을 위해 제목을 더 묻지 않는다(다시 열면 이어서 받는다)
     const visible = (node) => !!node?.getClientRects?.().length;
     const target = [opener, $('write-menu'), $('mobile-add'), $('mobile-more')].find(visible) || null;
     opener = null;
     setTimeout(() => target?.focus?.(), 0);
   });
 
-  return { open, close, readFile, isOpen: () => !!dialog.open, state: () => ({ view: state.view, count: state.result?.videos.length || 0, reading: state.reading }), refs };
+  return { open, close, readFile, isOpen: () => !!dialog.open, state: () => ({ view: state.view, count: state.result?.videos.length || 0, reading: state.reading, picked: [...state.picked] }), titles, refs };
 }

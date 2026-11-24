@@ -8,6 +8,7 @@ import {
   BOOKMARK_SCAN_MAX, NO_FOLDER_LABEL, UNNAMED_FOLDER_LABEL, READ_NOT_BOOKMARK, READ_NO_VIDEO,
   isBookmarkFile, parseBookmarkHtml, classifyBookmarkUrl, cleanBookmarkTitle, bookmarkDate, folderLabel,
   collectBookmarkVideos, readBookmarkVideos, folderGroups, foundSummaryText,
+  existingVideoTrees, defaultPicked, scopeState, pickScope, pickOne, createTitleQueue, pickedCountText,
 } from '../public/v41/bookmark-import.mjs';
 
 const fixture = (name) => readFileSync(new URL(`./fixtures/bookmarks/${name}.html`, import.meta.url), 'utf8');
@@ -228,4 +229,118 @@ test('유튜브가 아닌 북마크의 주소·제목은 결과에 남지 않는
     assert.ok(!dump.includes(secret), `${secret} 은(는) 결과에 없어야 한다`);
   }
   assert.equal(collectBookmarkVideos(null).videos.length, 0);
+});
+
+// ---- 3단계: 미리보기 목록의 계산 ----
+const video = (n, extra = {}) => ({ id: `b${n}`, videoId: `FAKEvid${String(n).padStart(4, '0')}`, url: `https://www.youtube.com/watch?v=FAKEvid${String(n).padStart(4, '0')}`, ...extra });
+
+test('이미 담은 영상은 어느 트리에 있든 찾고(주소 모양이 달라도), 구간이 다른 같은 영상은 새 장면으로 둔다', () => {
+  const trees = [
+    { id: 't1', title: '첫 트리', moments: [{ id: 'm1', url: 'https://youtu.be/FAKEvid0001' }, { id: 'm2', url: '' }, { id: 'm3', url: 'https://example.test/' }] },
+    { id: 't2', subject: '둘째 트리', moments: [{ id: 'm4', url: 'https://www.youtube.com/watch?v=FAKEvid0002&t=30' }, { id: 'm5', url: 'https://www.youtube.com/shorts/FAKEvid0003', startSeconds: 10, endSeconds: 20 }] },
+  ];
+  const videos = [
+    video(1),                                                                 // 첫 트리에 짧은 주소로 있음
+    video(2),                                                                 // 둘째 트리에는 30초부터 — 다른 장면
+    video(2, { id: 'b2t', url: 'https://youtu.be/FAKEvid0002?t=30' }),         // 같은 30초 장면 → 이미 있음
+    video(3),                                                                 // 둘째 트리에는 구간(10~20)으로 — 다른 장면
+    video(4),                                                                 // 어디에도 없음
+  ];
+  const found = existingVideoTrees(videos, trees);
+  assert.deepEqual([...found], [['b1', '첫 트리'], ['b2t', '둘째 트리']]);
+  assert.deepEqual([...existingVideoTrees(videos, trees, (tree) => `<${tree.id}>`)], [['b1', '<t1>'], ['b2t', '<t2>']], '트리 이름 규칙은 화면이 넘긴다');
+  assert.equal(existingVideoTrees(videos, null).size, 0);
+  assert.equal(existingVideoTrees(null, trees).size, 0);
+});
+
+test('처음 고름은 이미 담은 영상을 빼고 파일 순서대로, 상한까지만', () => {
+  const videos = [video(1), video(2), video(3), video(4), video(5)];
+  const existing = new Map([['b2', '트리']]);
+  assert.deepEqual(defaultPicked(videos, existing), ['b1', 'b3', 'b4', 'b5']);
+  assert.deepEqual(defaultPicked(videos, existing, 2), ['b1', 'b3']);
+  assert.deepEqual(defaultPicked(videos, new Map(videos.map((v) => [v.id, '트리']))), []);
+  assert.deepEqual(defaultPicked(null, existing), []);
+});
+
+test('묶음 고르기 칸의 모양 표(전체·폴더 공통)', () => {
+  const videos = [video(1), video(2), video(3)];
+  const existing = new Map([['b3', '트리']]);
+  const rows = [
+    [[], { total: 2, on: 0, checked: false, mixed: false, empty: false }, '아무것도 안 고름'],
+    [['b1'], { total: 2, on: 1, checked: false, mixed: true, empty: false }, '일부'],
+    [['b1', 'b2'], { total: 2, on: 2, checked: true, mixed: false, empty: false }, '새 영상 모두'],
+    [['b1', 'b2', 'b3'], { total: 2, on: 2, checked: true, mixed: false, empty: false }, '이미 있음까지 손으로 고름'],
+    [['b3'], { total: 2, on: 0, checked: false, mixed: true, empty: false }, '이미 있음만 손으로 고름'],
+  ];
+  for (const [picked, want, why] of rows) assert.deepEqual(scopeState(videos, existing, new Set(picked)), want, why);
+  assert.deepEqual(scopeState([video(3)], existing, new Set()), { total: 0, on: 0, checked: false, mixed: false, empty: true }, '새 영상이 없는 폴더');
+});
+
+test('묶음 고르기·하나 고르기 표: 켜면 새 영상만, 끄면 그 묶음을 모두 풀고, 상한이 차면 더 고르지 않는다', () => {
+  const videos = [video(1), video(2), video(3), video(4)];
+  const existing = new Map([['b2', '트리']]);
+  const scope = (picked, on, max) => { const out = pickScope(videos, existing, new Set(picked), on, max); return [[...out.picked], out.clipped]; };
+  assert.deepEqual(scope([], true), [['b1', 'b3', 'b4'], 0], '켜기: 이미 있음은 고르지 않는다');
+  assert.deepEqual(scope(['b2'], true), [['b2', 'b1', 'b3', 'b4'], 0], '손으로 고른 이미 있음은 그대로 둔다');
+  assert.deepEqual(scope(['b1', 'b2', 'b9'], false), [['b9'], 0], '끄기: 이 묶음 것만 모두 푼다(다른 묶음 것은 그대로)');
+  assert.deepEqual(scope(['b9'], true, 2), [['b9', 'b1'], 2], '상한 2: 하나만 더 고르고 둘은 못 고른다');
+  assert.deepEqual(scope(['b8', 'b9'], true, 2), [['b8', 'b9'], 3], '상한이 이미 찼으면 하나도 못 고른다');
+  const one = (picked, id, on, max) => { const out = pickOne(new Set(picked), id, on, max); return [[...out.picked], out.refused]; };
+  assert.deepEqual(one([], 'b1', true), [['b1'], false]);
+  assert.deepEqual(one(['b1'], 'b1', true), [['b1'], false], '이미 고른 것');
+  assert.deepEqual(one(['b1'], 'b1', false), [[], false]);
+  assert.deepEqual(one(['b1', 'b2'], 'b3', true, 2), [['b1', 'b2'], true], '상한이 차면 거절');
+  assert.deepEqual(one(['b1', 'b2'], 'b2', false, 2), [['b1'], false], '풀기는 언제나 된다');
+  assert.equal(pickedCountText(0), '고른 영상이 없어요');
+  assert.equal(pickedCountText(12), '12개 고름');
+});
+
+test('제목 줄: 한 번에 하나씩 차례로, 상한까지만 부르고, 받은 것은 다시 부르지 않는다', async () => {
+  const calls = [];
+  let active = 0, peak = 0;
+  const gaps = [];
+  const got = [];
+  const queue = createTitleQueue({
+    limit: 4,
+    gapMs: 30,
+    wait: async (ms) => { gaps.push(ms); },
+    fetchTitle: async (id) => {
+      calls.push(id);
+      active += 1; peak = Math.max(peak, active);
+      await new Promise((resolve) => setImmediate(resolve));
+      active -= 1;
+      if (id === 'bad') throw new Error('조회 실패');
+      if (id === 'empty') return '';
+      return ` 제목 ${id} `;
+    },
+    onTitle: (id, title) => got.push([id, title]),
+  });
+  const first = queue.add(['a', 'bad', 'a', '', null]);
+  void queue.add(['empty', 'b', 'c']); // 달리는 중에 더 세워도 줄은 하나다
+  await first;
+  assert.equal(peak, 1, '동시에 하나만 부른다');
+  assert.deepEqual(calls, ['a', 'bad', 'empty', 'b'], '세운 순서대로, 같은 것은 한 번, 상한 4번까지만');
+  assert.deepEqual(got, [['a', '제목 a'], ['bad', ''], ['empty', ''], ['b', '제목 b']]);
+  assert.deepEqual(gaps, [30, 30, 30], '사이마다 쉰다(상한에 닿은 뒤에는 쉬지 않는다)');
+  assert.deepEqual([queue.title('a'), queue.title('bad'), queue.has('bad'), queue.has('c'), queue.asked(), queue.idle()], ['제목 a', '', true, false, 4, true]);
+  await queue.add(['a', 'bad', 'c']);
+  assert.equal(calls.length, 4, '상한 뒤에는 더 부르지 않고, 받은 것(실패 포함)은 다시 부르지 않는다');
+  queue.remember('c', ' 저장 때 받은 제목 ');
+  assert.equal(queue.title('c'), '저장 때 받은 제목');
+});
+
+test('제목 줄 멈추기: 줄을 비우고 지금 받던 하나만 끝낸다. 다시 세우면 이어서 받는다', async () => {
+  const calls = [];
+  let release = null;
+  const queue = createTitleQueue({ fetchTitle: (id) => { calls.push(id); return new Promise((resolve) => { release = () => resolve(`제목 ${id}`); }); } });
+  const running = queue.add(['a', 'b', 'c']);
+  assert.deepEqual([calls, queue.waiting()], [['a'], 2]);
+  queue.stop();
+  release();
+  await running;
+  assert.deepEqual([calls, queue.title('a'), queue.waiting(), queue.idle()], [['a'], '제목 a', 0, true]);
+  const again = queue.add(['b']);
+  release();
+  await again;
+  assert.deepEqual(calls, ['a', 'b']);
 });
