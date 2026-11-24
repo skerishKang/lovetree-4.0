@@ -216,7 +216,7 @@ function writeBoardMode(mode) {
   }
 }
 let boardMode = readBoardMode();
-function setBoardMode(mode, { save = true, replace = true } = {}) {
+function setBoardMode(mode, { save = true, replace = true, animate = false } = {}) {
   if (mode !== 'date' && mode !== 'mine') return;
   boardMode = mode;
   if (save) writeBoardMode(mode);
@@ -224,6 +224,7 @@ function setBoardMode(mode, { save = true, replace = true } = {}) {
     b.setAttribute('aria-pressed', b.dataset.boardMode === mode ? 'true' : 'false');
   // #619-6: '내 배치'는 좌표 복원이 아니라 순서 배치다(순서가 있으면 순서대로 쌓는다; 옛 좌표는 payload 보존만).
   if (replace) {
+    if (animate) cardLayer.querySelectorAll('.card').forEach(el => el.classList.add('shiftPreview'));
     placeAll();
     settlePlacedCards();
   }
@@ -283,8 +284,41 @@ function projectBoardOrder() {
   return LT58Model.orderFromSaved(slots, rest);
 }
 let momentOrder = projectBoardOrder();
+let hasSavedBoardOrder =
+    !!LT58Model.orderOfMoments(LTDEMO.moments) || moments.some(m => m.savedPos),
+  clearSavedBoardOrder = false;
 function orderRank(id) {
   return momentOrder.indexOf(id);
+}
+function captureBoardOrderState() {
+  return {
+    mode: boardMode,
+    momentOrder: momentOrder.slice(),
+    hasSavedBoardOrder,
+    clearSavedBoardOrder,
+    saved: moments.map(m => ({
+      id: m.id,
+      savedPos: !!m.savedPos,
+      savedXY: m.savedXY ? { ...m.savedXY } : null
+    }))
+  };
+}
+function restoreBoardOrderState(state, { mode = state?.mode } = {}) {
+  if (!state) return;
+  momentOrder = Array.isArray(state.momentOrder) ? state.momentOrder.slice() : [];
+  hasSavedBoardOrder = state.hasSavedBoardOrder === true;
+  clearSavedBoardOrder = state.clearSavedBoardOrder === true;
+  const saved = new Map((state.saved || []).map(item => [item.id, item]));
+  for (const m of moments) {
+    const old = saved.get(m.id);
+    if (!old) continue;
+    m.savedPos = old.savedPos;
+    m.savedXY = old.savedXY ? { ...old.savedXY } : null;
+  }
+  setBoardMode(mode === 'date' ? 'date' : 'mine');
+}
+function discardBoardUndoSnapshot(value) {
+  if (value && undoStack.at(-1) === value) undoStack.pop();
 }
 // #619-5: 쌓기 배치(핀터레스트식) — 열마다 위에서부터 차곡차곡 쌓는다. 줄을 맞추지 않으므로
 // 세로(쇼츠) 카드가 섞인 열 아래가 비지 않는다. #619-6: '내 배치'는 좌표가 아니라 순서로 쌓는다.
@@ -361,19 +395,35 @@ function insertIndexAt(px, py, excludeId) {
   return { index: best.index + (after ? 1 : 0), target: best.id, after };
 }
 // 놓으면 그 자리에 끼어들고 나머지는 순서대로 다시 쌓인다. 저장은 순서(순위) 그대로다.
-function commitInsert(id, index) {
+function commitInsert(id, index, { before = captureBoardOrderState(), snapshot: undoSnapshot = null } = {}) {
   const seq = momentOrder.filter(x => x !== id);
   const at = Math.max(0, Math.min(seq.length, index));
   seq.splice(at, 0, id);
   momentOrder = seq;
+  hasSavedBoardOrder = true;
+  clearSavedBoardOrder = false;
   // 놓은 뒤에는 '내 배치' 순서대로 보여야 한다(날짜순으로 다시 쌓으면 방금 끼운 자리가 안 보인다 — #619-6).
-  if (boardMode !== 'mine') setBoardMode('mine');
+  if (boardMode !== 'mine') setBoardMode('mine', { animate: true });
   else {
     placeAll();
     settlePlacedCards();
     if (mobileBoardScroll()) applyView(false);
   }
-  persistBoard();
+  if (exampleBoard) {
+    persistBoard();
+    return;
+  }
+  persistBoard({
+    onSettled: result => {
+      if (!result.ok) {
+        restoreBoardOrderState(before);
+        discardBoardUndoSnapshot(undoSnapshot);
+        failNotice('배치를 저장하지 못했어요. 원래 자리로 되돌렸어요.');
+        return;
+      }
+      showBoardOrderUndo({ before, snapshot: undoSnapshot });
+    }
+  });
 }
 
 // #1072 A-17: 카드 순서 단추 한 벌과 순서 옮기기 — 키보드로도 '내 배치' 순서를 바꿀 수 있게 한다.
@@ -393,6 +443,8 @@ function moveCardOrder(id, dir) {
   seq.splice(at, 1);
   seq.splice(to, 0, id);
   momentOrder = seq;
+  hasSavedBoardOrder = true;
+  clearSavedBoardOrder = false;
   // 옮긴 뒤에도 '내 배치' 순서대로 보인다(끌기와 같은 규칙).
   if (boardMode !== 'mine') setBoardMode('mine');
   else {
@@ -403,9 +455,34 @@ function moveCardOrder(id, dir) {
   persistBoard();
   return true;
 }
+function resetBoardOrder() {
+  if (!boardSaveEnabled()) return;
+  if (!window.confirm('내 배치를 처음대로 돌릴까요? 날짜순 배치로 돌아갑니다.')) return;
+  const before = captureBoardOrderState();
+  const undoSnapshot = snapshot();
+  momentOrder = LT58Model.dateDescOrder(moments).map(m => m.id);
+  hasSavedBoardOrder = false;
+  clearSavedBoardOrder = true;
+  for (const m of moments) {
+    m.savedPos = false;
+    m.savedXY = null;
+  }
+  setBoardMode('date');
+  persistBoard({
+    onSettled: result => {
+      if (result.ok) {
+        toast('내 배치를 처음대로 되돌렸어요.');
+        return;
+      }
+      restoreBoardOrderState(before);
+      discardBoardUndoSnapshot(undoSnapshot);
+      failNotice('처음대로 저장에 실패했어요. 원래 배치를 유지했어요.');
+    }
+  });
+}
 
-// #894: '내 배치'에서 끄는 동안 다른 카드가 실시간으로 비켜 준다 — 끼어들 자리에 놓였을 때의
-// 자리를 미리 계산해 나머지 카드를 옮겨 둔다(180ms 전환). 움직임 끄기(셸 설정·lt41-motion)면 즉시.
+// #894: 끄는 동안 다른 카드가 실시간으로 비켜 준다 — 끼어들 자리에 놓였을 때의
+// 자리를 미리 계산해 나머지 카드를 옮겨 둔다(200ms 전환). 움직임 끄기(셸 설정·lt41-motion)면 즉시.
 // 끌고 있는 카드 자체는 포인터를 그대로 따라오고, 놓으면 commitInsert가 같은 자리로 확정한다.
 let boardMotionOff = false,
   previewSig = '';
@@ -434,7 +511,10 @@ function previewShift(dragId, hit) {
     const s = layout.get(id2);
     if (!s) continue;
     const pos = LT58Model.gridPosition(s.col, s.y, i++);
-    if (id2 === dragId) continue;
+    if (id2 === dragId) {
+      if (typeof placeDropPlaceholder === 'function') placeDropPlaceholder(dragId, pos);
+      continue;
+    }
     const el = cardLayer.querySelector(`[data-id="${id2}"]`);
     if (!el) continue;
     el.classList.add('shiftPreview');
@@ -445,6 +525,7 @@ function previewShift(dragId, hit) {
 function clearPreviewShift() {
   previewSig = '';
   cardLayer.querySelectorAll('.shiftPreview').forEach(el => el.classList.remove('shiftPreview'));
+  cardLayer.querySelector('.boardDropPlaceholder')?.remove();
 }
 
 function projectBoardConnections() {
@@ -517,7 +598,8 @@ function boardPayload() {
 // 순서 값이 없는 트리(아직 순서로 저장한 적 없는)는 예전처럼 좌표를 보낸다('날짜순'에서는 꽂은 자리를 그대로).
 function orderPayload(m) {
   const rank = orderRank(m.id);
-  if (rank >= 0)
+  if (clearSavedBoardOrder) return { x: null, y: null, rot: 0 };
+  if (hasSavedBoardOrder && rank >= 0)
     return { x: m.savedXY ? m.savedXY.x : m.x, y: LT58Model.ORDER_Y_BASE + rank, rot: m.rot };
   return m.savedPos && m.savedXY && boardMode === 'date'
     ? { x: m.savedXY.x, y: m.savedXY.y, rot: m.savedXY.rot }
@@ -531,17 +613,33 @@ function newBoardId() {
   return id;
 }
 // #1058: 보내기가 던지면 조용히 넘기지 않고 보드 알림 줄에 실패를 알린다(성공은 #905 규칙으로 알리지 않는다).
-function persistBoard() {
-  if (!boardSaveEnabled()) return;
+let boardSaveSequence = 0;
+const pendingBoardSaves = new Map();
+function persistBoard({ onSettled } = {}) {
+  const settle = typeof onSettled === 'function' ? onSettled : null;
+  if (!boardSaveEnabled()) {
+    settle?.({ ok: false, error: '저장할 수 있는 연결이 없어요.' });
+    return null;
+  }
+  const requestId = settle ? `board-${++boardSaveSequence}` : null;
+  if (requestId) pendingBoardSaves.set(requestId, settle);
   try {
     const treeId = window.parent.LT41.tree.id;
     window.parent.postMessage(
-      { type: globalThis.LT41_MSG.boardSync, treeId, moments: boardPayload() },
+      {
+        type: globalThis.LT41_MSG.boardSync,
+        treeId,
+        moments: boardPayload(),
+        ...(requestId ? { requestId } : {})
+      },
       location.origin
     );
+    return requestId;
   } catch (error) {
+    if (requestId) pendingBoardSaves.delete(requestId);
     globalThis.LT41Report?.report(error, '보드 저장 보내기');
-    failNotice('보드 저장에 실패했어요. 잠시 뒤 다시 시도해 주세요.');
+    if (settle) settle({ ok: false, error: error?.message || '보드 저장에 실패했어요.' });
+    else failNotice('보드 저장에 실패했어요. 잠시 뒤 다시 시도해 주세요.');
   }
 }
 // #1058: 저장 실패 알림 — 카드보다 위 층(z 9999), 불투명 바탕, 화면 아래 가운데, 최소 5초.
@@ -557,6 +655,17 @@ function failNotice(t) {
 window.addEventListener('message', e => {
   if (e.origin !== location.origin) return;
   if (e.data?.type !== globalThis.LT41_MSG.boardSaved) return;
+  const requestId = typeof e.data.requestId === 'string' ? e.data.requestId : '';
+  const settle = requestId ? pendingBoardSaves.get(requestId) : null;
+  if (settle) {
+    pendingBoardSaves.delete(requestId);
+    try {
+      settle({ ok: e.data.ok === true, error: e.data.error || '' });
+    } catch (error) {
+      globalThis.LT41Report?.report(error, '보드 저장 응답');
+    }
+    return;
+  }
   if (e.data.ok === false)
     toast(e.data.error || '서버에 저장하지 못했어요. 잠시 뒤 다시 시도해 주세요.');
 });
@@ -581,6 +690,7 @@ let view = { x: 0, y: 0, z: 0.78 },
   drag = null,
   pan = null,
   undoStack = [],
+  activeBoardOrderUndo = null,
   cinema = false,
   addType = 'photo';
 
@@ -914,14 +1024,17 @@ function screenToWorld(cx, cy) {
 }
 
 function snapshot() {
-  undoStack.push(
-    JSON.stringify({
+  dismissBoardOrderUndo();
+  const value = JSON.stringify({
       moments: moments.map(m => ({ ...m })),
       connections: connections.map(c => ({ ...c })),
-      momentOrder: momentOrder.slice()
-    })
-  );
+      momentOrder: momentOrder.slice(),
+      hasSavedBoardOrder,
+      clearSavedBoardOrder
+    });
+  undoStack.push(value);
   if (undoStack.length > 24) undoStack.shift();
+  return value;
 }
 
 function undo() {
@@ -931,6 +1044,8 @@ function undo() {
   moments = o.moments;
   connections = o.connections;
   if (Array.isArray(o.momentOrder)) momentOrder = o.momentOrder.slice();
+  if (typeof o.hasSavedBoardOrder === 'boolean') hasSavedBoardOrder = o.hasSavedBoardOrder;
+  if (typeof o.clearSavedBoardOrder === 'boolean') clearSavedBoardOrder = o.clearSavedBoardOrder;
   renderCards();
   renderThreads();
   persistBoard();
@@ -1063,7 +1178,10 @@ function selectMoment(id, open = true) {
 }
 
 function toast(t) {
+  dismissBoardOrderUndo();
   let el = $('#toast');
+  el.classList.remove('boardOrderToast');
+  delete el.dataset.boardOrderUndo;
   el.textContent = t;
   el.classList.add('show');
   clearTimeout(toast.t);
@@ -1072,9 +1190,62 @@ function toast(t) {
 // #662 후속(CTO 지시): 상세 판이 열리면 안내 풍선은 즉시 치운다 — 안내는 '순간을 선택하라'는 뜻이라 이미 선택해
 // 판이 열렸으면 필요 없고, 넓은 판에서는 풍선 자리가 판 안쪽('이어진 순간' 줄)과 포개진다. 다른 풍선(마음 저장 등)은 그대로 뜬다.
 function hideToast() {
+  dismissBoardOrderUndo();
   const el = $('#toast');
   clearTimeout(toast.t);
   el.classList.remove('show');
+}
+function dismissBoardOrderUndo() {
+  const active = activeBoardOrderUndo;
+  if (!active) return;
+  activeBoardOrderUndo = null;
+  clearTimeout(toast.t);
+  const el = $('#toast');
+  if (el?.dataset.boardOrderUndo === active.token) {
+    delete el.dataset.boardOrderUndo;
+    el.classList.remove('boardOrderToast', 'show');
+    el.replaceChildren();
+  }
+}
+function showBoardOrderUndo({ before, snapshot: undoSnapshot }) {
+  const el = $('#toast');
+  if (!el) return;
+  dismissBoardOrderUndo();
+  const action = { token: `board-undo-${Date.now()}-${Math.random()}`, before, snapshot: undoSnapshot };
+  const message = document.createElement('span');
+  message.textContent = '배치를 저장했어요';
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'boardOrderUndo';
+  button.textContent = '되돌리기';
+  button.addEventListener('click', () => undoBoardOrder(action));
+  el.replaceChildren(message, button);
+  el.dataset.boardOrderUndo = action.token;
+  el.classList.add('boardOrderToast', 'show');
+  activeBoardOrderUndo = action;
+  clearTimeout(toast.t);
+  toast.t = setTimeout(() => {
+    if (activeBoardOrderUndo === action) dismissBoardOrderUndo();
+    el.classList.remove('show');
+  }, 6000);
+}
+function undoBoardOrder(action) {
+  if (activeBoardOrderUndo !== action) return;
+  const current = captureBoardOrderState();
+  dismissBoardOrderUndo();
+  restoreBoardOrderState(action.before, { mode: 'mine' });
+  persistBoard({
+    onSettled: result => {
+      if (result.ok) {
+        discardBoardUndoSnapshot(action.snapshot);
+        toast('이전 배치로 돌아왔어요.');
+      } else {
+        restoreBoardOrderState(current, { mode: 'mine' });
+        discardBoardUndoSnapshot(action.snapshot);
+        failNotice('되돌리기를 저장하지 못했어요. 저장된 배치를 유지했어요.');
+      }
+    }
+  });
 }
 
 function addMoment(m, connectFrom = null) {
@@ -1289,7 +1460,7 @@ function headerFade(on) {
 let boardTouches = new Map(),
   pinch = null;
 viewport.addEventListener('pointerdown', e => {
-  if (cinema || mobileBoardScroll() || e.target.closest('.card')) return;
+  if (cinema || mobileBoardScroll() || e.target.closest('.card,button,a,input,textarea,select')) return;
   if (e.pointerType === 'touch') {
     boardTouches.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (boardTouches.size === 1) {
@@ -1435,6 +1606,19 @@ for (const b of document.querySelectorAll('[data-board-mode]')) {
     );
   };
 }
+function addBoardResetButton() {
+  const group = document.querySelector('.boardModeSwitch');
+  if (!group || !boardSaveEnabled() || LTDEMO.readOnly) return;
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.id = 'boardResetOrderBtn';
+  button.className = 'tool modeSwitchBtn boardResetOrderBtn';
+  button.textContent = '처음대로';
+  button.setAttribute('aria-label', '내 배치 순서를 날짜순으로 되돌리기');
+  button.addEventListener('click', resetBoardOrder);
+  group.appendChild(button);
+}
+addBoardResetButton();
 $('#undoBtn').onclick = undo;
 $('#minusBtn').onclick = () => zoomAtCenter(Math.max(0.38, view.z - 0.1));
 $('#plusBtn').onclick = () => zoomAtCenter(Math.min(1.45, view.z + 0.1));

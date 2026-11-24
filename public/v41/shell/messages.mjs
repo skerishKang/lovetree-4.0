@@ -72,7 +72,7 @@ export function createMessages(deps) {
     if (data?.type === MSG.viewer) { document.body.classList.toggle('lt-viewer-open', data.open === true); return; }
     // 4.1 기억 보드 저장: 화면이 만든 순간·연결·배치를 기존 워크스페이스 저장 경로로 보낸다.
     if (data?.type === MSG.boardSync) {
-      const reply = (ok, error) => { try { event.source?.postMessage({type:MSG.boardSaved, ok, error}, location.origin); } catch {} };
+      const reply = (ok, error) => { try { event.source?.postMessage({type:MSG.boardSaved, ok, error, ...(typeof data.requestId === 'string' ? {requestId:data.requestId} : {})}, location.origin); } catch {} };
       if (getSource() !== 'server' || !getMember()?.snapshot().writable) { reply(false, '서버 편집 연결이 없어 저장하지 않았어요.'); return; }
       try { getMember().apply('boardSync', {moments: data.moments}, {treeId: data.treeId}); reply(true); }
       catch (error) { report(error, '보드 저장'); reply(false, error?.message || '저장하지 못했어요.'); }

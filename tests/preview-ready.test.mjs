@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { functionsReady, isNotYetUp, READY_TIMEOUT_MS, READY_INTERVAL_MS } from '../tools/postdeploy/preview-ready.mjs';
+import { functionsReady, isNotYetUp, READY_TIMEOUT_MS, READY_INTERVAL_MS, READY_PATH } from '../tools/postdeploy/preview-ready.mjs';
 
 const read = (p) => readFileSync(new URL(p, import.meta.url), 'utf8');
 
@@ -75,14 +75,16 @@ test('#496 네트워크 오류는 다음 시도로 넘기고, 응답이 오면 r
   assert.equal(calls, 2);
 });
 
-test('눈치채는 주소는 미리보기의 /api/account 하나다', async () => {
+test('#1254 준비 확인은 저장 API를 거치지 않는 Functions 응답 경로를 본다', async () => {
   const seen = [];
   await functionsReady('https://preview.example', {
-    fetcher: async (url) => { seen.push(url); return { status: 401 }; },
+    fetcher: async (url) => { seen.push(url); return { status: 200 }; },
     timeoutMs: 1000,
     intervalMs: 1
   });
-  assert.deepEqual(seen, ['https://preview.example/api/account']);
+  assert.deepEqual(seen, [`https://preview.example${READY_PATH}`]);
+  assert.equal(READY_PATH.startsWith('/api/'), false, '저장 API 경로로 준비를 재지 않는다');
+  assert.equal(READY_PATH, '/robots.txt', 'Functions가 직접 답하는 정적·라우팅 응답을 쓴다');
 });
 
 test('주소가 없으면 확인하지 않고 null로 돌아간다', async () => {
