@@ -270,7 +270,7 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin,a
   owner.textContent=displayOwner.slice(0,1);
   ownerText.textContent=displayOwner;
   treeLine.append(owner,ownerText);
-  if(item.aiTester)treeLine.append(el('span','moments-ai','AI 명예회원'));
+  if(item.aiTester)treeLine.append(el('span','moments-ai','✦ AI 명예회원'));
   treeLine.append(el('span','moments-tree-name',item.treeTitle||''));
   titleLine.textContent=item.title||'';
   // 꼬리표는 '가수:아이유' 같은 머리말을 뺀 값만 — 기존 parseTag 한 벌을 그대로 쓴다.

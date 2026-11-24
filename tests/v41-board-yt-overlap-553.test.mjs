@@ -9,7 +9,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
-import { createReadStream } from 'node:fs';
+import { createReadStream, readFileSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -364,6 +364,12 @@ test('970 실행: 썸네일 — 영상·사진이 화면 안에 보인다(가짜
       await context.close();
     }
   } finally { await browser.close(); server.close(); }
+});
+
+test('#1273 8번 휴대폰 보드: 카드가 예약 칸을 더 채워 빈 틈을 줄인다(간격 기준은 그대로)', () => {
+  const js = readFileSync(new URL('../public/v41/views/board/board.js', import.meta.url), 'utf8');
+  assert.match(js, /narrow \? 16 : 24/, '좁은 화면에서만 벌림 간격을 줄인다');
+  assert.match(js, /BASE_RESERVED_H = 330/, '예약 높이 기준 330px은 그대로');
 });
 
 test('#1273 2번 화면: 크게 보기에 영어 라벨과 빈 한마디 줄이 없다', { skip, timeout: 180000 }, async () => {
