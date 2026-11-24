@@ -35,13 +35,14 @@ function tree952({ subject, count, youtube = false }) {
   return t;
 }
 
-async function boot952(browser, { width = 1440, member = false, motion = 'reduce', initStorage = {}, routes = {}, thumb = THUMB, waitUntil = 'load' } = {}) {
+async function boot952(browser, { width = 1440, member = false, motion = 'reduce', initStorage = {}, routes = {}, thumb = THUMB, waitUntil = 'load', initScript = null } = {}) {
   const server = await serve({});
   const base = `http://127.0.0.1:${server.address().port}`;
   const ctx = await browser.newContext({ viewport: { width, height: width === 390 ? 844 : 900 }, reducedMotion: motion });
   await ctx.addInitScript((entries) => {
     for (const [k, v] of Object.entries(entries)) { try { localStorage.setItem(k, v); } catch {} }
   }, initStorage);
+  if (initScript) await ctx.addInitScript(initScript);
   const trees = [tree952({ subject: '좋아하는 순간들', count: 8, youtube: true }), tree952({ subject: '여름', count: 3 })];
   const workspace = { revision: 1, state: { version: 1, trees, prefs: { displayName: '화면검사 시험계정' } }, subject: 'visual-audit-fake', writeSubjectBound: true, savedAt: '2026-11-20T00:00:00.000Z' };
   await ctx.route('**/*', (route) => {
@@ -847,4 +848,37 @@ test('#1204 첫 화면 순차 등장·안내 삭제·WebGL 말풍선·기억·�
       assert.ok(first.styles.every(x=>x.animation==='none'&&x.opacity==='1'));
     }finally{await close952(reduced);}
   }finally{await browser.close();}
+});
+
+test('#1026 첫 화면 카드는 첫 궤도 자리를 받은 뒤에만 보이고 글귀와 같은 프레임에 풀린다', { skip: REQUIRE952 ? false : skip952, timeout: 180000 }, async () => {
+  if (skip952) assert.fail(skip952);
+  const browser = await chromium952.launch({ headless: true });
+  try {
+    const h = await boot952(browser, {
+      width: 1440, member: false, motion: 'no-preference',
+      initScript: () => {
+        window.__firstFrame1026 = [];
+        const timer = setInterval(() => {
+          const sr = document.querySelector('#orbit')?.shadowRoot;
+          if (!sr) return;
+          const cards = [...sr.querySelectorAll('button.card')];
+          const hidden = cards.filter(e => e.classList.contains('lt-first-frame'));
+          if (hidden.some(e => e.style.transform)) window.__firstFrame1026.push({ kind: 'hidden-with-position' });
+          if (!hidden.length) {
+            const shown = cards.filter(e => !e.classList.contains('off'));
+            window.__firstFrame1026.push({ kind: 'shown', missing: shown.filter(e => !e.style.transform).length, wait: sr.querySelector('.center')?.hasAttribute('data-lt-home-wait') ? 1 : 0 });
+            clearInterval(timer);
+          }
+        }, 16);
+      }
+    });
+    try {
+      await h.frame.waitForFunction(() => window.__firstFrame1026?.some(x => x.kind === 'shown'), null, { timeout: 15000 });
+      const frames = await h.frame.evaluate(() => window.__firstFrame1026);
+      // 첫 자리를 받은 뒤에도 공개 전까지는 숨겨 유지된다(hidden-with-position은 정상 중간 상태).
+      const shown = frames.find(x => x.kind === 'shown');
+      assert.equal(shown.missing, 0, '보이는 순간 모든 카드에 궤도 자리가 있다: ' + JSON.stringify(shown));
+      assert.equal(shown.wait, 0, '카드와 글귀의 시작이 같은 프레임이다: ' + JSON.stringify(shown));
+    } finally { await close952(h); }
+  } finally { await browser.close(); }
 });
