@@ -220,9 +220,30 @@ test('#537 실제 화면: 1440·390에서 한 장으로 끝까지 넘기면 모�
     }));
     assert.equal(phoneBtns.single, true, `폰 폭: 1장 단추가 보인다(${JSON.stringify(phoneBtns)})`);
     assert.equal(phoneBtns.double, true, `폰 폭: 2장 단추가 보인다(${JSON.stringify(phoneBtns)})`);
-    assert.equal(phoneBtns.doubleDisabled, true, '폰 폭: 2장은 비활성이다');
+    assert.equal(phoneBtns.doubleDisabled, false, '폰 폭: 2장 단추를 누를 수 있다');
     assert.equal(phoneBtns.cellsEqual, true, `폰 폭: 두 칸 크기가 같다(${JSON.stringify(phoneBtns)})`);
     const phoneWalk = await walkAll(phone.frame);
+    // #1287: mobile double view is a single history step; back restores the selected moment.
+    const beforeMobileSpread = await phone.frame.evaluate(() => ({
+      focus: window.LTDEMO.get(),
+      historyLength: history.length
+    }));
+    await phone.frame.locator('#doubleViewBtn').click();
+    await phone.page.waitForTimeout(250);
+    const openedMobileSpread = await phone.frame.evaluate(() => ({
+      view: window.__TRACK59__.getState().view,
+      historyLength: history.length
+    }));
+    assert.equal(openedMobileSpread.view, 'double', '휴대폰 2장은 펼친 책 보기');
+    assert.equal(openedMobileSpread.historyLength, beforeMobileSpread.historyLength + 1, '2장 진입은 기록 한 칸');
+    await phone.frame.evaluate(() => history.back());
+    await phone.page.waitForTimeout(250);
+    const returnedMobilePage = await phone.frame.evaluate(() => ({
+      view: window.__TRACK59__.getState().view,
+      focus: window.LTDEMO.get()
+    }));
+    assert.equal(returnedMobilePage.view, 'single', '뒤로 가기 뒤 한 장 복귀');
+    assert.equal(returnedMobilePage.focus, beforeMobileSpread.focus, '뒤로 가기 뒤 같은 순간');
     await phone.ctx.close();
     assert.equal(phoneGeom.state.shape, 'phone', '폰 폭은 휴대폰 모양');
     assert.deepEqual(phoneGeom.pages, { left: false, right: false, mobile: true }, '휴대폰 한 장은 mobile-page');
@@ -493,5 +514,63 @@ test('책 조작 버튼 히트박스는 44x44 이상이다(렌더링 ::after 터
   } finally {
     if (browser) await browser.close().catch(() => {});
     server.close();
+  }
+});
+
+// #1287: mobile book controls, rotation choice, list mode and history are browser contracts.
+test('#1287 모바일 책 보기 제어와 가로 복귀', { skip: REQUIRE ? false : skip, timeout: 90000 }, async () => {
+  if (skip) assert.fail('화면 검사에 브라우저가 필요합니다: ' + skip);
+  const server = await serve(ROOT);
+  let browser;
+  try {
+    browser = await chromium.launch({ headless: true });
+    const env = await openBook(browser, 'http://127.0.0.1:' + server.address().port, 390, 844, 'single');
+    const { page, frame } = env;
+    const initial = await frame.evaluate(() => {
+      const rect = selector => document.querySelector(selector)?.getBoundingClientRect();
+      const a = rect('#book-display-inline [data-book-display=book]');
+      const b = rect('#book-display-inline [data-book-display=list]');
+      const title = document.querySelector('.lt-screen-toolbar-title');
+      const book = rect('#book');
+      const after = rect('#whyMargin');
+      return {
+        hit: [a?.width, a?.height, b?.width, b?.height],
+        titleHidden: !title || getComputedStyle(title).display === 'none',
+        gap: after && book ? after.top - book.bottom : -1,
+        focus: window.LTDEMO.get(),
+        mode: window.__TRACK59__.getState().view
+      };
+    });
+    assert.equal(initial.mode, 'single');
+    assert.ok(initial.hit.every(v => v >= 44), '책/목록 단추의 누름 영역 44px 이상');
+    assert.equal(initial.titleHidden, true, '휴대폰 도구 줄의 중복 제목 없음');
+    assert.ok(initial.gap >= 12, '책 면과 이어 보기 사이 간격 12px 이상: ' + initial.gap);
+    await frame.locator('#book-display-inline [data-book-display=list]').click();
+    assert.equal(await frame.evaluate(() => document.querySelector('#archivePanel').classList.contains('open')), true, '목록을 누르면 목록이 열린다');
+    assert.equal(await frame.getAttribute('#book-display-inline [data-book-display=list]', 'aria-checked'), 'true', '목록 선택 표시');
+    await frame.locator('#archiveClose').click();
+    assert.equal(await frame.getAttribute('#book-display-inline [data-book-display=book]', 'aria-checked'), 'true', '책 복귀 시 선택 표시');
+    await page.setViewportSize({width:844,height:390});
+    await page.waitForTimeout(200);
+    assert.equal(await frame.evaluate(() => window.__TRACK59__.getState().view), 'single', '휴대폰만 돌려도 자동 두 장으로 전환되지 않음');
+    await page.setViewportSize({width:390,height:844});
+    await frame.locator('#doubleViewBtn').click();
+    await page.waitForTimeout(250);
+    const opened = await frame.evaluate(() => ({
+      mode: window.__TRACK59__.getState().view,
+      full: document.fullscreenElement === document.querySelector('#bookWrap'),
+      hint: !document.querySelector('#book-rotate-hint')?.hidden
+    }));
+    assert.equal(opened.mode, 'double', '2장 단추로 펼침');
+    assert.ok(opened.full || opened.hint, '전체 화면 또는 가로 돌리기 안내');
+    await frame.locator('#mobile-spread-exit').click();
+    await page.waitForTimeout(250);
+    const back = await frame.evaluate(() => ({ mode:window.__TRACK59__.getState().view,focus:window.LTDEMO.get() }));
+    assert.equal(back.mode, 'single', '1장 복귀');
+    assert.equal(back.focus, initial.focus, '1장 복귀시 같은 순간');
+    await env.ctx.close();
+  } finally {
+    await browser?.close();
+    await new Promise(resolve => server.close(resolve));
   }
 });
