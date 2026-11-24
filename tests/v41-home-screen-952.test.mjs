@@ -845,7 +845,7 @@ test('#1309 휴대폰 세로는 8장 리본이 흐르고 숫자판·단추·링�
   let overlaps = 0;
   for (const box of boxes) for (const zone of protectedZones) if (hit(box, zone) > 1) overlaps++;
   const first = boxes[0];
-  return { mode: host.dataset.ltLayout, active: cards.length, visible: boxes.length, overlaps, zones: protectedZones.length, first: first && [(first.l + first.r) / 2, (first.t + first.b) / 2], rates: cards.flatMap(e => e.getAnimations().filter(a => a.effect.target === e).map(a => a.playbackRate)) };
+  return { mode: host.dataset.ltLayout, active: cards.length, visible: boxes.length, overlaps, zones: protectedZones.length, first: first && [(first.l + first.r) / 2, (first.t + first.b) / 2], rates: cards.flatMap(e => e.getAnimations().filter(a => a.effect.target === e && !a.effect.pseudoElement).map(a => a.playbackRate)) };
  });
  try {
   for (const theme of ['night', 'garden']) {

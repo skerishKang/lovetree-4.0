@@ -86,6 +86,7 @@ extraCSS+=`@keyframes lt-home-rise{from{opacity:0;transform:translateY(12px)}to{
 .card.lt-first-frame{visibility:hidden}
 .center[data-lt-home-wait] .lt-home-enter{animation-play-state:paused;opacity:0}
 .lt-card-tip{position:absolute;z-index:4;left:50%;bottom:8px;transform:translateX(-50%);padding:3px 7px;border:1px solid var(--lt-gold-line);border-radius:999px;background:var(--lt-stage);color:var(--lt-pearl);font-size:12px;line-height:16px;white-space:nowrap;pointer-events:none;opacity:0}
+.card:has(.lt-fallback-notice) .lt-card-tip{bottom:44px}
 .world.lt-hint-ready .lt-card-tip{opacity:1}
 .world.lt-hint-ready .card.lt-card-hint:after{animation:lt-card-pulse 1.2s ease-in-out 2}
 @keyframes lt-card-pulse{0%,100%{border-color:var(--lt-gold-line);box-shadow:none}50%{border-color:var(--lt-gold);box-shadow:0 0 0 2px var(--lt-gold-line),0 0 18px var(--lt-gold-glow)}}
@@ -784,7 +785,7 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
   const origin=app.getBoundingClientRect(),r=el.getBoundingClientRect(),box={l:r.left-origin.left,t:r.top-origin.top,r:r.right-origin.left,b:r.bottom-origin.top};
   return {x:(box.l+box.r)/2,y:(box.t+box.b)/2,box,hidden:box.r<0||box.l>origin.width||box.b<0||box.t>origin.height,ribbon:true,index:i};
  });
- const syncRibbonMotion=()=>{const rate=motionRunning()&&ribbonSeek===null?1:0;for(const a of ribbonAnims)if(a)a.playbackRate=rate;};
+ const syncRibbonMotion=()=>{const rate=motionRunning()&&ribbonSeek===null?1:0;for(const a of ribbonAnims)if(a){a.playbackRate=rate;if(rate)a.play();else a.pause();}};
  const setLayoutMode=(next,w,h)=>{
   if(next===layoutMode&&next!=='ribbon')return;
   if(next!==layoutMode&&!hintDismissed){hintCardIndex=-1;hintVisible=false;clearTimeout(hintTimer);world.classList.remove('lt-hint-ready');}
@@ -815,14 +816,13 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
   }
   selectCardHint(best);
  };
- const ribbonPhase=a=>a?((((a.currentTime||0)-(a.effect?.getTiming().delay||0))/(elements[0]?.__ribbonDuration||96000))%1+1)%1:0;
   // #1086: 궤도 경로 검사용 — 지정 진행률로 카드를 그린다(실제 루프와 같은 orbitWrite 경로).
   globalThis.__LT_ORBIT_TEST__={
    lastWriteAt(){return lastWriteAt;},hintIndex(){return hintCardIndex;},ribbonTime(){return ribbonAnims[0]?.currentTime||0;},ribbonAdvanced(initial){return (ribbonAnims[0]?.currentTime||0)-initial;},
-   progress(now){if(layoutMode==='ribbon')return ribbonPhase(ribbonAnims[0]);const cfg=orbitRings(layoutBox?.w||0,layoutBox?.h||0)[cards[0].ring];const elapsed=now-orbitStart-pausedTotal-(pausedAt?now-pausedAt:0);return ((elapsed/Math.round(ORBIT_MS/cfg.speed))+phase)%1;},
+   progress(now){if(layoutMode==='ribbon')return ((ribbonAnims[0]?.currentTime||0)/(elements[0]?.__ribbonDuration||96000)%1+1)%1;const cfg=orbitRings(layoutBox?.w||0,layoutBox?.h||0)[cards[0].ring];const elapsed=now-orbitStart-pausedTotal-(pausedAt?now-pausedAt:0);return ((elapsed/Math.round(ORBIT_MS/cfg.speed))+phase)%1;},
    period(){if(layoutMode==='ribbon')return elements[0]?.__ribbonDuration||96000;const cfg=orbitRings(layoutBox?.w||0,layoutBox?.h||0)[cards[0].ring];return Math.round(ORBIT_MS/cfg.speed);},
    hold(on){if(layoutMode==='ribbon'){if(on)ribbonAnims.forEach(a=>a?.pause());else{ribbonSeek=null;syncRibbonMotion();}return;}if(on){orbitPause();stopOrbitLoop();}else{testSeek=null;orbitResume();startOrbitLoop();}},
-   seek(t){if(layoutMode==='ribbon'){ribbonSeek=t;ribbonAnims.forEach(a=>{if(a){a.pause();a.currentTime=t*(elements[0]?.__ribbonDuration||96000)+(a.effect?.getTiming().delay||0);}});return true;}testSeek=t;for(let i=0;i<elements.length;i++){
+   seek(t){if(layoutMode==='ribbon'){ribbonSeek=t;ribbonAnims.forEach(a=>{if(a){a.pause();a.currentTime=t*(elements[0]?.__ribbonDuration||96000);}});return true;}testSeek=t;for(let i=0;i<elements.length;i++){
     const frames=orbitFrames[i],el=elements[i];if(!frames||!frames.length||!el)continue;
     if(el.__seekSaved===undefined)el.__seekSaved=el.style.transform;
     const tf=orbitTransform(frames,t);if(tf){el.style.transform=tf;}}
