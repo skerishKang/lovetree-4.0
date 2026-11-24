@@ -647,6 +647,22 @@ window.LT56Model = (() => {
       const cx = Math.max(a.l, Math.min(o.x, a.r)), cy = Math.max(a.t, Math.min(o.y, a.b));
       return Math.hypot(o.x - cx, o.y - cy) < o.r + 1;
     };
+    // #1259: 선분과 글자 상자의 교차를 정확히 판정한다(선 두께·글자 외곽 여백 포함).
+    const crosses = (r, e) => {
+      const pad = e.pad ?? 3;
+      let lo = 0, hi = 1;
+      const dx = e.b.x - e.a.x, dy = e.b.y - e.a.y;
+      for (const [start, delta, min, max] of [
+        [e.a.x, dx, r.l - pad, r.r + pad],
+        [e.a.y, dy, r.t - pad, r.b + pad]
+      ]) {
+        if (!delta) { if (start < min || start > max) return false; continue; }
+        const t1 = (min - start) / delta, t2 = (max - start) / delta;
+        lo = Math.max(lo, Math.min(t1, t2)); hi = Math.min(hi, Math.max(t1, t2));
+        if (lo > hi) return false;
+      }
+      return true;
+    };
     for (const c of cands) {
       const spots = {
         right: { l: c.x + c.r + g, t: c.y - c.h / 2 },
@@ -657,13 +673,25 @@ window.LT56Model = (() => {
       const dx = c.dir?.x ?? 1, dy = c.dir?.y ?? 0;
       const first = dx > 0.35 ? 'right' : dx < -0.35 ? 'left' : dy < 0 ? 'above' : 'below';
       const order = [first, ...['right', 'left', 'above', 'below'].filter(k => k !== first)];
-      for (const key of (c.only ? [first] : order)) {
-        const s = spots[key], rect = { l: s.l, t: s.t, r: s.l + c.w, b: s.t + c.h };
+      const candidates = (c.only ? [first] : order).map(key => spots[key]);
+      // 시작 이름표는 좁은 화면에서도 전체 제목을 유지하도록 위아래 자리의 가로 위치를 맞춘다.
+      if (c.avoidEdges && !c.only) {
+        for (const distance of [0, 12, 28, 48, 72, 100, 140]) {
+          for (const key of ['above', 'below']) {
+            const t = spots[key].t + (key === 'above' ? -distance : distance);
+            const l = Math.max(bounds.x, Math.min(spots[key].l, bounds.x + bounds.w - c.w));
+            candidates.push({ l, t });
+          }
+        }
+      }
+      for (const s of candidates) {
+        const rect = { l: s.l, t: s.t, r: s.l + c.w, b: s.t + c.h };
         if (rect.l < bounds.x || rect.r > bounds.x + bounds.w || rect.t < bounds.y || rect.b > bounds.y + bounds.h) continue;
         if (rects.some(r => overlaps(rect, r))) continue;
         if (obstacles.some(o => onDot(rect, o))) continue;
+        if (c.avoidEdges && (opts.segments || []).some(e => crosses(rect, e))) continue;
         rects.push(rect);
-        out.push({ id: c.id, text: c.text, x: rect.l, y: rect.t + c.h * 0.77, rect, tw: c.tw || 0 });
+        out.push({ id: c.id, text: c.text, x: rect.l, y: rect.t + (c.lineH || c.h) * 0.77, rect, tw: c.tw || 0, ...(c.lines ? { lines: c.lines, lineH: c.lineH } : {}) });
         break;
       }
     }

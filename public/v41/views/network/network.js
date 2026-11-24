@@ -1580,6 +1580,8 @@
     for (let i = 1; i <= steps; i++) {
       const q = pointBezier(g, (t * i) / steps);
       ctx.lineTo(q.x, q.y);
+      DRAWN_EDGE_SEGMENTS.push({ a: p, b: q, pad: 2 + ctx.lineWidth / 2 });
+      p = q;
     }
     ctx.stroke();
   }
@@ -1818,6 +1820,7 @@
   // 자리는 LT56Model.placeLabels 한 벌이 고른다 — 다른 이름표·점과 겹치는 자리에는 붙이지 않는다. 글씨 12px.
   const LABEL_PX = 12;
   let LAST_LABELS = [];
+  let DRAWN_EDGE_SEGMENTS = [];
   let THUMB_RECTS = [];
   /* #951 (CTO 261120): 이름표를 글자 수로 자르면 남은 폭이 있어도 'Ditto …'로 잘렸다.
    남은 폭(BOX)에 맞춰 재어 자르고, 짧은 이름은 그대로 다 보인다 — 이름표끼리 겹침은 placeLabels가 지킨다. */
@@ -1877,8 +1880,19 @@
       .sort((a, b) => pri(a) - pri(b) || nodes.indexOf(a) - nodes.indexOf(b));
     const push = (n, text, p, r, dir, only) => {
       if (!visible(p, 0)) return;
-      const w = ctx.measureText(text).width;
-      out.push({ id: n.id, text, x: p.x, y: p.y, r, w, h, dir, only, tw: 0 });
+      const lines = [text];
+      const cap = Math.max(80, BOX.w - 16);
+      if (n.first && ctx.measureText(text).width > cap) {
+        lines.length = 0;
+        let line = '';
+        for (const ch of text) {
+          if (line && ctx.measureText(line + ch).width > cap) { lines.push(line.trimEnd()); line = ''; }
+          line += ch;
+        }
+        if (line) lines.push(line.trimStart());
+      }
+      const w = Math.max(...lines.map(line => ctx.measureText(line).width));
+      out.push({ id: n.id, text, lines, x: p.x, y: p.y, r, w, h: h * lines.length, lineH: h, dir, only, tw: 0, avoidEdges: !!n.first });
     };
     for (const n of moments.filter(n => pri(n) <= 1)) {
       const p = w2s(n.x, n.y);
@@ -2018,7 +2032,7 @@
         }
       });
     const b = { x: BOX.x - 12, y: BOX.y - 12, w: BOX.w + 24, h: BOX.h + 24 };
-    LAST_LABELS = LT56Model.placeLabels(labelCands(), obstacles, b);
+    LAST_LABELS = LT56Model.placeLabels(labelCands(), obstacles, b, { segments: DRAWN_EDGE_SEGMENTS });
     ctx.font = `600 ${LABEL_PX}px Pretendard,sans-serif`;
     ctx.textAlign = 'left';
     ctx.lineJoin = 'round';
@@ -2035,8 +2049,11 @@
       /* #951 ③: 사진은 점 자리로 옮겼다 — 이름표는 글자만 쓴다. */
       const tx = l.x;
       ctx.fillStyle = n?.kind === 'cluster' ? paint('cluster-text') : paint('text');
-      ctx.strokeText(l.text, tx, l.y);
-      ctx.fillText(l.text, tx, l.y);
+      for (const [i, line] of (l.lines || [l.text]).entries()) {
+        const y = l.y + i * (l.lineH || LABEL_PX);
+        ctx.strokeText(line, tx, y);
+        ctx.fillText(line, tx, y);
+      }
     }
     ctx.globalAlpha = 1;
     /* 이름표가 없는 순간에 올리면 그 순간 전체 제목(#601 — 줄임 없이). */ const hv = state.hover;
@@ -2128,6 +2145,7 @@
   }
   function draw() {
     THUMB_RECTS = [];
+    DRAWN_EDGE_SEGMENTS = [];
     ctx.save();
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     const bg = ctx.createLinearGradient(0, 0, 0, vh);
@@ -2675,6 +2693,7 @@
             }),
     box: () => BOX,
     labels: () => LAST_LABELS,
+    edgeSegments: () => DRAWN_EDGE_SEGMENTS,
     fan: () => !!NETFIT?.fan,
     thumbs: () => [...thumbs.entries()].map(([id, e]) => ({ id, ok: e.ok })),
     thumbsSettled: () => [...thumbs.values()].every(e => e.ready),
