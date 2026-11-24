@@ -16,6 +16,10 @@
    단추는 같은 행의 끝자리에 둔다. */
 #community-panel .community-group-rail{display:flex;align-items:center;gap:8px}
 #community-panel #community-groups{flex:1 1 auto;min-width:0}
+/* #1305: 가수 단추 줄은 옆으로 넘기고, 회색 막대를 숨기고 오른쪽 끝만 흐린다. */
+#community-panel #community-groups{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding-right:18px;-webkit-mask-image:linear-gradient(to right,#000 0,#000 calc(100% - 18px),transparent 100%);mask-image:linear-gradient(to right,#000 0,#000 calc(100% - 18px),transparent 100%)}
+#community-panel #community-groups::-webkit-scrollbar{display:none}
+#community-panel #community-groups .community-group-chip{flex:none;white-space:nowrap}
 /* #972: 그룹 찾기 단추 위를 덮던 흐림 막을 없애고, 작은 화면에서 칩을 끝까지 읽는다. */
 #community-panel .community-group-rail::after{display:none}
 @media(max-width:520px){
@@ -107,6 +111,7 @@ dialog.community-group-find::backdrop{background:transparent}
 
 /* #1025 2단계 — 가수 칩 줄·담기 창·선 아이콘. 색은 identity 토큰만 쓴다. */
 .moments-chips{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;max-width:1500px;margin:0 auto 12px}
+.moments-chips[hidden]{display:none}
 .moments-chip{min-height:40px;padding:0 14px;border:1px solid var(--lt-line);border-radius:var(--lt-r-pill);background:var(--lt-glass);color:var(--lt-muted);font:inherit;font-size:13px;cursor:pointer}
 .moments-chip.is-active{border-color:var(--lt-gold);background:var(--lt-primary);color:var(--lt-primary-ink)}
 .moments-rail-svg{width:24px;height:24px;display:block;color:currentColor}
@@ -145,18 +150,24 @@ html[data-lt-theme=garden] .moments-comments-dialog{background:var(--lt-paper);c
 @media(max-width:780px){
  #community-panel:has(#community-tab-moments[aria-selected="true"]){padding-inline:0;overflow-x:clip}
  #community-panel:has(#community-tab-moments[aria-selected="true"]) .community-top{height:0;margin:0;padding:0}
- #community-panel:has(#community-tab-moments[aria-selected="true"]) .community-tabs{
-  position:absolute;z-index:19;top:calc(env(safe-area-inset-top) + 48px);left:8px;
+ /* #1305: 전환 단추는 두 화면 모두 같은 자리·같은 크기로 영상 위 빈 띠에 둔다. */
+ #community-panel:has(#community-tab-moments[aria-selected="true"]) .community-tabs,
+ #community-panel:has(#community-tab-trees[aria-selected="true"]) .community-tabs{
+  position:absolute;z-index:19;top:calc(env(safe-area-inset-top) + 6px);left:8px;
   gap:4px;width:max-content;margin:0;padding:3px;border-radius:var(--lt-r-pill);
   background:var(--lt-glass-strong)
  }
- #community-panel:has(#community-tab-moments[aria-selected="true"]) .community-tabs button{
-  min-width:52px;min-height:32px;padding:0 9px;font-size:12px
+ #community-panel:has(#community-tab-moments[aria-selected="true"]) .community-tabs button,
+ #community-panel:has(#community-tab-trees[aria-selected="true"]) .community-tabs button{
+  min-width:52px;min-height:32px;padding:0 9px;font-size:13px
  }
  #community-moments-panel{width:100%;min-width:0;overflow-x:clip}
- #community-moments-panel .moments-chips{position:absolute;z-index:19;top:calc(env(safe-area-inset-top) + 51px);right:8px;max-width:42vw;justify-content:flex-end;flex-wrap:nowrap;gap:3px;overflow-x:auto;margin:0}
+ /* #1305: 가수 단추 줄도 같은 빈 띠에, 옆으로 넘기게, 끝은 흐리게. */
+ #community-moments-panel .moments-chips{position:absolute;z-index:19;top:calc(env(safe-area-inset-top) + 6px);right:8px;left:132px;max-width:none;justify-content:flex-start;flex-wrap:nowrap;gap:4px;overflow-x:auto;scrollbar-width:none;padding-right:18px;-webkit-mask-image:linear-gradient(to right,#000 0,#000 calc(100% - 18px),transparent 100%);mask-image:linear-gradient(to right,#000 0,#000 calc(100% - 18px),transparent 100%);margin:0}
+ #community-moments-panel .moments-chips::-webkit-scrollbar{display:none}
  #community-moments-panel .moments-chip{min-height:30px;padding:0 9px;font-size:11px;white-space:nowrap;flex:none}
- #community-moments-panel .moments-stage{width:100%;max-width:none;height:calc(100dvh - 90px - env(safe-area-inset-bottom));min-height:0;margin:0;gap:0}
+ /* #1305: 위쪽 단추 띠만큼 영상을 아래로 내려 자막을 가리지 않게 한다. */
+ #community-moments-panel .moments-stage{width:100%;max-width:none;height:calc(100dvh - 128px - env(safe-area-inset-bottom));min-height:0;margin:38px 0 0;gap:0}
  #community-moments-panel .moments-card{height:100%;width:100%;max-width:none;aspect-ratio:auto;border:0;border-radius:0;box-shadow:none}
  #community-moments-panel .moments-media{background:var(--lt-stage)}
  #community-moments-panel .moments-poster{object-fit:cover}
@@ -205,3 +216,20 @@ html[data-lt-theme=garden] .moments-comments-dialog{background:var(--lt-paper);c
 }
 
 @media(min-width:781px){#community-moments-panel .moments-note{display:block;width:auto;min-width:0;min-height:0;height:auto;margin:0;padding:0;border:0;border-radius:0;background:transparent;box-shadow:none;color:inherit;font:inherit;font-size:13px;line-height:1.3;appearance:none;text-align:left}}
+
+/* #1305 휴대폰 트리 화면 — 큰 제목·설명을 빼고 검색·정렬 → 가수 단추 → 카드 순으로. */
+@media(max-width:780px){
+ #community-tree-panel{display:flex;flex-direction:column}
+ #community-tree-panel .panel-heading,
+ #community-tree-panel > .panel-note{display:none}
+ #community-search-form{order:1;margin:44px 0 0;width:100%;box-sizing:border-box}
+ #community-tree-panel .community-group-rail{order:2;margin:8px 0 4px}
+ #community-popular-stages{order:3;margin:0}
+ #community-popular-stages .community-stage-list,
+ #community-popular-stages .community-stages-empty{display:none}
+ #community-popular-stages .community-stages-title{margin:0;font-size:12px;line-height:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ #community-tree-panel .community-results{order:4;margin:0;width:100%;box-sizing:border-box}
+ #community-tree-panel .community-policy{order:5}
+ /* 그룹 찾기는 가수 단추 줄 맨 끝에 같은 모양으로 붙는다. */
+ #community-panel .community-group-find{min-height:40px;padding:0 12px;font-size:13px}
+}

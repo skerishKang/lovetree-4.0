@@ -230,6 +230,8 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin,a
  // 칩 줄: 전체 + 서버가 센 공개 쇼츠 가수 꼬리표 상위 6개. 누르면 그 가수만 다시 섞는다.
  function renderChips(){
   const choices=[{value:'',label:'전체'},...(groups||[]).map(g=>({value:tagKey(g.value)||g.value,label:g.value,tag:'가수:'+g.value}))];
+  // #1305: 고를 가수가 없으면 '전체'만 덩그러니 남기지 않는다.
+  chips.hidden=choices.length<2;
   chips.replaceChildren(...choices.map(choice=>{
    const chip=el('button','moments-chip',choice.label);chip.type='button';
    const active=(choice.value?('가수:'+choice.label):'')===activeTag;
@@ -239,7 +241,15 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin,a
   }));
  }
 
+ // #1305: 유튜브 API 명령은 postMessage 목표가 주소의 origin과 같아야 닿는다.
+ const YT_ORIGIN='https://www.youtube-nocookie.com';
+ const command=(frame,func,args=[])=>{
+  if(!frame?.contentWindow)return false;
+  try{frame.contentWindow.postMessage(JSON.stringify({event:'command',func,args}),YT_ORIGIN);return true;}catch{return false;}
+ };
  function clearFrames(){
+  // 앞 영상을 먼저 멈추고 지운다 — DOM에서만 빼면 소리가 남는 경우가 있다.
+  if(currentFrame)command(currentFrame,'pauseVideo');
   for(const frame of frames){frame.onload=null;frame.src='about:blank';frame.remove();}
   frames=[];
  }
@@ -252,7 +262,13 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin,a
   frame.referrerpolicy='strict-origin-when-cross-origin';
   frame.setAttribute('allowfullscreen','');
   frame.src=embedSrc(item.videoId,item);
-  frame.onload=()=>{frame.classList.add('is-ready');try{frame.contentWindow?.postMessage('{"event":"listening"}','https://www.youtube-nocookie.com');}catch{}};
+  // #1305: 재생이 막히던 원인 — 'listening'만 보내고 재생 명령을 보내지 않았다.
+  //에이피아이가 켜진 iframe은 주소의 autoplay=1만으로 시작하지 않으므로 준비 뒤 playVideo를 보낸다.
+  frame.onload=()=>{
+   frame.classList.add('is-ready');
+   try{frame.contentWindow?.postMessage('{"event":"listening"}',YT_ORIGIN);}catch{}
+   setTimeout(()=>{if(frame.isConnected&&frame===currentFrame){command(frame,'mute');command(frame,'playVideo');stage.dataset.ltAutoplay='1';}},120);
+  };
   frames.push(frame);
   return frame;
  }
@@ -288,8 +304,10 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin,a
   playerProgress.value=0;
   progress.dataset.ltProgress='0';
   if(!matchMedia('(max-width:780px)').matches){void progressFill.offsetWidth;progressFill.classList.add('is-running');}
-  unmuted=false;mute.textContent='소리 켜기';mute.setAttribute('aria-label','소리 켜기');
-  stage.dataset.ltMomentsMuted='true';
+  // #1305: 소리 선택은 이번 방문 동안 유지 — 순간을 넘겨도 되돌리지 않는다.
+  mute.textContent=unmuted?'소리 끄기':'소리 켜기';mute.setAttribute('aria-label',mute.textContent);
+  stage.dataset.ltMomentsMuted=String(!unmuted);
+  stage.dataset.ltAutoplay='';stage.dataset.ltPlaying='0';
   media.dataset.orientation=item.vertical===false||item.isVertical===false?'landscape':'portrait';
   if(matchMedia('(max-width:780px)').matches){try{hint.hidden=localStorage.getItem('lt41.momentSwipeSeen')==='1';}catch{hint.hidden=false;}}else hint.hidden=true;
   currentFrame=now;
@@ -351,6 +369,7 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin,a
     return;
    }
    media.classList.toggle('is-playing',state===1);
+   stage.dataset.ltPlaying=state===1?'1':'0';
   }
  });
  if(typeof window!=='undefined'&&typeof window.addEventListener==='function')window.addEventListener('keydown',event=>{
@@ -368,18 +387,18 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin,a
   mute.onclick=event=>{
     event.stopPropagation();
     if(!currentFrame)return;
-    const command=unmuted?'mute':'unMute';
-    try{currentFrame.contentWindow?.postMessage(JSON.stringify({event:'command',func:command,args:[]}),'https://www.youtube-nocookie.com');}catch{}
+    command(currentFrame,unmuted?'mute':'unMute');
     unmuted=!unmuted;mute.textContent=unmuted?'소리 끄기':'소리 켜기';mute.setAttribute('aria-label',mute.textContent);stage.dataset.ltMomentsMuted=String(!unmuted);
   };
+  // #1305: 화면 한 번 누르면 멈춤·재생이 바뀐다. 소리는 '소리 켜기' 단추만 맡는다.
   media.addEventListener('click',event=>{
-    if(event.target.closest('button'))return;
-  if(!currentFrame||unmuted||matchMedia('(max-width:780px)').matches)return;
-  try{currentFrame.contentWindow?.postMessage('{"event":"command","func":"unMute","args":[]}','https://www.youtube-nocookie.com');}catch{}
-  try{currentFrame.contentWindow?.postMessage('{"event":"command","func":"setVolume","args":[100]}','https://www.youtube-nocookie.com');}catch{}
-  unmuted=true;
-  stage.dataset.ltMomentsMuted='false';
- });
+   if(event.target.closest('button'))return;
+   if(!currentFrame)return;
+   const playing=stage.dataset.ltPlaying==='1';
+   command(currentFrame,playing?'pauseVideo':'playVideo');
+   stage.dataset.ltPlaying=playing?'0':'1';
+   media.classList.toggle('is-playing',!playing);
+  });
  function activate(){if(!items.length&&!loading)void load();else render();}
  function deactivate(){clearFrames();media.querySelectorAll('.moments-frame').forEach(node=>node.remove());}
  return {activate,deactivate,load,step,state:()=>({count:frames.length,id:stage.dataset.ltMomentsId||'',index,loaded:items.length})};
