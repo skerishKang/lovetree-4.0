@@ -141,3 +141,8 @@ html[data-v41-screen=network]:not([data-lt-board-theme=night]) .lt-screen-toolba
 html[data-v41-screen=network]:not([data-lt-board-theme=night]) .lt-screen-toolbar .view-switch{
   background:var(--lt-glass-strong);box-shadow:inset 0 0 0 1px var(--lt-line);
 }
+
+/* #1249: 짧은 서재 제목을 온전히 표시하고 지도 재생 글자에 여백을 둔다. */
+html[data-v41-screen=shelf] .lt-screen-toolbar .lt-toolbar-left{flex:none}
+html[data-v41-screen=shelf] .lt-screen-toolbar .search{min-width:0}
+html[data-v41-screen=network] .lt-screen-toolbar #mapPlayBtn{flex:none;padding:0 10px}
