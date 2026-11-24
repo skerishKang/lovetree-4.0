@@ -39,9 +39,8 @@ try{for(const w of [1440,390])for(const theme of ['night','garden'])for(const n 
  await p.screenshot({path:out+'/'+n+'-'+w+'-'+theme+'-fit.png'});
  await f.locator('#goRoot').click();await f.waitForFunction(()=>document.querySelector('#stage').dataset.lod==='near');
  await p.screenshot({path:out+'/'+n+'-'+w+'-'+theme+'-root.png'});
- const card=f.locator('.ts-card.is-root');assert.equal(await card.locator('.ts-title').evaluate(e=>getComputedStyle(e).fontSize),'11px');const id=await card.getAttribute('data-id');await card.click();await f.locator('#treeDetail[open]').waitFor();await f.locator('#openMoment').click();await p.waitForFunction(id=>location.hash.includes('/book')&&window.LT41?.momentId===id,id,{timeout:10000}); 
+ const card=f.locator('.ts-card.is-root');assert.equal(await card.locator('.ts-title').evaluate(e=>getComputedStyle(e).fontSize),'11px');const id=await card.getAttribute('data-id');await card.click();await f.locator('#treeDetail[open]').waitFor();await f.locator('#openMoment').click();await p.waitForFunction(id=>location.hash.includes('/book')&&window.LT41?.momentId===id,id,{timeout:10000});
  }
  }finally{await ctx.close();}
  }results.push({w,theme,n,samples});await writeFile(out+'/results.json',JSON.stringify(results,null,2));
 }}finally{await browser.close();await new Promise(r=>server.close(r));}
-

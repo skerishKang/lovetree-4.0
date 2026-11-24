@@ -47,7 +47,7 @@ function draw() {
   perf.layoutMs = performance.now() - t0;
   drawCards(layout);
   drawWood(layout, style);
-  
+
   setPick(state.pick && layout.cards.some((c) => c.id === state.pick) ? state.pick : null);
   perf.drawMs = performance.now() - t0;
   tell();
