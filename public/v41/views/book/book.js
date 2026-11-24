@@ -7,12 +7,13 @@ const DEMO_VIDEO='data:video/mp4;base64,AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMW1w
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 /* #519: 닫힌 창(opacity 0) 안의 입력칸이 Tab 초점을 받던 문제 — open일 때만 inert를 뺀다.
    책의 닫힌 창(상세·크게 보기·링크·갈림길·목차·이어진 순간)은 처음부터 inert다. */
-// #1291: book panels and deliberate jumps use one browser-history step.
+// #1291: 창과 판 열기, 목록에서 이동은 방문 기록을 한 번만 남긴다.
 let bookHistoryRestoring=false,bookHistoryTransferring=false;
-const bookState=()=>({...(history.state||{}),ltBookPage:current,ltBookMoment:LTDEMO.get()||null,ltBookScrollY:window.scrollY,ltBookInnerScroll:['mobileContent','leftPage','rightPage'].map(id=>document.getElementById(id)?.scrollTop||0)});
+try{history.scrollRestoration='manual'}catch{}
+const bookState=()=>({...(history.state||{}),ltBookPage:current,ltBookMoment:LTDEMO.get()||null,ltBookScrollY:window.scrollY,ltBookInnerScroll:['mobileContent','leftPage','rightPage','detailSide'].map(id=>document.getElementById(id)?.scrollTop||0)});
 function recordBookOpen(id){
- if(bookHistoryRestoring||bookHistoryTransferring)return;
- history.replaceState(bookState(),'',location.href);
+ if(bookHistoryRestoring||bookHistoryTransferring||history.state?.ltBookOverlay===id)return;
+ if(!history.state?.ltBookOverlay)history.replaceState(bookState(),'',location.href);
  history.pushState({...bookState(),ltBookOverlay:id},'',location.href);
 }
 function closeBookHistory(id){
@@ -23,7 +24,7 @@ function completeBookJump(id,page){
  history.replaceState(state,'',location.href);
 }
 const bookDialogs=[]; /* 열린 창 스택 — Esc는 맨 위 창 하나만 닫는다(공통 창 닫기 규칙과 같은 방식). */
-function setBookOpen(el, open){if(!el)return;if(open&&!el.classList.contains('open'))recordBookOpen(el.id);if(!open&&el.classList.contains('open'))closeBookHistory(el.id);el.classList.toggle('open',!!open);const i=bookDialogs.indexOf(el);if(i>=0)bookDialogs.splice(i,1);if(open){el.removeAttribute('inert');bookDialogs.push(el)}else el.setAttribute('inert','')}
+function setBookOpen(el, open){if(!el)return;if(open&&!el.classList.contains('open'))recordBookOpen(el.id);if(!open&&el.classList.contains('open'))closeBookHistory(el.id);el.classList.toggle('open',!!open);if(el.id==='viewer'&&!open)$('#viewerMedia')?.replaceChildren();const i=bookDialogs.indexOf(el);if(i>=0)bookDialogs.splice(i,1);if(open){el.removeAttribute('inert');bookDialogs.push(el)}else el.setAttribute('inert','')}
 const topBookDialog=()=>bookDialogs[bookDialogs.length-1]||null;
 const bookWrap=$('#bookWrap'),book=$('#book'),leftPage=$('#leftPage'),rightPage=$('#rightPage'),mobilePage=$('#mobilePage'),mobileContent=$('#mobileContent');
 let current=0,recent=[],lastMoment=null,selectedMomentId=null,lensOn=true,machineState='IDLE',turn=null,turnAnim=null,focusAfter=null;
@@ -99,7 +100,7 @@ async function beginMobileSpread(){
  try{await screen.orientation?.lock?.('landscape')}catch{}
  spreadOrientationNotice(innerWidth<innerHeight);
 }
-window.addEventListener('popstate',()=>{if(mobileDoubleActive){mobileSpreadHistory=false;finishMobileSpread()}});
+window.addEventListener('popstate',event=>{if(mobileDoubleActive&&!event.state?.ltBookSpread){mobileSpreadHistory=false;finishMobileSpread()}});
 window.addEventListener('popstate',event=>{
  const target=event.state?.ltBookOverlay||null;
  bookHistoryRestoring=true;
@@ -112,16 +113,21 @@ window.addEventListener('popstate',event=>{
    }
   }
   if($('#archivePanel')?.classList.contains('open')&&target!=='archivePanel')closeArchive();
+  if($('#overview')?.classList.contains('open')&&target!=='overview')window.__BOOK_USABILITY__?.closeJourney?.();
+  if(target!=='lightbox'&&document.querySelector('.lt-lightbox'))LTMedia.closeLightbox();
+  if(!['detailSide','viewer','lightbox'].includes(target)&&(document.querySelector('.page-detail')||($('#detailSide')&&!$('#detailSide').hidden)))window.__BOOK_USABILITY__?.closeDetail?.();
   const state=event.state||{};
   if(Number.isInteger(state.ltBookPage)&&state.ltBookMoment&&
      (state.ltBookPage!==current||state.ltBookMoment!==LTDEMO.get())){
    renderSpread(posOfMoment(state.ltBookMoment),state.ltBookMoment,false);
   }
   if(Number.isFinite(state.ltBookScrollY))window.scrollTo(0,state.ltBookScrollY);
-  if(Array.isArray(state.ltBookInnerScroll))['mobileContent','leftPage','rightPage'].forEach((id,i)=>{const el=document.getElementById(id);if(el&&Number.isFinite(state.ltBookInnerScroll[i]))el.scrollTop=state.ltBookInnerScroll[i]});
+  if(Array.isArray(state.ltBookInnerScroll))['mobileContent','leftPage','rightPage','detailSide'].forEach((id,i)=>{const el=document.getElementById(id);if(el&&Number.isFinite(state.ltBookInnerScroll[i])){el.scrollTop=state.ltBookInnerScroll[i];requestAnimationFrame(()=>{if(history.state===event.state)el.scrollTop=state.ltBookInnerScroll[i]})}});
  }finally{bookHistoryRestoring=false}
 });
 
+document.addEventListener('lt-media-lightbox-open',()=>recordBookOpen('lightbox'));
+document.addEventListener('lt-media-lightbox-close',()=>closeBookHistory('lightbox'));
 // #1287: book scrolling temporarily reduces the parent's floating add button.
 let bookScrollIdle;
 document.addEventListener('scroll',()=>{
