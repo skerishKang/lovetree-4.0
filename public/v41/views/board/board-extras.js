@@ -209,6 +209,7 @@ renderCards = function () {
     x.draggable = false;
     x.setAttribute('draggable', 'false');
   });
+  if (typeof updateEmptyHint === 'function') updateEmptyHint();
   if (selected) selectMoment(selected, false);
   applyFilters();
   if (mobileBoardScroll() && viewport.classList.contains('board-scroll')) applyView(false);
@@ -286,6 +287,7 @@ function bindCardV11(el) {
     let m = moments.find(x => x.id === id),
       p = screenToWorld(e.clientX, e.clientY);
     drag = { id, dx: p.x - m.x, dy: p.y - m.y };
+    document.body.classList.add('board-hint-drag');
     down = { x: e.clientX, y: e.clientY };
     moved = false;
     el.classList.add('dragLift');
@@ -331,6 +333,8 @@ function bindCardV11(el) {
     if (drag?.id === id) {
       let m = moments.find(x => x.id === id);
       drag = null;
+      document.body.classList.remove('board-hint-drag');
+      if (typeof updateEmptyHint === 'function') updateEmptyHint();
       el.classList.remove('dragLift');
       el.classList.add('dropSettle');
       setTimeout(() => el.classList.remove('dropSettle'), 420);
@@ -363,6 +367,8 @@ function bindCardV11(el) {
   el.addEventListener('pointercancel', e => {
     if (drag?.id !== id) return;
     drag = null;
+    document.body.classList.remove('board-hint-drag');
+    if (typeof updateEmptyHint === 'function') updateEmptyHint();
     el.classList.remove('dragLift', 'dropSettle');
     el.releasePointerCapture?.(e.pointerId);
     clearInsertMark();

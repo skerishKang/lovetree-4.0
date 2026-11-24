@@ -240,9 +240,10 @@ test('4-2. 가로 YouTube 표지는 넓게 그리고 세로 표지는 흐린 배
     await h.search();
     const [wideCard, tallCard] = h.get('community-list').children;
     const wideCover = wideCard.children[0], tallCover = tallCard.children[0];
-    assert.equal(wideCover.dataset.mediaKind, 'video-youtube');
+    // #1322: 흐린 배경+가운데 그림은 세로 영상 한 겹만 — 가로는 표지 한 장을 꽉 채운다.
+    assert.equal(wideCover.dataset.mediaKind, 'video-landscape');
     assert.equal(tallCover.dataset.mediaKind, 'video-vertical');
-    assert.equal(wideCover.children[0].children.some(node => node.className === 'community-cover-backdrop'), true);
+    assert.equal(wideCover.children[0].children.some(node => node.className === 'community-cover-backdrop'), false);
     assert.equal(tallCover.children[0].children.some(node => node.className === 'community-cover-backdrop'), true);
   } finally { h.restore(); }
 });
