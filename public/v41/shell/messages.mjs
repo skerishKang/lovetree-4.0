@@ -133,9 +133,10 @@ export function createMessages(deps) {
       if (data.view === 'track32-bookshelf.html' && !getMember()?.snapshot().owned) { openLoginStart('shelf'); return; }
       show(data.view);
     }
-    if (data?.type === MSG.select && window.LT41?.tree.moments.some(m => m.id === data.id)) {
-      window.LT41.momentId = data.id; links(); writeLocation();
+    if ((data?.type === MSG.selection || data?.type === MSG.select) && window.LT41?.tree.moments.some(m => m.id === data.id)) {
+      window.LT41.momentId = data.id; links(); writeLocation('push', data.boardState);
     }
+    if (data?.type === MSG.boardDetail) { writeLocation('replace'); return; }
     // #315: 공유 감상(share)은 읽기 전용이다. 안쪽 화면의 버튼 정리를 통과한 쓰기 메시지가 남아도 여기서 막는다(이중).
     if (data?.type === MSG.newTree) { if (getSource() !== 'share') openNewTree(); return; }
     if (data?.type === MSG.write && getSource() === 'share') return;
@@ -236,7 +237,7 @@ export function createMessages(deps) {
     if (data?.type === MSG.example && exampleTree?.moments?.some(m => m.id === data.momentId) && ['track59-sketchbook.html', 'track58-pinboard.html'].includes(data.view)) {
       sample({treeId: exampleTree.id, momentId: data.momentId}, data.view);
     }
-    if (data?.type === MSG.selection || data?.type === MSG.choose) { links(); writeLocation(); }
+    if (data?.type === MSG.choose) { links(); writeLocation(); }
   });
 
   function sharePayload() {

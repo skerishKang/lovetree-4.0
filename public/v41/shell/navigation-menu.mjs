@@ -31,6 +31,7 @@ export function createNavigationMenu(ctx){
    // 방문자에게는 서재가 없으므로 접기 메뉴에서도 숨긴다.
    if(ctx.source!=='share')add('서재',()=>(0,ctx.show)('track32-bookshelf.html',true,'',true),ctx.current==='track32-bookshelf.html');
    // 2026-11-17 대표 결정: 트리 0개여도 네 화면이 모두 열리므로 접기 메뉴에서도 책·보드·지도를 늘 둔다.
+   add('트리',()=>(0,ctx.show)('track61-tree.html',true,'',true),ctx.current==='track61-tree.html');
    add('책',()=>(0,ctx.show)('track59-sketchbook.html',true,'',true),ctx.current==='track59-sketchbook.html');
    add('보드',()=>(0,ctx.show)('track58-pinboard.html',true,'',true),ctx.current==='track58-pinboard.html');
    add('지도',()=>(0,ctx.show)('track56-network.html',true,'',true),ctx.current==='track56-network.html');

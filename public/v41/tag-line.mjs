@@ -20,7 +20,8 @@ const MANUAL_TOGGLE = '직접 붙이기';
 function chipHTML(tag) {
   const cls = tag.state === 'confirmed' ? 'is-confirmed' : 'is-proposal';
   const title = tag.state === 'confirmed' ? '누르면 꼬리표를 뗀다' : '누르면 꼬리표를 붙인다';
-  return `<button type="button" class="lt-tag-chip ${cls}" data-tag-raw="${esc(tag.raw || tag.value)}" title="${title}">${esc(chipText(tag))}</button>`;
+  // #1288: 올림에서만 뜨는 설명은 접근 이름으로 옮긴다(칩 글자는 이미 화면에 보인다).
+  return `<button type="button" class="lt-tag-chip ${cls}" data-tag-raw="${esc(tag.raw || tag.value)}" aria-label="${esc(chipText(tag))} · ${title}">${esc(chipText(tag))}</button>`;
 }
 
 // 꼬리표 줄 하나를 host에 그린다. update(moment)로 같은 자리에 다시 그리고, destroy로 지운다.

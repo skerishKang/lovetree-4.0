@@ -153,6 +153,9 @@ html[data-v41-screen=shelf] .hero.strip-mode .hero-copy { display: none; }
   box-shadow: inset 0 0 0 1px rgba(255,255,255,.16);
 }
 .resume-thumb img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+/* #1273 8번: 표지 그림이 없을 때 빈 칸 대신 이름 첫 글자를 쓴다(기존 색 토큰만 쓴다). */
+.resume-thumb-mark { position: absolute; inset: 0; display: grid; place-items: center; color: var(--lt-pearl); font-size: 22px; font-weight: 700; }
+html[data-v41-screen=shelf][data-lt-theme=garden] .resume-thumb-mark { color: var(--lt-ink); }
 .resume-line { display: flex; align-items: baseline; gap: 8px; flex: 1 1 auto; min-width: 0; }
 .resume-line strong {
   max-width: 42%;

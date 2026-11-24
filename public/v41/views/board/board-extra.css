@@ -365,6 +365,8 @@ html[data-lt-theme=garden] .ytLinkRow a{color:var(--lt-link,#3b5bdb)}
    display:none 대신 opacity를 쓰는 건 숨은 동안에도 탭 이동이 닿아야 하기 때문이다. */
 .card .cardOrder{position:absolute;left:10px;right:10px;bottom:10px;display:flex;gap:6px;justify-content:flex-end;z-index:3;opacity:0;pointer-events:none}
 .card:hover .cardOrder,.card:focus-within .cardOrder{opacity:1;pointer-events:auto}
+/* #1288: 마우스가 없는 기기에서는 올림을 기다리지 않고 순서 단추를 늘 보인다. */
+@media (hover: none){.card .cardOrder{opacity:1;pointer-events:auto}}
 .card .orderBtn{appearance:none;border:1px solid rgba(90,65,103,.35);background:rgba(16,10,25,.72);color:#f7edf8;font-size:11px;line-height:1;padding:7px 10px;border-radius:7px;cursor:pointer;backdrop-filter:blur(8px)}
 .card .orderBtn:hover,.card .orderBtn:focus-visible{background:rgba(16,10,25,.92)}
 

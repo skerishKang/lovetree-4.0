@@ -1,0 +1,117 @@
+
+:root{
+  --ts-bar-h:56px;
+  --ts-page:radial-gradient(120% 90% at 50% 100%,var(--lt-stage-2) 0%,var(--lt-stage) 70%);
+  --ts-card-bg:var(--lt-stage-2);--ts-card-ink:var(--lt-pearl);--ts-card-line:var(--lt-gold-line);
+  --ts-card-shadow:0 14px 30px var(--lt-line);
+  --ts-note-bg:var(--lt-paper);--ts-note-ink:var(--lt-ink);
+  --ts-limb:var(--lt-gold-deep);
+  --ts-wood:color-mix(in srgb,var(--lt-gold-deep) 56%,var(--lt-stage-2));
+  --ts-grain:color-mix(in srgb,var(--lt-gold) 46%,transparent);
+  --ts-leaf:color-mix(in srgb,var(--lt-group-5) 78%,var(--lt-stage-2));
+  --ts-soil:color-mix(in srgb,var(--lt-gold-deep) 30%,transparent);
+  --ts-path:var(--lt-gold);
+  --ts-bundle:var(--lt-rose);
+  --ts-btn:var(--lt-glass);--ts-btn-on:var(--lt-primary);--ts-btn-on-ink:var(--lt-primary-ink);
+}
+html[data-lt-theme=garden]{
+  --ts-page:radial-gradient(120% 90% at 50% 100%,var(--lt-stage-2) 0%,var(--lt-stage) 72%);
+  --ts-card-bg:var(--lt-paper);--ts-card-ink:var(--lt-ink);
+  --ts-card-shadow:var(--lt-garden-shadow);
+  --ts-note-bg:var(--lt-garden-edge);--ts-note-ink:var(--lt-ink);
+  --ts-limb:var(--lt-gold-ink);
+  --ts-wood:color-mix(in srgb,var(--lt-gold-ink) 70%,var(--lt-ink));
+  --ts-grain:color-mix(in srgb,var(--lt-paper) 34%,transparent);
+  --ts-leaf:color-mix(in srgb,var(--lt-group-5) 86%,var(--lt-paper));
+  --ts-soil:color-mix(in srgb,var(--lt-gold-ink) 26%,transparent);
+  --ts-path:var(--lt-rose);
+  --ts-bundle:var(--lt-rose-ink);
+  --ts-btn:var(--lt-glass);
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--lt-stage);color:var(--lt-pearl);font-family:var(--lt-ui);overflow:hidden;-webkit-text-size-adjust:100%}
+
+/* 무대 */
+.ts-stage{position:absolute;inset:var(--lt-toolbar-height) 0 var(--ts-footer-h) 0;overflow:hidden;background:var(--ts-page);touch-action:none;cursor:grab;outline:0}
+.ts-stage[data-dragging=true]{cursor:grabbing}
+.ts-world{position:absolute;left:0;top:0;width:0;height:0;transform-origin:0 0}
+.ts-stage[data-dragging=true] .ts-world{will-change:transform}
+.ts-stage[data-glide=true] .ts-world{transition:transform .28s cubic-bezier(.2,.7,.2,1)}
+.ts-wood{position:absolute;left:0;top:0;width:1px;height:1px;overflow:visible;pointer-events:none}
+.ts-limb{fill:var(--ts-wood)}
+.ts-limb.is-bundle{fill:color-mix(in srgb,var(--ts-bundle) 62%,var(--ts-limb))}
+.ts-limb.is-bundle{fill:color-mix(in srgb,var(--ts-bundle) 46%,var(--ts-wood))}
+.ts-grain{fill:none;stroke:var(--ts-grain);stroke-linecap:round}
+.ts-leaf{fill:var(--ts-leaf)}
+.ts-soil{fill:none;stroke:var(--ts-soil);stroke-linecap:round}
+.ts-root{fill:none;stroke:var(--ts-wood);stroke-linecap:round}
+.ts-lit{fill:var(--ts-path)}
+.ts-stump{fill:var(--ts-wood)}
+.ts-stage.has-pick .ts-limb{opacity:.38}
+
+/* 카드: 첫 화면 금테 카드처럼 바깥 테 + 안쪽 테 두 줄 */
+.ts-cards{position:absolute;left:0;top:0}
+.ts-card,.ts-chip{position:absolute;left:var(--x);top:var(--y);width:var(--w);height:var(--h);margin:0;padding:0;font-family:var(--lt-ui);cursor:pointer;user-select:none;-webkit-user-select:none}
+.ts-card{display:flex;flex-direction:column;overflow:hidden;contain:strict;text-align:left;border:1px solid var(--ts-card-line);border-radius:var(--lt-r-card);
+  background:var(--ts-card-bg);color:var(--ts-card-ink);box-shadow:var(--ts-card-shadow)}
+.ts-card::after{content:'';position:absolute;inset:2px;border:1px solid var(--ts-card-line);border-radius:calc(var(--lt-r-card) - 2px);pointer-events:none;opacity:.7}
+.ts-card:hover{border-color:var(--lt-gold-deep)}
+.ts-thumb{position:relative;display:block;flex:0 0 var(--thumb);height:var(--thumb);background:var(--lt-stage-2);overflow:hidden}
+.ts-thumb img{display:block;width:100%;height:100%;object-fit:cover;pointer-events:none}
+.ts-cap{display:flex;flex-direction:column;justify-content:center;gap:1px;flex:1 1 auto;min-height:0;padding:0 8px}
+.ts-meta{display:flex;align-items:center;gap:5px;font-size:12px;line-height:1.25;color:var(--lt-muted);white-space:nowrap;overflow:hidden}
+.ts-emo{flex:0 0 7px;width:7px;height:7px;border-radius:50%;background:var(--emo,var(--lt-rose))}
+.ts-title{font-size:13px;line-height:1.3;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* 썸네일이 없는 순간 = 글 카드(종이) */
+.ts-card.is-note{background:var(--ts-note-bg);color:var(--ts-note-ink)}
+.ts-card.is-note .ts-cap{padding:0 10px}
+.ts-card.is-note .ts-title{white-space:normal;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2}
+.ts-card.is-note .ts-meta{color:color-mix(in srgb,var(--ts-note-ink) 72%,transparent)}
+/* #777 확정 시안: 사진 면적을 넓히고 제목만 한 줄로 작게 남긴다. */
+.ts-stage .ts-card .ts-cap{flex:0 0 20px;min-height:20px;padding:0 7px;justify-content:center}
+.ts-card .ts-meta{display:none}
+.ts-stage .ts-card .ts-title{display:block;font-size:11px;line-height:1.25;font-weight:400;color:var(--lt-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ts-stage .ts-card .ts-thumb{flex:1 1 auto;height:auto;min-height:0}
+.ts-stage .ts-card.is-note .ts-cap{flex:1 1 auto}
+.ts-stage .ts-card.is-note .ts-title{color:var(--ts-note-ink)}
+
+/* 뿌리(첫 순간) */
+.ts-card.is-root{border-color:var(--lt-gold-deep);box-shadow:0 0 0 1px var(--lt-gold-line),0 0 34px var(--lt-gold-glow),var(--ts-card-shadow)}
+.ts-first{position:absolute;left:8px;top:8px;padding:2px 8px;border-radius:var(--lt-r-pill);background:var(--lt-glass-strong);border:1px solid var(--lt-gold-line);
+  color:var(--lt-gold);font-size:12px;line-height:1.4}
+/* 묶음 가지('+24개')와 접기 단추 */
+.ts-chip{display:flex;align-items:center;justify-content:center;border:1px dashed var(--ts-bundle);border-radius:var(--lt-r-pill);
+  background:color-mix(in srgb,var(--ts-bundle) 16%,var(--ts-card-bg));color:var(--ts-bundle);font-size:13px;font-weight:700;line-height:1}
+.ts-chip:hover{background:color-mix(in srgb,var(--ts-bundle) 28%,var(--ts-card-bg))}
+.ts-chip.is-fold{border-style:solid;font-weight:600}
+/* 고른 순간: 뿌리부터 그 순간까지 이어진 길만 또렷하게 */
+.ts-stage.has-pick .ts-card,.ts-stage.has-pick .ts-chip{opacity:.42}
+.ts-stage.has-pick .ts-card.on-path{opacity:1}
+.ts-card.is-pick{border-color:var(--ts-path);box-shadow:0 0 0 2px var(--ts-path),0 0 30px var(--lt-gold-glow),var(--ts-card-shadow)}
+/* 작게 보일 때(전체 보기): 글자는 읽을 수 없으니 사진만 남긴다 */
+.ts-stage[data-lod=far] .ts-card:not(.is-note) .ts-cap,.ts-stage[data-lod=far] .ts-first{display:none}
+
+.ts-stage[data-lod=far] .ts-card:not(.is-note) .ts-thumb{flex:0 0 100%;height:100%}
+.ts-stage[data-lod=far] .ts-card{box-shadow:none}
+/* 묶음 단추는 누르는 곳이라 작게 보일 때도 숫자가 읽히게 글자를 키운다 */
+.ts-stage[data-lod=far] .ts-chip{font-size:20px}
+.ts-stage[data-lod=far] .ts-card.is-root{box-shadow:0 0 0 2px var(--lt-gold-deep),0 0 40px var(--lt-gold-glow)}
+
+
+html[data-v41-screen=tree]{--lt-toolbar-top:0px;--ts-footer-h:48px}
+.ts-footer{position:absolute;inset:auto 0 0;height:var(--ts-footer-h);display:flex;align-items:center;padding:0 16px;border-top:1px solid var(--lt-line);background:var(--lt-glass);color:var(--lt-pearl)}
+.ts-note{margin:0;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:13px}
+.ts-note span{color:var(--lt-muted);margin-left:8px}
+.ts-empty{position:absolute;inset:0;display:grid;place-items:center;color:var(--lt-muted)}
+.ts-empty[hidden]{display:none}
+.ts-card:focus-visible,.ts-chip:focus-visible{outline:2px solid var(--lt-gold);outline-offset:2px}
+.ts-detail{max-width:min(420px,calc(100% - 32px));max-height:80%;overflow:auto;padding:20px;border:1px solid var(--lt-line);border-radius:var(--lt-r-card);background:var(--lt-stage-2);color:var(--lt-pearl)}
+.ts-detail::backdrop{background:var(--lt-glass)}
+.ts-detail h2{margin:0 0 12px;font-size:18px;overflow-wrap:anywhere}
+.ts-detail p{white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px}
+.ts-detail img{display:block;width:100%;max-height:240px;object-fit:contain}
+.ts-detail-actions{display:flex;justify-content:flex-end;gap:8px}
+.ts-detail-actions button{min-height:44px;padding:0 14px;border:1px solid var(--lt-line);border-radius:var(--lt-r-pill);background:var(--lt-glass-strong);color:var(--lt-pearl);font:inherit}
+@media(max-width:600px){.ts-footer{padding-inline:10px}.ts-note{font-size:12px}}
+@media(prefers-reduced-motion:reduce){.ts-stage[data-glide=true] .ts-world{transition:none}}

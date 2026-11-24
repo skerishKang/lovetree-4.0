@@ -59,7 +59,7 @@ function renderTreeMenu(){
   if(active&&!active.hidden)scrollTreeItemIntoView(active);
  });
   // 트리를 누르면 그 트리로 이동한다: 책·보드·지도를 보던 중이면 같은 보기로, 그 외(첫 화면·내 트리·둘러보기)에는 그 트리의 책으로. 주소도 따라오게 남긴다.
-  const TREE_VIEWS=new Set(['track32-bookshelf.html','track59-sketchbook.html','track58-pinboard.html','track56-network.html']);
+  const TREE_VIEWS=new Set(['track32-bookshelf.html','track61-tree.html','track59-sketchbook.html','track58-pinboard.html','track56-network.html']);
   treePopover.querySelectorAll('[data-tree-id]').forEach(b=>b.onclick=()=>{
    const id=b.dataset.treeId;closeTreeMenu();if(!id)return;
    // 서재는 프레임을 다시 띄우지 않고 가운데 책만 고른 트리로 옮긴다(2026-11-18 13:49 결정).
