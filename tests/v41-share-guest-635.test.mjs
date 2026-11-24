@@ -1008,6 +1008,7 @@ test('#1259 방문자 책 첫 안내가 제목과 크게 보기 영상 조작부
      assert.ok(target.w>=44&&target.h>=44&&target.hit,key+' 페이지 이동 단추 실제 클릭 영역: '+JSON.stringify(target));
     }
     await shot(p,'1259-'+key+'-book');
+    const linksBefore=await p.evaluate(()=>{const l=document.querySelector('.home-links');return !!l&&l.checkVisibility({checkOpacity:true,checkVisibilityCSS:true})});
     await f.locator('[data-yt-expand]:visible').first().click({timeout:3000});
     await f.locator('.lt-lightbox-media').waitFor({state:'visible'});
     await p.waitForFunction(()=>document.body.classList.contains('lt-book-lightbox-open'),null,{timeout:2000});
@@ -1016,9 +1017,11 @@ test('#1259 방문자 책 첫 안내가 제목과 크게 보기 영상 조작부
     assert.equal(video.hidden,false,key+' 안내 시간 안에 크게 보기 검사');
     assert.equal(video.notice,null,key+' 크게 보기 중 첫 안내 숨김');
     assert.equal(video.mediaOverlap,0,key+' 재생 조작부를 포함한 영상 영역 교차 면적 0');
+    assert.equal(await p.evaluate(()=>{const l=document.querySelector('.home-links');return !!l&&l.checkVisibility({checkOpacity:true,checkVisibilityCSS:true})}),false,key+' 크게 보기 중 아래 링크(새 소식·의견 보내기…) 숨김');
     await shot(p,'1259-'+key+'-vertical');
     await f.locator('.lt-lightbox-close').click();
     await p.waitForFunction(()=>!document.body.classList.contains('lt-book-lightbox-open'),null,{timeout:2000});
+    assert.equal(await p.evaluate(()=>{const l=document.querySelector('.home-links');return !!l&&l.checkVisibility({checkOpacity:true,checkVisibilityCSS:true})}),linksBefore,key+' 크게 보기를 닫으면 아래 링크가 열기 전 상태로 돌아온다');
     console.log('#1259',key,'제목 교차 0, 영상 교차 0');
    }finally{await context.close()}
   }
