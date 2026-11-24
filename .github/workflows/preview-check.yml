@@ -408,6 +408,8 @@ jobs:
           npx playwright install --with-deps chromium
           npm run build
       - name: 첫 화면 휴대폰 12조합 회귀 시험
+        env:
+          LT_1284_REQUIRE: '1'
         run: node --test --test-concurrency=1 tests/v41-1284-home.test.mjs
 
   screen-book:
