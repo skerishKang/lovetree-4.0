@@ -600,3 +600,102 @@ test('#1098 회색 썸네일이면 제목 카드로 바뀐다', { skip: REQUIRE 
     } finally { await h.ctx.close(); await new Promise(r => h.server.close(r)); }
   } finally { await browser.close(); }
 });
+
+import {expectNoHistoryGrowth} from './helpers/history-assert.mjs';
+
+test('#1294 둘러보기 트리·순간 탭과 미리보기·그룹 찾기 뒤로 가기', {skip:REQUIRE?false:skip,timeout:240000},async()=>{
+ if(skip)assert.fail(skip);
+ const browser=await chromium.launch({headless:true});
+ try{
+ for(const [width,height] of [[390,844],[1440,900]]){
+  const h=await bootExploreTab(browser,{width,height,theme:'night'});
+  try{
+   await openExploreTab(h.page,width);
+   const page=h.page;
+   await page.waitForSelector('#community-list .community-card');
+   const back=async()=>{await page.goBack();await page.waitForTimeout(110);};
+   const navState=()=>page.evaluate(()=>({hash:location.hash,trees:!document.getElementById('community-tree-panel').hidden,moments:!document.getElementById('community-moments-panel').hidden}));
+   const home=await navState();assert.equal(home.hash,'#explore');
+   await expectNoHistoryGrowth(page,async()=>page.locator('#community-sort').selectOption({index:1}),width+' 정렬');
+   await page.route('**/api/public/moments**',route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({items:items.slice(0,6),total:6,groups:GROUPS})}));
+   await page.locator('#community-tab-moments').click();
+   await page.waitForFunction(()=>!!document.querySelector('.moments-stage')?.dataset.ltMomentsId);
+   assert.equal((await navState()).hash,'#explore/moments');
+   await page.locator('#community-moments-panel .moments-rail-button').nth(2).click();
+   await page.locator('.moments-add-dialog:not([hidden])').waitFor();
+   await back();
+   assert.equal(await page.locator('.moments-add-dialog').evaluate(el=>el.hidden),true,width+' 담기 창 한 번 뒤로 가기');
+   assert.equal((await navState()).hash,'#explore/moments',width+' 담기 창 화면 유지');
+   await back();assert.deepEqual(await navState(),home,width+' 순간 → 트리 복원');
+   await page.locator('#community-tab-moments').click();
+   await page.locator('#community-tab-trees').click();
+   await back();
+   assert.equal((await navState()).hash,'#explore/moments',width+' 트리 → 순간 복원');
+   await back();assert.deepEqual(await navState(),home,width+' 이전 트리 복원');
+   await page.locator('#community-list .community-card').first().click();
+   assert.equal(await page.locator('#community-preview').evaluate(el=>el.open),true,width+' 미리보기 열기');
+   await back();
+   assert.equal(await page.locator('#community-preview').evaluate(el=>el.open),false,width+' 미리보기 복귀');
+   assert.deepEqual(await navState(),home,width+' 미리보기 후 화면');
+   await page.locator('button.community-group-find').click();
+   assert.equal(await page.locator('#community-group-find').evaluate(el=>el.open),true,width+' 그룹 찾기 열기');
+   await back();
+   assert.equal(await page.locator('#community-group-find').evaluate(el=>el.open),false,width+' 그룹 찾기 복귀');
+   assert.deepEqual(await navState(),home,width+' 그룹 찾기 후 화면');
+   // 감상 화면 이동은 별도 URL이며 뒤로 가기 한 번에 둘러보기 미리보기를 복원한다.
+   await page.locator('#community-list .community-card').first().click();
+   await page.locator('.community-preview-open').click();
+   await page.waitForFunction(()=>location.hash.startsWith('#share/'),null,{timeout:15000});
+   await back();
+   assert.equal((await navState()).hash,'#explore',width+' 공유 감상에서 뒤로 가기 주소');
+   assert.equal(await page.locator('#community-panel').evaluate(el=>el.open),true,width+' 공유 감상에서 둘러보기 복귀');
+   await page.waitForFunction(()=>document.getElementById('community-preview')?.open===true,null,{timeout:5000});
+   assert.equal(await page.locator('#community-preview').evaluate(el=>el.open),true,width+' 공유 감상에서 미리보기 상태 복원');
+
+   console.log('#1294 TREES',width,'OK');
+  }finally{await h.ctx.close();await new Promise(ok=>h.server.close(ok));}
+ }
+ }finally{await browser.close();}
+});
+
+test('#1294 순간 밀기 기록 누적 없음·댓글 뒤로 가기·탭 복원', {skip:REQUIRE?false:skip,timeout:240000},async()=>{
+ if(skip)assert.fail(skip);
+ const browser=await chromium.launch({headless:true});
+ try{
+ for(const [width,height] of [[390,844],[1440,900]]){
+  const h=await boot(browser,{width,height,theme:'night'});
+  try{
+   const page=h.page,stage=page.locator('#community-moments-panel .moments-stage');
+   const start=await page.evaluate(()=>history.length);
+   const startId=await stage.getAttribute('data-lt-moments-id');
+   for(let i=0;i<5;i++){
+    if(width===390)await stage.evaluate(el=>{
+     const t=y=>new Touch({identifier:1,target:el,clientX:180,clientY:y});
+     el.dispatchEvent(new TouchEvent('touchstart',{bubbles:true,touches:[t(620)],changedTouches:[t(620)]}));
+     el.dispatchEvent(new TouchEvent('touchend',{bubbles:true,touches:[],changedTouches:[t(320)]}));
+    });
+    else await page.locator('.moments-step').nth(1).click();
+   }
+   assert.notEqual(await stage.getAttribute('data-lt-moments-id'),startId,width+' 다음 순간 이동');
+   assert.equal(await page.evaluate(()=>history.length),start,width+' 5번 넘김 후 기록 증가 0');
+   await page.locator('.moments-rail-button').nth(1).click();
+   await page.locator('.moments-comments-dialog:not([hidden])').waitFor();
+   await page.goBack();await page.waitForTimeout(120);
+   assert.equal(await page.locator('.moments-comments-dialog').evaluate(el=>el.hidden),true,width+' 댓글 뒤로 가기');
+   assert.equal(await page.evaluate(()=>location.hash),'#explore/moments',width+' 댓글 뒤로 가기 주소 유지');
+   const selected=await stage.getAttribute('data-lt-moments-id');
+   await page.locator('#community-tab-trees').click();
+   await page.goBack();await page.waitForTimeout(130);
+   assert.equal(await page.evaluate(()=>location.hash),'#explore/moments',width+' 탭 돌아오기');
+   assert.equal(await stage.getAttribute('data-lt-moments-id'),selected,width+' 순간 위치 복원');
+   // 분류·화면 설명·소리·공감은 같은 순간 안의 옵션이므로 기록이 늘지 않는다.
+   await expectNoHistoryGrowth(page,async()=>page.locator('.moments-chip').last().click(),width+' 가수 필터');
+   if(width===390){
+    await expectNoHistoryGrowth(page,async()=>page.locator('.moments-note').click(),width+' 설명 펼치기');
+    await expectNoHistoryGrowth(page,async()=>page.locator('.moments-mute').click(),width+' 소리 전환');
+   }
+   console.log('#1294 MOMENTS',width,'OK');
+  }finally{await h.ctx.close();await new Promise(ok=>h.server.close(ok));}
+ }
+ }finally{await browser.close();}
+});

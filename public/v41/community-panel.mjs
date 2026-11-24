@@ -12,12 +12,12 @@ import {localDateOnly} from './local-date.mjs';
 import {POPULAR_STAGE_TITLE,POPULAR_STAGE_EMPTY,POPULAR_STAGE_WEEK_LABEL,publicStageCount,stageVoteLabel,stageVoteNotice,stageMomentTitle,readStage,toggleStage} from './community-stages.mjs';
 // #1025: [순간] 탭 — 공개 세로 순간 숏츠 보기(서버 조회·세로 판정은 기존 한 벌 재사용).
 import {mountMoments} from './community-moments.mjs';
+import {createExploreLayers} from './community-history.mjs';
 // #1098 2단계: 판의 순간 목록 — 순간 카드에 그 순간의 ♡·댓글 수, ♡ 누르기·댓글 쓰기는 순간 단위 API(서버 #1136).
 import {mountMomentList} from './community-moment-list.mjs';
 const el=(tag,className,text)=>{const node=document.createElement(tag);if(className)node.className=className;if(text!=null)node.textContent=text;return node;};
 // 셸이 낯선 주소를 #home으로 바꾸기 전에(module import 시점) 직접 들어온 주소를 기억한다(#1025).
 const hashNow=()=>typeof location!=='undefined'?(location.hash||''):'';
-const ENTER_MOMENTS=typeof location!=='undefined'&&location.hash==='#explore/moments';
 export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareOwn,hasOwnTree,getDateStyle,getArtistGroups=()=>[],onAddToTree,notify,memberLogin}){
  const api=createCommunityApi(),form=dialog.querySelector('#community-search-form'),query=dialog.querySelector('#community-query'),list=dialog.querySelector('#community-list'),groups=dialog.querySelector('#community-groups'),feedback=dialog.querySelector('#community-feedback'),more=dialog.querySelector('#community-more'),preview=dialog.querySelector('#community-preview'),sortSelect=dialog.querySelector('#community-sort');
  // #1025: [트리] [순간] 탭 — 주소 #explore/moments 는 새로고침·공유로 유지한다.
@@ -29,7 +29,8 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
  // '2026. 11. 15'(UTC 날짜 절단)로 나왔다. 예전 String(createdAt).slice(0,10) 절단 대신
  // localDateOnly(#547 한 벌)로 기기 지역 날짜를 만들어 formatDisplayDate에 넘긴다.
  const when=value=>formatDisplayDate(localDateOnly(value),dateStyle());
- const moments=momentsPanel?mountMoments({panel:momentsPanel,onOpenShare,onAddToTree,notify,memberLogin,api,when}):null;
+ const historyLayers=createExploreLayers();
+ const moments=momentsPanel?mountMoments({panel:momentsPanel,onOpenShare,onAddToTree,notify,memberLogin,api,when,historyLayers}):null;
  let currentTab='trees',hashGuard=false;
  const writeHash=value=>{
   if(typeof history==='undefined'||typeof history.pushState!=='function'||typeof history.replaceState!=='function')return;
@@ -270,7 +271,7 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
  function renderPreview(item){
   if(!item){preview.replaceChildren();return;}
   const head=el('div','community-preview-head'),eyebrow=el('p','community-preview-kicker','공개 순간 미리보기'),close=el('button','community-preview-close','×');
-  close.type='button';close.setAttribute('aria-label','미리보기 닫기');close.onclick=()=>preview.close();head.append(eyebrow,close);
+  close.type='button';close.setAttribute('aria-label','미리보기 닫기');close.onclick=()=>historyLayers.dismiss('tree-preview');head.append(eyebrow,close);
   const body=el('div','community-preview-body'),title=el('h3','',displayTreeTitle(item.title));title.id='community-preview-title';
   const subject=el('p','community-preview-subject',item.subject||''),moment=el('p','community-preview-moment-title',item.cover?.title||'공개된 순간');
   const summary=item.summary?el('p','community-preview-summary',item.summary):null;
@@ -283,8 +284,14 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
   // #792 ⑤: 담기 단추 자리. 무대가 확인되기 전에는 비어 있고(자리도 차지하지 않는다), 확인되면 그 자리에서 열린다.
   const stageBox=el('div','community-stage-box');stageBox.hidden=true;
   actions.append(favWrap,statButton(item,'reaction','공감',voteNote),stageBox);
-  const open=el('button','community-preview-open','대표 순간부터 감상');open.type='button';open.onclick=()=>onOpenShare(item);
-  const start=el('button','community-preview-start','내 기록 새로 시작');start.type='button';start.onclick=()=>onStartRecord(item.subject);
+  const open=el('button','community-preview-open','대표 순간부터 감상');open.type='button';open.onclick=()=>{
+    historyLayers.suspend('tree-preview',()=>{if(!dialog.open)openPanel();selectedId=item.shareId;renderPreview(item);if(!preview.open)preview.showModal();});
+    onOpenShare(item);
+   };
+  const start=el('button','community-preview-start','내 기록 새로 시작');start.type='button';start.onclick=()=>{
+    historyLayers.suspend('tree-preview',()=>{if(!dialog.open)openPanel();selectedId=item.shareId;renderPreview(item);if(!preview.open)preview.showModal();});
+    onStartRecord(item.subject);
+   };
   const status=el('p','community-preview-message','');status.dataset.communityPreviewMessage='';status.setAttribute('role','status');
   const choices=el('div','community-preview-choices');choices.append(open,start);
   // #1098 1단계: 댓글을 판 아래 바로 — 최근 3개 + '댓글 모두 보기'(⋯ 메뉴에는 신고·차단만 남는다).
@@ -302,7 +309,7 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
   if(item.cover?.momentId)mountStageVote(item,stageBox);
   comments(item,{host:commentHost,heading:commentHeading,meta});
  }
- function openPreview(item){selectedId=item.shareId;renderPreview(item);if(!preview.open)preview.showModal();}
+ function openPreview(item){selectedId=item.shareId;renderPreview(item);if(!preview.open){preview.showModal();historyLayers.open('tree-preview',()=>preview.close());}}
  function card(item){
   const titleText=displayTreeTitle(item.title),momentText=item.cover?.title||'공개된 순간';
   const weekly=weeklyNote(item),metaText=`${item.cover?.emotion||item.emotions?.[0]||'공개'} · ${when(item.createdAt)} · ${smallCountLabel('공감',item.stats?.hearts||0)}${weekly?` · ${weekly}`:''}`;
@@ -348,7 +355,7 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
  for(const link of dialog.querySelectorAll('[data-community-view]'))link.onclick=()=>{dialog.close();[...document.querySelectorAll('[data-view]')].find(node=>node.dataset.view===link.dataset.communityView)?.click();};
  const tabs=()=>[...document.querySelectorAll('nav [data-view]')];
   // #1025: 탭을 바꿀 때마다 주소를 갱신한다(새로고침·공유로 같은 보기를 연다).
-  function selectTab(which,{writeHash=true}={}){
+  function selectTab(which,{syncHash=true}={}){
    currentTab=which;
    const momentsOn=which==='moments';
    if(treeTab){treeTab.setAttribute('aria-selected',String(!momentsOn));treeTab.tabIndex=momentsOn?-1:0;}
@@ -356,7 +363,7 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
    if(treePanel)treePanel.hidden=momentsOn;
    if(momentsPanel)momentsPanel.hidden=!momentsOn;
    if(moments)momentsOn?moments.activate():moments.deactivate();
-   if(writeHash&&hashNow()!==(momentsOn?'#explore/moments':'#explore'))writeHash(momentsOn?'#explore/moments':'#explore');
+   if(syncHash&&hashNow()!==(momentsOn?'#explore/moments':'#explore'))writeHash(momentsOn?'#explore/moments':'#explore');
   }
   treeTab?.addEventListener('click',()=>selectTab('trees'));
   momentsTab?.addEventListener('click',()=>selectTab('moments'));
@@ -364,19 +371,19 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
    if(dialog.open)return;
    dialog.showModal();button.setAttribute('aria-current','true');
    for(const t of tabs()){if(t.getAttribute('aria-current')==='true'){t.dataset.wasCurrent='1';t.setAttribute('aria-current','false');}}
-   const wantMoments=ENTER_MOMENTS||hashNow()==='#explore/moments';
-   selectTab(wantMoments?'moments':'trees',{writeHash:false});
+   const wantMoments=hashNow()==='#explore/moments';
+   selectTab(wantMoments?'moments':'trees',{syncHash:false});
    if(!wantMoments){load(false);loadPopularStages();}
   };
   if(typeof window!=='undefined'&&typeof window.addEventListener==='function')window.addEventListener('hashchange',()=>{
    if(hashGuard)return;
-   if(hashNow()==='#explore/moments'){openPanel();selectTab('moments',{writeHash:false});}
+   if(hashNow()==='#explore/moments'||hashNow()==='#explore'){openPanel();selectTab(hashNow()==='#explore/moments'?'moments':'trees',{syncHash:false});}
   });
  dialog.addEventListener('close',()=>{if(preview.open)preview.close();moments?.deactivate();button.setAttribute('aria-current','false');const emptyShown=!document.getElementById('empty')?.hidden;for(const t of tabs()){if(t.dataset.wasCurrent){delete t.dataset.wasCurrent;if(!emptyShown)t.setAttribute('aria-current','true');}}button.focus();
-  if(hashNow()==='#explore/moments'||hashNow()==='#explore')writeHash('');
+  if(!historyLayers.suspended('tree-preview')&&(hashNow()==='#explore/moments'||hashNow()==='#explore'))writeHash('');
  });
- preview.addEventListener('close',()=>[...list.querySelectorAll('.community-card')].find(node=>node.dataset.shareId===selectedId)?.focus());
- preview.addEventListener('click',event=>{if(event.target===preview)preview.close();});
+ preview.addEventListener('close',()=>{if(historyLayers.active('tree-preview'))historyLayers.dismiss('tree-preview');[...list.querySelectorAll('.community-card')].find(node=>node.dataset.shareId===selectedId)?.focus();});
+ preview.addEventListener('click',event=>{if(event.target===preview)historyLayers.dismiss('tree-preview');});
  // #784 자동완성(#784 ②): 검색칸 입력마다 화면에서만 돌린다(네트워크 왕복 없음).
  // 후보를 누르거나 Enter하면 그 그룹을 고른 것으로(칩 맨 앞 + 목록 거름) 동작한다.
  const chooseGroup=name=>{selectedArtist=name;renderGroups();load(false);hideSuggest();};
@@ -440,7 +447,7 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
     const opt=el('button','community-group-find-option',`${g.group}  ·  공개 트리 ${g.count??0}`);
     opt.type='button';opt.setAttribute('role','option');opt.setAttribute('aria-selected','false');
     opt.dataset.groupName=g.group;
-    opt.onclick=()=>{chooseGroup(g.group);findDialog.close();};
+    opt.onclick=()=>{chooseGroup(g.group);historyLayers.dismiss('group-find');};
     findList.append(opt);
    }
   }
@@ -457,16 +464,16 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
   if(event.key==='ArrowDown'){event.preventDefault();findMove(1);}
   if(event.key==='ArrowUp'){event.preventDefault();findMove(-1);}
   if(event.key==='Enter'&&findActive>=0){event.preventDefault();findOptions()[findActive]?.click();}
-  if(event.key==='Escape'){event.preventDefault();findDialog.close();}
+  if(event.key==='Escape'){event.preventDefault();historyLayers.dismiss('group-find');}
  });
  // #784: 미리보기(#community-preview)처럼 찾기 창은 둘러보기 창 안에 둔다 —
  // 바깥에 뜨면 또 다른 modal dialog는 부모 modal을 닫아 버린다(Chromium). 미리보기와 같은 집 안에서 열린다.
  (dialog||document.body)?.appendChild?.(findDialog) ?? (() => { try { document.body?.appendChild?.(findDialog); } catch {} })();
  const findButton=el('button','community-group-find','그룹 찾기');findButton.type='button';
- findButton.onclick=()=>{renderFindList('');findQuery.value='';if(!findDialog.open)findDialog.showModal();findQuery.focus();};
+ findButton.onclick=()=>{renderFindList('');findQuery.value='';if(!findDialog.open){findDialog.showModal();historyLayers.open('group-find',()=>findDialog.close());}findQuery.focus();};
  // Esc 기본 동작(바깥 dialog 닫기 복원)을 막고 직접 닫아, 초점을 그룹 찾기 단추로 돌린다.
- findDialog.addEventListener('close',()=>{findButton.focus();});
- findClose.onclick=()=>findDialog.close();
+ findDialog.addEventListener('close',()=>{if(historyLayers.active('group-find'))historyLayers.dismiss('group-find');findButton.focus();});
+ findClose.onclick=()=>historyLayers.dismiss('group-find');
  const rail=dialog.querySelector('.community-group-rail');
  if(rail&&typeof rail.appendChild==='function')rail.appendChild(findButton);
  // #792 ⑤: 둘러보기 제목 아래·검색칸 위에 '이번 주 인기 무대' 한 줄. 서버가 3표 미만을 빼고 내리므로
