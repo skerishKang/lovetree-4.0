@@ -98,8 +98,19 @@ export function mountScreenToolbar({ screen, titleFrom, tools = [], initialBar =
       if (bookPlay.parentElement !== nav) nav.append(bookPlay);
     }
   };
+  const shelfSearch = screen === 'shelf' ? tools.find(el => el?.matches('.search')) : null;
+  const shelfSearchHome = shelfSearch?.parentElement;
+  const placeShelfSearch = () => {
+    if (!shelfSearch || !shelfSearchHome) return;
+    const narrow = matchMedia('(max-width:600px)').matches;
+    const target = narrow ? shelfSearchHome : group;
+    if (shelfSearch.parentElement === target) return;
+    if (narrow) target.prepend(shelfSearch);
+    else target.insertBefore(shelfSearch, target.querySelector('#shelfNewTree'));
+  };
   for (const tool of tools) if (tool && tool.parentElement !== group) group.append(tool);
   keepBookPhonePlay();
+  placeShelfSearch();
 
   let stashed = [];
   const isPlay = (el) => /^(playAllBtn|cinemaBtn|mapPlayBtn)$/.test(el.id || '');
@@ -122,6 +133,7 @@ export function mountScreenToolbar({ screen, titleFrom, tools = [], initialBar =
     align();
     for (const el of stashed) if (el.parentElement === menu) group.append(el);
     keepBookPhonePlay();
+    placeShelfSearch();
     stashed = [];
     menu.replaceChildren();
     menu.hidden = true;

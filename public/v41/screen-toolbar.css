@@ -156,3 +156,11 @@ html[data-v41-screen] body .lt-continue:is(#playAllBtn,#cinemaBtn,#mapPlayBtn){
 html[data-v41-screen] body .lt-continue:is(#playAllBtn,#cinemaBtn,#mapPlayBtn):is(:hover,:focus-visible){
   background:var(--lt-glass-strong);border-color:var(--lt-pearl);color:var(--lt-pearl);box-shadow:none;
 }
+
+/* #1249: 좁은 서재의 검색은 기존 검색 줄을 사용해 안내 문구 전체를 보여 준다. */
+@media(max-width:600px){
+  html[data-v41-screen=shelf] .shelf-controls{display:flex;flex-direction:row;align-items:center;gap:8px}
+  html[data-v41-screen=shelf] .shelf-controls .search{flex:1 1 auto;min-width:0;max-width:none}
+  html[data-v41-screen=shelf] .shelf-controls .search input{box-sizing:border-box;width:100%;padding-right:16px}
+  html[data-v41-screen=shelf] .shelf-controls .count{flex:0 0 auto;min-height:0;white-space:nowrap}
+}

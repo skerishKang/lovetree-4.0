@@ -363,3 +363,52 @@ test('#1249 이어 보기: 화면·권한·폭별 공통 테두리, 장미색 �
     }
   }finally{await browser.close();await new Promise(r=>server.close(r));}
 });
+
+
+test('#1249 서재 검색칸: 390 안내 글자 전체 표시, 검색 동작, 가로 넘침 0', { skip, timeout: 120000 }, async () => {
+  const makeTree=(id,title)=>({id,title,subject:title,moments:[{id:id+'m1',title:'시험 순간',type:'memo',date:'2026-11-01',note:'가짜 기록',first:true}],edges:[]});
+  const trees=[makeTree('t1','시험용 사과'),makeTree('t2','시험용 바나나')];
+  const host=`<html><body style="margin:0" data-member="in" data-record-source="server"><script>window.LT41=${JSON.stringify({source:'server',writable:true,owned:true,momentId:'t1m1',prefs:{},tree:trees[0],trees})};</script><iframe src="/v41/views/track32-bookshelf.html" style="position:fixed;inset:0;width:100vw;height:100vh;border:0"></iframe></body></html>`;
+  const server=await serve({'/shelf-search-host.html':host}),base='http://127.0.0.1:'+server.address().port;
+  const browser=await chromium.launch({headless:true});
+  try{
+    for(const theme of ['garden','night']){
+      const ctx=await browser.newContext({viewport:{width:390,height:844}});
+      try{
+        await ctx.addInitScript(t=>localStorage.setItem('lt41.theme',t),theme);
+        await ctx.route('**/*',r=>{const u=new URL(r.request().url());if(u.origin!==base)return r.abort();if(u.pathname.startsWith('/api/'))return r.fulfill({status:200,json:{ok:true,items:[]}});return r.continue();});
+        const page=await ctx.newPage();
+        await page.goto(base+'/shelf-search-host.html',{waitUntil:'load',timeout:20000});
+        const frame=page.frames().find(f=>f!==page.mainFrame());
+        await frame.waitForSelector('.lt-screen-toolbar',{timeout:12000});
+        await frame.waitForFunction(()=>document.querySelectorAll('.book-card').length===2);
+        const field=frame.locator('#searchInput');
+        const measure=()=>field.evaluate(el=>{
+          const s=getComputedStyle(el),placeholder=getComputedStyle(el,'::placeholder'),r=el.getBoundingClientRect();
+          const canvas=document.createElement('canvas'),c=canvas.getContext('2d');
+          c.font=[placeholder.fontWeight,placeholder.fontSize,placeholder.fontFamily].join(' ');
+          const available=el.clientWidth-parseFloat(s.paddingLeft)-parseFloat(s.paddingRight);
+          const bar=document.querySelector('.lt-screen-toolbar').getBoundingClientRect();
+          return {width:r.width,available,needed:Math.ceil(c.measureText(el.placeholder).width),below:r.top>=bar.bottom-1,inToolbar:!!el.closest('.lt-screen-toolbar'),overflow:Math.max(0,document.documentElement.scrollWidth-innerWidth),inside:r.left>=0&&r.right<=innerWidth+1,visible:r.width>0&&r.height>0,viewVisible:!!document.getElementById('shelf-view-inline').getClientRects().length,newVisible:!!document.getElementById('shelfNewTree').getClientRects().length};
+        });
+        let m=await measure();console.log(theme,390,JSON.stringify(m));
+        assert.ok(m.available>=m.needed,theme+' 안내 문구 전체 폭');
+        assert.ok(m.below&&!m.inToolbar&&m.inside&&m.visible,theme+' 별도 검색 줄');
+        assert.equal(m.overflow,0,theme+' 가로 넘침 0');
+        assert.ok(m.viewVisible&&m.newVisible,theme+' 기존 단추 유지');
+        await field.fill('바나나');
+        await frame.waitForFunction(()=>document.querySelectorAll('.book-card').length===1);
+        assert.match(await frame.locator('.book-card').innerText(),/바나나/);
+        await field.fill('');
+        await frame.waitForFunction(()=>document.querySelectorAll('.book-card').length===2);
+        await page.setViewportSize({width:1440,height:900});
+        await frame.waitForFunction(()=>!!document.getElementById('searchInput').closest('.lt-toolbar-tools'));
+        m=await measure();assert.ok(m.inToolbar&&m.available>=m.needed&&m.inside,theme+' 넓은 화면 기존 줄 유지');
+        assert.equal(m.overflow,0);
+        await page.setViewportSize({width:390,height:844});
+        await frame.waitForFunction(()=>!!document.getElementById('searchInput').closest('.shelf-controls'));
+        m=await measure();assert.ok(m.below&&m.available>=m.needed&&m.inside,theme+' 다시 좁은 화면');
+      }finally{await ctx.close();}
+    }
+  }finally{await browser.close();await new Promise(r=>server.close(r));}
+});
