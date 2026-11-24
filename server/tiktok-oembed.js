@@ -1,9 +1,11 @@
 import { logServerError } from './error-log.js';
 // 틱톡 oEmbed 프록시 — 영상 표시 정보(제목·작성자·썸네일·크기)를 서버에서 안전하게 가져온다(#791).
 //
-// - 실제 요청은 고정 호스트 `www.tiktok.com/oembed` 하나로만 나간다. 입력에서 온
-//   주소가 목적지가 되지 않는다(SSRF 표면 없음). 클라이언트가 준 숫자 영상 id나
-//   정본/짧은 틱톡 주소만 허용하고, 그 밖은 받지도 않는다.
+// - 실제 요청은 고정 호스트 `www.tiktok.com`의 두 경로(oembed·정본 영상 페이지)로만
+//   나간다. 입력에서 온 주소가 목적지가 되지 않는다(SSRF 표면 없음). 클라이언트가 준
+//   숫자 영상 id나 정본/짧은 틱톡 주소만 허용하고, 그 밖은 받지도 않는다.
+// - 운영 oEmbed는 200을 주면서 thumbnail_url·title·author_name을 담지 않는다(2026-11 실측).
+//   썸네일이 없을 때만 같은 호스트의 영상 페이지를 읽어 페이지 안의 표지 주소를 쓴다.
 // - 짧은 주소(vm·vt.tiktok.com)는 서버에서 한 번 따라가(redirect) 정본 주소의 숫자
 //   id를 뽑는다. 따라간 주소의 호스트는 tiktok.com 계열일 때만 받아들인다.
 // - 틱톡 oEmbed는 없는 id에도 200을 돌려줄 수 있다. 응답 코드로 영상 존재를 단정하지
@@ -19,6 +21,10 @@ export const TIKTOK_VIDEO_ID = /^\d{15,25}$/;
 const TIKTOK_HOSTS = new Set(['www.tiktok.com', 'tiktok.com']);
 const SHORT_HOSTS = new Set(['vm.tiktok.com', 'vt.tiktok.com']);
 const OEMBED_ENDPOINT = 'https://www.tiktok.com/oembed';
+const VIDEO_PAGE_ENDPOINT = 'https://www.tiktok.com/@tiktok/video/';
+const PAGE_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0.0.0 Safari/537.36';
+const MAX_PAGE_BYTES = 2 * 1024 * 1024;
+const REHYDRATION_SCRIPT = /<script id="__UNIVERSAL_DATA_FOR_REHYDRATION__"[^>]*>([\s\S]*?)<\/script>/;
 const THUMBNAIL_HOST = /(?:^|\.)(?:tiktokcdn\.com|tiktok\.com)$/;
 export const DEFAULT_TIMEOUT_MS = 3000;
 export const DEFAULT_TTL_MS = 24 * 60 * 60 * 1000;
@@ -90,6 +96,22 @@ export function exposedMetadata(videoId, data) {
   };
 }
 
+/** 영상 페이지의 정적 데이터에서 요청한 영상과 같은 id의 표지 주소만 꺼낸다. */
+export function thumbnailFromPage(html, videoId) {
+  const matched = REHYDRATION_SCRIPT.exec(String(html || ''));
+  if (!matched) return '';
+  let data;
+  try { data = JSON.parse(matched[1]); } catch { return ''; }
+  const item = data?.__DEFAULT_SCOPE__?.['webapp.video-detail']?.itemInfo?.itemStruct;
+  if (!item || String(item.id) !== String(videoId)) return '';
+  const video = item.video || {};
+  for (const key of ['originCover', 'cover', 'dynamicCover']) {
+    const candidate = safeThumbnail(video[key]);
+    if (candidate) return candidate;
+  }
+  return '';
+}
+
 export function createTiktokOembedClient({ fetchImpl = (...args) => fetch(...args), timeoutMs = DEFAULT_TIMEOUT_MS, ttlMs = DEFAULT_TTL_MS, now = () => Date.now() } = {}) {
   const cache = new Map();
 
@@ -134,6 +156,29 @@ export function createTiktokOembedClient({ fetchImpl = (...args) => fetch(...arg
     throw new ApiError(400, 'tiktok_id', '틱톡 영상 주소나 숫자 영상 id가 필요해요.');
   }
 
+  // oEmbed가 썸네일을 주지 않을 때만 정본 영상 페이지를 읽는다. 실패하면 빈 문자열로
+  // 두고, 링크 저장은 막지 않는다. 페이지 크기에는 상한을 둔다.
+  async function pageThumbnail(videoId) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), Math.max(1, timeoutMs));
+    try {
+      const response = await fetchImpl(`${VIDEO_PAGE_ENDPOINT}${videoId}`, {
+        headers: { accept: 'text/html', 'user-agent': PAGE_USER_AGENT },
+        redirect: 'error',
+        signal: controller.signal
+      });
+      if (!response?.ok || typeof response.text !== 'function') return '';
+      const length = Number(response.headers?.get?.('content-length'));
+      if (Number.isFinite(length) && length > MAX_PAGE_BYTES) return '';
+      const html = await response.text();
+      return String(html || '').length > MAX_PAGE_BYTES ? '' : thumbnailFromPage(html, videoId);
+    } catch {
+      return '';
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   return {
     async metadata(input, { refresh = false } = {}) {
       const { videoId, author } = await resolveInput(input);
@@ -158,6 +203,7 @@ export function createTiktokOembedClient({ fetchImpl = (...args) => fetch(...arg
 
       // @계정 이름은 oEmbed가 주지 않으면 따라간 정본 주소(또는 입력 정본)에서 푼다.
       const value = { ...exposedMetadata(videoId, data), author: safeText(author, MAX_AUTHOR) };
+      if (!value.thumbnailUrl) value.thumbnailUrl = await pageThumbnail(videoId);
       remember(videoId, value);
       return { ...value, cached: false };
     },

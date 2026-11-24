@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { tiktokVideoId, tiktokShortUrl, tiktokAuthor, exposedMetadata, createTiktokOembedClient, createTiktokOembedHandler } from '../server/tiktok-oembed.js';
+import { tiktokVideoId, tiktokShortUrl, tiktokAuthor, exposedMetadata, thumbnailFromPage, createTiktokOembedClient, createTiktokOembedHandler } from '../server/tiktok-oembed.js';
 import { ApiError } from '../server/errors.js';
 
 // #791: 틱톡 oEmbed 프록시 — 유튜브와 같은 길. 외부 호출은 가짜 응답으로만 시험한다.
@@ -46,6 +46,45 @@ test('표시 필드만 남기고 썸네일은 https + 틱톡 CDN일 때만 통�
   const empty = exposedMetadata(ID, { title: '', author_name: '', thumbnail_url: '' });
   assert.equal(empty.title, '');
   assert.equal(empty.thumbnailUrl, '');
+});
+
+test('oEmbed에 썸네일이 없으면 영상 페이지의 같은 id 표지를 쓴다', () => {
+  const cover = 'https://p16-common-sign.tiktokcdn.com/origin.jpg?x-expires=1';
+  const html = '<script id="__UNIVERSAL_DATA_FOR_REHYDRATION__" type="application/json">' + JSON.stringify({
+    __DEFAULT_SCOPE__: { 'webapp.video-detail': { itemInfo: { itemStruct: { id: ID, video: { originCover: cover, cover: 'https://p16.tiktokcdn.com/other.jpg' } } } } }
+  }) + '</script>';
+  assert.equal(thumbnailFromPage(html, ID), cover);
+  assert.equal(thumbnailFromPage(html, '9999999999999999999'), '', '다른 영상 id는 거부');
+  assert.equal(thumbnailFromPage('<p>no data</p>', ID), '');
+  assert.equal(thumbnailFromPage('<script id="__UNIVERSAL_DATA_FOR_REHYDRATION__">not json</script>', ID), '');
+  assert.equal(thumbnailFromPage(html.replace(/p16(?:-common-sign)?\.tiktokcdn\.com/g, 'evil.example'), ID), '', '틱톡 CDN이 아닌 주소는 거부');
+});
+
+test('oEmbed에 썸네일이 없으면 같은 호스트의 영상 페이지를 한 번 더 부른다', async () => {
+  const seen = [];
+  const cover = 'https://p19-common-sign.tiktokcdn.com/origin.jpg?x-expires=1';
+  const html = '<script id="__UNIVERSAL_DATA_FOR_REHYDRATION__">' + JSON.stringify({
+    __DEFAULT_SCOPE__: { 'webapp.video-detail': { itemInfo: { itemStruct: { id: ID, video: { originCover: cover } } } } }
+  }) + '</script>';
+  const client = createTiktokOembedClient({ fetchImpl: async (url, init) => {
+    seen.push([url, init]);
+    if (url.startsWith('https://www.tiktok.com/oembed')) return jsonResponse({ width: '325', height: '578' });
+    return { ok: true, status: 200, headers: { get: () => undefined }, text: async () => html };
+  } });
+  const value = await client.metadata(ID);
+  assert.equal(value.thumbnailUrl, cover);
+  assert.equal(seen.length, 2);
+  assert.match(seen[1][0], /^https:\/\/www\.tiktok\.com\/@tiktok\/video\//);
+  assert.equal(seen[1][1].redirect, 'error');
+  assert.equal(seen[1][1].headers.accept, 'text/html');
+});
+
+test('영상 페이지를 읽지 못해도 링크 정보는 그대로 돌려준다', async () => {
+  let calls = 0;
+  const client = createTiktokOembedClient({ fetchImpl: async () => { calls += 1; if (calls === 1) return jsonResponse({ width: '325', height: '578' }); throw new Error('blocked'); } });
+  const value = await client.metadata(ID);
+  assert.equal(value.videoId, ID);
+  assert.equal(value.thumbnailUrl, '');
 });
 
 test('@계정 이름은 정본 주소 경로에서만 풀고 짧은 주소·평문 id는 모른다', () => {

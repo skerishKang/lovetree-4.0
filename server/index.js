@@ -33,16 +33,7 @@ import { createOpsNotifier } from './ops-notify.js';
 import { createYoutubeOembedHandler } from './youtube-oembed.js';
 import { createTiktokOembedHandler } from './tiktok-oembed.js';
 import { createInstagramOembedHandler } from './instagram-oembed.js';
-import { createPadiemAuthorityAuth } from './padiem-authority-auth.js';
 import { createSharedAccessAuth, sharedAuthEnabled } from './padiem-access-auth.mjs';
-import { createAuthorityRelayClient } from './authority-relay-transport.js';
-import { createAuthorityWriter } from './authority-writer.js';
-import { createLoginService } from './login-service.js';
-import { fromBearer, fromCookie } from './session-credential.js';
-import { unconfiguredAuth } from './auth.js';
-import { createMemoryLoginStateStore, createPostgresLoginStateStore } from './login-state-store.js';
-import { createHandoffMintClient } from './handoff-mint-client.js';
-import { countAuthorityReads, countMint, countWriteCall } from './legacy-call-log.js';
 import { ApiError } from './errors.js';
 import { createAccountRepo } from './db/account-postgres.js';
 import { createAccountDeleteRpcRepo } from './db/account-delete-rpc-postgres.js';
@@ -221,7 +212,6 @@ const adminCustomersHandler = createAdminCustomersHandler({
 const youtubeOembedHandler = createYoutubeOembedHandler({ authenticate: guardedAuthenticate, productId: LOVETREE_PRODUCT_ID });
 const tiktokOembedHandler = createTiktokOembedHandler({ authenticate: guardedAuthenticate, productId: LOVETREE_PRODUCT_ID });
 const instagramOembedHandler = createInstagramOembedHandler({ authenticate: guardedAuthenticate, productId: LOVETREE_PRODUCT_ID });
-const login = await buildLogin(pool);
 const mediaHandler = createMediaHandler({
  authenticate: guardedAuthenticate, productId: LOVETREE_PRODUCT_ID,
  store: mediaStore,
