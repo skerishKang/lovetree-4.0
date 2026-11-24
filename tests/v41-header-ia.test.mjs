@@ -808,7 +808,7 @@ test('이슈 905 화면(1440): 자동 저장 성공은 알림이 없고, 저장 
     await p1.goto(`${base}/v41/?account=1`, { waitUntil: 'load' });
     await waitSynced644(p1);
     // 토스트 관측기: #905 검사는 '뜬 적이 없다'를 봐야 하므로 뜨는 순간마다 기록해 둔다.
-    // (첫 안내 '내 기록을 불러왔어요.'는 남아 있을 수 있으니, 기록을 비운 뒤부터 잰다.)
+    // #1320: '불러왔어요' 안내는 없어졌다(기록 0개 첫 순간 안내만 남음) — 저장 안내만 재기 위해 기록을 비운 뒤부터 잰다.
     const watchToasts = () => p1.evaluate(() => {
       window.__n905 = [];
       const t = document.getElementById('toast');

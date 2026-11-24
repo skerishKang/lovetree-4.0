@@ -578,6 +578,7 @@ jobs:
       - name: 셸·설정·테마 화면 시험(건너뜀=실패 — 이슈 952)
         env:
           LT_SHELL_952_REQUIRE: '1'
+          LT_SHELL_1320_REQUIRE: '1'
         if: needs.screen-changes.outputs.changed == 'true'
         run: |
           start=$(date +%s)
