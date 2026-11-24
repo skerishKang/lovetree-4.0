@@ -31,13 +31,13 @@ function defaultView(){return innerWidth<=820?'single':'double'}
 let viewChoice=storedView();
 /* #537: 폰 폭(600px 미만)은 화면 모양이 휴대폰(스크롤 흐름)이고, 넓은 화면의 한 장은 두 장 책의 한 쪽을 크게 보여 준다. */
 function narrow(){return innerWidth<600}
-const phoneSession=narrow()||(matchMedia('(pointer:coarse)').matches&&Math.min(screen.width,screen.height)<600);
+function phoneSession(){try{if(parent!==window)return Math.min(parent.innerWidth,parent.innerHeight)<600}catch{}return narrow()||(matchMedia('(pointer:coarse)').matches&&Math.min(screen.width,screen.height)<600)}
 let mobileDoubleActive=false;
 let mobileSpreadHistory=false;
-function single(){return phoneSession?!mobileDoubleActive:(viewChoice??defaultView())==='single'}
+function single(){return phoneSession()?!mobileDoubleActive:(viewChoice??defaultView())==='single'}
 function applyViewAttr(){
  document.documentElement.dataset.bookView=single()?'single':'double';
- document.documentElement.dataset.bookShape=phoneSession&&!mobileDoubleActive?'phone':'wide';
+ document.documentElement.dataset.bookShape=phoneSession()&&!mobileDoubleActive?'phone':'wide';
  document.documentElement.classList.toggle('book-mobile-spread',mobileDoubleActive);
  syncViewButtons();
 }
@@ -88,7 +88,7 @@ window.addEventListener('popstate',()=>{if(mobileDoubleActive){mobileSpreadHisto
 // #1287: book scrolling temporarily reduces the parent's floating add button.
 let bookScrollIdle;
 document.addEventListener('scroll',()=>{
- if(!phoneSession)return;
+ if(!phoneSession())return;
  try{parent.document.body.classList.add('lt-book-scrolling')}catch{return}
  clearTimeout(bookScrollIdle);
  bookScrollIdle=setTimeout(()=>{try{parent.document.body.classList.remove('lt-book-scrolling')}catch{}},180);
@@ -97,7 +97,7 @@ window.addEventListener('pagehide',()=>{clearTimeout(bookScrollIdle);try{parent.
 
 function setViewChoice(v){
  if(machineState!=='IDLE'){setTimeout(()=>setViewChoice(v),120);return}
- if(phoneSession){
+ if(phoneSession()){
   if(v==='double'){beginMobileSpread();return}
   if(mobileDoubleActive){if(mobileSpreadHistory){history.back()}else finishMobileSpread();return}
   return;
