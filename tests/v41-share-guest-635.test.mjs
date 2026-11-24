@@ -985,7 +985,8 @@ test('#1259 방문자 책 첫 안내가 제목과 크게 보기 영상 조작부
      const media=d.querySelector('.lt-lightbox-media');
      const mr=shown(media)?box(media,fr.left,fr.top):null;
      const intersection=(a,b)=>a&&b?Math.max(0,Math.min(a.right,b.right)-Math.max(a.left,b.left))*Math.max(0,Math.min(a.bottom,b.bottom)-Math.max(a.top,b.top)):0;
-     return {notice:tr,frame:fr,titles,titleOverlap:titles.map(r=>intersection(tr,r)),frameOverlap:intersection(tr,fr),media:mr,mediaOverlap:intersection(tr,mr),hidden:t.hidden};
+     const nav=d.querySelector(".nav-pill");const nr=shown(nav)?box(nav,fr.left,fr.top):null;
+     return {nav:nr,notice:tr,frame:fr,titles,titleOverlap:titles.map(r=>intersection(tr,r)),frameOverlap:intersection(tr,fr),media:mr,mediaOverlap:intersection(tr,mr),hidden:t.hidden};
     });
     assert.equal(await f.locator('.story-tip').count(),0,key+' 방문자 쓰기 안내 0개');
     assert.equal(await p.evaluate(()=>localStorage.getItem('lt41.tips.bookStory')),null,key+' 방문자는 내 기록의 최초 안내 상태를 소비하지 않는다');
@@ -993,6 +994,12 @@ test('#1259 방문자 책 첫 안내가 제목과 크게 보기 영상 조작부
     assert.ok(book.notice&&book.titles.length,key+' 첫 안내와 제목이 실제로 표시된다');
     assert.equal(book.frameOverlap,0,key+' 책 화면과 안내의 교차 면적 0: '+JSON.stringify(book));
     assert.ok(book.titleOverlap.every(x=>x===0),key+' 제목 교차 면적 0');
+    if(width===390){
+     assert.ok(book.nav&&book.nav.bottom<=book.frame.bottom+0.5,key+' 페이지 이동 줄 전체 표시: '+JSON.stringify(book));
+     const next=f.locator('.nav-pill #nextBtn');
+     const target=await next.evaluate(e=>{const r=e.getBoundingClientRect();return {w:r.width,h:r.height,hit:e.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2))}});
+     assert.ok(target.w>=44&&target.h>=44&&target.hit,key+' 페이지 이동 단추 실제 클릭 영역: '+JSON.stringify(target));
+    }
     await shot(p,'1259-'+key+'-book');
     await f.locator('[data-yt-expand]:visible').first().click({timeout:3000});
     await f.locator('.lt-lightbox-media').waitFor({state:'visible'});

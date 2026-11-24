@@ -1244,6 +1244,6 @@ body[data-record-source=share][data-fab-lift=book] #toast[data-visitor-intro]:no
  position:relative;flex:0 0 auto;inset:auto;transform:none;margin:4px auto 54px;
 }
 @media(max-width:520px){
- body[data-record-source=share][data-fab-lift=book] #toast[data-visitor-intro]:not([hidden]){margin:4px auto max(8px,env(safe-area-inset-bottom))}
+ body[data-record-source=share][data-fab-lift=book] #toast[data-visitor-intro]:not([hidden]){margin:2px auto max(2px,env(safe-area-inset-bottom));padding:6px 10px;line-height:1.4}
 }
 body[data-record-source=share][data-fab-lift=book].lt-book-lightbox-open #toast[data-visitor-intro]{display:none}
