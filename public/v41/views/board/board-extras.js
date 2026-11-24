@@ -270,19 +270,31 @@ function clearInsertMark() {
   cardLayer
     .querySelectorAll('.insert-target')
     .forEach(el => el.classList.remove('insert-target', 'insert-after'));
+  cardLayer.querySelector('.boardDropPlaceholder')?.remove();
 }
-function markInsertTarget(targetId, after) {
-  clearInsertMark();
-  if (!targetId) return;
-  const el = cardLayer.querySelector(`[data-id="${targetId}"]`);
-  if (!el) return;
-  el.classList.add('insert-target');
-  if (after) el.classList.add('insert-after');
+function placeDropPlaceholder(dragId, position) {
+  if (!position) return;
+  const dragged = cardLayer.querySelector(`[data-id="${dragId}"]`);
+  if (!dragged) return;
+  let placeholder = cardLayer.querySelector('.boardDropPlaceholder');
+  if (!placeholder) {
+    placeholder = document.createElement('div');
+    placeholder.className = 'boardDropPlaceholder';
+    placeholder.setAttribute('aria-hidden', 'true');
+    cardLayer.appendChild(placeholder);
+  }
+  placeholder.style.left = position.x + 'px';
+  placeholder.style.top = position.y + 'px';
+  placeholder.style.width = (dragged.offsetWidth || 242) + 'px';
+  placeholder.style.height = (dragged.offsetHeight || BASE_RESERVED_H) + 'px';
+  placeholder.style.setProperty('--rot', dragged.style.getPropertyValue('--rot') || '0deg');
 }
 function bindCardV11(el) {
   let id = el.dataset.id,
     down = null,
-    moved = false;
+    moved = false,
+    dragOrigin = null,
+    dragSnapshot = null;
   el.addEventListener('pointerdown', e => {
     if (
       e.target.closest('button,input,textarea,select,video') ||
@@ -292,7 +304,8 @@ function bindCardV11(el) {
     if (cinema) return;
     if (typeof dragGuard === 'function' && !dragGuard()) return;
     e.stopPropagation();
-    snapshot();
+    dragOrigin = typeof captureBoardOrderState === 'function' ? captureBoardOrderState() : null;
+    dragSnapshot = null;
     let m = moments.find(x => x.id === id),
       p = screenToWorld(e.clientX, e.clientY);
     drag = { id, dx: p.x - m.x, dy: p.y - m.y };
@@ -303,18 +316,22 @@ function bindCardV11(el) {
   });
   el.addEventListener('pointermove', e => {
     if (!drag || drag.id !== id) return;
+    if (!moved && down && Math.hypot(e.clientX - down.x, e.clientY - down.y) > 4) {
+      moved = true;
+      if (typeof snapshot === 'function') dragSnapshot = snapshot();
+      if (typeof setBoardMode === 'function' && boardMode !== 'mine')
+        setBoardMode('mine', { animate: true });
+    }
     let p = screenToWorld(e.clientX, e.clientY),
       m = moments.find(x => x.id === id);
-    if (down && Math.hypot(e.clientX - down.x, e.clientY - down.y) > 4) moved = true;
     m.x = Math.max(70, Math.min(1320, p.x - drag.dx));
     m.y = Math.max(120, Math.min(760, p.y - drag.dy));
     el.style.left = m.x + 'px';
     el.style.top = m.y + 'px';
     scheduleThreadFrame();
-    // #619-6: 끄는 동안 들어갈 자리를 표시한다(가장 가까운 카드에 테두리). #894: '내 배치'에서는 나머지 카드도 실시간으로 비켜 준다.
+    // #1245: 끌기가 시작되면 배치 모드를 맞추고, 점선 칸과 카드 이동을 함께 미리 본다.
     if (moved && typeof insertIndexAt === 'function') {
       const hit = insertIndexAt(p.x, p.y, id);
-      markInsertTarget(hit ? id : null, hit ? hit.after : false);
       if (typeof previewShift === 'function') previewShift(id, hit);
     } else if (moved) {
       clearInsertMark();
@@ -330,6 +347,8 @@ function bindCardV11(el) {
       setTimeout(() => el.classList.remove('dropSettle'), 420);
       el.releasePointerCapture?.(e.pointerId);
       if (!moved) {
+        dragOrigin = null;
+        dragSnapshot = null;
         selectMoment(id, true);
         return;
       }
@@ -340,9 +359,30 @@ function bindCardV11(el) {
       const pUp = typeof screenToWorld === 'function' ? screenToWorld(e.clientX, e.clientY) : null;
       const hit =
         pUp && typeof insertIndexAt === 'function' ? insertIndexAt(pUp.x, pUp.y, id) : null;
-      if (hit && typeof commitInsert === 'function') commitInsert(id, hit.index);
-      else if (typeof persistBoard === 'function') persistBoard();
+      const origin = dragOrigin;
+      const undoSnapshot = dragSnapshot;
+      dragOrigin = null;
+      dragSnapshot = null;
+      if (hit && typeof commitInsert === 'function')
+        commitInsert(id, hit.index, { before: origin, snapshot: undoSnapshot });
+      else if (origin && typeof restoreBoardOrderState === 'function') {
+        restoreBoardOrderState(origin);
+        if (typeof discardBoardUndoSnapshot === 'function') discardBoardUndoSnapshot(undoSnapshot);
+      }
     }
+  });
+  el.addEventListener('pointercancel', e => {
+    if (drag?.id !== id) return;
+    drag = null;
+    el.classList.remove('dragLift', 'dropSettle');
+    el.releasePointerCapture?.(e.pointerId);
+    clearInsertMark();
+    if (typeof clearPreviewShift === 'function') clearPreviewShift();
+    if (moved && dragOrigin && typeof restoreBoardOrderState === 'function')
+      restoreBoardOrderState(dragOrigin);
+    if (typeof discardBoardUndoSnapshot === 'function') discardBoardUndoSnapshot(dragSnapshot);
+    dragOrigin = null;
+    dragSnapshot = null;
   });
   el.addEventListener('mouseenter', () => {
     let v = el.querySelector('video:not(.lt-user-video)');
@@ -1360,6 +1400,9 @@ addEventListener('message', e => {
         : BASE_RESERVED_H
     );
   momentOrder = projectBoardOrder();
+  hasSavedBoardOrder =
+    !!LT58Model.orderOfMoments(LTDEMO.moments) || moments.some(m => m.savedPos);
+  clearSavedBoardOrder = false;
   connections = projectBoardConnections();
   replayPath = projectReplayPath();
   undoStack = [];

@@ -87,6 +87,8 @@ extraCSS+=`.card.lt-under-link{opacity:0}\n.card .surface .lt-orbit-texture{posi
 extraCSS+=`@keyframes lt-home-rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
 .center .lt-home-line{display:block}.center .lt-home-enter{animation:lt-home-rise 460ms cubic-bezier(.2,.7,.2,1) both;animation-delay:calc(var(--lt-home-order)*100ms)}
 @media(prefers-reduced-motion:reduce){.center .lt-home-enter{animation:none;opacity:1;transform:none}}
+.card.lt-first-frame{visibility:hidden}
+.center[data-lt-home-wait] .lt-home-enter{animation-play-state:paused;opacity:0}
 .lt-orbit-tip{position:absolute;z-index:5;left:0;top:0;opacity:0;pointer-events:none;padding:7px 11px;border:1px solid var(--lt-gold-line);border-radius:999px;background:var(--lt-stage);color:var(--lt-pearl);font-size:12px;line-height:18px;white-space:nowrap;contain:paint;will-change:transform,opacity;transform:translate3d(0,0,0)}
 .lt-orbit-tip[data-visible]{opacity:1}`;
 
@@ -202,6 +204,7 @@ if(previewStrip.length)host.classList.add('lt-preview-mode');
  }
 origin/main
  const app=shadow.querySelector('.app'),world=shadow.querySelector('.world'),dialog=shadow.querySelector('dialog');
+ shadow.querySelector('.center')?.setAttribute('data-lt-home-wait','');
  // Separate the two descriptive lines without inserting or removing any layout box.
  const description=shadow.querySelector('.center > p.lt-home-enter');
  if(description){
@@ -516,7 +519,7 @@ shadow.addEventListener('click',e=>{const pv=e.target.closest('[data-lt-preview-
  const tipTimer=setTimeout(()=>{tipReady=true;if(reduced)tipPinned=false;orbitWrite(performance.now());},1900);
  track(()=>clearTimeout(tipTimer));
 
-performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElement('button');b.className=`card ${c.type} ${c.sizeClass}${c.example?' example':''}${c.source==='mine'?' mine':''}`;b.style.setProperty('--fit',c.fitMode==='contain'?'contain':'cover');;b.dataset.example=c.example?'1':'';b.setAttribute('tabindex','-1');b.setAttribute('aria-hidden','true');b.innerHTML=`<span class="lt-shadow-hover" aria-hidden="true"></span><span class="lt-shadow-busy" aria-hidden="true"></span><span class="lt-move"><span class="lt-lift"><span class="surface" data-lt-thumb-host>${c.image?`<img src="${esc(c.image)}" alt="" draggable="false" loading="lazy" decoding="async"${devicePixelRatio<=1&&compactOrbitImages[c.image]?` srcset="${esc(compactOrbitImages[c.image])}"`:''}${thumbFallbackAttrs(c,{candidates:c.thumbCandidates||[c.image],writable:!demo&&!c.example,variant:'orbit'})}${c.youtubeThumb?' referrerpolicy="no-referrer"':''}>`:(!demo&&!c.example&&needsFallbackCard(c,{autoLoad:false})?fallbackCardMarkup(c,{writable:!demo&&!c.example,variant:'orbit',dateStyle}):`<div class="memoKicker">${esc(dateOf(c))}</div><div class="memoText">${esc(mainOf(c))}</div><div class="memoFoot">${esc(c.emotion)}</div>`)}</span></span></span>${c.youtubeThumb&&c.image?'<span class="playGlyph" aria-hidden="true">▶</span>':''}${c.first?'<div class="firstMark">FIRST</div>':''}<div class="caption"><span>${esc(mainOf(c))}${subMarkup(c)}</span></div>`;
+performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElement('button');b.className=`card ${c.type} ${c.sizeClass}${c.example?' example':''}${c.source==='mine'?' mine':''} lt-first-frame`;b.style.setProperty('--fit',c.fitMode==='contain'?'contain':'cover');;b.dataset.example=c.example?'1':'';b.setAttribute('tabindex','-1');b.setAttribute('aria-hidden','true');b.innerHTML=`<span class="lt-shadow-hover" aria-hidden="true"></span><span class="lt-shadow-busy" aria-hidden="true"></span><span class="lt-move"><span class="lt-lift"><span class="surface" data-lt-thumb-host>${c.image?`<img src="${esc(c.image)}" alt="" draggable="false" loading="lazy" decoding="async"${devicePixelRatio<=1&&compactOrbitImages[c.image]?` srcset="${esc(compactOrbitImages[c.image])}"`:''}${thumbFallbackAttrs(c,{candidates:c.thumbCandidates||[c.image],writable:!demo&&!c.example,variant:'orbit'})}${c.youtubeThumb?' referrerpolicy="no-referrer"':''}>`:(!demo&&!c.example&&needsFallbackCard(c,{autoLoad:false})?fallbackCardMarkup(c,{writable:!demo&&!c.example,variant:'orbit',dateStyle}):`<div class="memoKicker">${esc(dateOf(c))}</div><div class="memoText">${esc(mainOf(c))}</div><div class="memoFoot">${esc(c.emotion)}</div>`)}</span></span></span>${c.youtubeThumb&&c.image?'<span class="playGlyph" aria-hidden="true">▶</span>':''}${c.first?'<div class="firstMark">FIRST</div>':''}<div class="caption"><span>${esc(mainOf(c))}${subMarkup(c)}</span></div>`;
  // #593: 바깥 .card 는 자리(궤도 애니메이션)만 맡는다 — 실제로 눌리고 초점을 받는 것은 안쪽 .surface 다(중첩 단추 방지).
  const surface=b.querySelector('.surface'),surfaceLabel=b.querySelector('.caption span')?.textContent||mainOf(c)||'순간';
  surface.setAttribute('role','button');surface.setAttribute('tabindex','0');surface.setAttribute('aria-label',surfaceLabel+' 눌러서 크게 보기');
@@ -544,6 +547,28 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
   const TWO_PI=Math.PI*2, ORBIT_MS=90000, ORBIT_STEPS=48, PHASE_STEP=.000018;
  const orbitAnims=cards.map(()=>null), floatAnims=cards.map(()=>null);
  let imagesReady=false,spritesReady=false;
+ // #1026 첫 프레임: 카드는 궤도 첫 자리를 받기 전에는 그리지 않는다. 앞 6장 그림이 오거나 600ms가 지나면
+ // (먼저 오는 쪽) 글귀의 차례로 떠오르기 시작 시점과 카드 공개를 같은 프레임에 맞춘다.
+ let firstFrameDone=false,contentReady=false,revealed=false;
+ const revealCenter=shadow.querySelector('.center');
+ const frontImgs=elements.slice(0,6).map(el=>el.querySelector('.surface img')).filter(Boolean);
+ function markContentReady(){if(contentReady)return;contentReady=true;tryReveal();}
+ function checkFrontImages(){if(frontImgs.length&&frontImgs.every(img=>img.complete))markContentReady();}
+ function tryReveal(){
+  if(revealed||!firstFrameDone||!contentReady)return;
+  revealed=true;
+  requestAnimationFrame(()=>{
+   revealCenter?.removeAttribute('data-lt-home-wait');
+   for(const el of elements)el.classList.remove('lt-first-frame');
+  });
+ }
+ const contentTimer=setTimeout(markContentReady,600);
+ track(()=>clearTimeout(contentTimer));
+ // 안전장치: 어떤 까닭으로 첫 궤도 자리가 끝내 안 들어와도 1.5초 뒤에는 글귀와 카드를 보인다(빈 첫 화면 방지).
+ const revealSafety=setTimeout(()=>{firstFrameDone=true;contentReady=true;tryReveal();},1500);
+ track(()=>clearTimeout(revealSafety));
+ for(const img of frontImgs){img.addEventListener('load',checkFrontImages,{signal});img.addEventListener('error',checkFrontImages,{signal});}
+ checkFrontImages();
  const animRunning=()=>imagesReady&&spritesReady&&!paused&&!reduced&&!dialog.open&&!document.hidden;
  const floatDelay=cards.map((c,i)=>i*370);
  // 멈춤(동작 줄이기·보기 메뉴)·팝업·숨은 탭이면 애니메이션만 세운다. 멈출 때는 떠 있음 위상을 첫 자리(0·18px)로
@@ -785,14 +810,19 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
  };
 
  const syncDomPose=(i,t=null)=>{const el=elements[i],f=orbitFrames[i];if(!el||!f?.length)return;const tf=orbitTransform(f,t??testSeek??fractionAt(i,lastPoseAt||performance.now()));if(tf){el.style.transform=tf;el.__orbitTf=tf;}};
- const orbitWrite=(now)=>{lastWriteAt=now;if(spritesReady){drawCanvas(now);return;}for(let i=0;i<elements.length;i++){
+ const orbitWrite=(now)=>{lastWriteAt=now;if(spritesReady){if(!firstFrameDone){firstFrameDone=true;tryReveal();}drawCanvas(now);return;}for(let i=0;i<elements.length;i++){
    const frames=orbitFrames[i],el=elements[i];if(!frames||!frames.length||!el||el.classList.contains('off'))continue;
    const cfg=(layoutBox&&layoutBox.w<=650?ringsNarrow:rings)[cards[i].ring];
    const elapsed=now-orbitStart-pausedTotal-(pausedAt?now-pausedAt:0);
    const t=((elapsed/Math.round(ORBIT_MS/cfg.speed))+phase)%1;
    const tf=orbitTransform(frames,t);
    if(tf&&el.__orbitTf!==tf){el.__orbitTf=tf;el.style.transform=tf;}
-  }};
+  }
+  if(!firstFrameDone){
+   const visible=elements.filter(el=>!el.classList.contains('off'));
+   if(!visible.length||visible.every(el=>el.__orbitTf)){firstFrameDone=true;tryReveal();}
+  }
+ };
   // #1086: 궤도 경로 검사용 — 지정 진행률로 카드를 그린다(실제 루프와 같은 orbitWrite 경로).
   globalThis.__LT_ORBIT_TEST__={lastWriteAt(){return lastWriteAt;},progress(now){const cfg=(layoutBox&&layoutBox.w<=650?ringsNarrow:rings)[cards[0].ring];const el=now-orbitStart-pausedTotal-(pausedAt?now-pausedAt:0);return ((el/Math.round(ORBIT_MS/cfg.speed))+phase)%1;},period(){const w=layoutBox&&layoutBox.w<=650?ringsNarrow:rings;return Math.round(ORBIT_MS/(w[cards[0].ring].speed));},hold(on){if(on){orbitPause();stopOrbitLoop();}else{testSeek=null;orbitResume();startOrbitLoop();}},seek(t){testSeek=t;for(let i=0;i<elements.length;i++){
    const frames=orbitFrames[i],el=elements[i];if(!frames||!frames.length||!el)continue;
