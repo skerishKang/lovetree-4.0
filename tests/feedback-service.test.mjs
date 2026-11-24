@@ -550,3 +550,14 @@ test('1190: 받는 주소나 비밀이 없으면 줄에만 쌓고 보내지 않�
   assert.equal(called,false);
   assert.equal((await outbox.list())[0].status,'pending');
 });
+
+test('#1273 6번: 의견 보내기 응답에 목록을 바로 채울 저장 값이 함께 온다', async () => {
+  const {call} = setup();
+  const res = await call('POST', '/api/feedback', {account: 'alice', ip: '203.0.113.1', body: {category: 'bug', body: '방금 보낸 의견', context: {}}});
+  assert.equal(res.status, 201);
+  assert.ok(Number.isInteger(res.body.id) && res.body.id > 0);
+  assert.equal(res.body.kind, 'opinion');
+  assert.equal(res.body.category, 'bug');
+  assert.equal(res.body.body, '방금 보낸 의견');
+  assert.ok(res.body.createdAt, '목록의 날짜 줄에 쓸 시각이 있다');
+});

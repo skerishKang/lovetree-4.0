@@ -47,6 +47,22 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
   cache.set(subjectId,role);
   return role;
  }
+ // 목록과 같은 주인 거름을 집계에도 쓴다(역할은 주인당 한 번만 읽는다). #1273 5번:
+ // 첫 화면 숫자와 둘러보기 목록이 다른 기준으로 세지지 않게 한 벌로 묶는다.
+ function hiddenOwnerLookup(){
+  const roleCache=new Map();
+  if(!admin)return async()=>false;
+  return async subjectId=>{
+   if(roleCache.has(subjectId))return roleCache.get(subjectId);
+   let role;
+   try{role=await admin.roleFor({productId,subjectId},{unknownOnFailure:true});}
+   catch{role=ROLE_UNKNOWN;}
+   if(role===ROLE_UNKNOWN)console.warn('[lovetree-community] 역할을 읽지 못해 공개 목록에서 제외');
+   const hidden=role===ROLE_TESTER||role===ROLE_UNKNOWN;
+   roleCache.set(subjectId,hidden);
+   return hidden;
+  };
+ }
  let totalsCache=null;
  // 이번 주의 시작(월요일 0시, KST — #824 결정 4 '주 = 월~일 KST'). KST는 UTC+9 고정이라 서머타임
  // 보정이 없다. 주 규칙은 여기 한 곳에서만 계산한다 — SQL·화면에 복제하지 않는다.
@@ -179,8 +195,25 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
   async discoverTotals(){
    const at=now();
    if(totalsCache&&at-totalsCache.at<60_000)return totalsCache.value;
-   if(typeof communityRepo.discoverTotals!=='function')return {trees:0,moments:0};
-   const value=await communityRepo.discoverTotals({productId});
+   let value;
+   if(typeof communityRepo.listDiscoverableSummaries==='function'){
+    // 목록을 고르는 같은 함수로 센다 — 공개·소개 켬·순간 3개 이상·숨김·비공개 제외와
+    // 시험 계정·역할 모름 거름이 첫 화면 숫자에도 그대로 적용된다.
+    const rows=await communityRepo.listDiscoverableSummaries({productId,viewerSubjectId:null,limit:240});
+    const hidden=hiddenOwnerLookup();
+    const seen=new Set();
+    let trees=0,moments=0;
+    for(const row of rows){
+     if(await hidden(row.share.subjectId))continue;
+     const key=row.share.subjectId+'|'+row.share.treeId;
+     if(seen.has(key))continue;
+     seen.add(key);trees+=1;
+     moments+=Number(row.share.momentCount||0);
+    }
+    value={trees,moments};
+   }else if(typeof communityRepo.discoverTotals==='function'){
+    value=await communityRepo.discoverTotals({productId});
+   }else value={trees:0,moments:0};
    totalsCache={at,value};
    return value;
   },
@@ -194,11 +227,8 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
    const docScanCache=new Map();
    const roleOf=admin?async subjectId=>listedRole(subjectId,roleCache):null;
    const aiTesterLookup=roleOf?async subjectId=>isAiTesterRole(await roleOf(subjectId)):null;
-   // #1071: 시험 계정뿐 아니라 역할을 읽지 못한 주인도 공개 목록에서 뺀다.
-   const isHiddenLookup=roleOf?async subjectId=>{
-    const role=await roleOf(subjectId);
-    return role===ROLE_TESTER||role===ROLE_UNKNOWN;
-   }:null;
+   // #1273 5번: 집계(discoverTotals)와 같은 주인 거름을 쓴다(#1071 시험 계정·역할 모름 포함).
+   const isHiddenLookup=hiddenOwnerLookup();
    let entries;
    if(typeof communityRepo.listDiscoverableSummaries==='function'){
     const {since,until}=votingWeek();

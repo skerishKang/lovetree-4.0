@@ -29,7 +29,7 @@ const themeToggleTop=$('theme-toggle');if(themeToggleTop)themeToggleTop.onclick=
   const recentErrors=reportEntries();
   return {screen,viewport:window.innerWidth+'x'+window.innerHeight,theme:readTheme(localStorage),version:'4.1',loggedIn:owned,treeId,recentErrors};
  }
- const feedbackDialog=createFeedbackDialog({$,notify,getContext:feedbackContext,show:()=>panel('feedback-panel'),openMyPosts:()=>{shellDialogs.requestClose('feedback-panel');feedbackBoard.openMyPosts();}});
+ const feedbackDialog=createFeedbackDialog({$,notify,getContext:feedbackContext,show:()=>panel('feedback-panel'),openMyPosts:()=>{shellDialogs.requestClose('feedback-panel');feedbackBoard.openMyPosts();},onSent:post=>feedbackBoard.addSentPost(post)});
  // 2026-11-16 계정 메뉴 정리: 메뉴의 '의견 보내기' 칸을 없애고 내 의견 창 안에서 바로 보내게 했다.
  // 보내기 창은 로그아웃 첫 화면 작은 링크($('feedback-link'))와 같은 창을 쓴다(feedbackDialog).
  $('myposts-send').onclick=()=>{shellDialogs.requestClose('myposts-panel');feedbackDialog.open();};
@@ -75,7 +75,7 @@ const themeToggleTop=$('theme-toggle');if(themeToggleTop)themeToggleTop.onclick=
   if(newsCount){const n=myNewsMount?.lastCount?.()||0;newsCount.hidden=!(n>0);if(n>0)newsCount.textContent=String(n);}
  }
  function onReplyCount(count){const badge=$('account-my-posts-count');if(badge){badge.hidden=!(count>0);if(count>0)badge.textContent=String(count);}dotState.replies=count>0;paintAccountDots();}
- const feedbackBoard=createFeedbackBoard({$,notify,show:()=>panel('journal-panel'),showFull:()=>panel('myposts-panel'),onReplyCount,onOpenUpdates:version=>{void updatesMount.openUpdates(version);}});
+ const feedbackBoard=createFeedbackBoard({$,notify,show:()=>panel('journal-panel'),showFull:()=>panel('myposts-panel'),onReplyCount,onOpenUpdates:version=>{void updatesMount.openUpdates(version);},isLoggedIn:()=>!!deps.member?.snapshot().owned, memberPhase:()=>deps.member?.snapshot().phase||''});
  $('account-journal').onclick=()=>{closeAccountMenu();feedbackBoard.openJournal();};
  $('account-my-posts').onclick=()=>{closeAccountMenu();feedbackBoard.openMyPosts();};
  // #540 마무리: 운영센터 입구. 계정 메뉴·설정의 '운영' 묶음에서 같은 화면을 새 탭으로 연다.

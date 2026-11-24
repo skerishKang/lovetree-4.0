@@ -20,7 +20,7 @@ function fakeEl(name) {
 
 const UPDATES = readFileSync(new URL('../public/v41/updates.json', import.meta.url), 'utf8');
 
-function mount(fetchImpl, posts) {
+function mount(fetchImpl, posts, opts = {}) {
   const els = {
     'journal-panel': fakeEl('journal-panel'), 'journal-form': fakeEl('journal-form'),
     'journal-error': fakeEl('journal-error'), 'myposts-panel': fakeEl('myposts-panel'),
@@ -33,13 +33,17 @@ function mount(fetchImpl, posts) {
   const storage = { getItem: k => mem.get(k) ?? null, setItem: (k, v) => mem.set(k, v) };
   const board = createFeedbackBoard({
     $, notify: () => {}, show: () => els['journal-panel'].showModal(), showFull: () => els['myposts-panel'].showModal(),
-    onReplyCount: n => counts.push(n), onOpenUpdates: v => opened.push(v), storage
+    onReplyCount: n => counts.push(n), onOpenUpdates: v => opened.push(v), storage,
+    isLoggedIn: opts.isLoggedIn, memberPhase: opts.memberPhase
   });
   const realFetch = globalThis.fetch;
-  globalThis.fetch = async (path) => ({
-    ok: true, status: 200,
-    json: async () => (path === '/v41/updates.json' ? JSON.parse(UPDATES) : {posts})
-  });
+  globalThis.fetch = async (path) => {
+    if (typeof fetchImpl === 'function') return fetchImpl(path);
+    return {
+      ok: true, status: 200,
+      json: async () => (path === '/v41/updates.json' ? JSON.parse(UPDATES) : {posts})
+    };
+  };
   return { board, els, counts, opened, restore: () => { globalThis.fetch = realFetch; } };
 }
 
@@ -134,5 +138,44 @@ test('하은2회차 ⑥: 내 의견 목록은 서버가 돌려준 글을 빠뜨�
     // 서버 순서(최신 먼저)대로 그린다 — 화면이 임의로 다시 섞지 않는다.
     const order = [...html.matchAll(/myposts-no">#(\d+)<\/span>/g)].map((m) => Number(m[1]));
     assert.deepEqual(order, [24, 23, 22, 21, 12], '서버가 준 순서(최신 먼저) 그대로다');
+  } finally { restore(); }
+});
+
+test('#1273 6번: 보낸 직후 응답의 의견이 내 의견 목록에 바로 나온다', async () => {
+  const posts = [{id: 9, kind: 'opinion', status: 'received', body: '먼저 보낸 의견', createdAt: '2026-11-24T00:00:00Z', replies: []}];
+  const {board, els, restore} = mount(null, posts);
+  try {
+    await board.openMyPosts();
+    assert.match(els['myposts-list'].innerHTML, /#9<\/span>/);
+    await board.addSentPost({id: 10, kind: 'opinion', status: 'received', title: '새 의견', body: '방금 보낸 의견', createdAt: '2026-11-24T00:01:00Z'});
+    const html = els['myposts-list'].innerHTML;
+    assert.match(html, /#10<\/span>/, '다시 부르기 전에도 새 의견이 보인다');
+    assert.match(html, /방금 보낸 의견/, '응답에 담긴 본문으로 그린다');
+    // 같은 번호를 두 번 넣어도 목록에 한 번만 있다.
+    await board.addSentPost({id: 10, kind: 'opinion', status: 'received', body: '방금 보낸 의견', createdAt: '2026-11-24T00:01:00Z'});
+    assert.equal([...els['myposts-list'].innerHTML.matchAll(/#10<\/span>/g)].length, 1);
+  } finally { restore(); }
+});
+
+test('#1273 6번: 로그인 상태에서 세션이 늦거나 401이어도 로그인 안내가 뜨지 않는다', async () => {
+  const unauthorized = () => ({ok: false, status: 401, message: '로그인이 필요해요.', json: async () => ({})});
+  const {board, els, restore} = mount(unauthorized, [], {isLoggedIn: () => true, memberPhase: () => 'synced'});
+  try {
+    await board.openMyPosts();
+    const html = els['myposts-list'].innerHTML;
+    assert.doesNotMatch(html, /로그인이 필요해요/, '로그인 상태에는 그 문구를 띄우지 않는다');
+    assert.match(html, /로그인을 확인하고 있어요/, '세션 확인 중으로 안내한다');
+  } finally { restore(); }
+});
+
+test('#1273 6번: 세션 확인이 끝나기 전에는 목록을 부르지 않는다', async () => {
+  const calls = [];
+  const {board, restore} = mount(path => {
+    calls.push(path);
+    return {ok: true, status: 200, json: async () => (path === '/v41/updates.json' ? JSON.parse(UPDATES) : {posts: []})};
+  }, [], {isLoggedIn: () => true, memberPhase: (() => { let n = 0; return () => (n++ < 2 ? 'checking' : 'synced'); })()});
+  try {
+    await board.openMyPosts();
+    assert.deepEqual(calls.filter(p => p === '/api/board/mine'), ['/api/board/mine']);
   } finally { restore(); }
 });

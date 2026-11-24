@@ -60,7 +60,7 @@ export function unreadReplyCount(posts, seenIds) {
   return count;
 }
 
-export function createFeedbackBoard({$, notify, show, showFull, onReplyCount, onOpenUpdates, storage, fetchJson}) {
+export function createFeedbackBoard({$, notify, show, showFull, onReplyCount, onOpenUpdates, storage, fetchJson, isLoggedIn, memberPhase}) {
   const api = createApi();
   const jpanel = $('journal-panel');
   const jform = $('journal-form');
@@ -68,6 +68,31 @@ export function createFeedbackBoard({$, notify, show, showFull, onReplyCount, on
   const ppanel = $('myposts-panel');
   const plist = $('myposts-list');
   const store = storage ?? (() => { try { return globalThis.localStorage; } catch { return null; } })();
+  // #1273 6번: 보낸 직후 응답의 글을 목록에 바로 넣고, 세션 확인이 끝나기 전에는
+  // '로그인이 필요해요'를 띄우지 않는다.
+  let sentPosts = [], lastPosts = null;
+  const signedIn = () => typeof isLoggedIn === 'function' && !!isLoggedIn();
+  const phase = () => String(typeof memberPhase === 'function' ? memberPhase() || '' : '');
+  function mergePosts(posts) {
+   const out = Array.isArray(posts) ? posts.slice() : [];
+   const ids = new Set(out.map(p => Number(p?.id)));
+   for (const post of sentPosts) if (!ids.has(Number(post.id))) { out.unshift(post); ids.add(Number(post.id)); }
+   return out;
+  }
+  async function waitForSession() {
+   for (let i = 0; i < 40; i++) {
+    const value = phase();
+    if (value && value !== 'checking') return;
+    await new Promise(resolve => setTimeout(resolve, 100));
+   }
+  }
+  function addSentPost(post) {
+   if (!post || !Number.isInteger(Number(post.id)) || Number(post.id) <= 0) return;
+   if (sentPosts.some(p => Number(p.id) === Number(post.id))) return;
+   sentPosts.push(post);
+   if (lastPosts && ppanel?.open) return renderPosts(mergePosts(lastPosts));
+   return Promise.resolve();
+  }
 
   async function updatesByIssue() {
     try {
@@ -122,16 +147,28 @@ export function createFeedbackBoard({$, notify, show, showFull, onReplyCount, on
     if (!ppanel) return;
     plist.innerHTML = '<p class="panel-note">불러오는 중이에요.</p>';
     if (typeof showFull === 'function') showFull(); else ppanel.showModal();
+    // 세션 확인이 끝나기 전에 목록을 부르면 로그인 상태인데도 401이 날 수 있다 — 확인을 먼저 기다린다.
+    await waitForSession();
     const res = await api.call('/api/board/mine');
-    const posts = res.ok && Array.isArray(res.posts) ? res.posts : [];
-    if (!res.ok) { plist.innerHTML = `<p class="panel-note">${esc(res.message || '불러오지 못했어요.')}</p>`; return; }
+    if (!res.ok) {
+      // 로그인 상태에서 서버가 아직 신원을 못 본 경우에는 '로그인이 필요해요'를 띄우지 않는다.
+      const message = res.status === 401 && signedIn() ? '지금 로그인을 확인하고 있어요. 잠시 뒤 다시 열어 주세요.' : res.message || '불러오지 못했어요.';
+      plist.innerHTML = `<p class="panel-note">${esc(message)}</p>`;
+      return;
+    }
+    const posts = mergePosts(Array.isArray(res.posts) ? res.posts : []);
+    sentPosts = [];
     // #611 4번: 열어 보면 새 답글 알림이 사라진다.
     const seen = readSeenReplies(store);
     for (const post of posts) for (const reply of Array.isArray(post.replies) ? post.replies : []) if (reply && Number.isInteger(reply.id)) seen.add(reply.id);
     writeSeenReplies(store, seen);
     reportUnread(posts);
-    if (!posts.length) { plist.innerHTML = '<p class="panel-note">아직 보낸 의견이 없어요.</p>'; return; }
+    if (!posts.length) { lastPosts = posts; plist.innerHTML = '<p class="panel-note">아직 보낸 의견이 없어요.</p>'; return; }
+    await renderPosts(posts);
+  }
 
+  async function renderPosts(posts) {
+    lastPosts = posts;
     const updates = await updatesByIssue();
     plist.innerHTML = posts.map(post => {
       const replies = Array.isArray(post.replies) ? post.replies : [];
@@ -238,5 +275,5 @@ export function createFeedbackBoard({$, notify, show, showFull, onReplyCount, on
     return reportUnread(res.posts);
   }
 
-  return {openJournal, openMyPosts, refreshReplyDot};
+  return {openJournal, openMyPosts, refreshReplyDot, addSentPost};
 }

@@ -174,7 +174,8 @@ export function createFeedbackService({feedbackRepo,productId,admin=null,opsNoti
       saved=>outboxEvent('new',{feedbackId:saved.id,body:masked,status:saved.status,isAiCustomer:isAi,accountSubjectId:subjectId,category,title:saved.title,createdAt:saved.createdAt})
     );
     notifySaved('feedback_new',row.title||firstLine(masked),String(row.id),audience);
-    return {id:row.id,status:row.status,createdAt:row.createdAt};
+    // #1273 6번: 보낸 직후 '내 의견' 목록에 같은 글을 바로 넣을 수 있게 저장된 값을 함께 돌려준다.
+    return {id:row.id,status:row.status,createdAt:row.createdAt,kind:row.kind,category:row.category,title:row.title,body:row.body};
    },
 
    /** 2차: AI 고객 '오늘 사용 일지'(게시판 글쓰기). 하루 한 건, 다시 쓰면 고친다. */

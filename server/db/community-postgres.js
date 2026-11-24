@@ -1,7 +1,7 @@
 import { countedVoterSql, rankingOwnerSql } from './ranking-policy-sql.js';
 
 const iso=value=>value instanceof Date?value.toISOString():value?String(value):null;
-const shareRow=value=>value&&({shareId:value.share_id,subjectId:value.subject_id,treeId:value.tree_id,entryMomentId:value.entry_moment_id,view:value.initial_view,status:value.status,createdAt:iso(value.created_at)});
+const shareRow=value=>value&&({shareId:value.share_id,subjectId:value.subject_id,treeId:value.tree_id,entryMomentId:value.entry_moment_id,view:value.initial_view,status:value.status,momentCount:Number(value.moment_count)||0,createdAt:iso(value.created_at)});
 // #1098 2단계: 대상 칸(target_kind·moment_id)을 함께 내려준다. 기존 행(트리 단위)은 'tree'·빈 값이다.
 const commentRow=value=>value&&({id:value.comment_id,shareId:value.share_id,subjectId:value.subject_id,body:value.body,status:value.status,targetKind:value.target_kind||'tree',momentId:value.moment_id||'',createdAt:iso(value.created_at),updatedAt:iso(value.updated_at),editedAt:value.edited_at?iso(value.edited_at):null});
 const reportRow=value=>value&&({id:value.report_id,shareId:value.share_id,reporterSubjectId:value.reporter_subject_id,reason:value.reason,status:value.status,commentId:value.comment_id||null,createdAt:iso(value.created_at),resolvedAt:iso(value.resolved_at),hidden:value.is_hidden===true||value.hidden===true});
