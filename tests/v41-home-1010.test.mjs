@@ -176,7 +176,7 @@ test('#1010 떠 있는 카드를 누르면 그 자리에서 크게 보고 책 �
   } finally { await browser.close(); }
 });
 
-test('#1010 숫자 두 줄 — 순간 N / 모아둔 M이 겹치지 않고 각자 눌린다(#1087)', { skip: REQUIRE1010 ? false : skip1010, timeout: 180000 }, async () => {
+test('#1010 숫자 두 줄 — 순간 N / 정리 전 M이 겹치지 않고 각자 눌린다(#1087)', { skip: REQUIRE1010 ? false : skip1010, timeout: 180000 }, async () => {
   if (skip1010) assert.fail(skip1010);
   const browser = await chromium1010.launch({ headless: true });
   try {
@@ -192,7 +192,7 @@ test('#1010 숫자 두 줄 — 순간 N / 모아둔 M이 겹치지 않고 각자
       });
       assert.equal(line.text.length, 2, '숫자는 두 줄: ' + JSON.stringify(line));
       assert.match(line.text[0], /^순간 \d+$/, '첫 줄 ' + line.text[0]);
-      assert.match(line.text[1], /^모아둔 \d+$/, '둘 줄 ' + line.text[1]);
+      assert.match(line.text[1], /^정리 전 \d+$/, '둘 줄 ' + line.text[1]);
       assert.deepEqual(line.buttons, [true, true], '두 숫자 모두 단추다');
       assert.ok(line.gap >= 0, '두 줄이 겹치지 않는다: ' + JSON.stringify(line));
     } finally { await close1010(h); }
