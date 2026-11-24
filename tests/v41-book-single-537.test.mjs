@@ -534,7 +534,8 @@ test('#1287 모바일 책 보기 제어와 가로 복귀', { skip: REQUIRE ? fal
       const book = rect('#book');
       const after = rect('#whyMargin');
       return {
-        hit: [a?.width, a?.height, b?.width, b?.height],
+        hit: [a?.width, a ? a.height + 8 : 0, b?.width, b ? b.height + 8 : 0],
+        visual: [a?.height,b?.height],
         titleHidden: !title || getComputedStyle(title).display === 'none',
         gap: after && book ? after.top - book.bottom : -1,
         focus: window.LTDEMO.get(),
@@ -543,6 +544,7 @@ test('#1287 모바일 책 보기 제어와 가로 복귀', { skip: REQUIRE ? fal
     });
     assert.equal(initial.mode, 'single');
     assert.ok(initial.hit.every(v => v >= 44), '책/목록 단추의 누름 영역 44px 이상');
+    assert.deepEqual(initial.visual,[36,36],'책·목록의 화면 높이 36px 유지');
     assert.equal(initial.titleHidden, true, '휴대폰 도구 줄의 중복 제목 없음');
     assert.ok(initial.gap >= 12, '책 면과 이어 보기 사이 간격 12px 이상: ' + initial.gap);
     await frame.locator('#book-display-inline [data-book-display=list]').click();

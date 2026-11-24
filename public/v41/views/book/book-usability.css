@@ -354,7 +354,8 @@ html[data-v41-screen=book] .detail-stage-note[hidden]{display:none}
  html[data-v41-screen=book] .topbar .book-title{display:none}
  html[data-v41-screen=book] .book-card-moment{position:relative;padding-top:46px}
  html[data-v41-screen=book] .book-card-moment .moment-edit{position:absolute;right:12px;top:4px;z-index:2}
- html[data-v41-screen=book] #book-display-inline button{min-height:44px;min-width:44px}
+  #book-display-inline button{position:relative;height:36px;min-height:36px;min-width:44px}
+  #book-display-inline button::after{content:"";position:absolute;inset:-4px 0}
  html[data-v41-screen=book] .book-wrap{margin-bottom:16px}
  html[data-v41-screen=book] .stage{padding-bottom:calc(16px + env(safe-area-inset-bottom,0px))}
 }
