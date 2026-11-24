@@ -1275,7 +1275,7 @@ html[data-lt-auth-phase=pending] .app-header .tree-prefix{visibility:hidden}
  .app-header .header-actions>.account-slot{grid-column:3;grid-row:1;width:80px;justify-content:flex-end}
  .app-header .tree-slot{flex:0 0 208px;width:208px}
  .app-header .tree-prefix{flex:0 0 21px;width:21px;margin-right:8px}
- .app-header .tree-frame .tree-views{display:grid;grid-template-columns:56px 44px 56px 56px 104px;gap:2px}
+ .app-header .tree-frame .tree-views{display:grid;grid-template-columns:56px 56px 44px 56px 56px 104px;gap:2px}
  .app-header .tree-frame .tree-views>button[data-view]{padding-inline:0;width:100%}
  .app-header .tree-frame .tree-views>button#community-menu{width:96px;padding-inline:0}
  .app-header .account-slot>#account-entry{width:72px}
