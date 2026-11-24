@@ -54,6 +54,8 @@ export function createWorkspaceRuntime(ctx){
     }
     (0,ctx.$)('empty-records').hidden=false;(0,ctx.$)('empty-records').classList.add('primary');
     (0,ctx.$)('empty-sample').hidden=true;(0,ctx.$)('empty-file').hidden=true;
+    // #822 6단계: 트리가 아직 없는 내 계정에는 '이미 모아 둔 영상이 있나요? 북마크에서 가져오기' 한 줄을 함께 보인다.
+    void ctx.bookmarkEmptyEntry?.show(owned&&!!ctx.member?.snapshot().writable);
   }
 
   function paintEmptyCopy(){
@@ -73,6 +75,8 @@ export function createWorkspaceRuntime(ctx){
    (0,ctx.$)('empty-records').classList.toggle('primary',owned);
    (0,ctx.$)('empty-sample').classList.toggle('primary',!owned);
    (0,ctx.$)('empty-file').hidden=owned;
+   // #822 6단계: 북마크 입구 한 줄은 화면별 빈 상태(paintEmptyForScreen)에서만 보인다 — 이 문구로 바뀌면 거둔다.
+   void ctx.bookmarkEmptyEntry?.show(false);
   }
 
   // #977: 작업 공간을 읽다 예외가 나도 셸 전체가 멈추지 않게 한다.
