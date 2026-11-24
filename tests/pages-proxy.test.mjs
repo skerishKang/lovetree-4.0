@@ -19,7 +19,8 @@ test('#1211: 서명된 원문만 전달하고 수신 증명은 프록시가 만�
     ['정상', raw, timestamp, 'lovetree', sign(timestamp,'lovetree',raw), 200],
     ['본문 변경', raw+' ', timestamp, 'lovetree', sign(timestamp,'lovetree',raw), 401],
     ['오래된 시각', raw, String(+timestamp-301000), 'lovetree', sign(String(+timestamp-301000),'lovetree',raw), 401],
-    ['미래 시각', raw, String(+timestamp+301000), 'lovetree', sign(String(+timestamp+301000),'lovetree',raw), 401],
+    // 미래 쪽은 앞 사례를 처리하는 동안 시계가 흐르면 차이가 줄어든다 — 기준(300초)보다 1분 넉넉히 앞선 시각을 쓴다.
+    ['미래 시각', raw, String(+timestamp+360000), 'lovetree', sign(String(+timestamp+360000),'lovetree',raw), 401],
     ['다른 사이트', raw, timestamp, 'other', sign(timestamp,'other',raw), 401],
     ['서명 모양 오류', raw, timestamp, 'lovetree', 'sha256=bad', 401],
     ['8KB 경계', raw.padEnd(8192-4,' '), timestamp, 'lovetree', sign(timestamp,'lovetree',raw.padEnd(8192-4,' ')), 200],
@@ -178,8 +179,8 @@ test('status·Location·Set-Cookie 를 그대로 돌려준다', async () => {
     headers: [
       ['location', '/'],
       ['content-type', 'text/plain; charset=utf-8'],
-      ['set-cookie', 'lovetree_session=abc; Path=/; Max-Age=3600; SameSite=Lax; HttpOnly'],
-      ['set-cookie', 'lovetree_oauth_state=; Path=/; Max-Age=0; SameSite=Lax; HttpOnly']
+      ['set-cookie', '__Host-lovetree-access=abc; Path=/; Max-Age=3600; SameSite=Lax; Secure; HttpOnly'],
+      ['set-cookie', 'lovetree_auth_state=; Path=/; Max-Age=0; SameSite=Lax; HttpOnly']
     ]
   }));
   const response = await onRequest(createProxy({ fetcher }), 'https://lovetree.example/auth/callback?code=lovt_1&state=s1');
@@ -187,8 +188,8 @@ test('status·Location·Set-Cookie 를 그대로 돌려준다', async () => {
   assert.equal(response.headers.get('location'), '/');
   const cookies = response.headers.getSetCookie();
   assert.equal(cookies.length, 2);
-  assert.match(cookies[0], /^lovetree_session=abc;/);
-  assert.match(cookies[1], /^lovetree_oauth_state=;/);
+  assert.match(cookies[0], /^__Host-lovetree-access=abc;/);
+  assert.match(cookies[1], /^lovetree_auth_state=;/);
 });
 
 test('사용자 요청으로 업스트림 목적지를 바꿀 수 없다', async () => {

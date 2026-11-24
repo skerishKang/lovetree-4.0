@@ -97,7 +97,9 @@ export function createMemberRuntime(ctx){
        if(generation!==ctx.loadGeneration||!ctx.member?.snapshot().owned||ctx.syncedNoticeKeys.has(key))return;
        ctx.syncedNoticeKeys.add(key);
        ctx.noticeQueue.request('toast',{maxWait:5000,
-        show:()=>ctx.shellNotice.notifyOnce(text,key),
+        // #1223: 앞선 우선순위 안내에 밀려 지나간 synced 알림이 notifyOnce 기록에 막혀 다시 뜨지 않았다.
+        // 중복은 위의 syncedNoticeKeys가 이미 막으므로 일반 notify로 띄운다(선점 뒤 대기열 재표시 허용).
+        show:()=>ctx.shellNotice.notify(text),
         hide:ctx.hideToast
        });
       }).catch(error=>report(error,'새 소식 확인'));
@@ -123,7 +125,7 @@ export function createMemberRuntime(ctx){
    else if(!status.dirty&&status.phase==='offline')(0,ctx.notify)(status.detail||'내 기록을 불러오지 못했어요.');
    (0,ctx.$)('write-menu').textContent=status.dirty?'저장 안 됨' :'＋ 순간 추가';
    // #1109: 내 화면을 먼저 고른 경우 빈 판 안내를 회원 상태 알림이 덮지 않는다.
-   if(ctx.current!=='src064-orbit.html'&&!window.LT41&&ctx.source!=='share'&&!(0,ctx.$)('empty').hidden)(0,ctx.paintEmptyForScreen)(ctx.current);
+   if(ctx.current!=='src064-orbit.html'&&ctx.source!=='share'&&!(0,ctx.$)('empty').hidden&&(!window.LT41||(0,ctx.$)('empty').dataset.emptyGuest==='1'))(0,ctx.paintEmptyForScreen)(ctx.current);
    else{(0,ctx.$)('empty-records').textContent=status.writable?'＋ 첫 트리 만들기':'내 기록 불러오기';(0,ctx.$)('empty-records').classList.toggle('primary',!!status.writable);(0,ctx.$)('empty-sample').classList.toggle('primary',!status.writable);}
    ctx.previousDirty=status.dirty;(0,ctx.renderAccount)();(0,ctx.flowNavigation)();document.body.dataset.member=ctx.member?.snapshot().owned?'in':'out';document.body.dataset.treeCount=String(ctx.model?.trees?.length||0);(0,ctx.applyAdvanced)();
   }
@@ -202,7 +204,12 @@ export function createMemberRuntime(ctx){
   async function sample(selection={},view){if(!(0,ctx.pauseMember)())return;const tree=await (0,ctx.loadExampleTree)();++ctx.loadGeneration;if(view)ctx.current=view;(0,ctx.load)(null,'example',selection,{},tree);if(view)(0,ctx.writeLocation)();(0,ctx.$)('save-feedback').hidden=true;if((0,ctx.$)('account-settings').open)(0,ctx.$)('account-settings').close();}
 
   // #1175: 공유 화면 밖으로 나가는 길 한 벌 — share 잔여를 치우고 예시 첫 화면으로 돌아가며, 화면에 남은 '감상' 안내를 거둔다.
-  function leaveShare(view){(0,ctx.hideToast)();void sample({},view);}
+  function leaveShare(view){
+    (0,ctx.hideToast)();
+    // 남의 공유에서 로고·뒤로가기로 나가면 방문자 자신의 첫 화면/계정으로 돌아간다.
+    if(ctx.member?.snapshot().owned||ctx.visitorAccount){ctx.current=view||'src064-orbit.html';void (0,ctx.startMember)();}
+    else void sample({},view);
+  }
   Object.defineProperties(ctx,{
     startMember:{value:startMember},
     sample:{value:sample},

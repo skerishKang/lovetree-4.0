@@ -188,12 +188,12 @@ test('트리 선택 글자는 로그인 상태에서만 "트리: 이름"이고 �
   assert.equal(treePickerText({owned: true, treeTitle: '그날의 공기', pendingDraft: true}), '트리: 그날의 공기');
 });
 
-test('트리 보기 탭은 로그인한 내 트리에서만 보인다', () => {
+test('서재·책·보드·지도 화면 탭은 로그인 여부·방문자 읽기와 무관하게 보인다', () => {
   assert.equal(treeViewsVisible({owned: true}), true);
-  assert.equal(treeViewsVisible({owned: false}), false);
-  // 공유로 남의 트리를 감상할 때도 숨긴다.
-  assert.equal(treeViewsVisible({owned: true, publicReading: true}), false);
-  assert.equal(treeViewsVisible({owned: false, publicReading: true}), false);
+  assert.equal(treeViewsVisible({owned: false}), true);
+  // 방문자도 같은 책·보드·지도 탭을 쓰고 서재·트리 선택·쓰기만 별도로 숨긴다.
+  assert.equal(treeViewsVisible({owned: true, publicReading: true}), true);
+  assert.equal(treeViewsVisible({owned: false, publicReading: true}), true);
 });
 
 test('브라우저에만 남은 미저장 기록을 찾아낸다', () => {

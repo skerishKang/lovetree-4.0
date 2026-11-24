@@ -422,7 +422,7 @@ function markup(url,title='',mediaMetadata=null,momentId='',context=null,momentM
  const body=m.kind==='tiktok'?(ttPanel+cached):m.kind==='instagram'?(igPanel+cached):auto
   // 내 기록: 썸네일을 처음부터 보여 준다(no-referrer·lazy). 재생 표시는 썸네일 전체를 덮는 단추라
   // 썸네일 아무 곳이나 눌러도 그 자리에서 재생한다. autoplay 는 누른 뒤 만들어지는 embed 주소에만 있다.
-  ?'<figure class="lt-yt-preview" data-lt-thumb-host><img src="'+esc(previewSrc)+'" alt="'+esc(title||'YouTube 영상 썸네일')+'"'+previewFallback+' referrerpolicy="no-referrer" loading="lazy" decoding="async"><button type="button" class="lt-yt-play" data-lt-play aria-label="바로 재생"><span aria-hidden="true">▶</span></button></figure>'+cached
+  ?'<figure class="lt-yt-preview" data-lt-thumb-host><img src="'+esc(previewSrc)+'" alt="'+esc(title||'YouTube 영상 썸네일')+'"'+previewFallback+' referrerpolicy="no-referrer" loading="lazy" decoding="async">'+(vertical?'<span class="lt-vertical-backdrop" aria-hidden="true"><img src="'+esc(previewSrc)+'" alt="" referrerpolicy="no-referrer" loading="lazy" decoding="async"></span>':'')+'<button type="button" class="lt-yt-play" data-lt-play aria-label="바로 재생"><span aria-hidden="true">▶</span></button></figure>'+cached
   :(linkCard?linkCard:(canLoad?'<button type="button" data-lt-load>'+esc(m.loadLabel)+'</button>':'<span>'+esc(m.label)+'</span>')+cached);
  const status=compact?'':(m.kind==='tiktok'?'재생을 누르면 공식 재생기가 열려요. 썸네일이 막혔으면 다시 받아 주세요.':m.kind==='instagram'?'재생을 누르면 공식 재생기가 열려요.':(auto?'재생을 누르면 여기서 바로 재생해요.':(canLoad?'불러오기를 누르면 원본 사이트에 연결됩니다.':'원본 사이트에서 확인할 수 있어요.')));
  // #393 2: 크게 보기 — 영상을 어두운 깔개 위 화면 가운데 크게 연다(바깥 클릭·Esc로 복귀).
@@ -769,4 +769,16 @@ if(typeof document!=='undefined'){
  document.addEventListener('pointerdown',e=>{if(e.target.closest?.('.lt-media')&&!e.target.closest?.('.card'))e.stopPropagation();},true);
  document.addEventListener('click',e=>{if(e.target.closest?.('[data-lt-title-edit]'))return;const root=e.target.closest?.('.lt-media');if(!root)return;e.stopImmediatePropagation();if(e.target.closest('[data-lt-thumb-refresh]')){e.preventDefault();void refreshTiktokThumb(root);return;}if(e.target.closest('[data-lt-expand]')){e.preventDefault();void openLightbox(root.dataset.ltUrl,root.dataset.ltTitle,root.hasAttribute('data-lt-vertical')?true:null,root.dataset.ltTiktokId);return;}if(e.target.closest('[data-lt-from-start]')){e.preventDefault();delete root.dataset.ltEnd;root.dataset.ltFromStart='1';void playInPlace(root);return;}if(e.target.closest('[data-lt-play]')){e.preventDefault();void playInPlace(root);return;}if(e.target.closest('[data-lt-load]')){e.preventDefault();load(root);}},true);
 }
+ // #1084 후속(운영 11-23): 세로 영상의 흐린 배경 그림은 가운데 썸네일의 첫 후보(oardefault)로 깔린다. 그 그림이 없는
+ // 영상은 YouTube가 120×90 회색 자리 그림을 돌려줘, 가운데는 다른 후보로 내려가도 배경만 회색이 된다.
+ // 가운데 썸네일이 실제로 불러온 그림으로 배경도 맞춘다(보드·책 공통).
+ const BACKDROP='.lt-vertical-backdrop img,.yt-vertical-backdrop img';
+ const syncBackdrop=img=>{
+  if(!(img instanceof HTMLImageElement))return;
+  const host=img.closest?.('[data-lt-thumb-host],.yt-play');if(!host)return;
+  const back=host.querySelector(BACKDROP);if(!back)return;
+  const main=img.matches(BACKDROP)?[...host.querySelectorAll('img')].find(x=>!x.matches(BACKDROP)&&x.naturalWidth>120):(img.naturalWidth>120?img:null);
+  if(main&&main.currentSrc&&back.src!==main.currentSrc&&(back.naturalWidth<=120||img===main))back.src=main.currentSrc;
+ };
+ if(typeof document!=='undefined')document.addEventListener('load',e=>syncBackdrop(e.target),true);
 })();

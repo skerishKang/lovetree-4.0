@@ -8,8 +8,7 @@
 | `functions/auth/[[path]].js` | `/auth/*` 전체를 소유(로그인·콜백·로그아웃만 통과) |
 | `functions/_lib/proxy.js` | 실제 프록시(설정·허용 목록·헤더·오류 계약) |
 | `public/_routes.json` | `/api/*`·`/auth/*`를 Function 소유로 못 박아 SPA 폴백이 삼키지 않게 한다(빌드 산출 `dist/_routes.json`) |
-| `tests/pages-proxy.test.mjs` | 계약 회귀 시험(15건) |
-| `scripts/dev-auth-chain.mjs` | `LOVETREE_DEV_FRONT_PORT`로 같은 프록시를 앞원진에 얹어 로컬에서 실제 화면 흐름을 검증한다 |
+| `tests/pages-proxy.test.mjs` | 계약 회귀 시험(15건) — #1247에서 옛 로그인 사슬 검증 스크립트를 걷어내고 이 시험이 계약을 그대로 지킨다 |
 
 ## 통합 출처
 

@@ -175,6 +175,7 @@ export function createNavigationRuntime(ctx){
       getModel:()=>ctx.model,
       getSource:()=>ctx.source,
       getCurrent:()=>ctx.current,
+      getVisitorAccount:()=>ctx.visitorAccount||null,
       accountApi:ctx.accountApi,
       // #368: 이메일을 불러오거나 지울 때마다 설정 "프로필" 표시도 같이 칠한다.
       onEmailChange:email=>(0,ctx.paintSettingsProfile)(email),
@@ -193,6 +194,7 @@ export function createNavigationRuntime(ctx){
       setCurrent:file=>{ctx.current=file;},
       getSource:()=>ctx.source,
       hasTree:()=>!!window.LT41,
+      isGuest:()=>!ctx.member?.snapshot().owned && ctx.source!=='share',
       takeNetworkOpen:ctx.takeNetworkOpen,
       takeBoardOpen:ctx.takeBoardOpen,
       // #1026 E: 로그아웃 예시를 동적으로 받는 동안에는 사용자가 연 창을 닫지 않는다.

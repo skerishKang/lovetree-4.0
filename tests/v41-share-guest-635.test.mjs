@@ -475,10 +475,7 @@ test('#635 PR C 규칙(정적): 시작 입구·첫날 표기·크게 보기 대�
   /* #book-dup2: 여백 60→68px — 보라색 책 테두리(.book-cover)가 wrap 아래로 14px 내려와 60px로는
      테두리 아래끝이 링크 줄 위 11px(정원에서는 10px 겹침)이었다. 68px로 테두리 아래끝을 링크 줄 위 17px에 둔다. */
   assert.match(layout, /padding:24px 14px 68px/, '390 책 화면: 아래 고정 링크 줄과 책 테두리가 겹치지 않게 16px 이상 띄울 여백을 둔다');
-  const orbit = read('src/views/orbit.js');
-  assert.match(orbit, /<span class="center-hint">드래그 · 금테 카드를 눌러 감상<\/span>/, '첫 화면 안내는 안내 줄 옆에 함께 그린다');
-  assert.ok(!orbit.includes('<div class="hint">드래그'), '첫 화면 오른쪽 아래 고정 안내(링크 줄과 겹치던)는 치웠다');
-  assert.match(orbit, /\.center-note\{display:flex;flex-wrap:wrap/, '안내 줄은 단추 묶음 바로 아래에서 두 문장을 나란히 쓴다');
+  // #1204 removed the old two-line orbit guidance; its absence and spacing are browser-tested.
 });
 
 // 실제 셸(/v41/)을 여는 도우미 — 로그아웃 상태 그대로(예시 기록).
@@ -587,7 +584,7 @@ test('#635 PR C 화면: 메뉴 시작 입구·첫날 표기·크게 보기 대�
           await context.close();
         }
 
-        // 11-첫 화면. 안내(단추 묶음 바로 아래)와 고정 링크 줄이 겹치지 않고 16px 이상 떨어져 있다.
+        // 11-첫 화면. #1204 removed the guidance below the actions; action row and fixed links remain apart.
         {
           const { context, page, frame, problems } = await openShell(browser, base, '', { width, height, theme });
           assert.equal(problems.length, 0, `첫 화면 ${width}·${theme}: 화면 오류 ${problems.join(' | ')}`);
@@ -601,15 +598,14 @@ test('#635 PR C 화면: 메뉴 시작 입구·첫날 표기·크게 보기 대�
           });
           assert.equal(drawn.nf, false, `${width}·${theme}: 첫 화면이 404('nf')로 그려졌다 — 시험 서버가 dist(빌드 산출물)를 서빙하는지 확인`);
           assert.ok(drawn.cards > 0 || drawn.center, `${width}·${theme}: 첫 화면(궤도)이 그려지지 않았다(카드 0개)`);
-          const noteBox = await frame.locator('.center-note').first().boundingBox();
+          const noteBox = await frame.locator('.center .actions').first().boundingBox();
           const linksBox = await page.locator('.home-links').boundingBox();
-          assert.ok(noteBox && linksBox, `${width}·${theme}: 안내 줄·링크 줄 자리를 못 읽었다`);
+          assert.ok(noteBox && linksBox, `${width}·${theme}: 단추 줄·링크 줄 자리를 못 읽었다`);
           const gapHome = Math.round(linksBox.y - (noteBox.y + noteBox.height));
           const overlapHome = Math.max(0, Math.min(noteBox.y + noteBox.height, linksBox.y + linksBox.height) - Math.max(noteBox.y, linksBox.y));
-          assert.equal(overlapHome, 0, `${width}·${theme}: 첫 화면 안내와 링크 줄이 ${overlapHome}px 겹친다`);
-          assert.ok(gapHome >= 16, `${width}·${theme}: 첫 화면 안내와 링크 줄 사이가 ${gapHome}px다(16px 이상)`);
-          const hintPos = await frame.evaluate(() => { const root = document.getElementById('orbit'); const el = root && root.shadowRoot ? root.shadowRoot.querySelector('.center-hint') : document.querySelector('.center-hint'); return el ? getComputedStyle(el).position : '없음'; });
-          assert.equal(hintPos, 'static', `${width}·${theme}: 안내가 여전히 화면 아래 고정 자리다(${hintPos})`);
+          assert.equal(overlapHome, 0, `${width}·${theme}: 첫 화면 단추와 링크 줄이 ${overlapHome}px 겹친다`);
+          assert.ok(gapHome >= 16, `${width}·${theme}: 첫 화면 단추와 링크 줄 사이가 ${gapHome}px다(16px 이상)`);
+          assert.equal(await frame.locator('.center-note,.center-hint').count(), 0, `${width}·${theme}: 지운 안내 문구가 다시 나타났다`);
           // #book-dup. 새 소식 카드: 390에서 머리줄 바로 아래 자리는 '순간 목록'·테마 단추를 가렸다(실측 겹침 133×66px).
           // 이제 화면 아래, 링크 줄 위에 놓인다 — 어떤 단추와도 겹침 0. 1440 자리(오른쪽 아래)는 그대로다.
           {
@@ -758,6 +754,195 @@ test('#792 ⑤ 화면: 공유 책 순간 상세에서 순간 열기·이 무대 
     }
   } finally {
     if (browser) await browser.close().catch(() => {});
+    server.close();
+  }
+});
+
+// 방문자 보기: 같은 셸·같은 책/보드/지도 문서를 사용하며 쓰기 요청은 내지 않는다.
+// 모든 사진은 테스트 서버의 고정 트리에서 만든다. 실계정·실제 공유 주소를 열지 않는다.
+test('방문자 공용 화면: 1440·390 책·보드·지도, 옛 공유 주소, 로고·둘러보기, 쓰기 0', {
+  skip: REQUIRE ? false : skip, timeout: 240000
+}, async () => {
+  if (skip) assert.fail('필수 브라우저가 없어 방문자 화면 검증을 진행할 수 없어요: '+skip);
+  const server = await serve();
+  const base = 'http://127.0.0.1:' + server.address().port;
+  const shareId='visitor-fixture-000000001';
+  const time='2026-11-23T00:00:00.000Z';
+  const fixtureTree={...tree,subject:'시험 트리',coverMomentId:'',coverDesign:'',inbox:false,createdAt:time,updatedAt:time,
+    moments:tree.moments.map(m=>({...m,createdAt:time,links:[]}))};
+  const {workspaceModel}=await import('../public/v41/workspace-model.mjs');
+  assert.equal(workspaceModel({revision:1,state:{version:1,trees:[fixtureTree]}}).trees.length,1,'공유와 내 화면이 동일한 유효 자료를 쓴다');
+  const screens = {book:'track59-sketchbook.html',board:'track58-pinboard.html',network:'track56-network.html'};
+  const matrix = [];
+  let browser;
+  try {
+    browser = await chromium.launch({headless:true});
+    const openShell = async ({width=1440,theme='night',view='book',owner=false,legacy=false,authenticatedShare=false}={}) => {
+      const context = await browser.newContext({viewport:{width,height:900},reducedMotion:'reduce'});
+      await context.addInitScript(t => {localStorage.setItem('lt41.theme',t);localStorage.setItem('lt41.boardTheme',t==='garden'?'paper':'night');},theme);
+      const writes=[];
+      await context.route('**/api/**', route => {
+        const request = route.request(), u=new URL(request.url());
+        if (!['GET','HEAD','OPTIONS'].includes(request.method())) writes.push({method:request.method(),path:u.pathname});
+        if(u.pathname==='/api/public/shares/'+shareId) return route.fulfill({status:200,json:{
+          ok:true,share:{id:shareId,view:'book',entryMomentId:'m1'},tree:fixtureTree
+        }});
+        if(u.pathname==='/api/workspace') return route.fulfill({status:200,json:{
+          revision:1,state:{version:1,trees:[fixtureTree],prefs:{}},subject:'fixture-visitor-owner',writeSubjectBound:true,savedAt:'2026-11-23T00:00:00.000Z'
+        }});
+        if(u.pathname==='/api/account') return route.fulfill(authenticatedShare||owner
+          ? {status:200,json:{ok:true,subject:'fixture-visitor-owner',email:'방문자'}}
+          : {status:401,json:{ok:false,error:{code:'not_logged_in'}}});
+        return route.fulfill({status:200,json:{ok:true,items:[],shares:[]}});
+      });
+      await context.route('**://i.ytimg.com/**',route=>route.abort());
+      const page=await context.newPage(), errors=[];
+      page.on('pageerror',e=>errors.push(String(e).slice(0,160)));
+      const hash=owner?'#my/'+view+'?tree=t1':('#share/'+shareId+(legacy?'':'/'+view));
+      await page.goto(base+'/v41/'+hash,{waitUntil:'domcontentloaded'});
+      try {
+        await page.waitForFunction(({filename,mode})=>{
+          const v=document.querySelector('#view'),ctx=window.LT41;
+          return ctx?.source===mode && v&&!v.hidden&&v.contentDocument?.readyState==='complete'
+            && v.contentWindow?.location?.pathname?.endsWith(filename)
+            && (v.contentDocument?.querySelector('.lt-screen-toolbar') || v.contentDocument?.querySelector('header'));
+        },{filename:screens[view],mode:owner?'server':'share'},{timeout:10000});
+      } catch (error) {
+        const diagnostic=await page.evaluate(()=>({
+          hash:location.hash,source:window.LT41?.source,tree:window.LT41?.tree?.id,
+          frames:[...document.querySelectorAll('#stage>iframe')].map(f=>({id:f.id,hidden:f.hidden,url:f.contentWindow?.location.href,ready:f.contentDocument?.readyState})),
+          empty:document.querySelector('#empty')?.innerText?.slice(0,150),
+          body:document.body?.dataset
+        }));
+        throw Error('화면 진입 검증 실패: '+JSON.stringify({owner,view,diagnostic,errors}));
+      }
+      await page.waitForTimeout(350);
+      assert.deepEqual(errors,[], '화면 스크립트 오류: '+errors.join('; '));
+      return {context,page,writes};
+    };
+    const metrics=async(page)=>page.evaluate(()=>{
+      const box=e=>{if(!e)return null;const r=e.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height}};
+      const v=document.querySelector('#view'), doc=v?.contentDocument;
+      return {
+        header:box(document.querySelector('.app-header')),
+        toolbar:box(doc?.querySelector('.lt-screen-toolbar')||doc?.querySelector('header')),
+        stage:box(document.querySelector('#stage')),
+        tabs:[...document.querySelectorAll('#tree-views button[data-view]')].filter(x=>x.getBoundingClientRect().width>0).map(x=>x.textContent.trim()),
+        browseVisible:!!document.querySelector('#community-menu')?.getClientRects().length,
+        pickerVisible:!!document.querySelector('.tree-slot')?.getClientRects().length,
+        writeVisible:!!document.querySelector('#write-menu')?.getClientRects().length,
+        readonly:v?.contentWindow?.LTDEMO?.readOnly,
+        writable:window.LT41?.writable,
+        source:window.LT41?.source,
+        frameUrl:v?.contentWindow?.location?.pathname,
+        theme:document.documentElement.getAttribute('data-lt-theme')||'night'
+      };
+    });
+    const owner=await openShell({owner:true,view:'book',width:1440});
+    const ownerMetrics=await metrics(owner.page);
+    assert.equal(ownerMetrics.source,'server');
+    const ownerPhone=await openShell({owner:true,view:'book',width:390});
+    await ownerPhone.page.setViewportSize({width:390,height:844});
+    const ownerLayouts={1440:{book:ownerMetrics,board:ownerMetrics,network:ownerMetrics},390:{book:await metrics(ownerPhone.page)}};
+    for(const view of ['board','network']){
+      const ownedView=await openShell({owner:true,view,width:390});
+      try{
+        await ownedView.page.setViewportSize({width:390,height:844});
+        ownerLayouts[390][view]=await metrics(ownedView.page);
+      } finally{await ownedView.context.close();}
+    }
+    // 비교 캡처는 첫 방문 권유 창·몇 초 뒤 사라지는 토스트 없이 동일한 내용 판으로 찍는다.
+    await owner.page.getByRole('button',{name:'지금은 안 할래요'}).click({timeout:2000}).catch(()=>{});
+    await owner.page.evaluate(()=>{const toast=document.querySelector('#toast');if(toast)toast.hidden=true;});
+    let ownerBuffer=await owner.page.screenshot(), visitorBookBuffer=null;
+    for(const [width,height] of [[1440,900],[390,844]]){
+      for(const theme of ['night','garden']){
+        for(const view of ['book','board','network']){
+          const visiting=await openShell({width,theme,view});
+          try{
+            await visiting.page.setViewportSize({width,height});
+            const m=await metrics(visiting.page);
+            if(width===1440){
+              assert.deepEqual(m.tabs,['책','보드','지도'],width+' '+theme+' '+view+': 공유 탭 구성');
+              assert.equal(m.browseVisible,true,'데스크톱 둘러보기 단추');
+            } else {
+              assert.deepEqual(m.tabs,[],'모바일은 내 화면처럼 접기 메뉴에서 탭을 표시한다');
+              await visiting.page.locator('#mobile-more').click();
+              const items=await visiting.page.locator('#header-overflow button').allTextContents();
+              for(const name of ['책','보드','지도','둘러보기'])assert.ok(items.includes(name),'모바일 메뉴 '+name);
+              assert.ok(!items.includes('서재'),'방문자 메뉴에는 서재가 없다');
+              assert.ok(!items.some(x=>x.includes('순간 추가')),'방문자 메뉴에는 쓰기 입구가 없다');
+              await visiting.page.locator('#mobile-more').click();
+            }
+            assert.equal(m.source,'share');
+            assert.equal(m.readonly,true,'안쪽 화면이 공유 읽기 전용이다');
+            assert.equal(m.writable,false,'쓰기 권한이 없다');
+            assert.equal(m.writeVisible,false,'쓰기 단추가 없다');
+            assert.equal(m.pickerVisible,false,'트리 고르기 화면이 없다');
+            const baseline=ownerLayouts[width][view];
+            assert.ok(Math.abs(m.header.height-baseline.header.height)<=2,'공용 머리줄 높이 오차 2px 이하: '+JSON.stringify({width,view,theme,visitor:m.header,owner:baseline.header}));
+            assert.ok(Math.abs(m.stage.y-baseline.stage.y)<=2,'공용 화면 시작 위치 오차 2px 이하');
+            if(view==='book'){
+              assert.ok(m.toolbar && baseline.toolbar,'책 도구 줄을 실제로 표시한다');
+              assert.ok(Math.abs(m.toolbar.height-baseline.toolbar.height)<=2,'책 도구 줄 높이 오차 2px 이하');
+              // 비교 캡처는 아래에서 임시 알림을 정리한 뒤 만든다.
+            }
+            const key='visitor-'+view+'-'+width+'-'+theme;
+            await visiting.page.evaluate(()=>{const toast=document.querySelector('#toast');if(toast)toast.hidden=true;});
+            if(view==='book'&&width===1440&&theme==='night') visitorBookBuffer=await visiting.page.screenshot();
+            await shot(visiting.page,key);
+            matrix.push({width,theme,view,header:m.header.height,toolbar:m.toolbar?.height});
+            if(view==='book'&&width===1440&&theme==='night'){
+              const frame=visiting.page.frames().find(f=>f.url().endsWith('/'+screens.book));
+              if(frame){
+                await frame.evaluate(()=>{parent.postMessage({type:'lt41-new-tree'},location.origin);parent.postMessage({type:'lt41-write',mode:'edit',momentId:'m1'},location.origin)});
+                await visiting.page.waitForTimeout(180);
+                assert.equal(await visiting.page.locator('#write-panel').evaluate(el=>el.open),false,'방문자가 쓰기 창을 열 수 없다');
+              }
+            }
+            assert.deepEqual(visiting.writes,[],'공유 탐색 중 변경 API 요청 0');
+            if(view==='book'&&width===390&&theme==='night'){
+              await visiting.page.locator('#mobile-more').click();
+              await visiting.page.getByRole('menuitem',{name:'둘러보기'}).click();
+              await visiting.page.waitForFunction(()=>location.hash.startsWith('#explore')&&document.querySelector('#community-panel')?.open,{timeout:9000}).catch(async()=>{throw Error('둘러보기로 나가지 못함')});
+              assert.equal(visiting.writes.length,0);
+              await visiting.page.locator('.brand').click();
+              await visiting.page.waitForFunction(()=>location.hash==='#home',{timeout:9000}).catch(async()=>{throw Error('로고로 나가지 못함')});
+            }
+          }finally{await visiting.context.close();}
+        }
+      }
+    }
+    assert.ok(visitorBookBuffer,'비교용 방문자 책 캡처가 만들어졌다');
+    const comparison=await browser.newPage({viewport:{width:2880,height:900}});
+    await comparison.setContent('<style>body{margin:0;display:flex}img{width:1440px;height:900px;object-fit:contain}</style>'+
+      '<img alt="내 책" src="data:image/png;base64,'+ownerBuffer.toString('base64')+'">'+
+      '<img alt="방문자 책" src="data:image/png;base64,'+visitorBookBuffer.toString('base64')+'">');
+    await comparison.screenshot({path:path.join(CAPTURE_DIR,'owner-vs-visitor-book-1440-night.png')});
+    await comparison.close();
+    await owner.context.close();
+    await ownerPhone.context.close();
+    const legacy=await openShell({width:1440,view:'book',legacy:true});
+    assert.equal((await metrics(legacy.page)).source,'share','#share/<id> 옛 주소도 감상한다');
+    await legacy.context.close();
+    const authenticated=await openShell({width:1440,view:'book',authenticatedShare:true});
+    try{
+      await authenticated.page.waitForFunction(()=>!document.querySelector('#account-avatar')?.hidden,{timeout:8000});
+      assert.equal(await authenticated.page.locator('#account-entry').isHidden(),true,'로그인한 방문자는 계정 단추를 본다');
+      await authenticated.page.locator('#account-avatar').click();
+      await authenticated.page.waitForFunction(()=>location.hash.startsWith('#my/home'),null,{timeout:8000});
+    }finally{await authenticated.context.close();}
+    const signedLogo=await openShell({width:1440,view:'book',authenticatedShare:true});
+    try{
+      await signedLogo.page.waitForFunction(()=>!document.querySelector('#account-avatar')?.hidden,null,{timeout:8000});
+      await signedLogo.page.locator('.brand').click();
+      await signedLogo.page.waitForFunction(()=>location.hash==='#home'&&window.LT41?.source==='server',null,{timeout:12000});
+      assert.equal(signedLogo.writes.length,0,'방문자 로고는 내 계정을 읽기만 한다');
+    }finally{await signedLogo.context.close();}
+    assert.equal(matrix.length,12,'지시한 1440·390 × 밤·정원 × 책·보드·지도 12장');
+    console.log('방문자 캡처 12장 + 비교 1장 확인:',CAPTURE_DIR);
+  }finally{
+    await browser?.close().catch(()=>{});
     server.close();
   }
 });

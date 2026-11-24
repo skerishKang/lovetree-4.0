@@ -53,9 +53,3 @@ test('첫 화면 건너뛰기는 44px 이상이다', () => {
   assert.match(rule, /min-height:44px/);
   assert.match(rule, /display:inline-flex/);
 });
-
-test('첫 화면 카드 출처 안내는 live region이다', () => {
-  const home = read('v41/home.js');
-  assert.match(home, /center-note'\)\?\.setAttribute\('aria-live','polite'\)/);
-  assert.match(home, /center-note'\)\?\.setAttribute\('role','status'\)/);
-});

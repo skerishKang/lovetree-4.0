@@ -330,8 +330,8 @@ momentContent=function(m,compact=false){
     :'<img src="'+t(remoteThumb)+'" alt="'+t(safe.title||'YouTube 영상 썸네일')+'"'+thumbFallback+' referrerpolicy="no-referrer" loading="lazy" decoding="async">';
    // YouTube 출처는 링크 한 곳에만 남긴다.
    const piece='<div class="clipping moment" data-moment="'+t(safe.id)+'">'+
-    '<button type="button" class="yt-play'+(vertical?' is-vertical':'')+'" data-lt-thumb-host data-yt-play="'+t(media.videoId)+'" data-yt-start="'+t(media.startSeconds||0)+'" data-yt-end="'+t(m.endSeconds||'')+'"'+(vertical?' data-yt-vertical="1"':'')+'>'+
-    face+
+    '<button type="button" class="yt-play'+(vertical?' is-vertical':'')+(vertical&&!thumb?' is-remote-vertical':'')+'"'+' data-lt-thumb-host data-yt-play="'+t(media.videoId)+'" data-yt-start="'+t(media.startSeconds||0)+'" data-yt-end="'+t(m.endSeconds||'')+'"'+(vertical?' data-yt-vertical="1"':'')+'>'+
+    (vertical&&!thumb?'<span class="yt-vertical-backdrop" aria-hidden="true"><img src="'+t(remoteThumb)+'" alt="" referrerpolicy="no-referrer" loading="lazy" decoding="async"></span>':'')+face+
     '<span class="yt-play-label">'+t(label)+'</span></button>'+
     '<div class="media-links"><a class="media-source-link" href="'+t(media.openUrl)+'" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">YouTube ↗</a>'+
     '<button type="button" data-yt-expand="'+t(safe.id)+'">크게 보기</button></div></div>';

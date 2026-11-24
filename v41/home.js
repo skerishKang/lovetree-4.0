@@ -32,6 +32,10 @@ const popular=mode==='popular'?await fetchPopularCards({limit:HOME_ORBIT_LIMIT})
 const mediaState=globalThis.LTMedia?.currentContext?.()||{source:'',owned:false};
 const youtube={describe:url=>globalThis.LTMedia?.describe?.(url)??null,auto:globalThis.LTMedia?.autoLoadMedia?.(mediaState.source,mediaState.owned)===true || (context.source==='server' && loggedIn && shellBody.dataset.member==='in')};
 const cardsPlan=homeCardsPlan({mode,loggedIn,context,popular,youtube});
+// 첫 화면이 셸의 기록을 다 받기 전에 그려지면 내 사진·영상 순간이 아직 없어 '예시만' 궤도로 시작한다(운영 11-24).
+// #1109 뒤로는 셸이 프레임을 다시 띄우지 않으므로, 기록이 도착했을 때 궤도 카드 구성이 달라지면 첫 화면만 다시 그린다.
+const cardsPlanKey=plan=>plan.kind+':'+plan.cards.map(c=>c?.id||c?.key||'').join(',');
+const initialCardsPlanKey=cardsPlanKey(cardsPlan);
 const cardTrees=cardsPlan.cards.length?[{id:'home-cards',title:'첫 화면 카드',moments:cardsPlan.cards}]:[];
 // #394: 순간 목록은 모든 트리의 순간을 최근 순으로 보는 곳. 트리 드롭다운의 "내 순간 전체 보기"로
 // 열릴 때는 셸이 남긴 요청(LT41_MOMENTS_OPEN)의 트리가 골라진 상태로 시작한다.
@@ -243,10 +247,7 @@ guideDialog.addEventListener('click',e=>{
   if(!hasMoments)first.onclick=loggedIn?()=>bridge.actions.requestMoment('add'):bridge.actions.start;
 }
 // 예시 모드는 궤도의 기존 안내를 그대로 두고, 나머지는 계획의 문구를 쓴다(빈 문자열이면 숨김).
-if(cardsPlan.note!==null)shadow.querySelector('.center-note').textContent=cardsPlan.note;
-// 2026-11-08 접근성: 카드 출처 안내가 바뀌면 화면 낭독기가 알린다.
-shadow.querySelector('.center-note')?.setAttribute('aria-live','polite');
-shadow.querySelector('.center-note')?.setAttribute('role','status');
+// #1204: the bottom guidance row was removed; keep home actions initialization independent of it.
 // 261116 PR 2(대표 확정): 큰 제목 아래 둘째 줄 안내(옛 정리 알림·첫 순간 안내)는 치웠다 —
 // 그 자리(글귀 바로 아래)에 '+ 순간 추가' 단추(밝은 채움)가 온다. 로그인 상태만 — 로그아웃은 지금처럼 둔다.
 if(hasMoments){
@@ -345,6 +346,13 @@ function refreshCountsFromParent(){
  const fresh=parent.LT41?.trees;
  if(!Array.isArray(fresh))return false;
  context.trees=fresh;
+ if(mode!=='example'&&mode!=='popular'){
+  const media=globalThis.LTMedia?.currentContext?.();
+  const nextYoutube={describe:youtube.describe,auto:globalThis.LTMedia?.autoLoadMedia?.(media?.source,media?.owned)===true||youtube.auto};
+  const next=homeCardsPlan({mode,loggedIn,context,popular,youtube:nextYoutube});
+  const anyDialogOpen=[...document.querySelectorAll('dialog')].some(d=>d.open)||[...(document.querySelector('#orbit')?.shadowRoot?.querySelectorAll('dialog')||[])].some(d=>d.open);
+  if(cardsPlanKey(next)!==initialCardsPlanKey&&!anyDialogOpen){location.reload();return true;}
+ }
  const inbox=fresh.find(t=>t?.inbox===true),inboxCount=inbox?.moments?.length||0;
  const total=fresh.reduce((n,t)=>n+(t?.moments?.length||0),0);
  if(!total)return true;

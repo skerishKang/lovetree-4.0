@@ -95,12 +95,9 @@ async function close1010({ server, ctx }) {
   await new Promise(r => server.close(r));
 }
 
-const noteState = (frame) => frame.locator('.center-note').evaluate(el => ({
-  text: el.textContent,
-  hidden: getComputedStyle(el).display === 'none',
-  dataOff: el.hasAttribute('data-off'),
-  hint: el.querySelector('.center-hint')?.textContent || ''
-}));
+// #1204(대표 결정 11-23): 첫 화면 단추 아래의 안내 문장(감상 예시·테두리 카드·드래그 힌트)을 모든 상태에서 없앴다.
+// 아래 네 시험은 상태마다 안내 줄이 다시 생기지 않는지 확인한다.
+const noteCount = (frame) => frame.locator('.center-note,.center-hint').count();
 
 test('#1010 기존 사용자(예시만 궤도) 안내 줄 — 금테를 빼고 떠다니는 카드를 가리킨다(1440, 카드가 보일 때)', { skip: REQUIRE1010 ? false : skip1010, timeout: 180000 }, async () => {
   if (skip1010) assert.fail(skip1010);
@@ -108,12 +105,7 @@ test('#1010 기존 사용자(예시만 궤도) 안내 줄 — 금테를 빼고 �
   try {
     const h = await boot1010(browser, { width: 1440 });
     try {
-      const note = await noteState(h.frame);
-      assert.ok(!note.hidden, '카드가 보이는 화면에서는 안내 줄도 보인다');
-      assert.match(note.text, /뒤에 떠다니는 카드는 감상 예시예요/, '안내 줄이 떠다니는 예시 카드를 가리킨다: ' + note.text);
-      assert.equal(note.hint, '눌러서 감상', '힌트는 누름을 안내한다: ' + note.hint);
-      assert.doesNotMatch(note.text, /금테/, '안내 줄에 금테가 없다(마지막 순간 카드와 헷갈리지 않게): ' + note.text);
-      assert.ok(note.text.includes('·'), '안내 줄에 가름점(·)이 그려진다 — 문구와 힌트 사이: ' + note.text);
+      assert.equal(await noteCount(h.frame), 0, '기존 사용자 1440 첫 화면에 단추 아래 안내 줄이 없다(#1204)');
       const visibleCards = await h.frame.locator('.card').evaluateAll(es => es.filter(e => !e.classList.contains('off')).length);
       assert.ok(visibleCards > 0, `떠다니는 예시 카드가 실제로 보인다(보이는 카드 ${visibleCards}장)`);
     } finally { await close1010(h); }
@@ -126,8 +118,7 @@ test('#1010 기존 사용자 390 — 떠다니는 예시 카드가 숨으면 안
   try {
     const h = await boot1010(browser, { width: 390 });
     try {
-      const note = await noteState(h.frame);
-      assert.ok(note.hidden && note.dataOff, '카드가 숨은 좁은 화면에서는 안내 줄도 숨는다: ' + JSON.stringify(note));
+      assert.equal(await noteCount(h.frame), 0, '기존 사용자 390 첫 화면에 안내 줄이 없다(#1204)');
       const visibleCards = await h.frame.locator('.card').evaluateAll(es => es.filter(e => !e.classList.contains('off')).length);
       assert.equal(visibleCards, 0, '이 화면(390·로그인 예시)에서는 궤도 카드가 보이지 않는다(#780 후속): ' + visibleCards);
     } finally { await close1010(h); }
@@ -140,9 +131,7 @@ test('#1010 신규 사용자(로그아웃 예시) 안내 줄은 그대로다', {
   try {
     const h = await boot1010(browser, { member: false });
     try {
-      const note = await noteState(h.frame);
-      assert.match(note.text, /감상 예시 · 내 기록에는 저장되지 않아요/, '신규 사용자 안내 줄 문구를 바꾸지 않는다: ' + note.text);
-      assert.equal(note.hint, '드래그 · 금테 카드를 눌러 감상', '신규 사용자 힌트도 그대로다: ' + note.hint);
+      assert.equal(await noteCount(h.frame), 0, '로그아웃 첫 화면에도 안내 줄이 없다(#1204)');
     } finally { await close1010(h); }
   } finally { await browser.close(); }
 });
@@ -153,9 +142,7 @@ test('#1010 섞어서(내 카드가 있는) 기존 사용자의 안내 줄은 �
   try {
     const h = await boot1010(browser, { mix: true });
     try {
-      const note = await noteState(h.frame);
-      assert.match(note.text, /테두리가 있는 카드는 내가 남긴 순간이에요/, '섞어서 안내는 이번에 바꾸지 않는다: ' + note.text);
-      assert.doesNotMatch(note.text, /감상 예시/, '섞어서 화면에 예시 안내 줄이 덧씌워지지 않는다: ' + note.text);
+      assert.equal(await noteCount(h.frame), 0, '섞어서(내 카드가 있는) 첫 화면에도 안내 줄이 없다(#1204)');
     } finally { await close1010(h); }
   } finally { await browser.close(); }
 });

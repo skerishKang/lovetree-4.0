@@ -7,8 +7,7 @@ export const ACCESS_LOG_RETENTION_DAYS = 90;
 // ② 탈퇴 처리 기록(lovetree_account_deletions — subject_hash·deleted_at)은 탈퇴 후 90일 뒤 자동 삭제.
 //    이전에는 '탈퇴 증거는 일부러 뺐다'(무기한 보관, 365일 prune)였지만 이번 결정으로 보관 기간이
 //    정해졌다. 90일이 안전한 근거: 이 기록이 막는 것은 탈퇴한 계정의 옛 세션이고, 러브트리 세션
-//    자격 증명은 최대 1시간(SESSION_MAX_AGE_SECONDS = 60*60, server/credentials/lovetree-session.js),
-//    로그인 왕복 상태는 10분(STATE_MAX_AGE_SECONDS)이라 기록보다 짧게 끝난다. 기록이 지워진 뒤 같은
+//    접근 자격 증명은 최대 1시간, 로그인 왕복 상태는 10분이라 기록보다 짧게 끝난다(#1247에 옛 모듈을 걷어냄). 같은
 //    subject로 다시 로그인하면 새 세션이며, 계정 데이터는 탈퇴 때 이미 전부 지워져 되살릴 것이 없다.
 export const GUEST_FEEDBACK_RETENTION_DAYS = 183;
 export const ACCOUNT_DELETION_RETENTION_DAYS = 90;

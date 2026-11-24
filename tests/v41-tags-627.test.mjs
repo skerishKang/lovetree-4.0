@@ -10,7 +10,7 @@ import { makeTag, parseTag, normalizeTags, tagValues, tagKey, TAG_KINDS, TAG_MAX
 import { tagFacets, filterMomentsByTags, matchMomentText } from '../public/v41/tag-filter.mjs';
 import { valueLimit } from '../public/v41/tag-line.mjs';
 import { createTree, addMoment, validateState } from '../src/domain.js';
-import { timingRatio, TIMING_RATIO_LIMIT, TIMING_CEILING_MS } from './helpers/timing-ratio.mjs';
+import { timingRatio, countRatio, TIMING_RATIO_LIMIT, TIMING_CEILING_MS } from './helpers/timing-ratio.mjs';
 import { renderTagLine, mountViewTagLine } from '../public/v41/tag-line.mjs';
 import { fakeEl } from './helpers/fake-dom.mjs';
 
@@ -647,6 +647,8 @@ test('suggestForMoments — 순간 300개 계산은 30개에 비해 제곱으로
   // 절대 ms 대신 같은 실행의 30개와 비교한다(#728 CI windows 러너에서 50ms 한도가 88.5ms로 흔들렸다).
   assert.ok(ratio <= TIMING_RATIO_LIMIT, `300개/30개 비율 ${ratio.toFixed(1)}배 ≤ ${TIMING_RATIO_LIMIT}배 (30개 ${smallMs.toFixed(2)}ms · 300개 ${bigMs.toFixed(1)}ms)`);
   assert.ok(bigMs <= TIMING_CEILING_MS, `300순간 한꺼번에 제안 ${bigMs.toFixed(1)}ms ≤ ${TIMING_CEILING_MS}ms`);
+  const counted = countRatio({ small: { fn: suggestForMoments, list: moments.slice(0, 30) }, big: { fn: suggestForMoments, list: moments } });
+  assert.ok(counted.ratio <= TIMING_RATIO_LIMIT, `제안 입력 읽기 300개/30개 ${counted.ratio.toFixed(1)}배 ≤ ${TIMING_RATIO_LIMIT}배 (${counted.smallCount} → ${counted.bigCount})`);
 });
 
 // ── 꼬리표로 찾기·걸러 보기(#627 후속): 순수 계산 — 화면(순간 목록)은 나중에 이 함수를 붙인다.
@@ -724,6 +726,8 @@ test('tagFacets·filterMomentsByTags·matchMomentText — 순간 300개 계산�
   // 절대 ms 대신 같은 실행의 30개와 비교한다(#728 CI windows 러너 흔들림, #731).
   assert.ok(ratio <= TIMING_RATIO_LIMIT, `300개/30개 비율 ${ratio.toFixed(1)}배 ≤ ${TIMING_RATIO_LIMIT}배 (30개 ${smallMs.toFixed(2)}ms · 300개 ${bigMs.toFixed(1)}ms)`);
   assert.ok(bigMs <= TIMING_CEILING_MS, `300순간 꼬리표 걸러 보기 ${bigMs.toFixed(1)}ms ≤ ${TIMING_CEILING_MS}ms`);
+  const counted = countRatio({ small: { fn: measure, list: moments.slice(0, 30) }, big: { fn: measure, list: moments } });
+  assert.ok(counted.ratio <= TIMING_RATIO_LIMIT, `꼬리표 입력 읽기 300개/30개 ${counted.ratio.toFixed(1)}배 ≤ ${TIMING_RATIO_LIMIT}배 (${counted.smallCount} → ${counted.bigCount})`);
 });
 
 // ── #735: 보드에서 붙인 꼬리표가 트리 첫 순간에 저장되던 결함 ─────────────────────────────

@@ -95,6 +95,7 @@ export function createHeaderHarness({
 } = {}) {
   const els = {
     'tree-views': fakeEl(),
+    'community-menu': fakeEl({hidden:true}),
     'record-menu': fakeEl(),
     'source-label': fakeEl(),
     'write-menu': fakeEl(),
@@ -116,7 +117,7 @@ export function createHeaderHarness({
   };
   const store = storage || { getItem: () => null, setItem() {}, removeItem() {} };
   globalThis.sessionStorage = store;
-  globalThis.document = { querySelectorAll: () => [], body: { classList: { add() {}, remove() {}, toggle() {}, contains: () => false }, dataset: {} } };
+  globalThis.document = { querySelector: (sel) => sel === '.tree-slot' ? (els['tree-slot'] ||= fakeEl()) : null, querySelectorAll: () => [], body: { classList: { add() {}, remove() {}, toggle() {}, contains: () => false }, dataset: {} } };
   globalThis.window = globalThis;
   globalThis.addEventListener = () => {};
   globalThis.matchMedia = (query) => ({

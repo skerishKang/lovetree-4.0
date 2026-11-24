@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createLocation } from '../public/v41/shell/location.mjs';
+import { createMemberRuntime } from '../public/v41/shell/member-runtime.mjs';
 // #1175 알림 정리 — 운영 버그 세 가지를 글자와 동작으로 고정한다.
 // ① 공유 화면을 본 뒤 서재 단추는 로그인 안내만(share 잔여가 화면 이동을 share 주소로 되돌리지 않게)
 // ② 알림이 책의 페이지 넘김 단추를 덮지 않게(책 화면 표식 복원)
@@ -98,7 +99,24 @@ test('#1175 ③ 로그아웃 상태 시작의 저장 연결 확인(401)은 진�
   assert.match(memberRuntime, /status\.phase\s*===\s*'login'\s*&&\s*!\s*status\.dirty\s*&&\s*document\.body\.dataset\.member\s*===\s*'in'\s*\)\s*\(\s*0\s*,\s*ctx\.notify\s*\)\s*\(\s*'로그인이 필요해요\.'/);
 });
 
-test('#1175 ① share 잔여를 치우는 길은 남은 감상 안내도 함께 거둔다', () => {
-  assert.match(memberRuntime, /function\s+leaveShare\s*\(\s*view\s*\)\s*\{\s*\(\s*0\s*,\s*ctx\.hideToast\s*\)\s*\(\s*\)\s*;\s*void\s+sample\s*\(\s*\{\s*\}\s*,\s*view\s*\)\s*;\s*\}/, '토스트를 거두고 예시 기록을 다시 싣는다');
-  assert.match(navigationRuntime, /if\s*\(\s*file\s*===\s*'src064-orbit\.html'\s*&&\s*ctx\.source\s*===\s*'share'\s*\)\s*\{\s*\(\s*0\s*,\s*ctx\.leaveShare\s*\)\s*\(\s*file\s*\)\s*;\s*return\s+true\s*;\s*\}/, '로고 길에서 share 잔여를 치운다');
+test('#1175 ① 공유에서 첫 화면으로 나갈 때 감상 알림을 지우고 방문자 기록으로 돌아간다', async () => {
+  const events=[];
+  const ctx={
+    member:null, loadGeneration:0,
+    hideToast:()=>events.push('toast'),
+    pauseMember:()=>true,
+    loadExampleTree:async()=>({id:'fixture-tree'}),
+    load:(_data,kind,_selection,_fallback,tree)=>events.push(['load',kind,tree.id]),
+    writeLocation:()=>events.push('location'),
+    $:id=>id==='account-settings'?{open:false}:{hidden:false}
+  };
+  createMemberRuntime(ctx);
+  ctx.leaveShare('src064-orbit.html');
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(events[0],'toast','이전 공유 알림은 가장 먼저 거둔다');
+  assert.deepEqual(events[1],['load','example','fixture-tree'],'공유 자료를 다시 쓰지 않는다');
+  assert.equal(ctx.current,'src064-orbit.html','로고는 방문자의 첫 화면을 연다');
+  assert.equal(ctx.loadGeneration,1,'공유 읽기 작업의 잔여 세대는 폐기한다');
+  assert.deepEqual(events[2],'location');
+  assert.match(navigationRuntime,/ctx\.leaveShare/,'로고 길은 공유 이탈 처리를 거친다');
 });
