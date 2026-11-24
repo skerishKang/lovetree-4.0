@@ -7,6 +7,7 @@ import { createProxy, upstreamOrigin, DEFAULT_RESPONSE_LIMIT_BYTES } from '../fu
 import { DEFAULT_MAX_BODY_BYTES } from '../server/http.js';
 import { createHmac } from 'node:crypto';
 import { verifyProxyProof } from '../server/proxy-proof.js';
+import { parse } from 'acorn';
 
 const UPSTREAM = 'https://api.lovetree.example';
 
@@ -419,6 +420,158 @@ function sourceFiles(dir, out = []) {
   }
   return out;
 }
+
+const AUDITED_FUNCTION_FETCHES = [
+  { file: 'functions/_lib/proxy.js', fn: 'createProxy', callee: 'fetch', kind: 'forwarder' },
+  { file: 'functions/_lib/proxy.js', fn: 'onRequest', callee: 'fetcher', kind: 'production' },
+  { file: 'functions/_lib/search-meta.mjs', fn: 'fetchJson', callee: 'fetcher', kind: 'production' },
+  { file: 'functions/_lib/search-meta.mjs', fn: 'collectSitemapShares', callee: 'fetch', kind: 'forwarder' },
+  { file: 'functions/_lib/search-meta.mjs', fn: 'createSitemap', callee: 'fetch', kind: 'forwarder' },
+  { file: 'functions/_lib/tree-preview.mjs', fn: 'readShare', callee: 'fetcher', kind: 'production' },
+  { file: 'functions/_lib/tree-preview.mjs', fn: 'createTreePreview', callee: 'fetch', kind: 'forwarder' },
+  { file: 'functions/_lib/shared-auth.mjs', fn: 'recordAccountEmail', callee: 'fetcher', kind: 'production' },
+  { file: 'functions/_lib/shared-auth.mjs', fn: 'exchange', callee: 'fetcher', kind: 'identity' },
+  { file: 'functions/_lib/shared-auth.mjs', fn: 'shared', callee: 'fetcher', kind: 'identity' },
+  { file: 'functions/_lib/padiem-access-verify.mjs', fn: 'keys', callee: 'fetcher', kind: 'identity' },
+  { file: 'functions/index.js', fn: 'onRequest', callee: 'env.ASSETS.fetch', kind: 'asset' },
+  { file: 'functions/v41/index.js', fn: 'onRequest', callee: 'env.ASSETS.fetch', kind: 'asset' }
+];
+
+function walkAst(node, fn, visit) {
+  if (!node || typeof node.type !== 'string') return;
+  if (node.type === 'FunctionDeclaration' || node.type === 'FunctionExpression') fn = node.id?.name || fn;
+  visit(node, fn);
+  for (const value of Object.values(node)) {
+    if (Array.isArray(value)) {
+      for (const child of value) if (child?.type) walkAst(child, fn, visit);
+    } else if (value?.type) walkAst(value, fn, visit);
+  }
+}
+
+function memberName(node) {
+  if (node?.type !== 'MemberExpression') return '';
+  if (!node.computed && node.property?.type === 'Identifier') return node.property.name;
+  return node.computed && node.property?.type === 'Literal' ? String(node.property.value) : '';
+}
+
+function isFetchReference(node, aliases) {
+  return (node?.type === 'Identifier' && aliases.has(node.name)) || memberName(node) === 'fetch';
+}
+
+function fetchAliases(ast) {
+  const aliases = new Set(['fetch', 'fetcher']);
+  let changed = true;
+  while (changed) {
+    changed = false;
+    walkAst(ast, null, node => {
+      if (!((node.type === 'VariableDeclarator' && node.id?.type === 'Identifier') ||
+            (node.type === 'AssignmentExpression' && node.left?.type === 'Identifier' && node.operator === '='))) return;
+      if (isFetchReference(node.init || node.right, aliases) && !aliases.has(node.id?.name || node.left?.name)) {
+        aliases.add(node.id?.name || node.left?.name);
+        changed = true;
+      }
+    });
+  }
+  return aliases;
+}
+
+function parseFunctionFile(file, source) {
+  const ast = parse(source, { ecmaVersion: 'latest', sourceType: 'module', allowHashBang: true });
+  const aliases = fetchAliases(ast);
+  const counts = new Map();
+  const calls = [];
+  walkAst(ast, null, (node, fn) => {
+    if (node.type !== 'CallExpression' || !isFetchReference(node.callee, aliases)) return;
+    const callee = source.slice(node.callee.start, node.callee.end);
+    const base = `${file}:${fn || '<module>'}:${callee}`;
+    const index = counts.get(base) || 0;
+    counts.set(base, index + 1);
+    calls.push({ file, fn: fn || '<module>', callee, index, key: `${base}:${index}`, node });
+  });
+  return { file, source, ast, calls };
+}
+
+function functionSourceFiles(dir, out = [], unsupported = []) {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const file = path.join(dir, entry.name);
+    if (entry.isDirectory()) functionSourceFiles(file, out, unsupported);
+    else if (/\.(?:js|mjs|cjs)$/.test(entry.name)) out.push(file);
+    else if (/\.(?:jsx|ts|tsx)$/.test(entry.name)) unsupported.push(path.relative(REPO, file).split(path.sep).join('/'));
+  }
+  return { files: out, unsupported };
+}
+
+function namedFunction(parsed, name) {
+  let found = null;
+  walkAst(parsed.ast, null, node => {
+    if ((node.type === 'FunctionDeclaration' || node.type === 'FunctionExpression') && node.id?.name === name) found = node;
+  });
+  assert.ok(found, `${parsed.file}에 ${name} 함수가 있다`);
+  return found;
+}
+
+function namedCall(parsed, fn, name) {
+  const calls = [];
+  walkAst(fn, null, node => {
+    if (node.type !== 'CallExpression') return;
+    const callee = parsed.source.slice(node.callee.start, node.callee.end);
+    if (callee === name) calls.push(node);
+  });
+  assert.equal(calls.length, 1, `${parsed.file}의 ${name} 호출은 하나다`);
+  return calls[0];
+}
+
+function objectValue(object, name) {
+  assert.equal(object?.type, 'ObjectExpression');
+  const property = object.properties.find(item => item.type === 'Property' && item.key?.name === name);
+  assert.ok(property, `객체에 ${name} 속성이 있다`);
+  return property.value;
+}
+
+function isProofCall(node) {
+  return node?.type === 'CallExpression' && node.callee?.type === 'Identifier' && node.callee.name === 'proxyProofHeaders' &&
+    node.arguments[0]?.type === 'Identifier' && node.arguments[0].name === 'env';
+}
+
+function assertDirectProof(parsed) {
+  const call = namedCall(parsed, namedFunction(parsed, 'recordAccountEmail'), 'fetcher');
+  const headers = objectValue(call.arguments[1], 'headers');
+  assert.ok(headers.properties.some(property => property.type === 'SpreadElement' && isProofCall(property.argument)), '내부 저장소 호출이 proxyProofHeaders(env)를 붙인다');
+}
+
+function assertProxyProof(parsed) {
+  const fn = namedFunction(parsed, 'createProxy');
+  const call = namedCall(parsed, fn, 'fetcher');
+  const headers = objectValue(call.arguments[1], 'headers');
+  assert.equal(headers.type, 'Identifier');
+  let setsProof = false;
+  let readsSecret = false;
+  walkAst(fn, null, node => {
+    if (node.type === 'MemberExpression' && node.object?.type === 'Identifier' && node.object.name === 'env' && memberName(node) === 'LOVETREE_PROXY_SECRET') readsSecret = true;
+    if (node.type !== 'CallExpression' || memberName(node.callee) !== 'set') return;
+    if (node.callee.object?.type === 'Identifier' && node.callee.object.name === headers.name &&
+        node.arguments[0]?.value === 'x-lovetree-proxy-proof' && node.arguments[1]?.type === 'Identifier' && node.arguments[1].name === 'proof') setsProof = true;
+  });
+  assert.ok(readsSecret && setsProof, '공용 프록시가 환경의 머리말을 실제 전달 헤더에 설정한다');
+}
+
+function assertSitemapProof(parsed) {
+  const sink = namedCall(parsed, namedFunction(parsed, 'fetchJson'), 'fetcher');
+  const sinkHeaders = objectValue(sink.arguments[1], 'headers');
+  assert.ok(sinkHeaders.properties.some(property => property.type === 'SpreadElement' && property.argument?.name === 'extraHeaders'), 'fetchJson가 추가 머리말을 전달한다');
+  const collect = namedCall(parsed, namedFunction(parsed, 'collectSitemapShares'), 'fetchJson');
+  assert.equal(collect.arguments[3]?.name, 'headers', '수집 경로가 머리말을 fetchJson에 넘긴다');
+  const route = namedCall(parsed, namedFunction(parsed, 'createSitemap'), 'collectSitemapShares');
+  assert.ok(isProofCall(objectValue(route.arguments[0], 'headers')), '사이트맵이 proxyProofHeaders(env)를 공급한다');
+}
+
+function assertPreviewProof(parsed) {
+  const sink = namedCall(parsed, namedFunction(parsed, 'readShare'), 'fetcher');
+  const sinkHeaders = objectValue(sink.arguments[1], 'headers');
+  assert.ok(sinkHeaders.properties.some(property => property.type === 'SpreadElement' && property.argument?.name === 'extraHeaders'), 'readShare가 추가 머리말을 전달한다');
+  const route = namedCall(parsed, namedFunction(parsed, 'createTreePreview'), 'readShare');
+  assert.ok(isProofCall(route.arguments[4]), '공유 미리보기가 proxyProofHeaders(env)를 공급한다');
+}
 function apiPathsInLine(line) {
   const literals = [...line.matchAll(/'([^']*)'|`([^`]*)`|"([^"]*)"/g)].map((m) => m[1] ?? m[2] ?? m[3]);
   const starts = literals.filter((s) => s.startsWith('/api/'));
@@ -489,6 +642,24 @@ test('서버 요청 출처 확인: 프록시가 공유 머리말을 업스트림
   const proxy = createProxy({ fetcher });
   await onRequest(proxy, 'https://lovetree.example/api/workspace', { method: 'GET' }, { LOVETREE_API_ORIGIN: UPSTREAM, LOVETREE_PROXY_SECRET: 's'.repeat(48) });
   assert.equal(fetcher.calls.at(-1).headers['x-lovetree-proxy-proof'], 's'.repeat(48));
+});
+
+test('functions의 운영 API fetch는 모두 출처 확인 머리말을 전달한다', () => {
+  const found = functionSourceFiles(path.join(REPO, 'functions'));
+  assert.deepEqual(found.unsupported, [], '지원하지 않는 Functions 실행 파일은 있으면 안 된다');
+  const parsed = found.files.map(file => parseFunctionFile(path.relative(REPO, file).split(path.sep).join('/'), readFileSync(file, 'utf8')));
+  const expected = AUDITED_FUNCTION_FETCHES.map(item => `${item.file}:${item.fn}:${item.callee}:0`).sort();
+  const actual = parsed.flatMap(item => item.calls.map(call => call.key)).sort();
+  const missing = expected.filter(key => !actual.includes(key));
+  const unknown = actual.filter(key => !expected.includes(key));
+  assert.deepEqual({ missing, unknown }, { missing: [], unknown: [] }, '새 fetch·별칭·멤버 호출은 검토 목록에 없으면 실패한다');
+  assert.equal(AUDITED_FUNCTION_FETCHES.filter(item => item.kind === 'production').length, 4, '운영 API 전달 경로 네 곳을 모두 검사한다');
+
+  const byFile = new Map(parsed.map(item => [item.file, item]));
+  assertProxyProof(byFile.get('functions/_lib/proxy.js'));
+  assertSitemapProof(byFile.get('functions/_lib/search-meta.mjs'));
+  assertPreviewProof(byFile.get('functions/_lib/tree-preview.mjs'));
+  assertDirectProof(byFile.get('functions/_lib/shared-auth.mjs'));
 });
 
 test('#1175 연결이 안 될 때만 한 번 더 부르고, 서버에 닿은 뒤 실패는 재전송하지 않는다', async () => {

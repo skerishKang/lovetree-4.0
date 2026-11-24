@@ -80,7 +80,8 @@ html[data-lt-theme=garden] #context-kind{color:var(--lt-rose-ink)}
 /* 둘러보기 카드 글자(261116): 10·11px를 12px 이상으로(본문급 13px·단추 13px — 검사기 KNOWN을 지우고 다시 지킨다). 반응·즐겨찾기 단추 누름 영역 44px(#705)은 그대로다. */
 .community-tag{position:absolute;z-index:1;left:10px;bottom:10px;padding:5px 8px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-pill);background:rgba(9,7,10,.8);color:var(--lt-gold);font-size:12px}
 /* 이슈 611 3번: AI 명예회원 배지 — 남에게 보이는 곳(둘러보기 카드·미리보기)에만 단다. */
-.community-ai{display:inline-flex;align-items:center;min-height:26px;padding:0 10px;border:1px solid var(--lt-rose);border-radius:var(--lt-r-pill);color:var(--lt-rose);font-size:12px;font-weight:700;letter-spacing:.04em}
+/* #1273 7번: 사람 회원 카드에는 이 배지가 없고, AI 명예회원만 장미 토큰의 별 배지로 구분한다. */
+.community-ai{display:inline-flex;align-items:center;min-height:26px;padding:0 10px;border:1px solid var(--lt-rose);border-radius:var(--lt-r-pill);background:color-mix(in srgb,var(--lt-rose) 18%,transparent);color:var(--lt-rose);font-size:12px;font-weight:700;letter-spacing:.04em}
 .community-cover .community-ai{position:absolute;z-index:1;top:10px;left:10px;background:rgba(9,7,10,.8)}
 .community-preview-paper .community-ai{margin-bottom:8px}
 .community-copy{min-width:0;padding:15px}.community-copy h3{margin:4px 0 8px;font-size:18px}.community-subject{margin:0;color:#d7a8ba;font-size:13px}.community-summary{min-height:42px;margin:0 0 8px;color:#e9dfe5;font-size:13px;line-height:1.65}.community-muted{color:var(--muted);font-size:12px;line-height:1.6}
@@ -719,6 +720,9 @@ html[data-lt-theme=garden] .home-links .feedback-link:hover{color:var(--lt-ink)}
 /* 390 지도·책·서재 목록: 조작 줄·책 테두리·'책 속의 트리' 상자와 겹치던 아래 링크 줄을 숨긴다(1440은 지금 자리).
    서재 목록은 프레임 안이 스크롤되므로 화면에 붙은 링크 줄이 지나가는 글자 위에 포개진다 — 책·지도와 같은 길로 숨긴다. */
 /* #1093: 여러 줄 선반 위에 화면에 붙은 링크가 포개지므로 서재는 폭과 무관하게 숨긴다. */
+/* #777: 트리 보기는 별도 상태 줄과 나무 영역을 사용하므로 첫 화면 전용 링크와 부유 ＋ 단추를 숨긴다.
+   새 순간 추가는 휴대폰의 상단 접기 메뉴에서 계속 사용할 수 있다. */
+body[data-fab-lift=tree] .home-links,body[data-fab-lift=tree] #mobile-add{display:none}
 body[data-fab-lift=shelf] .home-links{display:none}
 @media(max-width:520px){body[data-fab-lift=book] .home-links,body[data-fab-lift=network] .home-links{display:none}}
 /* 이슈 611: 계정 단추 점 — 새 소식이나 새 답글이 있을 때. */
@@ -1009,6 +1013,8 @@ body.community-screen #stage>iframe,body.community-screen #empty{display:none}
 #community-panel .community-cover-fallback{position:absolute;inset:0;display:grid;place-items:center;padding:20px;color:var(--lt-pearl);font-size:14px;text-align:center}
 #community-panel .community-cover-badge{position:absolute;z-index:2;display:inline-flex;align-items:center;min-height:28px;padding:4px 9px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-pill);background:var(--lt-ink);color:var(--lt-paper);font-size:12px;font-weight:700;line-height:1.2}
 #community-panel .community-cover .community-ai{top:10px;left:10px}
+/* #1273 7번: 사람 카드의 기본 배지와 달리 AI 명예회원은 장미 토큰으로 구분한다(새 색 없음). */
+#community-panel .community-cover-badge.community-ai{border-color:var(--lt-rose);background:color-mix(in srgb,var(--lt-rose) 22%,var(--lt-ink));color:var(--lt-rose)}
 #community-panel .community-cover .community-count{bottom:10px;left:10px}
 /* #1026 묶음 D: 사진은 다 받은 뒤 0.2초로 나타난다. 칸 크기(aspect-ratio)는 처음부터 같다. */
 #community-panel .community-cover-image,#community-panel .community-cover-backdrop{transition:opacity .2s ease}
@@ -1281,7 +1287,7 @@ html[data-lt-auth-phase=pending] .app-header .tree-prefix{visibility:hidden}
  .app-header .header-actions>.account-slot{grid-column:3;grid-row:1;width:80px;justify-content:flex-end}
  .app-header .tree-slot{flex:0 0 208px;width:208px}
  .app-header .tree-prefix{flex:0 0 21px;width:21px;margin-right:8px}
- .app-header .tree-frame .tree-views{display:grid;grid-template-columns:56px 44px 56px 56px 104px;gap:2px}
+ .app-header .tree-frame .tree-views{display:grid;grid-template-columns:56px 56px 44px 56px 56px 104px;gap:2px}
  .app-header .tree-frame .tree-views>button[data-view]{padding-inline:0;width:100%}
  .app-header .tree-frame .tree-views>button#community-menu{width:96px;padding-inline:0}
  .app-header .account-slot>#account-entry{width:72px}

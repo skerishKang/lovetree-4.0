@@ -20,7 +20,7 @@ const themeToggleTop=$('theme-toggle');if(themeToggleTop)themeToggleTop.onclick=
  $('settings-advanced').onclick=()=>{const next=!readAdvanced();try{localStorage.setItem(advancedKey(),next?'1':'0')}catch{}applyAdvanced();};
  $('account-open-settings').onclick=()=>{closeAccountMenu();void openAccountSettings();};
  // 고객 의견 창구 (#540): 로그인=계정 메뉴, 로그아웃=첫 화면 아래 작은 링크·접기 메뉴. 모두 같은 창을 쓴다.
- const FEEDBACK_SCREEN={'src064-orbit.html':'첫 화면','track59-sketchbook.html':'책','track58-pinboard.html':'보드','track56-network.html':'지도','track32-bookshelf.html':'서재'};
+ const FEEDBACK_SCREEN={'src064-orbit.html':'첫 화면','track59-sketchbook.html':'책','track58-pinboard.html':'보드','track56-network.html':'지도','track61-tree.html':'트리','track32-bookshelf.html':'서재'};
  function feedbackContext(){
   const owned=!!deps.member?.snapshot().owned;
   const screen=$('community-panel')?.open?'둘러보기':$('account-settings')?.open?'설정':(FEEDBACK_SCREEN[deps.current]||'첫 화면');
@@ -534,13 +534,13 @@ async function showPublicRoute(route){
  if(deps.member&&!(deps.member.snapshot().owned?pauseMember():leaveMember())){writeLocation('replace');return;}
  const generation=++deps.loadGeneration;
  deps.activeShareId=route.shareId;
- deps.current=screenForView(['book','board','network'].includes(route.view)?route.view:'book')[1];
+ deps.current=screenForView(['tree','book','board','network'].includes(route.view)?route.view:'book')[1];
  deps.handledHash=location.hash;
  $('empty').querySelector('h1').textContent='공유된 순간을 펼치고 있어요.';
  $('empty').querySelector('p').textContent='소유자가 공개한 트리 한 개만 확인합니다.';
  $('empty-sample').hidden=true;$('empty-records').hidden=true;$('view').hidden=true;$('empty').hidden=false;
  const answer=await shareApi.read(route.shareId||'');if(generation!==deps.loadGeneration)return;if(!answer.ok){publicProblem(answer);return;}
- deps.activeShareId=answer.share.id;const view=['book','board','network'].includes(route.view)?route.view:answer.share.view;deps.current=screenForView(view)[1];load({revision:0,state:{version:1,trees:[answer.tree]}},'share',{treeId:answer.tree.id,momentId:answer.share.entryMomentId});
+ deps.activeShareId=answer.share.id;const view=['tree','book','board','network'].includes(route.view)?route.view:answer.share.view;deps.current=screenForView(view)[1];load({revision:0,state:{version:1,trees:[answer.tree]}},'share',{treeId:answer.tree.id,momentId:answer.share.entryMomentId});
  // #891: 공유 주소가 특정 순간을 가리키면(시작 순간) 보드만 그 순간의 상세 판을 열어 보여 준다.
  if(view==='board'&&answer.share.entryMomentId)requestBoardOpen(answer.share.entryMomentId);
  deps.activeShareId=answer.share.id;show(deps.current,false);writeLocation('replace');

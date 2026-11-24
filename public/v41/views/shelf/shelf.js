@@ -119,7 +119,8 @@ import { createReader } from './shelf-reader.js';
           var fallbackChapter=info.book.chapters.find(function(c){return c.image});
           var src=info.moment&&info.moment.thumb?info.moment.thumb:(info.book.coverMedia||(fallbackChapter&&fallbackChapter.image)||'');
           var candidates=info.moment&&info.moment.thumbCandidates?info.moment.thumbCandidates:(info.book.coverCandidates&&info.book.coverCandidates.length?info.book.coverCandidates:(fallbackChapter&&fallbackChapter.thumbCandidates?fallbackChapter.thumbCandidates:[src]));
-          thumb.innerHTML=src?'<img src="'+esc(src)+'"'+coverFallbackAttrs(candidates||[src])+' alt="" loading="lazy" referrerpolicy="no-referrer">':'';
+          // #1273 8번: 그림이 없으면 빈 색 칸으로 남지 않게 트리 이름 첫 글자로 표지를 채운다(사진 위에는 글자를 얹지 않는다).
+          thumb.innerHTML=src?'<img src="'+esc(src)+'"'+coverFallbackAttrs(candidates||[src])+' alt="" loading="lazy" referrerpolicy="no-referrer">':'<span class="resume-thumb-mark" aria-hidden="true">'+esc(String(info.treeName||info.book.name||'책').slice(0,1))+'</span>';
           thumb.style.setProperty('--cover',info.book.color);
           thumb.style.setProperty('--cover-accent',info.book.accent);
           if(info.book.design)thumb.setAttribute('data-cover-design',info.book.design);else thumb.removeAttribute('data-cover-design');

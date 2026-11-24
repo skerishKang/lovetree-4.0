@@ -59,9 +59,8 @@ export function createCommunityScreen(deps) {
   function openRoute() {
     if (!dialog.open) { button.click(); return; }
     // 이미 열려 있으면 안내 탭을 주소와 맞춘다 — [순간](#explore/moments) 방향은 창 모듈의 hashchange 규칙이 맡는다.
-    if (!/^#explore\/moments$/.test(location.hash) && dialog.querySelector('#community-tab-moments')?.getAttribute('aria-selected') === 'true') {
-      dialog.querySelector('#community-tab-trees')?.click();
-    }
+    // 뒤로 가기로 [순간] → [트리]를 복원할 때 새 방문 기록을 만들지 않는다.
+    // 실제 탭 표시는 community-panel의 hashchange 처리에서 조용히 동기화한다.
   }
   return {isOpen: () => !!dialog.open, openRoute, close: () => dialog.close()};
 }

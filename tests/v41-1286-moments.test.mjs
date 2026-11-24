@@ -168,3 +168,77 @@ test('#1286 휴대폰 쇼츠 폭·접근성·밀기 및 넓은 화면 유지', {
   }
  }finally{await browser.close();}
 });
+
+test('#1305 순간 보기 첫 영상은 소리 없이 자동 재생되고, 누르면 멈춤·재생이 바뀐다', {skip:REQUIRE?false:skip,timeout:240000}, async () => {
+  if(skip)assert.fail(skip);
+  const browser=await chromium.launch({headless:true});
+  try{
+   for(const [width,height] of [[390,844],[1440,900]]){
+    const h=await boot(browser,{width,height,theme:'night'});
+    try{
+     const panel=h.page.locator('#community-moments-panel'),stage=panel.locator('.moments-stage');
+     await h.page.waitForTimeout(300);
+     assert.equal(await stage.getAttribute('data-lt-autoplay'),'1','준비 뒤 재생 명령을 보냈다');
+     assert.equal(await stage.getAttribute('data-lt-moments-muted'),'true','첫 영상은 소리 없이');
+     await panel.locator('.moments-media').evaluate(el=>el.click());
+     assert.equal(await stage.getAttribute('data-lt-playing'),'1','화면 누르면 재생');
+     await panel.locator('.moments-media').evaluate(el=>el.click());
+     assert.equal(await stage.getAttribute('data-lt-playing'),'0','다시 누르면 멈춤');
+     // 소리 선택은 순간을 넘겨도 유지된다.
+     await panel.locator('.moments-mute').evaluate(el=>el.click());
+     if(width===390)assert.equal(await stage.getAttribute('data-lt-moments-muted'),'false');
+     const before=await stage.getAttribute('data-lt-moments-id');
+     await step(h.page,panel,width,1);
+     await h.page.waitForTimeout(200);
+     assert.notEqual(await stage.getAttribute('data-lt-moments-id'),before,'넘기면 다음 순간');
+     if(width===390)assert.equal(await stage.getAttribute('data-lt-moments-muted'),'false','소리 선택 유지');
+     assert.equal(await panel.locator('.moments-frame').count(),2,'지금 것+다음 것만 남는다');
+    }finally{await h.ctx.close();await new Promise(r=>h.server.close(r));}
+   }
+  }finally{await browser.close();}
+ });
+
+test('#1305 390 단추는 영상 위 빈 띠에 있고 가수 단추는 잘리지 않는다', {skip:REQUIRE?false:skip,timeout:240000}, async () => {
+  if(skip)assert.fail(skip);
+  const browser=await chromium.launch({headless:true});
+  try{
+   const h=await boot(browser,{width:390,height:844,theme:'night'});
+   try{
+    const m=await h.page.evaluate(()=>{
+     const tabs=document.querySelector('.community-tabs').getBoundingClientRect();
+     const card=document.querySelector('.moments-card').getBoundingClientRect();
+     const chips=document.querySelector('.moments-chips');
+     const chipRect=chips.getBoundingClientRect();
+     const cs=getComputedStyle(chips);
+     return {tabBottom:tabs.bottom,cardTop:card.top,chipsRight:chipRect.right,vw:innerWidth,
+      chipScroll:chips.scrollWidth,chipClient:chips.clientWidth,hidden:cs.scrollbarWidth,
+      names:[...chips.querySelectorAll('.moments-chip')].map(e=>e.textContent.trim()),tabW:Math.round(tabs.width)};
+    });
+    assert.ok(m.tabBottom<=m.cardTop,'단추가 영상 위 빈 띠에 있다: '+JSON.stringify(m));
+    assert.ok(m.chipsRight<=m.vw+1,'가수 단추 줄이 화면 밖으로 잘리지 않는다: '+JSON.stringify(m));
+    assert.ok(m.names.length>=2&&m.names.includes('아이유'),'가수 단추가 여러 개 보인다: '+JSON.stringify(m));
+    assert.equal(m.hidden,'none','회색 스크롤 막대를 숨긴다: '+JSON.stringify(m));
+    // 트리 화면의 전환 단추도 같은 자리·같은 크기다. 카드 한 장을 mock으로 채운 새 창에서 본다.
+    const card={shareId:'c0000000000000000000000a',title:'화면 확인용 공개 트리',subject:'확인 대상',summary:'첫 순간 소개',createdAt:'2026-11-15T09:00:00.000Z',momentCount:3,aiTester:false,emotions:['설렘'],cover:{url:'https://i.ytimg.com/vi/qaScreenAudit001/hqdefault.jpg',title:'첫 순간',emotion:'설렘'},stats:{favorites:0,hearts:0,favored:false,hearted:false,reactions:{},mine:[]}};
+    const treeCtx=await browser.newContext({viewport:{width:390,height:844},reducedMotion:'reduce'});
+    try{
+    await treeCtx.route('**/api/**',route=>route.fulfill({status:200,contentType:'application/json',body:'{"ok":true,"items":[]}'}));
+    await treeCtx.route('**/api/community/shares*',route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({items:[card],total:1,groups:[]})}));
+    const treePage=await treeCtx.newPage();
+    await treePage.goto(h.base+'/v41/#explore',{waitUntil:'domcontentloaded'});
+    await treePage.waitForSelector('#community-list .community-card',{timeout:10000});
+    const tree=await treePage.evaluate(()=>{
+     const tabs=document.querySelector('.community-tabs').getBoundingClientRect();
+     const first=document.querySelector('#community-list .community-card')?.getBoundingClientRect();
+     const heading=getComputedStyle(document.querySelector('#community-tree-panel .panel-heading')).display;
+     return {tabs:{top:Math.round(tabs.top),left:Math.round(tabs.left),w:Math.round(tabs.width),h:Math.round(tabs.height)},
+      firstTop:first?Math.round(first.top):null,firstBottom:first?Math.round(first.bottom):null,vh:innerHeight,heading,note:getComputedStyle(document.querySelector('#community-tree-panel > .panel-note')).display};
+    });
+    assert.equal(tree.heading,'none','큰 제목을 뺀다');
+    assert.equal(tree.note,'none','설명 글을 뺀다');
+    assert.equal(tree.tabs.w,m.tabW,'두 화면의 전환 단추 폭이 같다');
+    assert.ok(tree.firstTop!==null&&tree.firstTop<tree.vh&&tree.firstBottom>0,'트리 카드 첫 줄이 첫 화면에 보인다: '+JSON.stringify(tree));
+    }finally{await treeCtx.close();}
+   }finally{await h.ctx.close();await new Promise(r=>h.server.close(r));}
+  }finally{await browser.close();}
+ });

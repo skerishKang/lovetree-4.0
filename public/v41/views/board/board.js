@@ -763,7 +763,9 @@ function settlePlacedCards() {
     .filter(m => els.has(m.id))
     .map(m => ({ id: m.id, x: m.x, y: m.y, h: reservedHeights.get(m.id) || BASE_RESERVED_H }));
   // #619-6: 카드 전부가 쌓기 배치라서 저장 자리가 따로 없고, 전부 열 안에서 벌림 대상이다.
-  const moved = LT58Model.settleColumnGaps(list, new Set(moments.map(m => m.id)), 24);
+  // #1273 8번: 휴대폰에서는 같은 열의 빈 틈을 조금 줄인다(예약 높이 330px 기준은 그대로).
+  const narrow = typeof matchMedia === 'function' && matchMedia('(max-width: 640px)').matches;
+  const moved = LT58Model.settleColumnGaps(list, new Set(moments.map(m => m.id)), narrow ? 16 : 24);
   let changed = false;
   for (const m of moments) {
     const y = moved.get(m.id);
@@ -1288,6 +1290,7 @@ function formFor(type) {
 
 function openAdd() {
   formFor(addType);
+  if (typeof pushBoardPanel === 'function') pushBoardPanel('add');
   $('#addModal').classList.add('open');
 }
 
@@ -1581,6 +1584,7 @@ $('#typeGrid').onclick = e => {
 $('#detailClose').onclick = () => {
   $('#detail').classList.remove('open');
   syncBoardPush();
+  if (window.parent !== window) parent.postMessage({ type: globalThis.LT41_MSG.boardDetail, open: false }, location.origin);
 };
 $('#openMoment').onclick = () => openViewer(selected);
 $('#closeViewer').onclick = () => {

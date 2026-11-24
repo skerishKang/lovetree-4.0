@@ -7,6 +7,15 @@ import { displayTreeTitle, autoTreeTitle, hasAutoTitleSuffix, AUTO_TITLE_SUFFIX 
 import { createTree } from '../public/v41/domain.mjs';
 
 const read = path => fs.readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
+
+test('#1273 8번 이어 보기 띠: 표지 그림이 없으면 빈 칸이 아니라 이름 첫 글자를 쓴다', () => {
+  const js = read('public/v41/views/shelf/shelf.js');
+  const css = read('public/v41/views/shelf/shelf-extra.css');
+  assert.match(js, /resume-thumb-mark/, '빈 표지 자리에 표식을 넣는다');
+  assert.match(js, /info\.treeName\|\|info\.book\.name/, '표식은 트리 이름에서 가져온다');
+  assert.match(css, /\.resume-thumb-mark/, '표식 스타일이 있다');
+  assert.match(css, /var\(--lt-pearl\)/, '새 색이 아니라 기존 토큰을 쓴다');
+});
 // 2026-11-09 #231 후속: 스타일·스크립트를 views/shelf/로 나눴다(마크업+옮긴 파일을 함께 본다).
 const shelf = [
   read('public/v41/views/track32-bookshelf.html'),

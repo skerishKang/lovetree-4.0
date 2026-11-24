@@ -126,7 +126,7 @@
     let f=$('#editFields');f.innerHTML=`${editMediaFields(m)}<input class="field" id="editTitle" value="${esc(m.title)}" aria-label="순간 제목"><textarea class="field" id="editMemo" rows="3" aria-label="마음 한마디">${esc(m.memo)}</textarea>${styleFieldsHTML('edit',m)}<div class="label labelSpaced">날짜</div><input class="field" id="editDate" type="date" value="${esc(m.date||'')}" aria-label="순간 날짜"><div class="netNote">공개 범위 · ${esc(m.privacy||'비공개')} · 순간 ID ${esc(m.id)}</div>`;
     bindKeywordPicker('edit',updateEditPreview);f.querySelectorAll('input,textarea,select').forEach(x=>x.addEventListener('input',updateEditPreview));$('#editMediaFile')?.addEventListener('change',updateEditPreview);$('#editUrl')?.addEventListener('input',updateEditPreview);$('#editVideoUrl')?.addEventListener('input',updateEditPreview);$('#removePhoto')?.addEventListener('click',()=>{removePhotoFlag=true;updateEditPreview()});
     f.querySelectorAll('input[name="editVideoSource"]').forEach(r=>r.addEventListener('change',()=>{let yt=r.value==='youtube'&&r.checked;$('#editVideoLocal').hidden=yt;$('#editVideoYoutube').hidden=!yt;updateEditPreview()}));
-    $('#editModal').classList.add('open');updateEditPreview();
+    pushBoardPanel('edit');$('#editModal').classList.add('open');updateEditPreview();
   };
   editPreviewState=function(){
     let m=moments.find(x=>x.id===selected),type=m.type,asset=m.asset,video=m.video,url=$('#editUrl')?.value??m.url,sourceUrl=m.sourceUrl||m.url||'',videoSource=m.videoSource||'local',videoId=m.videoId||'';let file=$('#editMediaFile')?.files?.[0];
@@ -164,7 +164,7 @@
     }else if(m.url)box.innerHTML=LTMedia.markup(m.url,m.title,m.mediaMetadata,m.id);else if(m.type==='video')box.innerHTML=`<video src="${m.video}" poster="${m.asset}" controls autoplay muted playsinline class="viewerFitVideo"></video>`;
     else if(m.type==='note')box.innerHTML=`<div class="viewerNoteQuote">“${esc(m.memo)}”</div>`;
     else box.innerHTML=`<img src="${m.asset}" alt="${esc(m.title)}" data-fallback="${ASSET.link}" onerror="this.onerror=null;this.src=this.dataset.fallback" class="viewerFitImg">`;
-    $('#vMeta').innerHTML=window.viewerMetaHTML({head:`${esc(LTLabels.type(m.originalType||m.type))}${m.type==='video'&&m.videoSource?` · ${esc(m.videoSource)}`:''} · ${esc(m.date)} · ${esc(m.emotion)}`,source:esc(m.source),url:originalUrl(m)?esc(originalUrl(m)):'',keywords:(m.keywords||[]).map(k=>esc(k)),memo:esc(m.memo||'')});$('#viewerModal').classList.add('open');
+    $('#vMeta').innerHTML=window.viewerMetaHTML({head:`${esc(LTLabels.type(m.originalType||m.type))}${m.type==='video'&&m.videoSource?` · ${esc(m.videoSource)}`:''} · ${esc(m.date)} · ${esc(m.emotion)}`,source:esc(m.source),url:originalUrl(m)?esc(originalUrl(m)):'',keywords:(m.keywords||[]).map(k=>esc(k)),memo:esc(m.memo||'')});pushBoardPanel('viewer');$('#viewerModal').classList.add('open');
   };
 
   /* Wire overwritten handlers and render actual YouTube source. */

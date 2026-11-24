@@ -35,7 +35,7 @@ const embedSrc=(id,item={})=>{
  return `${EMBED}${encodeURIComponent(id)}?${params.join('&')}`;
 };
 
-export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin,api=null,when=null}){
+export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin,api=null,when=null,historyLayers=null}){
  const stage=el('div','moments-stage');
  const card=el('div','moments-card');
  const media=el('div','moments-media');
@@ -134,7 +134,7 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin,a
  const addDialog=el('div','moments-add-dialog');addDialog.setAttribute('role','dialog');addDialog.setAttribute('aria-modal','true');addDialog.setAttribute('aria-label','어느 트리에 담을까요');addDialog.hidden=true;
  const addTitle=el('h3','moments-add-title','어느 트리에 담을까요');
  const addList=el('div','moments-add-list');
- const addClose=el('button','moments-add-close','×');addClose.type='button';addClose.setAttribute('aria-label','닫기');addClose.onclick=()=>{addDialog.hidden=true;};
+ const addClose=el('button','moments-add-close','×');addClose.type='button';addClose.setAttribute('aria-label','닫기');addClose.onclick=()=>{if(historyLayers)historyLayers.dismiss('moment-add');else addDialog.hidden=true;};
  addDialog.append(addTitle,addClose,addList);panel.append(addDialog);
  let pendingAdd=null;
  function openAddDialog(item){
@@ -152,14 +152,14 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin,a
    };
    return button;
   }));
-  addDialog.hidden=false;
+  addDialog.hidden=false;historyLayers?.open('moment-add',()=>{addDialog.hidden=true;});
  }
  // #1098 2단계: 순간 댓글 창 — 읽기·쓰기는 순간 단위 API(서버 #1136). 막히면 서버 응답 안내를 그대로 보여 주고,
  // 로그아웃(401)에는 트리 댓글과 같이 로그인 안내를 곁들인다. AI 명예회원 댓글은 트리 작성자 표시와 같은 방식으로 구분한다.
  const commentsDialog=el('div','moments-comments-dialog');commentsDialog.setAttribute('role','dialog');commentsDialog.setAttribute('aria-modal','true');commentsDialog.setAttribute('aria-label','순간 댓글');commentsDialog.hidden=true;
  const commentsTitle=el('h3','moments-comments-title','댓글');
  const closeComments=()=>{commentsDialog.hidden=true;panel.classList.remove('lt-comments-open');};
- const commentsClose=el('button','moments-add-close','×');commentsClose.type='button';commentsClose.setAttribute('aria-label','닫기');commentsClose.onclick=closeComments;
+ const commentsClose=el('button','moments-add-close','×');commentsClose.type='button';commentsClose.setAttribute('aria-label','닫기');commentsClose.onclick=()=>{if(historyLayers)historyLayers.dismiss('moment-comments');else closeComments();};
  const commentsNotice=el('p','moments-comments-notice');commentsNotice.setAttribute('role','status');commentsNotice.hidden=true;
  const commentsList=el('div','moments-comments-list');
  const commentsForm=el('form','community-comment-form');const commentsInput=el('textarea','');const commentsSubmit=el('button','community-mini','댓글 남기기');
@@ -183,11 +183,11 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin,a
  };
  async function openComments(){
   const item=current();if(!item||!item.shareId||!item.id||!api||typeof api.momentComments!=='function')return;
-  commentsDialog.hidden=false;panel.classList.add('lt-comments-open');commentsNotice.hidden=true;
+  commentsDialog.hidden=false;panel.classList.add('lt-comments-open');historyLayers?.open('moment-comments',closeComments);commentsNotice.hidden=true;
   commentsTitle.textContent='댓글';
   commentsList.replaceChildren(el('p','community-muted','댓글을 불러오는 중…'));
   const answer=await api.momentComments(item.shareId,item.id);
-  if(current()!==item){closeComments();return;} // 넘겨 뒤 늦게 온 응답은 버린다
+  if(current()!==item){if(historyLayers)historyLayers.dismiss('moment-comments');else closeComments();return;} // 넘겨 뒤 늦게 온 응답은 버린다
   if(!answer.ok){
    commentsNotice.textContent=(answer&&answer.message)||(answer.status===401?'로그인하면 댓글을 남길 수 있어요.':'댓글을 불러오지 못했어요.');
    commentsNotice.hidden=false;
@@ -230,6 +230,8 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin,a
  // 칩 줄: 전체 + 서버가 센 공개 쇼츠 가수 꼬리표 상위 6개. 누르면 그 가수만 다시 섞는다.
  function renderChips(){
   const choices=[{value:'',label:'전체'},...(groups||[]).map(g=>({value:tagKey(g.value)||g.value,label:g.value,tag:'가수:'+g.value}))];
+  // #1305: 고를 가수가 없으면 '전체'만 덩그러니 남기지 않는다.
+  chips.hidden=choices.length<2;
   chips.replaceChildren(...choices.map(choice=>{
    const chip=el('button','moments-chip',choice.label);chip.type='button';
    const active=(choice.value?('가수:'+choice.label):'')===activeTag;
@@ -239,7 +241,15 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin,a
   }));
  }
 
+ // #1305: 유튜브 API 명령은 postMessage 목표가 주소의 origin과 같아야 닿는다.
+ const YT_ORIGIN='https://www.youtube-nocookie.com';
+ const command=(frame,func,args=[])=>{
+  if(!frame?.contentWindow)return false;
+  try{frame.contentWindow.postMessage(JSON.stringify({event:'command',func,args}),YT_ORIGIN);return true;}catch{return false;}
+ };
  function clearFrames(){
+  // 앞 영상을 먼저 멈추고 지운다 — DOM에서만 빼면 소리가 남는 경우가 있다.
+  if(currentFrame)command(currentFrame,'pauseVideo');
   for(const frame of frames){frame.onload=null;frame.src='about:blank';frame.remove();}
   frames=[];
  }
@@ -252,7 +262,13 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin,a
   frame.referrerpolicy='strict-origin-when-cross-origin';
   frame.setAttribute('allowfullscreen','');
   frame.src=embedSrc(item.videoId,item);
-  frame.onload=()=>{frame.classList.add('is-ready');try{frame.contentWindow?.postMessage('{"event":"listening"}','https://www.youtube-nocookie.com');}catch{}};
+  // #1305: 재생이 막히던 원인 — 'listening'만 보내고 재생 명령을 보내지 않았다.
+  //에이피아이가 켜진 iframe은 주소의 autoplay=1만으로 시작하지 않으므로 준비 뒤 playVideo를 보낸다.
+  frame.onload=()=>{
+   frame.classList.add('is-ready');
+   try{frame.contentWindow?.postMessage('{"event":"listening"}',YT_ORIGIN);}catch{}
+   setTimeout(()=>{if(frame.isConnected&&frame===currentFrame){command(frame,'mute');command(frame,'playVideo');stage.dataset.ltAutoplay='1';}},120);
+  };
   frames.push(frame);
   return frame;
  }
@@ -270,7 +286,7 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin,a
   owner.textContent=displayOwner.slice(0,1);
   ownerText.textContent=displayOwner;
   treeLine.append(owner,ownerText);
-  if(item.aiTester)treeLine.append(el('span','moments-ai','AI 명예회원'));
+  if(item.aiTester)treeLine.append(el('span','moments-ai','✦ AI 명예회원'));
   treeLine.append(el('span','moments-tree-name',item.treeTitle||''));
   titleLine.textContent=item.title||'';
   // 꼬리표는 '가수:아이유' 같은 머리말을 뺀 값만 — 기존 parseTag 한 벌을 그대로 쓴다.
@@ -288,8 +304,10 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin,a
   playerProgress.value=0;
   progress.dataset.ltProgress='0';
   if(!matchMedia('(max-width:780px)').matches){void progressFill.offsetWidth;progressFill.classList.add('is-running');}
-  unmuted=false;mute.textContent='소리 켜기';mute.setAttribute('aria-label','소리 켜기');
-  stage.dataset.ltMomentsMuted='true';
+  // #1305: 소리 선택은 이번 방문 동안 유지 — 순간을 넘겨도 되돌리지 않는다.
+  mute.textContent=unmuted?'소리 끄기':'소리 켜기';mute.setAttribute('aria-label',mute.textContent);
+  stage.dataset.ltMomentsMuted=String(!unmuted);
+  stage.dataset.ltAutoplay='';stage.dataset.ltPlaying='0';
   media.dataset.orientation=item.vertical===false||item.isVertical===false?'landscape':'portrait';
   if(matchMedia('(max-width:780px)').matches){try{hint.hidden=localStorage.getItem('lt41.momentSwipeSeen')==='1';}catch{hint.hidden=false;}}else hint.hidden=true;
   currentFrame=now;
@@ -351,6 +369,7 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin,a
     return;
    }
    media.classList.toggle('is-playing',state===1);
+   stage.dataset.ltPlaying=state===1?'1':'0';
   }
  });
  if(typeof window!=='undefined'&&typeof window.addEventListener==='function')window.addEventListener('keydown',event=>{
@@ -368,18 +387,18 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin,a
   mute.onclick=event=>{
     event.stopPropagation();
     if(!currentFrame)return;
-    const command=unmuted?'mute':'unMute';
-    try{currentFrame.contentWindow?.postMessage(JSON.stringify({event:'command',func:command,args:[]}),'https://www.youtube-nocookie.com');}catch{}
+    command(currentFrame,unmuted?'mute':'unMute');
     unmuted=!unmuted;mute.textContent=unmuted?'소리 끄기':'소리 켜기';mute.setAttribute('aria-label',mute.textContent);stage.dataset.ltMomentsMuted=String(!unmuted);
   };
+  // #1305: 화면 한 번 누르면 멈춤·재생이 바뀐다. 소리는 '소리 켜기' 단추만 맡는다.
   media.addEventListener('click',event=>{
-    if(event.target.closest('button'))return;
-  if(!currentFrame||unmuted||matchMedia('(max-width:780px)').matches)return;
-  try{currentFrame.contentWindow?.postMessage('{"event":"command","func":"unMute","args":[]}','https://www.youtube-nocookie.com');}catch{}
-  try{currentFrame.contentWindow?.postMessage('{"event":"command","func":"setVolume","args":[100]}','https://www.youtube-nocookie.com');}catch{}
-  unmuted=true;
-  stage.dataset.ltMomentsMuted='false';
- });
+   if(event.target.closest('button'))return;
+   if(!currentFrame)return;
+   const playing=stage.dataset.ltPlaying==='1';
+   command(currentFrame,playing?'pauseVideo':'playVideo');
+   stage.dataset.ltPlaying=playing?'0':'1';
+   media.classList.toggle('is-playing',!playing);
+  });
  function activate(){if(!items.length&&!loading)void load();else render();}
  function deactivate(){clearFrames();media.querySelectorAll('.moments-frame').forEach(node=>node.remove());}
  return {activate,deactivate,load,step,state:()=>({count:frames.length,id:stage.dataset.ltMomentsId||'',index,loaded:items.length})};

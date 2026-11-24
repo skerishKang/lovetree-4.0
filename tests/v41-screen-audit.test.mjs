@@ -2425,7 +2425,7 @@ test('#657 후속 261117: 상단 탭 글자 통일과 고른 탭 칸 높이(390�
   }
 });
 // 2026-11-17 대표 결정: 트리 0개 계정에서도 서재·책·보드·지도 탭이 보이고 각 화면의 빈 상태가 뜬다.
-test('#657 후속 261117: 트리 0개 계정의 탭 4개와 화면별 빈 상태(390·1440 × 정원·밤)', { skip: REQUIRE ? false : skip, timeout: 240000 }, async () => {
+test('#657 후속 261117: 트리 0개 계정의 탭 5개와 화면별 빈 상태(390·1440 × 정원·밤)', { skip: REQUIRE ? false : skip, timeout: 240000 }, async () => {
   const server = await serve();
   const base = `http://127.0.0.1:${server.address().port}`;
   const browser = await chromium.launch();
@@ -2447,7 +2447,7 @@ test('#657 후속 261117: 트리 0개 계정의 탭 4개와 화면별 빈 상태
           const chain=[];for(let e=document.querySelector('#tree-views button[data-view]');e;e=e.parentElement){const s=getComputedStyle(e),r=e.getBoundingClientRect();chain.push({id:e.id,tag:e.tagName,cls:e.className,hidden:e.hidden,display:s.display,visibility:s.visibility,w:r.width,h:r.height,data:{...e.dataset}})}
           return {chain,member:document.body.dataset.member,source:document.body.dataset.recordSource,treeCount:document.body.dataset.treeCount,loading:!document.getElementById('stage-loading')?.hidden};
         })));
-        const labels = { 'track32-bookshelf.html': '서재', 'track59-sketchbook.html': '책', 'track58-pinboard.html': '보드', 'track56-network.html': '지도' };
+        const labels = { 'track32-bookshelf.html': '서재', 'track61-tree.html': '트리', 'track59-sketchbook.html': '책', 'track58-pinboard.html': '보드', 'track56-network.html': '지도' };
         const openMore = async () => {
           if (width !== 390) return;
           const open = await page.locator('#header-overflow').evaluate((el) => el.classList.contains('is-open') && !el.hidden);
@@ -2466,7 +2466,7 @@ test('#657 후속 261117: 트리 0개 계정의 탭 4개와 화면별 빈 상태
           });
           return { buttons, folded, overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth, themeButtons: document.querySelectorAll('#theme-toggle').length };
         }, Object.values(labels));
-        assert.equal(tabs.buttons.length, 4, `${width}/${theme}: 탭 4개 — ${JSON.stringify(tabs.buttons)}`);
+        assert.equal(tabs.buttons.length, 5, `${width}/${theme}: 탭 5개 — ${JSON.stringify(tabs.buttons)}`);
         assert.ok(tabs.buttons.every((b) => b.w > 0 && b.h > 0), `${width}/${theme}: 탭 rect>0 — ${JSON.stringify(tabs.buttons)}`);
         assert.ok(tabs.overflow <= 0, `${width}/${theme}: 가로 넘침 ${tabs.overflow}px`);
         assert.equal(tabs.themeButtons, 1, `${width}/${theme}: 머리줄 테마 단추 1개`);
@@ -2474,6 +2474,7 @@ test('#657 후속 261117: 트리 0개 계정의 탭 4개와 화면별 빈 상태
         assert.equal(unselectedColors.length, 1, `${width}/${theme}: 고르지 않은 탭 글자색 RGB 같음 — ${JSON.stringify(tabs.buttons)}`);
         for (const [view, heading, action] of [
           ['track32-bookshelf.html', '아직 책장이 비어 있어요.', '＋ 새 트리'],
+          ['track61-tree.html', '아직 트리가 없어요.', '＋ 첫 순간 추가'],
           ['track59-sketchbook.html', '아직 트리가 없어요.', '＋ 첫 순간 추가'],
           ['track58-pinboard.html', '아직 트리가 없어요.', '＋ 첫 순간 추가'],
           ['track56-network.html', '아직 트리가 없어요.', '＋ 첫 순간 추가']
@@ -2502,11 +2503,11 @@ test('#657 후속 261117: 트리 0개 계정의 탭 4개와 화면별 빈 상태
               rectsOk: targets.every(([, t]) => t && t.w > 0 && t.h > 0),
               overlaps: targets.flatMap(([tn, t]) => blockers.map(([bn, b]) => [tn + '/' + bn, overlap(t, b)])),
               current: folded
-              ? Object.keys({ 'track32-bookshelf.html': '서재', 'track59-sketchbook.html': '책', 'track58-pinboard.html': '보드', 'track56-network.html': '지도' }).find((v) => { const b = [...document.querySelectorAll('#header-overflow button')].find((x) => x.getAttribute('aria-current') === 'true'); return b && b.textContent.trim() === { 'track32-bookshelf.html': '서재', 'track59-sketchbook.html': '책', 'track58-pinboard.html': '보드', 'track56-network.html': '지도' }[v]; }) || ''
+              ? Object.keys({ 'track32-bookshelf.html': '서재', 'track61-tree.html': '트리', 'track59-sketchbook.html': '책', 'track58-pinboard.html': '보드', 'track56-network.html': '지도' }).find((v) => { const b = [...document.querySelectorAll('#header-overflow button')].find((x) => x.getAttribute('aria-current') === 'true'); return b && b.textContent.trim() === { 'track32-bookshelf.html': '서재', 'track61-tree.html': '트리', 'track59-sketchbook.html': '책', 'track58-pinboard.html': '보드', 'track56-network.html': '지도' }[v]; }) || ''
               : document.querySelector('#tree-views button[aria-current="true"]')?.dataset.view || ''
             };
           }, tabs.folded);
-          assert.equal(state.hash, '#' + { 'track32-bookshelf.html': 'shelf', 'track59-sketchbook.html': 'book', 'track58-pinboard.html': 'board', 'track56-network.html': 'network' }[view], `${width}/${theme}/${view}: 주소가 탭에 남는다`);
+          assert.equal(state.hash, '#' + { 'track32-bookshelf.html': 'shelf', 'track61-tree.html': 'tree', 'track59-sketchbook.html': 'book', 'track58-pinboard.html': 'board', 'track56-network.html': 'network' }[view], `${width}/${theme}/${view}: 주소가 탭에 남는다`);
           assert.equal(state.home, false, `${width}/${theme}/${view}: 첫 화면으로 튕기지 않는다`);
           assert.ok(state.emptyShown, `${width}/${theme}/${view}: 빈 상태가 보인다`);
           assert.equal(state.heading, heading, `${width}/${theme}/${view}: 빈 상태 문구`);
@@ -2628,16 +2629,18 @@ test('#972 서재·책 상세·둘러보기·새 소식 화면 치수', { skip: 
           await page.waitForFunction(() => typeof document.querySelector('#community-menu')?.onclick === 'function');
           await page.evaluate(() => document.getElementById('community-menu').click());
           await page.waitForSelector('#community-panel[open] .community-group-chip:nth-child(4)');
-          const discover = await page.evaluate(() => {
+          const discover = await page.evaluate((screenWidth) => {
             const rect = sel => document.querySelector(sel).getBoundingClientRect();
             const rail = rect('#community-groups'), last = rect('#community-groups .community-group-chip:last-child');
             const button = rect('button.community-group-find'), popular = rect('#community-popular-stages');
             const form = rect('#community-search-form'), head = rect('#community-panel .panel-heading'), list = rect('.community-results');
             const overlap = Math.max(0, Math.min(last.right, button.right) - Math.max(last.left, button.left)) *
               Math.max(0, Math.min(last.bottom, button.bottom) - Math.max(last.top, button.top));
+            // #1305: 390에서는 큰 제목을 빼고 검색·정렬 바로 아래 가수 단추 줄을 둔다 — 숨겨진 제목은 정렬에서 뺀다.
+            const aligned = screenWidth === 390 ? [form, list] : [form, head, list];
             return { clip: Math.max(0, last.right - rail.right), overlap, gap: button.left - rail.right,
-              chipHeight: last.height, alignment: Math.max(...[form, head, list].flatMap(r => [Math.abs(popular.left - r.left), Math.abs(popular.width - r.width)])) };
-          });
+              chipHeight: last.height, alignment: Math.max(...aligned.flatMap(r => [Math.abs(popular.left - r.left), Math.abs(popular.width - r.width)])) };
+          }, width);
           assert.ok(discover.clip <= 1, `${theme}/${width}: 마지막 칩 잘림 ${discover.clip}px`);
           assert.equal(discover.overlap, 0, `${theme}/${width}: 칩과 단추 겹침`);
           assert.ok(discover.gap >= 8 && discover.chipHeight >= 44, '칩과 단추 사이 여백 및 터치 높이');
