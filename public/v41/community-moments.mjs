@@ -47,12 +47,22 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin,a
  poster.onerror=()=>{const item=current();const src=poster.getAttribute('src')||'';if(item?.videoId&&!/hqdefault\.jpg/.test(src))poster.src=youtubeStageThumbUrl(item.videoId,'hqdefault');else showPosterFallback();};
  const overlay=el('div','moments-overlay');
  const treeLine=el('div','moments-tree');
+ const owner=el('span','moments-owner');owner.setAttribute('aria-hidden','true');
+ const ownerText=el('span','moments-owner-text');
  const titleLine=el('div','moments-title');
  const tagLine=el('div','moments-tags');
- const noteLine=el('div','moments-note');
+ const noteLine=el('button','moments-note');noteLine.type='button';noteLine.setAttribute('aria-label','설명 펼치기');
+ noteLine.onclick=()=>{const expanded=noteLine.getAttribute('aria-expanded')==='true';noteLine.setAttribute('aria-expanded',String(!expanded));noteLine.setAttribute('aria-label',expanded?'설명 펼치기':'설명 접기');};
+ const mute=el('button','moments-mute','소리 켜기');mute.type='button';mute.setAttribute('aria-label','소리 켜기');
+ const progressButton=el('div','moments-player-controls');
  overlay.append(treeLine,titleLine,tagLine,noteLine);
- const progress=el('div','moments-progress');const progressFill=el('span','moments-progress-fill');progress.append(progressFill);
- media.append(poster,posterFallback,overlay,progress);
+ const progress=el('div','moments-progress');const progressFill=el('span','moments-progress-fill');
+ const playerProgress=el('progress','moments-progress-native');playerProgress.max=100;playerProgress.value=0;playerProgress.setAttribute('aria-label','재생 진행');
+ progress.append(progressFill,playerProgress);
+ const swipeLayer=el('div','moments-swipe-layer');swipeLayer.setAttribute('aria-hidden','true');
+ const hint=el('div','moments-swipe-hint','위로 밀어 다음 순간');hint.setAttribute('role','status');hint.hidden=true;
+ progressButton.append(mute);
+ media.append(poster,posterFallback,swipeLayer,overlay,progress,progressButton,hint);
  card.append(media);
  const rail=el('div','moments-rail');
  const nav=el('div','moments-nav');
@@ -71,6 +81,7 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin,a
  // #1098 2단계: 그 순간의 ♡·댓글 수 — 공개 숫자 규칙(#824 결정 7)을 그대로, 3 미만은 숫자를 남기지 않는다.
  const momentStats={hearts:0,comments:0};
  const paintCount=(span,value)=>{if(span)span.textContent=Number(value)>=3?String(value):'';};
+ const railCountLabel=(span,value)=>{if(span)span.textContent=Number(value)>=3?String(value):span.dataset.fallback||'';};
  const paintCounts=()=>{paintCount(heartCount,momentStats.hearts);paintCount(commentsCount,momentStats.comments);};
  const applyStats=(answer)=>{
   if(!answer)return;
@@ -98,13 +109,13 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin,a
  const railButtons=[
   {icon:'♡',label:'마음',action:()=>toggleHeart()},
   {icon:bubbleIcon(),label:'댓글',action:()=>current()&&openComments()},
-  {icon:treeIcon(),label:'트리',action:()=>current()&&onOpenShare?.({shareId:current().shareId,view:'book'})},
   {icon:'＋',label:'담기',action:()=>current()&&openAddDialog(current())},
+  {icon:treeIcon(),label:'트리',action:()=>current()&&onOpenShare?.({shareId:current().shareId,view:'book'})},
   {icon:'↗',label:'공유',action:()=>current()&&copyShare(current())}
  ];
  for(const spec of railButtons){
   const button=el('button','moments-rail-button');
-  button.type='button';
+  button.type='button';button.setAttribute('aria-label',spec.label);
   const icon=typeof spec.icon==='string'?el('span','moments-rail-icon',spec.icon):spec.icon;
   if(typeof spec.icon!=='string')icon.setAttribute('class','moments-rail-svg');
   button.append(icon,el('span','moments-rail-label',spec.label));
@@ -241,7 +252,7 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin,a
   frame.referrerpolicy='strict-origin-when-cross-origin';
   frame.setAttribute('allowfullscreen','');
   frame.src=embedSrc(item.videoId,item);
-  frame.onload=()=>frame.classList.add('is-ready');
+  frame.onload=()=>{frame.classList.add('is-ready');try{frame.contentWindow?.postMessage('{"event":"listening"}','https://www.youtube-nocookie.com');}catch{}};
   frames.push(frame);
   return frame;
  }
@@ -255,12 +266,17 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin,a
   poster.src=item.thumbnail||'';
   poster.alt=item.title||'';
   treeLine.replaceChildren();
+  const displayOwner=String(item.ownerName||item.publicDisplayName||item.authorLabel||item.ownerLabel||item.creatorName||item.authorName||'트리 주인').trim();
+  owner.textContent=displayOwner.slice(0,1);
+  ownerText.textContent=displayOwner;
+  treeLine.append(owner,ownerText);
   if(item.aiTester)treeLine.append(el('span','moments-ai','AI 명예회원'));
   treeLine.append(el('span','moments-tree-name',item.treeTitle||''));
   titleLine.textContent=item.title||'';
   // 꼬리표는 '가수:아이유' 같은 머리말을 뺀 값만 — 기존 parseTag 한 벌을 그대로 쓴다.
   tagLine.textContent=(item.keywords||[]).slice(0,4).map(raw=>parseTag(raw)?.value||raw).filter(Boolean).join(' · ');
   noteLine.textContent=item.note||'';
+  noteLine.setAttribute('aria-expanded','false');noteLine.setAttribute('aria-label','설명 펼치기');
   noteLine.hidden=!item.note;
   // 지금 것 + 다음 것만 iframe — 나머지는 포스터로 남긴다.
   clearFrames();
@@ -269,13 +285,18 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin,a
   if(now)media.append(now);
   if(next){next.classList.add('moments-next');media.append(next);}
   progressFill.classList.remove('is-running');
-  void progressFill.offsetWidth;
-  progressFill.classList.add('is-running');
-  unmuted=false;
+  playerProgress.value=0;
+  progress.dataset.ltProgress='0';
+  if(!matchMedia('(max-width:780px)').matches){void progressFill.offsetWidth;progressFill.classList.add('is-running');}
+  unmuted=false;mute.textContent='소리 켜기';mute.setAttribute('aria-label','소리 켜기');
+  stage.dataset.ltMomentsMuted='true';
+  media.dataset.orientation=item.vertical===false||item.isVertical===false?'landscape':'portrait';
+  if(matchMedia('(max-width:780px)').matches){try{hint.hidden=localStorage.getItem('lt41.momentSwipeSeen')==='1';}catch{hint.hidden=false;}}else hint.hidden=true;
   currentFrame=now;
   stage.dataset.ltMomentsCount=String(frames.length);
   stage.dataset.ltMomentsId=item.videoId||item.id;
   closeComments(); // 순간을 넘기면 댓글 창을 닫는다 — 다음 순간 것을 다시 열게
+  momentStats.hearts=0;momentStats.comments=0;setLiked(false);paintCounts();
   void loadStats(); // 그 순간의 ♡·댓글 수 — 모양이 다른 응답은 조용히 기본 표시를 유지한다
  }
  let currentFrame=null;
@@ -307,6 +328,7 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin,a
   if(nextIndex>=items.length){void load();index=Math.min(index,items.length-1);return;}
   if(nextIndex<0)return;
   index=nextIndex;
+  if(matchMedia('(max-width:780px)').matches){hint.hidden=true;try{localStorage.setItem('lt41.momentSwipeSeen','1');}catch{}}
   render();
  }
  up.onclick=()=>step(-1);
@@ -316,11 +338,16 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin,a
  if(typeof window!=='undefined'&&typeof window.addEventListener==='function')window.addEventListener('message',event=>{
   if(!currentFrame||event.source!==currentFrame.contentWindow)return;
   let data;try{data=typeof event.data==='string'?JSON.parse(event.data):event.data;}catch{return;}
+  if(data?.event==='infoDelivery'&&data.info&&typeof data.info==='object'){
+    const info=data.info;const duration=Number(info.duration),time=Number(info.currentTime);
+    if(Number.isFinite(duration)&&duration>0&&Number.isFinite(time)){const value=Math.max(0,Math.min(100,time/duration*100));playerProgress.value=value;progress.dataset.ltProgress=String(Math.round(value));}
+    if(typeof info.muted==='boolean'){unmuted=!info.muted;mute.textContent=unmuted?'소리 끄기':'소리 켜기';mute.setAttribute('aria-label',mute.textContent);stage.dataset.ltMomentsMuted=String(!unmuted);}
+  }
   if(data?.event==='onStateChange'){
    const state=Number(data.info),item=current(),start=Number(item?.startSeconds);
    // 구간이 있는 순간은 끝나면 그 구간 처음으로 돌아간다(기존 구간 재생 규칙과 같은 동작).
    if(state===0&&item&&Number.isSafeInteger(start)&&start>=0&&Number.isSafeInteger(Number(item.endSeconds))&&Number(item.endSeconds)>start){
-    try{currentFrame.contentWindow.postMessage('{"event":"command","func":"seekTo","args":['+start+',true]}','https://www.youtube.com');currentFrame.contentWindow.postMessage('{"event":"command","func":"playVideo","args":[]}','https://www.youtube.com');}catch{}
+    try{currentFrame.contentWindow.postMessage('{"event":"command","func":"seekTo","args":['+start+',true]}','https://www.youtube-nocookie.com');currentFrame.contentWindow.postMessage('{"event":"command","func":"playVideo","args":[]}','https://www.youtube-nocookie.com');}catch{}
     return;
    }
    media.classList.toggle('is-playing',state===1);
@@ -331,17 +358,25 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin,a
   if(event.key==='ArrowDown'){event.preventDefault();step(1);}
   if(event.key==='ArrowUp'){event.preventDefault();step(-1);}
  });
- stage.addEventListener('touchstart',event=>{touchY=event.touches[0]?.clientY??null;},{passive:true});
+  stage.addEventListener('touchstart',event=>{const t=event.touches[0];touchY=t?{x:t.clientX,y:t.clientY}:null;},{passive:true});
  stage.addEventListener('touchend',event=>{
   if(touchY===null)return;
-  const dy=(event.changedTouches[0]?.clientY??touchY)-touchY;
-  if(Math.abs(dy)>40)step(dy<0?1:-1);
+  const t=event.changedTouches[0],dy=(t?.clientY??touchY.y)-touchY.y,dx=(t?.clientX??touchY.x)-touchY.x;
+  if(Math.abs(dy)>55&&Math.abs(dy)>Math.abs(dx)*1.4&&!(event.target?.closest?.('button,textarea,select,input')))step(dy<0?1:-1);
   touchY=null;
  },{passive:true});
- media.addEventListener('click',()=>{
-  if(!currentFrame||unmuted)return;
-  try{currentFrame.contentWindow?.postMessage('{"event":"command","func":"unMute","args":[]}','https://www.youtube.com');}catch{}
-  try{currentFrame.contentWindow?.postMessage('{"event":"command","func":"setVolume","args":[100]}','https://www.youtube.com');}catch{}
+  mute.onclick=event=>{
+    event.stopPropagation();
+    if(!currentFrame)return;
+    const command=unmuted?'mute':'unMute';
+    try{currentFrame.contentWindow?.postMessage(JSON.stringify({event:'command',func:command,args:[]}),'https://www.youtube-nocookie.com');}catch{}
+    unmuted=!unmuted;mute.textContent=unmuted?'소리 끄기':'소리 켜기';mute.setAttribute('aria-label',mute.textContent);stage.dataset.ltMomentsMuted=String(!unmuted);
+  };
+  media.addEventListener('click',event=>{
+    if(event.target.closest('button'))return;
+  if(!currentFrame||unmuted||matchMedia('(max-width:780px)').matches)return;
+  try{currentFrame.contentWindow?.postMessage('{"event":"command","func":"unMute","args":[]}','https://www.youtube-nocookie.com');}catch{}
+  try{currentFrame.contentWindow?.postMessage('{"event":"command","func":"setVolume","args":[100]}','https://www.youtube-nocookie.com');}catch{}
   unmuted=true;
   stage.dataset.ltMomentsMuted='false';
  });
