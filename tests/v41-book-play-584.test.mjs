@@ -408,7 +408,7 @@ test('584 실행: 머리줄 — 1장|2장 한 묶음, 돋보기 아이콘, 말�
     const { ctx, frame } = await openBook(browser, 1440, 900);
     try {
       const head = await frame.evaluate(() => {
-        const toggle = document.querySelector('.view-toggle');
+        const toggle = document.getElementById('book-view-toggle');
         const cells = [...toggle.querySelectorAll('.ui-btn')];
         const lens = document.getElementById('lensBtn');
         const pill = (el) => { const s = getComputedStyle(el); return { border: s.borderTopWidth + '/' + s.borderRadius, bg: s.backgroundColor }; };
@@ -589,17 +589,10 @@ test('26: 책을 열어 둔 채 트리를 바꾸면 책 제목·첫 카드·카�
         assert.match(before.src,/track59-sketchbook/, '책 화면');
         assert.ok(before.title==='A', '전환 전 책 제목 A');
 
-        if (width === 390) {
-          // 390에서는 책 안의 트리 제목 메뉴로 바꾼다(헤더 트리 선택은 접혀 있다).
-          const frame = page.locator('#view:not([hidden]), #view-next:not([hidden])').first().contentFrame();
-          await frame.locator('#bookTitleBtn').click();
-          await page.waitForTimeout(150);
-          await frame.locator(`#treeMenuPanel [data-tree-id="${b.id}"]`).click();
-        } else {
-          await page.locator('#record-menu').click();
-          await page.waitForTimeout(150);
-          await page.locator(`#tree-popover [data-tree-id="${b.id}"]`).click();
-        }
+        // 공통 줄로 옮긴 뒤에는 머리줄 트리 선택(기록 메뉴)에서 바꾼다.
+        await page.locator('#record-menu').click();
+        await page.waitForTimeout(150);
+        await page.locator(`#tree-popover [data-tree-id="${b.id}"]`).click();
         await page.waitForFunction((id) => {
           const f = [...document.querySelectorAll('#view, #view-next')].find(x => !x.hidden && x.getClientRects().length > 0);
           try { return (f?.contentWindow?.location?.search || '').includes(id); } catch { return false; }
@@ -1047,4 +1040,48 @@ test('1030 실행: 같은 종류 영상의 펼침면 칸 크기 차이 0(1440·3
       }
     }
   } finally { await browser.close(); }
+});
+
+
+// 책 줄·재생·두 칸 전환의 시각 회귀. 고정 시험 트리만 사용한다.
+test('책 도구 줄: 중복 제목 없음·이어 보기·두 칸 동일 치수(1440·390/밤·정원)', {skip, timeout: 180000}, async () => {
+  const browser = await chromium.launch({headless:true});
+  try {
+    for (const width of [1440,390]) for (const theme of ['night','garden']) {
+      const {ctx,frame,errors} = await openBook(browser,width,width===390?844:900);
+      try {
+        await frame.evaluate((t)=>{document.documentElement.setAttribute('data-lt-theme',t==='garden'?'garden':'');},theme);
+        await frame.waitForSelector('.lt-toolbar-title');
+        const result = await frame.evaluate(()=>{
+          const toolbar=document.querySelector('.lt-screen-toolbar');
+          const toggle=document.getElementById('book-view-toggle');
+          const cells=[...toggle.children].filter(n=>n.tagName==='BUTTON');
+          const geom=el=>{const r=el.getBoundingClientRect(),s=getComputedStyle(el);return {w:r.width,h:r.height,radius:s.borderRadius};};
+          const old=document.querySelector('.topbar');
+          const play=document.getElementById('playAllBtn');
+          return {
+            title:toolbar.querySelector('.lt-toolbar-title').textContent.trim(),
+            titleCount:[...document.querySelectorAll('.lt-toolbar-title')].filter(n=>n.textContent.trim()==='시험 트리'&&n.getClientRects().length).length,
+            oldVisible:!!old&&getComputedStyle(old).display!=='none',
+            playText:play.textContent.trim(),
+            playAria:play.getAttribute('aria-label'),
+            playNearNav:!!play.closest('.nav-pill'),
+            playInToolbar:toolbar.contains(play),
+            geom:cells.map(geom),
+            chosen:cells.map(c=>c.getAttribute('aria-pressed'))
+          };
+        });
+        assert.equal(result.title,'시험 트리');
+        assert.equal(result.titleCount,1,'트리 이름은 줄에서 한 번');
+        assert.equal(result.oldVisible,false,'상단 중복 제목 띠는 보이지 않는다');
+        assert.equal(result.playText,'▶ 이어 보기');
+        assert.match(result.playAria,/이어서 보기/);
+        assert.equal(result.geom.length,2);
+        assert.deepEqual(result.geom[0],result.geom[1],width+' '+theme+' 두 칸의 계산 치수가 다름');
+        assert.deepEqual(result.chosen,width===390?['true','false']:['false','true']);
+        assert.equal(width===390?result.playNearNav:result.playInToolbar,true);
+        assert.deepEqual(errors,[],'실행 예외 없음');
+      } finally {await ctx.close();}
+    }
+  } finally {await browser.close();}
 });

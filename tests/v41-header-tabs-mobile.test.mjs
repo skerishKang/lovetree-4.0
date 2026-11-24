@@ -54,7 +54,7 @@ test('실행(390): 머리줄은 접어 한 줄로 남고, 더보기 메뉴에 �
     assert.equal(folded.treeViews, false, '390: 서재·책·보드·지도 탭은 접힌다');
     assert.equal(folded.write, false, '390: ＋ 순간 추가는 접힌다');
     assert.equal(folded.more, true, '390: 더보기(☰) 단추는 보인다');
-    assert.ok(folded.headerHeight < 80, `390: 머리줄은 한 줄(${folded.headerHeight}px)`);
+    assert.equal(folded.headerHeight, 57, `390: 머리줄은 한 줄 57px(${folded.headerHeight}px)`);
 
     await page.click('#mobile-more');
     await page.waitForFunction(() => !document.getElementById('header-overflow')?.hidden, null, { timeout: 5000 });

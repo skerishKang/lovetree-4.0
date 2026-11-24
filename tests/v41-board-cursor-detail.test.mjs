@@ -261,7 +261,8 @@ test('6. 화면: 판 제목(기억 보드·설명 줄)은 무대 밖 고정 머�
   t.after(async () => { await browser.close(); server.close(); });
   const { context, page, frame, problems } = await openHost(browser, `http://127.0.0.1:${server.address().port}/host.html`);
   assert.deepEqual(problems, [], '화면 오류 없음: ' + problems.join(' | '));
-  const left = () => frame.$eval('.boardTitle h1', (el) => Math.round(el.getBoundingClientRect().left));
+  // #1249: 보드 제목은 공통 도구 줄로 옮겼다 — 움직이는 판 밖 고정 제목의 왼쪽 여백을 같은 기준으로 잰다.
+  const left = () => frame.$eval('.lt-screen-toolbar .lt-toolbar-title', (el) => Math.round(el.getBoundingClientRect().left));
   // 처음 자리에서도, 전체 보기로 다시 맞춘 뒤에도 왼쪽 24px 안쪽에서 시작한다.
   assert.ok(await left() >= 24, `처음 자리 제목 왼편 ${(await left())}px — 24px 이상`);
   await frame.evaluate(() => fitAll(true));

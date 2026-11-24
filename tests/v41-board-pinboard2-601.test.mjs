@@ -575,6 +575,12 @@ test('#662 화면: 상세 판의 행동 단추를 실제 좌표 클릭으로 누
         assert.equal(await page.evaluate(() => window.LT41_MESSAGES.some((m) => m.type === 'lt41-open-network')), true, `${width}px: '지도에서 관계 보기'를 실제 클릭으로 누르면 셸에 요청이 간다`);
         // 여기부터 시네마 → 시네마가 켜진다(상세가 닫히므로 마지막에 누른다).
         const cm = await center('cinemaFromMoment');
+        const cinemaHit = await frame.evaluate(({x,y}) => {
+          const b = document.getElementById('cinemaFromMoment');
+          const hit = document.elementFromPoint(x,y);
+          return {enabled: !b.disabled, hit: b === hit || b.contains(hit)};
+        }, cm);
+        assert.deepEqual(cinemaHit, {enabled:true,hit:true}, width + ': 마지막 순간도 감상 가능하고 클릭 좌표가 단추에 닿음');
         await page.mouse.click(cm.x, cm.y);
         await page.waitForTimeout(800);
         assert.equal(await frame.evaluate(() => document.getElementById('cinemaOverlay').classList.contains('active')), true, `${width}px: '여기부터 시네마'를 실제 클릭으로 누르면 시네마가 켜진다`);
