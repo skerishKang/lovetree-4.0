@@ -1238,3 +1238,12 @@ dialog#account-assets .assets-detail-none{margin:0;font-size:13px;color:var(--lt
 .header-actions .view-toggle .ui-btn,.header-actions .view-toggle>button{min-height:42px;height:42px}
 nav #record-menu{justify-content:space-between}
 nav #record-menu #source-label{flex:1 1 auto;text-align:left}
+
+/* #1259-2: 방문자 책 첫 안내만 문서 흐름의 별도 칸을 사용한다. 보드 안내와 머리줄은 그대로. */
+body[data-record-source=share][data-fab-lift=book] #toast[data-visitor-intro]:not([hidden]){
+ position:relative;flex:0 0 auto;inset:auto;transform:none;margin:4px auto 54px;
+}
+@media(max-width:520px){
+ body[data-record-source=share][data-fab-lift=book] #toast[data-visitor-intro]:not([hidden]){margin:4px auto max(8px,env(safe-area-inset-bottom))}
+}
+body[data-record-source=share][data-fab-lift=book].lt-book-lightbox-open #toast[data-visitor-intro]{display:none}
