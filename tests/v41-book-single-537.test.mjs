@@ -576,3 +576,57 @@ test('#1287 모바일 책 보기 제어와 가로 복귀', { skip: REQUIRE ? fal
     await new Promise(resolve => server.close(resolve));
   }
 });
+import {expectNoHistoryGrowth} from './helpers/history-assert.mjs';
+
+test('#1291 책 판 열기와 옵션 전환의 뒤로 가기', {skip: REQUIRE ? false : skip,timeout:100000}, async()=>{
+ if(skip) assert.fail('실제 화면 시험을 건너뛸 수 없습니다: '+skip);
+ const server=await serve(ROOT);
+ let browser;
+ try {
+  browser=await chromium.launch({headless:true,args:['--disable-gpu']});
+  for(const [width,height] of [[390,844],[1440,900]]){
+   const env=await openBook(browser,'http://127.0.0.1:'+server.address().port,width,height,'single');
+   const {frame}=env;
+   const snapshot=()=>frame.evaluate(()=>({
+    length:history.length,overlay:history.state?.ltBookOverlay||null,focus:window.LTDEMO.get(),page:window.__TRACK59__.getState().page,
+    archive:window.__TRACK59__.getState().archive,detail:window.__TRACK59__.getState().detail,
+    viewer:window.__TRACK59__.getState().viewer,scrollY:window.scrollY
+   }));
+   await expectNoHistoryGrowth(frame,()=>frame.evaluate(()=>window.__TRACK59__.setView('single')),'한 장 보기 옵션');
+   const original=await snapshot();
+   await frame.evaluate(()=>window.__TRACK59__.openArchive());
+   assert.equal((await snapshot()).length,original.length+1,'목록 판은 방문 기록 한 칸');
+   assert.equal((await snapshot()).archive,true);
+   await frame.evaluate(()=>history.back());
+   await frame.waitForFunction(()=>!window.__TRACK59__.getState().archive);
+   assert.equal((await snapshot()).page,original.page,'목록 뒤로 가기 쪽 복귀');
+   const beforeDetail=await snapshot();
+   const id=await frame.evaluate(()=>window.__TRACK59__.getState().pageIds[0]);
+   await frame.evaluate(x=>window.__TRACK59__.showDetail(x),id);
+   assert.equal((await snapshot()).overlay,'detail','순간 자세히 한 칸');
+   await frame.evaluate(()=>document.querySelector('#openViewerBtn').click());
+   assert.equal((await snapshot()).overlay,'viewer','크게 보기 한 칸');
+   await frame.evaluate(()=>history.back());
+   await frame.waitForFunction(()=>!window.__TRACK59__.getState().viewer);
+   assert.equal((await snapshot()).detail,true,'크게 보기 뒤로 가기는 순간 자세히로');
+   await frame.evaluate(()=>history.back());
+   await frame.waitForFunction(()=>!window.__TRACK59__.getState().detail);
+   assert.equal((await snapshot()).page,beforeDetail.page,'순간 자세히 뒤로 가기 책 복귀');
+   await expectNoHistoryGrowth(frame,()=>frame.evaluate(()=>window.__TRACK59__.turnNext()),'일반 책장 넘김은 기록을 쌓지 않음');
+   await frame.waitForTimeout(600);
+   const beforeJump=await snapshot();
+   await frame.evaluate(()=>window.__TRACK59__.openArchive());
+   await frame.locator('#archiveList [data-jump="3"]').first().click();
+   await frame.waitForTimeout(750);
+   assert.equal((await snapshot()).page,3,'목록에서 다른 쪽으로 이동');
+   await frame.evaluate(()=>history.back());
+   await frame.waitForTimeout(750);
+   assert.equal((await snapshot()).page,beforeJump.page,'목록 점프 뒤로 가기 이전 쪽');
+
+   await env.ctx.close();
+  }
+ }finally{
+  await browser?.close();
+  await new Promise(r=>server.close(r));
+ }
+});

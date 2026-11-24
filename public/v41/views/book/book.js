@@ -7,8 +7,23 @@ const DEMO_VIDEO='data:video/mp4;base64,AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMW1w
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 /* #519: 닫힌 창(opacity 0) 안의 입력칸이 Tab 초점을 받던 문제 — open일 때만 inert를 뺀다.
    책의 닫힌 창(상세·크게 보기·링크·갈림길·목차·이어진 순간)은 처음부터 inert다. */
+// #1291: book panels and deliberate jumps use one browser-history step.
+let bookHistoryRestoring=false,bookHistoryTransferring=false;
+const bookState=()=>({...(history.state||{}),ltBookPage:current,ltBookMoment:LTDEMO.get()||null,ltBookScrollY:window.scrollY,ltBookInnerScroll:['mobileContent','leftPage','rightPage'].map(id=>document.getElementById(id)?.scrollTop||0)});
+function recordBookOpen(id){
+ if(bookHistoryRestoring||bookHistoryTransferring)return;
+ history.replaceState(bookState(),'',location.href);
+ history.pushState({...bookState(),ltBookOverlay:id},'',location.href);
+}
+function closeBookHistory(id){
+ if(!bookHistoryRestoring&&!bookHistoryTransferring&&history.state?.ltBookOverlay===id)history.back();
+}
+function completeBookJump(id,page){
+ const state={...history.state,ltBookOverlay:null,ltBookMoment:id,ltBookPage:page,ltBookScrollY:window.scrollY};
+ history.replaceState(state,'',location.href);
+}
 const bookDialogs=[]; /* 열린 창 스택 — Esc는 맨 위 창 하나만 닫는다(공통 창 닫기 규칙과 같은 방식). */
-function setBookOpen(el, open){if(!el)return;el.classList.toggle('open',!!open);const i=bookDialogs.indexOf(el);if(i>=0)bookDialogs.splice(i,1);if(open){el.removeAttribute('inert');bookDialogs.push(el)}else el.setAttribute('inert','')}
+function setBookOpen(el, open){if(!el)return;if(open&&!el.classList.contains('open'))recordBookOpen(el.id);if(!open&&el.classList.contains('open'))closeBookHistory(el.id);el.classList.toggle('open',!!open);const i=bookDialogs.indexOf(el);if(i>=0)bookDialogs.splice(i,1);if(open){el.removeAttribute('inert');bookDialogs.push(el)}else el.setAttribute('inert','')}
 const topBookDialog=()=>bookDialogs[bookDialogs.length-1]||null;
 const bookWrap=$('#bookWrap'),book=$('#book'),leftPage=$('#leftPage'),rightPage=$('#rightPage'),mobilePage=$('#mobilePage'),mobileContent=$('#mobileContent');
 let current=0,recent=[],lastMoment=null,selectedMomentId=null,lensOn=true,machineState='IDLE',turn=null,turnAnim=null,focusAfter=null;
@@ -85,6 +100,28 @@ async function beginMobileSpread(){
  spreadOrientationNotice(innerWidth<innerHeight);
 }
 window.addEventListener('popstate',()=>{if(mobileDoubleActive){mobileSpreadHistory=false;finishMobileSpread()}});
+window.addEventListener('popstate',event=>{
+ const target=event.state?.ltBookOverlay||null;
+ bookHistoryRestoring=true;
+ try{
+  for(const id of ['viewer','detail','branchModal']){
+   const panel=$('#'+id);
+   if(panel?.classList.contains('open')&&target!==id){
+    if(id==='branchModal')closeBranch();
+    else setBookOpen(panel,false);
+   }
+  }
+  if($('#archivePanel')?.classList.contains('open')&&target!=='archivePanel')closeArchive();
+  const state=event.state||{};
+  if(Number.isInteger(state.ltBookPage)&&state.ltBookMoment&&
+     (state.ltBookPage!==current||state.ltBookMoment!==LTDEMO.get())){
+   renderSpread(posOfMoment(state.ltBookMoment),state.ltBookMoment,false);
+  }
+  if(Number.isFinite(state.ltBookScrollY))window.scrollTo(0,state.ltBookScrollY);
+  if(Array.isArray(state.ltBookInnerScroll))['mobileContent','leftPage','rightPage'].forEach((id,i)=>{const el=document.getElementById(id);if(el&&Number.isFinite(state.ltBookInnerScroll[i]))el.scrollTop=state.ltBookInnerScroll[i]});
+ }finally{bookHistoryRestoring=false}
+});
+
 // #1287: book scrolling temporarily reduces the parent's floating add button.
 let bookScrollIdle;
 document.addEventListener('scroll',()=>{
@@ -264,13 +301,13 @@ function closeArchive(){if(archiveByDisplay){
  try{localStorage.setItem('lt41.bookDisplay','book')}catch{}
  try{parent.postMessage({type:globalThis.LT41_MSG.prefs,patch:{bookDisplay:'book'}},location.origin)}catch{}
  }
-const panel=$('#archivePanel');panel.classList.remove('open');panel.inert=true;$('#archiveBtn').setAttribute('aria-expanded','false');archiveOpener?.focus()}function openArchive(){archiveOpener=document.activeElement;renderArchive();const panel=$('#archivePanel');panel.inert=false;panel.classList.add('open');$('#archiveBtn').setAttribute('aria-expanded','true');$('#archiveClose').focus()}$('#archiveBtn').setAttribute('aria-expanded','false');$('#archiveBtn').setAttribute('aria-controls','archivePanel');$('#archiveBtn').onclick=openArchive;$('#book-display-inline')?.addEventListener('click',e=>{
+const panel=$('#archivePanel');if(panel.classList.contains('open'))closeBookHistory(panel.id);panel.classList.remove('open');panel.inert=true;$('#archiveBtn').setAttribute('aria-expanded','false');archiveOpener?.focus()}function openArchive(){archiveOpener=document.activeElement;renderArchive();const panel=$('#archivePanel');if(!panel.classList.contains('open'))recordBookOpen(panel.id);panel.inert=false;panel.classList.add('open');$('#archiveBtn').setAttribute('aria-expanded','true');$('#archiveClose').focus()}$('#archiveBtn').setAttribute('aria-expanded','false');$('#archiveBtn').setAttribute('aria-controls','archivePanel');$('#archiveBtn').onclick=openArchive;$('#book-display-inline')?.addEventListener('click',e=>{
  const choice=e.target.closest('[data-book-display]')?.dataset.bookDisplay;
  if(!choice)return;
  paintInlineBookDisplay(choice);
  if(choice==='list'){archiveByDisplay=true;openArchive()}
  else if($('#archivePanel').classList.contains('open'))closeArchive();
-});$('#archiveClose').onclick=closeArchive;$('#archivePanel').addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();closeArchive()}});$('#archivePanel').addEventListener('click',e=>{const b=e.target.closest('[data-jump]');if(!b)return;const target=+b.dataset.jump,focus=b.dataset.focus||(momentAtPos(target)?.id||'');closeArchive();if(target===current){renderSpread(current,focus,false)}else autoTurn(target>current?'next':'prev',target,focus)});$('#detailIndexBtn').onclick=()=>{setBookOpen($('#detail'),false);openArchive()};
+});$('#archiveClose').onclick=closeArchive;$('#archivePanel').addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();closeArchive()}});$('#archivePanel').addEventListener('click',e=>{const b=e.target.closest('[data-jump]');if(!b)return;const target=+b.dataset.jump,focus=b.dataset.focus||(momentAtPos(target)?.id||'');bookHistoryTransferring=true;try{closeArchive();completeBookJump(focus,target)}finally{bookHistoryTransferring=false}if(target===current){renderSpread(current,focus,false)}else autoTurn(target>current?'next':'prev',target,focus)});$('#detailIndexBtn').onclick=()=>{bookHistoryTransferring=true;try{setBookOpen($('#detail'),false);history.replaceState({...history.state,ltBookOverlay:'archivePanel'},'',location.href);openArchive()}finally{bookHistoryTransferring=false}};
 /* Branch chooser */
 /* 갈림길 고르는 창 — 맨 위 창 하나만 닫고, 초점은 연 책갈피로 돌려 준다. */
 let branchOpener=null,branchTargets=[],branchCurrentId='',branchExpanded=false,branchQuery='';
@@ -286,7 +323,7 @@ $('#branchClose').onclick=closeBranch;
 $('#branchModal').addEventListener('click',e=>{if(e.target===$('#branchModal'))closeBranch()});
 $('#branchSearch').addEventListener('input',e=>{branchQuery=e.target.value;renderBranchChoices()});
 $('#branchMore').onclick=()=>{branchExpanded=true;renderBranchChoices();$('#branchChoices').scrollTop=0};
-$('#branchChoices').onclick=e=>{if(e.target.closest('#branchMore'))return;const b=e.target.closest('[data-branch-target]');if(!b)return;const t=+b.dataset.branchTarget;closeBranch();t===current?renderSpread(t,b.dataset.focus,false):autoTurn(t>current?'next':'prev',t,b.dataset.focus)};
+$('#branchChoices').onclick=e=>{if(e.target.closest('#branchMore'))return;const b=e.target.closest('[data-branch-target]');if(!b)return;const t=+b.dataset.branchTarget;bookHistoryTransferring=true;try{closeBranch();completeBookJump(b.dataset.focus,t)}finally{bookHistoryTransferring=false}t===current?renderSpread(t,b.dataset.focus,false):autoTurn(t>current?'next':'prev',t,b.dataset.focus)};
 document.addEventListener('keydown',e=>{if(e.key!=='Escape'||topBookDialog()!==$('#branchModal'))return;e.preventDefault();e.stopPropagation();closeBranch()},true);
 $('#lensBtn').onclick=()=>{lensOn=!lensOn;$('#lensBtn').classList.toggle('active',lensOn);if(!lensOn)hideLens()};
 /* #642: 전체 화면 단추로도 resize 가 일어난다. 그때 renderSpread 가 장을 처음부터 다시 그려
