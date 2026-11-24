@@ -233,7 +233,9 @@ async function stableShot(frame, page, file) {
     if (!(await assetsReady(frame, page))) { previous = null; continue; }
     await page.waitForTimeout(250);
   }
-  writeFileSync(file, previous);
+  // 끝까지 안정되지 않으면 마지막으로 한 장을 찍어 남긴다(고정 실패로 표시). 예전에는 자료 대기가 끝나지 않으면
+  // previous가 null인 채로 저장을 시도해 예외가 나고, 캡처 전체가 한 장도 남기지 못한 채 끝났다(11-24 CI).
+  writeFileSync(file, previous ?? await page.screenshot());
   return false;
 }
 
@@ -270,7 +272,16 @@ async function capture(argv) {
           const page = await context.newPage();
           const name = scene.openAccount ? `account-${viewport.tag}-${theme}.png` : shotName(scene.name, viewport, theme);
           try {
-            const { frame, href } = await openScene(page, options.base, scene);
+            let opened;
+            try { opened = await openScene(page, options.base, scene); }
+            catch (error) {
+              // 한 장이 실패해도 나머지 장은 계속 찍는다.
+              manifest.push({ shot: name, scene: scene.name, opened: false, error: String(error?.message || error).split('\n')[0] });
+              console.log(`! ${name}: 화면을 열다 오류 (${String(error?.message || error).split('\n')[0]})`);
+              unstable += 1;
+              continue;
+            }
+            const { frame, href } = opened;
             if (!frame) {
               manifest.push({ shot: name, scene: scene.name, opened: false, shown: href });
               console.log(`! ${name}: 화면이 열리지 않음 (${href || '주소 없음'})`);
@@ -286,7 +297,14 @@ async function capture(argv) {
               }).catch(() => {});
               await page.waitForTimeout(400);
             }
-            const stable = await stableShot(frame, page, path.join(out, name));
+            let stable = false;
+            try { stable = await stableShot(frame, page, path.join(out, name)); }
+            catch (error) {
+              manifest.push({ shot: name, scene: scene.name, opened: true, shown: href, stable: false, error: String(error?.message || error).split('\n')[0] });
+              console.log(`! ${name}: 찍다 오류 (${String(error?.message || error).split('\n')[0]})`);
+              unstable += 1;
+              continue;
+            }
             manifest.push({ shot: name, scene: scene.name, opened: true, shown: href, stable });
             if (!stable) unstable += 1;
             count += 1;

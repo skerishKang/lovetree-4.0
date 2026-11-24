@@ -1566,6 +1566,8 @@ jobs:
         env:
           LOVETREE_POSTDEPLOY_BROWSER: chromium
         run: |
+          # 캡처가 일부 실패해도 종료 코드·로그 끝줄을 남긴다(bash -e면 echo·tail 전에 끝나 원인이 안 보였다).
+          set +e
           start=$(date +%s)
           node tools/visual-baseline/visual-baseline.mjs capture \
             --base "${{ steps.base.outputs.baseUrl }}/v41/" --out visual-before > "$RUNNER_TEMP/before.log" 2>&1
@@ -1579,6 +1581,8 @@ jobs:
         env:
           LOVETREE_POSTDEPLOY_BROWSER: chromium
         run: |
+          # 캡처가 일부 실패해도 종료 코드·로그 끝줄을 남긴다(bash -e면 echo·tail 전에 끝나 원인이 안 보였다).
+          set +e
           start=$(date +%s)
           node tools/visual-baseline/visual-baseline.mjs capture \
             --base "${{ steps.preview.outputs.url }}/v41/" --out visual-after > "$RUNNER_TEMP/after.log" 2>&1
