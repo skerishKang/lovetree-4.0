@@ -1179,6 +1179,8 @@ function selectMoment(id, open = true) {
   }
 }
 
+// #1273 9번: 안내 시간은 공통 타이머 한 벌에서 잰다(단추 있음 8초 / 없음 2.2초, 올려 두면 멈춤).
+const toastTimer = window.LTToastTimer.createToastTimer();
 function toast(t) {
   dismissBoardOrderUndo();
   let el = $('#toast');
@@ -1186,22 +1188,21 @@ function toast(t) {
   delete el.dataset.boardOrderUndo;
   el.textContent = t;
   el.classList.add('show');
-  clearTimeout(toast.t);
-  toast.t = setTimeout(() => el.classList.remove('show'), 2200);
+  toastTimer.arm(el, window.LTToastTimer.PLAIN_TOAST_MS, () => el.classList.remove('show'));
 }
 // #662 후속(CTO 지시): 상세 판이 열리면 안내 풍선은 즉시 치운다 — 안내는 '순간을 선택하라'는 뜻이라 이미 선택해
 // 판이 열렸으면 필요 없고, 넓은 판에서는 풍선 자리가 판 안쪽('이어진 순간' 줄)과 포개진다. 다른 풍선(마음 저장 등)은 그대로 뜬다.
 function hideToast() {
   dismissBoardOrderUndo();
   const el = $('#toast');
-  clearTimeout(toast.t);
+  toastTimer.cancel();
   el.classList.remove('show');
 }
 function dismissBoardOrderUndo() {
   const active = activeBoardOrderUndo;
   if (!active) return;
   activeBoardOrderUndo = null;
-  clearTimeout(toast.t);
+  toastTimer.cancel();
   const el = $('#toast');
   if (el?.dataset.boardOrderUndo === active.token) {
     delete el.dataset.boardOrderUndo;
@@ -1225,11 +1226,10 @@ function showBoardOrderUndo({ before, snapshot: undoSnapshot }) {
   el.dataset.boardOrderUndo = action.token;
   el.classList.add('boardOrderToast', 'show');
   activeBoardOrderUndo = action;
-  clearTimeout(toast.t);
-  toast.t = setTimeout(() => {
+  toastTimer.arm(el, window.LTToastTimer.ACTION_TOAST_MS, () => {
     if (activeBoardOrderUndo === action) dismissBoardOrderUndo();
     el.classList.remove('show');
-  }, 6000);
+  });
 }
 function undoBoardOrder(action) {
   if (activeBoardOrderUndo !== action) return;
@@ -1352,9 +1352,14 @@ function openViewer(id) {
     box.innerHTML = `<video src="${m.video}" poster="${m.asset}" controls autoplay muted playsinline class="viewerFitVideo"></video>`;
   else if (m.type === 'note') box.innerHTML = `<div class="viewerNoteQuote">“${esc(m.memo)}”</div>`;
   else box.innerHTML = `<img src="${m.asset}" alt="${esc(m.title)}" class="viewerFitImg">`;
-  $('#vMeta').innerHTML =
-    (_vi.sub ? '<div class="videoTitle">▶ ' + esc(_vi.sub) + '</div>' : '') +
-    `${esc(LTLabels.type(m.originalType || m.type))} · ${esc(dateText(m.date))} · ${esc(m.emotion)}<br>출처: ${esc(m.source)}${m.url ? `<br>URL: ${esc(m.url)}` : ''}<br>마음 한마디: ${esc(m.memo)}`;
+  $('#vMeta').innerHTML = window.viewerMetaHTML({
+    head: `${esc(LTLabels.type(m.originalType || m.type))} · ${esc(dateText(m.date))} · ${esc(m.emotion)}`,
+    source: esc(m.source),
+    url: m.url ? esc(m.url) : '',
+    keywords: (m.keywords || []).map((keyword) => esc(keyword)),
+    memo: esc(m.memo || ''),
+    mediaTitle: _vi.sub ? esc(_vi.sub) : ''
+  });
   $('#viewerModal').classList.add('open');
 }
 

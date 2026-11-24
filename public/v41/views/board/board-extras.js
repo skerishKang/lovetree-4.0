@@ -961,7 +961,7 @@ function editMediaFields(m) {
     return `<div class="label">VIDEO</div><input class="field" id="editMediaFile" type="file" accept="video/*" aria-label="바꿀 영상 파일 고르기">`;
   if (m.type === 'link' || m.type === 'youtube')
     return `<div class="label">${m.type === 'youtube' ? 'VIDEO LINK / YOUTUBE' : 'LINK'}</div><input class="field" id="editUrl" value="${esc(m.url || '')}" aria-label="바꿀 링크 주소">`;
-  return `<div class="label">NOTE BODY</div><textarea class="field" id="editNoteBody" rows="4" aria-label="마음 한마디">${esc(m.memo)}</textarea>`;
+  return `<div class="label">마음 한마디</div><textarea class="field" id="editNoteBody" rows="4" aria-label="마음 한마디">${esc(m.memo)}</textarea>`;
 }
 let editBase = null,
   editTempAsset = null,
@@ -973,7 +973,7 @@ function openEdit() {
   editBase = JSON.parse(JSON.stringify(m));
   removePhotoFlag = false;
   let f = $('#editFields');
-  f.innerHTML = `${editMediaFields(m)}<input class="field" id="editTitle" value="${esc(m.title)}" aria-label="순간 제목"><textarea class="field" id="editMemo" rows="3" aria-label="마음 한마디">${esc(m.memo)}</textarea>${styleFieldsHTML('edit', m)}<div class="editMetaNote">DATE · ${esc(m.date)} &nbsp; PRIVACY · ${esc(m.privacy || 'PRIVATE')}</div>`;
+  f.innerHTML = `${editMediaFields(m)}<input class="field" id="editTitle" value="${esc(m.title)}" aria-label="순간 제목"><textarea class="field" id="editMemo" rows="3" aria-label="마음 한마디">${esc(m.memo)}</textarea>${styleFieldsHTML('edit', m)}<div class="editMetaNote">날짜 · ${esc(m.date)} &nbsp; 공개 범위 · ${esc(m.privacy || '비공개')}</div>`;
   bindKeywordPicker('edit', updateEditPreview);
   f.querySelectorAll('input,textarea,select').forEach(x =>
     x.addEventListener('input', updateEditPreview)
@@ -1065,9 +1065,14 @@ openViewer = function (id) {
   else if (m.type === 'note') box.innerHTML = `<div class="viewerNoteQuote">“${esc(m.memo)}”</div>`;
   else
     box.innerHTML = `<img src="${m.type === 'youtube' ? youtubeThumb(m.url || '') : m.asset}" alt="${esc(_vi.main)}" data-fallback="${ASSET.link}" ${thumbRetryAttrs(m)} class="viewerFitImg">`;
-  $('#vMeta').innerHTML =
-    (_vi.sub ? '<div class="videoTitle">▶ ' + esc(_vi.sub) + '</div>' : '') +
-    `${esc(LTLabels.type(m.originalType || m.type))} · ${esc(dateText(m.date))} · ${esc(m.emotion)}<br>출처: ${esc(m.source)}${m.url ? `<br>URL: ${esc(m.url)}` : ''}<br>Keywords: ${(m.keywords || []).map(k => '#' + esc(k)).join(' ')}<br>마음 한마디: ${esc(m.memo)}`;
+  $('#vMeta').innerHTML = window.viewerMetaHTML({
+    head: `${esc(LTLabels.type(m.originalType || m.type))} · ${esc(dateText(m.date))} · ${esc(m.emotion)}`,
+    source: esc(m.source),
+    url: m.url ? esc(m.url) : '',
+    keywords: (m.keywords || []).map((keyword) => esc(keyword)),
+    memo: esc(m.memo || ''),
+    mediaTitle: _vi.sub ? esc(_vi.sub) : ''
+  });
   // #327 2부: 내 기록(서버)의 순간 보기에서 다른 트리로 옮기기. 공유·예시는 숨긴다.
   if (
     window.parent !== window &&
