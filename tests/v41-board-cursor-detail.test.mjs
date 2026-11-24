@@ -13,7 +13,7 @@ import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { testBackNavigation } from './helpers/back-navigation.mjs';
+import { testBackNavigation } from './helpers/history-assert.mjs';
 
 const ROOT = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
 const PUB = path.join(ROOT, 'public');
