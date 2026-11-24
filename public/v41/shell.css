@@ -715,6 +715,9 @@ html[data-lt-theme=garden] .home-links .feedback-link:hover{color:var(--lt-ink)}
 /* 390 지도·책·서재 목록: 조작 줄·책 테두리·'책 속의 트리' 상자와 겹치던 아래 링크 줄을 숨긴다(1440은 지금 자리).
    서재 목록은 프레임 안이 스크롤되므로 화면에 붙은 링크 줄이 지나가는 글자 위에 포개진다 — 책·지도와 같은 길로 숨긴다. */
 /* #1093: 여러 줄 선반 위에 화면에 붙은 링크가 포개지므로 서재는 폭과 무관하게 숨긴다. */
+/* #777: 트리 보기는 별도 상태 줄과 나무 영역을 사용하므로 첫 화면 전용 링크와 부유 ＋ 단추를 숨긴다.
+   새 순간 추가는 휴대폰의 상단 접기 메뉴에서 계속 사용할 수 있다. */
+body[data-fab-lift=tree] .home-links,body[data-fab-lift=tree] #mobile-add{display:none}
 body[data-fab-lift=shelf] .home-links{display:none}
 @media(max-width:520px){body[data-fab-lift=book] .home-links,body[data-fab-lift=network] .home-links{display:none}}
 /* 이슈 611: 계정 단추 점 — 새 소식이나 새 답글이 있을 때. */

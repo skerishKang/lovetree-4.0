@@ -89,7 +89,7 @@ function flowNavigation(){
   // #458: 모바일 떠 있는 ＋ 단추는 로그인한 내 기록(서버·쓰기 가능)에서만 뜬다. 공유·예시 화면·로그아웃·읽기 전용에서는 숨긴다.
   document.body.classList.toggle('lt-fab-ok',!$('write-menu').hidden&&getSource()==='server'&&owned);
   /* 이슈 458: 화면마다 아래쪽에 이미 있는 단추·탭 높이가 다르므로 화면별로 단추를 얼마나 올릴지 셸 CSS가 쓴다. */
-  document.body.dataset.fabLift={'track59-sketchbook.html':'book','track58-pinboard.html':'board','track56-network.html':'network','track61-tree.html':'network','track32-bookshelf.html':'shelf'}[getCurrent()]||'';
+  document.body.dataset.fabLift={'track59-sketchbook.html':'book','track58-pinboard.html':'board','track56-network.html':'network','track61-tree.html':'tree','track32-bookshelf.html':'shelf'}[getCurrent()]||'';
   if(entryRoot?.dataset)delete entryRoot.dataset.ltHeaderPending;
   const phase=getMember()?.snapshot()?.phase;
   if(phase==='login'||phase==='synced')settleHeaderAuth(!!getMember()?.snapshot()?.owned);
