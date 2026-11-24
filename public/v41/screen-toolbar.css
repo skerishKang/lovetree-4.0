@@ -123,7 +123,8 @@ html[data-v41-screen=network] .lt-screen-toolbar .view-switch{box-sizing:border-
 html[data-v41-screen=network] .lt-screen-toolbar .view-switch .pill{flex:1 1 0;min-width:0;padding:0 5px;text-align:center}
 html[data-v41-screen=board] .lt-screen-toolbar .lt-toolbar-tools>button.headbtn{height:36px;min-height:36px}
 html[data-v41-screen=board] .lt-screen-toolbar .lt-toolbar-tools #fitBtn{height:36px;min-height:36px}
-html[data-v41-screen=board] .lt-screen-toolbar .lt-toolbar-tools .cinemaBtn{width:auto;padding:0 10px}
+html[data-v41-screen=board] .lt-screen-toolbar .lt-toolbar-tools{min-height:44px}
+html[data-v41-screen=board] .lt-screen-toolbar .lt-toolbar-tools .cinemaBtn{position:relative;inset:auto;width:auto;padding:0 10px}
 @media(max-width:600px){
   .lt-screen-toolbar{gap:8px;padding:0 10px}
   .lt-toolbar-left{gap:4px}
