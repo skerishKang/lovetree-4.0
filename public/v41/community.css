@@ -246,3 +246,5 @@ html[data-lt-theme=garden] #community-panel:has(#community-tab-moments[aria-sele
 #community-panel .community-stages-skeleton{height:18px;border-radius:var(--lt-r-pill);background:color-mix(in srgb,var(--lt-gold-line) 22%,transparent)}
 #community-panel .community-cover-badges{flex-wrap:nowrap}
 #community-panel .community-cover-badge{white-space:nowrap}
+/* #1330: 빈 인기 무대는 제목만 감추고 칸은 유지해 뒤의 카드가 밀리지 않게 한다. */
+#community-panel #community-popular-stages.is-empty .community-stages-title{visibility:hidden}

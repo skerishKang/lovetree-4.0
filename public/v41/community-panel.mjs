@@ -506,9 +506,9 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
  const renderPopularStages=rows=>{
   const shown=(Array.isArray(rows)?rows:[]).filter(stage=>stage&&stage.stageId&&publicStageCount(stage.weeklyVoters)!==null);
   popularList.replaceChildren();
-  // #1330: 보여 줄 무대가 없으면 제목 줄까지 숨긴다(빈 제목만 남지 않게).
-  if(!shown.length){popular.hidden=true;return;}
-  popular.hidden=false;
+  // #1330: 보여 줄 무대가 없으면 제목을 감춘다. 칸 높이는 그대로 두어 카드가 밀리지 않게 한다.
+  if(!shown.length){popular.classList.add('is-empty');popularList.replaceChildren(skeleton);return;}
+  popular.classList.remove('is-empty');
   for(const stage of shown){
    const row=el('span','community-stage');row.dataset.stageId=stage.stageId;
    row.append(el('span','community-stage-title',stageMomentTitle(stage)),el('span','community-stage-count',`${POPULAR_STAGE_WEEK_LABEL} ${publicStageCount(stage.weeklyVoters)}`));

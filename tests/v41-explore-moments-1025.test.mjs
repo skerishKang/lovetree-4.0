@@ -790,7 +790,8 @@ test('#1330 휴대폰 상단·카드 다듬기 — 캡슐 없음, 검색·정렬
             queryH: q.getBoundingClientRect().height, sortH: s.getBoundingClientRect().height,
             scrollbar: getComputedStyle(groups).scrollbarWidth, snap: getComputedStyle(groups).scrollSnapType,
             fade: getComputedStyle(groups).maskImage, findRight: find.getBoundingClientRect().right, railRight: document.querySelector('.community-group-rail').getBoundingClientRect().right,
-            popularHidden: document.querySelector('#community-popular-stages').hidden,
+            popularEmpty: document.querySelector('#community-popular-stages').classList.contains('is-empty'),
+            popularTitle: getComputedStyle(document.querySelector('#community-popular-stages .community-stages-title')).visibility,
             badgeRows: badges.map((b) => ({ group: Math.round(b.getBoundingClientRect().height), one: Math.round(b.firstElementChild?.getBoundingClientRect().height || 0) })),
             thumb: document.querySelector('#community-list .community-cover-image')?.src || ''
           };
@@ -805,7 +806,8 @@ test('#1330 휴대폰 상단·카드 다듬기 — 캡슐 없음, 검색·정렬
           assert.match(facts.fade, /gradient/, `${width}/${theme}: 오른쪽 끝 흐림`);
           assert.ok(facts.findRight <= facts.railRight + 1, `${width}/${theme}: 그룹 찾기 줄 끝 고정`);
         }
-        assert.equal(facts.popularHidden, true, `${width}/${theme}: 빈 인기 무대 제목 숨김`);
+        assert.equal(facts.popularEmpty, true, `${width}/${theme}: 빈 인기 무대 표시`);
+        assert.equal(facts.popularTitle, 'hidden', `${width}/${theme}: 빈 인기 무대 제목 감춤`);
         for (const badge of facts.badgeRows) assert.equal(badge.group, badge.one, `${width}/${theme}: 배지 한 줄`);
         assert.match(facts.thumb, /mqdefault/, `${width}/${theme}: 띠 없는 썸네일 먼저`);
         await ctx.close();
