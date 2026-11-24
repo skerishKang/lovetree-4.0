@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 import { serve } from './helpers/screen-audit.mjs';
+import { testBackNavigation } from './helpers/history-assert.mjs';
 import { createTree, addMoment } from '../public/v41/domain.mjs';
 
 const REQUIRE = process.env.LT_SHELF_NEWTREE_REQUIRE === '1';
@@ -18,11 +19,11 @@ function tree(n) {
   return t;
 }
 
-async function openShelf(browser, origin) {
-  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+async function openShelf(browser, origin, width = 1440, count = 1) {
+  const ctx = await browser.newContext({ viewport: { width, height: width === 390 ? 844 : 900 } });
   await ctx.route('**://i.ytimg.com/**', (r) => r.fulfill({ status: 200, contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="10" height="10" fill="#333"/></svg>' }));
   await ctx.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
-  const state = { version: 1, trees: [tree(1)], prefs: {} };
+  const state = { version: 1, trees: Array.from({ length: count }, (_, i) => tree(i + 1)), prefs: {} };
   await ctx.route('**/api/workspace**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ revision: 1, state, subject: '시험계정', writeSubjectBound: true, savedAt: '2026-11-18T09:00:00.000Z' }) }));
   const page = await ctx.newPage();
   await page.goto(`${origin}/v41/?account=1`, { waitUntil: 'load', timeout: 60000 });
@@ -32,6 +33,8 @@ async function openShelf(browser, origin) {
   await page.waitForFunction(() => [...document.querySelectorAll('iframe')].some((f) => {
     try { return /track32-bookshelf/.test(f.contentWindow.location.href) && f.contentDocument.querySelector('.book-card'); } catch { return false; }
   }), null, { timeout: 15000 });
+  await page.waitForFunction(() => { const f = document.querySelector('#view:not([hidden])'); return f?.contentDocument?.documentElement?.dataset?.v41Screen === 'shelf'; }, null, { timeout: 15000 });
+  await page.waitForTimeout(300);
   return { ctx, page };
 }
 
@@ -77,3 +80,79 @@ for (const [name, fn] of [
     }
   });
 }
+
+/* #1290 서재 뒤로 가기 계약 — #1298 공용 판정 사용.
+ * 기록함: 책 선택·이어 보기·새 트리 창·트리 관리 창·상단 화면 이동.
+ * 기록 안 함: 검색·진열 방식·선반 이동·트리 선택(화면 전환 없는 경우).
+ */
+test('#1290 서재 검색·진열은 기록하지 않고 책 열기는 바로 전 서재로 돌아온다(390·1440)', { skip: skip || !REQUIRE ? skip || 'LT_SHELF_NEWTREE_REQUIRE=1 일 때 실행' : false, timeout: 180000 }, async () => {
+  const server = await serve();
+  const browser = await chromium.launch({ headless: true });
+  try {
+    for (const width of [390, 1440]) {
+      const { ctx, page } = await openShelf(browser, `http://127.0.0.1:${server.address().port}`, width);
+      try {
+        const frame = page.frames().find(f => /track32-bookshelf/.test(f.url()));
+        assert.ok(frame, '서재 프레임');
+        await testBackNavigation(page, { frame, recorded: false, action: () => frame.fill('#searchInput', '시험') });
+        await testBackNavigation(page, { frame, recorded: false, action: () => frame.fill('#searchInput', '') });
+        await testBackNavigation(page, { frame, recorded: false, action: () => frame.click('[data-shelf-view="carousel"]') });
+        await testBackNavigation(page, { frame, recorded: false, action: () => frame.click('[data-shelf-view="shelf"]') });
+        await page.screenshot({ path: `E:/tmp/lt1290-${width}-before.png` });
+        await testBackNavigation(page, { frame, recorded: true, action: () => frame.click('[data-book-id]') , settleMs: 450, timeoutMs: 10000 });
+        const back = page.frames().find(f => /track32-bookshelf/.test(f.url()));
+        if (back) await page.screenshot({ path: `E:/tmp/lt1290-${width}-after.png` });
+      } finally { await ctx.close(); }
+    }
+  } finally { await browser.close(); server.closeAllConnections?.(); await new Promise(ok => server.close(ok)); }
+});
+
+test('#1290 서재 창과 이어 보기의 기록·복귀(390·1440)', { skip: skip || !REQUIRE ? skip || 'LT_SHELF_NEWTREE_REQUIRE=1 일 때 실행' : false, timeout: 180000 }, async () => {
+  const server = await serve();
+  const browser = await chromium.launch({ headless: true });
+  try {
+    for (const width of [390, 1440]) for (const [name, action] of [
+      ['새 트리', frame => frame.click('#shelfNewTree')],
+      ['트리 관리', frame => frame.evaluate(() => document.querySelector('[data-manage-id]').click())],
+      ['이어 보기', frame => frame.click('#resumeStrip')]
+    ]) {
+      const { ctx, page } = await openShelf(browser, `http://127.0.0.1:${server.address().port}`, width);
+      try {
+        const frame = page.frames().find(f => /track32-bookshelf/.test(f.url()));
+        await testBackNavigation(page, { frame, recorded: true, action: () => action(frame), timeoutMs: 10000 });
+        console.log('SHELF_BACK', width, name);
+      } finally { await ctx.close(); }
+    }
+  } finally { await browser.close(); server.closeAllConnections?.(); await new Promise(ok => server.close(ok)); }
+});
+
+test('#1290 서재 선반 이동·선택·검색은 방문 기록을 늘리지 않는다', { skip: skip || !REQUIRE ? skip || 'LT_SHELF_NEWTREE_REQUIRE=1 일 때 실행' : false, timeout: 120000 }, async () => {
+  const server = await serve();
+  const browser = await chromium.launch({ headless: true });
+  try {
+    for (const width of [390, 1440]) {
+      const { ctx, page } = await openShelf(browser, `http://127.0.0.1:${server.address().port}`, width, 3);
+      try {
+        const frame = page.frames().find(f => /track32-bookshelf/.test(f.url()));
+        assert.equal(await frame.locator('.book-card').count(), 3, '책 3권에서 이동 시험');
+        await testBackNavigation(page, { frame, recorded: false, action: () => frame.evaluate(() => document.getElementById('shelfNext').click()) });
+        await testBackNavigation(page, { frame, recorded: false, action: () => frame.evaluate(() => document.getElementById('shelfPrev').click()) });
+      } finally { await ctx.close(); }
+    }
+  } finally { await browser.close(); server.closeAllConnections?.(); await new Promise(ok => server.close(ok)); }
+});
+
+test('#1290 서재에서 보드·책 상단 화면 이동은 뒤로 가기 한 번에 서재로 복귀한다', { skip: skip || !REQUIRE ? skip || 'LT_SHELF_NEWTREE_REQUIRE=1 일 때 실행' : false, timeout: 120000 }, async () => {
+  const server = await serve();
+  const browser = await chromium.launch({ headless: true });
+  try {
+    for (const width of [390, 1440]) for (const target of ['track58-pinboard.html', 'track59-sketchbook.html']) {
+      const { ctx, page } = await openShelf(browser, `http://127.0.0.1:${server.address().port}`, width);
+      try {
+        const frame = page.frames().find(f => /track32-bookshelf/.test(f.url()));
+        await testBackNavigation(page, { frame, recorded: true, action: () => page.evaluate(file => document.querySelector('[data-view="' + file + '"]').click(), target), timeoutMs: 10000 });
+        console.log('SHELF_TAB_BACK', width, target);
+      } finally { await ctx.close(); }
+    }
+  } finally { await browser.close(); server.closeAllConnections?.(); await new Promise(ok => server.close(ok)); }
+});

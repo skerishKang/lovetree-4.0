@@ -233,14 +233,15 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
  }
  function renderCover(item,{loading='lazy'}={}){
   const cover=el('div','community-cover'),youtube=item.cover?.type==='youtube',video=['video','youtube'].includes(item.cover?.type),vertical=video&&item.cover?.vertical===true;
-  cover.dataset.mediaKind=vertical?'video-vertical':youtube?'video-youtube':video?'video':'photo';
+  // #1322: 한 겹 규칙 — 흐린 배경+가운데 그림은 세로 영상만. 그 밖은 표지 한 장을 꽉 채운다.
+  cover.dataset.mediaKind=vertical?'video-vertical':video?'video-landscape':'photo';
   const url=item.cover?.thumbnailUrl||item.cover?.url||'';
   if(url){
    // #1026 묶음 D: 칸은 처음부터 같은 크기로 잡혀 있다(community-cover의 aspect-ratio).
    // 사진은 다 받은 뒤에만 0.2초로 나타난다 — 반쯤 내려온 그림이나 빈 칸→일부→완성 단계가 보이지 않는다.
    const art=el('span','community-cover-art');
    const ready=img=>{if(img.isConnected)img.classList?.add('is-ready')};
-   if(vertical||youtube){
+   if(vertical){
     const backdrop=el('img','community-cover-backdrop');backdrop.alt='';backdrop.setAttribute('aria-hidden','true');backdrop.loading=loading;backdrop.classList?.add('is-loading');
     backdrop.addEventListener('load',()=>ready(backdrop),{once:true});
     backdrop.addEventListener('error',()=>{if(backdrop.isConnected)backdrop.remove()},{once:true});
@@ -252,8 +253,11 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
    image.src=url;if(image.complete&&image.naturalWidth)ready(image);
    art.append(image);cover.append(art);
   }else cover.append(el('span','community-cover-fallback',item.cover?.title||'공개된 순간'));
-  if(item.aiTester===true)cover.append(el('span','community-cover-badge community-ai','✦ AI 명예회원'));
-  cover.append(el('span','community-cover-badge community-count',`순간 ${item.momentCount}`));
+  // #1322: 카드 위 배지는 모두 같은 자리·같은 크기로 아래 한 줄에 모은다.
+  const badges=el('span','community-cover-badges');
+  if(item.aiTester===true)badges.append(el('span','community-cover-badge community-ai','✦ AI 명예회원'));
+  badges.append(el('span','community-cover-badge community-count',`순간 ${item.momentCount}`));
+  cover.append(badges);
   return cover;
  }
  function moreMenu(item){

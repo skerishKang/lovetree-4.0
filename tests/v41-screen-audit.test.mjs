@@ -1723,7 +1723,8 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
         const detail = `${samples}회 관찰, 마지막 상태: 셸 알림=${last?.shellUp ? '보임' : '없음'}(${last?.shellText ?? '요소 없음'}), 보드 말풍선=${last?.boardUp ? '보임' : '없음'}(${last?.boardText ?? '요소 없음'}), 보드 프레임=[${(last?.frames || []).join(' | ')}]`;
         return { sawShell, sawBoard, maxArea: Math.round(maxArea), bothAt, detail };
       });
-      assert.ok(twoNotices.sawShell, `390 셸 알림(기록 불러오기 안내)이 떠 있는 자리를 본다(빈손 통과 금지) — ${twoNotices.detail}`);
+      // #1320: 기록 불러오기 안내를 없앴으므로 이 자리는 비어 있어야 한다(겹침 검사는 빈손 통과가 아니다).
+      assert.equal(twoNotices.sawShell, false, `390 셸 기록 불러오기 안내가 없다 — ${twoNotices.detail}`);
       assert.equal(twoNotices.sawBoard, false, `390 보드 첫 진입 안내 토스트가 없다 — ${twoNotices.detail}`);
       assert.equal(twoNotices.maxArea, 0, `390 셸 알림과 보드 안내 말풍선이 같은 자리에 포개지지 않는다(겹침 ${twoNotices.maxArea}px², 동시 노출: ${twoNotices.bothAt < 0 ? '없음' : twoNotices.bothAt + '번째 관찰'})`);
       await pageNotice.close();

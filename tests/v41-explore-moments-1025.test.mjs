@@ -609,9 +609,12 @@ test('#1294 둘러보기 트리·순간 탭과 미리보기·그룹 찾기 뒤�
  try{
  for(const [width,height] of [[390,844],[1440,900]]){
   const h=await bootExploreTab(browser,{width,height,theme:'night'});
+  let cdp;
   try{
    await openExploreTab(h.page,width);
    const page=h.page;
+   cdp=await page.context().newCDPSession(page);
+   await cdp.send('Emulation.setCPUThrottlingRate',{rate:width===1440?6:1});
    await page.waitForSelector('#community-list .community-card');
    const back=async()=>{await page.goBack();await page.waitForTimeout(110);};
    const navState=()=>page.evaluate(()=>({hash:location.hash,trees:!document.getElementById('community-tree-panel').hidden,moments:!document.getElementById('community-moments-panel').hidden}));
@@ -643,9 +646,12 @@ test('#1294 둘러보기 트리·순간 탭과 미리보기·그룹 찾기 뒤�
    assert.equal(await page.locator('#community-group-find').evaluate(el=>el.open),false,width+' 그룹 찾기 복귀');
    assert.deepEqual(await navState(),home,width+' 그룹 찾기 후 화면');
    // 감상 화면 이동은 별도 URL이며 뒤로 가기 한 번에 둘러보기 미리보기를 복원한다.
+   const sharedTree=exploreTree(1);
+   await page.route('**/api/public/shares/*',async route=>{if(width===1440)await new Promise(resolve=>setTimeout(resolve,700));await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({ok:true,share:{id:EXPLORE_CARD(0).shareId,view:'book',entryMomentId:sharedTree.moments[0].id},tree:sharedTree})});});
    await page.locator('#community-list .community-card').first().click();
    await page.locator('.community-preview-open').click();
    await page.waitForFunction(()=>location.hash.startsWith('#share/'),null,{timeout:15000});
+   if(width===390)await page.waitForFunction(()=>document.body.dataset.recordSource==='share'&&document.getElementById('empty')?.hidden,null,{timeout:15000});
    await back();
    assert.equal((await navState()).hash,'#explore',width+' 공유 감상에서 뒤로 가기 주소');
    assert.equal(await page.locator('#community-panel').evaluate(el=>el.open),true,width+' 공유 감상에서 둘러보기 복귀');
@@ -653,7 +659,7 @@ test('#1294 둘러보기 트리·순간 탭과 미리보기·그룹 찾기 뒤�
    assert.equal(await page.locator('#community-preview').evaluate(el=>el.open),true,width+' 공유 감상에서 미리보기 상태 복원');
 
    console.log('#1294 TREES',width,'OK');
-  }finally{await h.ctx.close();await new Promise(ok=>h.server.close(ok));}
+  }finally{await cdp?.detach();await h.ctx.close();await new Promise(ok=>h.server.close(ok));}
  }
  }finally{await browser.close();}
 });
@@ -698,4 +704,57 @@ test('#1294 순간 밀기 기록 누적 없음·댓글 뒤로 가기·탭 복원
   }finally{await h.ctx.close();await new Promise(ok=>h.server.close(ok));}
  }
  }finally{await browser.close();}
+});
+
+test('#1322 트리 카드 표지는 한 겹 — 가로·세로·그림 없음 높이 차 1px 이하(390·1440 × 밤·정원)', { skip: REQUIRE ? false : skip, timeout: 240000 }, async () => {
+  if (skip) assert.fail(skip);
+  const svg = (w, h, color) => 'data:image/svg+xml,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><rect width="100%" height="100%" fill="${color}"/></svg>`);
+  const card = (i, extra) => ({
+    shareId: 'share' + String(i).padStart(20, '0'), title: '트리 ' + (i + 1), subject: '공개자', summary: '첫 기록',
+    momentCount: 3 + i, createdAt: '2026-11-20T09:30:00.000Z', publicDisplayName: '공개자', emotions: ['설렘'],
+    stats: { hearts: 3, favorites: 1, hearted: false, favored: false, reactions: { heart: 3 }, mine: [] }, ...extra
+  });
+  const cards = [
+    card(0, { cover: { emotion: '설렘', title: '가로 순간', type: 'photo', thumbnailUrl: svg(640, 360, '#3d5a80') } }),
+    card(1, { cover: { emotion: '설렘', title: '세로 순간', type: 'youtube', vertical: true, thumbnailUrl: svg(360, 640, '#7b3f61') }, aiTester: true }),
+    card(2, { cover: { emotion: '설렘', title: '제목 카드', type: 'photo', url: '' } })
+  ];
+  const browser = await chromium.launch({ headless: true });
+  try {
+    for (const [width, height] of [[390, 844], [1440, 900]]) for (const theme of ['night', 'garden']) {
+      const server = await serve();
+      try {
+        const base = `http://127.0.0.1:${server.address().port}`;
+        const ctx = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
+        await ctx.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); } catch {} }, theme);
+        await ctx.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
+        await ctx.route('**/api/community/shares**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, items: cards, totalVisible: 3, nextCursor: '', groups: [], groupsAll: [] }) }));
+        await ctx.route('**/api/workspace**', (r) => r.fulfill({ status: 401, contentType: 'application/json', body: '{"ok":false,"code":"unauthenticated"}' }));
+        const page = await ctx.newPage();
+        await page.goto(`${base}/v41/#explore`, { waitUntil: 'load' });
+        await page.waitForSelector('#community-list .community-card');
+        const facts = await page.evaluate(() => [...document.querySelectorAll('#community-list .community-cover')].map((c) => {
+          const badges = [...c.querySelectorAll('.community-cover-badge')].map((b) => {
+            const r = b.getBoundingClientRect();
+            return { top: Math.round(r.top), height: Math.round(r.height) };
+          });
+          return {
+            h: c.getBoundingClientRect().height, kind: c.dataset.mediaKind,
+            backdrop: !!c.querySelector('.community-cover-backdrop'),
+            grad: getComputedStyle(c, '::after').backgroundImage,
+            badges
+          };
+        }));
+        assert.equal(facts.length, 3, `${width}/${theme}: 세 카드가 보인다`);
+        const heights = facts.map((f) => f.h);
+        assert.ok(Math.max(...heights) - Math.min(...heights) <= 1, `${width}/${theme}: 표지 높이 차 1px 이하 ${JSON.stringify(heights)}`);
+        assert.deepEqual(facts.map((f) => f.backdrop), [false, true, false], `${width}/${theme}: 흐린 배경은 세로 영상만`);
+        for (const f of facts) {
+          assert.match(f.grad, /linear-gradient/, `${width}/${theme}: 아래쪽 그라데이션 한 겹`);
+          assert.ok(f.badges.every((b) => b.height === f.badges[0].height && b.top === f.badges[0].top), `${width}/${theme}: 배지 위치·크기 통일 ${JSON.stringify(f.badges)}`);
+        }
+        await ctx.close();
+      } finally { await new Promise((r) => server.close(r)); }
+    }
+  } finally { await browser.close(); }
 });
