@@ -713,6 +713,8 @@ test('같은 tree_id를 가진 두 계정은 둘 다 소개되고 한쪽 숨김�
     assert.deepEqual(subjectsOf(await repo.listDiscoverableSummaries({ productId, limit: 10 })), ['owner-a', 'owner-b']);
     assert.deepEqual(subjectIdsOf(await repo.listDiscoverable({ productId, limit: 10 })), ['owner-a', 'owner-b']);
     assert.deepEqual(await repo.discoverTotals({ productId }), { trees: 2, moments: 6 });
+    // #1273 5번: 같은 자료에서 목록 수와 집계 수가 같은 기준으로 나온다.
+    assert.equal((await repo.discoverTotals({ productId })).trees, (await repo.listDiscoverableSummaries({ productId, limit: 10 })).length);
     // 한쪽 숨김 — 그 계정만 목록에서 내려가고 같은 tree_id의 다른 계정에 번지지 않는다.
     await pool.query('INSERT INTO lovetree_community_hidden_shares(product_id,share_id,hidden_by) VALUES($1,$2,$3)',
       [productId, shareIds['owner-a'], 'moderator']);

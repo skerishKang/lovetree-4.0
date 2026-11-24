@@ -455,9 +455,11 @@ function moveCardOrder(id, dir) {
   persistBoard();
   return true;
 }
-function resetBoardOrder() {
+// 브라우저 기본 확인 창은 쓰지 않는다 — 공통 앱 안 확인 창이 없으면 취소로 처리한다.
+const askConfirm = (message) => (globalThis.LT41Confirm?.ask ? globalThis.LT41Confirm.ask(message) : Promise.resolve(false));
+async function resetBoardOrder() {
   if (!boardSaveEnabled()) return;
-  if (!window.confirm('내 배치를 처음대로 돌릴까요? 날짜순 배치로 돌아갑니다.')) return;
+  if (!await askConfirm('내 배치를 처음대로 돌릴까요? 날짜순으로 돌아갑니다.')) return;
   const before = captureBoardOrderState();
   const undoSnapshot = snapshot();
   momentOrder = LT58Model.dateDescOrder(moments).map(m => m.id);
