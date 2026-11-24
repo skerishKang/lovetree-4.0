@@ -10,6 +10,7 @@ import {
 } from '../public/v41/views/tree/tree-layout.mjs';
 import { DATASETS, EMOTIONS, dataset } from '../tests/fixtures/tree-777-data.mjs';
 import { EMOTIONS as APP_EMOTIONS } from '../public/v41/domain.mjs';
+import { testBackNavigation } from './helpers/history-assert.mjs';
 
 const EPS = 1e-6;
 const COUNTS = [10, 40, 120];
@@ -438,4 +439,62 @@ test('#777 가지는 자기 띠 안에서만 휘고, 부모·자식이 아닌 �
     }
   });
   assert.ok(checked > 50000);
+});
+
+// #1295 트리 보기 뒤로 가기 — 화면에서 실제로 누르고 돌아온다(390·1440).
+let chromium, skip = false;
+const REQUIRE = process.env.LT_TREE_777_REQUIRE === '1';
+try {
+  ({ chromium } = await import('playwright'));
+  const { existsSync } = await import('node:fs');
+  if (!existsSync(chromium.executablePath())) skip = 'Playwright Chromium이 없어 트리 보기 뒤로 가기 시험을 건너뜀';
+} catch { skip = 'playwright 패키지가 없어 트리 보기 뒤로 가기 시험을 건너뜀'; }
+
+const treeWorkspace = () => {
+  const moments = Array.from({ length: 6 }, (_, i) => ({
+    id: 'm' + (i + 1), parentId: i ? 'm' + i : null, relation: i ? '이어짐' : '',
+    title: '순간 ' + (i + 1), date: `2026-01-0${i + 1}`, emotion: '설렘', note: '기록 ' + (i + 1),
+    type: 'memo', url: '', keywords: [], createdOrder: i + 1, links: i < 5 ? ['m' + (i + 2)] : [],
+    createdAt: `2026-01-0${i + 1}T00:00:00.000Z`
+  }));
+  return { revision: 1, subject: 'trial-subject', writeSubjectBound: true, state: { version: 1, prefs: {}, trees: [{
+    id: 't6', subject: '시험 사용자', title: '사슬 6', coverMomentId: '', inbox: false,
+    createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-06T00:00:00.000Z', moments
+  }] } };
+};
+
+async function openShellTree(browser, base, width) {
+  const context = await browser.newContext({ viewport: { width, height: width === 390 ? 844 : 900 }, reducedMotion: 'reduce' });
+  await context.addInitScript(() => localStorage.setItem('lt41.tips.firstTree', '1'));
+  const page = await context.newPage();
+  await page.route('**/api/workspace*', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(treeWorkspace()) }));
+  await page.goto(`${base}/v41/?account=1`, { waitUntil: 'load' });
+  await page.waitForFunction(() => window.LT41?.tree?.id === 't6', null, { timeout: 20000 });
+  await page.evaluate(() => document.querySelector('[data-view="track61-tree.html"]').click());
+  await page.waitForFunction(() => document.querySelector('#view')?.contentDocument?.querySelectorAll('#cards [data-kind="moment"]').length >= 6, null, { timeout: 20000 });
+  await page.waitForTimeout(400);
+  const handle = await page.$('#view');
+  return { context, page, frame: await handle.contentFrame() };
+}
+
+test('#1295 화면: 트리 보기 동작별 뒤로 가기 기록', { skip: REQUIRE ? false : skip, timeout: 300000 }, async (t) => {
+  if (skip) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip}`);
+  const browser = await chromium.launch();
+  const { serve } = await import('./helpers/screen-audit.mjs');
+  const server = await serve();
+  const base = `http://127.0.0.1:${server.address().port}`;
+  t.after(async () => { await browser.close(); server.close(); });
+  for (const width of [390, 1440]) {
+    const { context, page, frame } = await openShellTree(browser, base, width);
+    // 기록함: 카드 누름 → 상세. 한 번 뒤로 가면 닫힌 상태로 돌아온다.
+    await testBackNavigation(page, { frame, recorded: true, panels: ['.ts-detail[open]'], action: () => frame.evaluate(() => document.querySelector('#cards [data-kind="moment"]:not(.is-root)').click()) });
+    assert.equal(await frame.evaluate(() => document.querySelectorAll('#cards [data-kind]').length), 6, '뒤로 가기 뒤에도 카드 여섯 장이 보인다');
+    // 기록 안 함: 확대·축소, 뿌리로, 전체, 묶음 펼치기 — 여러 번 눌러도 기록이 늘지 않는다.
+    await testBackNavigation(page, { frame, recorded: false, action: () => frame.evaluate(() => document.getElementById('zoomIn').click()) });
+    await testBackNavigation(page, { frame, recorded: false, action: () => frame.evaluate(() => document.getElementById('zoomOut').click()) });
+    await testBackNavigation(page, { frame, recorded: false, action: () => frame.evaluate(() => document.getElementById('goRoot').click()) });
+    await testBackNavigation(page, { frame, recorded: false, action: () => frame.evaluate(() => document.getElementById('goFit').click()) });
+    await testBackNavigation(page, { frame, recorded: false, action: () => frame.evaluate(() => { const chip = document.querySelector('#cards [data-kind="bundle"]'); if (chip) chip.click(); }) });
+    await context.close();
+  }
 });

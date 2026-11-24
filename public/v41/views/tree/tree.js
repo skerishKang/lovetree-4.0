@@ -20,6 +20,47 @@ const SIZES = {
 };
 
 const state = { expanded:new Set(),root:null,layout:null,sizes:SIZES.wide,scale:1,tx:0,ty:0,pick:null,mode:'fit' };
+
+/* #1295 뒤로 가기: 순간 열기·상세는 기록하고, 접기·뿌리로·전체·확대·축소는 기록하지 않는다.
+   기록하지 않는 동작은 같은 자리에서 여러 번 눌러도 기록이 쌓이지 않게 pushState를 쓰지 않는다. */
+const detail = document.getElementById('treeDetail');
+let restoringTree = false;
+function treeSnapshot(panel) {
+  return {
+    lt41Tree: true,
+    lt41TreePanel: panel || null,
+    lt41TreePick: state.pick,
+    lt41TreeExpanded: [...state.expanded],
+    lt41TreeView: { scale: state.scale, tx: state.tx, ty: state.ty, mode: state.mode }
+  };
+}
+function pushTree(panel) {
+  if (restoringTree) return;
+  try { history.pushState(treeSnapshot(panel), ''); } catch {}
+}
+function rememberTree() {
+  if (restoringTree) return;
+  try { history.replaceState(treeSnapshot(null), ''); } catch {}
+}
+function restoreTree(st) {
+  if (!st?.lt41Tree) return;
+  restoringTree = true;
+  const wantDetail = st.lt41TreePanel === 'detail';
+  if (detail?.open && !wantDetail) detail.close();
+  state.pick = st.lt41TreePick ?? null;
+  state.expanded = new Set(st.lt41TreeExpanded || []);
+  const v = st.lt41TreeView;
+  if (v) { state.scale = v.scale; state.tx = v.tx; state.ty = v.ty; state.mode = v.mode || 'free'; }
+  if (wantDetail && detail && !detail.open && state.pick) openDetail(state.pick);
+  else draw();
+  applyNow();
+  restoringTree = false;
+}
+addEventListener('popstate', () => {
+  const st = history.state;
+  if (st?.lt41Tree) restoreTree(st);
+  else restoreTree(treeSnapshot(null));
+});
 // 숫자로 재는 것: 계산·그리기 시간, 주소를 연 때부터 첫 그림까지, 끌기 중 프레임 간격.
 // 무대 크기는 카드를 넣기 전에 한 번 재 둔다 — 카드 120장을 넣은 뒤에 재면 그 자리에서 전체 배치를 다시 계산하게 된다.
 const view = { w: 0, h: 0 };
@@ -288,7 +329,7 @@ stage.addEventListener('click', (e) => {
   if (suppressClick) { e.preventDefault(); e.stopPropagation(); return; }
   const node = e.target.closest('[data-id]');
   if (!node) { if (state.pick) setPick(null); return; }
-  if (node.dataset.kind === 'moment') { setPick(node.dataset.id); openDetail(node.dataset.id); return; }
+  if (node.dataset.kind === 'moment') { setPick(node.dataset.id); openDetail(node.dataset.id); pushTree('detail'); return; }
   // 묶음 가지를 펼치거나 다시 접는다. 그 갈림의 부모 카드가 화면에서 움직이지 않게 자리를 맞춘다.
   const hubId = node.dataset.id.slice(0, node.dataset.id.lastIndexOf(':'));
   const before = state.layout.cards.find((c) => c.id === hubId);
@@ -330,12 +371,12 @@ $('zoomOut').addEventListener('click', () => { glide(); zoomAt(1 / 1.3, ...cente
 
 
 const data=window.LTDEMO;
-const detail=$('treeDetail');
 const titleSource=el('span','',data.title||'트리');
 mountScreenToolbar({screen:'tree',titleFrom:titleSource,initialBar:document.querySelector('.lt-screen-toolbar'),tools:['goRoot','goFit','zoomOut','zoomIn'].map($)});
 function openDetail(id){
  const m=data.moments.find(m=>m.id===id);if(!m)return;
- data.select(id);$('treeDetailTitle').textContent=m.title||'제목 없음';
+ // #1295: 셸 주소 기록과 안쪽 기록이 겹치면 뒤로 가기가 두 번 쌓인다 — 선택은 프레임 상태로만 남긴다.
+ $('treeDetailTitle').textContent=m.title||'제목 없음';
  $('treeDetailNote').textContent=[m.date,m.emotion,m.memo].filter(Boolean).join(' · ');
  const host=$('treeDetailMedia');host.replaceChildren();
  const src=thumbnailCandidates(m,{autoLoad:data.source==='server'})[0];
@@ -343,8 +384,10 @@ function openDetail(id){
  if(!detail.open)detail.showModal();
 }
 $('treeDetailClose').addEventListener('click',()=>detail.close());
+// 닫기로 기록을 더 쌓지 않는다 — 현재 칸의 상태만 '상세 닫힘'으로 갱신한다(뒤로 가기는 그 칸을 소비한다).
+detail.addEventListener('close',()=>{if(!restoringTree)try{history.replaceState(treeSnapshot(null),'');}catch{}});
 $('openMoment').addEventListener('click',()=>{if(state.pick)parent.postMessage({type:MSG.openBook,treeId:data.treeId,id:state.pick},location.origin);});
-function rehome(){if(!state.layout)return;if(state.mode==='fit')fitAll(false);else if(state.mode==='root')toRoot(false);else applyNow();}
+function rehome(){if(!state.layout)return;if(state.mode==='fit')fitAll(false);else if(state.mode==='root')toRoot(false);else applyNow();rememberTree();}
 function load(){
  const moments=data.moments.map(m=>{const thumbs=thumbnailCandidates(m,{autoLoad:data.source==='server'});return {...m,id:String(m.id),parentId:m.parentId==null?null:String(m.parentId),thumb:thumbs[0]||'',thumbs};});
  state.root=buildHierarchy(moments);state.expanded.clear();state.pick=null;
@@ -352,6 +395,8 @@ function load(){
  for(const id of ['goRoot','goFit','zoomOut','zoomIn'])$(id).disabled=!state.root;
  if(!state.root){state.layout=null;note.textContent='순간 0개';return;}
  measure();draw();fitAll(false);
+ // 기본 칸도 트리 상태로 적어 둔다 — 뒤로 가기로 돌아올 때 닫힌 상세와 펼침 상태를 복원한다.
+ rememberTree();
 }
 new ResizeObserver(()=>{const before={...view};measure();if(!state.root||(before.w===view.w&&before.h===view.h))return;if((before.w<700)!==(view.w<700))draw();rehome();}).observe(stage);
 addEventListener('message',e=>{if(!isShellMessage(e))return;if(e.data.type===MSG.momentsSaved&&data.refresh()){titleSource.textContent=data.title;load();}});
