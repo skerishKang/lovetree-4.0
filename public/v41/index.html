@@ -7,6 +7,10 @@ html[data-lt-auth-phase=pending] .app-header #account-entry{visibility:hidden}
 html[data-lt-auth-phase=pending][data-lt-auth-hint=out] .app-header #account-entry{visibility:visible}
 html[data-lt-auth-phase=pending][data-lt-auth-hint=in] .app-header #account-entry{display:none}
 html[data-lt-auth-phase=pending][data-lt-auth-hint=in] .app-header #account-avatar[hidden]{display:flex;visibility:visible}
+/* #1320: 확인 중에는 '로그인' 글자를 감추되 자리는 지킨다. 5초를 넘기면 조용한 점만 보인다. */
+html[lang][data-lt-auth-checking="1"][data-lt-auth-phase] .app-header #account-entry{visibility:hidden}
+html[data-lt-auth-slow="1"] .app-header .account-slot{position:relative}
+html[data-lt-auth-slow="1"] .app-header .account-slot::after{content:"";position:absolute;right:8px;top:50%;width:6px;height:6px;margin-top:-3px;border-radius:50%;background:var(--lt-gold);pointer-events:none}
 
 /* #1026: cached member picker stays in place while authentication is checked. */
 html[data-lt-auth-phase=pending][data-lt-auth-hint=in] .app-header nav #record-menu[hidden]{display:flex;visibility:visible;pointer-events:none}
