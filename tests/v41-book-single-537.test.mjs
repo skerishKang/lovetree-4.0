@@ -534,7 +534,7 @@ test('#1287 모바일 책 보기 제어와 가로 복귀', { skip: REQUIRE ? fal
       const book = rect('#book');
       const after = rect('#whyMargin');
       return {
-        hit: [a?.width, a ? a.height + 8 : 0, b?.width, b ? b.height + 8 : 0],
+        hit: [a,b].flatMap(r=>{const el=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);const owns=(x,y)=>el.contains(document.elementFromPoint(x,y));return [r.width,owns(r.x+r.width/2,r.top-3.5)&&owns(r.x+r.width/2,r.bottom+3.5)?r.height+8:0]}),
         visual: [a?.height,b?.height],
         titleHidden: !title || getComputedStyle(title).display === 'none',
         gap: after && book ? after.top - book.bottom : -1,
