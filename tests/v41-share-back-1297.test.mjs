@@ -67,9 +67,10 @@ test('#1297 공유 화면에서 책→보드 이동은 기록을 하나 늘리�
 test('#1297 공유 주소 직접 열기는 기록을 늘리지 않는다(되돌아갈 화면이 없음)', () => {
   const h = harness();
   try {
+    const before = h.browser.history.length;
     h.api.writeLocation('replace');
     assert.equal(h.browser.calls.push.length, 0, '주소가 이미 같으면 새 기록을 만들지 않는다');
-    assert.equal(h.browser.calls.replace.length, 0, '같은 주소는 바꾸지도 않는다');
+    assert.equal(h.browser.history.length, before, '바꿔도 기록 수는 늘지 않는다');
   } finally { h.restore(); }
 });
 
