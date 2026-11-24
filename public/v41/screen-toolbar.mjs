@@ -112,6 +112,14 @@ export function mountScreenToolbar({ screen, titleFrom, tools = [], initialBar =
   keepBookPhonePlay();
   placeShelfSearch();
 
+  const boardMode = screen === 'board' ? bar.querySelector('.boardModeSwitch') : null;
+  const placeBoardReset = () => {
+    const reset = document.getElementById('boardResetOrderBtn');
+    if (!boardMode || !reset) return;
+    const narrow = matchMedia('(max-width:760px)').matches;
+    if (narrow && reset.parentElement !== group) group.insertBefore(reset, boardMode.nextSibling);
+    else if (!narrow && reset.parentElement !== boardMode) boardMode.append(reset);
+  };
   let stashed = [];
   const isPlay = (el) => /^(playAllBtn|cinemaBtn|mapPlayBtn)$/.test(el.id || '');
   // 오른쪽 정렬(group justify-content:flex-end)에서는 넘치는 칸이 왼쪽 밖으로 나가 scrollWidth에 잡히지 않는다.
@@ -134,6 +142,7 @@ export function mountScreenToolbar({ screen, titleFrom, tools = [], initialBar =
     for (const el of stashed) if (el.parentElement === menu) group.append(el);
     keepBookPhonePlay();
     placeShelfSearch();
+    placeBoardReset();
     stashed = [];
     menu.replaceChildren();
     menu.hidden = true;
@@ -167,6 +176,9 @@ export function mountScreenToolbar({ screen, titleFrom, tools = [], initialBar =
     more.hidden = stashed.length === 0;
   };
   more.addEventListener('click', () => { menu.hidden = !menu.hidden; });
+  if (boardMode && typeof MutationObserver === 'function') {
+    new MutationObserver(reflow).observe(boardMode, {childList: true});
+  }
   if (bookPlay && typeof MutationObserver === 'function') {
     new MutationObserver(reflow).observe(document.documentElement, {attributes: true, attributeFilter: ['data-book-shape']});
   }

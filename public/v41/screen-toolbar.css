@@ -164,3 +164,14 @@ html[data-v41-screen] body .lt-continue:is(#playAllBtn,#cinemaBtn,#mapPlayBtn):i
   html[data-v41-screen=shelf] .shelf-controls .search input{box-sizing:border-box;width:100%;padding-right:16px}
   html[data-v41-screen=shelf] .shelf-controls .count{flex:0 0 auto;min-height:0;white-space:nowrap}
 }
+
+/* #1249: 배치 초기화도 공통 줄 높이와 묶음 안에 유지한다. */
+html[data-v41-screen=board] .lt-toolbar-tools .boardModeSwitch:has(>#boardResetOrderBtn){
+  grid-template-columns:repeat(3,minmax(0,1fr));min-width:210px
+}
+html[data-v41-screen=board] .lt-screen-toolbar #boardResetOrderBtn{
+  box-sizing:border-box;height:36px;min-height:36px;white-space:nowrap;
+}
+html[data-v41-screen=board] .lt-toolbar-tools .boardModeSwitch>#boardResetOrderBtn{
+  border-left:1px solid var(--lt-line);border-radius:0;
+}
