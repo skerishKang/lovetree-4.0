@@ -1688,7 +1688,11 @@
     const rawAlpha = nodeAlpha(n),
       al = paintAlpha(rawAlpha, 'node-alpha-min'),
       nodeColor = state.mode !== 'OVERVIEW' && rawAlpha < 0.5 ? paint('context') : colorOf(n),
-      rgb = hexRgb(nodeColor),
+      // 작은 꼬리표 점은 밝은 판에서 가장자리 혼합으로 대비가 약해진다.
+      // 점을 그리는 색만 진하게 하여 묶음 색의 관계와 공용 토큰을 유지한다.
+      rgb = hexRgb(nodeColor).map(v =>
+        state.mobile && state.view === 'tag' && readPlate() === 'paper' ? Math.round(v * 0.85) : v
+      ),
       sel = state.selected?.id === n.id || state.play?.currentId === n.id,
       hov = state.hover?.id === n.id;
     let r = dotRadius(n);
