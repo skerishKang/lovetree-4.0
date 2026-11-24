@@ -54,6 +54,46 @@ export function mapChanged(changedFiles) {
   ));
 }
 
+// 2026-11-24: 화면이 바뀌어도 한 화면 안에서만 바뀐 PR은 그 화면 잡과 공통 검사기(a·b·c)·지도 잡만 돌린다.
+// 고를 수 있는 잡은 아래 여섯이다. 공통 검사기와 지도 잡은 지금처럼 늘 판정대로 돈다.
+// 화면 시험 파일이 바뀌면 그 파일을 실행하는 잡을, 보드 전용 소스가 바뀌면 보드 잡을 고른다.
+// 그 밖의 화면 파일(공용 모듈·셸·CSS·빌드 설정·helpers 등)이 하나라도 있으면 전부(all)다 — 애매하면 다 돈다.
+export const SELECTABLE_JOBS = ['screen-board', 'screen-home', 'screen-book', 'screen-reload', 'screen-shell', 'screen-book-screen'];
+const AREA_SOURCES = [
+  [/^public\/v41\/views\/board\//, 'screen-board'],
+  [/^public\/v41\/views\/track58-pinboard\.html$/, 'screen-board']
+];
+
+export function jobTestFiles(workflowText = readFileSync(WORKFLOW, 'utf8')) {
+  const start = workflowText.indexOf('  screen-board:');
+  const end = workflowText.indexOf('  deploy:');
+  const section = workflowText.slice(start, end);
+  const jobs = {};
+  const heads = [...section.matchAll(/^  ([a-z0-9-]+):\n/gm)];
+  heads.forEach((h, i) => {
+    const body = section.slice(h.index, i + 1 < heads.length ? heads[i + 1].index : section.length);
+    jobs[h[1]] = new Set([...body.matchAll(/tests\/[A-Za-z0-9_./-]+\.(?:test\.mjs|mjs|js)/g)].map((m) => m[0]));
+  });
+  return jobs;
+}
+
+export function selectJobs(changedFiles, jobTests, screenTests, screenHelpers) {
+  const picked = new Set();
+  for (const f of changedFiles) {
+    if (!f) continue;
+    const one = classify([f], screenTests, screenHelpers);
+    if (!one.changed) continue;
+    if (screenTests.has(f)) {
+      for (const [job, files] of Object.entries(jobTests)) if (files.has(f) && SELECTABLE_JOBS.includes(job)) picked.add(job);
+      continue;
+    }
+    const area = AREA_SOURCES.find(([re]) => re.test(f));
+    if (area) { picked.add(area[1]); continue; }
+    return 'all';
+  }
+  return SELECTABLE_JOBS.filter((j) => picked.has(j)).join(',');
+}
+
 export function classify(changedFiles, screenTests, screenHelpers) {
   const reasons = [];
   let changed = false;
@@ -92,5 +132,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   console.log(`화면 바뀜: ${result.changed} (${changed.length}개 파일)`);
   const map = result.changed && mapChanged(changed);
   console.log(`지도 바뀜: ${map}`);
-  if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `changed=${result.changed}\nmap_changed=${map}\n`);
+  const jobs = result.changed ? selectJobs(changed, jobTestFiles(), new Set(tests), new Set(helperFiles(tests))) : '';
+  console.log(`돌릴 화면 잡: ${jobs === 'all' ? '전부' : (jobs || '없음(공통 검사기·지도만)')}`);
+  if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `changed=${result.changed}\nmap_changed=${map}\njobs=${jobs}\n`);
 }
