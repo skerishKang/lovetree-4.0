@@ -1066,9 +1066,20 @@ test('#1259 방문자 보드 유튜브 표지는 자동 표시하고 외부 사�
      const card=f.locator('.card[data-id="'+id+'"]');
      const img=card.locator('.lt-yt-preview > img');
      assert.equal(await img.count(),1,key+' '+id+' 카드 내용: '+await card.innerHTML());
-     await img.scrollIntoViewIfNeeded();
-     await img.evaluate(e=>e.decode());
-     assert.ok(await img.evaluate(e=>e.complete&&e.naturalWidth>120&&e.naturalHeight>90),key+' '+id+' 썸네일 표시');
+     // 표지는 크기(세로 영상 여부)를 안 뒤 한 번 다시 그려져 그림 요소가 바뀔 수 있다. 잡아 둔 요소를 쓰지 않고
+     // 매번 새로 찾아 '보이게 하고 다 읽혔는지'를 본다(요소 떨어짐으로 흔들리던 것 — 판정은 그대로).
+     const frame=p.frames().find(fr=>fr.parentFrame()&&fr.url().includes('track58-pinboard'));
+     let shown=false;
+     for(let i=0;i<40&&!shown;i++){
+      shown=await frame.evaluate(cardId=>{
+       const e=document.querySelector('.card[data-id="'+cardId+'"] .lt-yt-preview > img');
+       if(!e)return false;
+       e.scrollIntoView({block:'center'});
+       return e.complete&&e.naturalWidth>120&&e.naturalHeight>90;
+      },id).catch(()=>false);
+      if(!shown)await p.waitForTimeout(200);
+     }
+     assert.ok(shown,key+' '+id+' 썸네일 표시');
      assert.equal(await card.locator('[data-lt-load]').count(),0,key+' 빈 표지 0');
      assert.equal(await card.locator('[data-lt-auto]').count(),0,key+' 소유자 전용 확인 제외');
     }

@@ -62,7 +62,7 @@ jobs:
     runs-on: ${{ fromJSON((github.event.pull_request.head.repo.full_name == github.repository && vars.USE_CGI_RUNNER == '1') && '["self-hosted","Linux","X64","cgi"]' || '["ubuntu-latest"]') }}
     timeout-minutes: 25
     needs: screen-changes
-    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-board,'))
+    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || needs.screen-changes.outputs.jobs == '' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-board,'))
     steps:
       - uses: actions/checkout@v4
         with:
@@ -263,7 +263,7 @@ jobs:
     runs-on: ${{ fromJSON((github.event.pull_request.head.repo.full_name == github.repository && vars.USE_CGI_RUNNER == '1') && '["self-hosted","Linux","X64","cgi"]' || '["ubuntu-latest"]') }}
     timeout-minutes: 12
     needs: screen-changes
-    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-home,'))
+    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || needs.screen-changes.outputs.jobs == '' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-home,'))
     steps:
       - uses: actions/checkout@v4
         with:
@@ -391,7 +391,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     needs: screen-changes
-    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-book,'))
+    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || needs.screen-changes.outputs.jobs == '' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-book,'))
     steps:
       - uses: actions/checkout@v4
         with:
@@ -488,7 +488,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     needs: screen-changes
-    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-shell,'))
+    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || needs.screen-changes.outputs.jobs == '' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-shell,'))
     steps:
       - uses: actions/checkout@v4
         with:
@@ -927,7 +927,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     needs: screen-changes
-    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-reload,'))
+    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || needs.screen-changes.outputs.jobs == '' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-reload,'))
     steps:
       - uses: actions/checkout@v4
         with:
@@ -1245,7 +1245,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     needs: screen-changes
-    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-book-screen,'))
+    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || needs.screen-changes.outputs.jobs == '' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-book-screen,'))
     steps:
       - uses: actions/checkout@v4
         with:
@@ -1469,7 +1469,9 @@ jobs:
           # 캡처가 일부 실패해도 종료 코드·로그 끝줄을 남긴다(bash -e면 echo·tail 전에 끝나 원인이 안 보였다).
           set +e
           start=$(date +%s)
-          node tools/visual-baseline/visual-baseline.mjs capture \
+          # 2026-11-24: 단계 timeout-minutes로 끊으면 continue-on-error여도 잡 전체가 취소(빨강)된다.
+          # 도구 안 상한(5분)에 더해 명령만 7분에서 끊어 단계는 종료 코드로 끝나게 한다(알림용 유지).
+          timeout -k 15 420 node tools/visual-baseline/visual-baseline.mjs capture \
             --base "${{ steps.base.outputs.baseUrl }}/v41/" --out visual-before > "$RUNNER_TEMP/before.log" 2>&1
           echo "status=$?" >> "$GITHUB_OUTPUT"
           echo "seconds=$(( $(date +%s) - start ))" >> "$GITHUB_OUTPUT"
@@ -1484,7 +1486,9 @@ jobs:
           # 캡처가 일부 실패해도 종료 코드·로그 끝줄을 남긴다(bash -e면 echo·tail 전에 끝나 원인이 안 보였다).
           set +e
           start=$(date +%s)
-          node tools/visual-baseline/visual-baseline.mjs capture \
+          # 2026-11-24: 단계 timeout-minutes로 끊으면 continue-on-error여도 잡 전체가 취소(빨강)된다.
+          # 도구 안 상한(5분)에 더해 명령만 7분에서 끊어 단계는 종료 코드로 끝나게 한다(알림용 유지).
+          timeout -k 15 420 node tools/visual-baseline/visual-baseline.mjs capture \
             --base "${{ steps.preview.outputs.url }}/v41/" --out visual-after > "$RUNNER_TEMP/after.log" 2>&1
           echo "status=$?" >> "$GITHUB_OUTPUT"
           echo "seconds=$(( $(date +%s) - start ))" >> "$GITHUB_OUTPUT"
