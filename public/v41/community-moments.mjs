@@ -35,7 +35,7 @@ const embedSrc=(id,item={})=>{
  return `${EMBED}${encodeURIComponent(id)}?${params.join('&')}`;
 };
 
-export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin,api=null,when=null}){
+export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin,api=null,when=null,historyLayers=null}){
  const stage=el('div','moments-stage');
  const card=el('div','moments-card');
  const media=el('div','moments-media');
@@ -134,7 +134,7 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin,a
  const addDialog=el('div','moments-add-dialog');addDialog.setAttribute('role','dialog');addDialog.setAttribute('aria-modal','true');addDialog.setAttribute('aria-label','어느 트리에 담을까요');addDialog.hidden=true;
  const addTitle=el('h3','moments-add-title','어느 트리에 담을까요');
  const addList=el('div','moments-add-list');
- const addClose=el('button','moments-add-close','×');addClose.type='button';addClose.setAttribute('aria-label','닫기');addClose.onclick=()=>{addDialog.hidden=true;};
+ const addClose=el('button','moments-add-close','×');addClose.type='button';addClose.setAttribute('aria-label','닫기');addClose.onclick=()=>{if(historyLayers)historyLayers.dismiss('moment-add');else addDialog.hidden=true;};
  addDialog.append(addTitle,addClose,addList);panel.append(addDialog);
  let pendingAdd=null;
  function openAddDialog(item){
@@ -152,14 +152,14 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin,a
    };
    return button;
   }));
-  addDialog.hidden=false;
+  addDialog.hidden=false;historyLayers?.open('moment-add',()=>{addDialog.hidden=true;});
  }
  // #1098 2단계: 순간 댓글 창 — 읽기·쓰기는 순간 단위 API(서버 #1136). 막히면 서버 응답 안내를 그대로 보여 주고,
  // 로그아웃(401)에는 트리 댓글과 같이 로그인 안내를 곁들인다. AI 명예회원 댓글은 트리 작성자 표시와 같은 방식으로 구분한다.
  const commentsDialog=el('div','moments-comments-dialog');commentsDialog.setAttribute('role','dialog');commentsDialog.setAttribute('aria-modal','true');commentsDialog.setAttribute('aria-label','순간 댓글');commentsDialog.hidden=true;
  const commentsTitle=el('h3','moments-comments-title','댓글');
  const closeComments=()=>{commentsDialog.hidden=true;panel.classList.remove('lt-comments-open');};
- const commentsClose=el('button','moments-add-close','×');commentsClose.type='button';commentsClose.setAttribute('aria-label','닫기');commentsClose.onclick=closeComments;
+ const commentsClose=el('button','moments-add-close','×');commentsClose.type='button';commentsClose.setAttribute('aria-label','닫기');commentsClose.onclick=()=>{if(historyLayers)historyLayers.dismiss('moment-comments');else closeComments();};
  const commentsNotice=el('p','moments-comments-notice');commentsNotice.setAttribute('role','status');commentsNotice.hidden=true;
  const commentsList=el('div','moments-comments-list');
  const commentsForm=el('form','community-comment-form');const commentsInput=el('textarea','');const commentsSubmit=el('button','community-mini','댓글 남기기');
@@ -183,11 +183,11 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin,a
  };
  async function openComments(){
   const item=current();if(!item||!item.shareId||!item.id||!api||typeof api.momentComments!=='function')return;
-  commentsDialog.hidden=false;panel.classList.add('lt-comments-open');commentsNotice.hidden=true;
+  commentsDialog.hidden=false;panel.classList.add('lt-comments-open');historyLayers?.open('moment-comments',closeComments);commentsNotice.hidden=true;
   commentsTitle.textContent='댓글';
   commentsList.replaceChildren(el('p','community-muted','댓글을 불러오는 중…'));
   const answer=await api.momentComments(item.shareId,item.id);
-  if(current()!==item){closeComments();return;} // 넘겨 뒤 늦게 온 응답은 버린다
+  if(current()!==item){if(historyLayers)historyLayers.dismiss('moment-comments');else closeComments();return;} // 넘겨 뒤 늦게 온 응답은 버린다
   if(!answer.ok){
    commentsNotice.textContent=(answer&&answer.message)||(answer.status===401?'로그인하면 댓글을 남길 수 있어요.':'댓글을 불러오지 못했어요.');
    commentsNotice.hidden=false;
