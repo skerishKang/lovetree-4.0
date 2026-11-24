@@ -22,11 +22,13 @@
 #community-panel #community-groups .community-group-chip{flex:none;white-space:nowrap}
 /* #972: 그룹 찾기 단추 위를 덮던 흐림 막을 없애고, 작은 화면에서 칩을 끝까지 읽는다. */
 #community-panel .community-group-rail::after{display:none}
-@media(max-width:520px){
- #community-panel .community-group-rail{gap:10px}
- #community-panel #community-groups{gap:6px;scrollbar-width:thin}
- #community-panel #community-groups::-webkit-scrollbar{display:block;height:4px}
- #community-panel .community-group-chip{padding-inline:8px}
+@media(max-width:780px){
+ /* #1330: 손가락으로 밀어 넘기고, 막대는 숨기고, 오른쪽 끝은 바탕색으로 흐린다. */
+ #community-panel .community-group-rail{gap:8px}
+ #community-panel #community-groups{gap:6px;scrollbar-width:none;scroll-snap-type:x proximity;-webkit-mask-image:linear-gradient(to right,#000 0,#000 calc(100% - 22px),var(--lt-stage) 100%);mask-image:linear-gradient(to right,#000 0,#000 calc(100% - 22px),var(--lt-stage) 100%)}
+ #community-panel #community-groups::-webkit-scrollbar{display:none}
+ #community-panel #community-groups .community-group-chip{scroll-snap-align:start}
+ #community-panel .community-group-find{flex:0 0 auto}
 }
 .community-group-find{min-height:44px;flex-shrink:0;padding:8px 14px;border:1px dashed var(--lt-gold-line);border-radius:var(--lt-r-pill);background:rgba(255,230,166,.06);color:var(--lt-pearl);font-size:13px}
 
@@ -150,17 +152,18 @@ html[data-lt-theme=garden] .moments-comments-dialog{background:var(--lt-paper);c
 @media(max-width:780px){
  #community-panel:has(#community-tab-moments[aria-selected="true"]){padding-inline:0;overflow-x:clip}
  #community-panel:has(#community-tab-moments[aria-selected="true"]) .community-top{height:0;margin:0;padding:0}
- /* #1305: 전환 단추는 두 화면 모두 같은 자리·같은 크기로 영상 위 빈 띠에 둔다. */
+ /* #1330: 감싼 캡슐 없이 단추 두 개만 둔다. 고른 쪽은 장미 토큰 채움. */
  #community-panel:has(#community-tab-moments[aria-selected="true"]) .community-tabs,
  #community-panel:has(#community-tab-trees[aria-selected="true"]) .community-tabs{
   position:absolute;z-index:19;top:calc(env(safe-area-inset-top) + 6px);left:8px;
-  gap:4px;width:max-content;margin:0;padding:3px;border-radius:var(--lt-r-pill);
-  background:var(--lt-glass-strong)
+  gap:6px;width:max-content;margin:0;padding:0;border:0;border-radius:0;background:none
  }
  #community-panel:has(#community-tab-moments[aria-selected="true"]) .community-tabs button,
  #community-panel:has(#community-tab-trees[aria-selected="true"]) .community-tabs button{
-  min-width:52px;min-height:32px;padding:0 9px;font-size:13px
+  min-width:52px;min-height:32px;padding:0 9px;font-size:13px;border:1px solid var(--lt-line);border-radius:var(--lt-r-pill);background:var(--lt-glass);color:var(--lt-muted)
  }
+ #community-panel .community-tabs button[aria-selected="true"]{background:var(--lt-rose);border-color:var(--lt-rose);color:var(--lt-stage)}
+ html[data-lt-theme=garden] #community-panel .community-tabs button[aria-selected="true"]{background:var(--lt-rose-ink);border-color:var(--lt-rose-ink);color:var(--lt-paper)}
  #community-moments-panel{width:100%;min-width:0;overflow-x:clip}
  /* #1305: 가수 단추 줄도 같은 빈 띠에, 옆으로 넘기게, 끝은 흐리게. */
  #community-moments-panel .moments-chips{position:absolute;z-index:19;top:calc(env(safe-area-inset-top) + 6px);right:8px;left:132px;max-width:none;justify-content:flex-start;flex-wrap:nowrap;gap:4px;overflow-x:auto;scrollbar-width:none;padding-right:18px;-webkit-mask-image:linear-gradient(to right,#000 0,#000 calc(100% - 18px),transparent 100%);mask-image:linear-gradient(to right,#000 0,#000 calc(100% - 18px),transparent 100%);margin:0}
@@ -233,3 +236,13 @@ html[data-lt-theme=garden] .moments-comments-dialog{background:var(--lt-paper);c
  /* 그룹 찾기는 가수 단추 줄 맨 끝에 같은 모양으로 붙는다. */
  #community-panel .community-group-find{min-height:40px;padding:0 12px;font-size:13px}
 }
+
+/* #1330 상단·배지 다듬기 — 새 색 없이 기존 토큰만 쓴다. */
+#community-panel:has(#community-tab-trees[aria-selected="true"]) .community-tabs #community-tab-trees,
+#community-panel:has(#community-tab-moments[aria-selected="true"]) .community-tabs #community-tab-moments{background:var(--lt-rose);border-color:var(--lt-rose);color:var(--lt-stage)}
+html[data-lt-theme=garden] #community-panel:has(#community-tab-trees[aria-selected="true"]) .community-tabs #community-tab-trees,
+html[data-lt-theme=garden] #community-panel:has(#community-tab-moments[aria-selected="true"]) .community-tabs #community-tab-moments{background:var(--lt-rose-ink);border-color:var(--lt-rose-ink);color:var(--lt-paper)}
+#community-panel #community-query,#community-panel #community-sort{min-height:48px;height:48px;border-radius:var(--lt-r-pill)}
+#community-panel .community-stages-skeleton{height:18px;border-radius:var(--lt-r-pill);background:color-mix(in srgb,var(--lt-gold-line) 22%,transparent)}
+#community-panel .community-cover-badges{flex-wrap:nowrap}
+#community-panel .community-cover-badge{white-space:nowrap}

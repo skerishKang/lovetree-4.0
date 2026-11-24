@@ -752,3 +752,64 @@ test('#1322 트리 카드 표지는 한 겹 — 가로·세로·그림 없음 �
     }
   } finally { await browser.close(); }
 });
+
+test('#1330 휴대폰 상단·카드 다듬기 — 캡슐 없음, 검색·정렬 같은 높이, 칩 밀기, 빈 인기 무대 숨김, 배지 한 줄', { skip: REQUIRE ? false : skip, timeout: 240000 }, async () => {
+  if (skip) assert.fail(skip);
+  const card = (i, extra) => ({
+    shareId: 'share' + String(i).padStart(20, '0'), title: '트리 ' + (i + 1), subject: '공개자', summary: '첫 기록',
+    momentCount: 3 + i, createdAt: '2026-11-20T09:30:00.000Z', publicDisplayName: '공개자', emotions: ['설렘'],
+    stats: { hearts: 3, favorites: 1, hearted: false, favored: false, reactions: { heart: 3 }, mine: [] }, ...extra
+  });
+  const cards = [
+    card(0, { cover: { emotion: '설렘', title: '가로', type: 'youtube', thumbnailUrl: 'https://i.ytimg.com/vi/j-XAL0kGh_E/mqdefault.jpg' } }),
+    card(1, { cover: { emotion: '설렘', title: '띠 있는 가로', type: 'youtube', thumbnailUrl: 'https://i.ytimg.com/vi/y234b8-jqVw/hqdefault.jpg' }, aiTester: true }),
+    card(2, { cover: { emotion: '설렘', title: '세로', type: 'youtube', vertical: true, thumbnailUrl: 'https://i.ytimg.com/vi/TkV6B6j06NA/oardefault.jpg' } })
+  ];
+  const browser = await chromium.launch({ headless: true });
+  try {
+    for (const [width, height] of [[390, 844], [1440, 900]]) for (const theme of ['night', 'garden']) {
+      const server = await serve();
+      try {
+        const base = `http://127.0.0.1:${server.address().port}`;
+        const ctx = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
+        await ctx.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); } catch {} }, theme);
+        await ctx.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
+        await ctx.route('**/api/community/shares**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, items: cards, totalVisible: 3, nextCursor: '', groups: [], groupsAll: [] }) }));
+        await ctx.route('**/api/community/stages/popular**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
+        await ctx.route('**/api/workspace**', (r) => r.fulfill({ status: 401, contentType: 'application/json', body: '{"ok":false,"code":"unauthenticated"}' }));
+        const page = await ctx.newPage();
+        await page.goto(`${base}/v41/#explore`, { waitUntil: 'load' });
+        await page.waitForSelector('#community-list .community-card');
+        await page.waitForTimeout(300);
+        const facts = await page.evaluate(() => {
+          const tabs = document.querySelector('.community-tabs'), q = document.querySelector('#community-query'), s = document.querySelector('#community-sort');
+          const groups = document.querySelector('#community-groups'), find = document.querySelector('button.community-group-find');
+          const badges = [...document.querySelectorAll('#community-list .community-cover-badges')];
+          return {
+            tabBg: getComputedStyle(tabs).backgroundImage, tabPad: getComputedStyle(tabs).padding,
+            queryH: q.getBoundingClientRect().height, sortH: s.getBoundingClientRect().height,
+            scrollbar: getComputedStyle(groups).scrollbarWidth, snap: getComputedStyle(groups).scrollSnapType,
+            fade: getComputedStyle(groups).maskImage, findRight: find.getBoundingClientRect().right, railRight: document.querySelector('.community-group-rail').getBoundingClientRect().right,
+            popularHidden: document.querySelector('#community-popular-stages').hidden,
+            badgeRows: badges.map((b) => ({ group: Math.round(b.getBoundingClientRect().height), one: Math.round(b.firstElementChild?.getBoundingClientRect().height || 0) })),
+            thumb: document.querySelector('#community-list .community-cover-image')?.src || ''
+          };
+        });
+        assert.equal(facts.tabBg, 'none', `${width}/${theme}: 탭을 감싼 캡슐 없음`);
+        assert.equal(facts.tabPad, '0px', `${width}/${theme}: 캡슐 안쪽 여백 없음`);
+        assert.equal(facts.queryH, facts.sortH, `${width}/${theme}: 검색·정렬 높이 차 0`);
+        assert.equal(facts.queryH, 48, `${width}/${theme}: 검색·정렬 48px`);
+        if (width === 390) {
+          assert.equal(facts.scrollbar, 'none', `${width}/${theme}: 칩 줄 막대 숨김`);
+          assert.match(facts.snap, /x/, `${width}/${theme}: 칩 줄 밀기 가능`);
+          assert.match(facts.fade, /gradient/, `${width}/${theme}: 오른쪽 끝 흐림`);
+          assert.ok(facts.findRight <= facts.railRight + 1, `${width}/${theme}: 그룹 찾기 줄 끝 고정`);
+        }
+        assert.equal(facts.popularHidden, true, `${width}/${theme}: 빈 인기 무대 제목 숨김`);
+        for (const badge of facts.badgeRows) assert.equal(badge.group, badge.one, `${width}/${theme}: 배지 한 줄`);
+        assert.match(facts.thumb, /mqdefault/, `${width}/${theme}: 띠 없는 썸네일 먼저`);
+        await ctx.close();
+      } finally { await new Promise((r) => server.close(r)); }
+    }
+  } finally { await browser.close(); }
+});
