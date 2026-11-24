@@ -11,7 +11,10 @@ import {applyHomeCenter} from './home-center.js';
 import {readTheme,writeTheme,appliedTheme,applyThemeAttribute} from '../public/v41/header-state.mjs';
 import {readTitleDisplay, titleDisplayOf, shouldReloadForTitleDisplay} from '../public/v41/book-usability.mjs';
 import {momentListEntries, momentListTrees} from './moment-list.js';
-import {youtubeIdFrom} from '../public/v41/youtube-id.mjs';
+import {youtubeIdFrom,isVerticalMoment} from '../public/v41/youtube-id.mjs';
+import {isAutoTitle} from '../public/v41/auto-title.mjs';
+import {fetchVideoMetadata} from '../public/v41/video-title.mjs';
+import {fetchVideoStatus} from '../public/v41/video-status.mjs';
 // 261116 PR 2: 카드 모드(마지막·고정·그날·무작위·트리)·숫자 줄이기 — 순수 계산 한 벌.
 import {HOME_MOMENT_KEY, readHomeMoment, normalizeHomeMoment, homeMomentPick, homeDayMoment, homeMomentMenu, formatCount} from './home-card-mode.js';
 const themeHost=document.getElementById('orbit');
@@ -53,6 +56,8 @@ const momentList=loggedIn?{
 }:null;
 const homeMomentChoice=homeMomentPick(momentList?.entries,homeMomentValue,{day:homeMomentDay,trees:momentList?.trees||[]});
 if(momentList){momentList.recent=homeMomentChoice.moment;momentList.recentHeader=homeMomentChoice.header;}
+const setHomePortrait=moment=>{const vertical=!!(moment&&isVerticalMoment(moment));shellBody.classList.toggle('lt-home-portrait',vertical);document.getElementById('orbit')?.toggleAttribute('data-lt-home-portrait',vertical);};
+setHomePortrait(homeMomentChoice.moment);
 // 이 문서가 그려질 때 쓴 날짜 표기. 셸이 같은 값을 다시 보내면 새로고침하지 않는다(아래 메시지 처리).
 const renderedDateStyle=dateStyleOf(ltDateStyle());
 // #481: 이 문서가 그릴 때 쓴 제목 보기. 받은 값이 이것과 다를 때만 다시 띄운다.
@@ -80,17 +85,21 @@ const renderedTitleDisplay=titleDisplayOf(readTitleDisplay(parent.LT41));
 if(momentsRequest){try{parent.postMessage({type:MSG.momentsOpened},location.origin)}catch{}}
 const shadow=document.getElementById('orbit').shadowRoot;
 const viewerStyle=document.createElement('style');
-viewerStyle.textContent=`#mediaViewerHome .mediaVisual iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#000}#mediaViewerHome .mediaActions button,#mediaViewerHome .mediaActions a{display:inline-flex;align-items:center;justify-content:center;font-size:13px;min-height:44px;padding:8px 14px}#mediaViewerHome .mediaWhy[hidden]{display:none}`;
+viewerStyle.textContent=`#mediaViewerHome .mediaVisual iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#000}#mediaViewerHome .mediaActions button,#mediaViewerHome .mediaActions a{display:inline-flex;align-items:center;justify-content:center;font-size:13px;min-height:44px;padding:8px 14px}#mediaViewerHome .mediaWhy[hidden]{display:none}#mediaViewerHome .mediaVisual [hidden]{display:none}#mediaViewerHome .mediaVisual .videoPlay{z-index:3}#mediaViewerHome .mediaVisual .mediaClose{z-index:4}`;
 shadow.append(viewerStyle);
 const viewer=document.createElement('div');viewer.className='mediaViewer';viewer.id='mediaViewerHome';viewer.setAttribute('aria-hidden','true');
-viewer.innerHTML=`<div class="mediaShell" role="dialog" aria-modal="true" aria-labelledby="mediaTitleHome"><div class="mediaVisual" id="mediaVisualHome"><button class="mediaClose" id="mediaCloseHome" aria-label="미디어 닫기">×</button><div class="videoBadge" id="mediaTypeBadgeHome">PHOTO</div><img id="mediaImageHome" alt="" src="" hidden><button class="videoPlay" id="mediaPlayHome" aria-label="미디어 미리보기 재생">▶</button><div class="mediaMemo" id="mediaMemoHome" hidden><div class="memoLabel">MEMORY NOTE</div><div class="memoMain" id="mediaMemoBodyHome"></div><div class="memoDate" id="mediaMemoDateHome"></div></div></div><div class="mediaInfo"><div class="mediaKicker" id="mediaKickerHome">MOMENT</div><h3 id="mediaTitleHome"></h3><div class="mediaMeta" id="mediaMetaHome"></div><div class="mediaWhy" hidden><b>WHY NEXT</b><p id="mediaWhyHome"></p></div><div class="mediaActions"><button class="primary" id="mediaBookHome">책에서 이어 보기</button><a id="mediaExternalHome" href="#" target="_blank" rel="noopener" hidden>원본 보기 ↗</a></div></div></div>`;
+viewer.innerHTML=`<div class="mediaShell" role="dialog" aria-modal="true" aria-labelledby="mediaTitleHome"><div class="mediaVisual" id="mediaVisualHome"><button class="mediaClose" id="mediaCloseHome" aria-label="미디어 닫기">×</button><div class="videoBadge" id="mediaTypeBadgeHome">사진</div><img id="mediaImageHome" alt="" src="" hidden><button class="videoPlay" id="mediaPlayHome" aria-label="미디어 미리보기 재생">▶</button><div class="mediaMemo" id="mediaMemoHome" hidden><div class="memoLabel">순간 기록</div><div class="memoMain" id="mediaMemoBodyHome"></div><div class="memoDate" id="mediaMemoDateHome"></div></div></div><div class="mediaInfo"><div class="mediaKicker" id="mediaKickerHome">순간</div><h3 id="mediaTitleHome"></h3><div class="mediaMeta" id="mediaMetaHome"></div><div class="mediaWhy" hidden><b>이어지는 이야기</b><p id="mediaWhyHome"></p></div><div class="mediaActions"><button class="primary" id="mediaBookHome">책에서 이어 보기</button><a id="mediaExternalHome" href="#" target="_blank" rel="noopener" hidden>원본 보기 ↗</a></div></div></div>`;
 shadow.append(viewer);
 const vEl=id=>shadow.querySelector('#'+id);
 shadow.querySelector('.recent-card')?.setAttribute('tabindex','0');
 let viewerOpener=null;
+let viewerSequence=0;
+let viewerSignal=new AbortController();
+const mediaKind=(videoId,moment)=>videoId?'동영상':moment.image?'사진':'기록';
+const fallbackVideoTitle='함께 간직한 영상';
 function closeHomeViewer(){
  if(!viewer.classList.contains('open'))return;
- viewer.querySelector('iframe')?.remove();
+ viewerSequence++;viewerSignal.abort();viewer.querySelector('iframe')?.remove();
  viewer.classList.remove('open');viewer.setAttribute('aria-hidden','true');
  try{parent.postMessage({type:MSG.viewer,open:false},location.origin)}catch{}
  vEl('mediaImageHome').hidden=true;vEl('mediaMemoHome').hidden=true;
@@ -101,27 +110,41 @@ function openHomeViewer(moment,opener=null){
  const orbitDialog=shadow.querySelector('dialog');if(orbitDialog?.open)orbitDialog.close();
  viewerOpener=opener||shadow.querySelector('.recent-card')||document.activeElement;
  const videoId=youtubeIdFrom(moment.url||'');
- vEl('mediaTitleHome').textContent=moment.title||'';
+ const sequence=++viewerSequence;viewerSignal.abort();viewerSignal=new AbortController();
+ const savedTitle=typeof moment.mediaMetadata?.title==='string'?moment.mediaMetadata.title.trim():'';
+ const namedTitle=!isAutoTitle(moment.title)&&typeof moment.title==='string'?moment.title.trim():'';
+ vEl('mediaTitleHome').textContent=namedTitle||savedTitle||(videoId?fallbackVideoTitle:'간직한 순간');
+ if(videoId&&!savedTitle&&!namedTitle){fetchVideoMetadata(videoId).then(meta=>{if(sequence===viewerSequence&&viewer.classList.contains('open')&&meta?.title)vEl('mediaTitleHome').textContent=meta.title;}).catch(()=>{});}
  vEl('mediaMetaHome').textContent=[moment.date||'',moment.emotion||''].filter(Boolean).join(' · ');
  const why=vEl('mediaWhyHome'),whyRow=why.closest('.mediaWhy');
  why.textContent=moment.whyNext||'';whyRow.hidden=!why.textContent;
- vEl('mediaKickerHome').textContent=`MOMENT · ${videoId?'VIDEO':moment.image?'PHOTO':'MEMO'}`;
- vEl('mediaTypeBadgeHome').textContent=videoId?'VIDEO':moment.image?'PHOTO':'MEMO';
+ vEl('mediaKickerHome').textContent=`순간 · ${mediaKind(videoId,moment)}`;
+ vEl('mediaTypeBadgeHome').textContent=mediaKind(videoId,moment);
  const img=vEl('mediaImageHome'),memo=vEl('mediaMemoHome');
- img.hidden=!!videoId||!moment.image;memo.hidden=!!videoId||!!moment.image;
+ img.hidden=!moment.image;memo.hidden=!!videoId||!!moment.image;
  if(moment.image)img.src=moment.image;
  if(!videoId&&!moment.image){vEl('mediaMemoBodyHome').textContent=moment.note||moment.title||'';vEl('mediaMemoDateHome').textContent=[moment.date||'',moment.emotion||''].filter(Boolean).join(' · ');}
- vEl('mediaPlayHome').hidden=!videoId;
+ const play=vEl('mediaPlayHome');play.hidden=true;play.onclick=null;
  const book=vEl('mediaBookHome'),external=vEl('mediaExternalHome');
  book.onclick=()=>{closeHomeViewer();bridge.actions.openBook(moment.treeId,moment.id);};
  external.hidden=!moment.url;if(moment.url)external.href=moment.url;
  const visual=vEl('mediaVisualHome');
  visual.querySelector('iframe')?.remove();
  if(videoId){
-  const frame=document.createElement('iframe');
-  frame.src=`https://www.youtube-nocookie.com/embed/${encodeURIComponent(videoId)}?autoplay=1&mute=1&playsinline=1&controls=0&rel=0&modestbranding=1`;
-  frame.allow='autoplay; encrypted-media';frame.title=moment.title||'';
-  visual.append(frame);
+  const showExternalOnly=()=>{if(sequence!==viewerSequence)return;visual.querySelector('iframe')?.remove();img.hidden=!moment.image;play.hidden=true;external.hidden=false;external.textContent='YouTube에서 보기';};
+  const startEmbed=()=>{if(sequence!==viewerSequence||!viewer.classList.contains('open'))return;visual.querySelector('iframe')?.remove();
+   const frame=document.createElement('iframe');frame.src=`https://www.youtube-nocookie.com/embed/${encodeURIComponent(videoId)}?autoplay=1&playsinline=1&enablejsapi=1&origin=${encodeURIComponent(location.origin)}`;
+   frame.allow='autoplay; encrypted-media; picture-in-picture';frame.allowFullscreen=true;frame.title=vEl('mediaTitleHome').textContent;
+   img.hidden=true;play.hidden=true;visual.append(frame);};
+  play.onclick=startEmbed;
+  fetchVideoStatus(videoId).then(status=>{if(sequence!==viewerSequence||!viewer.classList.contains('open'))return;
+   if(status==='noembed'||status==='private'||status==='gone'){showExternalOnly();return;}
+   play.hidden=false;img.hidden=!moment.image;
+  }).catch(()=>{if(sequence===viewerSequence)play.hidden=false;});
+  addEventListener('message',event=>{if(sequence!==viewerSequence||!['https://www.youtube.com','https://www.youtube-nocookie.com'].includes(event.origin))return;
+   let data=event.data;try{if(typeof data==='string')data=JSON.parse(data);}catch{return;}
+   if(data?.event==='onError'&&[101,150].includes(Number(data.info)))showExternalOnly();
+  },{signal:viewerSignal.signal});
  }
  viewer.classList.add('open');viewer.setAttribute('aria-hidden','false');
  try{parent.postMessage({type:MSG.viewer,open:true},location.origin)}catch{}
@@ -132,7 +155,7 @@ viewer.addEventListener('click',event=>{if(event.target===viewer)closeHomeViewer
 addEventListener('keydown',event=>{if(event.key==='Escape')closeHomeViewer();});
 shadow.addEventListener('click',event=>{
  if(!event.target.closest?.('.recent-card'))return;
- if(event.target.closest?.('[data-recent-head],[data-recent-change]'))return;
+ if(event.target.closest?.('[data-recent-head],[data-recent-change],[data-recent-play]'))return;
  event.stopPropagation();event.preventDefault();
  openHomeViewer(homeMomentChoice?.moment);
 },true);
@@ -261,6 +284,7 @@ const setHomeMoment=next=>{
  try{parent.postMessage({type:MSG.homeMoment,value:homeMomentValue},location.origin)}catch{}
  const picked=homeMomentPick(momentList?.entries,homeMomentValue,{day:homeMomentDay,trees:momentList?.trees||[]});
  orbit?.recent?.set(picked.moment,picked.header);
+ setHomePortrait(picked.moment);
  closeRecentMenu();
 };
  let recentMenu=null,recentMenuOpener=null;
