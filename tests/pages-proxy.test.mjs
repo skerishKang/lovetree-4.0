@@ -19,7 +19,8 @@ test('#1211: 서명된 원문만 전달하고 수신 증명은 프록시가 만�
     ['정상', raw, timestamp, 'lovetree', sign(timestamp,'lovetree',raw), 200],
     ['본문 변경', raw+' ', timestamp, 'lovetree', sign(timestamp,'lovetree',raw), 401],
     ['오래된 시각', raw, String(+timestamp-301000), 'lovetree', sign(String(+timestamp-301000),'lovetree',raw), 401],
-    ['미래 시각', raw, String(+timestamp+301000), 'lovetree', sign(String(+timestamp+301000),'lovetree',raw), 401],
+    // 미래 쪽은 앞 사례를 처리하는 동안 시계가 흐르면 차이가 줄어든다 — 기준(300초)보다 1분 넉넉히 앞선 시각을 쓴다.
+    ['미래 시각', raw, String(+timestamp+360000), 'lovetree', sign(String(+timestamp+360000),'lovetree',raw), 401],
     ['다른 사이트', raw, timestamp, 'other', sign(timestamp,'other',raw), 401],
     ['서명 모양 오류', raw, timestamp, 'lovetree', 'sha256=bad', 401],
     ['8KB 경계', raw.padEnd(8192-4,' '), timestamp, 'lovetree', sign(timestamp,'lovetree',raw.padEnd(8192-4,' ')), 200],
