@@ -565,7 +565,7 @@ html[data-lt-theme=garden] #cleanup-panel input:not([type=checkbox]),html[data-l
 /* 탭은 글자 링크다 — 누름 영역은 44px, hover는 옅은 바탕·진한 글자색. */
 .tree-frame .tree-views>button{min-height:44px;align-self:center;border:0;border-radius:8px;padding:0 12px;background:none;font-size:14px;font-weight:400;color:var(--lt-muted)}
 .tree-frame .tree-views>button:hover,.tree-frame .tree-views>button:focus-visible{background:rgba(255,255,255,.07)}
-.tree-frame .tree-views>button#community-menu{border-left:1px solid var(--line);margin-left:8px}
+
 /* 261119 대표 결정: 탭을 감싸는 판을 없앤다 — 판 배경·테두리·안쪽 여백 0, 탭은 글자 링크다(판 배경 없음). */
 .tree-frame{display:flex;align-items:center;flex:0 0 auto;margin-left:6px}
 /* 이슈 421 2회차: 트리 선택·보기 탭이 모두 숨겨진 상태(로그아웃·트리 없음·공유)에서는 빈 틀이 점으로 남지 않게 틀 자체를 숨긴다. */
@@ -635,7 +635,7 @@ nav .tree-frame{scroll-snap-align:center}
  .tree-frame{margin-left:0;padding:0;border:0;background:none}
  .app-header{display:flex;min-height:56px;padding:6px 10px;gap:6px;flex-wrap:nowrap}
  .main-nav{flex:0 0 auto}
- body .main-nav #community-menu,body .main-nav .tree-views{display:none}
+ body .main-nav .tree-views>button[data-view]{display:none}
  body .header-actions #write-menu{display:none}
  /* 이슈 457 3번: .main-nav가 더 안 자라(flex:0 0 auto) 트리 틀이 없으면(로그인·트리 0개) nav 내용이
     줄어 계정·☰가 로고 바로 옆에 붙는다. 오른쪽 끝에 고정해 트리 틀 유무와 상관없이 같은 자리에 있게 한다. */
@@ -1245,3 +1245,22 @@ nav #record-menu #source-label{flex:1 1 auto;text-align:left}
 .header-actions .view-toggle>button[aria-checked=true]{background:var(--lt-primary);color:var(--lt-primary-ink)}
 html[data-lt-theme=garden] .header-actions .view-toggle>button:not([aria-checked=true]){color:var(--lt-ink)}
 @media(max-width:780px){.header-actions .view-toggle{min-width:84px}}
+
+/* #1246: 공개 트리 입구는 탭이 아니라 첫 화면과 같은 선 나침반·투명 테두리 단추다. */
+html .tree-frame .tree-views>button#community-menu{
+ display:inline-flex;align-items:center;justify-content:center;gap:6px;flex:none;
+ min-height:44px;padding:0 12px;margin-left:8px;border:1px solid var(--lt-line);
+ border-radius:var(--lt-r-pill);background:transparent;box-shadow:none;
+ color:var(--lt-muted);text-decoration:none
+}
+html .tree-frame .tree-views>button#community-menu:is(:hover,:focus-visible,[aria-current=true]){
+ border-color:var(--lt-pearl);color:var(--lt-pearl);background:transparent;text-decoration:none;box-shadow:none
+}
+html .tree-frame .tree-views>button#community-menu[aria-current=true]{font-weight:600}
+#community-menu .header-compass{width:15px;height:15px;flex:none}
+@media(max-width:780px){
+ body .main-nav .tree-views{display:flex;flex:none}
+ html .tree-frame .tree-views>button#community-menu{width:44px;min-width:44px;padding:0;margin-left:2px}
+ #community-menu .community-menu-label{display:none}
+ #community-menu .header-compass{width:19px;height:19px}
+}

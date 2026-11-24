@@ -477,7 +477,7 @@ test('1028 실행: 트리 목록만 스크롤하고 동작 칸은 고정이며 �
 });
 
 
-test('#1246 모든 화면의 순간 추가만 장미색', {skip: REQUIRE ? false : skip || 'LT_TOPMENU_REQUIRE=1 일 때 실행', timeout:180000}, async()=>{
+test('#1246 모든 화면의 순간 추가만 장미색·둘러보기 테두리', {skip: REQUIRE ? false : skip || 'LT_TOPMENU_REQUIRE=1 일 때 실행', timeout:180000}, async()=>{
   if(skip)assert.fail(skip);
   const server=await serve(),base='http://127.0.0.1:'+server.address().port;
   const browser=await chromium.launch({headless:true});
@@ -505,11 +505,21 @@ test('#1246 모든 화면의 순간 추가만 장미색', {skip: REQUIRE ? false
           sample.style.backgroundColor='var(--lt-cta-rose)';sample.style.color='var(--lt-cta-white)';document.body.append(sample);
           const rose=getComputedStyle(sample).backgroundColor,white=getComputedStyle(sample).color;sample.remove();
           const info=e=>{const s=getComputedStyle(e);return{id:e.id,bg:s.backgroundColor,ink:s.color,visible:e.checkVisibility({checkVisibilityCSS:true})}};
+          const explore=document.getElementById('community-menu'),cs=getComputedStyle(explore),er=explore.getBoundingClientRect();
+          const icon=explore.querySelector('svg'),ir=icon.getBoundingClientRect(),header=document.querySelector('.app-header').getBoundingClientRect();
+          const picker=document.getElementById('record-menu').getBoundingClientRect();
+          const hit=document.elementFromPoint(er.x+er.width/2,er.y+er.height/2);
           return {rose,white,head:info(document.getElementById('write-menu')),fab:info(document.getElementById('mobile-add')),
+            explore:{...info(explore),current:explore.getAttribute('aria-current')==='true',border:cs.borderTopWidth,borderColor:cs.borderTopColor,borderStyle:cs.borderTopStyle,radius:parseFloat(cs.borderTopLeftRadius),deco:cs.textDecorationLine,weight:cs.fontWeight,icon:ir.width>0&&ir.height>0&&icon.getAttribute('stroke')==='currentColor'&&icon.getAttribute('fill')==='none'&&icon.getAttribute('aria-hidden')==='true',labelVisible:explore.querySelector('.community-menu-label').checkVisibility(),width:er.width,height:er.height,inside:er.left>=header.left&&er.right<=header.right&&er.top>=header.top&&er.bottom<=header.bottom,hit:hit===explore||explore.contains(hit),pickerOverlap:Math.max(0,Math.min(er.right,picker.right)-Math.max(er.left,picker.left))},
+            headerHeight:Math.round(header.height),overflow:document.documentElement.scrollWidth-innerWidth,
+            tabs:[...document.querySelectorAll('#tree-views button[data-view]')].map(e=>({border:getComputedStyle(e).borderTopWidth,deco:getComputedStyle(e).textDecorationLine,current:e.getAttribute('aria-current')==='true'})),
             other:[...document.querySelectorAll('.app-header button,.app-header a')].filter(e=>!['write-menu','mobile-add'].includes(e.id)&&e.checkVisibility({checkVisibilityCSS:true})).map(info)};
         });
+        let idleExplore;
         for(const [name,hash] of [['home','#home'],...SCREENS,['community','#explore']]){
-          await page.evaluate(h=>location.hash=h,hash);
+          if(name==='community')await page.locator('#community-menu').click();
+          else await page.evaluate(h=>location.hash=h,hash);
+          await page.mouse.move(2,300);
           if(name==='community')await page.waitForFunction(()=>document.body.classList.contains('community-screen'));
           else if(name==='home')await page.waitForFunction(()=>document.body.classList.contains('home-existing'));
           else await page.waitForFunction(h=>[...document.querySelectorAll('iframe')].some(f=>f.checkVisibility()&&f.contentWindow?.location.href.includes(h)),({shelf:'track32-bookshelf',book:'track59-sketchbook',board:'track58-pinboard',map:'track56-network'})[name]);
@@ -520,6 +530,25 @@ test('#1246 모든 화면의 순간 추가만 장미색', {skip: REQUIRE ? false
           assert.deepEqual(m.other.filter(b=>b.bg===m.rose),[],key+' 다른 머리줄 단추에 장미색 없음');
           if(width===1440)assert.equal(m.head.visible,true,key+' 머리줄 순간 추가 표시');
           else if(!['home','community'].includes(name))assert.equal(m.fab.visible,true,key+' 휴대폰 순간 추가 표시');
+          const e=m.explore;
+          assert.ok(e.visible&&e.icon&&e.inside&&e.hit&&e.pickerOverlap===0,key+' 둘러보기 아이콘·실제 누름 영역·겹침 0 '+JSON.stringify(e));
+          assert.ok(e.width>=44&&e.height>=44,key+' 둘러보기 44px 누름 영역');
+          assert.equal(e.bg,'rgba(0, 0, 0, 0)',key+' 투명 배경');
+          assert.equal(e.border,'1px',key+' 테두리');
+          assert.equal(e.borderStyle,'solid',key+' 테두리 모양');
+          assert.ok(e.radius>=22,key+' 둥근 단추');
+          assert.equal(e.deco,'none',key+' 밑줄 없음');
+          assert.equal(e.labelVisible,width===1440,key+' 넓은 화면만 글자 표시');
+          assert.equal(e.current,name==='community',key+' 현재 둘러보기 표시');
+          assert.ok(m.tabs.every(t=>t.border==='0px'),key+' 내 트리 탭은 테두리 없음');
+          assert.equal(m.overflow,0,key+' 가로 넘침 0');
+          if(width===390)assert.equal(m.headerHeight,57,key+' 머리줄 57px');
+          if(name==='home')idleExplore=e;
+          if(name==='community'){
+            assert.notEqual(e.borderColor,idleExplore.borderColor,key+' 현재 테두리 강조');
+            assert.notEqual(e.ink,idleExplore.ink,key+' 현재 글자 강조');
+            assert.ok(Number(e.weight)>Number(idleExplore.weight),key+' 현재 글자 굵기');
+          }
           console.log(key,JSON.stringify(m));
         }
       }finally{await ctx.close();}
