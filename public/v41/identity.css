@@ -486,6 +486,16 @@ html[data-v41-screen=book] .tools #lensBtn.active{color:var(--lt-gold)}
 html[data-v41-screen=book] .tools #lensBtn.active:hover{color:var(--lt-gold)}
 html[data-v41-screen=book] .tools .lens-icon{display:block}
 
+/* 공통 앱 안 확인 창(#1109 창 모양 부품 재사용) — 브라우저 기본 confirm 대신 이 틀을 쓴다. 새 색 없음. */
+dialog.lt-confirm{inset:0;margin:auto;width:min(380px,calc(100vw - 32px));max-width:calc(100vw - 32px);height:fit-content;max-height:calc(100dvh - 88px);padding:24px;border:1px solid var(--lt-line);border-radius:var(--lt-r-card);background:var(--lt-glass-strong);color:var(--lt-pearl);overflow:auto}
+dialog.lt-confirm::backdrop{background:var(--lt-dialog-backdrop,rgba(3,3,7,.85));backdrop-filter:var(--lt-dialog-backdrop-blur,blur(12px))}
+dialog.lt-confirm .lt-confirm-message{margin:0;font-size:15px;line-height:1.6}
+dialog.lt-confirm .button-row{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px;margin-top:18px}
+dialog.lt-confirm .button-row button{min-height:44px;padding:10px 18px;border:1px solid var(--lt-line);border-radius:var(--lt-r-pill);background:var(--lt-glass-strong);color:var(--lt-pearl);font:inherit;font-size:14px}
+dialog.lt-confirm .button-row .primary{background:var(--lt-primary);color:var(--lt-primary-ink);border-color:var(--lt-primary)}
+html[data-lt-theme=garden] dialog.lt-confirm{color:var(--lt-ink)}
+html[data-lt-theme=garden] dialog.lt-confirm .button-row .primary{background:var(--lt-primary);color:var(--lt-primary-ink);border-color:var(--lt-primary)}
+
 /* #463(2026-11-13): 트리 0개 빈 화면의 '빈 트리 미리보기' 그림 — 점선 빈 카드 3장 + 금빛 실.
    '순간이 이어져 트리가 된다'를 장식으로 보여 준다(대표 결정 2026-11-12 18:19).
    - 바탕은 첫 화면과 같은 가운데 금빛 빛무리.

@@ -369,11 +369,17 @@ test('#1245 처음대로: 확인 한 번 뒤 순서 값이 비워지고 날짜�
   try {
     const { context, page, frame } = await openHost(browser, `${base}/__host-board-reset.html`, { width: 1440, height: 900 });
     let confirmations = 0;
-    page.on('dialog', async (dialog) => { confirmations++; await dialog.accept(); });
+    page.on('dialog', async (dialog) => { confirmations++; await dialog.dismiss(); });
     await frame.locator('#boardResetOrderBtn').click();
+    const confirm = frame.locator('#lt-confirm');
+    await confirm.waitFor({ state: 'visible' });
+    assert.equal(confirmations, 0, '브라우저 기본 확인 창을 쓰지 않는다');
+    assert.equal(await confirm.locator('#lt-confirm-cancel').evaluate((el) => el === document.activeElement), true, '취소가 기본 초점이다');
+    await confirm.locator('#lt-confirm-ok').click();
     await page.waitForFunction(() => window.LT41_SAVES.length === 1);
     const saved = await page.evaluate(() => window.LT41_SAVES[0]);
-    assert.equal(confirmations, 1, '처음대로는 확인을 한 번 받는다');
+    assert.equal(await confirm.count(), 1, '확인 창은 한 번만 열리고 그대로 닫힌다');
+    assert.equal(await confirm.locator('#lt-confirm-ok').isVisible(), false);
     assert.equal(M.orderOfMoments(saved), null, '저장 문서에 순서 값이 남지 않는다');
     assert.ok(saved.every((m) => m.x === null && m.y === null), '기존 칸 위치도 함께 정리한다');
     assert.equal(await frame.locator('[data-board-mode="date"]').getAttribute('aria-pressed'), 'true', '날짜순으로 돌아간다');
@@ -484,4 +490,41 @@ test('#1245 390px 손가락: 짧게 누르면 순간을 열고 끌면 빈 칸·�
     assert.equal(problems.length, 0, `화면 오류 없음 (${problems.join(' | ') || '없음'})`);
     await context.close();
   } finally { await browser.close(); server.close(); }
+});
+
+
+test('#1273 처음대로 취소: 공통 확인 창에서 취소하면 아무것도 바뀌지 않는다', { skip: REQUIRE ? false : skip, timeout: 300000 }, async () => {
+  if (skip) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip}`);
+  const tree = starTree(8);
+  tree.moments.forEach((m, i) => { m.x = 150; m.y = -10000 + i; });
+  const server = await serve({ '/__host-board-reset-cancel.html': hostHTMLWithSaveReplies(tree) });
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const { context, page, frame } = await openHost(browser, `${base}/__host-board-reset-cancel.html`, { width: 1440, height: 900 });
+    let nativeDialogs = 0;
+    page.on('dialog', async (dialog) => { nativeDialogs++; await dialog.dismiss(); });
+    const before = await frame.evaluate(() => [...document.querySelectorAll('#cardLayer .card')].map((el) => el.dataset.id));
+    const beforeMode = await frame.locator('[data-board-mode="date"]').getAttribute('aria-pressed');
+    await frame.locator('#boardResetOrderBtn').click();
+    const confirm = frame.locator('#lt-confirm');
+    await confirm.waitFor({ state: 'visible' });
+    await confirm.locator('#lt-confirm-cancel').click();
+    assert.equal(await confirm.isVisible(), false, '취소하면 확인 창이 닫힌다');
+    assert.equal(nativeDialogs, 0, '브라우저 기본 확인 창을 쓰지 않는다');
+    assert.equal(await page.evaluate(() => window.LT41_SAVES.length), 0, '저장 요청을 보내지 않는다');
+    const after = await frame.evaluate(() => [...document.querySelectorAll('#cardLayer .card')].map((el) => el.dataset.id));
+    assert.deepEqual(after, before, '카드 순서가 그대로다');
+    assert.equal(await frame.locator('[data-board-mode="date"]').getAttribute('aria-pressed'), beforeMode, '배치 모드가 그대로다');
+    await context.close();
+  } finally { await browser.close(); server.close(); }
+});
+
+test('#1273 공통 확인 창 연결과 기본 창 미사용(코드 검사)', () => {
+  const board = fs.readFileSync(new URL('../public/v41/views/board/board.js', import.meta.url), 'utf8');
+  const html = fs.readFileSync(new URL('../public/v41/views/track58-pinboard.html', import.meta.url), 'utf8');
+  assert.equal(/window\.confirm\s*\(/.test(board), false, '보드에 브라우저 기본 confirm 호출이 남지 않는다');
+  assert.match(board, /LT41Confirm/);
+  assert.ok(html.indexOf('/v41/confirm-dialog.js') > 0, '보드가 공통 확인 창을 읽는다');
+  assert.ok(html.indexOf('/v41/confirm-dialog.js') < html.indexOf('/v41/views/board/board.js'), '확인 창이 보드보다 먼저 온다');
 });
