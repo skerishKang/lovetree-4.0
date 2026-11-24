@@ -111,7 +111,7 @@ test('화면 줄 E2E: 세 화면 줄 높이·위치 같음, 이어 보기 하나
         assert.deepEqual(geo.crossLine, [], `${label}: 선택 단추가 줄 아래 선을 넘지 않음`);
         assert.deepEqual(geo.clipped, [], `${label}: 보이는 단추가 머리줄 안에 들어간다`);
         assert.deepEqual(geo.textClipped, [], `${label}: 보이는 단추의 글자가 잘리지 않는다`);
-        assert.equal(geo.back, '← 서재', `${label}: 공통 줄 왼쪽에 서재 이동이 있다`);
+        assert.equal(geo.back, null, `${label}: 중복 서재 단추 없음`);
         await ctx.close();
       }
     }
@@ -211,7 +211,7 @@ const shownPath = (page) => page.evaluate(() => {
   try { return frame?.contentWindow?.location?.pathname || ''; } catch { return ''; }
 });
 
-test('화면 줄: ← 서재를 누르면 서재로 이동한다(1440)', { skip, timeout: 120000 }, async () => {
+test('화면 줄: 중복 복귀 단추 없이 상단 서재 탭으로 이동한다(1440)', { skip, timeout: 120000 }, async () => {
   const workspace = shellWorkspace();
   const server = await serve();
   const base = `http://127.0.0.1:${server.address().port}`;
@@ -230,16 +230,14 @@ test('화면 줄: ← 서재를 누르면 서재로 이동한다(1440)', { skip,
       })()), null, { timeout: 20000 });
       await page.waitForFunction(() => {
         const frame = [...document.querySelectorAll('#view, #view-next')].find((item) => !item.hidden && item.getClientRects().length > 0);
-        try { return !!frame?.contentDocument?.querySelector('.lt-screen-toolbar .shelf-back'); } catch { return false; }
+        return !!frame?.contentDocument?.querySelector('.lt-screen-toolbar');
       }, null, { timeout: 12000 });
-      const clicked = await page.evaluate(() => {
-        const f = [...document.querySelectorAll('#view, #view-next')].find((x) => !x.hidden && x.getClientRects().length > 0);
-        const back = f?.contentDocument?.querySelector('.lt-screen-toolbar .shelf-back');
-        if (!back) return false;
-        back.click();
-        return true;
+      const back = await page.evaluate(() => {
+        const frame = [...document.querySelectorAll('#view, #view-next')].find((item) => !item.hidden && item.getClientRects().length > 0);
+        return !!frame?.contentDocument?.querySelector('.lt-screen-toolbar .shelf-back');
       });
-      assert.equal(clicked, true, '공통 줄에 ← 서재가 있다');
+      assert.equal(back, false, '공통 줄에 중복 복귀 단추가 없다');
+      await page.locator('.main-nav button[data-view="track32-bookshelf.html"]').click();
       await page.waitForFunction(() => /track32-bookshelf/.test((() => {
         const f = [...document.querySelectorAll('#view, #view-next')].find((x) => !x.hidden && x.getClientRects().length > 0);
         try { return f?.contentWindow?.location?.pathname || ''; } catch { return ''; }

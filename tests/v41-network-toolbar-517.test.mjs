@@ -241,7 +241,7 @@ test('#951 ①② 위 단추 한 줄(높이 같음·줄 수 1) + 순간 3개 작
             return { id: b.id, w: Math.round(r.width * 10) / 10, h: Math.round(r.height), padL: parseFloat(cs.paddingLeft), padR: parseFloat(cs.paddingRight), fs: parseFloat(cs.fontSize), textW: Math.round(range.getBoundingClientRect().width * 10) / 10 };
           }),
           // 되돌아가기 화살표는 하나(글자 + ::before) — 예전 폰 규칙이 화살표를 하나 더 그려 '←←'가 됐다.
-          back: (() => { const b = document.getElementById('shelfBackBtn'), before = getComputedStyle(b, '::before').content || ''; return { text: b.textContent.trim(), glyphs: (b.textContent.match(/←/g) || []).length + (before.includes('←') ? 1 : 0), before }; })(),
+          back: !!document.getElementById('shelfBackBtn'),
           title: (() => {
             const el = document.querySelector('.lt-screen-toolbar .lt-toolbar-title');
             const cs = getComputedStyle(el), probe = document.createElement('span');
@@ -264,7 +264,7 @@ test('#951 ①② 위 단추 한 줄(높이 같음·줄 수 1) + 순간 3개 작
       assert.deepEqual(m.viewsFull.map((v) => v[1]), [true, true, true], `${width}: 보기 방식 세 이름이 다 보인다(${JSON.stringify(m.viewsFull)})`);
       assert.deepEqual(m.viewsFull.map((v) => parseFloat(v[2]) >= 13), [true, true, true], `${width}: 보기 방식 글자는 13px 이상이다(${JSON.stringify(m.viewsFull)})`);
       assert.ok(m.title.client >= m.title.four, `${width}: 트리 이름 네 글자 이상 보인다(보이는 폭 ${m.title.client} ≥ 네 글자 ${m.title.four})`);
-      assert.equal(m.back.glyphs, 1, `${width}: 되돌아가기 화살표는 하나다(${JSON.stringify(m.back)})`);
+      assert.equal(m.back, false, '중복 서재 복귀 단추 없음');
       assert.ok(m.viewBox.every((v) => v.textW <= v.w - v.padL - v.padR + 1), `${width}: 보기 글자가 단추 안에 있다(${JSON.stringify(m.viewBox.map((v) => [v.textW, v.w]))})`);
       assert.ok(m.viewBox.every((v) => v.fs >= 13), `${width}: 보기 글자 13px 이상(${JSON.stringify(m.viewBox.map((v) => v.fs))})`);
       if (width < 431) {
@@ -448,10 +448,7 @@ test('#951 ⑤ 서재에서 들어온 지도: ← 서재 단추 1개 + 묶음 �
         });
         const tag = `${width}/${n}`;
         assert.deepEqual(errors, [], `${tag}: 지도 화면 오류 없음`);
-        assert.equal(m.back.length, 1, `${tag}: '← 서재' 단추가 하나 보인다(${JSON.stringify(m.back)})`);
-        assert.equal(m.back[0].text, '← 서재', `${tag}: 단추 글자`);
-        assert.equal(m.back[0].aria, '서재로 돌아가기', `${tag}: 단추 읽어주기(aria-label)`);
-        assert.ok(m.back[0].l >= 0 && m.back[0].l < 30, `${tag}: 단추가 왼쪽 위에 있다(${m.back[0].l})`);
+        assert.equal(m.back.length, 0, `${tag}: 중복 서재 복귀 단추 없음`);
         assert.deepEqual(m.overlap, [], `${tag}: 위 단추끼리 겹침 없음(${JSON.stringify(m.overlap)})`);
         assert.equal(m.barClip, 0, `${tag}: 위 줄이 화면 밖으로 넘치지 않는다`);
         assert.deepEqual(m.views, ['이어진 길', '묶음', '시간 순'], `${tag}: 보기 이름`);

@@ -2940,7 +2940,7 @@ test('#1091: 서재·책·보드 화면 도구 줄의 계산값이 같고 390 �
       for (const [screen, value] of Object.entries(values)) {
         assert.equal(value.height, width === 390 ? '48px' : '52px');
         assert.equal(value.buttonHeight, '36px');
-        assert.equal(value.shelfBack, screen !== 'shelf', '공통 줄 왼쪽에 ← 서재가 있다');
+        assert.equal(value.shelfBack, false, '공통 줄에 중복 서재 단추 없음');
         assert.equal(value.covered, false, '화면 본문이 도구 줄에 가려졌다');
       }
     }
