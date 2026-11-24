@@ -1290,6 +1290,7 @@ function formFor(type) {
 
 function openAdd() {
   formFor(addType);
+  if (typeof pushBoardPanel === 'function') pushBoardPanel('add');
   $('#addModal').classList.add('open');
 }
 
@@ -1583,6 +1584,7 @@ $('#typeGrid').onclick = e => {
 $('#detailClose').onclick = () => {
   $('#detail').classList.remove('open');
   syncBoardPush();
+  if (window.parent !== window) parent.postMessage({ type: globalThis.LT41_MSG.boardDetail, open: false }, location.origin);
 };
 $('#openMoment').onclick = () => openViewer(selected);
 $('#closeViewer').onclick = () => {

@@ -252,7 +252,7 @@ export function createWritingRuntime(ctx){
       show:(file,write)=>(0,ctx.show)(file,write),
       screens,
       choose:(id,momentId)=>(0,ctx.choose)(id,momentId),
-      writeLocation:(mode)=>(0,ctx.writeLocation)(mode),
+      writeLocation:(mode,boardState)=>(0,ctx.writeLocation)(mode,boardState),
       openLoginStart:intent=>(0,ctx.openLoginStart)(intent),
       flowNavigation:()=>(0,ctx.flowNavigation)(),
       setHandled:hash=>{ctx.handledHash=hash;}
@@ -277,7 +277,7 @@ export function createWritingRuntime(ctx){
       openSettingsData:intent=>(0,ctx.openAccountData)(intent),
       show:(file,write)=>(0,ctx.show)(file,write),
       links:()=>(0,ctx.links)(),
-      writeLocation:(mode)=>(0,ctx.writeLocation)(mode),
+      writeLocation:(mode,boardState)=>(0,ctx.writeLocation)(mode,boardState),
       choose:(id,momentId)=>(0,ctx.choose)(id,momentId),
       openTreeManager:()=>shellPanels.openTreeManager(),
       openTagManager:opts=>shellTagManager.open(opts),

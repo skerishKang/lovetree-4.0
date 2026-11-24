@@ -433,8 +433,11 @@ addEventListener('DOMContentLoaded', () => {
     globalThis.LT41Report?.report(e, '썸네일 대체 처리');
   }
 });
+let restoringBoardPanel = false;
 selectMoment = function (id, open = true) {
-  if (open) LTDEMO.select(id);
+  const previousState = { lt58View: { ...view }, lt58Scroll: { left: viewport.scrollLeft, top: viewport.scrollTop } };
+  if (!restoringBoardPanel) rememberBoardState();
+  if (open && !restoringBoardPanel) LTDEMO.select(id, previousState);
   selected = id;
   mobilePicker?.select(id);
   document
@@ -540,6 +543,78 @@ selectMoment = function (id, open = true) {
       );
   }
 };
+function rememberBoardState() {
+  try {
+    history.replaceState({
+      ...(history.state || {}),
+      lt58Board: true,
+      lt58MomentId: selected,
+      lt58View: { ...view },
+      lt58Scroll: { left: viewport.scrollLeft, top: viewport.scrollTop }
+    }, '');
+  } catch {}
+}
+function boardPanelState(name) {
+  return {
+    lt58Board: true,
+    lt58Panel: name,
+    lt41BoardDetail: $('#detail').classList.contains('open'),
+    lt58MomentId: selected,
+    lt58View: { ...view },
+    lt58Scroll: { left: viewport.scrollLeft, top: viewport.scrollTop },
+    lt58CinemaIndex: cinemaV11.active ? cinemaV11.index : null
+  };
+}
+function pushBoardPanel(name) {
+  const state = boardPanelState(name);
+  if (window.parent !== window && window.parent?.LT41_FRAME_MESSAGES) {
+    parent.postMessage({ type: globalThis.LT41_MSG.boardPanel, state }, location.origin);
+    return;
+  }
+  rememberBoardState();
+  try {
+    history.pushState(state, '');
+  } catch {}
+}
+function restoreBoardState(state) {
+  if (!state?.lt58Board) return;
+  restoringBoardPanel = true;
+  if (cinemaV11.active) endCinemaV11(false);
+  $('#viewerModal').classList.remove('open');
+  $('#viewerMedia video')?.pause();
+  $('#editModal').classList.remove('open');
+  $('#addModal').classList.remove('open');
+  $('#nextChooser').classList.remove('open');
+  $('#leftPanel').classList.remove('mobileOpen');
+  const id = state.lt58MomentId || selected;
+  if (moments.some(moment => moment.id === id)) {
+    if (state.lt41BoardDetail) selectMoment(id, true);
+    else {
+      $('#detail').classList.remove('open');
+      selectMoment(id, false);
+    }
+  }
+  if (state.lt58View) {
+    Object.assign(view, state.lt58View);
+    applyView(false);
+  }
+  requestAnimationFrame(() => {
+    viewport.scrollLeft = state.lt58Scroll?.left || 0;
+    viewport.scrollTop = state.lt58Scroll?.top || 0;
+    if (state.lt58Panel === 'cinema') {
+      startCinemaV11(0, state.lt58MomentId, false);
+      setCinemaPosition(state.lt58CinemaIndex || 0, 0);
+    }
+    restoringBoardPanel = false;
+  });
+}
+addEventListener('popstate', () => {
+  if (!window.parent?.LT41_FRAME_MESSAGES) restoreBoardState(history.state);
+});
+addEventListener('message', event => {
+  if (!globalThis.LT41_isShellMessage?.(event) || event.data?.type !== globalThis.LT41_MSG.boardRestore) return;
+  restoreBoardState({ lt58Board: true, lt58MomentId: event.data.momentId, lt41BoardDetail: event.data.detailOpen, lt58View: event.data.view, lt58Scroll: event.data.scroll, lt58Panel: event.data.panel, lt58CinemaIndex: event.data.cinemaIndex });
+});
 function connRow(c, dir) {
   const t = moments.find(x => x.id === (dir === 'next' ? c.b : c.a));
   return `<button type="button" class="connCard" data-cid="${c.id}" data-dir="${dir}">${connThumb(t)}<span class="connName">${esc(titleMain(t))}</span>${c.why && c.why !== '관련 순간' ? `<span class="connWhy">${esc(c.why)}</span>` : ''}</button>`;
@@ -603,6 +678,7 @@ function focusBoardMoment(id, open = true) {
   let m = moments.find(x => x.id === id),
     el = cardLayer.querySelector(`[data-id="${id}"]`);
   if (!m || !el) return;
+  const previousState = { lt58View: { ...view }, lt58Scroll: { left: viewport.scrollLeft, top: viewport.scrollTop } };
   let cx = m.x + el.offsetWidth / 2,
     cy = m.y + el.offsetHeight / 2,
     vw = viewport.clientWidth,
@@ -622,7 +698,7 @@ function focusBoardMoment(id, open = true) {
   view.y = vw < 700 ? topOffset - m.y * view.z : vh / 2 - cy * view.z;
   applyView(open);
   noteUserView();
-  if (!open) LTDEMO.select(id);
+  if (!open) LTDEMO.select(id, previousState);
   selectMoment(id, open);
 }
 function pulseConnection(c, after) {
@@ -667,6 +743,7 @@ function chooseNext(dir = 'next') {
       return `<button class="routeChoice" data-cid="${c.id}" data-dir="${dir}">${esc(titleMain(target))}<small>${esc(c.why)}</small></button>`;
     })
     .join('');
+  pushBoardPanel('chooser');
   $('#nextChooser').classList.add('open');
 }
 function closeChooser() {
@@ -742,8 +819,11 @@ $('#themeGrid').onclick = e => {
 $('#defaultPin').onchange = e => (defaultPinStyle = e.target.value);
 $('#defaultCard').onchange = e => (defaultCardStyle = e.target.value);
 $('#leftCollapse').onclick = () => {
-  if (innerWidth < 760) $('#leftPanel').classList.toggle('mobileOpen');
-  else $('#leftPanel').classList.toggle('collapsed');
+  if (innerWidth < 760) {
+    const open = !$('#leftPanel').classList.contains('mobileOpen');
+    $('#leftPanel').classList.toggle('mobileOpen', open);
+    if (open) pushBoardPanel('tools');
+  } else $('#leftPanel').classList.toggle('collapsed');
 };
 /* #891: 도구 줄의 '+ 순간 추가'는 뺐다 — 머리줄 단추(#addBtn) 한 벌만 둔다 */ $(
   '#toolCinema'
@@ -1212,7 +1292,8 @@ function cinemaTick(now) {
   }
   cinemaV11.raf = requestAnimationFrame(cinemaTick);
 }
-function startCinemaV11(fromIndex = 0, fromMoment = null) {
+function startCinemaV11(fromIndex = 0, fromMoment = null, record = true) {
+  if (record) pushBoardPanel('cinema');
   if (cinemaV11.active) {
     endCinemaV11(false);
   }
@@ -1281,7 +1362,7 @@ $('#enterBeat').onclick = () => {
     toast('Cinema의 이 장면에서 기억 보드로 들어왔어요.');
   }
 };
-$('#walkAgain').onclick = () => startCinemaV11(0, cinemaV11.fromMoment);
+$('#walkAgain').onclick = () => startCinemaV11(0, cinemaV11.fromMoment, false);
 $('#backBoard').onclick = () => endCinemaV11(true);
 $('#finalOpen').onclick = () => {
   let id = cinemaV11.focused;

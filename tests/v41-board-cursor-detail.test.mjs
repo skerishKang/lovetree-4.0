@@ -13,6 +13,7 @@ import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { testBackNavigation } from './helpers/back-navigation.mjs';
 
 const ROOT = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
 const PUB = path.join(ROOT, 'public');
@@ -85,6 +86,51 @@ async function openHost(browser, url, { width = 1440, height = 900 } = {}) {
 }
 
 const worldTransform = (frame) => frame.$eval('.boardWorld', (el) => el.style.transform || '');
+
+const shellWorkspace = () => {
+  const moments = chainTree(6).moments.map((moment, index) => ({
+    ...moment,
+    links: index < 5 ? ['m' + (index + 2)] : [],
+    createdAt: `2026-01-0${index + 1}T00:00:00.000Z`
+  }));
+  return {
+    revision: 1,
+    subject: 'trial-subject',
+    writeSubjectBound: true,
+    state: {
+      version: 1,
+      prefs: {},
+      trees: [{
+        id: 't6', subject: '시험 사용자', title: '사슬 6', coverMomentId: '', inbox: false,
+        createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-06T00:00:00.000Z', moments
+      }]
+    }
+  };
+};
+
+async function openShellBoard(browser, base, { width = 1440, height = 900 } = {}) {
+  const context = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
+  await context.addInitScript(() => localStorage.setItem('lt41.tips.firstTree', '1'));
+  const page = await context.newPage();
+  const errors = [];
+  page.on('pageerror', error => errors.push(String(error.message || error)));
+  page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
+  await page.route('**/api/workspace*', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(shellWorkspace()) }));
+  await page.goto(`${base}/v41/?account=1`, { waitUntil: 'load' });
+  try {
+    await page.waitForFunction(() => window.LT41?.tree?.id === 't6', null, { timeout: 20000 });
+    await page.evaluate(() => document.querySelector('[data-view="track58-pinboard.html"]').click());
+    await page.waitForFunction(() => {
+      const frame = document.querySelector('#view');
+      return frame?.contentDocument?.querySelectorAll('#cardLayer .card').length === 6 && !frame.contentDocument.querySelector('#detail.open');
+    }, null, { timeout: 20000 });
+  } catch (error) {
+    throw new Error(`${error.message} / ${errors.join(' | ')}`);
+  }
+  await page.waitForTimeout(500);
+  const handle = await page.$('#view');
+  return { context, page, frame: await handle.contentFrame() };
+}
 
 // #952: 커서·상세 단추의 소스 글자 검사 10개를 걷어냈다. 남은 것은 화면에서 재는 동작이다.
 test('1. 화면: 커서 동그라미가 없고, 판·카드는 grab·끌면 grabbing — 판을 끌면 panning이 켜졌다 꺼진다', { skip: REQUIRE ? false : skip, timeout: 240000 }, async (t) => {
@@ -301,4 +347,130 @@ test('7. 화면: 390px 고르기 칸은 순간 상세와 같은 원래 제목을
   }, changed);
   await frame.waitForFunction(title => [...document.querySelectorAll('.lt-moment-picker select option')].some(option => option.textContent === `2. ${title}`), changed, { timeout: 5000 });
   assert.equal((await optionLabels())[1], `2. ${changed}`, '서버 기록이 갱신되면 고르기 칸도 새 원래 제목으로 바뀐다');
+});
+
+test('8. 화면: 보드의 테마·정렬·확대·필터는 뒤로 가기 기록을 늘리지 않는다', { skip: REQUIRE ? false : skip, timeout: 240000 }, async (t) => {
+  const browser = await chromium.launch();
+  const server = await serve();
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const { context, page, frame } = await openShellBoard(browser, base);
+  t.after(async () => { await context.close(); await browser.close(); server.close(); });
+  await testBackNavigation(page, { frame, recorded: false, action: () => frame.click('[data-board-mode="mine"]') });
+  await testBackNavigation(page, { frame, recorded: false, action: async () => { await frame.click('#boardBgBtn'); await frame.click('.lt-bg-item[data-bg="paper"]'); } });
+  await testBackNavigation(page, { frame, recorded: false, action: () => frame.evaluate(() => document.getElementById('plusBtn').click()) });
+  await testBackNavigation(page, { frame, recorded: false, action: () => frame.evaluate(() => { const filter = document.getElementById('mediaFilter'); filter.value = 'note'; filter.dispatchEvent(new Event('change')); }) });
+});
+
+test('9. 화면: 보드 순간 열기는 뒤로 가기 한 번에 이전 순간·닫힌 상세로 돌아간다', { skip: REQUIRE ? false : skip, timeout: 240000 }, async (t) => {
+  const browser = await chromium.launch();
+  const server = await serve();
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const { context, page, frame } = await openShellBoard(browser, base);
+  t.after(async () => { await context.close(); await browser.close(); server.close(); });
+  await testBackNavigation(page, {
+    frame,
+    recorded: true,
+    action: () => frame.evaluate(() => selectMoment('m2', true))
+  });
+});
+
+test('10. 화면: 보드 크게 보기는 뒤로 가기로 닫히고 이전 상세 판으로 돌아간다', { skip: REQUIRE ? false : skip, timeout: 240000 }, async (t) => {
+  const browser = await chromium.launch();
+  const server = await serve();
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const { context, page, frame } = await openShellBoard(browser, base);
+  t.after(async () => { await context.close(); await browser.close(); server.close(); });
+  await frame.click('.card[data-id="m1"]');
+  await frame.waitForSelector('#detail.open');
+  await testBackNavigation(page, { frame, recorded: true, action: () => frame.click('#openMoment') });
+});
+
+test('11. 화면: 보드 수정 창은 뒤로 가기로 닫히고 이전 상세 판으로 돌아간다', { skip: REQUIRE ? false : skip, timeout: 240000 }, async (t) => {
+  const browser = await chromium.launch();
+  const server = await serve();
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const { context, page, frame } = await openShellBoard(browser, base);
+  t.after(async () => { await context.close(); await browser.close(); server.close(); });
+  await frame.click('.card[data-id="m1"]');
+  await frame.waitForSelector('#detail.open');
+  await testBackNavigation(page, {
+    frame,
+    recorded: true,
+    action: () => frame.evaluate(() => { document.getElementById('detailMoreBtn').click(); document.getElementById('editMomentBtn').click(); })
+  });
+});
+
+test('12. 화면: 보드 시네마는 뒤로 가기로 닫히고 이전 보드 상태로 돌아간다', { skip: REQUIRE ? false : skip, timeout: 240000 }, async (t) => {
+  const browser = await chromium.launch();
+  const server = await serve();
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const { context, page, frame } = await openShellBoard(browser, base);
+  t.after(async () => { await context.close(); await browser.close(); server.close(); });
+  await testBackNavigation(page, { frame, recorded: true, action: () => frame.click('#cinemaBtn') });
+});
+
+test('13. 화면: 보드에서 책으로 이동한 뒤 뒤로 가기는 이전 보드 상태로 돌아온다', { skip: REQUIRE ? false : skip, timeout: 240000 }, async (t) => {
+  const browser = await chromium.launch();
+  const server = await serve();
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const { context, page, frame } = await openShellBoard(browser, base);
+  t.after(async () => { await context.close(); await browser.close(); server.close(); });
+  await testBackNavigation(page, { frame, recorded: true, action: () => page.click('[data-view="track59-sketchbook.html"]') });
+});
+
+test('14. 화면: 390px 보드 도구 판은 뒤로 가기로 닫히고 스크롤 위치를 복구한다', { skip: REQUIRE ? false : skip, timeout: 240000 }, async (t) => {
+  const browser = await chromium.launch();
+  const server = await serve();
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const { context, page, frame } = await openShellBoard(browser, base, { width: 390, height: 844 });
+  t.after(async () => { await context.close(); await browser.close(); server.close(); });
+  await frame.evaluate(() => { document.getElementById('viewport').scrollTop = 120; });
+  await testBackNavigation(page, { frame, recorded: true, action: () => frame.evaluate(() => document.getElementById('mobileTools').click()) });
+});
+
+test('15. 화면: 보드에서 지도로 이동한 뒤 뒤로 가기는 열린 순간 상세로 돌아온다', { skip: REQUIRE ? false : skip, timeout: 240000 }, async (t) => {
+  const browser = await chromium.launch();
+  const server = await serve();
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const { context, page, frame } = await openShellBoard(browser, base);
+  t.after(async () => { await context.close(); await browser.close(); server.close(); });
+  await frame.click('.card[data-id="m1"]');
+  await frame.waitForSelector('#detail.open');
+  await testBackNavigation(page, { frame, recorded: true, action: () => frame.evaluate(() => document.getElementById('detailMapBtn').click()) });
+});
+
+test('16. 화면: 보드의 트리 옮기기 창은 뒤로 가기로 닫히고 순간 상세로 돌아간다', { skip: REQUIRE ? false : skip, timeout: 240000 }, async (t) => {
+  const browser = await chromium.launch();
+  const server = await serve();
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const { context, page, frame } = await openShellBoard(browser, base);
+  t.after(async () => { await context.close(); await browser.close(); server.close(); });
+  await frame.click('.card[data-id="m1"]');
+  await frame.waitForSelector('#detail.open');
+  await testBackNavigation(page, { frame, recorded: true, action: () => frame.evaluate(() => document.getElementById('detailMoveBtn').click()) });
+});
+
+test('17. 화면: 시네마 장면에서 보드로 들어간 뒤 뒤로 가기는 시네마로 돌아간다', { skip: REQUIRE ? false : skip, timeout: 240000 }, async (t) => {
+  const browser = await chromium.launch();
+  const server = await serve();
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const { context, page, frame } = await openShellBoard(browser, base);
+  t.after(async () => { await context.close(); await browser.close(); server.close(); });
+  await frame.click('#cinemaBtn');
+  await frame.waitForSelector('#cinemaOverlay.active');
+  await testBackNavigation(page, { frame, recorded: true, action: () => frame.click('#enterBeat') });
+});
+
+test('18. 화면: 시네마 재생·장면 이동·다시 보기는 뒤로 가기 기록을 늘리지 않는다', { skip: REQUIRE ? false : skip, timeout: 240000 }, async (t) => {
+  const browser = await chromium.launch();
+  const server = await serve();
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const { context, page, frame } = await openShellBoard(browser, base);
+  t.after(async () => { await context.close(); await browser.close(); server.close(); });
+  await frame.click('#cinemaBtn');
+  await frame.waitForSelector('#cinemaOverlay.active');
+  await testBackNavigation(page, { frame, recorded: false, action: () => frame.click('#cinPlay') });
+  await testBackNavigation(page, { frame, recorded: false, action: () => frame.click('#cinNext') });
+  await testBackNavigation(page, { frame, recorded: false, action: () => frame.click('#cinRestart') });
+  await testBackNavigation(page, { frame, recorded: false, action: () => frame.evaluate(() => { document.getElementById('finalCTA').classList.add('show'); document.getElementById('walkAgain').click(); }) });
 });

@@ -73,7 +73,7 @@ test('로그인한 내 기록은 #my/<view>?tree=…&moment=…를 쓰고 최근
 test('popstate·hashchange는 같은 함수에 연결된다', () => {
   const {calls} = setup();
   const listened = calls.filter(c => c[0] === 'listen').map(c => c[1]);
-  assert.deepEqual(listened, ['popstate', 'hashchange']);
+  assert.deepEqual(listened, ['message', 'popstate', 'hashchange']);
 });
 
 test('이미 처리한 해시는 다시 처리하지 않는다', () => {
