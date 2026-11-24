@@ -7,6 +7,7 @@ import {parseTag,tagKey,isChannelLikeArtist} from '../tags.mjs';
 // #480 L13: 날짜는 책·보드·지도·첫 화면과 같은 한 벌(formatDisplayDate)로만 적는다.
 import {formatDisplayDate} from '../book-usability.mjs';
 import {copyPublicMoment} from '../moments-copy.mjs';
+import {thumbnailCandidates} from '../thumb-fallback.mjs';
 // #1072 A-16: 화면 공용 오류 기록 — 저장·보드·미디어 경로에서 조용히 넘기던 빈 catch를 여기서 기록한다.
 import {report} from '../report.mjs';
 
@@ -349,7 +350,19 @@ export function createMessages(deps) {
     const answer = await shareApi.list();
     if (answer.ok) renderShareList(answer.shares); else $('share-list').textContent = shareFailure(answer);
   }
+  // #1285 5번: 그림 없는 고르기 칸 옆에 고른 순간의 작은 표지를 붙인다.
+  function paintShareMomentThumb() {
+    const img = $('share-moment-thumb');
+    if (!img) return;
+    const chosen = window.LT41?.tree?.moments?.find((m) => m.id === $('share-moment')?.value);
+    const src = chosen ? (thumbnailCandidates(chosen)[0] || '') : '';
+    img.onerror = () => { img.hidden = true; };
+    const show = /^https?:\/\//.test(src);
+    img.hidden = !show;
+    img.src = show ? src : '';
+  }
   function invalidateSharePreview() {
+    paintShareMomentThumb();
     sharePreviewKey = ''; sharePreviewToken = '';
     $('share-create').disabled = true;
     $('share-preview-result').hidden = true;
@@ -371,6 +384,7 @@ export function createMessages(deps) {
       $('share-moment').append(o);
     }
     $('share-moment').value = window.LT41.momentId;
+    paintShareMomentThumb();
     // #368 3차: 처음 열 보기는 설정의 공유 기본값으로 시작한다(공유마다 바꿀 수 있다).
     $('share-view').value = getShareDefaults().view;
     sharePreviewKey = ''; sharePreviewToken = '';
