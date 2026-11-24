@@ -7,6 +7,7 @@ import fs from 'node:fs';
 
 globalThis.window = globalThis;
 import '../public/v41/html-escape.mjs'; // A-15: 글자 막기 정본을 먼저 등록한다.
+await import('../public/v41/toast-timer.js');
 await import('../public/v41/views/board/board-model.js');
 const M = globalThis.LT58Model;
 const REQUIRE = process.env.LT_BOARD_ORDER_619_REQUIRE === '1';
@@ -484,4 +485,63 @@ test('#1245 390px 손가락: 짧게 누르면 순간을 열고 끌면 빈 칸·�
     assert.equal(problems.length, 0, `화면 오류 없음 (${problems.join(' | ') || '없음'})`);
     await context.close();
   } finally { await browser.close(); server.close(); }
+});
+
+test('#1273 9번 되돌리기 토스트: 단추 있음 8초·없음 기존 시간·올려 두면 멈춤', () => {
+  const api = globalThis.LTToastTimer;
+  assert.equal(typeof api.createToastTimer, 'function');
+  assert.ok(api.ACTION_TOAST_MS >= 8000, `단추 있는 안내는 8초 이상(${api.ACTION_TOAST_MS})`);
+  assert.equal(api.PLAIN_TOAST_MS, 2200, '단추 없는 안내 시간은 그대로');
+
+  let clock = 0, seq = 0;
+  const timers = new Map();
+  const timer = api.createToastTimer({
+    now: () => clock,
+    setTimer: (fn, ms) => { const id = ++seq; timers.set(id, { fn, at: clock + ms }); return id; },
+    clearTimer: (id) => timers.delete(id)
+  });
+  const fire = () => {
+    for (const [id, entry] of [...timers]) if (entry.at <= clock) { timers.delete(id); entry.fn(); }
+  };
+  const el = {
+    listeners: {},
+    addEventListener(name, fn) { (this.listeners[name] = this.listeners[name] || []).push(fn); },
+    emit(name, extra = {}) { for (const fn of this.listeners[name] || []) fn({ currentTarget: this, ...extra }); }
+  };
+  let expired = 0;
+  timer.arm(el, api.ACTION_TOAST_MS, () => { expired += 1; });
+  assert.equal(timer.snapshot().remaining, 8000);
+  clock = 3000; fire();
+  assert.equal(expired, 0, '3초에는 사라지지 않는다');
+  el.emit('mouseenter');
+  assert.equal(timer.snapshot().paused, true);
+  assert.equal(timer.snapshot().remaining, 5000, '올린 시점의 남은 시간을 지킨다');
+  clock = 20000; fire();
+  assert.equal(expired, 0, '마우스를 올려 둔 동안에는 시간이 흐르지 않는다');
+  el.emit('mouseleave');
+  assert.equal(timer.snapshot().paused, false);
+  clock = 24000; fire();
+  assert.equal(expired, 0);
+  clock = 25000; fire();
+  assert.equal(expired, 1, '벗어난 뒤 남은 시간이 지나면 사라진다');
+
+  timer.arm(el, api.ACTION_TOAST_MS, () => { expired += 1; });
+  clock += 1000;
+  el.emit('focusin');
+  assert.equal(timer.snapshot().paused, true, '초점이 들어가도 멈춘다');
+  clock += 20000; fire();
+  assert.equal(expired, 1, '초점이 있는 동안에는 사라지지 않는다');
+  el.emit('focusout', { relatedTarget: null });
+  clock += 8000; fire();
+  assert.equal(expired, 2, '초점이 빠진 뒤 남은 시간 뒤 사라진다');
+});
+
+test('#1273 9번 보드 토스트는 공통 타이머를 쓰고 단추 없는 시간은 그대로다', () => {
+  const board = fs.readFileSync(new URL('../public/v41/views/board/board.js', import.meta.url), 'utf8');
+  const html = fs.readFileSync(new URL('../public/v41/views/track58-pinboard.html', import.meta.url), 'utf8');
+  assert.match(html, /\/v41\/toast-timer\.js/, '공통 타이머를 먼저 불러온다');
+  assert.match(board, /toastTimer\.arm\(el, window\.LTToastTimer\.PLAIN_TOAST_MS/, '안내 토스트도 공통 타이머');
+  assert.match(board, /toastTimer\.arm\(el, window\.LTToastTimer\.ACTION_TOAST_MS/, '되돌리기 토스트는 단추용 시간');
+  assert.doesNotMatch(board, /setTimeout\(\(\) => el\.classList\.remove\('show'\), 2200\)/, '옛 개별 시계 없음');
+  assert.doesNotMatch(board, /\}, 6000\);/, '옛 6초 되돌리기 시계 없음');
 });
