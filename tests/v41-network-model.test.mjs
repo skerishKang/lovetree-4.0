@@ -335,3 +335,31 @@ test('월이 여섯 개를 넘으면 이어 붙이는데도 NaN이 없다(이슈
   assert.ok(groups.length <= 6);
   for (const group of groups) assert.doesNotMatch(group.name, /NaN|undefined/);
 });
+
+test('#1273 3번 시간 순: 첫 고리와 마지막 점·이름표가 화면 안에 있다', () => {
+  const box = { x: 16, y: 115, w: 2528, h: 949 };
+  const moments = Array.from({ length: 8 }, (_, i) => ({ id: 'm' + i, date: `2026-${String(i + 1).padStart(2, '0')}-10`, emotion: '설렘' }));
+  const fit = M.timeLayout(moments, { box, dotR: 5, gap: 8, hubR: 9, inset: 64 });
+  const xs = Object.values(fit.points).map((p) => p.x);
+  assert.ok(Math.min(...xs) - 48 >= box.x, `첫 순간의 겹친 고리 왼쪽 잘림 0(${Math.round(Math.min(...xs) - 48)})`);
+  assert.ok(Math.max(...xs) + 5 <= box.x + box.w, `마지막 점 오른쪽 잘림 0(${Math.round(Math.max(...xs) + 5)})`);
+  const labels = M.placeLabels(
+    [{ id: 'last', text: '시험 순간 8', x: Math.max(...xs), y: box.y + box.h / 2, r: 5, w: 63, h: 16, dir: { x: -1, y: 0 } }],
+    [], { x: box.x - 12, y: box.y - 12, w: box.w + 24, h: box.h + 24 }, { gap: 4, space: 2 }
+  );
+  assert.equal(labels.length, 1, '마지막 이름표가 화면 밖으로 사라지지 않는다');
+  assert.ok(labels[0].rect.r <= box.x + box.w + 12, '이름표 오른쪽 잘림 0');
+  assert.match(SCREEN, /timeLayout\(LTDEMO\.moments, \{ box: BOX, dotR: 5, gap: 8, hubR: 9, inset: 64 \}\)/, '화면도 같은 여백을 쓴다');
+});
+
+test('#1273 3번 시작 이름표는 이어진 선 위에 얹히지 않는다', () => {
+  const segments = [{ a: { x: 100, y: 200 }, b: { x: 620, y: 200 }, pad: 3 }];
+  const out = M.placeLabels(
+    [{ id: 'first', text: '여기서 시작 · 시험 순간 1', x: 120, y: 200, r: 20, w: 160, h: 16, dir: { x: 0, y: -1 }, avoidEdges: true }],
+    [], { x: 0, y: 0, w: 800, h: 400 }, { segments, gap: 4, space: 2 }
+  );
+  assert.equal(out.length, 1, '시작 이름표를 잃지 않는다');
+  const r = out[0].rect;
+  assert.ok(r.b < 197 || r.t > 203, `선을 가리지 않는다(${JSON.stringify(r)})`);
+  assert.match(SCREEN, /n\.first \? \{ x: 0, y: -1 \} : dirOf\(p, centerOf\(n\)\)/, '화면도 시작 이름표를 위쪽부터 잡는다');
+});
