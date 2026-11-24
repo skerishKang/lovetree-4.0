@@ -507,6 +507,9 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
  }
  const contentTimer=setTimeout(markContentReady,600);
  track(()=>clearTimeout(contentTimer));
+ // 안전장치: 어떤 까닭으로 첫 궤도 자리가 끝내 안 들어와도 1.5초 뒤에는 글귀와 카드를 보인다(빈 첫 화면 방지).
+ const revealSafety=setTimeout(()=>{firstFrameDone=true;contentReady=true;tryReveal();},1500);
+ track(()=>clearTimeout(revealSafety));
  for(const img of frontImgs){img.addEventListener('load',checkFrontImages,{signal});img.addEventListener('error',checkFrontImages,{signal});}
  checkFrontImages();
  const animRunning=()=>imagesReady&&spritesReady&&!paused&&!reduced&&!dialog.open&&!document.hidden;
@@ -760,7 +763,7 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
   }
   if(!firstFrameDone){
    const visible=elements.filter(el=>!el.classList.contains('off'));
-   if(visible.length&&visible.every(el=>el.__orbitTf)){firstFrameDone=true;tryReveal();}
+   if(!visible.length||visible.every(el=>el.__orbitTf)){firstFrameDone=true;tryReveal();}
   }
  };
   // #1086: 궤도 경로 검사용 — 지정 진행률로 카드를 그린다(실제 루프와 같은 orbitWrite 경로).
