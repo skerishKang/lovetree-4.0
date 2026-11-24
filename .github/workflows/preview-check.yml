@@ -1463,15 +1463,15 @@ jobs:
         if: steps.preview.outputs.url != '' && steps.changes.outputs.ui == 'true'
         id: capture-before
         continue-on-error: true
-        # 2026-11-24: 캡처가 끝나지 않는 화면에서 15분 넘게 잡을 붙잡았다. 도구 안 상한(6분)에 더해 단계도 8분에서 끊는다.
-        timeout-minutes: 8
         env:
           LOVETREE_POSTDEPLOY_BROWSER: chromium
         run: |
           # 캡처가 일부 실패해도 종료 코드·로그 끝줄을 남긴다(bash -e면 echo·tail 전에 끝나 원인이 안 보였다).
           set +e
           start=$(date +%s)
-          node tools/visual-baseline/visual-baseline.mjs capture \
+          # 2026-11-24: 단계 timeout-minutes로 끊으면 continue-on-error여도 잡 전체가 취소(빨강)된다.
+          # 도구 안 상한(5분)에 더해 명령만 7분에서 끊어 단계는 종료 코드로 끝나게 한다(알림용 유지).
+          timeout -k 15 420 node tools/visual-baseline/visual-baseline.mjs capture \
             --base "${{ steps.base.outputs.baseUrl }}/v41/" --out visual-before > "$RUNNER_TEMP/before.log" 2>&1
           echo "status=$?" >> "$GITHUB_OUTPUT"
           echo "seconds=$(( $(date +%s) - start ))" >> "$GITHUB_OUTPUT"
@@ -1480,15 +1480,15 @@ jobs:
         if: steps.preview.outputs.url != '' && steps.changes.outputs.ui == 'true'
         id: capture-after
         continue-on-error: true
-        # 2026-11-24: 캡처가 끝나지 않는 화면에서 15분 넘게 잡을 붙잡았다. 도구 안 상한(6분)에 더해 단계도 8분에서 끊는다.
-        timeout-minutes: 8
         env:
           LOVETREE_POSTDEPLOY_BROWSER: chromium
         run: |
           # 캡처가 일부 실패해도 종료 코드·로그 끝줄을 남긴다(bash -e면 echo·tail 전에 끝나 원인이 안 보였다).
           set +e
           start=$(date +%s)
-          node tools/visual-baseline/visual-baseline.mjs capture \
+          # 2026-11-24: 단계 timeout-minutes로 끊으면 continue-on-error여도 잡 전체가 취소(빨강)된다.
+          # 도구 안 상한(5분)에 더해 명령만 7분에서 끊어 단계는 종료 코드로 끝나게 한다(알림용 유지).
+          timeout -k 15 420 node tools/visual-baseline/visual-baseline.mjs capture \
             --base "${{ steps.preview.outputs.url }}/v41/" --out visual-after > "$RUNNER_TEMP/after.log" 2>&1
           echo "status=$?" >> "$GITHUB_OUTPUT"
           echo "seconds=$(( $(date +%s) - start ))" >> "$GITHUB_OUTPUT"
