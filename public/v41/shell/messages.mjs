@@ -190,8 +190,15 @@ export function createMessages(deps) {
       return;
     }
     // 트리 칩 순서(2026-11-17, 대표 결정): 계정 설정 칸(state.prefs.treeChipOrder)에 저장 — 기존 setPrefs 한 길.
-    if (data?.type === MSG.prefs && data.patch?.treeChipOrder && getSource() === 'server') {
-      try { getMember().apply('setPrefs', { treeChipOrder: data.patch.treeChipOrder }); } catch (error) { notify(error?.message || '순서를 저장하지 못했어요.'); }
+    if (data?.type === MSG.prefs && (data.patch?.treeChipOrder || data.patch?.bookDisplay === 'book' || data.patch?.bookDisplay === 'list') && getSource() === 'server') {
+      try {
+        const patch = {};
+        if (data.patch.treeChipOrder) patch.treeChipOrder = data.patch.treeChipOrder;
+        if (data.patch.bookDisplay === 'book' || data.patch.bookDisplay === 'list') patch.bookDisplay = data.patch.bookDisplay;
+        getMember().apply('setPrefs', patch);
+        if (window.LT41) window.LT41.prefs = getMember().state().prefs;
+        if (patch.bookDisplay) try { localStorage.setItem('lt41.bookDisplay', patch.bookDisplay); } catch {}
+      } catch (error) { notify(error?.message || '순서를 저장하지 못했어요.'); }
       return;
     }
     // 261117 고객 의견: 첫 화면 둘째 줄 '모아둔 순간 N개 정리하기' — 모아둔 순간 정리 창을 연다(옮기기와 별개).

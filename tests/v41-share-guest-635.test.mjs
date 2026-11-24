@@ -573,7 +573,14 @@ test('#635 PR C 화면: 메뉴 시작 입구·첫날 표기·크게 보기 대�
             assert.ok(spacing >= 16, `${width}·${theme}: 책과 링크 줄 사이가 ${spacing}px다(16px 이상)`);
           }
           await shot(page, `book-after-${width}-${theme}`);
-          await frame.click('#overviewBtn');
+          const overviewButton = frame.locator('#overviewBtn');
+          if (!(await overviewButton.isVisible())) {
+            const moreButton = frame.locator('.lt-toolbar-more');
+            assert.equal(await moreButton.isVisible(), true, `${width}·${theme}: 접힌 도구를 여는 단추가 없다`);
+            await moreButton.click();
+            await overviewButton.waitFor({ state: 'visible', timeout: 5000 });
+          }
+          await overviewButton.click();
           await frame.waitForFunction(() => (document.querySelector('#journeySummary')?.textContent || '').length > 0, null, { timeout: 8000 });
           const summary = await frame.evaluate(() => document.querySelector('#journeySummary').textContent.trim());
           assert.match(summary, /^\d+단계 · (첫날|\d+일째)$/, `${width}·${theme}: '이어진 순간' 요약이 첫날·N일째 모양이 아니다(${summary})`);

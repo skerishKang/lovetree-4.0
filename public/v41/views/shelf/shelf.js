@@ -86,11 +86,14 @@ import { createReader } from './shelf-reader.js';
         // #256-1: 목록이 바뀔 때마다 다시 그린다. 칸은 검색·필터와 무관하게 전체 책(allBooks) 기준이라 좁아져도 그대로다.
         renderResumeCard();
         $('#shelfRail').innerHTML=(list.length?list.map(function(book,index){
-          // #212: 표지에 이름 한 번만. 표지 아래는 "순간 N개 · 마지막 YYYY-MM-DD" 하나만. "책 · 02"·"기본 표지" 같은 내부 표시는 없다.
+          // #212: 표지에 이름 한 번만. 사진 표지에는 제목을 올리지 않고(표지 사진만), 표지 아래는 두 줄로 — '제목 · N개 순간' / 'N일 전 추가'(한 줄 넘으면 말줄임).
           // #256-3: 디자인 표지는 shelf-model coverChoice 판정(book.design)을 그대로 쓴다. 없으면 속성도 없다(기존 화면 변화 0).
+          var metaParts=bookMeta(book).split(' · ');
+          var metaLine1=book.name+' · '+metaParts[0];
+          var metaLine2=metaParts.slice(1).join(' · ');
           return '<article class="book-card" data-book-index="'+index+'"><button type="button" data-book-id="'+esc(book.id)+'" aria-label="'+esc(book.name)+' 책 열기">'+
-            '<div class="book-cover'+coverClasses(book)+'"'+(book.design?' data-cover-design="'+esc(book.design)+'"':'')+'>'+(book.coverMedia?'<img class="book-cover-media" src="'+esc(book.coverMedia)+'"'+coverFallbackAttrs(book.coverCandidates||[book.coverMedia])+' alt="" loading="lazy" referrerpolicy="no-referrer">':'')+'<span class="cover-symbol"><span>'+esc(book.symbol)+'</span></span><strong class="cover-title">'+esc(book.name)+'</strong></div>'+
-            '<span class="book-card-meta"><span>'+esc(bookMeta(book))+'</span></span></button><button type="button" class="book-manage" data-manage-id="'+esc(book.id)+'" aria-label="'+esc(book.name)+' 고치기">⋯</button></article>';
+            '<div class="book-cover'+coverClasses(book)+'"'+(book.design?' data-cover-design="'+esc(book.design)+'"':'')+'>'+(book.coverMedia?'<img class="book-cover-media" src="'+esc(book.coverMedia)+'"'+coverFallbackAttrs(book.coverCandidates||[book.coverMedia])+' alt="" loading="lazy" referrerpolicy="no-referrer">':'')+'<span class="cover-symbol"><span>'+esc(book.symbol)+'</span></span>'+(book.coverMedia?'':'<strong class="cover-title">'+esc(book.name)+'</strong>')+'</div>'+
+            '<span class="book-card-meta"><span class="book-card-meta-title">'+esc(metaLine1)+'</span><span class="book-card-meta-date">'+esc(metaLine2)+'</span></span></button><button type="button" class="book-manage" data-manage-id="'+esc(book.id)+'" aria-label="'+esc(book.name)+' 고치기">⋯</button></article>';
         }).join(''):'<div class="empty"><strong>찾는 책이 없어요.</strong><span>트리 이름·좋아하는 대상·순간 제목으로 검색해 보세요.</span></div>');
         updateCarousel(false);
       }
@@ -113,8 +116,9 @@ import { createReader } from './shelf-reader.js';
         var thumb=$('#resumeThumb');
         if(thumb){
           // 가로 썸네일: 마지막 순간의 사진을 먼저 쓰고, 없으면 책 표지 사진·표지 색 칸으로 채운다. 글자는 썸네일 안에 넣지 않는다.
-          var src=info.moment&&info.moment.thumb?info.moment.thumb:(info.book.coverMedia||'');
-          var candidates=info.moment&&info.moment.thumbCandidates?info.moment.thumbCandidates:(info.book.coverCandidates||[info.book.coverMedia]);
+          var fallbackChapter=info.book.chapters.find(function(c){return c.image});
+          var src=info.moment&&info.moment.thumb?info.moment.thumb:(info.book.coverMedia||(fallbackChapter&&fallbackChapter.image)||'');
+          var candidates=info.moment&&info.moment.thumbCandidates?info.moment.thumbCandidates:(info.book.coverCandidates&&info.book.coverCandidates.length?info.book.coverCandidates:(fallbackChapter&&fallbackChapter.thumbCandidates?fallbackChapter.thumbCandidates:[src]));
           thumb.innerHTML=src?'<img src="'+esc(src)+'"'+coverFallbackAttrs(candidates||[src])+' alt="" loading="lazy" referrerpolicy="no-referrer">':'';
           thumb.style.setProperty('--cover',info.book.color);
           thumb.style.setProperty('--cover-accent',info.book.accent);

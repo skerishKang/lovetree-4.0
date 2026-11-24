@@ -294,21 +294,21 @@ function togglePlay() {
 
 function updateAvailability() {
   items = itemsForBook();
-  playAllBtn.hidden = items.length === 0;
+  playAllBtn.hidden = false;
   if (!items.length && open) closePlayback();
 }
 
 // 390에서는 머리줄 도구가 넘치지 않도록 '이어 보기'를 책 아래 이동 줄로 옮긴다.
 function placePlayButton() {
   const phone = document.documentElement.dataset.bookShape === 'phone';
-  const tools = document.querySelector('.topbar .tools');
+  const tools = document.querySelector('.lt-toolbar-tools');
   const nav = document.querySelector('.nav-pill');
   if (phone && nav && playAllBtn.parentElement !== nav) {
     playAllBtn.classList.add('playback-launch');
     nav.append(playAllBtn);
   } else if (!phone && tools && playAllBtn.parentElement !== tools) {
     playAllBtn.classList.remove('playback-launch');
-    tools.prepend(playAllBtn);
+    tools.append(playAllBtn);
   }
 }
 

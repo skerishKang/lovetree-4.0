@@ -52,10 +52,10 @@ html[data-v41-screen=shelf] .book-card .book-cover {
 /* ── 261118 대표 지적 6: 책장 한 줄을 무대 세로 가운데쯤에 세워 넘김 목록 위·아래 빈 공간을 나누고,
    바닥 고정 링크 줄(새 소식·의견 보내기…)과 선반·책이 겹치지 않게 아래 여백을 확보한다(링크 줄 44px + 여백). */
 html[data-v41-screen=shelf] .app{display:flex;flex-direction:column;padding-bottom:72px}
-html[data-v41-screen=shelf] .page{display:flex;flex-direction:column;flex:1 1 auto;width:100%}
+html[data-v41-screen=shelf] .page{display:flex;flex-direction:column;flex:1 1 auto;width:100%;margin-top:0;padding-top:0}
 /* 261118 대표 지적 2차: 이어 보기 띠는 위쪽에 붙이고(위 여백 24px 이내), 남은 세로 공간은 책장이 쓴다. */
 html[data-v41-screen=shelf] .shelf-screen{display:flex;flex-direction:column;justify-content:flex-start;flex:1 1 auto;min-height:0}
-html[data-v41-screen=shelf] .shelf-viewport{margin-top:auto;margin-bottom:auto}
+html[data-v41-screen=shelf] .shelf-viewport{margin-top:12px;margin-bottom:auto}
 
 /* ── 261118 대표 지적 3차: 보이는 갈색 막대는 .shelf-base(wood gradient)다. 카드 높이를 내용에 맞춰
    표지 바로 아래 설명이 오고 카드 아랫단(설명 글자 아래)이 막대 윗면에 닿게 한다 — 카드 안 빈 칸이 빔으로 보였던 원인. */
@@ -72,10 +72,9 @@ html[data-v41-screen=shelf] .shelf-base{position:static;left:auto;right:auto;bot
 html[data-v41-screen=shelf] .book-card .book-cover-media{object-position:50% 50%}
 
 /* ── #1093: 390에서는 보기 토글을 머리줄 대신 도구 줄에 둔다. */
-.shelf-view-inline{display:none;align-items:center;padding:3px;border:1px solid var(--lt-line);border-radius:999px}
+.shelf-view-inline{display:inline-flex;align-items:center;padding:3px;border:1px solid var(--lt-line);border-radius:999px}
 .shelf-view-inline button{min-height:36px;padding:0 11px;border:0;border-radius:999px;background:transparent;color:var(--muted);font-size:12px;white-space:nowrap}
 .shelf-view-inline button[aria-checked=true]{background:var(--lt-primary);color:var(--lt-primary-ink)}
-@media(max-width:520px){.shelf-view-inline{display:inline-flex}}
 /* 390에서는 책 아래 설명을 한 줄로 적고 남는 글자는 말줄임으로 표시한다. */
 @media(max-width:520px){html[data-v41-screen=shelf] .book-card-meta span{display:block;max-height:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;-webkit-line-clamp:1}}
 
@@ -103,6 +102,9 @@ html[data-v41-screen=shelf] .shelf-viewport[data-shelf-view=shelf] .book-card::a
  background:linear-gradient(#714b3b,#2e201e);box-shadow:0 6px 11px rgba(0,0,0,.22)
 }
 html[data-v41-screen=shelf] .shelf-viewport[data-shelf-view=shelf] .book-card-meta{margin-top:11px;text-align:center}
+html[data-v41-screen=shelf] .book-card-meta-title,html[data-v41-screen=shelf] .book-card-meta-date{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+html[data-v41-screen=shelf] .book-card-meta-title{color:var(--lt-ink);font-size:13px;font-weight:700}
+html[data-v41-screen=shelf] .book-card-meta-date:empty{display:none}
 html[data-v41-screen=shelf] .shelf-viewport[data-shelf-view=shelf] .book-card-meta strong{font-size:clamp(11px,1.1vw,14px)}
 html[data-v41-screen=shelf] .shelf-viewport[data-shelf-view=shelf] .cover-title{font-size:clamp(10px,1.05vw,14px)}
 @media(max-width:700px){
@@ -269,7 +271,7 @@ html[data-v41-screen=shelf][data-lt-theme=garden] .book-card > .book-manage {
 }
 
 /* #972: 펼쳐 보기·검색·책장의 간격을 유지하며 세 요소를 함께 세로 가운데에 둔다. */
-html[data-v41-screen=shelf] .shelf-screen:has(.hero.strip-mode) .hero.strip-mode { margin-top: auto; }
+html[data-v41-screen=shelf] .shelf-screen:has(.hero.strip-mode) .hero.strip-mode { margin-top: 0; }
 html[data-v41-screen=shelf] .shelf-screen:has(.hero.strip-mode) .shelf-viewport { margin-top: 0; margin-bottom: auto; }
 /* 책은 선반 위에 두고 표지·두 줄 이름표와 그림자에 필요한 높이만 남긴다. */
 html[data-v41-screen=shelf] .shelf-screen:has(.hero.strip-mode) .shelf-rail { height: 280px; }
