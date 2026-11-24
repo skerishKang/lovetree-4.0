@@ -67,6 +67,8 @@
     tagsSaved: fromShell('lt41-tags-saved', 'ok, momentId, keywords, error?'),
     // 옛 화면의 테마 변경 알림은 기존 기기 설정을 다시 읽는 계기가 된다.
     theme: fromView('lt41-theme', '없음'),
+    // 틱톡 공식 재생기에서 화면으로 오는 외부 메시지. 셸 메시지로는 받지 않는다.
+    tiktokPlayerError: Object.freeze({ name: 'onPlayerError', from: '틱톡 공식 재생기', to: '화면', payload: 'x-tiktok-player, value.errorCode' }),
     titleDisplay: fromShell('lt41-title-display', 'value'),
     treesRenamed: fromShell('lt41-trees-renamed', 'titles'),
     treesSaved: fromShell('lt41-trees-saved', 'background?, treeId?, momentId?'),

@@ -443,11 +443,12 @@ jobs:
       - name: 미디어·담기 화면 시험(건너뜀=실패 — 이슈 952)
         env:
           LT_MEDIA_952_REQUIRE: '1'
+          LT_TIKTOK_REQUIRE: '1'
         if: needs.screen-changes.outputs.changed == 'true'
         run: |
           start=$(date +%s)
           npx vite build > /dev/null
-          node --test --test-concurrency=1 tests/v41-media-vertical.test.mjs tests/v41-quick-add.test.mjs
+          node --test --test-concurrency=1 tests/v41-media-vertical.test.mjs tests/v41-quick-add.test.mjs tests/v41-tiktok-playback.test.mjs
           echo "미디어·담기 화면 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
 
       # 이슈 970: 트리 드롭다운(닫힘 길·초점 복귀·키보드)과 인증 화면 시안(전환·빈 칸 안내·오류 자리)을

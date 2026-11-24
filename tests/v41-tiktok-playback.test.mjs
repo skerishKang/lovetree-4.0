@@ -44,10 +44,10 @@ test('#791 같은 날짜 설정을 다시 받아도 공식 재생 칸을 유지�
     await p.waitForTimeout(1000);
     assert.ok(await handle.evaluate(e=>e.isConnected),width+' '+view+' 같은 설정 뒤 동일한 재생 칸 유지');
     const child=await handle.contentFrame();assert.ok(child);
-    await p.evaluate(()=>document.getElementById('view').contentWindow.postMessage({'x-tiktok-player':true,type:'onPlayerError',value:{errorCode:3001}},location.origin));
+    await p.evaluate(type=>document.getElementById('view').contentWindow.postMessage({'x-tiktok-player':true,type,value:{errorCode:3001}},location.origin),MSG.tiktokPlayerError);
     await p.waitForTimeout(100);
     assert.ok(await handle.evaluate(e=>e.isConnected),'다른 출처의 오류는 무시한다');
-    await child.evaluate(()=>parent.postMessage({'x-tiktok-player':true,type:'onPlayerError',value:{errorCode:3001}},'*'));
+    await child.evaluate(type=>parent.postMessage({'x-tiktok-player':true,type,value:{errorCode:3001}},'*'),MSG.tiktokPlayerError);
     await f.locator('.lt-lightbox-note').filter({hasText:'틱톡에서 영상을 재생하지 못했어요.'}).waitFor({state:'visible'});
     assert.equal(await f.locator('.lt-lightbox-note a').last().getAttribute('href'),url);
    }

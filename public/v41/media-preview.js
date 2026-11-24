@@ -51,7 +51,7 @@ function watchTiktokFrame(frame,originalUrl){
  tiktokFrames.set(frame,link.openUrl);
 }
 function tiktokPlayerMessage(event){
- if(event.origin!=='https://www.tiktok.com'||event.data?.['x-tiktok-player']!==true||event.data.type!=='onPlayerError')return;
+ if(event.origin!=='https://www.tiktok.com'||event.data?.['x-tiktok-player']!==true||event.data.type!==globalThis.LT41_MSG.tiktokPlayerError)return;
  const code=event.data.value?.errorCode;
  if(![1001,2001,3001].includes(code))return; // 3002: 공식 재생기의 수동 재생 단추를 유지한다.
  for(const [frame,url] of tiktokFrames){
