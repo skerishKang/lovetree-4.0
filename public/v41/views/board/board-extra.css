@@ -60,7 +60,6 @@ html[data-lt-theme=garden] .panelTitle,html[data-lt-theme=garden] .panelHead{col
 html[data-lt-theme=garden] .toolbar button,html[data-lt-theme=garden] .miniBtn,html[data-lt-theme=garden] .themeBtn,html[data-lt-theme=garden] .styleMini,html[data-lt-theme=garden] .keywordBtn{
  background:rgba(255,253,248,.9);border-color:var(--lt-line);color:var(--lt-ink)}
 html[data-lt-theme=garden] .miniBtn.accent,html[data-lt-theme=garden] .themeBtn.active{background:rgba(200,110,121,.14);border-color:var(--lt-gold-line);color:var(--lt-gold-ink)}
-html[data-lt-theme=garden] .cinemaBtn{background:var(--lt-primary);color:var(--lt-primary-ink);box-shadow:0 12px 36px rgba(75,51,42,.18)}
 html[data-lt-theme=garden] .modal{background:var(--lt-paper);color:var(--lt-ink);border-color:var(--lt-line)}
 html[data-lt-theme=garden] .modalShade{background:rgba(75,51,42,.28)}
 html[data-lt-theme=garden] .toast{background:var(--lt-glass-strong);border-color:var(--lt-line);color:var(--lt-ink)}

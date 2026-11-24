@@ -315,3 +315,51 @@ test('휴대폰 책: 초기화 순서와 관계없이 이어 보기는 아래 �
     server.close();
   }
 });
+
+
+test('#1249 이어 보기: 화면·권한·폭별 공통 테두리, 장미색 채움 없음', { skip, timeout: 180000 }, async () => {
+  const tree={id:'t1',title:'시험용',moments:[1,2,3].map(i=>({id:'m'+i,title:'시험 순간 '+i,date:'2026-11-0'+i,type:'memo',note:'가짜 기록',first:i===1})),edges:[]};
+  const routes={book:['track59-sketchbook.html','playAllBtn'],board:['track58-pinboard.html','cinemaBtn'],network:['track56-network.html','mapPlayBtn']};
+  const extra={};
+  for(const [screen,[route]] of Object.entries(routes)) for(const visitor of [false,true]){
+    const source=visitor?'share':'server';
+    extra['/'+screen+'-'+source+'.html']=`<html><body style="margin:0" data-member="${visitor?'out':'in'}" data-record-source="${source}"><script>window.LT41=${JSON.stringify({source,writable:!visitor,owned:!visitor,momentId:'m1',prefs:{},tree,trees:[tree]})};</script><iframe src="/v41/views/${route}" style="position:fixed;inset:0;width:100vw;height:100vh;border:0"></iframe></body></html>`;
+  }
+  const server=await serve(extra),base='http://127.0.0.1:'+server.address().port;
+  const browser=await chromium.launch({headless:true});
+  try{
+    for(const theme of ['garden','night']){
+      let expected;
+      for(const width of [1440,390]) for(const visitor of [false,true]) for(const [screen,[,id]] of Object.entries(routes)){
+        const ctx=await browser.newContext({viewport:{width,height:width===390?844:900}});
+        try{
+          await ctx.addInitScript(t=>localStorage.setItem('lt41.theme',t),theme);
+          await ctx.route('**/*',r=>{const u=new URL(r.request().url());if(u.origin!==base)return r.abort();if(u.pathname.startsWith('/api/'))return r.fulfill({status:200,json:{ok:true,items:[]}});return r.continue();});
+          const page=await ctx.newPage();
+          await page.goto(base+'/'+screen+'-'+(visitor?'share':'server')+'.html',{waitUntil:'load',timeout:20000});
+          const frame=page.frames().find(f=>f!==page.mainFrame());
+          const btn=frame.locator('#'+id);
+          await btn.waitFor({state:'visible',timeout:12000});
+          if(screen==='book'&&width===390) await frame.locator('.nav-pill #playAllBtn').waitFor({state:'visible',timeout:12000});
+          const result=await btn.evaluate(el=>{
+            const s=getComputedStyle(el),r=el.getBoundingClientRect(),range=document.createRange();
+            range.selectNodeContents(el);
+            const sample=document.createElement('span');sample.style.background='var(--lt-primary)';sample.style.color='var(--lt-pearl)';document.body.append(sample);
+            const primary=getComputedStyle(sample).backgroundColor;sample.remove();
+            return {style:{background:s.backgroundColor,image:s.backgroundImage,border:s.borderTopColor,borderWidth:s.borderTopWidth,borderStyle:s.borderTopStyle,radius:s.borderTopLeftRadius,color:s.color,font:s.fontWeight},primary,inside:r.left>=0&&r.right<=innerWidth+1&&r.top>=0&&r.bottom<=innerHeight+1,clipped:range.getBoundingClientRect().width>el.clientWidth-parseFloat(s.paddingLeft)-parseFloat(s.paddingRight)+1};
+          });
+          const label=[theme,width,visitor?'방문자':'소유자',screen].join(' ');
+          if(!expected)expected=result.style;
+          assert.deepEqual(result.style,expected,label+' 동일한 공통 스타일');
+          assert.notEqual(result.style.background,result.primary,label+' 기본 채움색 금지');
+          assert.equal(result.style.image,'none',label+' 단색 테두리');
+          assert.equal(result.style.borderWidth,'1px',label+' 테두리 두께');
+          assert.equal(result.style.borderStyle,'solid',label+' 테두리 모양');
+          assert.equal(result.inside,true,label+' 화면 안');
+          assert.equal(result.clipped,false,label+' 글자 잘림 없음');
+          console.log(label,JSON.stringify(result.style));
+        }finally{await ctx.close();}
+      }
+    }
+  }finally{await browser.close();await new Promise(r=>server.close(r));}
+});
