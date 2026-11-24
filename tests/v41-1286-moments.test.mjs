@@ -2,7 +2,7 @@
 // iframe은 지금 것+다음 것만(≤2), 10회 넘기는 동안 같은 영상 반복 0, 세로만, 390·1440·2560 겹침·잘림 0.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync } from 'node:fs';
+import { existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { serve, auditPage, failuresOf } from './helpers/screen-audit.mjs';
@@ -39,11 +39,12 @@ async function step(page, panel, width, delta) {
   }
 }
 
-async function boot(browser, { width, height, theme, thumb = THUMB, moment = null }) {
+async function boot(browser, { width, height, theme, thumb = THUMB, moment = null, init = null }) {
   const server = await serve();
   const base = `http://127.0.0.1:${server.address().port}`;
   const ctx = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce', hasTouch: width <= 780, isMobile: width <= 780 });
   await ctx.addInitScript(t => { try { localStorage.setItem('lt41.theme', t); } catch {} }, theme);
+  if (init) await ctx.addInitScript(init);
   // #1098 2단계: 그 순간의 ♡·댓글 모의 응답 — moment 값을 넣지 않으면 숫자 0·안 눌림(기존 시험과 같은 기본).
   const momentState = moment || { hearts: 0, aiHearts: 0, comments: 0, hearted: false, reactionCalls: 0, commentCalls: 0, commentList: [], failReaction: false };
   await ctx.route('**/*', (route) => {
@@ -242,3 +243,84 @@ test('#1305 390 단추는 영상 위 빈 띠에 있고 가수 단추는 잘리�
    }finally{await h.ctx.close();await new Promise(r=>h.server.close(r));}
   }finally{await browser.close();}
  });
+
+
+const SOUND_CAPTURE = process.env.LT_1332_CAPTURE || '';
+if (SOUND_CAPTURE) mkdirSync(SOUND_CAPTURE, { recursive: true });
+const SOUND_KEY = 'lt41.momentSoundSeen';
+const soundSpy = () => {
+  window.__ltSoundPosts = [];
+  const original = Object.getOwnPropertyDescriptor(HTMLIFrameElement.prototype, 'contentWindow');
+  Object.defineProperty(HTMLIFrameElement.prototype, 'contentWindow', {
+    configurable: true,
+    get() {
+      const real = original.get.call(this);
+      if (!real) return real;
+      return new Proxy(real, {
+        get(target, key) {
+          if (key === 'postMessage') return (...args) => { window.__ltSoundPosts.push(String(args[0])); return target.postMessage(...args); };
+          const value = target[key];
+          return typeof value === 'function' ? value.bind(target) : value;
+        }
+      });
+    }
+  });
+};
+
+test('#1332 알약: 음소거 재생 중 보이고 누르면 소리가 켜진다', { skip: REQUIRE ? false : skip, timeout: 240000 }, async () => {
+  if (skip) assert.fail(skip);
+  const browser = await chromium.launch({ headless: true });
+  try {
+    for (const [width, height] of [[390, 844], [1440, 900]]) for (const theme of ['night', 'garden']) {
+      const h = await boot(browser, { width, height, theme, init: soundSpy });
+      try {
+        const panel = h.page.locator('#community-moments-panel');
+        const stage = panel.locator('.moments-stage');
+        const pill = panel.locator('.moments-sound-pill');
+        await h.page.waitForTimeout(250);
+        assert.equal(await stage.getAttribute('data-lt-moments-muted'), 'true', `${width}/${theme}: 첫 영상은 음소거`);
+        assert.equal(await pill.isVisible(), true, `${width}/${theme}: 알약이 보인다`);
+        assert.match(await pill.textContent(), /눌러서 소리 켜기/, `${width}/${theme}: 큰 안내 문구`);
+        assert.ok((await pill.boundingBox()).height >= 44, `${width}/${theme}: 누름 영역 44px 이상`);
+        if (SOUND_CAPTURE) await h.page.screenshot({ path: join(SOUND_CAPTURE, `sound-${width}-${theme}-before.png`), animations: 'disabled' });
+        const playingBefore = await stage.getAttribute('data-lt-playing');
+        await pill.click();
+        await h.page.waitForTimeout(150);
+        assert.equal(await stage.getAttribute('data-lt-moments-muted'), 'false', `${width}/${theme}: 소리가 켜졌다`);
+        assert.equal(await pill.isVisible(), false, `${width}/${theme}: 알약이 사라졌다`);
+        assert.equal(await stage.getAttribute('data-lt-playing'), playingBefore, `${width}/${theme}: 멈춤·재생은 그대로`);
+        const sent = await h.page.evaluate(() => (window.__ltSoundPosts || []).some((m) => m.includes('unMute')));
+        assert.equal(sent, true, `${width}/${theme}: unMute 명령을 보냈다`);
+        const remembered = await h.page.evaluate((key) => localStorage.getItem(key), SOUND_KEY);
+        assert.equal(remembered, '1', `${width}/${theme}: 이 기기에 기억했다`);
+        if (SOUND_CAPTURE) await h.page.screenshot({ path: join(SOUND_CAPTURE, `sound-${width}-${theme}-after.png`), animations: 'disabled' });
+        const beforeId = await stage.getAttribute('data-lt-moments-id');
+        await step(h.page, panel, width, 1);
+        await h.page.waitForTimeout(250);
+        assert.notEqual(await stage.getAttribute('data-lt-moments-id'), beforeId, `${width}/${theme}: 다음 순간`);
+        assert.equal(await pill.isVisible(), false, `${width}/${theme}: 다음 순간에도 알약 없음`);
+        assert.equal(await stage.getAttribute('data-lt-moments-muted'), 'false', `${width}/${theme}: 소리 유지`);
+      } finally { await h.ctx.close(); await new Promise((r) => h.server.close(r)); }
+    }
+  } finally { await browser.close(); }
+});
+
+test('#1332 다시 방문하면 작은 알약으로 안내한다', { skip: REQUIRE ? false : skip, timeout: 240000 }, async () => {
+  if (skip) assert.fail(skip);
+  const browser = await chromium.launch({ headless: true });
+  try {
+    for (const [width, height] of [[390, 844], [1440, 900]]) {
+      const h = await boot(browser, {
+        width, height, theme: 'night',
+        init: () => { try { localStorage.setItem('lt41.momentSoundSeen', '1'); } catch {} }
+      });
+      try {
+        const pill = h.page.locator('#community-moments-panel .moments-sound-pill');
+        assert.equal(await pill.isVisible(), true, `${width}: 작은 알약도 보인다`);
+        assert.equal((await pill.textContent()).trim(), '소리 켜기', `${width}: 짧은 문구`);
+        assert.ok(await pill.evaluate((el) => el.classList.contains('is-small')), `${width}: 작은 모양`);
+        assert.ok((await pill.boundingBox()).height >= 44, `${width}: 작은 알약도 누름 영역 44px 이상`);
+      } finally { await h.ctx.close(); await new Promise((r) => h.server.close(r)); }
+    }
+  } finally { await browser.close(); }
+});

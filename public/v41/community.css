@@ -202,6 +202,10 @@ html[data-lt-theme=garden] .moments-comments-dialog{background:var(--lt-paper);c
  #community-moments-panel .moments-swipe-hint[hidden]{display:none}
 }
 
+/* #1332: 음소거 재생 중 소리 켜기 알약 — 기존 테마 토큰만 쓴다. */
+#community-moments-panel .moments-sound-pill{position:absolute;z-index:7;left:50%;bottom:calc(96px + env(safe-area-inset-bottom));transform:translateX(-50%);min-height:44px;max-width:calc(100% - 32px);padding:10px 20px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-pill);background:var(--lt-glass-strong);color:var(--lt-pearl);font:inherit;font-size:14px;font-weight:600;white-space:nowrap;cursor:pointer}
+#community-moments-panel .moments-sound-pill[hidden]{display:none}
+#community-moments-panel .moments-sound-pill.is-small{padding:8px 16px;font-size:13px;font-weight:400}
 @media(max-width:780px){#community-moments-panel .moments-player-controls,#community-moments-panel .moments-swipe-layer,#community-moments-panel .moments-owner,#community-moments-panel .moments-owner-text{display:flex}#community-moments-panel .moments-owner{display:grid}#community-moments-panel .moments-swipe-hint:not([hidden]){display:block}#community-moments-panel .moments-note[hidden]{display:none}}
 .moments-note{padding:0;border:0;background:transparent;color:inherit;font:inherit;font-size:13px;text-align:left;line-height:1.3}
 
