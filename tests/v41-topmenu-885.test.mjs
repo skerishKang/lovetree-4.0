@@ -475,3 +475,54 @@ test('1028 실행: 트리 목록만 스크롤하고 동작 칸은 고정이며 �
     console.log('MENU_1028_NUMBERS', JSON.stringify(numbers));
   } finally { await browser.close(); await new Promise((ok) => server.close(ok)); }
 });
+
+
+test('#1246 모든 화면의 순간 추가만 장미색', {skip: REQUIRE ? false : skip || 'LT_TOPMENU_REQUIRE=1 일 때 실행', timeout:180000}, async()=>{
+  if(skip)assert.fail(skip);
+  const server=await serve(),base='http://127.0.0.1:'+server.address().port;
+  const browser=await chromium.launch({headless:true});
+  try{
+    for(const width of [1440,390])for(const theme of ['night','garden']){
+      const ctx=await browser.newContext({viewport:{width,height:width===390?844:900},reducedMotion:'reduce'});
+      try{
+        await ctx.addInitScript(t=>{localStorage.setItem('lt41.theme',t);localStorage.setItem('lt41.tips.firstTree','1')},theme);
+        const state={version:1,trees:[tree(1),tree(2)],prefs:{}};
+        await ctx.route('**/*',r=>{
+          const u=new URL(r.request().url());
+          if(u.origin!==base)return r.abort();
+          if(u.pathname==='/api/workspace')return r.fulfill({status:200,json:{revision:1,state,subject:'header-color-test',writeSubjectBound:true,savedAt:'2026-11-18T09:00:00Z'}});
+          if(u.pathname.startsWith('/api/'))return r.fulfill({status:200,json:{ok:true,items:[],trees:0,moments:0}});
+          return r.continue();
+        });
+        const page=await ctx.newPage();
+        await page.goto(base+'/v41/?account=1#home');
+        await page.waitForFunction(()=>window.LT41?.trees?.length===2&&document.body.dataset.member==='in');
+        const ask=page.locator('#discover-ask-no');
+        await ask.waitFor({state:'visible',timeout:4000}).catch(()=>{});
+        if(await ask.isVisible())await ask.click();
+        const read=()=>page.evaluate(()=>{
+          const sample=document.createElement('span');
+          sample.style.backgroundColor='var(--lt-cta-rose)';sample.style.color='var(--lt-cta-white)';document.body.append(sample);
+          const rose=getComputedStyle(sample).backgroundColor,white=getComputedStyle(sample).color;sample.remove();
+          const info=e=>{const s=getComputedStyle(e);return{id:e.id,bg:s.backgroundColor,ink:s.color,visible:e.checkVisibility({checkVisibilityCSS:true})}};
+          return {rose,white,head:info(document.getElementById('write-menu')),fab:info(document.getElementById('mobile-add')),
+            other:[...document.querySelectorAll('.app-header button,.app-header a')].filter(e=>!['write-menu','mobile-add'].includes(e.id)&&e.checkVisibility({checkVisibilityCSS:true})).map(info)};
+        });
+        for(const [name,hash] of [['home','#home'],...SCREENS,['community','#explore']]){
+          await page.evaluate(h=>location.hash=h,hash);
+          if(name==='community')await page.waitForFunction(()=>document.body.classList.contains('community-screen'));
+          else if(name==='home')await page.waitForFunction(()=>document.body.classList.contains('home-existing'));
+          else await page.waitForFunction(h=>[...document.querySelectorAll('iframe')].some(f=>f.checkVisibility()&&f.contentWindow?.location.href.includes(h)),({shelf:'track32-bookshelf',book:'track59-sketchbook',board:'track58-pinboard',map:'track56-network'})[name]);
+          const m=await read(),key=[width,theme,name].join('/');
+          assert.equal(m.head.bg,m.rose,key+' 머리줄 배경');
+          assert.equal(m.head.ink,m.white,key+' 머리줄 글자');
+          if(width===390){assert.equal(m.fab.bg,m.rose,key+' 휴대폰 배경');assert.equal(m.fab.ink,m.white,key+' 휴대폰 글자');}
+          assert.deepEqual(m.other.filter(b=>b.bg===m.rose),[],key+' 다른 머리줄 단추에 장미색 없음');
+          if(width===1440)assert.equal(m.head.visible,true,key+' 머리줄 순간 추가 표시');
+          else if(!['home','community'].includes(name))assert.equal(m.fab.visible,true,key+' 휴대폰 순간 추가 표시');
+          console.log(key,JSON.stringify(m));
+        }
+      }finally{await ctx.close();}
+    }
+  }finally{await browser.close();await new Promise(r=>server.close(r));}
+});

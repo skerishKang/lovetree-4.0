@@ -193,7 +193,9 @@ test('#942 첫 화면 추가 단추와 숫자 묶음', { skip: REQUIRE ? false :
         const visibleAdds=[head,fab,top].filter(b=>b?.visible);
         check(visibleAdds.length===(member?(width===1440?2:1):0),key+' 추가 단추 개수 '+JSON.stringify(visibleAdds));
         if(top?.visible)check(top.bg===rose&&top.ink==='rgb(255, 255, 255)'&&top.contrast>=4.5,key+' 가운데 장미색·대비 '+JSON.stringify(top));
-        if(head.visible)check(head.bg!==rose&&head.border!=='0px'&&head.contrast>=4.5,key+' 머리줄은 밝은 테두리 '+JSON.stringify(head));
+        // #1246: 같은 추가 동작은 둘 다 장미색. 개수·위치·대비 기준은 그대로.
+        if(head.visible)check(head.bg===rose&&head.ink==='rgb(255, 255, 255)'&&head.border!=='0px'&&head.contrast>=4.5,key+' 머리줄 장미색·대비 '+JSON.stringify(head));
+        if(fab.visible)check(fab.bg===rose&&fab.ink==='rgb(255, 255, 255)'&&fab.contrast>=4.5,key+' 휴대폰 추가 장미색·대비 '+JSON.stringify(fab));
         check(head.visible===(member&&width===1440)&&!fab.visible&&!!top?.visible===member,key+' 추가 단추 위치');
         check(JSON.stringify(buttons.map(b=>b.text))===JSON.stringify(member?['순간 목록','둘러보기','서재']:['＋ 첫 순간 추가','둘러보기','어떻게 쓰나요']),key+' 가운데 순서');
         const light=theme==='night'?'rgb(238, 233, 224)':'rgb(255, 253, 248)';
