@@ -179,3 +179,14 @@ test('#1273 6번: 세션 확인이 끝나기 전에는 목록을 부르지 않�
     assert.deepEqual(calls.filter(p => p === '/api/board/mine'), ['/api/board/mine']);
   } finally { restore(); }
 });
+
+test('#1273 6번: 창을 닫은 상태에서 보낸 의견도 다시 열면 목록에 있다', async () => {
+  const {board, els, restore} = mount(null, []);
+  try {
+    await board.addSentPost({id: 12, kind: 'opinion', status: 'received', body: '닫힌 상태에서 보낸 의견', createdAt: '2026-11-24T00:03:00Z'});
+    await board.openMyPosts();
+    const html = els['myposts-list'].innerHTML;
+    assert.match(html, /#12<\/span>/, '보낸 글은 목록에 한 번 있다');
+    assert.match(html, /닫힌 상태에서 보낸 의견/);
+  } finally { restore(); }
+});
