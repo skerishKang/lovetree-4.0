@@ -174,16 +174,22 @@ test('952 실행: 부팅이 끝나면 synced 안내가 토스트에 뜬다(기�
       try {
         await page.goto(`${base}/v41/?account=1`, { waitUntil: 'load' });
         // #1103: 안내는 차례로 온다 — 첫 트리 판·새 소식 띠를 닫으면 정보 안내가 그 자리에 뜬다.
-        if (!await page.evaluate(() => document.getElementById('tree-tips')?.hidden)) await page.click('#tree-tips-close');
-        await page.waitForFunction(() => {
-          const card = document.getElementById('updates-card'), toast = document.getElementById('toast');
-          return (card && !card.hidden) || (toast && !toast.hidden && toast.textContent.includes('불러왔어요'));
-        }, null, { timeout: 10000 });
-        if (!await page.evaluate(() => document.getElementById('updates-card')?.hidden)) await page.click('#updates-dismiss');
-        await page.waitForFunction((want) => {
-          const toast = document.getElementById('toast');
-          return !!toast && !toast.hidden && toast.textContent === want;
-        }, expected, { timeout: 20000 });
+        // 첫 트리 판·새 소식 띠는 부팅 뒤 늦게 나타날 수 있다. 한 번만 보고 지나가면, 늦게 뜬 판이 줄을 잡아
+        // 정보 안내가 5초 대기 규칙(#1103)으로 건너뛰어져 시험이 흔들렸다. 그래서 끝까지 지켜보며 나타나는 대로 닫는다.
+        // 판정은 그대로다: 20초 안에 기대한 문구의 토스트가 떠야 한다.
+        const deadline = Date.now() + 20000;
+        let seen = false;
+        while (Date.now() < deadline) {
+          const state = await page.evaluate((want) => {
+            const tips = document.getElementById('tree-tips'), card = document.getElementById('updates-card'), toast = document.getElementById('toast');
+            return { tips: !!tips && !tips.hidden, card: !!card && !card.hidden, done: !!toast && !toast.hidden && toast.textContent === want };
+          }, expected);
+          if (state.done) { seen = true; break; }
+          if (state.tips) await page.click('#tree-tips-close').catch(() => {});
+          else if (state.card) await page.click('#updates-dismiss').catch(() => {});
+          await page.waitForTimeout(100);
+        }
+        assert.ok(seen, `20초 안에 '${expected}' 안내가 토스트에 떠야 한다`);
       } catch (error) {
         console.log('안내 변화', trees.length, JSON.stringify(await page.evaluate(() => window.__noticeTrace)));
         throw error;
@@ -307,13 +313,20 @@ test('1076 실행: synced 안내는 첫 진입 1번, 화면 이동 0번, 계정 
     const page = await ctx.newPage();
     try {
       await page.goto(`${base}/v41/?account=1`, { waitUntil: 'load' });
-      if (!await page.evaluate(() => document.getElementById('tree-tips')?.hidden)) await page.click('#tree-tips-close');
-      await page.waitForFunction(() => {
-        const card = document.getElementById('updates-card'), toast = document.getElementById('toast');
-        return (card && !card.hidden) || (toast && !toast.hidden && toast.textContent.includes('불러왔어요'));
-      }, null, { timeout: 10000 });
-      if (!await page.evaluate(() => document.getElementById('updates-card')?.hidden)) await page.click('#updates-dismiss');
-      await page.waitForFunction(() => window.__toastShows === 1, null, { timeout: 20000 });
+      // 952 실행 시험과 같은 까닭: 첫 트리 판·새 소식 띠가 늦게 뜰 수 있어 한 번만 보고 닫으면 흔들린다.
+      // 나타나는 대로 닫으며 20초 안에 안내가 정확히 1번 뜨기를 기다린다. 판정(1번)은 그대로다.
+      const deadline = Date.now() + 20000;
+      while (Date.now() < deadline) {
+        const state = await page.evaluate(() => {
+          const tips = document.getElementById('tree-tips'), card = document.getElementById('updates-card');
+          return { tips: !!tips && !tips.hidden, card: !!card && !card.hidden, shows: window.__toastShows };
+        });
+        if (state.shows >= 1) break;
+        if (state.tips) await page.click('#tree-tips-close').catch(() => {});
+        else if (state.card) await page.click('#updates-dismiss').catch(() => {});
+        await page.waitForTimeout(100);
+      }
+      assert.equal(await page.evaluate(() => window.__toastShows), 1, '20초 안에 synced 안내가 정확히 1번 떠야 한다');
       for (const view of ['track59-sketchbook.html', 'track56-network.html']) {
         await page.evaluate((v) => document.querySelector(`button[data-view="${v}"]`)?.click(), view);
         await page.waitForTimeout(700);
