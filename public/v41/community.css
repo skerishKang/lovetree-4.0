@@ -137,3 +137,70 @@ html[data-lt-theme=garden] .moments-comments-dialog{background:var(--lt-paper);c
 .moments-comments-dialog .community-mini:disabled{opacity:.6}
 /* #1098 2단계: 레일 숫자 — ♡·댓글 수(3 미만은 숫자 없음). 390에서도 아이콘 아래 숫자가 같은 자리에 온다. */
 .moments-rail-count{font-size:12px;color:var(--lt-pearl);min-height:14px}
+
+.moments-owner,.moments-owner-text,.moments-swipe-layer,.moments-player-controls,.moments-swipe-hint{display:none}
+
+/* #1286 휴대폰 순간 보기: 공통 색 토큰만 사용, 넓은 화면은 기존 규칙 유지. */
+@media(max-width:780px){
+ #community-panel:has(#community-tab-moments[aria-selected="true"]){padding-inline:0;overflow-x:clip}
+ #community-panel:has(#community-tab-moments[aria-selected="true"]) .community-top{height:0;margin:0;padding:0}
+ #community-panel:has(#community-tab-moments[aria-selected="true"]) .community-tabs{
+  position:absolute;z-index:19;top:calc(env(safe-area-inset-top) + 48px);left:8px;
+  gap:4px;width:max-content;margin:0;padding:3px;border-radius:var(--lt-r-pill);
+  background:var(--lt-glass-strong)
+ }
+ #community-panel:has(#community-tab-moments[aria-selected="true"]) .community-tabs button{
+  min-width:52px;min-height:32px;padding:0 9px;font-size:12px
+ }
+ #community-moments-panel{width:100%;min-width:0;overflow-x:clip}
+ #community-moments-panel .moments-chips{position:absolute;z-index:19;top:calc(env(safe-area-inset-top) + 51px);right:8px;max-width:42vw;justify-content:flex-end;flex-wrap:nowrap;gap:3px;overflow-x:auto;margin:0}
+ #community-moments-panel .moments-chip{min-height:30px;padding:0 9px;font-size:11px;white-space:nowrap;flex:none}
+ #community-moments-panel .moments-stage{width:100%;max-width:none;height:calc(100dvh - 90px - env(safe-area-inset-bottom));min-height:0;margin:0;gap:0}
+ #community-moments-panel .moments-card{height:100%;width:100%;max-width:none;aspect-ratio:auto;border:0;border-radius:0;box-shadow:none}
+ #community-moments-panel .moments-media{background:var(--lt-stage)}
+ #community-moments-panel .moments-poster{object-fit:cover}
+ #community-moments-panel .moments-media[data-orientation="landscape"] .moments-frame:not(.moments-next){width:100%;height:100%;transform:scale(2.2);transform-origin:center}
+ #community-moments-panel .moments-swipe-layer{position:absolute;inset:0;z-index:2;touch-action:pan-x}
+ #community-moments-panel .moments-rail{position:absolute;right:7px;bottom:calc(102px + env(safe-area-inset-bottom));z-index:5;gap:4px;padding:0}
+ #community-moments-panel .moments-rail-button{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  width:54px;min-width:54px;min-height:60px;gap:4px;padding:3px 2px;
+  border:0;border-radius:0;background:transparent;color:white;
+  text-shadow:0 2px 6px var(--lt-stage);box-shadow:none
+ }
+ #community-moments-panel .moments-rail-icon{font-size:27px;filter:drop-shadow(0 2px 3px var(--lt-stage))}
+ #community-moments-panel .moments-rail-svg{width:27px;height:27px;filter:drop-shadow(0 2px 3px var(--lt-stage))}
+ #community-moments-panel .moments-rail-label{display:block;color:inherit;font-size:11px;line-height:1.1}
+ #community-moments-panel .moments-rail-count{color:inherit;font-size:11px;line-height:1.1;min-height:0}
+ #community-moments-panel .moments-nav{display:none}
+ #community-moments-panel .moments-overlay{padding:56px 68px calc(26px + env(safe-area-inset-bottom)) 14px;gap:5px}
+ #community-moments-panel .moments-tree{gap:5px;flex-wrap:wrap;font-size:12px}
+ #community-moments-panel .moments-owner{display:grid;place-items:center;width:30px;height:30px;flex:none;border-radius:50%;background:var(--lt-glass-strong);color:white;border:1px solid var(--lt-line);font-weight:700}
+ #community-moments-panel .moments-owner-text{font-size:12px;font-weight:700}
+ #community-moments-panel .moments-tree-name{font-size:12px}
+ #community-moments-panel .moments-ai{font-size:10px;padding:1px 5px}
+ #community-moments-panel .moments-title{font-size:15px;white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+ #community-moments-panel .moments-note{display:-webkit-box;max-width:100%;padding:0;border:0;background:transparent;color:inherit;text-align:left;font:inherit;font-size:12px;line-height:1.45;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;pointer-events:auto;cursor:pointer}
+ #community-moments-panel .moments-note[aria-expanded="true"]{display:block;max-height:40dvh;overflow-y:auto}
+ #community-moments-panel .moments-tags{font-size:11px}
+ #community-moments-panel .moments-progress{height:3px;z-index:8;bottom:env(safe-area-inset-bottom)}
+ #community-moments-panel .moments-player-controls{position:absolute;z-index:6;right:10px;bottom:calc(12px + env(safe-area-inset-bottom))}
+ #community-moments-panel .moments-mute{min-width:66px;min-height:36px;padding:0 8px;border:0;background:transparent;color:white;font-size:12px;text-shadow:0 2px 6px var(--lt-stage)}
+ #community-moments-panel .moments-swipe-hint{position:absolute;left:50%;top:46%;transform:translate(-50%,-50%);z-index:8;max-width:80%;padding:8px 12px;border-radius:var(--lt-r-pill);background:var(--lt-glass-strong);color:var(--lt-pearl);font-size:13px;pointer-events:none}
+ #community-moments-panel .moments-swipe-hint[hidden]{display:none}
+}
+
+@media(max-width:780px){#community-moments-panel .moments-player-controls,#community-moments-panel .moments-swipe-layer,#community-moments-panel .moments-owner,#community-moments-panel .moments-owner-text{display:flex}#community-moments-panel .moments-owner{display:grid}#community-moments-panel .moments-swipe-hint:not([hidden]){display:block}#community-moments-panel .moments-note[hidden]{display:none}}
+.moments-note{padding:0;border:0;background:transparent;color:inherit;font:inherit;font-size:13px;text-align:left;line-height:1.3}
+
+/* #1286: 유튜브 시간은 모바일 기본 진행 요소로 표시하여 인라인 스타일을 만들지 않는다. */
+.moments-progress-native{display:none}
+@media(max-width:780px){
+ #community-moments-panel .moments-progress-fill{display:none}
+ #community-moments-panel .moments-progress-native{display:block;width:100%;height:3px;appearance:none;border:0;border-radius:0;background:var(--lt-glass)}
+ #community-moments-panel .moments-progress-native::-webkit-progress-bar{background:var(--lt-glass)}
+ #community-moments-panel .moments-progress-native::-webkit-progress-value{background:var(--lt-gold)}
+ #community-moments-panel .moments-progress-native::-moz-progress-bar{background:var(--lt-gold)}
+}
+
+@media(min-width:781px){#community-moments-panel .moments-note{display:block;width:auto;min-width:0;min-height:0;height:auto;margin:0;padding:0;border:0;border-radius:0;background:transparent;box-shadow:none;color:inherit;font:inherit;font-size:13px;line-height:1.3;appearance:none;text-align:left}}

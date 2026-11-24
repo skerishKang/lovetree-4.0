@@ -366,6 +366,29 @@ test('970 실행: 썸네일 — 영상·사진이 화면 안에 보인다(가짜
   } finally { await browser.close(); server.close(); }
 });
 
+test('#1273 2번 화면: 크게 보기에 영어 라벨과 빈 한마디 줄이 없다', { skip, timeout: 180000 }, async () => {
+  if (skip) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip}`);
+  const tree = {
+    id: 'viewer', title: '뷰어 확인',
+    moments: [{ id: 'm1', title: '순간', date: '2026-11-24', emotion: '설렘', note: '', keywords: ['가수:BTS'], url: '', type: 'memo', source: '내 기록', x: null, y: null, rot: 0 }],
+    edges: []
+  };
+  const server = await serve({ '/__host-viewer.html': hostHTML(tree) });
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const { context, frame } = await openHost(browser, `${base}/__host-viewer.html`, { width: 1440, height: 900 });
+    await frame.evaluate(() => window.openViewer('m1'));
+    await frame.waitForSelector('#viewerModal.open', { timeout: 5000 });
+    const text = await frame.locator('#viewerModal').innerText();
+    assert.match(text, /순간 크게 보기/);
+    assert.match(text, /꼬리표: #가수:BTS/);
+    assert.doesNotMatch(text, /PROVENANCE|VIEWER|Keywords:|URL:|Source:|Note:/, `영어 라벨 없음: ${text}`);
+    assert.doesNotMatch(text, /마음 한마디:/, `빈 한마디 줄은 화면에 없다: ${text}`);
+    await context.close();
+  } finally { await browser.close(); server.close(); }
+});
+
 test('970 실행: 썸네일 — 불러오기 실패면 대체 표시, 깨진 그림 아이콘 없다(390·1440)', { skip: skip || !REQUIRE970 ? skip || 'LT_970_REQUIRE=1 일 때 실행' : false, timeout: 240000 }, async () => {
   if (skip) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip}`);
   const server = await serve({ '/__host-media-fail.html': hostHTML(MEDIA_TREE) });

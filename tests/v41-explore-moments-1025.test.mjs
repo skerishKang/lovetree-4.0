@@ -242,7 +242,7 @@ test('#1075 — 밝은 영상 위에서도 390·1440의 단추 일곱 개가 보
     const h = await boot(browser, { width, height, theme, thumb: BRIGHT_THUMB });
     try {
      const panel = h.page.locator('#community-moments-panel');
-     const nodes = await panel.evaluate(el => [...el.querySelectorAll('.moments-rail-button, .moments-step')].map(node => {
+     const nodes = await panel.evaluate(el => [...el.querySelectorAll('.moments-rail-button, .moments-step')].filter(node=>getComputedStyle(node.closest('.moments-nav')||node).display!=='none').map(node => {
       const r = node.getBoundingClientRect();
       const x = Math.round(r.left + r.width / 2), y = Math.round(r.top + r.height / 2);
       const hit = document.elementFromPoint(x, y);
@@ -259,11 +259,11 @@ test('#1075 — 밝은 영상 위에서도 390·1440의 단추 일곱 개가 보
      }));
      const room = await panel.evaluate(el => {
       const card = el.querySelector('.moments-card').getBoundingClientRect();
-      const buttons = [...el.querySelectorAll('.moments-rail-button, .moments-step')].map(node => node.getBoundingClientRect());
+      const buttons = [...el.querySelectorAll('.moments-rail-button, .moments-step')].filter(node=>getComputedStyle(node.closest('.moments-nav')||node).display!=='none').map(node => node.getBoundingClientRect());
       const text = Math.max(...[...el.querySelectorAll('.moments-overlay > *')].map(node => node.getBoundingClientRect().right));
       return { cardRight: Math.round(card.right), buttonRight: Math.round(Math.max(...buttons.map(r => r.right))), buttonLeft: Math.round(Math.min(...buttons.map(r => r.left))), textRight: Math.round(text) };
      });
-     assert.equal(nodes.length, 7, `${width}·${theme}: 오른쪽 다섯(마음·댓글·트리·담기·공유) + 위아래 둘`);
+     assert.equal(nodes.length, width<=780?5:7, `${width}·${theme}: 오른쪽 다섯(마음·댓글·트리·담기·공유) + 위아래 둘`);
      for (const node of nodes) {
       assert.ok(node.visible, `${width}·${theme}: ${node.label}이 보이지 않음 — ${JSON.stringify(node)}`);
       assert.ok(node.inView, `${width}·${theme}: ${node.label}이 화면 밖 — ${JSON.stringify(node)}`);
@@ -273,18 +273,13 @@ test('#1075 — 밝은 영상 위에서도 390·1440의 단추 일곱 개가 보
        for (const node of nodes) {
         assert.equal(node.color, 'rgb(255, 255, 255)', `${width}·${theme}: 밝은 영상 위 흰 글자 — ${node.label} ${node.color}`);
         assert.equal(node.opacity, '1', `${width}·${theme}: ${node.label}만 흐리게 남음 — ${node.opacity}`);
-        const parts = node.background.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
-        assert.ok(parts, `${width}·${theme}: ${node.label}에 어두운 배경이 없음 — ${node.background}`);
-        assert.ok(Number(parts[1]) < 40 && Number(parts[2]) < 40 && Number(parts[3]) < 40 && Number(parts[4] ?? 1) > 0.5, `${width}·${theme}: ${node.label} 스크림이 너무 옅음 — ${node.background}`);
+        assert.equal(node.background,'rgba(0, 0, 0, 0)','휴대폰 단추 원형 바탕 제거');
+        assert.ok(node.rect[2]>=44&&node.rect[3]>=44,'휴대폰 누르기 영역 44px');
        }
        const inset = room.cardRight - room.buttonRight;
-       assert.ok(inset >= 10 && inset <= 12, `${width}·${theme}: 단추가 카드 가장자리에서 ${inset}px — ${JSON.stringify(room)}`);
+       assert.ok(inset >= 6 && inset <= 9, `${width}·${theme}: 단추가 카드 가장자리에서 ${inset}px — ${JSON.stringify(room)}`);
        assert.ok(room.textRight <= room.buttonLeft, `${width}·${theme}: 아래 글이 단추와 겹침 — ${JSON.stringify(room)}`);
-       const top = await panel.evaluate(el => ({
-        navBottom: Math.max(...[...el.querySelectorAll('.moments-step')].map(n => n.getBoundingClientRect().bottom)),
-        railTop: Math.min(...[...el.querySelectorAll('.moments-rail-button')].map(n => n.getBoundingClientRect().top))
-       }));
-       assert.ok(top.navBottom < top.railTop, `${width}·${theme}: 위아래 단추가 오른쪽 넷과 겹침 — ${JSON.stringify(top)}`);
+       assert.equal(await panel.locator('.moments-nav').evaluate(n=>getComputedStyle(n).display),'none','휴대폰 ▲▼ 숨김');
        const heart = panel.locator('.moments-rail-button').first();
        assert.equal(await heart.locator('.moments-rail-icon').textContent(), '♡', '기본 마음은 빈 하트');
        assert.equal(await heart.getAttribute('aria-pressed'), 'false', '기본 누름 상태 아님');
@@ -294,7 +289,7 @@ test('#1075 — 밝은 영상 위에서도 390·1440의 단추 일곱 개가 보
        await heart.click();
        assert.equal(await heart.locator('.moments-rail-icon').textContent(), '♡', '다시 누르면 빈 하트');
        const before = await panel.locator('.moments-stage').getAttribute('data-lt-moments-id');
-       await panel.locator('.moments-step').nth(1).click();
+       await panel.evaluate(el=>el.querySelector('.moments-stage').dispatchEvent(new WheelEvent('wheel',{deltaY:120,bubbles:true,cancelable:true})));
        const after = await panel.locator('.moments-stage').getAttribute('data-lt-moments-id');
        assert.notEqual(before, after, `${width}·${theme}: 다음 순간 단추가 실제로 눌린다`);
       } else {
@@ -393,10 +388,10 @@ test('#1098 2단계 — 쇼츠의 그 순간 ♡·댓글 수와 순간 단위 �
     await h.page.setViewportSize({ width: 390, height: 844 });
     await h.page.waitForTimeout(200);
     const mobile = await h.page.evaluate(() => {
-     const nodes = [...document.querySelectorAll('#community-moments-panel .moments-rail-button, #community-moments-panel .moments-step')];
+     const nodes = [...document.querySelectorAll('#community-moments-panel .moments-rail-button')];
      return { inView: nodes.every((n) => { const r = n.getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight && r.left >= 0 && r.right <= innerWidth; }), overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth };
     });
-    assert.equal(mobile.inView, true, '390 단추 일곱 개가 화면 안에 있다');
+    assert.equal(mobile.inView, true, '390 단추 다섯 개가 화면 안에 있다');
     assert.ok(mobile.overflow <= 1, `390 가로 넉침 0: ${mobile.overflow}`);
    } finally { await h.ctx.close(); await new Promise(r => h.server.close(r)); }
   } finally { await browser.close(); }
