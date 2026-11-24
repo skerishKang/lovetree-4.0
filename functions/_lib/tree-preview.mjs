@@ -12,7 +12,7 @@
  * - 취소·삭제·없는 공유는 '공유가 취소되었어요' 기본 카드(noindex)이고, 사람은 첫 화면으로 보낸다.
  *   서버에 닿지 못했을 때는 중립 기본 카드(noindex)를 주고, 사람은 공유 주소로 보낸다(앱이 상태를 알려 준다).
  */
-import { jsonError, upstreamOrigin } from './proxy.js';
+import { jsonError, upstreamOrigin, proxyProofHeaders } from './proxy.js';
 // #1060: 썸네일 주소 글자는 화면과 같은 정본(youtube-id.mjs) 한 벌에서만 만든다.
 import { safeYoutubeThumb, youtubeIdFrom, youtubeStageThumbUrl } from '../../public/v41/youtube-id.mjs';
 import {
@@ -110,13 +110,13 @@ function respondRedirect(request, location) {
   return new Response(request.method === 'HEAD' ? null : '', { status: 302, headers });
 }
 
-async function readShare(fetcher, origin, shareId, timeoutMs) {
+async function readShare(fetcher, origin, shareId, timeoutMs, extraHeaders = {}) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), Math.max(0, timeoutMs));
   try {
     const response = await fetcher(`${origin}/api/public/shares/${shareId}`, {
       method: 'GET',
-      headers: { accept: 'application/json' },
+      headers: { accept: 'application/json', ...extraHeaders },
       signal: controller.signal,
       redirect: 'manual'
     });
@@ -180,7 +180,7 @@ export function createTreePreview({ fetcher = (...args) => fetch(...args), timeo
     let read = null;
     let canceledShare = false;
     try {
-      const answer = await readShare(fetcher, origin, shareId, timeoutMs);
+      const answer = await readShare(fetcher, origin, shareId, timeoutMs, proxyProofHeaders(env));
       read = answer.read || null;
       canceledShare = answer.canceled === true;
     } catch {

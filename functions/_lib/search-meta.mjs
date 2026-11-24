@@ -8,7 +8,7 @@
  * - 사람이 앱을 여는 공유 주소 형식은 public/v41/shell/messages.mjs shareUrlFor 와
  *   같은 규칙(운영 주소 루트, 그 밖은 /v41/)을 따른다.
  */
-import { jsonError, upstreamOrigin } from './proxy.js';
+import { jsonError, upstreamOrigin, proxyProofHeaders } from './proxy.js';
 // A-11: 기본 카드 그림 주소도 썸네일 정본 한 벌에서 가져온다(출력 문자열 그대로).
 import { CARD_IMAGE_URL as CANONICAL_CARD_IMAGE_URL } from '../../public/v41/youtube-id.mjs';
 
@@ -85,11 +85,11 @@ function dateOnly(value) {
   return /^\d{4}-\d{2}-\d{2}/.test(text) ? text.slice(0, 10) : '';
 }
 
-async function fetchJson(fetcher, url, timeoutMs) {
+async function fetchJson(fetcher, url, timeoutMs, extraHeaders = {}) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), Math.max(0, timeoutMs));
   try {
-    const response = await fetcher(url, { method: 'GET', headers: { accept: 'application/json' }, signal: controller.signal });
+    const response = await fetcher(url, { method: 'GET', headers: { accept: 'application/json', ...extraHeaders }, signal: controller.signal });
     if (!response.ok) {
       await response.body?.cancel().catch(() => {});
       throw new Error(`upstream_${response.status}`);
@@ -106,7 +106,7 @@ async function fetchJson(fetcher, url, timeoutMs) {
 // #538(공유 기본 공개)이 머지되면 이 함수가 부르는 경로·조건만 여기서 바꾸면 된다.
 export const SITEMAP_MAX_ENTRIES = 200;
 
-export async function collectSitemapShares({ fetcher = (...args) => fetch(...args), origin, timeoutMs = 10_000, maxEntries = SITEMAP_MAX_ENTRIES } = {}) {
+export async function collectSitemapShares({ fetcher = (...args) => fetch(...args), origin, timeoutMs = 10_000, maxEntries = SITEMAP_MAX_ENTRIES, headers = {} } = {}) {
   // discover 의 페이지 크기는 서버가 최대 24까지 받는다(server/community-service.js).
   const size = 24;
   const entries = [];
@@ -115,7 +115,7 @@ export async function collectSitemapShares({ fetcher = (...args) => fetch(...arg
   for (let page = 0; entries.length < maxEntries && page < maxPages; page += 1) {
     const query = new URLSearchParams({ limit: String(size) });
     if (cursor) query.set('cursor', cursor);
-    const body = await fetchJson(fetcher, `${origin}/api/community/shares?${query}`, timeoutMs);
+    const body = await fetchJson(fetcher, `${origin}/api/community/shares?${query}`, timeoutMs, headers);
     for (const item of Array.isArray(body?.items) ? body.items : []) {
       if (item && SHARE_ID.test(String(item.shareId || ''))) {
         entries.push({ shareId: String(item.shareId), lastmod: dateOnly(item.createdAt) });
@@ -137,7 +137,7 @@ export function createSitemap({ fetcher = (...args) => fetch(...args), timeoutMs
     if (!origin) return jsonError(503, 'storage_unavailable', '서버 저장 주소가 설정되지 않았어요.');
     let entries;
     try {
-      entries = await collectSitemapShares({ fetcher, origin, timeoutMs });
+      entries = await collectSitemapShares({ fetcher, origin, timeoutMs, headers: proxyProofHeaders(env) });
     } catch {
       return jsonError(503, 'sitemap_unavailable', '사이트맵을 만들지 못했어요.');
     }
