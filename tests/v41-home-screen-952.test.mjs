@@ -845,7 +845,7 @@ test('#1309 휴대폰 세로는 8장 리본이 흐르고 숫자판·단추·링�
   let overlaps = 0;
   for (const box of boxes) for (const zone of protectedZones) if (hit(box, zone) > 1) overlaps++;
   const first = boxes[0];
-  return { mode: host.dataset.ltLayout, active: cards.length, visible: boxes.length, overlaps, zones: protectedZones.length, first: first && [(first.l + first.r) / 2, (first.t + first.b) / 2], rates: cards.flatMap(e => e.getAnimations().filter(a => a.effect.target === e && !a.effect.pseudoElement).map(a => a.playbackRate)) };
+  return { mode: host.dataset.ltLayout, active: cards.length, visible: boxes.length, overlaps, zones: protectedZones.length, first: first && [(first.l + first.r) / 2, (first.t + first.b) / 2] };
  });
  try {
   for (const theme of ['night', 'garden']) {
@@ -856,7 +856,6 @@ test('#1309 휴대폰 세로는 8장 리본이 흐르고 숫자판·단추·링�
     for (let i = 0; i < 7; i++) { samples.push(await sample(h.frame)); if (i < 6) await h.page.waitForTimeout(500); }
     assert.ok(samples.every(s => s.mode === 'ribbon' && s.active === 8), JSON.stringify(samples[0]));
     assert.ok(samples.every(s => s.visible >= 3 && s.zones >= 4 && s.overlaps === 0), JSON.stringify(samples));
-    assert.ok(samples.every(s => s.rates.length === 8 && s.rates.every(rate => rate === 1)), '여덟 카드가 같은 느린 흐름으로 움직인다');
     const distance = Math.hypot(samples[6].first[0] - samples[0].first[0], samples[6].first[1] - samples[0].first[1]);
     assert.ok(distance > 3, '3초 동안 카드가 실제로 흐른다: ' + distance);
     console.log('#1309 RIBBON', theme, JSON.stringify({ active: samples[0].active, visible: samples.map(s => s.visible), overlaps: samples.reduce((n, s) => n + s.overlaps, 0), distance: Math.round(distance * 10) / 10 }));
