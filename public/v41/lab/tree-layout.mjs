@@ -5,12 +5,16 @@
 // 카드 크기가 제각각이어도 O(n)이고, 겹침이 없다. 계산은 '뿌리가 위, 자식이 아래'로 하고 마지막에
 // 세로 좌표만 뒤집어 위로 자라게 한다.
 //
-// 이 시안에서 더한 것 두 가지(둘 다 겹침 없는 성질은 그대로다):
+// 이 시안에서 더한 것 세 가지(셋 다 배치 상자로 넣으므로 겹침 없는 성질은 그대로다):
 //  1. 가지 띠 — 부모 카드와 자식 카드 사이에 '띠' 상자를 하나 끼운다. 띠의 가로 폭은 자식들이 놓인 뒤에
 //     정해지고(첫 자식 중심~끝 자식 중심), 가지 곡선은 이 띠 안에서만 휜다. 띠도 배치 상자라서
 //     다른 가지의 카드가 띠에 들어오지 못한다 → 가지가 남의 카드 위를 지나가지 않는다.
+//     옆으로 멀리 뻗는 가지일수록 띠가 높아져(두 번 놓기) 선반처럼 눕지 않고 비스듬히 오른다.
 //  2. 무게 중심 — 부모는 자식들 한가운데가 아니라 '달린 순간 수'로 무게를 준 중심 아래에 선다.
 //     길게 이어진 쪽(줄기)은 거의 곧게 위로 가고, 짧은 갈림은 옆으로 빠진다. 자식이 하나면 정확히 수직이다.
+//  3. 엇갈림 — 한 순간에서 갈림이 많이(5개 이상) 보이면 하나 걸러 하나씩 가지를 길게 뽑아 두 층으로 놓는다.
+//     긴 가지의 곧은 부분도 '대' 상자로 자리를 잡아 두므로 아래층 카드 사이를 정확히 지나간다.
+//     한 줄로 늘어선 빗자루 모양 대신 수관처럼 보이고 폭이 약 40% 줄어든다.
 //
 // 순서: 형제는 데이터 순서(만든 순서) 그대로 왼쪽→오른쪽에 놓는다. 크기로 다시 줄 세우지 않는다.
 
@@ -19,10 +23,11 @@ export const LAYOUT_DEFAULTS = Object.freeze({
   foldShow: 3,      // 접었을 때 보이는 갈림 수(나머지는 '+N개' 묶음 가지)
   gapX: 16,         // 나란한 카드 사이 가로 틈
   gapY: 12,         // 카드와 그 위쪽(가지 띠·다른 가지 카드) 사이 세로 틈
-  bandMin: 44,      // 가지 띠 높이: 자식 하나일 때
-  bandPerChild: 7,  // 자식이 하나 늘 때마다 띠가 높아지는 만큼(넓게 퍼지는 가지는 길게)
-  bandMax: 100,
-  bandPad: 12,      // 띠 양끝 여유 — 가장 굵은 가지 반폭보다 커야 한다
+  bandMin: 44,      // 가지 띠 높이: 곧게 이어질 때
+  bandSlope: 0.1,   // 가지가 옆으로 뻗는 폭 1px마다 띠가 높아지는 만큼
+  bandMax: 150,
+  bandPad: 12,      // 띠·대 양끝 여유 — 가장 굵은 가지 반폭보다 커야 한다
+  staggerOver: 4,   // 보이는 갈림이 이 수를 넘으면 하나 걸러 하나씩 길게 뽑는다(0 = 끔)
   balance: 'weight',// 'weight' = 무게 중심, 'middle' = 첫·끝 자식의 한가운데(고전 tidy tree)
   weightPower: 1.5
 });
@@ -84,9 +89,9 @@ export function visibleChildren(node, options = {}, expanded = null) {
   if (kids.length <= foldOver) return { shown: kids, bundle: null };
   if (expanded && expanded.has(node.id)) return { shown: kids, bundle: { open: true, count: 0, size: 0, hidden: [] } };
   const hidden = kids.slice(foldShow);
-  let size = 0;
-  for (const h of hidden) size += h.size;
-  return { shown: kids.slice(0, foldShow), bundle: { open: false, count: hidden.length, size, hidden } };
+  let size = 0, largest = 1;
+  for (const h of hidden) { size += h.size; largest = Math.max(largest, h.size); }
+  return { shown: kids.slice(0, foldShow), bundle: { open: false, count: hidden.length, size, largest, hidden } };
 }
 
 /* ── 2. 가변 크기 tidy tree (van der Ploeg) ──────────────────────────── */
@@ -261,61 +266,96 @@ export function layoutTree(root, options = {}) {
   const opt = { ...LAYOUT_DEFAULTS, ...options };
   const sizeOf = opt.sizeOf || (() => ({ w: 108, h: 96 }));
   const expanded = opt.expanded || null;
-  if (!root) return { cards: [], bands: [], edges: [], bounds: { minX: 0, maxX: 0, minY: 0, maxY: 0, width: 0, height: 0 }, total: 0, visible: 0, hidden: 0 };
+  if (!root) return { cards: [], bands: [], stems: [], edges: [], bounds: { minX: 0, maxX: 0, minY: 0, maxY: 0, width: 0, height: 0 }, total: 0, visible: 0, hidden: 0 };
 
+  // weight = 그 가지의 무게(달린 순간 수). 굵기와 무게 중심에 쓴다.
   const cardBox = (item) => {
     const s = sizeOf(item);
     const b = box('card', s.w + opt.gapX, s.h + opt.gapY);
     b.item = item; b.cw = s.w; b.ch = s.h;
-    b.weight = item.size;
+    b.weight = item.weight;
     return b;
   };
 
-  const rootItem = { kind: 'moment', id: root.id, node: root, moment: root.moment, root: true, size: root.size, depth: 0, parentId: null };
+  const rootItem = { kind: 'moment', id: root.id, node: root, moment: root.moment, root: true, size: root.size, weight: root.size, depth: 0, parentId: null };
   const rootBox = cardBox(rootItem);
+  const bandBoxes = [];
   const pending = [rootBox];
   while (pending.length) {
     const b = pending.pop();
     const node = b.item.node;
-    if (b.item.kind !== 'moment') continue;
     const { shown, bundle } = visibleChildren(node, opt, expanded);
     b.item.folded = bundle && !bundle.open ? bundle.count : 0;
-    const count = shown.length + (bundle ? 1 : 0);
-    if (!count) continue;
-    const band = box('band', opt.bandPad * 2, Math.min(opt.bandMax, opt.bandMin + opt.bandPerChild * (count - 1)));
+    if (!shown.length && !bundle) continue;
+    const band = box('band', opt.bandPad * 2, opt.bandMin);
     band.owner = b;
     b.c.push(band);
     b.band = band;
+    bandBoxes.push(band);
+    const kids = [];
     for (const child of shown) {
-      const cb = cardBox({ kind: 'moment', id: child.id, node: child, moment: child.moment, root: false, size: child.size, depth: child.depth, parentId: node.id });
-      cb.up = b;
-      band.c.push(cb);
+      const cb = cardBox({ kind: 'moment', id: child.id, node: child, moment: child.moment, root: false, size: child.size, weight: child.size, depth: child.depth, parentId: node.id });
+      kids.push(cb);
       pending.push(cb);
     }
     if (bundle) {
-      const item = bundle.open
-        ? { kind: 'fold', id: node.id + ':fold', node, size: 1, count: node.children.length, depth: node.depth + 1, parentId: node.id }
-        : { kind: 'bundle', id: node.id + ':bundle', node, size: bundle.size, count: bundle.count, depth: node.depth + 1, parentId: node.id };
-      const cb = cardBox(item);
-      cb.up = b;
-      band.c.push(cb);
+      // 묶음은 가지 여럿을 접어 둔 것이라 굵은 가지 하나로 그리지 않는다 — 숨은 갈림 중 가장 큰 것만큼만 굵다.
+      kids.push(cardBox(bundle.open
+        ? { kind: 'fold', id: node.id + ':fold', node, size: 0, weight: 1, count: node.children.length, depth: node.depth + 1, parentId: node.id }
+        : { kind: 'bundle', id: node.id + ':bundle', node, size: bundle.size, weight: bundle.largest, count: bundle.count, depth: node.depth + 1, parentId: node.id }));
     }
+    // 엇갈림: 갈림이 많으면 두 층으로 놓는다. 더 이어지는 갈림은 늘 위층(그 위로 자랄 자리가 필요하다),
+    // 더 이어지지 않는 갈림은 아래층·위층을 번갈아 간다. 위층 가지는 '대' 상자를 딛고 선다.
+    // 대의 높이 = 아래층 카드 상자 가운데 가장 큰 것.
+    const upper = new Array(kids.length).fill(false);
+    let rise = 0;
+    if (opt.staggerOver > 0 && kids.length > opt.staggerOver) {
+      let last = true;
+      kids.forEach((cb, i) => {
+        const grows = cb.item.kind === 'moment' && cb.item.node.children.length > 0;
+        upper[i] = grows || !last;
+        last = upper[i];
+        if (!upper[i]) rise = Math.max(rise, cb.h);
+      });
+      if (rise === 0) upper.fill(false);
+    }
+    kids.forEach((cb, i) => {
+      cb.up = b;
+      if (upper[i]) {
+        const stem = box('stem', opt.bandPad * 2, rise);
+        stem.weight = cb.weight;
+        stem.c.push(cb);
+        cb.stem = stem;
+        band.c.push(stem);
+      } else band.c.push(cb);
+    });
+    band.kids = kids;
   }
 
-  const boxes = tidy(rootBox, opt);
+  // 한 번 놓아 가지가 뻗는 폭을 재고, 그 폭에 맞춰 띠 높이를 정한 뒤 다시 놓는다.
+  let boxes = tidy(rootBox, opt);
+  if (opt.bandSlope > 0) {
+    for (const band of bandBoxes) {
+      const span = band.w - opt.bandPad * 2;
+      band.h = Math.min(opt.bandMax, opt.bandMin + span * opt.bandSlope);
+    }
+    for (const b of boxes) {
+      b.prelim = 0; b.mod = 0; b.shift = 0; b.change = 0; b.tl = null; b.tr = null; b.el = null; b.er = null; b.msel = 0; b.mser = 0;
+      if (b.kind === 'band') { b.w = opt.bandPad * 2; b.ax = b.w / 2; }
+    }
+    boxes = tidy(rootBox, opt);
+  }
 
   // 뿌리 카드 아래 가운데를 (0,0)으로, 세로는 뒤집는다.
   const ox = rootBox.x + rootBox.ax;
-  const cards = [], bands = [], edges = [];
+  const cards = [], bands = [], stems = [], edges = [];
   for (const b of boxes) {
-    if (b.kind === 'band') {
-      bands.push({ parentId: b.owner.item.id, x: b.x - ox, y: -(b.y + b.h), w: b.w, h: b.h });
-      continue;
-    }
+    if (b.kind === 'band') { bands.push({ parentId: b.owner.item.id, x: b.x - ox, y: -(b.y + b.h), w: b.w, h: b.h }); continue; }
+    if (b.kind === 'stem') { stems.push({ id: b.c[0].item.id, x: b.x - ox, y: -(b.y + b.h), w: b.w, h: b.h }); continue; }
     const left = b.x + opt.gapX / 2 - ox;
     const card = {
       id: b.item.id, kind: b.item.kind, moment: b.item.moment || null, root: !!b.item.root,
-      parentId: b.item.parentId, depth: b.item.depth, size: b.item.size, count: b.item.count || 0, folded: b.item.folded || 0,
+      parentId: b.item.parentId, depth: b.item.depth, size: b.item.size, weight: b.item.weight, count: b.item.count || 0, folded: b.item.folded || 0,
       x: left, y: -(b.y + b.ch), w: b.cw, h: b.ch, cx: left + b.cw / 2
     };
     b.card = card;
@@ -325,13 +365,14 @@ export function layoutTree(root, options = {}) {
     if (b.kind !== 'card' || !b.band) continue;
     const p = b.card;
     let main = null;
-    for (const cb of b.band.c) if (!main || cb.item.size > main.item.size) main = cb;
-    for (const cb of b.band.c) {
+    for (const cb of b.band.kids) if (cb.item.kind === 'moment' && (!main || cb.item.weight > main.item.weight)) main = cb;
+    for (const cb of b.band.kids) {
       const c = cb.card;
       edges.push({
-        from: p.id, to: c.id, kind: c.kind, size: c.size, parentSize: p.size, main: cb === main,
+        from: p.id, to: c.id, kind: c.kind, size: c.weight, parentSize: p.weight, main: cb === main,
         x0: p.cx, y0: p.y, x1: c.cx, y1: c.y + c.h,
-        stem: opt.gapY   // 부모 카드 위 이만큼은 곧게 오른 뒤 띠 안에서 휜다
+        stem: opt.gapY,                  // 부모 카드 위 이만큼은 곧게 오른 뒤 띠 안에서 휜다
+        rise: cb.stem ? cb.stem.h : 0    // 엇갈려 올린 가지는 띠를 지난 뒤 이만큼 곧게 더 오른다
       });
     }
   }
@@ -343,7 +384,7 @@ export function layoutTree(root, options = {}) {
     if (c.kind === 'moment') visible++;
   }
   const total = root.size;
-  return { cards, bands, edges, bounds: { minX, maxX, minY, maxY, width: maxX - minX, height: maxY - minY }, total, visible, hidden: total - visible };
+  return { cards, bands, stems, edges, bounds: { minX, maxX, minY, maxY, width: maxX - minX, height: maxY - minY }, total, visible, hidden: total - visible };
 }
 
 /* ── 4. 가지 모양 ─────────────────────────────────────────────────────── */
@@ -373,14 +414,15 @@ export function edgeWidths(edge, total, style = {}) {
 export function branchCurve(edge, style = {}) {
   const lean = style.lean ?? 0.1, k1 = style.k1 ?? 0.5, k2 = style.k2 ?? 0.5;
   const sy = edge.y0 - (edge.stem || 0);
-  const h = sy - edge.y1;
+  const ey = edge.y1 + (edge.rise || 0);
+  const h = sy - ey;
   const dx = edge.x1 - edge.x0;
   return {
-    x0: edge.x0, y0: edge.y0,
+    x0: edge.x0, y0: edge.y0, x1: edge.x1, y1: edge.y1,
     p0: [edge.x0, sy],
     p1: [edge.x0 + dx * lean, sy - h * k1],
-    p2: [edge.x1, edge.y1 + h * k2],
-    p3: [edge.x1, edge.y1]
+    p2: [edge.x1, ey + h * k2],
+    p3: [edge.x1, ey]
   };
 }
 
@@ -402,6 +444,7 @@ export function branchPoints(edge, style = {}, steps = 12) {
   const c = branchCurve(edge, style);
   const pts = [[c.x0, c.y0]];
   for (let i = 0; i <= steps; i++) pts.push(cubicAt(c, i / steps));
+  if (edge.rise) pts.push([c.x1, c.y1]);
   return pts;
 }
 
@@ -427,6 +470,8 @@ export function branchRibbon(edge, w0, w1, style = {}, steps = 12) {
     const ease = t * t * (3 - 2 * t);
     push(p, n[0] < 0 ? [-n[0], -n[1]] : n, w0 + (w1 - w0) * ease);
   }
+  // 엇갈려 올린 가지의 곧은 끝(대): 굵기 w1 그대로.
+  if (edge.rise) push([c.x1, c.y1], [1, 0], w1);
   const outline = leftSide.concat(rightSide.reverse());
   let d = '';
   for (let i = 0; i < outline.length; i++) d += (i ? 'L' : 'M') + outline[i][0].toFixed(1) + ' ' + outline[i][1].toFixed(1);

@@ -44,9 +44,9 @@ const allFoldable = (root) => {
 };
 
 /** 겹치는 쌍과, 가로·세로로 너무 붙은 쌍을 센다. */
-function crowding(cards, bands, gapX, gapY) {
+function crowding(cards, others, gapX, gapY) {
   let overlap = 0, tightX = 0, tightY = 0;
-  const rects = [...cards, ...bands];
+  const rects = [...cards, ...others];
   for (let i = 0; i < rects.length; i++) {
     for (let j = i + 1; j < rects.length; j++) {
       const a = rects[i], b = rects[j];
@@ -188,7 +188,9 @@ test('#777 깊은 나무(한 줄 4,000개)와 넓은 나무(한 순간에 3,000�
   const wide = layoutTree(wideRoot, { sizeOf: SIZES.wide, expanded: new Set([0]) });
   assert.equal(wide.visible, 3001);
   const xs = wide.cards.filter((c) => c.kind === 'moment' && !c.root).map((c) => c.x);
-  for (let i = 1; i < xs.length; i++) assert.ok(xs[i] - xs[i - 1] >= 108 + LAYOUT_DEFAULTS.gapX - EPS);
+  for (let i = 1; i < xs.length; i++) assert.ok(xs[i] > xs[i - 1], '순서 그대로');
+  // 두 층으로 엇갈리므로 같은 층(하나 건너)끼리는 카드 폭 + 틈만큼 떨어진다.
+  for (let i = 2; i < xs.length; i++) assert.ok(xs[i] - xs[i - 2] >= 108 + LAYOUT_DEFAULTS.gapX - EPS);
 });
 
 /* ── 시안 배치: 겹침·방향·순서 ────────────────────────────────────────── */
@@ -196,8 +198,8 @@ test('#777 깊은 나무(한 줄 4,000개)와 넓은 나무(한 순간에 3,000�
 test('#777 겹침 0 — 세 데이터 × 카드 크기 두 벌 × 접힘·펼침, 카드 사이 틈도 지킨다', () => {
   let layouts = 0;
   everyLayout((layout, { label, options }) => {
-    const { overlap, tightX, tightY } = crowding(layout.cards, layout.bands, LAYOUT_DEFAULTS.gapX, LAYOUT_DEFAULTS.gapY);
-    assert.equal(overlap, 0, `${label}: 카드·가지 띠 겹침 ${overlap}쌍`);
+    const { overlap, tightX, tightY } = crowding(layout.cards, [...layout.bands, ...layout.stems], LAYOUT_DEFAULTS.gapX, LAYOUT_DEFAULTS.gapY);
+    assert.equal(overlap, 0, `${label}: 카드·가지 띠·대 겹침 ${overlap}쌍`);
     assert.equal(tightX, 0, `${label}: 가로 틈 ${LAYOUT_DEFAULTS.gapX}px 미만 ${tightX}쌍`);
     assert.equal(tightY, 0, `${label}: 세로 틈 ${LAYOUT_DEFAULTS.gapY}px 미만 ${tightY}쌍`);
     assert.deepEqual(layoutTree(buildHierarchy(dataset(layout.total)), options).cards.map((c) => [c.id, c.x, c.y]), layout.cards.map((c) => [c.id, c.x, c.y]), `${label}: 같은 입력이면 같은 자리`);
@@ -225,7 +227,7 @@ test('#777 무작위 순간 나무 200그루(카드 크기 제각각, 큰 갈림
     const expanded = new Set(seed % 3 === 0 ? allFoldable(root) : []);
     for (const balance of ['weight', 'middle']) {
       const layout = layoutTree(root, { sizeOf, balance, expanded, bandPad: 12 + (seed % 12) });
-      const c = crowding(layout.cards, layout.bands, LAYOUT_DEFAULTS.gapX, LAYOUT_DEFAULTS.gapY);
+      const c = crowding(layout.cards, [...layout.bands, ...layout.stems], LAYOUT_DEFAULTS.gapX, LAYOUT_DEFAULTS.gapY);
       assert.deepEqual(c, { overlap: 0, tightX: 0, tightY: 0 }, `씨앗 ${seed}·${balance}`);
       checkDirectionAndOrder(layout, root, `씨앗 ${seed}·${balance}`);
       assert.equal(layout.visible + layout.hidden, n);
@@ -302,7 +304,8 @@ test('#777 접기 개수: 27갈림 = 3개 + "+24개" 묶음, 누르면(펼침) 2
   assert.deepEqual(kids.filter((c) => c.kind === 'moment').map((c) => c.id), hub.children.slice(0, 3).map((n) => n.id), '앞의 세 갈림이 보인다');
   const bundle = kids.find((c) => c.kind === 'bundle');
   assert.equal(bundle.count, 24);
-  assert.equal(bundle.size, hub.children.slice(3).reduce((s, n) => s + n.size, 0), '묶음 가지는 숨긴 순간 수만큼 굵다');
+  assert.equal(bundle.size, hub.children.slice(3).reduce((s, n) => s + n.size, 0), '묶음이 숨긴 순간 수');
+  assert.equal(bundle.weight, Math.max(...hub.children.slice(3).map((n) => n.size)), '묶음 가지 굵기 = 숨은 갈림 중 가장 큰 것(굵은 가지 하나로 그리지 않는다)');
   assert.equal(folded.cards.find((c) => c.id === hub.id).folded, 24);
   assert.equal(folded.hidden, bundle.size);
   assert.equal(folded.visible, 40 - bundle.size);
@@ -334,6 +337,51 @@ test('#777 접기 경계: 갈림 6개까지는 그대로, 7개부터 3개 + 묶�
   // 120개 데이터: 10갈림 한 곳만 접힌다(3 + 묶음 7), 5갈림은 그대로.
   const big = layoutTree(buildHierarchy(dataset(120)), { sizeOf: SIZES.wide });
   assert.deepEqual(big.cards.filter((c) => c.kind === 'bundle').map((c) => c.count), [7]);
+});
+
+/* ── 엇갈림·띠 높이 ──────────────────────────────────────────────────── */
+
+test('#777 갈림이 많으면 두 층으로 엇갈린다 — 27갈림을 펼친 폭이 한 줄일 때보다 30% 넘게 줄고 순서는 그대로', () => {
+  const root = buildHierarchy(dataset(40));
+  const hub = flat(root).find((n) => n.children.length === 27);
+  const expanded = new Set([hub.id]);
+  const row = layoutTree(root, { sizeOf: SIZES.wide, expanded, staggerOver: 0 });
+  const two = layoutTree(root, { sizeOf: SIZES.wide, expanded });
+  assert.equal(row.stems.length, 0);
+  assert.ok(two.bounds.width < row.bounds.width * 0.7, `한 줄 ${Math.round(row.bounds.width)}px → 두 층 ${Math.round(two.bounds.width)}px`);
+  const kids = two.cards.filter((c) => c.parentId === hub.id);
+  assert.deepEqual(kids.filter((c) => c.kind === 'moment').map((c) => c.id), hub.children.map((n) => n.id), '왼쪽→오른쪽 순서는 데이터 순서');
+  const base = Math.max(...kids.map((c) => c.y + c.h));
+  const upper = kids.map((c) => c.y + c.h < base - EPS);
+  assert.equal(upper.filter(Boolean).length, two.stems.length, '위층 가지마다 대가 하나');
+  for (let i = 1; i < kids.length; i++) assert.ok(upper[i] || upper[i - 1], '아래층 카드가 나란히 붙지 않는다(사이에 위층 가지의 대가 지나간다)');
+  hub.children.forEach((n, i) => { if (n.children.length) assert.ok(upper[i], '더 이어지는 갈림은 위층'); });
+  for (const e of two.edges.filter((x) => x.from === hub.id)) assert.equal(e.rise > 0, upper[kids.findIndex((c) => c.id === e.to)], '올린 가지에만 곧은 대가 있다');
+  // 이어지는 갈림이 없는 27갈림이면 폭이 38% 넘게 준다.
+  const star = buildHierarchy([{ id: 'r', parentId: null, thumb: 'x' }, ...Array.from({ length: 27 }, (_, i) => ({ id: 'k' + i, parentId: 'r', thumb: 'x' }))]);
+  const starRow = layoutTree(star, { sizeOf: SIZES.wide, expanded: new Set(['r']), staggerOver: 0 });
+  const starTwo = layoutTree(star, { sizeOf: SIZES.wide, expanded: new Set(['r']) });
+  assert.ok(starTwo.bounds.width < starRow.bounds.width * 0.62, `한 줄 ${Math.round(starRow.bounds.width)}px → 두 층 ${Math.round(starTwo.bounds.width)}px`);
+  // 접힌 상태(3개 + 묶음)는 갈림이 4개라 엇갈리지 않는다.
+  assert.equal(layoutTree(root, { sizeOf: SIZES.wide }).stems.length, 0);
+});
+
+test('#777 가지 띠 높이: 곧게 이어지면 가장 낮고, 옆으로 뻗을수록 높다(위·아래 한계 안)', () => {
+  everyLayout((layout, { options, label }) => {
+    const pad = options.bandPad;
+    const kidsOf = new Map();
+    for (const c of layout.cards) if (c.parentId !== null) kidsOf.set(c.parentId, (kidsOf.get(c.parentId) || 0) + 1);
+    for (const band of layout.bands) {
+      assert.ok(band.h >= LAYOUT_DEFAULTS.bandMin - EPS && band.h <= LAYOUT_DEFAULTS.bandMax + EPS, `${label}: 띠 높이 ${band.h}`);
+      if (kidsOf.get(band.parentId) === 1) {
+        assert.ok(Math.abs(band.h - LAYOUT_DEFAULTS.bandMin) < EPS, `${label}: 한 줄로 이어지는 띠는 가장 낮다`);
+        assert.ok(Math.abs(band.w - pad * 2) < EPS);
+      }
+    }
+  });
+  const wideFan = layoutTree(buildHierarchy(dataset(40)), { sizeOf: SIZES.wide, expanded: new Set(['b003']) });
+  const chain = layoutTree(buildHierarchy(dataset(10)), { sizeOf: SIZES.wide });
+  assert.ok(Math.max(...wideFan.bands.map((b) => b.h)) > Math.max(...chain.bands.map((b) => b.h)) + 40, '27갈림의 띠가 두 갈래 띠보다 훨씬 높다');
 });
 
 /* ── 가지 모양 ───────────────────────────────────────────────────────── */

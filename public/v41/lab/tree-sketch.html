@@ -1,0 +1,589 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<title>트리 보기 시안 · 이슈 777</title>
+<!-- #777 1단계 시안: 앱 밖 시험 페이지 한 장. 앱(셸·머리줄·탭)과 이어져 있지 않다.
+     자리 계산은 tree-layout.mjs, 시험 데이터는 tree-sketch-data.mjs 가 맡고 이 파일은 그리기와 조작만 한다.
+     색·모서리는 앱의 identity.css 토큰(--lt-*)만 쓴다. 바깥 주소는 부르지 않는다.
+     주소 뒤에 ?n=10|40|120 &style=1|2 &theme=night|garden &open=1(접힌 갈림 펼침) &view=root 를 붙일 수 있다. -->
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="modulepreload" href="./tree-layout.mjs">
+<link rel="modulepreload" href="./tree-sketch-data.mjs">
+<link rel="stylesheet" href="../identity.css">
+<style>
+:root{
+  --ts-bar-h:56px;
+  --ts-page:radial-gradient(120% 90% at 50% 100%,var(--lt-stage-2) 0%,var(--lt-stage) 70%);
+  --ts-card-bg:var(--lt-stage-2);--ts-card-ink:var(--lt-pearl);--ts-card-line:var(--lt-gold-line);
+  --ts-card-shadow:0 14px 30px rgba(0,0,0,.5);
+  --ts-note-bg:var(--lt-paper);--ts-note-ink:var(--lt-ink);
+  --ts-limb:var(--lt-gold-deep);
+  --ts-wood:color-mix(in srgb,var(--lt-gold-deep) 56%,var(--lt-stage-2));
+  --ts-grain:color-mix(in srgb,var(--lt-gold) 46%,transparent);
+  --ts-leaf:color-mix(in srgb,var(--lt-group-5) 78%,var(--lt-stage-2));
+  --ts-soil:color-mix(in srgb,var(--lt-gold-deep) 30%,transparent);
+  --ts-path:var(--lt-gold);
+  --ts-bundle:var(--lt-rose);
+  --ts-btn:rgba(255,255,255,.06);--ts-btn-on:var(--lt-primary);--ts-btn-on-ink:var(--lt-primary-ink);
+}
+html[data-lt-theme=garden]{
+  --ts-page:radial-gradient(120% 90% at 50% 100%,var(--lt-stage-2) 0%,var(--lt-stage) 72%);
+  --ts-card-bg:var(--lt-paper);--ts-card-ink:var(--lt-ink);
+  --ts-card-shadow:var(--lt-garden-shadow);
+  --ts-note-bg:var(--lt-garden-edge);--ts-note-ink:var(--lt-ink);
+  --ts-limb:var(--lt-gold-ink);
+  --ts-wood:color-mix(in srgb,var(--lt-gold-ink) 70%,var(--lt-ink));
+  --ts-grain:color-mix(in srgb,var(--lt-paper) 34%,transparent);
+  --ts-leaf:color-mix(in srgb,var(--lt-group-5) 86%,var(--lt-paper));
+  --ts-soil:color-mix(in srgb,var(--lt-gold-ink) 26%,transparent);
+  --ts-path:var(--lt-rose);
+  --ts-bundle:var(--lt-rose-ink);
+  --ts-btn:rgba(119,91,82,.07);
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--lt-stage);color:var(--lt-pearl);font-family:var(--lt-ui);overflow:hidden;-webkit-text-size-adjust:100%}
+
+/* 위 줄: 시험용 고르개 */
+.ts-bar{position:fixed;inset:0 0 auto 0;z-index:5;min-height:var(--ts-bar-h);display:flex;align-items:center;gap:8px 14px;flex-wrap:wrap;
+  padding:8px max(16px,env(safe-area-inset-right)) 8px max(16px,env(safe-area-inset-left));
+  background:var(--lt-glass-strong);border-bottom:1px solid var(--lt-line)}
+.ts-name{display:flex;align-items:baseline;gap:10px;margin:0 auto 0 0;font-size:15px;font-weight:600;letter-spacing:.02em;white-space:nowrap}
+.ts-name small{font-size:12px;font-weight:400;color:var(--lt-muted);letter-spacing:0}
+.ts-seg{display:flex;align-items:center;gap:6px;margin:0;padding:0;border:0;min-width:0}
+.ts-seg legend{float:left;padding:0;margin-right:2px;font-size:12px;color:var(--lt-muted)}
+.ts-seg button,.ts-hud button{min-height:36px;padding:0 12px;border:1px solid var(--lt-line);border-radius:var(--lt-r-pill);
+  background:var(--ts-btn);color:inherit;font-size:13px;line-height:1;cursor:pointer;white-space:nowrap}
+.ts-seg button:hover,.ts-hud button:hover{border-color:var(--lt-gold-line)}
+.ts-seg button[aria-pressed=true]{background:var(--ts-btn-on);border-color:var(--ts-btn-on);color:var(--ts-btn-on-ink);font-weight:600}
+.ts-seg button:focus-visible,.ts-hud button:focus-visible,.ts-card:focus-visible,.ts-chip:focus-visible{outline:2px solid var(--lt-gold);outline-offset:2px}
+
+/* 무대 */
+.ts-stage{position:fixed;inset:var(--ts-bar-h) 0 0 0;overflow:hidden;background:var(--ts-page);touch-action:none;cursor:grab;outline:0}
+.ts-stage[data-dragging=true]{cursor:grabbing}
+.ts-world{position:absolute;left:0;top:0;width:0;height:0;transform-origin:0 0}
+.ts-stage[data-dragging=true] .ts-world{will-change:transform}
+.ts-stage[data-glide=true] .ts-world{transition:transform .28s cubic-bezier(.2,.7,.2,1)}
+.ts-wood{position:absolute;left:0;top:0;width:1px;height:1px;overflow:visible;pointer-events:none}
+.ts-limb{fill:var(--ts-limb)}
+.ts-stage[data-style="2"] .ts-limb{fill:var(--ts-wood)}
+.ts-limb.is-bundle{fill:color-mix(in srgb,var(--ts-bundle) 62%,var(--ts-limb))}
+.ts-stage[data-style="2"] .ts-limb.is-bundle{fill:color-mix(in srgb,var(--ts-bundle) 46%,var(--ts-wood))}
+.ts-grain{fill:none;stroke:var(--ts-grain);stroke-linecap:round}
+.ts-leaf{fill:var(--ts-leaf)}
+.ts-soil{fill:none;stroke:var(--ts-soil);stroke-linecap:round}
+.ts-root{fill:none;stroke:var(--ts-wood);stroke-linecap:round}
+.ts-lit{fill:var(--ts-path)}
+.ts-stage[data-style="1"] .ts-grain,.ts-stage[data-style="1"] .ts-leaf,.ts-stage[data-style="1"] .ts-root,.ts-stage[data-style="1"] .ts-stump{display:none}
+.ts-stump{fill:var(--ts-wood)}
+.ts-stage.has-pick .ts-limb{opacity:.38}
+
+/* 카드: 첫 화면 금테 카드처럼 바깥 테 + 안쪽 테 두 줄 */
+.ts-cards{position:absolute;left:0;top:0}
+.ts-card,.ts-chip{position:absolute;left:var(--x);top:var(--y);width:var(--w);height:var(--h);margin:0;padding:0;font-family:var(--lt-ui);cursor:pointer;user-select:none;-webkit-user-select:none}
+.ts-card{display:flex;flex-direction:column;overflow:hidden;contain:strict;text-align:left;border:1px solid var(--ts-card-line);border-radius:var(--lt-r-card);
+  background:var(--ts-card-bg);color:var(--ts-card-ink);box-shadow:var(--ts-card-shadow)}
+.ts-card::after{content:'';position:absolute;inset:2px;border:1px solid var(--ts-card-line);border-radius:calc(var(--lt-r-card) - 2px);pointer-events:none;opacity:.7}
+.ts-card:hover{border-color:var(--lt-gold-deep)}
+.ts-thumb{position:relative;display:block;flex:0 0 var(--thumb);height:var(--thumb);background:var(--lt-stage-2);overflow:hidden}
+.ts-thumb img{display:block;width:100%;height:100%;object-fit:cover;pointer-events:none}
+.ts-cap{display:flex;flex-direction:column;justify-content:center;gap:1px;flex:1 1 auto;min-height:0;padding:0 8px}
+.ts-meta{display:flex;align-items:center;gap:5px;font-size:12px;line-height:1.25;color:var(--lt-muted);white-space:nowrap;overflow:hidden}
+.ts-emo{flex:0 0 7px;width:7px;height:7px;border-radius:50%;background:var(--emo,var(--lt-rose))}
+.ts-title{font-size:13px;line-height:1.3;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ts-card[data-emo="0"]{--emo:var(--lt-group-1)}.ts-card[data-emo="1"]{--emo:var(--lt-group-3)}.ts-card[data-emo="2"]{--emo:var(--lt-group-4)}
+.ts-card[data-emo="3"]{--emo:var(--lt-group-2)}.ts-card[data-emo="4"]{--emo:var(--lt-group-5)}.ts-card[data-emo="5"]{--emo:var(--lt-group-6)}
+/* 썸네일이 없는 순간 = 글 카드(종이) */
+.ts-card.is-note{background:var(--ts-note-bg);color:var(--ts-note-ink)}
+.ts-card.is-note .ts-cap{padding:0 10px}
+.ts-card.is-note .ts-title{white-space:normal;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2}
+.ts-card.is-note .ts-meta{color:color-mix(in srgb,var(--ts-note-ink) 72%,transparent)}
+/* 뿌리(첫 순간) */
+.ts-card.is-root{border-color:var(--lt-gold-deep);box-shadow:0 0 0 1px var(--lt-gold-line),0 0 34px var(--lt-gold-glow),var(--ts-card-shadow)}
+.ts-first{position:absolute;left:8px;top:8px;padding:2px 8px;border-radius:var(--lt-r-pill);background:var(--lt-glass-strong);border:1px solid var(--lt-gold-line);
+  color:var(--lt-gold);font-size:12px;line-height:1.4}
+/* 묶음 가지('+24개')와 접기 단추 */
+.ts-chip{display:flex;align-items:center;justify-content:center;border:1px dashed var(--ts-bundle);border-radius:var(--lt-r-pill);
+  background:color-mix(in srgb,var(--ts-bundle) 16%,var(--ts-card-bg));color:var(--ts-bundle);font-size:13px;font-weight:700;line-height:1}
+.ts-chip:hover{background:color-mix(in srgb,var(--ts-bundle) 28%,var(--ts-card-bg))}
+.ts-chip.is-fold{border-style:solid;font-weight:600}
+/* 고른 순간: 뿌리부터 그 순간까지 이어진 길만 또렷하게 */
+.ts-stage.has-pick .ts-card,.ts-stage.has-pick .ts-chip{opacity:.42}
+.ts-stage.has-pick .ts-card.on-path{opacity:1}
+.ts-card.is-pick{border-color:var(--ts-path);box-shadow:0 0 0 2px var(--ts-path),0 0 30px var(--lt-gold-glow),var(--ts-card-shadow)}
+/* 작게 보일 때(전체 보기): 글자는 읽을 수 없으니 사진만 남긴다 */
+.ts-stage[data-lod=far] .ts-card:not(.is-note) .ts-cap,.ts-stage[data-lod=far] .ts-first{display:none}
+.ts-stage[data-lod=far] .ts-card:not(.is-note) .ts-thumb{flex-basis:100%;height:100%}
+.ts-stage[data-lod=far] .ts-card{box-shadow:none}
+.ts-stage[data-lod=far] .ts-card.is-root{box-shadow:0 0 0 2px var(--lt-gold-deep),0 0 40px var(--lt-gold-glow)}
+
+/* 아래: 상태 글과 조작 단추 */
+.ts-hud{position:fixed;right:max(14px,env(safe-area-inset-right));bottom:max(14px,env(safe-area-inset-bottom));z-index:4;display:flex;gap:6px}
+.ts-hud button{min-width:40px;min-height:40px;background:var(--lt-glass-strong)}
+.ts-hud .ts-go{border-color:var(--lt-gold-line);font-weight:600}
+.ts-note{position:fixed;left:max(14px,env(safe-area-inset-left));bottom:max(14px,env(safe-area-inset-bottom));z-index:4;max-width:min(560px,calc(100vw - 28px));margin:0;padding:8px 12px;
+  border:1px solid var(--lt-line);border-radius:var(--lt-r-card);background:var(--lt-glass-strong);font-size:13px;line-height:1.45;color:var(--lt-pearl);pointer-events:none}
+.ts-note span{display:block;font-size:12px;color:var(--lt-muted)}
+.ts-note b{font-weight:600}
+@media(max-width:699px){
+  /* 첫 줄: 이름 + 테마, 둘째 줄: 데이터 + 시안. 상태 글은 위 줄 바로 아래 한 줄, 조작 단추는 아래 한 줄. */
+  .ts-bar{gap:6px 8px;padding-top:6px;padding-bottom:6px}
+  .ts-name{flex:1 1 calc(100% - 130px);min-width:0;margin:0;gap:8px;overflow:hidden;text-overflow:ellipsis}
+  .ts-wide{display:none}
+  #pickTheme{order:1}#pickData{order:2}#pickStyle{order:3;margin-left:auto}
+  .ts-seg legend{display:none}
+  .ts-seg button{padding:0 10px}
+  .ts-note{left:8px;right:8px;top:calc(var(--ts-bar-h) + 8px);bottom:auto;max-width:none;padding:6px 10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .ts-note b,.ts-note span{display:inline}
+  .ts-note b::after{content:' · ';font-weight:400;color:var(--lt-muted)}
+}
+@media(prefers-reduced-motion:reduce){.ts-stage[data-glide=true] .ts-world{transition:none}}
+</style>
+</head>
+<body>
+<header class="ts-bar">
+  <h1 class="ts-name">LoveTree <small>트리 보기 시안 · 이슈 777<span class="ts-wide"> · 앱 밖 시험 페이지</span></small></h1>
+  <fieldset class="ts-seg" id="pickData"><legend>순간</legend>
+    <button type="button" data-n="10" title="한 줄기 + 갈림 2">10개</button>
+    <button type="button" data-n="40" title="한 순간에 갈림 27개">40개</button>
+    <button type="button" data-n="120" title="긴 줄기 + 가지 여럿">120개</button>
+  </fieldset>
+  <fieldset class="ts-seg" id="pickStyle"><legend>시안</legend>
+    <button type="button" data-style="1">① 곡선 가지</button>
+    <button type="button" data-style="2">② 굵은 나무</button>
+  </fieldset>
+  <fieldset class="ts-seg" id="pickTheme"><legend>테마</legend>
+    <button type="button" data-theme="night">밤</button>
+    <button type="button" data-theme="garden">정원</button>
+  </fieldset>
+</header>
+
+<main class="ts-stage" id="stage" tabindex="0" aria-label="트리 보기 — 끌어서 옮기고, 휠이나 두 손가락으로 확대합니다">
+  <div class="ts-world" id="world">
+    <svg class="ts-wood" id="wood" aria-hidden="true"><g id="ground"></g><g id="leaves"></g><g id="limbs"></g><g id="lit"></g></svg>
+    <div class="ts-cards" id="cards"></div>
+  </div>
+</main>
+
+<p class="ts-note" id="note" role="status"></p>
+<div class="ts-hud">
+  <button type="button" class="ts-go" id="goRoot" title="첫 순간(뿌리)을 읽을 수 있는 크기로 보여 줍니다">뿌리로</button>
+  <button type="button" id="goFit" title="나무 전체를 한 화면에 맞춥니다">전체</button>
+  <button type="button" id="zoomOut" aria-label="축소">−</button>
+  <button type="button" id="zoomIn" aria-label="확대">＋</button>
+</div>
+
+<script type="module">
+import { buildHierarchy, layoutTree, branchWidth, edgeWidths, branchRibbon, branchPoints } from './tree-layout.mjs';
+import { dataset, EMOTIONS } from './tree-sketch-data.mjs';
+
+const scriptStart = performance.now();
+const SVG = 'http://www.w3.org/2000/svg';
+const $ = (id) => document.getElementById(id);
+const stage = $('stage'), world = $('world'), cardsEl = $('cards'), note = $('note');
+const layers = { ground: $('ground'), leaves: $('leaves'), limbs: $('limbs'), lit: $('lit') };
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+// 시안 두 개: 자리 규칙은 같고 가지 그리는 법만 다르다(굵은 가지에 맞춰 가지 띠가 조금 넓고 높다).
+const STYLES = {
+  1: { bandPad: 12, bandMin: 44, bandSlope: 0.1, curve: { lean: 0.1, k1: 0.5, k2: 0.5 },
+    width: () => ({ min: 1.6, max: 8, power: 0.6, flare: 1.25 }) },
+  2: { bandPad: 22, bandMin: 56, bandSlope: 0.12, curve: { lean: 0.16, k1: 0.42, k2: 0.6 },
+    width: (n) => ({ min: 2.6, max: clamp(12 + 1.8 * Math.sqrt(n), 14, 34), power: 0.5, flare: 1.35 }) }
+};
+// 카드 크기: 뿌리·사진 카드·글 카드·묶음이 서로 다르다(가변 크기 배치). 좁은 화면은 한 단계 작게.
+const SIZES = {
+  wide: { card: [108, 100, 60], rootCard: [132, 122, 80], noteCard: [108, 66, 0], chip: [80, 38] },
+  narrow: { card: [92, 88, 52], rootCard: [112, 106, 68], noteCard: [92, 60, 0], chip: [68, 34] }
+};
+
+const query = new URLSearchParams(location.search);
+const state = {
+  n: [10, 40, 120].includes(Number(query.get('n'))) ? Number(query.get('n')) : 10,
+  style: query.get('style') === '2' ? 2 : 1,
+  theme: query.get('theme') === 'garden' ? 'garden' : 'night',
+  expanded: new Set(), root: null, layout: null, sizes: SIZES.wide,
+  scale: 1, tx: 0, ty: 0, pick: null, moved: false
+};
+// 숫자로 재는 것: 계산·그리기 시간, 주소를 연 때부터 첫 그림까지, 끌기 중 프레임 간격.
+// 무대 크기는 카드를 넣기 전에 한 번 재 둔다 — 카드 120장을 넣은 뒤에 재면 그 자리에서 전체 배치를 다시 계산하게 된다.
+const view = { w: 0, h: 0 };
+const measure = () => { view.w = stage.clientWidth; view.h = stage.clientHeight; };
+const perf = { scriptStartMs: scriptStart, layoutMs: 0, drawMs: 0, firstBuildMs: null, firstPaintMs: null, drag: null };
+
+const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+const svg = (tag, cls, attrs) => { const e = document.createElementNS(SVG, tag); if (cls) e.setAttribute('class', cls); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; };
+const shortDate = (d) => String(d || '').slice(2).replaceAll('-', '.');
+
+function sizeOf(item) {
+  const s = state.sizes;
+  const pick = item.kind !== 'moment' ? s.chip : item.root ? s.rootCard : item.moment.thumb ? s.card : s.noteCard;
+  return { w: pick[0], h: pick[1] };
+}
+
+/* ── 그리기 ─────────────────────────────────────────────────────────── */
+
+function draw() {
+  const t0 = performance.now();
+  const style = STYLES[state.style];
+  state.sizes = view.w < 700 ? SIZES.narrow : SIZES.wide;
+  const layout = layoutTree(state.root, { sizeOf, expanded: state.expanded, bandPad: style.bandPad, bandMin: style.bandMin, bandSlope: style.bandSlope });
+  state.layout = layout;
+  perf.layoutMs = performance.now() - t0;
+  drawCards(layout);
+  drawWood(layout, style);
+  stage.dataset.style = String(state.style);
+  setPick(state.pick && layout.cards.some((c) => c.id === state.pick) ? state.pick : null);
+  perf.drawMs = performance.now() - t0;
+  tell();
+}
+
+function drawCards(layout) {
+  const frag = document.createDocumentFragment();
+  for (const c of layout.cards) {
+    let node;
+    if (c.kind === 'moment') {
+      const m = c.moment;
+      node = el('button', 'ts-card' + (c.root ? ' is-root' : '') + (m.thumb ? '' : ' is-note'));
+      node.dataset.emo = String(Math.max(0, EMOTIONS.indexOf(m.emotion)));
+      if (m.thumb) {
+        const thumb = el('span', 'ts-thumb');
+        const img = el('img');
+        img.alt = ''; img.decoding = 'async'; img.draggable = false; img.src = m.thumb;
+        thumb.append(img);
+        if (c.root) thumb.append(el('span', 'ts-first', '첫 순간'));
+        node.append(thumb);
+        node.style.setProperty('--thumb', (c.root ? state.sizes.rootCard[2] : state.sizes.card[2]) + 'px');
+      }
+      const cap = el('span', 'ts-cap');
+      const meta = el('span', 'ts-meta');
+      // 카드 폭에 늘 들어가도록 감정은 색 점으로만, 낱말은 고른 순간 안내와 풍선말·읽어 주는 이름에 둔다.
+      meta.append(el('i', 'ts-emo'), document.createTextNode(shortDate(m.date)));
+      node.title = `${m.date} · ${m.emotion} · ${m.title || '제목 없음'}`;
+      cap.append(meta, el('span', 'ts-title', m.title || '제목 없음'));
+      node.append(cap);
+      node.setAttribute('aria-label', `${c.root ? '첫 순간' : '뿌리에서 ' + (c.depth + 1) + '번째'} · ${m.date} · ${m.emotion} · ${m.title || '제목 없음'}`);
+    } else if (c.kind === 'bundle') {
+      node = el('button', 'ts-chip', `+${c.count}개`);
+      node.setAttribute('aria-label', `접힌 갈림 ${c.count}개 펼치기 (순간 ${c.size}개)`);
+    } else {
+      node = el('button', 'ts-chip is-fold', '접기');
+      node.setAttribute('aria-label', `갈림 ${c.count}개를 다시 접기`);
+    }
+    node.type = 'button';
+    node.dataset.id = c.id;
+    node.dataset.kind = c.kind;
+    node.style.setProperty('--x', c.x + 'px'); node.style.setProperty('--y', c.y + 'px');
+    node.style.setProperty('--w', c.w + 'px'); node.style.setProperty('--h', c.h + 'px');
+    frag.append(node);
+  }
+  cardsEl.replaceChildren(frag);
+}
+
+function drawWood(layout, style) {
+  const total = layout.total;
+  const widths = style.width(total);
+  const rootCard = layout.cards[0];
+  // 가는 가지부터 그려 굵은 줄기가 위에 온다 → 갈림에서 곁가지가 줄기 뒤에서 나오는 것처럼 보인다.
+  const edges = layout.edges.map((e) => ({ e, w: edgeWidths(e, total, widths) })).sort((a, b) => a.w[1] - b.w[1]);
+  const limbs = document.createDocumentFragment(), leaves = document.createDocumentFragment();
+  state.ribbons = new Map();
+  for (const { e, w } of edges) {
+    const ribbon = branchRibbon(e, w[0], w[1], style.curve, 14);
+    state.ribbons.set(e.to, ribbon.d);
+    limbs.append(svg('path', 'ts-limb' + (e.kind === 'moment' ? '' : ' is-bundle'), { d: ribbon.d }));
+    if (w[1] >= 7) {
+      // 굵은 가지에만 결 한 줄(시안 ②에서만 보인다).
+      const pts = branchPoints(e, style.curve, 14);
+      limbs.append(svg('path', 'ts-grain', { d: 'M' + pts.map((p) => `${(p[0] - w[1] * 0.18).toFixed(1)} ${p[1].toFixed(1)}`).join('L'), 'stroke-width': Math.max(1, w[1] * 0.12).toFixed(1) }));
+    }
+    if (e.kind === 'moment' && e.size === 1) {
+      // 장식 잎: 가지 끝(더 이어지지 않는 순간)에만 두 장. 카드 아래에 깔려 구조를 가리지 않는다.
+      const pts = branchPoints(e, style.curve, 10);
+      for (const [at, side] of [[7, 1], [9, -1]]) {
+        const [x, y] = pts[at];
+        leaves.append(svg('path', 'ts-leaf', { d: 'M0 0C4 -7 13 -8 18 -2C12 3 4 4 0 0Z', transform: `translate(${x.toFixed(1)} ${y.toFixed(1)}) rotate(${side > 0 ? -28 : 208}) scale(${state.sizes === SIZES.narrow ? 0.8 : 1})` }));
+      }
+    }
+  }
+  layers.limbs.replaceChildren(limbs);
+  layers.leaves.replaceChildren(leaves);
+  // 뿌리 아래: 시안 ①은 흙 선 한 줄, 시안 ②는 밑동과 뿌리.
+  const base = branchWidth(total, total, widths);
+  const ground = document.createDocumentFragment();
+  const half = rootCard.w * 0.9;
+  ground.append(svg('path', 'ts-soil', { d: `M${-half} 20Q0 8 ${half} 20`, 'stroke-width': 1.5 }));
+  ground.append(svg('path', 'ts-stump', { d: `M${-base / 2} -10L${-base / 2} 4C${-base / 2} 14 ${-base * 0.9} 20 ${-base * 1.5} 24L${base * 1.5} 24C${base * 0.9} 20 ${base / 2} 14 ${base / 2} 4L${base / 2} -10Z` }));
+  for (const [dx, dy, k] of [[-2.6, 16, 0.42], [2.6, 16, 0.42], [-1.5, 22, 0.3], [1.6, 22, 0.3]]) {
+    ground.append(svg('path', 'ts-root', { d: `M${dx * base * 0.3} 14Q${dx * base * 0.7} ${14 + dy * 0.4} ${dx * base} ${14 + dy}`, 'stroke-width': (base * k).toFixed(1) }));
+  }
+  layers.ground.replaceChildren(ground);
+}
+
+/* ── 고른 순간 강조 ─────────────────────────────────────────────────── */
+
+function setPick(id) {
+  state.pick = id;
+  const path = new Set();
+  if (id) {
+    const byId = new Map(state.layout.cards.map((c) => [c.id, c]));
+    for (let at = byId.get(id); at; at = byId.get(at.parentId)) path.add(at.id);
+  }
+  stage.classList.toggle('has-pick', !!id);
+  for (const node of cardsEl.children) {
+    node.classList.toggle('on-path', path.has(node.dataset.id));
+    node.classList.toggle('is-pick', node.dataset.id === id);
+    if (node.dataset.kind === 'moment') node.setAttribute('aria-pressed', node.dataset.id === id ? 'true' : 'false');
+  }
+  const lit = document.createDocumentFragment();
+  for (const pid of path) { const d = state.ribbons.get(pid); if (d) lit.append(svg('path', 'ts-lit', { d })); }
+  layers.lit.replaceChildren(lit);
+  tell();
+}
+
+function tell() {
+  const L = state.layout;
+  if (!L) return;
+  const picked = state.pick && L.cards.find((c) => c.id === state.pick);
+  note.replaceChildren();
+  if (picked) {
+    const m = picked.moment;
+    note.append(el('b', '', m.title), el('span', '', `${m.date} · ${m.emotion} · 뿌리에서 ${picked.depth + 1}번째 순간 · 이 순간 위로 ${picked.size - 1}개`));
+    return;
+  }
+  note.append(el('b', '', `순간 ${L.visible}/${L.total}개`));
+  const parts = [];
+  if (L.hidden) parts.push(`접힌 순간 ${L.hidden}개`);
+  if (perf.firstPaintMs != null) parts.push(`첫 그림 ${Math.round(perf.firstPaintMs)}ms(그중 계산·그리기 ${perf.firstBuildMs.toFixed(1)}ms)`);
+  if (perf.drag) parts.push(`끌기 ${perf.drag.frames}프레임 · 가장 긴 간격 ${perf.drag.maxGap.toFixed(1)}ms`);
+  note.append(el('span', '', parts.join(' · ') || '카드를 누르면 뿌리부터 그 순간까지 이어진 길이 밝아집니다'));
+}
+
+/* ── 옮기기·확대 ────────────────────────────────────────────────────── */
+
+// 끌기처럼 한 프레임에 여러 번 부르는 곳은 apply(), 한 번에 자리를 옮기는 곳은 applyNow().
+let frame = 0;
+function applyNow() {
+  if (frame) { cancelAnimationFrame(frame); frame = 0; }
+  world.style.transform = `translate3d(${state.tx}px,${state.ty}px,0) scale(${state.scale})`;
+  const lod = state.sizes.card[0] * state.scale < 62 ? 'far' : 'near';
+  if (stage.dataset.lod !== lod) stage.dataset.lod = lod;
+}
+function apply() {
+  if (!frame) frame = requestAnimationFrame(() => { frame = 0; applyNow(); });
+}
+function glide() {
+  stage.dataset.glide = 'true';
+  clearTimeout(glide.timer);
+  glide.timer = setTimeout(() => { stage.dataset.glide = 'false'; }, 320);
+}
+// 화면에서 상태 글·조작 단추가 가리는 자리(좁은 화면: 위 한 줄 + 아래 한 줄, 넓은 화면: 아래 여백만).
+function insets() {
+  const narrow = view.w < 700;
+  return narrow ? { side: 12, top: 50, bottom: 70 } : { side: 36, top: 28, bottom: 34 };
+}
+function fitAll(animate) {
+  const b = state.layout.bounds, pad = insets();
+  const w = view.w, h = view.h, below = 30;
+  const scale = clamp(Math.min((w - pad.side * 2) / b.width, (h - pad.top - pad.bottom) / (b.height + below)), 0.04, 1);
+  state.scale = scale;
+  state.tx = w / 2 - (b.minX + b.maxX) / 2 * scale;
+  state.ty = pad.top + (h - pad.top - pad.bottom) / 2 - (b.minY + b.maxY + below) / 2 * scale;
+  state.moved = false;
+  if (animate) glide();
+  applyNow();
+}
+function toRoot(animate) {
+  // 뿌리 카드가 읽히는 크기(1배)로, 화면 아래 가운데에 온다.
+  state.scale = 1;
+  state.tx = view.w / 2;
+  state.ty = view.h - insets().bottom - 36;
+  state.moved = true;
+  if (animate) glide();
+  applyNow();
+}
+function zoomAt(factor, px, py) {
+  const next = clamp(state.scale * factor, 0.04, 3);
+  const k = next / state.scale;
+  state.tx = px - (px - state.tx) * k;
+  state.ty = py - (py - state.ty) * k;
+  state.scale = next;
+  state.moved = true;
+  apply();
+}
+const center = () => [view.w / 2, view.h / 2];
+
+const pointers = new Map();
+let drag = null, pinch = null, suppressClick = false, meter = null;
+function startMeter() {
+  meter = { stamps: [], on: true };
+  const tick = (t) => { if (!meter || !meter.on) return; meter.stamps.push(t); requestAnimationFrame(tick); };
+  requestAnimationFrame(tick);
+}
+function stopMeter() {
+  if (!meter) return;
+  meter.on = false;
+  const gaps = [];
+  for (let i = 1; i < meter.stamps.length; i++) gaps.push(meter.stamps[i] - meter.stamps[i - 1]);
+  if (gaps.length > 5) {
+    const sorted = [...gaps].sort((a, b) => a - b);
+    perf.drag = { frames: gaps.length, avgGap: gaps.reduce((a, b) => a + b, 0) / gaps.length, p95Gap: sorted[Math.floor(sorted.length * 0.95)], maxGap: sorted[sorted.length - 1], over20: gaps.filter((g) => g > 20).length, over34: gaps.filter((g) => g > 34).length };
+    if (!state.pick) tell();
+  }
+  meter = null;
+}
+stage.addEventListener('pointerdown', (e) => {
+  if (e.button > 0) return;
+  pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (pointers.size === 1) drag = { id: e.pointerId, x: e.clientX, y: e.clientY, tx: state.tx, ty: state.ty, live: false };
+  if (pointers.size === 2) {
+    const [a, b] = [...pointers.values()];
+    pinch = { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, scale: state.scale };
+    drag = null;
+  }
+});
+stage.addEventListener('pointermove', (e) => {
+  if (!pointers.has(e.pointerId)) return;
+  const before = pointers.get(e.pointerId);
+  pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (pinch && pointers.size === 2) {
+    const [a, b] = [...pointers.values()];
+    const box = stage.getBoundingClientRect();
+    const d = Math.hypot(a.x - b.x, a.y - b.y) || 1;
+    zoomAt(pinch.scale * d / pinch.d / state.scale, (a.x + b.x) / 2 - box.left, (a.y + b.y) / 2 - box.top);
+    state.tx += (e.clientX - before.x) / 2; state.ty += (e.clientY - before.y) / 2;
+    suppressClick = true;
+    return;
+  }
+  if (!drag || drag.id !== e.pointerId) return;
+  if (!drag.live) {
+    if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 5) return;
+    drag.live = true; suppressClick = true;
+    stage.dataset.dragging = 'true';
+    stage.setPointerCapture(e.pointerId);
+    startMeter();
+  }
+  state.tx = drag.tx + e.clientX - drag.x;
+  state.ty = drag.ty + e.clientY - drag.y;
+  state.moved = true;
+  apply();
+});
+function endPointer(e) {
+  pointers.delete(e.pointerId);
+  if (pointers.size < 2) pinch = null;
+  if (drag && drag.id === e.pointerId) {
+    if (drag.live) { stage.dataset.dragging = 'false'; stopMeter(); }
+    drag = null;
+  }
+  // 끌기가 끝난 뒤 뒤따라오는 click 한 번만 막는다.
+  if (suppressClick) setTimeout(() => { suppressClick = false; }, 0);
+}
+stage.addEventListener('pointerup', endPointer);
+stage.addEventListener('pointercancel', endPointer);
+stage.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const box = stage.getBoundingClientRect();
+  zoomAt(Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0016)), e.clientX - box.left, e.clientY - box.top);
+}, { passive: false });
+stage.addEventListener('click', (e) => {
+  if (suppressClick) { e.preventDefault(); e.stopPropagation(); return; }
+  const node = e.target.closest('[data-id]');
+  if (!node) { if (state.pick) setPick(null); return; }
+  if (node.dataset.kind === 'moment') { setPick(state.pick === node.dataset.id ? null : node.dataset.id); return; }
+  // 묶음 가지를 펼치거나 다시 접는다. 그 갈림의 부모 카드가 화면에서 움직이지 않게 자리를 맞춘다.
+  const hubId = node.dataset.id.slice(0, node.dataset.id.lastIndexOf(':'));
+  const before = state.layout.cards.find((c) => c.id === hubId);
+  if (node.dataset.kind === 'bundle') state.expanded.add(hubId); else state.expanded.delete(hubId);
+  draw();
+  const after = state.layout.cards.find((c) => c.id === hubId);
+  state.tx += (before.cx - after.cx) * state.scale;
+  state.ty += (before.y - after.y) * state.scale;
+  apply();
+  cardsEl.querySelector(`[data-id="${CSS.escape(hubId)}"]`)?.focus({ preventScroll: true });
+}, true);
+stage.addEventListener('keydown', (e) => {
+  const step = e.shiftKey ? 240 : 80;
+  const [cx, cy] = center();
+  if (e.key === 'ArrowLeft') state.tx += step; else if (e.key === 'ArrowRight') state.tx -= step;
+  else if (e.key === 'ArrowUp') state.ty += step; else if (e.key === 'ArrowDown') state.ty -= step;
+  else if (e.key === '+' || e.key === '=') return zoomAt(1.25, cx, cy);
+  else if (e.key === '-') return zoomAt(0.8, cx, cy);
+  else if (e.key === '0') return fitAll(true);
+  else if (e.key === 'Home') return toRoot(true);
+  else if (e.key === 'Escape') return setPick(null);
+  else return;
+  e.preventDefault(); state.moved = true; apply();
+});
+// 자판으로 옮겨 간 카드가 화면 밖이면 안으로 데려온다.
+cardsEl.addEventListener('focusin', (e) => {
+  if (!e.target.matches(':focus-visible')) return;
+  const r = e.target.getBoundingClientRect(), s = stage.getBoundingClientRect(), m = 24;
+  const dx = r.left < s.left + m ? s.left + m - r.left : r.right > s.right - m ? s.right - m - r.right : 0;
+  const dy = r.top < s.top + m ? s.top + m - r.top : r.bottom > s.bottom - m ? s.bottom - m - r.bottom : 0;
+  if (dx || dy) { state.tx += dx; state.ty += dy; state.moved = true; glide(); apply(); }
+});
+
+$('goRoot').addEventListener('click', () => toRoot(true));
+$('goFit').addEventListener('click', () => fitAll(true));
+$('zoomIn').addEventListener('click', () => { glide(); zoomAt(1.3, ...center()); });
+$('zoomOut').addEventListener('click', () => { glide(); zoomAt(1 / 1.3, ...center()); });
+
+/* ── 고르개 ─────────────────────────────────────────────────────────── */
+
+function mark() {
+  for (const b of $('pickData').querySelectorAll('button')) b.setAttribute('aria-pressed', String(Number(b.dataset.n) === state.n));
+  for (const b of $('pickStyle').querySelectorAll('button')) b.setAttribute('aria-pressed', String(Number(b.dataset.style) === state.style));
+  for (const b of $('pickTheme').querySelectorAll('button')) b.setAttribute('aria-pressed', String(b.dataset.theme === state.theme));
+  // 앱과 같은 규칙: 속성 없음 = 밤, data-lt-theme=garden = 정원.
+  if (state.theme === 'garden') document.documentElement.setAttribute('data-lt-theme', 'garden');
+  else document.documentElement.removeAttribute('data-lt-theme');
+  const next = new URLSearchParams({ n: state.n, style: state.style, theme: state.theme });
+  history.replaceState(null, '', location.pathname + '?' + next);
+}
+function load(n) {
+  state.n = n;
+  state.root = buildHierarchy(dataset(n));
+  state.expanded = new Set();
+  state.pick = null;
+  mark(); draw(); fitAll(false);
+}
+$('pickData').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) load(Number(b.dataset.n)); });
+$('pickStyle').addEventListener('click', (e) => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  state.style = Number(b.dataset.style);
+  mark(); draw();
+  if (!state.moved) fitAll(false); else apply();
+});
+$('pickTheme').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) { state.theme = b.dataset.theme; mark(); } });
+let resizeTimer = 0;
+addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { measure(); draw(); if (!state.moved) fitAll(false); else apply(); }, 120); });
+
+/* ── 시작 ───────────────────────────────────────────────────────────── */
+
+// 위 줄 높이는 화면 폭에 따라 한 줄·두 줄로 달라진다 — 실제 높이를 재서 무대가 그 아래에서 시작하게 한다.
+const bar = document.querySelector('.ts-bar');
+const syncBar = () => document.documentElement.style.setProperty('--ts-bar-h', Math.ceil(bar.getBoundingClientRect().height) + 'px');
+new ResizeObserver(syncBar).observe(bar);
+syncBar();
+measure();
+
+state.root = buildHierarchy(dataset(state.n));
+if (query.get('open') === '1') {
+  // 접힌 갈림을 처음부터 펼친다(캡처·확인용).
+  const stack = [state.root];
+  while (stack.length) { const n = stack.pop(); if (n.children.length > 6) state.expanded.add(n.id); stack.push(...n.children); }
+}
+mark();
+draw();
+if (query.get('view') === 'root') toRoot(false); else fitAll(false);
+perf.firstBuildMs = perf.drawMs;
+perf.readyMs = performance.now();
+requestAnimationFrame((t1) => { perf.frameOneMs = performance.now(); requestAnimationFrame(() => { perf.firstPaintMs = performance.now(); tell(); }); });
+window.__TREE_SKETCH__ = { state, perf, fitAll, toRoot, zoomAt, setPick, load };
+</script>
+</body>
+</html>
