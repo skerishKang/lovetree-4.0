@@ -206,7 +206,6 @@ html[data-lt-auth-phase=pending] #mobile-add{visibility:hidden;pointer-events:no
  html[data-lt-auth-phase] .app-header .tree-slot{flex:0 0 208px;width:208px}
  html[data-lt-auth-phase] .app-header .account-slot{flex:0 0 80px;width:80px;justify-content:flex-end}
  html[data-lt-auth-phase] .app-header #write-menu{flex:0 0 122px;width:122px}
- html[data-lt-auth-phase] .app-header #write-menu[hidden]{display:flex;visibility:hidden;pointer-events:none}
 }
 /* #1026: 늦게 도착하는 글꼴의 한글 폭을 미리 맞춰 머리줄·안내 문구 이동을 줄인다. */
 @font-face{font-family:'LT UI Metric Fallback';src:local('Malgun Gothic');size-adjust:86%;font-display:swap}
@@ -1263,4 +1262,27 @@ html .tree-frame .tree-views>button#community-menu[aria-current=true]{font-weigh
  html .tree-frame .tree-views>button#community-menu{width:44px;min-width:44px;padding:0;margin-left:2px}
  #community-menu .community-menu-label{display:none}
  #community-menu .header-compass{width:19px;height:19px}
+}
+
+/* #1246: 권한 단추가 없어도 칸은 그대로 둔다. 숨긴 단추는 초점·클릭 대상이 아니다. */
+.app-header .tree-slot{min-height:40px}
+.app-header .tree-slot:has(>#record-menu[hidden])>.tree-prefix,
+html[data-lt-auth-phase=pending] .app-header .tree-prefix{visibility:hidden}
+@media(min-width:781px){
+ .app-header .brand{flex:0 0 112px;width:112px}
+ .app-header .header-actions{display:grid;grid-template-columns:44px 122px 80px;align-items:center}
+ .app-header .header-actions>#theme-toggle{grid-column:1;grid-row:1}
+ .app-header .header-actions>#write-menu{grid-column:2;grid-row:1;width:122px}
+ .app-header .header-actions>.account-slot{grid-column:3;grid-row:1;width:80px;justify-content:flex-end}
+ .app-header .tree-slot{flex:0 0 208px;width:208px}
+ .app-header .tree-prefix{flex:0 0 21px;width:21px;margin-right:8px}
+ .app-header .tree-frame .tree-views{display:grid;grid-template-columns:56px 44px 56px 56px 104px;gap:2px}
+ .app-header .tree-frame .tree-views>button[data-view]{padding-inline:0;width:100%}
+ .app-header .tree-frame .tree-views>button#community-menu{width:96px;padding-inline:0}
+ .app-header .account-slot>#account-entry{width:72px}
+}
+@media(max-width:780px){
+ .app-header .tree-frame .tree-views{width:46px;flex:0 0 46px}
+ .app-header .account-slot>#account-entry{width:56px}
+ .app-header .tree-frame .tree-slot{min-height:40px}
 }
