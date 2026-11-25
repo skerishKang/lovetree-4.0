@@ -1,15 +1,23 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {chromium} from 'playwright';
+import {existsSync} from 'node:fs';
+
 import {serve} from './helpers/screen-audit.mjs';
 import {mkdir} from 'node:fs/promises';
+const REQUIRE=process.env.LT_MOMENTS_1025_REQUIRE==='1';
+let chromium,skipReason=null;
+try{
+ ({chromium}=await import('playwright'));
+ if(!existsSync(chromium.executablePath()))skipReason='브라우저 실행 파일 없음';
+}catch{skipReason='브라우저 모듈 없음';}
 const card=(n,ai)=>({
  shareId:'share'+String(n).padStart(20,'0'),title:ai?'AI 기록 트리':'일반 공개 트리',
  subject:'가수',summary:'공개 기록',momentCount:3,createdAt:'2026-11-20T09:30:00.000Z',
  publicDisplayName:ai?'하늘':'비공개 일반 사용자',aiTester:ai,
  cover:{title:'첫 순간',type:'photo',url:''},stats:{hearts:3,favorites:1,hearted:false,favored:false,reactions:{heart:3},mine:[]}
 });
-test('#1363 정렬 직접 메뉴·검색 입력·#1361 안내 위치 — 390·1440 밤·정원', {timeout:180000},async()=>{
+test('#1363 정렬 직접 메뉴·검색 입력·#1361 안내 위치 — 390·1440 밤·정원', {skip:REQUIRE?false:(skipReason||undefined),timeout:180000},async()=>{
+ if(skipReason)assert.fail(skipReason);
  const server=await serve();const browser=await chromium.launch({headless:true});
  const base='http://127.0.0.1:'+server.address().port;
  const capture=process.env.LT1363_CAPTURE_DIR;
