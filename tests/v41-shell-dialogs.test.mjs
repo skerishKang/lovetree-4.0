@@ -454,7 +454,7 @@ test('보이는 연 버튼(data-lt-return)이 있으면 더보기 버튼으로 �
 // 보내기 전 검사와 보낸 뒤 화면(제목·안내·주 단추)을 실제 값으로 고정한다.
 import { createFeedbackDialog } from '../public/v41/feedback.mjs';
 
-function feedbackHarness({loggedIn = false, recentErrors = null} = {}) {
+function feedbackHarness({loggedIn = false, recentErrors = null, onSent, sendResult} = {}) {
   const make = (props = {}) => ({
     value: '', textContent: '', hidden: false, disabled: false, open: false,
     dataset: {}, listeners: {}, focusCount: 0,
@@ -499,7 +499,8 @@ function feedbackHarness({loggedIn = false, recentErrors = null} = {}) {
     getContext: () => ({screen: '첫 화면', viewport: '1440x900', theme: 'night', version: '4.1', loggedIn, treeId: '', recentErrors: recentErrors !== null ? recentErrors : reportEntries()}),
     show: () => { els['feedback-panel'].open = true; },
     openMyPosts: () => { myPostsOpened += 1; },
-    api: {send: async (payload) => { sent.push(payload); return {ok: true, status: 201}; }}
+    onSent,
+    api: {send: async (payload) => { sent.push(payload); return sendResult || {ok: true, status: 201}; }}
   });
   return {dialog, els, sent, closeButton, myPostsOpenCount: () => myPostsOpened};
 }
@@ -778,4 +779,21 @@ test('의견 창: 기록이 없으면 칸을 숨기고, 기록이 있어도 끄�
     if (box.checked && base[key] !== undefined && base[key] !== null && base[key] !== '') out[key] = base[key];
   }
   assert.equal(out.recentErrors, undefined, '끈 최근 오류 기록은 보내지 않는다');
+});
+
+test('#1273 6번: 보내기 성공하면 응답의 새 의견을 목록쪽으로 넘긴다', async () => {
+  const sentPosts = [];
+  const h = feedbackHarness({
+    loggedIn: true,
+    onSent: post => sentPosts.push(post),
+    sendResult: {ok: true, id: 31, status: 'received', createdAt: '2026-11-24T00:02:00Z', kind: 'opinion', category: 'bug', title: '새 제목', body: '새 의견 본문'}
+  });
+  h.dialog.open();
+  h.els['feedback-category'].value = 'bug';
+  h.els['feedback-body'].value = '새 의견 본문';
+  await h.els['feedback-form'].listeners.submit({preventDefault() {}});
+  assert.equal(sentPosts.length, 1);
+  assert.equal(sentPosts[0].id, 31);
+  assert.equal(sentPosts[0].body, '새 의견 본문');
+  assert.equal(sentPosts[0].kind, 'opinion');
 });

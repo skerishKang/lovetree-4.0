@@ -37,7 +37,7 @@ body:before{content:"MEMORY\A SKETCHBOOK";white-space:pre;position:fixed;left:3.
 .view-toggle{display:inline-flex;flex:none}
 .view-toggle .ui-btn{min-height:44px}
 .view-toggle .ui-btn[aria-pressed=true]{background:var(--gold);border-color:var(--gold);color:#fff}
-@media(max-width:599px){#doubleViewBtn{display:none}}
+
 .ui-btn{border:1px solid rgba(255,255,255,.13);background:rgba(255,255,255,.055);color:#f5ece6;border-radius:999px;padding:8px 12px;cursor:pointer;transition:.18s}
 .ui-btn:hover,.ui-btn.active{background:rgba(205,137,163,.15);border-color:rgba(228,189,203,.4);transform:translateY(-1px)}
 .shelf-back{margin-right:auto;min-height:44px;padding:8px 14px;flex:0 0 auto}
@@ -167,6 +167,8 @@ html[data-lt-theme=garden] .shelf-back:hover{background:var(--lt-glass-strong);b
 .lens:before{content:"";position:absolute;z-index:6;inset:14px;border-radius:50%;box-shadow:inset -18px -22px 25px rgba(85,69,61,.08),inset 12px 8px 18px rgba(255,255,255,.35)}
 .lens:after{content:"";position:absolute;z-index:7;left:46px;top:30px;width:76px;height:24px;border-radius:50%;background:linear-gradient(90deg,rgba(255,255,255,.48),rgba(255,255,255,0));transform:rotate(-27deg);filter:blur(2px)}
 .lens-stage{position:absolute;left:0;top:0;transform-origin:0 0;will-change:transform}
+/* #1231: 닫힌 돋보기의 복제본은 실제 책 페이지의 넘침 판정에 섞이지 않게 배치에서 뺀다. */
+.lens:not(.active) .lens-stage{display:none}
 .lens-handle{position:fixed;z-index:119;width:24px;height:128px;border-radius:16px;background:linear-gradient(90deg,#6e4d39,#a17b58 45%,#5b3d2d);box-shadow:0 13px 21px rgba(0,0,0,.3);transform-origin:12px 4px;transform:rotate(-42deg);pointer-events:none;opacity:0;transition:opacity .15s}
 .lens-handle.active{opacity:1}
 .lens-meta{position:fixed;z-index:121;width:270px;padding:13px 15px;border:1px solid rgba(255,255,255,.12);border-radius:12px;background:rgba(30,21,27,.86);box-shadow:0 16px 30px rgba(0,0,0,.32);pointer-events:none;opacity:0;transform:translateY(5px);transition:.16s}
@@ -200,10 +202,14 @@ html[data-lt-theme=garden] .shelf-back:hover{background:var(--lt-glass-strong);b
 .detail-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:15px}
 .viewer{position:fixed;z-index:140;inset:0;display:grid;place-items:center;padding:20px;background:rgba(16,11,14,.78);backdrop-filter:blur(13px);opacity:0;pointer-events:none;transition:.2s}
 .viewer.open{opacity:1;pointer-events:auto}
-.viewer-card{width:min(840px,94vw);max-height:90vh;overflow:auto;padding:17px;background:#f3ecdf;color:#433a34;border-radius:17px;box-shadow:0 28px 60px rgba(0,0,0,.45)}
+.viewer-card{width:min(840px,94vw);max-height:90vh;overflow:auto;padding:17px;background:var(--lt-paper);color:var(--lt-ink);border-radius:17px;box-shadow:0 28px 60px rgba(0,0,0,.45)}
+/* #1285 8번: 밤에는 종이 대신 무대 토큰 — 밝은 흰 카드로 눈이 부시지 않게 한다. */
+html:not([data-lt-theme=garden]) .viewer-card{background:var(--lt-stage-2);color:var(--lt-pearl)}
 .viewer-top{display:flex;justify-content:flex-end}
 .viewer-top .close{background:#decfc2;color:#5b4943}
-.viewer-media{height:min(56vh,500px);display:grid;place-items:center;overflow:hidden;background:#e7ddcf;border-radius:10px}
+html:not([data-lt-theme=garden]) .viewer-top .close{background:var(--lt-glass-strong);color:var(--lt-pearl)}
+.viewer-media{height:min(56vh,500px);display:grid;place-items:center;overflow:hidden;background:var(--lt-paper);border-radius:10px}
+html:not([data-lt-theme=garden]) .viewer-media{background:var(--lt-stage)}
 .viewer-note{padding:10px;text-align:center}
 .viewer-link-card{padding:38px;font-family:var(--book-serif);font-size:24px;line-height:1.6;text-align:center}
 .viewer-link-meta{font:11px var(--ui-sans);color:#89776f}
@@ -330,6 +336,7 @@ html[data-book-shape=phone] .lens-meta{display:none}
 html[data-book-shape=phone] .mobile-inspect{display:block;position:fixed;z-index:125;width:150px;height:150px;border-radius:50%;overflow:hidden;pointer-events:none;opacity:0;box-shadow:0 18px 36px rgba(0,0,0,.38),inset 0 0 0 7px rgba(239,226,205,.92),inset 0 0 0 9px rgba(100,76,62,.24);background:#efe7d8;transition:opacity .15s}
 html[data-book-shape=phone] .mobile-inspect.active{opacity:1}
 html[data-book-shape=phone] .mobile-lens-stage{position:absolute;left:0;top:0;transform-origin:0 0}
+html[data-book-shape=phone] .mobile-inspect:not(.active) .mobile-lens-stage{display:none}
 html[data-book-shape=phone] .archive-panel{top:auto;bottom:0;width:100%;height:min(83vh,700px);border-radius:22px 22px 0 0;transform:translateY(104%);padding:20px 16px}
 html[data-book-shape=phone] .archive-panel.open{transform:none}
 html[data-book-shape=phone] .detail{left:6px;right:6px;bottom:6px;width:auto;max-height:72vh;border-radius:18px;transform:translateY(110%)}
@@ -423,9 +430,7 @@ html[data-lt-theme=garden] .book-empty{color:var(--lt-ink)}
 .playback-controls button:disabled{opacity:.38;cursor:not-allowed}
 #pbToggle{border-color:var(--gold);background:var(--gold);color:#24170d}
 #pbCloseBottom{margin-left:auto}
-#playAllBtn.playback-launch{width:auto;height:44px;min-height:44px;padding:8px 13px;border:1px solid var(--gold);border-radius:999px;background:var(--gold);color:#24170d;font:700 13px/1 var(--ui-sans);white-space:nowrap}
-#playAllBtn.playback-launch:hover{background:#d8ad77;border-color:#d8ad77}
-html[data-lt-theme=garden] #playAllBtn.playback-launch{border-color:var(--lt-primary,#c76e8b);background:var(--lt-primary,#c76e8b);color:var(--lt-paper,#fffdf8)}
+#playAllBtn.playback-launch{width:auto;height:44px;min-height:44px;padding:8px 13px;white-space:nowrap}
 .playback-status{min-height:20px;margin:8px 2px 0;font-size:12px;line-height:1.5;color:#c8b6ab}
 html[data-lt-theme=garden] .playback{background:rgba(247,240,232,.86)}
 html[data-lt-theme=garden] .playback-card{border-color:rgba(119,91,82,.28);background:linear-gradient(160deg,#fffdf8,#f3e9dc);color:var(--lt-ink,#433a34);box-shadow:0 30px 80px rgba(75,51,42,.24)}

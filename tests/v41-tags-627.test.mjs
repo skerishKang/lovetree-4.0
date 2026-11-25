@@ -10,7 +10,7 @@ import { makeTag, parseTag, normalizeTags, tagValues, tagKey, TAG_KINDS, TAG_MAX
 import { tagFacets, filterMomentsByTags, matchMomentText } from '../public/v41/tag-filter.mjs';
 import { valueLimit } from '../public/v41/tag-line.mjs';
 import { createTree, addMoment, validateState } from '../src/domain.js';
-import { timingRatio, TIMING_RATIO_LIMIT, TIMING_CEILING_MS } from './helpers/timing-ratio.mjs';
+import { timingRatio, countRatio, TIMING_RATIO_LIMIT, TIMING_CEILING_MS } from './helpers/timing-ratio.mjs';
 import { renderTagLine, mountViewTagLine } from '../public/v41/tag-line.mjs';
 import { fakeEl } from './helpers/fake-dom.mjs';
 
@@ -634,6 +634,8 @@ test('suggestForMoments — 순간 300개 계산은 30개에 비해 제곱으로
   // 절대 ms 대신 같은 실행의 30개와 비교한다(#728 CI windows 러너에서 50ms 한도가 88.5ms로 흔들렸다).
   assert.ok(ratio <= TIMING_RATIO_LIMIT, `300개/30개 비율 ${ratio.toFixed(1)}배 ≤ ${TIMING_RATIO_LIMIT}배 (30개 ${smallMs.toFixed(2)}ms · 300개 ${bigMs.toFixed(1)}ms)`);
   assert.ok(bigMs <= TIMING_CEILING_MS, `300순간 한꺼번에 제안 ${bigMs.toFixed(1)}ms ≤ ${TIMING_CEILING_MS}ms`);
+  const counted = countRatio({ small: { fn: suggestForMoments, list: moments.slice(0, 30) }, big: { fn: suggestForMoments, list: moments } });
+  assert.ok(counted.ratio <= TIMING_RATIO_LIMIT, `제안 입력 읽기 300개/30개 ${counted.ratio.toFixed(1)}배 ≤ ${TIMING_RATIO_LIMIT}배 (${counted.smallCount} → ${counted.bigCount})`);
 });
 
 // ── 꼬리표로 찾기·걸러 보기(#627 후속): 순수 계산 — 화면(순간 목록)은 나중에 이 함수를 붙인다.
@@ -711,6 +713,8 @@ test('tagFacets·filterMomentsByTags·matchMomentText — 순간 300개 계산�
   // 절대 ms 대신 같은 실행의 30개와 비교한다(#728 CI windows 러너 흔들림, #731).
   assert.ok(ratio <= TIMING_RATIO_LIMIT, `300개/30개 비율 ${ratio.toFixed(1)}배 ≤ ${TIMING_RATIO_LIMIT}배 (30개 ${smallMs.toFixed(2)}ms · 300개 ${bigMs.toFixed(1)}ms)`);
   assert.ok(bigMs <= TIMING_CEILING_MS, `300순간 꼬리표 걸러 보기 ${bigMs.toFixed(1)}ms ≤ ${TIMING_CEILING_MS}ms`);
+  const counted = countRatio({ small: { fn: measure, list: moments.slice(0, 30) }, big: { fn: measure, list: moments } });
+  assert.ok(counted.ratio <= TIMING_RATIO_LIMIT, `꼬리표 입력 읽기 300개/30개 ${counted.ratio.toFixed(1)}배 ≤ ${TIMING_RATIO_LIMIT}배 (${counted.smallCount} → ${counted.bigCount})`);
 });
 
 // ── #735: 보드에서 붙인 꼬리표가 트리 첫 순간에 저장되던 결함 ─────────────────────────────
@@ -1040,4 +1044,29 @@ test('#37: 순간을 바꾸면 되돌리기 알림을 거둔다', () => {
   line.update({ id: 'm2', title: '다음 순간', keywords: [] });
   assert.equal(String(host.innerHTML).includes('꼬리표를 뺐어요'), false, '다른 순간의 알림을 가져 가지 않는다');
   assert.equal(line.momentId, 'm2');
+});
+
+
+// #1273 1번 — 곡명이 가수로 제안되던 문제. 실제 공식 뮤직비디오 제목 형태를 표로 고정한다.
+test('가수·곡명 구분: 대문자 한 단어·한글 곡명·괄호 병기·꼬리 표시', () => {
+  const cases = [
+    ['BTS (방탄소년단) FIRE (불타오르네) Official MV', ['artist:BTS', 'song:FIRE']],
+    ['BTS (방탄소년단) 봄날', ['artist:BTS', 'song:봄날']],
+    ['BTS (방탄소년단) 피 땀 눈물', ['artist:BTS', 'song:피 땀 눈물']],
+    ['BTS (방탄소년단) Dynamite Official MV', ['artist:BTS', 'song:Dynamite']],
+    ['BTS FIRE (불타오르네) Official MV', ['artist:BTS', 'song:FIRE']],
+    ['방탄소년단 FIRE Official MV', ['song:FIRE']],
+    ['BTS (방탄소년단) FIRE M/V', ['artist:BTS', 'song:FIRE']],
+    ['BTS (방탄소년단) FIRE Official Music Video', ['artist:BTS', 'song:FIRE']],
+    ['BTS FIRE Official MV', ['song:FIRE']],
+    ['뉴진스 (NewJeans) How Sweet Official MV', ['artist:NewJeans', 'song:How Sweet']],
+    ['TWICE "CHEER UP" M/V', ['artist:TWICE', 'song:CHEER UP']],
+    ['BTS (방탄소년단) "피 땀 눈물 (Blood Sweat & Tears)" Official MV', ['artist:BTS', 'song:피 땀 눈물']],
+  ];
+  assert.ok(cases.length >= 10, '실제 제목 형태 10개 이상');
+  for (const [title, expected] of cases) {
+    const got = brief(suggestTagsFromTitle(title));
+    assert.deepEqual(got, expected, title);
+    assert.ok(!got.some((s) => s.startsWith('artist:FIRE')), '곡명 FIRE를 가수로 권하지 않는다: ' + title);
+  }
 });

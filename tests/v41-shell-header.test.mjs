@@ -77,11 +77,11 @@ function harness({ owned = false, trees = 0, tree = null, source = 'example', cu
   return { header, els, store, tips: () => tips, setOwned: (value) => { ownedState = value; }, restore };
 }
 
-test('flowNavigation: 로그아웃이면 트리 탭을 숨기고 "트리 고르기"를 보여 준다', () => {
+test('flowNavigation: 로그아웃에서도 화면 탭을 유지하고 트리 선택만 숨긴다', () => {
   const h = harness({ owned: false, trees: 0, tree: null });
   try {
     h.header.flowNavigation();
-    assert.equal(h.els['tree-views'].hidden, true, '트리 보기 탭 숨김');
+    assert.equal(h.els['tree-views'].hidden, false, '서재·책·보드·지도 화면 탐색 유지(#1231)');
     // #222: 로그아웃은 트리 선택도 숨긴다(글자는 다음 로그인을 위해 '트리 고르기'로 남겨 둔다).
     assert.equal(h.els['record-menu'].hidden, true, '트리 선택은 숨김');
     assert.equal(h.els['source-label'].textContent, '트리 고르기');
@@ -108,12 +108,12 @@ test('flowNavigation: 트리가 있으면 탭·트리 이름·공유가 모두 �
   }
 });
 
-test('flowNavigation: 공유 감상에서는 트리 관련을 숨긴다', () => {
+test('flowNavigation: 방문자는 공용 탭을 쓰고 트리 선택·쓰기만 숨긴다', () => {
   const tree = { id: 't0', title: '리센느', moments: [] };
   const h = harness({ owned: false, trees: 1, tree, source: 'share' });
   try {
     h.header.flowNavigation();
-    assert.equal(h.els['tree-views'].hidden, true);
+    assert.equal(h.els['tree-views'].hidden, false, '공용 책·보드·지도 탭 표시');
     assert.equal(h.els['record-menu'].hidden, true, '트리 선택도 숨김');
     assert.equal(h.els['write-menu'].hidden, true);
     assert.equal(h.els['share-menu'].hidden, true);

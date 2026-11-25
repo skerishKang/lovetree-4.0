@@ -11,7 +11,27 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 jobs:
+  # 2026-11-24: PR마다 Windows로 전체 시험을 돌리면 호스트 실행기를 오래 잡아 다른 PR이 줄을 섰다.
+  # 화면(브라우저에서 도는 파일)·문서·화면 시험만 바뀐 PR은 Windows에서 운영체제 차이가 날 곳이 없어
+  # 시험을 건너뛰고 성공으로 끝낸다(필수 검사 이름은 그대로). main에 들어간 뒤에는 Windows도 항상 다 돈다.
+  # 도구·서버·스크립트·패키지·설정처럼 경로나 운영체제를 타는 파일이 하나라도 바뀌면 PR에서도 다 돈다.
+  os-changes:
+    name: 운영체제 차이 검사 필요 여부
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      changed: ${{ steps.diff.outputs.changed }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: diff
+        run: |
+          if [ "${{ github.event_name }}" != "pull_request" ]; then echo "changed=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+          git diff --name-only '${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }}' > /tmp/os-files.txt || { echo "changed=true" >> "$GITHUB_OUTPUT"; exit 0; }
+          node tools/ci/os-changes.mjs /tmp/os-files.txt
   check:
+    needs: os-changes
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest]
@@ -20,16 +40,24 @@ jobs:
     runs-on: ${{ fromJSON(((github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository) && vars.USE_CGI_RUNNER == '1' && matrix.os == 'ubuntu-latest') && '["self-hosted","Linux","X64","cgi"]' || format('["{0}"]', matrix.os)) }}
     timeout-minutes: 15
     steps:
+      - name: Windows 건너뜀 알림
+        if: matrix.os == 'windows-latest' && needs.os-changes.outputs.changed != 'true'
+        run: echo "운영체제를 타는 파일 변경 없음 — Windows 시험 건너뜀(main 병합 뒤에는 돈다)" >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/checkout@v4
+        if: matrix.os != 'windows-latest' || needs.os-changes.outputs.changed == 'true'
         with:
           clean: true
       - uses: actions/setup-node@v4
+        if: matrix.os != 'windows-latest' || needs.os-changes.outputs.changed == 'true'
         with:
           node-version: 22
           cache: npm
       - run: npm ci
+        if: matrix.os != 'windows-latest' || needs.os-changes.outputs.changed == 'true'
       - run: npm test
+        if: matrix.os != 'windows-latest' || needs.os-changes.outputs.changed == 'true'
       - run: npm run build
+        if: matrix.os != 'windows-latest' || needs.os-changes.outputs.changed == 'true'
   server-changes:
     name: 서버 바뀜 검사
     runs-on: ubuntu-latest

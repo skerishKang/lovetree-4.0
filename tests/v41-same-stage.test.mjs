@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 // #627 후속: 같은 영상·같은 무대 찾기 한 벌(same-stage.mjs) — 동작 시험만 한다(소스 글자 검사 없다).
 import { videoKey, findDuplicates, findSameStage } from '../public/v41/same-stage.mjs';
 import { stageKeyForMoment, findMatchingStageId } from '../src/stage-key.js';
-import { timingRatio, TIMING_RATIO_LIMIT, TIMING_CEILING_MS } from './helpers/timing-ratio.mjs';
+import { timingRatio, countRatio, TIMING_RATIO_LIMIT, TIMING_CEILING_MS } from './helpers/timing-ratio.mjs';
 
 test('videoKey — 주소 모양 열여덟 가지(watch·youtu.be·shorts·m.youtube·embed·t=·ytimg)', () => {
   const cases = [
@@ -120,6 +120,11 @@ test('300개 순간 계산은 30개에 비해 제곱으로 느려지지 않는�
   assert.ok(dup.bigMs <= TIMING_CEILING_MS, `findDuplicates 300개 ${dup.bigMs.toFixed(1)}ms ≤ ${TIMING_CEILING_MS}ms`);
   assert.ok(stage.ratio <= TIMING_RATIO_LIMIT, `findSameStage 300개/30개 비율 ${stage.ratio.toFixed(1)}배 ≤ ${TIMING_RATIO_LIMIT}배 (30개 ${stage.smallMs.toFixed(2)}ms · 300개 ${stage.bigMs.toFixed(1)}ms)`);
   assert.ok(stage.bigMs <= TIMING_CEILING_MS, `findSameStage 300개 ${stage.bigMs.toFixed(1)}ms ≤ ${TIMING_CEILING_MS}ms`);
+  // 시간과 무관하게 입력 읽기 횟수도 선형이어야 한다(제곱 구현이면 약 100배).
+  for (const [name, fn] of [['findDuplicates', findDuplicates], ['findSameStage', findSameStage]]) {
+    const counted = countRatio({ small: { fn, list: moments.slice(0, 30) }, big: { fn, list: moments } });
+    assert.ok(counted.ratio <= TIMING_RATIO_LIMIT, `${name} 입력 읽기 300개/30개 ${counted.ratio.toFixed(1)}배 ≤ ${TIMING_RATIO_LIMIT}배 (${counted.smallCount} → ${counted.bigCount})`);
+  }
 });
 
 test('findSameStage — 묶음 열쇠는 값에 나올 수 없는 구분자로 잡는다(| 값이어도 안 뭉개진다)', () => {

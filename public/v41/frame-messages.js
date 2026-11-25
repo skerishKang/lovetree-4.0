@@ -10,10 +10,13 @@
   }
 
   const messages = Object.freeze({
-    selection: fromView('lt-selection', 'id'),
+    selection: fromView('lt-selection', 'id, boardState? (noHistory: 기록 없이 현재 순간만 갱신)'),
     account: fromView('lt41-account', '없음'),
     advanced: fromShell('lt41-advanced', 'value'),
     boardSaved: fromShell('lt41-board-saved', 'ok, error?'),
+    boardDetail: fromShell('lt41-board-detail', 'open'),
+    boardPanel: fromView('lt41-board-panel', 'state'),
+    boardRestore: fromShell('lt41-board-restore', 'momentId, detailOpen, view?, scroll?, panel?, cinemaIndex?'),
     boardSync: fromView('lt41-board-sync', 'treeId, moments'),
     // 셸은 옛 화면에서 같은 이름으로 보낸 판 선택도 받는다.
     boardTheme: Object.freeze({ name: 'lt41-board-theme', from: '셸·화면', to: '화면·셸', payload: 'value' }),

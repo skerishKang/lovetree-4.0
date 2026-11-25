@@ -54,7 +54,7 @@ test('실행(390): 머리줄은 접어 한 줄로 남고, 더보기 메뉴에 �
     assert.equal(folded.treeViews, false, '390: 서재·책·보드·지도 탭은 접힌다');
     assert.equal(folded.write, false, '390: ＋ 순간 추가는 접힌다');
     assert.equal(folded.more, true, '390: 더보기(☰) 단추는 보인다');
-    assert.ok(folded.headerHeight < 80, `390: 머리줄은 한 줄(${folded.headerHeight}px)`);
+    assert.equal(folded.headerHeight, 57, `390: 머리줄은 한 줄 57px(${folded.headerHeight}px)`);
 
     await page.click('#mobile-more');
     await page.waitForFunction(() => !document.getElementById('header-overflow')?.hidden, null, { timeout: 5000 });
@@ -64,7 +64,7 @@ test('실행(390): 머리줄은 접어 한 줄로 남고, 더보기 메뉴에 �
     }));
     assert.deepEqual(
       menu.items,
-      ['첫 화면', '둘러보기', '서재', '책', '보드', '지도', '＋ 순간 추가', '의견 보내기'],
+      ['첫 화면', '둘러보기', '서재', '트리', '보드', '책', '지도', '＋ 순간 추가', '의견 보내기'],
       '접기 메뉴도 맨 위 메뉴와 같은 구조·순서다(#380 2번, 261117 서재 첫 자리)'
     );
     assert.equal(menu.current, '첫 화면', '지금 보는 화면 항목에 aria-current가 있다(#458)');

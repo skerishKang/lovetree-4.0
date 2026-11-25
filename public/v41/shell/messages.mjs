@@ -7,6 +7,7 @@ import {parseTag,tagKey,isChannelLikeArtist} from '../tags.mjs';
 // #480 L13: 날짜는 책·보드·지도·첫 화면과 같은 한 벌(formatDisplayDate)로만 적는다.
 import {formatDisplayDate} from '../book-usability.mjs';
 import {copyPublicMoment} from '../moments-copy.mjs';
+import {thumbnailCandidates} from '../thumb-fallback.mjs';
 // #1072 A-16: 화면 공용 오류 기록 — 저장·보드·미디어 경로에서 조용히 넘기던 빈 catch를 여기서 기록한다.
 import {report} from '../report.mjs';
 
@@ -72,7 +73,7 @@ export function createMessages(deps) {
     if (data?.type === MSG.viewer) { document.body.classList.toggle('lt-viewer-open', data.open === true); return; }
     // 4.1 기억 보드 저장: 화면이 만든 순간·연결·배치를 기존 워크스페이스 저장 경로로 보낸다.
     if (data?.type === MSG.boardSync) {
-      const reply = (ok, error) => { try { event.source?.postMessage({type:MSG.boardSaved, ok, error}, location.origin); } catch {} };
+      const reply = (ok, error) => { try { event.source?.postMessage({type:MSG.boardSaved, ok, error, ...(typeof data.requestId === 'string' ? {requestId:data.requestId} : {})}, location.origin); } catch {} };
       if (getSource() !== 'server' || !getMember()?.snapshot().writable) { reply(false, '서버 편집 연결이 없어 저장하지 않았어요.'); return; }
       try { getMember().apply('boardSync', {moments: data.moments}, {treeId: data.treeId}); reply(true); }
       catch (error) { report(error, '보드 저장'); reply(false, error?.message || '저장하지 못했어요.'); }
@@ -132,11 +133,13 @@ export function createMessages(deps) {
       if (data.view === 'track32-bookshelf.html' && !getMember()?.snapshot().owned) { openLoginStart('shelf'); return; }
       show(data.view);
     }
-    if (data?.type === MSG.select && window.LT41?.tree.moments.some(m => m.id === data.id)) {
-      window.LT41.momentId = data.id; links(); writeLocation();
+    if ((data?.type === MSG.selection || data?.type === MSG.select) && window.LT41?.tree.moments.some(m => m.id === data.id)) {
+      // #1333: 트리 보기에서 고른 순간은 현재 순간으로만 반영하고 방문 기록은 늘리지 않는다.
+      window.LT41.momentId = data.id; links(); writeLocation(data.noHistory || data.boardState?.noHistory ? 'replace' : 'push', data.boardState);
     }
+    if (data?.type === MSG.boardDetail) { writeLocation('replace'); return; }
     // #315: 공유 감상(share)은 읽기 전용이다. 안쪽 화면의 버튼 정리를 통과한 쓰기 메시지가 남아도 여기서 막는다(이중).
-    if (data?.type === MSG.newTree) { openNewTree(); return; }
+    if (data?.type === MSG.newTree) { if (getSource() !== 'share') openNewTree(); return; }
     if (data?.type === MSG.write && getSource() === 'share') return;
     if (data?.type === MSG.write && data.mode === 'edit' && data.momentId) {
       const targetTree = data.treeId
@@ -190,8 +193,15 @@ export function createMessages(deps) {
       return;
     }
     // 트리 칩 순서(2026-11-17, 대표 결정): 계정 설정 칸(state.prefs.treeChipOrder)에 저장 — 기존 setPrefs 한 길.
-    if (data?.type === MSG.prefs && data.patch?.treeChipOrder && getSource() === 'server') {
-      try { getMember().apply('setPrefs', { treeChipOrder: data.patch.treeChipOrder }); } catch (error) { notify(error?.message || '순서를 저장하지 못했어요.'); }
+    if (data?.type === MSG.prefs && (data.patch?.treeChipOrder || data.patch?.bookDisplay === 'book' || data.patch?.bookDisplay === 'list') && getSource() === 'server') {
+      try {
+        const patch = {};
+        if (data.patch.treeChipOrder) patch.treeChipOrder = data.patch.treeChipOrder;
+        if (data.patch.bookDisplay === 'book' || data.patch.bookDisplay === 'list') patch.bookDisplay = data.patch.bookDisplay;
+        getMember().apply('setPrefs', patch);
+        if (window.LT41) window.LT41.prefs = getMember().state().prefs;
+        if (patch.bookDisplay) try { localStorage.setItem('lt41.bookDisplay', patch.bookDisplay); } catch {}
+      } catch (error) { notify(error?.message || '순서를 저장하지 못했어요.'); }
       return;
     }
     // #1096: 지도의 '잇기'에서 온 요청도 같은 트리의 기존 reparent·link·unlink 길만 쓴다.
@@ -245,7 +255,7 @@ export function createMessages(deps) {
     if (data?.type === MSG.example && exampleTree?.moments?.some(m => m.id === data.momentId) && ['track59-sketchbook.html', 'track58-pinboard.html'].includes(data.view)) {
       sample({treeId: exampleTree.id, momentId: data.momentId}, data.view);
     }
-    if (data?.type === MSG.selection || data?.type === MSG.choose) { links(); writeLocation(); }
+    if (data?.type === MSG.choose) { links(); writeLocation(); }
   });
 
   function sharePayload() {
@@ -359,7 +369,19 @@ export function createMessages(deps) {
     const answer = await shareApi.list();
     if (answer.ok) renderShareList(answer.shares); else $('share-list').textContent = shareFailure(answer);
   }
+  // #1285 5번: 그림 없는 고르기 칸 옆에 고른 순간의 작은 표지를 붙인다.
+  function paintShareMomentThumb() {
+    const img = $('share-moment-thumb');
+    if (!img) return;
+    const chosen = window.LT41?.tree?.moments?.find((m) => m.id === $('share-moment')?.value);
+    const src = chosen ? (thumbnailCandidates(chosen)[0] || '') : '';
+    img.onerror = () => { img.hidden = true; };
+    const show = /^https?:\/\//.test(src);
+    img.hidden = !show;
+    img.src = show ? src : '';
+  }
   function invalidateSharePreview() {
+    paintShareMomentThumb();
     sharePreviewKey = ''; sharePreviewToken = '';
     $('share-create').disabled = true;
     $('share-preview-result').hidden = true;
@@ -381,6 +403,7 @@ export function createMessages(deps) {
       $('share-moment').append(o);
     }
     $('share-moment').value = window.LT41.momentId;
+    paintShareMomentThumb();
     // #368 3차: 처음 열 보기는 설정의 공유 기본값으로 시작한다(공유마다 바꿀 수 있다).
     $('share-view').value = getShareDefaults().view;
     sharePreviewKey = ''; sharePreviewToken = '';

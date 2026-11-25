@@ -89,6 +89,14 @@ exit 0
 EOF
 cat > "$bin/curl" <<'EOF'
 #!/usr/bin/env bash
+# FAKE_REQUIRE_PROOF가 있으면 출처 확인 머리말(-K - 표준입력 설정)이 맞을 때만 200, 아니면 403.
+# 머리말 값이 명령줄 인자에 들어오면 실패로 본다(ps에 보이면 안 된다).
+if [[ -n "${FAKE_REQUIRE_PROOF:-}" ]]; then
+  for a in "$@"; do [[ "$a" == *"$FAKE_REQUIRE_PROOF"* ]] && { printf 'argv_leak'; exit 0; }; done
+  cfg=""; [[ " $* " == *" -K - "* ]] && cfg=$(cat)
+  if [[ "$cfg" == *"x-lovetree-proxy-proof: $FAKE_REQUIRE_PROOF"* ]]; then printf '200'; else printf '403'; fi
+  exit 0
+fi
 printf '%s' "${FAKE_HTTP_CODE:-200}"
 exit 0
 EOF
@@ -243,7 +251,7 @@ pass next_sha_and_retention
 
 # 서버·화면 공통 판정 파일이 단독으로 바뀌어도 그 커밋을 설치한다.
 mkdir -p "$seed/public/v41"
-for module in src/domain.js src/moment-range.js src/stage-key.js public/v41/tags.mjs public/v41/youtube-id.mjs; do
+for module in src/domain.js src/moment-range.js src/stage-key.js public/v41/tags.mjs public/v41/tree-open-view.mjs public/v41/youtube-id.mjs; do
   printf '\n// updated\n' >> "$seed/$module"
   release=$(push_commit "update $module")
   run_autodeploy
@@ -251,6 +259,17 @@ for module in src/domain.js src/moment-range.js src/stage-key.js public/v41/tags
   assert_eq "$release" "$(field installed_sha)" "$module"
 done
 pass shared_server_modules
+
+# #1250: 서버가 머리말 없는 요청을 막는 모드에서도 확인 요청이 .env의 공유 값으로 통과한다.
+proof_value=test-proof-value-0123456789abcdef0123456789
+printf 'LOVETREE_PROXY_SECRET="%s"\n' "$proof_value" > "$app/.env"
+printf 'v5\n' > "$seed/server/index.js"
+G=$(push_commit g)
+run_autodeploy env FAKE_REQUIRE_PROOF="$proof_value"
+assert_eq "$G" "$(field installed_sha)" proof_installed
+assert_eq "installed" "$(field result)" proof_result
+if grep -q "$proof_value" "$root/run.log"; then fail proof_value_logged; fi
+pass health_check_sends_proxy_proof
 
 # 8) 수동 install.sh가 같은 잠금 파일을 쓰는지(정적 확인 — 적용 경로에 flock이 있어야 한다)
 grep -q 'lovetree-api-deploy.lock' "$repo_root/deploy/host-com2/lovetree-api/install.sh" || fail install_lock_path_missing

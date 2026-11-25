@@ -33,11 +33,12 @@ const measureHome = async (frame, { worst = false } = {}) => {
     const sr = document.querySelector('main#orbit').shadowRoot;
     const c = sr.querySelector('.center');
     const zone = c ? window.__ltZoneOf(c.getBoundingClientRect(), sr.querySelector('.app').getBoundingClientRect()) : null;
-    const nodes = [...sr.querySelectorAll('.card')], hook=globalThis.__LT_ORBIT_TEST__, poses=hook?.poses()||[], rasters=hook?.rasterStats()||[];
+    const nodes = [...sr.querySelectorAll('.card')], hook=globalThis.__LT_ORBIT_TEST__, poses=hook?.poses()||[], rasters=hook?.rasterStats()||[],ribbon=document.querySelector('main#orbit').dataset.ltLayout==='ribbon';
     const origin=sr.querySelector('.app').getBoundingClientRect(),visible=[],rects=[];
     for(let i=0;i<nodes.length;i++){
       const el=nodes[i],p=poses[i],s=rasters[i];
-      if(!p||!s||el.classList.contains('clash')||getComputedStyle(el).display==='none')continue;
+      if(!p||(!ribbon&&!s)||el.classList.contains('clash')||el.classList.contains('off')||getComputedStyle(el).display==='none')continue;
+      if(ribbon){const r={l:origin.left+p.box.l,t:origin.top+p.box.t,r:origin.left+p.box.r,b:origin.top+p.box.b};if(r.r-r.l<2||r.r<0||r.b<0||r.l>innerWidth||r.t>innerHeight)continue;visible.push(el);rects.push(r);continue;}
       const xs=[],ys=[];
       for(const x of [-s.guardW/2,s.guardW/2])for(const y of [-s.guardH/2,s.guardH/2]){
         const u=x+p.fx,v=y+p.fy,q=1-(p.zx*u+p.zy*v)/1200;
@@ -148,11 +149,12 @@ const frameOf = async (page) => {
   return frame;
 };
 
-const openHome = async (browser, base, { width, height, member, reducedMotion = 'no-preference' }) => {
+const openHome = async (browser, base, { width, height, member, reducedMotion = 'no-preference', theme = null }) => {
   const mobile = width <= 650;
   const context = await browser.newContext({ viewport: { width, height }, isMobile: mobile, hasTouch: mobile, reducedMotion });
   const page = await context.newPage();
   await addCiFont(page);
+  if (theme) await page.addInitScript((t) => localStorage.setItem('lt41.theme', t), theme);
   await page.goto(`${base}${member === 'in' ? '/__lt535-host.html' : '/v41/'}`, { waitUntil: 'domcontentloaded' });
   const frame = await frameOf(page);
   assert.ok(frame, '첫 화면 안쪽 문서가 열린다');
@@ -284,11 +286,13 @@ s('#535 카드끼리 겹친 면적을 줄였다(1440·1920·390, 안전 구역 �
           best.intrude = Math.max(best.intrude, d.intrude);
           await page.waitForTimeout(500);
         }
+        const activeCards = w === 390 ? await frame.evaluate(() => [...document.querySelector('main#orbit').shadowRoot.querySelectorAll('.card')].filter(e => !e.classList.contains('off')).length) : null;
         await context.close();
         console.log('OVERLAP_949', tag, member, JSON.stringify({ cards: best.cards, pairs: best.pairs, area: best.area, intrude: best.intrude, zone: best.zone, centerRect: best.centerRect, font: best.font }));
         assert.equal(best.intrude, 0, `${tag}/${member}: 가운데 안전 구역 침범 0`);
-        // 261116 PR 2: 로그인 첫 화면은 위쪽 '+ 순간 추가'·정보 줄이 가운데를 차지해 좁은 폭에서 궤도가 더 숨긴다. #780 후속: 390 로그인 예시(mix-empty 포함)는 궤도를 숨기므로 기준 0장, 나머지는 9장을 유지한다.
-        const minCards = (w === 390 && member === 'in') ? 0 : 9;
+        // #1309: 390은 8장 리본을 유지하고, 흐름상 화면에 보이는 카드는 6장 이상이다.
+        const minCards = w === 390 ? 6 : 9;
+        if (w === 390) assert.equal(activeCards, 8, '390 리본은 8장을 유지한다');
         assert.ok(best.cards >= minCards, `${tag}/${member}: 카드가 사라지지 않는다(실제 ${best.cards}장, 기준 ${minCards}장)`);
         // 전 값: 1440 269k·292k / 1920 277k·301k / 390 44k·36k
         assert.ok(best.area <= limit.area, `${tag}/${member}: 겹친 면적 합이 줄었다(실제 ${best.area}px², 한도 ${limit.area})`);
@@ -478,4 +482,62 @@ s('#942 모든 자리 lg 카드도 가운데를 침범하지 않는다(390·1440
     }
   } finally { await browser.close(); }
 }, { timeout: 300000 });
+
+// #1382: 부유가 살아 있는 동안에도 접근성 상자(.card)가 캔버스에 그린 카드와 같은 자리에 있어야 한다.
+// 누름 판정(hitProjective)은 캔버스 투영을 그대로 쓰므로 바꾸지 않는다 — 여기서는 상자만 잰다.
+s('#1382 카드 DOM 상자 중심과 그려진 카드 중심 차이 4px 이하(1440·844·390 × 밤·정원)', async () => {
+  const browser = await chromium.launch({ headless: true });
+  const rows = [];
+  try {
+    for (const [width, height] of [[1440, 900], [844, 390], [390, 844]]) for (const theme of ['night', 'garden']) {
+      const { context, frame } = await openHome(browser, lib.base, { width, height, member: 'in', theme });
+      try {
+        await frame.waitForFunction(() => globalThis.__LT_ORBIT_TEST__?.canvasReady());
+        await frame.waitForTimeout(600);
+        // 정지 상태에서는 모든 보이는 카드가 4px 이하여야 한다(멈출 때 전부 맞춘다).
+        const stopped = await frame.evaluate(() => {
+          const api = globalThis.__LT_ORBIT_TEST__; api.hold(true);
+          const host = document.getElementById('orbit'), root = host.shadowRoot;
+          const poses = api.poses(), cards = [...root.querySelectorAll('.card')];
+          const origin = root.querySelector('.app').getBoundingClientRect();
+          const errors = []; let first = -1;
+          for (let i = 0; i < cards.length; i++) {
+            const p = poses[i], el = cards[i];
+            if (!p || p.hidden || el.classList.contains('off') || el.classList.contains('clash') || getComputedStyle(el).display === 'none') continue;
+            const r = el.getBoundingClientRect();
+            errors.push(Math.hypot((r.left + r.right) / 2 - origin.left - (p.box.l + p.box.r) / 2,
+              (r.top + r.bottom) / 2 - origin.top - (p.box.t + p.box.b) / 2));
+            if (first < 0) first = i;
+          }
+          return { total: cards.length, measured: errors.length, max: errors.length ? Math.max(...errors) : 0, first };
+        });
+        // 움직이는 중에는 초점 카드만 매 프레임 맞는다 — 그 카드도 4px 이하여야 한다.
+        await frame.evaluate((idx) => {
+          const api = globalThis.__LT_ORBIT_TEST__; api.hold(false);
+          const root = document.getElementById('orbit').shadowRoot;
+          const surface = [...root.querySelectorAll('.card')][idx]?.querySelector('.surface');
+          surface?.focus({ preventScroll: true });
+        }, stopped.first);
+        await frame.waitForTimeout(200);
+        const focused = await frame.evaluate((idx) => {
+          const api = globalThis.__LT_ORBIT_TEST__, poses = api.poses();
+          const host = document.getElementById('orbit'), root = host.shadowRoot;
+          const el = [...root.querySelectorAll('.card')][idx], p = poses[idx];
+          if (!el || !p) return { max: null };
+          const r = el.getBoundingClientRect(), origin = root.querySelector('.app').getBoundingClientRect();
+          return { max: Math.hypot((r.left + r.right) / 2 - origin.left - (p.box.l + p.box.r) / 2,
+            (r.top + r.bottom) / 2 - origin.top - (p.box.t + p.box.b) / 2) };
+        }, stopped.first);
+        rows.push({ width, height, theme, ...stopped, focusedMax: focused.max });
+      } finally { await context.close(); }
+    }
+  } finally { await browser.close(); }
+  console.log('#1382 DOM/그림 중심 차이', JSON.stringify(rows));
+  for (const r of rows) {
+    assert.ok(r.total >= 20, `${r.width}x${r.height} ${r.theme}: 카드 20장 이상(실제 ${r.total}장)`);
+    assert.ok(r.measured > 0, `${r.width}x${r.height} ${r.theme}: 잰 카드가 있다`);
+    assert.ok(r.max <= 4, `${r.width}x${r.height} ${r.theme}: 정지 상태 중심 차이 4px 이하(실제 ${Math.round(r.max * 100) / 100}px)`);
+    assert.ok(r.focusedMax !== null && r.focusedMax <= 4, `${r.width}x${r.height} ${r.theme}: 초점 카드 중심 차이 4px 이하(실제 ${Math.round(r.focusedMax * 100) / 100}px)`);
+  }
+});
 

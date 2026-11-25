@@ -14,9 +14,9 @@ export function createWorkspaceRuntime(ctx){
 
   function showInFrame(url,title){return ctx.shellScreens.showInFrame(url,title);}
 
-  function show(file,write=true,treeKey=''){
+  function show(file,write=true,treeKey='',fromHeaderTab=false){
    if(file==='src064-orbit.html')ctx.shellStageLoading.start('home');else ctx.shellStageLoading.cancel();
-   return ctx.shellScreens.show(file,write,treeKey);
+   return ctx.shellScreens.show(file,write,treeKey,fromHeaderTab);
   }
 
   function frameLoaded(frame){return ctx.shellScreens.frameLoaded(frame);}
@@ -24,7 +24,7 @@ export function createWorkspaceRuntime(ctx){
   // #380 5번: '정리하기' 입구는 트리 ▾ 드롭다운 한 곳에서만 그린다(renderTreeMenu). 헤더 단추는 없앴다.
   function viewContext(){}
 
-  function choose(id,momentId,skipShow=false){const tree=ctx.model.trees.find(t=>t.id===id);window.LT41=tree?{tree,trees:ctx.model.trees,source:ctx.source,momentId:tree.moments.find(m=>m.id===momentId)?.id||tree.moments.find(m=>m.parentId===null)?.id||tree.moments[0]?.id,prefs:(0,ctx.currentPrefs)(),writable:ctx.source==='server'&&!!ctx.member?.snapshot().writable,}:null;
+  function choose(id,momentId,skipShow=false){const tree=ctx.model.trees.find(t=>t.id===id);if(skipShow&&window.LT41?.tree?.id===tree?.id){window.LT41.momentId=tree.moments.find(m=>m.id===momentId)?.id||tree.moments.find(m=>m.parentId===null)?.id||tree.moments[0]?.id;window.LT41.prefs=(0,ctx.currentPrefs)();window.LT41.writable=ctx.source==='server'&&!!ctx.member?.snapshot().writable;return;}window.LT41=tree?{tree,trees:ctx.model.trees,source:ctx.source,momentId:tree.moments.find(m=>m.id===momentId)?.id||tree.moments.find(m=>m.parentId===null)?.id||tree.moments[0]?.id,prefs:(0,ctx.currentPrefs)(),writable:ctx.source==='server'&&!!ctx.member?.snapshot().writable,}:null;
     if(!skipShow&&(tree||ctx.current==='src064-orbit.html'))show(ctx.current,false,id||'');
    else if(!skipShow||!tree){(0,ctx.flowNavigation)();document.body.classList.remove('home-screen');hideFrames();
     // 261118 대표 결정: 트리 0개 계정이 주소(#my/shelf 등)로 바로 들어와도 그 화면의 빈 상태(#817)를 보여 준다 —
@@ -35,18 +35,33 @@ export function createWorkspaceRuntime(ctx){
   // 백업 파일 열기는 계정 없이 쓰는 입구라 로그인 상태에서는 숨긴다(로그아웃은 지금 그대로 둔다).
   // 2026-11-17 대표 결정: 트리 0개 계정이 서재·책·보드·지도탭을 열면 그 화면의 빈 상태를 보여 준다.
   function paintEmptyForScreen(file){
+    const empty=(0,ctx.$)('empty');
+    const owned=!!ctx.member?.snapshot().owned;
     const shelf=file==='track32-bookshelf.html';
-    if(shelf)(0,ctx.$)('empty').dataset.emptyView='shelf';else delete (0,ctx.$)('empty').dataset.emptyView;
-    (0,ctx.$)('empty').querySelector('h1').textContent=shelf?'아직 책장이 비어 있어요.':'아직 트리가 없어요.';
-    (0,ctx.$)('empty').querySelector('p').textContent=shelf?'첫 순간을 담으면 책장에 책이 꽂혀요.':'좋아하는 영상 주소 하나면 시작돼요.';
-    (0,ctx.$)('empty-records').textContent=shelf?'＋ 새 트리':'＋ 첫 순간 추가';
+    if(shelf&&owned)empty.dataset.emptyView='shelf';else delete empty.dataset.emptyView;
+    if(!owned){
+      // 2026-11-23: 로그아웃 탭은 예시 트리 대신 보드와 같은 빈 상태를 보여 준다.
+      const name=({'track32-bookshelf.html':'서재','track61-tree.html':'트리','track59-sketchbook.html':'책','track58-pinboard.html':'보드','track56-network.html':'지도','track60-graph.html':'지도'})[file]||'기록';
+      empty.dataset.emptyGuest='1';
+      empty.querySelector('h1').textContent=`로그인하면 내 ${name}${name==='책'?'이':'가'} 보여요`;
+      empty.querySelector('p').textContent='로그인한 계정의 기록을 이 화면에서 볼 수 있어요.';
+      (0,ctx.$)('empty-records').textContent='로그인';
+    }else{
+      delete empty.dataset.emptyGuest;
+      empty.querySelector('h1').textContent=shelf?'아직 책장이 비어 있어요.':'아직 트리가 없어요.';
+      empty.querySelector('p').textContent=shelf?'첫 순간을 담으면 책장에 책이 꽂혀요.':'좋아하는 영상 주소 하나면 시작돼요.';
+      (0,ctx.$)('empty-records').textContent=shelf?'＋ 새 트리':'＋ 첫 순간 추가';
+    }
     (0,ctx.$)('empty-records').hidden=false;(0,ctx.$)('empty-records').classList.add('primary');
     (0,ctx.$)('empty-sample').hidden=true;(0,ctx.$)('empty-file').hidden=true;
+    // #822 6단계: 트리가 아직 없는 내 계정에는 '이미 모아 둔 영상이 있나요? 북마크에서 가져오기' 한 줄을 함께 보인다.
+    void ctx.bookmarkEmptyEntry?.show(owned&&!!ctx.member?.snapshot().writable);
   }
 
   function paintEmptyCopy(){
     const owned=!!ctx.member?.snapshot().owned;
     delete (0,ctx.$)('empty').dataset.emptyView;
+    delete (0,ctx.$)('empty').dataset.emptyGuest;
     (0,ctx.$)('empty').querySelector('h1').textContent=owned?'아직 트리가 없어요.':'다시 펼칠 순간을 기다리고 있어요.';
    // #463(2026-11-13): 트리 0개(로그인)는 처음 온 사람용 한 줄로. 예전 문구는 다시 온 사람용이었고
    // ("예시를 둘러보거나..."), 떠 있는 카드가 예시라는 것도 모호했다.
@@ -60,6 +75,8 @@ export function createWorkspaceRuntime(ctx){
    (0,ctx.$)('empty-records').classList.toggle('primary',owned);
    (0,ctx.$)('empty-sample').classList.toggle('primary',!owned);
    (0,ctx.$)('empty-file').hidden=owned;
+   // #822 6단계: 북마크 입구 한 줄은 화면별 빈 상태(paintEmptyForScreen)에서만 보인다 — 이 문구로 바뀌면 거둔다.
+   void ctx.bookmarkEmptyEntry?.show(false);
   }
 
   // #977: 작업 공간을 읽다 예외가 나도 셸 전체가 멈추지 않게 한다.

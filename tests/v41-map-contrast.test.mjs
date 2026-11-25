@@ -16,6 +16,19 @@ try { ({ chromium } = await import('playwright')); if (!existsSync(chromium.exec
 catch { skip = 'playwright 패키지가 없음'; }
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.woff2': 'font/woff2' };
 
+async function clickToolbar(frame, selector) {
+  const button = frame.locator(selector);
+  let openedMore = false;
+  if (!(await button.isVisible())) {
+    const more = frame.locator('.lt-screen-toolbar .lt-toolbar-more');
+    await more.click();
+    openedMore = true;
+    await button.waitFor({ state: 'visible', timeout: 5000 });
+  }
+  await button.click();
+  if (openedMore) await frame.locator('.lt-screen-toolbar .lt-toolbar-more').click();
+}
+
 function serve(root) {
   const server = createServer(async (req, res) => {
     const clean = decodeURIComponent((req.url || '/').split('?')[0]);
@@ -70,8 +83,8 @@ test('지도 실제 대비: 앱 2 × 판 2 × 1440·390, 두 보기·선택 상�
         await page.waitForTimeout(500);
         const results = [];
         for (const view of ['network', 'tag', 'time']) {
-          if (view === 'tag') { await frame.locator('#viewConc').click(); await settleMap(frame); }
-          if (view === 'time') { await frame.locator('#viewGraph').click(); await settleMap(frame); }
+          if (view === 'tag') { await clickToolbar(frame, '#viewConc'); await settleMap(frame); }
+          if (view === 'time') { await clickToolbar(frame, '#viewGraph'); await settleMap(frame); }
           for (const state of view === 'network' ? ['overview', 'focus', 'cluster'] : ['overview', 'focus']) {
             if (state === 'focus') {
               await settleMap(frame);
@@ -101,8 +114,8 @@ test('지도 실제 대비: 앱 2 × 판 2 × 1440·390, 두 보기·선택 상�
             }
             evidence.push({ tag, canvas: measured.canvas, dom: measured.dom });
             if (OUT) await writeFile(path.join(OUT, `${tag}.png`), measured.screenshot);
-            if (state === 'focus') { await frame.locator('#detailClose').click(); await frame.locator('#overviewBtn').click(); await settleMap(frame); }
-            if (state === 'cluster') { await frame.locator('#overviewBtn').click(); await settleMap(frame); }
+            if (state === 'focus') { await frame.locator('#detailClose').click(); await clickToolbar(frame, '#overviewBtn'); await settleMap(frame); }
+            if (state === 'cluster') { await clickToolbar(frame, '#overviewBtn'); await settleMap(frame); }
           }
         }
         const worst = worstMapRoles(results), canvasRoles = new Set(worst.filter(r => r.kind === 'canvas').map(r => r.role)), domRoles = new Set(worst.filter(r => r.kind === 'dom').map(r => r.role));

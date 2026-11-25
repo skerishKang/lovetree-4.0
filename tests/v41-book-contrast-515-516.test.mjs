@@ -79,7 +79,7 @@ async function openBook(browser, base, width, theme) {
   return { ctx, page, frame, errors };
 }
 
-test('#515·#516 정원 책: 이유 줄·보기 알약(고른 쪽/안 고른 쪽)·페이지 수가 4.5:1 이상', { skip: REQUIRE ? false : skip, timeout: 180000 }, async () => {
+test('#515·#516 정원 책: 이유 줄·보기 알약·페이지 수·도구 줄 전환이 4.5:1 이상', { skip: REQUIRE ? false : skip, timeout: 180000 }, async () => {
   if (skip) assert.fail(`미리보기 검사에서는 화면 대비 시험 건너뜀이 실패다 — ${skip}`);
   const server = await serve(ROOT);
   const base = `http://127.0.0.1:${server.address().port}`;
@@ -94,6 +94,19 @@ test('#515·#516 정원 책: 이유 줄·보기 알약(고른 쪽/안 고른 쪽
         const single = await measure(page, frame, '#singleViewBtn');
         const double = await measure(page, frame, '#doubleViewBtn');
         const pageLabel = await measure(page, frame, '#pageLabel');
+        const toolbar = [];
+        for (const selector of ['#book-display-inline button[aria-checked="true"]', '#book-display-inline button[aria-checked="false"]', '#book-view-toggle button[aria-pressed="true"]', '#book-view-toggle button[aria-pressed="false"]']) {
+          const row = await measure(page, frame, selector);
+          if (row) toolbar.push(row);
+        }
+        const dimensions = await frame.evaluate(() => ['#book-display-inline', '#book-view-toggle'].map(selector => [...document.querySelector(selector).children].filter(el => el.tagName === 'BUTTON').map(el => { const r = el.getBoundingClientRect(); return [r.width, r.height]; })));
+        for (const pair of dimensions) assert.deepEqual(pair[0], pair[1], `${width}·${theme}: 도구 줄 선택·비선택 칸 크기 같음`);
+        const idle = frame.locator('#book-display-inline button[aria-checked="false"]');
+        const beforeHover = await idle.evaluate(el => { const s = getComputedStyle(el); return { bg: s.backgroundColor, color: s.color, cursor: s.cursor }; });
+        await idle.hover();
+        const afterHover = await idle.evaluate(el => { const s = getComputedStyle(el); return { bg: s.backgroundColor, color: s.color, cursor: s.cursor }; });
+        assert.notDeepEqual([afterHover.bg, afterHover.color], [beforeHover.bg, beforeHover.color], `${width}·${theme}: 비선택 도구 줄 칸 마우스 올림 변화`);
+        assert.equal(afterHover.cursor, 'pointer');
         await ctx.close();
         assert.equal(errors.length, 0, `${width}·${theme}: 페이지 오류 ${errors.join(' | ')}`);
         assert.ok(pageLabel, `${width}·${theme}: 페이지 수를 찾지 못함`);
@@ -110,6 +123,7 @@ test('#515·#516 정원 책: 이유 줄·보기 알약(고른 쪽/안 고른 쪽
           if (!row) continue;
           if (theme === 'garden' && row.ratio < 4.5) failures.push(`${width}·정원 ${name} ${row.color}/${row.bg} = ${row.ratio}:1`);
         }
+        for (const row of toolbar) if (row.ratio < 4.5) failures.push(`${width}·${theme} 도구 줄 ${row.text} ${row.color}/${row.bg} = ${row.ratio}:1`);
         if (theme === 'garden' && pageLabel.ratio < 4.5) failures.push(`${width}·정원 페이지 수 ${pageLabel.color}/${pageLabel.bg} = ${pageLabel.ratio}:1`);
       }
     }

@@ -4,6 +4,7 @@
 import {ownerSelectionRoute,accountPosition,rememberAccountPosition,resolveAccountPosition,parseSelectionRoute} from '../selection-location.mjs';
 import {journeyRouteDecision} from '../first-journey.mjs';
 import {screenForView,viewForFile} from './navigation.mjs';
+import {MSG} from '../frame-messages.mjs';
 
 export function createLocation(deps) {
   const {$} = deps;
@@ -25,13 +26,52 @@ export function createLocation(deps) {
   const openFirstJourney = deps.openFirstJourney;
   const finishJourney = deps.finishJourney;
   const leaveJourney = deps.leaveJourney;
+  const links = deps.links;
+  let handledBoardDetail = !!globalThis.history?.state?.lt41BoardDetail;
+  let handledBoardPanel = globalThis.history?.state?.lt58Panel || '';
+
+  function boardDetailOpen() {
+    if (getCurrent() !== 'track58-pinboard.html') return false;
+    try {
+      return !!$('view')?.contentDocument?.querySelector('#detail.open');
+    } catch {
+      return false;
+    }
+  }
+
+  function locationState() {
+    return getCurrent() === 'track58-pinboard.html'
+      ? { lt58Board: true, lt41BoardDetail: boardDetailOpen() }
+      : null;
+  }
+
+  function boardScroll() {
+    try {
+      const viewport = $('view')?.contentDocument?.getElementById('viewport');
+      return { left: viewport?.scrollLeft || 0, top: viewport?.scrollTop || 0 };
+    } catch {
+      return { left: 0, top: 0 };
+    }
+  }
+
+  function pushBoardPanel(state) {
+    history.replaceState({
+      ...(history.state || {}),
+      lt58Board: true,
+      lt58MomentId: state?.lt58MomentId,
+      lt58View: state?.lt58View,
+      lt58Scroll: state?.lt58Scroll
+    }, '', location.hash);
+    history.pushState(state, '', location.hash);
+    handledBoardPanel = state?.lt58Panel || '';
+  }
 
   function ownerPosition() {
     const c = window.LT41;
     return c ? {treeId: c.tree.id, momentId: c.momentId, view: viewForFile(getCurrent())} : null;
   }
 
-  function writeLocation(mode = 'push') {
+  function writeLocation(mode = 'push', boardState = null) {
     const position = ownerPosition();
     const owned = getSource() === 'server' && getMember()?.snapshot().owned && position;
     const shareId = getActiveShareId();
@@ -40,13 +80,34 @@ export function createLocation(deps) {
     // 공유 기록을 새로 읽어 '감상' 안내가 되풀이되고, 로그아웃 상태에서는 공유 상태에서 빠져나오지 못한다.
     const shareView = ['book', 'board', 'network'].includes(viewForFile(getCurrent()));
     const hash = getSource() === 'share' && shareId && shareView ? `#share/${shareId}/${viewForFile(getCurrent())}` : owned ? ownerSelectionRoute(position) : '#' + viewForFile(getCurrent());
-    if (location.hash !== hash) history[mode === 'replace' ? 'replaceState' : 'pushState'](null, '', hash);
+    const state = locationState();
+    const detailChanged = !!state?.lt41BoardDetail !== handledBoardDetail;
+    if (mode === 'push' && owned && getCurrent() === 'track58-pinboard.html' && globalThis.history?.state?.lt58Board) {
+      history.replaceState({
+        ...(history.state || {}),
+        lt58Board: true,
+        lt58MomentId: position?.momentId,
+        lt58View: boardState?.lt58View || globalThis.history?.state?.lt58View,
+        lt58Scroll: boardState?.lt58Scroll || boardScroll()
+      }, '', location.hash);
+    }
+    if (location.hash !== hash) history[mode === 'replace' ? 'replaceState' : 'pushState'](state, '', hash);
+    // 같은 주소에서는 담긴 상태가 달라졌을 때만 바꾼다(#1297 '같은 주소는 바꾸지 않음'과 #1292 보드 상태 기록을 함께 지킨다).
+    else if (mode === 'replace' && JSON.stringify(globalThis.history?.state ?? null) !== JSON.stringify(state ?? null)) history.replaceState(state, '', hash);
+    else if (detailChanged) history.pushState(state, '', hash);
+    handledBoardDetail = !!state?.lt41BoardDetail;
+    handledBoardPanel = '';
     setHandled(hash);
     if (owned) rememberAccountPosition(localStorage, getMember().snapshot().subject, position);
   }
 
   function applyBrowserLocation() {
-    if (location.hash === deps.getHandled()) return;
+    const historyState = globalThis.history?.state;
+    const detailOpen = historyState?.lt58Board ? !!historyState.lt41BoardDetail : parseSelectionRoute(location.hash).view === 'board';
+    const panel = historyState?.lt58Panel || '';
+    if (location.hash === deps.getHandled() && detailOpen === handledBoardDetail && panel === handledBoardPanel) return;
+    handledBoardDetail = detailOpen;
+    handledBoardPanel = panel;
     setHandled(location.hash);
     const journeyRoute = journeyRouteDecision({hash: location.hash, open: getCurrent() === 'first-journey.html', saved: journey.saved()});
     if (journeyRoute.action === 'goto') { gotoJourneyStep(journeyRoute.step); return; }
@@ -61,6 +122,7 @@ export function createLocation(deps) {
     // 돌아왔을 때 share 상태가 남으면 탭 줄이 숨고(서재 단추에 닿지 않음) 화면을 옮길 때마다
     // 공유 기록을 다시 읽어 '감상' 안내가 되풀이된다. 내 기록 주소(owner)는 기존 로그인 이어 주기 그대로 둔다.
     if (getSource() === 'share' && route.scope !== 'owner') { deps.leaveShare?.(screenForView(route.view)[1]); return; }
+    const previousFile = getCurrent();
     setCurrent(screenForView(route.view)[1]);
     if (route.scope === 'owner') {
       if (getSource() !== 'server' || !getMember()?.snapshot().owned) { show(getCurrent(), false); void startMember(); return; }
@@ -70,8 +132,16 @@ export function createLocation(deps) {
       // choose()가 안에서 show()로 지도 프레임을 새로 띄우므로, 표시는 choose 전에 남긴다.
       if (route.view === 'network' && route.momentId && resolved.position.momentId === route.momentId) requestNetworkOpen(route.momentId);
       // #891: 보드 주소가 특정 순간을 가리키고 그 순간을 찾았을 때만 상세 판 자동 열림을 요청한다.
-      if (route.view === 'board' && route.momentId && resolved.position.momentId === route.momentId) requestBoardOpen(route.momentId);
-      choose(resolved.position.treeId, resolved.position.momentId);
+      if (route.view === 'board' && previousFile === 'track58-pinboard.html' && window.LT41?.tree?.id === resolved.position.treeId) {
+        choose(resolved.position.treeId, resolved.position.momentId, true);
+        const frame = $('view')?.contentWindow;
+        const state = globalThis.history?.state;
+        frame?.postMessage({ type: MSG.boardRestore, momentId: resolved.position.momentId, detailOpen, view: state?.lt58View, scroll: state?.lt58Scroll, panel: state?.lt58Panel, cinemaIndex: state?.lt58CinemaIndex }, location.origin);
+        links?.();
+      } else {
+        if (route.view === 'board') requestBoardOpen?.(detailOpen && resolved.position.momentId === route.momentId ? route.momentId : null);
+        choose(resolved.position.treeId, resolved.position.momentId);
+      }
       if (resolved.treeMissing || resolved.momentMissing) {
         writeLocation('replace');
         notify(resolved.treeMissing ? '이 주소의 기록을 현재 계정에서 찾을 수 없어 최근 위치를 열었어요.' : '이 주소의 순간을 찾을 수 없어 트리의 시작 순간을 열었어요.');
@@ -81,6 +151,11 @@ export function createLocation(deps) {
     show(getCurrent(), false);
   }
 
+  addEventListener('message', event => {
+    if (event.origin !== location.origin || event.data?.type !== MSG.boardPanel) return;
+    if (event.source !== $('view')?.contentWindow && event.source !== $('view-next')?.contentWindow) return;
+    pushBoardPanel(event.data.state);
+  });
   addEventListener('popstate', applyBrowserLocation);
   addEventListener('hashchange', applyBrowserLocation);
 

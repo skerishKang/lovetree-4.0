@@ -15,6 +15,7 @@
 // 크롬이 없는 곳에서는 화면 시험을 건너뛰고, LT_635A_REQUIRE=1(미리보기 검사)에서는 건너뜀을 실패로 본다.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { inspectYoutubeIframe, countYoutubeAutoplay } from './helpers/youtube-embed-audit.mjs';
 import { createServer } from 'node:http';
 import { createReadStream, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
@@ -475,10 +476,7 @@ test('#635 PR C 규칙(정적): 시작 입구·첫날 표기·크게 보기 대�
   /* #book-dup2: 여백 60→68px — 보라색 책 테두리(.book-cover)가 wrap 아래로 14px 내려와 60px로는
      테두리 아래끝이 링크 줄 위 11px(정원에서는 10px 겹침)이었다. 68px로 테두리 아래끝을 링크 줄 위 17px에 둔다. */
   assert.match(layout, /padding:24px 14px 68px/, '390 책 화면: 아래 고정 링크 줄과 책 테두리가 겹치지 않게 16px 이상 띄울 여백을 둔다');
-  const orbit = read('src/views/orbit.js');
-  assert.match(orbit, /<span class="center-hint">드래그 · 금테 카드를 눌러 감상<\/span>/, '첫 화면 안내는 안내 줄 옆에 함께 그린다');
-  assert.ok(!orbit.includes('<div class="hint">드래그'), '첫 화면 오른쪽 아래 고정 안내(링크 줄과 겹치던)는 치웠다');
-  assert.match(orbit, /\.center-note\{display:flex;flex-wrap:wrap/, '안내 줄은 단추 묶음 바로 아래에서 두 문장을 나란히 쓴다');
+  // #1204 removed the old two-line orbit guidance; its absence and spacing are browser-tested.
 });
 
 // 실제 셸(/v41/)을 여는 도우미 — 로그아웃 상태 그대로(예시 기록).
@@ -576,7 +574,14 @@ test('#635 PR C 화면: 메뉴 시작 입구·첫날 표기·크게 보기 대�
             assert.ok(spacing >= 16, `${width}·${theme}: 책과 링크 줄 사이가 ${spacing}px다(16px 이상)`);
           }
           await shot(page, `book-after-${width}-${theme}`);
-          await frame.click('#overviewBtn');
+          const overviewButton = frame.locator('#overviewBtn');
+          if (!(await overviewButton.isVisible())) {
+            const moreButton = frame.locator('.lt-toolbar-more');
+            assert.equal(await moreButton.isVisible(), true, `${width}·${theme}: 접힌 도구를 여는 단추가 없다`);
+            await moreButton.click();
+            await overviewButton.waitFor({ state: 'visible', timeout: 5000 });
+          }
+          await overviewButton.click();
           await frame.waitForFunction(() => (document.querySelector('#journeySummary')?.textContent || '').length > 0, null, { timeout: 8000 });
           const summary = await frame.evaluate(() => document.querySelector('#journeySummary').textContent.trim());
           assert.match(summary, /^\d+단계 · (첫날|\d+일째)$/, `${width}·${theme}: '이어진 순간' 요약이 첫날·N일째 모양이 아니다(${summary})`);
@@ -587,7 +592,7 @@ test('#635 PR C 화면: 메뉴 시작 입구·첫날 표기·크게 보기 대�
           await context.close();
         }
 
-        // 11-첫 화면. 안내(단추 묶음 바로 아래)와 고정 링크 줄이 겹치지 않고 16px 이상 떨어져 있다.
+        // 11-첫 화면. #1204 removed the guidance below the actions; action row and fixed links remain apart.
         {
           const { context, page, frame, problems } = await openShell(browser, base, '', { width, height, theme });
           assert.equal(problems.length, 0, `첫 화면 ${width}·${theme}: 화면 오류 ${problems.join(' | ')}`);
@@ -601,15 +606,14 @@ test('#635 PR C 화면: 메뉴 시작 입구·첫날 표기·크게 보기 대�
           });
           assert.equal(drawn.nf, false, `${width}·${theme}: 첫 화면이 404('nf')로 그려졌다 — 시험 서버가 dist(빌드 산출물)를 서빙하는지 확인`);
           assert.ok(drawn.cards > 0 || drawn.center, `${width}·${theme}: 첫 화면(궤도)이 그려지지 않았다(카드 0개)`);
-          const noteBox = await frame.locator('.center-note').first().boundingBox();
+          const noteBox = await frame.locator('.center .actions').first().boundingBox();
           const linksBox = await page.locator('.home-links').boundingBox();
-          assert.ok(noteBox && linksBox, `${width}·${theme}: 안내 줄·링크 줄 자리를 못 읽었다`);
+          assert.ok(noteBox && linksBox, `${width}·${theme}: 단추 줄·링크 줄 자리를 못 읽었다`);
           const gapHome = Math.round(linksBox.y - (noteBox.y + noteBox.height));
           const overlapHome = Math.max(0, Math.min(noteBox.y + noteBox.height, linksBox.y + linksBox.height) - Math.max(noteBox.y, linksBox.y));
-          assert.equal(overlapHome, 0, `${width}·${theme}: 첫 화면 안내와 링크 줄이 ${overlapHome}px 겹친다`);
-          assert.ok(gapHome >= 16, `${width}·${theme}: 첫 화면 안내와 링크 줄 사이가 ${gapHome}px다(16px 이상)`);
-          const hintPos = await frame.evaluate(() => { const root = document.getElementById('orbit'); const el = root && root.shadowRoot ? root.shadowRoot.querySelector('.center-hint') : document.querySelector('.center-hint'); return el ? getComputedStyle(el).position : '없음'; });
-          assert.equal(hintPos, 'static', `${width}·${theme}: 안내가 여전히 화면 아래 고정 자리다(${hintPos})`);
+          assert.equal(overlapHome, 0, `${width}·${theme}: 첫 화면 단추와 링크 줄이 ${overlapHome}px 겹친다`);
+          assert.ok(gapHome >= 16, `${width}·${theme}: 첫 화면 단추와 링크 줄 사이가 ${gapHome}px다(16px 이상)`);
+          assert.equal(await frame.locator('.center-note,.center-hint').count(), 0, `${width}·${theme}: 지운 안내 문구가 다시 나타났다`);
           // #book-dup. 새 소식 카드: 390에서 머리줄 바로 아래 자리는 '순간 목록'·테마 단추를 가렸다(실측 겹침 133×66px).
           // 이제 화면 아래, 링크 줄 위에 놓인다 — 어떤 단추와도 겹침 0. 1440 자리(오른쪽 아래)는 그대로다.
           {
@@ -759,5 +763,457 @@ test('#792 ⑤ 화면: 공유 책 순간 상세에서 순간 열기·이 무대 
   } finally {
     if (browser) await browser.close().catch(() => {});
     server.close();
+  }
+});
+
+// 방문자 보기: 같은 셸·같은 책/보드/지도 문서를 사용하며 쓰기 요청은 내지 않는다.
+// 모든 사진은 테스트 서버의 고정 트리에서 만든다. 실계정·실제 공유 주소를 열지 않는다.
+test('방문자 공용 화면: 1440·390 책·보드·지도, 옛 공유 주소, 로고·둘러보기, 쓰기 0', {
+  skip: REQUIRE ? false : skip, timeout: 240000
+}, async () => {
+  if (skip) assert.fail('필수 브라우저가 없어 방문자 화면 검증을 진행할 수 없어요: '+skip);
+  const server = await serve();
+  const base = 'http://127.0.0.1:' + server.address().port;
+  const shareId='visitor-fixture-000000001';
+  const time='2026-11-23T00:00:00.000Z';
+  const fixtureTree={...tree,subject:'시험 트리',coverMomentId:'',coverDesign:'',inbox:false,createdAt:time,updatedAt:time,
+    moments:tree.moments.map(m=>({...m,createdAt:time,links:[]}))};
+  const {workspaceModel}=await import('../public/v41/workspace-model.mjs');
+  assert.equal(workspaceModel({revision:1,state:{version:1,trees:[fixtureTree]}}).trees.length,1,'공유와 내 화면이 동일한 유효 자료를 쓴다');
+  const screens = {book:'track59-sketchbook.html',board:'track58-pinboard.html',network:'track56-network.html'};
+  const matrix = [];
+  let browser;
+  try {
+    browser = await chromium.launch({headless:true});
+    const openShell = async ({width=1440,theme='night',view='book',owner=false,legacy=false,authenticatedShare=false}={}) => {
+      const context = await browser.newContext({viewport:{width,height:900},reducedMotion:'reduce'});
+      await context.addInitScript(t => {localStorage.setItem('lt41.theme',t);localStorage.setItem('lt41.boardTheme',t==='garden'?'paper':'night');},theme);
+      const writes=[];
+      await context.route('**/api/**', route => {
+        const request = route.request(), u=new URL(request.url());
+        if (!['GET','HEAD','OPTIONS'].includes(request.method())) writes.push({method:request.method(),path:u.pathname});
+        if(u.pathname==='/api/public/shares/'+shareId) return route.fulfill({status:200,json:{
+          ok:true,share:{id:shareId,view:'book',entryMomentId:'m1'},tree:fixtureTree
+        }});
+        if(u.pathname==='/api/workspace') return route.fulfill({status:200,json:{
+          revision:1,state:{version:1,trees:[fixtureTree],prefs:{}},subject:'fixture-visitor-owner',writeSubjectBound:true,savedAt:'2026-11-23T00:00:00.000Z'
+        }});
+        if(u.pathname==='/api/account') return route.fulfill(authenticatedShare||owner
+          ? {status:200,json:{ok:true,subject:'fixture-visitor-owner',email:'방문자'}}
+          : {status:401,json:{ok:false,error:{code:'not_logged_in'}}});
+        return route.fulfill({status:200,json:{ok:true,items:[],shares:[]}});
+      });
+      await context.route('**://i.ytimg.com/**',route=>route.abort());
+      const page=await context.newPage(), errors=[];
+      page.on('pageerror',e=>errors.push(String(e).slice(0,160)));
+      const hash=owner?'#my/'+view+'?tree=t1':('#share/'+shareId+(legacy?'':'/'+view));
+      await page.goto(base+'/v41/'+hash,{waitUntil:'domcontentloaded'});
+      try {
+        await page.waitForFunction(({filename,mode})=>{
+          const v=document.querySelector('#view'),ctx=window.LT41;
+          return ctx?.source===mode && v&&!v.hidden&&v.contentDocument?.readyState==='complete'
+            && v.contentWindow?.location?.pathname?.endsWith(filename)
+            && (v.contentDocument?.querySelector('.lt-screen-toolbar') || v.contentDocument?.querySelector('header'));
+        },{filename:screens[view],mode:owner?'server':'share'},{timeout:10000});
+      } catch (error) {
+        const diagnostic=await page.evaluate(()=>({
+          hash:location.hash,source:window.LT41?.source,tree:window.LT41?.tree?.id,
+          frames:[...document.querySelectorAll('#stage>iframe')].map(f=>({id:f.id,hidden:f.hidden,url:f.contentWindow?.location.href,ready:f.contentDocument?.readyState})),
+          empty:document.querySelector('#empty')?.innerText?.slice(0,150),
+          body:document.body?.dataset
+        }));
+        throw Error('화면 진입 검증 실패: '+JSON.stringify({owner,view,diagnostic,errors}));
+      }
+      await page.waitForTimeout(350);
+      assert.deepEqual(errors,[], '화면 스크립트 오류: '+errors.join('; '));
+      return {context,page,writes};
+    };
+    const metrics=async(page)=>page.evaluate(()=>{
+      const box=e=>{if(!e)return null;const r=e.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height}};
+      const v=document.querySelector('#view'), doc=v?.contentDocument;
+      return {
+        header:box(document.querySelector('.app-header')),
+        toolbar:box(doc?.querySelector('.lt-screen-toolbar')||doc?.querySelector('header')),
+        stage:box(document.querySelector('#stage')),
+        tabs:[...document.querySelectorAll('#tree-views button[data-view]')].filter(x=>x.getBoundingClientRect().width>0).map(x=>x.textContent.trim()),
+        browseVisible:!!document.querySelector('#community-menu')?.getClientRects().length,
+        pickerVisible:!!document.querySelector('.tree-slot')?.getClientRects().length,
+        writeVisible:!!document.querySelector('#write-menu')?.getClientRects().length,
+        readonly:v?.contentWindow?.LTDEMO?.readOnly,
+        writable:window.LT41?.writable,
+        source:window.LT41?.source,
+        frameUrl:v?.contentWindow?.location?.pathname,
+        theme:document.documentElement.getAttribute('data-lt-theme')||'night'
+      };
+    });
+    const owner=await openShell({owner:true,view:'book',width:1440});
+    const ownerMetrics=await metrics(owner.page);
+    assert.equal(ownerMetrics.source,'server');
+    const ownerPhone=await openShell({owner:true,view:'book',width:390});
+    await ownerPhone.page.setViewportSize({width:390,height:844});
+    const ownerLayouts={1440:{book:ownerMetrics,board:ownerMetrics,network:ownerMetrics},390:{book:await metrics(ownerPhone.page)}};
+    for(const view of ['board','network']){
+      const ownedView=await openShell({owner:true,view,width:390});
+      try{
+        await ownedView.page.setViewportSize({width:390,height:844});
+        ownerLayouts[390][view]=await metrics(ownedView.page);
+      } finally{await ownedView.context.close();}
+    }
+    // 비교 캡처는 첫 방문 권유 창·몇 초 뒤 사라지는 토스트 없이 동일한 내용 판으로 찍는다.
+    await owner.page.getByRole('button',{name:'지금은 안 할래요'}).click({timeout:2000}).catch(()=>{});
+    await owner.page.evaluate(()=>{const toast=document.querySelector('#toast');if(toast)toast.hidden=true;});
+    let ownerBuffer=await owner.page.screenshot(), visitorBookBuffer=null;
+    for(const [width,height] of [[1440,900],[390,844]]){
+      for(const theme of ['night','garden']){
+        for(const view of ['book','board','network']){
+          const visiting=await openShell({width,theme,view});
+          try{
+            await visiting.page.setViewportSize({width,height});
+            const m=await metrics(visiting.page);
+            if(width===1440){
+              assert.deepEqual(m.tabs,['트리','보드','책','지도'],width+' '+theme+' '+view+': 공유 탭 구성');
+              assert.equal(m.browseVisible,true,'데스크톱 둘러보기 단추');
+            } else {
+              assert.deepEqual(m.tabs,[],'모바일은 내 화면처럼 접기 메뉴에서 탭을 표시한다');
+              await visiting.page.locator('#mobile-more').click();
+              const items=await visiting.page.locator('#header-overflow button').allTextContents();
+              for(const name of ['트리','책','보드','지도','둘러보기'])assert.ok(items.includes(name),'모바일 메뉴 '+name);
+              assert.ok(!items.includes('서재'),'방문자 메뉴에는 서재가 없다');
+              assert.ok(!items.some(x=>x.includes('순간 추가')),'방문자 메뉴에는 쓰기 입구가 없다');
+              await visiting.page.locator('#mobile-more').click();
+            }
+            assert.equal(m.source,'share');
+            assert.equal(m.readonly,true,'안쪽 화면이 공유 읽기 전용이다');
+            assert.equal(m.writable,false,'쓰기 권한이 없다');
+            assert.equal(m.writeVisible,false,'쓰기 단추가 없다');
+            assert.equal(m.pickerVisible,false,'트리 고르기 화면이 없다');
+            const baseline=ownerLayouts[width][view];
+            assert.ok(Math.abs(m.header.height-baseline.header.height)<=2,'공용 머리줄 높이 오차 2px 이하: '+JSON.stringify({width,view,theme,visitor:m.header,owner:baseline.header}));
+            assert.ok(Math.abs(m.stage.y-baseline.stage.y)<=2,'공용 화면 시작 위치 오차 2px 이하');
+            if(view==='book'){
+              assert.ok(m.toolbar && baseline.toolbar,'책 도구 줄을 실제로 표시한다');
+              assert.ok(Math.abs(m.toolbar.height-baseline.toolbar.height)<=2,'책 도구 줄 높이 오차 2px 이하');
+              // 비교 캡처는 아래에서 임시 알림을 정리한 뒤 만든다.
+            }
+            const key='visitor-'+view+'-'+width+'-'+theme;
+            await visiting.page.evaluate(()=>{const toast=document.querySelector('#toast');if(toast)toast.hidden=true;});
+            if(view==='book'&&width===1440&&theme==='night') visitorBookBuffer=await visiting.page.screenshot();
+            await shot(visiting.page,key);
+            matrix.push({width,theme,view,header:m.header.height,toolbar:m.toolbar?.height});
+            if(view==='book'&&width===1440&&theme==='night'){
+              const frame=visiting.page.frames().find(f=>f.url().endsWith('/'+screens.book));
+              if(frame){
+                await frame.evaluate(()=>{parent.postMessage({type:'lt41-new-tree'},location.origin);parent.postMessage({type:'lt41-write',mode:'edit',momentId:'m1'},location.origin)});
+                await visiting.page.waitForTimeout(180);
+                assert.equal(await visiting.page.locator('#write-panel').evaluate(el=>el.open),false,'방문자가 쓰기 창을 열 수 없다');
+              }
+            }
+            assert.deepEqual(visiting.writes,[],'공유 탐색 중 변경 API 요청 0');
+            if(view==='book'&&width===390&&theme==='night'){
+              await visiting.page.locator('#mobile-more').click();
+              await visiting.page.getByRole('menuitem',{name:'둘러보기'}).click();
+              await visiting.page.waitForFunction(()=>location.hash.startsWith('#explore')&&document.querySelector('#community-panel')?.open,{timeout:9000}).catch(async()=>{throw Error('둘러보기로 나가지 못함')});
+              assert.equal(visiting.writes.length,0);
+              await visiting.page.locator('.brand').click();
+              await visiting.page.waitForFunction(()=>location.hash==='#home',{timeout:9000}).catch(async()=>{throw Error('로고로 나가지 못함')});
+            }
+          }finally{await visiting.context.close();}
+        }
+      }
+    }
+    assert.ok(visitorBookBuffer,'비교용 방문자 책 캡처가 만들어졌다');
+    const comparison=await browser.newPage({viewport:{width:2880,height:900}});
+    await comparison.setContent('<style>body{margin:0;display:flex}img{width:1440px;height:900px;object-fit:contain}</style>'+
+      '<img alt="내 책" src="data:image/png;base64,'+ownerBuffer.toString('base64')+'">'+
+      '<img alt="방문자 책" src="data:image/png;base64,'+visitorBookBuffer.toString('base64')+'">');
+    await comparison.screenshot({path:path.join(CAPTURE_DIR,'owner-vs-visitor-book-1440-night.png')});
+    await comparison.close();
+    await owner.context.close();
+    await ownerPhone.context.close();
+    const legacy=await openShell({width:1440,view:'book',legacy:true});
+    assert.equal((await metrics(legacy.page)).source,'share','#share/<id> 옛 주소도 감상한다');
+    await legacy.context.close();
+    const authenticated=await openShell({width:1440,view:'book',authenticatedShare:true});
+    try{
+      await authenticated.page.waitForFunction(()=>!document.querySelector('#account-avatar')?.hidden,{timeout:8000});
+      assert.equal(await authenticated.page.locator('#account-entry').isHidden(),true,'로그인한 방문자는 계정 단추를 본다');
+      await authenticated.page.locator('#account-avatar').click();
+      await authenticated.page.waitForFunction(()=>location.hash.startsWith('#my/home'),null,{timeout:8000});
+    }finally{await authenticated.context.close();}
+    const signedLogo=await openShell({width:1440,view:'book',authenticatedShare:true});
+    try{
+      await signedLogo.page.waitForFunction(()=>!document.querySelector('#account-avatar')?.hidden,null,{timeout:8000});
+      await signedLogo.page.locator('.brand').click();
+      await signedLogo.page.waitForFunction(()=>location.hash==='#home'&&window.LT41?.source==='server',null,{timeout:12000});
+      assert.equal(signedLogo.writes.length,0,'방문자 로고는 내 계정을 읽기만 한다');
+    }finally{await signedLogo.context.close();}
+    assert.equal(matrix.length,12,'지시한 1440·390 × 밤·정원 × 책·보드·지도 12장');
+    console.log('방문자 캡처 12장 + 비교 1장 확인:',CAPTURE_DIR);
+  }finally{
+    await browser?.close().catch(()=>{});
+    server.close();
+  }
+});
+
+test('#1259 방문자 책 첫 안내가 제목과 크게 보기 영상 조작부를 가리지 않는다', {skip:REQUIRE?false:skip,timeout:90000}, async()=>{
+ if(skip)assert.fail(skip);
+ const server=await serve(),base='http://127.0.0.1:'+server.address().port;
+ const shareId='visitor-notice-1259-fixture',time='2026-11-24T00:00:00.000Z';
+ const fixture={...tree,subject:'시험 트리',coverMomentId:'',coverDesign:'',inbox:false,createdAt:time,updatedAt:time,moments:tree.moments.map((m,i)=>({...m,createdAt:time,links:[],...(i===0?{title:'세로 영상과 함께 남긴 첫 순간',url:'https://www.youtube.com/shorts/dQw4w9WgXcQ',mediaMetadata:{title:'시험 세로 영상',vertical:true}}:{})}))};
+ let browser;
+ try{
+  browser=await chromium.launch({headless:true});
+  for(const [width,height] of [[1440,900],[390,844]])for(const theme of ['garden','night']){
+   const context=await browser.newContext({viewport:{width,height},reducedMotion:'reduce'});
+   const key=width+'-'+theme;
+   try{
+    await context.addInitScript(t=>{localStorage.setItem('lt41.theme',t)},theme);
+    await context.route('**/*',r=>{
+     const u=new URL(r.request().url());
+     if(u.origin!==base){
+      if(u.hostname.includes('youtube')&&u.pathname.startsWith('/embed/'))return r.fulfill({contentType:'text/html',body:'<!doctype html><html lang="ko"><meta charset="utf-8"><style>body{margin:0;background:#24212b;color:#fff;display:grid;place-items:center;height:100vh}footer{position:absolute;bottom:0;left:0;right:0;padding:12px;background:#131018}</style><body><main>시험용 세로 영상</main><footer id="controls">▶　0:01 / 0:16　━━━━━━</footer></body></html>'});
+      if(u.hostname==='i.ytimg.com')return r.fulfill({contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="180" height="320"><rect width="180" height="320" fill="#51404e"/><circle cx="90" cy="160" r="35" fill="#e9d3bd"/></svg>'});
+      return r.abort();
+     }
+     if(u.pathname==='/api/public/shares/'+shareId)return r.fulfill({json:{ok:true,share:{id:shareId,view:'book',entryMomentId:'m1'},tree:fixture,aiTester:true}});
+     if(u.pathname==='/api/account')return r.fulfill({status:401,json:{ok:false,error:{code:'not_logged_in'}}});
+     if(u.pathname.startsWith('/api/'))return r.fulfill({json:{ok:true,items:[],shares:[]}});
+     return r.continue();
+    });
+    const p=await context.newPage();await p.goto(base+'/v41/#share/'+shareId+'/book',{waitUntil:'domcontentloaded'});
+    await p.waitForFunction(()=>window.LT41?.source==='share'&&!document.querySelector('#view').hidden&&!!document.querySelector('#view').contentDocument?.querySelector('.moment-title'),null,{timeout:15000});
+    const f=p.frameLocator('#view'),toast=p.locator('#toast');
+    await toast.filter({hasText:'공개된 트리를 감상하는 화면이에요'}).waitFor({state:'visible'});
+    const measure=()=>p.evaluate(()=>{
+     const t=document.querySelector('#toast'),f=document.querySelector('#view'),d=f.contentDocument;
+     const box=(e,dx=0,dy=0)=>{const r=e.getBoundingClientRect();return {left:r.left+dx,right:r.right+dx,top:r.top+dy,bottom:r.bottom+dy,width:r.width,height:r.height}};
+     const shown=e=>!!e&&e.checkVisibility({checkOpacity:true,checkVisibilityCSS:true});
+     const tr=shown(t)?box(t):null,fr=box(f);
+     const titles=[...d.querySelectorAll('.moment-title')].filter(shown).map(e=>box(e,fr.left,fr.top));
+     const media=d.querySelector('.lt-lightbox-media');
+     const mr=shown(media)?box(media,fr.left,fr.top):null;
+     const intersection=(a,b)=>a&&b?Math.max(0,Math.min(a.right,b.right)-Math.max(a.left,b.left))*Math.max(0,Math.min(a.bottom,b.bottom)-Math.max(a.top,b.top)):0;
+     const nav=d.querySelector(".nav-pill");const nr=shown(nav)?box(nav,fr.left,fr.top):null;
+     return {nav:nr,notice:tr,frame:fr,titles,titleOverlap:titles.map(r=>intersection(tr,r)),frameOverlap:intersection(tr,fr),media:mr,mediaOverlap:intersection(tr,mr),hidden:t.hidden};
+    });
+    assert.equal(await f.locator('.story-tip').count(),0,key+' 방문자 쓰기 안내 0개');
+    assert.equal(await p.evaluate(()=>localStorage.getItem('lt41.tips.bookStory')),null,key+' 방문자는 내 기록의 최초 안내 상태를 소비하지 않는다');
+    const book=await measure();
+    assert.ok(book.notice&&book.titles.length,key+' 첫 안내와 제목이 실제로 표시된다');
+    assert.equal(book.frameOverlap,0,key+' 책 화면과 안내의 교차 면적 0: '+JSON.stringify(book));
+    assert.ok(book.titleOverlap.every(x=>x===0),key+' 제목 교차 면적 0');
+    if(width===390){
+     assert.ok(book.nav&&book.nav.bottom<=book.frame.bottom+0.5,key+' 페이지 이동 줄 전체 표시: '+JSON.stringify(book));
+     const next=f.locator('.nav-pill #nextBtn');
+     const target=await next.evaluate(e=>{const r=e.getBoundingClientRect();return {w:r.width,h:r.height,hit:e.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2))}});
+     assert.ok(target.w>=44&&target.h>=44&&target.hit,key+' 페이지 이동 단추 실제 클릭 영역: '+JSON.stringify(target));
+    }
+    await shot(p,'1259-'+key+'-book');
+    const linksBefore=await p.evaluate(()=>{const l=document.querySelector('.home-links');return !!l&&l.checkVisibility({checkOpacity:true,checkVisibilityCSS:true})});
+    await f.locator('[data-yt-expand]:visible').first().click({timeout:3000});
+    await f.locator('.lt-lightbox-media').waitFor({state:'visible'});
+    await p.waitForFunction(()=>document.body.classList.contains('lt-book-lightbox-open'),null,{timeout:2000});
+    const video=await measure();
+    assert.ok(video.media,key+' 영상 재생 칸 표시');
+    assert.equal(video.hidden,false,key+' 안내 시간 안에 크게 보기 검사');
+    assert.equal(video.notice,null,key+' 크게 보기 중 첫 안내 숨김');
+    assert.equal(video.mediaOverlap,0,key+' 재생 조작부를 포함한 영상 영역 교차 면적 0');
+    assert.equal(await p.evaluate(()=>{const l=document.querySelector('.home-links');return !!l&&l.checkVisibility({checkOpacity:true,checkVisibilityCSS:true})}),false,key+' 크게 보기 중 아래 링크(새 소식·의견 보내기…) 숨김');
+    await shot(p,'1259-'+key+'-vertical');
+    await f.locator('.lt-lightbox-close').click();
+    await p.waitForFunction(()=>!document.body.classList.contains('lt-book-lightbox-open'),null,{timeout:2000});
+    assert.equal(await p.evaluate(()=>{const l=document.querySelector('.home-links');return !!l&&l.checkVisibility({checkOpacity:true,checkVisibilityCSS:true})}),linksBefore,key+' 크게 보기를 닫으면 아래 링크가 열기 전 상태로 돌아온다');
+    console.log('#1259',key,'제목 교차 0, 영상 교차 0');
+   }finally{await context.close()}
+  }
+ }finally{await browser?.close();server.close()}
+});
+
+
+test('#1259 방문자 보드 유튜브 표지는 자동 표시하고 외부 사진은 동의를 기다린다', {skip:REQUIRE?false:skip,timeout:90000}, async()=>{
+ if(skip)assert.fail(skip);
+ const server=await serve(),base='http://127.0.0.1:'+server.address().port;
+ const shareId='visitor-board-1259-fixture',time='2026-11-24T00:00:00.000Z';
+ const fixture={...tree,subject:'시험 트리',createdAt:time,updatedAt:time,moments:tree.moments.map((m,i)=>({...m,createdAt:time,links:[],...(i===1?{url:'https://www.youtube.com/shorts/abc123DEF45',mediaMetadata:{title:'세로 영상',vertical:true}}:i===2?{url:'https://external.test/photo.png'}:{})}))};
+ let browser;
+ try{
+  browser=await chromium.launch({headless:true});
+  for(const [width,height] of [[1440,900],[390,844]])for(const theme of ['garden','night']){
+   const context=await browser.newContext({viewport:{width,height},reducedMotion:'reduce'});
+   const external=[],yt=[],writes=[],key=width+'-'+theme;
+   try{
+    await context.addInitScript(t=>localStorage.setItem('lt41.theme',t),theme);
+    await context.route('**/*',r=>{
+     const u=new URL(r.request().url());
+     if(u.origin!==base){
+      if(u.hostname==='i.ytimg.com'){
+       yt.push(u.href);
+       const vertical=u.pathname.includes('oardefault'),w=vertical?180:480,h=vertical?320:360;
+       return r.fulfill({contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="'+w+'" height="'+h+'"><rect width="100%" height="100%" fill="#51404e"/><circle cx="'+w/2+'" cy="'+h/2+'" r="45" fill="#e9d3bd"/></svg>'});
+      }
+      if(u.hostname==='external.test')external.push(u.href);
+      return r.abort();
+     }
+     if(u.pathname.startsWith('/api/')&&!['GET','HEAD','OPTIONS'].includes(r.request().method()))writes.push(u.pathname);
+     if(u.pathname==='/api/public/shares/'+shareId)return r.fulfill({json:{ok:true,share:{id:shareId,view:'board',entryMomentId:'m1'},tree:fixture}});
+     if(u.pathname==='/api/account')return r.fulfill({status:401,json:{ok:false,error:{code:'not_logged_in'}}});
+     if(u.pathname.startsWith('/api/'))return r.fulfill({json:{ok:true,items:[],shares:[]}});
+     return r.continue();
+    });
+    const p=await context.newPage();await p.goto(base+'/v41/#share/'+shareId+'/board',{waitUntil:'domcontentloaded'});
+    await p.waitForFunction(()=>window.LT41?.source==='share'&&!document.querySelector('#view').hidden&&document.querySelector('#view').contentDocument?.querySelectorAll('#cardLayer .card').length===3,null,{timeout:15000});
+    const f=p.frameLocator('#view');
+    for(const id of ['m1','m2']){
+     const card=f.locator('.card[data-id="'+id+'"]');
+     const img=card.locator('.lt-yt-preview > img');
+     assert.equal(await img.count(),1,key+' '+id+' 카드 내용: '+await card.innerHTML());
+     // 표지는 크기(세로 영상 여부)를 안 뒤 한 번 다시 그려져 그림 요소가 바뀔 수 있다. 잡아 둔 요소를 쓰지 않고
+     // 매번 새로 찾아 '보이게 하고 다 읽혔는지'를 본다(요소 떨어짐으로 흔들리던 것 — 판정은 그대로).
+     const frame=p.frames().find(fr=>fr.parentFrame()&&fr.url().includes('track58-pinboard'));
+     let shown=false;
+     for(let i=0;i<40&&!shown;i++){
+      shown=await frame.evaluate(cardId=>{
+       const e=document.querySelector('.card[data-id="'+cardId+'"] .lt-yt-preview > img');
+       if(!e)return false;
+       e.scrollIntoView({block:'center'});
+       return e.complete&&e.naturalWidth>120&&e.naturalHeight>90;
+      },id).catch(()=>false);
+      if(!shown)await p.waitForTimeout(200);
+     }
+     assert.ok(shown,key+' '+id+' 썸네일 표시');
+     assert.equal(await card.locator('[data-lt-load]').count(),0,key+' 빈 표지 0');
+     assert.equal(await card.locator('[data-lt-auto]').count(),0,key+' 소유자 전용 확인 제외');
+    }
+    assert.equal(await f.locator('.card[data-id="m3"] [data-lt-load]').count(),1,key+' 외부 사진 동의 유지');
+    assert.equal(await f.locator('.card[data-id="m3"] img').count(),0,key+' 외부 사진 자동 표시 없음');
+    assert.equal(external.length,0,key+' 외부 사진 요청 0');
+    assert.ok(yt.some(u=>u.includes('dQw4w9WgXcQ'))&&yt.some(u=>u.includes('abc123DEF45')),key+' 두 영상 표지 요청');
+    assert.deepEqual(writes,[],key+' 공유 보기 쓰기 0');
+    await f.locator('.card[data-id="m1"]').scrollIntoViewIfNeeded();
+    await p.evaluate(()=>{const toast=document.querySelector('#toast');if(toast)toast.hidden=true;});
+    await shot(p,'1259-'+key+'-board');
+    console.log('#1259',key,'유튜브 표지 2, 빈 표지 0, 외부 사진 요청 0');
+   }finally{await context.close()}
+  }
+ }finally{await browser?.close();server.close()}
+});
+
+
+test('#1259 방문자 지도 시작 제목과 실제 연결선 교차 0', {skip:REQUIRE?false:skip,timeout:90000}, async()=>{
+ if(skip)assert.fail(skip);
+ const server=await serve(),base='http://127.0.0.1:'+server.address().port;
+ const shareId='visitor-map-1259-fixture',time='2026-11-24T00:00:00.000Z';
+ const fixture={...tree,subject:'시험 트리',createdAt:time,updatedAt:time,moments:tree.moments.map((m,i)=>({...m,createdAt:time,links:[],...(i===0?{title:'처음 함께 듣고 오래 기억하고 싶었던 특별한 순간의 이야기',mediaMetadata:null}:i===1?{url:'https://www.youtube.com/shorts/abc123DEF45',mediaMetadata:{title:'세로 영상',vertical:true}}:{})}))};
+ let browser;
+ try{
+  browser=await chromium.launch({headless:true});
+  for(const [width,height] of [[1440,900],[390,844]])for(const theme of ['garden','night']){
+   const context=await browser.newContext({viewport:{width,height},reducedMotion:'reduce'});
+   const key=width+'-'+theme;
+   try{
+    await context.addInitScript(t=>{localStorage.setItem('lt41.theme',t);localStorage.setItem('lt41.boardTheme',t==='garden'?'paper':'night')},theme);
+    await context.route('**/*',r=>{
+     const u=new URL(r.request().url());
+     if(u.origin!==base){
+      if(u.hostname==='i.ytimg.com')return r.fulfill({headers:{'access-control-allow-origin':'*'},contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="480" height="360"><rect width="100%" height="100%" fill="#51404e"/><circle cx="240" cy="180" r="45" fill="#e9d3bd"/></svg>'});
+      return r.abort();
+     }
+     if(u.pathname==='/api/public/shares/'+shareId)return r.fulfill({json:{ok:true,share:{id:shareId,view:'network',entryMomentId:'m1'},tree:fixture}});
+     if(u.pathname==='/api/account')return r.fulfill({status:401,json:{ok:false,error:{code:'not_logged_in'}}});
+     if(u.pathname.startsWith('/api/'))return r.fulfill({json:{ok:true,items:[],shares:[]}});
+     return r.continue();
+    });
+    const p=await context.newPage();await p.goto(base+'/v41/#share/'+shareId+'/network',{waitUntil:'domcontentloaded'});
+    await p.waitForFunction(()=>window.LT41?.source==='share'&&!document.querySelector('#view').hidden&&document.querySelector('#view').contentWindow?.__lt?.labels().length>0,null,{timeout:15000});
+    await p.evaluate(()=>{const toast=document.querySelector('#toast');if(toast)toast.hidden=true;});
+    await p.waitForTimeout(400);
+    const result=await p.evaluate(()=>{
+     const w=document.querySelector('#view').contentWindow,lt=w.__lt;
+     const label=lt.labels().find(l=>l.id===lt.FIRST?.id||l.text.startsWith('여기서 시작'));
+     if(!label)return {label:null,labels:lt.labels(),first:lt.FIRST?.id,segments:lt.edgeSegments().length};
+     const r=label.rect;
+     // 실제 렌더링 선분을 촘촘하게 샘플링하여 상자 내부에 진입하는지 독립 검증.
+     const hits=lt.edgeSegments().filter(e=>{
+      for(let i=0;i<=100;i++){const t=i/100,x=e.a.x+(e.b.x-e.a.x)*t,y=e.a.y+(e.b.y-e.a.y)*t;
+       if(x>=r.l-e.pad&&x<=r.r+e.pad&&y>=r.t-e.pad&&y<=r.b+e.pad)return true;
+      }return false;
+     });
+     return {label,segments:lt.edgeSegments().length,hits:hits.length};
+    });
+    assert.ok(result.label,key+' 시작 제목 표시: '+JSON.stringify(result));
+    assert.ok(result.segments>0,key+' 실제 연결선 표시');
+    assert.equal(result.hits,0,key+' 교차 0: '+JSON.stringify(result));
+    await shot(p,'1259-'+key+'-network');
+    console.log('#1259',key,'시작 제목 표시, 연결선 교차 0');
+   }finally{await context.close()}
+  }
+ }finally{await browser?.close();server.close()}
+});
+
+test('#1378 공유 감상: 390·1440 × 밤·정원 재생 iframe 최소 크기·가림·자동재생', { skip: REQUIRE ? false : skip, timeout: 240000 }, async () => {
+  const server = await serve();
+  const base = 'http://127.0.0.1:' + server.address().port;
+  const browser = await chromium.launch({ headless: true });
+  try {
+    for (const [width, height] of [[390, 844], [1440, 900]]) {
+      for (const theme of ['night', 'garden']) {
+        const { context, frame } = await openBook(browser, base + '/share-host.html', { width, height, theme,
+          route: route => route.fulfill({ status: 200, contentType: 'image/svg+xml',
+            body: '<svg xmlns="http://www.w3.org/2000/svg" width="160" height="90"/>' }),
+        });
+        try {
+          await context.route('**/api/youtube/oembed*', route => route.fulfill({
+            status: 200, contentType: 'application/json', body: '{"title":"기록 영상"}',
+          }));
+          await context.route('**/youtube-nocookie.com/**', route => route.fulfill({
+            status: 200, contentType: 'text/html', body: '<!doctype html><title>YouTube video</title>',
+          }));
+          await frame.locator('[data-yt-play]').first().click({ force: true });
+          await frame.waitForSelector('iframe.yt-frame', { timeout: 10000 });
+          if (process.env.LT_1378_SHARE_CAPTURE_DIR) {
+            mkdirSync(process.env.LT_1378_SHARE_CAPTURE_DIR, { recursive: true });
+            await frame.page().screenshot({ path: path.join(process.env.LT_1378_SHARE_CAPTURE_DIR, 'share-' + width + '-' + theme + '.png') });
+          }
+          const result = await inspectYoutubeIframe(frame.locator('iframe.yt-frame').first());
+          assert.ok(result.minimum200, width + '/' + theme + ': 공유 플레이어 ' + result.width + '×' + result.height);
+          assert.equal(result.blocked, 0, width + '/' + theme + ': 가림 ' + result.blockers.join(','));
+          assert.equal(await countYoutubeAutoplay(frame), 1, width + '/' + theme + ': 자동재생 하나');
+        } finally { await context.close(); }
+      }
+    }
+  } finally {
+    await browser.close();
+    await new Promise(resolve => server.close(resolve));
+  }
+});
+
+test('#1378 공유 감상: 읽기 전용 영상의 임베드 거절은 플레이어 대신 원본 링크를 남긴다', { skip: REQUIRE ? false : skip, timeout: 90000 }, async () => {
+  const server = await serve();
+  const base = 'http://127.0.0.1:' + server.address().port;
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const { context, frame } = await openBook(browser, base + '/share-host.html', {
+      width: 390, height: 844, theme: 'garden', route: route => route.fulfill({
+        status: 200, contentType: 'image/svg+xml',
+        body: '<svg xmlns="http://www.w3.org/2000/svg" width="160" height="90"/>',
+      }),
+    });
+    try {
+      assert.equal(await frame.evaluate(() => window.parent.LT41?.writable), false, '공유 감상 쓰기 불가');
+      await context.route('**/api/youtube/oembed*', route => route.fulfill({
+        status: 401, contentType: 'application/json', body: '{"error":"youtube_embed_forbidden"}',
+      }));
+      await context.route('**/youtube-nocookie.com/**', route => route.fulfill({
+        status: 200, contentType: 'text/html', body: '<title>YouTube video</title>',
+      }));
+      await frame.locator('[data-yt-play]').first().click({ force: true });
+      await frame.waitForSelector('.yt-unavailable-note', { timeout: 10000 });
+      assert.equal(await frame.locator('iframe.yt-frame').count(), 0, '재생 불가 iframe 제거');
+      assert.equal(await frame.locator('.yt-unavailable-link[href*="youtube.com"]').count(), 1,
+        '원본 YouTube 영상 링크 유지');
+    } finally { await context.close(); }
+  } finally {
+    await browser.close();
+    await new Promise(resolve => server.close(resolve));
   }
 });

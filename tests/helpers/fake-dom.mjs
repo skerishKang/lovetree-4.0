@@ -95,6 +95,7 @@ export function createHeaderHarness({
 } = {}) {
   const els = {
     'tree-views': fakeEl(),
+    'community-menu': fakeEl({hidden:true}),
     'record-menu': fakeEl(),
     'source-label': fakeEl(),
     'write-menu': fakeEl(),
@@ -116,7 +117,7 @@ export function createHeaderHarness({
   };
   const store = storage || { getItem: () => null, setItem() {}, removeItem() {} };
   globalThis.sessionStorage = store;
-  globalThis.document = { querySelectorAll: () => [], body: { classList: { add() {}, remove() {}, toggle() {}, contains: () => false }, dataset: {} } };
+  globalThis.document = { querySelector: (sel) => sel === '.tree-slot' ? (els['tree-slot'] ||= fakeEl()) : null, querySelectorAll: () => [], body: { classList: { add() {}, remove() {}, toggle() {}, contains: () => false }, dataset: {} } };
   globalThis.window = globalThis;
   globalThis.addEventListener = () => {};
   globalThis.matchMedia = (query) => ({
@@ -204,4 +205,42 @@ export function fakeBrowser({hash = '#home', state = null} = {}) {
       else globalThis.localStorage = saved.localStorage;
     }
   };
+}
+
+// #822: 창 마크업을 스스로 만드는 모듈용 가짜 문서. createElement로 만든 노드가 자식·속성·귀를 기억한다.
+// 실제 DOM처럼 id를 주면 getElementById로 찾을 수 있고, 창(dialog)을 닫으면 'close' 귀가 불린다.
+export function fakeDocument() {
+  const byId = new Map();
+  function node(tag) {
+    const el = fakeEl({
+      tagName: String(tag).toUpperCase(), children: [], parentNode: null, value: '', checked: false, disabled: false, open: false, className: '',
+      append(...kids) { for (const kid of kids) { if (kid && typeof kid === 'object') kid.parentNode = el; el.children.push(kid); } },
+      replaceChildren(...kids) { el.children = []; el.append(...kids); },
+      click() { el.dispatch('click', { target: el, preventDefault() {}, stopPropagation() {} }); },
+      showModal() { el.open = true; },
+      close() { if (!el.open) return; el.open = false; el.dispatch('close', {}); }
+    });
+    let id = '';
+    Object.defineProperty(el, 'id', { get: () => id, set: (value) => { id = String(value); byId.set(id, el); }, enumerable: true });
+    return el;
+  }
+  return { createElement: node, body: node('body'), head: node('head'), activeElement: null, getElementById: (id) => byId.get(id) || null };
+}
+
+// 가짜 노드의 보이는 글자: 자기 글자 + 숨기지 않은 자식들의 글자(실제 textContent 흉내, hidden은 뺀다).
+export function fakeText(node) {
+  if (!node || typeof node !== 'object' || node.hidden) return '';
+  return String(node.textContent || '') + (node.children || []).map(fakeText).join('');
+}
+
+// 가짜 노드 아래에서 조건에 맞는 노드를 모두 찾는다(숨긴 가지도 포함 — 숨김 여부는 시험이 따로 본다).
+export function fakeFind(node, test) {
+  const out = [];
+  const walk = (current) => {
+    if (!current || typeof current !== 'object') return;
+    if (test(current)) out.push(current);
+    for (const kid of current.children || []) walk(kid);
+  };
+  walk(node);
+  return out;
 }

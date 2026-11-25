@@ -11,8 +11,8 @@
  * 출처 — 같은 경로의 프록시 구현은 이 하나만 남긴다.
  * 응답 본문 완료까지의 기한·실제 읽기 취소(504)·응답 크기 상한·형식 검사·허용 헤더 목록과
  * 시험 대부분은 PR #68(`e2884e6`)의 것이고, 경로별 메서드 제한(405)과 `public/_routes.json`
- * 라우팅, 로컬 앞원진 검증(`scripts/dev-auth-chain.mjs`, `LOVETREE_DEV_FRONT_PORT`)은
- * PR #69에서 더했다. 컴2가 프록시를 단독 정리한다.
+ * 라우팅과 로컬 앞원진 검증(`LOVETREE_DEV_FRONT_PORT`)은 PR #69에서 더했다.
+ * #1247: 옛 로그인 사슬 검증 스크립트는 걷어냈다 — 이 프록시의 계약은 시험 파일이 그대로 지킨다.
  */
 // 경로마다 브라우저가 실제로 쓰는 메서드만 넘긴다. 그 밖은 COM2까지 내려보내지 않는다.
 const MEDIA_ITEM = /^\/api\/media\/[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}\.(?:png|jpg|gif|webp|mp4|webm)$/;
@@ -329,3 +329,10 @@ export function createProxy({ fetcher = (...args) => fetch(...args), timeoutMs =
 
 // 프록시가 넘기는 전체 경로 — 서버 진입 분기 표 검사에서 쓴다(#1047). 값은 그대로 두고 읽기용으로만 내보낸다.
 export const ALLOWED_PATHS = ALLOWED;
+
+// #1250: Pages Functions가 서버를 직접 부를 때도 프록시와 같은 출처 확인 머리말을 붙인다.
+// (사이트맵·공유 미리보기는 프록시를 거치지 않고 서버를 부르므로, 빠지면 서버가 '머리말 없음'으로 기록하고 막기 모드에서 거절한다.)
+export function proxyProofHeaders(env) {
+  const proof = typeof env?.LOVETREE_PROXY_SECRET === 'string' ? env.LOVETREE_PROXY_SECRET.trim() : '';
+  return proof ? { 'x-lovetree-proxy-proof': proof } : {};
+}

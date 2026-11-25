@@ -13,7 +13,7 @@ import {createLocation} from "./location.mjs";
 
 export function createNavigationRuntime(ctx){
   let shellLocation, PENDING_NEW, shellDialogs, shellHomeLink, shellHeader, shellScreens;
-  function writeLocation(mode){return shellLocation.writeLocation(mode);}
+  function writeLocation(mode,boardState){return shellLocation.writeLocation(mode,boardState);}
 
   function applyBrowserLocation(){return shellLocation.applyBrowserLocation();}
 
@@ -91,7 +91,8 @@ export function createNavigationRuntime(ctx){
       setHandled:hash=>{ctx.handledHash=hash;},
       communityScreen:ctx.shellCommunityScreen,
       show:(file,write)=>(0,ctx.show)(file,write),
-      choose:(id,momentId)=>(0,ctx.choose)(id,momentId),
+      choose:(id,momentId,skipShow)=>(0,ctx.choose)(id,momentId,skipShow),
+      links:(...args)=>(0,ctx.links)(...args),
       notify:text=>(0,ctx.notify)(text),
       startMember:()=>(0,ctx.startMember)(),
       showPublicRoute:route=>(0,ctx.showPublicRoute)(route),
@@ -175,6 +176,7 @@ export function createNavigationRuntime(ctx){
       getModel:()=>ctx.model,
       getSource:()=>ctx.source,
       getCurrent:()=>ctx.current,
+      getVisitorAccount:()=>ctx.visitorAccount||null,
       accountApi:ctx.accountApi,
       // #368: 이메일을 불러오거나 지울 때마다 설정 "프로필" 표시도 같이 칠한다.
       onEmailChange:email=>(0,ctx.paintSettingsProfile)(email),
@@ -193,6 +195,7 @@ export function createNavigationRuntime(ctx){
       setCurrent:file=>{ctx.current=file;},
       getSource:()=>ctx.source,
       hasTree:()=>!!window.LT41,
+      isGuest:()=>!ctx.member?.snapshot().owned && ctx.source!=='share',
       takeNetworkOpen:ctx.takeNetworkOpen,
       takeBoardOpen:ctx.takeBoardOpen,
       // #1026 E: 로그아웃 예시를 동적으로 받는 동안에는 사용자가 연 창을 닫지 않는다.

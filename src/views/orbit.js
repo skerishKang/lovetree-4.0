@@ -12,6 +12,7 @@ import samples from './orbit-samples.json';
 import compactOrbitImages from './orbit-compact.json';
 import {paintCardBitmap,cardPose,hitPose,hitProjective,sortPaintOrder} from './orbit-canvas.js';
 import {createOrbitGL} from './orbit-webgl.js';
+import {orbitHintSeen,rememberOrbitHint} from './orbit-hint-memory.js';
 import {escape as esc, orbitRecords, resume, remember} from './memory.js';
 import {SERVICE, GO_TREES, READ_BOOK, VIEW_TREE, NEW_TREE, BOOK_IS_READING} from '../terms.js';
 import {mediaLinkView} from '../media.js';
@@ -26,7 +27,9 @@ export const ORBIT_EXAMPLE = {
 // 좁은 화면(w<=650)은 원래 반지름을 그대로 쓴다: 화면이 좁으면 벌린 반지름이 오히려 카드를 안전 구역 밖으로 밀어 숨긴다.
 const rings={main:{rx:700,ry:330,zAmp:420,zBase:0,speed:1,band:0},inner:{rx:530,ry:250,zAmp:330,zBase:0,speed:1,band:0},outer:{rx:900,ry:420,zAmp:520,zBase:0,speed:1,band:0},upper:{rx:610,ry:290,zAmp:460,zBase:0,speed:1,band:0},lower:{rx:760,ry:350,zAmp:470,zBase:0,speed:1,band:0}};
 const ringsNarrow={main:{rx:700,ry:330,zAmp:420,zBase:0,speed:1,band:0},inner:{rx:520,ry:260,zAmp:330,zBase:0,speed:1,band:0},outer:{rx:900,ry:430,zAmp:520,zBase:0,speed:1,band:0},upper:{rx:610,ry:290,zAmp:460,zBase:0,speed:1,band:0},lower:{rx:760,ry:350,zAmp:470,zBase:0,speed:1,band:0}};
-let extraCSS=`:host{display:block;height:100dvh;min-height:540px;font-family:var(--ui,system-ui,sans-serif)}.app{height:100%;font-family:var(--ui,system-ui,sans-serif)}.card{text-align:left;padding:0;border:1px solid rgba(255,234,183,.30);--lt-orbit-shadow:0 24px 60px rgba(0,0,0,.38)}.card:after{content:'';position:absolute;inset:2px;border:1px solid rgba(255,234,183,.28);border-radius:inherit;pointer-events:none;transition:border-color .2s,box-shadow .2s}.card .surface{transition:transform .25s ease}/* #586: 끄는 동안(data-lt-busy)은 hover 모양을 바꾸지 않는다 — 카드 위를 지나치며 테두리·번짐·그림자가 계속
+const ringsCompact=Object.fromEntries(Object.entries(rings).map(([name,ring])=>[name,{...ring,rx:ring.rx*.48,ry:ring.ry*.48,zAmp:ring.zAmp*.55}]));
+const orbitRings=(w,h)=>h<=500?ringsCompact:w<=650?ringsNarrow:rings;
+let extraCSS=`:host{display:block;height:100dvh;min-height:0;font-family:var(--ui,system-ui,sans-serif)}.app{height:100%;font-family:var(--ui,system-ui,sans-serif)}.card{text-align:left;padding:0;border:1px solid rgba(255,234,183,.30);--lt-orbit-shadow:0 24px 60px rgba(0,0,0,.38)}.card:after{content:'';position:absolute;inset:2px;border:1px solid rgba(255,234,183,.28);border-radius:inherit;pointer-events:none;transition:border-color .2s,box-shadow .2s}.card .surface{transition:transform .25s ease}/* #586: 끄는 동안(data-lt-busy)은 hover 모양을 바꾸지 않는다 — 카드 위를 지나치며 테두리·번짐·그림자가 계속
    바뀌어 다시 계산·다시 칠하는 일이 끌기를 버겁게 했다. 손을 떼면 원래 hover 모양으로 돌아온다. */
 :host(:not([data-lt-busy])) .card:hover,:host(:not([data-lt-busy])) .card:focus-visible{z-index:3000!important;border-color:#ffe6a6}:host(:not([data-lt-busy])) .card:hover:after,:host(:not([data-lt-busy])) .card:focus-visible:after{border-color:#fff0c7;box-shadow:inset 0 0 18px rgba(255,221,150,.28)}:host(:not([data-lt-busy])) .card:hover .surface,:host(:not([data-lt-busy])) .card:focus-visible .surface{transform:scale(1.035)}:host(:not([data-lt-busy])) .card:hover img,:host(:not([data-lt-busy])) .card:focus-visible img{filter:saturate(.9) brightness(1.06)}@media(prefers-reduced-motion:reduce){.card,.card img,.card .caption,.card:after,.card .surface,.center,.focusLayer,.connectionPeek,.menuPanel,.drawer,.focusInfo,.closeFocus,.mediaViewer,.localNotice,.previewPlaying img,.mediaVisual.previewPlaying img{animation:none;transition:none}}.card.mine{border-width:3px;border-color:var(--lt-gold-deep);--lt-orbit-shadow:0 24px 60px rgba(0,0,0,.38),0 0 0 1px var(--lt-gold-line),0 0 20px var(--lt-gold-glow)}.card.mine:after{border-color:var(--lt-gold-line)}:host([data-lt-theme=garden]) .card.mine{border-color:var(--lt-rose);--lt-orbit-shadow:var(--lt-garden-shadow),0 0 0 1px var(--lt-gold-line),0 0 20px var(--lt-gold-glow)}:host([data-lt-theme=garden]) .recent-card{border-color:var(--lt-rose)}.card:focus-visible,button:focus-visible,a:focus-visible{outline:3px solid #e8b8c9;outline-offset:5px}.topbar{z-index:70;gap:16px}.topbar button{pointer-events:auto}.top-actions{display:flex;gap:20px;align-items:center}.center{pointer-events:none;max-width:90vw}.center .actions{pointer-events:none}.center .actions button{pointer-events:auto}.center h1{font-size:clamp(30px,4vw,54px)}.center p{line-height:1.8}.actions{flex-wrap:wrap}.subtleBtn{min-height:44px}.card.clash{visibility:hidden}.primary-cta{background:#eee7e0;color:#28212b;border-color:#eee7e0}.primary-cta:hover{background:#eee7e0;border-color:#eee7e0}:host([data-lt-theme=garden]) .center .primary-cta{background:#eee7e0;color:#28212b;border-color:#eee7e0}:host([data-lt-theme=garden]) .center .primary-cta:hover{background:#eee7e0;border-color:#eee7e0}.hint{pointer-events:none}.caption{pointer-events:none}.card .memoText{overflow:hidden;display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical;overflow-wrap:anywhere}.orbit-dialog{border:1px solid #564957;color:#eee7e9;background:#151118;border-radius:22px;width:min(900px,94vw);max-height:88dvh;padding:0;overflow:auto}.orbit-dialog::backdrop{background:#030307d9;backdrop-filter:blur(12px)}.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:30px;padding:42px}.detail-image{width:100%;height:390px;object-fit:contain;background:#08070a;border-radius:12px}.detail-image--vertical{display:block;width:auto;max-width:100%;aspect-ratio:9/16;margin:0 auto}.detail-paper{min-height:280px;background:#eae2d3;color:#4d3a40;padding:35px;font:24px/1.7 Georgia,serif;white-space:pre-wrap;overflow-wrap:anywhere;border-radius:8px;transform:rotate(-2deg)}.detail-copy h2{font-size:30px;line-height:1.3;overflow-wrap:anywhere}.detail-copy p{font-size:15px;line-height:1.9;white-space:pre-wrap;overflow-wrap:anywhere;color:#c8beca}.detail-copy small{color:#bd9cad}.detail-buttons{display:flex;flex-wrap:wrap;gap:9px;margin-top:20px}.detail-buttons button,.detail-buttons a,.close{padding:10px 14px;border:1px solid #615364;background:#302537;border-radius:99px;color:#eee3eb;text-decoration:none;cursor:pointer;min-height:44px}.media-unrecognized{display:block;margin-top:20px;padding:10px 14px;border:1px solid #615364;border-radius:10px;background:#241d2a;color:#c8beca;font-size:13px;line-height:1.8;overflow-wrap:anywhere}.close{position:absolute;right:12px;top:10px;z-index:7}.index-list{padding:56px 35px 35px;display:grid;gap:8px}.index-list h2{margin:8px 0 20px}.index-list button{text-align:left;border:1px solid #514454;background:#221b27;color:#eee5ed;padding:14px;border-radius:10px;cursor:pointer}.index-list small{display:block;color:#b9a4be;margin-top:6px}.center-scrim{position:absolute;z-index:10;left:50%;top:50%;width:min(820px,96vw);height:min(560px,74dvh);transform:translate(-50%,-50%);pointer-events:none;background:radial-gradient(ellipse 62% 58% at 50% 49%,rgba(3,3,8,.9) 0%,rgba(3,3,8,.78) 40%,rgba(3,3,8,.42) 68%,rgba(3,3,8,0) 100%)}.center{z-index:22}.center .center-note{margin:15px 0 0;font-size:13px;letter-spacing:0;line-height:1.7;color:#d4cee0}.menuBtn{pointer-events:auto;min-height:44px;padding:10px 15px;border:1px solid rgba(255,255,255,.22);border-radius:999px;background:rgba(9,8,14,.62);color:#ece7f1;font-size:11px;letter-spacing:.06em;backdrop-filter:blur(8px)}.menuBtn:hover{border-color:rgba(255,255,255,.44);background:rgba(255,255,255,.09)}.hint{font-size:13px;letter-spacing:.04em;color:#9c97a6}@media(max-width:650px){.center-scrim{width:min(560px,104vw);height:min(430px,56dvh);background:radial-gradient(ellipse 64% 58% at 50% 47%,rgba(3,3,8,.93) 0%,rgba(3,3,8,.84) 40%,rgba(3,3,8,.46) 70%,rgba(3,3,8,0) 100%)}.center .center-note{font-size:10px}.topbar{padding:14px 18px}.brand{font-size:9px;letter-spacing:.12em}.top-actions{gap:12px}.detail-grid{grid-template-columns:1fr;padding:48px 22px 24px;gap:14px}.detail-image{height:220px}.detail-paper{min-height:150px;padding:20px;font-size:20px}.detail-copy h2{font-size:24px}.center h1{font-size:30px}.hint{font-size:13px;bottom:18px;right:80px}/* 이슈 458: 셸 ＋ 단추(오른쪽 아래 56px) 자리를 비워 둔다 */.actions{gap:8px}.subtleBtn{padding:10px 12px;font-size:12px}.detail-copy p{font-size:14px}}@media(max-width:768px){.brand{font-size:12px}.menuBtn{font-size:14px}.subtleBtn{font-size:14px}.hint{font-size:14px}.center .center-note{font-size:14px}.eyebrow{font-size:12px}.focusActions button,.focusActions a{font-size:14px}.focusInfo .kicker{font-size:12px}.meta{font-size:14px}.why b{font-size:14px}.panelHead strong{font-size:14px}.media-unrecognized{font-size:14px}.card.video .playGlyph{font-size:12px}.card.video .duration{font-size:12px}.card.link .surface:after{font-size:12px}.card.memo .memoKicker{font-size:12px}.card.memo .memoFoot{font-size:12px}.card .caption{font-size:12px}.firstMark{font-size:12px}.index-list small{font-size:14px}}.index-filters{display:flex;flex-wrap:wrap;gap:8px;margin:-6px 0 20px}.indexFilter{padding:7px 14px;border:1px solid #514454;border-radius:999px;background:#221b27;color:#cfc3d6;font:inherit;font-size:13px;cursor:pointer;min-height:36px}.indexFilter.active{border-color:#e8b8c9;color:#fff;background:#3a2c40}.indexFilter:focus-visible{outline:3px solid #e8b8c9;outline-offset:2px}.index-empty{color:#b9a4be;font-size:14px;line-height:1.7;margin:6px 0 0}.indexTagTitle{margin:18px 0 0;font-size:12px;color:#bd9cad}.index-tag-filter{display:grid;gap:10px;margin:-6px 0 20px;padding:14px;border:1px solid #3a2c40;border-radius:12px;background:#1b1520}.indexTagPickedRow{display:flex;flex-wrap:wrap;gap:8px}.lt-tree-dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--lt-tree-dot,#8a7f8f);flex:0 0 auto}.lt-tree-tag{display:inline-flex;align-items:center;gap:5px}.indexFilter{display:inline-flex;align-items:center;gap:6px}.indexTagPicked{display:inline-flex;align-items:center;min-height:44px;padding:0 12px;border:1px solid #e8b8c9;border-radius:999px;background:#3a2c40;color:#fff;font:inherit;font-size:13px;cursor:pointer}.indexTagKind{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.indexTagKindName{min-width:52px;color:#bd9cad;font-size:12px}.indexTagChips{display:flex;flex-wrap:wrap;gap:8px}.indexTagChip{display:inline-flex;align-items:center;min-height:44px;padding:0 12px;border:1px solid #514454;border-radius:999px;background:#221b27;color:#cfc3d6;font:inherit;font-size:13px;cursor:pointer}.indexTagChip.active{border-color:#e8b8c9;color:#fff;background:#3a2c40}.indexTagMore{display:inline-flex;align-items:center;min-height:44px;padding:0 10px;border:0;background:none;color:#bd9cad;font:inherit;font-size:13px;cursor:pointer;text-decoration:underline}.indexTagChip:focus-visible,.indexTagMore:focus-visible,.indexTagPicked:focus-visible{outline:3px solid #e8b8c9;outline-offset:2px}.detail-grid{position:relative}.detail-nav{position:absolute;top:50%;transform:translateY(-50%);z-index:6;min-width:44px;min-height:44px;padding:8px 13px;border:1px solid #615364;border-radius:999px;background:#302537;color:#eee3eb;font:inherit;font-size:15px;cursor:pointer}.detail-nav--prev{left:10px}.detail-nav--next{right:10px}.detail-nav:disabled{opacity:.35;cursor:default}.detail-nav:focus-visible{outline:3px solid #e8b8c9;outline-offset:2px}.detail-nav-note{position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:6;margin:0;color:#bd9cad;font-size:12px}:host([data-lt-busy]) .card{will-change:transform;--lt-orbit-busy-shadow:0 14px 34px rgba(0,0,0,.34)}:host([data-lt-busy]) .card.mine{--lt-orbit-busy-shadow:0 14px 34px rgba(0,0,0,.34),0 0 0 1px var(--lt-gold-line),0 0 12px var(--lt-gold-glow)}:host([data-lt-busy]) .card:after{box-shadow:none}:host([data-lt-busy]) .recent-card:hover,:host([data-lt-busy]) .recent-card:focus-within{border-color:var(--lt-gold-deep);box-shadow:0 24px 60px rgba(0,0,0,.38),0 0 0 1px var(--lt-gold-line),0 0 22px var(--lt-gold-glow);outline:none}:host([data-lt-theme=garden]) .recent-card:hover,:host([data-lt-theme=garden]) .recent-card:focus-within{border-color:var(--lt-rose)}:host([data-lt-busy]) .recent-card:hover:after,:host([data-lt-busy]) .recent-card:focus-within:after{border-color:var(--lt-gold-line)}
 /* 옮기기·칩 순서(2026-11-17): 고르기 칸·행별 옮기기·대상 메뉴·안내 줄·끌기 표시. 색은 이 찾의 기존 값(#514454·#e8b8c9 계열)을 쓴다. */
@@ -48,6 +51,15 @@ let extraCSS=`:host{display:block;height:100dvh;min-height:540px;font-family:var
 .orbit-dialog.lt-dragging{cursor:grabbing}
 .orbit-dialog.lt-dragging [data-lt-moment-row]{pointer-events:none;opacity:.7}.index-empty{color:#b9a4be;font-size:14px;line-height:1.7;margin:6px 0 0}.indexTagTitle{margin:18px 0 0;font-size:12px;color:#bd9cad}.index-tag-filter{display:grid;gap:10px;margin:-6px 0 20px;padding:14px;border:1px solid #3a2c40;border-radius:12px;background:#1b1520}.indexTagPickedRow{display:flex;flex-wrap:wrap;gap:8px}.indexTagPicked{display:inline-flex;align-items:center;min-height:44px;padding:0 12px;border:1px solid #e8b8c9;border-radius:999px;background:#3a2c40;color:#fff;font:inherit;font-size:13px;cursor:pointer}.indexTagKind{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.indexTagKindName{min-width:52px;color:#bd9cad;font-size:12px}.indexTagChips{display:flex;flex-wrap:wrap;gap:8px}.indexTagChip{display:inline-flex;align-items:center;min-height:44px;padding:0 12px;border:1px solid #514454;border-radius:999px;background:#221b27;color:#cfc3d6;font:inherit;font-size:13px;cursor:pointer}.indexTagChip.active{border-color:#e8b8c9;color:#fff;background:#3a2c40}.indexTagMore{display:inline-flex;align-items:center;min-height:44px;padding:0 10px;border:0;background:none;color:#bd9cad;font:inherit;font-size:13px;cursor:pointer;text-decoration:underline}.indexTagChip:focus-visible,.indexTagMore:focus-visible,.indexTagPicked:focus-visible{outline:3px solid #e8b8c9;outline-offset:2px}.detail-grid{position:relative}.detail-nav{position:absolute;top:50%;transform:translateY(-50%);z-index:6;min-width:44px;min-height:44px;padding:8px 13px;border:1px solid #615364;border-radius:999px;background:#302537;color:#eee3eb;font:inherit;font-size:15px;cursor:pointer}.detail-nav--prev{left:10px}.detail-nav--next{right:10px}.detail-nav:disabled{opacity:.35;cursor:default}.detail-nav:focus-visible{outline:3px solid #e8b8c9;outline-offset:2px}.detail-nav-note{position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:6;margin:0;color:#bd9cad;font-size:12px}:host([data-lt-busy]) .card{will-change:transform;--lt-orbit-busy-shadow:0 14px 34px rgba(0,0,0,.34)}:host([data-lt-busy]) .card.mine{--lt-orbit-busy-shadow:0 14px 34px rgba(0,0,0,.34),0 0 0 1px var(--lt-gold-line),0 0 12px var(--lt-gold-glow)}:host([data-lt-busy]) .card:after{box-shadow:none}:host([data-lt-busy]) .recent-card:hover,:host([data-lt-busy]) .recent-card:focus-within{border-color:var(--lt-gold-deep);box-shadow:0 24px 60px rgba(0,0,0,.38),0 0 0 1px var(--lt-gold-line),0 0 22px var(--lt-gold-glow);outline:none}:host([data-lt-theme=garden]) .recent-card:hover,:host([data-lt-theme=garden]) .recent-card:focus-within{border-color:var(--lt-rose)}:host([data-lt-busy]) .recent-card:hover:after,:host([data-lt-busy]) .recent-card:focus-within:after{border-color:var(--lt-gold-line)}`;
 
+// #1084: 순간 목록·궤도 상세에서도 가로 썸네일 속 회색 여백 대신 화면 전체를 흐린 썸네일로 채운다.
+extraCSS += `
+.index-row-thumb.is-vertical{position:relative;isolation:isolate}
+.index-row-thumb.is-vertical::before,.detail-vertical-stage::before{content:"";position:absolute;inset:-18px;background-image:var(--lt-orbit-thumb);background-size:cover;background-position:center;filter:blur(6px) brightness(.7);transform:scale(2.8);pointer-events:none}
+.index-row-thumb.is-vertical img{position:relative;width:40%;height:100%;object-fit:cover}
+.detail-vertical-stage{position:relative;width:max-content;max-width:100%;margin:0 auto;overflow:hidden;border-radius:12px;isolation:isolate}
+.detail-vertical-stage .detail-image--vertical{position:relative;display:block;width:calc(390px*9/16);max-width:100%;height:390px;aspect-ratio:9/16;object-fit:cover;clip-path:inset(0 13%);margin:0}
+@media(max-width:650px){.detail-vertical-stage .detail-image--vertical{width:calc(220px*9/16);height:220px}}
+`;
 extraCSS += '@media(min-width:651px){.detail-grid{padding-left:64px;padding-right:64px}}@media(max-width:650px){.detail-grid{padding-top:60px}.detail-nav{top:6px;transform:none}.detail-nav--prev{left:12px}.detail-nav--next{left:64px;right:auto}.detail-nav-note{top:20px}}';
 // #426: 최근 순간 카드 — 궤도의 금빛 내 카드(.card.mine)와 같은 결(테두리·이중선·금빛 번짐). 390에서는 폭=화면-32px, 세로 썸네일 높이 제한.
 // 261118 대표 지적 1번(이슈 #884): 카드 층 아래 경계를 둔 것이 바닥에 빈 회색 띠를 만들었다 —
@@ -55,13 +67,35 @@ extraCSS += '@media(min-width:651px){.detail-grid{padding-left:64px;padding-righ
 extraCSS+=`.center-note{display:flex;flex-wrap:wrap;justify-content:center;align-items:baseline;gap:2px 10px}.center-note[data-off]{display:none}.center-hint{color:var(--lt-muted,#9b98a6)}@media(max-width:650px){.center p.note-with-hint{font-size:12px;line-height:1.5;margin-top:8px}}/* #635 PR C: '드래그 · 금테 카드를 눌러 감상' 안내를 단추 묶음 바로 아래(안내 줄 옆)로 올린다 — 화면 아래 고정 링크 줄과 겹치지 않게. */`;
 /* 261117 대표 검수: 마우스로 열었으면 닫기 단추의 초점 테두리를 그리지 않는다(#795 계정 메뉴와 같은 방식) — 키보드로 열었으면 보인다. */
 extraCSS+=`dialog[data-lt-opened-by=mouse] .close:focus-visible,dialog[data-lt-opened-by=mouse] .close:focus{outline:0;box-shadow:none}`;
-extraCSS+=`.recent-card{pointer-events:auto;position:relative;display:block;width:min(430px,86vw);margin:24px auto 0;padding:0;text-align:left;border:3px solid var(--lt-gold-deep);border-radius:16px;background:rgba(10,9,14,.82);box-shadow:0 24px 60px rgba(0,0,0,.38),0 0 0 1px var(--lt-gold-line),0 0 22px var(--lt-gold-glow);cursor:pointer;overflow:hidden;font:inherit;color:inherit}.recent-media[data-recent-state=loading] .recent-thumb,.recent-media[data-recent-state=loading]::before,.recent-media[data-recent-state=failed] .recent-thumb,.recent-media[data-recent-state=failed]::before{opacity:0}.recent-media[data-recent-video] .recent-thumb,.recent-media[data-recent-video]::before{transition:opacity .2s ease}.recent-media[data-recent-video]+.recent-meta{box-sizing:border-box;height:82px}.recent-media[data-recent-video]+.recent-meta small{line-height:16px}.recent-media[data-recent-state=loading]:after{content:'';position:absolute;inset:0;background:linear-gradient(110deg,transparent 25%,color-mix(in srgb,var(--lt-muted) 12%,transparent) 50%,transparent 75%);background-size:200% 100%;animation:recent-shimmer 1.8s ease-in-out infinite;pointer-events:none}@keyframes recent-shimmer{from{background-position:200% 0}to{background-position:-200% 0}}.recent-media[data-recent-state=loading] .recent-play,.recent-media[data-recent-state=failed] .recent-play,.recent-video-status{display:none}.recent-media[data-recent-state=failed] .recent-video-status{position:absolute;inset:0;display:grid;place-items:center;padding:16px;text-align:center;font-size:14px;line-height:1.5;color:var(--lt-muted)}@media(prefers-reduced-motion:reduce){.recent-media[data-recent-state=loading]:after{animation:none}.recent-media[data-recent-video] .recent-thumb,.recent-media[data-recent-video]::before{transition:none}}.recent-card:after{content:'';position:absolute;inset:2px;border:1px solid var(--lt-gold-line);border-radius:inherit;pointer-events:none}.recent-card:hover,.recent-card:focus-within{border-color:#ffe6a6;box-shadow:0 24px 60px rgba(0,0,0,.4),0 0 0 2px rgba(255,224,158,.75),0 0 26px rgba(238,190,104,.68);outline:none}.recent-card:hover:after,.recent-card:focus-within:after{border-color:#fff0c7}.recent-open{position:absolute;inset:0;z-index:0;width:100%;height:100%;margin:0;border:0;padding:0;background:transparent;cursor:pointer;font:inherit}.recent-media{position:relative;z-index:1;display:block;width:100%;aspect-ratio:16/9;background:#0b0a10;overflow:hidden}.recent-media.vertical{width:100%;aspect-ratio:16/9;margin:0}.recent-media img{width:100%;height:100%;object-fit:cover;display:block}.recent-media.vertical::before{content:'';position:absolute;inset:-12px;background-image:var(--lt-recent-bg);background-size:cover;background-position:center;filter:blur(18px) brightness(.72);opacity:.86;transform:scale(1.06);pointer-events:none}.recent-media.vertical .recent-thumb{position:relative;object-fit:contain}.recent-play{position:absolute;inset:0;width:100%;min-height:44px;min-width:44px;border:0;padding:0;background:transparent;cursor:pointer;display:grid;place-items:center}.recent-play>span{display:grid;place-items:center;min-width:52px;min-height:52px;border-radius:50%;background:#1a1620d9;color:#fff;border:1px solid rgba(255,255,255,.4);font-size:20px;line-height:1}.recent-frame{position:absolute;inset:0;width:100%;height:100%;border:0;background:#000}.recent-meta{position:relative;z-index:1;display:block;padding:10px 14px 12px}.recent-meta small{display:block;font-size:11px;letter-spacing:.04em;color:#b9b2c4}.recent-meta strong{display:block;margin:3px 0 2px;font-size:15px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.recent-media--memo{aspect-ratio:auto;display:grid;place-items:center;padding:16px;min-height:96px}.recent-media--slot{aspect-ratio:auto}.recent-memo{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;font-size:14px;line-height:1.7;color:#e6ddef;overflow-wrap:anywhere}@media(max-width:650px){.center{width:calc(100vw - 16px);max-width:calc(100vw - 16px)}.recent-card{width:calc(100vw - 32px)}.recent-media.vertical{width:100%}}`;
+extraCSS+=`.recent-card{pointer-events:auto;position:relative;display:block;width:min(430px,86vw);margin:24px auto 0;padding:0;text-align:left;border:3px solid var(--lt-gold-deep);border-radius:16px;background:rgba(10,9,14,.82);box-shadow:0 24px 60px rgba(0,0,0,.38),0 0 0 1px var(--lt-gold-line),0 0 22px var(--lt-gold-glow);cursor:pointer;overflow:hidden;font:inherit;color:inherit}.recent-media[data-recent-state=loading] .recent-thumb,.recent-media[data-recent-state=loading]::before,.recent-media[data-recent-state=failed] .recent-thumb,.recent-media[data-recent-state=failed]::before{opacity:0}.recent-media[data-recent-video] .recent-thumb,.recent-media[data-recent-video]::before{transition:opacity .2s ease}.recent-media[data-recent-video]+.recent-meta{box-sizing:border-box;height:82px}.recent-media[data-recent-video]+.recent-meta small{line-height:16px}.recent-media[data-recent-state=loading]:after{content:'';position:absolute;inset:0;background:linear-gradient(110deg,transparent 25%,color-mix(in srgb,var(--lt-muted) 12%,transparent) 50%,transparent 75%);background-size:200% 100%;animation:recent-shimmer 1.8s ease-in-out infinite;pointer-events:none}@keyframes recent-shimmer{from{background-position:200% 0}to{background-position:-200% 0}}.recent-media[data-recent-state=loading] .recent-play,.recent-media[data-recent-state=failed] .recent-play,.recent-video-status{display:none}.recent-media[data-recent-state=failed] .recent-video-status{position:absolute;inset:0;display:grid;place-items:center;padding:16px;text-align:center;font-size:14px;line-height:1.5;color:var(--lt-muted)}@media(prefers-reduced-motion:reduce){.recent-media[data-recent-state=loading]:after{animation:none}.recent-media[data-recent-video] .recent-thumb,.recent-media[data-recent-video]::before{transition:none}}.recent-card:after{content:'';position:absolute;inset:2px;border:1px solid var(--lt-gold-line);border-radius:inherit;pointer-events:none}.recent-card:hover,.recent-card:focus-within{border-color:#ffe6a6;box-shadow:0 24px 60px rgba(0,0,0,.4),0 0 0 2px rgba(255,224,158,.75),0 0 26px rgba(238,190,104,.68);outline:none}.recent-card:hover:after,.recent-card:focus-within:after{border-color:#fff0c7}.recent-open{position:absolute;inset:0;z-index:0;width:100%;height:100%;margin:0;border:0;padding:0;background:transparent;cursor:pointer;font:inherit}.recent-media{position:relative;z-index:1;display:block;width:100%;aspect-ratio:16/9;background:#0b0a10;overflow:hidden}.recent-media.vertical{width:100%;aspect-ratio:16/9;margin:0}.recent-media img{width:100%;height:100%;object-fit:cover;display:block}.recent-media.vertical::before{content:'';position:absolute;inset:-18px;background-image:var(--lt-recent-bg);background-size:cover;background-position:center;filter:blur(6px) brightness(.7);opacity:.86;transform:scale(2.8);pointer-events:none}.recent-media.vertical .recent-thumb{position:absolute;top:0;left:50%;width:22.8%;height:100%;object-fit:cover;object-position:center;transform:translateX(-50%)}.recent-media .recent-thumb[hidden]{display:none}.recent-play{position:absolute;inset:0;width:100%;min-height:44px;min-width:44px;border:0;padding:0;background:transparent;cursor:pointer;display:grid;place-items:center}.recent-play>span{display:grid;place-items:center;min-width:52px;min-height:52px;border-radius:50%;background:#1a1620d9;color:#fff;border:1px solid rgba(255,255,255,.4);font-size:20px;line-height:1}.recent-frame{position:absolute;inset:0;width:100%;height:100%;border:0;background:#000}.recent-media.vertical .recent-frame{left:50%;right:auto;width:31.640625%;transform:translateX(-50%)}.recent-meta{position:relative;z-index:1;display:block;padding:10px 14px 12px}.recent-meta small{display:block;font-size:11px;letter-spacing:.04em;color:#b9b2c4}.recent-meta strong{display:block;margin:3px 0 2px;font-size:15px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.recent-media--memo{aspect-ratio:auto;display:grid;place-items:center;padding:16px;min-height:96px}.recent-media--slot{aspect-ratio:auto}.recent-memo{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;font-size:14px;line-height:1.7;color:#e6ddef;overflow-wrap:anywhere}@media(max-width:650px){.center{width:calc(100vw - 16px);max-width:calc(100vw - 16px)}.recent-card{width:calc(100vw - 32px)}.recent-media.vertical{width:100%;aspect-ratio:1/1}.recent-media.vertical .recent-thumb{width:40%;height:100%;max-width:40%;object-fit:cover;left:50%;transform:translateX(-50%)}.recent-media.vertical .recent-frame{width:56.25%}.recent-card.is-playing-mobile{position:fixed;inset:8px;z-index:4000;width:calc(100vw - 16px);max-width:none;height:calc(100dvh - 16px);margin:0;display:flex;flex-direction:column;justify-content:center}.recent-card.is-playing-mobile .recent-media{flex:1 1 auto;min-height:0;max-height:calc(100dvh - 120px);aspect-ratio:auto}.recent-card.is-playing-mobile .recent-frame{height:100%;width:100%;left:0;transform:none}.recent-card.is-playing-mobile .recent-meta{flex:none}.recent-card.is-playing-mobile .recent-play{z-index:2;inset:auto 6px 6px auto;width:52px;height:52px}.recent-card.is-playing-mobile .recent-play>span{min-width:44px;min-height:44px}}`;
 // 261116 PR 2: 머리글 단추(카드 모드 고르기). 눈에 보이는 글자 12px 이상·대비 4.5:1 위, 누름 영역은 :after로 44px를 채운다(menuBtn과 같은 판). 카드 열림(recent-open)과 갈라진다 — 단추 자체가 위에 있어 그쪽이 눌린다.
+/* #1284: 세로 영상 카드가 길어져도 상단 안내가 화면 밖으로 밀리지 않도록 위에서부터 배치한다. */
+extraCSS+=`@media(max-width:650px){:host([data-lt-home-portrait]) .center{top:18px;transform:translateX(-50%)}:host([data-lt-home-portrait]) .center.dim{transform:translateX(-50%) scale(.96)}}`;
+// 세로 터치는 안쪽 문서 스크롤에 넘기고 가로 끌기는 궤도가 계속 받는다.
+extraCSS+=`.app{touch-action:pan-y}`;
 extraCSS+=`.recent-head{position:relative;display:inline-flex;align-items:baseline;gap:1px;min-height:24px;margin:-4px 0;padding:2px 0;border:0;background:none;cursor:pointer;font:inherit;font-size:13px;letter-spacing:.04em;color:#cdc5da;text-align:left;white-space:nowrap}.recent-head:after{content:'';position:absolute;inset:-10px -12px -10px -8px;border-radius:8px}.recent-head:focus-visible{outline:3px solid #e8b8c9;outline-offset:2px}.recent-head-arrow{font-size:12px;color:#a79db8}.recent-head:hover{color:#eee6f6}.recent-head-row{display:flex;align-items:center;justify-content:space-between;gap:10px}.recent-change{position:relative;min-height:24px;padding:2px 0;border:0;background:none;cursor:pointer;font:inherit;font-size:13px;color:#cdc5da;white-space:nowrap;text-decoration:underline;text-underline-offset:3px}.recent-change:after{content:'';position:absolute;inset:-10px -8px;border-radius:8px}.recent-change:hover{color:#eee6f6}.recent-change:focus-visible{outline:3px solid #e8b8c9;outline-offset:2px}:host([data-lt-theme=garden]) .recent-head,:host([data-lt-theme=garden]) .recent-change,:host([data-lt-theme=garden]) .recent-head-arrow{color:var(--lt-muted)}`;
 // #1109: 정리 창과 같은 닫기 단추·뒤 덮개·390 꽉 찬 창 규칙.
 extraCSS+=`.orbit-dialog:not(#guidePanel)::backdrop{background:rgba(3,3,7,.85);backdrop-filter:blur(12px)}.orbit-dialog:not(#guidePanel) .close{box-sizing:border-box;width:44px;height:44px;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;padding:0;border:1px solid #615364;border-radius:50%;background:#ffffff07;font-size:24px;line-height:1;color:inherit;position:absolute;right:12px;top:10px;z-index:7}@media(max-width:520px){.orbit-dialog:not(#guidePanel){width:100vw;max-width:none;height:100dvh;max-height:100dvh;inset:0;margin:0;border:0;border-radius:0}.orbit-dialog:not(#guidePanel) .close{top:8px;right:8px;background:#151118e6}}`;
 // #1077: 바닥 링크·새 소식 카드 자리를 지나는 예시 카드는 그 구간만 투명하게(자리와 장수는 유지).
 extraCSS+=`.card.lt-under-link{opacity:0}\n.card .surface .lt-orbit-texture{position:absolute;inset:0;width:100%;height:100%;display:block;object-fit:var(--fit,cover);object-position:var(--pos,50% 50%);transform:scale(1.02);pointer-events:none}\n.card.fitContain .surface .lt-orbit-texture{padding:7px;object-fit:contain;transform:scale(.94)}\n.card .surface.lt-textured img{opacity:0;filter:none}.card .surface:not(.lt-textured) img{filter:saturate(var(--sat,.66)) brightness(var(--bright,.86)) var(--lt-orbit-depth,brightness(1))}\n.card.memo .surface{filter:var(--lt-orbit-depth,brightness(1))}\n:host(:not([data-lt-busy])) .card:is(:hover,:focus-visible,.hovered) .surface.lt-textured .lt-orbit-texture{opacity:0}:host(:not([data-lt-busy])) .card:is(:hover,:focus-visible,.hovered) .surface.lt-textured img{opacity:1;filter:saturate(.9) brightness(1.06) var(--lt-orbit-depth,brightness(1))}\n.card::before,.card>.lt-shadow-hover,.card>.lt-shadow-busy{content:"";position:absolute;inset:-1px;border-radius:inherit;pointer-events:none;transition:opacity .18s;z-index:-1}\n.card::before{box-shadow:var(--lt-orbit-shadow);opacity:1}.card>.lt-shadow-hover{box-shadow:0 24px 60px rgba(0,0,0,.4),0 0 0 2px rgba(255,224,158,.75),0 0 26px rgba(238,190,104,.68);opacity:0}.card>.lt-shadow-busy{box-shadow:var(--lt-orbit-busy-shadow);opacity:0}\n.card.mine::before,.card.mine>.lt-shadow-hover,.card.mine>.lt-shadow-busy{inset:-3px}:host(:not([data-lt-busy])) .card:is(:hover,:focus-visible,.hovered)::before,:host([data-lt-busy]) .card::before{opacity:0}:host(:not([data-lt-busy])) .card:is(:hover,:focus-visible,.hovered)>.lt-shadow-hover,:host([data-lt-busy]) .card>.lt-shadow-busy{opacity:1}\n`;
+
+// #1204: opacity/transform only; existing layout boxes are allocated before paint.
+extraCSS+=`@keyframes lt-home-rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+.center .lt-home-line{display:block}.center .lt-home-enter{animation:lt-home-rise 460ms cubic-bezier(.2,.7,.2,1) both;animation-delay:calc(var(--lt-home-order)*100ms)}
+@media(prefers-reduced-motion:reduce){.center .lt-home-enter{animation:none;opacity:1;transform:none}}
+.card.lt-first-frame{visibility:hidden}
+.center[data-lt-home-wait] .lt-home-enter{animation-play-state:paused;opacity:0}
+.lt-card-tip{position:absolute;z-index:4;left:50%;bottom:8px;transform:translateX(-50%);padding:3px 7px;border:1px solid var(--lt-gold-line);border-radius:999px;background:var(--lt-stage);color:var(--lt-pearl);font-size:12px;line-height:16px;white-space:nowrap;pointer-events:none;opacity:0}
+.card:has(.lt-fallback-notice) .lt-card-tip{bottom:44px}
+.world.lt-hint-ready .lt-card-tip{opacity:1}
+.world.lt-hint-ready .card.lt-card-hint:after{animation:lt-card-pulse 1.2s ease-in-out 2}
+@keyframes lt-card-pulse{0%,100%{border-color:var(--lt-gold-line);box-shadow:none}50%{border-color:var(--lt-gold);box-shadow:0 0 0 2px var(--lt-gold-line),0 0 18px var(--lt-gold-glow)}}
+:host([data-lt-motion-paused]) .card.lt-card-hint:after{animation:none}
+@media(prefers-reduced-motion:reduce){.world.lt-hint-ready .card.lt-card-hint:after{animation:none}}
+.world.lt-ribbon .card{left:0;top:0;transform-origin:0 0}
+.world.lt-ribbon .card .lt-lift{transform:none}
+@media(max-height:500px){.center{width:min(500px,62vw);top:45%}.center .eyebrow{margin-bottom:6px;font-size:10px}.center h1{font-size:30px}.center>p:not(.center-note){display:none}.center .actions{margin-top:12px}.center .recent-card{width:min(300px,40vw);margin-top:10px}.center .recent-media{aspect-ratio:16/7}.center-scrim{width:min(700px,90vw);height:min(300px,80dvh)}}
+`;
 
 export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSelect=()=>{},recordNote=null,examples=[],onOpen=null,empty=false,titleDisplay='both',momentList=null,dateStyle='dot',prefs=null,initialPicking=false,initialNotice=null,homePin=null,loggedIn}) {
  performance.mark('m0');
@@ -117,7 +151,8 @@ export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSel
   const CARD_NOMINAL={wide:{sm:[128,166],md:[180,232],lg:[226,292]},narrow:{sm:[92,120],md:[132,172],lg:[168,218]}};
   const forceLg=()=>globalThis.__LT_FORCE_LG__===true;
   const CARD_CAPS=[[1280,28],[900,20],[650,14],[0,10]];
- const cardCapFor=w=>{for(const [min,cap] of CARD_CAPS)if(w>=min)return cap;return 10;};
+ const cardCapFor=(w,h)=>w<=520&&h>500?8:h<=500?Math.min(10,cardCapForWidth(w)):cardCapForWidth(w);
+ const cardCapForWidth=w=>{for(const [min,cap] of CARD_CAPS)if(w>=min)return cap;return 10;};
   const cards=all.slice(0,48).map((c)=>forceLg()?{...c,sizeClass:'lg'}:c), last=demo?all[0]:resume(storage,trees);
  const lastCard=demo?all[0]:all.find(c=>c.treeId===last?.tree.id&&c.id===last?.moment.id)||all[0];
  // #426: 첫 화면 가운데 "최근 순간 카드" — 모든 트리의 최근 순간 한 장. 궤도가 예시 모드(로그인 후 '섞어서'에서 사진 3장 미만·mix-empty, 또는 예시 고름)여도
@@ -157,8 +192,26 @@ export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSel
   // ▶ 단추·제목 달기는 그대로 따로 눌린다(마우스 클릭 범위·Enter·Space는 이전과 같다).
   return `<div class="recent-card mine" data-do="recent"><button type="button" class="recent-open" data-do="recent" aria-label="${esc(head)} 이어 보기"></button>${media}<span class="recent-meta"><span class="recent-head-row"><button type="button" class="recent-head" data-recent-head aria-haspopup="true" aria-expanded="false" aria-label="첫 화면 카드 고르기: ${recentHeader!==null?esc(recentHeader):'마지막 순간'}">${recentHeader!==null?esc(recentHeader):`마지막 순간${days===null?'':` · ${relativeDayLabel(days)}`}`}<span class="recent-head-arrow" aria-hidden="true"> ▾</span></button><button type="button" class="recent-change" data-recent-change aria-haspopup="true" aria-expanded="false" aria-label="첫 화면 카드 바꾸기">바꾸기</button></span><strong>${esc(head)}</strong><small>${esc(c.subject||'내 트리')} · 이어 보기 →</small></span></div>`;
  };
- performance.mark('m1');shadow.innerHTML=`<style>${originalCSS}${extraCSS}.auth-entry{white-space:nowrap}</style><section class="app" aria-label="${SERVICE} 첫 화면"><div class="topbar"><span class="brand">${SERVICE} · MEMORY ORBIT</span><div class="top-actions"><button class="menuBtn" data-do="index">순간 목록</button>${authHtml}</div></div><div class="world"></div><div class="center-scrim" aria-hidden="true"></div><div class="center" data-lt-keep-clear><div class="eyebrow">${titleDemo?'나의 첫 순간':'WELCOME BACK'}</div><h1>${titleDemo?'좋아하는 순간부터.':'다시, 그 순간으로.'}</h1><p>${titleDemo?'간직하고 싶은 장면에 마음을 남겨 보세요.<br>지금 떠오르는 순간 하나면 충분해요.':'기억은 아직 여기에서 이어지고 있어요.'}</p>${recentMoment?recentMarkup(recentMoment):''}<div class="actions"><button class="subtleBtn primary-cta" data-do="${titleDemo?'new':'continue'}">${titleDemo?NEW_TREE:'이어 보던 순간'}</button><button class="subtleBtn" data-do="${titleDemo?'continue':'new'}">${titleDemo?'예시 순간 감상':NEW_TREE}</button><button class="subtleBtn" data-do="trees">${GO_TREES}</button></div><p class="center-note${demo?' note-with-hint':''}"><span>${demo?(loggedIn===true?'뒤에 떠다니는 카드는 감상 예시예요':'감상 예시 · 내 기록에는 저장되지 않아요'):esc(recordNote??`${all.length}개의 순간 · 서버에 보관`)}</span>${demo?(loggedIn===true?'<span>·</span><span class="center-hint">눌러서 감상</span>':'<span class="center-hint">드래그 · 금테 카드를 눌러 감상</span>'):''}</p></div></section><dialog class="orbit-dialog" aria-label="순간 감상"></dialog>`;
+ performance.mark('m1');shadow.innerHTML=`<style>${originalCSS}${extraCSS}.auth-entry{white-space:nowrap}</style><section class="app" aria-label="${SERVICE} 첫 화면"><div class="topbar"><span class="brand">${SERVICE} · MEMORY ORBIT</span><div class="top-actions"><button class="menuBtn" data-do="index">순간 목록</button>${authHtml}</div></div><div class="world"></div><div class="center-scrim" aria-hidden="true"></div><div class="center" data-lt-keep-clear><div class="eyebrow lt-home-enter" style="--lt-home-order:0">${titleDemo?'나의 첫 순간':'다시 만나 반가워요'}</div><h1 class="lt-home-enter" style="--lt-home-order:1">${titleDemo?'좋아하는 순간부터.':'다시, 그 순간으로.'}</h1><p class="lt-home-enter" style="--lt-home-order:2">${titleDemo?'간직하고 싶은 장면에 마음을 남겨 보세요.<br>지금 떠오르는 순간 하나면 충분해요.':'기억은 아직 여기에서 이어지고 있어요.'}</p>${recentMoment?recentMarkup(recentMoment):''}<div class="actions lt-home-enter" style="--lt-home-order:4"><button class="subtleBtn primary-cta" data-do="${titleDemo?'new':'continue'}">${titleDemo?NEW_TREE:'이어 보던 순간'}</button><button class="subtleBtn" data-do="${titleDemo?'continue':'new'}">${titleDemo?'예시 순간 감상':NEW_TREE}</button><button class="subtleBtn" data-do="trees">${GO_TREES}</button></div></div></section><dialog class="orbit-dialog" aria-label="순간 감상"></dialog>`;
  const app=shadow.querySelector('.app'),world=shadow.querySelector('.world'),dialog=shadow.querySelector('dialog');
+ shadow.querySelector('.center')?.setAttribute('data-lt-home-wait','');
+ // Separate the two descriptive lines without inserting or removing any layout box.
+ const description=shadow.querySelector('.center > p.lt-home-enter');
+ if(description){
+  const lines=description.innerHTML.split(/<br\s*\/?>/i);
+  description.classList.remove('lt-home-enter');
+  description.innerHTML=lines.map((line,i)=>`<span class="lt-home-line lt-home-enter" style="--lt-home-order:${2+i}">${line}</span>`).join('');
+ }
+
+ // #1084 후속(운영 11-23): 세로 영상의 흐린 배경은 처음 후보(oardefault)로 깔리는데, 그 그림이 없는 영상은 YouTube가
+ // 120×90 회색 자리 그림을 돌려줘 칸 전체가 회색이 된다. 가운데 썸네일이 후보를 내려가며 실제로 불러온 그림으로 배경도 바꾼다.
+ const followThumb=img=>{
+  if(!(img instanceof HTMLImageElement)||!img.currentSrc||img.naturalWidth<=120)return;
+  const host=img.closest('.recent-media.vertical')||img.closest('.index-row-thumb.is-vertical')||img.closest('.detail-vertical-stage');
+  if(!host)return;
+  host.style.setProperty(host.classList.contains('recent-media')?'--lt-recent-bg':'--lt-orbit-thumb','url("'+img.currentSrc.replace(/"/g,'%22')+'")');
+ };
+ shadow.addEventListener('load',e=>followThumb(e.target),true);
  // #1010: 예시 안내 줄 — 떠다니는 예시 카드가 숨는 좁은 화면에서는 함께 숨긴다(아래 배치에서 data-off를 묻는다).
  const centerNote=shadow.querySelector('.center-note');
  const fallbackCanvas=document.createElement('canvas'),glCanvas=document.createElement('canvas');
@@ -170,12 +223,14 @@ export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSel
  const canvasStyle=document.createElement('style');canvasStyle.textContent='.app.lt-webgl-vignette::before{z-index:2}.orbit-canvas{position:absolute;inset:0;width:100%;height:100%;display:none;pointer-events:auto}.world.lt-canvas .orbit-canvas{display:block}.world.lt-canvas .card{opacity:0;will-change:auto;contain:none;pointer-events:none}.world.lt-canvas .card *{will-change:auto;pointer-events:none}';shadow.append(canvasStyle);
  const canvasCtx=fallbackCanvas.getContext('2d');
  const reduceQuery=matchMedia('(prefers-reduced-motion: reduce)');let reduced=reduceQuery.matches,paused=reduced,phase=0,raf=0,previous=0,drag=null,moved=0,opener=null,spin=0,glide=0;
+ host.toggleAttribute('data-lt-motion-paused',paused);
   // #942: 가리키기·클릭으로 배경이 움직이지 않게 카메라는 항상 중심(0,0)에 둔다. 회전은 끌 때만 phase 로 누적한다.
   let cameraTarget={x:0,y:0}, camera={x:0,y:0};
  // #586: 패럴랙스는 pointermove마다 화면 중심을 재지 않는다 — 끄는 동안 pointermove가 프레임보다
  // 자주 불려 강제 배치 읽기가 늘었다. rect는 창 크기가 바뀔 때(fitNotice)만 다시 재고 캐시를 쓴다.
  let appBox=null;
  const motionOn=() => !paused && !hoveredCard && !dialog.open && !document.hidden;
+ const motionRunning=()=>!paused&&!reduced&&!dialog.open&&!document.hidden;
  const neutralizePointer=() => { cameraTarget={x:0,y:0}; camera={x:0,y:0}; };
  // #213 2번: 움직임 켜기/멈춤은 도구 줄의 "보기" 메뉴가 부른다(setMotionPaused).
  // #535-3: 끄는 동안에만 카드 레이어를 미리 승격하고(스타일 재계산 28.8→14.6ms) 금빛 번짐을 가볍게 한다.
@@ -187,7 +242,7 @@ export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSel
  // syncMotion을 부르지 않으면(수정 전) 스위치를 꺼도 rAF 루프만 멈추고 애니메이션은 계속 돌아 카드가 멈추지 않았다.
  // 다만 유효 상태(animRunning)가 실제로 바뀔 때만 맞춘다 — 동작 줄이기 기기에서 셸이 뜰 때 보내는
  // lt41-motion(paused:false)이 syncMotion의 떠 있음 위상 리셋을 새로 발동시켜 #535가 재던 자리를 바꾸지 않게.
- const setMotionPaused=(next)=>{const running=animRunning();paused=!!next;if(paused)neutralizePointer();if(animRunning()!==running)syncMotion();schedule();};
+ const setMotionPaused=(next)=>{const running=animRunning();paused=!!next;host.toggleAttribute('data-lt-motion-paused',paused);if(paused)neutralizePointer();if(animRunning()!==running||layoutMode==='ribbon')syncMotion();schedule();};
  function rememberCard(c){if(!demo)remember(storage,c.treeId,c.id);}
  // #394 1번: 상세 창에서 열기 전 목록 순서(트리 고르기 포함) 그대로 앞·뒤로 옮겨 본다.
  // 목록에 없는 순간(예시 채움 카드 등)은 옮겨 볼 목록이 없으니 화살표를 두지 않는다.
@@ -197,10 +252,12 @@ export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSel
  let lastInputWasKeyboard=false;
  shadow.addEventListener('keydown',()=>{lastInputWasKeyboard=true;},{capture:true,signal});
  shadow.addEventListener('pointerdown',()=>{lastInputWasKeyboard=false;},{capture:true,signal});
- const openDialogCentered=(d)=>{d.dataset.ltOpenedBy=lastInputWasKeyboard?'keyboard':'mouse';d.showModal();};
+ const openDialogCentered=(d)=>{d.dataset.ltOpenedBy=lastInputWasKeyboard?'keyboard':'mouse';d.showModal();d.dataset.ltHomeKind=d.querySelector('.index-list')?'index':'detail';globalThis.LTHomeHistory?.open(d.dataset.ltHomeKind,()=>d.close());};
  function stepDetail(dir){const order=listRows();const at=order.findIndex(x=>x.key===detailMoment?.key);const next=order[at+dir];if(!next)return;renderDetail(next);dialog.querySelector(dir<0?'[data-do=prev]':'[data-do=next]')?.focus();}
  function focus(c){if(!c)return;if(!c.example){onSelect(c.id);rememberCard(c);}if(!dialog.open)opener=shadow.activeElement;renderDetail(c);}
- function renderDetail(c){detailMoment=c;
+ function renderDetail(c){
+  if(dialog.open&&dialog.dataset.ltHomeKind==='index'){dialog.dataset.ltHomeKind='detail';const scrollTop=dialog.scrollTop,previousOpener=opener;globalThis.LTHomeHistory?.open('detail',()=>{index();dialog.dataset.ltHomeKind='index';opener=previousOpener;dialog.scrollTop=scrollTop;requestAnimationFrame(()=>{if(dialog.open&&dialog.dataset.ltHomeKind==='index')dialog.scrollTop=scrollTop})});}
+  detailMoment=c;
   const children=c.example?[all.find(x=>x.id===c.next),all.find(x=>x.id===c.branch)].filter(Boolean):demo?[all.find(x=>x.id===c.next),all.find(x=>x.id===c.branch)].filter(Boolean):poolFor(c).filter(x=>x.treeId===c.treeId&&x.parentId===c.id);
   const link = mediaLinkView(c.url);
   // #393: 순간 상세 창도 같은 틀 규칙 — 세로 영상(쇼츠·세로 비율 정보)은 세로 틀, 썸네일 잘림 없음.
@@ -211,7 +268,7 @@ export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSel
   // 표시하지 않고, 직접 쓴 제목이 없으면 마음 한마디를 큰 글씨로 쓴다(둘 다 없으면 제목 칸을 비워 둔다).
   const head=momentHeadTitle(c,titleMode);
   const nav=hasNav?`<button class="detail-nav detail-nav--prev" data-do="prev" aria-label="이전 순간"${atStart?' disabled':''}>←</button><button class="detail-nav detail-nav--next" data-do="next" aria-label="다음 순간"${atEnd?' disabled':''}>→</button>${atStart||atEnd?`<p class="detail-nav-note" role="status">${atStart?'처음 순간':'마지막 순간'}</p>`:''}`:'';
-  dialog.innerHTML=`<button class="close" data-do="close" aria-label="닫기">×</button>${nav}<div class="detail-grid"><div data-lt-thumb-host>${c.image?`<img class="detail-image${vertical?' detail-image--vertical':''}" src="${esc(c.image)}" alt="${esc(head.main||c.title)}"${thumbFallbackAttrs(c,{candidates:c.thumbCandidates||[c.image],writable:!demo&&!c.example,variant:'detail'})} referrerpolicy="no-referrer">`:(!demo&&!c.example&&needsFallbackCard(c,{autoLoad:false})?fallbackCardMarkup(c,{writable:!demo&&!c.example,variant:'detail',dateStyle}):`<div class="detail-paper">${esc(c.note)}</div>`)}</div><div class="detail-copy"><small>${demo||c.example?'감상 예시':esc(c.subject||'내 순간')} · ${esc(c.emotion)}</small>${head.main?`<h2>${esc(head.main)}</h2>`:''}${head.sub?`<span class="videoTitle">▶ ${esc(head.sub)}</span>`:''}<small>${esc(dateOf(c))}${(demo||c.example)&&c.type==='video'?' · 영상 포스터 예시':''}</small>${c.startSeconds!==undefined&&c.startSeconds!==null?`<small class="detail-range">기억할 구간 ${esc(formatRange(c.startSeconds,c.endSeconds))}</small>`:''}${head.memoAsMain?'':`<p>${esc(c.note)}</p>`}${c.relation?`<small>이전 순간에서 이어진 이유</small><p>${esc(c.relation)}</p>`:''}<div class="detail-buttons"><button data-do="book" title="${BOOK_IS_READING}">${READ_BOOK}</button><button data-do="work">${demo||c.example?NEW_TREE:VIEW_TREE}</button>${link ? (link.kind === 'invalid' ? `<span class="media-unrecognized" role="note">${esc(link.text)}</span>` : `<a href="${esc(link.href)}" target="_blank" rel="noopener noreferrer">${esc(link.text)} ↗</a>`) : ''}${homePin&&!demo&&!c.example?`<button data-do="home-pin">${homePin.pinned(c)?'내리기':'첫 화면에 걸기'}</button>`:''}</div>${children.length?`<p>다음으로 이어진 순간</p><div class="detail-buttons">${children.map(x=>`<button data-next="${esc(x.key)}">${esc(mainOf(x))}</button>`).join('')}</div>`:'<p>다음 이야기를 기다리는 순간이에요.</p>'}</div></div>`;
+  dialog.innerHTML=`<button class="close" data-do="close" aria-label="닫기">×</button>${nav}<div class="detail-grid"><div data-lt-thumb-host${vertical&&c.youtubeThumb?` class="detail-vertical-stage" style="--lt-orbit-thumb:url(&quot;${esc(c.image)}&quot;)"`:''}>${c.image?`<img class="detail-image${vertical?' detail-image--vertical':''}" src="${esc(c.image)}" alt="${esc(head.main||c.title)}"${thumbFallbackAttrs(c,{candidates:c.thumbCandidates||[c.image],writable:!demo&&!c.example,variant:'detail'})} referrerpolicy="no-referrer">`:(!demo&&!c.example&&needsFallbackCard(c,{autoLoad:false})?fallbackCardMarkup(c,{writable:!demo&&!c.example,variant:'detail',dateStyle}):`<div class="detail-paper">${esc(c.note)}</div>`)}</div><div class="detail-copy"><small>${demo||c.example?'감상 예시':esc(c.subject||'내 순간')} · ${esc(c.emotion)}</small>${head.main?`<h2>${esc(head.main)}</h2>`:''}${head.sub?`<span class="videoTitle">▶ ${esc(head.sub)}</span>`:''}<small>${esc(dateOf(c))}${(demo||c.example)&&c.type==='video'?' · 영상 포스터 예시':''}</small>${c.startSeconds!==undefined&&c.startSeconds!==null?`<small class="detail-range">기억할 구간 ${esc(formatRange(c.startSeconds,c.endSeconds))}</small>`:''}${head.memoAsMain?'':`<p>${esc(c.note)}</p>`}${c.relation?`<small>이전 순간에서 이어진 이유</small><p>${esc(c.relation)}</p>`:''}<div class="detail-buttons"><button data-do="book" title="${BOOK_IS_READING}">${READ_BOOK}</button><button data-do="work">${demo||c.example?NEW_TREE:VIEW_TREE}</button>${link ? (link.kind === 'invalid' ? `<span class="media-unrecognized" role="note">${esc(link.text)}</span>` : `<a href="${esc(link.href)}" target="_blank" rel="noopener noreferrer">${esc(link.text)} ↗</a>`) : ''}${homePin&&!demo&&!c.example?`<button data-do="home-pin">${homePin.pinned(c)?'내리기':'첫 화면에 걸기'}</button>`:''}</div>${children.length?`<p>다음으로 이어진 순간</p><div class="detail-buttons">${children.map(x=>`<button data-next="${esc(x.key)}">${esc(mainOf(x))}</button>`).join('')}</div>`:'<p>다음 이야기를 기다리는 순간이에요.</p>'}</div></div>`;
   // #1010: 예시(데모) 카드의 '책 읽기'도 onOpen으로 새지 않게 !demo를 더한다 — openBook이 기존 lt41-example 경로로 예시 기억책을 연다.
   dialog.querySelector('[data-do=book]').onclick=()=>{dialog.close();if(onOpen&&!c.example&&!demo)onOpen(c);else actions.openBook(c.treeId,c.id,demo)};
   dialog.querySelector('[data-do=work]').onclick=()=>{dialog.close();demo?actions.requestMoment('new'):actions.openWorkspace(c.treeId,c.id)};
@@ -263,7 +320,7 @@ export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSel
   const treeTag=c=>c.treeLabel?'<span class="lt-tree-tag"><span class="lt-tree-dot" style="--lt-tree-dot:'+treeColorOf(c.treeId)+'" aria-hidden="true"></span>'+esc(c.treeLabel)+'</span>':'';
   const rowOf=c=>{
    const head=momentHeadTitle(c,titleMode).main;
-   const thumb=c.image?`<span class="index-row-thumb"><img src="${esc(c.image)}" alt=""${thumbFallbackAttrs(c,{candidates:c.thumbCandidates||[c.image],mode:'thumb-slot'})} referrerpolicy="no-referrer" loading="lazy" decoding="async"></span>`:'';
+   const thumb=c.image?`<span class="index-row-thumb${isVerticalMoment(c)&&c.youtubeThumb?' is-vertical':''}"${isVerticalMoment(c)&&c.youtubeThumb?` style="--lt-orbit-thumb:url(&quot;${esc(c.image)}&quot;)"`:''}><img src="${esc(c.image)}" alt=""${thumbFallbackAttrs(c,{candidates:c.thumbCandidates||[c.image],mode:'thumb-slot'})} referrerpolicy="no-referrer" loading="lazy" decoding="async"></span>`:'';
    let inner;
    if(!head&&!demo&&!c.example){
     inner=`<button data-next="${esc(c.key)}" data-lt-moment-row class="index-row-card">${thumb}<span class="index-row-body">${fallbackCardMarkup(c,{writable:!demo&&!c.example,variant:'row',dateStyle})}${listFilter==='all'?treeTag(c):''}</span></button>`;
@@ -387,15 +444,18 @@ export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSel
   dialog.querySelectorAll('[data-tag-more]').forEach(b=>b.onclick=()=>{const kind=b.dataset.tagMore||'plain';if(tagExpanded.has(kind))tagExpanded.delete(kind);else tagExpanded.add(kind);index();});
   dialog.querySelectorAll('[data-tag-pick]').forEach(b=>b.onclick=()=>{tagSelected.delete(b.dataset.tagPick||'');index();});
   dialog.querySelector('[data-tag-clear]')?.addEventListener('click',()=>{tagSelected.clear();index();});
-  openDialogCentered(dialog);}
+  if(!dialog.open)openDialogCentered(dialog);}
  // #426: 최근 순간 카드 — 본문을 누르면(클릭·Enter·Space) 그 순간을 연다(궤도 카드와 같은 onOpen 경로). ▶는 카드 안 재생/정지로 구분하고, 플레이어는 누른 뒤에만 만든다(첫 화면 열 때 YouTube 요청 0건).
 const openRecent=()=>{if(!recentMoment)return;if(onOpen&&!recentMoment.example){onOpen(recentMoment);return;}actions.openBook(recentMoment.treeId,recentMoment.id,demo);};
-let recentFrame=null;
-const toggleRecentPlay=btn=>{if(!recentMoment)return;const card=shadow.querySelector('.recent-card');if(!card)return;const media=card.querySelector('.recent-media');if(!media)return;if(recentFrame){recentFrame.remove();recentFrame=null;media.querySelector('img')?.removeAttribute('hidden');btn.setAttribute('aria-label','바로 재생');const glyph=btn.querySelector('span');if(glyph)glyph.textContent='▶';return;}
+let recentFrame=null,recentHistory=false,recentCardSlot=null;
+const signalRecentView=open=>{try{const type=globalThis.LT41_MSG?.viewer;if(type&&parent!==window)parent.postMessage({type,open},location.origin);}catch{}};
+const toggleRecentPlay=btn=>{if(!recentMoment)return;const card=shadow.querySelector('.recent-card');if(!card)return;const media=card.querySelector('.recent-media');if(!media)return;if(recentFrame){recentFrame.remove();recentFrame=null;card.classList.remove('is-playing-mobile');if(recentCardSlot){recentCardSlot.replaceWith(card);recentCardSlot=null;signalRecentView(false);}if(recentHistory){recentHistory=false;if(history.state?.ltRecentPlaying===true)history.back();}media.querySelector('img')?.removeAttribute('hidden');btn.setAttribute('aria-label','바로 재생');const glyph=btn.querySelector('span');if(glyph)glyph.textContent='▶';return;}
  const id=youtubeIdFrom(recentMoment.url)||(globalThis.LTMedia?.describe?.(recentMoment.url)||{}).videoId;
  const embed=id?embedUrl(id):null;
  if(!embed)return;
- const frame=document.createElement('iframe');frame.className='recent-frame';frame.src=embed;frame.title=mainOf(recentMoment)||'YouTube 영상';frame.allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';frame.allowFullscreen=true;frame.setAttribute('referrerpolicy','strict-origin-when-cross-origin');media.querySelector('img')?.setAttribute('hidden','');media.append(frame);recentFrame=frame;btn.setAttribute('aria-label','정지');const glyph=btn.querySelector('span');if(glyph)glyph.textContent='■';};
+ const frame=document.createElement('iframe');frame.className='recent-frame';frame.src=embed;frame.title=mainOf(recentMoment)||'YouTube 영상';frame.allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';frame.allowFullscreen=true;frame.setAttribute('referrerpolicy','strict-origin-when-cross-origin');media.querySelector('img')?.setAttribute('hidden','');media.append(frame);recentFrame=frame;if(matchMedia('(max-width:650px)').matches){recentCardSlot=document.createComment('recent-card-slot');card.before(recentCardSlot);shadow.append(card);card.classList.add('is-playing-mobile');signalRecentView(true);history.pushState({...history.state,ltRecentPlaying:true},'');recentHistory=true;}btn.setAttribute('aria-label','정지');const glyph=btn.querySelector('span');if(glyph)glyph.textContent='■';btn.focus();};
+addEventListener('popstate',()=>{if(recentFrame&&recentHistory){recentHistory=false;const btn=shadow.querySelector('[data-recent-play]');if(btn){toggleRecentPlay(btn);btn.focus();}}},{signal});
+shadow.addEventListener('keydown',e=>{if(e.key==='Escape'&&recentFrame){const btn=shadow.querySelector('[data-recent-play]');if(btn){e.preventDefault();toggleRecentPlay(btn);btn.focus();}}},{signal});
 shadow.addEventListener('click',e=>{const play=e.target.closest('[data-recent-play]');if(play){e.stopPropagation();toggleRecentPlay(play);return;}const b=e.target.closest('button');if(!b){if(!e.target.closest?.('[data-lt-title-edit]')&&e.target.closest?.('[data-do=recent]'))openRecent();return;}if(b.dataset.next){if(suppressClickKey&&suppressClickKey===b.dataset.next){suppressClickKey='';return;}if(picking){const key=b.dataset.next;if(pickedKeys.has(key))pickedKeys.delete(key);else pickedKeys.add(key);index();return;}focus(findMoment(b.dataset.next));return;}switch(b.dataset.do){case'close':dialog.close();break;case'new':actions.requestMoment('new');break;case'trees':actions.navigate('trees');break;case'continue':focus(lastCard);break;case'index':index();break;case'recent':if(!e.target.closest?.('[data-lt-title-edit]'))openRecent();break;}},{signal});
  dialog.addEventListener('close',()=>{opener?.focus();syncMotion();schedule();tagSelected.clear();tagExpanded.clear();picking=false;pickedKeys.clear();moveMenuFor=null;suppressClickKey='';indexNotice=null;},{signal});
  dialog.addEventListener('close',()=>{opener?.focus();syncMotion();schedule();tagSelected.clear();tagExpanded.clear();},{signal});
@@ -418,17 +478,39 @@ shadow.addEventListener('click',e=>{const play=e.target.closest('[data-recent-pl
  });
  track(disposeThumb);
  checkRecentVideo(shadow.querySelector('.recent-card'));
-performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElement('button');b.className=`card ${c.type} ${c.sizeClass}${c.example?' example':''}${c.source==='mine'?' mine':''}`;b.style.setProperty('--fit',c.fitMode==='contain'?'contain':'cover');;b.dataset.example=c.example?'1':'';b.setAttribute('tabindex','-1');b.setAttribute('aria-hidden','true');b.innerHTML=`<span class="lt-shadow-hover" aria-hidden="true"></span><span class="lt-shadow-busy" aria-hidden="true"></span><span class="lt-move"><span class="lt-lift"><span class="surface" data-lt-thumb-host>${c.image?`<img src="${esc(c.image)}" alt="" draggable="false" loading="lazy" decoding="async"${devicePixelRatio<=1&&compactOrbitImages[c.image]?` srcset="${esc(compactOrbitImages[c.image])}"`:''}${thumbFallbackAttrs(c,{candidates:c.thumbCandidates||[c.image],writable:!demo&&!c.example,variant:'orbit'})}${c.youtubeThumb?' referrerpolicy="no-referrer"':''}>`:(!demo&&!c.example&&needsFallbackCard(c,{autoLoad:false})?fallbackCardMarkup(c,{writable:!demo&&!c.example,variant:'orbit',dateStyle}):`<div class="memoKicker">${esc(dateOf(c))}</div><div class="memoText">${esc(mainOf(c))}</div><div class="memoFoot">${esc(c.emotion)}</div>`)}</span></span></span>${c.youtubeThumb&&c.image?'<span class="playGlyph" aria-hidden="true">▶</span>':''}${c.first?'<div class="firstMark">FIRST</div>':''}<div class="caption"><span>${esc(mainOf(c))}${subMarkup(c)}</span></div>`;
+// #1204: per-device first-use hint; failure to access storage must not block cards.
+ let hintDismissed=orbitHintSeen(),hintStartedAt=0,hintTimer=0,hintVisible=false,hintSpritePending=false,hintCardIndex=-1;
+ let layoutMode='orbit',ribbonAnims=[],ribbonSeek=null;host.dataset.ltLayout=layoutMode;
+ function selectCardHint(i){
+  if(hintDismissed||i<0||!elements[i])return;
+  if(hintCardIndex===i&&elements[i].querySelector('.lt-card-tip'))return;
+  for(const el of elements){el.classList.remove('lt-card-hint');el.querySelector('.lt-card-tip')?.remove();}
+  hintCardIndex=i;const card=elements[i],tip=document.createElement('span');tip.className='lt-card-tip';tip.setAttribute('aria-hidden','true');tip.textContent='눌러 보세요';card.classList.add('lt-card-hint');if(layoutMode!=='ribbon')card.append(tip);
+ }
+ function activateCardHint(){
+  if(hintDismissed||hintVisible||hintCardIndex<0)return;
+  hintVisible=true;hintStartedAt=performance.now();world.classList.add('lt-hint-ready');
+  clearTimeout(hintTimer);hintTimer=setTimeout(dismissCardHint,3000);track(()=>clearTimeout(hintTimer));
+ }
+ function dismissCardHint(){
+  if(hintDismissed)return;
+  hintDismissed=true;hintVisible=false;clearTimeout(hintTimer);world.classList.remove('lt-hint-ready');rememberOrbitHint();
+  const card=elements[hintCardIndex];card?.classList.remove('lt-card-hint');card?.querySelector('.lt-card-tip')?.remove();
+  queueHintSpriteRefresh();
+ }
+
+performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElement('button');b.className=`card ${c.type} ${c.sizeClass}${c.example?' example':''}${c.source==='mine'?' mine':''} lt-first-frame`;b.style.setProperty('--fit',c.fitMode==='contain'?'contain':'cover');;b.dataset.example=c.example?'1':'';b.setAttribute('tabindex','-1');b.setAttribute('aria-hidden','true');b.innerHTML=`<span class="lt-shadow-hover" aria-hidden="true"></span><span class="lt-shadow-busy" aria-hidden="true"></span><span class="lt-move"><span class="lt-lift"><span class="surface" data-lt-thumb-host>${c.image?`<img src="${esc(c.image)}" alt="" draggable="false" loading="lazy" decoding="async"${devicePixelRatio<=1&&compactOrbitImages[c.image]?` srcset="${esc(compactOrbitImages[c.image])}"`:''}${thumbFallbackAttrs(c,{candidates:c.thumbCandidates||[c.image],writable:!demo&&!c.example,variant:'orbit'})}${c.youtubeThumb?' referrerpolicy="no-referrer"':''}>`:(!demo&&!c.example&&needsFallbackCard(c,{autoLoad:false})?fallbackCardMarkup(c,{writable:!demo&&!c.example,variant:'orbit',dateStyle}):`<div class="memoKicker">${esc(dateOf(c))}</div><div class="memoText">${esc(mainOf(c))}</div><div class="memoFoot">${esc(c.emotion)}</div>`)}</span></span></span>${c.youtubeThumb&&c.image?'<span class="playGlyph" aria-hidden="true">▶</span>':''}${c.first?'<div class="firstMark">FIRST</div>':''}<div class="caption"><span>${esc(mainOf(c))}${subMarkup(c)}</span></div>`;
  // #593: 바깥 .card 는 자리(궤도 애니메이션)만 맡는다 — 실제로 눌리고 초점을 받는 것은 안쪽 .surface 다(중첩 단추 방지).
  const surface=b.querySelector('.surface'),surfaceLabel=b.querySelector('.caption span')?.textContent||mainOf(c)||'순간';
- surface.setAttribute('role','button');surface.setAttribute('tabindex','0');surface.setAttribute('aria-label',surfaceLabel);
+ surface.setAttribute('role','button');surface.setAttribute('tabindex','0');surface.setAttribute('aria-label',surfaceLabel+' 눌러서 크게 보기');
  surface.addEventListener('pointerenter',e=>{if(e.pointerType==='mouse'&&!drag)hoveredCard=surface;},{signal});
  surface.addEventListener('pointerleave',()=>{if(hoveredCard===surface)hoveredCard=null;},{signal});
  // #1010: 예시(데모) 카드 누름은 궤도의 자세히 보기 창으로 돌려 놓는다 — onOpen은 내·공개 카드용이다.
  // 데모 표본에는 example 자리표가 없어(onOpen&&!c.example) onOpen으로 새어 openMine이 조용히 무시됐다(눌러도 무반응).
  // 창의 '책 읽기'는 기존 lt41-example 경로로 예시 기억책을 연다(home-actions openBook).
- surface.addEventListener('click',e=>{if(e.target?.closest?.('[data-lt-title-edit]'))return;if(e.detail===0||moved<9){if(onOpen&&!c.example&&!demo){onOpen(c);return;}focus(c)}},{signal});
+ surface.addEventListener('click',e=>{if(e.target?.closest?.('[data-lt-title-edit]'))return;dismissCardHint();if(e.detail===0||moved<9){if(onOpen&&!c.example&&!demo){onOpen(c);return;}focus(c)}},{signal});
  world.append(b);return b;});performance.mark('m3');
+ shadow.addEventListener('click',e=>{if(e.target.closest('.card'))dismissCardHint();},{capture:true,signal});
  // #429 2/2: 카드 기본 폭·높이와 안전 구역은 둘째 번에 한 번만 잰다. 첫 그리기에서 강제 레이아웃을 하면
  // 뼈대 완성(DOMContentLoaded)이 그 만큼 늦어진다(#400 뼈대 완성 보호 — 첫 그리기는 밀어내기 없이 그린다).
  let layoutBox=null,cardSizes=null,warmups=0;
@@ -445,7 +527,30 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
   const TWO_PI=Math.PI*2, ORBIT_MS=90000, ORBIT_STEPS=48, PHASE_STEP=.000018;
  const orbitAnims=cards.map(()=>null), floatAnims=cards.map(()=>null);
  let imagesReady=false,spritesReady=false;
- const animRunning=()=>imagesReady&&spritesReady&&!paused&&!reduced&&!dialog.open&&!document.hidden;
+ // #1365: 첫 화면 뼈대(글귀·단추·카드 자리)는 기다리지 않고 바로 보인다.
+ // 카드는 궤도 첫 자리를 받은 뒤에 공개하고, 그림·글꼴은 준비되는 대로 바꾼다(#1026 첫 자리 규칙 유지).
+ let firstFrameDone=false,contentReady=false,revealed=false;
+ const revealCenter=shadow.querySelector('.center');
+ const frontImgs=elements.slice(0,6).map(el=>el.querySelector('.surface img')).filter(Boolean);
+ function markContentReady(){if(contentReady)return;contentReady=true;tryReveal();}
+ function checkFrontImages(){if(frontImgs.length&&frontImgs.every(img=>img.complete))markContentReady();}
+ function tryReveal(){
+  if(revealed||!firstFrameDone||!contentReady)return;
+  revealed=true;
+  requestAnimationFrame(()=>{
+   revealCenter?.removeAttribute('data-lt-home-wait');
+   for(const el of elements)el.classList.remove('lt-first-frame');
+   activateCardHint();
+  });
+ }
+ // 그림이 늦어도 뼈대는 바로 보인다 — 첫 자리(firstFrameDone)가 준비되면 함께 공개한다.
+ markContentReady();
+ // 안전장치: 어떤 까닭으로 첫 궤도 자리가 끝내 안 들어와도 1.5초 뒤에는 글귀와 카드를 보인다(빈 첫 화면 방지).
+ const revealSafety=setTimeout(()=>{firstFrameDone=true;contentReady=true;tryReveal();},1500);
+ track(()=>clearTimeout(revealSafety));
+ for(const img of frontImgs){img.addEventListener('load',checkFrontImages,{signal});img.addEventListener('error',checkFrontImages,{signal});}
+ checkFrontImages();
+ const animRunning=()=>layoutMode!=='ribbon'&&imagesReady&&spritesReady&&!paused&&!reduced&&!dialog.open&&!document.hidden;
  const floatDelay=cards.map((c,i)=>i*370);
  // 멈춤(동작 줄이기·보기 메뉴)·팝업·숨은 탭이면 애니메이션만 세운다. 멈출 때는 떠 있음 위상을 첫 자리(0·18px)로
  // 되돌려, 예전에 elapsed 가 0 에 얼어 있던 화면과 같은 자리를 보여 준다.
@@ -454,7 +559,7 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
  let orbitRaf=0,orbitStart=performance.now(),pausedTotal=0,pausedAt=orbitStart,lastWriteAt=orbitStart;
  const orbitPause=()=>{if(!pausedAt)pausedAt=performance.now();};
  const orbitResume=()=>{if(pausedAt){pausedTotal+=performance.now()-pausedAt;pausedAt=0;}};
- const syncMotion=()=>{const rate=animRunning()?1:0;
+ const syncMotion=()=>{if(layoutMode==='ribbon'){syncRibbonMotion();return;}const rate=animRunning()?1:0;
   for(const a of orbitAnims)if(a)a.playbackRate=rate;
   floatAnims.forEach((a,i)=>{if(!a)return;a.playbackRate=rate;if(!rate){const d=a.effect.getTiming().duration;a.currentTime=floatDelay[i]%d;}});
   if(rate){orbitResume();startOrbitLoop();}else{orbitPause();stopOrbitLoop();orbitWrite(performance.now());}};
@@ -464,7 +569,7 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
  // 밀어내기(#429/#457/#491)도 표본마다 계산하므로, 애니메이션만 돌아도 가운데 안전 구역을 침범하지 않는다.
  const orbitKF=[];
  const orbitKeyframes=(i,w,h,warm)=>{if(orbitKF[i])return orbitKF[i];
-  const c=cards[i],narrow=w<=650,cfg=(narrow?ringsNarrow:rings)[c.ring],fit=Math.min(1,w/780,h/850)*(narrow?.5:1),out=[];
+  const c=cards[i],narrow=w<=650,compact=h<=500,cfg=orbitRings(w,h)[c.ring],fit=Math.min(1,w/780,h/850)*(narrow?.5:1)*(compact?.72:1),out=[];
   // #593: 판정 사각형을 떠 있음 폭만큼(+24·+40) 부풀려 잡으므로, 목표 구역도 그만큼 넓혀 잡는다 —
   // 부푼 만큼만 밀면 실제 카드가 그 차이만큼 안쪽(가운데 구역)에 서서 미리보기 검사에 걸린다(실측 20px).
   const padX=narrow?30:16,padY=narrow?30:20;
@@ -528,7 +633,7 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
   orbitKF[i]=out;
   // 261117 대표 결정: 표본이 하나도 없으면(noFit — 좁은 화면 소수 카드 궤도 숨김 포함) 굽는 동안의 숨김을 되돌리지 않는다.
   const el0=elements[i];if(el0&&lastPaint&&el0.__z!==lastPaint.zv){el0.__z=lastPaint.zv;el0.style.zIndex=lastPaint.zv;}
-  if(el0&&el0.classList.contains('off')&&i<cardCapFor(w)&&!noFit[i])el0.classList.remove('off');
+  if(el0&&el0.classList.contains('off')&&i<cardCapFor(w,layoutBox?.h||h)&&!noFit[i])el0.classList.remove('off');
   return out;};
  // 좁은 화면 반지름 표가 다르므로 폭 대역이 바뀔 때만 궤도 애니메이션을 다시 건다(창 크기가 바뀔 때 몇 번).
  let orbitBand=null,orbitBox=null;
@@ -575,6 +680,7 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
   renderer=next;glCanvas.width=fallbackCanvas.width;glCanvas.height=fallbackCanvas.height;activateCanvas(glCanvas);if(spritesReady)drawCanvas(performance.now());
  }catch{}},{signal});
  const rebuildSprites=async(force=false)=>{
+  if(layoutMode==='ribbon')return;
   if(!imagesReady||!layoutBox||!canvasCtx||signal.aborted)return;if(building){rebuildPending=true;return;}
   const {w,h}=layoutBox,dpr=devicePixelRatio||1,key=[w,h,dpr,host.getAttribute('data-lt-theme'),orbitBox].join('|');
   if(!force&&spriteKey===key)return;building=true;orbitEvent("bitmap-start");const epoch=++spriteEpoch;
@@ -590,8 +696,19 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
    for(const board of [fallbackCanvas,glCanvas]){board.width=Math.ceil(w*dpr);board.height=Math.ceil(h*dpr);}spriteKey=key;
    spritesReady=true;for(const a of floatAnims)a?.cancel();floatAnims.fill(null);world.classList.add('lt-canvas');activateCanvas(renderer?glCanvas:fallbackCanvas);
    for(const el of elements){el.removeAttribute('aria-hidden');el.setAttribute('role','presentation');}
-   syncMotion();drawCanvas(performance.now());schedule();
+   syncMotion();drawCanvas(performance.now());if(revealed)activateCardHint();schedule();
   }finally{orbitEvent("bitmap-end");building=false;if(rebuildPending&&!signal.aborted){rebuildPending=false;void rebuildSprites(true);}}
+ };
+ const queueHintSpriteRefresh=()=>{
+  if(layoutMode==='ribbon'||!spritesReady||hintSpritePending||signal.aborted)return;
+  hintSpritePending=true;requestIdleCallback(async()=>{
+   try{
+    const next=await paintCardBitmap(elements[hintCardIndex],devicePixelRatio||1,false,floatOffset(hintCardIndex,0));
+    if(signal.aborted||!next){next?.image.close();return;}
+    if(renderer&&!renderer.update(hintCardIndex,next)){next.image.close();return;}
+    const previous=sprites[hintCardIndex];sprites[hintCardIndex]=next;previous?.image.close();drawCanvas(performance.now());
+   }finally{hintSpritePending=false;}
+  },{timeout:500});
  };
  const spriteTheme=new MutationObserver(()=>{void rebuildSprites(true);});spriteTheme.observe(host,{attributes:true,attributeFilter:['data-lt-theme']});track(()=>spriteTheme.disconnect());
   const startOrbit=(i,w,h,warm)=>{const el=elements[i];if(!el)return;orbitAnims[i]?.cancel();orbitAnims[i]=null;
@@ -605,18 +722,18 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
    for(let j=1;j<frames.length;j++){const b=frames[j];if(t<=b.offset){const a=frames[j-1],span=b.offset-a.offset||1;
     return lerpTransform(a,b,(t-a.offset)/span);}}
    return frames[frames.length-1].transform;};
- const startFloat=(i)=>{if(spritesReady)return;const lift=elements[i]?.querySelector('.lt-lift');if(!lift)return;
+ const startFloat=(i)=>{if(spritesReady||layoutMode==='ribbon')return;const lift=elements[i]?.querySelector('.lt-lift');if(!lift)return;
   floatAnims[i]=lift.animate(floatKeyframes(),{duration:Math.round(1000*(11+(i%4)*1.7)),iterations:Infinity,id:'lt-float',delay:-floatDelay[i]});
   floatAnims[i].playbackRate=animRunning()?1:0;};
  // 애니메이션의 현재 시각을 phase 에 맞춘다(끌고 난 뒤 이어지는 자리가 튀지 않게).
   const syncOrbitTime=()=>{}; // #1086 3차: WAAPI 제거로 할 일 없음(끌기 복귀 시 자리는 JS 루프가 이어감).
   const valuesAt=(frames,t,out)=>{if(t<=frames[0].offset)return frames[0].values;for(let j=1;j<frames.length;j++){const b=frames[j];if(t<=b.offset){const a=frames[j-1],f=(t-a.offset)/(b.offset-a.offset||1);for(let k=0;k<a.values.length;k++)out[k]=k===0?a.values[0]:Math.round((a.values[k]+(b.values[k]-a.values[k])*f)*100)/100;return out;}}return frames[frames.length-1].values;};
- const fractionAt=(i,now)=>{const cfg=(layoutBox.w<=650?ringsNarrow:rings)[cards[i].ring];const elapsed=now-orbitStart-pausedTotal-(pausedAt?now-pausedAt:0);return ((elapsed/Math.round(ORBIT_MS/cfg.speed)+phase)%1+1)%1;};
+ const fractionAt=(i,now)=>{const cfg=orbitRings(layoutBox?.w||0,layoutBox?.h||0)[cards[i].ring];const elapsed=now-orbitStart-pausedTotal-(pausedAt?now-pausedAt:0);return ((elapsed/Math.round(ORBIT_MS/cfg.speed)+phase)%1+1)%1;};
  const valuePool=elements.map(()=>new Float64Array(8)),floatPool=elements.map(()=>({x:0,y:0})),posePool=elements.map(()=>({a:0,b:0,c:0,d:0,x:0,y:0,box:{l:0,t:0,r:0,b:0}})),screenBox={l:0,t:0,r:0,b:0};
  let zoneIdle=0,testSeek=null,testFloatActive=false,testFloatPaused=false;
  const scheduleBottomZones=()=>{if(zoneIdle)return;zoneIdle=requestIdleCallback(()=>{zoneIdle=0;if(!signal.aborted)measureBottomZones();},{timeout:500});};
  track(()=>{if(zoneIdle)cancelIdleCallback(zoneIdle);});
- const drawCanvas=(now,seek=null)=>{if(!spritesReady||!layoutBox)return;lastPoseAt=now;seek=seek??testSeek;
+ const drawCanvas=(now,seek=null)=>{if(layoutMode==='ribbon'||!spritesReady||!layoutBox)return;lastPoseAt=now;seek=seek??testSeek;
   const {w,h}=layoutBox,ratio=devicePixelRatio||1,elapsed=now-orbitStart-pausedTotal-(pausedAt?now-pausedAt:0);
   if(renderer)renderer.begin();else{canvasCtx.setTransform(1,0,0,1,0,0);canvasCtx.clearRect(0,0,canvas.width,canvas.height);}
   const zone=safeZone,ox=appBox?.left||0,oy=appBox?.top||0;
@@ -627,6 +744,9 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
    const fp=floatOffset(i,testFloatPaused||(seek!==null&&!testFloatActive)||!animRunning()?0:elapsed,floatPool[i]);
    const pose=cardPose(values,w,h,sprite.w,sprite.h,fp.x-sprite.offset.x,fp.y-sprite.offset.y,posePool[i]);
    poses[i]=pose;const box=pose.box;
+   // #1382: DOM 상자 갱신을 줄인다 — 초점 카드는 매 프레임, 나머지는 250ms마다 한 번.
+   // 그림과 누름 판정(hitProjective)은 매 프레임 그대로다.
+   if(i===focusIndex||now-(el.__domSyncAt||0)>=250){syncDomPose(i);el.__domSyncAt=now;}
    const gx=(Math.abs(pose.a)*sprite.guardW+Math.abs(pose.c)*sprite.guardH)/2,gy=(Math.abs(pose.b)*sprite.guardW+Math.abs(pose.d)*sprite.guardH)/2;
    screenBox.l=pose.x-gx;screenBox.r=pose.x+gx;screenBox.t=pose.y-gy;screenBox.b=pose.y+gy;
    const centerHit=zone&&zoneOverlapArea(zone,screenBox)>1;
@@ -636,34 +756,99 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
    if(el.classList.contains('clash')!==clash)el.classList.toggle('clash',clash);
    if(el.classList.contains('lt-under-link')!==under)el.classList.toggle('lt-under-link',under);
    const padX=(Math.abs(pose.a)+Math.abs(pose.c))*sprite.pad,padY=(Math.abs(pose.b)+Math.abs(pose.d))*sprite.pad;if(pose.hidden||box.r+padX<0||box.l-padX>w||box.b+padY<0||box.t-padY>h)continue;
-   if(renderer){renderer.draw(i,sprite,pose,w,h,i===focusIndex||i===hoverIndex);continue;}
+   const pulse=i===hintCardIndex?cardHintPulse(now):0;
+   if(renderer){renderer.draw(i,sprite,pose,w,h,i===focusIndex||i===hoverIndex,pulse);continue;}
    const {a,b,c,d,x,y}=pose;canvasCtx.setTransform(a*ratio,b*ratio,c*ratio,d*ratio,x*ratio,y*ratio);
    canvasCtx.drawImage(sprite.image,sprite.drawX,sprite.drawY,sprite.drawW,sprite.drawH);
-   if(i===focusIndex||i===hoverIndex){canvasCtx.strokeStyle='#ffe6a6';canvasCtx.lineWidth=2;canvasCtx.beginPath();canvasCtx.roundRect(-sprite.w/2,-sprite.h/2,sprite.w,sprite.h,12);canvasCtx.stroke();}
+   if(i===focusIndex||i===hoverIndex||pulse>0){canvasCtx.strokeStyle='#ffe6a6';canvasCtx.lineWidth=2;canvasCtx.globalAlpha=pulse>0?pulse:1;canvasCtx.beginPath();canvasCtx.roundRect(-sprite.w/2,-sprite.h/2,sprite.w,sprite.h,12);canvasCtx.stroke();canvasCtx.globalAlpha=1;}
   }
  };
- const syncDomPose=(i,t=null)=>{const el=elements[i],f=orbitFrames[i];if(!el||!f?.length)return;const tf=orbitTransform(f,t??testSeek??fractionAt(i,lastPoseAt||performance.now()));if(tf){el.style.transform=tf;el.__orbitTf=tf;}};
- const orbitWrite=(now)=>{lastWriteAt=now;if(spritesReady){drawCanvas(now);return;}for(let i=0;i<elements.length;i++){
+ const cardHintPulse=(now)=>{
+  if(!hintVisible||hintDismissed||reduced||paused)return 0;
+  const elapsed=(now-hintStartedAt)/1200;if(elapsed<0||elapsed>=2)return 0;
+  return .2+.6*(1-Math.cos(elapsed*Math.PI*2))/2;
+ };
+
+ // #1382: 캔버스 경로에서는 .lt-lift 의 WAAPI 부유가 끊기므로(697행) 그림에 쓰인 포즈 행렬을
+ // 같은 시각에 DOM 상자에도 쓴다. 부유 오프셋은 회전·배율 안쪽에서 적용돼야 하므로 translate에 더하지 않는다.
+ const syncDomPose=(i,t=null)=>{const el=elements[i],f=orbitFrames[i];if(!el||!f?.length)return;
+  if(spritesReady&&poses[i]&&!el.__dragTf){const p=poses[i];
+   const cx=(p.box.l+p.box.r)/2,cy=(p.box.t+p.box.b)/2;
+   const tf=`matrix(${p.a.toFixed(4)},${p.b.toFixed(4)},${p.c.toFixed(4)},${p.d.toFixed(4)},${(cx-p.ox).toFixed(2)},${(cy-p.oy).toFixed(2)})`;
+   if(el.__orbitTf!==tf){el.__orbitTf=tf;el.style.transform=tf;}return;}
+  const tf=orbitTransform(f,t??testSeek??fractionAt(i,lastPoseAt||performance.now()));
+  if(tf&&el.__orbitTf!==tf){el.__orbitTf=tf;el.style.transform=tf;}};
+ const orbitWrite=(now)=>{lastWriteAt=now;if(layoutMode==='ribbon'){if(!firstFrameDone){firstFrameDone=true;tryReveal();}return;}if(spritesReady){if(!firstFrameDone){firstFrameDone=true;tryReveal();}drawCanvas(now);return;}for(let i=0;i<elements.length;i++){
    const frames=orbitFrames[i],el=elements[i];if(!frames||!frames.length||!el||el.classList.contains('off'))continue;
-   const cfg=(layoutBox&&layoutBox.w<=650?ringsNarrow:rings)[cards[i].ring];
+   const cfg=orbitRings(layoutBox?.w||0,layoutBox?.h||0)[cards[i].ring];
    const elapsed=now-orbitStart-pausedTotal-(pausedAt?now-pausedAt:0);
    const t=((elapsed/Math.round(ORBIT_MS/cfg.speed))+phase)%1;
    const tf=orbitTransform(frames,t);
    if(tf&&el.__orbitTf!==tf){el.__orbitTf=tf;el.style.transform=tf;}
-  }};
+  }
+  if(!firstFrameDone){
+   const visible=elements.filter(el=>!el.classList.contains('off'));
+   if(!visible.length||visible.every(el=>el.__orbitTf)){firstFrameDone=true;tryReveal();}
+  }
+ };
+ const ribbonPoses=()=>elements.map((el,i)=>{
+  if(el.classList.contains('off'))return null;
+  const origin=app.getBoundingClientRect(),r=el.getBoundingClientRect(),box={l:r.left-origin.left,t:r.top-origin.top,r:r.right-origin.left,b:r.bottom-origin.top};
+  return {x:(box.l+box.r)/2,y:(box.t+box.b)/2,box,hidden:box.r<0||box.l>origin.width||box.b<0||box.t>origin.height,ribbon:true,index:i};
+ });
+ const syncRibbonMotion=()=>{const rate=motionRunning()&&ribbonSeek===null?1:0;for(const a of ribbonAnims)if(a){a.playbackRate=rate;if(rate)a.play();else a.pause();}};
+ const setLayoutMode=(next,w,h)=>{
+  if(next===layoutMode&&next!=='ribbon')return;
+  if(next!==layoutMode&&!hintDismissed){hintCardIndex=-1;hintVisible=false;clearTimeout(hintTimer);world.classList.remove('lt-hint-ready');}
+  for(const a of ribbonAnims)a?.cancel();ribbonAnims=[];ribbonSeek=null;world.classList.remove('lt-ribbon');
+  for(const a of floatAnims)a?.cancel();floatAnims.fill(null);
+  for(const el of elements){el.style.removeProperty('transform');el.style.removeProperty('z-index');el.style.removeProperty('--lt-orbit-depth');delete el.__orbitTf;delete el.__domSyncAt;el.classList.remove('clash','lt-under-link');const surface=el.querySelector('.surface');surface?.classList.remove('lt-textured');surface?.querySelector('.lt-orbit-texture')?.remove();}
+  layoutMode=next;host.dataset.ltLayout=next;
+  if(next==='ribbon'){
+   stopOrbitLoop();world.classList.remove('lt-canvas');world.classList.add('lt-ribbon');const duration=96000;if(!hintDismissed)selectCardHint(0);
+   elements.slice(0,8).forEach((el,i)=>{
+    el.classList.remove('off');const y=48+(i%2)*8,tilt=-5+(i%4)*3,baseH=el.offsetHeight||172,scale=Math.max(.32,Math.min(i===0?.68:.56+(i%3)*.04,((safeZone?.t||150)-12-y-8)/baseH)),baseW=el.offsetWidth||132,from=-baseW*scale-20,to=w+20,slot=(i===0?4:i<=4?i+4:i-4)/8;
+    const anim=el.animate([{transform:`translate3d(${from}px,${y}px,0) scale(${scale}) rotate(${tilt}deg)`},{transform:`translate3d(${to}px,${y}px,0) scale(${scale}) rotate(${tilt}deg)`}],{duration,iterations:Infinity,easing:'linear',delay:-slot*duration});
+    el.__ribbonDuration=duration;el.style.zIndex=String(20-i);ribbonAnims[i]=anim;
+   });
+   elements.slice(8).forEach(el=>el.classList.add('off'));syncRibbonMotion();if(revealed)activateCardHint();
+  }else{
+   if(spritesReady)world.classList.add('lt-canvas');orbitKF.fill(null);orbitBox=null;noFit.length=0;
+  }
+ };
+ const selectFrontCardHint=(w,h)=>{
+  if(hintDismissed||hintCardIndex>=0)return;
+  let best=-1,bestScale=-1;
+  for(let i=0;i<Math.min(cardCapFor(w,h),elements.length);i++){
+   const el=elements[i],frames=orbitFrames[i],base=cardSizes[i];if(el.classList.contains('off')||!frames?.length||!base)continue;
+   const values=valuesAt(frames,phase,valuePool[i]),pose=cardPose(values,w,h,base.w,base.h,0,0,posePool[i]),box=pose.box;
+   if(box.l<8||box.t<8||box.r>w-8||box.b>h-8||(safeZone&&zoneOverlapArea(safeZone,box)>1))continue;
+   if(values[4]>bestScale){best=i;bestScale=values[4];}
+  }
+  selectCardHint(best);
+ };
   // #1086: 궤도 경로 검사용 — 지정 진행률로 카드를 그린다(실제 루프와 같은 orbitWrite 경로).
-  globalThis.__LT_ORBIT_TEST__={lastWriteAt(){return lastWriteAt;},progress(now){const cfg=(layoutBox&&layoutBox.w<=650?ringsNarrow:rings)[cards[0].ring];const el=now-orbitStart-pausedTotal-(pausedAt?now-pausedAt:0);return ((el/Math.round(ORBIT_MS/cfg.speed))+phase)%1;},period(){const w=layoutBox&&layoutBox.w<=650?ringsNarrow:rings;return Math.round(ORBIT_MS/(w[cards[0].ring].speed));},hold(on){if(on){orbitPause();stopOrbitLoop();}else{testSeek=null;orbitResume();startOrbitLoop();}},seek(t){testSeek=t;for(let i=0;i<elements.length;i++){
-   const frames=orbitFrames[i],el=elements[i];if(!frames||!frames.length||!el)continue;
-   if(el.__seekSaved===undefined)el.__seekSaved=el.style.transform;
-   const tf=orbitTransform(frames,t);if(tf){el.style.transform=tf;}}
-   if(spritesReady)drawCanvas(performance.now(),t);return true;},restore(){testSeek=null;for(const el of elements){if(el.__seekSaved!==undefined){el.style.transform=el.__seekSaved;el.__orbitTf=el.__seekSaved;delete el.__seekSaved;}}if(spritesReady)drawCanvas(performance.now());},freezeOrbit(t){testSeek=t;testFloatActive=true;},pauseFloat(){testFloatPaused=true;},syncDomPoses(){for(let i=0;i<elements.length;i++)syncDomPose(i);},canvasReady(){return spritesReady;},canvasSettled(){return spritesReady&&!building&&!rebuildPending&&!layoutPending&&!zoneIdle;},renderer(){return renderer?"webgl":"2d";},paintOrder(){return spriteOrder.slice();},blurStages(){return sprites.map((sp,i)=>sp?{i,css:sp.cssBlur,baked:sp.bakedBlur}:null);},poses(){return poses.map(p=>p?{...p,box:{...p.box}}:null);},rasterStats(){return sprites.map(sp=>sp?{alpha:sp.alpha,brightness:sp.brightness,blur:sp.cssBlur,bakedBlur:sp.bakedBlur,borderColor:sp.borderColor,borderWidth:sp.borderWidth,rimColor:sp.rimColor,rimWidth:sp.rimWidth,shadowRaster:sp.shadowRaster,baseAlpha:sp.baseAlpha,guardW:sp.guardW,guardH:sp.guardH,guardScale:sp.guardScale}:null);}};
+  globalThis.__LT_ORBIT_TEST__={
+   lastWriteAt(){return lastWriteAt;},hintIndex(){return hintCardIndex;},ribbonTime(){return ribbonAnims[0]?.currentTime||0;},ribbonAdvanced(initial){return (ribbonAnims[0]?.currentTime||0)-initial;},
+   progress(now){if(layoutMode==='ribbon')return ((ribbonAnims[0]?.currentTime||0)/(elements[0]?.__ribbonDuration||96000)%1+1)%1;const cfg=orbitRings(layoutBox?.w||0,layoutBox?.h||0)[cards[0].ring];const elapsed=now-orbitStart-pausedTotal-(pausedAt?now-pausedAt:0);return ((elapsed/Math.round(ORBIT_MS/cfg.speed))+phase)%1;},
+   period(){if(layoutMode==='ribbon')return elements[0]?.__ribbonDuration||96000;const cfg=orbitRings(layoutBox?.w||0,layoutBox?.h||0)[cards[0].ring];return Math.round(ORBIT_MS/cfg.speed);},
+   hold(on){if(layoutMode==='ribbon'){if(on)ribbonAnims.forEach(a=>a?.pause());else{ribbonSeek=null;syncRibbonMotion();}return;}if(on){orbitPause();stopOrbitLoop();const now=performance.now();for(let i=0;i<elements.length;i++)if(elements[i]&&!elements[i].classList.contains('off')){syncDomPose(i);elements[i].__domSyncAt=now;}}else{testSeek=null;orbitResume();startOrbitLoop();}},
+   seek(t){if(layoutMode==='ribbon'){ribbonSeek=t;ribbonAnims.forEach(a=>{if(a){a.pause();a.currentTime=t*(elements[0]?.__ribbonDuration||96000);}});return true;}testSeek=t;for(let i=0;i<elements.length;i++){
+    const frames=orbitFrames[i],el=elements[i];if(!frames||!frames.length||!el)continue;
+    if(el.__seekSaved===undefined)el.__seekSaved=el.style.transform;
+    const tf=orbitTransform(frames,t);if(tf){el.style.transform=tf;}}
+    if(spritesReady)drawCanvas(performance.now(),t);return true;},
+   restore(){if(layoutMode==='ribbon'){ribbonSeek=null;syncRibbonMotion();return;}testSeek=null;for(const el of elements){if(el.__seekSaved!==undefined){el.style.transform=el.__seekSaved;el.__orbitTf=el.__seekSaved;delete el.__seekSaved;}}if(spritesReady)drawCanvas(performance.now());},
+   freezeOrbit(t){testSeek=t;testFloatActive=true;},pauseFloat(){testFloatPaused=true;},syncDomPoses(){if(layoutMode!=='ribbon')for(let i=0;i<elements.length;i++)syncDomPose(i);},
+   canvasReady(){return layoutMode==='ribbon'||spritesReady;},canvasSettled(){return layoutMode==='ribbon'?!layoutPending:spritesReady&&!building&&!rebuildPending&&!layoutPending&&!zoneIdle;},renderer(){return layoutMode==='ribbon'?'ribbon':renderer?'webgl':'2d';},paintOrder(){return layoutMode==='ribbon'?[7,6,5,4,3,2,1,0]:spriteOrder.slice();},blurStages(){return sprites.map((sp,i)=>sp?{i,css:sp.cssBlur,baked:sp.bakedBlur}:null);},poses(){return layoutMode==='ribbon'?ribbonPoses():poses.map(p=>p?{...p,box:{...p.box}}:null);},rasterStats(){return sprites.map(sp=>sp?{alpha:sp.alpha,brightness:sp.brightness,blur:sp.cssBlur,bakedBlur:sp.bakedBlur,borderColor:sp.borderColor,borderWidth:sp.borderWidth,rimColor:sp.rimColor,rimWidth:sp.rimWidth,shadowRaster:sp.shadowRaster,baseAlpha:sp.baseAlpha,guardW:sp.guardW,guardH:sp.guardH,guardScale:sp.guardScale}:null);}
+  };
   const orbitTick=(now)=>{if(!animRunning()){orbitRaf=0;return;}orbitWrite(now);orbitRaf=requestAnimationFrame(orbitTick);};
   const startOrbitLoop=()=>{if(!orbitRaf){orbitWrite(performance.now());orbitRaf=requestAnimationFrame(orbitTick);}};
   const stopOrbitLoop=()=>{if(orbitRaf)cancelAnimationFrame(orbitRaf);orbitRaf=0;};
  // 카메라(패럴랙스): 가까운 카드가 더 크게 움직인다. 층마다 값을 넘겨 애니메이션 사이에 끼어든다.
  // 깊이별 계수에 쓰는 sc 는 카드가 궤도 한 바퀴에서 갖는 배율의 평균(카드마다 고정) — 흔들림 폭 차이는 눈에 띄지 않는다.
  let avgScales=cards.map(()=>1);
- const camWrite=()=>{if(spritesReady)return;elements.forEach((el,i)=>{const move=el.querySelector('.lt-move');if(!move)return;const sc=avgScales[i];
+ const camWrite=()=>{if(layoutMode==='ribbon'||spritesReady)return;elements.forEach((el,i)=>{const move=el.querySelector('.lt-move');if(!move)return;const sc=avgScales[i];
   const mx=(camera.x*(.45+sc*.3)).toFixed(2),my=(camera.y*(.38+sc*.24)).toFixed(2);
   if(move.__mx===mx&&move.__my===my)return;move.__mx=mx;move.__my=my;move.style.transform=`translate3d(${mx}px,${my}px,0)`;});};
 // 카드 한 장의 자리 계산 — 궤도 키프레임을 구울 때와 끄는 동안(JS 쓰기) 모두 이 함수를 쓴다.
@@ -674,7 +859,7 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
  function placeCard(el,c,i,th,x,y,z,sc,w,h,fit,narrow,zs,warm,prefer,baking=false){
   let outSide=null;
   // #429 2/2: 폭별 상한을 넘는 카드는 숨긴다(가로 넘침·과밀 방지). 창이 넓어지면 다시 보인다.
-  if(i>=cardCapFor(w)){el.classList.add('off');return;}
+  if(i>=cardCapFor(w,h)){el.classList.add('off');return;}
   if(el.classList.contains('off'))el.classList.remove('off');
   // 카드는 left/top:50% 에 놓이므로 카드 중심을 궤도 자리에 맞추는 -90·-116(카드 기본 폭·높이의 절반)을 늘 더한다.
   let px=x*sc*(!demo&&cards.length<=8?1:fit)-90,py=y*sc*(!demo&&cards.length<=8?1:fit)-116;
@@ -688,7 +873,7 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
    // 판정 사각형은 '실제 카드 중심' 둘레로만 부풀린다 — 부푼 크기로 중심까지 옮기면 모델이 실제보다
    // 12·20px 어긋나, 아래로 민 카드가 실제로는 20px 더 위(=가운데 구역 안)에 서게 된다(실측 4px 침범).
    const Cx0=w/2+px+base.w/2,Cy0=h/2+py+base.h/2;
-   const cScale=narrow?sc*Math.max(.58,fit):sc;
+   const cScale=(narrow||h<=500)?sc*(!demo&&cards.length<=8?1:Math.max(.58,fit)):sc;
    let minX=1e9,maxX=-1e9,minY=1e9,maxY=-1e9;
    for(const corner of [[-1,-1],[1,-1],[-1,1],[1,1]]){
     const X=size.w/2*corner[0],Y=size.h/2*corner[1];
@@ -728,7 +913,12 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
      const zx=w/2,zy=h/2,cx=(minX+maxX)/2,cy=(minY+maxY)/2;
     let dx=cx-zx,dy=cy-zy;const len=Math.hypot(dx,dy)||1;dx/=len;dy/=len;
     const need=Math.max(0,Math.abs(dx)*(zs.r-zs.l)/2+Math.abs(dy)*(zs.b-zs.t)/2+Math.abs(dx)*(maxX-minX)/2+Math.abs(dy)*(maxY-minY)/2-len);
-    if(need>0){px+=dx*need;py+=dy*need;}
+    if(need>0){px+=dx*need;py+=dy*need;if(h<=500){minX+=dx*need;maxX+=dx*need;minY+=dy*need;maxY+=dy*need;}}
+   }
+   if(h<=500){
+    const shiftX=minX<0?-minX:maxX>w?w-maxX:0,shiftY=minY<0?-minY:maxY>h?h-maxY:0;
+    px+=shiftX;py+=shiftY;minX+=shiftX;maxX+=shiftX;minY+=shiftY;maxY+=shiftY;
+    if(maxX>zs.l&&minX<zs.r&&maxY>zs.t&&minY<zs.b){el.classList.add('off');return;}
    }
    // #593: 모델을 계산한 표본은 밀어내지 않았어도 판정 사각형을 남긴다 — 굽는 쪽이 '표본 사이 직선'이
    // 가운데 구역을 지나는지 검사할 때 쓴다(비어 있으면 그 구간을 건너뛰어 침범이 남았다).
@@ -759,13 +949,15 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
   cardSizes=elements.map((el,i)=>{const n=nominal[cards[i].sizeClass]||nominal.md;return {w:Math.max(el.offsetWidth||0,n[0]),h:Math.max(el.offsetHeight||0,n[1])};});
   layoutBox={w,h};
   if(warmups<1)warmups=1;
-  const cap=cardCapFor(w);
+  setLayoutMode(w<=520&&h>500?'ribbon':h<=500?'compact':'orbit',w,h);
+  if(layoutMode==='ribbon'){orbitWrite(performance.now());return;}
+  const cap=cardCapFor(w,h);
   // 궤도 애니메이션 — 폭 대역(좁은 화면 반지름 표)이나 안전 구역이 바뀌면 다시 굽고, 아니면 시각만 맞춘다.
-  const band=w<=650?'narrow':'wide',boxKey=`${band}|${Math.round(w)}x${Math.round(h)}|${safeZone?`${Math.round(safeZone.l)},${Math.round(safeZone.t)},${Math.round(safeZone.r)},${Math.round(safeZone.b)}`:'-'}|${warmups}|${cards.map((c)=>c.sizeClass).join('')}`;
+  const band=layoutMode,boxKey=`${band}|${Math.round(w)}x${Math.round(h)}|${safeZone?`${Math.round(safeZone.l)},${Math.round(safeZone.t)},${Math.round(safeZone.r)},${Math.round(safeZone.b)}`:'-'}|${warmups}|${cards.map((c)=>c.sizeClass).join('')}`;
   const needBake=orbitBox!==boxKey;let depthChanged=false;
   // #593: 지금 위상의 자리로 한 번 배치해 밝기·z-index(placeCard)를 쓰고, 떠 있음 애니메이션을 건다.
   // 유휴에는 이 배치를 다시 부르지 않는다 — 프레임마다 쓰던 style 쓰기가 사라진 자리다.
-  const zs=safeZone?{l:safeZone.l-(w<=650?50:12),t:safeZone.t-(w<=650?50:12),r:safeZone.r+(w<=650?50:12),b:safeZone.b+(w<=650?50:12)}:null,fit=Math.min(1,w/780,h/850)*(w<=650?.5:1),narrow=w<=650;
+  const zs=safeZone?{l:safeZone.l-(w<=650?50:12),t:safeZone.t-(w<=650?50:12),r:safeZone.r+(w<=650?50:12),b:safeZone.b+(w<=650?50:12)}:null,fit=Math.min(1,w/780,h/850)*(w<=650?.5:1)*(h<=500?.72:1),narrow=w<=650;
   // 상한을 넘는 카드도 placeCard 를 거쳐야 숨김(display:none)이 유지된다 — 건너뛰면 화면 가운데에 남는다.
   // #1010: 떠다니는 예시 카드가 숨는 좁은 화면(390 등)에서는 예시 안내 줄도 함께 숨긴다 — 카드 없는 안내만 남아 헷갈리지 않게.
   // 신규 사용자(로그아웃 예시)는 390에서도 카드가 보이므로(fewHide=false) 안내 줄이 그대로다.
@@ -773,7 +965,7 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
   if(demo)centerNote?.toggleAttribute('data-off',fewHide);
   cards.forEach((c,i)=>{
    avgScales[i]=avgScaleOf(c,w,h);
-   const cfg=(narrow?ringsNarrow:rings)[c.ring],th=c.baseAngle+phase*cfg.speed+c.phaseOffset;
+   const cfg=orbitRings(w,h)[c.ring],th=c.baseAngle+phase*cfg.speed+c.phaseOffset;
    let x=Math.cos(th)*cfg.rx,y=Math.sin(th)*cfg.ry+cfg.band,z=Math.sin(th+1.1+c.phaseOffset*4)*cfg.zAmp+cfg.zBase+c.zOffset;
    if(!fewHide&&!demo&&cards.length<=8){const angle=i*Math.PI*2/cards.length+phase;x=Math.cos(angle)*Math.min(w*.34,420);y=Math.sin(angle)*Math.min(h*.3,250)+(i%2===0?80:-80);z=0;}
    const sc=Math.max(.18,Math.min(narrow?1.1:1.82,1050/(1050-z)));
@@ -787,7 +979,7 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
     // 첫 자리·모양은 위 placeCard 가 이미 다 그렸으므로(화면 변화 0), WAAPI 붙임만 뒤로 미룬다.
     elements.forEach((el,i)=>{orbitKF[i]=null;});
     const total=Math.min(cap,elements.length),chunk=12;
-    for(let from=0;from<total;from+=chunk){const start=from;requestAnimationFrame(()=>{for(let i=start;i<Math.min(start+chunk,total);i++)startOrbit(i,w,h,warmups);if(start+chunk>=total)void rebuildSprites();if(animRunning())startOrbitLoop();orbitWrite(performance.now());});}
+    for(let from=0;from<total;from+=chunk){const start=from;requestAnimationFrame(()=>{for(let i=start;i<Math.min(start+chunk,total);i++)startOrbit(i,w,h,warmups);if(start+chunk>=total){selectFrontCardHint(w,h);void rebuildSprites();}if(animRunning())startOrbitLoop();orbitWrite(performance.now());});}
     orbitBox=boxKey;
    }
    if(spritesReady)syncPaintOrder();if(!needBake&&depthChanged&&(spritesReady||building))void rebuildSprites(true);
@@ -797,17 +989,17 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
  }
  // 카드가 궤도 한 바퀴에서 갖는 배율의 평균 — 패럴랙스 깊이 계수에만 쓴다.
  function avgScaleOf(c,w,h){
-  const narrow=w<=650,cfg=(narrow?ringsNarrow:rings)[c.ring],narrowMax=narrow?1.1:1.82;let sum=0,N=16;
+  const narrow=w<=650,cfg=orbitRings(w,h)[c.ring],narrowMax=narrow?1.1:1.82;let sum=0,N=16;
   for(let k=0;k<N;k++){const th=c.baseAngle+k/N*TWO_PI;const z=Math.sin(th+1.1+c.phaseOffset*4)*cfg.zAmp+cfg.zBase+c.zOffset;sum+=Math.max(.18,Math.min(narrowMax,1050/(1050-z)));}
   return sum/N;
  }
  // 끄는 동안·관성 동안의 자리 쓰기. 유휴에는 부르지 않는다 — 그때는 애니메이션만 돈다.
  let jsMode=false;
  function dragDraw(){
-  if((!drag&&!glide)||!jsMode)return;
+  if(layoutMode==='ribbon'||(!drag&&!glide)||!jsMode)return;
   const w=layoutBox?.w||app.clientWidth,h=layoutBox?.h||app.clientHeight;
-  const zs=safeZone?{l:safeZone.l-(w<=650?50:12),t:safeZone.t-(w<=650?50:12),r:safeZone.r+(w<=650?50:12),b:safeZone.b+(w<=650?50:12)}:null,fit=Math.min(1,w/780,h/850)*(w<=650?.5:1),narrow=w<=650;
-  cards.forEach((c,i)=>{const el=elements[i],cfg=(narrow?ringsNarrow:rings)[c.ring];const th=c.baseAngle+phase*cfg.speed+c.phaseOffset;
+  const zs=safeZone?{l:safeZone.l-(w<=650?50:12),t:safeZone.t-(w<=650?50:12),r:safeZone.r+(w<=650?50:12),b:safeZone.b+(w<=650?50:12)}:null,fit=Math.min(1,w/780,h/850)*(w<=650?.5:1)*(h<=500?.72:1),narrow=w<=650;
+  cards.forEach((c,i)=>{const el=elements[i],cfg=orbitRings(w,h)[c.ring];const th=c.baseAngle+phase*cfg.speed+c.phaseOffset;
    let x=Math.cos(th)*cfg.rx,y=Math.sin(th)*cfg.ry+cfg.band,z=Math.sin(th+1.1+c.phaseOffset*4)*cfg.zAmp+cfg.zBase+c.zOffset;
    if(w<=650&&((!demo&&cards.length<=8)||(demo&&loggedIn===true))){el.classList.add('off');return;} // 261117: 좁은 화면 소수 카드 숨김 유지. 로그인 예시도 390에서 숨김(#780 후속)
    if(!demo&&cards.length<=8){const angle=i*Math.PI*2/cards.length+phase;x=Math.cos(angle)*Math.min(w*.34,420);y=Math.sin(angle)*Math.min(h*.3,250)+(i%2===0?80:-80);z=0;}
@@ -840,7 +1032,7 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
    add(shell.getElementById('updates-card'));orbitEvent('bottom-zone-end');
   }catch{ /* 부모 문서를 읽을 수 없으면(다른 출처 등) 바닥 구역 없음 — 가운데 가드만 돈다 */ }
  };
- const guardClash=(now)=>{if(spritesReady||!safeZone||!appBox)return;
+ const guardClash=(now)=>{if(layoutMode==='ribbon'||spritesReady||!safeZone||!appBox)return;
   if(now-bottomZonesAt>500){measureBottomZones();bottomZonesAt=now;}
   // 구역은 measureSafeZone 이 같은 함수(safeZoneOf)로 실측해 둔 값 — 매 프레임 다시 재지 않는다(#586 rect 캐시).
   const zone={l:safeZone.l+appBox.left,t:safeZone.t+appBox.top,r:safeZone.r+appBox.left,b:safeZone.b+appBox.top};
@@ -889,9 +1081,9 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
  let pressed=-1;
  board.addEventListener('pointerdown',e=>{pressed=cardAt(e);},{signal});
  board.addEventListener('pointercancel',()=>{pressed=-1;},{signal});
- board.addEventListener('click',()=>{const i=pressed;pressed=-1;if(moved>=9||i<0)return;syncDomPose(i);const surface=elements[i].querySelector('.surface');surface.focus({preventScroll:true});surface.click();},{signal});}
+ board.addEventListener('click',()=>{const i=pressed;pressed=-1;if(moved>=9||i<0)return;dismissCardHint();syncDomPose(i);const surface=elements[i].querySelector('.surface');surface.focus({preventScroll:true});surface.click();},{signal});}
  for(const [i,el] of elements.entries()){const surface=el.querySelector('.surface');surface.addEventListener('focus',()=>{focusIndex=i;syncDomPose(i);if(!animRunning())drawCanvas(performance.now());},{signal});surface.addEventListener('blur',()=>{focusIndex=-1;if(!animRunning())drawCanvas(performance.now());},{signal});surface.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();surface.click();}},{signal});}
- app.addEventListener('pointerdown',e=>{if(e.target.closest('.center,.topbar'))return;drag={x:e.clientX,id:e.pointerId,at:performance.now()};moved=0;spin=0;glide=0;},{signal});
+ app.addEventListener('pointerdown',e=>{if(layoutMode==='ribbon'||e.target.closest('.center,.topbar'))return;drag={x:e.clientX,id:e.pointerId,at:performance.now()};moved=0;spin=0;glide=0;},{signal});
  // 261118 대표 지적 4번(이슈 #884): 누르는 것만으로는 무대를 움직이지 않는다 — 카드가 잠깐 흔들렸다.
  // 실제로 누른 채 끌 때(6px 넘을 때)만 끌기 모드로 들어가 자리를 손으로 쓴다. 카드 클릭은 원래 동작 그대로.
  app.addEventListener('pointermove',e=>{if(!drag||e.pointerId!==drag.id)return;const dx=e.clientX-drag.x;moved+=Math.abs(dx);
@@ -915,7 +1107,13 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
  // 측정은 getBoundingClientRect 강제 레이아웃을 일으키므로 첫 프레임으로 미룬다(#400 뼈대 완성 보호).
  let safeZone=null,safeZoneDirty=true;
  const measureSafeZone=()=>{const c=shadow.querySelector('.center');if(!c){safeZone=null;return;}safeZone=safeZoneOf(c.getBoundingClientRect(),app.getBoundingClientRect());measureBottomZones();};
- const fitNotice=()=>{host.style.height=`calc(100dvh - ${noticeOuter()}px)`;appBox=app.getBoundingClientRect();safeZoneDirty=true;schedule();};
+ const fitNotice=()=>{
+  const viewportHeight=Math.max(0,innerHeight-noticeOuter()),centerHeight=shadow.querySelector('.center')?.getBoundingClientRect().height||0;
+  const portrait=host.hasAttribute('data-lt-home-portrait')&&innerWidth<=650;
+  // 가운데 덩어리가 화면보다 길면 iframe 문서가 스크롤하도록 실제 높이를 넘긴다.
+  const contentHeight=portrait?Math.max(app.clientWidth+372,centerHeight+34):centerHeight+32;
+  host.style.height=`${Math.ceil(Math.max(viewportHeight,contentHeight))}px`;appBox=app.getBoundingClientRect();safeZoneDirty=true;schedule();
+ };
  const noticeResize=typeof ResizeObserver==="function"?new ResizeObserver(fitNotice):null;
  const barNow=document.getElementById("sync-bar");
  if(noticeResize&&barNow)noticeResize.observe(barNow);
@@ -926,7 +1124,7 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
  // fonts.ready 접근은 뼈대 완성 뒤로 미룬다(#400) — 첫 그리기를 막지 않는다.
  const remeasure=()=>{safeZoneDirty=true;schedule();};
  const centerNow=shadow.querySelector('.center');
- const centerResize=typeof ResizeObserver==="function"&&centerNow?new ResizeObserver(remeasure):null;
+ const centerResize=typeof ResizeObserver==="function"&&centerNow?new ResizeObserver(()=>{fitNotice();remeasure();}):null;
  if(centerResize)centerResize.observe(centerNow);
  setTimeout(()=>{document.fonts?.ready?.then(remeasure).catch(()=>{});},0);
  track(()=>centerResize?.disconnect());
@@ -942,7 +1140,8 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
  // #1086: 동작 줄이기가 켜져도 정지 위치는 한 번 써서 카드가 보이게 한다. 설정 변경 시 루프를 켜고 끄고 위치를 다시 쓴다.
  orbitWrite(performance.now());
  const prepareOrbitImages=async()=>{
-  const images=elements.flatMap(el=>[...el.querySelectorAll('.surface img')]);
+  const ribbonAtStart=app.clientWidth<=520&&app.clientHeight>500;
+  const images=(ribbonAtStart?elements.slice(0,8):elements).flatMap(el=>[...el.querySelectorAll('.surface img')]);
   await Promise.allSettled(images.map(async img=>{
    // 숨은 접근성 카드의 지연 불러오기 속성은 그대로 두고 그림판용 원본만 미리 해독한다.
    const source=new Image();source.referrerPolicy=img.referrerPolicy;
@@ -952,12 +1151,12 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
   }));
   if(signal.aborted)return;
   elements.forEach(paintOrbitTexture);
-  imagesReady=true;void rebuildSprites();schedule();
+  imagesReady=true;if(layoutMode==='ribbon')syncRibbonMotion();else void rebuildSprites();schedule();
  };
  void prepareOrbitImages();
  const onReduceChange=(e)=>{reduced=e.matches;syncMotion();orbitWrite(performance.now());};
  reduceQuery.addEventListener?.('change',onReduceChange);track(()=>reduceQuery.removeEventListener?.('change',onReduceChange));
- track(()=>cancelAnimationFrame(raf));track(()=>stopOrbitLoop());track(()=>orbitAnims.forEach(a=>a?.cancel()));track(()=>floatAnims.forEach(a=>a?.cancel()));track(()=>dialog.close());
+ track(()=>cancelAnimationFrame(raf));track(()=>stopOrbitLoop());track(()=>orbitAnims.forEach(a=>a?.cancel()));track(()=>floatAnims.forEach(a=>a?.cancel()));track(()=>ribbonAnims.forEach(a=>a?.cancel()));track(()=>dialog.close());
  // #213 2번: 첫 화면 도구 줄의 "보기" 메뉴가 움직임을 읽고 바꾼다. dispose는 함수 그대로 둔다.
  dispose.motion={get paused(){return paused;},set(value){setMotionPaused(value);},toggle(){setMotionPaused(!paused);return paused;}};
  // 261116 PR 2: 홈(v41/home.js)이 쓰는 좁은 출구 둘. recent.set — 모드가 바뀌면 카드 한 장을 같은 결(recentMarkup)로 갈아끼운다(header가 null이면 '마지막 순간 · N일 전' 기본 문구).

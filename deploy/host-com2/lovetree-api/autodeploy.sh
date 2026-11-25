@@ -56,6 +56,13 @@ for arg in "$@"; do
   esac
 done
 
+# .env에서 출처 확인 공유 값을 읽는다(없으면 빈 값). 값은 출력하지 않는다.
+proxy_proof() {
+  local file=${AUTODEPLOY_ENV_FILE:-$app/.env}
+  [[ -r "$file" ]] || return 0
+  sed -n 's/^LOVETREE_PROXY_SECRET=//p' "$file" | tail -1 | tr -d '\r' | sed -e 's/^["'"'"']//' -e 's/["'"'"']$//'
+}
+
 state_read() {
   "$node_bin" -e '
     const fs = require("fs");
@@ -167,7 +174,7 @@ fi
 has_api=0
 for file in "${changed[@]}"; do
   case "$file" in
-    server/*|src/domain.js|src/moment-range.js|src/stage-key.js|public/v41/tags.mjs|public/v41/youtube-id.mjs|public/v41/youtube-id.js|package.json|package-lock.json|\
+    server/*|src/domain.js|src/moment-range.js|src/stage-key.js|public/v41/tags.mjs|public/v41/tree-open-view.mjs|public/v41/youtube-id.mjs|public/v41/youtube-id.js|package.json|package-lock.json|\
     tools/admin-role.mjs|tools/env-file.mjs|tools/ops-reply.mjs|tools/relink-opinion-author.mjs|\
     deploy/host-com2/lovetree-api/install.sh|\
     deploy/host-com2/lovetree-api/check_config.mjs|\
@@ -280,7 +287,14 @@ fi
 if [[ -z "$verify_failed" ]]; then
   code=""
   for ((i = 1; i <= http_retries; i++)); do
-    code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "$health_url" 2>/dev/null || true)
+    # #1250: 서버가 출처 확인 머리말을 막는 모드(LOVETREE_PROXY_ENFORCE=1)에서도 확인 요청이 통과하게
+    # .env의 공유 값을 머리말로 보낸다. 값은 명령줄(ps)·로그에 남지 않게 curl 설정을 표준입력으로 넘긴다.
+    proof=$(proxy_proof)
+    if [[ -n "$proof" ]]; then
+      code=$(printf 'header = "x-lovetree-proxy-proof: %s"\n' "$proof" | curl -s -o /dev/null -w '%{http_code}' --max-time 5 -K - "$health_url" 2>/dev/null || true)
+    else
+      code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "$health_url" 2>/dev/null || true)
+    fi
     if [[ "$code" == "$http_expect" ]]; then break; fi
     sleep "$http_retry_sleep"
   done

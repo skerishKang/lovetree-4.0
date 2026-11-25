@@ -422,3 +422,42 @@ export function failuresOf(res, 크기, 테마) {
   for (const c of res.contrast || []) rows.push(['대비', lineOf({ 항목: '대비', ...c })]);
   return rows.map(([항목, 줄]) => ({ 항목, 줄: `${줄} · ${크기}·${테마}` }));
 }
+
+
+// #1362 확장: 선택 탭·칩 채움과 쉬는 테두리가 역할 변수를 쓰는지, 글자 대비가 4.5:1인지 잔다.
+// 화면 공통 검사기에서 쓰는 함수다. 페이지·안쪽 프레임 어디에 붙여도 동하게 document 기준으로 읽는다.
+export const roleStyleFn = function roleStyle(selectors) {
+  const rgb = (s) => { const m = /rgba?\(([^)]+)\)/.exec(s || ''); if (!m) return null; const p = m[1].split(',').map((v) => parseFloat(v)); return [p[0], p[1], p[2], p.length > 3 ? p[3] : 1]; };
+  const lum = (c) => { const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }; return 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]); };
+  const over = (t, b) => [t[0] * t[3] + b[0] * (1 - t[3]), t[1] * t[3] + b[1] * (1 - t[3]), t[2] * t[3] + b[2] * (1 - t[3]), 1];
+  const ratio = (fg, bg) => { const a = lum(fg), b = lum(bg); return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05); };
+  const probe = document.createElement('span');
+  probe.style.display = 'none';
+  document.body.append(probe);
+  const read = (name) => { probe.style.color = 'var(' + name + ')'; return getComputedStyle(probe).color; };
+  const names = ['--lt-role-line', '--lt-role-idle-border', '--lt-role-idle-ink', '--lt-role-bg', '--lt-role-accent-bg', '--lt-role-accent-ink', '--lt-role-secondary-ink'];
+  const vars = Object.fromEntries(names.map((name) => [name, read(name)]));
+  probe.remove();
+  const look = (sel) => {
+    const el = document.querySelector(sel);
+    if (!el) return null;
+    const cs = getComputedStyle(el);
+    const bg = rgb(cs.backgroundColor) || [0, 0, 0, 0];
+    const fg = rgb(cs.color) || [0, 0, 0, 1];
+    const base = rgb(vars['--lt-role-bg']) || [0, 0, 0, 1];
+    const line = parseFloat(cs.borderTopWidth) > 0 ? cs.borderTopColor : cs.boxShadow;
+    return { bg: cs.backgroundColor, color: cs.color, border: cs.borderTopColor, line, ratio: Math.round(ratio(over(fg, bg), over(bg, base)) * 100) / 100 };
+  };
+  return { vars, looks: Object.fromEntries(selectors.map((sel) => [sel, look(sel)])) };
+};
+
+// 한 문서 안의 선택·쉬는 쌍을 검사한다. 선택은 강조 채움, 쉬는 테두리는 역할 선, 글자는 4.5:1 이상.
+export function assertRolePair(assert, report, label, vars, selected, idle, idleBorderName = '--lt-role-idle-border') {
+  if (!selected || !idle) return;
+  assert.equal(selected.bg, vars['--lt-role-accent-bg'], label + ': 선택 탭·칩은 강조 채움');
+  assert.equal(selected.color, vars['--lt-role-accent-ink'], label + ': 선택 탭·칩 글자는 강조 위 색');
+  assert.ok(selected.ratio >= 4.5, label + ': 선택 글자 대비 ' + selected.ratio + ':1');
+  assert.ok(String(idle.line).includes(vars['--lt-role-line']), label + ': 쉬는 테두리는 ' + idleBorderName + ' — ' + idle.line);
+  assert.ok(idle.ratio >= 4.5, label + ': 쉬는 글자 대비 ' + idle.ratio + ':1');
+  report.push({ label, selected: selected.ratio, idle: idle.ratio });
+}

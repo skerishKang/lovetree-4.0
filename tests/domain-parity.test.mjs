@@ -6,8 +6,8 @@
 // 한쪽만 허용 목록에 넣는 순간 걸리게 한다.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {validateState as validateServerCopy} from '../src/domain.js';
-import {validateState as validateScreenCopy} from '../public/v41/domain.mjs';
+import * as server from '../src/domain.js';
+import * as screen from '../public/v41/domain.mjs';
 
 // 어느 허용 목록에도 없는 필드들 — 지금은 두 벌 모두 지운다. 한쪽만 허용하면 이 시험이 실패한다.
 const UNKNOWN_FIELDS = {z: 1.5, w: '남는가', legacyNote: '옛 문서 흔적'};
@@ -80,16 +80,53 @@ const FIXED_STATE = {
 };
 
 test('두 벌의 validateState가 필드가 다 들어간 고정 문서에서 같은 출력을 내려준다', () => {
-  const fromServerCopy = validateServerCopy(structuredClone(FIXED_STATE));
-  const fromScreenCopy = validateScreenCopy(structuredClone(FIXED_STATE));
+  const fromServerCopy = server.validateState(structuredClone(FIXED_STATE));
+  const fromScreenCopy = screen.validateState(structuredClone(FIXED_STATE));
   assert.deepEqual(fromScreenCopy, fromServerCopy);
 });
 
 test('어느 허용 목록에도 없는 필드는 두 벌 모두 같은 방식으로 지운다', () => {
-  const cleaned = validateScreenCopy(structuredClone(FIXED_STATE));
+  const cleaned = screen.validateState(structuredClone(FIXED_STATE));
   const moment = cleaned.trees[0].moments.find(m => m.id === 'm1');
   assert.equal(Object.keys(moment).some(key => Object.prototype.hasOwnProperty.call(UNKNOWN_FIELDS, key)), false, '모르는 필드는 출력에 남지 않는다');
   assert.equal('junkPref' in cleaned.prefs, false, '모르는 설정 값은 출력에 남지 않는다');
   assert.equal(moment.keywords.includes('k'.repeat(25)), false, '길이 한도를 넘은 꼬리표는 지운다');
   assert.deepEqual(moment.keywords, ['가수:이름', '무대:쇼', 'k'.repeat(24)]);
 });
+
+for (const [name, domain] of [['서버', server], ['브라우저', screen]]) {
+  test(name + '에서 옛 트리와 잘못된 열 화면은 트리 보기로 읽는다', () => {
+    const state = structuredClone(FIXED_STATE);
+    assert.equal(domain.validateState(state).trees[0].openView, 'tree');
+    for (const invalid of [null, 'shelf', 'map', ['book'], 3]) {
+      state.trees[0].openView = invalid;
+      assert.equal(domain.validateState(state).trees[0].openView, 'tree');
+    }
+  });
+
+  test(name + '에서 열 화면만 바꾸거나 이름만 고쳐도 트리 설정이 유지된다', () => {
+    const fields = { subject: '봄날', title: '첫 순간', note: '첫 마음' };
+    const tree = domain.createTree(fields);
+    assert.equal(tree.openView, 'tree');
+    const edit = { title: tree.title, subject: tree.subject };
+    for (const openView of ['tree', 'board', 'book', 'network']) {
+      assert.equal(domain.createTree({ ...fields, openView }).openView, openView);
+      const changed = domain.editTree(tree, { ...edit, openView });
+      assert.equal(changed.openView, openView);
+      assert.equal(domain.editTree(changed, edit), changed);
+      assert.equal(domain.editTree(changed, { ...edit, title: '새 이름' }).openView, openView);
+      assert.equal(domain.editTree(changed, { ...edit, openView: '알 수 없음' }).openView, 'tree');
+    }
+  });
+
+  test(name + '에서 백업을 기존 목록에 합치면 새 식별자에도 열 화면이 보존된다', () => {
+    const currentTree = { ...FIXED_STATE.trees[0], openView: 'network' };
+    const current = { version: 1, trees: [currentTree] };
+    const imported = domain.importTrees(current, {
+      version: 1, trees: [{ ...currentTree, openView: 'board' }, FIXED_STATE.trees[1]]
+    });
+    assert.deepEqual(imported.trees.map(tree => tree.openView), ['network', 'board', 'tree']);
+    assert.notEqual(imported.trees[1].id, currentTree.id);
+    assert.deepEqual(current.trees, [currentTree]);
+  });
+}

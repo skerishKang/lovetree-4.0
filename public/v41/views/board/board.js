@@ -216,7 +216,7 @@ function writeBoardMode(mode) {
   }
 }
 let boardMode = readBoardMode();
-function setBoardMode(mode, { save = true, replace = true } = {}) {
+function setBoardMode(mode, { save = true, replace = true, animate = false } = {}) {
   if (mode !== 'date' && mode !== 'mine') return;
   boardMode = mode;
   if (save) writeBoardMode(mode);
@@ -224,6 +224,7 @@ function setBoardMode(mode, { save = true, replace = true } = {}) {
     b.setAttribute('aria-pressed', b.dataset.boardMode === mode ? 'true' : 'false');
   // #619-6: '내 배치'는 좌표 복원이 아니라 순서 배치다(순서가 있으면 순서대로 쌓는다; 옛 좌표는 payload 보존만).
   if (replace) {
+    if (animate) cardLayer.querySelectorAll('.card').forEach(el => el.classList.add('shiftPreview'));
     placeAll();
     settlePlacedCards();
   }
@@ -283,8 +284,41 @@ function projectBoardOrder() {
   return LT58Model.orderFromSaved(slots, rest);
 }
 let momentOrder = projectBoardOrder();
+let hasSavedBoardOrder =
+    !!LT58Model.orderOfMoments(LTDEMO.moments) || moments.some(m => m.savedPos),
+  clearSavedBoardOrder = false;
 function orderRank(id) {
   return momentOrder.indexOf(id);
+}
+function captureBoardOrderState() {
+  return {
+    mode: boardMode,
+    momentOrder: momentOrder.slice(),
+    hasSavedBoardOrder,
+    clearSavedBoardOrder,
+    saved: moments.map(m => ({
+      id: m.id,
+      savedPos: !!m.savedPos,
+      savedXY: m.savedXY ? { ...m.savedXY } : null
+    }))
+  };
+}
+function restoreBoardOrderState(state, { mode = state?.mode } = {}) {
+  if (!state) return;
+  momentOrder = Array.isArray(state.momentOrder) ? state.momentOrder.slice() : [];
+  hasSavedBoardOrder = state.hasSavedBoardOrder === true;
+  clearSavedBoardOrder = state.clearSavedBoardOrder === true;
+  const saved = new Map((state.saved || []).map(item => [item.id, item]));
+  for (const m of moments) {
+    const old = saved.get(m.id);
+    if (!old) continue;
+    m.savedPos = old.savedPos;
+    m.savedXY = old.savedXY ? { ...old.savedXY } : null;
+  }
+  setBoardMode(mode === 'date' ? 'date' : 'mine');
+}
+function discardBoardUndoSnapshot(value) {
+  if (value && undoStack.at(-1) === value) undoStack.pop();
 }
 // #619-5: 쌓기 배치(핀터레스트식) — 열마다 위에서부터 차곡차곡 쌓는다. 줄을 맞추지 않으므로
 // 세로(쇼츠) 카드가 섞인 열 아래가 비지 않는다. #619-6: '내 배치'는 좌표가 아니라 순서로 쌓는다.
@@ -313,6 +347,7 @@ function placeStacked() {
 // 날짜순·내 배치 모두 쌓기 배치다(순서만 다르다). 전환·처음 열기·창 크기 변경이 함께 쓴다.
 function placeAll() {
   placeStacked();
+  updateEmptyHint();
 }
 // #619-6: 끼워 넣기 — 끄는 동안 자리를 보이기 위해 끌고 있는 카드를 뺀 나머지 카드를 현재 순서로 다시 쌓은 자리다.
 function insertCells(excludeId) {
@@ -361,18 +396,35 @@ function insertIndexAt(px, py, excludeId) {
   return { index: best.index + (after ? 1 : 0), target: best.id, after };
 }
 // 놓으면 그 자리에 끼어들고 나머지는 순서대로 다시 쌓인다. 저장은 순서(순위) 그대로다.
-function commitInsert(id, index) {
+function commitInsert(id, index, { before = captureBoardOrderState(), snapshot: undoSnapshot = null } = {}) {
   const seq = momentOrder.filter(x => x !== id);
   const at = Math.max(0, Math.min(seq.length, index));
   seq.splice(at, 0, id);
   momentOrder = seq;
+  hasSavedBoardOrder = true;
+  clearSavedBoardOrder = false;
   // 놓은 뒤에는 '내 배치' 순서대로 보여야 한다(날짜순으로 다시 쌓으면 방금 끼운 자리가 안 보인다 — #619-6).
-  if (boardMode !== 'mine') setBoardMode('mine');
+  if (boardMode !== 'mine') setBoardMode('mine', { animate: true });
   else {
     placeAll();
     settlePlacedCards();
+    if (mobileBoardScroll()) applyView(false);
   }
-  persistBoard();
+  if (exampleBoard) {
+    persistBoard();
+    return;
+  }
+  persistBoard({
+    onSettled: result => {
+      if (!result.ok) {
+        restoreBoardOrderState(before);
+        discardBoardUndoSnapshot(undoSnapshot);
+        failNotice('배치를 저장하지 못했어요. 원래 자리로 되돌렸어요.');
+        return;
+      }
+      showBoardOrderUndo({ before, snapshot: undoSnapshot });
+    }
+  });
 }
 
 // #1072 A-17: 카드 순서 단추 한 벌과 순서 옮기기 — 키보드로도 '내 배치' 순서를 바꿀 수 있게 한다.
@@ -392,18 +444,48 @@ function moveCardOrder(id, dir) {
   seq.splice(at, 1);
   seq.splice(to, 0, id);
   momentOrder = seq;
+  hasSavedBoardOrder = true;
+  clearSavedBoardOrder = false;
   // 옮긴 뒤에도 '내 배치' 순서대로 보인다(끌기와 같은 규칙).
   if (boardMode !== 'mine') setBoardMode('mine');
   else {
     placeAll();
     settlePlacedCards();
+    if (mobileBoardScroll()) applyView(false);
   }
   persistBoard();
   return true;
 }
+// 브라우저 기본 확인 창은 쓰지 않는다 — 공통 앱 안 확인 창이 없으면 취소로 처리한다.
+const askConfirm = (message) => (globalThis.LT41Confirm?.ask ? globalThis.LT41Confirm.ask(message) : Promise.resolve(false));
+async function resetBoardOrder() {
+  if (!boardSaveEnabled()) return;
+  if (!await askConfirm('내 배치를 처음대로 돌릴까요? 날짜순으로 돌아갑니다.')) return;
+  const before = captureBoardOrderState();
+  const undoSnapshot = snapshot();
+  momentOrder = LT58Model.dateDescOrder(moments).map(m => m.id);
+  hasSavedBoardOrder = false;
+  clearSavedBoardOrder = true;
+  for (const m of moments) {
+    m.savedPos = false;
+    m.savedXY = null;
+  }
+  setBoardMode('date');
+  persistBoard({
+    onSettled: result => {
+      if (result.ok) {
+        toast('내 배치를 처음대로 되돌렸어요.');
+        return;
+      }
+      restoreBoardOrderState(before);
+      discardBoardUndoSnapshot(undoSnapshot);
+      failNotice('처음대로 저장에 실패했어요. 원래 배치를 유지했어요.');
+    }
+  });
+}
 
-// #894: '내 배치'에서 끄는 동안 다른 카드가 실시간으로 비켜 준다 — 끼어들 자리에 놓였을 때의
-// 자리를 미리 계산해 나머지 카드를 옮겨 둔다(180ms 전환). 움직임 끄기(셸 설정·lt41-motion)면 즉시.
+// #894: 끄는 동안 다른 카드가 실시간으로 비켜 준다 — 끼어들 자리에 놓였을 때의
+// 자리를 미리 계산해 나머지 카드를 옮겨 둔다(200ms 전환). 움직임 끄기(셸 설정·lt41-motion)면 즉시.
 // 끌고 있는 카드 자체는 포인터를 그대로 따라오고, 놓으면 commitInsert가 같은 자리로 확정한다.
 let boardMotionOff = false,
   previewSig = '';
@@ -432,7 +514,10 @@ function previewShift(dragId, hit) {
     const s = layout.get(id2);
     if (!s) continue;
     const pos = LT58Model.gridPosition(s.col, s.y, i++);
-    if (id2 === dragId) continue;
+    if (id2 === dragId) {
+      if (typeof placeDropPlaceholder === 'function') placeDropPlaceholder(dragId, pos);
+      continue;
+    }
     const el = cardLayer.querySelector(`[data-id="${id2}"]`);
     if (!el) continue;
     el.classList.add('shiftPreview');
@@ -443,6 +528,7 @@ function previewShift(dragId, hit) {
 function clearPreviewShift() {
   previewSig = '';
   cardLayer.querySelectorAll('.shiftPreview').forEach(el => el.classList.remove('shiftPreview'));
+  cardLayer.querySelector('.boardDropPlaceholder')?.remove();
 }
 
 function projectBoardConnections() {
@@ -515,7 +601,8 @@ function boardPayload() {
 // 순서 값이 없는 트리(아직 순서로 저장한 적 없는)는 예전처럼 좌표를 보낸다('날짜순'에서는 꽂은 자리를 그대로).
 function orderPayload(m) {
   const rank = orderRank(m.id);
-  if (rank >= 0)
+  if (clearSavedBoardOrder) return { x: null, y: null, rot: 0 };
+  if (hasSavedBoardOrder && rank >= 0)
     return { x: m.savedXY ? m.savedXY.x : m.x, y: LT58Model.ORDER_Y_BASE + rank, rot: m.rot };
   return m.savedPos && m.savedXY && boardMode === 'date'
     ? { x: m.savedXY.x, y: m.savedXY.y, rot: m.savedXY.rot }
@@ -529,17 +616,33 @@ function newBoardId() {
   return id;
 }
 // #1058: 보내기가 던지면 조용히 넘기지 않고 보드 알림 줄에 실패를 알린다(성공은 #905 규칙으로 알리지 않는다).
-function persistBoard() {
-  if (!boardSaveEnabled()) return;
+let boardSaveSequence = 0;
+const pendingBoardSaves = new Map();
+function persistBoard({ onSettled } = {}) {
+  const settle = typeof onSettled === 'function' ? onSettled : null;
+  if (!boardSaveEnabled()) {
+    settle?.({ ok: false, error: '저장할 수 있는 연결이 없어요.' });
+    return null;
+  }
+  const requestId = settle ? `board-${++boardSaveSequence}` : null;
+  if (requestId) pendingBoardSaves.set(requestId, settle);
   try {
     const treeId = window.parent.LT41.tree.id;
     window.parent.postMessage(
-      { type: globalThis.LT41_MSG.boardSync, treeId, moments: boardPayload() },
+      {
+        type: globalThis.LT41_MSG.boardSync,
+        treeId,
+        moments: boardPayload(),
+        ...(requestId ? { requestId } : {})
+      },
       location.origin
     );
+    return requestId;
   } catch (error) {
+    if (requestId) pendingBoardSaves.delete(requestId);
     globalThis.LT41Report?.report(error, '보드 저장 보내기');
-    failNotice('보드 저장에 실패했어요. 잠시 뒤 다시 시도해 주세요.');
+    if (settle) settle({ ok: false, error: error?.message || '보드 저장에 실패했어요.' });
+    else failNotice('보드 저장에 실패했어요. 잠시 뒤 다시 시도해 주세요.');
   }
 }
 // #1058: 저장 실패 알림 — 카드보다 위 층(z 9999), 불투명 바탕, 화면 아래 가운데, 최소 5초.
@@ -555,6 +658,17 @@ function failNotice(t) {
 window.addEventListener('message', e => {
   if (e.origin !== location.origin) return;
   if (e.data?.type !== globalThis.LT41_MSG.boardSaved) return;
+  const requestId = typeof e.data.requestId === 'string' ? e.data.requestId : '';
+  const settle = requestId ? pendingBoardSaves.get(requestId) : null;
+  if (settle) {
+    pendingBoardSaves.delete(requestId);
+    try {
+      settle({ ok: e.data.ok === true, error: e.data.error || '' });
+    } catch (error) {
+      globalThis.LT41Report?.report(error, '보드 저장 응답');
+    }
+    return;
+  }
   if (e.data.ok === false)
     toast(e.data.error || '서버에 저장하지 못했어요. 잠시 뒤 다시 시도해 주세요.');
 });
@@ -579,6 +693,7 @@ let view = { x: 0, y: 0, z: 0.78 },
   drag = null,
   pan = null,
   undoStack = [],
+  activeBoardOrderUndo = null,
   cinema = false,
   addType = 'photo';
 
@@ -623,7 +738,7 @@ function dateText(v) {
 function cardHTML(m) {
   let media = '';
   if (m.url)
-    media = LTMedia.markup(m.url, m.title, m.mediaMetadata, m.id, null, null, { compact: true });
+    media = LTMedia.markup(m.url, m.title, m.mediaMetadata, m.id, null, null, { compact: true, visitorYoutubeCover: true });
   else if (m.type === 'note') media = `<div class="noteText">“${esc(m.cardMemo || m.memo)}”</div>`;
   else if (m.type === 'video')
     media = `<div class="media"><video muted playsinline loop poster="${m.asset}" src="${m.video}"></video><span class="playBadge">▶</span><span class="duration">${m.duration || '00:03'}</span></div>`;
@@ -637,6 +752,7 @@ function renderCards() {
   cardLayer.innerHTML = moments.map(cardHTML).join('');
   cardLayer.querySelectorAll('.card').forEach(el => bindCard(el));
   settlePlacedCards();
+  if (typeof updateEmptyHint === 'function') updateEmptyHint();
   if (selected) selectMoment(selected, false);
 }
 
@@ -649,7 +765,9 @@ function settlePlacedCards() {
     .filter(m => els.has(m.id))
     .map(m => ({ id: m.id, x: m.x, y: m.y, h: reservedHeights.get(m.id) || BASE_RESERVED_H }));
   // #619-6: 카드 전부가 쌓기 배치라서 저장 자리가 따로 없고, 전부 열 안에서 벌림 대상이다.
-  const moved = LT58Model.settleColumnGaps(list, new Set(moments.map(m => m.id)), 24);
+  // #1273 8번: 휴대폰에서는 같은 열의 빈 틈을 조금 줄인다(예약 높이 330px 기준은 그대로).
+  const narrow = typeof matchMedia === 'function' && matchMedia('(max-width: 640px)').matches;
+  const moved = LT58Model.settleColumnGaps(list, new Set(moments.map(m => m.id)), narrow ? 16 : 24);
   let changed = false;
   for (const m of moments) {
     const y = moved.get(m.id);
@@ -661,8 +779,51 @@ function settlePlacedCards() {
   if (changed) rerenderThreads();
 }
 
+let mobileBoardBaseY = 0;
+function mobileBoardScroll() { return innerWidth < 700 && !cinema; }
+function mobileBoardBounds() {
+  const cards = boardCards();
+  if (!cards.length) return null;
+  return {
+    top: Math.min(...cards.map(c => c.y)),
+    bottom: Math.max(...cards.map(c => c.y + c.h)),
+    left: Math.min(...cards.map(c => c.x)),
+    right: Math.max(...cards.map(c => c.x + c.w))
+  };
+}
+function boardResizeMobile() {
+  placeAll();
+  const bounds = mobileBoardBounds();
+  if (bounds) view.x = viewport.clientWidth / 2 - (bounds.left + bounds.right) * view.z / 2;
+  applyView(false);
+}
+viewport.addEventListener('scroll', () => {
+  if (viewport.classList.contains('board-scroll')) view.y = mobileBoardBaseY - viewport.scrollTop;
+}, { passive: true });
 function applyView(animated = false) {
   growBoard();
+  updateEmptyHint();
+  const scroll = mobileBoardScroll();
+  const space = $('#boardScrollSpace');
+  viewport.classList.toggle('board-scroll', scroll);
+  viewport.classList.toggle('board-scroll-editing', scroll && boardMode === 'mine');
+  if (scroll) {
+    const bounds = mobileBoardBounds(), safe = boardSafeArea();
+    if (bounds) {
+      mobileBoardBaseY = safe.y - bounds.top * view.z;
+      if (viewMode === 'fit') mobileBoardBaseY = Math.max(mobileBoardBaseY, view.y);
+      // 실제 카드 끝을 지나 빈 판이 끝없이 이어지지 않도록 스크롤 길이를 정한다.
+      space.style.height = Math.max(viewport.clientHeight, Math.ceil(mobileBoardBaseY + bounds.bottom * view.z + (viewport.clientHeight - safe.y - safe.h) + 24)) + 'px';
+      world.classList.remove('lt-view-pan');
+      world.style.transform = `translate(${view.x}px,${mobileBoardBaseY}px) scale(${view.z})`;
+      viewport.scrollTop = Math.max(0, mobileBoardBaseY - view.y);
+      view.y = mobileBoardBaseY - viewport.scrollTop;
+      $('#zoomLabel').textContent = Math.round(view.z * 100) + '%';
+      return;
+    }
+  }
+  space.style.height = '';
+  viewport.scrollTop = 0;
   world.classList.toggle('lt-view-pan', animated);
   world.style.transform = `translate(${view.x}px,${view.y}px) scale(${view.z})`;
   $('#zoomLabel').textContent = Math.round(view.z * 100) + '%';
@@ -693,6 +854,38 @@ function boardCards() {
     return { id: m.id, x: m.x, y: m.y, w: el?.offsetWidth || 242, h: el?.offsetHeight || 260 };
   });
 }
+// #1321: 카드 묶음 아래 빈 판이 240px 이상일 때만 점선 자리를 보여 준다.
+// 판 높이는 그대로 두고, 자리 표시는 얹기만 한다. 쓰기 가능·넓은 화면·시네마 밖에서만 쓴다.
+function updateEmptyHint() {
+  // 카드를 다시 그리면 안내도 함께 지워진다 — 그릴 때마다 다시 붙인다.
+  let emptyHint = document.getElementById('boardEmptyHint');
+  if (!emptyHint) {
+    emptyHint = document.createElement('div');
+    emptyHint.id = 'boardEmptyHint';
+    emptyHint.className = 'board-empty-hint';
+    emptyHint.setAttribute('aria-hidden', 'true');
+    emptyHint.innerHTML = '<span>순간을 끌어 여기에 놓아 보세요</span>';
+    emptyHint.hidden = true;
+    cardLayer.appendChild(emptyHint);
+  }
+  if (!boardSaveEnabled() || mobileBoardScroll() || cinema || !moments.length) {
+    emptyHint.hidden = true;
+    return;
+  }
+  const cards = boardCards();
+  if (!cards.length) { emptyHint.hidden = true; return; }
+  const left = Math.min(...cards.map((c) => c.x));
+  const right = Math.max(...cards.map((c) => c.x + c.w));
+  const bottom = Math.max(...cards.map((c) => c.y + c.h));
+  // 무대 안쪽 여백 48px는 CSS의 .surface inset과 같은 값이다(새 상수를 만들지 않는다).
+  const free = worldSize.h - 48 - bottom - 24;
+  if (free < 240) { emptyHint.hidden = true; return; }
+  emptyHint.hidden = false;
+  emptyHint.style.left = left + 'px';
+  emptyHint.style.top = bottom + 24 + 'px';
+  emptyHint.style.width = Math.max(520, right - left) + 'px';
+  emptyHint.style.height = Math.min(free, 320) + 'px';
+}
 // 보이는 칸: 왼쪽 도구 창·오른쪽 상세 창(열려 있거나 곧 열릴 때)을 뺀 자리. 좁은 화면(760 미만)은 두 창이 아래에서 올라오므로 빼지 않는다.
 function boardSafeArea(expectDetail = false) {
   let vw = viewport.clientWidth,
@@ -719,8 +912,9 @@ function boardSafeArea(expectDetail = false) {
       const r = pk.getBoundingClientRect();
       if (r.width) top = Math.max(top, r.bottom - vr.top + 12);
     }
+    // 이어 보기가 공통 도구 줄로 옮겨가면 더 이상 판 위에 떠 있지 않다 — 판 아래 여백을 차지하지 않는다.
     const cb = $('.cinemaBtn');
-    if (cb) {
+    if (cb && !cb.closest('.lt-screen-toolbar')) {
       const r = cb.getBoundingClientRect();
       if (r.width) bottom = Math.max(bottom, vr.bottom - r.top + 12);
     }
@@ -772,15 +966,20 @@ function noteUserView() {
 }
 // #490: 화면 전환(두 장 앞뒤 바꿈)에서는 이 문서가 숨은 프레임(폭 0)에서 먼저 뜬다. 그때 한 맞춤을 '전체 보기'로
 // 기억하면 드러난 뒤 resize가 맞춤(55%)을 다시 적용해 처음 80%·기억한 자리가 무시됐다 → 처음 자리 대기로 둔다.
-// #662(CTO 지시): 좁은 판(<700)에서도 전체 맞춤은 순간이 많으면 카드를 손톱만 하게 몰아 넣는다 — 예전처럼 지금(또는 첫)
-// 순간 카드가 읽히는 배율(카드 폭 ≥ 화면의 6할)로 크게 보이게 초점을 맞춘다. 머리글·탐색 판 비켜 두기는
-// focusBoardMoment가 판 아래끝을 실측해 해준다(#662). 초점 보기는 캔버스 설계상 이웃 카드가 도구 밑으로 슬라이드된다 —
-// 검사기는 보드의 도구×캔버스 겹침을 설계대로 제외하고 대신 '작은카드' 기준으로 읽히는 배율을 지킨다.
+// #1249: 휴대폰 일반 진입은 첫 카드부터 100% 크기로 실제 스크롤한다.
+// 명시적으로 선택한 순간으로 진입할 때는 그 카드로 이동하되 모든 카드에 닿을 수 있다.
 function boardStartView() {
   if (innerWidth < 700) {
-    if (typeof focusBoardMoment === 'function') focusBoardMoment(LTDEMO.get(), false);
-    else fitAll(false);
+    const bounds = mobileBoardBounds();
     viewMode = 'start';
+    const openId = new URLSearchParams(location.search).get('open');
+    if (openId && typeof focusBoardMoment === 'function') focusBoardMoment(openId, false);
+    else if (bounds) {
+      view.z = 1;
+      view.x = viewport.clientWidth / 2 - (bounds.left + bounds.right) / 2;
+      view.y = boardSafeArea().y - bounds.top;
+      applyView(false);
+    } else fitAll(false);
     return;
   }
   let vw = viewport.clientWidth,
@@ -864,14 +1063,17 @@ function screenToWorld(cx, cy) {
 }
 
 function snapshot() {
-  undoStack.push(
-    JSON.stringify({
+  dismissBoardOrderUndo();
+  const value = JSON.stringify({
       moments: moments.map(m => ({ ...m })),
       connections: connections.map(c => ({ ...c })),
-      momentOrder: momentOrder.slice()
-    })
-  );
+      momentOrder: momentOrder.slice(),
+      hasSavedBoardOrder,
+      clearSavedBoardOrder
+    });
+  undoStack.push(value);
   if (undoStack.length > 24) undoStack.shift();
+  return value;
 }
 
 function undo() {
@@ -881,6 +1083,8 @@ function undo() {
   moments = o.moments;
   connections = o.connections;
   if (Array.isArray(o.momentOrder)) momentOrder = o.momentOrder.slice();
+  if (typeof o.hasSavedBoardOrder === 'boolean') hasSavedBoardOrder = o.hasSavedBoardOrder;
+  if (typeof o.clearSavedBoardOrder === 'boolean') clearSavedBoardOrder = o.clearSavedBoardOrder;
   renderCards();
   renderThreads();
   persistBoard();
@@ -1012,19 +1216,75 @@ function selectMoment(id, open = true) {
   }
 }
 
+// #1273 9번: 안내 시간은 공통 타이머 한 벌에서 잰다(단추 있음 8초 / 없음 2.2초, 올려 두면 멈춤).
+const toastTimer = window.LTToastTimer.createToastTimer();
 function toast(t) {
+  dismissBoardOrderUndo();
   let el = $('#toast');
+  el.classList.remove('boardOrderToast');
+  delete el.dataset.boardOrderUndo;
   el.textContent = t;
   el.classList.add('show');
-  clearTimeout(toast.t);
-  toast.t = setTimeout(() => el.classList.remove('show'), 2200);
+  toastTimer.arm(el, window.LTToastTimer.PLAIN_TOAST_MS, () => el.classList.remove('show'));
 }
 // #662 후속(CTO 지시): 상세 판이 열리면 안내 풍선은 즉시 치운다 — 안내는 '순간을 선택하라'는 뜻이라 이미 선택해
 // 판이 열렸으면 필요 없고, 넓은 판에서는 풍선 자리가 판 안쪽('이어진 순간' 줄)과 포개진다. 다른 풍선(마음 저장 등)은 그대로 뜬다.
 function hideToast() {
+  dismissBoardOrderUndo();
   const el = $('#toast');
-  clearTimeout(toast.t);
+  toastTimer.cancel();
   el.classList.remove('show');
+}
+function dismissBoardOrderUndo() {
+  const active = activeBoardOrderUndo;
+  if (!active) return;
+  activeBoardOrderUndo = null;
+  toastTimer.cancel();
+  const el = $('#toast');
+  if (el?.dataset.boardOrderUndo === active.token) {
+    delete el.dataset.boardOrderUndo;
+    el.classList.remove('boardOrderToast', 'show');
+    el.replaceChildren();
+  }
+}
+function showBoardOrderUndo({ before, snapshot: undoSnapshot }) {
+  const el = $('#toast');
+  if (!el) return;
+  dismissBoardOrderUndo();
+  const action = { token: `board-undo-${Date.now()}-${Math.random()}`, before, snapshot: undoSnapshot };
+  const message = document.createElement('span');
+  message.textContent = '배치를 저장했어요';
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'boardOrderUndo';
+  button.textContent = '되돌리기';
+  button.addEventListener('click', () => undoBoardOrder(action));
+  el.replaceChildren(message, button);
+  el.dataset.boardOrderUndo = action.token;
+  el.classList.add('boardOrderToast', 'show');
+  activeBoardOrderUndo = action;
+  toastTimer.arm(el, window.LTToastTimer.ACTION_TOAST_MS, () => {
+    if (activeBoardOrderUndo === action) dismissBoardOrderUndo();
+    el.classList.remove('show');
+  });
+}
+function undoBoardOrder(action) {
+  if (activeBoardOrderUndo !== action) return;
+  const current = captureBoardOrderState();
+  dismissBoardOrderUndo();
+  restoreBoardOrderState(action.before, { mode: 'mine' });
+  persistBoard({
+    onSettled: result => {
+      if (result.ok) {
+        discardBoardUndoSnapshot(action.snapshot);
+        toast('이전 배치로 돌아왔어요.');
+      } else {
+        restoreBoardOrderState(current, { mode: 'mine' });
+        discardBoardUndoSnapshot(action.snapshot);
+        failNotice('되돌리기를 저장하지 못했어요. 저장된 배치를 유지했어요.');
+      }
+    }
+  });
 }
 
 function addMoment(m, connectFrom = null) {
@@ -1065,6 +1325,7 @@ function formFor(type) {
 
 function openAdd() {
   formFor(addType);
+  if (typeof pushBoardPanel === 'function') pushBoardPanel('add');
   $('#addModal').classList.add('open');
 }
 
@@ -1129,9 +1390,14 @@ function openViewer(id) {
     box.innerHTML = `<video src="${m.video}" poster="${m.asset}" controls autoplay muted playsinline class="viewerFitVideo"></video>`;
   else if (m.type === 'note') box.innerHTML = `<div class="viewerNoteQuote">“${esc(m.memo)}”</div>`;
   else box.innerHTML = `<img src="${m.asset}" alt="${esc(m.title)}" class="viewerFitImg">`;
-  $('#vMeta').innerHTML =
-    (_vi.sub ? '<div class="videoTitle">▶ ' + esc(_vi.sub) + '</div>' : '') +
-    `${esc(LTLabels.type(m.originalType || m.type))} · ${esc(dateText(m.date))} · ${esc(m.emotion)}<br>출처: ${esc(m.source)}${m.url ? `<br>URL: ${esc(m.url)}` : ''}<br>마음 한마디: ${esc(m.memo)}`;
+  $('#vMeta').innerHTML = window.viewerMetaHTML({
+    head: `${esc(LTLabels.type(m.originalType || m.type))} · ${esc(dateText(m.date))} · ${esc(m.emotion)}`,
+    source: esc(m.source),
+    url: m.url ? esc(m.url) : '',
+    keywords: (m.keywords || []).map((keyword) => esc(keyword)),
+    memo: esc(m.memo || ''),
+    mediaTitle: _vi.sub ? esc(_vi.sub) : ''
+  });
   $('#viewerModal').classList.add('open');
 }
 
@@ -1239,7 +1505,7 @@ function headerFade(on) {
 let boardTouches = new Map(),
   pinch = null;
 viewport.addEventListener('pointerdown', e => {
-  if (cinema || e.target.closest('.card')) return;
+  if (cinema || mobileBoardScroll() || e.target.closest('.card,button,a,input,textarea,select')) return;
   if (e.pointerType === 'touch') {
     boardTouches.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (boardTouches.size === 1) {
@@ -1324,7 +1590,7 @@ function zoomDecorPause() {
 viewport.addEventListener(
   'wheel',
   e => {
-    if (cinema) return;
+    if (cinema || mobileBoardScroll()) return;
     e.preventDefault();
     let before = screenToWorld(e.clientX, e.clientY),
       factor = Math.exp(-e.deltaY * 0.0012),
@@ -1353,6 +1619,7 @@ $('#typeGrid').onclick = e => {
 $('#detailClose').onclick = () => {
   $('#detail').classList.remove('open');
   syncBoardPush();
+  if (window.parent !== window) parent.postMessage({ type: globalThis.LT41_MSG.boardDetail, open: false }, location.origin);
 };
 $('#openMoment').onclick = () => openViewer(selected);
 $('#closeViewer').onclick = () => {
@@ -1385,6 +1652,19 @@ for (const b of document.querySelectorAll('[data-board-mode]')) {
     );
   };
 }
+function addBoardResetButton() {
+  const group = document.querySelector('.boardModeSwitch');
+  if (!group || !boardSaveEnabled() || LTDEMO.readOnly) return;
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.id = 'boardResetOrderBtn';
+  button.className = 'tool modeSwitchBtn boardResetOrderBtn';
+  button.textContent = '처음대로';
+  button.setAttribute('aria-label', '내 배치 순서를 날짜순으로 되돌리기');
+  button.addEventListener('click', resetBoardOrder);
+  group.appendChild(button);
+}
+addBoardResetButton();
 $('#undoBtn').onclick = undo;
 $('#minusBtn').onclick = () => zoomAtCenter(Math.max(0.38, view.z - 0.1));
 $('#plusBtn').onclick = () => zoomAtCenter(Math.min(1.45, view.z + 0.1));

@@ -1,4 +1,4 @@
-:root{font-family:Pretendard,"Noto Sans KR",system-ui,sans-serif;color:var(--lt-pearl);background:var(--lt-stage);color-scheme:dark;--line:var(--lt-line);--muted:var(--lt-muted);--rose:var(--lt-rose)}*{box-sizing:border-box}body{margin:0;height:100dvh;display:flex;flex-direction:column;overflow:hidden}button,a,select,input{font:inherit}button,a{-webkit-tap-highlight-color:transparent}button{cursor:pointer}button,a,select{touch-action:manipulation}button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid var(--lt-gold);outline-offset:3px}button:disabled{opacity:.45;cursor:default}button{color:inherit}a{color:inherit;text-decoration:none}.skip{position:fixed;left:16px;top:-80px;z-index:50;background:#fff;color:#211723;padding:12px;display:inline-flex;align-items:center;min-height:44px}.skip:focus{top:8px}.app-header{flex:0 0 auto;min-height:92px;display:flex;align-items:center;gap:20px;padding:24px 28px;border-bottom:1px solid var(--line);background:var(--lt-stage);z-index:5}.brand{display:flex;align-items:center;gap:9px;flex-shrink:0;min-height:44px;color:var(--lt-pearl);opacity:.92}.brand>span{font-weight:700;font-size:12px;letter-spacing:.22em;white-space:nowrap}.brand small{font-size:12px;font-weight:600;letter-spacing:.12em;color:var(--lt-gold);margin-left:8px}nav{display:flex;align-items:center;gap:4px;flex:1;min-width:0}nav button{background:none;border:0;border-radius:var(--lt-r-pill);min-height:44px;padding:0 15px;color:var(--lt-muted);font-size:14px;white-space:nowrap}nav button:hover{background:#ffffff09;color:#fff}nav button[aria-current=true]{color:var(--lt-pearl);background:rgba(255,230,166,.07);box-shadow:inset 0 0 0 1px var(--lt-gold-line)}.header-actions{display:flex;align-items:center;gap:12px;flex-shrink:0}.header-actions > button,.account-slot > button,.account-slot > .login{display:flex;align-items:center;justify-content:center;gap:6px;min-height:44px;padding:10px 15px;font-size:14px;letter-spacing:.06em;white-space:nowrap;color:#ece7f1;background:rgba(9,8,14,.62);border:1px solid rgba(255,255,255,.22);border-radius:var(--lt-r-pill);backdrop-filter:blur(8px)}.header-actions .source{color:#ece7f1}#connection-count{color:var(--rose)}.login{border:1px solid rgba(255,255,255,.22)}.header-actions > button:hover,.account-slot > button:hover,.account-slot > .login:hover{border-color:rgba(255,255,255,.44);background:rgba(255,255,255,.09)}#stage{position:relative;flex:1;min-height:0;outline:none;background:var(--lt-stage)}/* 2026-11-08 #211: 새 화면을 뒤에서 다 그린 뒤 앞으로 올린다. 두 장을 겹쳐 두어 빈 바탕 프레임이 없다. */iframe{display:block;width:100%;height:100%;border:0;background:var(--lt-stage)}#stage>iframe{position:absolute;inset:0;width:100%;height:100%}#stage>#view{z-index:2}#stage>#view-next{z-index:1}#empty{height:100%;background:radial-gradient(ellipse at 50% 20%,var(--lt-stage-2),var(--lt-stage) 65%);align-content:center;text-align:center;padding:24px}#empty[hidden],iframe[hidden]{display:none}.empty-mark{display:block;font-size:60px;color:var(--lt-gold);font-weight:200}h1{font-size:clamp(24px,4vw,38px);font-weight:500;letter-spacing:-.05em}#empty p{color:var(--muted);line-height:1.8}#empty button{margin:6px;min-height:46px;padding:10px 20px;border-radius:var(--lt-r-pill);border:1px solid rgba(255,255,255,.16);background:rgba(8,8,12,.3)}#empty button.primary,.primary{display:inline-flex;align-items:center;justify-content:center;min-height:44px;border:0;border-radius:var(--lt-r-pill);padding:10px 16px;background:var(--lt-primary);color:var(--lt-primary-ink)}dialog{position:fixed;inset:0 0 0 auto;margin:0;width:420px;max-width:100%;height:100dvh;max-height:100dvh;border:0;border-left:1px solid var(--line);padding:28px 24px;background:var(--lt-glass-strong);backdrop-filter:blur(24px);color:var(--lt-pearl);box-shadow:-16px 0 80px #0007;overflow:auto}dialog::backdrop{background:rgba(0,0,0,.55);backdrop-filter:blur(3px)}
+:root{font-family:Pretendard,"Noto Sans KR",system-ui,sans-serif;color:var(--lt-pearl);background:var(--lt-stage);color-scheme:dark;--line:var(--lt-line);--muted:var(--lt-muted);--rose:var(--lt-rose)}*{box-sizing:border-box}body{margin:0;height:100dvh;display:flex;flex-direction:column;overflow:hidden}button,a,select,input{font:inherit}button,a{-webkit-tap-highlight-color:transparent}button{cursor:pointer}button,a,select{touch-action:manipulation}button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid var(--lt-gold);outline-offset:3px}button:disabled{opacity:.45;cursor:default}button{color:inherit}a{color:inherit;text-decoration:none}.skip{position:fixed;left:16px;top:-80px;z-index:50;background:#fff;color:#211723;padding:12px;display:inline-flex;align-items:center;min-height:44px}.skip:focus{top:8px}.app-header{flex:0 0 auto;min-height:92px;display:flex;align-items:center;gap:20px;padding:24px 28px;border-bottom:1px solid var(--line);background:var(--lt-stage);z-index:5}.brand{display:flex;align-items:center;gap:9px;flex-shrink:0;min-height:44px;color:var(--lt-pearl);opacity:.92}.brand>span{font-weight:700;font-size:12px;letter-spacing:.22em;white-space:nowrap}.brand small{font-size:12px;font-weight:600;letter-spacing:.12em;color:var(--lt-gold);margin-left:8px}nav{display:flex;align-items:center;gap:4px;flex:1;min-width:0}nav button{background:none;border:0;border-radius:var(--lt-r-pill);min-height:44px;padding:0 15px;color:var(--lt-muted);font-size:14px;white-space:nowrap}nav button:hover{background:#ffffff09;color:#fff}nav button[aria-current=true]{color:var(--lt-role-accent-ink);background:transparent;box-shadow:none}.header-actions{display:flex;align-items:center;gap:12px;flex-shrink:0}.header-actions > button,.account-slot > button,.account-slot > .login{display:flex;align-items:center;justify-content:center;gap:6px;min-height:44px;padding:10px 15px;font-size:14px;letter-spacing:.06em;white-space:nowrap;color:#ece7f1;background:rgba(9,8,14,.62);border:1px solid rgba(255,255,255,.22);border-radius:var(--lt-r-pill);backdrop-filter:blur(8px)}.header-actions .source{color:#ece7f1}#connection-count{color:var(--rose)}.login{border:1px solid rgba(255,255,255,.22)}.header-actions > button:hover,.account-slot > button:hover,.account-slot > .login:hover{border-color:rgba(255,255,255,.44);background:rgba(255,255,255,.09)}#stage{position:relative;flex:1;min-height:0;outline:none;background:var(--lt-stage)}/* 2026-11-08 #211: 새 화면을 뒤에서 다 그린 뒤 앞으로 올린다. 두 장을 겹쳐 두어 빈 바탕 프레임이 없다. */iframe{display:block;width:100%;height:100%;border:0;background:var(--lt-stage)}#stage>iframe{position:absolute;inset:0;width:100%;height:100%}#stage>#view{z-index:2}#stage>#view-next{z-index:1}#empty{height:100%;background:radial-gradient(ellipse at 50% 20%,var(--lt-stage-2),var(--lt-stage) 65%);align-content:center;text-align:center;padding:24px}#empty[hidden],iframe[hidden]{display:none}.empty-mark{display:block;font-size:60px;color:var(--lt-gold);font-weight:200}h1{font-size:clamp(24px,4vw,38px);font-weight:500;letter-spacing:-.05em}#empty p{color:var(--muted);line-height:1.8}#empty button{margin:6px;min-height:46px;padding:10px 20px;border-radius:var(--lt-r-pill);border:1px solid rgba(255,255,255,.16);background:rgba(8,8,12,.3)}#empty button.primary,.primary{display:inline-flex;align-items:center;justify-content:center;min-height:44px;border:0;border-radius:var(--lt-r-pill);padding:10px 16px;background:var(--lt-primary);color:var(--lt-primary-ink)}dialog{position:fixed;inset:0 0 0 auto;margin:0;width:420px;max-width:100%;height:100dvh;max-height:100dvh;border:0;border-left:1px solid var(--line);padding:28px 24px;background:var(--lt-glass-strong);backdrop-filter:blur(24px);color:var(--lt-pearl);box-shadow:-16px 0 80px #0007;overflow:auto}dialog::backdrop{background:rgba(0,0,0,.55);backdrop-filter:blur(3px)}
 /* 2026-11-11 #380 4: 오른쪽 패널을 두 모양으로 띄운다 — data-lt-panel="full"(맨 위 메뉴 아래 내용 자리를 모두 차지)·"center"(화면 가운데 작은 창). 컴퓨터와 모바일이 같은 모양이다. --lt-panel-top은 dialogs.mjs가 열릴 때 맨 위 메뉴 높이로 정한다. 이번 틀을 쓰는 패널은 순간 정리(full)·트리 관리(center)이고, 나머지 패널은 다음 단계에서 옮긴다. */
 dialog[data-lt-panel=full]{inset:var(--lt-panel-top,66px) 0 0 0;width:auto;max-width:none;height:calc(100dvh - var(--lt-panel-top,66px));max-height:calc(100dvh - var(--lt-panel-top,66px));border-left:0;box-shadow:none}
 dialog[data-lt-panel=center]{inset:0;margin:auto;width:min(460px,calc(100vw - 32px));max-width:calc(100vw - 32px);height:fit-content;max-height:calc(100dvh - 88px);border:1px solid var(--line);border-radius:var(--lt-r-card);box-shadow:0 18px 60px #0009}
@@ -24,6 +24,9 @@ dialog[data-lt-panel=card]::backdrop{background:rgba(3,3,7,.85);backdrop-filter:
 .tree-views{display:flex;align-items:center;gap:4px;margin-left:12px;padding-left:12px;border-left:1px solid var(--line)}.tree-views>small{font-size:11px;white-space:nowrap;color:var(--muted);margin-right:5px}.tree-views[hidden],#connection-menu[hidden]{display:none}
 @media(max-width:780px){.tree-views{flex:0 0 auto;margin-left:4px;padding-left:4px;gap:0}.tree-views>small{display:none}.tree-views>button{padding:0 8px}.header-actions{min-width:0}.header-actions #write-menu{max-width:96px;overflow:hidden;text-overflow:ellipsis}}
 
+/* 방문자도 같은 머리줄을 쓰되 트리 고르기와 서재는 누르지 못하고 보이지 않는다. */
+body.share-visitor .tree-slot,body.share-visitor .tree-views>.visitor-hidden{display:none}
+/* #1231 이후 내 화면도 390 한 줄(57px)이다 — 방문자 전용 높이를 두면 책 화면에서 110px로 밀린다. */
 /* One tree label; the selected navigation tab already names the current view. */
 #view-context{flex:0 0 auto;display:flex;align-items:center;gap:10px;min-height:36px;padding:6px 24px;background:var(--lt-stage-2);color:var(--lt-pearl);border-bottom:1px solid var(--line);font-size:12px}
 #view-context[hidden]{display:none}
@@ -38,15 +41,18 @@ html[data-lt-theme=garden] #context-kind{color:var(--lt-rose-ink)}
 .management-block{padding-bottom:22px}.management-block+.management-block{padding-top:22px;border-top:1px solid var(--line)}.management-block label{display:block;margin:14px 0;font-size:13px;color:var(--lt-muted)}.management-block input{display:block;width:100%;min-height:44px;margin-top:8px;padding:11px 12px;border:1px solid rgba(255,255,255,.22);border-radius:12px;background:rgba(255,255,255,.04);color:var(--lt-pearl);line-height:1.6}#parent-current{margin:0;color:var(--lt-pearl);font-weight:600}#parent-management[hidden]{display:none}@media(max-width:780px){.management-block input,#tree-form input,#tree-form select{font-size:16px}}
 
 /* Explicit sharing keeps the established dark rose panels and 44px controls. */
+/* #1285 5번: 순간 고르기 칸의 작은 표지와 주 단추 강조 — 기존 토큰만 쓴다. */
+#share-moment-thumb{width:44px;height:56px;object-fit:cover;border:1px solid var(--lt-gold-line);border-radius:6px;margin-top:8px}
+#share-panel .button-row .primary:not([disabled]){border-color:var(--lt-gold-line);font-weight:700}
 .share-warning{margin:16px 0;padding:14px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-card);background:rgba(255,230,166,.06)}.share-warning p{margin:6px 0 0}.share-url{display:flex;gap:8px}.share-url input{flex:1;min-width:0}.share-url button{flex:0 0 auto}.share-item{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line)}.share-item small{display:block;color:var(--muted);margin-top:4px}.share-item button{min-height:44px}.share-item-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.share-item-actions button{min-width:112px}.share-revoked{opacity:.62}#share-preview-moments{max-height:220px;overflow:auto;padding-left:22px}#share-preview-moments li{margin:8px 0;color:#e8dce4}
 /* #369: 단계를 눈에 보이게 — ① 고르기 ② 미리보기 ③ 링크 만들기, 다음에 할 일 안내. */
 .share-steps{display:flex;gap:8px;margin:14px 0 0;padding:0;list-style:none}
-.share-steps li{flex:1 1 0;min-width:0;padding:8px 10px;border:1px solid var(--lt-line);border-radius:10px;font-size:12px;color:var(--lt-muted);display:flex;gap:6px;align-items:baseline}
+.share-steps li{flex:1 1 0;min-width:0;padding:8px 10px;border:1px solid var(--lt-role-line);border-radius:10px;font-size:12px;color:var(--lt-role-idle-ink);display:flex;gap:6px;align-items:baseline}
 .share-steps li::before{font-weight:800;flex:0 0 auto}
 .share-steps li[data-state="todo"]::before{content:"①"}
 .share-steps li[data-step="2"][data-state="todo"]::before{content:"②"}
 .share-steps li[data-step="3"][data-state="todo"]::before{content:"③"}
-.share-steps li[data-state="current"]{border-color:var(--lt-gold-line);box-shadow:inset 0 0 0 1px var(--lt-gold-line);color:var(--lt-pearl)}
+.share-steps li[data-state="current"]{border-color:var(--lt-role-accent-bg);background:var(--lt-role-accent-bg);color:var(--lt-role-accent-ink)}
 .share-steps li[data-state="current"]::before{color:var(--lt-gold)}
 .share-steps li[data-state="done"]{color:var(--lt-gold)}
 .share-steps li[data-state="done"]::before{content:"✓";color:var(--lt-gold)}
@@ -77,7 +83,8 @@ html[data-lt-theme=garden] #context-kind{color:var(--lt-rose-ink)}
 /* 둘러보기 카드 글자(261116): 10·11px를 12px 이상으로(본문급 13px·단추 13px — 검사기 KNOWN을 지우고 다시 지킨다). 반응·즐겨찾기 단추 누름 영역 44px(#705)은 그대로다. */
 .community-tag{position:absolute;z-index:1;left:10px;bottom:10px;padding:5px 8px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-pill);background:rgba(9,7,10,.8);color:var(--lt-gold);font-size:12px}
 /* 이슈 611 3번: AI 명예회원 배지 — 남에게 보이는 곳(둘러보기 카드·미리보기)에만 단다. */
-.community-ai{display:inline-flex;align-items:center;min-height:26px;padding:0 10px;border:1px solid var(--lt-rose);border-radius:var(--lt-r-pill);color:var(--lt-rose);font-size:12px;font-weight:700;letter-spacing:.04em}
+/* #1273 7번: 사람 회원 카드에는 이 배지가 없고, AI 명예회원만 장미 토큰의 별 배지로 구분한다. */
+.community-ai{display:inline-flex;align-items:center;min-height:26px;padding:0 10px;border:1px solid var(--lt-rose);border-radius:var(--lt-r-pill);background:color-mix(in srgb,var(--lt-rose) 18%,transparent);color:var(--lt-rose);font-size:12px;font-weight:700;letter-spacing:.04em}
 .community-cover .community-ai{position:absolute;z-index:1;top:10px;left:10px;background:rgba(9,7,10,.8)}
 .community-preview-paper .community-ai{margin-bottom:8px}
 .community-copy{min-width:0;padding:15px}.community-copy h3{margin:4px 0 8px;font-size:18px}.community-subject{margin:0;color:#d7a8ba;font-size:13px}.community-summary{min-height:42px;margin:0 0 8px;color:#e9dfe5;font-size:13px;line-height:1.65}.community-muted{color:var(--muted);font-size:12px;line-height:1.6}
@@ -161,11 +168,16 @@ nav #record-menu:hover{background:rgba(255,255,255,.06);border-radius:var(--lt-r
 nav #record-menu #source-label{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 nav #record-menu svg{flex:0 0 auto;opacity:.7}
 nav #record-menu[hidden]{display:none}
-/* 주 버튼은 #write-menu 하나뿐. 금색 강조는 기존 토큰만 쓴다. */
-.header-actions #write-menu.primary-action{background:rgba(255,230,166,.1);border-color:var(--lt-gold-line);color:var(--lt-gold);box-shadow:inset 0 0 0 1px rgba(255,230,166,.18)}
-.header-actions #write-menu.primary-action:hover{background:rgba(255,230,166,.16);border-color:var(--lt-gold);color:var(--lt-gold)}
-/* 첫 화면은 가운데 추가 단추만 강조 — 머리줄은 밝은 테두리, 모바일 ＋는 숨긴다(#1084). */
-body.home-existing .header-actions #write-menu.primary-action,body.home-existing .header-actions #write-menu.primary-action:hover{background:var(--lt-paper);border-color:var(--lt-line-paper);color:var(--lt-ink);box-shadow:none}
+.main-nav>button#community-menu{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px;padding:0 12px;border:1px solid var(--lt-line);border-radius:var(--lt-r-pill);background:transparent;color:var(--lt-muted);white-space:nowrap}
+.main-nav>button#community-menu[hidden]{display:none}
+@media(max-width:780px){.main-nav>button#community-menu{padding-inline:10px;scroll-snap-align:center}}
+/* #1246: 같은 순간 추가 동작은 모든 화면에서 같은 장미색을 사용한다.
+   #1350: 가운데 '+ 순간 추가'와 글자 크기·모서리도 맞춘다. 높이만 머리줄 안에 들어가는 만큼 둔다. */
+html .header-actions #write-menu.primary-action,html .header-actions #write-menu.primary-action:hover{
+ background:var(--lt-cta-rose);border-color:var(--lt-cta-rose);color:var(--lt-cta-white);box-shadow:none;
+ font-size:15px;letter-spacing:.02em;border-radius:var(--lt-r-pill)
+}
+@media(max-width:650px){html .header-actions #write-menu.primary-action{font-size:14px}}
 body.home-existing.lt-fab-ok #mobile-add{display:none}
 /* 로그인·로그아웃 모두 같은 머리줄 테마 단추(#776 규칙) — 44px 원형, 값은 lt41.theme 공유. */
 #theme-toggle{width:44px;height:44px;min-width:44px;min-height:44px;padding:0;border-radius:50%;border:1px solid var(--line);background:rgba(255,255,255,.05);color:var(--lt-gold);font-size:17px;line-height:1;display:inline-flex;align-items:center;justify-content:center}
@@ -181,6 +193,44 @@ body.home-existing.lt-fab-ok #mobile-add{display:none}
 /* #1094 보기 방식 전환 묶음(책/목록) — 테마 단추 옆 두 칸고르기. 다음 이슈(#1093 선반/회전)도 같은 묶음을 쓴다. */
 .view-toggle{display:inline-flex;align-items:center;gap:0;padding:3px;border:1px solid rgba(255,255,255,.22);border-radius:var(--lt-r-pill);background:rgba(9,8,14,.62)}
 .view-toggle[hidden]{display:none}
+/* #1026: 기존 셸 머리줄 높이(390 약 57px)를 그대로 사용한다. */
+/* #1231: 예전 2행 머리줄의 nav 위 2px·아래 7px 여백을 없앤다.
+   인증 전에 감춰 둔 트리 단추(높이 40px)가 있어도 헤더는 57px로 일정하다. */
+@media(max-width:780px){.app-header .main-nav{padding-top:0;padding-bottom:0}}
+
+/* #1026: 인증이 확인되기 전에는 권한별 머리줄 요소를 숨긴다. 첫 배치부터 로그인/계정 단추의 자리를 예약한다. */
+html[data-lt-auth-phase=pending] .app-header #record-menu{visibility:hidden;pointer-events:none}
+html[data-lt-auth-phase=pending] .app-header #write-menu,
+html[data-lt-auth-phase=pending] .app-header #share-menu{display:none}
+html[data-lt-auth-phase=pending] .app-header #account-entry{visibility:hidden;pointer-events:none}
+html[data-lt-auth-phase=pending][data-lt-auth-hint=out] .app-header #account-entry{visibility:visible;pointer-events:auto}
+html[data-lt-auth-phase=pending][data-lt-auth-hint=in] .app-header #account-entry{display:none}
+html[data-lt-auth-phase=pending][data-lt-auth-hint=in] .app-header #account-avatar[hidden]{display:flex;visibility:visible;pointer-events:none}
+html[data-lt-auth-phase=pending][data-lt-auth-hint=in] .app-header #record-menu{display:flex;visibility:visible;pointer-events:none}
+/* #1026: cached member picker stays in place while authentication is checked. */
+html[data-lt-auth-phase=pending][data-lt-auth-hint=in] .app-header nav #record-menu[hidden]{display:flex;visibility:visible;pointer-events:none}
+html[data-lt-auth-phase=pending] #mobile-add{visibility:hidden;pointer-events:none}
+/* #1231: 데스크톱은 권한 메뉴의 폭을 예약하고 화면 탭 좌표를 고정한다.
+   인증 전후 트리 선택·쓰기·계정의 존재 변화가 탭/테마를 밀지 않게 한다. */
+@media(min-width:781px){
+ html[data-lt-auth-phase] .app-header .tree-slot{flex:0 0 208px;width:208px}
+ html[data-lt-auth-phase] .app-header .account-slot{flex:0 0 80px;width:80px;justify-content:flex-end}
+ html[data-lt-auth-phase] .app-header #write-menu{flex:0 0 122px;width:122px}
+}
+/* #1026: 늦게 도착하는 글꼴의 한글 폭을 미리 맞춰 머리줄·안내 문구 이동을 줄인다. */
+@font-face{font-family:'LT UI Metric Fallback';src:local('Malgun Gothic');size-adjust:86%;font-display:swap}
+html:is([data-lt-shell-entry=shelf],[data-lt-shell-entry=book],[data-lt-shell-entry=board]) .header-actions,
+html:is([data-lt-shell-entry=shelf],[data-lt-shell-entry=book],[data-lt-shell-entry=board]) #empty,
+html:is([data-lt-shell-entry=shelf],[data-lt-shell-entry=book],[data-lt-shell-entry=board]) .home-links{font-family:'Pretendard Variable','LT UI Metric Fallback','Noto Sans KR',system-ui,sans-serif}
+/* 깊은 주소에서만 서버 권한 확인 전의 메뉴를 숨기고 첫 배치를 유지한다. */
+html[data-lt-header-pending] #record-menu,
+html[data-lt-header-pending] #write-menu{display:none}
+/* #1026: 첫 렌더링부터 서재·책 보기 단추의 최종 자리를 확보한다. */
+.view-toggle[data-lt-pending]{visibility:hidden;pointer-events:none}
+#book-display-toggle[data-lt-pending],#shelf-view-toggle[data-lt-pending]{display:none}
+html[data-lt-shell-entry=shelf] #book-display-toggle[data-lt-pending],html[data-lt-shell-entry=book] #book-display-toggle[data-lt-pending]{display:inline-flex}
+@media(min-width:521px){html[data-lt-shell-entry=shelf] #shelf-view-toggle[data-lt-pending]{display:inline-flex}}
+
 .view-toggle button{min-height:44px;padding:0 12px;border:0;border-radius:var(--lt-r-pill);background:transparent;color:#ece7f1;font-size:13px;letter-spacing:.02em;white-space:nowrap}
 .view-toggle button:hover{background:rgba(255,255,255,.09)}
 .view-toggle button[aria-checked="true"]{background:var(--lt-primary);color:var(--lt-primary-ink)}
@@ -247,12 +297,25 @@ html[data-v41-screen=book] .tools .ui-btn::after,html[data-v41-screen=board] hea
 }
 /* 책/목록 토글(상단 단추)이 보일 때만 머리줄을 감아 트리 줄을 온전히 남긴다. */
 @media(max-width:780px){
- .app-header:has(.view-toggle:not([hidden])){flex-wrap:wrap}
- .app-header:has(.view-toggle:not([hidden])) .main-nav{flex-basis:100%;order:3}
+ .app-header:has(.view-toggle:not([hidden]):not([data-lt-pending])){flex-wrap:wrap}
+ .app-header:has(.view-toggle:not([hidden]):not([data-lt-pending])) .main-nav{flex-basis:100%;order:3}
  /* 머리줄이 두 줄이 되면 트리 팝오버도 그 아래에서 열린다. */
- .app-header:has(.view-toggle:not([hidden])) .tree-popover{top:108px}
+ .app-header:has(.view-toggle:not([hidden]):not([data-lt-pending])) .tree-popover{top:108px}
 }
 /* 넘치는 쪽 끝의 페이드. 스크롤 위치에 따라 켜고 끄는 클래스는 shell.mjs가 붙인다. */
+/* #1026: 깊은 링크에서 첫 그림부터 최종 머리줄 행을 예약한다. */
+@media(max-width:780px){
+ html:is([data-lt-shell-entry=shelf],[data-lt-shell-entry=book]) .app-header{flex-wrap:wrap}
+ html:is([data-lt-shell-entry=shelf],[data-lt-shell-entry=book]) .app-header .main-nav{flex-basis:100%;order:3}
+}
+/* #1231: 390에서는 2행 예약을 적용하지 않는다. 기존 57px 한 줄 기준 유지.
+   보기 전환 단추는 같은 줄에서 공간을 나누어 쓰고, 탐색은 더보기에서도 제공한다. */
+@media(max-width:520px){
+ .app-header:has(.view-toggle:not([hidden]):not([data-lt-pending])),
+ html:is([data-lt-shell-entry=shelf],[data-lt-shell-entry=book]) .app-header{flex-wrap:nowrap}
+ .app-header:has(.view-toggle:not([hidden]):not([data-lt-pending])) .main-nav,
+ html:is([data-lt-shell-entry=shelf],[data-lt-shell-entry=book]) .app-header .main-nav{flex-basis:0;order:0;min-width:0}
+}
 @media(max-width:780px){
  .app-header{--nav-fade:28px}
  .app-header nav.fade-start{mask-image:linear-gradient(to right,transparent 0,#000 var(--nav-fade))}
@@ -266,6 +329,8 @@ html[data-v41-screen=book] .tools .ui-btn::after,html[data-v41-screen=board] hea
 /* 2026-11-08 #213 3번: 첫 트리를 만든 직후 한 번만 보여 주는 말풍선. 밤·정원 모두 --lt-* 토큰만 쓴다. */
 .tree-tips{position:fixed;top:104px;right:20px;z-index:25;width:min(360px,calc(100% - 24px));display:grid;gap:10px;padding:18px 18px 14px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-card);background:var(--lt-glass-strong);backdrop-filter:blur(20px);box-shadow:0 18px 48px #0008;color:var(--lt-pearl)}
 .tree-tips[hidden]{display:none}
+/* #1378: 첫 화면의 크게 보기 재생 중에는 첫 트리 안내가 플레이어를 덮지 않습니다. */
+body.home-screen.lt-viewer-open .tree-tips{display:none}
 .tree-tips .tree-tips-step{margin:0;font-size:12px;font-weight:700;letter-spacing:var(--lt-track);color:var(--lt-gold)}
 .tree-tips h2{margin:0;font-size:18px;line-height:1.5}
 .tree-tips ul{list-style:none;margin:0;padding:0;display:grid;gap:12px}
@@ -511,7 +576,7 @@ html[data-lt-theme=garden] #cleanup-panel input:not([type=checkbox]),html[data-l
 /* 탭은 글자 링크다 — 누름 영역은 44px, hover는 옅은 바탕·진한 글자색. */
 .tree-frame .tree-views>button{min-height:44px;align-self:center;border:0;border-radius:8px;padding:0 12px;background:none;font-size:14px;font-weight:400;color:var(--lt-muted)}
 .tree-frame .tree-views>button:hover,.tree-frame .tree-views>button:focus-visible{background:rgba(255,255,255,.07)}
-.tree-frame .tree-views>button#community-menu{border-left:1px solid var(--line);margin-left:8px}
+
 /* 261119 대표 결정: 탭을 감싸는 판을 없앤다 — 판 배경·테두리·안쪽 여백 0, 탭은 글자 링크다(판 배경 없음). */
 .tree-frame{display:flex;align-items:center;flex:0 0 auto;margin-left:6px}
 /* 이슈 421 2회차: 트리 선택·보기 탭이 모두 숨겨진 상태(로그아웃·트리 없음·공유)에서는 빈 틀이 점으로 남지 않게 틀 자체를 숨긴다. */
@@ -519,7 +584,7 @@ html[data-lt-theme=garden] #cleanup-panel input:not([type=checkbox]),html[data-l
 .tree-frame .tree-slot{margin-left:0}
 .tree-frame .tree-views{margin-left:0;padding-left:0;border-left:0;gap:2px;align-self:stretch;align-items:center;min-height:44px}
 /* 261119 대표 결정: 고른 탭은 채운 판이 아니라 글자로 표시한다 — 밑줄 2px + 진한 글자(현재 화면은 aria-current 1개). */
-.tree-frame .tree-views>button[aria-current=true]{background:none;color:var(--lt-pearl);box-shadow:none;font-weight:600;text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:6px;text-decoration-color:currentColor}
+.tree-frame .tree-views>button[aria-current=true]{background:transparent;color:var(--lt-role-accent-ink);box-shadow:none;font-weight:600;text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:6px;text-decoration-color:currentColor}
 @media(max-width:780px){.tree-frame .tree-views>button{font-size:14px}}
 .tree-slot{position:relative;display:flex;align-items:center;flex:0 0 auto;margin-left:6px}
 /* #1090: 트리 글자는 단추 밖 고정, 390에서는 자리가 좁아 숨긴다. */
@@ -559,7 +624,11 @@ nav .tree-frame{scroll-snap-align:center}
 .tree-name{min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
 .tree-count{font-size:11px;color:var(--lt-muted);white-space:nowrap}
 .tree-check{color:var(--lt-gold);font-weight:800}
-.tree-foot{display:grid;gap:3px;margin-top:6px;padding-top:6px;border-top:1px solid var(--lt-line)}
+.tree-foot{display:grid;gap:3px;margin-top:4px;padding-top:4px;border-top:1px solid var(--lt-line)}
+/* #1285 6번: 묶음 구분선과 위험 동작 표시 — 기존 토큰만 쓴다. */
+.tree-group-divider{height:1px;margin:0 9px;background:var(--lt-line)}
+.tree-foot .tree-danger .tree-name{color:var(--lt-rose)}
+.tree-foot .tree-danger:hover,.tree-foot .tree-danger:focus-visible{background:rgba(200,110,121,.12)}
 .tree-foot button{min-height:44px;text-align:left;border:0;border-radius:10px;background:none;color:var(--lt-pearl);padding:0 9px;font-size:13px}
 .tree-foot button:hover,.tree-foot button:focus-visible{background:rgba(255,255,255,.07)}
 .account-head{display:flex;align-items:center;gap:10px;padding:6px 6px 10px;border-bottom:1px solid var(--lt-line)}
@@ -572,6 +641,9 @@ nav .tree-frame{scroll-snap-align:center}
 #header-overflow{display:none}
 #header-overflow.is-open{display:grid;position:absolute;top:64px;right:16px;z-index:70;min-width:190px;padding:8px;border:1px solid var(--lt-line);border-radius:var(--lt-r-card);background:var(--lt-glass-strong);backdrop-filter:blur(24px);box-shadow:0 18px 50px #0009}
 #header-overflow button{min-height:44px;text-align:left;border:0;border-radius:10px;background:none;color:var(--lt-pearl);padding:0 10px;font-size:13px}
+/* #1285 11번: 접힌 메뉴의 둘러보기 항목도 데스크탑 탭과 같은 투명 테두리·나침반으로 구분한다. */
+#header-overflow button.lt-discover-item:not([aria-current]){border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-pill);background:transparent;display:flex;align-items:center;gap:8px;padding:0 12px}
+#header-overflow button.lt-discover-item .header-compass{width:16px;height:16px;flex:0 0 auto;color:var(--lt-gold)}
 #mobile-more{display:none;min-width:44px;justify-content:center}
 @media(max-width:1020px){.app-header{padding:9px 14px;gap:10px}.main-nav>button{padding:0 8px;font-size:12px}nav #record-menu{max-width:150px}}
 /* #1029 데스크탑: 트리 이름 길이와 무관하게 단추 폭을 180px로 고정한다. 옆 탭의 x가 밀리지 않고,
@@ -597,7 +669,7 @@ nav .tree-frame{scroll-snap-align:center}
    공유·예시 화면·로그아웃·읽기 전용·창(dialog)이 열려 있을 때·화상 키보드가 올라올 때는 숨긴다. 781px 이상에는 영향이 없다. */
 #mobile-add{display:none}
 @media(max-width:780px){
- #mobile-add{position:fixed;right:14px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:40;width:56px;height:56px;display:none;align-items:center;justify-content:center;border-radius:50%;border:1px solid var(--lt-gold-line);background:var(--lt-primary);color:var(--lt-primary-ink);font-size:26px;line-height:1;box-shadow:0 10px 30px #0008;cursor:pointer}
+ #mobile-add{position:fixed;right:14px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:40;width:56px;height:56px;display:none;align-items:center;justify-content:center;border-radius:50%;border:1px solid var(--lt-cta-rose);background:var(--lt-cta-rose);color:var(--lt-cta-white);font-size:26px;line-height:1;box-shadow:0 10px 30px #0008;cursor:pointer}
  body.lt-fab-ok #mobile-add{display:flex}
  body.lt-fab-ok:has(dialog[open]) #mobile-add{display:none}
  body.lt-fab-ok.lt-kbd #mobile-add{display:none}
@@ -606,6 +678,10 @@ nav .tree-frame{scroll-snap-align:center}
  /* 화면마다 아래쪽에 이미 있는 단추·탭 위로 올린다(390·360 실측값 — 겹침 0 근거는 이슈 458 보고).
     책: 갈라치기 탭(아래 99px) 위, 보드: 시네마 보기(아래 68px) 위, 지도: 이동 리본(이슈 638로 올라감, 아래 160px) 위, 책장: 넘김 화살표(아래 28px) 위. */
  body.lt-fab-ok[data-fab-lift="book"] #mobile-add{bottom:calc(104px + env(safe-area-inset-bottom))}
+  /* #1287: keep the add control above the book's lower controls, shrink while scrolling. */
+  body.lt-fab-ok[data-fab-lift="book"] #mobile-add{transition:transform .16s ease;transform-origin:right bottom}
+  body.lt-fab-ok.lt-book-scrolling[data-fab-lift="book"] #mobile-add{transform:scale(.72)}
+
  body.lt-fab-ok[data-fab-lift="board"] #mobile-add{bottom:calc(68px + env(safe-area-inset-bottom))}
  body.lt-fab-ok[data-fab-lift="network"] #mobile-add{bottom:calc(160px + env(safe-area-inset-bottom))}
  /* 책장의 넘김 화살표(›)는 내용 높이를 따라 붙는다(390×844 실측 724~768). 화면이 낮으면(749px 이하)
@@ -617,7 +693,7 @@ nav .tree-frame{scroll-snap-align:center}
     오른쪽을 비켜 설 필요가 없다(자리는 셸이 --lt-toast-bottom으로 잰다). */
 }
 /* #987: 접힌 메뉴에서도 현재 화면의 글자에만 밑줄을 표시한다. */
-#header-overflow button[aria-current="true"]{box-shadow:none;border:0;font-weight:600;text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:6px}
+#header-overflow button[aria-current="true"]{box-shadow:none;border:0;background:var(--lt-role-accent-bg);color:var(--lt-role-accent-ink);font-weight:600;text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:6px}
 
 /* 고객 의견 창구 (이슈 540) — 로그아웃 상태 첫 화면 아래 작은 글씨 링크. */
 .feedback-link{padding:6px 10px;border:0;background:none;color:var(--muted);font-size:13px;letter-spacing:.04em;text-decoration:underline;text-underline-offset:3px;opacity:.75;cursor:pointer}
@@ -628,6 +704,10 @@ nav .tree-frame{scroll-snap-align:center}
    75% 라 카드가 지나가면 묻혀 보였다 — 75% 를 거두고 각 테마의 진한 글자색 + 무대색 후광으로
    글자만 또렷하게 살린다(배경은 없다). */
 .home-links{position:fixed;left:14px;bottom:max(10px,env(safe-area-inset-bottom));z-index:24;display:flex;gap:2px;align-items:center}
+/* #1284: 첫 화면 링크는 숫자판을 덮지 않고 화면 흐름에 참여한다. */
+body.home-screen .home-links{position:relative;left:auto;bottom:auto;flex:0 0 auto;align-self:center;margin:0 auto max(10px,env(safe-area-inset-bottom));z-index:3}
+/* 안쪽 문서가 스크롤을 맡은 뒤에도 카드 아래 단추와 바닥 링크의 겹침 0을 유지한다. */
+@media(max-width:650px){body.home-screen .home-links{top:3px}}
 .home-links .feedback-link{opacity:1;color:var(--lt-pearl);text-shadow:0 1px 1px var(--lt-stage),0 -1px 1px var(--lt-stage),1px 0 1px var(--lt-stage),-1px 0 1px var(--lt-stage),0 0 4px var(--lt-stage),0 0 8px var(--lt-stage),0 0 14px var(--lt-stage),0 0 20px var(--lt-stage)}
 /* 개인정보 처리방침·이용약관 링크(2026-11-16): 같은 줄의 작은 링크와 같은 글자·색. 줄이 좁으면
    두 개로 나누어 넘치지 않게 한다(가로 넘침 0 — 390 실측). 누름 영역은 44px 이상. */
@@ -642,10 +722,29 @@ html[data-lt-theme=garden] .home-links .feedback-link:hover{color:var(--lt-ink)}
    오른쪽 아래 ＋ 단추(#458, 56px·right 14px → 왼쪽 끝 320px)와 겹치지 않는다.
    첫 화면(body.home-screen)만 — 다른 화면의 링크 줄 규칙은 그대로 둔다. */
 @media(max-width:520px){.home-links a.feedback-link{display:none}}
-@media(max-width:520px){body.home-screen .home-links{flex-wrap:wrap;max-width:calc(100% - 150px)}body.home-screen .home-links a.feedback-link{display:inline-flex}body.home-screen .home-links .feedback-link{min-height:30px;padding:2px 8px}}
+/* #1231: 데스크톱도 링크 네 칸의 크기를 먼저 고정해 한글 글꼴 교체 때 재배치를 방지한다. */
+@media(min-width:521px){
+ .home-links{height:44px}
+ .home-links>.feedback-link{flex:0 0 auto;height:44px;min-height:44px;white-space:nowrap;box-sizing:border-box}
+ .home-links>.feedback-link:nth-child(1){width:80px}
+ .home-links>.feedback-link:nth-child(2){width:132px}
+ .home-links>.feedback-link:nth-child(3){width:172px}
+ .home-links>.feedback-link:nth-child(4){width:114px}
+}
+/* #1026: font swap에도 네 하단 링크가 2×2 고정 칸을 떠나지 않도록 배치한다. */
+@media(max-width:520px){
+ body.home-screen .home-links{flex-wrap:nowrap;align-self:flex-start;width:min(296px,calc(100vw - 94px));max-width:none;height:44px;margin-left:12px;align-content:center;column-gap:0;row-gap:0}
+ body.home-screen .home-links a.feedback-link{display:inline-flex}
+ body.home-screen .home-links .feedback-link{flex:0 0 auto;min-width:0;height:44px;min-height:44px;padding:2px 4px;font-size:13px;letter-spacing:0;white-space:nowrap;overflow:visible}
+ /* 계정 글꼴 폭이 달라져도 오른쪽 단추가 수평으로 이동하지 않는다. */
+ .app-header .account-slot{flex:0 0 66px;width:66px;justify-content:flex-end}
+}
 /* 390 지도·책·서재 목록: 조작 줄·책 테두리·'책 속의 트리' 상자와 겹치던 아래 링크 줄을 숨긴다(1440은 지금 자리).
    서재 목록은 프레임 안이 스크롤되므로 화면에 붙은 링크 줄이 지나가는 글자 위에 포개진다 — 책·지도와 같은 길로 숨긴다. */
 /* #1093: 여러 줄 선반 위에 화면에 붙은 링크가 포개지므로 서재는 폭과 무관하게 숨긴다. */
+/* #777: 트리 보기는 별도 상태 줄과 나무 영역을 사용하므로 첫 화면 전용 링크와 부유 ＋ 단추를 숨긴다.
+   새 순간 추가는 휴대폰의 상단 접기 메뉴에서 계속 사용할 수 있다. */
+body[data-fab-lift=tree] .home-links,body[data-fab-lift=tree] #mobile-add{display:none}
 body[data-fab-lift=shelf] .home-links{display:none}
 @media(max-width:520px){body[data-fab-lift=book] .home-links,body[data-fab-lift=network] .home-links{display:none}}
 /* 이슈 611: 계정 단추 점 — 새 소식이나 새 답글이 있을 때. */
@@ -670,7 +769,11 @@ body[data-fab-lift=shelf] .home-links{display:none}
 /* 창(모달·패널)이 열려 있으면 아래 고정 요소는 모두 숨는다 — 닫으면 저절로 돌아온다(의견 #26 점검). */
 body.lt-viewer-open .updates-card,body.lt-viewer-open .home-links,body.lt-viewer-open #toast,
 body:has(dialog[open]) .updates-card,body.lt-sheet-open .updates-card,
-body:has(dialog[open]) .home-links,body.lt-sheet-open .home-links,body.lt-viewer-open #toast{display:none}
+body:has(dialog[open]) .home-links,body.lt-sheet-open .home-links,body.lt-viewer-open #toast,
+/* 책 '크게 보기'(.lt-lightbox)는 dialog가 아니라 화면 안 겹이라 위 규칙에 걸리지 않았다 — 아래 링크·새 소식 띠가 어두운 바탕 위에 떠 보였다(#1259 캡처). */
+body.lt-book-lightbox-open .home-links,body.lt-book-lightbox-open .updates-card{display:none}
+/* #1284: 아래 링크가 본문 흐름으로 내려간 첫 화면에서는 새 소식 띠를 숫자판 위로 올린다. */
+@media(max-width:520px){body.home-screen[data-member="in"] .updates-card,body.home-screen[data-member="in"].lt-fab-ok .updates-card{bottom:calc(132px + env(safe-area-inset-bottom))}}
 /* 짧은 알림은 창 밖에 둔다. 셸 창이 열려 있어도 로고·상단 메뉴를 덮지 않게 머리글 바로 아래 띠에 둔다(#1175). */
 body:has(dialog[open]) #toast{top:calc(68px + env(safe-area-inset-top));bottom:auto;left:14px;transform:none;max-width:calc(100% - 88px)}
 /* 780 이하는 머리글이 낮아진다 — 같은 띠에서 머리글 바로 아래에 붙인다(#1175). */
@@ -785,8 +888,8 @@ body.lt-frame-dialog-open #toast{top:calc(68px + env(safe-area-inset-top));botto
 .share-visibility-row-2{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:6px 0;border-top:1px solid var(--lt-line)}
 .share-visibility-row-2:first-of-type{border-top:0}
 .share-visibility-row-2>span{flex:0 0 auto;min-width:72px;font-size:13px;color:var(--lt-muted)}
-#share-discover-toggle,#share-visibility-toggle{min-height:44px;padding:10px 16px;border-radius:var(--lt-r-pill);border:1px solid var(--lt-gold-line);background:transparent;color:var(--lt-gold);font-size:14px}
-#share-discover-toggle[data-state="on"],#share-visibility-toggle[data-state="private"]{background:var(--lt-primary);color:var(--lt-primary-ink);border-color:transparent}
+#share-discover-toggle,#share-visibility-toggle{min-height:44px;padding:10px 16px;border-radius:var(--lt-r-pill);border:1px solid var(--lt-role-line);background:transparent;color:var(--lt-role-secondary-ink);font-size:14px}
+#share-discover-toggle[data-state="on"],#share-visibility-toggle[data-state="private"]{background:var(--lt-role-accent-bg);color:var(--lt-role-accent-ink);border-color:var(--lt-role-accent-bg)}
 #share-panel p{word-break:keep-all}
 /* 공유 제목과 선택 상자 사이를 위 입력 칸과 같은 간격으로 띄운다. */
 #share-form > label{display:block}
@@ -819,6 +922,14 @@ html[data-lt-theme=garden] #share-form select,html[data-lt-theme=garden] #share-
 .myposts-item{border:1px solid var(--lt-line);border-radius:var(--lt-r-card);padding:14px 16px;background:var(--lt-glass)}
 .myposts-head{display:flex;gap:8px;align-items:center;font-size:12px;color:var(--lt-muted)}
 .myposts-kind{color:var(--lt-gold)}
+/* #1285 7번: 상태 말을 배지로 — 기존 상태 토큰만 쓴다. */
+.myposts-status[data-status]{border:1px solid currentColor;border-radius:var(--lt-r-pill);padding:1px 8px;font-weight:700;color:var(--lt-muted)}
+.myposts-status[data-status=received]{color:var(--lt-rose)}
+.myposts-status[data-status=reviewing]{color:var(--lt-gold)}
+.myposts-status[data-status=fixed]{color:var(--lt-group-5)}
+.myposts-status[data-status=later]{color:var(--lt-violet)}
+html[data-lt-theme=garden] .myposts-status[data-status=received]{color:var(--lt-rose-ink)}
+html[data-lt-theme=garden] .myposts-status[data-status=reviewing]{color:var(--lt-gold-ink)}
 .myposts-date{margin-left:auto}
 .myposts-title{font-size:15px;margin:6px 0;font-weight:600;overflow-wrap:anywhere;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
 .myposts-body{font-size:13px;line-height:1.8;color:var(--lt-pearl);overflow-wrap:anywhere;white-space:pre-wrap}
@@ -880,6 +991,13 @@ html[data-lt-theme=garden] #share-form select,html[data-lt-theme=garden] #share-
  nav #record-menu{flex:1 1 auto;width:100%;min-width:0;padding-inline:8px;justify-content:space-between}
  nav #record-menu #source-label{flex:1;min-width:0;text-align:left}
 }
+/* #1231: 360~390에서 트리 선택 단추가 오른쪽 테마 단추 아래로
+   넘치지 않게 부모 폭 안에서 말줄임한다. 화살표·클릭 영역은 남긴다. */
+@media(max-width:420px){
+ .app-header .main-nav{min-width:44px}
+ .app-header .main-nav .tree-frame,.app-header .main-nav .tree-slot{max-width:100%;min-width:0}
+ .app-header .main-nav #record-menu{width:100%;max-width:150px;min-width:0;overflow:hidden}
+}
 /* 261117: share-menu·header-overflow는 그리드 자동 배치에서 암시적 열을 만들어 390 헤더를 밀었다 —
    0폭 자리(1행 전체)에 박아 둔다. 실제 보기는 hidden 속성으로 여전히 동작한다. */
 .app-header>#share-menu,.app-header>#header-overflow{grid-column:1/-1;grid-row:1;width:0;min-width:0;height:0;min-height:0;padding:0;border:0;overflow:hidden}
@@ -899,16 +1017,16 @@ body.community-screen #stage>iframe,body.community-screen #empty{display:none}
 #community-panel .panel-note{max-width:1500px;margin:0 auto 18px;color:var(--lt-pearl)}
 #community-panel .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 #community-panel .community-toolbar{max-width:1500px;margin:0 auto 12px;display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:10px;align-items:center}
-#community-panel #community-query,#community-panel #community-sort{min-width:0;min-height:46px;padding:10px 14px;border:1px solid var(--lt-line-paper);border-radius:var(--lt-r-card);background:var(--lt-paper);color:var(--lt-ink);font-size:14px}
-#community-panel #community-query::placeholder{color:var(--lt-ink);opacity:1}
+#community-panel #community-query,#community-panel #community-sort{min-width:0;min-height:46px;padding:10px 14px;border:1px solid var(--lt-role-input-border);border-radius:var(--lt-r-card);background:var(--lt-role-input-bg);color:var(--lt-role-input-ink);font-size:14px}
+#community-panel #community-query::placeholder{color:var(--lt-role-text-muted);opacity:1}
 #community-panel #community-sort{min-width:104px;cursor:pointer}
 #community-panel .community-search-submit{min-height:46px;padding:10px 18px;border:0;border-radius:var(--lt-r-pill);background:var(--lt-primary);color:var(--lt-primary-ink);font-weight:700}
 #community-panel .community-group-rail{position:relative;max-width:1500px;margin:0 auto 16px;overflow:hidden}
 #community-panel .community-group-rail::after{content:"";position:absolute;inset:0 0 0 auto;width:34px;background:linear-gradient(90deg,transparent,var(--lt-stage));pointer-events:none}
 #community-panel #community-groups{display:flex;flex-wrap:nowrap;gap:8px;max-width:100%;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;overscroll-behavior-x:contain;white-space:nowrap}
 #community-panel #community-groups::-webkit-scrollbar{display:none}
-#community-panel .community-group-chip{flex:0 0 auto;min-height:44px;padding:0 16px;border:1px solid var(--lt-line-paper);border-radius:var(--lt-r-pill);background:var(--lt-paper);color:var(--lt-ink);font-size:13px;white-space:nowrap}
-#community-panel .community-group-chip.is-active{border-color:var(--lt-gold);background:var(--lt-primary);color:var(--lt-primary-ink);font-weight:700}
+#community-panel .community-group-chip{flex:0 0 auto;min-height:44px;padding:0 16px;border:1px solid var(--lt-role-idle-border);border-radius:var(--lt-r-pill);background:var(--lt-role-idle-bg);color:var(--lt-role-idle-ink);font-size:13px;white-space:nowrap}
+#community-panel .community-group-chip.is-active{border-color:var(--lt-role-accent-bg);background:var(--lt-role-accent-bg);color:var(--lt-role-accent-ink)}
 #community-panel .community-results{max-width:1500px;margin:0 auto}
 #community-panel #community-feedback{min-height:24px;margin:0 0 10px;color:var(--lt-pearl);font-size:13px}
 #community-panel #community-list{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:18px;margin:0;padding:0;border:0}
@@ -916,22 +1034,27 @@ body.community-screen #stage>iframe,body.community-screen #empty{display:none}
 #community-panel .community-card:hover{transform:translateY(-3px);box-shadow:0 14px 32px color-mix(in srgb,var(--lt-stage) 38%,transparent)}
 #community-panel .community-card:focus-visible{outline:3px solid var(--lt-gold);outline-offset:3px}
 #community-panel .community-cover{position:relative;display:block;min-height:0;aspect-ratio:.95;overflow:hidden;background:var(--lt-stage);background-image:none}
-#community-panel .community-cover::after{display:none;content:none}
+/* #1322: 가독성 그라데이션은 제목·배지 아래쪽 한 겹만. */
+#community-panel .community-cover::after{content:"";position:absolute;inset:auto 0 0;height:56%;z-index:2;pointer-events:none;background:linear-gradient(to top,color-mix(in srgb,var(--lt-ink) 78%,transparent),transparent)}
 #community-panel .community-cover-art{position:absolute;inset:0;display:grid;place-items:center;overflow:hidden}
 #community-panel .community-cover-image{position:relative;z-index:1;display:block;width:100%;height:100%;object-fit:cover}
-#community-panel .community-cover[data-media-kind="video-vertical"] .community-cover-backdrop,#community-panel .community-cover[data-media-kind="video-youtube"] .community-cover-backdrop{position:absolute;inset:-10px;display:block;width:calc(100% + 20px);height:calc(100% + 20px);object-fit:cover;filter:blur(18px);opacity:.78;transform:scale(1.06)}
+/* #1322: 흐린 실제 썸네일 배경+가운데 세로 그림은 세로 영상 한 가지에만. */
+#community-panel .community-cover[data-media-kind="video-vertical"] .community-cover-backdrop{position:absolute;inset:-10px;display:block;width:calc(100% + 20px);height:calc(100% + 20px);object-fit:cover;filter:blur(18px);opacity:.78;transform:scale(1.06)}
 #community-panel .community-cover[data-media-kind="video-vertical"] .community-cover-image{object-fit:contain}
-#community-panel .community-cover[data-media-kind="video-youtube"] .community-cover-image{object-fit:contain}
 #community-panel .community-cover-fallback{position:absolute;inset:0;display:grid;place-items:center;padding:20px;color:var(--lt-pearl);font-size:14px;text-align:center}
-#community-panel .community-cover-badge{position:absolute;z-index:2;display:inline-flex;align-items:center;min-height:28px;padding:4px 9px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-pill);background:var(--lt-ink);color:var(--lt-paper);font-size:12px;font-weight:700;line-height:1.2}
-#community-panel .community-cover .community-ai{top:10px;left:10px}
-#community-panel .community-cover .community-count{bottom:10px;left:10px}
+/* #1322: 모든 배지는 같은 자리·같은 크기로 아래 한 줄에 모인다. */
+#community-panel .community-cover-badges{position:absolute;z-index:3;left:10px;right:10px;bottom:10px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+#community-panel .community-cover-badge{display:inline-flex;align-items:center;min-height:28px;padding:4px 9px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-pill);background:var(--lt-ink);color:var(--lt-paper);font-size:12px;font-weight:700;line-height:1.2;white-space:nowrap}
+/* #1273 7번: 사람 카드의 기본 배지와 달리 AI 명예회원은 장미 토큰으로 구분한다(새 색 없음). */
+#community-panel .community-cover-badges .community-ai{position:static;z-index:auto;top:auto;left:auto;background:color-mix(in srgb,var(--lt-rose) 22%,var(--lt-ink))}
+#community-panel .community-cover-badge.community-ai{border-color:var(--lt-rose);color:var(--lt-rose)}
 /* #1026 묶음 D: 사진은 다 받은 뒤 0.2초로 나타난다. 칸 크기(aspect-ratio)는 처음부터 같다. */
 #community-panel .community-cover-image,#community-panel .community-cover-backdrop{transition:opacity .2s ease}
 #community-panel .community-cover-image.is-loading,#community-panel .community-cover-backdrop.is-loading{opacity:0}
 #community-panel .community-cover-image.is-ready{opacity:1}
 #community-panel .community-cover-backdrop.is-ready{opacity:.78}
 #community-panel .community-card-title{margin:12px 14px 0;color:var(--lt-ink);font-size:16px;font-weight:700;line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#community-panel .community-card-owner{display:block;min-width:0;margin:3px 14px 0;color:var(--lt-ink);font-size:12px;line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #community-panel .community-card-moment{margin:4px 14px 0;color:var(--lt-ink);font-size:14px;line-height:1.45;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #community-panel .community-card-distinct{display:block;margin:4px 14px 0;color:var(--lt-ink);font-size:12px;line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #community-panel .community-card-meta{margin:7px 14px 14px;color:var(--lt-ink);font-size:13px;line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -948,7 +1071,7 @@ body.community-screen #stage>iframe,body.community-screen #empty{display:none}
 #community-preview .community-preview-close{width:44px;height:44px;border:1px solid var(--lt-line-paper);border-radius:var(--lt-r-pill);background:var(--lt-paper);color:var(--lt-ink);font-size:24px;line-height:1}
 #community-preview>.community-cover{flex:0 0 auto;aspect-ratio:1.6;max-height:28dvh}
 #community-preview>.community-cover[data-media-kind="video-youtube"]{aspect-ratio:16/9;max-height:28dvh}
-#community-preview>.community-cover[data-media-kind="video-youtube"] .community-cover-image{object-fit:contain}
+#community-preview>.community-cover[data-media-kind="video-youtube"] .community-cover-image{object-fit:cover}
 #community-preview>.community-cover[data-media-kind="video-youtube"] .community-cover-backdrop{position:absolute;inset:-10px;display:block;width:calc(100% + 20px);height:calc(100% + 20px);object-fit:cover;filter:blur(18px);opacity:.78;transform:scale(1.06)}
 #community-preview .community-preview-body{display:grid;gap:8px;padding:14px 18px 18px}
 #community-preview .community-preview-body h3{margin:0;color:var(--lt-ink);font-size:24px;line-height:1.35}
@@ -1065,6 +1188,8 @@ html[data-lt-theme=garden] dialog.lt-close-confirm .button-row .primary{backgrou
 dialog[data-lt-panel=card]::backdrop{background:var(--lt-dialog-backdrop);backdrop-filter:var(--lt-dialog-backdrop-blur)}
 .close{width:var(--lt-dialog-close-size);height:var(--lt-dialog-close-size);border-radius:var(--lt-dialog-close-radius);font-size:var(--lt-dialog-close-font)}
 /* 프레임 안 창이 열리면 셸 머리줄·아래 고정 항목도 같은 덮개로 어둡게 — 뒤 배경이 화면 전체를 덮는다. */
+/* #1368: 머리줄 위치 기준이 없으면 ::after 덮개가 1440 화면 전체를 덮는다. */
+body.lt-frame-dialog-open .app-header{position:relative}
 body.lt-frame-dialog-open .app-header,body.lt-frame-dialog-open .home-links,body.lt-frame-dialog-open #mobile-add,body.lt-frame-dialog-open .updates-card{pointer-events:none}
 body.lt-frame-dialog-open .app-header::after,body.lt-frame-dialog-open .home-links::after,body.lt-frame-dialog-open #mobile-add::after,body.lt-frame-dialog-open .updates-card::after{content:'';position:absolute;inset:0;z-index:1;border-radius:inherit;background:var(--lt-dialog-backdrop);backdrop-filter:var(--lt-dialog-backdrop-blur);pointer-events:none}
 /* 정리 창은 본문만 안에서 스크롤하고 주 단추는 아래 고정 줄에 둔다(옮기기·새 트리 만들기 잘림 방지). */
@@ -1147,3 +1272,87 @@ dialog#account-assets .assets-detail-none{margin:0;font-size:13px;color:var(--lt
  #moment-form #delete-moment{font-size:0}
  #moment-form #delete-moment::before{content:'🗑';font-size:20px}
 }
+
+/* #1231: 360~390 너비에서 책 보기 전환 버튼이 있는 한 줄 머리줄의 트리 선택 클릭 영역 확보. */
+@media(max-width:390px){
+  .app-header .brand{flex:0 0 28px;width:28px;min-width:28px}
+  .app-header .brand-word{display:none}
+  .app-header .brand::before{content:'LT';font-size:13px;letter-spacing:0}
+}
+/* 대표 11-23: 서재·책에서만 머리줄 보기 전환(.view-toggle) 높이가 52px이라 머리줄이 8px 커지고 단추·아래 선이 내려왔다.
+   머리줄 안의 보기 전환은 다른 단추와 같은 44px로 맞춘다. 트리 단추의 ⌄는 이름 길이와 상관없이 오른쪽 끝에 둔다. */
+.header-actions .view-toggle{padding:0;height:44px}
+.header-actions .view-toggle .ui-btn,.header-actions .view-toggle>button{min-height:42px;height:42px}
+nav #record-menu{justify-content:space-between}
+nav #record-menu #source-label{flex:1 1 auto;text-align:left}
+
+/* 머리줄 책/목록·선반/회전 전환도 두 칸 치수를 통일한다. */
+.header-actions .view-toggle{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:stretch;min-width:96px;height:44px;min-height:44px;padding:0;overflow:hidden;border-color:var(--lt-line);background:var(--lt-glass-strong)}
+.header-actions .view-toggle[hidden]{display:none}
+.header-actions .view-toggle>button{box-sizing:border-box;width:100%;height:42px;min-height:42px;padding:0 8px;border:0;border-radius:var(--lt-r-pill);background:transparent;color:var(--lt-pearl);font:600 13px var(--lt-ui)}
+.header-actions .view-toggle>button[aria-checked=true]{background:var(--lt-primary);color:var(--lt-primary-ink)}
+html[data-lt-theme=garden] .header-actions .view-toggle>button:not([aria-checked=true]){color:var(--lt-ink)}
+@media(max-width:780px){.header-actions .view-toggle{min-width:84px}}
+
+/* #1246: 공개 트리 입구는 탭이 아니라 첫 화면과 같은 선 나침반·투명 테두리 단추다. */
+@media(min-width:781px){
+html .main-nav>button#community-menu{
+ display:inline-flex;align-items:center;justify-content:center;gap:6px;flex:none;
+ min-height:44px;padding:0 12px;margin-left:8px;border:1px solid var(--lt-line);
+ border-radius:var(--lt-r-pill);background:transparent;box-shadow:none;
+ color:var(--lt-muted);text-decoration:none
+}
+html .main-nav>button#community-menu:is(:hover,:focus-visible,[aria-current=true]){
+ border-color:var(--lt-pearl);color:var(--lt-pearl);background:transparent;text-decoration:none;box-shadow:none
+}
+html .main-nav>button#community-menu[aria-current=true]{font-weight:600}
+#community-menu .header-compass{width:15px;height:15px;flex:none}
+}
+
+
+/* #1246: 권한 단추가 없어도 칸은 그대로 둔다. 숨긴 단추는 초점·클릭 대상이 아니다. */
+.app-header .tree-slot{min-height:40px}
+.app-header .tree-slot:has(>#record-menu[hidden])>.tree-prefix,
+html[data-lt-auth-phase=pending] .app-header .tree-prefix{visibility:hidden}
+@media(min-width:781px){
+ .app-header .brand{flex:0 0 112px;width:112px}
+ /* #1350: 로그아웃 확정 시 숨겨진 순간 추가 칸을 접어 테마와 계정 사이 간격을 복원합니다. */
+ .app-header .header-actions{display:grid;grid-template-columns:44px 80px;align-items:center}
+ .app-header .header-actions>#theme-toggle{grid-column:1;grid-row:1}
+ .app-header .header-actions>#write-menu{grid-column:2;grid-row:1;width:122px}
+ .app-header .header-actions>.account-slot{grid-column:2;grid-row:1;width:80px;justify-content:flex-end}
+ /* 로그인 흔적이 있는 확인 중에는 122px를 예약하며, 확정 로그인에서도 유지합니다. */
+ html[data-lt-auth-phase=pending][data-lt-auth-hint=in] .app-header .header-actions,
+ html[data-lt-auth-phase=ready][data-lt-auth-hint=in] .app-header .header-actions,
+ html:not([data-lt-auth-phase=pending]) .app-header .header-actions:has(>#write-menu:not([hidden])){grid-template-columns:44px 122px 80px}
+ html[data-lt-auth-phase=pending][data-lt-auth-hint=in] .app-header .header-actions>.account-slot,
+ html[data-lt-auth-phase=ready][data-lt-auth-hint=in] .app-header .header-actions>.account-slot,
+ html:not([data-lt-auth-phase=pending]) .app-header .header-actions:has(>#write-menu:not([hidden]))>.account-slot{grid-column:3}
+ .app-header .tree-slot{flex:0 0 208px;width:208px}
+ .app-header .tree-prefix{flex:0 0 21px;width:21px;margin-right:8px}
+ .app-header .tree-frame .tree-views{display:grid;grid-template-columns:56px 68px 56px 44px 56px;gap:2px}
+ .app-header .tree-frame .tree-views>button[data-view]{padding-inline:0;width:100%}
+ .app-header .tree-frame .tree-views>button[data-view="track61-tree.html"]{margin-left:12px;width:calc(100% - 12px)}
+ .app-header .main-nav>button#community-menu{width:96px;padding-inline:0}
+ .app-header .account-slot>#account-entry{width:72px}
+}
+@media(max-width:780px){
+ .app-header .account-slot>#account-entry{width:56px}
+ .app-header .tree-frame .tree-slot{min-height:40px}
+}
+
+/* #1259-2: 방문자 책 첫 안내만 문서 흐름의 별도 칸을 사용한다. 보드 안내와 머리줄은 그대로. */
+body[data-record-source=share][data-fab-lift=book] #toast[data-visitor-intro]:not([hidden]){
+ position:relative;flex:0 0 auto;inset:auto;transform:none;margin:4px auto 54px;
+}
+@media(max-width:520px){
+ body[data-record-source=share][data-fab-lift=book] #toast[data-visitor-intro]:not([hidden]){margin:2px auto max(2px,env(safe-area-inset-bottom));padding:6px 10px;line-height:1.4}
+}
+body[data-record-source=share][data-fab-lift=book].lt-book-lightbox-open #toast[data-visitor-intro]{display:none}
+
+@media(max-width:780px){#community-panel .community-card-owner{margin:3px 10px 0;font-size:11px}}
+
+#community-preview .community-preview-start-help{margin:6px 0 12px;color:var(--lt-ink);font-size:12px;line-height:1.5}
+
+/* #1362: 휴대폰에서만 선택 탭을 채운다(넓은 화면의 기존 모양은 그대로). */
+@media(max-width:780px){nav button[aria-current=true],.tree-frame .tree-views>button[aria-current=true]{background:var(--lt-role-accent-bg);color:var(--lt-role-accent-ink)}}

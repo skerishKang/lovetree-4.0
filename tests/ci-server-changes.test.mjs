@@ -12,7 +12,7 @@ test('서버 코드·배포 스크립트·의존성이 바뀌면 서버 바뀜�
 });
 
 test('서버 관련 시험이 바뀌면 서버 바뀜이다', () => {
-  assert.equal(changed(['tests/login-state-postgres.test.mjs']), true);
+  assert.equal(changed(['tests/admin-roles-postgres.test.mjs']), true);
   assert.equal(changed(['tests/migrations-postgres.test.mjs']), true);
   assert.equal(changed(['tests/install-preflight.test.mjs']), true);
 });
@@ -23,6 +23,7 @@ test('판정 도구와 판정이 들어 있는 워크플로는 서버 바뀜이�
 });
 
 test('운영 설치 대상 파일 하나만 바뀌어도 서버 바뀜이다', () => {
+  assert.equal(changed(['public/v41/tree-open-view.mjs']), true);
   assert.equal(changed(['public/v41/youtube-id.mjs']), true);
   assert.equal(changed(['src/domain.js']), true);
   assert.equal(changed(['tools/export-ai-customer-db.mjs']), true);

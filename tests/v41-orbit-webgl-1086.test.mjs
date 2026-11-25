@@ -96,7 +96,11 @@ test('#1086 실제 기존 DOM과 새 그림판의 카드 28장 쌓임 순서와 
  assert.deepEqual(results.after.rasters.slice(0,28).map(s=>s?[s.brightness,s.blur]:null),expectedDepth,"배치 갱신 뒤 기존 카드 깊이 필터와 비트맵 일치");
  let points=0,max=0;
  for(const [i,after] of results.after.phases.entries()){
-  const before=results.before.phases[i];assert.equal(after.labels.length,28);assert.deepEqual(after.labels,before.labels);
+  const before=results.before.phases[i];assert.equal(after.labels.length,28);
+  // #1204: 카드 접근성 이름 끝에 ' 눌러서 크게 보기' 안내가 붙었다. 같은 카드가 같은 순서인지는 안내를 뗀 이름으로 비교한다(고정 기준은 #1221 직전이라 안내가 없다).
+  const cardName=l=>String(l||'').replace(/ 눌러서 크게 보기$/,'');
+  assert.deepEqual(after.labels.map(cardName),before.labels.map(cardName));
+  assert.ok(after.labels.every(l=>/ 눌러서 크게 보기$/.test(l)),'새 그림판 카드 이름에 누름 안내가 붙는다');
   assert.deepEqual(after.z,before.z,'기존 DOM과 같은 깊이 밴드');
   assert.equal(after.order.length,28);assert.equal(new Set(after.order).size,28);
   for(const source of [before,after])for(const point of source.points){

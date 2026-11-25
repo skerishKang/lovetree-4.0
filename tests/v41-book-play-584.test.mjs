@@ -11,6 +11,7 @@
 import {waitForShownScreen} from './helpers/visible-frame.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { inspectYoutubeIframe, countYoutubeAutoplay } from './helpers/youtube-embed-audit.mjs';
 import { readFileSync, existsSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { createReadStream } from 'node:fs';
@@ -408,7 +409,7 @@ test('584 실행: 머리줄 — 1장|2장 한 묶음, 돋보기 아이콘, 말�
     const { ctx, frame } = await openBook(browser, 1440, 900);
     try {
       const head = await frame.evaluate(() => {
-        const toggle = document.querySelector('.view-toggle');
+        const toggle = document.getElementById('book-view-toggle');
         const cells = [...toggle.querySelectorAll('.ui-btn')];
         const lens = document.getElementById('lensBtn');
         const pill = (el) => { const s = getComputedStyle(el); return { border: s.borderTopWidth + '/' + s.borderRadius, bg: s.backgroundColor }; };
@@ -589,17 +590,10 @@ test('26: 책을 열어 둔 채 트리를 바꾸면 책 제목·첫 카드·카�
         assert.match(before.src,/track59-sketchbook/, '책 화면');
         assert.ok(before.title==='A', '전환 전 책 제목 A');
 
-        if (width === 390) {
-          // 390에서는 책 안의 트리 제목 메뉴로 바꾼다(헤더 트리 선택은 접혀 있다).
-          const frame = page.locator('#view:not([hidden]), #view-next:not([hidden])').first().contentFrame();
-          await frame.locator('#bookTitleBtn').click();
-          await page.waitForTimeout(150);
-          await frame.locator(`#treeMenuPanel [data-tree-id="${b.id}"]`).click();
-        } else {
-          await page.locator('#record-menu').click();
-          await page.waitForTimeout(150);
-          await page.locator(`#tree-popover [data-tree-id="${b.id}"]`).click();
-        }
+        // 공통 줄로 옮긴 뒤에는 머리줄 트리 선택(기록 메뉴)에서 바꾼다.
+        await page.locator('#record-menu').click();
+        await page.waitForTimeout(150);
+        await page.locator(`#tree-popover [data-tree-id="${b.id}"]`).click();
         await page.waitForFunction((id) => {
           const f = [...document.querySelectorAll('#view, #view-next')].find(x => !x.hidden && x.getClientRects().length > 0);
           try { return (f?.contentWindow?.location?.search || '').includes(id); } catch { return false; }
@@ -1047,4 +1041,274 @@ test('1030 실행: 같은 종류 영상의 펼침면 칸 크기 차이 0(1440·3
       }
     }
   } finally { await browser.close(); }
+});
+
+
+// 책 줄·재생·두 칸 전환의 시각 회귀. 고정 시험 트리만 사용한다.
+test('책 도구 줄: 중복 제목 없음·이어 보기·두 칸 동일 치수(1440·390/밤·정원)', {skip, timeout: 180000}, async () => {
+  const browser = await chromium.launch({headless:true});
+  try {
+    for (const width of [1440,390]) for (const theme of ['night','garden']) {
+      const {ctx,frame,errors} = await openBook(browser,width,width===390?844:900);
+      try {
+        await frame.evaluate((t)=>{document.documentElement.setAttribute('data-lt-theme',t==='garden'?'garden':'');},theme);
+        await frame.waitForSelector('.lt-toolbar-title');
+        const result = await frame.evaluate(()=>{
+          const toolbar=document.querySelector('.lt-screen-toolbar');
+          const toggle=document.getElementById('book-view-toggle');
+          const cells=[...toggle.children].filter(n=>n.tagName==='BUTTON');
+          const geom=el=>{const r=el.getBoundingClientRect(),s=getComputedStyle(el);return {w:r.width,h:r.height,radius:s.borderRadius};};
+          const old=document.querySelector('.topbar');
+          const play=document.getElementById('playAllBtn');
+          return {
+            title:toolbar.querySelector('.lt-toolbar-title').textContent.trim(),
+            titleCount:[...document.querySelectorAll('.lt-toolbar-title')].filter(n=>n.textContent.trim()==='시험 트리'&&n.getClientRects().length).length,
+            oldVisible:!!old&&getComputedStyle(old).display!=='none',
+            playText:play.textContent.trim(),
+            playAria:play.getAttribute('aria-label'),
+            playNearNav:!!play.closest('.nav-pill'),
+            playInToolbar:toolbar.contains(play),
+            geom:cells.map(geom),
+            chosen:cells.map(c=>c.getAttribute('aria-pressed'))
+          };
+        });
+        assert.equal(result.title,'시험 트리');
+        assert.equal(result.titleCount,1,'트리 이름은 줄에서 한 번');
+        assert.equal(result.oldVisible,false,'상단 중복 제목 띠는 보이지 않는다');
+        assert.equal(result.playText,'▶ 이어 보기');
+        assert.match(result.playAria,/이어서 보기/);
+        assert.equal(result.geom.length,2);
+        assert.deepEqual(result.geom[0],result.geom[1],width+' '+theme+' 두 칸의 계산 치수가 다름');
+        assert.deepEqual(result.chosen,width===390?['true','false']:['false','true']);
+        assert.equal(width===390?result.playNearNav:result.playInToolbar,true);
+        assert.deepEqual(errors,[],'실행 예외 없음');
+      } finally {await ctx.close();}
+    }
+  } finally {await browser.close();}
+});
+
+test('#1288 휴대폰에서는 올림·초점 말풍선을 끄고 돌아오면 남은 것을 감춘다', async () => {
+  await import('../public/v41/hover-tip.js');
+  const api = globalThis.LTHoverTip;
+  assert.equal(typeof api.isHoverDevice, 'function');
+  assert.equal(api.isHoverDevice(() => true), true, '마우스가 있는 기기');
+  assert.equal(api.isHoverDevice(() => false), false, '마우스 없는 기기');
+  assert.equal(api.isHoverDevice(() => { throw new Error('없음'); }), false, '물음 확인이 실패하면 끈다');
+  const bubbles = [{ hidden: false }, { hidden: true }];
+  api.hideHoverTips({ querySelectorAll: () => bubbles });
+  assert.deepEqual(bubbles.map((b) => b.hidden), [true, true], '모든 말풍선을 감춘다');
+  for (const file of ['public/v41/views/book/book-extra.js', 'public/v41/views/board/board-extras.js']) {
+    const src = read(file);
+    assert.match(src, /!window\.LTHoverTip\.isHoverDevice\(\)/, `${file}: 올림·초점 말풍선을 기기로 가른다`);
+    assert.match(src, /window\.LTHoverTip\.mountHoverTipGuard\(document\)/, `${file}: 돌아올 때 감추는 장치를 단다`);
+  }
+  for (const page of ['public/v41/views/track59-sketchbook.html', 'public/v41/views/track58-pinboard.html']) {
+    assert.match(read(page), /\/v41\/hover-tip\.js/, `${page}: 공통 가드를 먼저 불러온다`);
+  }
+  assert.match(read('public/v41/views/board/board-extra.css'), /@media \(hover: none\)\{\.card \.cardOrder\{opacity:1/, '보드 순서 단추는 터치에서 늘 보인다');
+  assert.match(read('public/v41/views/book/book-usability.css'), /@media \(hover: none\)/, '책 고치기 단추는 터치에서 늘 보인다');
+});
+
+test('#1288 그림만 있는 단추는 접근 이름이 있다(예외는 이유와 함께)', () => {
+  // 정적 문서에서 글자 없이 그림만 있는 단추를 찾는다. 예외는 접근 이름을 붙이는 시점과 이유를 적는다.
+  const ALLOW = {
+    'account-avatar': '로그인 상태에서 셸이 aria-label과 첫 글자를 붙인다',
+    'branchTab': '갈림길이 생길 때 book.js가 aria-label을 붙인다'
+  };
+  const pages = [
+    'public/v41/index.html', 'public/v41/views/track32-bookshelf.html',
+    'public/v41/views/track59-sketchbook.html', 'public/v41/views/track58-pinboard.html',
+    'public/v41/views/track56-network.html'
+  ];
+  const iconOnly = [];
+  for (const page of pages) {
+    for (const m of read(page).matchAll(/<button\b([^>]*)>([\s\S]*?)<\/button>/g)) {
+      const attrs = m[1];
+      const text = m[2].replace(/<[^>]*>/g, '').trim();
+      if (text || /aria-label=/.test(attrs)) continue;
+      const id = (attrs.match(/id="([^"]+)"/) || [])[1] || '';
+      if (!(id in ALLOW)) iconOnly.push(`${page}: ${id || attrs.slice(0, 40)}`);
+    }
+  }
+  assert.deepEqual(iconOnly, [], `글자·접근 이름 없는 단추 0: ${iconOnly.join(' | ')}`);
+  for (const [id, reason] of Object.entries(ALLOW)) assert.ok(reason.length > 0, `${id}: 예외 이유가 있다`);
+  // 그림 단추가 동적으로 생기는 곳도 접근 이름을 붙인다.
+  assert.match(read('public/v41/views/book/book-extra.js'), /aria-label','돋보기'/, '돋보기 접근 이름');
+  assert.match(read('public/v41/views/track56-network.html'), /aria-label="전체 맞춤"[^>]*>⤢/, '전체 맞춤 접근 이름');
+  assert.match(read('public/v41/views/track56-network.html'), /aria-label="더 보기"[^>]*>⋯/, '더 보기 접근 이름');
+});
+
+test('#1378 크게 보기: 390·1440 × 밤·정원, 공용 유튜브 9지점·크기·자동재생', { skip, timeout: 240000 }, async () => {
+  const browser = await chromium.launch({ headless: true });
+  const embed = (route) => route.fulfill({
+    status: 200,
+    contentType: 'text/html',
+    body: '<!doctype html><html><head><title>YouTube video</title></head><body></body></html>',
+  });
+  try {
+    for (const [width, height] of [[390, 844], [1440, 900]]) {
+      for (const theme of ['night', 'garden']) {
+        const { ctx, frame } = await openBook(browser, width, height, [
+          ['**/youtube-nocookie.com/**', embed],
+          ['**/www.youtube.com/embed/**', embed],
+        ]);
+        try {
+          await frame.evaluate((value) => {
+            localStorage.setItem('lt41.theme', value);
+            document.documentElement.setAttribute('data-lt-theme', value);
+          }, theme);
+          await frame.locator('.media-links [data-yt-expand]').first().click({ force: true });
+          await frame.waitForSelector('.lt-lightbox iframe', { timeout: 10000 });
+          const inspected = await inspectYoutubeIframe(frame.locator('.lt-lightbox iframe'));
+          assert.equal(inspected.blocked, 0,
+            width + '/' + theme + ' 크게 보기 iframe 앞 우리 요소 0: ' + inspected.blockers.join(','));
+          assert.equal(inspected.minimum200, true,
+            width + '/' + theme + ' 최소 200×200: ' + inspected.width + '×' + inspected.height);
+          assert.equal(await countYoutubeAutoplay(frame), 1,
+            width + '/' + theme + ' 자동 재생 지정 한 개');
+          assert.equal(await frame.locator('.lt-lightbox-stage .lt-yt-preview,.lt-lightbox-stage [data-lt-play]').count(), 0,
+            width + '/' + theme + ' 재생 중 표지·재생 단추 없음');
+          if (width === 390 && theme === 'night') {
+            await frame.evaluate(() => {
+              const player = document.querySelector('.lt-lightbox iframe');
+              window.dispatchEvent(new MessageEvent('message', {
+                origin: 'https://www.youtube-nocookie.com',
+                source: player.contentWindow,
+                data: JSON.stringify({ event: 'onError', info: 150 }),
+              }));
+            });
+            assert.equal(await frame.locator('.lt-lightbox iframe').count(), 0,
+              'YouTube 임베드 거절이면 플레이어 제거');
+            assert.equal(await frame.locator('.lt-lightbox-stage a[href*="youtube.com"]').count(), 1,
+              '재생 불가 안내와 원본 보기 경로');
+          }
+          await frame.locator('.lt-lightbox-close').click();
+          assert.equal(await frame.locator('.lt-lightbox iframe').count(), 0,
+            width + '/' + theme + ' 크게 보기 닫으면 플레이어 제거');
+        } finally {
+          await ctx.close();
+        }
+      }
+    }
+  } finally {
+    await browser.close();
+  }
+});
+
+test('#1378 크게 보기: 이미 재생 중인 인라인 영상과 자동 재생이 중복되지 않는다', { skip, timeout: 120000 }, async () => {
+  const browser = await chromium.launch({ headless: true });
+  const mock = route => route.fulfill({
+    status: 200, contentType: 'text/html',
+    body: '<!doctype html><title>YouTube video</title>',
+  });
+  try {
+    const { ctx, frame } = await openBook(browser, 390, 844, [
+      ['**/youtube-nocookie.com/**', mock],
+      ['**/www.youtube.com/embed/**', mock],
+    ]);
+    try {
+      await frame.locator('[data-yt-play]').first().click({ force: true });
+      await frame.waitForSelector('iframe.yt-frame', { timeout: 10000 });
+      assert.equal(await countYoutubeAutoplay(frame), 1, '인라인 재생 하나');
+      await frame.locator('.yt-video-expand').first().click({ force: true });
+      await frame.waitForFunction(() => !!document.fullscreenElement || !!document.querySelector('.lt-lightbox iframe'), null, { timeout: 10000 });
+      assert.equal(await countYoutubeAutoplay(frame), 1, '크게 보기 시작 후 동시 자동재생 지정 하나');
+      if (await frame.locator('.lt-lightbox-close').count()) await frame.locator('.lt-lightbox-close').click();
+      else await frame.evaluate(() => document.exitFullscreen?.());
+    } finally {
+      await ctx.close();
+    }
+  } finally {
+    await browser.close();
+  }
+});
+
+test('#1378 크게 보기: 임베드 거절 상태면 iframe을 걷고 원본 링크를 남긴다', { skip, timeout: 120000 }, async () => {
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const { ctx, frame } = await openBook(browser, 390, 844, [
+      ['**/api/youtube/oembed*', route => route.fulfill({
+        status: 401, contentType: 'application/json', body: '{"error":"youtube_embed_forbidden"}',
+      })],
+      ['**/youtube-nocookie.com/**', route => route.fulfill({
+        status: 200, contentType: 'text/html', body: '<title>YouTube video</title>',
+      })],
+    ]);
+    try {
+      await frame.locator('.media-links [data-yt-expand]').first().click({ force: true });
+      await frame.waitForSelector('.lt-lightbox-stage a[href*="youtube.com"]', { timeout: 10000 });
+      assert.equal(await frame.locator('.lt-lightbox iframe').count(), 0, '임베드 거절 후 플레이어 제거');
+      assert.equal(await frame.locator('.lt-lightbox-stage [role="status"]').count(), 1, '재생 불가 안내');
+    } finally {
+      await ctx.close();
+    }
+  } finally {
+    await browser.close();
+  }
+});
+
+test('#1378 책: 390·1440 × 밤·정원 재생 iframe 200×200·가림 0·자동재생 1개', { skip, timeout: 240000 }, async () => {
+  const browser = await chromium.launch({ headless: true });
+  const embed = route => route.fulfill({
+    status: 200, contentType: 'text/html', body: '<!doctype html><title>YouTube video</title>',
+  });
+  try {
+    for (const [width, height] of [[390, 844], [1440, 900]]) {
+      for (const theme of ['night', 'garden']) {
+        const { ctx, frame } = await openBook(browser, width, height, [
+          ['**/youtube-nocookie.com/**', embed],
+          ['**/www.youtube.com/embed/**', embed],
+        ]);
+        try {
+          await frame.evaluate(value => {
+            localStorage.setItem('lt41.theme', value);
+            document.documentElement.setAttribute('data-lt-theme', value);
+          }, theme);
+          const before = await frame.locator('[data-yt-play]').count();
+          assert.ok(before > 0, '재생 전 영상 표지 존재');
+          await frame.locator('[data-yt-play]').first().click({ force: true });
+          await frame.waitForSelector('iframe.yt-frame', { timeout: 10000 });
+          const inspected = await inspectYoutubeIframe(frame.locator('iframe.yt-frame').first());
+          assert.equal(inspected.minimum200, true,
+            width + '/' + theme + ' 재생 iframe 최소 200×200: ' + inspected.width + '×' + inspected.height);
+          assert.equal(inspected.blocked, 0,
+            width + '/' + theme + ' 플레이어 앞 가림 0: ' + inspected.blockers.join(','));
+          assert.equal(await countYoutubeAutoplay(frame), 1,
+            width + '/' + theme + ' 자동재생 지정 한 개');
+          assert.equal(await frame.locator('iframe.yt-frame').first()
+            .evaluate(el => el.parentElement.querySelector('[data-yt-play],.yt-play') !== null),
+            false, '재생 중인 iframe에 앞서던 표지 제거');
+        } finally {
+          await ctx.close();
+        }
+      }
+    }
+  } finally {
+    await browser.close();
+  }
+});
+
+test('#1378 책: 임베드 금지 때 플레이어 제거 후 원본 링크', { skip, timeout: 120000 }, async () => {
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const { ctx, frame } = await openBook(browser, 390, 844, [
+      ['**/api/youtube/oembed*', route => route.fulfill({
+        status: 401, contentType: 'application/json', body: '{"error":"youtube_embed_forbidden"}',
+      })],
+      ['**/youtube-nocookie.com/**', route => route.fulfill({
+        status: 200, contentType: 'text/html', body: '<title>YouTube video</title>',
+      })],
+    ]);
+    try {
+      await frame.locator('[data-yt-play]').first().click({ force: true });
+      await frame.waitForSelector('.yt-unavailable-note', { timeout: 10000 });
+      assert.equal(await frame.locator('iframe.yt-frame').count(), 0, '재생 불가 iframe 제거');
+      assert.equal(await frame.locator('.yt-unavailable-link[href*="youtube.com"]').count(), 1,
+        '재생 불가 시 원본 영상 링크 제공');
+    } finally {
+      await ctx.close();
+    }
+  } finally {
+    await browser.close();
+  }
 });
