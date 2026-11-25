@@ -886,6 +886,11 @@ test('#1309 휴대폰 세로는 8장 리본이 흐르고 숫자판·단추·링�
      const host=document.querySelector('#orbit'),cards=[...host.shadowRoot.querySelectorAll('.card:not(.off)')];
      return host.dataset.ltLayout==='ribbon'&&cards.length===8&&cards.every(card=>card.getAnimations().filter(a=>a.effect.target===card&&!a.effect.pseudoElement).length===1);
     },null,{timeout:20000});
+    // #1314 리본은 배경 띠라서 안내 글자를 띄우지 않는다(테두리 반짝임만 유지). 글자가 제목과 겹치는 것을 막는다.
+    await h.frame.waitForFunction(() => document.querySelector('#orbit').shadowRoot.querySelector('.world.lt-hint-ready'), null, { timeout: 20000 });
+    const ribbonHint = await h.frame.evaluate(() => { const root = document.querySelector('#orbit').shadowRoot; return { tips: root.querySelectorAll('.lt-card-tip').length, hinted: root.querySelectorAll('.lt-card-hint').length }; });
+    assert.equal(ribbonHint.tips, 0, '390 세로 리본에서는 첫 방문 안내 글자를 띄우지 않는다');
+    assert.equal(ribbonHint.hinted, 1, '390 세로 리본에서도 첫 방문 테두리 반짝임은 남는다');
     const samples = [];
     for (let i = 0; i < 7; i++) { samples.push(await sample(h.frame)); if (i < 6) await h.page.waitForTimeout(500); }
     assert.ok(samples.every(s => s.mode === 'ribbon' && s.active === 8), JSON.stringify(samples[0]));

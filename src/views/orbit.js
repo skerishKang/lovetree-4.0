@@ -485,7 +485,7 @@ shadow.addEventListener('click',e=>{const play=e.target.closest('[data-recent-pl
   if(hintDismissed||i<0||!elements[i])return;
   if(hintCardIndex===i&&elements[i].querySelector('.lt-card-tip'))return;
   for(const el of elements){el.classList.remove('lt-card-hint');el.querySelector('.lt-card-tip')?.remove();}
-  hintCardIndex=i;const card=elements[i],tip=document.createElement('span');tip.className='lt-card-tip';tip.setAttribute('aria-hidden','true');tip.textContent='눌러 보세요';card.classList.add('lt-card-hint');card.append(tip);
+  hintCardIndex=i;const card=elements[i],tip=document.createElement('span');tip.className='lt-card-tip';tip.setAttribute('aria-hidden','true');tip.textContent='눌러 보세요';card.classList.add('lt-card-hint');if(layoutMode!=='ribbon')card.append(tip);
  }
  function activateCardHint(){
   if(hintDismissed||hintVisible||hintCardIndex<0)return;
