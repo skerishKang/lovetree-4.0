@@ -313,3 +313,94 @@ html[data-lt-theme=garden] #community-panel:has(#community-tab-moments[aria-sele
 @media(max-width:780px){#community-panel .community-top-row #community-search-form{flex:1 1 auto;min-width:0;margin-left:auto}}
 
 #community-panel #community-query::-webkit-search-cancel-button{display:none}
+/* #1354 1단계 시안 — 유튜브 재생 면과 서비스 정보·조작 면을 분리한다. */
+#community-panel .community-top-row.is-moments .moments-toolbar{display:flex;align-items:center;justify-content:flex-end;gap:6px;margin-left:auto;pointer-events:auto}
+#community-panel .community-top-row:not(.is-moments) .moments-toolbar{display:none}
+#community-panel .community-top-row.is-moments #community-search-form,
+#community-panel .community-top-row.is-moments .community-sort-label{display:none}
+#community-panel .moments-toolbar button{display:inline-flex;align-items:center;justify-content:center;gap:4px;min-height:44px;padding:0 12px;border:1px solid var(--lt-line);border-radius:var(--lt-r-pill);background:var(--lt-glass-strong);color:var(--lt-pearl);font:inherit;font-size:13px;white-space:nowrap}
+#community-panel .moments-toolbar .moments-rail-button.is-sound{width:48px;min-width:48px;padding:0}
+#community-panel .moments-toolbar .moments-rail-svg{width:22px;height:22px}
+#community-panel .moments-toolbar .moments-rail-label{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+#community-moments-panel .moments-stage{display:grid;grid-template-columns:minmax(180px,250px) minmax(260px,420px) 64px 52px;align-items:center;justify-content:center;gap:14px;width:100%;max-width:1150px;height:min(calc(100dvh - 184px),740px);min-height:420px;max-height:none;margin:0 auto}
+#community-moments-panel .moments-context{grid-column:1;grid-row:1;display:flex;flex-direction:column;gap:18px;align-self:center;min-width:0;max-height:100%;overflow-y:auto;padding:24px 18px;border:1px solid var(--lt-line);border-radius:var(--lt-r-card);background:var(--lt-stage-2);color:var(--lt-pearl)}
+#community-moments-panel .moments-context .moments-overlay{position:static;display:grid;gap:12px;padding:0;background:none;color:inherit;text-shadow:none;pointer-events:auto}
+#community-moments-panel .moments-context .moments-tree{flex-wrap:wrap;align-items:center;gap:8px}
+#community-moments-panel .moments-context .moments-title{font-size:20px;line-height:1.45;white-space:normal;overflow-wrap:anywhere}
+#community-moments-panel .moments-context .moments-note{display:block;white-space:normal;overflow:visible;text-overflow:clip;line-height:1.6}
+#community-moments-panel .moments-context .moments-tags{white-space:normal;line-height:1.5}
+#community-moments-panel .moments-context .moments-chips{position:static;display:flex;flex-wrap:wrap;justify-content:flex-start;max-width:100%;margin:0;mask-image:none;-webkit-mask-image:none}
+#community-moments-panel .moments-context .moments-chips[hidden]{display:none}
+#community-moments-panel .moments-card{grid-column:2;grid-row:1;position:relative;width:min(100%,calc((100dvh - 184px)*9/16));min-width:200px;height:100%;min-height:200px;max-width:100%;aspect-ratio:auto;justify-self:center;overflow:hidden;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-card);background:var(--lt-stage)}
+#community-moments-panel .moments-media{position:absolute;inset:0;overflow:hidden;background:var(--lt-stage)}
+#community-moments-panel .moments-frame{position:absolute;inset:0;width:100%;height:100%;transform:none}
+#community-moments-panel .moments-frame.moments-next{visibility:hidden;pointer-events:none}
+#community-moments-panel .moments-poster{z-index:2;pointer-events:none}
+#community-moments-panel .moments-media.is-playing .moments-poster{visibility:hidden;opacity:0}
+#community-moments-panel .moments-rail{grid-column:3;grid-row:1;position:static;display:flex;flex-direction:column;align-self:center;gap:6px;min-width:0;padding:0}
+#community-moments-panel .moments-rail-button{position:relative;display:grid;justify-items:center;gap:3px;min-width:54px;min-height:62px;padding:6px 3px;background:none;color:var(--lt-pearl);text-shadow:none}
+#community-moments-panel .moments-rail-label{display:block;color:var(--lt-muted);font-size:11px}
+#community-moments-panel .moments-nav{grid-column:4;grid-row:1;position:static;display:grid;align-self:center;gap:12px;transform:none}
+#community-moments-panel .moments-step{width:46px;height:46px}
+#community-moments-panel .moments-sound-pill,
+#community-moments-panel .moments-swipe-layer,
+#community-moments-panel .moments-swipe-hint,
+#community-moments-panel .moments-player-controls{display:none}
+#community-moments-panel .moments-progress{display:none}
+#community-moments-panel .moments-owner,#community-moments-panel .moments-owner-text{display:inline-flex}
+#community-moments-panel .moments-owner{display:grid;place-items:center;flex:none;width:32px;height:32px;border:1px solid var(--lt-line);border-radius:50%;background:var(--lt-glass)}
+@media(max-width:780px){
+ #community-panel:has(#community-tab-moments[aria-selected="true"]){padding:0 8px 8px;overflow:hidden}
+ #community-panel:has(#community-tab-moments[aria-selected="true"]) .community-top-row{position:relative;z-index:25;width:100%;height:48px;margin:0;padding:0 3px}
+ #community-panel:has(#community-tab-moments[aria-selected="true"]) .community-top-row .community-tabs{position:static;display:flex;width:auto;height:48px;min-width:0;margin:0}
+ #community-panel:has(#community-tab-moments[aria-selected="true"]) .community-top-row .community-tabs button{min-height:44px;min-width:49px;padding:0 9px}
+ #community-panel:has(#community-tab-moments[aria-selected="true"]) .community-top-row .moments-toolbar{display:flex;position:static;z-index:1;gap:4px;margin-left:auto}
+ #community-panel .moments-toolbar button{min-height:44px}
+ #community-panel .moments-toolbar .moments-info-button{padding:0 11px}
+ #community-moments-panel{width:100%;min-width:0;overflow:visible}
+ #community-moments-panel .moments-stage{display:grid;grid-template-columns:minmax(0,1fr) 70px;grid-template-rows:minmax(200px,1fr);column-gap:0;row-gap:0;width:100%;height:calc(100dvh - 68px - env(safe-area-inset-bottom));min-height:0;margin:0;max-width:none}
+ #community-moments-panel .moments-card{grid-area:1/1/2/3;width:100%;min-width:200px;min-height:200px;height:100%;max-width:100%;border:0;border-radius:0;box-shadow:none}
+ #community-moments-panel .moments-media[data-orientation="landscape"] .moments-frame:not(.moments-next){width:100%;height:100%;transform:none}
+ #community-moments-panel .moments-context,
+ #community-moments-panel .moments-rail{display:none}
+ #community-moments-panel .moments-nav{display:none}
+ #community-moments-panel .moments-stage.moments-info-open{grid-template-rows:minmax(200px,1fr) minmax(0,252px)}
+ #community-moments-panel .moments-stage.moments-info-open .moments-card{grid-area:1/1/2/3}
+ #community-moments-panel .moments-stage.moments-info-open .moments-context{grid-area:2/1/3/2;display:flex;align-self:stretch;gap:10px;max-height:none;min-width:0;padding:13px 12px;overflow-y:auto;border:1px solid var(--lt-line);border-right:0;border-radius:0;background:var(--lt-stage-2)}
+ #community-moments-panel .moments-stage.moments-info-open .moments-rail{grid-area:2/2/3/3;display:flex;align-self:stretch;justify-content:flex-start;align-items:center;gap:2px;overflow-y:auto;padding:6px 3px;border:1px solid var(--lt-line);border-left:0;background:var(--lt-stage-2)}
+ #community-moments-panel .moments-context .moments-overlay{padding:0;gap:8px}
+ #community-moments-panel .moments-context .moments-title{font-size:16px}
+ #community-moments-panel .moments-context .moments-tree{font-size:11px}
+ #community-moments-panel .moments-context .moments-ai{font-size:10px}
+ #community-moments-panel .moments-context .moments-note{font-size:13px;line-height:1.5}
+ #community-moments-panel .moments-context .moments-chips{position:static;width:100%;height:auto;max-width:100%;padding:0;overflow-x:auto;flex-wrap:nowrap;-webkit-mask-image:none;mask-image:none}
+ #community-moments-panel .moments-rail-button{display:flex;flex-direction:column;justify-content:center;gap:2px;width:58px;min-width:58px;min-height:48px;padding:3px;color:var(--lt-pearl);text-shadow:none}
+ #community-moments-panel .moments-rail-label{font-size:10px;color:inherit}
+ #community-moments-panel .moments-rail-icon{font-size:21px;filter:none}
+ #community-moments-panel .moments-rail-svg{width:21px;height:21px;filter:none}
+ #community-moments-panel .moments-rail-count{font-size:10px;min-height:0}
+ #community-moments-panel .moments-owner,#community-moments-panel .moments-owner-text{display:inline-flex}
+}
+
+/* #1354 휴대폰: 전체 화면 대화창에서 48px 도구 띠만 예약한다. */
+#community-moments-panel .moments-context{margin:0}
+@media(max-width:780px){
+ #community-panel[data-lt-panel=full]:has(#community-tab-moments[aria-selected="true"]){inset:0;width:100vw;max-width:none;height:100dvh;max-height:100dvh;padding:0 8px;overflow:hidden}
+ #community-panel:has(#community-tab-moments[aria-selected="true"]) .community-top{display:none}
+ #community-panel:has(#community-tab-moments[aria-selected="true"]) .community-top-row{height:48px}
+ #community-moments-panel .moments-stage{height:calc(100dvh - 48px - env(safe-area-inset-bottom))}
+ #community-moments-panel .moments-stage.moments-info-open .moments-context{margin:0;max-height:none}
+ #community-panel .moments-toolbar .moments-close-button{width:38px;min-width:38px;padding:0;font-size:21px}
+}
+
+@media(max-width:780px){
+ body:has(#community-panel[open] #community-tab-moments[aria-selected="true"]) .app-header{visibility:hidden;pointer-events:none}
+}
+
+@media(max-width:780px){
+ /* 재생 면 좌우에 손가락 이동용 좁은 여백을 둔다. 영상 위에는 층을 올리지 않는다. */
+ #community-moments-panel .moments-card{width:calc(100% - 16px);justify-self:center}
+}
+
+/* PC의 정보는 왼쪽 판에 항상 표시하므로 토글은 휴대폰에만 둔다. */
+@media(min-width:781px){#community-panel .moments-toolbar .moments-info-button{display:none}}
