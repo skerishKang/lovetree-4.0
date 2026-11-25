@@ -123,7 +123,7 @@ export function mountScreenToolbar({ screen, titleFrom, tools = [], initialBar =
     else if (!narrow && reset.parentElement !== boardMode) boardMode.append(reset);
   };
   let stashed = [];
-  const isPinnedConnect = (el) => screen === 'network' && el?.id === 'connectToggle' && !el.hidden;
+  const isPinnedConnect = (el) => screen === 'network' && /^(connectToggle|demoToggle)$/.test(el?.id || '') && !el.hidden;
   const isPlay = (el) => /^(playAllBtn|cinemaBtn|mapPlayBtn)$/.test(el.id || '') || isPinnedConnect(el);
   // 오른쪽 정렬(group justify-content:flex-end)에서는 넘치는 칸이 왼쪽 밖으로 나가 scrollWidth에 잡히지 않는다.
   // 보이는 단추 폭의 합으로 직접 재어 넘침을 판정한다(기준을 낮추지 않는다).
