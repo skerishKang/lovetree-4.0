@@ -54,8 +54,12 @@ test('#1349 가운데 순간 추가: 390·1440 × 밤·정원 × 로그인·방�
             await page.goto(base+'/v41/'+(member?'?account=1':'')+'#home');
             if(member) {
               await page.waitForFunction(()=>!!window.LT41?.trees?.length);
-              const intro=page.locator('#discover-ask-no');
-              if(await intro.isVisible())await intro.click();
+              const intro=page.locator('#discover-ask');
+              await intro.waitFor({state:'visible',timeout:6000}).catch(()=>{});
+              if(await intro.isVisible()){
+                await page.locator('#discover-ask-no').click();
+                await intro.waitFor({state:'hidden',timeout:5000});
+              }
             }
             const frame=page.frameLocator('#view');
             const button=member?frame.locator('.home-add-top'):frame.locator('.center .actions button').first();
@@ -63,6 +67,10 @@ test('#1349 가운데 순간 추가: 390·1440 × 밤·정원 × 로그인·방�
             const box=await button.boundingBox();
             assert.ok(box && box.width>=44 && box.height>=35,'가운데 버튼이 실제로 보입니다.');
             const x=box.x+box.width/2,y=box.y+box.height/2;
+            assert.equal(await button.evaluate(el=>{
+              const rect=el.getBoundingClientRect(),root=el.getRootNode();
+              return root.elementFromPoint(rect.left+rect.width/2,rect.top+rect.height/2)===el;
+            }),true,'단추 중심에 다른 궤도·카드 층이 걸리지 않습니다.');
             if(input==='mouse')await page.mouse.click(x,y);
             else await page.touchscreen.tap(x,y);
             if(member){
