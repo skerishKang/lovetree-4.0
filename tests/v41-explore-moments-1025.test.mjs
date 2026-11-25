@@ -870,6 +870,14 @@ test('#1338 인기 무대 오류·2초 지연에도 트리 카드를 1초 안에
     const ctx=await browser.newContext({viewport:{width,height},reducedMotion:'reduce'});
     try{
      await ctx.addInitScript(t=>{try{localStorage.setItem('lt41.theme',t)}catch{}},theme);
+     // #1380: 시간은 페이지 안의 같은 시계로 잰다 — 카드 요청 시작(Resource Timing)부터 카드가 문서에 들어간 순간까지.
+     // 바깥(Node) 시계와 waitFor 확인 간격은 실행기가 바쁘면 수 초씩 늘어나 화면 동작과 무관하게 흔들렸다.
+     await ctx.addInitScript(()=>{
+      const watch=()=>new MutationObserver((_,observer)=>{
+       if(document.querySelector('#community-list .community-card')){window.__ltCardAt=performance.now();observer.disconnect();}
+      }).observe(document.documentElement,{subtree:true,childList:true});
+      if(document.documentElement)watch();else document.addEventListener('DOMContentLoaded',watch);
+     });
      let cardRequestAt=0;
      await ctx.route('**/api/**',r=>r.fulfill({status:200,contentType:'application/json',body:'{"ok":true,"items":[]}'}));
      await ctx.route('**/api/community/shares**',async r=>{
@@ -887,8 +895,11 @@ test('#1338 인기 무대 오류·2초 지연에도 트리 카드를 1초 안에
      const page=await ctx.newPage();
      await page.goto(base+'/v41/#explore',{waitUntil:'domcontentloaded'});
      await page.locator('#community-list .community-card').first().waitFor({state:'visible',timeout:5000});
-     const elapsed=Date.now()-cardRequestAt;
      assert.ok(cardRequestAt>0,mode+'/'+width+'/'+theme+': 트리 요청이 시작됐다');
+     const elapsed=await page.evaluate(()=>{
+      const entry=performance.getEntriesByType('resource').find(e=>/\/api\/community\/shares\?/.test(e.name));
+      return entry&&window.__ltCardAt?Math.round(window.__ltCardAt-entry.startTime):Infinity;
+     });
      assert.ok(elapsed<(mode==='both'?1500:1000),mode+'/'+width+'/'+theme+': 카드 요청부터 제때 보여야 함 ('+elapsed+'ms)');
      const before=await page.evaluate(()=>{
       const card=document.querySelector('#community-list .community-card'),popular=document.querySelector('#community-popular-stages');
