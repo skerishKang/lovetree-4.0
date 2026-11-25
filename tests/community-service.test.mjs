@@ -953,3 +953,77 @@ test('#1273 5번: 첫 화면 공개 트리 숫자와 둘러보기 목록은 같�
   assert.equal(stats.body.moments, 6, '순간 수도 같은 기준으로 센다');
   assert.deepEqual(list.body.items.map(item => item.title), ['명예회원 트리', '일반 트리']);
 });
+
+// #1356 2단계 '내 순간': 본인 작업공간의 세로 순간만 (비공개 트리 포함, 공개 목록과 같은 모양)
+const MY_MOMENT_KEYS=['aiTester','date','emotion','endSeconds','id','keywords','note','shareId','startSeconds','thumbnail','title','treeTitle','url','videoId'];
+function treeWith(title,moments){
+  let tree=createTree({subject:'좋아하는 대상',title,note:'기록',emotion:'설렘',date:'2026-11-01',url:moments[0].url},CLOCK);
+  tree=editTree(tree,{title,subject:tree.subject,coverMomentId:''});
+  tree.moments[0].title=moments[0].title;
+  tree.moments[0].keywords=moments[0].keywords||[];
+  for(const m of moments.slice(1)){
+    tree=addMoment(tree,{title:m.title,note:'기록',emotion:'설렘',date:'2026-11-01',url:m.url},tree.moments[0].id,CLOCK);
+    tree.moments.at(-1).keywords=m.keywords||[];
+  }
+  while(tree.moments.length<3)tree=addMoment(tree,{title:'담은 순간',note:'기록',emotion:'설렘',date:'2026-11-01',url:''},tree.moments[0].id,CLOCK);
+  return tree;
+}
+async function mySetup(){
+  const d=momentsSetup();
+  const ws=createWorkspaceService({repo:d.workspaceRepo,productId:PRODUCT});
+  const trees=[
+    treeWith('앨리스 트리',[{title:'앨리스 쇼츠1',url:SHORTS_URL('aaaa1111111'),keywords:['가수:가수A']},{title:'앨리스 쇼츠2',url:SHORTS_URL('bbbb2222222'),keywords:['가수:가수B']}]),
+    treeWith('앨리스 비공개 트리',[{title:'비공개 쇼츠',url:SHORTS_URL('ffff6666666')}]),
+    treeWith('앨리스 가로 트리',[{title:'가로 무대',url:WATCH_URL('dddd4444444')}]),
+  ];
+  await ws.write(principal('alice'),{state:{version:1,trees},expectedRevision:0,clientKey:'seed-alice-1356-own'});
+  const rows=[];
+  for(const [i,tree] of trees.slice(0,2).entries()){
+    rows.push(await d.shareRepo.create({productId:PRODUCT,shareId:'ownshare'+String(i+1).padStart(17,'0'),subjectId:'alice',treeId:tree.id,entryMomentId:tree.moments[0].id,view:'book',momentCount:tree.moments.length,origin:'auto'}));
+  }
+  d.rows.push(...rows);
+  await d.save('bob','밥 트리',[{title:'밥 쇼츠',url:SHORTS_URL('cccc3333333'),keywords:['가수:가수A']}]);
+  d.setPrivate(trees[1].id);
+  for(const row of d.rows)await d.discoverRepo.set({productId:PRODUCT,subjectId:row.subjectId,treeId:row.treeId,discover:true});
+  d.seed();
+  return {d,trees,rows};
+}
+test('#1356 내 순간: 본인 작업공간의 세로 순간만 — 비공개 트리 포함, 가로·타인 순간 제외',async()=>{
+  const {d,rows}=await mySetup();
+  const mine=await d.service.myMoments('alice');
+  assert.deepEqual(mine.items.map(i=>i.title).sort(),['비공개 쇼츠','앨리스 쇼츠1','앨리스 쇼츠2'].sort());
+  assert.equal(mine.total,3);
+  assert.equal(mine.items.find(i=>i.title==='앨리스 쇼츠1').shareId,rows[0].shareId);
+  assert.equal(mine.items.find(i=>i.title==='비공개 쇼츠').shareId,rows[1].shareId);
+  assert.deepEqual(mine.groups.map(g=>g.value).sort(),['가수A','가수B']);
+  assert.ok(!JSON.stringify(mine).includes('"subjectId"'));
+  assert.deepEqual(await d.service.myMoments('nobody'),{items:[],total:0,groups:[]});
+});
+test('#1356 내 순간 API: 로그인 필수·subjectId 인자 무시·공개 목록과 같은 한 줄 모양·limit·exclude',async()=>{
+  const {d}=await mySetup();
+  const handle=createCommunityHandler({
+    productId:PRODUCT,
+    service:d.service,
+    authenticate:async request=>{
+      const account=request.headers?.account;
+      if(!account)throw new ApiError(401,'unauthenticated','login');
+      return principal(account);
+    },
+  });
+  const path='/api/community/me/moments';
+  assert.equal((await call(handle,'GET',path)).status,401);
+  const res=await call(handle,'GET',path,{account:'alice',query:'subjectId=bob&limit=30'});
+  assert.equal(res.status,200);
+  assert.deepEqual(res.body.items.map(i=>i.title).sort(),['비공개 쇼츠','앨리스 쇼츠1','앨리스 쇼츠2'].sort());
+  assert.ok(!JSON.stringify(res.body).includes('"subjectId"'));
+  const pub=await d.service.moments({limit:30});
+  assert.ok(!pub.items.some(i=>i.title==='비공개 쇼츠'),'공개 목록에는 비공개 트리가 나오지 않는다');
+  assert.deepEqual(Object.keys(res.body.items[0]).sort(),MY_MOMENT_KEYS);
+  assert.deepEqual(Object.keys(pub.items[0]).sort(),MY_MOMENT_KEYS);
+  const one=await call(handle,'GET',path,{account:'alice',query:'limit=1'});
+  assert.equal(one.body.items.length,1);
+  assert.equal(one.body.total,3);
+  const ex=await call(handle,'GET',path,{account:'alice',query:'exclude=aaaa1111111'});
+  assert.equal(ex.body.total,2);
+  assert.ok(!ex.body.items.some(i=>i.videoId==='aaaa1111111'));
+});
