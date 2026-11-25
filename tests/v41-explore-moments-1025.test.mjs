@@ -863,7 +863,7 @@ test('#1338 인기 무대 오류·2초 지연에도 트리 카드를 1초 안에
  const shots=process.env.LT_STAGE_1338_SHOTS||'';
  const browser=await chromium.launch({headless:true});
  try{
-  for(const mode of ['failed','late'])for(const [width,height] of [[390,844],[1440,900]])for(const theme of ['night','garden']){
+  for(const mode of ['failed','late','both'])for(const [width,height] of [[390,844],[1440,900]])for(const theme of ['night','garden']){
    const server=await serve();
    try{
     const base='http://127.0.0.1:'+server.address().port;
@@ -872,14 +872,16 @@ test('#1338 인기 무대 오류·2초 지연에도 트리 카드를 1초 안에
      await ctx.addInitScript(t=>{try{localStorage.setItem('lt41.theme',t)}catch{}},theme);
      let cardRequestAt=0;
      await ctx.route('**/api/**',r=>r.fulfill({status:200,contentType:'application/json',body:'{"ok":true,"items":[]}'}));
-     await ctx.route('**/api/community/shares**',r=>{
+     await ctx.route('**/api/community/shares**',async r=>{
       cardRequestAt=Date.now();
+      // 'both': 운영 측정(#1343)처럼 카드·무대 응답이 둘 다 느리고 무대가 카드보다 조금 늦게 오는 경우.
+      if(mode==='both')await new Promise(resolve=>setTimeout(resolve,800));
       return r.fulfill({status:200,contentType:'application/json',
        body:JSON.stringify({ok:true,items:[sample],totalVisible:1,nextCursor:'',groups:[],groupsAll:[]})});
      });
      await ctx.route('**/api/community/stages/popular**',async r=>{
       if(mode==='failed')return r.abort('failed');
-      await new Promise(resolve=>setTimeout(resolve,2000));
+      await new Promise(resolve=>setTimeout(resolve,mode==='both'?950:2000));
       return r.fulfill({status:200,contentType:'application/json',body:JSON.stringify({ok:true,items:[{stageId:'late-stage',weeklyVoters:5,title:'늦게 도착한 무대'}]})});
      });
      const page=await ctx.newPage();
@@ -887,23 +889,28 @@ test('#1338 인기 무대 오류·2초 지연에도 트리 카드를 1초 안에
      await page.locator('#community-list .community-card').first().waitFor({state:'visible',timeout:5000});
      const elapsed=Date.now()-cardRequestAt;
      assert.ok(cardRequestAt>0,mode+'/'+width+'/'+theme+': 트리 요청이 시작됐다');
-     assert.ok(elapsed<1000,mode+'/'+width+'/'+theme+': 카드 요청부터 1초 안에 보여야 함 ('+elapsed+'ms)');
+     assert.ok(elapsed<(mode==='both'?1500:1000),mode+'/'+width+'/'+theme+': 카드 요청부터 제때 보여야 함 ('+elapsed+'ms)');
      const before=await page.evaluate(()=>{
       const card=document.querySelector('#community-list .community-card'),popular=document.querySelector('#community-popular-stages');
       return {y:card.getBoundingClientRect().top,hidden:popular.hidden,cardCount:document.querySelectorAll('#community-list .community-card').length,
        stageHeight:popular.getBoundingClientRect().height};
      });
      assert.equal(before.cardCount,1,mode+'/'+width+'/'+theme+': 공개 트리 카드 표시');
-     assert.equal(before.hidden,true,mode+'/'+width+'/'+theme+': 실패·초과 시간에는 인기 무대 줄 접기');
-     assert.equal(before.stageHeight,0,mode+'/'+width+'/'+theme+': 빈 띠 높이 0');
+     if(mode==='both'){
+      assert.equal(before.hidden,false,mode+'/'+width+'/'+theme+': 카드 응답 뒤 300ms 안에 온 인기 무대는 함께 보인다');
+      assert.ok(before.stageHeight>0,mode+'/'+width+'/'+theme+': 인기 무대 줄 높이');
+     }else{
+      assert.equal(before.hidden,true,mode+'/'+width+'/'+theme+': 실패·초과 시간에는 인기 무대 줄 접기');
+      assert.equal(before.stageHeight,0,mode+'/'+width+'/'+theme+': 빈 띠 높이 0');
+     }
      if(mode==='late')await page.waitForTimeout(2100);
      const after=await page.evaluate(()=>{
       const card=document.querySelector('#community-list .community-card'),popular=document.querySelector('#community-popular-stages');
       return {y:card.getBoundingClientRect().top,hidden:popular.hidden,stageHeight:popular.getBoundingClientRect().height};
      });
      assert.equal(after.y,before.y,mode+'/'+width+'/'+theme+': 카드 뒤 자리 밀림 0');
-     assert.equal(after.hidden,true,mode+'/'+width+'/'+theme+': 늦은 무대 결과가 줄을 다시 열지 않음');
-     assert.equal(after.stageHeight,0,mode+'/'+width+'/'+theme+': 줄 높이 0 유지');
+     assert.equal(after.hidden,before.hidden,mode+'/'+width+'/'+theme+': 처음 그린 뒤 무대 줄 상태가 바뀌지 않음');
+     assert.equal(after.stageHeight,before.stageHeight,mode+'/'+width+'/'+theme+': 줄 높이 유지');
      if(shots){
       const {mkdir}=await import('node:fs/promises');
       await mkdir(shots,{recursive:true});
