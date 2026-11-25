@@ -243,7 +243,7 @@ test('#951 ①② 위 단추 한 줄(높이 같음·줄 수 1) + 순간 3개 작
           // 되돌아가기 화살표는 하나(글자 + ::before) — 예전 폰 규칙이 화살표를 하나 더 그려 '←←'가 됐다.
           back: !!document.getElementById('shelfBackBtn'),
           title: (() => {
-            const el = document.querySelector('.lt-screen-toolbar .lt-toolbar-title');
+            const el = document.querySelector('.lt-screen-toolbar .lt-toolbar-tree-name');
             const cs = getComputedStyle(el), probe = document.createElement('span');
             probe.style.cssText = `position:absolute;visibility:hidden;white-space:pre;font:${cs.font}`;
             probe.textContent = (el.textContent || '').trim().slice(0, 4);

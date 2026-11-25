@@ -68,7 +68,7 @@ async function openHost(browser, url) {
     if (!frame) await page.waitForTimeout(250);
   }
   assert.ok(frame, '보드 프레임이 열린다');
-  await frame.waitForSelector('.lt-screen-toolbar .lt-toolbar-title', { timeout: 20000 });
+  await frame.waitForSelector('.lt-screen-toolbar .lt-toolbar-tree-name', { timeout: 20000 });
   await page.waitForTimeout(400);
   return { context, page, frame, problems };
 }
@@ -82,19 +82,21 @@ for (const [source, writable] of [['server', true], ['share', false]]) {
     t.after(async () => { await browser.close(); server.close(); });
     const { context, page, frame, problems } = await openHost(browser, `http://127.0.0.1:${server.address().port}/host.html`);
     assert.deepEqual(problems, [], '화면 오류 없음: ' + problems.join(' | '));
-    await frame.waitForFunction(title => document.querySelector('.lt-toolbar-title')?.textContent.trim() === title, TREES[0].title);
+    await frame.waitForFunction(title => document.querySelector('.lt-toolbar-tree-name')?.textContent.trim() === title, TREES[0].title);
     const head = await frame.evaluate(title => {
       const visible = el => !!el && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
       const names = [...document.querySelectorAll('*')].filter(el => el.children.length === 0 && el.textContent.trim() === title && visible(el));
       return {
-        title: document.querySelector('.lt-toolbar-title').textContent.trim(),
+        title: document.querySelector('.lt-toolbar-tree-name').textContent.trim(),
         names: names.length,
         oldButton: visible(document.getElementById('treeTitleBtn')),
         oldMenu: visible(document.getElementById('treeMenuPanel'))
       };
     }, TREES[0].title);
     assert.deepEqual(head, { title: TREES[0].title, names: 1, oldButton: false, oldMenu: false });
-    await frame.click('.lt-toolbar-title');
+    const picker = frame.locator('button.lt-toolbar-tree-choice');
+    assert.equal(await picker.count(), source === 'server' ? 1 : 0);
+    if (source === 'server') await picker.click();
     assert.equal(await frame.locator('#treeMenuPanel').isVisible(), false);
     assert.deepEqual(await page.evaluate(() => window.__msgs.filter(m => m.type === 'lt41-open-view')), []);
     await context.close();
