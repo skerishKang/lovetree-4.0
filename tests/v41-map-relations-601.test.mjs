@@ -513,6 +513,51 @@ test('#1096 체험 — 미리보기 예시 지도에서만 켜지고, 저장 없
       await page.waitForTimeout(500);
       return {ctx, page, frame};
     };
+    // #1219: ?? ???? ??? ?? ?? ??? ?? ?? ?? ? ??? ??.
+    for (const width of [390, 360]) for (const theme of ['night', 'garden']) {
+      const mobile = await open('preview.lovetree-4-0.pages.dev', 'login-host.html', width, theme);
+      try {
+        const measured = await mobile.frame.evaluate(() => {
+          const button = document.getElementById('connectToggle');
+          const bar = document.querySelector('.lt-screen-toolbar');
+          const row = bar?.querySelector('.lt-toolbar-tools');
+          const rect = button?.getBoundingClientRect();
+          const css = button ? getComputedStyle(button) : null;
+          return {
+            exists: !!button, hidden: button?.hidden,
+            visible: !!rect && rect.width >= 40 && rect.height >= 36 && css.display !== 'none',
+            inRow: !!row?.contains(button),
+            inBar: !!bar?.contains(button),
+            left: rect?.left, right: rect?.right, viewport: innerWidth,
+            pressed: button?.getAttribute('aria-pressed')
+          };
+        });
+        const label = width + '/' + theme;
+        assert.equal(measured.exists, true, label + ': ?? ??? ????');
+        assert.equal(measured.hidden, false, label + ': ?? ??? ?? ??? ??');
+        assert.equal(measured.visible, true, label + ': ??? ??? ??? ????');
+        assert.equal(measured.inRow, true, label + ': ??? ? ?? ?? ?? ?? ?? ??');
+        assert.equal(measured.inBar, true, label + ': ?? ?? ?? ???');
+        assert.ok(measured.left >= -0.5 && measured.right <= measured.viewport + 0.5,
+          label + ': ??? ?? ?? ?? ?? ??');
+        assert.equal(measured.pressed, 'false', label + ': ?? ?? ??? ???');
+        await mobile.frame.click('#connectToggle');
+        assert.equal(await mobile.frame.evaluate(() => window.__lt.connect().mode), true,
+          label + ': ?? ???? ??? ???');
+        assert.equal(await mobile.frame.locator('#connectToggle').getAttribute('aria-pressed'), 'true',
+          label + ': ?? ?? ??? ???');
+        if (process.env.LT_MAP_CONNECT_CAPTURE_DIR) {
+          mkdirSync(process.env.LT_MAP_CONNECT_CAPTURE_DIR, { recursive: true });
+          await mobile.page.screenshot({
+            path: path.join(process.env.LT_MAP_CONNECT_CAPTURE_DIR, '??-' + width + '-' + theme + '.png')
+          });
+        }
+        await mobile.frame.click('#connectToggle');
+        assert.equal(await mobile.frame.evaluate(() => window.__lt.connect().mode), false,
+          label + ': ?? ? ?? ???? ??? ???');
+      } finally { await mobile.ctx.close(); }
+    }
+
     const preview = await open('preview.lovetree-4-0.pages.dev', 'demo-host.html');
     try {
       const initial = await preview.frame.evaluate(() => ({
@@ -535,6 +580,21 @@ test('#1096 체험 — 미리보기 예시 지도에서만 켜지고, 저장 없
       }));
       const before = await readModel();
 
+      // ?? ??? ??? ????? ? ?? ??? ?? ?? ???? ????.
+      const demoHit = await preview.frame.evaluate(() => {
+        const button = document.getElementById('demoToggle');
+        const rect = button.getBoundingClientRect();
+        const target = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+        return {
+          parent: button.parentElement?.className,
+          pointer: getComputedStyle(button).pointerEvents,
+          left: rect.left, top: rect.top, width: rect.width, height: rect.height,
+          target: target?.id || target?.className || target?.tagName,
+          clickable: button === target || button.contains(target)
+        };
+      });
+      assert.equal(demoHit.clickable, true,
+        '???? ?? ?? ??? ?? ?? ??? ???? ???: ' + JSON.stringify(demoHit));
       await preview.frame.click('#demoToggle');
       assert.equal(await preview.frame.evaluate(() => window.__lt.connect().banner), true, '화면 위쪽에 체험 띠가뜬다');
 
@@ -592,49 +652,5 @@ test('#1096 체험 — 미리보기 예시 지도에서만 켜지고, 저장 없
       assert.equal(await logged.frame.evaluate(() => document.getElementById('connectToggle').hidden), false, '대신 실제 잇기 단추가 보인다');
     } finally { await logged.ctx.close(); }
 
-    // #1219: ?? ???? ??? ?? ?? ??? ?? ?? ?? ? ??? ??.
-    for (const width of [390, 360]) for (const theme of ['night', 'garden']) {
-      const mobile = await open('preview.lovetree-4-0.pages.dev', 'login-host.html', width, theme);
-      try {
-        const measured = await mobile.frame.evaluate(() => {
-          const button = document.getElementById('connectToggle');
-          const bar = document.querySelector('.lt-screen-toolbar');
-          const row = bar?.querySelector('.lt-toolbar-tools');
-          const rect = button?.getBoundingClientRect();
-          const css = button ? getComputedStyle(button) : null;
-          return {
-            exists: !!button, hidden: button?.hidden,
-            visible: !!rect && rect.width >= 40 && rect.height >= 36 && css.display !== 'none',
-            inRow: !!row?.contains(button),
-            inBar: !!bar?.contains(button),
-            left: rect?.left, right: rect?.right, viewport: innerWidth,
-            pressed: button?.getAttribute('aria-pressed')
-          };
-        });
-        const label = width + '/' + theme;
-        assert.equal(measured.exists, true, label + ': ?? ??? ????');
-        assert.equal(measured.hidden, false, label + ': ?? ??? ?? ??? ??');
-        assert.equal(measured.visible, true, label + ': ??? ??? ??? ????');
-        assert.equal(measured.inRow, true, label + ': ??? ? ?? ?? ?? ?? ?? ??');
-        assert.equal(measured.inBar, true, label + ': ?? ?? ?? ???');
-        assert.ok(measured.left >= -0.5 && measured.right <= measured.viewport + 0.5,
-          label + ': ??? ?? ?? ?? ?? ??');
-        assert.equal(measured.pressed, 'false', label + ': ?? ?? ??? ???');
-        await mobile.frame.click('#connectToggle');
-        assert.equal(await mobile.frame.evaluate(() => window.__lt.connect().mode), true,
-          label + ': ?? ???? ??? ???');
-        assert.equal(await mobile.frame.locator('#connectToggle').getAttribute('aria-pressed'), 'true',
-          label + ': ?? ?? ??? ???');
-        if (process.env.LT_MAP_CONNECT_CAPTURE_DIR) {
-          mkdirSync(process.env.LT_MAP_CONNECT_CAPTURE_DIR, { recursive: true });
-          await mobile.page.screenshot({
-            path: path.join(process.env.LT_MAP_CONNECT_CAPTURE_DIR, '??-' + width + '-' + theme + '.png')
-          });
-        }
-        await mobile.frame.click('#connectToggle');
-        assert.equal(await mobile.frame.evaluate(() => window.__lt.connect().mode), false,
-          label + ': ?? ? ?? ???? ??? ???');
-      } finally { await mobile.ctx.close(); }
-    }
   } finally { await browser.close(); server.close(); }
 });
