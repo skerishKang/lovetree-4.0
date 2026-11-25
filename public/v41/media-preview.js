@@ -400,11 +400,12 @@ const ownedUrls=new Map();
 // #393 2: 크게 보기 — 지금 문서(책·보드 등)를 어둡게 깔고 영상을 화면 가운데 크게 연다.
 // 세로 영상은 화면 높이 가득, 가로는 폭 가득. 바깥 클릭·Esc·닫기 단추로 복귀하고,
 // 닫으면 iframe/video 를 치워 재생도 멈춘다. 유튜브 자체 전체 화면은 iframe allowFullscreen 그대로.
-let lightbox=null,lightboxOpener=null,lightboxBlob=null;
+let lightbox=null,lightboxOpener=null,lightboxBlob=null,lightboxErrorListener=null;
 function closeLightbox(){
  if(!lightbox)return;
  const node=lightbox;lightbox=null;
  document.removeEventListener('keydown',lightboxKey,true);
+ if(lightboxErrorListener){window.removeEventListener('message',lightboxErrorListener);lightboxErrorListener=null}
  if(lightboxBlob){URL.revokeObjectURL(lightboxBlob);lightboxBlob=null}
  node.remove();
  document.dispatchEvent(new Event('lt-media-lightbox-close'));
@@ -438,11 +439,29 @@ async function openLightbox(url,title='',verticalHint=null){
   if(!alive())return;
   if(!embed){stage.innerHTML='<p class="lt-lightbox-note">바로 재생할 수 없어요. 원본 링크에서 열어 주세요.</p>';return}
   const frame=document.createElement('iframe');
-  frame.className='lt-lightbox-media';frame.src=embed;frame.title=title||'YouTube 영상';
+  const apiUrl=new URL(embed);apiUrl.searchParams.set('enablejsapi','1');apiUrl.searchParams.set('origin',location.origin);
+  frame.className='lt-lightbox-media';frame.src=apiUrl.href;frame.title=title||'YouTube 영상';
   frame.allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';frame.allowFullscreen=true;
   // #584: 그 자리 재생과 같은 이유(오류 153)로 no-referrer 를 쓰지 않는다.
   frame.setAttribute('referrerpolicy','strict-origin-when-cross-origin');
   stage.replaceChildren(frame);
+  // YouTube IFrame API 오류 101/150(임베드 거절)·153(플레이어 구성 실패) 등에서는
+  // 재생할 수 없는 iframe을 걷고 원본 영상으로 이동할 수 있게 합니다.
+  lightboxErrorListener=event=>{
+   if(!alive()||event.source!==frame.contentWindow||
+      !['https://www.youtube.com','https://www.youtube-nocookie.com'].includes(event.origin))return;
+   let data=event.data;
+   if(typeof data==='string'){try{data=JSON.parse(data)}catch{return}}
+   if(data?.event!=='onError'||![2,5,100,101,150,153].includes(Number(data.info)))return;
+   const note=document.createElement('p');note.className='lt-lightbox-note';
+   note.setAttribute('role','status');
+   note.textContent='여기에서 재생할 수 없는 영상입니다.';
+   const link=document.createElement('a');link.href=m.openUrl||url;
+   link.target='_blank';link.rel='noopener noreferrer';
+   link.textContent='YouTube에서 보기';
+   stage.replaceChildren(note,link);
+  };
+  window.addEventListener('message',lightboxErrorListener);
  }else{
   let src=m.loadUrl;
   if(m.privateFile){
