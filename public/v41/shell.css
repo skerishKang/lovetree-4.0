@@ -168,10 +168,13 @@ nav #record-menu:hover{background:rgba(255,255,255,.06);border-radius:var(--lt-r
 nav #record-menu #source-label{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 nav #record-menu svg{flex:0 0 auto;opacity:.7}
 nav #record-menu[hidden]{display:none}
-/* #1246: 같은 순간 추가 동작은 모든 화면에서 같은 장미색을 사용한다. */
+/* #1246: 같은 순간 추가 동작은 모든 화면에서 같은 장미색을 사용한다.
+   #1350: 가운데 '+ 순간 추가'와 글자 크기·모서리도 맞춘다. 높이만 머리줄 안에 들어가는 만큼 둔다. */
 html .header-actions #write-menu.primary-action,html .header-actions #write-menu.primary-action:hover{
- background:var(--lt-cta-rose);border-color:var(--lt-cta-rose);color:var(--lt-cta-white);box-shadow:none
+ background:var(--lt-cta-rose);border-color:var(--lt-cta-rose);color:var(--lt-cta-white);box-shadow:none;
+ font-size:15px;letter-spacing:.02em;border-radius:var(--lt-r-pill)
 }
+@media(max-width:650px){html .header-actions #write-menu.primary-action{font-size:14px}}
 body.home-existing.lt-fab-ok #mobile-add{display:none}
 /* 로그인·로그아웃 모두 같은 머리줄 테마 단추(#776 규칙) — 44px 원형, 값은 lt41.theme 공유. */
 #theme-toggle{width:44px;height:44px;min-width:44px;min-height:44px;padding:0;border-radius:50%;border:1px solid var(--line);background:rgba(255,255,255,.05);color:var(--lt-gold);font-size:17px;line-height:1;display:inline-flex;align-items:center;justify-content:center}
