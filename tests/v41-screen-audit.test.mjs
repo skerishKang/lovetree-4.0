@@ -590,7 +590,7 @@ test('#657 화면 공통 검사기: 아홉 화면 둘레·스크롤 주인 관�
   const shard = process.env.LT_SCREEN_AUDIT_SHARD || '';
   const outputDir = fileURLToPath(new URL('../test-results/v41-frame-observation/' + (shard || 'all') + '/', import.meta.url));
   const beforeDir = process.env.LT_FRAME_OBSERVATION_BEFORE_DIR || '';
-  const server = await serve();
+  const server = await serve({}, { port: 4401 });
   const base = `http://127.0.0.1:${server.address().port}`;
   const browser = await chromium.launch({ headless: true });
   const started = Date.now();
