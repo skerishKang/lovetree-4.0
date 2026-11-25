@@ -41,6 +41,9 @@ html[data-lt-theme=garden] #context-kind{color:var(--lt-rose-ink)}
 .management-block{padding-bottom:22px}.management-block+.management-block{padding-top:22px;border-top:1px solid var(--line)}.management-block label{display:block;margin:14px 0;font-size:13px;color:var(--lt-muted)}.management-block input{display:block;width:100%;min-height:44px;margin-top:8px;padding:11px 12px;border:1px solid rgba(255,255,255,.22);border-radius:12px;background:rgba(255,255,255,.04);color:var(--lt-pearl);line-height:1.6}#parent-current{margin:0;color:var(--lt-pearl);font-weight:600}#parent-management[hidden]{display:none}@media(max-width:780px){.management-block input,#tree-form input,#tree-form select{font-size:16px}}
 
 /* Explicit sharing keeps the established dark rose panels and 44px controls. */
+/* #1285 5번: 순간 고르기 칸의 작은 표지와 주 단추 강조 — 기존 토큰만 쓴다. */
+#share-moment-thumb{width:44px;height:56px;object-fit:cover;border:1px solid var(--lt-gold-line);border-radius:6px;margin-top:8px}
+#share-panel .button-row .primary:not([disabled]){border-color:var(--lt-gold-line);font-weight:700}
 .share-warning{margin:16px 0;padding:14px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-card);background:rgba(255,230,166,.06)}.share-warning p{margin:6px 0 0}.share-url{display:flex;gap:8px}.share-url input{flex:1;min-width:0}.share-url button{flex:0 0 auto}.share-item{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line)}.share-item small{display:block;color:var(--muted);margin-top:4px}.share-item button{min-height:44px}.share-item-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.share-item-actions button{min-width:112px}.share-revoked{opacity:.62}#share-preview-moments{max-height:220px;overflow:auto;padding-left:22px}#share-preview-moments li{margin:8px 0;color:#e8dce4}
 /* #369: 단계를 눈에 보이게 — ① 고르기 ② 미리보기 ③ 링크 만들기, 다음에 할 일 안내. */
 .share-steps{display:flex;gap:8px;margin:14px 0 0;padding:0;list-style:none}
@@ -613,7 +616,11 @@ nav .tree-frame{scroll-snap-align:center}
 .tree-name{min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
 .tree-count{font-size:11px;color:var(--lt-muted);white-space:nowrap}
 .tree-check{color:var(--lt-gold);font-weight:800}
-.tree-foot{display:grid;gap:3px;margin-top:6px;padding-top:6px;border-top:1px solid var(--lt-line)}
+.tree-foot{display:grid;gap:3px;margin-top:4px;padding-top:4px;border-top:1px solid var(--lt-line)}
+/* #1285 6번: 묶음 구분선과 위험 동작 표시 — 기존 토큰만 쓴다. */
+.tree-group-divider{height:1px;margin:0 9px;background:var(--lt-line)}
+.tree-foot .tree-danger .tree-name{color:var(--lt-rose)}
+.tree-foot .tree-danger:hover,.tree-foot .tree-danger:focus-visible{background:rgba(200,110,121,.12)}
 .tree-foot button{min-height:44px;text-align:left;border:0;border-radius:10px;background:none;color:var(--lt-pearl);padding:0 9px;font-size:13px}
 .tree-foot button:hover,.tree-foot button:focus-visible{background:rgba(255,255,255,.07)}
 .account-head{display:flex;align-items:center;gap:10px;padding:6px 6px 10px;border-bottom:1px solid var(--lt-line)}
@@ -626,6 +633,9 @@ nav .tree-frame{scroll-snap-align:center}
 #header-overflow{display:none}
 #header-overflow.is-open{display:grid;position:absolute;top:64px;right:16px;z-index:70;min-width:190px;padding:8px;border:1px solid var(--lt-line);border-radius:var(--lt-r-card);background:var(--lt-glass-strong);backdrop-filter:blur(24px);box-shadow:0 18px 50px #0009}
 #header-overflow button{min-height:44px;text-align:left;border:0;border-radius:10px;background:none;color:var(--lt-pearl);padding:0 10px;font-size:13px}
+/* #1285 11번: 접힌 메뉴의 둘러보기 항목도 데스크탑 탭과 같은 투명 테두리·나침반으로 구분한다. */
+#header-overflow button.lt-discover-item:not([aria-current]){border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-pill);background:transparent;display:flex;align-items:center;gap:8px;padding:0 12px}
+#header-overflow button.lt-discover-item .header-compass{width:16px;height:16px;flex:0 0 auto;color:var(--lt-gold)}
 #mobile-more{display:none;min-width:44px;justify-content:center}
 @media(max-width:1020px){.app-header{padding:9px 14px;gap:10px}.main-nav>button{padding:0 8px;font-size:12px}nav #record-menu{max-width:150px}}
 /* #1029 데스크탑: 트리 이름 길이와 무관하게 단추 폭을 180px로 고정한다. 옆 탭의 x가 밀리지 않고,
@@ -898,6 +908,14 @@ html[data-lt-theme=garden] #share-form select,html[data-lt-theme=garden] #share-
 .myposts-item{border:1px solid var(--lt-line);border-radius:var(--lt-r-card);padding:14px 16px;background:var(--lt-glass)}
 .myposts-head{display:flex;gap:8px;align-items:center;font-size:12px;color:var(--lt-muted)}
 .myposts-kind{color:var(--lt-gold)}
+/* #1285 7번: 상태 말을 배지로 — 기존 상태 토큰만 쓴다. */
+.myposts-status[data-status]{border:1px solid currentColor;border-radius:var(--lt-r-pill);padding:1px 8px;font-weight:700;color:var(--lt-muted)}
+.myposts-status[data-status=received]{color:var(--lt-rose)}
+.myposts-status[data-status=reviewing]{color:var(--lt-gold)}
+.myposts-status[data-status=fixed]{color:var(--lt-group-5)}
+.myposts-status[data-status=later]{color:var(--lt-violet)}
+html[data-lt-theme=garden] .myposts-status[data-status=received]{color:var(--lt-rose-ink)}
+html[data-lt-theme=garden] .myposts-status[data-status=reviewing]{color:var(--lt-gold-ink)}
 .myposts-date{margin-left:auto}
 .myposts-title{font-size:15px;margin:6px 0;font-weight:600;overflow-wrap:anywhere;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
 .myposts-body{font-size:13px;line-height:1.8;color:var(--lt-pearl);overflow-wrap:anywhere;white-space:pre-wrap}
@@ -1038,7 +1056,7 @@ body.community-screen #stage>iframe,body.community-screen #empty{display:none}
 #community-preview .community-preview-close{width:44px;height:44px;border:1px solid var(--lt-line-paper);border-radius:var(--lt-r-pill);background:var(--lt-paper);color:var(--lt-ink);font-size:24px;line-height:1}
 #community-preview>.community-cover{flex:0 0 auto;aspect-ratio:1.6;max-height:28dvh}
 #community-preview>.community-cover[data-media-kind="video-youtube"]{aspect-ratio:16/9;max-height:28dvh}
-#community-preview>.community-cover[data-media-kind="video-youtube"] .community-cover-image{object-fit:contain}
+#community-preview>.community-cover[data-media-kind="video-youtube"] .community-cover-image{object-fit:cover}
 #community-preview>.community-cover[data-media-kind="video-youtube"] .community-cover-backdrop{position:absolute;inset:-10px;display:block;width:calc(100% + 20px);height:calc(100% + 20px);object-fit:cover;filter:blur(18px);opacity:.78;transform:scale(1.06)}
 #community-preview .community-preview-body{display:grid;gap:8px;padding:14px 18px 18px}
 #community-preview .community-preview-body h3{margin:0;color:var(--lt-ink);font-size:24px;line-height:1.35}

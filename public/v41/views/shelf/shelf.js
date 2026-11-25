@@ -95,6 +95,16 @@ import { createReader } from './shelf-reader.js';
             '<div class="book-cover'+coverClasses(book)+'"'+(book.design?' data-cover-design="'+esc(book.design)+'"':'')+'>'+(book.coverMedia?'<img class="book-cover-media" src="'+esc(book.coverMedia)+'"'+coverFallbackAttrs(book.coverCandidates||[book.coverMedia])+' alt="" loading="lazy" referrerpolicy="no-referrer">':'')+'<span class="cover-symbol"><span>'+esc(book.symbol)+'</span></span>'+(book.coverMedia?'':'<strong class="cover-title">'+esc(book.name)+'</strong>')+'</div>'+
             '<span class="book-card-meta"><span class="book-card-meta-title">'+esc(metaLine1)+'</span><span class="book-card-meta-date">'+esc(metaLine2)+'</span></span></button><button type="button" class="book-manage" data-manage-id="'+esc(book.id)+'" aria-label="'+esc(book.name)+' 고치기">⋯</button></article>';
         }).join(''):'<div class="empty"><strong>찾는 책이 없어요.</strong><span>트리 이름·좋아하는 대상·순간 제목으로 검색해 보세요.</span></div>');
+          // #1285 1번: 책이 적은 넓은 화면에서 오른쪽이 빈 양피지로 남지 않게 빈 칸 자리를 둔다.
+          // 실제 새 트리 입구는 오른쪽 단추 하나만 유지한다(누를 수 있는 요소가 아니다).
+          if (list.length > 0 && list.length < 4 && railWidth >= 1200) {
+            var row = shelfRowLayout(list.length, railWidth);
+            var grid = shelfView() === 'shelf';
+            for (var slot = list.length; slot < 4; slot += 1) {
+              var at = grid ? '' : ' style="--x:' + row.xOf(slot) + 'px"';
+              $('#shelfRail').insertAdjacentHTML('beforeend', '<div class="shelf-empty-slot" aria-hidden="true"' + at + '><span>새 트리 자리</span></div>');
+            }
+          }
         updateCarousel(false);
       }
       // #256-1 → 261118 대표 지적 4: 이어 보기 띠 한 줄 — [가로 썸네일] 트리 이름 · 순간 제목 · '이어 보기 ▶'.

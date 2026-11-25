@@ -988,7 +988,8 @@
   };
   function paintHero() {
     const p = document.querySelector('.hero p');
-    if (p) p.textContent = HERO_LINES[state.view] || HERO_LINES.network;
+    // #1285 4번: 시간 순에서는 가운데 줄에서 떨어진 '여기서 시작'을 제목 줄로 옮긴다.
+    if (p) p.textContent = state.view === 'time' ? `여기서 시작 · ${HERO_LINES.time}` : (HERO_LINES[state.view] || HERO_LINES.network);
   }
   function setView(v) {
     v = normView(v);
@@ -1902,7 +1903,7 @@
       const full = state.selected?.id === n.id;
       push(
         n,
-        n.first
+        n.first && state.view !== 'time'
           ? `여기서 시작 · ${full ? t : LT56Model.shortTitle(t, max)}`
           : full
             ? t
@@ -2160,7 +2161,8 @@
     drawRings();
     drawTimeLine();
     edges.forEach(drawEdge);
-    if (state.view === 'tag') TAG_CLUSTERS.forEach(drawHub);
+    // #1285 3번: 이름표가 없는 '아직 묶음에 안 든' 원은 그리지 않는다(범례·이름표와 같은 기준).
+    if (state.view === 'tag') TAG_CLUSTERS.filter((c) => !c.shelf).forEach(drawHub);
     else if (state.view === 'network') CLUSTERS.forEach(drawHub);
     if (state.view === 'network') {
       anchors.forEach(drawNode);
