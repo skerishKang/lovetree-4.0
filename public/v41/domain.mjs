@@ -1,6 +1,7 @@
 // #547: '오늘' 날짜는 기기의 지역 날짜로 만든다(UTC 날짜였을 때 새벽 순간이 하루 전으로 찍혔다).
 import { localDateOnly } from './local-date.mjs';
 import { isAutoTitle, autoTitleFor } from './auto-title.mjs';
+import { DEFAULT_TREE_OPEN_VIEW, normalizeTreeOpenView } from './tree-open-view.mjs';
 
 // #792: 순간 구간의 순수 계산(서버 사본 src/moment-range.js와 같은 규칙 — tests/moment-range-792.test.mjs가 대조).
 export const MAX_RANGE_SECONDS = 12 * 60 * 60;
@@ -407,7 +408,7 @@ export function createTree(input, clock = new Date().toISOString()) {
   const subject = requireText(input.subject, '좋아하는 대상', 60);
   const moment = { ...validateMomentInput(input), id: newId(), parentId: null, relation: '', links: [], createdAt: clock };
   // #212: 자동 접미사(", 나의 순간들")는 더 붙이지 않는다. 표시 단계 규칙은 tree-name.mjs.
-  return { id: newId(), subject, title: subject, coverMomentId: '', coverDesign: '', inbox: false, createdAt: clock, updatedAt: clock, moments: [moment] };
+  return { id: newId(), subject, title: subject, openView: normalizeTreeOpenView(input.openView), coverMomentId: '', coverDesign: '', inbox: false, createdAt: clock, updatedAt: clock, moments: [moment] };
 }
 export function editTree(tree, input, clock = new Date().toISOString()) {
   const title = requireText(input.title, '트리 이름', 100);
@@ -418,8 +419,11 @@ export function editTree(tree, input, clock = new Date().toISOString()) {
   // #380 5번: 표지 방법(basic·moment·design·photo)은 따로 저장한다. 고른 방법 하나만 표지가 되고,
   // 고르지 않은 곳의 저장값은 지우지 않는다(되돌리면 그대로 다시 보인다).
   const coverMode = normalizeCoverMode(input.coverMode);
-  if (tree.title === title && tree.subject === subject && (tree.coverMomentId || '') === coverMomentId && (tree.coverDesign || '') === coverDesign && (tree.coverMode || '') === coverMode) return tree;
-  const next = { ...tree, title, subject, coverMomentId, coverDesign, updatedAt: clock };
+  const openView = normalizeTreeOpenView(input.openView === undefined ? tree.openView : input.openView);
+  if (tree.openView === openView && tree.title === title && tree.subject === subject &&
+      (tree.coverMomentId || '') === coverMomentId && (tree.coverDesign || '') === coverDesign &&
+      (tree.coverMode || '') === coverMode) return tree;
+  const next = { ...tree, title, subject, openView, coverMomentId, coverDesign, updatedAt: clock };
   // 방법을 고르지 않은 옛 저장본에는 빈 값을 새로 심지 않는다(모양을 그대로 둔다).
   if (coverMode) next.coverMode = coverMode; else delete next.coverMode;
   return next;
@@ -559,7 +563,7 @@ export function quickAdd(state, input, clock = new Date().toISOString()) {
   const inbox = trees.find(tree => tree.inbox === true);
   if (!inbox) {
     if (trees.length >= MAX_TREES) throw new Error(`트리는 ${MAX_TREES}개까지 만들 수 있어요.`);
-    const tree = { id: newId(), subject: INBOX_SUBJECT, title: INBOX_SUBJECT, coverMomentId: '', coverDesign: '', inbox: true, createdAt: clock, updatedAt: clock, moments: [moment] };
+    const tree = { id: newId(), subject: INBOX_SUBJECT, title: INBOX_SUBJECT, openView: DEFAULT_TREE_OPEN_VIEW, coverMomentId: '', coverDesign: '', inbox: true, createdAt: clock, updatedAt: clock, moments: [moment] };
     return { state: { version: 1, trees: [...trees, tree], prefs: normalizePrefs(state.prefs) }, treeId: tree.id, momentId: moment.id };
   }
   // '가' 결정: 빠른 추가는 이전 순간을 고를 길이 없으므로 가장 최근 순간 다음에 잇는다(첫 순간 하나뿐이면 첫 순간).
@@ -610,7 +614,7 @@ export function treeFromMoments(state, fromTreeId, momentIds, options = {}, cloc
   });
   if (state.trees.length >= MAX_TREES) throw new Error(`트리는 ${MAX_TREES}개까지 만들 수 있어요.`);
   const root = { ...moving[0], parentId: null, relation: '', links: [] };
-  const tree = { id: newId(), subject, title: `${subject}, 나의 순간들`, coverMomentId: '', coverDesign: '', inbox: false, createdAt: clock, updatedAt: clock, moments: [root, ...moving.slice(1).map(m => ({ ...m, parentId: root.id, relation: '', links: [] }))] };
+  const tree = { id: newId(), subject, title: `${subject}, 나의 순간들`, openView: DEFAULT_TREE_OPEN_VIEW, coverMomentId: '', coverDesign: '', inbox: false, createdAt: clock, updatedAt: clock, moments: [root, ...moving.slice(1).map(m => ({ ...m, parentId: root.id, relation: '', links: [] }))] };
   const moments = detachMoments(from, movedIds);
   if (!moments.length) return { state: { version: 1, trees: [...state.trees.filter(t => t.id !== fromTreeId), tree], prefs: normalizePrefs(state.prefs) }, treeId: tree.id };
   const fromNext = { ...from, coverMomentId: movedIds.has(from.coverMomentId) ? '' : from.coverMomentId || '', updatedAt: clock, moments };
@@ -693,7 +697,7 @@ export function validateState(value) {
     const coverMode = normalizeCoverMode(tree.coverMode);
     const inbox = tree.inbox === true && !inboxSeen;
     if (inbox) inboxSeen = true;
-    const out = { id: tree.id, subject: requireText(tree.subject, '대상', 60), title: requireText(tree.title, '트리 제목', 100), coverMomentId, coverDesign, inbox, createdAt: tree.createdAt, updatedAt: tree.updatedAt, moments };
+    const out = { id: tree.id, subject: requireText(tree.subject, '대상', 60), title: requireText(tree.title, '트리 제목', 100), openView: normalizeTreeOpenView(tree.openView), coverMomentId, coverDesign, inbox, createdAt: tree.createdAt, updatedAt: tree.updatedAt, moments };
     if (coverMode) out.coverMode = coverMode;
     return out;
   });

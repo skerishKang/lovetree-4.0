@@ -744,6 +744,9 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
    const fp=floatOffset(i,testFloatPaused||(seek!==null&&!testFloatActive)||!animRunning()?0:elapsed,floatPool[i]);
    const pose=cardPose(values,w,h,sprite.w,sprite.h,fp.x-sprite.offset.x,fp.y-sprite.offset.y,posePool[i]);
    poses[i]=pose;const box=pose.box;
+   // #1382: DOM 상자 갱신을 줄인다 — 초점 카드는 매 프레임, 나머지는 250ms마다 한 번.
+   // 그림과 누름 판정(hitProjective)은 매 프레임 그대로다.
+   if(i===focusIndex||now-(el.__domSyncAt||0)>=250){syncDomPose(i);el.__domSyncAt=now;}
    const gx=(Math.abs(pose.a)*sprite.guardW+Math.abs(pose.c)*sprite.guardH)/2,gy=(Math.abs(pose.b)*sprite.guardW+Math.abs(pose.d)*sprite.guardH)/2;
    screenBox.l=pose.x-gx;screenBox.r=pose.x+gx;screenBox.t=pose.y-gy;screenBox.b=pose.y+gy;
    const centerHit=zone&&zoneOverlapArea(zone,screenBox)>1;
@@ -766,7 +769,15 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
   return .2+.6*(1-Math.cos(elapsed*Math.PI*2))/2;
  };
 
- const syncDomPose=(i,t=null)=>{const el=elements[i],f=orbitFrames[i];if(!el||!f?.length)return;const tf=orbitTransform(f,t??testSeek??fractionAt(i,lastPoseAt||performance.now()));if(tf){el.style.transform=tf;el.__orbitTf=tf;}};
+ // #1382: 캔버스 경로에서는 .lt-lift 의 WAAPI 부유가 끊기므로(697행) 그림에 쓰인 포즈 행렬을
+ // 같은 시각에 DOM 상자에도 쓴다. 부유 오프셋은 회전·배율 안쪽에서 적용돼야 하므로 translate에 더하지 않는다.
+ const syncDomPose=(i,t=null)=>{const el=elements[i],f=orbitFrames[i];if(!el||!f?.length)return;
+  if(spritesReady&&poses[i]&&!el.__dragTf){const p=poses[i];
+   const cx=(p.box.l+p.box.r)/2,cy=(p.box.t+p.box.b)/2;
+   const tf=`matrix(${p.a.toFixed(4)},${p.b.toFixed(4)},${p.c.toFixed(4)},${p.d.toFixed(4)},${(cx-p.ox).toFixed(2)},${(cy-p.oy).toFixed(2)})`;
+   if(el.__orbitTf!==tf){el.__orbitTf=tf;el.style.transform=tf;}return;}
+  const tf=orbitTransform(f,t??testSeek??fractionAt(i,lastPoseAt||performance.now()));
+  if(tf&&el.__orbitTf!==tf){el.__orbitTf=tf;el.style.transform=tf;}};
  const orbitWrite=(now)=>{lastWriteAt=now;if(layoutMode==='ribbon'){if(!firstFrameDone){firstFrameDone=true;tryReveal();}return;}if(spritesReady){if(!firstFrameDone){firstFrameDone=true;tryReveal();}drawCanvas(now);return;}for(let i=0;i<elements.length;i++){
    const frames=orbitFrames[i],el=elements[i];if(!frames||!frames.length||!el||el.classList.contains('off'))continue;
    const cfg=orbitRings(layoutBox?.w||0,layoutBox?.h||0)[cards[i].ring];
@@ -791,7 +802,7 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
   if(next!==layoutMode&&!hintDismissed){hintCardIndex=-1;hintVisible=false;clearTimeout(hintTimer);world.classList.remove('lt-hint-ready');}
   for(const a of ribbonAnims)a?.cancel();ribbonAnims=[];ribbonSeek=null;world.classList.remove('lt-ribbon');
   for(const a of floatAnims)a?.cancel();floatAnims.fill(null);
-  for(const el of elements){el.style.removeProperty('transform');el.style.removeProperty('z-index');el.style.removeProperty('--lt-orbit-depth');delete el.__orbitTf;el.classList.remove('clash','lt-under-link');const surface=el.querySelector('.surface');surface?.classList.remove('lt-textured');surface?.querySelector('.lt-orbit-texture')?.remove();}
+  for(const el of elements){el.style.removeProperty('transform');el.style.removeProperty('z-index');el.style.removeProperty('--lt-orbit-depth');delete el.__orbitTf;delete el.__domSyncAt;el.classList.remove('clash','lt-under-link');const surface=el.querySelector('.surface');surface?.classList.remove('lt-textured');surface?.querySelector('.lt-orbit-texture')?.remove();}
   layoutMode=next;host.dataset.ltLayout=next;
   if(next==='ribbon'){
    stopOrbitLoop();world.classList.remove('lt-canvas');world.classList.add('lt-ribbon');const duration=96000;if(!hintDismissed)selectCardHint(0);
@@ -821,7 +832,7 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
    lastWriteAt(){return lastWriteAt;},hintIndex(){return hintCardIndex;},ribbonTime(){return ribbonAnims[0]?.currentTime||0;},ribbonAdvanced(initial){return (ribbonAnims[0]?.currentTime||0)-initial;},
    progress(now){if(layoutMode==='ribbon')return ((ribbonAnims[0]?.currentTime||0)/(elements[0]?.__ribbonDuration||96000)%1+1)%1;const cfg=orbitRings(layoutBox?.w||0,layoutBox?.h||0)[cards[0].ring];const elapsed=now-orbitStart-pausedTotal-(pausedAt?now-pausedAt:0);return ((elapsed/Math.round(ORBIT_MS/cfg.speed))+phase)%1;},
    period(){if(layoutMode==='ribbon')return elements[0]?.__ribbonDuration||96000;const cfg=orbitRings(layoutBox?.w||0,layoutBox?.h||0)[cards[0].ring];return Math.round(ORBIT_MS/cfg.speed);},
-   hold(on){if(layoutMode==='ribbon'){if(on)ribbonAnims.forEach(a=>a?.pause());else{ribbonSeek=null;syncRibbonMotion();}return;}if(on){orbitPause();stopOrbitLoop();}else{testSeek=null;orbitResume();startOrbitLoop();}},
+   hold(on){if(layoutMode==='ribbon'){if(on)ribbonAnims.forEach(a=>a?.pause());else{ribbonSeek=null;syncRibbonMotion();}return;}if(on){orbitPause();stopOrbitLoop();const now=performance.now();for(let i=0;i<elements.length;i++)if(elements[i]&&!elements[i].classList.contains('off')){syncDomPose(i);elements[i].__domSyncAt=now;}}else{testSeek=null;orbitResume();startOrbitLoop();}},
    seek(t){if(layoutMode==='ribbon'){ribbonSeek=t;ribbonAnims.forEach(a=>{if(a){a.pause();a.currentTime=t*(elements[0]?.__ribbonDuration||96000);}});return true;}testSeek=t;for(let i=0;i<elements.length;i++){
     const frames=orbitFrames[i],el=elements[i];if(!frames||!frames.length||!el)continue;
     if(el.__seekSaved===undefined)el.__seekSaved=el.style.transform;

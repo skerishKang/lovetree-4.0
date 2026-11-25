@@ -263,8 +263,8 @@ test('#638 주소 형태 여섯 가지가 같은 영상 ID로 풀린다', () => 
 });
 
 // ---- 이슈 638 ①: quickAdd 도메인 규칙 — 고른 트리 우선(#327의 '모아둔 순간 고정'을 바꾼 대표 결정 2026-11-15) ----
-const inboxTree = { id: 't-inbox', subject: QUICK_INBOX_LABEL, title: QUICK_INBOX_LABEL, inbox: true, coverMomentId: '', coverDesign: '', createdAt: '2026-11-01T00:00:00Z', updatedAt: '2026-11-01T00:00:00Z', moments: [{ id: 's0', parentId: null, links: [], createdAt: '2026-11-01T00:00:00Z', title: '첫 순간', note: '', emotion: '설렘', date: '2026-11-01', relation: '', url: 'https://youtu.be/abc123DEF45' }] };
-const secondTree = { id: 't-second', subject: '두 번째 트리', title: '두 번째 트리', inbox: false, coverMomentId: '', coverDesign: '', createdAt: '2026-11-02T00:00:00Z', updatedAt: '2026-11-02T00:00:00Z', moments: [{ id: 's9', parentId: null, links: [], createdAt: '2026-11-02T00:00:00Z', title: '담는 순간', note: '', emotion: '설렘', date: '2026-11-02', relation: '', url: '' }] };
+const inboxTree = { id: 't-inbox', subject: QUICK_INBOX_LABEL, title: QUICK_INBOX_LABEL, inbox: true, openView: 'tree', coverMomentId: '', coverDesign: '', createdAt: '2026-11-01T00:00:00Z', updatedAt: '2026-11-01T00:00:00Z', moments: [{ id: 's0', parentId: null, links: [], createdAt: '2026-11-01T00:00:00Z', title: '첫 순간', note: '', emotion: '설렘', date: '2026-11-01', relation: '', url: 'https://youtu.be/abc123DEF45' }] };
+const secondTree = { id: 't-second', subject: '두 번째 트리', title: '두 번째 트리', inbox: false, openView: 'board', coverMomentId: '', coverDesign: '', createdAt: '2026-11-02T00:00:00Z', updatedAt: '2026-11-02T00:00:00Z', moments: [{ id: 's9', parentId: null, links: [], createdAt: '2026-11-02T00:00:00Z', title: '담는 순간', note: '', emotion: '설렘', date: '2026-11-02', relation: '', url: '' }] };
 const stateWithTwoTrees = { version: 1, trees: [inboxTree, secondTree], prefs: {} };
 
 test('#638 quickAdd는 고른 트리(input.treeId)에 담고, 가장 최근 순간 다음에 잇는다', () => {
@@ -274,6 +274,7 @@ test('#638 quickAdd는 고른 트리(input.treeId)에 담고, 가장 최근 순�
   assert.equal(tree.moments.length, 2);
   assert.equal(tree.moments[1].parentId, 's9', '가장 최근 순간 다음에 잇는다(가 결정)');
   assert.equal(result.state.trees.find(tree => tree.id === 't-inbox').moments.length, 1, '첫 트리는 그대로');
+  assert.deepEqual(result.state.trees.map(tree => tree.openView), ['tree', 'board'], '두 트리의 열 화면을 보존한다');
   assert.deepEqual(validateState(result.state), result.state);
 });
 

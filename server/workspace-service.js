@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import { EMPTY_STATE, MAX_TREES, validateState } from '../src/domain.js';
+import { DEFAULT_TREE_OPEN_VIEW } from '../public/v41/tree-open-view.mjs';
 import { ApiError } from './errors.js';
 
 const CLIENT_KEY = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
@@ -15,7 +16,14 @@ function documentMessage(error) {
 }
 
 export function requestHashOf(validatedState, expectedRevision) {
-  return createHash('sha256').update(`${JSON.stringify(validatedState)}\n${expectedRevision}`, 'utf8').digest('hex');
+  // 기본 화면은 옛 문서에서 생략됐다. 배포 전에 저장된 요청도 같은 키로 다시 보낼 수 있게 한다.
+  const trees = validatedState.trees.map(tree => {
+    if (tree.openView !== DEFAULT_TREE_OPEN_VIEW) return tree;
+    const { openView, ...previousFields } = tree;
+    return previousFields;
+  });
+  const document = JSON.stringify({ ...validatedState, trees });
+  return createHash('sha256').update(`${document}\n${expectedRevision}`, 'utf8').digest('hex');
 }
 
 // #986: 규칙이 바뀐 예전 문서에는 도메인 규칙을 어긴 트리가 섞여 있을 수 있다. 문서 전체를
