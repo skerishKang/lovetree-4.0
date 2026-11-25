@@ -168,7 +168,7 @@ test('#1025 순간 보기 — iframe 2개 이하·10회 넘기기 같은 영상 
           return { viewport: innerHeight, cardBottom: Math.round(card.bottom), cardTop: Math.round(card.top), railCount: rail.length, railBottom: Math.round(Math.max(...rail.map(r => r.bottom))), railTop: Math.round(Math.min(...rail.map(r => r.top))) };
         });
         assert.ok(bounds.cardTop >= 0 && bounds.cardBottom <= bounds.viewport, `${width}·${theme}: 판이 화면 밖 — ${JSON.stringify(bounds)}`);
-        assert.equal(bounds.railCount, 5, `${width}·${theme}: 단추 다섯(마음·댓글·트리·담기·공유)`);
+        assert.equal(bounds.railCount, 6, `${width}·${theme}: 단추 여섯(소리·마음·댓글·트리·담기·공유)`);
         assert.ok(bounds.railTop >= 0 && bounds.railBottom <= bounds.viewport, `${width}·${theme}: 단추가 화면 밖 — ${JSON.stringify(bounds)}`);
         const tags = await panel.locator('.moments-tags').textContent();
         assert.ok(!tags.includes(':'), `${width}·${theme}: 꼬리표 머리말을 뺀 값만 — ${tags}`);
@@ -263,7 +263,7 @@ test('#1075 — 밝은 영상 위에서도 390·1440의 단추 일곱 개가 보
       const text = Math.max(...[...el.querySelectorAll('.moments-overlay > *')].map(node => node.getBoundingClientRect().right));
       return { cardRight: Math.round(card.right), buttonRight: Math.round(Math.max(...buttons.map(r => r.right))), buttonLeft: Math.round(Math.min(...buttons.map(r => r.left))), textRight: Math.round(text) };
      });
-     assert.equal(nodes.length, width<=780?5:7, `${width}·${theme}: 오른쪽 다섯(마음·댓글·트리·담기·공유) + 위아래 둘`);
+     assert.equal(nodes.length, width<=780?6:8, `${width}·${theme}: 오른쪽 여섯(소리·마음·댓글·트리·담기·공유) + 위아래 둘`);
      for (const node of nodes) {
       assert.ok(node.visible, `${width}·${theme}: ${node.label}이 보이지 않음 — ${JSON.stringify(node)}`);
       assert.ok(node.inView, `${width}·${theme}: ${node.label}이 화면 밖 — ${JSON.stringify(node)}`);
@@ -271,7 +271,8 @@ test('#1075 — 밝은 영상 위에서도 390·1440의 단추 일곱 개가 보
      }
       if (width <= 780) {
        for (const node of nodes) {
-        assert.equal(node.color, 'rgb(255, 255, 255)', `${width}·${theme}: 밝은 영상 위 흰 글자 — ${node.label} ${node.color}`);
+        if(node.label==='소리 켜기')assert.equal(node.color, await panel.evaluate(()=>{const c=getComputedStyle(document.documentElement).getPropertyValue('--lt-rose').trim();const n=parseInt(c.slice(1,3),16)+', '+parseInt(c.slice(3,5),16)+', '+parseInt(c.slice(5,7),16);return 'rgb('+n+')';}), `${width}·${theme}: 음소거는 장미색 — ${node.color}`);
+         else assert.equal(node.color, 'rgb(255, 255, 255)', `${width}·${theme}: 밝은 영상 위 흰 글자 — ${node.label} ${node.color}`);
         assert.equal(node.opacity, '1', `${width}·${theme}: ${node.label}만 흐리게 남음 — ${node.opacity}`);
         assert.equal(node.background,'rgba(0, 0, 0, 0)','휴대폰 단추 원형 바탕 제거');
         assert.ok(node.rect[2]>=44&&node.rect[3]>=44,'휴대폰 누르기 영역 44px');
@@ -391,7 +392,7 @@ test('#1098 2단계 — 쇼츠의 그 순간 ♡·댓글 수와 순간 단위 �
      const nodes = [...document.querySelectorAll('#community-moments-panel .moments-rail-button')];
      return { inView: nodes.every((n) => { const r = n.getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight && r.left >= 0 && r.right <= innerWidth; }), overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth };
     });
-    assert.equal(mobile.inView, true, '390 단추 다섯 개가 화면 안에 있다');
+    assert.equal(mobile.inView, true, '390 단추 여섯 개가 화면 안에 있다');
     assert.ok(mobile.overflow <= 1, `390 가로 넉침 0: ${mobile.overflow}`);
    } finally { await h.ctx.close(); await new Promise(r => h.server.close(r)); }
   } finally { await browser.close(); }
@@ -698,7 +699,7 @@ test('#1294 순간 밀기 기록 누적 없음·댓글 뒤로 가기·탭 복원
    await expectNoHistoryGrowth(page,async()=>page.locator('.moments-chip').last().click(),width+' 가수 필터');
    if(width===390){
     await expectNoHistoryGrowth(page,async()=>page.locator('.moments-note').click(),width+' 설명 펼치기');
-    await expectNoHistoryGrowth(page,async()=>page.locator('.moments-mute').click(),width+' 소리 전환');
+    await expectNoHistoryGrowth(page,async()=>page.locator('.moments-rail-button.is-sound').click(),width+' 소리 전환');
    }
    console.log('#1294 MOMENTS',width,'OK');
   }finally{await h.ctx.close();await new Promise(ok=>h.server.close(ok));}
