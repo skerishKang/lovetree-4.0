@@ -66,7 +66,7 @@ async function visibleShellFrame(page) {
   return handle ? handle.contentFrame() : null;
 }
 
-export async function backState(page, { frame = null, panels = [] } = {}) {
+async function captureOnce(page, { frame = null, panels = [] } = {}) {
   const target = await visibleShellFrame(page) || frame;
   const selectors = [...DEFAULT_PANELS, ...panels];
   const shell = await page.evaluate(captureDocument, selectors);
@@ -80,6 +80,20 @@ export async function backState(page, { frame = null, panels = [] } = {}) {
     selectedMoment: inner.selectedMoment || shell.selectedMoment,
     scroll: { shell: shell.scroll, frame: inner.scroll }
   };
+}
+
+export async function backState(page, options = {}) {
+  const navigational = /Execution context was destroyed|most likely because of a navigation|Target closed|Frame was detached/;
+  let last = null;
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    try { return await captureOnce(page, options); }
+    catch (error) {
+      last = error;
+      if (!navigational.test(String(error?.message || error))) throw error;
+      await page.waitForTimeout(50);
+    }
+  }
+  throw last;
 }
 
 function comparable(state) {
