@@ -308,6 +308,8 @@ let soundButton=null;
    if(!frame.isConnected||frame!==currentFrame||stage.dataset.ltPlaying==='1'||tries++>=32){clearInterval(frame._ltKick);return;}
    try{frame.contentWindow?.postMessage('{"event":"listening"}',YT_ORIGIN);}catch{}
    // 소리를 켠 채로는 휴대폰이 자동 재생을 막는다 — 2초 안에 시작하지 않으면 음소거로 시작한다.
+   // 소리를 켜 둔 사람은 새 영상에서도 소리로 시작한다(주소의 mute=1을 풀어 준다).
+   // 휴대폰이 소리 자동 재생을 막아 2초 안에 시작하지 않으면 음소거로 시작한다.
    if(wantSound&&tries<=8){command(frame,'playVideo');command(frame,'unMute');}
    else{command(frame,'mute');command(frame,'playVideo');}
    stage.dataset.ltAutoplay='1';
@@ -429,6 +431,8 @@ let soundButton=null;
     const info=data.info;const duration=Number(info.duration),time=Number(info.currentTime);
     if(Number.isFinite(duration)&&duration>0&&Number.isFinite(time)){const value=Math.max(0,Math.min(100,time/duration*100));playerProgress.value=value;progress.dataset.ltProgress=String(Math.round(value));}
     if(info.playerState===1){media.classList.add('is-playing');stage.dataset.ltPlaying='1';}
+    // 화면 표시는 유튜브가 알려 준 실제 상태를 따른다. 새 영상은 주소의 mute=1로 음소거 상태를 알려 오므로,
+    // 소리를 켜 둔 사람의 선택(wantSound)이 있으면 몇 번 더 소리를 다시 켠다(브라우저가 막으면 알약이 다시 보인다).
     if(typeof info.muted==='boolean'){
      unmuted=!info.muted;paintSound();
      if(info.muted&&wantSound&&(currentFrame._ltSoundTries=(currentFrame._ltSoundTries||0)+1)<=8)command(currentFrame,'unMute');

@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {createHmac} from 'node:crypto';
 import {createFeedbackHandler, createFeedbackService, maskPersonal} from '../server/feedback-service.js';
 import {createMemoryFeedbackRepo} from '../server/testing/memory-feedback-repo.js';
 import {createMemoryFeedbackOutbox} from '../server/testing/memory-feedback-outbox.js';
@@ -493,6 +494,58 @@ test('1190: 새 의견을 저장하면 보낼 줄이 생기고 이메일·소개
   assert.equal(rows[0].payload.accountSubjectId,'ai');
   assert.equal(rows[0].payload.email,undefined);
   assert.equal(rows[0].payload.intro,undefined);
+});
+
+test('피드백 59: 운영센터에 없는 의견의 상태 변경은 새 의견을 먼저 보내 만든다', async () => {
+  const feedbackRepo=createMemoryFeedbackRepo(),outbox=createMemoryFeedbackOutbox({now:()=>1000});
+  const admin={roleFor:async value=>value?.subjectId==='admin'?'admin':value?.subjectId==='ai'?'ai_customer':null};
+  const service=createFeedbackService({feedbackRepo,productId:PRODUCT,admin,outbox,now:()=>1000,nameOf:async()=> '시험닉'});
+  const legacy=await feedbackRepo.create({productId:PRODUCT,subjectId:'ai',category:'bug',body:'상태를 바꾸면 운영센터에도 보여야 해요'});
+  await service.update(principal('admin'),String(legacy.id),{status:'reviewing'});
+
+  const received=new Map(),calls=[],fields=['event','feedbackId','body','status','append','isAiCustomer','accountSubjectId','category','title','createdAt'];
+  const dispatcher=createFeedbackOutboxDispatcher({
+    outbox,receiverUrl:'https://ops.example.test/inbox',secret:'fixture-secret',now:()=>1000,
+    fetchImpl:async(url,init)=>{
+      const value=JSON.parse(init.body);
+      calls.push({url,init,value});
+      const allowed=new Set(value.accountName===undefined?fields:[...fields,'accountName']);
+      if([...Object.keys(value)].sort().join()!==[...allowed].sort().join())return {status:400};
+      if(value.event==='new'){
+        if(received.has(value.feedbackId))return {status:200};
+        received.set(value.feedbackId,{...value});
+        return {status:201};
+      }
+      const current=received.get(value.feedbackId);
+      if(!current)return {status:404};
+      if(value.event==='status')current.status=value.status;
+      return {status:200};
+    }
+  });
+  assert.equal(await dispatcher.drain(),2);
+  assert.deepEqual(calls.map(call=>call.value.event),['new','status']);
+  assert.equal(received.get(legacy.id).status,'reviewing');
+  assert.equal(received.get(legacy.id).body,legacy.body);
+  assert.equal(received.get(legacy.id).accountName,'시험닉');
+  assert.equal(received.get(legacy.id).isAiCustomer,true);
+  assert.equal(received.get(legacy.id).title,'상태를 바꾸면 운영센터에도 보여야 해요');
+  assert.deepEqual((await outbox.list()).map(row=>[row.kind,row.status,row.attempts]),[['new','sent',0],['status','sent',0]]);
+  for(const {init} of calls){
+    const expected=createHmac('sha256','fixture-secret').update(`${init.headers['x-lt-timestamp']}\nlovetree\n${init.body}`,'utf8').digest('hex');
+    assert.equal(init.headers['x-lt-signature'],'sha256='+expected);
+  }
+});
+
+test('피드백 59: 이미 보낸 새 의견의 상태 변경은 새 의견 줄을 늘리지 않는다', async () => {
+  const feedbackRepo=createMemoryFeedbackRepo(),outbox=createMemoryFeedbackOutbox({now:()=>1000});
+  const admin={roleFor:async value=>value?.subjectId==='admin'?'admin':value?.subjectId==='ai'?'ai_customer':null};
+  const service=createFeedbackService({feedbackRepo,productId:PRODUCT,admin,outbox,now:()=>1000});
+  const saved=await service.submit({principal:principal('ai'),request:{headers:{}},category:'bug',body:'이미 보낸 의견',context:{}});
+  await service.update(principal('admin'),String(saved.id),{status:'reviewing'});
+  const rows=await outbox.list();
+  assert.deepEqual(rows.map(row=>row.kind),['new','status']);
+  assert.equal(rows[0].eventKey,'new');
+  assert.equal(rows[1].payload.feedbackId,saved.id);
 });
 
 test('1190: 같은 의견 id와 일 키는 한 줄만 만든다', async () => {
