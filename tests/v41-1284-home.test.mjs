@@ -130,7 +130,7 @@ test('#1346 첫 화면은 손가락으로 안쪽 문서를 끝까지 스크롤�
  const server=await serve();globalThis._lt1284port=server.address().port;
  if(OUT)await mkdir(OUT,{recursive:true});
  const results=[];
- let drag=null;
+ let drag=null,ribbonDrag=null;
  try{
   for(const member of [true,false])for(const [width,height] of [[390,844],[390,700],[844,390]])for(const scene of (member?scenarios.filter(s=>s.type!=='blocked'):[scenarios[0]])){
    const {context,page,frame}=await open({width,height,theme:'night',scene,member});
@@ -144,19 +144,27 @@ test('#1346 첫 화면은 손가락으로 안쪽 문서를 끝까지 스크롤�
     let after=await touchState(page);
     for(let i=0;i<4&&after.actions.bottom>after.insideClient+1;i++){await swipeUp(page);after=await touchState(page);}
     if(capture)await page.screenshot({path:path.join(OUT,stem+'-after.png')});
-    if(member&&width===390&&height===844&&scene.type==='vertical'){
+    // #1314 이후 844×390은 궤도, 390 세로는 리본이다. 궤도 위상 확인은 가로 궤도에서만 하고, 리본에서는 가로로 끌어도 세로 스크롤이 없는지만 본다.
+    if(member&&width===844&&height===390&&scene.type==='landscape'){
      await frame.locator('#orbit').evaluate(()=>globalThis.__LT_ORBIT_TEST__.hold(true));
      const start=await frame.locator('#orbit').evaluate(()=>globalThis.__LT_ORBIT_TEST__.progress(performance.now())),box=await page.locator('#view').boundingBox();
      await swipe(page,{x:box.x+36,y:box.y+box.height-12},{x:box.x+box.width-36,y:box.y+box.height-12});
      const end=await frame.locator('#orbit').evaluate(()=>globalThis.__LT_ORBIT_TEST__.progress(performance.now()));
      drag={start,end,scrollBefore:after.insideScroll,scroll:await frame.locator('#orbit').evaluate(()=>document.scrollingElement.scrollTop)};
     }
+    if(member&&width===390&&height===844&&scene.type==='vertical'){
+     const box=await page.locator('#view').boundingBox();
+     await swipe(page,{x:box.x+36,y:box.y+box.height-12},{x:box.x+box.width-36,y:box.y+box.height-12});
+     ribbonDrag={scrollBefore:after.insideScroll,scroll:await frame.locator('#orbit').evaluate(()=>document.scrollingElement.scrollTop)};
+    }
     results.push({member,width,height,scene:scene.type,before,after});
    }finally{await context.close();}
   }
-  console.log('#1346 TOUCH',JSON.stringify({drag,rows:results.map(r=>({member:r.member,scene:r.scene,size:`${r.width}x${r.height}`,shell:[r.before.shellHeight,r.after.shellHeight],inside:[r.before.insideClient,r.before.insideHeight,r.before.insideScroll,r.after.insideScroll],actions:[r.before.actions.bottom,r.after.actions.bottom]}))}));
+  console.log('#1346 TOUCH',JSON.stringify({drag,ribbonDrag,rows:results.map(r=>({member:r.member,scene:r.scene,size:`${r.width}x${r.height}`,shell:[r.before.shellHeight,r.after.shellHeight],inside:[r.before.insideClient,r.before.insideHeight,r.before.insideScroll,r.after.insideScroll],actions:[r.before.actions.bottom,r.after.actions.bottom]}))}));
   assert.ok(drag&&Math.abs(drag.end-drag.start)>.001,'가로 터치 끌기는 궤도 위상을 계속 바꾼다');
   assert.equal(drag.scroll,drag.scrollBefore,'가로 끄기는 세로 스크롤을 만들지 않는다');
+  assert.ok(ribbonDrag,'390 세로 리본에서 가로 끌기를 실행했다');
+  assert.equal(ribbonDrag.scroll,ribbonDrag.scrollBefore,'390 세로 리본은 가로로 끌어도 세로 스크롤이 생기지 않는다');
   for(const row of results){
    const label=`${row.member?'회원':'방문자'} ${row.scene} ${row.width}x${row.height}`;
    assert.ok(row.after.shellHeight<=row.after.viewport+1,`${label}: 셸 body를 늘리지 않는다 (${row.after.shellHeight}/${row.after.viewport})`);

@@ -19,11 +19,13 @@ const SAMPLE = () => {
   const root = document.getElementById('orbit')?.shadowRoot;
   const all = root ? [...root.querySelectorAll('button.card')] : [];
   // #1086: 숨은 단추의 위치 대신 실제 그림판의 원근 좌표와 투명도를 읽는다.
-  const hook = window.__LT_ORBIT_TEST__, poses = hook.poses(), rasters = hook.rasterStats();
+  const hook = window.__LT_ORBIT_TEST__, poses = hook.poses(), rasters = hook.rasterStats(), ribbon = document.getElementById('orbit').dataset.ltLayout === 'ribbon';
   const origin = root.querySelector('.app').getBoundingClientRect();
   const rectOf = c => {
     const i = all.indexOf(c), p = poses[i], s = rasters[i];
-    if (!p || !s) return null;
+    if (!p) return null;
+  if (ribbon) return { l: origin.left + p.box.l, t: origin.top + p.box.t, r: origin.left + p.box.r, b: origin.top + p.box.b };
+  if (!s) return null;
     const xs = [], ys = [];
     for (const x of [-s.guardW/2, s.guardW/2]) for (const y of [-s.guardH/2, s.guardH/2]) {
       const u=x+p.fx, v=y+p.fy, q=1-(p.zx*u+p.zy*v)/1200;
@@ -44,7 +46,7 @@ const SAMPLE = () => {
   const hit = (a, b) => Math.max(0, Math.min(a.r, b.r) - Math.max(a.l, b.l)) * Math.max(0, Math.min(a.b, b.b) - Math.max(a.t, b.t));
   const visible = all.filter((c) => { const cs = getComputedStyle(c); return cs.display !== 'none' && cs.visibility !== 'hidden' && !c.classList.contains('off'); });
   // 바닥 자리를 지나는 동안 투명해진 카드는 글자를 덮지 않는다 — '가리는 카드'만 교차로 센다.
-  const opaque = visible.filter(c => { const i = all.indexOf(c); return poses[i] && rasters[i] && !poses[i].hidden && rasters[i].alpha > 0.05; });
+  const opaque = visible.filter(c => { const i = all.indexOf(c), p = poses[i]; return p && !p.hidden && (ribbon || (rasters[i] && rasters[i].alpha > 0.05)); });
   let pairs = 0;
   for (const box of opaque.map(rectOf)) for (const z of zones) if (hit(box, z) > 1) pairs += 1;
   const first = opaque[0] ? rectOf(opaque[0]) : null;
@@ -103,7 +105,7 @@ test('#1077 390 로그아웃 첫 화면의 떠다니는 카드는 바닥 링크�
           }
           return Math.round(max);
         });
-        assert.ok(crossed > 0, `${theme}: 궤도 경로가 바닥 자리를 지난다(최대 교차 ${crossed}px²) — 빈손 통과가 아니다`);
+        assert.equal(crossed, 0, `${theme}: 리본 경로는 바닥 자리를 지나지 않는다(최대 교차 ${crossed}px²)`);
 
         // 위상은 위에서 restore()로 되돌렸다. 가드가 클래스를 반영하고 글꼴·그림이 실제로
         // 그려진 다음부터 샘플을 모은다(첫 프레임에 카드가 아직 안 보이던 흔들림, #1191).
@@ -115,7 +117,7 @@ test('#1077 390 로그아웃 첫 화면의 떠다니는 카드는 바닥 링크�
         const total = samples.reduce((n, s) => n + s.pairs, 0);
         const moved = samples[0].firstCenter && samples[6].firstCenter && Math.hypot(samples[0].firstCenter[0] - samples[6].firstCenter[0], samples[0].firstCenter[1] - samples[6].firstCenter[1]) > 3;
         console.log('#1077', theme, JSON.stringify({ crossed, total, samples: samples.map((s) => ({ pairs: s.pairs, visible: s.visible, zones: s.zones })), moved }));
-        assert.ok(samples.every((s) => s.zones === 2 && s.visible >= 9 && s.opaque > 0), `${theme}: 바닥 링크·새 소식 카드가 보이는 자리에서 카드 9장 이상을 유지하고 잰다: ${JSON.stringify(samples[0])}`);
+        assert.ok(samples.every((s) => s.zones === 2 && s.visible === 8 && s.opaque > 0), `${theme}: 바닥 링크·새 소식 카드가 보이는 자리에서 리본 8장을 유지하고 잰다: ${JSON.stringify(samples[0])}`);
         assert.ok(moved, `${theme}: 3초 동안 카드가 움직인다`);
         assert.equal(total, 0, `${theme}: 3초×0.5초 간격 보이는 카드×바닥 자리 교차 ${total}쌍`);
       } finally { await ctx.close(); }

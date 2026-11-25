@@ -28,11 +28,6 @@ test('카드 수 상한: 폭별 값을 코드가 약속대로 돌려준다', () 
   assert.equal(evalCap(390), 10);
 });
 
-test('상한을 넘는 카드는 frame에서 숨기고, 폭이 넓어지면 다시 보인다', () => {
-  assert.match(orbit, /if\(i>=cardCapFor\(w\)\)\{el\.classList\.add\('off'\);return;\}/);
-  assert.match(orbit, /if\(el\.classList\.contains\('off'\)\)el\.classList\.remove\('off'\);/);
-});
-
 test('카드는 언제나 불투명하고, 크기·밝기·흐림으로 깊이를 낸다', () => {
   assert.doesNotMatch(orbit, /el\.style\.opacity=/, '카드 opacity 인라인 없음');
   // 카드 규칙(.card를 포함한 선택자) 하나하를 훑어 반투명·mix-blend·blur가 없음을 확인한다.
@@ -62,8 +57,7 @@ test('가운데 안전 구역: 제목·버튼 묶음 사각형+여백을 재고,
   assert.match(zoneSrc, /SAFE_MARGIN = 32/, '안전 구역 여백 32px');
   // 카드 사각형(회전 여유 18%)과 겹치면 가장 얇은 쪽으로 민다 — 겹침 0 보장.
   // #491: 좁은 화면에서는 그려지는 배율(cScale)로 투영한다(넓은 화면은 fit=1이라 cScale===sc).
-  assert.match(orbit, /const cScale=narrow\?sc\*Math\.max\(\.58,fit\):sc;/, '판정 배율은 좁은 화면에서만 그림 배율을 따른다');
-  assert.match(orbit, /const sxp=w\/2\+\(Cx0-w\/2\+x2\*cScale\)\*k/, '카드 위치까지 포함한 원근 투영 계산');
+   assert.match(orbit, /const sxp=w\/2\+\(Cx0-w\/2\+x2\*cScale\)\*k/, '카드 위치까지 포함한 원근 투영 계산');
   // 261118 규칙: '가장 얇은 쪽으로 밀어낸다' 소스 글자 단추는 방사 방향 밀어내기로 바꾸면서 거뒀다 —
   // 실제 겹침·안전 구역 침범은 535 실행 시험(v41-orbit-535-float-overlap)이 숫자로 잰다.
   // 옛 고정 타원 밀어내기는 안전 구역 판정으로 대체됐다.

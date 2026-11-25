@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 import {startCpuSampling,startTrace,reportGaps} from './1086-trace.mjs';
 
 const MIME={'.html':'text/html; charset=utf-8','.js':'text/javascript','.mjs':'text/javascript','.css':'text/css','.json':'application/json','.svg':'image/svg+xml','.webp':'image/webp','.jpg':'image/jpeg','.png':'image/png','.woff2':'font/woff2'};
-export const combinations=[[1440,900,'night'],[1440,900,'garden'],[390,844,'night'],[390,844,'garden']];
+export const combinations=[[1440,900,'night'],[1440,900,'garden'],[390,844,'night'],[390,844,'garden'],[800,900,'night']];
 const backgroundFlags=['--disable-background-timer-throttling','--disable-renderer-backgrounding','--disable-backgrounding-occluded-windows'];
 const phase=.2;
 export async function compareOrbit({main,current,headed=false,out,only,variants=['before','after'],captureOnly=false,measureOnly=false,traceEnabled=false}){
@@ -43,8 +43,8 @@ export async function compareOrbit({main,current,headed=false,out,only,variants=
    const page=await context.newPage();await page.goto(base+'/v41/',{waitUntil:'load'});await page.bringToFront();await page.mouse.move(0,0);
    let frame;for(let i=0;i<80;i++){frame=page.frames().find(f=>f.url().includes('home.html'));if(frame)break;await page.waitForTimeout(250);}
    assert.ok(frame,'첫 화면 문서 확인');
-   await frame.waitForFunction(v=>{const s=document.querySelector('main#orbit')?.shadowRoot,t=globalThis.__LT_ORBIT_TEST__;return s&&t&&(v==='before'||t.canvasReady())&&[...s.querySelectorAll('.card:not(.off)')].filter(e=>e.style.transform).length>=9;},variant);
-   if(variant==='after')assert.equal(await frame.evaluate(()=>globalThis.__LT_ORBIT_TEST__.renderer()),'webgl');
+   await frame.waitForFunction(v=>{const host=document.querySelector('main#orbit'),s=host?.shadowRoot,t=globalThis.__LT_ORBIT_TEST__,active=s?[...s.querySelectorAll('.card:not(.off)')].filter(e=>host.dataset.ltLayout==='ribbon'||e.style.transform):[];return s&&t&&(v==='before'||t.canvasReady())&&active.length>=(host.dataset.ltLayout==='ribbon'?6:9);},variant);
+   if(variant==='after')assert.equal(await frame.evaluate(()=>{const host=document.querySelector('main#orbit');return host.dataset.ltLayout==='ribbon'?'ribbon':globalThis.__LT_ORBIT_TEST__.renderer();}),await frame.evaluate(()=>document.querySelector('main#orbit').dataset.ltLayout==='ribbon'?'ribbon':'webgl'));
    await page.waitForTimeout(1500);
    return await body(page,frame);
   }finally{await context.close();}
@@ -55,23 +55,24 @@ export async function compareOrbit({main,current,headed=false,out,only,variants=
  const measure=async(page,frame,width,theme,variant,first=0,count=3)=>{
   const key=width+'-'+theme+'-'+variant,slot=pending[key]||(pending[key]={groups:[],attempts:[],advanced:0});
   const groups=slot.groups,attempts=slot.attempts;
-  const initial=await frame.evaluate(()=>globalThis.__LT_ORBIT_TEST__.lastWriteAt());
+  const ribbon=await frame.evaluate(()=>document.querySelector('main#orbit').dataset.ltLayout==='ribbon');
+  const initial=await frame.evaluate(ribbon=>{const hook=globalThis.__LT_ORBIT_TEST__;return ribbon?hook.ribbonTime():hook.lastWriteAt();},ribbon);
   for(let i=first;i<first+count;i++){
    for(let attempt=1;;attempt++){
     if(headed){await page.bringToFront();visibleWindow();}
     const traceKey=width+"-"+theme+"-"+variant+"-"+(i+1)+"-"+attempt;
     const stopTrace=traceEnabled?await startTrace(browser):null;
     let data,events;
-    try{data=await frame.evaluate(async traced=>{
-     const t=globalThis.__LT_ORBIT_TEST__,initial=t.lastWriteAt(),visibility=new Set([document.visibilityState]),changes=[];
+    try{data=await frame.evaluate(async ({traceEnabled,ribbon,initial})=>{
+     const t=globalThis.__LT_ORBIT_TEST__,visibility=new Set([document.visibilityState]),changes=[];
      const change=()=>{visibility.add(document.visibilityState);changes.push({at:performance.now(),state:document.visibilityState});};
      document.addEventListener("visibilitychange",change);
-     const anchor=traced?performance.mark("orbit:trace-anchor").startTime:null;
+     const anchor=traceEnabled?performance.mark("orbit:trace-anchor").startTime:null;
      try{
       const frames=await new Promise(resolve=>{const frames=[];let start;function tick(now){visibility.add(document.visibilityState);if(start===undefined)start=now;frames.push(now);if(now-start>=10000)resolve(frames);else requestAnimationFrame(tick);}requestAnimationFrame(tick);});
-      return {frames,anchor,timeOrigin:performance.timeOrigin,visibility:[...visibility],changes,advanced:t.lastWriteAt()-initial,theme:document.querySelector('main#orbit').getAttribute('data-lt-theme')||document.documentElement.getAttribute('data-lt-theme')||'night'};
+      return {frames,anchor,timeOrigin:performance.timeOrigin,visibility:[...visibility],changes,advanced:ribbon?t.ribbonAdvanced(initial):t.lastWriteAt()-initial,theme:document.querySelector('main#orbit').getAttribute('data-lt-theme')||document.documentElement.getAttribute('data-lt-theme')||'night'};
      }finally{document.removeEventListener('visibilitychange',change);}
-    },traceEnabled);}finally{if(stopTrace)events=await stopTrace(path.join(out,traceKey+"-trace.json"));}
+    },{traceEnabled,ribbon,initial});}finally{if(stopTrace)events=await stopTrace(path.join(out,traceKey+"-trace.json"));}
     if(events)await reportGaps(events,data,out,path.join(out,traceKey+"-gaps.json"));
     const gaps=data.frames.slice(1).map((x,i)=>x-data.frames[i]),topVisibility=await page.evaluate(()=>document.visibilityState);
     const group={frames:gaps.length,over50:gaps.filter(x=>x>50).length,max:Math.max(...gaps),median:[...gaps].sort((a,b)=>a-b)[Math.floor(gaps.length/2)],visibility:data.visibility,topVisibility,near1000:gaps.filter(x=>x>=850&&x<=1150).length,advanced:data.advanced};
@@ -85,7 +86,7 @@ export async function compareOrbit({main,current,headed=false,out,only,variants=
     assert.ok(headed&&attempt<3,'가시성 또는 백그라운드 프레임 제한으로 측정 무효');
    }
   }
-  slot.advanced+=await frame.evaluate(()=>globalThis.__LT_ORBIT_TEST__.lastWriteAt())-initial;
+  slot.advanced+=await frame.evaluate(({ribbon,initial})=>{const hook=globalThis.__LT_ORBIT_TEST__;return ribbon?hook.ribbonAdvanced(initial):hook.lastWriteAt()-initial;},{ribbon,initial});
   if(groups.length<3)return;
   assert.ok(slot.advanced>=30000,'실제 궤도 30초 동안 움직임 확인');
   const result={width,theme,variant,groups};results.push(result);console.log(JSON.stringify(result));
@@ -103,7 +104,7 @@ export async function compareOrbit({main,current,headed=false,out,only,variants=
   // 두 화면 모두 글꼴과 실제 배치 갱신을 끝낸 뒤 같은 위상을 고정한다.
   await frame.evaluate(async()=>{await document.fonts.ready;dispatchEvent(new Event('resize'));await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));});
   if(variant==='after')await frame.waitForFunction(()=>globalThis.__LT_ORBIT_TEST__.canvasSettled());
-  const snapshot=()=>{const root=document.querySelector('main#orbit').shadowRoot;return [...root.querySelectorAll('.card:not(.off)')].map(el=>({label:el.querySelector('.surface')?.getAttribute('aria-label'),transform:el.style.transform,z:Number(getComputedStyle(el).zIndex),clash:el.classList.contains('clash'),under:el.classList.contains('lt-under-link')}));};
+  const snapshot=()=>{const root=document.querySelector('main#orbit').shadowRoot;return [...root.querySelectorAll('.card:not(.off)')].map(el=>({label:el.querySelector('.surface')?.getAttribute('aria-label'),transform:document.querySelector('main#orbit').dataset.ltLayout==='ribbon'?getComputedStyle(el).transform:el.style.transform,z:Number(getComputedStyle(el).zIndex),clash:el.classList.contains('clash'),under:el.classList.contains('lt-under-link')}));};
   const fixed=await frame.evaluate(async phase=>{
    const t=globalThis.__LT_ORBIT_TEST__,root=document.querySelector('main#orbit').shadowRoot;t.hold(true);
    for(const a of root.getAnimations())if(a.id==='lt-float'){a.pause();a.currentTime=0;}
@@ -112,9 +113,9 @@ export async function compareOrbit({main,current,headed=false,out,only,variants=
    dispatchEvent(new Event('resize'));
    await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
    t.seek(phase);
-   return [...root.querySelectorAll('.card:not(.off)')].map(el=>({label:el.querySelector('.surface')?.getAttribute('aria-label'),transform:el.style.transform,z:Number(getComputedStyle(el).zIndex),clash:el.classList.contains('clash'),under:el.classList.contains('lt-under-link')}));
+   return [...root.querySelectorAll('.card:not(.off)')].map(el=>({label:el.querySelector('.surface')?.getAttribute('aria-label'),transform:document.querySelector('main#orbit').dataset.ltLayout==='ribbon'?getComputedStyle(el).transform:el.style.transform,z:Number(getComputedStyle(el).zIndex),clash:el.classList.contains('clash'),under:el.classList.contains('lt-under-link')}));
   },phase);
-  assert.equal(fixed.length,width===1440?28:9);
+  assert.equal(fixed.length,width===1440?28:width===390?(variant==='before'?9:8):width===800?14:9);
   assert.ok(fixed.every(c=>c.transform),'고정 위치의 카드 변환값 확인');
   if(variant==="after"){await frame.waitForFunction(()=>globalThis.__LT_ORBIT_TEST__.canvasSettled());await frame.evaluate(phase=>globalThis.__LT_ORBIT_TEST__.seek(phase),phase);}
   const styles=await frame.evaluate(()=>{
@@ -160,9 +161,12 @@ export async function compareOrbit({main,current,headed=false,out,only,variants=
     const a=captures[width+'-'+theme+'-before'],b=captures[width+'-'+theme+'-after'];
     assert.equal(a.phase,b.phase);assert.equal(a.floatTime,b.floatTime);
     const pose=({label,transform,z})=>({label,transform,z});
-    assert.deepEqual(a.cards.map(pose),b.cards.map(pose),'기존 화면과 새 화면의 고정 궤도 위치 및 쌓임 순서');
-    const guardDiff=a.cards.flatMap((c,i)=>c.clash!==b.cards[i].clash||c.under!==b.cards[i].under?[i]:[]);
-    console.log('GUARD',width,theme,JSON.stringify(guardDiff));
+    if(width===390){assert.equal(a.cards.length,9);assert.equal(b.cards.length,8);console.log('RIBBON',width,theme,'9→8');}
+    else{
+     assert.deepEqual(a.cards.map(pose),b.cards.map(pose),'기존 화면과 새 화면의 고정 궤도 위치 및 쌓임 순서');
+     const guardDiff=a.cards.flatMap((c,i)=>c.clash!==b.cards[i].clash||c.under!==b.cards[i].under?[i]:[]);
+     console.log('GUARD',width,theme,JSON.stringify(guardDiff));
+    }
    }
   }
   return results;

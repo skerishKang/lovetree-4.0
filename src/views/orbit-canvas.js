@@ -31,6 +31,13 @@ function badge(ctx,el,x,y,css,text){
  ctx.strokeStyle=css.borderColor;ctx.lineWidth=parseFloat(css.borderWidth)||1;ctx.stroke();
  font(ctx,css);ctx.textAlign='center';ctx.fillText(text,x+w/2,y+h/2,w-4);ctx.textAlign='start';
 }
+function cardTip(ctx,el,x,y){
+ const tip=el.querySelector('.lt-card-tip');if(!tip)return;
+ const css=getComputedStyle(tip),w=tip.offsetWidth,h=tip.offsetHeight;if(!w||!h)return;
+ const left=x+(tip.offsetLeft||0)-w/2,top=y+(tip.offsetTop||0);
+ ctx.fillStyle=css.backgroundColor;round(ctx,left,top,w,h,h/2);ctx.fill();ctx.strokeStyle=css.borderTopColor;ctx.lineWidth=parseFloat(css.borderTopWidth)||1;ctx.stroke();
+ font(ctx,css);ctx.textAlign='center';ctx.fillText(tip.textContent||'',left+w/2,top+h/2,w-4);ctx.textAlign='start';
+}
 function posValue(str,space){return str?.endsWith('%')?space*parseFloat(str)/100:parseFloat(str)||0;}
 export async function paintCardBitmap(el,dpr,hover=false,offset={x:0,y:0}){
  const w=el.offsetWidth,h=el.offsetHeight;if(!w||!h)return null;
@@ -84,6 +91,7 @@ export async function paintCardBitmap(el,dpr,hover=false,offset={x:0,y:0}){
  ctx.strokeStyle=hover?'#ffe6a6':css.borderColor;ctx.lineWidth=border;round(ctx,border/2,border/2,w-border,h-border,radius-border/2);ctx.stroke();
  const rim=getComputedStyle(el,'::after'),rimWidth=parseFloat(rim.borderTopWidth)||0;
  if(rimWidth&&rim.content!=='none'&&Number(rim.opacity)!==0){const rx=border+(parseFloat(rim.left)||0)+rimWidth/2,ry=border+(parseFloat(rim.top)||0)+rimWidth/2,rr=border+(parseFloat(rim.right)||0)+rimWidth/2,rb=border+(parseFloat(rim.bottom)||0)+rimWidth/2;ctx.strokeStyle=rim.borderTopColor;ctx.lineWidth=rimWidth;round(ctx,rx,ry,w-rx-rr,h-ry-rb,Math.max(0,radius-rx));ctx.stroke();}
+ if(el.classList.contains('lt-card-hint'))cardTip(ctx,el,border,border);
  for(const e of el.querySelectorAll('.firstMark,.playGlyph')){const c=getComputedStyle(e);badge(ctx,e,border+e.offsetLeft,border+e.offsetTop,c,e.textContent||'');}
  if(hover){
   const cap=el.querySelector('.caption span'),capStyle=getComputedStyle(cap);font(ctx,capStyle);ctx.fillStyle=capStyle.color;ctx.fillText(cap.textContent||'',8,h-13,w-16);
