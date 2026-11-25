@@ -11,6 +11,8 @@ import { stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { flat26, lt41Stub } from './helpers/map-shapes.mjs';
+import { testBackNavigation } from './helpers/history-assert.mjs';
+import { createTree } from '../public/v41/domain.mjs';
 
 const ROOT = path.resolve(process.env.LT_MAP_FAN_ROOT || fileURLToPath(new URL('../public', import.meta.url)));
 const REQUIRE = process.env.LT_MAP_FAN_REQUIRE === '1';
@@ -348,4 +350,48 @@ test('#1378 지도 영상: 임베드 차단 시 iframe 제거와 원본 링크',
     assert.equal(await page.locator('#viewerMedia iframe').count(),0,'닫은 뒤 iframe 0');
     assert.equal(await page.locator('#ltViewer.open').count(),0,'Esc로 닫힘');
   }finally{await ctx.close();await browser.close();await new Promise(r=>server.close(r));}
+});
+
+// #1298: 지도 영상 크게 보기 — 뒤로 가기 한 번으로 닫히고 상세 판은 그대로 남는다.
+test('#1298 지도 영상 크게 보기 뒤로 가기: 창 닫힘·iframe 0·상세 판 유지(390·1440)', { skip: REQUIRE ? false : skip, timeout: 240000 }, async () => {
+  if (skip) assert.fail(skip);
+  const tree = createTree({ subject: '시험', title: '시험 순간', date: '2026-11-20', emotion: '설렘', note: '', url: 'https://youtu.be/dQw4w9WgXcQ' }, '2026-11-20T00:00:00.000Z');
+  const workspace = { revision: 1, state: { version: 1, trees: [tree], prefs: {} }, subject: '시험계정', writeSubjectBound: true, savedAt: '2026-11-20T00:00:00.000Z' };
+  const server = await serve();
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch({ headless: true });
+  try {
+    for (const width of [390, 1440]) {
+      const ctx = await browser.newContext({ viewport: { width, height: width === 390 ? 844 : 900 }, reducedMotion: 'no-preference' });
+      try {
+        await ctx.route('**/api/**', r => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
+        await ctx.route('**/api/account**', r => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"email":"measure@example.invalid","subject":"시험계정"}' }));
+        await ctx.route('**/api/workspace**', r => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(workspace) }));
+        await ctx.route('**/i.ytimg.com/**', r => r.fulfill({ status: 200, contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="900"><rect width="1200" height="900" fill="#92829f"/></svg>' }));
+        await ctx.route('**/www.youtube-nocookie.com/**', r => r.fulfill({ status: 200, contentType: 'text/html', body: '<title>YouTube</title>' }));
+        await ctx.route('**/api/youtube/oembed*', r => r.fulfill({ status: 200, contentType: 'application/json', body: '{"title":"영상"}' }));
+        const page = await ctx.newPage();
+        await page.goto(base + '/v41/?account=1#home', { waitUntil: 'domcontentloaded' });
+        await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 30000 });
+        await page.locator('#discover-ask-no').click().catch(() => {});
+        await page.evaluate(() => document.querySelector('[data-view="track56-network.html"]').click());
+        await page.waitForFunction(() => { const f = document.querySelector('#view:not([hidden])'); try { return !!f && /track56-network/.test(f.contentWindow.location.href); } catch { return false; } }, null, { timeout: 20000 });
+        const frame = await (await page.$('#view:not([hidden])')).contentFrame();
+        await frame.waitForFunction(() => !!window.__lt?.selectMoment, null, { timeout: 20000 });
+        await frame.evaluate(() => window.__lt.selectMoment(window.__lt.nodes.find(n => n.kind === 'moment'), true));
+        await frame.waitForSelector('#detail.open', { timeout: 10000 });
+        await frame.waitForFunction(() => !!document.querySelector('#detailPlayer .lt-media .lt-media-body'), null, { timeout: 10000 });
+        await page.waitForTimeout(600);
+        await testBackNavigation(page, { frame, recorded: true, panels: ['#ltViewer.open'], settleMs: 400, timeoutMs: 10000, action: async () => {
+          await frame.evaluate(() => document.querySelector('#detailPlayer [data-lt-play]').click());
+          await frame.waitForSelector('#ltViewer.open', { timeout: 8000 });
+        } });
+        const after = await frame.evaluate(() => ({ open: document.getElementById('ltViewer').classList.contains('open'), iframes: document.querySelectorAll('#viewerMedia iframe').length, detail: document.getElementById('detail').classList.contains('open') }));
+        assert.equal(after.open, false, '뒤로 가기로 크게 보기가 닫힌다');
+        assert.equal(after.iframes, 0, '뒤로 가기 뒤 iframe 0');
+        assert.equal(after.detail, true, '상세 판은 그대로 열려 있다');
+        console.log('MAP_BACK', width, JSON.stringify(after));
+      } finally { await ctx.close(); }
+    }
+  } finally { await browser.close(); await new Promise(r => server.close(r)); }
 });
