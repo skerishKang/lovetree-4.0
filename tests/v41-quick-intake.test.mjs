@@ -7,7 +7,7 @@ import {
   INTAKE_URL_PARAM, INTAKE_TEXT_PARAM, INTAKE_TITLE_PARAM, INTAKE_MAX_URL_LENGTH,
   readIntakeParams, classifyIntake, firstHttpUrl, resolveIntakeCandidate, canonicalUrl, isSameVideoMoment,
   findSameVideoInTree, treesWithSameVideo, createPendingSlot,
-  resolveMediaMetadata, INTAKE_TITLE_WAIT_MS,
+  resolveMediaMetadata, INTAKE_TITLE_WAIT_MS, intakeValueProblem, INTAKE_MAX_VALUE_LENGTH,
 } from '../public/v41/quick-intake.mjs';
 import {
   isShareDemoHost, shareDemoWanted, isAndroidChrome, installHintWanted,
@@ -64,6 +64,18 @@ test('firstHttpUrl / resolveIntakeCandidate: url → text → title 순, 첫 주
   const ok = `https://a.test/${'a'.repeat(INTAKE_MAX_URL_LENGTH - 'https://a.test/'.length)}`;
   assert.equal(ok.length, INTAKE_MAX_URL_LENGTH);
   assert.equal(resolveIntakeCandidate({ url: ok, text: '', title: '' }), ok, '상한 길이는 받는다');
+});
+
+test('#788 intakeValueProblem: 긴 값·스크립트 글자가 섞인 값은 막고, 평범한 주소·문구는 받는다', () => {
+  assert.equal(intakeValueProblem('https://a.test/1', '좋은 글 https://b.test/2', '제목'), '');
+  assert.equal(intakeValueProblem('x'.repeat(INTAKE_MAX_VALUE_LENGTH)), '', '상한 길이는 받는다');
+  assert.equal(intakeValueProblem('x'.repeat(INTAKE_MAX_VALUE_LENGTH + 1)), 'long');
+  assert.equal(intakeValueProblem('', '', ''), '');
+  assert.equal(intakeValueProblem('https://a.test/<script>'), 'script');
+  assert.equal(intakeValueProblem('', 'javascript:alert(1)', ''), 'script');
+  assert.equal(intakeValueProblem('', '', 'vbscript:x'), 'script');
+  assert.equal(intakeValueProblem('data:text/html,x', '', ''), 'script');
+  assert.equal(intakeValueProblem('https://a.test/\u0007', '', ''), 'script', '제어 문자');
 });
 
 test('classifyIntake: 빈 값·주소·그 외를 구분한다', () => {

@@ -266,6 +266,23 @@ test('공유 시트 진입: 주소가 아닌 문구는 안내하고 지운다', 
   assert.equal(intake.pending(), null, '주소가 아닌 값은 보관하지 않는다');
 });
 
+test('#788 공유 진입: 스크립트가 섞인 값은 주소가 있어도 통째로 막고, 주소 꼬리는 지운다', () => {
+  const member = memberFixture();
+  const { intake, notifies, replaced, opened } = setup({ member, browser: fakeBrowser({ search: `?${INTAKE_TEXT_PARAM}=${encodeURIComponent('<script>x</script> https://a.test/1')}` }) });
+  assert.deepEqual(replaced, ['/v41/']);
+  assert.deepEqual(notifies, ['링크 형식을 확인해 주세요.']);
+  assert.equal(intake.pending(), null, '섞인 값은 보관하지 않는다');
+  assert.deepEqual(opened, []);
+});
+
+test('#788 공유 진입: 너무 긴 값은 주소가 있어도 막는다', () => {
+  const member = memberFixture();
+  const long = `${'가'.repeat(4097)} https://a.test/1`;
+  const { intake, notifies } = setup({ member, browser: fakeBrowser({ search: `?${INTAKE_TEXT_PARAM}=${encodeURIComponent(long)}` }) });
+  assert.deepEqual(notifies, ['링크 형식을 확인해 주세요.']);
+  assert.equal(intake.pending(), null);
+});
+
 test('#876 공유 시트 진입: 이미 담은 같은 영상이면 막지 말고 안내 창을 열고, 그래도 담기로 담는다', () => {
   const url = 'https://b.test/1';
   const member = memberFixture({ trees: [{ id: 'inbox', inbox: true, title: '모아둔 순간', moments: [{ id: 'm0', url }] }] });

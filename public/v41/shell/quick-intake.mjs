@@ -6,7 +6,7 @@ import {
 } from '../quick-add.mjs';
 import {
   INTAKE_LOGIN_RETRY_TEXT, INTAKE_STEP_LOGIN, INTAKE_STEP_NOTICE, INTAKE_STEP_SKIP, INTAKE_STEP_WAIT,
-  classifyIntake, createLoginAttemptSlot, createPendingSlot, findSameVideoInTree, intakeStep, loginAttempted,
+  classifyIntake, createLoginAttemptSlot, createPendingSlot, findSameVideoInTree, intakeStep, intakeValueProblem, loginAttempted,
   readIntakeParams, resolveIntakeCandidate, resolveMediaMetadata, treesWithSameVideo,
 } from '../quick-intake.mjs';
 import {formatDisplayDate} from '../book-usability.mjs';
@@ -136,6 +136,7 @@ export function createQuickIntake(deps) {
     try { found = readIntakeParams(loc.search); } catch { found = null; }
     if (!found?.found) return;
     stripParam(found);                              // 한 번만 통하는 값 — 먼저 지운다
+    if (intakeValueProblem(found.url, found.text, found.title)) { notify(QUICK_INVALID_ERROR); return; }   // #788: 긴 값·스크립트 섞인 값은 통째로 막는다
     const candidate = resolveIntakeCandidate(found);
     if (!candidate) {                               // 세 값이 다 비었으면 소비만, 나머지는 안 쓸 주소다
       if ([found.url, found.text, found.title].some((value) => value !== '')) notify(QUICK_INVALID_ERROR);

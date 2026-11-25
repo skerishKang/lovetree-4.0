@@ -16,6 +16,19 @@ export const INTAKE_TITLE_PARAM = 'qtitle';
 export const INTAKE_MAX_URL_LENGTH = 2048;
 const URL_PATTERN = /https?:\/\/[^\s<>"'`]+/;
 
+// #788 3단계: 받은 원문 값 자체를 막는 검사 — 너무 긴 값, 스크립트·꺾쇠·스크립트 주소 글자가 섞인 값.
+// 여기서 걸리면 값 하나도 담지 않고 안내만 한다(주소만 골라 살리지 않는다).
+export const INTAKE_MAX_VALUE_LENGTH = 4096;
+const SCRIPT_PATTERN = /[<>\u0000-\u001f]|javascript:|vbscript:|data:/i;
+export function intakeValueProblem(...values) {
+  for (const value of values) {
+    if (typeof value !== 'string') continue;
+    if (value.length > INTAKE_MAX_VALUE_LENGTH) return 'long';
+    if (SCRIPT_PATTERN.test(value)) return 'script';
+  }
+  return '';
+}
+
 // 값들에서 첫 http(s) 주소만 뽑는다(앞뒤 문구·문장부호 제거). 상한 초과 주소는 건너뛴다.
 export function firstHttpUrl(...values) {
   for (const value of values) {
