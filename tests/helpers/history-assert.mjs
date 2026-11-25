@@ -3,6 +3,9 @@
 // await testBackNavigation(page, { frame, recorded: false, action: () => frame.click('#themeGrid button') });
 import assert from 'node:assert/strict';
 
+const HISTORY_WAIT_MS = 5000;
+const OBSERVE_MS = 100;
+
 const DEFAULT_PANELS = [
   'dialog[open]',
   '.detail.open',
@@ -86,46 +89,104 @@ function comparable(state) {
   return { ...rest, frame: inner };
 }
 
+function sameState(a, b) {
+  try { assert.deepEqual(comparable(a), comparable(b)); return true; } catch { return false; }
+}
+
+// 셸이 안쪽 메시지를 받은 뒤 기록을 늘린다 — 메시지 도착을 실제 신호로 본다(#1412 측정).
+async function installObserver(target, { messages = false } = {}) {
+  if (!target) return;
+  await target.evaluate(withMessages => {
+    if (withMessages && !window.__ltHistoryMsgHook) {
+      window.__ltHistoryMsgHook = true;
+      window.__ltHistoryMsgSeen = 0;
+      addEventListener('message', () => { window.__ltHistoryMsgSeen += 1; });
+    }
+    if (!window.__ltHistoryDomHook) {
+      window.__ltHistoryDomHook = true;
+      window.__ltHistoryDomSeen = 0;
+      new MutationObserver(() => { window.__ltHistoryDomSeen += 1; })
+        .observe(document.documentElement, { subtree: true, attributes: true, childList: true, characterData: true });
+    }
+  }, messages);
+}
+const signalCounts = target => target
+  ? target.evaluate(() => ({ msg: window.__ltHistoryMsgSeen || 0, dom: window.__ltHistoryDomSeen || 0 }))
+  : Promise.resolve({ msg: 0, dom: 0 });
+
+async function waitForGrowth(page, frame, before, waitMs) {
+  const checks = [page.waitForFunction(n => history.length > n, before, { timeout: waitMs }).then(() => true, () => false)];
+  if (frame) checks.push(frame.waitForFunction(n => history.length > n, before, { timeout: waitMs }).then(() => true, () => false));
+  const results = await Promise.all(checks);
+  return results.some(Boolean);
+}
+
+async function waitForProcessed(page, frame, before, waitMs) {
+  const deadline = Date.now() + waitMs;
+  while (Date.now() < deadline) {
+    const [shell, inner] = await Promise.all([signalCounts(page), signalCounts(frame)]);
+    if (shell.msg > before.shell.msg || shell.dom > before.shell.dom || inner.dom > before.inner.dom) return true;
+    await page.waitForTimeout(25);
+  }
+  return false;
+}
+
 async function waitForPrevious(page, expected, options) {
   const deadline = Date.now() + (options.timeoutMs || 5000);
   let current = null;
   while (Date.now() < deadline) {
     current = await backState(page, options);
-    try {
-      assert.deepEqual(comparable(current), comparable(expected));
-      return current;
-    } catch {}
+    if (sameState(current, expected)) return current;
     await page.waitForTimeout(50);
   }
   assert.deepEqual(comparable(current), comparable(expected), `뒤로 가기 한 번에 바로 전 상태로 돌아와야 한다 / 기록 상태: ${JSON.stringify({ before: expected.historyState, after: current.historyState })}`);
   return current;
 }
 
-export async function testBackNavigation(page, { frame = null, recorded, action, panels = [], timeoutMs = 5000, settleMs = 100 } = {}) {
+export async function testBackNavigation(page, { frame = null, recorded, action, panels = [], timeoutMs = 5000 } = {}) {
   assert.equal(typeof action, 'function', 'action 함수가 필요하다');
   assert.equal(typeof recorded, 'boolean', '기록함 여부를 true/false로 선언해야 한다');
   const options = { frame, panels, timeoutMs };
+  const waitMs = Math.min(timeoutMs || HISTORY_WAIT_MS, HISTORY_WAIT_MS);
+  await installObserver(page, { messages: true });
+  await installObserver(frame);
   const before = await backState(page, options);
-  await action();
-  await page.waitForTimeout(settleMs);
-  const afterAction = await backState(page, options);
   const beforeHistory = Math.max(before.historyLength, before.frameHistoryLength);
-  const afterHistory = Math.max(afterAction.historyLength, afterAction.frameHistoryLength);
-  if (!recorded) {
-    assert.equal(afterHistory, beforeHistory, '기록하지 않는 동작은 history.length를 늘리지 않는다');
-    return { before, afterAction, afterBack: null };
+  const signalsBefore = { shell: await signalCounts(page), inner: await signalCounts(frame) };
+  await action();
+
+  if (recorded) {
+    const grew = await waitForGrowth(page, frame, beforeHistory, waitMs);
+    const afterAction = await backState(page, options);
+    const afterHistory = Math.max(afterAction.historyLength, afterAction.frameHistoryLength);
+    assert.equal(grew, true, `기록하는 동작 후 기록이 늘어나야 한다 / ${JSON.stringify({ before: beforeHistory, after: afterHistory, messageSeen: (await signalCounts(page)).msg - signalsBefore.shell.msg })}`);
+    assert.equal(afterHistory, beforeHistory + 1, `기록하는 동작은 history를 한 칸 늘린다 / ${JSON.stringify({ before: before.historyState, after: afterAction.historyState, beforeLength: beforeHistory, afterLength: afterHistory, frameBefore: before.frameHistoryLength, frameAfter: afterAction.frameHistoryLength })}`);
+    const backTarget = afterAction.frameHistoryLength > before.frameHistoryLength ? (await visibleShellFrame(page) || frame) : page;
+    await backTarget.evaluate(() => history.back());
+    const afterBack = await waitForPrevious(page, before, options);
+    return { before, afterAction, afterBack };
   }
-  assert.equal(afterHistory, beforeHistory + 1, `기록하는 동작은 history를 한 칸 늘린다 / ${JSON.stringify({ before: before.historyState, after: afterAction.historyState, beforeLength: beforeHistory, afterLength: afterHistory, frameBefore: before.frameHistoryLength, frameAfter: afterAction.frameHistoryLength })}`);
-  const backTarget = afterAction.frameHistoryLength > before.frameHistoryLength ? (await visibleShellFrame(page) || frame) : page;
-  await backTarget.evaluate(() => history.back());
-  const afterBack = await waitForPrevious(page, before, options);
-  return { before, afterAction, afterBack };
+
+  await waitForProcessed(page, frame, signalsBefore, waitMs);
+  await page.waitForTimeout(OBSERVE_MS);
+  const afterAction = await backState(page, options);
+  const afterHistory = Math.max(afterAction.historyLength, afterAction.frameHistoryLength);
+  assert.equal(afterHistory, beforeHistory, '기록하지 않는 동작은 history.length를 늘리지 않는다');
+  return { before, afterAction, afterBack: null };
 }
 
 // #1298: 단순 옵션 변경에서 브라우저 방문 기록이 늘어나지 않는지 확인한다.
 export async function expectNoHistoryGrowth(page, action, label) {
- const before = await page.evaluate(() => history.length);
- await action();
- const after = await page.evaluate(() => history.length);
- assert.equal(after, before, label + ': 방문 기록 증가 0');
+  await installObserver(page, { messages: true });
+  const before = { length: await page.evaluate(() => history.length), signals: await signalCounts(page) };
+  await action();
+  const deadline = Date.now() + HISTORY_WAIT_MS;
+  while (Date.now() < deadline) {
+    const now = await signalCounts(page);
+    if (now.msg > before.signals.msg || now.dom > before.signals.dom) break;
+    await page.waitForTimeout(25);
+  }
+  await page.waitForTimeout(OBSERVE_MS);
+  const after = await page.evaluate(() => history.length);
+  assert.equal(after, before.length, label + ': 방문 기록 증가 0');
 }
