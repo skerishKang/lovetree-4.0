@@ -499,8 +499,8 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
   const TWO_PI=Math.PI*2, ORBIT_MS=90000, ORBIT_STEPS=48, PHASE_STEP=.000018;
  const orbitAnims=cards.map(()=>null), floatAnims=cards.map(()=>null);
  let imagesReady=false,spritesReady=false;
- // #1026 첫 프레임: 카드는 궤도 첫 자리를 받기 전에는 그리지 않는다. 앞 6장 그림이 오거나 600ms가 지나면
- // (먼저 오는 쪽) 글귀의 차례로 떠오르기 시작 시점과 카드 공개를 같은 프레임에 맞춘다.
+ // #1365: 첫 화면 뼈대(글귀·단추·카드 자리)는 기다리지 않고 바로 보인다.
+ // 카드는 궤도 첫 자리를 받은 뒤에 공개하고, 그림·글꼴은 준비되는 대로 바꾼다(#1026 첫 자리 규칙 유지).
  let firstFrameDone=false,contentReady=false,revealed=false;
  const revealCenter=shadow.querySelector('.center');
  const frontImgs=elements.slice(0,6).map(el=>el.querySelector('.surface img')).filter(Boolean);
@@ -514,8 +514,8 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
    for(const el of elements)el.classList.remove('lt-first-frame');
   });
  }
- const contentTimer=setTimeout(markContentReady,600);
- track(()=>clearTimeout(contentTimer));
+ // 그림이 늦어도 뼈대는 바로 보인다 — 첫 자리(firstFrameDone)가 준비되면 함께 공개한다.
+ markContentReady();
  // 안전장치: 어떤 까닭으로 첫 궤도 자리가 끝내 안 들어와도 1.5초 뒤에는 글귀와 카드를 보인다(빈 첫 화면 방지).
  const revealSafety=setTimeout(()=>{firstFrameDone=true;contentReady=true;tryReveal();},1500);
  track(()=>clearTimeout(revealSafety));
