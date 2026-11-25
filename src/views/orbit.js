@@ -242,7 +242,7 @@ export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSel
  function stepDetail(dir){const order=listRows();const at=order.findIndex(x=>x.key===detailMoment?.key);const next=order[at+dir];if(!next)return;renderDetail(next);dialog.querySelector(dir<0?'[data-do=prev]':'[data-do=next]')?.focus();}
  function focus(c){if(!c)return;dismissOrbitTip();if(!c.example){onSelect(c.id);rememberCard(c);}if(!dialog.open)opener=shadow.activeElement;renderDetail(c);}
  function renderDetail(c){
-  if(dialog.open&&dialog.dataset.ltHomeKind==='index'){dialog.dataset.ltHomeKind='detail';globalThis.LTHomeHistory?.open('detail',()=>{index();dialog.dataset.ltHomeKind='index'});}
+  if(dialog.open&&dialog.dataset.ltHomeKind==='index'){dialog.dataset.ltHomeKind='detail';const scrollTop=dialog.scrollTop,previousOpener=opener;globalThis.LTHomeHistory?.open('detail',()=>{index();dialog.dataset.ltHomeKind='index';opener=previousOpener;dialog.scrollTop=scrollTop;requestAnimationFrame(()=>{if(dialog.open&&dialog.dataset.ltHomeKind==='index')dialog.scrollTop=scrollTop})});}
   detailMoment=c;
   const children=c.example?[all.find(x=>x.id===c.next),all.find(x=>x.id===c.branch)].filter(Boolean):demo?[all.find(x=>x.id===c.next),all.find(x=>x.id===c.branch)].filter(Boolean):poolFor(c).filter(x=>x.treeId===c.treeId&&x.parentId===c.id);
   const link = mediaLinkView(c.url);

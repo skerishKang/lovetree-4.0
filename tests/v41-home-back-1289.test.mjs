@@ -81,6 +81,21 @@ test('#1289 첫 화면 방문 기록 및 복원', {skip:REQUIRE?false:'필수 �
     await screenshot(page,label+'-detail-back.png');
     await ctx.close();
    }
+   if(width===390&&theme==='night'){
+    const {ctx,page,frame}=await setup();
+    await frame.evaluate(()=>document.querySelector('#orbit')?.shadowRoot?.querySelector('[data-do="moments"]')?.click());
+    await frame.waitForFunction(()=>document.documentElement.dataset.ltHomePanel==='index');
+    const prior=await frame.evaluate(()=>{
+      const dlg=document.querySelector('#orbit').shadowRoot.querySelector('dialog');
+      dlg.style.maxHeight='220px';
+      dlg.scrollTop=100;
+      return dlg.scrollTop;
+    });
+    assert.ok(prior>0,'목록 내부 스크롤 재현');
+    await testBackNavigation(page,{frame,recorded:true,panels:['html[data-lt-home-panel="index"]'],action:()=>frame.evaluate(()=>document.querySelector('#orbit')?.shadowRoot?.querySelector('dialog [data-next]')?.click())});
+    assert.equal(await frame.evaluate(()=>document.querySelector('#orbit')?.shadowRoot?.querySelector('dialog')?.scrollTop),prior,'직전 목록 스크롤 복원');
+    await ctx.close();
+   }
    {
     const {ctx,page,frame}=await setup();
     await testBackNavigation(page,{frame,recorded:true,action:()=>frame.evaluate(()=>document.querySelector('#orbit')?.shadowRoot?.querySelector('[data-do="trees"]')?.click())});
