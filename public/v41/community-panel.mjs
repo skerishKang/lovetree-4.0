@@ -355,12 +355,12 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
   }
   if(preview.open&&selectedId){const selected=items.find(item=>item.shareId===selectedId);if(selected){renderPreview(selected);if(focusedAction)preview.querySelector(`[data-community-action="${focusedAction}"]`)?.focus();}}
  }
- async function load(append=false,stageReady=Promise.resolve()){
+ async function load(append=false,settleStages=null){
   if(append&&loading)return;
   const requestId=++loadId;loading=true;more.disabled=true;message('공개 트리를 불러오는 중이에요.');
   if(!append){items=[];cursor='';render();}
   const answer=await api.discover({q:query.value.trim(),artist:selectedArtist,cursor,limit:12,sort:sortSelect?.value||''});
-  await stageReady;
+  if(settleStages)await settleStages();
   if(requestId!==loadId)return;
   loading=false;
   if(!answer.ok){message(answer.message||'공개 트리를 불러오지 못했어요.');more.hidden=true;more.disabled=false;render();return;}
@@ -394,8 +394,8 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
    for(const t of tabs()){if(t.getAttribute('aria-current')==='true'){t.dataset.wasCurrent='1';t.setAttribute('aria-current','false');}}
    const wantMoments=hashNow()==='#explore/moments';
    selectTab(wantMoments?'moments':'trees',{syncHash:false});
-   // 카드 요청은 인기 무대와 동시에 시작하고, 첫 그리기만 결과 또는 최대 300ms를 기다린다.
-   if(!wantMoments){const stageReady=loadPopularStages();void load(false,stageReady);}
+   // 카드 요청은 인기 무대와 동시에 시작하고, 카드 응답 뒤 첫 그리기만 무대 결과를 최대 300ms 기다린다.
+   if(!wantMoments){const settleStages=startPopularStages();void load(false,settleStages);}
   };
   if(typeof window!=='undefined'&&typeof window.addEventListener==='function')window.addEventListener('hashchange',()=>{
    if(hashGuard)return;
@@ -517,14 +517,17 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
    popularList.append(row);
   }
  };
- async function loadPopularStages(){
-  // 인기 무대 요청은 카드와 동시에 시작한다. 300ms 후 도착한 무대는 카드 위치를 밀지 않도록 버린다.
-  let timer;
+ function startPopularStages(){
+  // 인기 무대 요청은 카드와 동시에 시작한다. 두 응답은 보통 비슷하게 온다(운영 측정 중앙값 각각 약 0.8초, #1343).
+  // 카드 응답이 온 뒤 300ms 안에 무대가 오면 함께 그리고, 그보다 늦은 결과는 카드 위치를 밀지 않도록 버린다.
   const request=Promise.resolve().then(()=>api.popularStages()).catch(()=>null);
-  const deadline=new Promise(resolve=>{timer=setTimeout(()=>resolve(null),300);});
-  const answer=await Promise.race([request,deadline]);
-  clearTimeout(timer);
-  renderPopularStages(answer?.ok?answer.items:[]);
+  return async()=>{
+   let timer;
+   const deadline=new Promise(resolve=>{timer=setTimeout(()=>resolve(null),300);});
+   const answer=await Promise.race([request,deadline]);
+   clearTimeout(timer);
+   renderPopularStages(answer?.ok?answer.items:[]);
+  };
  }
  popularList.append(skeleton); // 불러오는 동안만 자리를 고정하는 뼈대
  button.onclick=openPanel;
