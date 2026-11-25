@@ -6,7 +6,7 @@ import {
 } from '../quick-add.mjs';
 import {
   INTAKE_LOGIN_RETRY_TEXT, INTAKE_STEP_LOGIN, INTAKE_STEP_NOTICE, INTAKE_STEP_SKIP, INTAKE_STEP_WAIT,
-  classifyIntake, createLoginAttemptSlot, createPendingSlot, findSameVideoInTree, intakeStep, loginAttempted,
+  classifyIntake, createLoginAttemptSlot, createPendingSlot, findSameVideoInTree, intakeStep, intakeValueProblem, loginAttempted,
   readIntakeParams, resolveIntakeCandidate, resolveMediaMetadata, treesWithSameVideo,
 } from '../quick-intake.mjs';
 import {formatDisplayDate} from '../book-usability.mjs';
@@ -47,6 +47,12 @@ export function createQuickIntake(deps) {
   }
 
   function intakeSave(url, via, options = {}) {
+    // #788: 미리보기(서버 없음)에서는 로그인으로 보내지 않고, 주소를 채운 창만 체험으로 보여준다.
+    if (via === 'share' && deps.isDemo?.()) {
+      deps.openQuickWithUrl?.(url, { demo: true });
+      slot.clear(); attempts.clear();
+      return;
+    }
     const step = intakeStep(sessionState(), { attempted: loginAttempted(attempts.read(), url) });
     if (step === INTAKE_STEP_SKIP) return;                                // 공유 감상: 담지 않는다
     if (step === INTAKE_STEP_WAIT) {                                       // 아직 모름: 로그인도 담기도 미룬다
@@ -61,6 +67,12 @@ export function createQuickIntake(deps) {
     if (step === INTAKE_STEP_LOGIN) {
       if (via === 'paste') { notify(DROP_LOGIN_NOTICE); return; }          // 붙여놓기는 안내만(옛 계약 그대로)
       slot.write(url); attempts.mark(url); loginStart(); return;          // 한 번만 로그인으로
+    }
+    // #788: 로그인 뒤에도 바로 저장하지 않고, 공유 주소가 채워진 쉬운 추가 창을 연다.
+    if (via === 'share' && deps.openQuickWithUrl) {
+      deps.openQuickWithUrl(url, { demo: false });
+      slot.clear(); attempts.clear();
+      return;
     }
     const member = deps.getMember?.();
     const snap = member?.snapshot?.();
@@ -124,6 +136,7 @@ export function createQuickIntake(deps) {
     try { found = readIntakeParams(loc.search); } catch { found = null; }
     if (!found?.found) return;
     stripParam(found);                              // 한 번만 통하는 값 — 먼저 지운다
+    if (intakeValueProblem(found.url, found.text, found.title)) { notify(QUICK_INVALID_ERROR); return; }   // #788: 긴 값·스크립트 섞인 값은 통째로 막는다
     const candidate = resolveIntakeCandidate(found);
     if (!candidate) {                               // 세 값이 다 비었으면 소비만, 나머지는 안 쓸 주소다
       if ([found.url, found.text, found.title].some((value) => value !== '')) notify(QUICK_INVALID_ERROR);

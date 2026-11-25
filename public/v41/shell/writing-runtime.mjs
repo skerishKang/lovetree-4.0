@@ -6,6 +6,7 @@ import {createPanels} from "./panels.mjs";
 import {createQuickAdd} from "./quick-add.mjs";
 import {createWritePanel, readWriteTab, writeWriteTab, mountBookmarkEntry, mountEmptyBookmarkEntry} from "./write-panel.mjs";
 import {createQuickIntake} from "./quick-intake.mjs";
+import {shareDemoWanted} from "../quick-add.mjs";
 import {createMessages, lastShelfTreeId} from "./messages.mjs";
 import {createTagSave} from "./tag-save.mjs";
 import {paintLoginLinks,paintThemeControls,applyTheme as applyThemeFor,toggleTheme as toggleThemeFor} from "./theme.mjs";
@@ -195,6 +196,10 @@ export function createWritingRuntime(ctx){
       // 담기·중복·로그인 필요 안내는 방금 한 행동의 결과다 — 상태 안내가 곧바로 덮지 않게 hold로 띄운다(#353 후속).
       notify:text=>(0,ctx.notify)(text,{hold:true}),
       openLoginStart:intent=>(0,ctx.openLoginStart)(intent),
+      // #788: 공유로 온 주소는 바로 저장하지 않고 쉬운 추가 창을 채워 연다.
+      openQuickWithUrl:(url,options)=>shellQuick.openQuick(url,options),
+      // #788: 미리보기(서버 없는 pages.dev·localhost)에서만 체험으로 보여준다 — 운영에서는 절대 켜지지 않는다.
+      isDemo:()=>shareDemoWanted({hostname:globalThis.location?.hostname||'',source:ctx.source,owned:ctx.member?.snapshot().owned===true}),
       // #876: 같은 영상 안내 창 — 붙여넣기·공유로 담을 때도 쉬운 추가와 같은 규칙(조용히 막기를 대체).
       videoDup:shellVideoDup,
       describe:(url)=>globalThis.LTMedia?.describe?.(url),

@@ -513,6 +513,10 @@ html[data-lt-theme=garden] #moment-form input,html[data-lt-theme=garden] #moment
 #quick-tree-select{flex:0 1 auto;max-width:46%;min-height:36px;padding:0 8px;border:1px solid var(--lt-line);border-radius:10px;background:rgba(255,255,255,.04);color:var(--lt-pearl);font-size:13px}
 #quick-tree-select:focus-visible{outline:2px solid var(--lt-gold);outline-offset:2px}
 #quick-tree-select[hidden]{display:none}
+/* #788: 공유 체험 안내와 홈 화면 추가 안내 — 쉬운 추가 창 아래 작은 한 줄. */
+.quick-demo-note{margin:8px 0 0;font-size:12px;line-height:1.5;color:var(--lt-gold)}
+.quick-install-hint{margin:8px 0 0;font-size:12px;line-height:1.5;color:var(--lt-muted)}
+.quick-demo-note[hidden],.quick-install-hint[hidden]{display:none}
 .quick-notice-row{display:flex;align-items:center;gap:10px;min-height:44px;margin-top:8px}
 .quick-notice{flex:1;min-width:0;font-size:13px;line-height:1.6;color:var(--lt-pearl);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #write-panel .quick-notice{margin:0}
