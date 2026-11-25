@@ -269,8 +269,8 @@ async function openPlayback() {
     $('#pbClose').focus();
   } catch {
     if (open && myToken === token) {
+      // 재생기 자체를 못 받은 실패는 '그 순간만 못 봄'이 아니다 — 건너뛰면 안내가 덮이고 다음 순간도 같은 실패라 그냥 안내만 남긴다.
       setStatus('YouTube 재생기를 불러오지 못했어요. 원본 링크에서 확인해 주세요.');
-      markUnavailable(index);
     }
   }
 }
@@ -352,6 +352,5 @@ function wire() {
   }
 }
 
-// YouTube IFrame API를 미리 받아 두어 첫 '이어 보기' 클릭이 사용자 동작 안에서 시작되게 한다.
-void loadYouTubeIframeApi().catch(() => {});
+// YouTube IFrame API는 책을 열 때 받지 않고, '이어 보기'를 누를 때 openPlayback이 처음 받는다(#1365).
 wire();
