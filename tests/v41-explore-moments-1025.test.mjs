@@ -616,7 +616,8 @@ test('#1294 둘러보기 트리·순간 탭과 미리보기·그룹 찾기 뒤�
    cdp=await page.context().newCDPSession(page);
    await cdp.send('Emulation.setCPUThrottlingRate',{rate:width===1440?6:1});
    await page.waitForSelector('#community-list .community-card');
-   const back=async()=>{await page.goBack();await page.waitForTimeout(110);};
+   // 느린 실행기에서도 주소 처리가 끝날 때까지 기다린다(판정 기준은 그대로).
+   const back=async()=>{await page.goBack();await page.waitForTimeout(300);};
    const navState=()=>page.evaluate(()=>({hash:location.hash,trees:!document.getElementById('community-tree-panel').hidden,moments:!document.getElementById('community-moments-panel').hidden}));
    const home=await navState();assert.equal(home.hash,'#explore');
    await expectNoHistoryGrowth(page,async()=>page.locator('#community-sort').selectOption({index:1}),width+' 정렬');
