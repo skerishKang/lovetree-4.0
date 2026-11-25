@@ -800,8 +800,24 @@ function boardResizeMobile() {
 viewport.addEventListener('scroll', () => {
   if (viewport.classList.contains('board-scroll')) view.y = mobileBoardBaseY - viewport.scrollTop;
 }, { passive: true });
+// 카드 위치와 독립적으로 이동형 판의 배경이 보이는 화면을 채우게 한다.
+function fitWideSurfaceBackground() {
+  const surface = world.querySelector('.surface');
+  if (!surface) return;
+  if (innerWidth < 1200) {
+    surface.style.left = '';
+    surface.style.right = '';
+    return;
+  }
+  const width = viewport.clientWidth;
+  const zoom = Math.max(0.1, view.z);
+  // 화면 양쪽 바깥 24px까지 배경을 펼치되 카드 좌표·배율은 건드리지 않는다.
+  surface.style.left = Math.min(48, (-24 - view.x) / zoom) + 'px';
+  surface.style.right = Math.min(48, worldSize.w - (width + 24 - view.x) / zoom) + 'px';
+}
 function applyView(animated = false) {
   growBoard();
+  fitWideSurfaceBackground();
   updateEmptyHint();
   const scroll = mobileBoardScroll();
   const space = $('#boardScrollSpace');

@@ -370,18 +370,14 @@ test('#1359 넓은 보드와 지도, 최근 순간 및 휴대폰 회귀', {skip:
           const box=await button.boundingBox();assert.ok(box.width>=44&&box.height>=44);
           const id=await button.getAttribute('data-moment-id');
           if(theme==='garden'){await button.focus();await button.press('Enter');}else await button.click();
-          const opened = await page.evaluate(id => ({
-            detail: document.getElementById('detail')?.className,
-            found: !!window.__lt?.nodes?.find(node => node.id === id),
-            selected: window.__lt?.state?.selected?.id,
-            button: document.querySelector('.lt1359-info button')?.textContent
-          }), id);
-          await page.waitForFunction(() => document.querySelector('#detail')?.classList.contains('open')).catch(async () => {
-            const detail = await page.evaluate(() => ({opened:document.querySelector('#detail')?.className, id:document.querySelector('.lt1359-info button')?.dataset.momentId, card:document.querySelector('#cardLayer .card')?.dataset.id, network:!!window.__lt, moments:window.LTDEMO?.moments?.length}));
-            throw Error(`상세 열기 실패: ${screen} ${width} ${theme} ${n}: ${JSON.stringify(detail)}`);
-          });
-          assert.ok((await page.locator('#detail').getAttribute('class') || '').includes('open'), `${screen} ${width} ${theme} ${n} 상세 열기: ${JSON.stringify(opened)}`);
-          assert.equal(await page.locator(screen==='board'?'#dTitle':'#detailTitle').textContent(),chainTree(n).moments.find(m=>m.id===id).title);
+          // 상세 제목에는 메모 유형을 표시할 수 있으므로 선택된 순간 ID와 열린 상태를 함께 검사한다.
+          await page.waitForFunction(({screen,id}) =>
+            document.querySelector('#detail')?.classList.contains('open') &&
+            (screen==='board'
+              ? document.querySelector('#cardLayer .card.selected')?.dataset.id===id
+              : window.__lt?.state?.selected?.id===id),
+            {screen,id}
+          );
         }
       } finally {await page.close();}
     }
