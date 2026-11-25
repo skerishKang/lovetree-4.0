@@ -796,8 +796,7 @@ test('#1330 휴대폰 상단·카드 다듬기 — 캡슐 없음, 검색·정렬
             queryH: q.getBoundingClientRect().height, sortH: s.getBoundingClientRect().height,
             scrollbar: getComputedStyle(groups).scrollbarWidth, snap: getComputedStyle(groups).scrollSnapType,
             fade: getComputedStyle(groups).maskImage, findRight: find.getBoundingClientRect().right, railRight: document.querySelector('.community-group-rail').getBoundingClientRect().right,
-            popularEmpty: document.querySelector('#community-popular-stages').classList.contains('is-empty'),
-            popularTitle: getComputedStyle(document.querySelector('#community-popular-stages .community-stages-title')).visibility,
+            popularHidden: document.querySelector('#community-popular-stages').hidden,
             badgeRows: badges.map((b) => ({ group: Math.round(b.getBoundingClientRect().height), one: Math.round(b.firstElementChild?.getBoundingClientRect().height || 0) })),
             thumb: document.querySelector('#community-list .community-cover-image')?.src || ''
           };
@@ -812,10 +811,41 @@ test('#1330 휴대폰 상단·카드 다듬기 — 캡슐 없음, 검색·정렬
           assert.match(facts.fade, /gradient/, `${width}/${theme}: 오른쪽 끝 흐림`);
           assert.ok(facts.findRight <= facts.railRight + 1, `${width}/${theme}: 그룹 찾기 줄 끝 고정`);
         }
-        assert.equal(facts.popularEmpty, true, `${width}/${theme}: 빈 인기 무대 표시`);
-        assert.equal(facts.popularTitle, 'hidden', `${width}/${theme}: 빈 인기 무대 제목 감춤`);
+        assert.equal(facts.popularHidden, true, `${width}/${theme}: 빈 인기 무대 줄을 접는다`);
         for (const badge of facts.badgeRows) assert.equal(badge.group, badge.one, `${width}/${theme}: 배지 한 줄`);
         assert.match(facts.thumb, /mqdefault/, `${width}/${theme}: 띠 없는 썸네일 먼저`);
+        await ctx.close();
+      } finally { await new Promise((r) => server.close(r)); }
+    }
+  } finally { await browser.close(); }
+});
+
+test('빈 인기 무대는 줄을 접고 칩 줄 아래 간격을 다른 정보 줄과 같게 둔다(390·1440 × 밤·정원)', { skip: REQUIRE ? false : skip, timeout: 240000 }, async () => {
+  if (skip) assert.fail(skip);
+  const share = { shareId: 'share' + '0'.repeat(19) + '1', title: '공개 트리', subject: '주인', summary: '첫 기록', momentCount: 3, createdAt: '2026-11-20T09:30:00.000Z', publicDisplayName: '공개자', emotions: ['설렘'], cover: { title: '첫 순간', type: 'photo', url: '' }, stats: { hearts: 3, favorites: 1, hearted: false, favored: false, reactions: { heart: 3 }, mine: [] } };
+  const browser = await chromium.launch({ headless: true });
+  try {
+    for (const [width, height] of [[390, 844], [1440, 900]]) for (const theme of ['night', 'garden']) {
+      const server = await serve();
+      try {
+        const base = `http://127.0.0.1:${server.address().port}`;
+        const ctx = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
+        await ctx.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); } catch {} }, theme);
+        await ctx.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
+        await ctx.route('**/api/community/shares**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, items: [share], totalVisible: 1, nextCursor: '', groups: [], groupsAll: [] }) }));
+        await ctx.route('**/api/community/stages/popular**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
+        await ctx.route('**/api/workspace**', (r) => r.fulfill({ status: 401, contentType: 'application/json', body: '{"ok":false,"code":"unauthenticated"}' }));
+        const page = await ctx.newPage();
+        await page.goto(`${base}/v41/#explore`, { waitUntil: 'load' });
+        await page.waitForSelector('#community-list .community-card');
+        const facts = await page.evaluate(() => {
+          const rail = document.querySelector('.community-group-rail').getBoundingClientRect();
+          const feedback = document.querySelector('#community-feedback').getBoundingClientRect();
+          const card = document.querySelector('#community-list .community-card').getBoundingClientRect();
+          return { hidden: document.querySelector('#community-popular-stages').hidden, railToFeedback: Math.round(feedback.top - rail.bottom), feedbackToCard: Math.round(card.top - feedback.bottom) };
+        });
+        assert.equal(facts.hidden, true, `${width}/${theme}: 빈 인기 무대 줄을 접는다`);
+        assert.ok(Math.abs(facts.railToFeedback - facts.feedbackToCard) <= 1, `${width}/${theme}: 칩 줄 아래 간격이 다른 줄 간격과 같다 ${JSON.stringify(facts)}`);
         await ctx.close();
       } finally { await new Promise((r) => server.close(r)); }
     }
