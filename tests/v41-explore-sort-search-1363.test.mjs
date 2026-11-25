@@ -65,7 +65,10 @@ test('#1363 정렬 직접 메뉴·검색 입력·#1361 안내 위치 — 390·14
     assert.equal(await btn.getAttribute('aria-expanded'),'false',width+'/'+theme+' Esc 닫힘');
     await btn.click();await page.locator('#community-query').click();
     assert.equal(await btn.getAttribute('aria-expanded'),'false',width+'/'+theme+' 바깥 클릭 닫힘');
-    const q=page.locator('#community-query');await q.fill('노래 검색');
+    const q=page.locator('#community-query');
+    await q.fill('가');await page.waitForTimeout(430);
+    assert.equal(await page.locator('#community-suggest').isVisible(),true,width+'/'+theme+' 자동 검색 뒤에도 그룹 추천 유지');
+    await q.fill('노래 검색');
     await page.waitForFunction(()=>document.querySelector('#community-feedback')?.hidden===false);
     await page.waitForTimeout(400);
     assert.ok(queries.some(item=>item.q==='노래 검색'),width+'/'+theme+' 지연 후 자동 검색');

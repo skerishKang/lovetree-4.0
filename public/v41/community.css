@@ -309,3 +309,5 @@ html[data-lt-theme=garden] #community-panel:has(#community-tab-moments[aria-sele
 #community-panel .community-sort-option.is-selected{font-weight:700;background:var(--lt-primary);color:var(--lt-primary-ink)}
 #community-panel .community-top-row .community-sort-label:focus-within::before{outline:0}
 @media(max-width:780px){#community-panel .community-top-row #community-search-form{flex:1 1 auto;min-width:0;margin-left:auto}}
+
+#community-panel #community-query::-webkit-search-cancel-button{display:none}

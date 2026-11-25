@@ -498,7 +498,7 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
  const scheduleSearch=()=>{
   clearTimeout(searchTimer);
   searchClear.hidden=!query.value;
-  searchTimer=setTimeout(()=>{hideSuggest();load(false);},320);
+  searchTimer=setTimeout(()=>{load(false);},320);
  };
  searchClear.hidden=!query.value;
  searchClear.onclick=()=>{clearTimeout(searchTimer);query.value='';hideSuggest();searchClear.hidden=true;load(false);query.focus();};
