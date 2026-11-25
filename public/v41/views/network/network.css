@@ -437,3 +437,5 @@ html[data-v41-screen=network][data-lt-board-theme=night] body .detailPlayer{back
 .connect-undo[hidden]{display:none}
 .connect-undo button{min-height:32px;padding:0 12px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-pill);background:transparent;color:var(--lt-gold);font:inherit;font-size:13px;white-space:nowrap}
 @media(max-width:640px){.connect-sheet{top:calc(var(--lt-map-toolbar-bottom,140px) + 4px)}}
+
+html[data-v41-screen=network] .lt-screen-toolbar .lt-toolbar-tools :is(#connectToggle,#demoToggle){flex:0 0 auto;min-width:44px;pointer-events:auto;position:relative;z-index:1}
