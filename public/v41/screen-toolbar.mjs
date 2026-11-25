@@ -19,7 +19,10 @@ function treeMetaText() {
 }
 export function mountScreenToolbar({ screen, titleFrom, tools = [], initialBar = null, backEl = null, meta = false }) {
   // Adopt a pre-rendered toolbar when supplied, so the first paint already has its final layout.
-  const bar = initialBar || document.createElement('div');
+  // ?? ??? ?? ???? ?? ????? ?? ?? ?? ?????.
+  const existingNetworkBar = screen === 'network'
+    ? document.querySelector('.lt-screen-toolbar[data-screen="network"]') : null;
+  const bar = initialBar || existingNetworkBar || document.createElement('div');
   bar.className = 'lt-screen-toolbar';
   bar.setAttribute('role', 'region');
   bar.setAttribute('aria-label', '화면 도구');
@@ -36,7 +39,7 @@ export function mountScreenToolbar({ screen, titleFrom, tools = [], initialBar =
   const menu = bar.querySelector('.lt-toolbar-menu') || document.createElement('div');
   menu.className = 'lt-toolbar-menu';
   menu.hidden = true;
-  if (!initialBar) {
+  if (!initialBar && !existingNetworkBar) {
     const left = document.createElement('div');
     left.className = 'lt-toolbar-left';
     if (backEl) left.append(backEl);
@@ -50,7 +53,7 @@ export function mountScreenToolbar({ screen, titleFrom, tools = [], initialBar =
   }
   const header = document.querySelector('header');
   // 도구 줄과 본문은 같은 위치 기준을 쓰고, 서로의 자식이 되지 않는다.
-  if (!initialBar) {
+  if (!initialBar && !existingNetworkBar) {
     if (header) header.after(bar);
     else document.body.prepend(bar);
   }
