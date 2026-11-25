@@ -769,12 +769,13 @@ test('#1309 첫 방문 안내는 앞 카드 안에서 함께 움직이고 누름
   try {
    await h.frame.waitForFunction(() => globalThis.__LT_ORBIT_TEST__?.canvasReady(), null, { timeout: 20000 });
    await h.frame.locator('.lt-card-tip').waitFor({ state: 'visible', timeout: 15000 });
+   await h.frame.evaluate(() => globalThis.__LT_ORBIT_TEST__.hold(true));
    const opening = await hintState(h.frame);
    assert.ok(opening.bound && opening.index >= 0 && opening.visible && opening.inside, JSON.stringify(opening));
    assert.ok(opening.bottomGap >= 0 && opening.bottomGap < 40, '안내는 카드 아래쪽 안에 있다: ' + JSON.stringify(opening));
    assert.equal(opening.floatingTip, false, '떠 있는 말풍선은 없다');
    assert.equal(opening.pulse, 'lt-card-pulse');
-   assert.ok(Math.hypot(opening.cardCenter[0] - opening.poseCenter[0], opening.cardCenter[1] - opening.poseCenter[1]) <= 2, '카드 좌표는 실제 캔버스 투영과 같다');
+   assert.ok(Math.hypot(opening.cardCenter[0] - opening.poseCenter[0], opening.cardCenter[1] - opening.poseCenter[1]) <= 2, '카드 좌표는 실제 캔버스 투영과 같다: '+JSON.stringify(opening));
    await h.frame.evaluate(() => globalThis.__LT_ORBIT_TEST__.seek(.2));
    const moved = await hintState(h.frame);
    await h.frame.evaluate(() => globalThis.__LT_ORBIT_TEST__.seek(.5));
@@ -852,10 +853,15 @@ test('#1309 휴대폰 세로는 8장 리본이 흐르고 숫자판·단추·링�
    const h = await boot952(browser, { width: 390, height: 844, motion: 'no-preference', initStorage: { 'lt41.theme': theme } });
    try {
     await h.frame.waitForFunction(() => globalThis.__LT_ORBIT_TEST__?.canvasReady(), null, { timeout: 20000 });
+    await h.frame.waitForFunction(() => {
+     const host=document.querySelector('#orbit'),cards=[...host.shadowRoot.querySelectorAll('.card:not(.off)')];
+     return host.dataset.ltLayout==='ribbon'&&cards.length===8&&cards.every(card=>card.getAnimations().filter(a=>a.effect.target===card&&!a.effect.pseudoElement).length===1);
+    },null,{timeout:20000});
     const samples = [];
     for (let i = 0; i < 7; i++) { samples.push(await sample(h.frame)); if (i < 6) await h.page.waitForTimeout(500); }
     assert.ok(samples.every(s => s.mode === 'ribbon' && s.active === 8), JSON.stringify(samples[0]));
     assert.ok(samples.every(s => s.visible >= 3 && s.zones >= 4 && s.overlaps === 0), JSON.stringify(samples));
+    assert.ok(samples.every(s => s.rates.length === 8 && s.rates.every(rate => rate === 1)), '여덟 카드가 같은 느린 흐름으로 움직인다: '+JSON.stringify(samples.map(s=>s.rates)));
     const distance = Math.hypot(samples[6].first[0] - samples[0].first[0], samples[6].first[1] - samples[0].first[1]);
     assert.ok(distance > 3, '3초 동안 카드가 실제로 흐른다: ' + distance);
     console.log('#1309 RIBBON', theme, JSON.stringify({ active: samples[0].active, visible: samples.map(s => s.visible), overlaps: samples.reduce((n, s) => n + s.overlaps, 0), distance: Math.round(distance * 10) / 10 }));
