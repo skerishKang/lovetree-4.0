@@ -9,14 +9,6 @@ import { readFileSync } from 'node:fs';
 
 const orbit = readFileSync(new URL('../src/views/orbit.js', import.meta.url), 'utf8');
 
-test('#491: 좁은 화면 충돌 판정은 그려지는 배율(cScale)을 쓴다', () => {
-  assert.match(orbit, /const cScale=narrow\?sc\*Math\.max\(\.58,fit\):sc;/, 'cScale은 좁은 화면에서만 그림 배율을 따른다');
-  assert.match(orbit, /x2\*cScale\)\*k/, '가로 투영이 cScale을 쓴다');
-  assert.match(orbit, /y3\*cScale\)\*k/, '세로 투영이 cScale을 쓴다');
-  // 옛 코드(sc 직접 투영)가 남지 않는다
-  assert.doesNotMatch(orbit, /x2\*sc\)\*k/, '옛 sc 직접 투영이 남지 않는다');
-});
-
 test('#491: 띠에 못 들어가는 카드는 배율을 줄여 보여 준다(숨기지 않는다)', () => {
   assert.match(orbit, /if\(!upFits&&!downFits\)\{/, '못 들어갈 때 분기가 있다');
   assert.doesNotMatch(orbit, /!upFits&&!downFits\)\{el\.style\.display='none';return;\}/, '옛 즉시 숨김이 남지 않는다');

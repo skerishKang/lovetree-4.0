@@ -921,7 +921,7 @@ test('#1338 인기 무대 오류·2초 지연에도 트리 카드를 1초 안에
  }finally{await browser.close();}
 });
 
-test('둘러보기 윗줄과 AI 명예회원 공개 이름 — 390·1440 × 밤·정원', {skip:REQUIRE?false:skip,timeout:240000},async()=>{
+test('둘러보기 윗줄·역할별 색·마우스 올림·칩 크기 — 390·1440 × 밤·정원', {skip:REQUIRE?false:skip,timeout:240000},async()=>{
  if(skip)assert.fail(skip);
  const card=(n,ai)=>({
   shareId:'share'+String(n).padStart(20,'0'),title:ai?'명예회원 공개 트리':'일반 공개 트리',subject:'가수',summary:'공개 기록',
@@ -929,6 +929,10 @@ test('둘러보기 윗줄과 AI 명예회원 공개 이름 — 390·1440 × 밤�
   aiTester:ai,cover:{title:'첫 순간',type:'photo',url:''},
   stats:{hearts:3,favorites:1,hearted:false,favored:false,reactions:{heart:3},mine:[]}
  });
+ const parseColor=value=>{const parts=value.match(/[\d.]+/g)?.map(Number)||[];return {r:parts[0]||0,g:parts[1]||0,b:parts[2]||0,a:parts[3]??1};};
+ const over=(fg,bg)=>({r:fg.r*fg.a+bg.r*(1-fg.a),g:fg.g*fg.a+bg.g*(1-fg.a),b:fg.b*fg.a+bg.b*(1-fg.a),a:1});
+ const luminance=color=>{const channel=value=>{value/=255;return value<=.04045?value/12.92:((value+.055)/1.055)**2.4;};return .2126*channel(color.r)+.7152*channel(color.g)+.0722*channel(color.b);};
+ const contrast=(fg,bg)=>{const a=luminance(fg),b=luminance(bg);return (Math.max(a,b)+.05)/(Math.min(a,b)+.05);};
  const browser=await chromium.launch({headless:true});
  try{
  for(const [width,height] of [[390,844],[1440,900]])for(const theme of ['night','garden']){
@@ -969,9 +973,56 @@ test('둘러보기 윗줄과 AI 명예회원 공개 이름 — 390·1440 × 밤�
     assert.deepEqual(initial.names,['AI 명예회원 하늘'],width+'/'+theme+': AI 카드만 이름');
     assert.equal(initial.ownerLink,false,width+'/'+theme+': 만든 사람은 링크 아님');
     assert.deepEqual(initial.groups.slice(0,3),['전체','많은 그룹','적은 그룹'],width+'/'+theme+': 방문자 공개 수 순서');
+    assert.deepEqual([initial.firstTab.w,initial.firstTab.h],[initial.secondTab.w,initial.secondTab.h],width+'/'+theme+': 선택·비선택 탭 크기 같음');
+    const roles=await page.evaluate(()=>{
+     const probe=document.createElement('span');probe.style.display='none';document.body.append(probe);
+     const read=name=>{probe.style.color='var('+name+')';return getComputedStyle(probe).color;};
+     const names=['--lt-role-bg','--lt-role-accent-bg','--lt-role-accent-ink','--lt-role-secondary-border','--lt-role-secondary-ink','--lt-role-input-bg','--lt-role-input-border','--lt-role-input-ink','--lt-role-idle-border','--lt-role-idle-ink','--lt-role-hover-bg','--lt-role-hover-border','--lt-role-hover-ink','--lt-role-text-strong','--lt-role-text-muted','--lt-role-text-faint','--lt-role-border','--lt-rose','--lt-rose-ink'];
+     const result=Object.fromEntries(names.map(name=>[name,read(name)]));probe.remove();return result;
+    });
+    const roleBg=parseColor(roles['--lt-role-bg']);
+    // #1362: 선택 탭은 강조 채움이고 비선택 탭과 다르다. 밤의 비선택 탭·칩 테두리는 금색이 아니다.
+    const tabLook=await page.evaluate(()=>{const look=id=>{const e=document.getElementById(id),s=getComputedStyle(e);return {selected:e.getAttribute('aria-selected'),bg:s.backgroundColor,border:s.borderTopColor};};return {trees:look('community-tab-trees'),moments:look('community-tab-moments')};});
+    assert.equal(tabLook.trees.selected,'true',width+'/'+theme+': 기본 선택 탭은 트리');
+    assert.equal(tabLook.trees.bg,roles['--lt-role-accent-bg'],width+'/'+theme+': 선택 탭 강조 채움');
+    assert.notEqual(tabLook.moments.bg,tabLook.trees.bg,width+'/'+theme+': 선택·비선택 탭 바탕 다름');
+    if(theme==='night'){
+     const notGold=c=>{const v=parseColor(c);return v.r-v.b<40;};
+     assert.ok(notGold(tabLook.moments.border),width+'/밤: 비선택 탭 테두리 금색 아님 '+tabLook.moments.border);
+     const chipBorder=await page.locator('#community-groups .community-group-chip:not(.is-active)').first().evaluate(el=>getComputedStyle(el).borderTopColor);
+     assert.ok(notGold(chipBorder),width+'/밤: 비선택 칩 테두리 금색 아님 '+chipBorder);
+    }
+    const pairs=[
+     ['강조',roles['--lt-role-accent-ink'],roles['--lt-role-accent-bg']],
+     ['보조 단추',roles['--lt-role-secondary-ink'],roles['--lt-role-bg']],
+     ['입력 칸',roles['--lt-role-input-ink'],roles['--lt-role-input-bg']],
+     ['선택 안 됨',roles['--lt-role-idle-ink'],roles['--lt-role-bg']],
+     ['마우스 올림',roles['--lt-role-hover-ink'],roles['--lt-role-hover-bg']],
+     ['글자 진함',roles['--lt-role-text-strong'],roles['--lt-role-bg']],
+     ['글자 중간',roles['--lt-role-text-muted'],roles['--lt-role-bg']],
+     ['글자 흐림',roles['--lt-role-text-faint'],roles['--lt-role-bg']]
+    ];
+    for(const [label,fg,bg] of pairs){const f=over(parseColor(fg),parseColor(bg)),b=over(parseColor(bg),roleBg),value=contrast(f,b);assert.ok(value>=4.5,width+'/'+theme+': '+label+' 대비 '+value.toFixed(2)+':1');}
+    if(theme==='night'){
+     const rose=[roles['--lt-rose'],roles['--lt-rose-ink']];
+     assert.ok(Object.entries(roles).filter(([name])=>name.startsWith('--lt-role-')).every(([,value])=>!rose.includes(value)),width+'/밤: 역할 색에 분홍 없음');
+    }
+    const idleTab=page.locator('#community-tab-moments'),tabBefore=await idleTab.evaluate(el=>{const s=getComputedStyle(el);return {bg:s.backgroundColor,color:s.color,cursor:s.cursor};});
+    await idleTab.hover();const tabAfter=await idleTab.evaluate(el=>{const s=getComputedStyle(el);return {bg:s.backgroundColor,color:s.color,cursor:s.cursor};});
+    assert.notDeepEqual([tabAfter.bg,tabAfter.color],[tabBefore.bg,tabBefore.color],width+'/'+theme+': 비선택 탭 마우스 올림 변화');
+    assert.equal(tabAfter.cursor,'pointer');await page.mouse.move(0,0);
+    const sortBefore=await page.locator('.community-sort-trigger').evaluate(el=>{const s=getComputedStyle(el);return {bg:s.backgroundColor,color:s.color};});
+    await page.locator('.community-sort-trigger').hover();const sortAfter=await page.locator('.community-sort-trigger').evaluate(el=>{const s=getComputedStyle(el);return {bg:s.backgroundColor,color:s.color};});
+    assert.notDeepEqual(sortAfter,sortBefore,width+'/'+theme+': 정렬 단추 마우스 올림 변화');await page.mouse.move(0,0);
+    const chip=page.locator('#community-groups .community-group-chip').filter({hasText:'많은 그룹'}).first(),chipBefore=await chip.evaluate(el=>{const r=el.getBoundingClientRect();return [r.width,r.height]});
+    await chip.click();await page.locator('.community-card').first().waitFor();const chipAfter=await chip.evaluate(el=>{const r=el.getBoundingClientRect();return [r.width,r.height]});
+    assert.deepEqual(chipAfter,chipBefore,width+'/'+theme+': 칩 선택 전후 크기 같음');
+    await chip.click();
     await page.locator('#community-query').focus();
     assert.equal(await page.locator('#community-query').evaluate(e=>document.activeElement===e),true,width+'/'+theme+': 검색칸 직접 입력');
     assert.ok(await page.locator('#community-query').evaluate(e=>e.getBoundingClientRect().width)>20,width+'/'+theme+': 입력칸 확장');
+    const inputLook=await page.locator('#community-query').evaluate(el=>{const s=getComputedStyle(el);return {bg:s.backgroundColor,color:s.color,border:s.borderTopColor};});
+    assert.deepEqual(inputLook,{bg:roles['--lt-role-input-bg'],color:roles['--lt-role-input-ink'],border:roles['--lt-role-input-border']},width+'/'+theme+': 입력 칸 역할 색 적용');
     await page.locator('#community-query').fill('가수');
     await page.locator('#community-query').press('Enter');
     assert.equal(await page.locator('#community-query').inputValue(),'가수');

@@ -37,7 +37,9 @@ const SCENES = [
 const ACCOUNT = { name: 'account', hash: '', expect: '/v41/home', openAccount: true };
 const WIDTHS = [
   { width: 1440, height: 900, tag: '1440' },
-  { width: 390, height: 844, tag: '390' }
+  { width: 390, height: 844, tag: '390' },
+  { width: 844, height: 390, tag: 'landscape', scenes: ['home'] },
+  { width: 800, height: 900, tag: 'wide', scenes: ['home'] }
 ];
 const THEMES = ['night', 'garden'];
 
@@ -264,8 +266,9 @@ async function capture(argv) {
   let skipped = 0;
   try {
     for (const viewport of WIDTHS) {
+      const scenes = [...SCENES, ACCOUNT].filter(scene => (!viewport.scenes || viewport.scenes.includes(scene.name)) && (!options.scenes || options.scenes.split(',').includes(scene.name)));
       for (const theme of THEMES) {
-        for (const scene of [...SCENES, ACCOUNT]) {
+        for (const scene of scenes) {
           if (Date.now() > stopAt) {
             const name = scene.openAccount ? `account-${viewport.tag}-${theme}.png` : shotName(scene.name, viewport, theme);
             manifest.push({ shot: name, scene: scene.name, opened: false, skipped: 'budget' });

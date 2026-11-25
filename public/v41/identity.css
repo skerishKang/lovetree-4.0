@@ -17,6 +17,14 @@
  --lt-glass:rgba(10,10,16,.78);--lt-glass-strong:rgba(7,7,12,.9);--lt-line:rgba(255,255,255,.14);--lt-line-paper:rgba(73,61,58,.2);
  --lt-primary:#eee9e0;--lt-primary-ink:#0a090d;      /* 1차 버튼 (첫 화면 감상창과 같음) */
  --lt-btn-ink:#1a1620;                                /* 어두운 공통 단추 바탕 (#886) */
+ --lt-role-bg:var(--lt-stage);--lt-role-accent-bg:var(--lt-gold-deep);--lt-role-accent-ink:var(--lt-stage);
+ /* #1362: 밤의 선 색은 회색 펄 계열. 금색은 선택 채움과 마우스 올림에만 쓴다. */
+ --lt-role-line:rgba(245,241,233,.4);
+ --lt-role-secondary-bg:transparent;--lt-role-secondary-border:var(--lt-role-line);--lt-role-secondary-ink:var(--lt-pearl);
+ --lt-role-input-bg:var(--lt-glass-strong);--lt-role-input-border:var(--lt-role-line);--lt-role-input-ink:var(--lt-pearl);
+ --lt-role-idle-bg:transparent;--lt-role-idle-border:var(--lt-role-line);--lt-role-idle-ink:var(--lt-pearl);
+ --lt-role-hover-bg:rgba(255,230,166,.10);--lt-role-hover-border:var(--lt-gold);--lt-role-hover-ink:var(--lt-gold);--lt-role-hover-cursor:pointer;
+ --lt-role-text-strong:var(--lt-pearl);--lt-role-text-muted:var(--lt-muted);--lt-role-text-faint:rgba(245,241,233,.64);--lt-role-border:var(--lt-role-line);
  --lt-r-pill:999px;--lt-r-panel:22px;--lt-r-card:14px;--lt-track:.2em;
  /* 보드 실·핀, 지도 그룹색: 원본 네온/인포그래픽 6색을 첫 화면 색상으로 옮긴 값. JS가 읽는다. */
  --lt-thread-rose:#d88f9c;--lt-thread-violet:#a99ac9;--lt-thread-cyan:#7892c9;--lt-thread-amber:#e6b14c;
@@ -155,8 +163,8 @@ html[data-v41-screen=network] .action.primary{background:linear-gradient(135deg,
 html[data-v41-screen=shelf]{--rose:var(--lt-rose);--rose-deep:var(--lt-rose-ink);--night:var(--lt-stage);--night-2:var(--lt-stage-2)}
 html[data-v41-screen=shelf] .reader-stage{background:radial-gradient(circle at 53% 42%,rgba(152,111,121,.22),transparent 26%),radial-gradient(circle at 22% 85%,rgba(77,117,122,.16),transparent 32%),linear-gradient(135deg,#17121f,#040407 85%)}
 /* 어댑터가 만든 선택 상태는 금테 한 줄로 통일한다(원본 예술 요소 제외). */
-html[data-v41-screen=board] .themeBtn.active,html[data-v41-screen=board] .styleMini.active{border-color:var(--lt-gold);box-shadow:0 0 14px rgba(238,190,104,.22)}
-html[data-v41-screen=shelf] .filter.active{border-color:var(--lt-gold-deep);box-shadow:0 0 0 1px var(--lt-gold-deep)}
+html[data-v41-screen=board] .themeBtn.active,html[data-v41-screen=board] .styleMini.active{border-color:var(--lt-role-accent-bg);background:var(--lt-role-accent-bg);color:var(--lt-role-accent-ink);box-shadow:none}
+html[data-v41-screen=shelf] .filter.active{border-color:var(--lt-role-accent-bg);background:var(--lt-role-accent-bg);color:var(--lt-role-accent-ink);box-shadow:none}
 /* 모바일 순간 선택 바(어댑터 mobile-moments.js): 보라 계열 → 첫 화면 토큰 */
 html[data-v41-screen] .lt-moment-picker{border-color:var(--lt-line-paper);border-radius:var(--lt-r-card)}
 html[data-v41-screen] .lt-moment-picker button{border-radius:var(--lt-r-pill);background:var(--lt-btn-ink,#1a1620);color:var(--lt-pearl)}
@@ -166,7 +174,7 @@ html[data-v41-screen] .lt-moment-picker select:focus-visible,html[data-v41-scree
 /* 안쪽 화면 상단 도구 줄(기억책 도구, 보드 전체 보기, 관계 지도 전체 보기·사용법): 첫 화면 메뉴 알약(.menuBtn)과 같은 모양 */
 html[data-v41-screen=book] .tools .ui-btn,html[data-v41-screen=board] header .headbtn,html[data-v41-screen=network] .top-actions .pill{min-height:44px;height:auto;padding:10px 15px;border:1px solid rgba(255,255,255,.22);border-radius:var(--lt-r-pill);background:rgba(9,8,14,.62);color:#ece7f1;font-size:14px;letter-spacing:.06em;backdrop-filter:blur(8px);box-shadow:none;transform:none}
 html[data-v41-screen=book] .tools .ui-btn:hover,html[data-v41-screen=board] header .headbtn:hover,html[data-v41-screen=network] .top-actions .pill:hover{border-color:rgba(255,255,255,.44);background:rgba(255,255,255,.09);transform:none}
-html[data-v41-screen=book] .tools .ui-btn.active{border-color:var(--lt-gold-line);background:rgba(255,230,166,.08);box-shadow:inset 0 0 0 1px var(--lt-gold-line)}
+html[data-v41-screen=book] .tools .ui-btn.active{border-color:var(--lt-role-accent-bg);background:var(--lt-role-accent-bg);color:var(--lt-role-accent-ink);box-shadow:none}
 html[data-v41-screen=board] header .headbtn.primary{background:rgba(9,8,14,.62);border-color:rgba(255,255,255,.22);box-shadow:none}
 html[data-v41-screen=network] .top-actions .pill{background:rgba(9,8,14,.8)}
 @media(max-width:699px){html[data-v41-screen=book] .tools .ui-btn,html[data-v41-screen=board] header .headbtn,html[data-v41-screen=network] .top-actions .pill{padding:8px 11px;font-size:13px}}
@@ -194,6 +202,13 @@ html[data-lt-theme=garden]{
  --lt-glass:rgba(255,253,248,.92);--lt-glass-strong:rgba(255,253,248,.98);
  --lt-line:rgba(119,91,82,.18);--lt-line-paper:rgba(119,91,82,.3);
  --lt-primary:#98505e;--lt-primary-ink:#fffdf8;
+ --lt-role-bg:var(--lt-stage);--lt-role-accent-bg:var(--lt-rose-ink);--lt-role-accent-ink:var(--lt-paper);
+ --lt-role-secondary-bg:transparent;--lt-role-secondary-border:rgba(152,80,94,.72);--lt-role-secondary-ink:var(--lt-rose-ink);
+ --lt-role-input-bg:var(--lt-paper);--lt-role-input-border:rgba(152,80,94,.72);--lt-role-input-ink:var(--lt-ink);
+ --lt-role-idle-bg:transparent;--lt-role-idle-border:rgba(152,80,94,.72);--lt-role-idle-ink:var(--lt-ink);
+ --lt-role-line:var(--lt-role-idle-border);
+ --lt-role-hover-bg:rgba(152,80,94,.08);--lt-role-hover-border:var(--lt-rose-ink);--lt-role-hover-ink:var(--lt-rose-ink);--lt-role-hover-cursor:pointer;
+ --lt-role-text-strong:var(--lt-ink);--lt-role-text-muted:var(--lt-muted);--lt-role-text-faint:rgba(64,53,54,.72);--lt-role-border:rgba(152,80,94,.72);
  --lt-cta-rose:var(--lt-rose-ink);
  --lt-garden-edge:#eee3d5;--lt-garden-shadow:0 18px 40px rgba(75,51,42,.16);
  --lt-tree-1:#6a5a9e;--lt-tree-2:#4f7e6a;--lt-tree-3:#96704f;--lt-tree-4:#5b7295;--lt-tree-5:#96637a;--lt-tree-6:#7a7a4f;
@@ -208,7 +223,7 @@ html[data-lt-theme=garden] .brand{color:var(--lt-ink);opacity:1}
 html[data-lt-theme=garden] .brand>span{font-family:'Gowun Batang',var(--lt-reading);color:var(--lt-ink);font-weight:700;letter-spacing:.22em}
 html[data-lt-theme=garden] .brand small{color:var(--lt-gold)}
 html[data-lt-theme=garden] nav button:hover{background:rgba(152,80,94,.08);color:var(--lt-ink)}
-html[data-lt-theme=garden] nav button[aria-current=true]{color:var(--lt-ink);background:rgba(200,110,121,.12);box-shadow:inset 0 0 0 1px var(--lt-gold-line)}
+html[data-lt-theme=garden] nav button[aria-current=true]{color:var(--lt-role-accent-ink);background:transparent;box-shadow:none}
 html[data-lt-theme=garden] .header-actions button,html[data-lt-theme=garden] .login{color:var(--lt-ink);background:rgba(255,253,248,.9);border-color:rgba(119,91,82,.3)}
 html[data-lt-theme=garden] .header-actions button:hover,html[data-lt-theme=garden] .login:hover{background:var(--lt-paper);border-color:rgba(119,91,82,.55)}
 html[data-lt-theme=garden] .account-avatar{background:rgba(200,110,121,.16);border-color:var(--lt-gold-line);color:var(--lt-gold-ink)}
@@ -271,18 +286,20 @@ html[data-lt-theme=garden] body,html[data-lt-theme=garden] .app-header{transitio
 :host .center .actions .subtleBtn:hover,:host .center .actions .subtleBtn:active{filter:brightness(.94)}
 :host([data-lt-theme=garden]) .center .actions .subtleBtn{background:var(--lt-paper);color:var(--lt-ink);border-color:var(--lt-line-paper)}
 :host .center .actions .primary-cta,:host .center .actions .primary-cta:hover,:host([data-lt-theme=garden]) .center .actions .primary-cta,:host([data-lt-theme=garden]) .center .actions .primary-cta:hover{background:var(--lt-cta-rose);border-color:var(--lt-cta-rose);color:var(--lt-cta-white)}
-/* #1246: 첫 화면 둘러보기만 채움 없는 나침반 단추. */
+/* #1246: 첫 화면 둘러보기만 채움 없는 나침반 단추.
+   #1350: 자리·투명 배경은 그대로 두고 테두리·글자를 역할 변수로 진하게 한다(순간 추가보다 한 단계 낮은 무게).
+   새 색 값·color-mix 없이 --lt-role-* 만 쓴다. */
 :host .center .actions .subtleBtn[data-do=community],
 :host([data-lt-theme=garden]) .center .actions .subtleBtn[data-do=community]{
  display:inline-flex;align-items:center;justify-content:center;gap:5px;white-space:nowrap;
- background:transparent;border:1px solid color-mix(in srgb,var(--lt-pearl) 55%,transparent);
- border-radius:var(--lt-r-pill);color:var(--lt-pearl);filter:none
+ background:transparent;border:1px solid var(--lt-role-text-strong);
+ border-radius:var(--lt-r-pill);color:var(--lt-role-text-strong);filter:none
 }
 :host .center .actions .subtleBtn[data-do=community]:hover,
 :host .center .actions .subtleBtn[data-do=community]:active,
 :host([data-lt-theme=garden]) .center .actions .subtleBtn[data-do=community]:hover,
 :host([data-lt-theme=garden]) .center .actions .subtleBtn[data-do=community]:active{
- background:color-mix(in srgb,var(--lt-pearl) 9%,transparent);border-color:var(--lt-pearl);filter:none
+ background:var(--lt-role-hover-bg);border-color:var(--lt-role-hover-border);filter:none
 }
 :host .center .actions .home-compass{width:15px;height:15px;flex:none}
 :host([data-lt-theme=garden]) .hint,:host([data-lt-theme=garden]) .caption{color:var(--lt-muted);text-shadow:none}
@@ -320,8 +337,9 @@ html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .shelf-jump:focus-visibl
 html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .stage-hint{color:var(--lt-muted)}
 html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .search input{border-color:var(--lt-line);color:var(--lt-pearl);background:rgba(10,10,17,.66)}
 html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .search input::placeholder{color:var(--lt-muted)}
-html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .filter{border-color:var(--lt-line);color:var(--lt-muted);background:rgba(10,10,17,.5)}
-html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .filter.active,html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .filter:hover{border-color:var(--lt-gold-line);color:var(--lt-gold);background:rgba(255,230,166,.08)}
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .filter{border-color:var(--lt-role-idle-border);color:var(--lt-role-idle-ink);background:var(--lt-role-idle-bg)}
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .filter.active{border-color:var(--lt-role-accent-bg);color:var(--lt-role-accent-ink);background:var(--lt-role-accent-bg)}
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .filter:not(.active):hover{border-color:var(--lt-role-hover-border);color:var(--lt-role-hover-ink);background:var(--lt-role-hover-bg)}
 html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .count{color:var(--lt-muted)}
 html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .shelf-viewport{border-color:var(--lt-line);background:radial-gradient(circle at 50% 11%,rgba(238,190,104,.1),transparent 33%),linear-gradient(180deg,var(--lt-stage-2),#05050a 88%);box-shadow:0 24px 60px rgba(0,0,0,.55)}
 html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .shelf-viewport[data-selected-book]{background:radial-gradient(circle at 50% 11%,color-mix(in srgb,var(--lt-gold-deep) 16%,transparent),transparent 33%),linear-gradient(180deg,var(--lt-stage-2),#05050a 88%)}
@@ -350,7 +368,8 @@ html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .info-rule{border-color:
 html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .chapter-heading strong{color:var(--lt-pearl)}
 html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .chapter-heading span{color:var(--lt-muted)}
 html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .chapter-item{border-color:var(--lt-line);color:var(--lt-pearl);background:rgba(10,10,17,.5)}
-html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .chapter-item:hover,html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .chapter-item.active{border-color:var(--lt-gold-line);background:rgba(255,230,166,.09)}
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .chapter-item.active{border-color:var(--lt-role-accent-bg);background:var(--lt-role-accent-bg);color:var(--lt-role-accent-ink)}
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .chapter-item:not(.active):hover{border-color:var(--lt-role-hover-border);background:var(--lt-role-hover-bg)}
 html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .chapter-item small,html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .chapter-item .arrow{color:var(--lt-muted)}
 html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .reader-info-foot{border-top-color:var(--lt-line);color:var(--lt-muted)}
 html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .reader-info-foot strong{color:var(--lt-gold)}
@@ -474,16 +493,16 @@ html[data-lt-theme=garden] .lt-thumb-tone,:host([data-lt-theme=garden]) .lt-thum
    같은 자리에서 더 세게 눌린 모양을 준다 — 맨 위 메뉴의 '지금 보기' 금테와 같은 결(금빛 바탕·금테). */
 /* 이슈 584(5번): '한 장/두 장' 두 알약을 한 테두리 안 두 칸(1장|2장)으로 묶는다 — 보드 [종이|밤]과 같은 묶음 모양.
    고른 칸만 금색 채움. 이 파일이 book.css 뒤에 실려 이 규칙이 이긴다(#464 자리). */
-html[data-v41-screen=book] .tools .view-toggle{border:1px solid rgba(255,255,255,.22);border-radius:999px;background:rgba(9,8,14,.35);padding:0;overflow:hidden}
+html[data-v41-screen=book] .tools .view-toggle{border:1px solid var(--lt-role-line);border-radius:999px;background:var(--lt-role-bg);padding:0;overflow:hidden}
 html[data-v41-screen=book] .tools .view-toggle .ui-btn{border:0;border-radius:0;background:transparent;box-shadow:none;transform:none;min-height:44px}
 html[data-v41-screen=book] .tools .view-toggle .ui-btn[aria-pressed=true],
-html[data-v41-screen=book] .tools .view-toggle .ui-btn[aria-pressed="true"]{background:var(--lt-gold);border-color:var(--lt-gold);color:var(--lt-stage);box-shadow:inset 0 0 0 1px rgba(0,0,0,.18);transform:none}
-html[data-v41-screen=book] .tools .view-toggle .ui-btn[aria-pressed=true]:hover{background:var(--lt-gold);border-color:var(--lt-gold);transform:none}
+html[data-v41-screen=book] .tools .view-toggle .ui-btn[aria-pressed="true"]{background:var(--lt-role-accent-bg);border-color:var(--lt-role-accent-bg);color:var(--lt-role-accent-ink);box-shadow:none;transform:none}
+html[data-v41-screen=book] .tools .view-toggle .ui-btn[aria-pressed=true]:hover{background:var(--lt-role-accent-bg);border-color:var(--lt-role-accent-bg);transform:none}
 /* 눌리지 않은 칸은 묶음 바탕을 그대로 쓴다(눌린 칸 금색과 대비). */
-html[data-v41-screen=book] .tools .view-toggle .ui-btn[aria-pressed=false]{color:var(--lt-muted);background:transparent;border-color:transparent}
+html[data-v41-screen=book] .tools .view-toggle .ui-btn[aria-pressed=false]{color:var(--lt-role-idle-ink);background:var(--lt-role-idle-bg);border-color:var(--lt-role-idle-border)}
 /* 이슈 584(6번): 돋보기는 아이콘 단추 — 켜지면 금색. */
-html[data-v41-screen=book] .tools #lensBtn.active{color:var(--lt-gold)}
-html[data-v41-screen=book] .tools #lensBtn.active:hover{color:var(--lt-gold)}
+html[data-v41-screen=book] .tools #lensBtn.active{color:var(--lt-role-accent-bg)}
+html[data-v41-screen=book] .tools #lensBtn.active:hover{color:var(--lt-role-hover-ink)}
 html[data-v41-screen=book] .tools .lens-icon{display:block}
 
 /* 공통 앱 안 확인 창(#1109 창 모양 부품 재사용) — 브라우저 기본 confirm 대신 이 틀을 쓴다. 새 색 없음. */

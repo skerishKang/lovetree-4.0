@@ -29,9 +29,9 @@ header[hidden]{display:none}
   border:1px solid var(--lt-line);border-radius:var(--lt-r-pill);
   background:var(--lt-glass-strong);color:var(--lt-pearl);font-family:var(--lt-ui);font-size:13px;white-space:nowrap;
 }
-.lt-toolbar-tools button[aria-pressed=true]{border-color:var(--lt-gold-line);color:var(--lt-gold)}
+.lt-toolbar-tools button[aria-pressed=true]{border-color:var(--lt-role-accent-bg);color:var(--lt-role-accent-ink)}
 .lt-toolbar-tools .view-toggle,.lt-toolbar-tools .boardModeSwitch,.lt-toolbar-tools .bgDrop{display:inline-flex;align-items:center;flex:none}
-.lt-toolbar-tools .view-toggle{border:1px solid var(--lt-line);border-radius:var(--lt-r-pill);overflow:hidden}
+.lt-toolbar-tools .view-toggle{border:1px solid var(--lt-role-line);border-radius:var(--lt-r-pill);overflow:hidden}
 .lt-toolbar-tools .boardModeSwitch{border:1px solid var(--lt-line);border-radius:var(--lt-r-pill);overflow:hidden;height:38px}
 .lt-toolbar-tools .cinemaBtn{position:static;flex:none;box-sizing:border-box;height:36px;min-height:36px;line-height:34px;padding:0 12px;width:auto;font-size:13px}
 .lt-toolbar-tools .view-toggle .ui-btn,.lt-toolbar-tools .boardModeSwitch .modeSwitchBtn{box-sizing:border-box;height:36px;min-height:36px;line-height:34px;padding:0 12px;font-size:13px}
@@ -93,17 +93,29 @@ html[data-book-shape=phone][data-v41-screen=book] .stage{top:auto;min-height:cal
 .lt-toolbar-tools .view-toggle>button[aria-checked=true],
 .lt-toolbar-tools .view-toggle>button[aria-pressed=true],
 .lt-toolbar-tools .shelf-view-inline>button[aria-checked=true],
-.lt-toolbar-tools .boardModeSwitch>button[aria-pressed=true]{
- background:var(--lt-primary);color:var(--lt-primary-ink);border:0;
+.lt-toolbar-tools .boardModeSwitch>button[aria-pressed=true],
+.lt-toolbar-tools .shelf-view-inline>button[aria-checked=true]{
+ background:var(--lt-role-accent-bg);color:var(--lt-role-accent-ink);border:0;
 }
 .lt-toolbar-tools .view-toggle>button:not([aria-checked=true]):not([aria-pressed=true]),
 .lt-toolbar-tools .shelf-view-inline>button:not([aria-checked=true]),
 .lt-toolbar-tools .boardModeSwitch>button:not([aria-pressed=true]){
- background:transparent;color:var(--lt-pearl);border:0;
+ background:var(--lt-role-idle-bg);color:var(--lt-role-idle-ink);border:0;box-shadow:inset 0 0 0 1px var(--lt-role-idle-border);
 }
+.lt-toolbar-tools .shelf-view-inline>button:not([aria-checked=true]){box-shadow:inset 0 0 0 1px var(--lt-role-idle-border)}
 html[data-lt-theme=garden] .lt-toolbar-tools .view-toggle>button:not([aria-checked=true]):not([aria-pressed=true]),
 html[data-lt-theme=garden] .lt-toolbar-tools .shelf-view-inline>button:not([aria-checked=true]),
 html[data-lt-theme=garden] .lt-toolbar-tools .boardModeSwitch>button:not([aria-pressed=true]){color:var(--lt-ink)}
+html[data-v41-screen=book] .lt-toolbar-tools #book-display-inline,
+html[data-v41-screen=book] .lt-toolbar-tools #book-view-toggle{background:var(--lt-role-bg);border-color:var(--lt-role-border)}
+html[data-v41-screen=book] .lt-toolbar-tools #book-display-inline>button,
+html[data-v41-screen=book] .lt-toolbar-tools #book-view-toggle>button{background:var(--lt-role-idle-bg);color:var(--lt-role-idle-ink);box-shadow:inset 0 0 0 1px var(--lt-role-idle-border)}
+html[data-v41-screen=book] .lt-toolbar-tools #book-display-inline>button[aria-checked=true],
+html[data-v41-screen=book] .lt-toolbar-tools #book-view-toggle>button[aria-pressed=true]{background:var(--lt-role-accent-bg);color:var(--lt-role-accent-ink);box-shadow:inset 0 0 0 1px var(--lt-role-accent-bg)}
+html[data-v41-screen=book] .lt-toolbar-tools #book-display-inline>button:not([aria-checked=true]):hover,
+html[data-v41-screen=book] .lt-toolbar-tools #book-view-toggle>button:not([aria-pressed=true]):hover,
+html[data-v41-screen=book] .lt-toolbar-tools #book-display-inline>button:not([aria-checked=true]):focus-visible,
+html[data-v41-screen=book] .lt-toolbar-tools #book-view-toggle>button:not([aria-pressed=true]):focus-visible{background:var(--lt-role-hover-bg);color:var(--lt-role-hover-ink);box-shadow:inset 0 0 0 1px var(--lt-role-hover-border);cursor:var(--lt-role-hover-cursor)}
 /* 서재 전환은 머리줄 토글이 걷어졌으므로 줄 안에 둔다 — 크기에 관계없이 한 벌만 보인다. */
 .lt-toolbar-tools .shelf-view-inline{display:grid}
 html[data-v41-screen=book] .lt-toolbar-tools #playAllBtn{order:10}
@@ -178,7 +190,7 @@ html[data-v41-screen=board] .lt-toolbar-tools .boardModeSwitch>#boardResetOrderB
 
 /* #1091: 지도 보기 전환도 공통 도구의 테마와 모양을 따른다. */
 html[data-v41-screen=network] .lt-screen-toolbar :is(.lt-toolbar-tools,.lt-toolbar-menu) .view-switch{
-  box-sizing:border-box;height:38px;padding:0;gap:0;border:1px solid var(--lt-line);
+  box-sizing:border-box;height:38px;padding:0;gap:0;border:1px solid var(--lt-role-line);
   border-radius:var(--lt-r-pill);background:var(--lt-glass-strong);box-shadow:none;
 }
 html[data-v41-screen=network] .lt-screen-toolbar :is(.lt-toolbar-tools,.lt-toolbar-menu) .view-switch .pill{
@@ -186,7 +198,7 @@ html[data-v41-screen=network] .lt-screen-toolbar :is(.lt-toolbar-tools,.lt-toolb
   background:transparent;color:var(--lt-pearl);box-shadow:none;font:600 13px var(--lt-ui);
 }
 html[data-v41-screen=network] .lt-screen-toolbar :is(.lt-toolbar-tools,.lt-toolbar-menu) .view-switch .pill[aria-pressed=true]{
-  background:var(--lt-primary);color:var(--lt-primary-ink);
+  background:var(--lt-role-accent-bg);color:var(--lt-role-accent-ink);
 }
 
 html[data-v41-screen=network] body .lt-screen-toolbar :is(.lt-toolbar-tools,.lt-toolbar-menu) :is(#overviewBtn,#netBgBtn){background:var(--lt-glass-strong);border-color:var(--lt-line);color:var(--lt-pearl);box-shadow:none}

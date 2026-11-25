@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { serve, auditPage, failuresOf } from './helpers/screen-audit.mjs';
 import { waitForShownScreen } from './helpers/visible-frame.mjs';
+import { inspectYoutubeIframe, countYoutubeAutoplay } from './helpers/youtube-embed-audit.mjs';
 import { createTree, addMoment } from '../public/v41/domain.mjs';
 
 const REQUIRE = process.env.LT_MOMENTS_1025_REQUIRE === '1';
@@ -240,9 +241,13 @@ test('#1354 플레이어 겹침·가시성·자동재생·정보상태·중앙�
      });
      const v=await panel.evaluate(el=>{
       const f=el.querySelector('.moments-frame:not(.moments-next)'),n=el.querySelector('.moments-next'),r=f.getBoundingClientRect(),card=el.querySelector('.moments-card'),ctx=el.querySelector('.moments-context'),row=document.querySelector('.community-top-row.is-moments'),stage=el.querySelector('.moments-stage');
-      const rect=e=>e.getBoundingClientRect(),xs=[.1,.5,.9],ys=[.1,.5,.9];
-      return {w:r.width,h:r.height,blocked:xs.flatMap(x=>ys.map(y=>document.elementFromPoint(r.left+r.width*x,r.top+r.height*y))).filter(e=>e!==f).length,frames:el.querySelectorAll('.moments-frame').length,autoplay:[...el.querySelectorAll('.moments-frame')].filter(e=>new URL(e.src).searchParams.get('autoplay')==='1').length,nextAuto:n?new URL(n.src).searchParams.get('autoplay'):null,nextMute:n?new URL(n.src).searchParams.get('mute'):null,contextVisible:rect(ctx).height>0,infoOpen:stage.classList.contains('moments-info-open'),contextTop:rect(ctx).top,cardTop:rect(card).top,rowLeft:rect(row).left,rowRight:rect(row).right,stageLeft:rect(stage).left,stageRight:rect(stage).right,topHeight:rect(row).height};
+      const rect=e=>e.getBoundingClientRect();
+      return {w:r.width,h:r.height,blocked:null,frames:el.querySelectorAll('.moments-frame').length,autoplay:null,nextAuto:n?new URL(n.src).searchParams.get('autoplay'):null,nextMute:n?new URL(n.src).searchParams.get('mute'):null,contextVisible:rect(ctx).height>0,infoOpen:stage.classList.contains('moments-info-open'),contextTop:rect(ctx).top,cardTop:rect(card).top,rowLeft:rect(row).left,rowRight:rect(row).right,stageLeft:rect(stage).left,stageRight:rect(stage).right,topHeight:rect(row).height};
      });
+     const playerAudit=await inspectYoutubeIframe(panel.locator('.moments-frame:not(.moments-next)'));
+     v.blocked=playerAudit.blocked;
+     v.autoplay=await countYoutubeAutoplay(panel);
+     assert.equal(playerAudit.minimum200,true,'공용 도우미: 플레이어 최소 크기');
      assert.ok(v.w>=200&&v.h>=200,'플레이어 최소 200×200');
      assert.equal(v.blocked,0,'플레이어 내부 9점의 맨 위 요소는 iframe');
      assert.equal(v.frames,2,'현재 영상+준비 영상 2개');

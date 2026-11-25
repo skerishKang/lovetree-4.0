@@ -271,3 +271,81 @@ test('#366 지도 화면 결과: 안내 불투명·연결 이유 툴팁·눌린 
     } finally { await ctx.close(); }
   } finally { await browser.close(); server.close(); }
 });
+
+test('#1378 지도 영상: 상세와 크게 보기 390·1440 × 밤·정원', {skip: REQUIRE ? false : skip, timeout: 180000}, async () => {
+  if(skip) assert.fail(skip);
+  const {inspectYoutubeIframe,countYoutubeAutoplay}=await import('./helpers/youtube-embed-audit.mjs');
+  const shape=flat26(), url='https://youtu.be/dQw4w9WgXcQ';
+  shape.moments[0].url=url;
+  const server=await serve(), base='http://127.0.0.1:'+server.address().port;
+  const browser=await chromium.launch({headless:true});
+  try{
+    for(const width of [390,1440]) for(const theme of ['night','garden']){
+      const ctx=await browser.newContext({viewport:{width,height:width===390?844:900},reducedMotion:'reduce'});
+      const stub=lt41Stub(shape,'m01');delete stub.tree.demoData;stub.source='server';stub.writable=true;stub.owned=true;
+      await ctx.addInitScript(({stub,theme})=>{
+        localStorage.setItem('lt41.theme',theme);
+        localStorage.setItem('lt41.boardTheme',theme==='garden'?'paper':'night');
+        window.LT41=stub;
+      },{stub,theme});
+      await ctx.route('**/track56-network.html*',async r=>{const response=await r.fetch();await r.fulfill({response,body:(await response.text()).replace('<body>','<body data-member="in" data-record-source="server">')});});
+      await ctx.route('**/i.ytimg.com/**',r=>r.fulfill({status:200,contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="900"><rect width="1200" height="900" fill="#92829f"/></svg>'}));
+      await ctx.route('**/www.youtube-nocookie.com/**',r=>r.fulfill({status:200,contentType:'text/html',body:'<title>YouTube</title>'}));
+      await ctx.route('**/api/youtube/oembed*',r=>r.fulfill({status:200,contentType:'application/json',body:'{"title":"영상"}'}));
+      const page=await ctx.newPage();
+      try{
+        await page.goto(base+'/v41/views/track56-network.html?open=m01',{waitUntil:'load'});
+        await page.waitForSelector('#detail.open',{timeout:20000});
+        await page.waitForFunction(()=>!!document.querySelector('#detailPlayer .lt-media'),null,{timeout:10000});
+        const capture=process.env.LT_MAP_YT_CAPTURE_DIR;
+        if(capture){const fs=await import('node:fs');fs.mkdirSync(capture,{recursive:true});await page.screenshot({path:path.join(capture,'before-'+width+'-'+theme+'.png')});}
+        const detail=page.locator('#detailPlayer'), play=detail.locator('[data-lt-play]');
+        assert.equal(await play.count(),1,'상세 썸네일');
+        assert.equal(await detail.locator('iframe').count(),0,'상세 초기 iframe 0');
+        await play.focus();await play.press('Enter');
+        await page.waitForSelector('#ltViewer.open',{timeout:8000});
+        assert.equal(await detail.locator('iframe').count(),0,'상세 iframe 0');
+        await page.waitForSelector('#viewerMedia iframe.lt-yt-frame',{timeout:10000});
+        const iframe=page.locator('#viewerMedia iframe.lt-yt-frame');
+        await iframe.scrollIntoViewIfNeeded();
+        const m=await inspectYoutubeIframe(iframe);
+        console.log('MAP_PLAYER',JSON.stringify({width,theme,w:m.width,h:m.height,blocked:m.blocked}));
+        assert.equal(m.minimum200,true,width+'/'+theme+': 크기 '+m.width+'×'+m.height);
+        assert.equal(m.blocked,0,width+'/'+theme+': 9지점 가림 '+m.blockers.join(','));
+        assert.ok(await countYoutubeAutoplay(page)<=1,'자동재생 최대 1');
+        if(capture)await page.screenshot({path:path.join(capture,'after-'+width+'-'+theme+'.png')});
+        if(width===390)await page.locator('#closeViewer').click();
+        else await page.keyboard.press('Escape');
+        assert.equal(await page.locator('#ltViewer.open').count(),0,'창 닫힘');
+        assert.equal(await page.locator('#viewerMedia iframe').count(),0,'닫은 뒤 iframe 0');
+      }finally{await ctx.close();}
+    }
+  }finally{await browser.close();await new Promise(r=>server.close(r));}
+});
+
+test('#1378 지도 영상: 임베드 차단 시 iframe 제거와 원본 링크', {skip: REQUIRE ? false : skip, timeout: 90000}, async () => {
+  if(skip) assert.fail(skip);
+  const shape=flat26(), url='https://youtu.be/dQw4w9WgXcQ';
+  shape.moments[0].url=url;
+  const server=await serve(),base='http://127.0.0.1:'+server.address().port;
+  const browser=await chromium.launch({headless:true});
+  const ctx=await browser.newContext({viewport:{width:390,height:844},reducedMotion:'reduce'});
+  try{
+    const stub=lt41Stub(shape,'m01');delete stub.tree.demoData;stub.source='server';stub.writable=true;
+    await ctx.addInitScript(s=>{localStorage.setItem('lt41.theme','garden');localStorage.setItem('lt41.boardTheme','paper');window.LT41=s;},stub);
+    await ctx.route('**/track56-network.html*',async r=>{const response=await r.fetch();await r.fulfill({response,body:(await response.text()).replace('<body>','<body data-member="in" data-record-source="server">')});});
+    await ctx.route('**/i.ytimg.com/**',r=>r.fulfill({status:200,contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="900"/>'}));
+    await ctx.route('**/api/youtube/oembed*',r=>r.fulfill({status:401,contentType:'application/json',body:'{"error":"youtube_embed_forbidden"}'}));
+    await ctx.route('**/www.youtube-nocookie.com/**',r=>r.fulfill({status:200,contentType:'text/html',body:'<title>Video</title>'}));
+    const page=await ctx.newPage();
+    await page.goto(base+'/v41/views/track56-network.html?open=m01',{waitUntil:'load'});
+    await page.waitForSelector('#detailPlayer [data-lt-play]',{timeout:20000});
+    await page.locator('#detailPlayer [data-lt-play]').click({force:true});
+    await page.waitForSelector('#viewerMedia .lt-media-noembed-link',{timeout:10000});
+    assert.equal(await page.locator('#viewerMedia iframe').count(),0,'차단 뒤 iframe 제거');
+    assert.equal(await page.locator('#viewerMedia .lt-media-noembed-link[href*="youtube.com"]').count(),1,'원본 링크 1개');
+    await page.keyboard.press('Escape');
+    assert.equal(await page.locator('#viewerMedia iframe').count(),0,'닫은 뒤 iframe 0');
+    assert.equal(await page.locator('#ltViewer.open').count(),0,'Esc로 닫힘');
+  }finally{await ctx.close();await browser.close();await new Promise(r=>server.close(r));}
+});

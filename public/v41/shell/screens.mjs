@@ -157,13 +157,31 @@ export function createScreens(deps) {
       if (token !== viewToken) return;
       let doc = null;
       try { doc = next.contentDocument; } catch {}
-      // 글꼴이 준비되고, 새 화면에 실제 내용이 그려진 뒤에 넘긴다(빈 화면을 보여 주지 않는다).
+      // #1365: 첫 화면처럼 내용을 가려진 문서(shadow root)에 그리는 경우도 내용으로 인정한다 —
+      // 본문 글자만 보면 늘 비어 있어 900ms 한계까지 기다리게 된다.
+      const shadowHasText = (d, sr) => {
+        const walker = d.createTreeWalker(sr, 4 /* SHOW_TEXT */, {
+          acceptNode(node) {
+            const tag = node.parentElement?.tagName;
+            if (tag === 'STYLE' || tag === 'SCRIPT') return 2 /* REJECT */;
+            return node.nodeValue.trim() ? 1 /* ACCEPT */ : 2 /* REJECT */;
+          },
+        });
+        return !!walker.nextNode();
+      };
       const waitContent = deadline => {
         if (token !== viewToken) return;
         let filled = false;
         try {
           const d = next.contentDocument;
-          filled = !!(d && d.body && d.body.children.length > 0 && (d.body.innerText || '').trim().length > 0);
+          if (d && d.body && d.body.children.length > 0) {
+            filled = !!(d.body.innerText || '').trim();
+            if (!filled) {
+              for (const host of d.querySelectorAll('*')) {
+                if (host.shadowRoot && shadowHasText(d, host.shadowRoot)) { filled = true; break; }
+              }
+            }
+          }
         } catch {}
         if (filled || Date.now() > deadline) {
           requestAnimationFrame(() => requestAnimationFrame(done));

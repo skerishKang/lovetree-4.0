@@ -112,7 +112,7 @@ test('#1010 기존 사용자(예시만 궤도) 안내 줄 — 금테를 빼고 �
   } finally { await browser.close(); }
 });
 
-test('#1010 기존 사용자 390 — 떠다니는 예시 카드가 숨으면 안내 줄도 숨긴다', { skip: REQUIRE1010 ? false : skip1010, timeout: 180000 }, async () => {
+test('#1010 기존 사용자 390 — 떠다니는 예시 카드 대신 8장 리본을 유지한다', { skip: REQUIRE1010 ? false : skip1010, timeout: 180000 }, async () => {
   if (skip1010) assert.fail(skip1010);
   const browser = await chromium1010.launch({ headless: true });
   try {
@@ -120,7 +120,7 @@ test('#1010 기존 사용자 390 — 떠다니는 예시 카드가 숨으면 안
     try {
       assert.equal(await noteCount(h.frame), 0, '기존 사용자 390 첫 화면에 안내 줄이 없다(#1204)');
       const visibleCards = await h.frame.locator('.card').evaluateAll(es => es.filter(e => !e.classList.contains('off')).length);
-      assert.equal(visibleCards, 0, '이 화면(390·로그인 예시)에서는 궤도 카드가 보이지 않는다(#780 후속): ' + visibleCards);
+      assert.equal(visibleCards, 8, '이 화면(390·로그인 예시)에서는 8장 리본을 유지한다: ' + visibleCards);
     } finally { await close1010(h); }
   } finally { await browser.close(); }
 });
