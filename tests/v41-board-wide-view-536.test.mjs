@@ -321,11 +321,15 @@ test('#1359 넓은 보드와 지도, 최근 순간 및 휴대폰 회귀', {skip:
       if (baseline && /wide-1359\.(js|css)$/.test(url)) return route.fulfill({status:200,contentType:url.endsWith('.js')?'text/javascript':'text/css',body:''});
       return route.continue();
     });
+    // 같은 데이터의 모바일 전후를 같은 애니메이션 시각에서 비교한다.
+    if (width === 390) await page.addInitScript(() => {
+      Object.defineProperty(performance, 'now', { configurable: true, value: () => 1000 });
+    });
     await page.addInitScript(({tree,theme}) => {
       localStorage.setItem('lt41.theme',theme);
       window.LT41={tree,source:'example',writable:false,momentId:tree.moments[0].id,prefs:{titleDisplay:'both'}};
     },{tree:chainTree(n),theme});
-    await page.goto(base + '/v41/views/track' + (screen==='board'?'58-pinboard':'56-network') + '.html');
+    await page.goto(base + '/v41/views/track' + (screen==='board'?'58-pinboard':'56-network') + '.html', { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(screen => screen==='board' ? document.querySelectorAll('#cardLayer .card').length>0 : !!window.__lt, screen);
     await page.evaluate(() => document.fonts.ready);
     return page;
@@ -354,7 +358,13 @@ test('#1359 넓은 보드와 지도, 최근 순간 및 휴대폰 회귀', {skip:
           const box=await button.boundingBox();assert.ok(box.width>=44&&box.height>=44);
           const id=await button.getAttribute('data-moment-id');
           if(theme==='garden'){await button.focus();await button.press('Enter');}else await button.click();
-          await page.waitForSelector('#detail.open');
+          const opened = await page.evaluate(id => ({
+            detail: document.getElementById('detail')?.className,
+            found: !!window.__lt?.nodes?.find(node => node.id === id),
+            selected: window.__lt?.state?.selected?.id,
+            button: document.querySelector('.lt1359-info button')?.textContent
+          }), id);
+          assert.ok((await page.locator('#detail').getAttribute('class') || '').includes('open'), `${screen} ${width} ${theme} ${n} 상세 열기: ${JSON.stringify(opened)}`);
           assert.equal(await page.locator(screen==='board'?'#dTitle':'#detailTitle').textContent(),chainTree(n).moments.find(m=>m.id===id).title);
         }
       } finally {await page.close();}
