@@ -9,7 +9,7 @@
 .community-suggest li{margin:0;padding:0}
 .community-suggest-option{display:flex;align-items:center;gap:8px;width:100%;min-height:44px;padding:10px 12px;border:0;border-radius:8px;background:none;text-align:left;font-size:14px;color:var(--lt-pearl)}
 .community-suggest-option small{margin-left:auto;color:var(--lt-muted);font-size:12px;white-space:nowrap}
-.community-suggest-option[aria-selected="true"]{background:rgba(255,230,166,.12);box-shadow:inset 0 0 0 1px var(--lt-gold-line)}
+.community-suggest-option[aria-selected="true"]{background:var(--lt-role-accent-bg);box-shadow:none;color:var(--lt-role-accent-ink)}
 .community-suggest-empty{padding:10px 12px;color:var(--lt-muted);font-size:13px}
 
 /* 그룹 찾기 단추 — 칩 줄은 shell.css의 flex 한 줄(#community-groups)을 그대로 두고
@@ -43,7 +43,7 @@ dialog.community-group-find::backdrop{background:transparent}
 .community-group-find-section{margin:0 0 4px;padding:10px 2px 4px;border-top:1px solid var(--line);font-size:12px;font-weight:700;color:var(--lt-muted)}
 .community-group-find-option{display:flex;align-items:center;gap:8px;width:100%;min-height:44px;padding:10px 12px;border:0;border-radius:8px;background:none;text-align:left;font-size:14px;color:var(--lt-pearl)}
 .community-group-find-option small{margin-left:auto;color:var(--lt-muted);font-size:12px;white-space:nowrap}
-.community-group-find-option[aria-selected="true"]{background:rgba(255,230,166,.12);box-shadow:inset 0 0 0 1px var(--lt-gold-line)}
+.community-group-find-option[aria-selected="true"]{background:var(--lt-role-accent-bg);box-shadow:none;color:var(--lt-role-accent-ink)}
 .community-group-find-empty{padding:18px 12px;color:var(--lt-muted);font-size:13px;line-height:1.7}
 /* 휴대폰: 아래서 올라오는 판. */
 @media(max-width:780px){

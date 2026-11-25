@@ -13,7 +13,7 @@ import assert from 'node:assert/strict';
 import { existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { serve, auditPage, failuresOf } from './helpers/screen-audit.mjs';
+import { serve, auditPage, failuresOf, roleStyleFn, assertRolePair } from './helpers/screen-audit.mjs';
 import { createTree, addMoment } from '../public/v41/domain.mjs';
 
 const REQUIRE = process.env.LT_SCREEN_AUDIT_REQUIRE === '1';
@@ -3416,4 +3416,65 @@ test('#1084 세로 영상 첫 화면의 미디어 칸에는 회색 여백이 없
       } finally { await ctx.close(); }
     }
   } finally { await browser.close(); await new Promise(ok => server.close(ok)); }
+});
+
+
+test('#1362 확장: 여섯 화면 선택 탭 채움·쉬는 테두리 역할 변수·글자 대비 4.5:1(390·1440 × 밤·정원)', { skip: REQUIRE ? false : skip, timeout: 300000 }, async () => {
+  if (skip) assert.fail(skip);
+  const server = await serve(), base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch({ headless: true });
+  const mk = (i) => ({ subject: '화면 확인', title: '순간 ' + i, note: '기록', emotion: '설렘', date: '2026-11-01', url: '' });
+  let data = createTree(mk(1), '2026-11-01T00:00:00.000Z');
+  for (let i = 2; i <= 4; i++) data = addMoment(data, mk(i), data.moments[0].id, '2026-11-01T00:00:00.000Z');
+  const workspace = { revision: 1, state: { version: 1, trees: [data], prefs: {} }, subject: '화면확인', writeSubjectBound: true, savedAt: '2026-11-25T00:00:00.000Z' };
+  const screens = [
+    ['서재', '#shelf', 'track32-bookshelf', '#shelf-view-inline button[aria-checked="true"]', '#shelf-view-inline button[aria-checked="false"]'],
+    ['책', '#book', 'track59-sketchbook', '#book-view-toggle button[aria-pressed="true"]', '#book-view-toggle button[aria-pressed="false"]'],
+    ['보드', '#board', 'track58-pinboard', '.boardModeSwitch .modeSwitchBtn[aria-pressed="true"]', '.boardModeSwitch .modeSwitchBtn:not([aria-pressed="true"])'],
+    ['지도', '#network', 'track56-network', '.lt-screen-toolbar .view-switch .pill[aria-pressed="true"]', '.lt-screen-toolbar .view-switch']
+  ];
+  const roleFn = roleStyleFn.toString();
+  const pairs = [];
+  try {
+    for (const width of [390, 1440]) for (const theme of ['night', 'garden']) {
+      const ctx = await browser.newContext({ viewport: { width, height: width === 390 ? 844 : 900 } });
+      await ctx.addInitScript(({ theme, id }) => {
+        localStorage.setItem('lt41.theme', theme);
+        try { localStorage.setItem('lt41.discoverAsked', JSON.stringify([id])); } catch {}
+      }, { theme, id: data.id });
+      await ctx.route('**/*', (route) => {
+        const u = new URL(route.request().url());
+        if (u.origin !== base) return route.abort();
+        if (u.pathname === '/api/workspace') return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(workspace) });
+        if (u.pathname.startsWith('/api/')) return route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' });
+        if (/youtube|ytimg|googlevideo/.test(u.host)) return route.abort();
+        return route.continue();
+      });
+      try {
+        const page = await ctx.newPage();
+        await page.goto(base + '/v41/?account=1#home', { waitUntil: 'load' });
+        await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
+        const label = `${width}·${theme}`;
+        if (width === 390) {
+          const shellLook = await page.evaluate(new Function('selectors', 'return (' + roleFn + ')(selectors);'), ['.tree-frame .tree-views>button[aria-current="true"]', '.tree-frame .tree-views>button[aria-current="false"]']);
+          assertRolePair(assert, pairs, label + '·머리줄 탭', shellLook.vars, shellLook.looks['.tree-frame .tree-views>button[aria-current="true"]'], shellLook.looks['.tree-frame .tree-views>button[aria-current="false"]'], '--lt-role-line');
+        }
+        for (const [name, hash, file, selected, idle] of screens) {
+          await page.evaluate((h) => { location.hash = h; }, hash);
+          await page.waitForFunction((f) => [...document.querySelectorAll('#stage iframe')].some((el) => !el.hidden && el.contentWindow?.location?.href.includes(f)), file, { timeout: 20000 });
+          const frame = await (await page.$('#view:not([hidden])')).contentFrame();
+          const look = await frame.evaluate(new Function('selectors', 'return (' + roleFn + ')(selectors);'), [selected, idle]);
+          assertRolePair(assert, pairs, label + '·' + name, look.vars, look.looks[selected], look.looks[idle], '--lt-role-line');
+        }
+        await page.evaluate(() => document.getElementById('share-panel').showModal());
+        const share = await page.evaluate(new Function('selectors', 'return (' + roleFn + ')(selectors);'), ['#share-steps li[data-state="current"]', '#share-steps li[data-state="todo"]']);
+        assertRolePair(assert, pairs, label + '·공유 감상', share.vars, share.looks['#share-steps li[data-state="current"]'], share.looks['#share-steps li[data-state="todo"]'], '--lt-role-line');
+        await page.evaluate(() => document.getElementById('share-panel').close());
+        if (width === 390) { await page.locator('#mobile-more').click(); await page.locator('#header-overflow button.lt-discover-item').click(); } else await page.locator('#community-menu').click();
+        const explore = await page.evaluate(new Function('selectors', 'return (' + roleFn + ')(selectors);'), ['#community-tab-trees', '#community-tab-moments']);
+        assertRolePair(assert, pairs, label + '·둘러보기', explore.vars, explore.looks['#community-tab-trees'], explore.looks['#community-tab-moments'], '--lt-role-line');
+      } finally { await ctx.close(); }
+    }
+  } finally { await browser.close(); server.close(); }
+  assert.ok(pairs.length >= 24, `역할 색 검사 24쌓 — 실제 ${pairs.length}`);
 });

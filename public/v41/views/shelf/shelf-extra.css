@@ -72,8 +72,8 @@ html[data-v41-screen=shelf] .shelf-base{position:static;left:auto;right:auto;bot
 html[data-v41-screen=shelf] .book-card .book-cover-media{object-position:50% 50%}
 
 /* ── #1093: 390에서는 보기 토글을 머리줄 대신 도구 줄에 둔다. */
-.shelf-view-inline{display:inline-flex;align-items:center;padding:3px;border:1px solid var(--lt-line);border-radius:999px}
-.shelf-view-inline button{min-height:36px;padding:0 11px;border:0;border-radius:999px;background:transparent;color:var(--muted);font-size:12px;white-space:nowrap}
+.shelf-view-inline{display:inline-flex;align-items:center;padding:3px;border:1px solid var(--lt-line);border-radius:var(--lt-r-pill)}
+.shelf-view-inline button{min-height:36px;padding:0 11px;border:0;border-radius:var(--lt-r-pill);background:transparent;color:var(--muted);font-size:12px;white-space:nowrap}
 .shelf-view-inline button[aria-checked=true]{background:var(--lt-primary);color:var(--lt-primary-ink)}
 /* 390에서는 책 아래 설명을 한 줄로 적고 남는 글자는 말줄임으로 표시한다. */
 @media(max-width:520px){html[data-v41-screen=shelf] .book-card-meta span{display:block;max-height:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;-webkit-line-clamp:1}}
@@ -203,7 +203,7 @@ html[data-v41-screen=shelf] .shelf-new-tree {
   min-height: 44px;
   padding: 0 18px;
   border: 1px solid var(--lt-line);
-  border-radius: 999px;
+  border-radius: var(--lt-r-pill);
   background: var(--lt-primary);
   color: var(--lt-primary-ink);
   font-size: 14px;

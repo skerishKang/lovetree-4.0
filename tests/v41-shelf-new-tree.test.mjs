@@ -156,3 +156,36 @@ test('#1290 서재에서 보드·책 상단 화면 이동은 뒤로 가기 한 �
     }
   } finally { await browser.close(); server.closeAllConnections?.(); await new Promise(ok => server.close(ok)); }
 });
+
+// #1298/#1400: 선반·회전 전환은 기록에 넣지 않는다 — 3번 바꿔도 뒤로 가기 한 번이면 서재를 떠난다.
+test('#1400 서재 선반·회전 3번 전환 뒤 뒤로 가기 한 번에 서재를 떠난다(390·1440)', { skip: skip || !REQUIRE ? skip || 'LT_SHELF_NEWTREE_REQUIRE=1 일 때 실행' : false, timeout: 180000 }, async () => {
+  const server = await serve();
+  const browser = await chromium.launch({ headless: true });
+  try {
+    for (const width of [390, 1440]) {
+      const { ctx, page } = await openShelf(browser, `http://127.0.0.1:${server.address().port}`, width);
+      try {
+        const frame = page.frames().find(f => /track32-bookshelf/.test(f.url()));
+        assert.ok(frame, '서재 프레임');
+        for (let i = 0; i < 3; i += 1) {
+          const view = i % 2 ? 'shelf' : 'carousel';
+          await testBackNavigation(page, { frame, recorded: false, action: () => frame.click(`[data-shelf-view="${view}"]`) });
+        }
+        const historyBefore = await page.evaluate(() => history.length);
+        await page.evaluate(() => history.back());
+        await page.waitForFunction(() => {
+          const f = document.querySelector('#view:not([hidden])');
+          try { return !!f && !/track32-bookshelf/.test(f.contentWindow.location.href || ''); } catch { return false; }
+        }, null, { timeout: 10000 });
+        const after = await page.evaluate(() => ({
+          hash: location.hash,
+          history: history.length,
+          shelfStillShown: (() => { try { return /track32-bookshelf/.test(document.querySelector('#view:not([hidden])')?.contentWindow.location.href || ''); } catch { return false; } })()
+        }));
+        assert.equal(after.history, historyBefore, '전환 3번은 기록을 늘리지 않는다');
+        assert.equal(after.shelfStillShown, false, '뒤로 가기 한 번에 서재를 떠난다');
+        console.log('SHELF_VIEW_BACK', width, JSON.stringify(after));
+      } finally { await ctx.close(); }
+    }
+  } finally { await browser.close(); server.closeAllConnections?.(); await new Promise(ok => server.close(ok)); }
+});

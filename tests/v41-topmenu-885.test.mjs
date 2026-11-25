@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { serve } from './helpers/screen-audit.mjs';
+import { testBackNavigation } from './helpers/history-assert.mjs';
 import { createTree, addMoment } from '../public/v41/domain.mjs';
 
 const REQUIRE = process.env.LT_TOPMENU_REQUIRE === '1';
@@ -76,6 +77,46 @@ test('상단 메뉴: 같은 글자 크기·테두리 0·세로선 0·현재 탭 
             };
           });
         }
+
+        // #1367: DOM and focus order match the visual header order.
+        const order = await page.evaluate(() => {
+          const nav = document.querySelector('.main-nav');
+          const ids = [...nav.querySelectorAll('button')].map((b) => b.id || b.dataset.view);
+          const rect = (sel) => {
+            const b = document.querySelector(sel)?.getBoundingClientRect();
+            return b ? { left: b.left, right: b.right } : null;
+          };
+          return {
+            ids,
+            shelf: rect('[data-view="track32-bookshelf.html"]'),
+            tree: rect('[data-view="track61-tree.html"]'),
+            explore: rect('#community-menu'),
+            picker: rect('#record-menu'),
+            overflow: Math.max(0, document.documentElement.scrollWidth - innerWidth),
+          };
+        });
+        assert.deepEqual(order.ids, [
+          'community-menu', 'record-menu', 'track32-bookshelf.html',
+          'track61-tree.html', 'track58-pinboard.html',
+          'track59-sketchbook.html', 'track56-network.html',
+        ], width + '/' + theme + ': header DOM order matches Tab order');
+        assert.equal(order.overflow, 0, width + '/' + theme + ': horizontal page overflow is zero');
+        if (width === 1440) {
+          assert.ok(order.explore.right <= order.picker.left, 'explore precedes picker');
+          assert.ok(order.tree.left - order.shelf.right >= 8, 'shelf and tree views have an actual gap');
+        } else {
+          await page.locator('#mobile-more').click();
+          const folded = await page.locator('#header-overflow [role="menuitem"]').allTextContents();
+          const labels = [
+            '\uB458\uB7EC\uBCF4\uAE30', '\uC11C\uC7AC', '\uD2B8\uB9AC',
+            '\uBCF4\uB4DC', '\uCC45', '\uC9C0\uB3C4',
+          ];
+          assert.deepEqual(folded.map((x) => x.trim()).filter((x) => labels.includes(x)), labels,
+            width + '/' + theme + ': folded menu follows the same order');
+          await page.keyboard.press('Escape');
+        }
+
+
         const base = perScreen.shelf;
         const xsStable = SCREENS.every(([name]) => JSON.stringify(perScreen[name].xs) === JSON.stringify(base.xs));
         assert.deepEqual([...new Set([base.recordFont, ...base.tabFonts])].length, 1, '트리 단추·탭 글자 크기 같음');
@@ -98,6 +139,16 @@ test('상단 메뉴: 같은 글자 크기·테두리 0·세로선 0·현재 탭 
           await page.evaluate(() => { for (const d of document.querySelectorAll('dialog[open]')) d.close(); });
           await page.screenshot({ path: `${SHOT}/menu-${width}-${theme}.png` });
         }
+        await testBackNavigation(page, {
+          recorded: true,
+          settleMs: 300,
+          action: width === 390
+            ? async () => {
+                await page.locator('#mobile-more').click();
+                await page.locator('#header-overflow [role="menuitem"]').filter({ hasText: /\uB458\uB7EC\uBCF4\uAE30/ }).click();
+              }
+            : () => page.locator('#community-menu').click(),
+        });
         await ctx.close();
       }
     }
