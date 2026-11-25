@@ -122,6 +122,7 @@ test('#1025 순간 보기 — iframe 2개 이하·10회 넘기기 같은 영상 
       const h = await boot(browser, { width, height, theme });
       try {
         const panel = h.page.locator('#community-moments-panel');
+        if(width<=780)await h.page.locator('.moments-toolbar .moments-info-button').click();
         const seen = [];
         let maxFrames = 0;
         for (let i = 0; i < 11; i++) {
@@ -150,17 +151,20 @@ test('#1025 순간 보기 — iframe 2개 이하·10회 넘기기 같은 영상 
           const overlay = el.querySelector('.moments-overlay');
           return {
             cardBg: getComputedStyle(card).backgroundColor,
+            mediaBg: getComputedStyle(el.querySelector('.moments-media')).backgroundColor,
+            posterPointer: getComputedStyle(poster).pointerEvents,
             posterOpacity: Number(getComputedStyle(poster).opacity),
             posterZ: Number(getComputedStyle(poster).zIndex),
             frameZ: frame ? Number(getComputedStyle(frame).zIndex) : 0,
             overlayBg: getComputedStyle(overlay).backgroundImage,
-            color: getComputedStyle(overlay).color
+            color: getComputedStyle(overlay).color,
+            contextBg: getComputedStyle(el.querySelector('.moments-context')).backgroundColor
           };
         });
-        assert.equal(look.cardBg, 'rgb(0, 0, 0)', `${width}·${theme}: 판 바탕은 테마와 무관한 검정 — ${look.cardBg}`);
-        assert.ok(look.posterOpacity > 0 && look.posterZ > look.frameZ, `${width}·${theme}: 썸네일이 iframe 위에 늘 보인다 — ${JSON.stringify(look)}`);
-        assert.match(look.overlayBg, /rgba\(0, 0, 0, 0\.92\)/, `${width}·${theme}: 판 아래 검은 그라데이션`);
-        assert.equal(look.color, 'rgb(255, 255, 255)', `${width}·${theme}: 겹친 글은 흰색`);
+        assert.equal(look.cardBg,look.mediaBg,"영상 영역 바탕과 카드 바탕 토큰 일치");
+        assert.equal(look.posterPointer,"none","썸네일이 플레이어 입력을 가로채지 않음");
+        assert.equal(look.overlayBg,"none","플레이어 전면 서비스 그라데이션 0");
+        assert.match(look.color,/^rgb/,"서비스 정보 판 글자 색 표시");
         // 판 전체와 오른쪽 단추 4개가 화면 안에 있다(낮은 화면 1440×700 포함).
         const bounds = await panel.evaluate(el => {
           const card = el.querySelector('.moments-card').getBoundingClientRect();
@@ -168,14 +172,20 @@ test('#1025 순간 보기 — iframe 2개 이하·10회 넘기기 같은 영상 
           return { viewport: innerHeight, cardBottom: Math.round(card.bottom), cardTop: Math.round(card.top), railCount: rail.length, railBottom: Math.round(Math.max(...rail.map(r => r.bottom))), railTop: Math.round(Math.min(...rail.map(r => r.top))) };
         });
         assert.ok(bounds.cardTop >= 0 && bounds.cardBottom <= bounds.viewport, `${width}·${theme}: 판이 화면 밖 — ${JSON.stringify(bounds)}`);
-        assert.equal(bounds.railCount, 6, `${width}·${theme}: 단추 여섯(소리·마음·댓글·트리·담기·공유)`);
+        assert.equal(bounds.railCount,5,"정보 판의 동작 단추 다섯");
+        assert.equal(await h.page.locator(".moments-toolbar .is-sound").isVisible(),true,"별도 상단 소리 단추 표시");
         assert.ok(bounds.railTop >= 0 && bounds.railBottom <= bounds.viewport, `${width}·${theme}: 단추가 화면 밖 — ${JSON.stringify(bounds)}`);
         const tags = await panel.locator('.moments-tags').textContent();
         assert.ok(!tags.includes(':'), `${width}·${theme}: 꼬리표 머리말을 뺀 값만 — ${tags}`);
-        // 흰 글자 대비 — 그라데이션 최약 지점(alpha .55) 위에 하얀 썸네일이 있어도 4.5:1 이상.
-        const bg = 255 * (1 - 0.55), lin = v => { v /= 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
-        const contrast = 1.05 / (lin(bg) + 0.05);
-        assert.ok(contrast >= 4.5, `${width}·${theme}: 글 대비 ${contrast.toFixed(2)}:1 < 4.5:1`);
+        // #1354 실제 정보 판 텍스트/바탕 대비를 검사한다(4.5:1 유지).
+        const lum=v=>{
+          const c=String(v).match(/[\d.]+/g).slice(0,3).map(Number);
+          return c.map(x=>{x/=255;return x<=.04045?x/12.92:((x+.055)/1.055)**2.4})
+            .reduce((sum,x,i)=>sum+x*[.2126,.7152,.0722][i],0);
+        };
+        const a=lum(look.color),b=lum(look.contextBg);
+        const contrast=(Math.max(a,b)+.05)/(Math.min(a,b)+.05);
+        assert.ok(contrast>=4.5,'정보 판 글자 대비 '+contrast.toFixed(2)+':1');
         // ↑ 단추와 키보드도 같은 동작
         const beforeUp = await panel.locator('.moments-stage').getAttribute('data-lt-moments-id');
         if (width <= 780) await panel.evaluate(el => el.querySelector('.moments-stage').dispatchEvent(new WheelEvent('wheel', { deltaY: -100, bubbles: true, cancelable: true })));
@@ -234,73 +244,39 @@ test('#1025 2단계 — 가수 칩 필터·구간 주소·나무 선 아이콘·
  } finally { await browser.close(); }
 });
 
-test('#1075 — 밝은 영상 위에서도 390·1440의 단추 일곱 개가 보이고 눌린다', { skip: REQUIRE ? false : skip, timeout: 240000 }, async () => {
-  if (skip) assert.fail(skip);
-  const browser = await chromium.launch({ headless: true });
-  try {
-   for (const [width, height] of [[390, 844], [1440, 900]]) for (const theme of ['night', 'garden']) {
-    const h = await boot(browser, { width, height, theme, thumb: BRIGHT_THUMB });
-    try {
-     const panel = h.page.locator('#community-moments-panel');
-     const nodes = await panel.evaluate(el => [...el.querySelectorAll('.moments-rail-button, .moments-step')].filter(node=>getComputedStyle(node.closest('.moments-nav')||node).display!=='none').map(node => {
-      const r = node.getBoundingClientRect();
-      const x = Math.round(r.left + r.width / 2), y = Math.round(r.top + r.height / 2);
-      const hit = document.elementFromPoint(x, y);
-      const cs = getComputedStyle(node);
-      return {
-       label: node.getAttribute('aria-label') || node.textContent.trim(),
-       visible: cs.display !== 'none' && r.width > 0 && r.height > 0,
-       inView: r.top >= 0 && r.bottom <= innerHeight && r.left >= 0 && r.right <= innerWidth,
-       reaches: node === hit || node.contains(hit),
-       hit: hit ? String(hit.className || hit.tagName) : '',
-       color: cs.color, background: cs.backgroundColor, opacity: cs.opacity,
-       rect: [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)]
-      };
-     }));
-     const room = await panel.evaluate(el => {
-      const card = el.querySelector('.moments-card').getBoundingClientRect();
-      const buttons = [...el.querySelectorAll('.moments-rail-button, .moments-step')].filter(node=>getComputedStyle(node.closest('.moments-nav')||node).display!=='none').map(node => node.getBoundingClientRect());
-      const text = Math.max(...[...el.querySelectorAll('.moments-overlay > *')].map(node => node.getBoundingClientRect().right));
-      return { cardRight: Math.round(card.right), buttonRight: Math.round(Math.max(...buttons.map(r => r.right))), buttonLeft: Math.round(Math.min(...buttons.map(r => r.left))), textRight: Math.round(text) };
-     });
-     assert.equal(nodes.length, width<=780?6:8, `${width}·${theme}: 오른쪽 여섯(소리·마음·댓글·트리·담기·공유) + 위아래 둘`);
-     for (const node of nodes) {
-      assert.ok(node.visible, `${width}·${theme}: ${node.label}이 보이지 않음 — ${JSON.stringify(node)}`);
-      assert.ok(node.inView, `${width}·${theme}: ${node.label}이 화면 밖 — ${JSON.stringify(node)}`);
-      assert.ok(node.reaches, `${width}·${theme}: ${node.label}을 다른 요소가 가림 — ${JSON.stringify(node)}`);
-     }
-      if (width <= 780) {
-       for (const node of nodes) {
-        if(node.label==='소리 켜기')assert.equal(node.color, await panel.evaluate(()=>{const c=getComputedStyle(document.documentElement).getPropertyValue('--lt-rose').trim();const n=parseInt(c.slice(1,3),16)+', '+parseInt(c.slice(3,5),16)+', '+parseInt(c.slice(5,7),16);return 'rgb('+n+')';}), `${width}·${theme}: 음소거는 장미색 — ${node.color}`);
-         else assert.equal(node.color, 'rgb(255, 255, 255)', `${width}·${theme}: 밝은 영상 위 흰 글자 — ${node.label} ${node.color}`);
-        assert.equal(node.opacity, '1', `${width}·${theme}: ${node.label}만 흐리게 남음 — ${node.opacity}`);
-        assert.equal(node.background,'rgba(0, 0, 0, 0)','휴대폰 단추 원형 바탕 제거');
-        assert.ok(node.rect[2]>=44&&node.rect[3]>=44,'휴대폰 누르기 영역 44px');
-       }
-       const inset = room.cardRight - room.buttonRight;
-       assert.ok(inset >= 6 && inset <= 9, `${width}·${theme}: 단추가 카드 가장자리에서 ${inset}px — ${JSON.stringify(room)}`);
-       assert.ok(room.textRight <= room.buttonLeft, `${width}·${theme}: 아래 글이 단추와 겹침 — ${JSON.stringify(room)}`);
-       assert.equal(await panel.locator('.moments-nav').evaluate(n=>getComputedStyle(n).display),'none','휴대폰 ▲▼ 숨김');
-       const heart = panel.locator('.moments-rail-button').first();
-       assert.equal(await heart.locator('.moments-rail-icon').textContent(), '♡', '기본 마음은 빈 하트');
-       assert.equal(await heart.getAttribute('aria-pressed'), 'false', '기본 누름 상태 아님');
-       await heart.click();
-       assert.equal(await heart.locator('.moments-rail-icon').textContent(), '♥', '누른 마음은 채운 하트');
-       assert.equal(await heart.getAttribute('aria-pressed'), 'true', '누름 상태 표시');
-       await heart.click();
-       assert.equal(await heart.locator('.moments-rail-icon').textContent(), '♡', '다시 누르면 빈 하트');
-       const before = await panel.locator('.moments-stage').getAttribute('data-lt-moments-id');
-       await panel.evaluate(el=>el.querySelector('.moments-stage').dispatchEvent(new WheelEvent('wheel',{deltaY:120,bubbles:true,cancelable:true})));
-       const after = await panel.locator('.moments-stage').getAttribute('data-lt-moments-id');
-       assert.notEqual(before, after, `${width}·${theme}: 다음 순간 단추가 실제로 눌린다`);
-      } else {
-      const rail = await panel.locator('.moments-rail-button').first().evaluate(el => getComputedStyle(el).backgroundColor);
-      assert.equal(rail, 'rgba(0, 0, 0, 0)', `${width}·${theme}: 데스크톱 단추는 그대로 — ${rail}`);
-     }
-     console.log('#1075', width, theme, JSON.stringify({ reached: nodes.filter(n => n.reaches).length, nav: nodes.slice(5).map(n => n.rect), rail: nodes.slice(0, 5).map(n => n.rect) }));
-    } finally { await h.ctx.close(); await new Promise(r => h.server.close(r)); }
+test('#1075 밝은 영상에서도 여섯 조작 단추와 PC 위아래 이동이 보이고 눌린다',{skip:REQUIRE?false:skip,timeout:240000},async()=>{
+ if(skip)assert.fail(skip);
+ const browser=await chromium.launch({headless:true});
+ try{for(const [width,height] of [[390,844],[1440,900]])for(const theme of ['night','garden']){
+  const h=await boot(browser,{width,height,theme,thumb:BRIGHT_THUMB});
+  try{
+   const panel=h.page.locator('#community-moments-panel');
+   if(width<=780)await h.page.locator('.moments-toolbar .moments-info-button').click();
+   const nodes=await panel.evaluate(el=>{
+    const frame=el.querySelector('.moments-frame:not(.moments-next)').getBoundingClientRect();
+    const actions=[...el.querySelectorAll('.moments-rail .moments-rail-button'),...el.querySelectorAll('.moments-nav .moments-step'),document.querySelector('.moments-toolbar .is-sound')];
+    return actions.filter(node=>node&&getComputedStyle(node).display!=='none'&&node.getBoundingClientRect().height>0).map(node=>{
+     const r=node.getBoundingClientRect(),x=r.left+r.width/2,y=r.top+r.height/2,hit=document.elementFromPoint(x,y);
+     const overlap=r.left<frame.right&&r.right>frame.left&&r.top<frame.bottom&&r.bottom>frame.top;
+     return {label:node.getAttribute('aria-label'),w:r.width,h:r.height,inView:r.left>=0&&r.top>=0&&r.right<=innerWidth&&r.bottom<=innerHeight,hit:node===hit||node.contains(hit),overlap,opacity:getComputedStyle(node).opacity};
+    });
+   });
+   assert.equal(nodes.length,width<=780?6:8,'외부 조작 단추 수, PC 방향 단추 두 개 추가');
+   for(const n of nodes){
+    assert.ok(n.w>=44&&n.h>=44,'누름 영역 44px 이상: '+n.label);
+    assert.equal(n.inView,true,'화면 밖 잘림 0: '+n.label);
+    assert.equal(n.hit,true,'실제 좌표에서 누름 방해 0: '+n.label);
+    assert.equal(n.overlap,false,'유튜브 플레이어 앞 단추 0: '+n.label);
+    assert.equal(n.opacity,'1','단추 흐림 0: '+n.label);
    }
-  } finally { await browser.close(); }
+   const heart=panel.locator('.moments-rail-button.is-heart');
+   assert.equal(await heart.getAttribute('aria-pressed'),'false','처음 공감 미선택');
+   await heart.click();
+   assert.equal(await heart.getAttribute('aria-pressed'),'true','공감 선택');
+   await heart.click();
+   assert.equal(await heart.getAttribute('aria-pressed'),'false','다시 공감 해제');
+  }finally{await h.ctx.close();await new Promise(r=>h.server.close(r));}
+ }}finally{await browser.close();}
 });
 
 // ── #1098 2단계 — 쇼츠(순간 보기)의 그 순간 ♡·댓글: 레일에 ♡ 수·댓글 수(3 미만은 숫자 없음),
@@ -558,6 +534,8 @@ test('#1098 순간 댓글 창은 불투명하고 뒤 단추를 가린다', { ski
       const h = await boot(browser, { width, height, theme: 'night' });
       try {
         const panel = h.page.locator('#community-moments-panel');
+        // #1354 휴대폰 단추는 정보 판을 펼친 뒤에만 보인다.
+        if (width === 390) await h.page.locator('.moments-toolbar .moments-info-button').click();
         await panel.locator('.moments-rail-button', { hasText: '댓글' }).click();
         const dialog = panel.locator('.moments-comments-dialog');
         await dialog.waitFor({ state: 'visible', timeout: 5000 });
@@ -594,10 +572,17 @@ test('#1098 회색 썸네일이면 제목 카드로 바뀐다', { skip: REQUIRE 
     try {
       const panel = h.page.locator('#community-moments-panel');
       const fallback = panel.locator('.moments-fallback');
-      await fallback.waitFor({ state: 'visible', timeout: 10000 });
-      const text = (await fallback.textContent()) || '';
-      assert.ok(text.includes('세로 순간 1'), '제목이 있는 카드로 대체된다: ' + text.slice(0, 120));
-      assert.equal(await panel.locator('.moments-poster').isVisible(), false, '회색 점 그림은 숨는다');
+      // #1354 회색 썸네일은 유튜브 플레이어를 덮는 카드가 되면 안 된다.
+      const frame = panel.locator('.moments-frame:not(.moments-next)');
+      await frame.waitFor({ state: 'attached' });
+      const result = await panel.evaluate(el => {
+        const f = el.querySelector('.moments-frame:not(.moments-next)');
+        const r = f.getBoundingClientRect();
+        return { overlay: getComputedStyle(el.querySelector('.moments-fallback')).display,
+          top: document.elementFromPoint(r.left+r.width/2,r.top+r.height/2)===f };
+      });
+      assert.equal(result.overlay, 'none', '재생 가능한 영상 위 회색 썸네일 대체 안내 없음');
+      assert.equal(result.top, true, '유튜브 플레이어가 실제 클릭을 받는다');
     } finally { await h.ctx.close(); await new Promise(r => h.server.close(r)); }
   } finally { await browser.close(); }
 });
@@ -625,6 +610,7 @@ test('#1294 둘러보기 트리·순간 탭과 미리보기·그룹 찾기 뒤�
    await page.locator('#community-tab-moments').click();
    await page.waitForFunction(()=>!!document.querySelector('.moments-stage')?.dataset.ltMomentsId);
    assert.equal((await navState()).hash,'#explore/moments');
+   if (width === 390) await page.locator('.moments-toolbar .moments-info-button').click();
    await page.locator('#community-moments-panel .moments-rail-button').nth(2).click();
    await page.locator('.moments-add-dialog:not([hidden])').waitFor();
    await back();
@@ -684,7 +670,8 @@ test('#1294 순간 밀기 기록 누적 없음·댓글 뒤로 가기·탭 복원
    }
    assert.notEqual(await stage.getAttribute('data-lt-moments-id'),startId,width+' 다음 순간 이동');
    assert.equal(await page.evaluate(()=>history.length),start,width+' 5번 넘김 후 기록 증가 0');
-   await page.locator('.moments-rail-button').nth(1).click();
+   if(width===390)await page.locator('.moments-toolbar .moments-info-button').click();
+   await page.locator('#community-moments-panel .moments-rail-button').nth(1).click();
    await page.locator('.moments-comments-dialog:not([hidden])').waitFor();
    await page.goBack();await page.waitForTimeout(120);
    assert.equal(await page.locator('.moments-comments-dialog').evaluate(el=>el.hidden),true,width+' 댓글 뒤로 가기');
@@ -870,6 +857,14 @@ test('#1338 인기 무대 오류·2초 지연에도 트리 카드를 1초 안에
     const ctx=await browser.newContext({viewport:{width,height},reducedMotion:'reduce'});
     try{
      await ctx.addInitScript(t=>{try{localStorage.setItem('lt41.theme',t)}catch{}},theme);
+     // #1380: 시간은 페이지 안의 같은 시계로 잰다 — 카드 요청 시작(Resource Timing)부터 카드가 문서에 들어간 순간까지.
+     // 바깥(Node) 시계와 waitFor 확인 간격은 실행기가 바쁘면 수 초씩 늘어나 화면 동작과 무관하게 흔들렸다.
+     await ctx.addInitScript(()=>{
+      const watch=()=>new MutationObserver((_,observer)=>{
+       if(document.querySelector('#community-list .community-card')){window.__ltCardAt=performance.now();observer.disconnect();}
+      }).observe(document.documentElement,{subtree:true,childList:true});
+      if(document.documentElement)watch();else document.addEventListener('DOMContentLoaded',watch);
+     });
      let cardRequestAt=0;
      await ctx.route('**/api/**',r=>r.fulfill({status:200,contentType:'application/json',body:'{"ok":true,"items":[]}'}));
      await ctx.route('**/api/community/shares**',async r=>{
@@ -887,8 +882,11 @@ test('#1338 인기 무대 오류·2초 지연에도 트리 카드를 1초 안에
      const page=await ctx.newPage();
      await page.goto(base+'/v41/#explore',{waitUntil:'domcontentloaded'});
      await page.locator('#community-list .community-card').first().waitFor({state:'visible',timeout:5000});
-     const elapsed=Date.now()-cardRequestAt;
      assert.ok(cardRequestAt>0,mode+'/'+width+'/'+theme+': 트리 요청이 시작됐다');
+     const elapsed=await page.evaluate(()=>{
+      const entry=performance.getEntriesByType('resource').find(e=>/\/api\/community\/shares\?/.test(e.name));
+      return entry&&window.__ltCardAt?Math.round(window.__ltCardAt-entry.startTime):Infinity;
+     });
      assert.ok(elapsed<(mode==='both'?1500:1000),mode+'/'+width+'/'+theme+': 카드 요청부터 제때 보여야 함 ('+elapsed+'ms)');
      const before=await page.evaluate(()=>{
       const card=document.querySelector('#community-list .community-card'),popular=document.querySelector('#community-popular-stages');

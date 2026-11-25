@@ -38,7 +38,7 @@ function bubbleIcon(){
 }
 // 구간 재생: 시작·끝 초가 있으면 기존 구간 재생 규칙(start·end)대로 주소에 넣는다.
 const embedSrc=(id,item={},{autoplay=true}={})=>{
- const params=[autoplay?'autoplay=1':'autoplay=0','mute=1','playsinline=1','controls=0','rel=0','modestbranding=1','enablejsapi=1'];
+ const params=[autoplay?'autoplay=1':'autoplay=0','mute=1','playsinline=1','controls=1','rel=0','enablejsapi=1'];
  const start=Number(item.startSeconds),end=Number(item.endSeconds);
  if(Number.isSafeInteger(start)&&start>0)params.push('start='+start);
  if(Number.isSafeInteger(end)&&end>start)params.push('end='+end);
@@ -52,10 +52,17 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin,a
  const media=el('div','moments-media');
  const poster=el('img','moments-poster');poster.alt='';poster.loading='lazy';
  const posterFallback=el('div','moments-fallback');posterFallback.hidden=true;
- function showPosterFallback(){const item=current();if(!item)return;posterFallback.innerHTML=fallbackCardMarkup(item,{variant:'orbit',videoUnavailable:!!item.videoId});posterFallback.hidden=false;poster.hidden=true;}
+ function showPosterFallback(){
+  const item=current();if(!item)return;
+  // #1354: 재생 가능한 플레이어 앞에는 안내 카드를 올리지 않는다.
+  if(stage.dataset.ltMomentUnavailable!=='1'&&media.querySelector('.moments-frame:not(.moments-next)'))return;
+  posterFallback.innerHTML=fallbackCardMarkup(item,{variant:'orbit',videoUnavailable:!!item.videoId});
+  posterFallback.hidden=false;poster.hidden=true;
+ }
  poster.onload=()=>{if(isGrayThumbnail(poster))showPosterFallback();};
  // 썸네일이 안 떠도 판이 비지 않게 — 세로 포스터가 없으면 기존 가로 포스터로 한 번 더 시도한다.
  poster.onerror=()=>{const item=current();const src=poster.getAttribute('src')||'';if(item?.videoId&&!/hqdefault\.jpg/.test(src))poster.src=youtubeStageThumbUrl(item.videoId,'hqdefault');else showPosterFallback();};
+ const context=el('section','moments-context');context.setAttribute('aria-label','순간 정보');
  const overlay=el('div','moments-overlay');
  const treeLine=el('div','moments-tree');
  const owner=el('span','moments-owner');owner.setAttribute('aria-hidden','true');
@@ -65,25 +72,23 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin,a
  const noteLine=el('button','moments-note');noteLine.type='button';noteLine.setAttribute('aria-label','설명 펼치기');
  noteLine.onclick=()=>{const expanded=noteLine.getAttribute('aria-expanded')==='true';noteLine.setAttribute('aria-expanded',String(!expanded));noteLine.setAttribute('aria-label',expanded?'설명 펼치기':'설명 접기');};
 let soundButton=null;
-  // #1332: 음소거 재생 중 가운데 아래에 띄우는 소리 켜기 알약. 기존 소리 단추는 끄기용으로 남긴다.
-  const soundPill=el('button','moments-sound-pill','🔇 눌러서 소리 켜기');soundPill.type='button';soundPill.hidden=true;
-  soundPill.setAttribute('aria-label','눌러서 소리 켜기');
- const progressButton=el('div','moments-player-controls');
+ const toolbar=el('div','moments-toolbar');toolbar.setAttribute('role','group');toolbar.setAttribute('aria-label','순간 영상 도구');
+ const infoButton=el('button','moments-info-button','ⓘ 정보');infoButton.type='button';infoButton.setAttribute('aria-label','순간 정보 열기');infoButton.setAttribute('aria-expanded','false');
+ const closeButton=el('button','moments-close-button','×');closeButton.type='button';closeButton.setAttribute('aria-label','둘러보기 닫기');closeButton.onclick=()=>panel.closest?.('dialog')?.close();
+ toolbar.append(infoButton,closeButton);
  overlay.append(treeLine,titleLine,tagLine,noteLine);
  const progress=el('div','moments-progress');const progressFill=el('span','moments-progress-fill');
  const playerProgress=el('progress','moments-progress-native');playerProgress.max=100;playerProgress.value=0;playerProgress.setAttribute('aria-label','재생 진행');
  progress.append(progressFill,playerProgress);
- const swipeLayer=el('div','moments-swipe-layer');swipeLayer.setAttribute('aria-hidden','true');
- const hint=el('div','moments-swipe-hint','위로 밀어 다음 순간');hint.setAttribute('role','status');hint.hidden=true;
-
- media.append(poster,posterFallback,swipeLayer,overlay,progress,soundPill,hint);
+ media.append(poster,posterFallback);
  card.append(media);
+ context.append(overlay);
  const rail=el('div','moments-rail');
  const nav=el('div','moments-nav');
  const up=el('button','moments-step','▲');up.type='button';up.setAttribute('aria-label','이전 순간');
  const down=el('button','moments-step','▼');down.type='button';down.setAttribute('aria-label','다음 순간');
  nav.append(up,down);
- stage.append(card,rail,nav);
+ stage.append(context,card,rail,nav);
  let liked=false,heartButton=null,heartCount=null,commentsCount=null;
  const setLiked=(value)=>{
   liked=!!value;
@@ -143,11 +148,13 @@ let soundButton=null;
   const soundStart=soundIcon(true);soundStart.setAttribute('class','moments-rail-svg');
   soundButton.append(soundStart,el('span','moments-rail-label','소리 켜기'));
   soundButton.setAttribute('aria-label','소리 켜기');soundButton.onclick=toggleSound;
-  rail.append(soundButton);
+  toolbar.prepend(soundButton);
  const chips=el('div','moments-chips');chips.setAttribute('role','group');chips.setAttribute('aria-label','가수 고르기');
  const empty=el('p','moments-empty','아직 공개 세로 순간이 없어요. 쇼츠를 담은 공개 트리가 늘면 여기에 나타나요.');
  empty.hidden=true;
- panel.append(chips,stage,empty);
+ context.append(chips);
+ panel.closest?.('dialog')?.querySelector('.community-top-row')?.append(toolbar);
+ panel.append(stage,empty);
 
  // 담기 창 — 기존 트리 고르기 창이 따로 없어 이 보기 안에 작은 창을 둔다(트리 목록은 셸 모델을 쓴다).
  const addDialog=el('div','moments-add-dialog');addDialog.setAttribute('role','dialog');addDialog.setAttribute('aria-modal','true');addDialog.setAttribute('aria-label','어느 트리에 담을까요');addDialog.hidden=true;
@@ -245,47 +252,39 @@ let soundButton=null;
  }
 
  let items=[],index=0,loading=false,token=0,frames=[],seen=new Set(),unmuted=false,wantSound=false,touchY=null,activeTag='',groups=[];
- let advancing=0,unavailableTimer=0,unavailableId='';
+let advancing=0,unavailableTimer=0,unavailableId='';
+ let enoughVisible=false;
+ const observer=typeof IntersectionObserver==='function'?new IntersectionObserver(entries=>{
+   enoughVisible=entries.some(entry=>entry.isIntersecting&&entry.intersectionRatio>0.5);
+   if(!enoughVisible&&currentFrame)command(currentFrame,'pauseVideo');
+   else if(enoughVisible&&currentFrame)kickPlay(currentFrame);
+ },{root:panel.closest?.('dialog')||null,threshold:[0,0.5,0.51,1]}):null;
+ observer?.observe(card);
  const current=()=>items[index]||null;
-  // #1332: 이 기기에서 한 번이라도 소리를 켠 적이 있으면 작은 알약으로 안내한다.
-  const SOUND_SEEN_KEY='lt41.momentSoundSeen';
-  const soundSeen=()=>{try{return localStorage.getItem(SOUND_SEEN_KEY)==='1';}catch{return false;}};
-  function paintSound(){
-    if(!soundButton)return;
-    // #1360: 재생 못 하는 영상에서는 소리 단추를 숨긴다(재생 중이 아니다).
-    soundButton.hidden=stage.dataset.ltMomentUnavailable==='1';
-    soundButton.textContent='';
-    const icon=soundIcon(!unmuted);icon.setAttribute('class','moments-rail-svg');
-    soundButton.append(icon,el('span','moments-rail-label',unmuted?'소리 끄기':'소리 켜기'));
-    soundButton.setAttribute('aria-label',unmuted?'소리 끄기':'소리 켜기');
-    soundButton.classList.toggle('is-muted',!unmuted);
-    stage.dataset.ltMomentsMuted=String(!unmuted);
-    paintSoundPill();
-  }
-  function paintSoundPill(){
-    const small=soundSeen();
-    soundPill.hidden=unmuted||!current()||(!soundSeen()&&index!==0);
-    soundPill.textContent=small?'소리 켜기':'🔇 눌러서 소리 켜기';
-    soundPill.classList.toggle('is-small',small);
-    soundPill.setAttribute('aria-label',small?'소리 켜기':'눌러서 소리 켜기');
-    placeSoundPill();
-  }
-  // #1332 확인: 글자 묶음 윗변 12px 위에 붙이고, 밀기 안내가 있으면 그 아래로 내린다.
-  function placeSoundPill(){
-    if(soundPill.hidden)return;
-    const mediaBox=media.getBoundingClientRect(),overlayBox=overlay.getBoundingClientRect();
-    if(!mediaBox.height||!overlayBox.height)return;
-    const pillH=soundPill.offsetHeight||44;
-    const overlayTop=overlayBox.top-mediaBox.top;
-    let top=overlayTop-12-pillH;
-    if(!hint.hidden){
-      const hintBox=hint.getBoundingClientRect();
-      if(hintBox.height)top=Math.max(top,hintBox.bottom-mediaBox.top+12);
-    }
-    const centerTop=mediaBox.height/2+8;
-    top=Math.max(centerTop,Math.min(top,overlayTop-12-pillH));
-    soundPill.style.top=Math.round(top)+'px';
-  }
+ const INFO_KEY='lt41.momentInfoOpen';
+ let infoOpen=false;try{infoOpen=localStorage.getItem(INFO_KEY)==='1';}catch{}
+ function paintInfo(){
+   stage.classList.toggle('moments-info-open',infoOpen);
+   infoButton.setAttribute('aria-expanded',String(infoOpen));
+   infoButton.setAttribute('aria-label',infoOpen?'순간 정보 닫기':'순간 정보 열기');
+   infoButton.textContent=infoOpen?'ⓘ 닫기':'ⓘ 정보';
+ }
+ infoButton.onclick=()=>{
+   infoOpen=!infoOpen;
+   try{localStorage.setItem(INFO_KEY,infoOpen?'1':'0');}catch{}
+   paintInfo();
+ };
+ paintInfo();
+ function paintSound(){
+   if(!soundButton)return;
+   soundButton.hidden=stage.dataset.ltMomentUnavailable==='1';
+   soundButton.replaceChildren();
+   const icon=soundIcon(!unmuted);icon.setAttribute('class','moments-rail-svg');
+   soundButton.append(icon,el('span','moments-rail-label',unmuted?'소리 끄기':'소리 켜기'));
+   soundButton.setAttribute('aria-label',unmuted?'소리 끄기':'소리 켜기');
+   soundButton.classList.toggle('is-muted',!unmuted);
+   stage.dataset.ltMomentsMuted=String(!unmuted);
+ }
  // 칩 줄: 전체 + 서버가 센 공개 쇼츠 가수 꼬리표 상위 6개. 누르면 그 가수만 다시 섞는다.
  function renderChips(){
   const choices=[{value:'',label:'전체'},...(groups||[]).map(g=>({value:tagKey(g.value)||g.value,label:g.value,tag:'가수:'+g.value}))];
@@ -309,11 +308,11 @@ let soundButton=null;
  // 휴대폰에서는 iframe 문서가 뜬 뒤에도 플레이어 준비가 늦어, 한 번 보낸 재생 명령이 버려진다.
  // 재생이 실제로 시작됐다는 신호(상태 1)가 올 때까지 짧은 간격으로 듣기·음소거·재생을 다시 보낸다(최대 8초).
  function kickPlay(frame){
-  if(frame!==currentFrame)return; // 미리 띄운 다음 영상은 넘겨 왔을 때 시작한다.
+  if(frame!==currentFrame||!enoughVisible)return; // 다음 영상이나 절반 이하로 보이는 플레이어는 시작하지 않는다.
   clearInterval(frame._ltKick);
   let tries=0;
   const send=()=>{
-   if(!frame.isConnected||frame!==currentFrame||stage.dataset.ltPlaying==='1'||tries++>=32){clearInterval(frame._ltKick);return;}
+   if(!frame.isConnected||frame!==currentFrame||!enoughVisible||stage.dataset.ltPlaying==='1'||tries++>=32){clearInterval(frame._ltKick);return;}
    try{frame.contentWindow?.postMessage('{"event":"listening"}',YT_ORIGIN);}catch{}
    // 소리를 켠 채로는 휴대폰이 자동 재생을 막는다 — 2초 안에 시작하지 않으면 음소거로 시작한다.
    // 소리를 켜 둔 사람은 새 영상에서도 소리로 시작한다(주소의 mute=1을 풀어 준다).
@@ -340,8 +339,9 @@ let soundButton=null;
   frame.allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';
   frame.referrerpolicy='strict-origin-when-cross-origin';
   frame.setAttribute('allowfullscreen','');
-  // 미리 불러 둔 다음 플레이어는 자동 재생하지 않는다(#1352 주의).
+  // 다음 영상은 자동 재생 없이 미리 준비한다.
   frame.src=embedSrc(item.videoId,item,{autoplay:!preload});
+  if(preload)frame.dataset.ltPreloaded='1';
   // #1305: 재생이 막히던 원인 — 'listening'만 보내고 재생 명령을 보내지 않았다.
   //에이피아이가 켜진 iframe은 주소의 autoplay=1만으로 시작하지 않으므로 준비 뒤 playVideo를 보낸다.
   frame.onload=()=>{
@@ -375,7 +375,7 @@ let soundButton=null;
   noteLine.textContent=item.note||'';
   noteLine.setAttribute('aria-expanded','false');noteLine.setAttribute('aria-label','설명 펼치기');
   noteLine.hidden=!item.note;
-  // 지금 것 + 다음 것만 iframe — 나머지는 포스터로 남긴다.
+  // 지금 것 + 다음 것만 iframe — 다음 것은 autoplay=0, mute=1로 준비한다.
   clearFrames();
   const now=makeFrame(item),next=makeFrame(items[index+1],{preload:true});
   media.querySelectorAll('.moments-frame').forEach(node=>node.remove());
@@ -389,8 +389,7 @@ let soundButton=null;
   paintSound();
   stage.dataset.ltAutoplay='';stage.dataset.ltPlaying='0';
   media.dataset.orientation=item.vertical===false||item.isVertical===false?'landscape':'portrait';
-  if(matchMedia('(max-width:780px)').matches){try{hint.hidden=localStorage.getItem('lt41.momentSwipeSeen')==='1';}catch{hint.hidden=false;}}else hint.hidden=true;
-   placeSoundPill();
+  paintInfo();
   currentFrame=now;
   stage.dataset.ltMomentsCount=String(frames.length);
   stage.dataset.ltMomentsId=item.videoId||item.id;
@@ -433,13 +432,12 @@ let soundButton=null;
   if(nextIndex>=items.length){void load();index=Math.min(index,items.length-1);return;}
   if(nextIndex<0)return;
   index=nextIndex;
-  if(matchMedia('(max-width:780px)').matches){hint.hidden=true;try{localStorage.setItem('lt41.momentSwipeSeen','1');}catch{}}
-   placeSoundPill();
+
   render();
  }
  up.onclick=()=>step(-1);
  down.onclick=()=>step(1);
- stage.addEventListener('wheel',event=>{if(Math.abs(event.deltaY)<4)return;event.preventDefault();step(event.deltaY>0?1:-1);},{passive:false});
+ stage.addEventListener('wheel',event=>{if(event.target?.closest?.('.moments-media,.moments-card')||Math.abs(event.deltaY)<4)return;event.preventDefault();step(event.deltaY>0?1:-1);},{passive:false});
  // 유튜브가 실제로 재생을 시작한 뒤에만 썸네일을 걷는다 — 그 전에는 썸네일이 판을 채운다(빈 판 방지).
  if(typeof window!=='undefined'&&typeof window.addEventListener==='function')window.addEventListener('message',event=>{
   if(!currentFrame||event.source!==currentFrame.contentWindow)return;
@@ -447,7 +445,7 @@ let soundButton=null;
   if(data?.event==='infoDelivery'&&data.info&&typeof data.info==='object'){
     const info=data.info;const duration=Number(info.duration),time=Number(info.currentTime);
     if(Number.isFinite(duration)&&duration>0&&Number.isFinite(time)){const value=Math.max(0,Math.min(100,time/duration*100));playerProgress.value=value;progress.dataset.ltProgress=String(Math.round(value));}
-    if(info.playerState===1){media.classList.add('is-playing');stage.dataset.ltPlaying='1';}
+    if(info.playerState===1){media.classList.add('is-playing');posterFallback.hidden=true;stage.dataset.ltPlaying='1';}
     // 화면 표시는 유튜브가 알려 준 실제 상태를 따른다. 새 영상은 주소의 mute=1로 음소거 상태를 알려 오므로,
     // 소리를 켜 둔 사람의 선택(wantSound)이 있으면 몇 번 더 소리를 다시 켠다(브라우저가 막으면 알약이 다시 보인다).
     if(typeof info.muted==='boolean'){
@@ -462,9 +460,15 @@ let soundButton=null;
    if(!item||unavailableId===item.id)return;
    unavailableId=item.id;
    stage.dataset.ltMomentUnavailable='1';
-   showPosterFallback(); // 제목 카드는 그대로, '영상을 볼 수 없어요'를 겹치지 않게 표시
+   // #1354: 오류 플레이어와 미리 불러 둔 플레이어를 걷고 안내만 표시한다.
+   clearFrames();
+   media.querySelectorAll('.moments-frame').forEach(frame=>frame.remove());
+   currentFrame=null;
+   stage.dataset.ltMomentsCount='0';
+   media.classList.remove('is-playing');
+   stage.dataset.ltPlaying='0';
+   showPosterFallback();
    if(soundButton)soundButton.hidden=true;
-   soundPill.hidden=true;
    clearTimeout(unavailableTimer);
    unavailableTimer=setTimeout(()=>{
     if(unavailableId===current()?.id&&autoNextEnabled())advanceAfterEnd();
@@ -488,15 +492,19 @@ let soundButton=null;
   }
  });
  if(typeof window!=='undefined'&&typeof window.addEventListener==='function')window.addEventListener('keydown',event=>{
-  if(!panel.closest('dialog')?.open||panel.hidden)return;
+  if(!panel.closest?.('dialog')?.open||panel.hidden)return;
   if(event.key==='ArrowDown'){event.preventDefault();step(1);}
   if(event.key==='ArrowUp'){event.preventDefault();step(-1);}
  });
-  stage.addEventListener('touchstart',event=>{const t=event.touches[0];touchY=t?{x:t.clientX,y:t.clientY}:null;},{passive:true});
- stage.addEventListener('touchend',event=>{
+  const swipeTargets=[stage,toolbar];
+  for(const target of swipeTargets)target.addEventListener('touchstart',event=>{
+    if(event.target?.closest?.('.moments-media')){touchY=null;return;}
+    const t=event.touches[0];touchY=t?{x:t.clientX,y:t.clientY}:null;
+  },{passive:true});
+ for(const target of swipeTargets)target.addEventListener('touchend',event=>{
   if(touchY===null)return;
   const t=event.changedTouches[0],dy=(t?.clientY??touchY.y)-touchY.y,dx=(t?.clientX??touchY.x)-touchY.x;
-  if(Math.abs(dy)>55&&Math.abs(dy)>Math.abs(dx)*1.4&&!(event.target?.closest?.('button,textarea,select,input')))step(dy<0?1:-1);
+  if(Math.abs(dy)>55&&Math.abs(dy)>Math.abs(dx)*1.4&&!event.target?.closest?.('.moments-media,textarea,select,input'))step(dy<0?1:-1);
   touchY=null;
  },{passive:true});
   function toggleSound(event){
@@ -505,25 +513,8 @@ let soundButton=null;
     command(currentFrame,unmuted?'mute':'unMute');
     unmuted=!unmuted;wantSound=unmuted;paintSound();
   };
-  // #1332: 알약은 소리만 켠다. 화면 누름(멈춤·재생)과 손짓 넘기기에 번지지 않게 막는다.
-  soundPill.onclick=event=>{
-    event.stopPropagation();event.preventDefault();
-    if(!currentFrame||unmuted)return;
-    command(currentFrame,'unMute');
-    unmuted=true;wantSound=true;paintSound();
-    try{localStorage.setItem(SOUND_SEEN_KEY,'1');}catch{}
-    paintSoundPill();
-  };
-  // #1305: 화면 한 번 누르면 멈춤·재생이 바뀐다. 소리는 '소리 켜기' 단추만 맡는다.
-  media.addEventListener('click',event=>{
-   if(event.target.closest('button'))return;
-   if(!currentFrame)return;
-   clearInterval(currentFrame._ltKick); // 사람이 누른 뒤에는 자동 재생 재시도를 멈춘다.
-   const playing=stage.dataset.ltPlaying==='1';
-   command(currentFrame,playing?'pauseVideo':'playVideo');
-   stage.dataset.ltPlaying=playing?'0':'1';
-   media.classList.toggle('is-playing',!playing);
-  });
+ // 플레이어 위에는 어떤 클릭·제스처 층도 두지 않는다.
+ // 재생·일시 정지는 유튜브 기본 컨트롤이 전담한다.
  function activate(){if(!items.length&&!loading)void load();else render();}
  function deactivate(){clearFrames();media.querySelectorAll('.moments-frame').forEach(node=>node.remove());}
  return {activate,deactivate,load,step,state:()=>({count:frames.length,id:stage.dataset.ltMomentsId||'',index,loaded:items.length})};
