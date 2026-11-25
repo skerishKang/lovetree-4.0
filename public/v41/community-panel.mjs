@@ -537,13 +537,20 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
  function startPopularStages(){
   // 인기 무대 요청은 카드와 동시에 시작한다. 두 응답은 보통 비슷하게 온다(운영 측정 중앙값 각각 약 0.8초, #1343).
   // 카드 응답이 온 뒤 300ms 안에 무대가 오면 함께 그리고, 그보다 늦은 결과는 카드 위치를 밀지 않도록 버린다.
-  const request=Promise.resolve().then(()=>api.popularStages()).catch(()=>null);
+  // 카드보다 먼저 온 무대 결과는 바로 그린다(카드가 아직 없으니 밀림이 없다).
+  // 300ms 안에 무대가 오지 않으면 뼈대 줄을 먼저 접어 둔다(불러오는 중 안내가 늦게 크게 밀리지 않게).
+  const stage={done:false,late:false};
+  const early=setTimeout(()=>{if(!stage.done)renderPopularStages([]);},300);
+  const request=Promise.resolve().then(()=>api.popularStages()).catch(()=>null).then(answer=>{
+   if(stage.late)return;
+   stage.done=true;clearTimeout(early);renderPopularStages(answer?.ok?answer.items:[]);
+  });
   return async()=>{
+   if(stage.done)return;
    let timer;
-   const deadline=new Promise(resolve=>{timer=setTimeout(()=>resolve(null),300);});
-   const answer=await Promise.race([request,deadline]);
+   await Promise.race([request,new Promise(resolve=>{timer=setTimeout(resolve,300);})]);
    clearTimeout(timer);
-   renderPopularStages(answer?.ok?answer.items:[]);
+   if(!stage.done){stage.late=true;clearTimeout(early);renderPopularStages([]);}
   };
  }
  popularList.append(skeleton); // 불러오는 동안만 자리를 고정하는 뼈대
