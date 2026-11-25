@@ -107,7 +107,10 @@ html[data-v41-screen=tree]{--lt-toolbar-top:0px;--ts-footer-h:48px}
 .ts-empty[hidden]{display:none}
 .ts-card:focus-visible,.ts-chip:focus-visible{outline:2px solid var(--lt-gold);outline-offset:2px}
 .ts-detail{max-width:min(420px,calc(100% - 32px));max-height:80%;overflow:auto;padding:20px;border:1px solid var(--lt-line);border-radius:var(--lt-r-card);background:var(--lt-stage-2);color:var(--lt-pearl)}
-.ts-detail::backdrop{background:var(--lt-glass)}
+/* #1368: 모달 덮개의 유리 배경은 일부 브라우저에서 판 글씨까지 흐리게 합성된다.
+   덮개는 투명하게 두고, 흐림은 상세 판 뒤의 트리 무대에 한정한다. */
+body:has(.ts-detail[open]) .ts-world{filter:blur(3px)}
+.ts-detail::backdrop{background:transparent}
 .ts-detail h2{margin:0 0 12px;font-size:18px;overflow-wrap:anywhere}
 .ts-detail p{white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px}
 .ts-detail img{display:block;width:100%;max-height:240px;object-fit:contain}

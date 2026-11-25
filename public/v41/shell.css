@@ -1180,6 +1180,8 @@ html[data-lt-theme=garden] dialog.lt-close-confirm .button-row .primary{backgrou
 dialog[data-lt-panel=card]::backdrop{background:var(--lt-dialog-backdrop);backdrop-filter:var(--lt-dialog-backdrop-blur)}
 .close{width:var(--lt-dialog-close-size);height:var(--lt-dialog-close-size);border-radius:var(--lt-dialog-close-radius);font-size:var(--lt-dialog-close-font)}
 /* 프레임 안 창이 열리면 셸 머리줄·아래 고정 항목도 같은 덮개로 어둡게 — 뒤 배경이 화면 전체를 덮는다. */
+/* #1368: 머리줄 위치 기준이 없으면 ::after 덮개가 1440 화면 전체를 덮는다. */
+body.lt-frame-dialog-open .app-header{position:relative}
 body.lt-frame-dialog-open .app-header,body.lt-frame-dialog-open .home-links,body.lt-frame-dialog-open #mobile-add,body.lt-frame-dialog-open .updates-card{pointer-events:none}
 body.lt-frame-dialog-open .app-header::after,body.lt-frame-dialog-open .home-links::after,body.lt-frame-dialog-open #mobile-add::after,body.lt-frame-dialog-open .updates-card::after{content:'';position:absolute;inset:0;z-index:1;border-radius:inherit;background:var(--lt-dialog-backdrop);backdrop-filter:var(--lt-dialog-backdrop-blur);pointer-events:none}
 /* 정리 창은 본문만 안에서 스크롤하고 주 단추는 아래 고정 줄에 둔다(옮기기·새 트리 만들기 잘림 방지). */
