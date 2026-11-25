@@ -387,3 +387,66 @@ test('#1352 동작: 마지막 순간에서 끝나도 멈추고 다음 것을 더
     } finally { await h.ctx.close(); await new Promise((r) => h.server.close(r)); }
   } finally { await browser.close(); }
 });
+
+test('#1286 휴대폰 실제 터치 밀기: 위 띠·영상 옆 여백·정보 판, 영상은 가로채지 않음', {skip:REQUIRE?false:skip,timeout:240000}, async()=>{
+ if(skip)assert.fail(skip);
+ const browser=await chromium.launch({headless:true});
+ try{
+  for(const theme of ['night','garden']){
+   const h=await boot(browser,{width:390,height:844,theme});
+   try{
+    const page=h.page,stage=page.locator('.moments-stage');
+    await page.locator('.moments-info-button').click();
+    const cdp=await h.ctx.newCDPSession(page);
+    const point=async(area)=>{
+     return page.evaluate(area=>{
+      const panel=document.querySelector('#community-moments-panel');
+      const stage=panel.querySelector('.moments-stage');
+      const frame=panel.querySelector('.moments-frame:not(.moments-next)');
+      const toolbar=document.querySelector('.moments-toolbar');
+      const context=panel.querySelector('.moments-context');
+      const rect=area==='toolbar'?toolbar.getBoundingClientRect():area==='context'?context.getBoundingClientRect():area==='video'?frame.getBoundingClientRect():stage.getBoundingClientRect();
+      for(let yi=1;yi<=9;yi++)for(let xi=1;xi<=9;xi++){
+       const x=rect.left+rect.width*(area==='margin'?[.01,.02,.03,.97,.98,.99,.01,.98,.99][xi-1]:xi/10),y=rect.top+rect.height*yi/10;
+       if(x<1||x>innerWidth-1||y<1||y>innerHeight-1)continue;
+       const el=document.elementFromPoint(x,y);
+       if(!el)continue;
+       if(area==='video'&&el===frame)return{x:Math.round(x),y:Math.round(y)};
+       if(area==='toolbar'&&toolbar.contains(el)&&!el.closest('button,a,input,select,textarea'))return{x:Math.round(x),y:Math.round(y)};
+       if(area==='context'&&context.contains(el)&&!el.closest('button,a,input,select,textarea'))return{x:Math.round(x),y:Math.round(y)};
+       if(area==='margin'&&stage.contains(el)&&!el.closest('.moments-media,.moments-context,.moments-nav,.moments-rail,button,a,input,select,textarea'))return{x:Math.round(x),y:Math.round(y)};
+      }
+      return null;
+     },area);
+    };
+    const swipe=async(p,up)=>{
+     const start={x:p.x,y:p.y},end={x:p.x,y:Math.max(8,Math.min(836,p.y+(up?-100:100)))};
+     // 시작 지점이 화면 끝에 가까우면 반대쪽으로 충분히 이동한다.
+     if(Math.abs(end.y-start.y)<65)end.y=start.y+(up?-70:70);
+     const touch=(pos)=>[{x:pos.x,y:pos.y,id:1}];
+     await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:touch(start)});
+     for(let i=1;i<=5;i++)await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:touch({x:start.x,y:start.y+(end.y-start.y)*i/5})});
+     await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+    };
+    for(const area of ['toolbar','margin','context']){
+     const p=await point(area);
+     assert.ok(p,theme+' '+area+' 실제 노출된 밀기 시작점');
+     const before=await stage.getAttribute('data-lt-moments-id');
+     await swipe(p,true);
+     await page.waitForFunction(id=>document.querySelector('.moments-stage')?.dataset.ltMomentsId!==id,before);
+     const after=await stage.getAttribute('data-lt-moments-id');
+     assert.notEqual(after,before,theme+' '+area+' 위 밀기 다음 순간');
+     await swipe(p,false);
+     await page.waitForFunction(id=>document.querySelector('.moments-stage')?.dataset.ltMomentsId!==id,after);
+     assert.equal(await stage.getAttribute('data-lt-moments-id'),before,theme+' '+area+' 아래 밀기 이전 순간');
+    }
+    const video=await point('video');
+    assert.ok(video,theme+' 영상 iframe 실제 터치 지점');
+    const before=await stage.getAttribute('data-lt-moments-id');
+    await swipe(video,true);
+    assert.equal(await stage.getAttribute('data-lt-moments-id'),before,theme+' 영상 위 밀기는 서비스 전환 안 함');
+    assert.equal(await page.locator('.moments-swipe-layer').count(),0,'영상 위 투명 밀기 층 없음');
+   }finally{await h.ctx.close();await new Promise(r=>h.server.close(r));}
+  }
+ }finally{await browser.close();}
+});

@@ -498,13 +498,13 @@ let advancing=0,unavailableTimer=0,unavailableId='';
  });
   const swipeTargets=[stage,toolbar];
   for(const target of swipeTargets)target.addEventListener('touchstart',event=>{
-    if(event.target?.closest?.('.moments-media,.moments-card')){touchY=null;return;}
+    if(event.target?.closest?.('.moments-media')){touchY=null;return;}
     const t=event.touches[0];touchY=t?{x:t.clientX,y:t.clientY}:null;
   },{passive:true});
  for(const target of swipeTargets)target.addEventListener('touchend',event=>{
   if(touchY===null)return;
   const t=event.changedTouches[0],dy=(t?.clientY??touchY.y)-touchY.y,dx=(t?.clientX??touchY.x)-touchY.x;
-  if(Math.abs(dy)>55&&Math.abs(dy)>Math.abs(dx)*1.4&&!event.target?.closest?.('.moments-media,.moments-card,textarea,select,input'))step(dy<0?1:-1);
+  if(Math.abs(dy)>55&&Math.abs(dy)>Math.abs(dx)*1.4&&!event.target?.closest?.('.moments-media,textarea,select,input'))step(dy<0?1:-1);
   touchY=null;
  },{passive:true});
   function toggleSound(event){
