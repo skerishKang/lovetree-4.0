@@ -355,11 +355,12 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
   }
   if(preview.open&&selectedId){const selected=items.find(item=>item.shareId===selectedId);if(selected){renderPreview(selected);if(focusedAction)preview.querySelector(`[data-community-action="${focusedAction}"]`)?.focus();}}
  }
- async function load(append=false){
+ async function load(append=false,stageReady=Promise.resolve()){
   if(append&&loading)return;
   const requestId=++loadId;loading=true;more.disabled=true;message('공개 트리를 불러오는 중이에요.');
   if(!append){items=[];cursor='';render();}
   const answer=await api.discover({q:query.value.trim(),artist:selectedArtist,cursor,limit:12,sort:sortSelect?.value||''});
+  await stageReady;
   if(requestId!==loadId)return;
   loading=false;
   if(!answer.ok){message(answer.message||'공개 트리를 불러오지 못했어요.');more.hidden=true;more.disabled=false;render();return;}
@@ -393,8 +394,8 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
    for(const t of tabs()){if(t.getAttribute('aria-current')==='true'){t.dataset.wasCurrent='1';t.setAttribute('aria-current','false');}}
    const wantMoments=hashNow()==='#explore/moments';
    selectTab(wantMoments?'moments':'trees',{syncHash:false});
-   // 빈 인기 무대 줄을 접기 전에 카드를 그리면 자리가 밀린다 — 먼저 접고 카드를 그린다.
-   if(!wantMoments){void loadPopularStages().then(()=>load(false));}
+   // 카드 요청은 인기 무대와 동시에 시작하고, 첫 그리기만 결과 또는 최대 300ms를 기다린다.
+   if(!wantMoments){const stageReady=loadPopularStages();void load(false,stageReady);}
   };
   if(typeof window!=='undefined'&&typeof window.addEventListener==='function')window.addEventListener('hashchange',()=>{
    if(hashGuard)return;
@@ -517,7 +518,12 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
   }
  };
  async function loadPopularStages(){
-  const answer=await api.popularStages();
+  // 인기 무대 요청은 카드와 동시에 시작한다. 300ms 후 도착한 무대는 카드 위치를 밀지 않도록 버린다.
+  let timer;
+  const request=Promise.resolve().then(()=>api.popularStages()).catch(()=>null);
+  const deadline=new Promise(resolve=>{timer=setTimeout(()=>resolve(null),300);});
+  const answer=await Promise.race([request,deadline]);
+  clearTimeout(timer);
   renderPopularStages(answer?.ok?answer.items:[]);
  }
  popularList.append(skeleton); // 불러오는 동안만 자리를 고정하는 뼈대

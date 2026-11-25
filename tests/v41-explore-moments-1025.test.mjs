@@ -851,3 +851,67 @@ test('빈 인기 무대는 줄을 접고 칩 줄 아래 간격을 다른 정보 
     }
   } finally { await browser.close(); }
 });
+
+test('#1338 인기 무대 오류·2초 지연에도 트리 카드를 1초 안에 표시하고 자리 밀림을 막는다', { skip: REQUIRE ? false : skip, timeout: 240000 }, async () => {
+ if(skip)assert.fail(skip);
+ const sample={
+  shareId:'share'+String(1).padStart(20,'0'),title:'무대 지연 점검 트리',subject:'공개자',summary:'공개된 순간',
+  momentCount:3,createdAt:'2026-11-20T09:30:00.000Z',publicDisplayName:'공개자',emotions:['설렘'],
+  cover:{title:'첫 순간',type:'photo',url:''},
+  stats:{hearts:3,favorites:1,hearted:false,favored:false,reactions:{heart:3},mine:[]}
+ };
+ const shots=process.env.LT_STAGE_1338_SHOTS||'';
+ const browser=await chromium.launch({headless:true});
+ try{
+  for(const mode of ['failed','late'])for(const [width,height] of [[390,844],[1440,900]])for(const theme of ['night','garden']){
+   const server=await serve();
+   try{
+    const base='http://127.0.0.1:'+server.address().port;
+    const ctx=await browser.newContext({viewport:{width,height},reducedMotion:'reduce'});
+    try{
+     await ctx.addInitScript(t=>{try{localStorage.setItem('lt41.theme',t)}catch{}},theme);
+     let cardRequestAt=0;
+     await ctx.route('**/api/**',r=>r.fulfill({status:200,contentType:'application/json',body:'{"ok":true,"items":[]}'}));
+     await ctx.route('**/api/community/shares**',r=>{
+      cardRequestAt=Date.now();
+      return r.fulfill({status:200,contentType:'application/json',
+       body:JSON.stringify({ok:true,items:[sample],totalVisible:1,nextCursor:'',groups:[],groupsAll:[]})});
+     });
+     await ctx.route('**/api/community/stages/popular**',async r=>{
+      if(mode==='failed')return r.abort('failed');
+      await new Promise(resolve=>setTimeout(resolve,2000));
+      return r.fulfill({status:200,contentType:'application/json',body:JSON.stringify({ok:true,items:[{stageId:'late-stage',weeklyVoters:5,title:'늦게 도착한 무대'}]})});
+     });
+     const page=await ctx.newPage();
+     await page.goto(base+'/v41/#explore',{waitUntil:'domcontentloaded'});
+     await page.locator('#community-list .community-card').first().waitFor({state:'visible',timeout:5000});
+     const elapsed=Date.now()-cardRequestAt;
+     assert.ok(cardRequestAt>0,mode+'/'+width+'/'+theme+': 트리 요청이 시작됐다');
+     assert.ok(elapsed<1000,mode+'/'+width+'/'+theme+': 카드 요청부터 1초 안에 보여야 함 ('+elapsed+'ms)');
+     const before=await page.evaluate(()=>{
+      const card=document.querySelector('#community-list .community-card'),popular=document.querySelector('#community-popular-stages');
+      return {y:card.getBoundingClientRect().top,hidden:popular.hidden,cardCount:document.querySelectorAll('#community-list .community-card').length,
+       stageHeight:popular.getBoundingClientRect().height};
+     });
+     assert.equal(before.cardCount,1,mode+'/'+width+'/'+theme+': 공개 트리 카드 표시');
+     assert.equal(before.hidden,true,mode+'/'+width+'/'+theme+': 실패·초과 시간에는 인기 무대 줄 접기');
+     assert.equal(before.stageHeight,0,mode+'/'+width+'/'+theme+': 빈 띠 높이 0');
+     if(mode==='late')await page.waitForTimeout(2100);
+     const after=await page.evaluate(()=>{
+      const card=document.querySelector('#community-list .community-card'),popular=document.querySelector('#community-popular-stages');
+      return {y:card.getBoundingClientRect().top,hidden:popular.hidden,stageHeight:popular.getBoundingClientRect().height};
+     });
+     assert.equal(after.y,before.y,mode+'/'+width+'/'+theme+': 카드 뒤 자리 밀림 0');
+     assert.equal(after.hidden,true,mode+'/'+width+'/'+theme+': 늦은 무대 결과가 줄을 다시 열지 않음');
+     assert.equal(after.stageHeight,0,mode+'/'+width+'/'+theme+': 줄 높이 0 유지');
+     if(shots){
+      const {mkdir}=await import('node:fs/promises');
+      await mkdir(shots,{recursive:true});
+      await page.screenshot({path:shots+'/'+mode+'-'+width+'-'+theme+'.png',animations:'disabled'});
+     }
+     console.log('#1338',mode,width,theme,'카드',elapsed+'ms','이동',after.y-before.y+'px');
+    }finally{await ctx.close();}
+   }finally{await new Promise(resolve=>server.close(resolve));}
+  }
+ }finally{await browser.close();}
+});
