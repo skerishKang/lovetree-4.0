@@ -51,6 +51,12 @@ function tree() {
   return { id: 'tree1', subject: '시험 사용자', title: '시험 트리', coverMomentId: '', inbox: false, moments, edges: [] };
 }
 
+function treeWithoutVideo() {
+  const data = tree();
+  data.moments = data.moments.map((moment) => ({ ...moment, url: '' }));
+  return data;
+}
+
 function serve() {
   const server = createServer(async (req, res) => {
     const url = req.url || '/';
@@ -69,14 +75,24 @@ function serve() {
 }
 
 // 책을 열고 첫 쪽이 그려질 때까지 기다린다. API 요청은 apiState 에 센다.
-async function openBook(browser, server, width, height, apiRoute) {
+async function openBook(browser, server, width, height, apiRoute, data = tree()) {
   const ctx = await browser.newContext({ viewport: { width, height } });
   await ctx.addInitScript(() => localStorage.setItem('lt41.theme', 'night'));
-  await ctx.addInitScript((t) => { window.__TREE__ = t; }, tree());
+  await ctx.addInitScript((t) => { window.__TREE__ = t; }, data);
+  // 첫 쪽이 처음 그려진 시각을 프레임 안에서 남긴다(바깥 시각과 같은 시계).
+  await ctx.addInitScript(() => {
+    const mark = () => {
+      if (window.__firstPageAt) return;
+      const drawn = (document.querySelector('#leftPage')?.children.length || document.querySelector('#mobileContent')?.children.length) > 0;
+      if (drawn) window.__firstPageAt = performance.timeOrigin + performance.now();
+    };
+    new MutationObserver(mark).observe(document, { childList: true, subtree: true });
+    if (document.readyState !== 'loading') mark();
+  });
   const page = await ctx.newPage();
-  const apiState = { count: 0 };
+  const apiState = { count: 0, times: [] };
   await page.route(/(^|\.)(ytimg\.com|googlevideo\.com|youtube-nocookie\.com)(\/|$)/, (route) => route.abort());
-  await page.route(API_URL, (route) => { apiState.count++; return apiRoute(route); });
+  await page.route(API_URL, (route) => { apiState.count++; apiState.times.push(Date.now()); return apiRoute(route); });
   await page.goto(`http://127.0.0.1:${server.address().port}/host`);
   const frame = await waitFrame(page);
   await frame.waitForFunction(() => (document.querySelector('#leftPage')?.children.length || document.querySelector('#mobileContent')?.children.length) > 0, null, { timeout: 20000 });
@@ -95,14 +111,17 @@ async function waitFrame(page) {
 const VIEWPORTS = [[1440, 900], [390, 844]];
 
 for (const [w, h] of VIEWPORTS) {
-  test(`#1365 책 열기: YouTube IFrame API를 받지 않는다(${w}·밤)`, { skip }, async () => {
+  test(`#1365 책 열기: 첫 쪽 그려지기 전 요청 0번, 뒤이어 한 번(${w}·밤)`, { skip }, async () => {
     const server = await serve();
     const browser = await chromium.launch();
     try {
       const { ctx, frame, apiState } = await openBook(browser, server, w, h, (route) => route.fulfill({ status: 200, contentType: 'text/javascript', body: FAKE_API }));
+      const firstPageAt = await frame.evaluate(() => window.__firstPageAt);
+      assert.ok(firstPageAt > 0, '첫 쪽이 그려진 시각을 남겨야 한다');
+      assert.ok(apiState.times.every((at) => at > firstPageAt), '첫 쪽이 그려지기 전에는 iframe_api 를 요청하면 안 된다');
       await new Promise((r) => setTimeout(r, 800));
-      assert.equal(apiState.count, 0, '책을 여는 것만으로 iframe_api 를 요청하면 안 된다');
-      assert.equal(await frame.evaluate(() => typeof window.YT), 'undefined');
+      assert.equal(apiState.count, 1, '첫 쪽 뒤 한가할 때 API를 한 번 미리 받는다');
+      assert.equal(await frame.evaluate(() => typeof window.YT), 'object', '미리 받은 재생기가 준비된다');
       await ctx.close();
     } finally {
       await browser.close();
@@ -115,15 +134,32 @@ for (const [w, h] of VIEWPORTS) {
     const browser = await chromium.launch();
     try {
       const { ctx, frame, apiState } = await openBook(browser, server, w, h, (route) => route.fulfill({ status: 200, contentType: 'text/javascript', body: FAKE_API }));
+      await new Promise((r) => setTimeout(r, 800));
+      assert.equal(apiState.count, 1, '재생 전에 API를 한 번 미리 받는다');
       await frame.locator('#playAllBtn').click();
       await frame.waitForFunction(() => document.querySelector('#pbPlayer iframe'), null, { timeout: 15000 });
-      assert.equal(apiState.count, 1, '이어 보기 첫 클릭에서 API를 한 번 받아야 한다');
+      assert.equal(apiState.count, 1, '첫 재생은 미리 받은 것을 그대로 쓴다');
       await frame.locator('#pbClose').click();
       await new Promise((r) => setTimeout(r, 400));
       await frame.locator('#playAllBtn').click();
       await frame.waitForFunction(() => document.querySelector('#pbPlayer iframe'), null, { timeout: 15000 });
       await new Promise((r) => setTimeout(r, 400));
       assert.equal(apiState.count, 1, '두 번째 재생에서 API를 다시 받으면 안 된다');
+      await ctx.close();
+    } finally {
+      await browser.close();
+      server.close();
+    }
+  });
+
+  test(`#1365 영상 없는 책은 API를 미리 받지 않는다(${w}·밤)`, { skip }, async () => {
+    const server = await serve();
+    const browser = await chromium.launch();
+    try {
+      const { ctx, frame, apiState } = await openBook(browser, server, w, h, (route) => route.fulfill({ status: 200, contentType: 'text/javascript', body: FAKE_API }), treeWithoutVideo());
+      await new Promise((r) => setTimeout(r, 800));
+      assert.equal(apiState.count, 0, '영상 순간이 없으면 미리 받지 않는다');
+      assert.equal(await frame.evaluate(() => typeof window.YT), 'undefined');
       await ctx.close();
     } finally {
       await browser.close();

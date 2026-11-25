@@ -298,6 +298,28 @@ function updateAvailability() {
   if (!items.length && open) closePlayback();
 }
 
+// #1365 2차: 첫 쪽을 그린 뒤 브라우저가 한가할 때 API를 미리 받는다.
+// 첫 쪽이 그려지기 전에는 요청이 0번이고, 영상 순간이 없는 책은 미리 받지 않는다.
+// 이미 받기 시작했으면 같은 Promise를 다시 쓰므로 재생에서 요청이 늘지 않는다.
+let prefetchArmed = false;
+const firstPageDrawn = () => !!(document.querySelector('#leftPage')?.children.length || document.querySelector('#mobileContent')?.children.length);
+function armApiPrefetch() {
+  if (prefetchArmed || !firstPageDrawn() || !items.length) return;
+  prefetchArmed = true;
+  const fetchWhenIdle = () => { void loadYouTubeIframeApi().catch(() => {}); };
+  if (typeof requestIdleCallback === 'function') requestIdleCallback(fetchWhenIdle, {timeout: 1500});
+  else setTimeout(fetchWhenIdle, 0);
+}
+function watchFirstPage() {
+  if (firstPageDrawn()) { armApiPrefetch(); return; }
+  const observer = new MutationObserver(() => {
+    if (!firstPageDrawn()) return;
+    observer.disconnect();
+    armApiPrefetch();
+  });
+  observer.observe(document.documentElement, {childList: true, subtree: true});
+}
+
 // 390에서는 머리줄 도구가 넘치지 않도록 '이어 보기'를 책 아래 이동 줄로 옮긴다.
 function placePlayButton() {
   const phone = document.documentElement.dataset.bookShape === 'phone';
@@ -317,6 +339,8 @@ function wire() {
   placePlayButton();
   addEventListener('resize', placePlayButton);
   new MutationObserver(placePlayButton).observe(document.documentElement, {attributes: true, attributeFilter: ['data-book-shape']});
+  addEventListener('load', armApiPrefetch, {once: true});
+  watchFirstPage();
   playAllBtn.addEventListener('click', () => { void openPlayback(); });
   $('#pbClose').addEventListener('click', closePlayback);
   $('#pbCloseBottom').addEventListener('click', closePlayback);
@@ -352,5 +376,6 @@ function wire() {
   }
 }
 
-// YouTube IFrame API는 책을 열 때 받지 않고, '이어 보기'를 누를 때 openPlayback이 처음 받는다(#1365).
+// YouTube IFrame API는 책을 열 때(첫 쪽 그려지기 전) 받지 않고, 첫 쪽 뒤 한가할 때 미리 받는다(#1365).
+// 재생은 이미 받은 것을 그대로 쓰고, 미리 받지 못했으면 그때 다시 시도한다.
 wire();
