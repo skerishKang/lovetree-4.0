@@ -513,7 +513,7 @@ test('#1096 체험 — 미리보기 예시 지도에서만 켜지고, 저장 없
       await page.waitForTimeout(500);
       return {ctx, page, frame};
     };
-    // #1219: ?? ???? ??? ?? ?? ??? ?? ?? ?? ? ??? ??.
+    // #1219: 좁은 화면에서도 잇기를 도구 줄에서 바로 보고 누를 수 있어야 합니다.
     for (const width of [390, 360]) for (const theme of ['night', 'garden']) {
       const mobile = await open('preview.lovetree-4-0.pages.dev', 'login-host.html', width, theme);
       try {
@@ -542,29 +542,29 @@ test('#1096 체험 — 미리보기 예시 지도에서만 켜지고, 저장 없
           };
         });
         const label = width + '/' + theme;
-        assert.equal(measured.exists, true, label + ': ?? ??? ????');
-        assert.equal(measured.hidden, false, label + ': ?? ??? ?? ??? ??');
-        assert.equal(measured.visible, true, label + ': ??? ??? ??? ????' + ' ' + JSON.stringify(measured));
-        assert.equal(measured.inRow, true, label + ': ??? ? ?? ?? ?? ?? ?? ??');
-        assert.equal(measured.inBar, true, label + ': ?? ?? ?? ???');
+        assert.equal(measured.exists, true, label + ': 잇기 단추가 존재합니다');
+        assert.equal(measured.hidden, false, label + ': 잇기 단추에 숨김 속성이 없습니다');
+        assert.equal(measured.visible, true, label + ': 표시 크기가 충분합니다 ' + JSON.stringify(measured));
+        assert.equal(measured.inRow, true, label + ': 잇기가 더 보기 메뉴가 아닌 도구 줄에 있습니다');
+        assert.equal(measured.inBar, true, label + ': 공통 도구 줄 안에 있습니다');
         assert.ok(measured.left >= -0.5 && measured.right <= measured.viewport + 0.5,
-          label + ': ??? ?? ?? ?? ?? ??');
-        assert.equal(measured.hit, true, label + ': ?? ?? ??? ?? ??? ' + JSON.stringify(measured));
-        assert.equal(measured.pressed, 'false', label + ': ?? ?? ??? ???');
+          label + ': 잇기가 화면 가로 범위 안에 있습니다');
+        assert.equal(measured.hit, true, label + ': 실제 클릭 지점이 잇기 단추입니다 ' + JSON.stringify(measured));
+        assert.equal(measured.pressed, 'false', label + ': 처음에는 선택되지 않습니다');
         await mobile.frame.click('#connectToggle');
         assert.equal(await mobile.frame.evaluate(() => window.__lt.connect().mode), true,
-          label + ': ?? ???? ??? ???');
+          label + ': 잇기를 누르면 모드가 켜집니다');
         assert.equal(await mobile.frame.locator('#connectToggle').getAttribute('aria-pressed'), 'true',
-          label + ': ?? ?? ??? ???');
+          label + ': 선택 상태가 켜집니다');
         if (process.env.LT_MAP_CONNECT_CAPTURE_DIR) {
           mkdirSync(process.env.LT_MAP_CONNECT_CAPTURE_DIR, { recursive: true });
           await mobile.page.screenshot({
-            path: path.join(process.env.LT_MAP_CONNECT_CAPTURE_DIR, '??-' + width + '-' + theme + '.png')
+            path: path.join(process.env.LT_MAP_CONNECT_CAPTURE_DIR, 'connect-' + width + '-' + theme + '.png')
           });
         }
         await mobile.frame.click('#connectToggle');
         assert.equal(await mobile.frame.evaluate(() => window.__lt.connect().mode), false,
-          label + ': ?? ? ?? ???? ??? ???');
+          label + ': 다시 누르면 잇기 모드가 꺼집니다');
       } finally { await mobile.ctx.close(); }
     }
 
