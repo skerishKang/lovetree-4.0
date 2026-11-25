@@ -840,7 +840,7 @@ test('#1309 움직임 줄이기에서는 카드 안 글자만 보이고 반짝�
  if (skip952) assert.fail(skip952);
  const browser = await chromium952.launch({ headless: true });
  try {
-  const h = await boot952(browser, { width: 390, motion: 'reduce' });
+  const h = await boot952(browser, { width: 1440, motion: 'reduce' }); // #1314 이후 390 세로 리본은 글자가 없어 괤도 배치에서 본다
   try {
    await h.frame.locator('.lt-card-tip').waitFor({ state: 'visible', timeout: 20000 });
    const sample = () => h.frame.evaluate(() => {
