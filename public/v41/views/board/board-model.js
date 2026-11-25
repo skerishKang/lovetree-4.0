@@ -8,8 +8,13 @@ window.LT58Model = (() => {
   // 관계도(줄)는 지도가 맡는다. 보드의 자리는 '칸(col)×줄(row)' 슬롯이다.
   const BASE_CARD_H = 424, ROW_GAP = 36, COL_PITCH = 300, GRID_MARGIN = 150;
   // 칸 수는 화면 폭이 정한다: 1440에서 4칸, 390에서 1칸, 2560에서 8칸. 카드 폭 242px + 사이 여백.
-  function gridColumns(vw) {
-    return Math.max(1, Math.floor(((Number(vw) || 0) - 32) / COL_PITCH));
+  function gridColumns(vw, count = 0) {
+    const width = Number(vw) || 0;
+    const baseline = Math.max(1, Math.floor((width - 32) / COL_PITCH));
+    // 40개 이하 기존 판 배치는 유지하고 48개 이상에서만 넓은 화면 열을 확장한다.
+    return width >= 1200 && count >= 48
+      ? Math.max(baseline, Math.floor((width - 44) / 265))
+      : baseline;
   }
   // 기본 순서: 날짜 최신순. 같은 날짜면 최근에 만든 순간부터(createdOrder 내림).
   function dateDescOrder(moments) {

@@ -588,6 +588,8 @@ function restoreBoardState(state) {
   if (cinemaV11.active) endCinemaV11(false);
   $('#viewerModal').classList.remove('open');
   $('#viewerMedia video')?.pause();
+  // #1298: 뒤로 가기로 닫을 때도 숨은 미디어를 지운다 — 소리와 스크롤 자취가 남지 않게.
+  $('#viewerMedia').replaceChildren();
   $('#editModal').classList.remove('open');
   $('#addModal').classList.remove('open');
   $('#nextChooser').classList.remove('open');

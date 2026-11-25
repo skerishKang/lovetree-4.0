@@ -72,8 +72,8 @@ html[data-v41-screen=shelf] .shelf-base{position:static;left:auto;right:auto;bot
 html[data-v41-screen=shelf] .book-card .book-cover-media{object-position:50% 50%}
 
 /* ── #1093: 390에서는 보기 토글을 머리줄 대신 도구 줄에 둔다. */
-.shelf-view-inline{display:inline-flex;align-items:center;padding:3px;border:1px solid var(--lt-line);border-radius:999px}
-.shelf-view-inline button{min-height:36px;padding:0 11px;border:0;border-radius:999px;background:transparent;color:var(--muted);font-size:12px;white-space:nowrap}
+.shelf-view-inline{display:inline-flex;align-items:center;padding:3px;border:1px solid var(--lt-line);border-radius:var(--lt-r-pill)}
+.shelf-view-inline button{min-height:36px;padding:0 11px;border:0;border-radius:var(--lt-r-pill);background:transparent;color:var(--muted);font-size:12px;white-space:nowrap}
 .shelf-view-inline button[aria-checked=true]{background:var(--lt-primary);color:var(--lt-primary-ink)}
 /* 390에서는 책 아래 설명을 한 줄로 적고 남는 글자는 말줄임으로 표시한다. */
 @media(max-width:520px){html[data-v41-screen=shelf] .book-card-meta span{display:block;max-height:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;-webkit-line-clamp:1}}
@@ -203,7 +203,7 @@ html[data-v41-screen=shelf] .shelf-new-tree {
   min-height: 44px;
   padding: 0 18px;
   border: 1px solid var(--lt-line);
-  border-radius: 999px;
+  border-radius: var(--lt-r-pill);
   background: var(--lt-primary);
   color: var(--lt-primary-ink);
   font-size: 14px;
@@ -215,7 +215,7 @@ html[data-v41-screen=shelf] .shelf-new-tree:hover { border-color: var(--lt-gold-
 html[data-v41-screen=shelf] .shelf-new-tree:focus-visible { outline: 3px solid var(--lt-gold); outline-offset: 2px; }
 html[data-v41-screen=shelf][data-lt-theme=garden] .shelf-new-tree {
   border-color: var(--lt-line-paper);
-  background: #fffaf5;
+  background: var(--paper-strong);
   color: #704b55;
 }
 html[data-v41-screen=shelf][data-lt-theme=garden] .shelf-new-tree:focus-visible { outline-color: var(--lt-gold-ink); }
@@ -295,3 +295,29 @@ html[data-v41-screen=shelf] .shelf-screen:has(.hero.strip-mode) .shelf-viewport[
 html[data-v41-screen=shelf] .shelf-viewport[data-shelf-view=shelf]{overflow:visible}
 /* 회전은 책장 높이가 고정이라 여유가 위로 몰린다 — 띠를 선반과 같은 자리에 둔다. */
 html[data-v41-screen=shelf] .shelf-screen:has(.shelf-viewport[data-shelf-view=carousel]) .hero.strip-mode{margin-top:0}
+
+/* #1366 ③ 회전 보기: 카드(표지+이름표) 전체가 레일 안에 들어오도록 높이를 미리 예약한다. */
+html[data-v41-screen=shelf] .shelf-screen:has(.hero.strip-mode) .shelf-viewport[data-shelf-view=carousel] .shelf-rail{height:320px}
+@media(max-width:700px){
+  html[data-v41-screen=shelf] .shelf-screen:has(.hero.strip-mode) .shelf-viewport[data-shelf-view=carousel] .shelf-rail{height:270px}
+}
+/* #1366 ④ 회전 보기에는 갈색 막대를 두지 않는다. 선반 보기는 아래 한 줄만 고정하고 카드마다 붙던 막대는 없앤다. */
+html[data-v41-screen=shelf] .shelf-viewport[data-shelf-view=carousel] .shelf-base{opacity:0}
+html[data-v41-screen=shelf] .shelf-viewport[data-shelf-view=shelf] .book-card::after{display:none}
+/* #1366 ⑤ 사진 표지 위 이름 띠 — 역할 변수만 쓴다. */
+html[data-v41-screen=shelf] .cover-name-band{
+  position:absolute;left:0;right:0;bottom:0;z-index:4;display:block;padding:7px 8px;
+  background:var(--lt-role-bg);color:var(--lt-role-text-strong);
+  font:700 11px/1.3 var(--lt-ui);text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis
+}
+/* #1366 ⑦ 빈 자리는 하나만, 작고 덜 띄게. 누르면 새 트리를 만든다. */
+html[data-v41-screen=shelf] .shelf-empty-slot{
+  position:absolute;left:50%;top:50%;width:104px;height:156px;margin:-78px 0 0 -52px;
+  display:grid;place-items:center;border:1px dashed var(--lt-role-line);border-radius:var(--lt-r-card);
+  background:var(--lt-role-bg);color:var(--lt-role-text-muted);font-size:12px;
+  transform:translate3d(var(--x,0px),0,0);pointer-events:auto;cursor:pointer
+}
+html[data-v41-screen=shelf] .shelf-viewport[data-shelf-view=shelf] .shelf-empty-slot{
+  position:relative;left:auto;top:auto;width:104px;height:156px;min-height:0;margin:0 auto;
+  transform:none;aspect-ratio:auto;align-self:end
+}

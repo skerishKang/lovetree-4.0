@@ -779,6 +779,7 @@
   function layoutNetwork() {
     NETFIT = LT56Model.networkLayout(LTDEMO.moments, {
       box: BOX,
+      viewportWidth: vw,
       dotR: 5,
       firstR: 20,
       gap: 8,
@@ -1315,6 +1316,8 @@
     const v = $('ltViewer');
     v.classList.add('open');
     v.setAttribute('aria-hidden', 'false');
+    // #1298: 크게 보기는 기록에 넣는다 — 뒤로 가기 한 번에 상세 판으로 돌아온다.
+    try { history.pushState({ lt56Viewer: true }, ''); } catch {}
     $('closeViewer').focus();
     const raw = LTDEMO.moments.find(moment => moment.id === n.id);
     const source = raw?.url || raw?.externalUrl || '';
@@ -1356,6 +1359,10 @@
     v.setAttribute('aria-hidden', 'true');
     $('detailOpen').focus();
   }
+  // #1298: 크게 보기 기록을 뒤로 가기로 되돌리면 상세 판은 그대로 두고 창만 닫는다.
+  addEventListener('popstate', () => {
+    if ($('ltViewer')?.classList.contains('open')) closeViewer();
+  });
   // #1378: 좁은 상세 판에는 썸네일과 재생 표시만 둡니다.
   // 공용 미디어의 document 캡처 리스너보다 먼저 받아 카드 안 iframe 생성을 막습니다.
   window.addEventListener('click', event => {
@@ -2741,6 +2748,11 @@
     })),
     edgeKinds: edges.reduce((a, e) => ((a[e.kind] = (a[e.kind] || 0) + 1), a), {})
   };
+  // 정보판의 최근 순간도 지도에서 쓰는 선택/상세 열기 함수로 처리한다.
+  addEventListener('lt-wide-open-moment', e => {
+    const node = byId[e.detail?.id];
+    if (node?.kind === 'moment') selectMoment(node, true);
+  });
   window.__lt = {
     edgeLen: () =>
       edges

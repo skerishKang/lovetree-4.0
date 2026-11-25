@@ -243,6 +243,12 @@ window.LT56Model = (() => {
   // ③ 점 반지름은 가장 가까운 이웃·묶음 점과 겹치지 않을 만큼만(최대 dotR). 첫 순간은 고리까지 firstR로 본다.
   // opts.candidates는 나중에 AI가 제안하는 흐린 후보 점이 들어올 자리(이슈 #366 기록) — 지금은 받기만 한다.
   function networkLayout(moments, opts = {}) {
+    // 전달받은 실제 화면 폭에 따라 다시 계산한다. 컴팩트 지도는 그대로 둔다.
+    const width = Number(opts.viewportWidth) || 0;
+    if (width >= 1200 && moments.length > 8 && opts.box) {
+      const grow = Math.min(72, opts.box.w * .045);
+      opts = { ...opts, box: { ...opts.box, x: opts.box.x - grow, w: opts.box.w + grow * 2 } };
+    }
     void opts.candidates;
     const box = opts.box || { x: 0, y: 0, w: opts.width || 1200, h: opts.height || 800 };
     // #601: 묶음은 감정별(opts.groups — 순간 id 배열의 배열)이다. 없으면(옛 부름) 예전처럼 순서대로 7개씩 자른다.

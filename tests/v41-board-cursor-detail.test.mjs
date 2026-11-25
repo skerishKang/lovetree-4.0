@@ -112,6 +112,10 @@ async function openShellBoard(browser, base, { width = 1440, height = 900 } = {}
   const context = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
   await context.addInitScript(() => localStorage.setItem('lt41.tips.firstTree', '1'));
   const page = await context.newPage();
+  if (process.env.LT_BOARD_CPU_RATE) {
+    const cdp = await context.newCDPSession(page);
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: Number(process.env.LT_BOARD_CPU_RATE) });
+  }
   const errors = [];
   page.on('pageerror', error => errors.push(String(error.message || error)));
   page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
@@ -308,7 +312,7 @@ test('6. 화면: 판 제목(기억 보드·설명 줄)은 무대 밖 고정 머�
   const { context, page, frame, problems } = await openHost(browser, `http://127.0.0.1:${server.address().port}/host.html`);
   assert.deepEqual(problems, [], '화면 오류 없음: ' + problems.join(' | '));
   // #1249: 보드 제목은 공통 도구 줄로 옮겼다 — 움직이는 판 밖 고정 제목의 왼쪽 여백을 같은 기준으로 잰다.
-  const left = () => frame.$eval('.lt-screen-toolbar .lt-toolbar-title', (el) => Math.round(el.getBoundingClientRect().left));
+  const left = () => frame.$eval('.lt-screen-toolbar .lt-toolbar-tree-choice', (el) => Math.round(el.getBoundingClientRect().left));
   // 처음 자리에서도, 전체 보기로 다시 맞춘 뒤에도 왼쪽 24px 안쪽에서 시작한다.
   assert.ok(await left() >= 24, `처음 자리 제목 왼편 ${(await left())}px — 24px 이상`);
   await frame.evaluate(() => fitAll(true));
@@ -367,10 +371,16 @@ test('9. 화면: 보드 순간 열기는 뒤로 가기 한 번에 이전 순간�
   const base = `http://127.0.0.1:${server.address().port}`;
   const { context, page, frame } = await openShellBoard(browser, base);
   t.after(async () => { await context.close(); await browser.close(); server.close(); });
+  const beforeHistory = await page.evaluate(() => history.length);
   await testBackNavigation(page, {
     frame,
     recorded: true,
-    action: () => frame.evaluate(() => selectMoment('m2', true))
+    action: async () => {
+      await frame.evaluate(() => selectMoment('m2', true));
+      // #1298: 선택 메시지는 셸이 비동기로 받아 기록을 늘린다 — 고정 대기 대신 실제 신호를 기다린다.
+      await frame.waitForSelector('#detail.open', { timeout: 5000 });
+      await page.waitForFunction(n => history.length > n, beforeHistory, { timeout: 5000 });
+    }
   });
 });
 
