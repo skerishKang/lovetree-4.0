@@ -148,7 +148,6 @@ function openHomeViewer(moment,opener=null){
   }).catch(()=>{if(sequence===viewerSequence)play.hidden=false;});
   addEventListener('message',event=>{if(sequence!==viewerSequence||!['https://www.youtube.com','https://www.youtube-nocookie.com'].includes(event.origin))return;
    let data=event.data;try{if(typeof data==='string')data=JSON.parse(data);}catch{return;}
-   if(event.source!==visual.querySelector('iframe')?.contentWindow)return;
     if(data?.event==='onError'&&[2,5,100,101,150,153].includes(Number(data.info)))showExternalOnly();
   },{signal:viewerSignal.signal});
  }
