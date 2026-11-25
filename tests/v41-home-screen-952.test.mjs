@@ -492,6 +492,7 @@ test('#1087 390 새 소식 띠와 숫자 두 줄 겹침 0', { skip: REQUIRE952 ?
           return { theme: localStorage.getItem('lt41.theme'), bandTop: Math.round(band.top), bandBottom: Math.round(band.bottom), rows, overlaps: rows.map(area), links: area(links) };
         });
         console.log('#1087 BAND', JSON.stringify(geo));
+        if(process.env.LT_1284_BAND_CAPTURE_DIR)await h.page.screenshot({path:`${process.env.LT_1284_BAND_CAPTURE_DIR}/band-${theme}-390.png`,animations:'disabled'});
         assert.ok(geo.rows.length >= 2, '두 줄 숫자가 실제로 그려진다: ' + JSON.stringify(geo));
         assert.ok(geo.overlaps.every(v => Math.round(v) === 0), '띠와 숫자 두 줄 겹침 0: ' + JSON.stringify(geo));
         assert.equal(Math.round(geo.links), 0, '띠와 바닥 링크 겹침 0: ' + JSON.stringify(geo));
@@ -517,9 +518,12 @@ test('#1088 가운데 카드 누름은 화면 이동 없이 크게 보기를 연
       await h.page.evaluate(() => { window.__nav1088 = []; addEventListener('message', e => { if (['lt41-navigate', 'lt41-community', 'lt41-cleanup'].includes(e.data?.type)) window.__nav1088.push(e.data.type); }); });
       const hashBefore = await h.page.evaluate(() => location.hash);
       const viewer = frame.locator('#mediaViewerHome');
-      const open = async () => { await frame.locator('.recent-play').click(); await viewer.waitFor({ state: 'visible', timeout: 5000 }); };
+      const open = async () => { await frame.locator('.recent-meta strong').click(); await viewer.waitFor({ state: 'visible', timeout: 5000 }); };
       await open();
       assert.equal(await viewer.getAttribute('aria-hidden'), 'false', '크게 보기 열림');
+      assert.equal(await frame.evaluate(() => document.querySelector('#orbit').shadowRoot.activeElement?.id || ''),'mediaCloseHome','설명 창 열면 닫기에 초점');
+      assert.equal(await frame.locator('#mediaVisualHome iframe').count(),0,'설명 창은 영상이 즉시 재생되지 않는다');
+      await frame.locator('#mediaPlayHome').click();
       const src = await frame.locator('#mediaVisualHome iframe').getAttribute('src');
       assert.match(src, /a1111111111/, '영상 id');
       assert.match(src, /autoplay=1/, '누름 안에서 재생 시작');
@@ -528,8 +532,7 @@ test('#1088 가운데 카드 누름은 화면 이동 없이 크게 보기를 연
       assert.ok(await h.page.evaluate(() => getComputedStyle(document.getElementById('updates-card')).display === 'none'), '열린 동안 아래 띠가 숨는다');
       assert.equal(await h.page.evaluate(() => location.hash), hashBefore, '주소 moved 0');
       assert.deepEqual(await h.page.evaluate(() => window.__nav1088), [], '화면 이동 요청 0');
-      const focusAfterOpen = await frame.evaluate(() => document.querySelector('#orbit').shadowRoot.activeElement?.id || '');
-      assert.equal(focusAfterOpen, 'mediaCloseHome', '열면 닫기 단추에 초점');
+
 
       await h.page.keyboard.press('Escape');
       assert.equal(await viewer.getAttribute('aria-hidden'), 'true', 'Esc로 닫힘');

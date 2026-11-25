@@ -93,9 +93,23 @@ export function createScreens(deps) {
 
   function showInFrame(url, title) {
     const active = $('view'), next = $('view-next');
+    // #1300: 공유 감상 진입은 안쪽 문서가 보이기 전까지 로딩 화면을 유지한다.
+    // 조기 완료 표시가 뒤로 가기와 iframe 교체를 경합시키지 않게 한다.
+    const shareLoading = getSource() === 'share';
+    if (shareLoading) $('empty').hidden = false;
+    const loadedInitial = frame => {
+      if (!shareLoading) return;
+      const finish = () => {
+        if (getSource() !== 'share' || frame !== $('view')) return;
+        try { if (frame.contentWindow.location.href !== url) { frame.addEventListener('load', finish, {once:true}); return; } } catch { return; }
+        $('empty').hidden = true;
+      };
+      frame.addEventListener('load', finish, {once:true});
+    };
     if (!next) {
       active.hidden = false;
       active.title = title;
+      loadedInitial(active);
       active.contentWindow.location.replace(url);
       return;
     }
@@ -108,6 +122,7 @@ export function createScreens(deps) {
       // #428: 이 자리는 곧바로 보이는 장이므로 초점 가드를 푼다(이전 hideFrames에서 막혔을 수 있다).
       setFrameFocusGuard(active, false);
       active.title = title;
+      loadedInitial(active);
       active.contentWindow.location.replace(url);
       return;
     }
@@ -123,6 +138,7 @@ export function createScreens(deps) {
       next.hidden = false;
       next.title = title;
       revealFrame(next);
+      if (shareLoading && getSource() === 'share') $('empty').hidden = true;
       applyTheme();
       if (!document.body.classList.contains('home-screen')) {
         next.classList.remove('lt-arrive');

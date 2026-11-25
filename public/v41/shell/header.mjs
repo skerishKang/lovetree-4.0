@@ -25,7 +25,7 @@ export function createHeader(deps) {
 
 function flowNavigation(){
   const owned=!!getMember()?.snapshot().owned;
-  const reading=!!window.LT41&&['track59-sketchbook.html','track58-pinboard.html','track56-network.html'].includes(getCurrent());
+  const reading=!!window.LT41&&['track61-tree.html','track59-sketchbook.html','track58-pinboard.html','track56-network.html'].includes(getCurrent());
   const publicReading=getSource()==='share';
   document.body.classList.toggle('share-visitor',publicReading);
   // 대표 결정(2026-11-23) + #1236: 서재·책·보드·지도 화면 탭은 로그인 여부·트리 개수와
@@ -89,7 +89,7 @@ function flowNavigation(){
   // #458: 모바일 떠 있는 ＋ 단추는 로그인한 내 기록(서버·쓰기 가능)에서만 뜬다. 공유·예시 화면·로그아웃·읽기 전용에서는 숨긴다.
   document.body.classList.toggle('lt-fab-ok',!$('write-menu').hidden&&getSource()==='server'&&owned);
   /* 이슈 458: 화면마다 아래쪽에 이미 있는 단추·탭 높이가 다르므로 화면별로 단추를 얼마나 올릴지 셸 CSS가 쓴다. */
-  document.body.dataset.fabLift={'track59-sketchbook.html':'book','track58-pinboard.html':'board','track56-network.html':'network','track32-bookshelf.html':'shelf'}[getCurrent()]||'';
+  document.body.dataset.fabLift={'track59-sketchbook.html':'book','track58-pinboard.html':'board','track56-network.html':'network','track61-tree.html':'tree','track32-bookshelf.html':'shelf'}[getCurrent()]||'';
   if(entryRoot?.dataset)delete entryRoot.dataset.ltHeaderPending;
   const phase=getMember()?.snapshot()?.phase;
   if(phase==='login'||phase==='synced')settleHeaderAuth(!!getMember()?.snapshot()?.owned);
@@ -123,6 +123,10 @@ function renderAccount(){
  if(visitor?.email&&!accountEmail)accountEmail=visitor.email;
  // #368 2차: 동그라미 글자는 표시 이름 첫 글자 → 이메일 첫 글자 → 나, 색은 계정 설정 칸의 고른 색(없으면 기본색).
  const prefs=(()=>{try{return getMember()?.state?.()?.prefs||{}}catch{return {}}})();
+ // #1320: 로그인 확인 중에는 '로그인' 글자를 보여 주지 않는다. 자리는 그대로 두어 옆 단추가 밀리지 않는다.
+ const checking=getMember()?.snapshot()?.phase==='checking'&&getSource()!=='share'&&!visitor;
+ const rootDataset=globalThis.document?.documentElement?.dataset;
+ if(rootDataset){if(checking)rootDataset.ltAuthChecking='1';else delete rootDataset.ltAuthChecking;}
  const view=accountPresentation({owned,email:accountEmail,name:prefs.displayName||deps.getCachedName?.()||''});
  const accent=owned?normalizeAccentColor(prefs.accentColor):'';
  const login=$('account-entry'),avatar=$('account-avatar');

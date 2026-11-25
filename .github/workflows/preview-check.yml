@@ -213,6 +213,15 @@ jobs:
           start=$(date +%s)
           node --test --test-concurrency=1 tests/v41-board-map-tree-title.test.mjs tests/v41-board-theme-flow.test.mjs
           echo "보드 트리 제목·판 테마 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+      # #1295: 트리 보기 뒤로 가기 시험(건너뜀=실패) — 화면 시험은 이 잡에서만 돌아야 한다.
+      - name: 트리 보기 뒤로 가기 시험(건너뜀=실패 — #1295)
+        env:
+          LT_TREE_777_REQUIRE: '1'
+        if: needs.screen-changes.outputs.changed == 'true'
+        run: |
+          start=$(date +%s)
+          node --test --test-concurrency=1 tests/v41-tree-layout-777.test.mjs
+          echo "트리 보기 뒤로 가기 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
       # #608: 보드 순간 수정 창에서 날짜를 바꾸는 시험 — 책과 같은 규칙·경로, 날짜순 재배치·내 배치 유지.
       # 크롬이 필요한 실행형 시험이라 이 잡에서 돈다. 건너뜀=실패.
       - name: 보드 날짜 수정 시험(건너뜀=실패 — #608)
@@ -362,7 +371,7 @@ jobs:
         run: |
           start=$(date +%s)
           npx vite build > /dev/null
-          node --test --test-concurrency=1 tests/v41-explore-moments-1025.test.mjs
+          node --test --test-concurrency=1 tests/v41-explore-moments-1025.test.mjs tests/v41-1286-moments.test.mjs
           echo "둘러보기 순간 보기 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
 
       # #631: 의견 보내기 창 — 1440×900 에서 스크롤 없이 들어오고, 체크 상자와 글자가 같은 줄이며,
@@ -384,6 +393,33 @@ jobs:
           if [ "${{ needs.screen-changes.outputs.changed }}" != "true" ]; then
             echo "건너뜀(화면 변경 없음)" | tee -a "$GITHUB_STEP_SUMMARY"
           fi
+
+  # #1284: 휴대폰 첫 화면 링크·쇼츠 카드·재생·막힌 동영상 회귀를 별도 검사한다.
+  screen-home-1284:
+    name: 화면 시험 — 첫 화면 휴대폰 #1284
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    needs: screen-changes
+    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || needs.screen-changes.outputs.jobs == '' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-home,'))
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          clean: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: 화면 시험 환경 준비
+        run: |
+          npm ci --no-audit --no-fund
+          npx playwright install --with-deps chromium
+          npm run build
+      - name: 첫 화면 휴대폰 12조합 회귀 시험
+        env:
+          LT_1284_REQUIRE: '1'
+        run: node --test --test-concurrency=1 tests/v41-1284-home.test.mjs
 
   screen-book:
     name: 화면 시험 — 책·감상
@@ -569,6 +605,7 @@ jobs:
       - name: 셸·설정·테마 화면 시험(건너뜀=실패 — 이슈 952)
         env:
           LT_SHELL_952_REQUIRE: '1'
+          LT_SHELL_1320_REQUIRE: '1'
         if: needs.screen-changes.outputs.changed == 'true'
         run: |
           start=$(date +%s)
@@ -696,6 +733,25 @@ jobs:
         timeout-minutes: 10
         run: |
           start=$(date +%s)
+          # APT mirror delays must not prevent the same Noto CJK font from being installed.
+          # Pin the upstream font revision; the APT path below remains as fallback.
+          # Upstream pinned revision: SHA-256 checked for both cached and downloaded copies.
+          noto_font="$HOME/.fonts/NotoSansCJK-Regular.ttc"
+          noto_sha256="b76b0433203017ca80401b2ee0dd69350349871c4b19d504c34dbdd80541690a"
+          if [ -f "$noto_font" ] && ! echo "$noto_sha256  $noto_font" | sha256sum --check --status; then
+            rm -f "$noto_font"
+          fi
+          if [ ! -f "$noto_font" ]; then
+            mkdir -p "$HOME/.fonts"
+            if curl -fLsS --retry 2 --connect-timeout 10 --max-time 90 "https://raw.githubusercontent.com/notofonts/noto-cjk/f8d157532fbfaeda587e826d4cd5b21a49186f7c/Sans/OTC/NotoSansCJK-Regular.ttc" -o "$noto_font"; then
+              if ! echo "$noto_sha256  $noto_font" | sha256sum --check --status; then
+                echo "Noto CJK checksum mismatch; falling back to APT"
+                rm -f "$noto_font"
+              fi
+            else
+              rm -f "$noto_font"
+            fi
+          fi
           if [ -f "$HOME/.fonts/NotoSansCJK-Regular.ttc" ]; then
             echo "캐시된 한글 글꼴 사용($(ls "$HOME/.fonts" | wc -l)개 파일)"
           else
@@ -784,6 +840,25 @@ jobs:
         timeout-minutes: 10
         run: |
           start=$(date +%s)
+          # APT mirror delays must not prevent the same Noto CJK font from being installed.
+          # Pin the upstream font revision; the APT path below remains as fallback.
+          # Upstream pinned revision: SHA-256 checked for both cached and downloaded copies.
+          noto_font="$HOME/.fonts/NotoSansCJK-Regular.ttc"
+          noto_sha256="b76b0433203017ca80401b2ee0dd69350349871c4b19d504c34dbdd80541690a"
+          if [ -f "$noto_font" ] && ! echo "$noto_sha256  $noto_font" | sha256sum --check --status; then
+            rm -f "$noto_font"
+          fi
+          if [ ! -f "$noto_font" ]; then
+            mkdir -p "$HOME/.fonts"
+            if curl -fLsS --retry 2 --connect-timeout 10 --max-time 90 "https://raw.githubusercontent.com/notofonts/noto-cjk/f8d157532fbfaeda587e826d4cd5b21a49186f7c/Sans/OTC/NotoSansCJK-Regular.ttc" -o "$noto_font"; then
+              if ! echo "$noto_sha256  $noto_font" | sha256sum --check --status; then
+                echo "Noto CJK checksum mismatch; falling back to APT"
+                rm -f "$noto_font"
+              fi
+            else
+              rm -f "$noto_font"
+            fi
+          fi
           if [ -f "$HOME/.fonts/NotoSansCJK-Regular.ttc" ]; then
             echo "캐시된 한글 글꼴 사용($(ls "$HOME/.fonts" | wc -l)개 파일)"
           else
@@ -872,6 +947,25 @@ jobs:
         timeout-minutes: 10
         run: |
           start=$(date +%s)
+          # APT mirror delays must not prevent the same Noto CJK font from being installed.
+          # Pin the upstream font revision; the APT path below remains as fallback.
+          # Upstream pinned revision: SHA-256 checked for both cached and downloaded copies.
+          noto_font="$HOME/.fonts/NotoSansCJK-Regular.ttc"
+          noto_sha256="b76b0433203017ca80401b2ee0dd69350349871c4b19d504c34dbdd80541690a"
+          if [ -f "$noto_font" ] && ! echo "$noto_sha256  $noto_font" | sha256sum --check --status; then
+            rm -f "$noto_font"
+          fi
+          if [ ! -f "$noto_font" ]; then
+            mkdir -p "$HOME/.fonts"
+            if curl -fLsS --retry 2 --connect-timeout 10 --max-time 90 "https://raw.githubusercontent.com/notofonts/noto-cjk/f8d157532fbfaeda587e826d4cd5b21a49186f7c/Sans/OTC/NotoSansCJK-Regular.ttc" -o "$noto_font"; then
+              if ! echo "$noto_sha256  $noto_font" | sha256sum --check --status; then
+                echo "Noto CJK checksum mismatch; falling back to APT"
+                rm -f "$noto_font"
+              fi
+            else
+              rm -f "$noto_font"
+            fi
+          fi
           if [ -f "$HOME/.fonts/NotoSansCJK-Regular.ttc" ]; then
             echo "캐시된 한글 글꼴 사용($(ls "$HOME/.fonts" | wc -l)개 파일)"
           else
@@ -1015,6 +1109,25 @@ jobs:
         run: |
           start=$(date +%s)
           # 두 갈래만 둔다(실행기마다 글꼴 구성이 달라 fc-list로 판단하면 캐시를 채울 기회를 놓친다 — 실측).
+          # APT mirror delays must not prevent the same Noto CJK font from being installed.
+          # Pin the upstream font revision; the APT path below remains as fallback.
+          # Upstream pinned revision: SHA-256 checked for both cached and downloaded copies.
+          noto_font="$HOME/.fonts/NotoSansCJK-Regular.ttc"
+          noto_sha256="b76b0433203017ca80401b2ee0dd69350349871c4b19d504c34dbdd80541690a"
+          if [ -f "$noto_font" ] && ! echo "$noto_sha256  $noto_font" | sha256sum --check --status; then
+            rm -f "$noto_font"
+          fi
+          if [ ! -f "$noto_font" ]; then
+            mkdir -p "$HOME/.fonts"
+            if curl -fLsS --retry 2 --connect-timeout 10 --max-time 90 "https://raw.githubusercontent.com/notofonts/noto-cjk/f8d157532fbfaeda587e826d4cd5b21a49186f7c/Sans/OTC/NotoSansCJK-Regular.ttc" -o "$noto_font"; then
+              if ! echo "$noto_sha256  $noto_font" | sha256sum --check --status; then
+                echo "Noto CJK checksum mismatch; falling back to APT"
+                rm -f "$noto_font"
+              fi
+            else
+              rm -f "$noto_font"
+            fi
+          fi
           if [ -f "$HOME/.fonts/NotoSansCJK-Regular.ttc" ]; then
             echo "캐시된 한글 글꼴 사용($(ls "$HOME/.fonts" | wc -l)개 파일)"
           else
@@ -1133,6 +1246,25 @@ jobs:
         run: |
           start=$(date +%s)
           # 두 갈래만 둔다(실행기마다 글꼴 구성이 달라 fc-list로 판단하면 캐시를 채울 기회를 놓친다 — 실측).
+          # APT mirror delays must not prevent the same Noto CJK font from being installed.
+          # Pin the upstream font revision; the APT path below remains as fallback.
+          # Upstream pinned revision: SHA-256 checked for both cached and downloaded copies.
+          noto_font="$HOME/.fonts/NotoSansCJK-Regular.ttc"
+          noto_sha256="b76b0433203017ca80401b2ee0dd69350349871c4b19d504c34dbdd80541690a"
+          if [ -f "$noto_font" ] && ! echo "$noto_sha256  $noto_font" | sha256sum --check --status; then
+            rm -f "$noto_font"
+          fi
+          if [ ! -f "$noto_font" ]; then
+            mkdir -p "$HOME/.fonts"
+            if curl -fLsS --retry 2 --connect-timeout 10 --max-time 90 "https://raw.githubusercontent.com/notofonts/noto-cjk/f8d157532fbfaeda587e826d4cd5b21a49186f7c/Sans/OTC/NotoSansCJK-Regular.ttc" -o "$noto_font"; then
+              if ! echo "$noto_sha256  $noto_font" | sha256sum --check --status; then
+                echo "Noto CJK checksum mismatch; falling back to APT"
+                rm -f "$noto_font"
+              fi
+            else
+              rm -f "$noto_font"
+            fi
+          fi
           if [ -f "$HOME/.fonts/NotoSansCJK-Regular.ttc" ]; then
             echo "캐시된 한글 글꼴 사용($(ls "$HOME/.fonts" | wc -l)개 파일)"
           else

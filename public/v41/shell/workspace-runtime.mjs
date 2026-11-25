@@ -24,7 +24,7 @@ export function createWorkspaceRuntime(ctx){
   // #380 5번: '정리하기' 입구는 트리 ▾ 드롭다운 한 곳에서만 그린다(renderTreeMenu). 헤더 단추는 없앴다.
   function viewContext(){}
 
-  function choose(id,momentId,skipShow=false){const tree=ctx.model.trees.find(t=>t.id===id);window.LT41=tree?{tree,trees:ctx.model.trees,source:ctx.source,momentId:tree.moments.find(m=>m.id===momentId)?.id||tree.moments.find(m=>m.parentId===null)?.id||tree.moments[0]?.id,prefs:(0,ctx.currentPrefs)(),writable:ctx.source==='server'&&!!ctx.member?.snapshot().writable,}:null;
+  function choose(id,momentId,skipShow=false){const tree=ctx.model.trees.find(t=>t.id===id);if(skipShow&&window.LT41?.tree?.id===tree?.id){window.LT41.momentId=tree.moments.find(m=>m.id===momentId)?.id||tree.moments.find(m=>m.parentId===null)?.id||tree.moments[0]?.id;window.LT41.prefs=(0,ctx.currentPrefs)();window.LT41.writable=ctx.source==='server'&&!!ctx.member?.snapshot().writable;return;}window.LT41=tree?{tree,trees:ctx.model.trees,source:ctx.source,momentId:tree.moments.find(m=>m.id===momentId)?.id||tree.moments.find(m=>m.parentId===null)?.id||tree.moments[0]?.id,prefs:(0,ctx.currentPrefs)(),writable:ctx.source==='server'&&!!ctx.member?.snapshot().writable,}:null;
     if(!skipShow&&(tree||ctx.current==='src064-orbit.html'))show(ctx.current,false,id||'');
    else if(!skipShow||!tree){(0,ctx.flowNavigation)();document.body.classList.remove('home-screen');hideFrames();
     // 261118 대표 결정: 트리 0개 계정이 주소(#my/shelf 등)로 바로 들어와도 그 화면의 빈 상태(#817)를 보여 준다 —
@@ -41,7 +41,7 @@ export function createWorkspaceRuntime(ctx){
     if(shelf&&owned)empty.dataset.emptyView='shelf';else delete empty.dataset.emptyView;
     if(!owned){
       // 2026-11-23: 로그아웃 탭은 예시 트리 대신 보드와 같은 빈 상태를 보여 준다.
-      const name=({'track32-bookshelf.html':'서재','track59-sketchbook.html':'책','track58-pinboard.html':'보드','track56-network.html':'지도','track60-graph.html':'지도'})[file]||'기록';
+      const name=({'track32-bookshelf.html':'서재','track61-tree.html':'트리','track59-sketchbook.html':'책','track58-pinboard.html':'보드','track56-network.html':'지도','track60-graph.html':'지도'})[file]||'기록';
       empty.dataset.emptyGuest='1';
       empty.querySelector('h1').textContent=`로그인하면 내 ${name}${name==='책'?'이':'가'} 보여요`;
       empty.querySelector('p').textContent='로그인한 계정의 기록을 이 화면에서 볼 수 있어요.';

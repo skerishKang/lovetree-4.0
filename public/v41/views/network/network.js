@@ -826,7 +826,8 @@
     }
   }
   function layoutTime() {
-    TIMEFIT = LT56Model.timeLayout(LTDEMO.moments, { box: BOX, dotR: 5, gap: 8, hubR: 9 });
+    // #1273 3번: 첫 순간의 겹친 고리(반지름 약 48px)와 마지막 이름표가 화면 밖으로 나가지 않게 양끝 여백을 둔다.
+    TIMEFIT = LT56Model.timeLayout(LTDEMO.moments, { box: BOX, dotR: 5, gap: 8, hubR: 9, inset: 64 });
   }
   function paintTagEmpty() {
     const el = $('tagEmpty');
@@ -872,7 +873,8 @@
     canvas.style.width = vw + 'px';
     canvas.style.height = vh + 'px';
     state.mobile = vw <= 640;
-    BOX = LT56Model.fitBox(vw, vh, measureInsets(), 16);
+    // #1273 3번: 넓은 화면에서는 그림판 바깥 여백을 줄여 빈 공간을 줄인다(좁은 화면은 그대로).
+    BOX = LT56Model.fitBox(vw, vh, measureInsets(), vw >= 1200 ? 8 : 16);
     layoutNetwork();
     layoutTag();
     layoutTime();
@@ -986,7 +988,8 @@
   };
   function paintHero() {
     const p = document.querySelector('.hero p');
-    if (p) p.textContent = HERO_LINES[state.view] || HERO_LINES.network;
+    // #1285 4번: 시간 순에서는 가운데 줄에서 떨어진 '여기서 시작'을 제목 줄로 옮긴다.
+    if (p) p.textContent = state.view === 'time' ? `여기서 시작 · ${HERO_LINES.time}` : (HERO_LINES[state.view] || HERO_LINES.network);
   }
   function setView(v) {
     v = normView(v);
@@ -1900,14 +1903,15 @@
       const full = state.selected?.id === n.id;
       push(
         n,
-        n.first
+        n.first && state.view !== 'time'
           ? `여기서 시작 · ${full ? t : LT56Model.shortTitle(t, max)}`
           : full
             ? t
             : fitLabel(t),
         p,
         dotRadius(n) + (n.first ? 9 : 0),
-        dirOf(p, centerOf(n))
+        // #1273 3번: 시작 이름표는 선 위에 얹히지 않도록 위쪽 자리를 먼저 고른다.
+        n.first ? { x: 0, y: -1 } : dirOf(p, centerOf(n))
       );
     }
     if (state.view === 'network')
@@ -2157,7 +2161,8 @@
     drawRings();
     drawTimeLine();
     edges.forEach(drawEdge);
-    if (state.view === 'tag') TAG_CLUSTERS.forEach(drawHub);
+    // #1285 3번: 이름표가 없는 '아직 묶음에 안 든' 원은 그리지 않는다(범례·이름표와 같은 기준).
+    if (state.view === 'tag') TAG_CLUSTERS.filter((c) => !c.shelf).forEach(drawHub);
     else if (state.view === 'network') CLUSTERS.forEach(drawHub);
     if (state.view === 'network') {
       anchors.forEach(drawNode);

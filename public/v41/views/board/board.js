@@ -347,6 +347,7 @@ function placeStacked() {
 // 날짜순·내 배치 모두 쌓기 배치다(순서만 다르다). 전환·처음 열기·창 크기 변경이 함께 쓴다.
 function placeAll() {
   placeStacked();
+  updateEmptyHint();
 }
 // #619-6: 끼워 넣기 — 끄는 동안 자리를 보이기 위해 끌고 있는 카드를 뺀 나머지 카드를 현재 순서로 다시 쌓은 자리다.
 function insertCells(excludeId) {
@@ -751,6 +752,7 @@ function renderCards() {
   cardLayer.innerHTML = moments.map(cardHTML).join('');
   cardLayer.querySelectorAll('.card').forEach(el => bindCard(el));
   settlePlacedCards();
+  if (typeof updateEmptyHint === 'function') updateEmptyHint();
   if (selected) selectMoment(selected, false);
 }
 
@@ -763,7 +765,9 @@ function settlePlacedCards() {
     .filter(m => els.has(m.id))
     .map(m => ({ id: m.id, x: m.x, y: m.y, h: reservedHeights.get(m.id) || BASE_RESERVED_H }));
   // #619-6: 카드 전부가 쌓기 배치라서 저장 자리가 따로 없고, 전부 열 안에서 벌림 대상이다.
-  const moved = LT58Model.settleColumnGaps(list, new Set(moments.map(m => m.id)), 24);
+  // #1273 8번: 휴대폰에서는 같은 열의 빈 틈을 조금 줄인다(예약 높이 330px 기준은 그대로).
+  const narrow = typeof matchMedia === 'function' && matchMedia('(max-width: 640px)').matches;
+  const moved = LT58Model.settleColumnGaps(list, new Set(moments.map(m => m.id)), narrow ? 16 : 24);
   let changed = false;
   for (const m of moments) {
     const y = moved.get(m.id);
@@ -798,6 +802,7 @@ viewport.addEventListener('scroll', () => {
 }, { passive: true });
 function applyView(animated = false) {
   growBoard();
+  updateEmptyHint();
   const scroll = mobileBoardScroll();
   const space = $('#boardScrollSpace');
   viewport.classList.toggle('board-scroll', scroll);
@@ -848,6 +853,38 @@ function boardCards() {
     let el = cardLayer.querySelector(`[data-id="${m.id}"]`);
     return { id: m.id, x: m.x, y: m.y, w: el?.offsetWidth || 242, h: el?.offsetHeight || 260 };
   });
+}
+// #1321: 카드 묶음 아래 빈 판이 240px 이상일 때만 점선 자리를 보여 준다.
+// 판 높이는 그대로 두고, 자리 표시는 얹기만 한다. 쓰기 가능·넓은 화면·시네마 밖에서만 쓴다.
+function updateEmptyHint() {
+  // 카드를 다시 그리면 안내도 함께 지워진다 — 그릴 때마다 다시 붙인다.
+  let emptyHint = document.getElementById('boardEmptyHint');
+  if (!emptyHint) {
+    emptyHint = document.createElement('div');
+    emptyHint.id = 'boardEmptyHint';
+    emptyHint.className = 'board-empty-hint';
+    emptyHint.setAttribute('aria-hidden', 'true');
+    emptyHint.innerHTML = '<span>순간을 끌어 여기에 놓아 보세요</span>';
+    emptyHint.hidden = true;
+    cardLayer.appendChild(emptyHint);
+  }
+  if (!boardSaveEnabled() || mobileBoardScroll() || cinema || !moments.length) {
+    emptyHint.hidden = true;
+    return;
+  }
+  const cards = boardCards();
+  if (!cards.length) { emptyHint.hidden = true; return; }
+  const left = Math.min(...cards.map((c) => c.x));
+  const right = Math.max(...cards.map((c) => c.x + c.w));
+  const bottom = Math.max(...cards.map((c) => c.y + c.h));
+  // 무대 안쪽 여백 48px는 CSS의 .surface inset과 같은 값이다(새 상수를 만들지 않는다).
+  const free = worldSize.h - 48 - bottom - 24;
+  if (free < 240) { emptyHint.hidden = true; return; }
+  emptyHint.hidden = false;
+  emptyHint.style.left = left + 'px';
+  emptyHint.style.top = bottom + 24 + 'px';
+  emptyHint.style.width = Math.max(520, right - left) + 'px';
+  emptyHint.style.height = Math.min(free, 320) + 'px';
 }
 // 보이는 칸: 왼쪽 도구 창·오른쪽 상세 창(열려 있거나 곧 열릴 때)을 뺀 자리. 좁은 화면(760 미만)은 두 창이 아래에서 올라오므로 빼지 않는다.
 function boardSafeArea(expectDetail = false) {
@@ -1179,6 +1216,8 @@ function selectMoment(id, open = true) {
   }
 }
 
+// #1273 9번: 안내 시간은 공통 타이머 한 벌에서 잰다(단추 있음 8초 / 없음 2.2초, 올려 두면 멈춤).
+const toastTimer = window.LTToastTimer.createToastTimer();
 function toast(t) {
   dismissBoardOrderUndo();
   let el = $('#toast');
@@ -1186,22 +1225,21 @@ function toast(t) {
   delete el.dataset.boardOrderUndo;
   el.textContent = t;
   el.classList.add('show');
-  clearTimeout(toast.t);
-  toast.t = setTimeout(() => el.classList.remove('show'), 2200);
+  toastTimer.arm(el, window.LTToastTimer.PLAIN_TOAST_MS, () => el.classList.remove('show'));
 }
 // #662 후속(CTO 지시): 상세 판이 열리면 안내 풍선은 즉시 치운다 — 안내는 '순간을 선택하라'는 뜻이라 이미 선택해
 // 판이 열렸으면 필요 없고, 넓은 판에서는 풍선 자리가 판 안쪽('이어진 순간' 줄)과 포개진다. 다른 풍선(마음 저장 등)은 그대로 뜬다.
 function hideToast() {
   dismissBoardOrderUndo();
   const el = $('#toast');
-  clearTimeout(toast.t);
+  toastTimer.cancel();
   el.classList.remove('show');
 }
 function dismissBoardOrderUndo() {
   const active = activeBoardOrderUndo;
   if (!active) return;
   activeBoardOrderUndo = null;
-  clearTimeout(toast.t);
+  toastTimer.cancel();
   const el = $('#toast');
   if (el?.dataset.boardOrderUndo === active.token) {
     delete el.dataset.boardOrderUndo;
@@ -1225,11 +1263,10 @@ function showBoardOrderUndo({ before, snapshot: undoSnapshot }) {
   el.dataset.boardOrderUndo = action.token;
   el.classList.add('boardOrderToast', 'show');
   activeBoardOrderUndo = action;
-  clearTimeout(toast.t);
-  toast.t = setTimeout(() => {
+  toastTimer.arm(el, window.LTToastTimer.ACTION_TOAST_MS, () => {
     if (activeBoardOrderUndo === action) dismissBoardOrderUndo();
     el.classList.remove('show');
-  }, 6000);
+  });
 }
 function undoBoardOrder(action) {
   if (activeBoardOrderUndo !== action) return;
@@ -1288,6 +1325,7 @@ function formFor(type) {
 
 function openAdd() {
   formFor(addType);
+  if (typeof pushBoardPanel === 'function') pushBoardPanel('add');
   $('#addModal').classList.add('open');
 }
 
@@ -1352,9 +1390,14 @@ function openViewer(id) {
     box.innerHTML = `<video src="${m.video}" poster="${m.asset}" controls autoplay muted playsinline class="viewerFitVideo"></video>`;
   else if (m.type === 'note') box.innerHTML = `<div class="viewerNoteQuote">“${esc(m.memo)}”</div>`;
   else box.innerHTML = `<img src="${m.asset}" alt="${esc(m.title)}" class="viewerFitImg">`;
-  $('#vMeta').innerHTML =
-    (_vi.sub ? '<div class="videoTitle">▶ ' + esc(_vi.sub) + '</div>' : '') +
-    `${esc(LTLabels.type(m.originalType || m.type))} · ${esc(dateText(m.date))} · ${esc(m.emotion)}<br>출처: ${esc(m.source)}${m.url ? `<br>URL: ${esc(m.url)}` : ''}<br>마음 한마디: ${esc(m.memo)}`;
+  $('#vMeta').innerHTML = window.viewerMetaHTML({
+    head: `${esc(LTLabels.type(m.originalType || m.type))} · ${esc(dateText(m.date))} · ${esc(m.emotion)}`,
+    source: esc(m.source),
+    url: m.url ? esc(m.url) : '',
+    keywords: (m.keywords || []).map((keyword) => esc(keyword)),
+    memo: esc(m.memo || ''),
+    mediaTitle: _vi.sub ? esc(_vi.sub) : ''
+  });
   $('#viewerModal').classList.add('open');
 }
 
@@ -1576,6 +1619,7 @@ $('#typeGrid').onclick = e => {
 $('#detailClose').onclick = () => {
   $('#detail').classList.remove('open');
   syncBoardPush();
+  if (window.parent !== window) parent.postMessage({ type: globalThis.LT41_MSG.boardDetail, open: false }, location.origin);
 };
 $('#openMoment').onclick = () => openViewer(selected);
 $('#closeViewer').onclick = () => {

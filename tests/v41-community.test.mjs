@@ -1,4 +1,4 @@
-import test from 'node:test';import assert from 'node:assert/strict';import {createCommunityApi} from '../public/v41/community-api.mjs';
+import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import {createCommunityApi} from '../public/v41/community-api.mjs';
 import {createProxy} from '../functions/_lib/proxy.js';
 test('community client uses fixed same-origin routes and idempotency headers',async()=>{
  const calls=[],fetchImpl=async(url,init={})=>{calls.push({url,init});return new Response(JSON.stringify(url.includes('/comments')?{comments:[]}:{items:[],stats:{},report:{}}),{headers:{'content-type':'application/json'}});},api=createCommunityApi({fetchImpl});
@@ -129,4 +129,17 @@ test('#792 ⑤ toggleStage: 성공하면 누름 상태와 3 미만 규칙 숫자
 
 test('#792 ⑤ 인기 무대 빈 안내는 한 곳에서 온다', () => {
   assert.equal(POPULAR_STAGE_EMPTY, '이번 주 인기 무대를 모으고 있어요');
+});
+
+test('#1273 7번 둘러보기: AI 명예회원 배지를 사람 회원과 구분한다(기존 토큰)', () => {
+  const panel = fs.readFileSync(new URL('../public/v41/community-panel.mjs', import.meta.url), 'utf8');
+  const moments = fs.readFileSync(new URL('../public/v41/community-moments.mjs', import.meta.url), 'utf8');
+  const shellCss = fs.readFileSync(new URL('../public/v41/shell.css', import.meta.url), 'utf8');
+  const momentsCss = fs.readFileSync(new URL('../public/v41/community.css', import.meta.url), 'utf8');
+  // #1330: 두 배지를 한 줄로 합쳐도 별 표식은 유지한다.
+  assert.match(panel, /✦ AI · [\s\S]{0,12}순간/, '트리 카드 배지에 별 표식');
+  assert.match(moments, /moments-ai','✦ AI 명예회원'/, '순간 카드 배지에 별 표식');
+  assert.match(shellCss, /community-cover-badge\.community-ai\{[^}]*var\(--lt-rose\)/, '카드 배지는 장미 토큰');
+  assert.match(momentsCss, /\.moments-ai\{[^}]*var\(--lt-rose\)/, '순간 배지도 장미 토큰');
+  assert.doesNotMatch(momentsCss, /\.moments-ai\{[^}]*var\(--lt-gold-line\)/, '사람 이름표와 같은 금색이 아니다');
 });

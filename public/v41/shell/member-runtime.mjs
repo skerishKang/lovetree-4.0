@@ -14,6 +14,7 @@ import {createNotifier, syncedNoticeText, newlyPublishedTrees, NOTICE_HIDE_MS} f
 import {normalizeTitleDisplay, normalizeAccentColor, normalizeDateStyle, normalizeStartPlace, normalizeShareView, normalizeHomeMoment, normalizeBookDisplay, normalizeShelfView, coverModeOf, normalizeCoverDesign} from "../domain.mjs";
 
 export function createMemberRuntime(ctx){
+  let memberCheckTimer = 0, checkingStill = false; // #1320: 확인이 5초를 넘겼을 때만 조용한 표시를 켠다.
   function memberStatus(status){
     ctx.shellIntake.flush();
     const failed=status.dirty&&['offline','rejected','conflict','login'].includes(status.phase);
@@ -77,8 +78,16 @@ export function createMemberRuntime(ctx){
     if(!status.actions.some(a=>a.name==='backup')){const b=document.createElement('button');b.textContent='현재 기록 백업';b.onclick=ctx.backup;(0,ctx.$)('save-actions').append(b);}
     }
    }
-   if(status.phase==='checking')(0,ctx.notify)('내 기록을 불러오고 있어요.');
-   else if(status.phase==='synced'){
+   // #1320: 배경 확인은 안내하지 않는다. 5초를 넘길 때만 머리줄에 조용한 점으로 알린다(글자 안내 아님).
+   if(status.phase==='checking'){
+    checkingStill=true;
+    if(!memberCheckTimer)memberCheckTimer=setTimeout(()=>{memberCheckTimer=0;if(checkingStill&&globalThis.document?.documentElement)globalThis.document.documentElement.dataset.ltAuthSlow='1';},5000);
+   }else{
+    checkingStill=false;
+    if(memberCheckTimer){clearTimeout(memberCheckTimer);memberCheckTimer=0;}
+    if(globalThis.document?.documentElement)delete globalThis.document.documentElement.dataset.ltAuthSlow;
+   }
+   if(status.phase==='synced'){
     // #984: 저장이 서버에서 확인되면(직전 미저장→synced) 열린 화면에 표지·이름 다시 그리기를 알린다.
     // 실패(rejected·offline·conflict·login)에서는 알리지 않는다 — 화면은 원래 표지를 그대로 두고 저장 안내 떠가 실패를 알린다.
     if(ctx.previousDirty){try{for(const f of (0,ctx.frames)())f.contentWindow?.postMessage({type:MSG.treesSaved},location.origin);}catch(error){report(error, '저장 알림 보내기');}}
@@ -87,7 +96,8 @@ export function createMemberRuntime(ctx){
     // 알림은 실패·오프라인·충돌(저장 안내 떠)과 사용자가 누른 큰 동작의 완료 확인만 띄운다.
     const momentCount=(ctx.model?.trees||[]).reduce((n,tree)=>n+((tree.moments||[]).length),0);
     // #1076: 서버 기록을 처음 불러왔을 때만 한 번 — 화면 이동·다시 띄우기로 오는 synced 상태에서는 띄우지 않는다.
-    if(!ctx.previousDirty){
+    // #1320: '불러왔어요' 안내는 없앤다. 남기는 것은 기록 0개 새 계정의 첫 순간 안내(#549)뿐이다.
+    if(!ctx.previousDirty&&status.writable&&momentCount===0){
      const text=syncedNoticeText({writable:status.writable,previousDirty:ctx.previousDirty,momentCount}),key='synced:'+String(ctx.member?.snapshot()?.subject||'session');
      // #952: 빈 첫 화면을 미리 열지 않으면 기록 응답이 새 소식 확인보다 앞설 수 있다.
      // 새 소식 띠가 줄에 들어온 뒤 안내를 올려야 먼저 보였다가 가려지는 일이 없다.

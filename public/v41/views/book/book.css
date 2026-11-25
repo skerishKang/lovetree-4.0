@@ -202,10 +202,14 @@ html[data-lt-theme=garden] .shelf-back:hover{background:var(--lt-glass-strong);b
 .detail-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:15px}
 .viewer{position:fixed;z-index:140;inset:0;display:grid;place-items:center;padding:20px;background:rgba(16,11,14,.78);backdrop-filter:blur(13px);opacity:0;pointer-events:none;transition:.2s}
 .viewer.open{opacity:1;pointer-events:auto}
-.viewer-card{width:min(840px,94vw);max-height:90vh;overflow:auto;padding:17px;background:#f3ecdf;color:#433a34;border-radius:17px;box-shadow:0 28px 60px rgba(0,0,0,.45)}
+.viewer-card{width:min(840px,94vw);max-height:90vh;overflow:auto;padding:17px;background:var(--lt-paper);color:var(--lt-ink);border-radius:17px;box-shadow:0 28px 60px rgba(0,0,0,.45)}
+/* #1285 8번: 밤에는 종이 대신 무대 토큰 — 밝은 흰 카드로 눈이 부시지 않게 한다. */
+html:not([data-lt-theme=garden]) .viewer-card{background:var(--lt-stage-2);color:var(--lt-pearl)}
 .viewer-top{display:flex;justify-content:flex-end}
 .viewer-top .close{background:#decfc2;color:#5b4943}
-.viewer-media{height:min(56vh,500px);display:grid;place-items:center;overflow:hidden;background:#e7ddcf;border-radius:10px}
+html:not([data-lt-theme=garden]) .viewer-top .close{background:var(--lt-glass-strong);color:var(--lt-pearl)}
+.viewer-media{height:min(56vh,500px);display:grid;place-items:center;overflow:hidden;background:var(--lt-paper);border-radius:10px}
+html:not([data-lt-theme=garden]) .viewer-media{background:var(--lt-stage)}
 .viewer-note{padding:10px;text-align:center}
 .viewer-link-card{padding:38px;font-family:var(--book-serif);font-size:24px;line-height:1.6;text-align:center}
 .viewer-link-meta{font:11px var(--ui-sans);color:#89776f}

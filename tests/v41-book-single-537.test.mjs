@@ -5,7 +5,7 @@
 import {shownFrameBox} from './helpers/visible-frame.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, mkdirSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
@@ -220,9 +220,30 @@ test('#537 실제 화면: 1440·390에서 한 장으로 끝까지 넘기면 모�
     }));
     assert.equal(phoneBtns.single, true, `폰 폭: 1장 단추가 보인다(${JSON.stringify(phoneBtns)})`);
     assert.equal(phoneBtns.double, true, `폰 폭: 2장 단추가 보인다(${JSON.stringify(phoneBtns)})`);
-    assert.equal(phoneBtns.doubleDisabled, true, '폰 폭: 2장은 비활성이다');
+    assert.equal(phoneBtns.doubleDisabled, false, '폰 폭: 2장 단추를 누를 수 있다');
     assert.equal(phoneBtns.cellsEqual, true, `폰 폭: 두 칸 크기가 같다(${JSON.stringify(phoneBtns)})`);
     const phoneWalk = await walkAll(phone.frame);
+    // #1287: mobile double view is a single history step; back restores the selected moment.
+    const beforeMobileSpread = await phone.frame.evaluate(() => ({
+      focus: window.LTDEMO.get(),
+      historyLength: history.length
+    }));
+    await phone.frame.locator('#doubleViewBtn').click();
+    await phone.page.waitForTimeout(250);
+    const openedMobileSpread = await phone.frame.evaluate(() => ({
+      view: window.__TRACK59__.getState().view,
+      historyLength: history.length
+    }));
+    assert.equal(openedMobileSpread.view, 'double', '휴대폰 2장은 펼친 책 보기');
+    assert.equal(openedMobileSpread.historyLength, beforeMobileSpread.historyLength + 1, '2장 진입은 기록 한 칸');
+    await phone.frame.evaluate(() => history.back());
+    await phone.page.waitForTimeout(250);
+    const returnedMobilePage = await phone.frame.evaluate(() => ({
+      view: window.__TRACK59__.getState().view,
+      focus: window.LTDEMO.get()
+    }));
+    assert.equal(returnedMobilePage.view, 'single', '뒤로 가기 뒤 한 장 복귀');
+    assert.equal(returnedMobilePage.focus, beforeMobileSpread.focus, '뒤로 가기 뒤 같은 순간');
     await phone.ctx.close();
     assert.equal(phoneGeom.state.shape, 'phone', '폰 폭은 휴대폰 모양');
     assert.deepEqual(phoneGeom.pages, { left: false, right: false, mobile: true }, '휴대폰 한 장은 mobile-page');
@@ -494,4 +515,151 @@ test('책 조작 버튼 히트박스는 44x44 이상이다(렌더링 ::after 터
     if (browser) await browser.close().catch(() => {});
     server.close();
   }
+});
+
+// #1287: mobile book controls, rotation choice, list mode and history are browser contracts.
+test('#1287 모바일 책 보기 제어와 가로 복귀', { skip: REQUIRE ? false : skip, timeout: 90000 }, async () => {
+  if (skip) assert.fail('화면 검사에 브라우저가 필요합니다: ' + skip);
+  const server = await serve(ROOT);
+  let browser;
+  try {
+    browser = await chromium.launch({ headless: true });
+    const env = await openBook(browser, 'http://127.0.0.1:' + server.address().port, 390, 844, 'single');
+    const { page, frame } = env;
+    const initial = await frame.evaluate(() => {
+      const rect = selector => document.querySelector(selector)?.getBoundingClientRect();
+      const a = rect('#book-display-inline [data-book-display=book]');
+      const b = rect('#book-display-inline [data-book-display=list]');
+      const title = document.querySelector('.lt-screen-toolbar-title');
+      const book = rect('#book');
+      const after = rect('#whyMargin');
+      return {
+        hit: [a,b].flatMap(r=>{const el=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);const owns=(x,y)=>el.contains(document.elementFromPoint(x,y));return [r.width,owns(r.x+r.width/2,r.top-3.5)&&owns(r.x+r.width/2,r.bottom+3.5)?r.height+8:0]}),
+        visual: [a?.height,b?.height],
+        titleHidden: !title || getComputedStyle(title).display === 'none',
+        gap: after && book ? after.top - book.bottom : -1,
+        focus: window.LTDEMO.get(),
+        mode: window.__TRACK59__.getState().view
+      };
+    });
+    assert.equal(initial.mode, 'single');
+    assert.ok(initial.hit.every(v => v >= 44), '책/목록 단추의 누름 영역 44px 이상');
+    assert.deepEqual(initial.visual,[36,36],'책·목록의 화면 높이 36px 유지');
+    assert.equal(initial.titleHidden, true, '휴대폰 도구 줄의 중복 제목 없음');
+    assert.ok(initial.gap >= 12, '책 면과 이어 보기 사이 간격 12px 이상: ' + initial.gap);
+    await frame.locator('#book-display-inline [data-book-display=list]').click();
+    assert.equal(await frame.evaluate(() => document.querySelector('#archivePanel').classList.contains('open')), true, '목록을 누르면 목록이 열린다');
+    assert.equal(await frame.getAttribute('#book-display-inline [data-book-display=list]', 'aria-checked'), 'true', '목록 선택 표시');
+    await frame.locator('#archiveClose').click();
+    assert.equal(await frame.getAttribute('#book-display-inline [data-book-display=book]', 'aria-checked'), 'true', '책 복귀 시 선택 표시');
+    await page.setViewportSize({width:844,height:390});
+    await page.waitForTimeout(200);
+    assert.equal(await frame.evaluate(() => window.__TRACK59__.getState().view), 'single', '휴대폰만 돌려도 자동 두 장으로 전환되지 않음');
+    await page.setViewportSize({width:390,height:844});
+    await frame.locator('#doubleViewBtn').click();
+    await page.waitForTimeout(250);
+    const opened = await frame.evaluate(() => ({
+      mode: window.__TRACK59__.getState().view,
+      full: document.fullscreenElement === document.querySelector('#bookWrap'),
+      hint: !document.querySelector('#book-rotate-hint')?.hidden
+    }));
+    assert.equal(opened.mode, 'double', '2장 단추로 펼침');
+    assert.ok(opened.full || opened.hint, '전체 화면 또는 가로 돌리기 안내');
+    await frame.locator('#mobile-spread-exit').click();
+    await page.waitForTimeout(250);
+    const back = await frame.evaluate(() => ({ mode:window.__TRACK59__.getState().view,focus:window.LTDEMO.get() }));
+    assert.equal(back.mode, 'single', '1장 복귀');
+    assert.equal(back.focus, initial.focus, '1장 복귀시 같은 순간');
+    await env.ctx.close();
+  } finally {
+    await browser?.close();
+    await new Promise(resolve => server.close(resolve));
+  }
+});
+import {expectNoHistoryGrowth,testBackNavigation} from './helpers/history-assert.mjs';
+
+test('#1291 책 판 열기와 옵션 전환의 뒤로 가기', {skip: REQUIRE ? false : skip,timeout:100000}, async()=>{
+ if(skip) assert.fail('실제 화면 시험을 건너뛸 수 없습니다: '+skip);
+ const server=await serve(ROOT);
+ let browser;
+ try {
+  browser=await chromium.launch({headless:true,args:['--disable-gpu']});
+  const shots=process.env.LT_BOOK_HISTORY_SHOTS||'';
+ if(shots)mkdirSync(shots,{recursive:true});
+ for(const [width,height] of [[390,844],[844,390],[1440,900]]){
+   const env=await openBook(browser,'http://127.0.0.1:'+server.address().port,width,height,'single');
+   const {frame,page}=env;
+   const snapshot=()=>frame.evaluate(()=>({
+    length:history.length,overlay:history.state?.ltBookOverlay||null,focus:window.LTDEMO.get(),page:window.__TRACK59__.getState().page,
+    archive:window.__TRACK59__.getState().archive,detail:window.__TRACK59__.getState().detail,
+    viewer:window.__TRACK59__.getState().viewer,scrollY:window.scrollY
+   }));
+   await testBackNavigation(page,{frame,recorded:false,action:()=>frame.evaluate(()=>window.__TRACK59__.setView('single'))});
+   if(shots)await page.screenshot({path:path.join(shots, `book-${width}-before.png`)});
+   const original=await snapshot();
+   await testBackNavigation(page,{frame,recorded:true,panels:['#archivePanel.open','#detail.open','#viewer.open','#branchModal.open'],action:()=>frame.evaluate(()=>window.__TRACK59__.openArchive())});
+   assert.equal((await snapshot()).page,original.page,'목차 뒤로 가기 쪽 복원');
+
+   const beforeDetail=await snapshot();
+   const id=await frame.evaluate(()=>window.__TRACK59__.getState().pageIds[0]);
+   await frame.evaluate(x=>window.__TRACK59__.showDetail(x),id);
+   assert.equal((await snapshot()).overlay,'detailSide','순간 자세히 한 칸');
+   await frame.evaluate(()=>document.querySelector('#openViewerBtn').click());
+   assert.equal((await snapshot()).overlay,'viewer','크게 보기 한 칸');
+   await frame.evaluate(()=>history.back());
+   await frame.waitForFunction(()=>!window.__TRACK59__.getState().viewer);
+   assert.equal(await frame.evaluate(()=>!!document.querySelector('#detailSide:not([hidden]),.page-detail')),true,'크게 보기 뒤로 가기는 순간 자세히로');
+   await frame.evaluate(()=>history.back());
+   await frame.waitForFunction(()=>!document.querySelector('#detailSide:not([hidden]),.page-detail'));
+   assert.equal((await snapshot()).page,beforeDetail.page,'순간 자세히 뒤로 가기 책 복귀');
+   await expectNoHistoryGrowth(frame,()=>frame.evaluate(()=>window.__TRACK59__.turnNext()),'일반 책장 넘김은 기록을 쌓지 않음');
+   await frame.waitForTimeout(600);
+   const beforeJump=await snapshot();
+   await frame.evaluate(()=>window.__TRACK59__.openArchive());
+   await frame.locator('#archiveList [data-jump="3"]').first().click();
+   await frame.waitForTimeout(750);
+   assert.equal((await snapshot()).page,3,'목록에서 다른 쪽으로 이동');
+   await frame.evaluate(()=>history.back());
+   await frame.waitForTimeout(750);
+   assert.equal((await snapshot()).page,beforeJump.page,'목록 점프 뒤로 가기 이전 쪽');
+
+   await env.ctx.close();
+   const actual=await openBook(browser,'http://127.0.0.1:'+server.address().port,width,height,'single');
+   const opts={frame:actual.frame,panels:['#detailSide:not([hidden])','.page-detail','#viewer.open','.lt-lightbox']};
+   await testBackNavigation(actual.page,{...opts,recorded:true,action:async()=>{
+    await actual.frame.evaluate(()=>{const id=document.querySelector('.moment[data-moment]')?.dataset.moment;window.__TRACK59__.showDetail(id)});
+    await actual.frame.waitForFunction(()=>!!document.querySelector('#detailSide:not([hidden]),.page-detail'));
+     if(shots)await actual.page.screenshot({path:path.join(shots,`book-${width}-detail-open.png`)});
+   }});
+   if(shots)await actual.page.screenshot({path:path.join(shots,`book-${width}-detail-back.png`)});
+   await actual.ctx.close();
+   const media=await openBook(browser,'http://127.0.0.1:'+server.address().port,width,height,'single');
+   await testBackNavigation(media.page,{frame:media.frame,panels:['.lt-lightbox'],recorded:true,action:async()=>{
+    await media.frame.evaluate(()=>{void LTMedia.openLightbox('https://www.youtube.com/watch?v=M7lc0UVf-VE','영상')});
+    await media.frame.waitForSelector('.lt-lightbox');
+     if(shots)await media.page.screenshot({path:path.join(shots,`book-${width}-media-open.png`)});
+   }});
+   if(shots)await media.page.screenshot({path:path.join(shots,`book-${width}-media-back.png`)});
+   await media.ctx.close();
+   const overview=await openBook(browser,'http://127.0.0.1:'+server.address().port,width,height,'single');
+   await testBackNavigation(overview.page,{frame:overview.frame,recorded:true,panels:['#overview.open'],action:()=>overview.frame.evaluate(()=>window.__TRACK59__.openOverview())});
+   await overview.ctx.close();
+   if(width!==1440){
+    const mobile=await openBook(browser,'http://127.0.0.1:'+server.address().port,width,height,'single');
+    await testBackNavigation(mobile.page,{frame:mobile.frame,recorded:true,action:async()=>{
+     await mobile.frame.evaluate(()=>window.__TRACK59__.setView('double'));
+     await mobile.frame.waitForFunction(()=>window.__TRACK59__.getState().view==='double');
+    }});
+    await mobile.ctx.close();
+   }
+   const viewer=await openBook(browser,'http://127.0.0.1:'+server.address().port,width,height,'single');
+   await viewer.frame.evaluate(()=>{const id=document.querySelector('.moment[data-moment]')?.dataset.moment;window.__TRACK59__.showDetail(id)});
+   await testBackNavigation(viewer.page,{frame:viewer.frame,recorded:true,panels:['#detailSide:not([hidden])','.page-detail','#viewer.open'],action:async()=>viewer.frame.locator('[data-detail-viewer]:visible').first().click()});
+   await viewer.ctx.close();
+
+  }
+ }finally{
+  await browser?.close();
+  await new Promise(r=>server.close(r));
+ }
 });

@@ -202,12 +202,14 @@ if (cardLayer && !cardLayer.dataset.noNativeDrag) {
 const _renderCardsV1 = renderCards;
 renderCards = function () {
   cardLayer.innerHTML = moments.map(cardHTML).join('');
+  mobilePicker?.refresh?.();
   cardLayer.querySelectorAll('.card').forEach(el => bindCardV11(el));
   // #894: 카드 안의 그림·링크 기본 끌기를 막는다 — 끌기가 보드 밖(셸)으로 새어 나가 '놓으면 담아요' 판이 떴다.
   cardLayer.querySelectorAll('.card img,.card a').forEach(x => {
     x.draggable = false;
     x.setAttribute('draggable', 'false');
   });
+  if (typeof updateEmptyHint === 'function') updateEmptyHint();
   if (selected) selectMoment(selected, false);
   applyFilters();
   if (mobileBoardScroll() && viewport.classList.contains('board-scroll')) applyView(false);
@@ -285,6 +287,7 @@ function bindCardV11(el) {
     let m = moments.find(x => x.id === id),
       p = screenToWorld(e.clientX, e.clientY);
     drag = { id, dx: p.x - m.x, dy: p.y - m.y };
+    document.body.classList.add('board-hint-drag');
     down = { x: e.clientX, y: e.clientY };
     moved = false;
     el.classList.add('dragLift');
@@ -330,6 +333,8 @@ function bindCardV11(el) {
     if (drag?.id === id) {
       let m = moments.find(x => x.id === id);
       drag = null;
+      document.body.classList.remove('board-hint-drag');
+      if (typeof updateEmptyHint === 'function') updateEmptyHint();
       el.classList.remove('dragLift');
       el.classList.add('dropSettle');
       setTimeout(() => el.classList.remove('dropSettle'), 420);
@@ -362,6 +367,8 @@ function bindCardV11(el) {
   el.addEventListener('pointercancel', e => {
     if (drag?.id !== id) return;
     drag = null;
+    document.body.classList.remove('board-hint-drag');
+    if (typeof updateEmptyHint === 'function') updateEmptyHint();
     el.classList.remove('dragLift', 'dropSettle');
     el.releasePointerCapture?.(e.pointerId);
     clearInsertMark();
@@ -432,8 +439,11 @@ addEventListener('DOMContentLoaded', () => {
     globalThis.LT41Report?.report(e, '썸네일 대체 처리');
   }
 });
+let restoringBoardPanel = false;
 selectMoment = function (id, open = true) {
-  if (open) LTDEMO.select(id);
+  const previousState = { lt58View: { ...view }, lt58Scroll: { left: viewport.scrollLeft, top: viewport.scrollTop } };
+  if (!restoringBoardPanel) rememberBoardState();
+  if (open && !restoringBoardPanel) LTDEMO.select(id, previousState);
   selected = id;
   mobilePicker?.select(id);
   document
@@ -539,6 +549,78 @@ selectMoment = function (id, open = true) {
       );
   }
 };
+function rememberBoardState() {
+  try {
+    history.replaceState({
+      ...(history.state || {}),
+      lt58Board: true,
+      lt58MomentId: selected,
+      lt58View: { ...view },
+      lt58Scroll: { left: viewport.scrollLeft, top: viewport.scrollTop }
+    }, '');
+  } catch {}
+}
+function boardPanelState(name) {
+  return {
+    lt58Board: true,
+    lt58Panel: name,
+    lt41BoardDetail: $('#detail').classList.contains('open'),
+    lt58MomentId: selected,
+    lt58View: { ...view },
+    lt58Scroll: { left: viewport.scrollLeft, top: viewport.scrollTop },
+    lt58CinemaIndex: cinemaV11.active ? cinemaV11.index : null
+  };
+}
+function pushBoardPanel(name) {
+  const state = boardPanelState(name);
+  if (window.parent !== window && window.parent?.LT41_FRAME_MESSAGES) {
+    parent.postMessage({ type: globalThis.LT41_MSG.boardPanel, state }, location.origin);
+    return;
+  }
+  rememberBoardState();
+  try {
+    history.pushState(state, '');
+  } catch {}
+}
+function restoreBoardState(state) {
+  if (!state?.lt58Board) return;
+  restoringBoardPanel = true;
+  if (cinemaV11.active) endCinemaV11(false);
+  $('#viewerModal').classList.remove('open');
+  $('#viewerMedia video')?.pause();
+  $('#editModal').classList.remove('open');
+  $('#addModal').classList.remove('open');
+  $('#nextChooser').classList.remove('open');
+  $('#leftPanel').classList.remove('mobileOpen');
+  const id = state.lt58MomentId || selected;
+  if (moments.some(moment => moment.id === id)) {
+    if (state.lt41BoardDetail) selectMoment(id, true);
+    else {
+      $('#detail').classList.remove('open');
+      selectMoment(id, false);
+    }
+  }
+  if (state.lt58View) {
+    Object.assign(view, state.lt58View);
+    applyView(false);
+  }
+  requestAnimationFrame(() => {
+    viewport.scrollLeft = state.lt58Scroll?.left || 0;
+    viewport.scrollTop = state.lt58Scroll?.top || 0;
+    if (state.lt58Panel === 'cinema') {
+      startCinemaV11(0, state.lt58MomentId, false);
+      setCinemaPosition(state.lt58CinemaIndex || 0, 0);
+    }
+    restoringBoardPanel = false;
+  });
+}
+addEventListener('popstate', () => {
+  if (!window.parent?.LT41_FRAME_MESSAGES) restoreBoardState(history.state);
+});
+addEventListener('message', event => {
+  if (!globalThis.LT41_isShellMessage?.(event) || event.data?.type !== globalThis.LT41_MSG.boardRestore) return;
+  restoreBoardState({ lt58Board: true, lt58MomentId: event.data.momentId, lt41BoardDetail: event.data.detailOpen, lt58View: event.data.view, lt58Scroll: event.data.scroll, lt58Panel: event.data.panel, lt58CinemaIndex: event.data.cinemaIndex });
+});
 function connRow(c, dir) {
   const t = moments.find(x => x.id === (dir === 'next' ? c.b : c.a));
   return `<button type="button" class="connCard" data-cid="${c.id}" data-dir="${dir}">${connThumb(t)}<span class="connName">${esc(titleMain(t))}</span>${c.why && c.why !== '관련 순간' ? `<span class="connWhy">${esc(c.why)}</span>` : ''}</button>`;
@@ -602,6 +684,7 @@ function focusBoardMoment(id, open = true) {
   let m = moments.find(x => x.id === id),
     el = cardLayer.querySelector(`[data-id="${id}"]`);
   if (!m || !el) return;
+  const previousState = { lt58View: { ...view }, lt58Scroll: { left: viewport.scrollLeft, top: viewport.scrollTop } };
   let cx = m.x + el.offsetWidth / 2,
     cy = m.y + el.offsetHeight / 2,
     vw = viewport.clientWidth,
@@ -621,7 +704,7 @@ function focusBoardMoment(id, open = true) {
   view.y = vw < 700 ? topOffset - m.y * view.z : vh / 2 - cy * view.z;
   applyView(open);
   noteUserView();
-  if (!open) LTDEMO.select(id);
+  if (!open) LTDEMO.select(id, previousState);
   selectMoment(id, open);
 }
 function pulseConnection(c, after) {
@@ -666,6 +749,7 @@ function chooseNext(dir = 'next') {
       return `<button class="routeChoice" data-cid="${c.id}" data-dir="${dir}">${esc(titleMain(target))}<small>${esc(c.why)}</small></button>`;
     })
     .join('');
+  pushBoardPanel('chooser');
   $('#nextChooser').classList.add('open');
 }
 function closeChooser() {
@@ -741,8 +825,11 @@ $('#themeGrid').onclick = e => {
 $('#defaultPin').onchange = e => (defaultPinStyle = e.target.value);
 $('#defaultCard').onchange = e => (defaultCardStyle = e.target.value);
 $('#leftCollapse').onclick = () => {
-  if (innerWidth < 760) $('#leftPanel').classList.toggle('mobileOpen');
-  else $('#leftPanel').classList.toggle('collapsed');
+  if (innerWidth < 760) {
+    const open = !$('#leftPanel').classList.contains('mobileOpen');
+    $('#leftPanel').classList.toggle('mobileOpen', open);
+    if (open) pushBoardPanel('tools');
+  } else $('#leftPanel').classList.toggle('collapsed');
 };
 /* #891: 도구 줄의 '+ 순간 추가'는 뺐다 — 머리줄 단추(#addBtn) 한 벌만 둔다 */ $(
   '#toolCinema'
@@ -766,7 +853,7 @@ function keywordPickerHTML(prefix, selected = []) {
   /* #736: 켜진 칩은 저장 순서 그대로(고정·커스텀 섞여도 원래 순서) — 저장 때 순서도 보존된다. 고정 목록 나머지는 그 뒤에. */ const offFixed =
     LT_KEYWORDS.filter(k => !sel.includes(k));
   const btn = (k, on, custom) =>
-    `<button type="button" class="keywordBtn ${on ? 'on' : ''}${custom ? ' is-custom-tag' : ''}" data-key="${custom ? esc(k) : k}"${custom ? ` title="누르면 꼬리표를 뗀다"` : ''}>${custom ? esc(tagChipText(k)) : k}</button>`;
+    `<button type="button" class="keywordBtn ${on ? 'on' : ''}${custom ? ' is-custom-tag' : ''}" data-key="${custom ? esc(k) : k}"${custom ? ` aria-label="${esc(tagChipText(k))} · 누르면 꼬리표를 뗀다"` : ''}>${custom ? esc(tagChipText(k)) : k}</button>`;
   return `<div class="label keywordPickerLead">KEYWORDS · 다중선택</div><div class="keywordPicker" id="${prefix}KeywordPicker">${sel.map(k => btn(k, true, !LT_KEYWORDS.includes(k))).join('')}${offFixed.map(k => btn(k, false, false)).join('')}</div><div class="keywordAddRow"><input class="field" id="${prefix}CustomKeyword" placeholder="커스텀 키워드 추가" aria-label="새 꼬리표 추가"><button type="button" class="miniBtn keywordAddBtn" id="${prefix}AddKeyword">추가</button></div>`;
 }
 function styleFieldsHTML(prefix, m = {}) {
@@ -961,7 +1048,7 @@ function editMediaFields(m) {
     return `<div class="label">VIDEO</div><input class="field" id="editMediaFile" type="file" accept="video/*" aria-label="바꿀 영상 파일 고르기">`;
   if (m.type === 'link' || m.type === 'youtube')
     return `<div class="label">${m.type === 'youtube' ? 'VIDEO LINK / YOUTUBE' : 'LINK'}</div><input class="field" id="editUrl" value="${esc(m.url || '')}" aria-label="바꿀 링크 주소">`;
-  return `<div class="label">NOTE BODY</div><textarea class="field" id="editNoteBody" rows="4" aria-label="마음 한마디">${esc(m.memo)}</textarea>`;
+  return `<div class="label">마음 한마디</div><textarea class="field" id="editNoteBody" rows="4" aria-label="마음 한마디">${esc(m.memo)}</textarea>`;
 }
 let editBase = null,
   editTempAsset = null,
@@ -973,7 +1060,7 @@ function openEdit() {
   editBase = JSON.parse(JSON.stringify(m));
   removePhotoFlag = false;
   let f = $('#editFields');
-  f.innerHTML = `${editMediaFields(m)}<input class="field" id="editTitle" value="${esc(m.title)}" aria-label="순간 제목"><textarea class="field" id="editMemo" rows="3" aria-label="마음 한마디">${esc(m.memo)}</textarea>${styleFieldsHTML('edit', m)}<div class="editMetaNote">DATE · ${esc(m.date)} &nbsp; PRIVACY · ${esc(m.privacy || 'PRIVATE')}</div>`;
+  f.innerHTML = `${editMediaFields(m)}<input class="field" id="editTitle" value="${esc(m.title)}" aria-label="순간 제목"><textarea class="field" id="editMemo" rows="3" aria-label="마음 한마디">${esc(m.memo)}</textarea>${styleFieldsHTML('edit', m)}<div class="editMetaNote">날짜 · ${esc(m.date)} &nbsp; 공개 범위 · ${esc(m.privacy || '비공개')}</div>`;
   bindKeywordPicker('edit', updateEditPreview);
   f.querySelectorAll('input,textarea,select').forEach(x =>
     x.addEventListener('input', updateEditPreview)
@@ -1065,9 +1152,14 @@ openViewer = function (id) {
   else if (m.type === 'note') box.innerHTML = `<div class="viewerNoteQuote">“${esc(m.memo)}”</div>`;
   else
     box.innerHTML = `<img src="${m.type === 'youtube' ? youtubeThumb(m.url || '') : m.asset}" alt="${esc(_vi.main)}" data-fallback="${ASSET.link}" ${thumbRetryAttrs(m)} class="viewerFitImg">`;
-  $('#vMeta').innerHTML =
-    (_vi.sub ? '<div class="videoTitle">▶ ' + esc(_vi.sub) + '</div>' : '') +
-    `${esc(LTLabels.type(m.originalType || m.type))} · ${esc(dateText(m.date))} · ${esc(m.emotion)}<br>출처: ${esc(m.source)}${m.url ? `<br>URL: ${esc(m.url)}` : ''}<br>Keywords: ${(m.keywords || []).map(k => '#' + esc(k)).join(' ')}<br>마음 한마디: ${esc(m.memo)}`;
+  $('#vMeta').innerHTML = window.viewerMetaHTML({
+    head: `${esc(LTLabels.type(m.originalType || m.type))} · ${esc(dateText(m.date))} · ${esc(m.emotion)}`,
+    source: esc(m.source),
+    url: m.url ? esc(m.url) : '',
+    keywords: (m.keywords || []).map((keyword) => esc(keyword)),
+    memo: esc(m.memo || ''),
+    mediaTitle: _vi.sub ? esc(_vi.sub) : ''
+  });
   // #327 2부: 내 기록(서버)의 순간 보기에서 다른 트리로 옮기기. 공유·예시는 숨긴다.
   if (
     window.parent !== window &&
@@ -1206,7 +1298,8 @@ function cinemaTick(now) {
   }
   cinemaV11.raf = requestAnimationFrame(cinemaTick);
 }
-function startCinemaV11(fromIndex = 0, fromMoment = null) {
+function startCinemaV11(fromIndex = 0, fromMoment = null, record = true) {
+  if (record) pushBoardPanel('cinema');
   if (cinemaV11.active) {
     endCinemaV11(false);
   }
@@ -1275,7 +1368,7 @@ $('#enterBeat').onclick = () => {
     toast('Cinema의 이 장면에서 기억 보드로 들어왔어요.');
   }
 };
-$('#walkAgain').onclick = () => startCinemaV11(0, cinemaV11.fromMoment);
+$('#walkAgain').onclick = () => startCinemaV11(0, cinemaV11.fromMoment, false);
 $('#backBoard').onclick = () => endCinemaV11(true);
 $('#finalOpen').onclick = () => {
   let id = cinemaV11.focused;
@@ -1510,7 +1603,10 @@ function hideBoardTip() {
   const bubble = document.getElementById('lt-tip-bubble');
   if (bubble) bubble.hidden = true;
 }
+// #1288: 휴대폰에서는 올림·초점 말풍선을 띄우지 않고, 페이지로 돌아오면 남은 것을 감춘다.
+window.LTHoverTip.mountHoverTipGuard(document);
 document.addEventListener('mouseover', e => {
+  if (!window.LTHoverTip.isHoverDevice()) return;
   const el = e.target.closest?.('[data-lt-tip]');
   if (el) showBoardTip(el);
 });
@@ -1518,6 +1614,7 @@ document.addEventListener('mouseout', e => {
   if (tipTarget && (!e.relatedTarget || !tipTarget.contains(e.relatedTarget))) hideBoardTip();
 });
 document.addEventListener('focusin', e => {
+  if (!window.LTHoverTip.isHoverDevice()) return;
   const el = e.target.closest?.('[data-lt-tip]');
   if (el) showBoardTip(el);
 });

@@ -9,7 +9,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
-import { createReadStream } from 'node:fs';
+import { createReadStream, readFileSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -363,6 +363,35 @@ test('970 실행: 썸네일 — 영상·사진이 화면 안에 보인다(가짜
       await frame.evaluate(() => document.getElementById('viewerModal').classList.remove('open'));
       await context.close();
     }
+  } finally { await browser.close(); server.close(); }
+});
+
+test('#1273 8번 휴대폰 보드: 카드가 예약 칸을 더 채워 빈 틈을 줄인다(간격 기준은 그대로)', () => {
+  const js = readFileSync(new URL('../public/v41/views/board/board.js', import.meta.url), 'utf8');
+  assert.match(js, /narrow \? 16 : 24/, '좁은 화면에서만 벌림 간격을 줄인다');
+  assert.match(js, /BASE_RESERVED_H = 330/, '예약 높이 기준 330px은 그대로');
+});
+
+test('#1273 2번 화면: 크게 보기에 영어 라벨과 빈 한마디 줄이 없다', { skip, timeout: 180000 }, async () => {
+  if (skip) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip}`);
+  const tree = {
+    id: 'viewer', title: '뷰어 확인',
+    moments: [{ id: 'm1', title: '순간', date: '2026-11-24', emotion: '설렘', note: '', keywords: ['가수:BTS'], url: '', type: 'memo', source: '내 기록', x: null, y: null, rot: 0 }],
+    edges: []
+  };
+  const server = await serve({ '/__host-viewer.html': hostHTML(tree) });
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const { context, frame } = await openHost(browser, `${base}/__host-viewer.html`, { width: 1440, height: 900 });
+    await frame.evaluate(() => window.openViewer('m1'));
+    await frame.waitForSelector('#viewerModal.open', { timeout: 5000 });
+    const text = await frame.locator('#viewerModal').innerText();
+    assert.match(text, /순간 크게 보기/);
+    assert.match(text, /꼬리표: #가수:BTS/);
+    assert.doesNotMatch(text, /PROVENANCE|VIEWER|Keywords:|URL:|Source:|Note:/, `영어 라벨 없음: ${text}`);
+    assert.doesNotMatch(text, /마음 한마디:/, `빈 한마디 줄은 화면에 없다: ${text}`);
+    await context.close();
   } finally { await browser.close(); server.close(); }
 });
 
