@@ -944,7 +944,7 @@ test('둘러보기 윗줄과 AI 명예회원 공개 이름 — 390·1440 × 밤�
     const initial=await page.evaluate(()=>{
      const r=s=>{const b=document.querySelector(s).getBoundingClientRect();return {x:b.x,y:b.y,w:b.width,h:b.height}};
      return {viewport:innerWidth,scroll:document.documentElement.scrollWidth,row:r('.community-top-row'),tabs:r('.community-tabs'),
-      search:r('#community-search-form'),sort:r('.community-sort-label'),icon:r('.community-sort-symbol'),
+      search:r('#community-search-form'),sort:r('.community-sort-label'),icon:r('.community-sort-label'),
       firstTab:r('#community-tab-trees'),secondTab:r('#community-tab-moments'),queryName:document.querySelector('#community-query').getAttribute('aria-label'),
       feedbackHidden:document.querySelector('#community-feedback').hidden,
       findVisible:[...document.querySelectorAll('button.community-group-find')].some(e=>e.getBoundingClientRect().width>0),

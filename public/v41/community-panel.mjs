@@ -31,8 +31,6 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
  searchTrigger.type='button';searchTrigger.setAttribute('aria-label','찾기 열기');
  form.insertBefore(searchTrigger,query);
  query.placeholder='찾기';query.setAttribute('aria-label','가수·노래·무대 찾기');
- const sortSymbol=el('span','community-sort-symbol','↕');sortSymbol.setAttribute('aria-hidden','true');
- sortLabel.prepend(sortSymbol);
  const popularOption=sortSelect?.querySelector("option[value=popular]");
  if(popularOption)popularOption.textContent="인기순";
  const expandSearch=()=>{form.classList.add('is-expanded');searchTrigger.setAttribute('aria-expanded','true');query.focus();};
