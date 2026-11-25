@@ -76,12 +76,13 @@ test('#1363 정렬 직접 메뉴·검색 입력·#1361 안내 위치 — 390·14
     const q=page.locator('#community-query');
     await q.fill('가');await page.waitForTimeout(430);
     assert.equal(await page.locator('#community-suggest').isVisible(),true,width+'/'+theme+' 자동 검색 뒤에도 그룹 추천 유지');
+    const autoResponse=page.waitForResponse(r=>r.url().includes('/api/community/shares?')&&new URL(r.url()).searchParams.get('q')==='노래 검색');
     await q.fill('노래 검색');
-    await page.waitForFunction(()=>document.querySelector('#community-feedback')?.hidden===false);
-    await page.waitForTimeout(400);
+    await autoResponse;
     assert.ok(queries.some(item=>item.q==='노래 검색'),width+'/'+theme+' 지연 후 자동 검색');
+    const enterResponse=page.waitForResponse(r=>r.url().includes('/api/community/shares?')&&new URL(r.url()).searchParams.get('q')==='엔터 검색');
     await q.fill('엔터 검색');await q.press('Enter');
-    await page.waitForFunction(()=>document.querySelector('#community-feedback')?.hidden===false);
+    await enterResponse;
     assert.ok(queries.some(item=>item.q==='엔터 검색'),width+'/'+theme+' 엔터 검색');
     assert.ok((await page.locator('.community-search-clear').boundingBox()).width>=44,width+'/'+theme+' 지우기 44 이상');
     await page.locator('.community-search-clear').click();
