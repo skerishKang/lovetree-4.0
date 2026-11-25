@@ -12,6 +12,12 @@ export function parseTimecode(value) {
   let seconds;
   if (/^\d+$/.test(raw)) {
     seconds = Number(raw);
+  } else if (/^\d+m(?:\d+s?)?$/.test(raw)) {
+    // #1316: 주소의 t=1m35s처럼 분·초를 붙여 쓴 값도 같은 해석 함수에서 초로 바꾼다.
+    const parts = raw.match(/^(\d+)m(?:(\d+)s?)?$/);
+    const minute = Number(parts[1]), second = Number(parts[2] || 0);
+    if (second >= 60) return null;
+    seconds = minute * 60 + second;
   } else {
     const parts = raw.split(':');
     if (parts.length < 2 || parts.length > 3 || parts.some(part => !/^\d{1,2}$/.test(part))) return null;
@@ -546,7 +552,11 @@ export function latestMomentId(tree) {
 
 export function quickAdd(state, input, clock = new Date().toISOString()) {
   // #344: 빠른 추가도 미리보기 때 받은 영상 제목(mediaMetadata)을 저장에 함께 넘긴다.
-  const moment = { ...validateMomentInput({ url: input?.url || '', mediaMetadata: input?.mediaMetadata }), id: newId(), parentId: null, relation: '', links: [], createdAt: clock };
+  // #1316: 주소의 시작 초는 기존 자동 채움 함수로 읽어 일반 추가와 같은 규칙으로 저장한다.
+  const url = input?.url || '';
+  const fromUrl = fillStartFromUrl(url, '');
+  const source = { url, mediaMetadata: input?.mediaMetadata, ...(fromUrl === null ? {} : { startSeconds: fromUrl }) };
+  const moment = { ...validateMomentInput(source), id: newId(), parentId: null, relation: '', links: [], createdAt: clock };
   const trees = state.trees;
   // #638(고른 트리 우선, CTO 결정 2026-11-15): 지금 고른 트리(input.treeId)에 담는다. 예전(#327)에는
   // 빠른 추가를 일부러 '모아둔 순간'(inbox)에 담았지만, 트리를 고른 채 담으면 엉뚱한 첫 트리에 들어가는
@@ -557,7 +567,7 @@ export function quickAdd(state, input, clock = new Date().toISOString()) {
     // 이슈 671: '그 순간 다음에 담기'(input.parentId)가 이 트리의 순간이면 그 순간 바로 다음에 잇는다.
     // 목적지가 없거나 못 찾으면(오래된 화면·지워진 순간) 기존 규칙대로 가장 최근 순간 다음에 담는다.
     const after = chosen.moments.some(m => m.id === input?.parentId) ? input.parentId : (latestMomentId(chosen) || chosen.moments.find(m => m.parentId === null).id);
-    const grown = addMoment(chosen, { url: input?.url || '', mediaMetadata: input?.mediaMetadata }, after, clock);
+    const grown = addMoment(chosen, source, after, clock);
     return { state: { version: 1, trees: trees.map(tree => tree.id === chosen.id ? grown : tree), prefs: normalizePrefs(state.prefs) }, treeId: chosen.id, momentId: grown.moments.at(-1).id };
   }
   const inbox = trees.find(tree => tree.inbox === true);
@@ -567,7 +577,7 @@ export function quickAdd(state, input, clock = new Date().toISOString()) {
     return { state: { version: 1, trees: [...trees, tree], prefs: normalizePrefs(state.prefs) }, treeId: tree.id, momentId: moment.id };
   }
   // '가' 결정: 빠른 추가는 이전 순간을 고를 길이 없으므로 가장 최근 순간 다음에 잇는다(첫 순간 하나뿐이면 첫 순간).
-  const grown = addMoment(inbox, { url: input?.url || '', mediaMetadata: input?.mediaMetadata }, latestMomentId(inbox) || inbox.moments.find(m => m.parentId === null).id, clock);
+  const grown = addMoment(inbox, source, latestMomentId(inbox) || inbox.moments.find(m => m.parentId === null).id, clock);
   return { state: { version: 1, trees: trees.map(tree => tree.id === inbox.id ? grown : tree), prefs: normalizePrefs(state.prefs) }, treeId: inbox.id, momentId: grown.moments.at(-1).id };
 }
 
