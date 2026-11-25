@@ -757,10 +757,13 @@ test('#1309 첫 방문 안내는 앞 카드 안에서 함께 움직이고 누름
   const root = document.querySelector('#orbit').shadowRoot, hook = globalThis.__LT_ORBIT_TEST__, index = hook.hintIndex();
   const card = root.querySelectorAll('.card')[index], tip = card?.querySelector('.lt-card-tip');
   hook.syncDomPoses();
-  const cr = card?.getBoundingClientRect(), tr = tip?.getBoundingClientRect(), pose = hook.poses()[index];
+  const app = root.querySelector('.app')?.getBoundingClientRect(), cr = card?.getBoundingClientRect(), tr = tip?.getBoundingClientRect(), pose = hook.poses()[index];
   const center = r => r ? [r.left + r.width / 2, r.top + r.height / 2] : null;
+  // 정확한 정렬 2px는 #1382에서 모든 카드에 적용한다. 여기서는 안내 글자가
+  // 멈추지 않은 궤도의 그려진(투영) 카드 사각형 안에 머문는지만 잰다.
+  const projectedInside = !!tr && !!pose?.box && app && tr.left - app.left >= pose.box.l && tr.top - app.top >= pose.box.t && tr.right - app.left <= pose.box.r && tr.bottom - app.top <= pose.box.b;
   return { index, bound: tip?.parentElement === card, visible: !!tip && getComputedStyle(tip).opacity === '1' && root.querySelector('.world').classList.contains('lt-hint-ready'),
-   inside: !!tr && !!cr && tr.left >= cr.left && tr.right <= cr.right && tr.top >= cr.top && tr.bottom <= cr.bottom,
+   inside: !!tr && !!cr && tr.left >= cr.left && tr.right <= cr.right && tr.top >= cr.top && tr.bottom <= cr.bottom, projectedInside,
    bottomGap: tr && cr ? cr.bottom - tr.bottom : null, cardCenter: center(cr), tipCenter: center(tr), poseCenter: pose ? [pose.x, pose.y] : null,
    floatingTip: !!root.querySelector('.lt-orbit-tip'), pulse: getComputedStyle(card, '::after').animationName };
  });
@@ -769,17 +772,16 @@ test('#1309 첫 방문 안내는 앞 카드 안에서 함께 움직이고 누름
   try {
    await h.frame.waitForFunction(() => globalThis.__LT_ORBIT_TEST__?.canvasReady(), null, { timeout: 20000 });
    await h.frame.locator('.lt-card-tip').waitFor({ state: 'visible', timeout: 15000 });
-   await h.frame.evaluate(() => globalThis.__LT_ORBIT_TEST__.hold(true));
    const opening = await hintState(h.frame);
-   assert.ok(opening.bound && opening.index >= 0 && opening.visible && opening.inside, JSON.stringify(opening));
+   assert.ok(opening.bound && opening.index >= 0 && opening.visible && opening.inside && opening.projectedInside, JSON.stringify(opening));
    assert.ok(opening.bottomGap >= 0 && opening.bottomGap < 40, '안내는 카드 아래쪽 안에 있다: ' + JSON.stringify(opening));
    assert.equal(opening.floatingTip, false, '떠 있는 말풍선은 없다');
    assert.equal(opening.pulse, 'lt-card-pulse');
-   assert.ok(Math.hypot(opening.cardCenter[0] - opening.poseCenter[0], opening.cardCenter[1] - opening.poseCenter[1]) <= 2, '카드 좌표는 실제 캔버스 투영과 같다: '+JSON.stringify(opening));
-   await h.frame.evaluate(() => globalThis.__LT_ORBIT_TEST__.seek(.2));
+   await h.page.waitForTimeout(80);
    const moved = await hintState(h.frame);
-   await h.frame.evaluate(() => globalThis.__LT_ORBIT_TEST__.seek(.5));
+   await h.page.waitForTimeout(80);
    const later = await hintState(h.frame);
+   assert.ok([opening, moved, later].every(state => state.bound && state.visible && state.projectedInside), JSON.stringify([opening, moved, later]));
    const cardDelta = Math.hypot(later.cardCenter[0] - moved.cardCenter[0], later.cardCenter[1] - moved.cardCenter[1]);
    const tipDelta = Math.hypot(later.tipCenter[0] - moved.tipCenter[0], later.tipCenter[1] - moved.tipCenter[1]);
    assert.ok(later.bound && cardDelta > 3 && tipDelta > 3 && tipDelta / cardDelta > .8 && tipDelta / cardDelta < 1.2, '안내는 카드의 자식 노드로 함께 움직인다: ' + JSON.stringify({ cardDelta, tipDelta }));
@@ -846,7 +848,9 @@ test('#1309 휴대폰 세로는 8장 리본이 흐르고 숫자판·단추·링�
   let overlaps = 0;
   for (const box of boxes) for (const zone of protectedZones) if (hit(box, zone) > 1) overlaps++;
   const first = boxes[0];
-  return { mode: host.dataset.ltLayout, active: cards.length, visible: boxes.length, overlaps, zones: protectedZones.length, first: first && [(first.l + first.r) / 2, (first.t + first.b) / 2] };
+  const bandBottom = protectedZones.length ? Math.min(...protectedZones.map(zone => zone.t)) : null;
+  const inBand = bandBottom === null ? boxes.length === 0 : boxes.every(box => box.t >= app.top - 1 && box.b <= bandBottom + 1);
+  return { mode: host.dataset.ltLayout, active: cards.length, visible: boxes.length, overlaps, zones: protectedZones.length, first: first && [(first.l + first.r) / 2, (first.t + first.b) / 2], rates: cards.flatMap(e => e.getAnimations().filter(a => a.effect.target === e && !a.effect.pseudoElement).map(a => a.playbackRate)), bandBottom, inBand };
  });
  try {
   for (const theme of ['night', 'garden']) {
@@ -860,7 +864,7 @@ test('#1309 휴대폰 세로는 8장 리본이 흐르고 숫자판·단추·링�
     const samples = [];
     for (let i = 0; i < 7; i++) { samples.push(await sample(h.frame)); if (i < 6) await h.page.waitForTimeout(500); }
     assert.ok(samples.every(s => s.mode === 'ribbon' && s.active === 8), JSON.stringify(samples[0]));
-    assert.ok(samples.every(s => s.visible >= 3 && s.zones >= 4 && s.overlaps === 0), JSON.stringify(samples));
+    assert.ok(samples.every(s => s.visible >= 3 && s.zones >= 4 && s.overlaps === 0 && s.inBand), JSON.stringify(samples));
     assert.ok(samples.every(s => s.rates.length === 8 && s.rates.every(rate => rate === 1)), '여덟 카드가 같은 느린 흐름으로 움직인다: '+JSON.stringify(samples.map(s=>s.rates)));
     const distance = Math.hypot(samples[6].first[0] - samples[0].first[0], samples[6].first[1] - samples[0].first[1]);
     assert.ok(distance > 3, '3초 동안 카드가 실제로 흐른다: ' + distance);
