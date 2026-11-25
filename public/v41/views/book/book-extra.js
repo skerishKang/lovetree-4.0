@@ -166,7 +166,7 @@ showDetail=function(id){
  const m=metadataFor(id);if(m){const view=titleViewFor(m);$b('#detailTitle').textContent=view.main;if(view.sub)$b('#detailTag').textContent+=' · ▶ '+view.sub;}
  setBookOpen($b('#detail'),false);
  const card=cardFor(id);
- if(card)placeDetail(id,card);
+ if(card){placeDetail(id,card);card.classList.add('focused')}
  }finally{bookHistoryTransferring=false}
 };
 if(window.__TRACK59__)window.__TRACK59__.showDetail=showDetail;
