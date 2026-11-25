@@ -720,6 +720,41 @@ test('#1350 머리줄 오른쪽 간격: 390·844·1440 × 밤·정원 × 로그�
               '/머리줄-' + width + '-' + theme + '-' + auth + '.png' });
           }
         }
+
+        // #1350: 로그인 흔적이 없는 확인 중 상태에서는 hidden 속성이 늦어도 예약 칸이 없어야 한다.
+        const noHint = await page.evaluate(async () => {
+          const root = document.documentElement;
+          const write = document.getElementById('write-menu');
+          root.dataset.ltAuthPhase = 'pending';
+          delete root.dataset.ltAuthHint;
+          write.hidden = false;
+          await new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done)));
+          const gap = () => {
+            const a = document.getElementById('theme-toggle').getBoundingClientRect();
+            const b = document.querySelector('.header-actions > .account-slot').getBoundingClientRect();
+            return Math.round((b.left - a.right) * 100) / 100;
+          };
+          const before = gap();
+          let cls = 0;
+          const observer = new PerformanceObserver(list => {
+            for (const entry of list.getEntries()) if (!entry.hadRecentInput) cls += entry.value;
+          });
+          observer.observe({ type: 'layout-shift', buffered: false });
+          root.dataset.ltAuthPhase = 'ready';
+          root.dataset.ltAuthHint = 'out';
+          write.hidden = true;
+          await new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done)));
+          observer.disconnect();
+          return { before, after: gap(), cls };
+        });
+        const compactGap = width === 1440 ? 12 : width === 844 ? 8 : 4;
+        assert.equal(noHint.before, compactGap,
+          width + '/' + theme + ': 로그인 흔적이 없으면 확인 중에도 예약 칸을 두지 않는다');
+        assert.equal(noHint.after, compactGap,
+          width + '/' + theme + ': 로그아웃 확정 후 같은 간격을 유지한다');
+        assert.ok(noHint.cls <= 0.01,
+          width + '/' + theme + ': 로그인 흔적 없는 상태의 로그아웃 확정 CLS 0.01 이하');
+        measurements.push({ width, theme, auth: '로그인 흔적 없는 확인 중', ...noHint });
         const cls = await page.evaluate(async () => {
           const root = document.documentElement;
           const write = document.getElementById('write-menu');
