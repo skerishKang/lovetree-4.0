@@ -2639,15 +2639,17 @@ test('#972 서재·책 상세·둘러보기·새 소식 화면 치수', { skip: 
             const visibleLastRight = Math.min(last.right, rail.right);
             const overlap = Math.max(0, Math.min(visibleLastRight, button.right) - Math.max(last.left, button.left)) *
               Math.max(0, Math.min(last.bottom, button.bottom) - Math.max(last.top, button.top));
-            // #1305: 390에서는 큰 제목을 빼고 검색·정렬 바로 아래 가수 단추 줄을 둔다 — 숨겨진 제목은 정렬에서 뺀다.
+            // 빈 인기 무대는 줄을 접는다 — 숨겨진 줄은 정렬에서 뺀다.
+            const popularVisible = !document.querySelector('#community-popular-stages').hidden;
             const aligned = screenWidth === 390 ? [form, list] : [form, head, list];
+            const alignment = !popularVisible ? 0 : Math.max(...aligned.flatMap(r => [Math.abs(popular.left - r.left), Math.abs(popular.width - r.width)]));
             const groups = document.querySelector('#community-groups');
             const scrollable = groups.scrollWidth > groups.clientWidth + 1;
             const lastChip = groups.querySelector('.community-group-chip:last-child');
             groups.scrollLeft = groups.scrollWidth;
             const reached = lastChip.getBoundingClientRect().right <= groups.getBoundingClientRect().right + 1;
             return { clip: Math.max(0, last.right - rail.right), overlap, gap: button.left - rail.right, scrollable, reached,
-              chipHeight: last.height, alignment: Math.max(...aligned.flatMap(r => [Math.abs(popular.left - r.left), Math.abs(popular.width - r.width)])) };
+              chipHeight: last.height, alignment };
           }, width);
           // #1330: 390은 칩 줄을 밀어 넘기므로 처음에 마지막 칩이 밖에 있어도, 끝까지 밀면 닿아야 한다.
           assert.ok(discover.clip <= 1 || (width === 390 && discover.scrollable && discover.reached), `${theme}/${width}: 마지막 칩 잘림 ${discover.clip}px`);

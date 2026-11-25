@@ -355,11 +355,12 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
   }
   if(preview.open&&selectedId){const selected=items.find(item=>item.shareId===selectedId);if(selected){renderPreview(selected);if(focusedAction)preview.querySelector(`[data-community-action="${focusedAction}"]`)?.focus();}}
  }
- async function load(append=false){
+ async function load(append=false,stageReady=Promise.resolve()){
   if(append&&loading)return;
   const requestId=++loadId;loading=true;more.disabled=true;message('공개 트리를 불러오는 중이에요.');
   if(!append){items=[];cursor='';render();}
   const answer=await api.discover({q:query.value.trim(),artist:selectedArtist,cursor,limit:12,sort:sortSelect?.value||''});
+  await stageReady;
   if(requestId!==loadId)return;
   loading=false;
   if(!answer.ok){message(answer.message||'공개 트리를 불러오지 못했어요.');more.hidden=true;more.disabled=false;render();return;}
@@ -393,7 +394,8 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
    for(const t of tabs()){if(t.getAttribute('aria-current')==='true'){t.dataset.wasCurrent='1';t.setAttribute('aria-current','false');}}
    const wantMoments=hashNow()==='#explore/moments';
    selectTab(wantMoments?'moments':'trees',{syncHash:false});
-   if(!wantMoments){load(false);loadPopularStages();}
+   // 카드 요청은 인기 무대와 동시에 시작하고, 첫 그리기만 결과 또는 최대 300ms를 기다린다.
+   if(!wantMoments){const stageReady=loadPopularStages();void load(false,stageReady);}
   };
   if(typeof window!=='undefined'&&typeof window.addEventListener==='function')window.addEventListener('hashchange',()=>{
    if(hashGuard)return;
@@ -506,9 +508,9 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
  const renderPopularStages=rows=>{
   const shown=(Array.isArray(rows)?rows:[]).filter(stage=>stage&&stage.stageId&&publicStageCount(stage.weeklyVoters)!==null);
   popularList.replaceChildren();
-  // #1330: 보여 줄 무대가 없으면 제목을 감춘다. 칸 높이는 그대로 두어 카드가 밀리지 않게 한다.
-  if(!shown.length){popular.classList.add('is-empty');popularList.replaceChildren(skeleton);return;}
-  popular.classList.remove('is-empty');
+  // 빈 응답이면 뼈대와 제목을 통째로 접어 빈칸을 남기지 않는다.
+  if(!shown.length){popular.hidden=true;popularList.replaceChildren();return;}
+  popular.hidden=false;
   for(const stage of shown){
    const row=el('span','community-stage');row.dataset.stageId=stage.stageId;
    row.append(el('span','community-stage-title',stageMomentTitle(stage)),el('span','community-stage-count',`${POPULAR_STAGE_WEEK_LABEL} ${publicStageCount(stage.weeklyVoters)}`));
@@ -516,7 +518,12 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
   }
  };
  async function loadPopularStages(){
-  const answer=await api.popularStages();
+  // 인기 무대 요청은 카드와 동시에 시작한다. 300ms 후 도착한 무대는 카드 위치를 밀지 않도록 버린다.
+  let timer;
+  const request=Promise.resolve().then(()=>api.popularStages()).catch(()=>null);
+  const deadline=new Promise(resolve=>{timer=setTimeout(()=>resolve(null),300);});
+  const answer=await Promise.race([request,deadline]);
+  clearTimeout(timer);
   renderPopularStages(answer?.ok?answer.items:[]);
  }
  popularList.append(skeleton); // 불러오는 동안만 자리를 고정하는 뼈대
