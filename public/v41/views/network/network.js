@@ -779,6 +779,7 @@
   function layoutNetwork() {
     NETFIT = LT56Model.networkLayout(LTDEMO.moments, {
       box: BOX,
+      viewportWidth: vw,
       dotR: 5,
       firstR: 20,
       gap: 8,
@@ -2747,6 +2748,11 @@
     })),
     edgeKinds: edges.reduce((a, e) => ((a[e.kind] = (a[e.kind] || 0) + 1), a), {})
   };
+  // 정보판의 최근 순간도 지도에서 쓰는 선택/상세 열기 함수로 처리한다.
+  addEventListener('lt-wide-open-moment', e => {
+    const node = byId[e.detail?.id];
+    if (node?.kind === 'moment') selectMoment(node, true);
+  });
   window.__lt = {
     edgeLen: () =>
       edges
