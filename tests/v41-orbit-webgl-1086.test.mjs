@@ -107,9 +107,13 @@ test('#1086 실제 기존 DOM과 새 그림판의 카드 28장 쌓임 순서와 
   const domPaintOrder=Array.from({length:28},(_,card)=>card).sort((a,b)=>after.z[a]-after.z[b]||a-b);
   assert.deepEqual(after.order,domPaintOrder,'현재 DOM 깊이 밴드와 WebGL 그리기 순서 일치');
   assert.equal(after.order.length,28);assert.equal(new Set(after.order).size,28);
+  // 역사적 DOM과 최신 그림판은 각 시점의 실제 밴드로 따로 판정한다.
+  // 같은 깊이 밴드에서는 DOM의 뒤쪽 요소가 앞에 오는 순서까지 엄격히 검증한다.
   for(const source of [before,after])for(const point of source.points){
-   const actual=after.order.filter(card=>point.hit.includes(card)).reverse();
-   assert.deepEqual(actual,point.hit,'겹친 카드의 앞뒤 순서 '+JSON.stringify({phase:after.phase,x:point.x,y:point.y}));points++;
+   const actual=source===before
+     ? [...point.hit].sort((a,b)=>before.z[b]-before.z[a]||b-a)
+     : after.order.filter(card=>point.hit.includes(card)).reverse();
+   assert.deepEqual(actual,point.hit,'동일 장면의 겹친 카드 앞뒤 순서 '+JSON.stringify({source:source===before?'before':'after',phase:after.phase,x:point.x,y:point.y}));points++;
   }
   assert.equal(after.errors.length,28);max=Math.max(max,...after.errors);
  }
