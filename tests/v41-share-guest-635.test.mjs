@@ -871,7 +871,7 @@ test('방문자 공용 화면: 1440·390 책·보드·지도, 옛 공유 주소,
             await visiting.page.setViewportSize({width,height});
             const m=await metrics(visiting.page);
             if(width===1440){
-              assert.deepEqual(m.tabs,['트리','책','보드','지도'],width+' '+theme+' '+view+': 공유 탭 구성');
+              assert.deepEqual(m.tabs,['트리','보드','책','지도'],width+' '+theme+' '+view+': 공유 탭 구성');
               assert.equal(m.browseVisible,true,'데스크톱 둘러보기 단추');
             } else {
               assert.deepEqual(m.tabs,[],'모바일은 내 화면처럼 접기 메뉴에서 탭을 표시한다');
