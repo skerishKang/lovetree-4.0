@@ -10,7 +10,10 @@ export async function inspectYoutubeIframe(iframe) {
     for (const y of [0.1, 0.5, 0.9]) for (const x of [0.1, 0.5, 0.9]) {
       const px = box.left + box.width * x;
       const py = box.top + box.height * y;
-      const top = document.elementFromPoint(px, py);
+      // Shadow DOM 안 플레이어는 문서가 아닌 해당 ShadowRoot에서 적중 요소를 판정합니다.
+      const root = element.getRootNode();
+      const top = typeof root.elementFromPoint === 'function'
+        ? root.elementFromPoint(px, py) : document.elementFromPoint(px, py);
       const withinViewport = px >= 0 && py >= 0 && px < innerWidth && py < innerHeight;
       const name = top
         ? top.tagName.toLowerCase()
