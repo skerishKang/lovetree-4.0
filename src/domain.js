@@ -1,4 +1,5 @@
 import { validateRange, rangeFields } from './moment-range.js';
+import { DEFAULT_TREE_OPEN_VIEW, normalizeTreeOpenView } from '../public/v41/tree-open-view.mjs';
 export const EMOTIONS = ['설렘', '위로', '벅참', '그리움', '고마움', '즐거움'];
 // #256-3: 책(트리)마다 고르는 디자인 표지. 테마 표지 색(--lt-cover-N) 위의 질감 변형 6종.
 // 값은 이 목록뿐이다. 모르는 값·타입은 저장 거부가 아니라 ''(기본 표지)로 되돌린다.
@@ -276,7 +277,7 @@ export function boardLayoutOf(m) {
 export function createTree(input, clock = new Date().toISOString()) {
   const subject = requireText(input.subject, '좋아하는 대상', 60);
   const moment = { ...validateMomentInput(input), id: newId(), parentId: null, relation: '', links: [], createdAt: clock };
-  return { id: newId(), subject, title: `${subject}, 나의 순간들`, coverMomentId: '', coverDesign: '', inbox: false, createdAt: clock, updatedAt: clock, moments: [moment] };
+  return { id: newId(), subject, title: `${subject}, 나의 순간들`, openView: normalizeTreeOpenView(input.openView), coverMomentId: '', coverDesign: '', inbox: false, createdAt: clock, updatedAt: clock, moments: [moment] };
 }
 export function editTree(tree, input, clock = new Date().toISOString()) {
   const title = requireText(input.title, '트리 이름', 100);
@@ -285,8 +286,11 @@ export function editTree(tree, input, clock = new Date().toISOString()) {
   if (typeof coverMomentId !== 'string' || (coverMomentId && !tree.moments.some(moment => moment.id === coverMomentId))) throw new Error('이 트리에서 표지 순간을 선택해 주세요.');
   const coverDesign = normalizeCoverDesign(input.coverDesign);
   const coverMode = normalizeCoverMode(input.coverMode);
-  if (tree.title === title && tree.subject === subject && (tree.coverMomentId || '') === coverMomentId && (tree.coverDesign || '') === coverDesign && (tree.coverMode || '') === coverMode) return tree;
-  const next = { ...tree, title, subject, coverMomentId, coverDesign, updatedAt: clock };
+  const openView = normalizeTreeOpenView(input.openView === undefined ? tree.openView : input.openView);
+  if (tree.openView === openView && tree.title === title && tree.subject === subject &&
+      (tree.coverMomentId || '') === coverMomentId && (tree.coverDesign || '') === coverDesign &&
+      (tree.coverMode || '') === coverMode) return tree;
+  const next = { ...tree, title, subject, openView, coverMomentId, coverDesign, updatedAt: clock };
   // 방법을 고르지 않은 옛 저장본에는 빈 값을 새로 심지 않는다(모양을 그대로 둔다).
   if (coverMode) next.coverMode = coverMode; else delete next.coverMode;
   return next;
@@ -412,7 +416,7 @@ export function quickAdd(state, input, clock = new Date().toISOString()) {
   const inbox = trees.find(tree => tree.inbox === true);
   if (!inbox) {
     if (trees.length >= MAX_TREES) throw new Error(`트리는 ${MAX_TREES}개까지 만들 수 있어요.`);
-    const tree = { id: newId(), subject: INBOX_SUBJECT, title: INBOX_SUBJECT, coverMomentId: '', coverDesign: '', inbox: true, createdAt: clock, updatedAt: clock, moments: [moment] };
+    const tree = { id: newId(), subject: INBOX_SUBJECT, title: INBOX_SUBJECT, openView: DEFAULT_TREE_OPEN_VIEW, coverMomentId: '', coverDesign: '', inbox: true, createdAt: clock, updatedAt: clock, moments: [moment] };
     return { state: { version: 1, trees: [...trees, tree], prefs: normalizePrefs(state.prefs) }, treeId: tree.id, momentId: moment.id };
   }
   // '가' 결정: 빠른 추가는 이전 순간을 고를 길이 없으므로 가장 최근 순간 다음에 잇는다(첫 순간 하나뿐이면 첫 순간).
@@ -463,7 +467,7 @@ export function treeFromMoments(state, fromTreeId, momentIds, options = {}, cloc
   });
   if (state.trees.length >= MAX_TREES) throw new Error(`트리는 ${MAX_TREES}개까지 만들 수 있어요.`);
   const root = { ...moving[0], parentId: null, relation: '', links: [] };
-  const tree = { id: newId(), subject, title: `${subject}, 나의 순간들`, coverMomentId: '', coverDesign: '', inbox: false, createdAt: clock, updatedAt: clock, moments: [root, ...moving.slice(1).map(m => ({ ...m, parentId: root.id, relation: '', links: [] }))] };
+  const tree = { id: newId(), subject, title: `${subject}, 나의 순간들`, openView: DEFAULT_TREE_OPEN_VIEW, coverMomentId: '', coverDesign: '', inbox: false, createdAt: clock, updatedAt: clock, moments: [root, ...moving.slice(1).map(m => ({ ...m, parentId: root.id, relation: '', links: [] }))] };
   const moments = detachMoments(from, movedIds);
   if (!moments.length) return { state: { version: 1, trees: [...state.trees.filter(t => t.id !== fromTreeId), tree], prefs: normalizePrefs(state.prefs) }, treeId: tree.id };
   const fromNext = { ...from, coverMomentId: movedIds.has(from.coverMomentId) ? '' : from.coverMomentId || '', updatedAt: clock, moments };
@@ -546,7 +550,7 @@ export function validateState(value) {
     const coverMode = normalizeCoverMode(tree.coverMode);
     const inbox = tree.inbox === true && !inboxSeen;
     if (inbox) inboxSeen = true;
-    const out = { id: tree.id, subject: requireText(tree.subject, '대상', 60), title: requireText(tree.title, '트리 제목', 100), coverMomentId, coverDesign, inbox, createdAt: tree.createdAt, updatedAt: tree.updatedAt, moments };
+    const out = { id: tree.id, subject: requireText(tree.subject, '대상', 60), title: requireText(tree.title, '트리 제목', 100), openView: normalizeTreeOpenView(tree.openView), coverMomentId, coverDesign, inbox, createdAt: tree.createdAt, updatedAt: tree.updatedAt, moments };
     if (coverMode) out.coverMode = coverMode;
     return out;
   });
