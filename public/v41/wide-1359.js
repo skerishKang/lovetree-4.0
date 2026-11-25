@@ -42,7 +42,11 @@
       button.type = 'button';
       button.dataset.momentId = moment.id;
       button.textContent = String(moment.title || moment.name || '이름 없는 순간');
-      button.addEventListener('click', () => {
+      button.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ' ') e.stopPropagation();
+      });
+      button.addEventListener('click', e => {
+        e.stopPropagation();
         if (screen === 'board') selectMoment(moment.id, true);
         else {
           const node = window.__lt?.nodes.find(n => n.id === moment.id);
