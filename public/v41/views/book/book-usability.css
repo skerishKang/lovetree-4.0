@@ -101,6 +101,8 @@ html[data-v41-screen=book] .yt-placeholder{display:grid;place-items:center;width
 html[data-v41-screen=book] .yt-play .lt-fallback-card{width:100%;height:100%;display:flex;flex-direction:column;justify-content:center}
 html[data-v41-screen=book] .yt-placeholder .yt-play-label{position:static;transform:none}
 html[data-v41-screen=book] .yt-frame{display:block;width:100%;aspect-ratio:16/9;border:0;background:#000}
+/* #1378: 좁은 책 화면의 재생 iframe은 검은 여백을 허용해 세로 200px을 확보합니다. */
+@media(max-width:600px){html[data-v41-screen=book] .yt-frame:not(.is-vertical){min-height:200px}}
 html[data-v41-screen=book] .yt-frame.is-vertical{width:auto;height:clamp(240px,52vh,400px);max-width:100%;aspect-ratio:9/16;margin:0 auto}
 /* 이슈 584: 크게 보기 단추를 영상 위(yt-expand)에서 카드 아래 한 줄로 옮긴다.
    왼쪽 YouTube ↗(원본 링크), 오른쪽 크게 보기 — 영상 위에는 단추가 겹치지 않는다. */
@@ -339,8 +341,8 @@ html[data-v41-screen=book][data-lt-theme=garden] .why-margin{padding:0;border:0;
 html[data-book-shape=phone][data-v41-screen=book] .why-margin{order:1;top:auto;bottom:auto;margin:0 76px 0 10px;position:static;left:auto;transform:none;width:auto}
 html[data-book-shape=phone][data-v41-screen=book] .nav-pill{order:2;position:static;bottom:auto;margin:2px auto 0}
 html[data-book-shape=phone][data-v41-screen=book] .branch-tab{order:3}
-html[data-book-shape=phone][data-v41-screen=book] .yt-play.is-vertical,
-html[data-book-shape=phone][data-v41-screen=book] .yt-frame.is-vertical{height:clamp(190px,26vh,230px)}
+html[data-book-shape=phone][data-v41-screen=book] .yt-play.is-vertical{height:clamp(190px,26vh,230px)}
+html[data-book-shape=phone][data-v41-screen=book] .yt-frame.is-vertical{height:clamp(200px,26vh,230px)}
 /* #792: 구간 재생 뒤 '처음부터 보기' — 터치 영역 44px. */
 html[data-v41-screen=book] .yt-from-start{align-self:flex-start;margin:8px 0 2px;min-height:44px;padding:8px 12px;border:1px solid var(--lt-line,#c9b8a8);border-radius:999px;background:none;color:var(--lt-ink);font:inherit;font-size:12px;cursor:pointer}
 

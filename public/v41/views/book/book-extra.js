@@ -6,6 +6,7 @@ import {coverChoice,COVER_PALETTE} from '/v41/views/shelf/shelf-model.mjs';
 import {coverMomentFor} from '/v41/views/shelf/shelf-model.mjs';
 import {thumbnailCandidates,thumbFallbackAttrs,coverFallbackAttrs,fallbackCardMarkup,mountThumbFallback,VIDEO_UNAVAILABLE_TEXT} from '/v41/thumb-fallback.mjs';
 import {mountExpandControls,ytOpenUrl} from '/v41/yt-expand.mjs';
+import {monitorBookYoutubeFrame} from '/v41/views/book/book-youtube-availability.mjs';
 import {createCommunityApi} from '/v41/community-api.mjs';
 // #792 4단계 ⑤: 공유 책의 순간 상세에서도 같은 규칙으로 '이 무대 담기' 단추를 붙인다.
 import {stageShareId,stageVoteLabel,stageVoteNotice,readStage,toggleStage} from '/v41/community-stages.mjs';
@@ -185,6 +186,7 @@ function playInline(yt,media){
  const watch=(media&&media.openUrl)?media.openUrl:('https://www.youtube.com/watch?v='+yt.dataset.ytPlay);
  const cell=mountExpandControls(host,{url:watch,openUrl:watch,vertical:yt.dataset.ytVertical==='1',lightbox:(u,ti,v)=>{window.LTMedia&&LTMedia.openLightbox(u,ti,v)}});
  cell.stage.append(frame);
+ monitorBookYoutubeFrame(frame,cell.stage,yt.dataset.ytPlay,watch);
  if(end>start)host.insertAdjacentHTML('beforeend','<button type="button" class="yt-from-start" data-yt-from-start="'+t(yt.dataset.ytPlay)+'">처음부터 보기</button>');
 }
 document.addEventListener('pointerdown',e=>{
@@ -197,7 +199,8 @@ document.addEventListener('pointerdown',e=>{
   frame.setAttribute('referrerpolicy','strict-origin-when-cross-origin');
   // #833: '처음부터 보기' 재생 칸도 같은 모서리 단추를 둔다.
   const cell=mountExpandControls(host,{url:ytOpenUrl(fromStart.dataset.ytFromStart),openUrl:ytOpenUrl(fromStart.dataset.ytFromStart),lightbox:(u,ti,v)=>{window.LTMedia&&LTMedia.openLightbox(u,ti,v)}});
-  cell.stage.append(frame);return}
+  cell.stage.append(frame);
+  monitorBookYoutubeFrame(frame,cell.stage,fromStart.dataset.ytFromStart,ytOpenUrl(fromStart.dataset.ytFromStart));return}
  const yt=e.target.closest&&e.target.closest('[data-yt-play]');
  if(!yt||yt.querySelector('.lt-fallback-card'))return;
  e.preventDefault();e.stopPropagation();

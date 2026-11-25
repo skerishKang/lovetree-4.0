@@ -1246,3 +1246,69 @@ test('#1378 크게 보기: 임베드 거절 상태면 iframe을 걷고 원본 �
     await browser.close();
   }
 });
+
+test('#1378 책: 390·1440 × 밤·정원 재생 iframe 200×200·가림 0·자동재생 1개', { skip, timeout: 240000 }, async () => {
+  const browser = await chromium.launch({ headless: true });
+  const embed = route => route.fulfill({
+    status: 200, contentType: 'text/html', body: '<!doctype html><title>YouTube video</title>',
+  });
+  try {
+    for (const [width, height] of [[390, 844], [1440, 900]]) {
+      for (const theme of ['night', 'garden']) {
+        const { ctx, frame } = await openBook(browser, width, height, [
+          ['**/youtube-nocookie.com/**', embed],
+          ['**/www.youtube.com/embed/**', embed],
+        ]);
+        try {
+          await frame.evaluate(value => {
+            localStorage.setItem('lt41.theme', value);
+            document.documentElement.setAttribute('data-lt-theme', value);
+          }, theme);
+          const before = await frame.locator('[data-yt-play]').count();
+          assert.ok(before > 0, '재생 전 영상 표지 존재');
+          await frame.locator('[data-yt-play]').first().click({ force: true });
+          await frame.waitForSelector('iframe.yt-frame', { timeout: 10000 });
+          const inspected = await inspectYoutubeIframe(frame.locator('iframe.yt-frame').first());
+          assert.equal(inspected.minimum200, true,
+            width + '/' + theme + ' 재생 iframe 최소 200×200: ' + inspected.width + '×' + inspected.height);
+          assert.equal(inspected.blocked, 0,
+            width + '/' + theme + ' 플레이어 앞 가림 0: ' + inspected.blockers.join(','));
+          assert.equal(await countYoutubeAutoplay(frame), 1,
+            width + '/' + theme + ' 자동재생 지정 한 개');
+          assert.equal(await frame.locator('iframe.yt-frame').first()
+            .evaluate(el => el.parentElement.querySelector('[data-yt-play],.yt-play') !== null),
+            false, '재생 중인 iframe에 앞서던 표지 제거');
+        } finally {
+          await ctx.close();
+        }
+      }
+    }
+  } finally {
+    await browser.close();
+  }
+});
+
+test('#1378 책: 임베드 금지 때 플레이어 제거 후 원본 링크', { skip, timeout: 120000 }, async () => {
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const { ctx, frame } = await openBook(browser, 390, 844, [
+      ['**/api/youtube/oembed*', route => route.fulfill({
+        status: 401, contentType: 'application/json', body: '{"error":"youtube_embed_forbidden"}',
+      })],
+      ['**/youtube-nocookie.com/**', route => route.fulfill({
+        status: 200, contentType: 'text/html', body: '<title>YouTube video</title>',
+      })],
+    ]);
+    try {
+      await frame.locator('[data-yt-play]').first().click({ force: true });
+      await frame.waitForSelector('.yt-unavailable-note', { timeout: 10000 });
+      assert.equal(await frame.locator('iframe.yt-frame').count(), 0, '재생 불가 iframe 제거');
+      assert.equal(await frame.locator('.yt-unavailable-link[href*="youtube.com"]').count(), 1,
+        '재생 불가 시 원본 영상 링크 제공');
+    } finally {
+      await ctx.close();
+    }
+  } finally {
+    await browser.close();
+  }
+});
