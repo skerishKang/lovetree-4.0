@@ -369,14 +369,42 @@ test('#1359 넓은 보드와 지도, 최근 순간 및 휴대폰 회귀', {skip:
         }
       } finally {await page.close();}
     }
+    const settleMobile = async page => {
+      await page.evaluate(() => {
+        // 기존 시간 변화 장식은 비교 캡처에서만 멈춘다. 제품 CSS는 변경하지 않는다.
+        for (const animation of document.getAnimations()) {
+          animation.pause();
+          try { animation.currentTime = 0; } catch {}
+        }
+        const glow = document.querySelector('.spaceGlow');
+        if (glow) glow.style.visibility = 'hidden';
+        if (window.__lt?.state) window.__lt.state.revealStart = 0;
+        window.__lt?.resize?.();
+      });
+      await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    };
+    const mobileAppearance = async page => page.evaluate(() => [...document.querySelectorAll('body, .app, .boardFrame, #viewport, #world, .surface, #cardLayer, .card, #stage, .topbar, .lt-screen-toolbar, .hero, .detail, button')].map(el => {
+      const r=el.getBoundingClientRect(),s=getComputedStyle(el);
+      return [el.tagName,el.id,el.className?.baseVal || el.className,
+        r.x,r.y,r.width,r.height,s.display,s.visibility,s.color,s.backgroundColor,s.backgroundImage,
+        s.fontFamily,s.fontSize,s.borderColor,s.padding,s.margin,s.transform];
+    }));
     for(const screen of ['board','network']) for(const theme of ['night','garden']) for(const n of [5,54]){
-      const before=await open(screen,390,844,theme,n,true);
-      const after=await open(screen,390,844,theme,n);
+      const page=await open(screen,390,844,theme,n,true);
       try{
-        assert.equal(await after.locator('.lt1359-info').count(),0);
-        const a=await before.screenshot({animations:'disabled'}),b=await after.screenshot({animations:'disabled'});
-        assert.ok(a.equals(b),screen+' '+theme+' '+n+' 휴대폰 픽셀 변경');
-      }finally{await before.close();await after.close();}
+        await settleMobile(page);
+        const appearanceBefore=await mobileAppearance(page);
+        const a=await page.screenshot({animations:'disabled'});
+        await page.unroute('**/*');
+        await page.route('**/*', route => route.request().url().startsWith(base) ? route.continue() : route.abort());
+        // 같은 화면에 신규 CSS·JS만 주입해 390 배치·스타일 변경 0을 판정한다.
+        await page.addStyleTag({ url: base + '/v41/wide-1359.css' });
+        await page.addScriptTag({ url: base + '/v41/wide-1359.js' });
+        assert.equal(await page.locator('.lt1359-info').count(),0);
+        await settleMobile(page);
+        const appearanceAfter=await mobileAppearance(page);
+        assert.deepEqual(appearanceAfter, appearanceBefore, screen+' '+theme+' '+n+' 휴대폰 화면 구성·스타일 변경');
+      }finally{await page.close();}
     }
   } finally {await browser.close();server.close();}
 });
