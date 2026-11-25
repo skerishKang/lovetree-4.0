@@ -986,7 +986,7 @@ function noteUserView() {
 // 명시적으로 선택한 순간으로 진입할 때는 그 카드로 이동하되 모든 카드에 닿을 수 있다.
 function wideBoardHorizontal(cards, viewportWidth, zoom) {
   const box = LT58Model.contentBox(cards, 0);
-  if (!box || viewportWidth < 1200) return null;
+  if (!box || innerWidth < 1200) return null;
   const z = Math.min(zoom, (viewportWidth - 48) / box.w);
   return { z, x: (viewportWidth - box.w * z) / 2 - box.x * z };
 }
@@ -1031,14 +1031,14 @@ function boardStartView() {
     v.y = Math.max(v.y, safe.y + 20 - Math.min(...cards.map(c => c.y)) * v.z);
   viewMode = v.mode === 'user' ? 'user' : 'start';
   if (v.mode === 'user') userView = saved;
-  else if (vw >= 1200) {
+  else if (innerWidth >= 1200) {
     const horizontal = wideBoardHorizontal(cards, vw, v.z);
     if (horizontal) Object.assign(v, horizontal);
   }
   Object.assign(view, { x: v.x, y: v.y, z: v.z });
   applyView(false);
   // #987: 상세를 여는 여덟 카드 트리는 실제 회전 카드 경계를 기준으로 판을 다시 맞춘다.
-  if (vw >= 1200 && cards.length === 8 && viewMode !== 'user') {
+  if (innerWidth >= 1200 && cards.length === 8 && viewMode !== 'user') {
     const bounds = [...cardLayer.querySelectorAll('.card[data-id]')].map(el => el.getBoundingClientRect());
     const frame = viewport.getBoundingClientRect();
     const left = Math.min(...bounds.map(r => r.left)) - frame.left;
@@ -1253,6 +1253,8 @@ function selectMoment(id, open = true) {
         ? ins.map(c => _row(c, 'prev')).join('<br><br>')
         : '아직 다음 순간이 없어요';
     $('#detail').classList.add('open');
+    // 상세 창으로 보드 표시 폭이 줄어든 경우에도 여덟 순간 모두 프레임 안에 놓는다.
+    if (innerWidth >= 1200 && moments.length === 8 && viewMode === 'start') boardStartView();
   }
 }
 
