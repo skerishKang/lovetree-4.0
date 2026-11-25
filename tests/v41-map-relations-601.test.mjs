@@ -8,7 +8,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
-import { createReadStream, existsSync } from 'node:fs';
+import { createReadStream, existsSync, mkdirSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -26,9 +26,14 @@ try {
   if (!existsSync(chromium.executablePath())) skip = 'Playwright Chromium이 없어 지도 관계 시험을 건너뜀';
 } catch { skip = 'playwright 패키지가 없어 지도 관계 시험을 건너뜀'; }
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.woff2': 'font/woff2' };
-async function serve() {
+async function serve(extraRoutes = {}) {
   const server = createServer(async (req, res) => {
     const clean = decodeURIComponent((req.url || '/').split('?')[0]);
+    if (extraRoutes[clean]) {
+      res.writeHead(200, {'content-type': 'text/html; charset=utf-8'});
+      res.end(extraRoutes[clean]);
+      return;
+    }
     for (const file of [path.join(ROOT, clean), path.join(ROOT, clean, 'index.html')]) {
       if (path.relative(ROOT, file).startsWith('..')) continue;
       try {
@@ -302,5 +307,380 @@ test('1001b 실행: 지도 순간 변경(고치기·연결·삭제) — 재적�
     assert.equal(afterDelete.nodes, before.nodes - 1, '점이 하나 줄어든다');
     assert.equal(navs.length, 0, `저장 흐름에서 화면 파일 항해는 0회여야 한다(실측 ${navs.length}: ${JSON.stringify(navs)})`);
     await ctx.close();
+  } finally { await browser.close(); server.close(); }
+});
+
+// #1096: 지도에서 끌어 잇기·옮기기·끊기. 끈 상태는 화면 이동만(저장 0), 켠 상태는 각 동작마다 기존 저장 길 한 번.
+test('#1096 지도 잇기 — 끔 끌기 0회, 켬 옮기기·잇기·끊기 각 1회, 고리 막힘, 390 두 번 누르기, 재적재 0', { skip: skip || !REQUIRE ? skip || 'LT_MAP_RELATIONS_REQUIRE=1 일 때 실행' : false, timeout: 240000 }, async () => {
+  if (skip) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip}`);
+  const {createTree: makeTree, addMoment: growTree} = await import('../public/v41/domain.mjs');
+  const serveApp = serve; // ? ??? ?? ??? ?? ??? ??? ?? ???? ??? ?? ??.
+  const {waitForShownScreen: waitShown} = await import('./helpers/visible-frame.mjs');
+  const CLOCK = '2026-11-01T00:00:00Z';
+  let tree = makeTree({subject: '시험', title: '지도 잇기 트리', note: '', emotion: '설렘', date: '2026-11-01', url: ''}, CLOCK);
+  const root = tree.moments[0].id;
+  const add = (title, parent, date) => {
+    tree = growTree(tree, {title, note: '마음', emotion: '설렘', date, url: ''}, parent, CLOCK);
+    return tree.moments.at(-1).id;
+  };
+  const m2 = add('둘 순간', root, '2026-11-02'),
+    m3 = add('셋 순간', m2, '2026-11-03'),
+    m4 = add('넷 순간', m3, '2026-11-04'),
+    m5 = add('다섯 순간', root, '2026-11-05');
+  const server = await serveApp();
+  const origin = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch();
+  try {
+    const ctx = await browser.newContext({viewport: {width: 1440, height: 900}, reducedMotion: 'reduce', locale: 'ko-KR'});
+    let stored = JSON.parse(JSON.stringify(tree)), rev = 1;
+    const puts = [], navs = [];
+    let counting = false;
+    await ctx.route('**/api/**', r => r.fulfill({status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}'}));
+    await ctx.route('**/api/workspace**', r => {
+      const req = r.request();
+      if (req.method() === 'PUT') {
+        const body = JSON.parse(req.postData() || '{}');
+        puts.push(body?.state?.trees?.[0] || null);
+        const edited = body?.state?.trees?.find(t => t.id === tree.id);
+        if (edited) stored = edited;
+        rev += 1;
+        return r.fulfill({status: 200, contentType: 'application/json', body: JSON.stringify({ok: true, revision: rev, subject: '시험계정'})});
+      }
+      return r.fulfill({status: 200, contentType: 'application/json', body: JSON.stringify({ok: true, revision: rev, subject: '시험계정', writeSubjectBound: true, savedAt: '2026-11-23T00:00:00.000Z', state: {version: 1, trees: [stored], prefs: {}}})});
+    });
+    const page = await ctx.newPage();
+    page.on('framenavigated', f => { if (counting && /\/v41\/(views\/|home\.html)/.test(f.url())) navs.push(f.url()); });
+    page.on('dialog', d => d.accept());
+    await page.goto(`${origin}/v41/?account=1`, {waitUntil: 'load'});
+    await page.waitForFunction(() => !!window.LT41?.trees?.length, null, {timeout: 20000});
+    await page.locator('#discover-ask-no').click().catch(() => {});
+    await page.locator('.tree-views [data-view="track56-network.html"]').click();
+    await waitShown(page, {path: 'track56-network'}, 8000);
+    await page.waitForTimeout(1200);
+    const frame = page.frames().find(f => /views\/track56-network/.test(f.url()));
+    assert.ok(frame, '지도 프레임이 열린다');
+    await frame.evaluate(() => { window.__doc1096 = 'alive'; });
+    counting = true;
+    const box = await (await frame.frameElement()).boundingBox();
+    assert.ok(box, '지도 프레임 자리');
+    const point = async (id, where) => {
+      const p = await frame.evaluate(([x, f]) => f === 'dot'
+        ? window.__lt.dots().find(d => d.id === x)
+        : window.__lt.edgePoint(...x), [id, where]);
+      assert.ok(p, `화면에 있는 자리 ${JSON.stringify(id)}`);
+      return {x: box.x + p.x, y: box.y + p.y};
+    };
+    const drag = async (from, to) => {
+      const a = await point(from, 'dot'), b = await point(to, 'dot');
+      await page.mouse.move(a.x, a.y);
+      await page.mouse.down();
+      await page.mouse.move(b.x, b.y, {steps: 8});
+      await page.mouse.up();
+    };
+    const clickDot = async id => {
+      const p = await point(id, 'dot');
+      await page.mouse.click(p.x, p.y);
+    };
+    const waitPut = async n => {
+      const deadline = Date.now() + 10000;
+      while (Date.now() < deadline && puts.length < n) await page.waitForTimeout(150);
+      assert.equal(puts.length, n, `저장 횟수 ${n}회`);
+    };
+    const waitIdle = () => frame.waitForFunction(() => !window.__lt.connect().busy, null, {timeout: 8000});
+    const base = puts.length;
+
+    // ① 잇기 끔: 점을 다른 점 위로 끌어도 화면만 움직인다(저장 0회).
+    await drag(m2, m3);
+    await page.waitForTimeout(600);
+    assert.equal(puts.length, base, '잇기 끈 상태 끌기는 저장 0회');
+    assert.equal(await frame.evaluate(() => window.__lt.sheet().open), false, '끈 상태에서는 선택 창이 뜨지 않는다');
+
+    // ② 잇기 켜기 — 공통 도구 줄의 단추다.
+    assert.equal(await frame.evaluate(() => document.querySelectorAll('.lt-screen-toolbar[data-screen="network"]').length),
+      1, '1440 지도 저장 화면에는 도구 줄이 하나만 생성된다');
+    const initialConnectHit = await frame.evaluate(() => {
+      const button = document.getElementById('connectToggle');
+      const rect = button.getBoundingClientRect();
+      const point = {x: rect.left + rect.width / 2, y: rect.top + rect.height / 2};
+      const hit = document.elementFromPoint(point.x, point.y);
+      const bars = [...document.querySelectorAll('.lt-screen-toolbar')].map((bar, i) => {
+        const r = bar.getBoundingClientRect();
+        return {index:i, top:r.top, left:r.left, right:r.right, bottom:r.bottom,
+          contains:bar.contains(button), display:getComputedStyle(bar).display};
+      });
+      return {button: {left:rect.left, right:rect.right, top:rect.top, bottom:rect.bottom,
+        hidden:button.hidden, parent:button.parentElement?.className},
+        hit:hit?.id || hit?.className || hit?.tagName, actual:hit === button || button.contains(hit), bars};
+    });
+    assert.equal(initialConnectHit.actual, true,
+      '? ?? ?? ??? ?? ??? ?? ?? ?? ???? ???: ' + JSON.stringify(initialConnectHit));
+    await frame.click('#connectToggle');
+    assert.equal(await frame.evaluate(() => window.__lt.connect().mode), true, '잇기가 켜진다');
+    const bar = await frame.evaluate(() => {
+      const b = document.querySelector('.lt-screen-toolbar'), t = document.getElementById('connectToggle');
+      return {inBar: !!b?.contains(t), hasBack: !!document.querySelector('.lt-screen-toolbar #shelfBackBtn'), height: getComputedStyle(b).height};
+    });
+    assert.ok(bar.inBar && !bar.hasBack, '잇기 단추는 공통 도구 줄에 있고 그 줄에는 ← 서재가 없다');
+    assert.equal(bar.height, '52px', '1440 도구 줄 높이가 책·보드와 같다');
+
+    // ③ 옮기기: 넷 순간을 다섯 순간 다음으로(자손이 아니다) — 저장 1회, 이유 한 줄 저장.
+    await drag(m4, m5);
+    await frame.waitForSelector('#connectSheet:not([hidden])', {timeout: 5000});
+    const moveSheet = await frame.evaluate(() => window.__lt.sheet());
+    assert.equal(moveSheet.mode, 'point');
+    assert.equal(moveSheet.reparentDisabled, false, '자손이 아니면 옮기기를 고를 수 있다');
+    await frame.fill('#connectWhy', '다시 이어진 이유');
+    await frame.click('#connectReparent');
+    await waitPut(base + 1);
+    await waitIdle();
+    assert.equal(await frame.evaluate(() => window.__doc1096), 'alive', '옮기기 뒤에도 같은 문서(재적재 0)');
+    assert.equal(await frame.evaluate(() => document.querySelector('#connectUndo').hidden), false, '되돌리기 안내가 뜬다');
+
+    // ④ 관련 연결 잇기 — 저장 1회.
+    await drag(m2, m5);
+    await frame.waitForSelector('#connectSheet:not([hidden])', {timeout: 5000});
+    await frame.click('#connectLink');
+    await waitPut(base + 2);
+    await waitIdle();
+    await page.waitForTimeout(500);
+    assert.equal(await frame.evaluate(() => window.__doc1096), 'alive', '잇기 뒤에도 같은 문서(재적재 0)');
+
+    // ⑤ 선 눌러 관련 연결 끊기 — 저장 1회.
+    const edge = await point([m2, m5], 'edge');
+    await page.mouse.click(edge.x, edge.y);
+    await frame.waitForSelector('#connectSheet:not([hidden])', {timeout: 5000});
+    assert.equal((await frame.evaluate(() => window.__lt.sheet())).mode, 'related', '관련 선을 누르면 끊기 창이 뜬다');
+    await frame.click('#connectCut');
+    await waitPut(base + 3);
+    await waitIdle();
+    assert.equal(await frame.evaluate(() => window.__doc1096), 'alive', '끊기 뒤에도 같은 문서(재적재 0)');
+
+    // ⑥ 고리: 자손 위로 옮기기는 막히고 이유를 보여 준다(저장 0회).
+    await drag(m2, m3);
+    await frame.waitForSelector('#connectSheet:not([hidden])', {timeout: 5000});
+    const loop = await frame.evaluate(() => window.__lt.sheet());
+    assert.equal(loop.reparentDisabled, true, '자손 위로 옮기기는 비활성');
+    assert.match(loop.note, /자기 자신이나 이어진 다음 순간/, `고리 이유: ${loop.note}`);
+    await frame.click('#connectClose');
+    await page.waitForTimeout(400);
+    assert.equal(puts.length, base + 3, '고리는 저장하지 않는다');
+
+    // ⑦ 390: 점 누름 → '여기에 잇기' → 대상 점 누름(두 번 누르기) — 저장 1회.
+    await page.setViewportSize({width: 390, height: 852});
+    await page.waitForTimeout(900);
+    assert.equal(await frame.evaluate(() => getComputedStyle(document.querySelector('.lt-screen-toolbar')).height), '48px', '390 도구 줄 높이');
+    await clickDot(m2);
+    assert.equal(await frame.evaluate(() => window.__lt.connect().from), m2, '첫 누름으로 출발 점이 정해진다');
+    await clickDot(m5);
+    await frame.waitForSelector('#connectSheet:not([hidden])', {timeout: 5000});
+    assert.equal((await frame.evaluate(() => window.__lt.sheet())).mode, 'point', '두 번째 누름으로 선택 창이 뜬다');
+    await frame.click('#connectLink');
+    await waitPut(base + 4);
+    await waitIdle();
+    assert.equal(await frame.evaluate(() => window.__doc1096), 'alive', '390 잇기 뒤에도 같은 문서(재적재 0)');
+    assert.equal(navs.length, 0, `저장 흐름에서 화면 파일 항해는 0회여야 한다(실측 ${navs.length})`);
+    await ctx.close();
+  } finally { await browser.close(); server.close(); }
+});
+
+// #1096 이어서: 미리보기(호스트가 *.lovetree-4-0.pages.dev)에서 로그아웃 예시 트리를 열 때만 체험을 쓴다.
+test('#1096 체험 — 미리보기 예시 지도에서만 켜지고, 저장 없이 화면 모델만 바뀌며 새로고침하면 되돌아온다', { skip: skip || !REQUIRE ? skip || 'LT_MAP_RELATIONS_REQUIRE=1 일 때 실행' : false, timeout: 240000 }, async () => {
+  if (skip) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip}`);
+  const CLOCK = '2026-11-01T00:00:00Z';
+  const ids = ['m1', 'm2', 'm3', 'm4', 'm5'];
+  const tree = {
+    id: 'demo-tree', title: '예시 지도', subject: '시험',
+    moments: ids.map((id, i) => ({id, title: `순간 ${id}`, date: `2026-11-0${i + 1}`, emotion: '설렘', note: '', url: '', parentId: i === 0 ? null : (id === 'm5' ? 'm1' : ids[i - 1]), relation: '', links: [], createdAt: CLOCK})),
+    edges: [
+      {kind: 'parent', from: 'm1', to: 'm2', reason: ''},
+      {kind: 'parent', from: 'm2', to: 'm3', reason: ''},
+      {kind: 'parent', from: 'm3', to: 'm4', reason: ''},
+      {kind: 'parent', from: 'm1', to: 'm5', reason: ''}
+    ]
+  };
+  const host = (source, writable, owned) => `<!doctype html><html lang="ko"><head><meta charset="utf-8"></head><body><script>window.LT41=${JSON.stringify({source, writable, owned, momentId: 'm1', prefs: {}, tree, trees: [tree]})};</script><iframe src="/v41/views/track56-network.html" style="position:fixed;inset:0;width:100vw;height:100vh;border:0"></iframe></body></html>`;
+  const server = await serve({
+    '/demo-host.html': host('example', false, false),
+    '/login-host.html': host('server', true, true)
+  });
+  const port = server.address().port;
+  const browser = await chromium.launch();
+  try {
+    const open = async (hostname, file, width = 1440, theme = 'night') => {
+      const ctx = await browser.newContext({viewport: {width, height: width <= 390 ? 844 : 900}, reducedMotion: 'reduce', locale: 'ko-KR'});
+      await ctx.addInitScript(themeName => { try { localStorage.setItem('lt41.theme', themeName); } catch {} }, theme);
+      await ctx.route('**/*', async route => {
+        const req = route.request(), u = new URL(req.url());
+        const simulated = u.hostname === 'lovetree.padiem.net' || u.hostname === 'lovetree-4-0.pages.dev' || u.hostname.endsWith('.lovetree-4-0.pages.dev');
+        if (!simulated) { await route.continue(); return; }
+        const local = new URL(req.url());
+        local.hostname = '127.0.0.1';
+        local.port = String(port);
+        const res = await fetch(local, {method: req.method(), headers: req.headers()});
+        await route.fulfill({status: res.status, contentType: res.headers.get('content-type') || 'text/plain', body: Buffer.from(await res.arrayBuffer())});
+      });
+      const page = await ctx.newPage();
+      await page.addInitScript(() => {
+        window.__saves = [];
+        addEventListener('message', e => { if (e.data?.type === 'lt41-map-relation-save') window.__saves.push(e.data); });
+      });
+      await page.goto(`http://${hostname}:${port}/${file}`, {waitUntil: 'load'});
+      const frame = page.frames().find(f => /track56-network/.test(f.url()));
+      assert.ok(frame, `${hostname}: 지도 프레임이 열린다`);
+      await frame.waitForFunction(() => window.__lt?.dots?.().length > 0, null, {timeout: 20000});
+      await page.waitForTimeout(500);
+      return {ctx, page, frame};
+    };
+    // #1219: 좁은 화면에서도 잇기를 도구 줄에서 바로 보고 누를 수 있어야 합니다.
+    for (const width of [390, 360]) for (const theme of ['night', 'garden']) {
+      const mobile = await open('preview.lovetree-4-0.pages.dev', 'login-host.html', width, theme);
+      try {
+        const measured = await mobile.frame.evaluate(() => {
+          const button = document.getElementById('connectToggle');
+          const bar = document.querySelector('.lt-screen-toolbar');
+          const row = bar?.querySelector('.lt-toolbar-tools');
+          const rect = button?.getBoundingClientRect();
+          const css = button ? getComputedStyle(button) : null;
+          const rowRect = row?.getBoundingClientRect();
+          const barRect = bar?.getBoundingClientRect();
+          const hit = rect ? document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2) : null;
+          return {
+            hit: hit === button || button?.contains(hit) || false,
+            hitTarget: hit?.id || hit?.className || hit?.tagName,
+            pointer: css?.pointerEvents,
+            top: rect?.top, bottom: rect?.bottom,
+            groupLeft: rowRect?.left, groupRight: rowRect?.right,
+            barTop: barRect?.top, barBottom: barRect?.bottom,
+            exists: !!button, hidden: button?.hidden,
+            visible: !!rect && rect.width >= 40 && rect.height >= 36 && css.display !== 'none',
+            inRow: !!row?.contains(button),
+            inBar: !!bar?.contains(button),
+            left: rect?.left, right: rect?.right, viewport: innerWidth,
+            pressed: button?.getAttribute('aria-pressed')
+          };
+        });
+        const label = width + '/' + theme;
+        assert.equal(await mobile.frame.evaluate(() => document.querySelectorAll('.lt-screen-toolbar[data-screen="network"]').length),
+          1, label + ': 지도 도구 줄은 하나만 생성된다');
+        assert.equal(measured.exists, true, label + ': 잇기 단추가 존재합니다');
+        assert.equal(measured.hidden, false, label + ': 잇기 단추에 숨김 속성이 없습니다');
+        assert.equal(measured.visible, true, label + ': 표시 크기가 충분합니다 ' + JSON.stringify(measured));
+        assert.equal(measured.inRow, true, label + ': 잇기가 더 보기 메뉴가 아닌 도구 줄에 있습니다');
+        assert.equal(measured.inBar, true, label + ': 공통 도구 줄 안에 있습니다');
+        assert.ok(measured.left >= -0.5 && measured.right <= measured.viewport + 0.5,
+          label + ': 잇기가 화면 가로 범위 안에 있습니다');
+        assert.equal(measured.hit, true, label + ': 실제 클릭 지점이 잇기 단추입니다 ' + JSON.stringify(measured));
+        assert.equal(measured.pressed, 'false', label + ': 처음에는 선택되지 않습니다');
+        await mobile.frame.click('#connectToggle');
+        assert.equal(await mobile.frame.evaluate(() => window.__lt.connect().mode), true,
+          label + ': 잇기를 누르면 모드가 켜집니다');
+        assert.equal(await mobile.frame.locator('#connectToggle').getAttribute('aria-pressed'), 'true',
+          label + ': 선택 상태가 켜집니다');
+        if (process.env.LT_MAP_CONNECT_CAPTURE_DIR) {
+          mkdirSync(process.env.LT_MAP_CONNECT_CAPTURE_DIR, { recursive: true });
+          await mobile.page.screenshot({
+            path: path.join(process.env.LT_MAP_CONNECT_CAPTURE_DIR, 'connect-' + width + '-' + theme + '.png')
+          });
+        }
+        await mobile.frame.click('#connectToggle');
+        assert.equal(await mobile.frame.evaluate(() => window.__lt.connect().mode), false,
+          label + ': 다시 누르면 잇기 모드가 꺼집니다');
+      } finally { await mobile.ctx.close(); }
+    }
+
+    const preview = await open('preview.lovetree-4-0.pages.dev', 'demo-host.html');
+    try {
+      const initial = await preview.frame.evaluate(() => ({
+        demo: window.__lt.connect(),
+        demoButton: !document.getElementById('demoToggle').hidden,
+        connectButton: !document.getElementById('connectToggle').hidden
+      }));
+      assert.equal(initial.demo.available, true, '미리보기 + 로그아웃 예시 트리에서 체험이 가능하다');
+      assert.equal(initial.demoButton, true, '도구 줄에 잇기 체험 단추가 보인다');
+      assert.equal(initial.connectButton, false, '읽기 전용 예시에는 실제 잇기 단추가 없다');
+      const box = await (await preview.frame.frameElement()).boundingBox();
+      const point = async id => {
+        const d = await preview.frame.evaluate(x => window.__lt.dots().find(p => p.id === x), id);
+        assert.ok(d, `점 ${id}`);
+        return {x: box.x + d.x, y: box.y + d.y};
+      };
+      const readModel = () => preview.frame.evaluate(() => ({
+        parent: window.LTDEMO.moments.find(m => m.id === 'm4').parentId,
+        edges: window.LTDEMO.edges.map(e => `${e.kind}:${e.from}>${e.to}`)
+      }));
+      const before = await readModel();
+
+      // ?? ??? ??? ????? ? ?? ??? ?? ?? ???? ????.
+      const demoHit = await preview.frame.evaluate(() => {
+        const button = document.getElementById('demoToggle');
+        const rect = button.getBoundingClientRect();
+        const target = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+        return {
+          parent: button.parentElement?.className,
+          pointer: getComputedStyle(button).pointerEvents,
+          left: rect.left, top: rect.top, width: rect.width, height: rect.height,
+          target: target?.id || target?.className || target?.tagName,
+          clickable: button === target || button.contains(target)
+        };
+      });
+      assert.equal(demoHit.clickable, true,
+        '???? ?? ?? ??? ?? ?? ??? ???? ???: ' + JSON.stringify(demoHit));
+      await preview.frame.click('#demoToggle');
+      assert.equal(await preview.frame.evaluate(() => window.__lt.connect().banner), true, '화면 위쪽에 체험 띠가뜬다');
+
+      // 옮기기
+      let a = await point('m4'), b = await point('m5');
+      await preview.page.mouse.click(a.x, a.y);
+      await preview.page.mouse.click(b.x, b.y);
+      await preview.frame.waitForSelector('#connectSheet:not([hidden])', {timeout: 5000});
+      await preview.frame.click('#connectReparent');
+      await preview.page.waitForTimeout(400);
+      assert.equal((await readModel()).parent, 'm5', '체험에서 이전 순간이 화면 모델만 바뀐다');
+
+      // 잇기
+      a = await point('m2'); b = await point('m5');
+      await preview.page.mouse.click(a.x, a.y);
+      await preview.page.mouse.click(b.x, b.y);
+      await preview.frame.waitForSelector('#connectSheet:not([hidden])', {timeout: 5000});
+      await preview.frame.click('#connectLink');
+      await preview.page.waitForTimeout(400);
+      assert.ok((await readModel()).edges.includes('related:m2>m5'), '체험에서 관련 연결이 화면에만 생긴다');
+
+      // 끊기
+      const onEdge = await preview.frame.evaluate(() => window.__lt.edgePoint('m2', 'm5'));
+      assert.ok(onEdge, '방금 이은 선이 그려진다');
+      await preview.page.mouse.click(box.x + onEdge.x, box.y + onEdge.y);
+      await preview.frame.waitForSelector('#connectSheet:not([hidden])', {timeout: 5000});
+      assert.equal((await preview.frame.evaluate(() => window.__lt.sheet())).mode, 'related');
+      await preview.frame.click('#connectCut');
+      await preview.page.waitForTimeout(400);
+      assert.ok(!(await readModel()).edges.includes('related:m2>m5'), '체험에서 관련 연결이 화면에서만 끊긴다');
+
+      assert.deepEqual(await preview.page.evaluate(() => window.__saves), [], '체험은 저장 요청 0회');
+      assert.equal((await readModel()).edges.filter(x => x.startsWith('parent:')).length, before.edges.filter(x => x.startsWith('parent:')).length, '부모 선 개수는 그대로다');
+
+      await preview.page.reload({waitUntil: 'load'});
+      const fresh = preview.page.frames().find(f => /track56-network/.test(f.url()));
+      assert.ok(fresh, '새로고침 뒤 지도 프레임');
+      await fresh.waitForFunction(() => window.__lt?.dots?.().length > 0, null, {timeout: 20000});
+      await preview.page.waitForTimeout(400);
+      assert.equal(await fresh.evaluate(() => window.LTDEMO.moments.find(m => m.id === 'm4').parentId), 'm3', '새로고침하면 원래 연결로 돌아온다');
+      assert.equal(await fresh.evaluate(() => window.__lt.connect().mode), false, '새로고침하면 체험이 꺼진다');
+      assert.equal(await fresh.evaluate(() => document.getElementById('demoBanner').hidden), true, '새로고침하면 체험 띠가 사라진다');
+    } finally { await preview.ctx.close(); }
+
+    const prod = await open('lovetree.padiem.net', 'demo-host.html');
+    try {
+      assert.equal(await prod.frame.evaluate(() => window.__lt.connect().available), false, '운영 주소에서는 체험이 불가능하다');
+      assert.equal(await prod.frame.evaluate(() => document.getElementById('demoToggle').hidden), true, '운영 주소에는 체험 단추가 없다');
+    } finally { await prod.ctx.close(); }
+
+    const logged = await open('preview.lovetree-4-0.pages.dev', 'login-host.html');
+    try {
+      assert.equal(await logged.frame.evaluate(() => window.__lt.connect().available), false, '로그인·쓰기 가능한 트리에서는 체험이 불가능하다');
+      assert.equal(await logged.frame.evaluate(() => document.getElementById('demoToggle').hidden), true, '로그인 상태에는 체험 단추가 없다');
+      assert.equal(await logged.frame.evaluate(() => document.getElementById('connectToggle').hidden), false, '대신 실제 잇기 단추가 보인다');
+    } finally { await logged.ctx.close(); }
+
   } finally { await browser.close(); server.close(); }
 });

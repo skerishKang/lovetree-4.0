@@ -204,6 +204,23 @@ export function createMessages(deps) {
       } catch (error) { notify(error?.message || '순서를 저장하지 못했어요.'); }
       return;
     }
+    // #1096: 지도의 '잇기'에서 온 요청도 같은 트리의 기존 reparent·link·unlink 길만 쓴다.
+    // 새 저장 경로·새 서버 호출은 없다. 성공하면 member-runtime이 momentsSaved를 띄워 지도가 제자리에서 다시 그린다.
+    if (data?.type === MSG.mapRelationSave) {
+      const action = data.action;
+      const reply = (ok, error) => { try { event.source?.postMessage({type:MSG.mapRelationSaved, ok, action, error}, location.origin); } catch {} };
+      if (!['reparent', 'link', 'unlink'].includes(action)) { reply(false, '알 수 없는 연결 변경이에요.'); return; }
+      if (getSource() !== 'server' || !getMember()?.snapshot().writable) { reply(false, '읽어 보는 화면에서는 연결을 바꿀 수 없어요.'); return; }
+      const tree = getModel()?.trees.find(item => item.id === data.treeId);
+      if (!tree || !tree.moments.some(item => item.id === data.momentId)) { reply(false, '순간을 찾지 못했어요.'); return; }
+      try {
+        const input = {targetId: String(data.targetId || '')};
+        if (action === 'reparent') input.relation = typeof data.relation === 'string' ? data.relation : '';
+        getMember().apply(action, input, {treeId: tree.id, momentId: data.momentId});
+        reply(true, '');
+      } catch (error) { reply(false, error?.message || '연결을 바꾸지 못했어요.'); }
+      return;
+    }
     // 261117 고객 의견: 첫 화면 둘째 줄 '모아둔 순간 N개 정리하기' — 모아둔 순간 정리 창을 연다(옮기기와 별개).
     if (data?.type === MSG.cleanup && getSource() === 'server') { openCleanup({}); return; }
     if (data?.type === MSG.openBook && getModel()?.trees.some(t => t.id === data.treeId && t.moments.some(m => m.id === data.id))) {

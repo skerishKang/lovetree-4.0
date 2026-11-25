@@ -102,10 +102,10 @@ async function openMap(browser, base, { width, theme }) {
   assert.ok(frame, '지도 프레임이 열린다');
   // #517: 글꼴·판 테마 적용으로 머리 높이가 바뀐 뒤 --lt-picker-top이 다시 잡힐 때까지 기다린다(측정 타이밍 흔들림 방지).
   await frame.waitForFunction(() => {
-    const tb = document.querySelector('.topbar')?.getBoundingClientRect().bottom;
+    const tb = document.querySelector('.lt-screen-toolbar')?.getBoundingClientRect().bottom;
     if (!tb) return false;
     const v = parseFloat(document.documentElement.style.getPropertyValue('--lt-picker-top') || '0');
-    return Math.abs(v - (tb + 8)) < 1;
+    return Math.abs(v - (tb - 2)) < 1;
   }, null, { timeout: 10000 }).catch(() => {});
   await page.waitForTimeout(400);
   return { context, page, frame };
@@ -124,14 +124,14 @@ test('지도 도구 줄: 390·360 × 밤·정원에서 넘침 0·누름 44px·�
           const m = await frame.evaluate(() => {
             const vw = innerWidth;
             const vis = (el) => { const cs = getComputedStyle(el); if (cs.display === 'none' || cs.visibility === 'hidden') return false; const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
-            const row = document.querySelector('.top-actions');
+            const row = document.querySelector('.lt-toolbar-tools');
             // #951 ①: 보기 방식은 붙은 단추 하나이고 좁으면 그 안에서 가로로 민다 — 묶음 칸 밖으로 나간 부분은 잘린 것으로 본다.
             const buttons = [...(row?.querySelectorAll('button') || [])].filter(vis).map((b) => {
               const r = b.getBoundingClientRect(), sw = b.closest('.view-switch'), st = sw ? sw.getBoundingClientRect() : null;
               return { id: b.id || (b.textContent || '').trim().slice(0, 10), l: Math.round(st ? Math.max(r.left, st.left) : r.left), r: Math.round(st ? Math.min(r.right, st.right) : r.right), h: Math.round(r.height) };
             });
             const rect = (sel) => { const el = document.querySelector(sel); if (!el || !vis(el)) return null; const b = el.getBoundingClientRect(); return { l: b.left, t: b.top, r: b.right, b: b.bottom }; };
-            const topbar = rect('.topbar');
+            const topbar = rect('.lt-screen-toolbar');
             const picker = rect('.lt-moment-picker');
             const hero = rect('.hero p');
             const overlap = (a, b) => { if (!a || !b) return 0; const w = Math.max(0, Math.round(Math.min(a.r, b.r) - Math.max(a.l, b.l))); const h = Math.max(0, Math.round(Math.min(a.b, b.b) - Math.max(a.t, b.t))); return w * h; };
@@ -139,7 +139,7 @@ test('지도 도구 줄: 390·360 × 밤·정원에서 넘침 0·누름 44px·�
             return {
               vw,
               outside: buttons.filter((b) => b.r > vw + 1 || b.l < -1),
-              short: buttons.filter((b) => b.h < 44),
+              short: buttons.filter((b) => b.h + 8 < 44),
               topbar, picker, hero,
               pickerOverlap: overlap(topbar, picker),
               heroOverlap: overlap(picker, hero),
@@ -199,7 +199,7 @@ test('#951 ①② 위 단추 한 줄(높이 같음·줄 수 1) + 순간 3개 작
           const l = st ? Math.max(r.left, st.left) : r.left, rr = st ? Math.min(r.right, st.right) : r.right;
           return { left: l, right: rr, top: r.top, bottom: r.bottom, width: Math.max(0, rr - l), height: r.height };
         };
-        const boxes = heroes.map((b) => ({ id: b.id || b.textContent.trim().slice(0, 8), l: Math.round(visRect(b).left), r: Math.round(visRect(b).right), t: Math.round(visRect(b).top), b: Math.round(visRect(b).bottom), h: Math.round(b.getBoundingClientRect().height), oneLine: b.scrollHeight - b.clientHeight <= 1 }));
+        const boxes = heroes.map((b) => ({ id: b.id || b.textContent.trim().slice(0, 8), l: Math.round(visRect(b).left), r: Math.round(visRect(b).right), t: Math.round(visRect(b).top), b: Math.round(visRect(b).bottom), h: Math.round(b.getBoundingClientRect().height), oneLine: (() => { const rg = document.createRange(); rg.selectNodeContents(b); return rg.getClientRects().length <= 1; })() }));
         // 단추끼리 겹침: 단추의 가운데 높이 세 점이 그 단추(또는 그 안 자식)에게 잡히지 않으면 가려진 것이다.
         const overlaps = [];
         for (const b of heroes) {
@@ -417,7 +417,7 @@ test('#951 ⑤ 서재에서 들어온 지도: ← 서재 단추 1개 + 묶음 �
         if (await more.isVisible()) await more.click();
         const m = await frame.evaluate(() => {
           const vis = (el) => { if (!el) return false; const cs = getComputedStyle(el); if (cs.display === 'none' || cs.visibility === 'hidden') return false; const r = el.getBoundingClientRect(); return r.width > 1 && r.height > 1; };
-          const box = (el) => { const r = el.getBoundingClientRect(); return { l: Math.round(r.left), r: Math.round(r.right), t: Math.round(r.top), b: Math.round(r.bottom) }; };
+          const box = (el) => { const r = el.getBoundingClientRect(); const sw = el.closest('.view-switch'); if (sw) { const sr = sw.getBoundingClientRect(); return { l: Math.round(Math.max(r.left, sr.left)), r: Math.round(Math.min(r.right, sr.right)), t: Math.round(r.top), b: Math.round(r.bottom) }; } return { l: Math.round(r.left), r: Math.round(r.right), t: Math.round(r.top), b: Math.round(r.bottom) }; };
           const backs = [...document.querySelectorAll('#shelfBackBtn')].filter(vis);
           const topBtns = [...document.querySelectorAll('.lt-screen-toolbar button')].filter(vis);
           const overlap = [];

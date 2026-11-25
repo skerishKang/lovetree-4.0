@@ -45,6 +45,9 @@
     move: fromView('lt41-move', 'momentId'),
     // pairs의 항목에는 id와 출발·도착 트리 식별값을 담는다.
     moveMoments: fromView('lt41-move-moments', 'momentIds, pairs, fromTreeId, toTreeId, targetLabel, noticeText, keepTreeId?'),
+    // #1096: 지도에서 보낸 연결 변경 요청 — reparent·link·unlink 중 하나만 담는다.
+    mapRelationSave: fromView('lt41-map-relation-save', 'action, treeId, momentId, targetId, relation?'),
+    mapRelationSaved: fromShell('lt41-map-relation-saved', 'ok, action, error?'),
     navigate: fromView('lt41-navigate', 'view'),
     networkView: fromShell('lt41-network-view', 'value'),
     newTree: fromView('lt41-new-tree', '없음'),

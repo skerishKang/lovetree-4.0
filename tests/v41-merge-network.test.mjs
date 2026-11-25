@@ -36,7 +36,8 @@ test('실제 기록 판본 문구를 기준으로 통일했다(범례 제목·�
 
 test('재생 안내는 source가 아니라 데이터 상태(예시 여부)로 갈린다', () => {
   assert.match(SERVER, /if\s*\(!canPlay\)\s*\{\s*toast\('실제 연결은 상단 부모·자식 및 관련 순간에서 선택하세요\.'\);\s*return;?\s*\}/);
-  assert.doesNotMatch(SERVER, /source\s*===\s*['"]example['"]/);
+  // #1096: 미리보기 체험은 호스트와 예시 트리 여부를 함께 확인해야 하므로 source 비교가 필요하다.
+  // 재생 안내 자체가 source로 갈라지는지는 위의 canPlay 단언이 그대로 막는다(동작 기준).
   assert.match(RUNTIME, /example:!!demo/);
 });
 

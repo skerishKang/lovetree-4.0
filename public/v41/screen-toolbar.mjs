@@ -72,7 +72,9 @@ export function mountScreenToolbar({ screen, titleFrom, tools = [], initialBar =
       if (header.offsetHeight > 0) root.style.setProperty('--lt-toolbar-top', `${header.offsetHeight + 4}px`);
       return;
     }
-    const bottom = Math.round(header.getBoundingClientRect().bottom) + 4;
+    // 지도는 머리 아래 작은 글자('순간 N · 이어진 선 N')가 먼저 오므로 그 자리를 비워 둔다.
+    const gap = screen === 'network' ? 26 : 4;
+    const bottom = Math.round(header.getBoundingClientRect().bottom) + gap;
     root.style.setProperty('--lt-toolbar-top', `${bottom}px`);
   };
   align();
@@ -121,7 +123,8 @@ export function mountScreenToolbar({ screen, titleFrom, tools = [], initialBar =
     else if (!narrow && reset.parentElement !== boardMode) boardMode.append(reset);
   };
   let stashed = [];
-  const isPlay = (el) => /^(playAllBtn|cinemaBtn|mapPlayBtn)$/.test(el.id || '');
+  const isPinnedConnect = (el) => screen === 'network' && /^(connectToggle|demoToggle)$/.test(el?.id || '') && !el.hidden;
+  const isPlay = (el) => /^(playAllBtn|cinemaBtn|mapPlayBtn)$/.test(el.id || '') || isPinnedConnect(el);
   // 오른쪽 정렬(group justify-content:flex-end)에서는 넘치는 칸이 왼쪽 밖으로 나가 scrollWidth에 잡히지 않는다.
   // 보이는 단추 폭의 합으로 직접 재어 넘침을 판정한다(기준을 낮추지 않는다).
   const fits = () => {
@@ -167,6 +170,7 @@ export function mountScreenToolbar({ screen, titleFrom, tools = [], initialBar =
     if (!fits()) stash(items.filter((el) => !isPlay(el) && essential(el)));
     for (let i = plays.length - 1; i >= 0 && !fits(); i -= 1) {
       const el = plays[i];
+      if (isPinnedConnect(el)) continue;
       menu.prepend(el);
       // 이어 보기는 맨 오른쪽으로 돌아와야 한다 — 앞에 넣으면 되돌릴 때 제일 왼쪽으로 간다.
       stashed.push(el);
@@ -185,7 +189,7 @@ export function mountScreenToolbar({ screen, titleFrom, tools = [], initialBar =
   if (typeof ResizeObserver === 'function') {
     const observer = new ResizeObserver(reflow);
     observer.observe(bar);
-    if (screen === 'board' && header) observer.observe(header);
+    if ((screen === 'board' || screen === 'network') && header) observer.observe(header);
   } else window.addEventListener('resize', reflow);
   reflow();
 

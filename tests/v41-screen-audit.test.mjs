@@ -706,6 +706,17 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     await take(page3, '보드·알림 줄');
     await lowerToast(page3);
     await page3.evaluate(() => document.body.classList.remove('lt-fab-ok'));
+    // #1096: 공통 도구 줄은 지도와 보드에서 같은 자리에 있어야 한다(오차 2px) — 보드를 먼저 재어 둔다.
+    const boardToolbar = await page3.evaluate(() => {
+      const frame = [...document.querySelectorAll('iframe')].find((f) => { try { return /track58-pinboard/.test(f.contentWindow.location.href); } catch { return false; } });
+      if (!frame) return null;
+      const box = (el) => { if (!el) return null; const r = el.getBoundingClientRect(); return { t: r.top, b: r.bottom, l: r.left, r: r.right }; };
+      const off = box(frame);
+      const tb = box(frame.contentDocument.querySelector('.lt-screen-toolbar'));
+      if (!off || !tb) return null;
+      return { top: tb.t + off.t, bottom: tb.b + off.t, height: Math.round(tb.b - tb.t) };
+    }).catch(() => null);
+    assert.ok(boardToolbar, '보드 도구 줄을 셸 안에서 잰다');
     await page3.evaluate(() => { location.hash = '#network'; });
     await page3.waitForTimeout(1800);
     await take(page3, '지도');
@@ -740,6 +751,20 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     assert.equal(mapHeader.overflowX, 0, `지도 머리줄 가로 넘침 0(실제 ${mapHeader.overflowX})`);
     assert.deepEqual(mapHeader.outOfFrame, [], '머리줄 단추가 화면 밖으로 나가지 않는다');
     assert.deepEqual(mapHeader.pairTexts, [], `머리줄 단추 겹침 0(실제 ${JSON.stringify(mapHeader.pairTexts)})`);
+    const mapToolbar = await page3.evaluate(() => {
+      const frame = [...document.querySelectorAll('iframe')].find((f) => { try { return /track56-network/.test(f.contentWindow.location.href); } catch { return false; } });
+      if (!frame) return null;
+      const box = (el) => { if (!el) return null; const r = el.getBoundingClientRect(); return { t: r.top, b: r.bottom, l: r.left, r: r.right }; };
+      const off = box(frame);
+      const tb = box(frame.contentDocument.querySelector('.lt-screen-toolbar'));
+      if (!off || !tb) return null;
+      return { top: tb.t + off.t, bottom: tb.b + off.t, height: Math.round(tb.b - tb.t) };
+    }).catch(() => null);
+    assert.ok(mapToolbar, '지도 도구 줄을 셸 안에서 잰다');
+    const gap = (a, b) => Math.abs(a - b);
+    assert.ok(gap(boardToolbar.top, mapToolbar.top) <= 2, `지도 도구 줄 위에 보드와 같다(보드 ${boardToolbar.top}·지도 ${mapToolbar.top})`);
+    assert.ok(gap(boardToolbar.height, mapToolbar.height) <= 2, `도구 줄 높이가 같다(보드 ${boardToolbar.height}·지도 ${mapToolbar.height})`);
+    assert.ok(gap(boardToolbar.bottom, mapToolbar.bottom) <= 2, `도구 줄 아래 경계가 같다(보드 ${boardToolbar.bottom}·지도 ${mapToolbar.bottom})`);
     // #638: 지도 390(조작 줄) — iframe 안 조작 줄이 셸의 링크 줄·＋ 단추와 겹치지 않고, 보기 전환 단추 대비 4.5:1.
     if (width === 390) {
       const ribbonCheck = await page3.evaluate(() => {
