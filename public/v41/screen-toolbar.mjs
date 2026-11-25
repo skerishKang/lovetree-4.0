@@ -1,3 +1,4 @@
+import { MSG } from './frame-messages.mjs';
 import { thumbnailCandidates } from './thumb-fallback.mjs';
 // #1091: 상단 메뉴 아래 화면 도구 줄 한 벌. 책·보드가 각자 그리던 줄 대신 이 부품을 호출한다.
 // 서재는 #1154가 상단을 바꾸는 중이라 아직 붙이지 않는다.
@@ -37,10 +38,10 @@ function prepareTreeChoice(bar, screen, title, titleFrom) {
     choice.addEventListener('click', event => {
       event.stopPropagation();
       const box = choice.getBoundingClientRect();
-      window.parent.postMessage({type:'lt41-toolbar-tree-picker', rect:{left:box.left,top:box.top,right:box.right,bottom:box.bottom}, via:event.detail===0?'keyboard':'mouse'}, location.origin);
+      window.parent.postMessage({type:MSG.toolbarTreePicker, rect:{left:box.left,top:box.top,right:box.right,bottom:box.bottom}, via:event.detail===0?'keyboard':'mouse'}, location.origin);
     });
     window.addEventListener('message', event => {
-      if(event.source!==window.parent || event.origin!==location.origin || event.data?.type!=='lt41-toolbar-tree-picker-state')return;
+      if(event.source!==window.parent || event.origin!==location.origin || event.data?.type!==MSG.toolbarTreePickerState)return;
       choice.setAttribute('aria-expanded',String(!!event.data.open));
       if(event.data.focus) choice.focus();
     });

@@ -99,11 +99,11 @@ function activeViewFrame(){
 }
 function tellFrame(open, focus=false){
  const frame=activeFrame;
- if(frame?.contentWindow)frame.contentWindow.postMessage({type:'lt41-toolbar-tree-picker-state',open,focus},location.origin);
+ if(frame?.contentWindow)frame.contentWindow.postMessage({type:MSG.toolbarTreePickerState,open,focus},location.origin);
 }
 function focusChoiceOnReady(){
  const frame=activeViewFrame();
- frame?.addEventListener('load',()=>{frame.contentWindow?.postMessage({type:'lt41-toolbar-tree-picker-state',open:false,focus:true},location.origin);},{once:true});
+ frame?.addEventListener('load',()=>{frame.contentWindow?.postMessage({type:MSG.toolbarTreePickerState,open:false,focus:true},location.origin);},{once:true});
 }
 function openTreeMenu(via='keyboard',rect=null,frame=null){
  if(!treePopover || deps.source!=='server' || !deps.member?.snapshot().owned || !deps.member?.snapshot().writable)return;
@@ -128,7 +128,7 @@ function closeTreeMenu(focus=false){
  activeFrame=null;
 }
 window.addEventListener('message',event=>{
- if(event.origin!==location.origin || event.data?.type!=='lt41-toolbar-tree-picker')return;
+ if(event.origin!==location.origin || event.data?.type!==MSG.toolbarTreePicker)return;
  const frame=activeViewFrame();
  if(!frame || event.source!==frame.contentWindow || deps.source!=='server' || !deps.member?.snapshot().owned || !deps.member?.snapshot().writable || !window.LT41?.tree)return;
  if(!['track32-bookshelf.html','track59-sketchbook.html','track58-pinboard.html','track56-network.html','track61-tree.html'].includes(deps.current))return;

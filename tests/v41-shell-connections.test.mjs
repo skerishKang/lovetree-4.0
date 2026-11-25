@@ -11,7 +11,7 @@ const SHELL_CONNECTIONS = [
   'account-entry', 'account-form', 'account-logout', 'account-open-settings',
   'advanced-backup', 'advanced-import', 'media-change-toggle', 'clear', 'delete-moment', 'editor-assets-open',
   'editor-cancel', 'empty-file', 'empty-records', 'empty-sample', 'file', 'logout', 'mobile-more', 'moment-form',
-  'profile-color', 'profile-form', 'profile-reset', 'record-menu', 'sample', 'server', 'settings-assets-open',
+  'profile-color', 'profile-form', 'profile-reset', 'sample', 'server', 'settings-assets-open',
   'share-copy', 'share-create', 'share-menu', 'share-moment', 'share-preview', 'share-view', 'tree-cover',
   'tree-delete', 'tree-form', 'tree-tips-close', 'settings-advanced', 'write-menu'
 ];
@@ -36,5 +36,6 @@ test('셸이 연결하던 요소는 지금도 셸·shell/ 안에서 연결을 �
   //  대신 '영상 바꾸기'(media-change-toggle) 연결을 이 자리에서 고정한다.
   const missing = SHELL_CONNECTIONS.filter(id => !new RegExp(String.raw`(?:\$\s*|\(\s*0\s*,\s*ctx\.\$\s*\)\s*)\(\s*'${id}'\s*\)\s*\??\s*\.\s*(onclick|onchange|onsubmit|oninput|addEventListener)\b`).test(source));
   assert.deepEqual(missing, [], '연결이 사라진 요소: ' + missing.join(', '));
-  assert.equal(SHELL_CONNECTIONS.length, 40);
+  assert.equal(SHELL_CONNECTIONS.length, 39);
+  assert.ok(source.includes('MSG.toolbarTreePicker'), '?? ?? ??? ??? ??? ????');
 });

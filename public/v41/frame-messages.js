@@ -53,6 +53,8 @@
     openNetwork: fromView('lt41-open-network', 'momentId, treeId?'),
     openTags: fromView('lt41-open-tags', 'suggest'),
     openView: fromView('lt41-open-view', 'treeId, view'),
+    toolbarTreePicker: fromView('lt41-toolbar-tree-picker', 'rect, via'),
+    toolbarTreePickerState: fromShell('lt41-toolbar-tree-picker-state', 'open, focus'),
     pageTurn: fromShell('lt41-page-turn', 'value'),
     // patch.treeChipOrder는 새 순서대로 정렬한 트리 식별값 배열이다.
     prefs: fromView('lt41-prefs', 'patch'),
