@@ -885,3 +885,47 @@ test('#1026 첫 화면 카드는 첫 궤도 자리를 받은 뒤에만 보이고
     } finally { await close952(h); }
   } finally { await browser.close(); }
 });
+
+// #1365: 지도에서 첫 화면으로 돌아올 때 빈 구간이 없음을 페이지 안 시계로 잰다.
+// 고치기 전 1440·390 모두 약 1.05~1.10초였고, 지금은 0.2초 안이다.
+// 최종 기준은 실측 보고로 정하므로 여기서는 '고치기 전보다 빠르다'만 확인하고 측정값을 출력에 남긴다.
+test('#1365 지도→첫 화면 전환에서 뼈대가 고치기 전보다 빨리 보인다', { skip: REQUIRE952 ? false : skip952, timeout: 180000 }, async () => {
+  if (skip952) assert.fail(skip952);
+  const browser = await chromium952.launch({ headless: true });
+  try {
+    for (const width of [390, 1440]) {
+      const h = await boot952(browser, { width, member: true, motion: 'no-preference' });
+      try {
+        await h.page.evaluate(() => { location.hash = '#network'; });
+        await h.page.waitForFunction(() => {
+          try { return /track56-network\.html/.test(document.querySelector('#view:not([hidden])')?.contentWindow.location.pathname || ''); }
+          catch { return false; }
+        }, null, { timeout: 20000 });
+        await h.page.waitForTimeout(1200);
+        await h.page.evaluate(() => {
+          const R = { t0: null, marks: {} };
+          window.__LT1365 = R;
+          const mark = k => { if (R.t0 !== null && !(k in R.marks)) R.marks[k] = Math.round(performance.now() - R.t0); };
+          const poll = () => {
+            for (const f of document.querySelectorAll('iframe')) {
+              try {
+                if (f.hidden || f.closest('[hidden]') || !/home\.html$/.test(f.contentWindow.location.pathname)) continue;
+              } catch { continue; }
+              mark('frameRevealed');
+              const sr = f.contentDocument?.getElementById('orbit')?.shadowRoot;
+              const center = sr?.querySelector('.center'), card = sr?.querySelector('.card');
+              if (center && !center.hasAttribute('data-lt-home-wait') && card && !card.classList.contains('lt-first-frame')) mark('skeletonVisible');
+            }
+            if (!('skeletonVisible' in R.marks)) requestAnimationFrame(poll);
+          };
+          document.querySelector('.brand').addEventListener('click', () => { R.t0 = performance.now(); poll(); }, { once: true, capture: true });
+        });
+        await h.page.locator('.brand').first().click();
+        await h.page.waitForFunction(() => 'skeletonVisible' in window.__LT1365.marks, null, { timeout: 15000 });
+        const marks = await h.page.evaluate(() => window.__LT1365.marks);
+        console.log(`#1365 ${width} 지도→첫 화면: ${JSON.stringify(marks)}`);
+        assert.ok(marks.skeletonVisible < 800, `${width} 뼈대가 고치기 전(약 1050ms)보다 빨라야 한다: ${marks.skeletonVisible}ms`);
+      } finally { await close952(h); }
+    }
+  } finally { await browser.close(); }
+});
