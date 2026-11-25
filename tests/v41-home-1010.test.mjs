@@ -491,6 +491,7 @@ async function closePreview(home) {
 }
 
 async function auditPreviewPlayback(page, home, item, label) {
+  const addBefore = await page.locator('#mobile-add').isVisible();
   const card = await openPreviewCard(home, item.id);
   const player = previewPlayer(home, item.kind);
   await player.waitFor({ state: 'visible', timeout: 15000 });
@@ -503,7 +504,9 @@ async function auditPreviewPlayback(page, home, item, label) {
   assert.equal(audit.autoplay, true, label + ' 공식 자동 재생');
   assert.equal(await countEmbedAutoplay(home), 1, label + ' 동시 자동 재생은 1개');
   assert.equal(await previewShellBlockers(page, player), 0, label + ' 셸 요소가 가리지 않는다');
+  if (addBefore) assert.equal(await page.locator('#mobile-add').isVisible(), false, label + ' 큰 보기 동안 #mobile-add 숨김');
   await closePreview(home);
+  assert.equal(await page.locator('#mobile-add').isVisible(), addBefore, label + ' 닫은 뒤 #mobile-add 표시 복귀');
 }
 
 // #791: '스크립트를 불렀다'가 아니라 '재생기가 실제로 보인다'를 확인한다(실제 브라우저).
@@ -557,14 +560,17 @@ test('#1378 홈 인스타그램 모의 oEmbed 404 — iframe 제거·원본 링�
     for (const theme of ['night', 'garden']) for (const width of [390, 1440]) {
       const h = await openPreview(browser, preview, { width, theme, instagramUnavailable: true });
       try {
+        const addBefore = await h.page.locator('#mobile-add').isVisible();
         await openPreviewCard(h.home, 'pv-ig-1');
         await h.home.waitForFunction(() => {
           const root = document.getElementById('orbit').shadowRoot;
           return root.querySelector('#mediaPlayHome').hidden && root.querySelector('#mediaExternalHome').textContent === '인스타그램에서 보기';
         });
         assert.equal(await h.home.locator('#mediaExternalHome').getAttribute('href'), PREVIEW_IG_URL, '재생 불가 원본 릴스 링크');
+        if (addBefore) assert.equal(await h.page.locator('#mobile-add').isVisible(), false, width + '·' + theme + ' 재생 불가 큰 보기 동안 #mobile-add 숨김');
         await assertPreviewClean(h.home);
         await closePreview(h.home);
+        assert.equal(await h.page.locator('#mobile-add').isVisible(), addBefore, width + '·' + theme + ' 재생 불가 닫은 뒤 #mobile-add 표시 복귀');
         assert.deepEqual(h.unexpected, [], width + '·' + theme + ': 모의하지 않은 외부 요청 0');
       } finally { await h.context.close(); }
     }

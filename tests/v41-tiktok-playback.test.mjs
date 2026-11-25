@@ -95,8 +95,15 @@ function openerFor(frame,view,kind){
 async function openMoment(page,view,kind,tree){
  const moment=momentFor(tree,kind);
  const query=view==='board'?'?tree='+tree.id:'?tree='+tree.id+'&moment='+moment.id;
- await page.evaluate(({view,query})=>location.hash='#my/'+view+query,{view,query});
- const frame=page.frameLocator('#view'),opener=openerFor(frame,view,kind);
+ const hash='#my/'+view+query,previousHash=await page.evaluate(()=>location.hash);
+ const previousFrame=await page.evaluateHandle(()=>[...document.querySelectorAll('#view,#view-next')].find(x=>!x.hidden&&x.getClientRects().length)||null);
+ await page.evaluate(hash=>{location.hash=hash},hash);
+ if(hash!==previousHash)await page.waitForFunction(previous=>{
+  const current=[...document.querySelectorAll('#view,#view-next')].find(x=>!x.hidden&&x.getClientRects().length);
+  return current&&current!==previous;
+ },previousFrame,{timeout:20000});
+ await previousFrame.dispose();
+ const frame=page.frameLocator('#view:not([hidden])'),opener=openerFor(frame,view,kind);
  await opener.waitFor({state:'visible',timeout:20000});
  return {frame,opener};
 }
@@ -131,12 +138,13 @@ async function assertNoPlaybackIframe(frame){
  assert.equal(await countEmbedAutoplay(frame),0,'자동 재생 iframe도 남아 있지 않다');
 }
 
-async function auditPlayback(page,frame,opener,kind,label){
+async function auditPlayback(page,frame,opener,kind,label,addBefore){
  const media=MEDIA[kind];
  await assertCompactHasNoIframe(opener);
  await opener.click();
  const player=frame.locator('.lt-lightbox iframe[src*="'+(kind==='tiktok'?'/player/v1/':'/reel/')+'"]');
  await player.waitFor({state:'visible',timeout:15000});
+ if(addBefore)assert.equal(await page.locator('#mobile-add').isVisible(),false,label+' 큰 보기 동안 #mobile-add 숨김');
  await assertCompactHasNoIframe(opener);
  assert.equal(await player.getAttribute('src'),media.src,label+' 공식 주소');
  const audit=await inspectEmbedIframe(player);
@@ -150,20 +158,23 @@ async function auditPlayback(page,frame,opener,kind,label){
  await frame.locator('.lt-lightbox-close').click();
  await frame.locator('.lt-lightbox').waitFor({state:'detached'});
  await assertNoPlaybackIframe(frame);
+ assert.equal(await page.locator('#mobile-add').isVisible(),addBefore,label+' 닫은 뒤 #mobile-add 표시 복귀');
 }
 
-async function auditInstagramFailure(frame,opener,state,label){
+async function auditInstagramFailure(page,frame,opener,state,label,addBefore){
  state.instagramUnavailable=true;
  try{
   await assertCompactHasNoIframe(opener);
   await opener.click();
   const note=frame.locator('.lt-lightbox-note').filter({hasText:'여기에서 재생할 수 없는 영상입니다.'});
   await note.waitFor({state:'visible',timeout:15000});
+  if(addBefore)assert.equal(await page.locator('#mobile-add').isVisible(),false,label+' 재생 불가 큰 보기 동안 #mobile-add 숨김');
   assert.equal(await note.locator('a').getAttribute('href'),MEDIA.instagram.url,label+' 재생 불가 원본 링크');
   await assertNoPlaybackIframe(frame);
   await frame.locator('.lt-lightbox-close').click();
   await frame.locator('.lt-lightbox').waitFor({state:'detached'});
   await assertNoPlaybackIframe(frame);
+  assert.equal(await page.locator('#mobile-add').isVisible(),addBefore,label+' 재생 불가 닫은 뒤 #mobile-add 표시 복귀');
  }finally{state.instagramUnavailable=false;}
 }
 
@@ -226,9 +237,9 @@ async function runOwnerMatrix(browser,server,view){
   try{
    for(const kind of ['tiktok','instagram']){
     const {frame,opener}=await openMoment(h.page,view,kind,tree);
-    const label=width+'·'+theme+'·'+view+'·'+kind;
-    await auditPlayback(h.page,frame,opener,kind,label);
-    if(kind==='instagram')await auditInstagramFailure(frame,opener,h.state,label);
+    const label=width+'·'+theme+'·'+view+'·'+kind,addBefore=await h.page.locator('#mobile-add').isVisible();
+    await auditPlayback(h.page,frame,opener,kind,label,addBefore);
+    if(kind==='instagram')await auditInstagramFailure(h.page,frame,opener,h.state,label,addBefore);
    }
    assert.deepEqual(h.unexpected,[],width+'·'+theme+'·'+view+' 모의하지 않은 외부 요청 0');
   }finally{await h.ctx.close();}
@@ -263,7 +274,8 @@ test('#1378 공유 실제 진입 경로 #share/<id>/book에서 틱톡·인스타
      await page.waitForFunction(()=>[...document.querySelectorAll('#view,#view-next')].some(f=>!f.hidden&&f.getClientRects().length&&f.contentDocument?.querySelector('.moment')),null,{timeout:20000});
      const frame=page.frameLocator('#view'),opener=openerFor(frame,'book',kind);
      await opener.waitFor({state:'visible',timeout:20000});
-     await auditPlayback(page,frame,opener,kind,width+'·'+theme+'·share·'+kind);
+     const addBefore=await page.locator('#mobile-add').isVisible();
+     await auditPlayback(page,frame,opener,kind,width+'·'+theme+'·share·'+kind,addBefore);
     }
     assert.deepEqual(unexpected,[],'공유 경로에서 모의하지 않은 외부 요청 0');
    }finally{await ctx.close();}
