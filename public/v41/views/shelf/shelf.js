@@ -32,11 +32,11 @@ import { VIEWS } from './shelf-views.mjs';
       var state = { filter:'all', query:'', selectedId:null, shelfIndex:0, shelfOffset:0, shelfList:[], chapterIndex:0, open:false, openProgress:0, customBooks:[], pageTurning:false };
       var storageKey = 'lovetree-people-book-shelf-v2-1-true-page-motion';
       var drag = { active:false, mode:'', startX:0, startY:0, moved:false, startProgress:0 };
-      // #1093: 계정 설정(bookDisplay와 같은 길) → 기기 미러 → 기본 선반.
+      // #1366: 계정 설정(bookDisplay와 같은 길) → 기기 미러 → 기본 회전.
       function shelfView() {
         try { var v=parent.LT41?.prefs?.shelfView; if(v==='shelf'||v==='carousel')return v; } catch {}
         try { var m=localStorage.getItem('lt41.shelfView'); if(m==='shelf'||m==='carousel')return m; } catch {}
-        return 'shelf';
+        return 'carousel';
       }
       function paintShelfViewInline(){
         var view=shelfView();
@@ -106,7 +106,8 @@ import { VIEWS } from './shelf-views.mjs';
          paintShelfViewInline();
         var railWidth=($('#shelfRail')&&$('#shelfRail').clientWidth)||0;
         // #944: 시작은 첫 책 왼쪽 끝이 책장 안쪽 여백. 고른 책이 뒤쪽이면 보이게만 최소로 민다.
-        state.shelfOffset=shelfRowLayout(list.length, railWidth).offsetFor(state.shelfIndex, state.shelfOffset||0);
+        // #1366: 선반은 그리드가 모든 책을 보여 주므로 캐러셀 넘김 값을 쓰지 않는다.
+        state.shelfOffset=shelfView()==='shelf'?0:shelfRowLayout(list.length, railWidth).offsetFor(state.shelfIndex, state.shelfOffset||0);
         // #889 원래 결정: 화살표는 책이 한 줄에 다 안 들어갈 때(넘김 배치일 때)만 둔다.
         applyShelfArrows(list.length,railWidth);
         // 261118 대표 지적 4: 트리가 있으면 소개 문 대신 이어 보기 띠 한 줄. 트리 0개일 때만 소개 문('…한 권의 책으로.'+'책 열기')이 보인다.
@@ -177,8 +178,8 @@ import { VIEWS } from './shelf-views.mjs';
       }
       // 화살표 0개(다 들어감) / 2개(넘침). 레일 폭이 정해지기 전에는 잠시 숨기고, ResizeObserver가 다시 맞춘다.
       function applyShelfArrows(count, railWidth) {
-        // 화살표는 보기 방식과 무관하게 옛날과 같은 넘침 조건에서만 뜬다(도구 줄 토글은 계산에 넣지 않는다).
-        var show=railWidth>0&&shelfRowLayout(count, railWidth).mode==='carousel'&&count>0;
+        // #1366: 선반은 여러 줄 그리드라 넘김이 없다. 화살표는 회전 보기에서만 둔다.
+        var show=shelfView()!=='shelf'&&railWidth>0&&shelfRowLayout(count, railWidth).mode==='carousel'&&count>0;
         var prevArrow=$('#shelfPrev'),nextArrow=$('#shelfNext');
         if(prevArrow)prevArrow.hidden=!show;
         if(nextArrow)nextArrow.hidden=!show;

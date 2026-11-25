@@ -306,7 +306,7 @@ export const SHELF_VIEW_KEY = 'lt41.shelfView';
 export const SHELF_VIEW_SHELF = 'shelf';
 export const SHELF_VIEW_CAROUSEL = 'carousel';
 export const SHELF_VIEWS = [SHELF_VIEW_SHELF, SHELF_VIEW_CAROUSEL];
-export const DEFAULT_SHELF_VIEW = SHELF_VIEW_SHELF;
+export const DEFAULT_SHELF_VIEW = SHELF_VIEW_CAROUSEL;
 
 export function normalizeShelfView(value) {
   return SHELF_VIEWS.includes(value) ? value : DEFAULT_SHELF_VIEW;
