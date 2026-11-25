@@ -1,4 +1,4 @@
-/* #1359 넓은 화면 검토용: 모든 색은 기존 화면 토큰 재사용 */
+/* #1359 넓은 화면: 모든 색은 기존 화면 토큰 재사용 */
 @media (min-width:1200px) {
   .lt1359-info {
     position:absolute;right:clamp(22px,3vw,76px);top:134px;

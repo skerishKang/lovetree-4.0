@@ -318,7 +318,7 @@ test('#1359 넓은 보드와 지도, 최근 순간 및 휴대폰 회귀', {skip:
     await page.route('**/*', route => {
       const url = route.request().url();
       if (!url.startsWith(base)) return route.abort();
-      if (baseline && /wide-1359\.(js|css)$/.test(url)) return route.fulfill({status:200,contentType:url.endsWith('.js')?'text/javascript':'text/css',body:''});
+      if (baseline && /wide-info-panel\.(js|css)$/.test(url)) return route.fulfill({status:200,contentType:url.endsWith('.js')?'text/javascript':'text/css',body:''});
       return route.continue();
     });
     // 같은 데이터의 모바일 전후를 같은 애니메이션 시각에서 비교한다.
@@ -337,18 +337,28 @@ test('#1359 넓은 보드와 지도, 최근 순간 및 휴대폰 회귀', {skip:
     return page;
   }
   try {
-    for(const screen of ['board','network']) for(const [width,height] of [[1280,800],[1440,900],[1920,1080]]) for(const theme of ['night','garden']) for(const n of [5,54]) {
+    for(const screen of ['board','network']) for(const [width,height] of [[1280,800],[1440,900],[1920,1080]]) for(const theme of ['night','garden']) for(const n of [5,40,54]) {
       const page = await open(screen,width,height,theme,n);
       try {
-        const g = await page.evaluate(() => {
+        const g = await page.evaluate(n => {
           const app=document.querySelector('.app'), surface=document.querySelector('.surface');
           const style=el=>getComputedStyle(el);
-          return {overflow:document.documentElement.scrollWidth-innerWidth, panel:!!document.querySelector('.lt1359-info'),cols:window.LT58Model?.gridColumns(innerWidth),
+          return {overflow:document.documentElement.scrollWidth-innerWidth, panel:!!document.querySelector('.lt1359-info'),cols:window.LT58Model?.gridColumns(innerWidth,n),
             appBg:style(app).backgroundColor, surfaceBg:surface?style(surface).backgroundColor:null,
             appImage:style(app).backgroundImage,surfaceImage:surface?style(surface).backgroundImage:null};
-        });
+        },n);
         assert.equal(g.overflow,0);
         assert.equal(g.panel,n===5);
+        if(screen==='board') {
+          const geometry=await page.evaluate(() => {
+            const rects=[...document.querySelectorAll('#cardLayer .card')].map(c=>c.getBoundingClientRect());
+            return {count:rects.length,min:Math.min(...rects.map(r=>r.left)),max:Math.max(...rects.map(r=>r.right))};
+          });
+          assert.equal(geometry.count,n);
+          assert.ok(geometry.min>=0,screen+' '+width+' '+theme+' '+n+' 왼쪽 카드 잘림: '+JSON.stringify(geometry));
+          assert.ok(geometry.max<=width,screen+' '+width+' '+theme+' '+n+' 오른쪽 카드 잘림: '+JSON.stringify(geometry));
+          if(n===54) assert.ok(Math.abs(geometry.min-(width-geometry.max))<=60,'좌우 여백 대칭: '+JSON.stringify(geometry));
+        }
         if(screen==='board' && n===54){
           assert.equal(g.cols,width===1280?4:width===1440?5:7);
           assert.equal(g.appBg,g.surfaceBg);
@@ -366,8 +376,36 @@ test('#1359 넓은 보드와 지도, 최근 순간 및 휴대폰 회귀', {skip:
             selected: window.__lt?.state?.selected?.id,
             button: document.querySelector('.lt1359-info button')?.textContent
           }), id);
+          await page.waitForFunction(() => document.querySelector('#detail')?.classList.contains('open')).catch(async () => {
+            const detail = await page.evaluate(() => ({opened:document.querySelector('#detail')?.className, id:document.querySelector('.lt1359-info button')?.dataset.momentId, card:document.querySelector('#cardLayer .card')?.dataset.id, network:!!window.__lt, moments:window.LTDEMO?.moments?.length}));
+            throw Error(`상세 열기 실패: ${screen} ${width} ${theme} ${n}: ${JSON.stringify(detail)}`);
+          });
           assert.ok((await page.locator('#detail').getAttribute('class') || '').includes('open'), `${screen} ${width} ${theme} ${n} 상세 열기: ${JSON.stringify(opened)}`);
           assert.equal(await page.locator(screen==='board'?'#dTitle':'#detailTitle').textContent(),chainTree(n).moments.find(m=>m.id===id).title);
+        }
+      } finally {await page.close();}
+    }
+    for(const screen of ['board','network']) {
+      const page=await open(screen,1440,900,'night',54);
+      try {
+        const measure=()=>page.evaluate(screen => {
+          if(screen==='board') {
+            const cards=[...document.querySelectorAll('#cardLayer .card')].map(c=>c.getBoundingClientRect());
+            return {cols:LT58Model.gridColumns(innerWidth,54),min:Math.min(...cards.map(c=>c.left)),max:Math.max(...cards.map(c=>c.right))};
+          }
+          return {width:innerWidth,box:window.__lt?.box()};
+        },screen);
+        const first=await measure();
+        await page.setViewportSize({width:1920,height:1080});
+        await page.waitForFunction(() => innerWidth===1920);
+        await page.evaluate(() => new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+        const second=await measure();
+        if(screen==='board') {
+          assert.equal(first.cols,5);
+          assert.equal(second.cols,7);
+          assert.ok(second.min>=0&&second.max<=1920,'크기 변경 뒤 카드 가로 잘림 없음');
+        } else {
+          assert.ok(second.box.w>first.box.w,'지도 1920 배치 영역 확대');
         }
       } finally {await page.close();}
     }
@@ -400,8 +438,8 @@ test('#1359 넓은 보드와 지도, 최근 순간 및 휴대폰 회귀', {skip:
         await page.unroute('**/*');
         await page.route('**/*', route => route.request().url().startsWith(base) ? route.continue() : route.abort());
         // 같은 화면에 신규 CSS·JS만 주입해 390 배치·스타일 변경 0을 판정한다.
-        await page.addStyleTag({ url: base + '/v41/wide-1359.css' });
-        await page.addScriptTag({ url: base + '/v41/wide-1359.js' });
+        await page.addStyleTag({ url: base + '/v41/wide-info-panel.css' });
+        await page.addScriptTag({ url: base + '/v41/wide-info-panel.js' });
         assert.equal(await page.locator('.lt1359-info').count(),0);
         await settleMobile(page);
         const appearanceAfter=await mobileAppearance(page);

@@ -237,7 +237,7 @@ function setBoardMode(mode, { save = true, replace = true, animate = false } = {
 // '날짜순'에서는 저장 자리도 날짜순 바둑판으로 다시 꽂는다(보여 주기만 — 저장 값을 지우지 않는다).
 function gridPlan(vw) {
   const slots = LT58Model.pinboardSpread(LT58Model.dateDescOrder(moments), {
-    cols: LT58Model.gridColumns(vw),
+    cols: LT58Model.gridColumns(vw, moments.length),
     saved: boardMode === 'mine' ? savedSlotsOf(moments) : null
   });
   const tops = LT58Model.gridRowTops(slots, id => reservedHeights.get(id) || BASE_RESERVED_H);
@@ -325,7 +325,7 @@ function discardBoardUndoSnapshot(value) {
 function placeStacked() {
   const seq = boardMode === 'date' ? LT58Model.dateDescOrder(moments) : momentOrder;
   const layout = LT58Model.stackLayout(seq, {
-    cols: LT58Model.gridColumns(innerWidth),
+    cols: LT58Model.gridColumns(innerWidth, moments.length),
     reservedOf: id => reservedHeights.get(id) || BASE_RESERVED_H
   });
   let i = 0;
@@ -353,7 +353,7 @@ function placeAll() {
 function insertCells(excludeId) {
   const seq = momentOrder.filter(id => id !== excludeId);
   const layout = LT58Model.stackLayout(seq, {
-    cols: LT58Model.gridColumns(innerWidth),
+    cols: LT58Model.gridColumns(innerWidth, moments.length),
     reservedOf: id => reservedHeights.get(id) || BASE_RESERVED_H
   });
   return seq.map((id, i) => {
@@ -506,7 +506,7 @@ function previewShift(dragId, hit) {
   if (sig === previewSig) return;
   previewSig = sig;
   const layout = LT58Model.stackLayout(seq, {
-    cols: LT58Model.gridColumns(innerWidth),
+    cols: LT58Model.gridColumns(innerWidth, moments.length),
     reservedOf: id2 => reservedHeights.get(id2) || BASE_RESERVED_H
   });
   let i = 0;
@@ -968,6 +968,12 @@ function noteUserView() {
 // 기억하면 드러난 뒤 resize가 맞춤(55%)을 다시 적용해 처음 80%·기억한 자리가 무시됐다 → 처음 자리 대기로 둔다.
 // #1249: 휴대폰 일반 진입은 첫 카드부터 100% 크기로 실제 스크롤한다.
 // 명시적으로 선택한 순간으로 진입할 때는 그 카드로 이동하되 모든 카드에 닿을 수 있다.
+function wideBoardHorizontal(cards, viewportWidth, zoom) {
+  const box = LT58Model.contentBox(cards, 0);
+  if (!box || viewportWidth < 1200) return null;
+  const z = Math.min(zoom, (viewportWidth - 48) / box.w);
+  return { z, x: (viewportWidth - box.w * z) / 2 - box.x * z };
+}
 function boardStartView() {
   if (innerWidth < 700) {
     const bounds = mobileBoardBounds();
@@ -1009,6 +1015,10 @@ function boardStartView() {
     v.y = Math.max(v.y, safe.y + 20 - Math.min(...cards.map(c => c.y)) * v.z);
   viewMode = v.mode === 'user' ? 'user' : 'start';
   if (v.mode === 'user') userView = saved;
+  else if (vw >= 1200) {
+    const horizontal = wideBoardHorizontal(cards, vw, v.z);
+    if (horizontal) Object.assign(v, horizontal);
+  }
   Object.assign(view, { x: v.x, y: v.y, z: v.z });
   applyView(false);
 }
@@ -1706,3 +1716,9 @@ function syncBoardPush() {
   if (viewMode === 'fit') fitAll(false);
   else boardStartView();
 }
+
+// 넓은 화면의 최근 순간 버튼도 보드에서 사용하는 상세 열기를 그대로 호출한다.
+addEventListener('lt-wide-open-moment', e => {
+  const id = e.detail?.id;
+  if (moments.some(m => m.id === id)) selectMoment(id, true);
+});

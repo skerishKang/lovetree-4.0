@@ -1,4 +1,4 @@
-// #1359: 넓은 화면 비교 시안. 운영 반영 전 검토용 코드.
+// 넓은 화면에서 기록이 적을 때 보이는 트리 요약 및 최근 순간 안내.
 (() => {
   if (innerWidth < 1200) return;
   const screen = document.documentElement.dataset.v41Screen;
@@ -6,22 +6,6 @@
   const sparse = data.length <= 8;
   document.documentElement.classList.add('lt1359-wide');
   document.documentElement.classList.toggle('lt1359-sparse', sparse);
-  // 기존 40개 보드의 4열·10줄 배치 계약은 유지하고, 더 밀집한 트리에서만 열을 확장한다.
-  if (screen === 'board' && data.length >= 48 && globalThis.LT58Model) {
-    const original = LT58Model.gridColumns;
-    LT58Model.gridColumns = width => width >= 1200
-      ? Math.max(original(width), Math.floor((width - 44) / 265))
-      : original(width);
-  }
-  if (screen === 'network' && !sparse && globalThis.LT56Model) {
-    const original = LT56Model.networkLayout;
-    LT56Model.networkLayout = (moments, opts) => {
-      if (innerWidth < 1200 || moments.length <= 8) return original(moments, opts);
-      const b = opts.box;
-      const grow = Math.min(72, b.w * .045);
-      return original(moments, { ...opts, box: { ...b, x: b.x - grow, w: b.w + grow * 2 } });
-    };
-  }
   if (!sparse) return;
   const mount = () => {
     const app = document.querySelector('.app');
@@ -47,11 +31,7 @@
       });
       button.addEventListener('click', e => {
         e.stopPropagation();
-        if (screen === 'board') selectMoment(moment.id, true);
-        else {
-          const node = window.__lt?.nodes.find(n => n.id === moment.id);
-          if (node) window.__lt.selectMoment(node, true);
-        }
+        dispatchEvent(new CustomEvent('lt-wide-open-moment', { detail: { id: moment.id } }));
       });
       item.append(button);
       list.append(item);
