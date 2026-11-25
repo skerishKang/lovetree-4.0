@@ -115,16 +115,7 @@ test('상단 메뉴: 같은 글자 크기·테두리 0·세로선 0·현재 탭 
             width + '/' + theme + ': folded menu follows the same order');
           await page.keyboard.press('Escape');
         }
-        await testBackNavigation(page, {
-          recorded: true,
-          settleMs: 300,
-          action: width === 390
-            ? async () => {
-                await page.locator('#mobile-more').click();
-                await page.locator('#header-overflow [role="menuitem"]').filter({ hasText: /\uB458\uB7EC\uBCF4\uAE30/ }).click();
-              }
-            : () => page.locator('#community-menu').click(),
-        });
+
 
         const base = perScreen.shelf;
         const xsStable = SCREENS.every(([name]) => JSON.stringify(perScreen[name].xs) === JSON.stringify(base.xs));
@@ -148,6 +139,16 @@ test('상단 메뉴: 같은 글자 크기·테두리 0·세로선 0·현재 탭 
           await page.evaluate(() => { for (const d of document.querySelectorAll('dialog[open]')) d.close(); });
           await page.screenshot({ path: `${SHOT}/menu-${width}-${theme}.png` });
         }
+        await testBackNavigation(page, {
+          recorded: true,
+          settleMs: 300,
+          action: width === 390
+            ? async () => {
+                await page.locator('#mobile-more').click();
+                await page.locator('#header-overflow [role="menuitem"]').filter({ hasText: /\uB458\uB7EC\uBCF4\uAE30/ }).click();
+              }
+            : () => page.locator('#community-menu').click(),
+        });
         await ctx.close();
       }
     }
