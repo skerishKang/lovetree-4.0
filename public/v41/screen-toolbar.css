@@ -204,7 +204,7 @@ html[data-v41-screen=network] .lt-screen-toolbar :is(.lt-toolbar-tools,.lt-toolb
 html[data-v41-screen=network] body .lt-screen-toolbar :is(.lt-toolbar-tools,.lt-toolbar-menu) :is(#overviewBtn,#netBgBtn){background:var(--lt-glass-strong);border-color:var(--lt-line);color:var(--lt-pearl);box-shadow:none}
 
 /* #1367 PR 2: reserved thumbnail, text ellipsis and a 44px unified hit target. */
-.lt-toolbar-tree-choice{box-sizing:border-box;display:inline-flex;align-items:center;gap:6px;flex:0 1 auto;min-width:0;max-width:clamp(100px,25vw,300px);height:44px;min-height:44px;padding:4px 8px;border:1px solid var(--lt-role-idle-border);border-radius:var(--lt-r-pill);background:var(--lt-role-idle-bg);color:var(--lt-role-idle-ink);font:600 14px/1.3 var(--lt-ui);text-align:left;white-space:nowrap;cursor:default}
+.lt-toolbar-tree-choice{box-sizing:border-box;display:inline-flex;align-items:center;gap:6px;flex:0 1 auto;min-width:112px;max-width:clamp(112px,25vw,300px);height:44px;min-height:44px;padding:4px 8px;border:1px solid var(--lt-role-idle-border);border-radius:var(--lt-r-pill);background:var(--lt-role-idle-bg);color:var(--lt-role-idle-ink);font:600 14px/1.3 var(--lt-ui);text-align:left;white-space:nowrap;cursor:default}
 button.lt-toolbar-tree-choice{cursor:pointer}
 button.lt-toolbar-tree-choice:hover,button.lt-toolbar-tree-choice:focus-visible{background:var(--lt-role-hover-bg);color:var(--lt-role-hover-ink);border-color:var(--lt-role-hover-border);outline-offset:2px}
 .lt-toolbar-tree-thumb{display:flex;align-items:center;justify-content:center;flex:0 0 30px;width:30px;height:30px;overflow:hidden;border-radius:50%;border:1px solid var(--lt-role-border);background:var(--lt-role-bg);color:var(--lt-role-text-strong);font-size:14px}
