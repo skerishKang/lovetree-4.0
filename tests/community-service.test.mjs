@@ -782,6 +782,51 @@ test('moments 2단계: 가수 꼬리표 상위 6개와 구간 값을 함께 준�
  assert.ok(filtered.items.every(i=>i.keywords.includes('가수:가수A')));
 });
 
+test('#1356 이 트리만: shareId는 그 공유 트리의 공개 순간만 — 다른 팬·숨김·소개 끈·비공개 트리는 빈 목록',async()=>{
+ const d=momentsSetup();
+ const alice=await d.save('alice','앨리스 트리',[
+  {title:'앨리스 쇼츠1',url:SHORTS_URL('aaaa1111111'),keywords:['가수:가수A']},
+  {title:'앨리스 쇼츠2',url:SHORTS_URL('bbbb2222222'),keywords:['가수:가수B']}
+ ]);
+ const bob=await d.save('bob','밥 트리',[{title:'밥 쇼츠',url:SHORTS_URL('cccc3333333'),keywords:['가수:가수A']}]);
+ const hidden=await d.save('carol','숨김 트리',[{title:'숨김 쇼츠',url:SHORTS_URL('dddd4444444')}]);
+ const off=await d.save('dave','소개 끈 트리',[{title:'끈 쇼츠',url:SHORTS_URL('eeee5555555')}]);
+ const priv=await d.save('erin','비공개 트리',[{title:'비공개 쇼츠',url:SHORTS_URL('ffff6666666')}]);
+ d.setPrivate(priv.tree.id);
+ await d.communityRepo.createReport({productId:PRODUCT,reportId:'report-1356-hidden',shareId:hidden.shareId,subjectId:'moderator',reason:'시험',clientKey:'key-1356-hidden'});
+ await d.communityRepo.moderateReport({productId:PRODUCT,reportId:'report-1356-hidden',status:'resolved',visibility:'hidden',actorSubjectId:'admin'});
+ for(const row of d.rows)await d.discoverRepo.set({productId:PRODUCT,subjectId:row.subjectId,treeId:row.treeId,discover:row.subjectId!=='dave'});
+ d.seed();
+ const titles=async q=>(await momentsCall(d.service,q)).items.map(i=>i.title).sort();
+ assert.deepEqual(await titles('limit=30&shareId='+alice.shareId),['앨리스 쇼츠1','앨리스 쇼츠2'],'앨리스 트리 공개 순간만');
+ assert.deepEqual(await titles('limit=30&shareId='+bob.shareId),['밥 쇼츠'],'밥 트리만');
+ assert.deepEqual(await titles('limit=30&shareId='+hidden.shareId),[],'숨김 공유는 빈 목록');
+ assert.deepEqual(await titles('limit=30&shareId='+off.shareId),[],'소개 끈 트리는 빈 목록');
+ assert.deepEqual(await titles('limit=30&shareId='+priv.shareId),[],'비공개 트리는 빈 목록');
+ assert.deepEqual(await titles('limit=30'),['밥 쇼츠','앨리스 쇼츠1','앨리스 쇼츠2'],'인자 없으면 전체 공개 순간');
+});
+
+test('#1356 이 트리만: 없는 shareId·잘못된 형식은 빈 목록, tag·exclude와 함께 쓰인다',async()=>{
+ const d=momentsSetup();
+ const alice=await d.save('alice','앨리스 트리',[
+  {title:'앨리스 쇼츠1',url:SHORTS_URL('aaaa1111111'),keywords:['가수:가수A']},
+  {title:'앨리스 쇼츠2',url:SHORTS_URL('bbbb2222222'),keywords:['가수:가수B']}
+ ]);
+ await d.save('bob','밥 트리',[{title:'밥 쇼츠',url:SHORTS_URL('cccc3333333'),keywords:['가수:가수A']}]);
+ for(const row of d.rows)await d.discoverRepo.set({productId:PRODUCT,subjectId:row.subjectId,treeId:row.treeId,discover:true});
+ d.seed();
+ const total=async q=>(await momentsCall(d.service,q)).total;
+ assert.equal(await total('limit=30'),3,'기존 결과 3개');
+ assert.equal(await total('limit=30&shareId='+'x'.repeat(26)),0,'없는 공유는 빈 목록');
+ assert.equal(await total('limit=30&shareId=short'),0,'짧은 형식은 빈 목록');
+ assert.equal(await total('limit=30&shareId='),0,'빈 값은 빈 목록');
+ assert.equal(await total('limit=30&shareId='+encodeURIComponent('bad id!!/../../x'+'y'.repeat(20))),0,'허용되지 않는 문자는 빈 목록');
+ assert.equal(await total('limit=30&shareId='+'z'.repeat(65)),0,'너무 긴 형식은 빈 목록');
+ assert.equal(await total('limit=30&shareId='+alice.shareId+'&tag='+encodeURIComponent('가수:가수A')),1,'tag와 함께: 앨리스 트리의 그 가수만');
+ assert.equal(await total('limit=30&shareId='+alice.shareId+'&exclude=aaaa1111111'),1,'exclude와 함께: 본 영상은 뺀다');
+ assert.equal(await total('limit=30&shareId='+alice.shareId+'&tag='+encodeURIComponent('가수:가수B')+'&exclude=bbbb2222222'),0,'tag·exclude 둘 다: 남는 것 없음');
+});
+
 test('담기: 공개 순간을 고른 트리에 복사해도 원본 공개 트리는 그대로다',async()=>{
  const {copyPublicMoment}=await import('../public/v41/moments-copy.mjs');
  const workspaceRepo=createMemoryWorkspaceRepo(),workspace=createWorkspaceService({repo:workspaceRepo,productId:PRODUCT});

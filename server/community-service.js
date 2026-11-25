@@ -317,13 +317,15 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
   // 공개 판정은 공개 읽기 경로(listPublicTagShares + projectSharedTree)를 그대로 쓰고,
   // 세로 판정도 화면과 같은 한 벌(isVerticalMoment)을 쓴다 — 서버에 규칙을 복사하지 않는다.
   // 이미 본 영상 id(youtube id)는 요청에서 받아 제외한다(세션 동안 같은 영상 반복 0).
-  async moments({limit=MOMENT_FEED_LIMIT,exclude=[],tag='',viewerSubjectId=null}={}){
+  async moments({limit=MOMENT_FEED_LIMIT,exclude=[],tag='',viewerSubjectId=null,shareId=null}={}){
+   // #1356 '이 트리만': 공개 조건은 전체와 같고 트리 조건만 더한다. 형식이 틀리면 빈 목록(없는 트리와 같은 답).
+   if(shareId!==null&&!SHARE_ID.test(String(shareId)))return {items:[],total:0,groups:[]};
    const want=Number.isFinite(Number(limit))?Math.max(1,Math.min(MOMENT_FEED_LIMIT,Math.floor(Number(limit)||MOMENT_FEED_LIMIT))):MOMENT_FEED_LIMIT;
    const seen=new Set((Array.isArray(exclude)?exclude:[]).map(x=>String(x||'').trim()).filter(Boolean));
    const parsedTag=tag?parseTag(clean(tag,28)):null;
    const tagValue=parsedTag?.kindId!==null&&parsedTag?.kindId!==undefined?tagKey(parsedTag.value):null;
    const matchesTag=moment=>!tagValue||(Array.isArray(moment.keywords)&&moment.keywords.some(raw=>{const p=parseTag(raw);return !!p&&p.kindId===parsedTag.kindId&&tagKey(p.value)===tagValue;}));
-   const shares=await communityRepo.listPublicTagShares({productId,viewerSubjectId,limit:400});
+   const shares=await communityRepo.listPublicTagShares({productId,viewerSubjectId,limit:400,treeShareId:shareId});
    const docs=new Map(),roles=new Map(),found=[],groupCounts=new Map();
    for(const share of shares){
     let stored=docs.get(share.subjectId);
@@ -469,7 +471,7 @@ export function createCommunityHandler({authenticate,service,productId}){
   // #627 3단계 '다른 팬 보기' — 공개 경로라 로그인 없이도 부른다. 로그인했으면 자기 트리·차단 관계를 뺀다.
   if(path==='/api/public/tag-moments'&&method==='GET'){const who=await principal(request,false);return {status:200,body:await service.tagMoments({tag:String(query.get('tag')||''),viewerSubjectId:who?.subjectId||null}),headers:NO_STORE};}
   // #1025: 공개 세로 순간 무작위 조회(로그인 없이도 부른다). exclude=쉼표로 구분한 본 영상 id.
-  if(path==='/api/public/moments'&&method==='GET'){const who=await principal(request,false);return {status:200,body:await service.moments({limit:query.get('limit')||MOMENT_FEED_LIMIT,exclude:String(query.get('exclude')||'').split(',').map(x=>x.trim()).filter(Boolean),tag:String(query.get('tag')||''),viewerSubjectId:who?.subjectId||null}),headers:NO_STORE};}
+  if(path==='/api/public/moments'&&method==='GET'){const who=await principal(request,false);return {status:200,body:await service.moments({limit:query.get('limit')||MOMENT_FEED_LIMIT,exclude:String(query.get('exclude')||'').split(',').map(x=>x.trim()).filter(Boolean),tag:String(query.get('tag')||''),viewerSubjectId:who?.subjectId||null,shareId:query.has('shareId')?String(query.get('shareId')):null}),headers:NO_STORE};}
   if(path==='/api/community/stats'&&method==='GET'){return {status:200,body:await service.discoverTotals(),headers:{...NO_STORE,'cache-control':'public, max-age=60'}};}
   if(path==='/api/community/shares'&&method==='GET'){const who=await principal(request,false);return {status:200,body:await service.discover({query:query.get('q')||'',emotion:query.get('emotion')||'',artistGroup:query.get('artist')||'',cursor:query.get('cursor')||'',limit:query.get('limit')||12,viewerSubjectId:who?.subjectId||null,sort:query.get('sort')||'latest'}),headers:NO_STORE};}
   if(path==='/api/community/me/favorites'&&method==='GET'){const who=await principal(request);return {status:200,body:{shareIds:await service.favorites(who.subjectId)},headers:NO_STORE};}
