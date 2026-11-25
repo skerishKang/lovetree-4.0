@@ -565,3 +565,47 @@ test('#1246 모든 화면의 순간 추가만 장미색·둘러보기 테두리'
     }
   }finally{await browser.close();await new Promise(r=>server.close(r));}
 });
+
+test('#1367 4번: 트리 고르기 목록은 바깥 누름·안쪽 화면 누름·Esc로 닫히고 초점이 돌아온다(390·1440 × 밤·정원)', { skip: skip || !REQUIRE ? skip || 'LT_TOPMENU_REQUIRE=1 일 때 실행' : false, timeout: 240000 }, async () => {
+  if (skip) assert.fail(skip);
+  const server = await serve();
+  const origin = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch({ headless: true });
+  try {
+    for (const width of [1440, 390]) for (const theme of ['night', 'garden']) {
+      const ctx = await browser.newContext({ viewport: { width, height: width === 390 ? 844 : 900 }, reducedMotion: 'reduce' });
+      await ctx.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); } catch {} }, theme);
+      await ctx.route('**://i.ytimg.com/**', (r) => r.fulfill({ status: 200, contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="10" height="10" fill="#333"/></svg>' }));
+      await ctx.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
+      const state = { version: 1, trees: [tree(1), tree(2)], prefs: {} };
+      await ctx.route('**/api/workspace**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ revision: 1, state, subject: '시험계정', writeSubjectBound: true, savedAt: '2026-11-18T09:00:00.000Z' }) }));
+      const page = await ctx.newPage();
+      try {
+        await page.goto(`${origin}/v41/?account=1`, { waitUntil: 'load', timeout: 60000 });
+        await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
+        await page.locator('#discover-ask-no').click().catch(() => {});
+        const hidden = () => page.evaluate(() => document.getElementById('tree-popover')?.hidden !== false);
+        const open = async () => { assert.equal(await hidden(), true, '처음에는 닫혀 있다'); await page.click('#record-menu'); assert.equal(await hidden(), false, '트리 고르기를 누르면 열린다'); };
+
+        // 머리줄 빈 곳(테마 단추)을 눌러도 창을 닫기만 하고 테마는 바뀌지 않는다.
+        await open();
+        const themeBefore = await page.evaluate(() => localStorage.getItem('lt41.theme'));
+        await page.click('#theme-toggle');
+        assert.equal(await hidden(), true, `${width}/${theme}: 바깥 누름으로 닫힌다`);
+        assert.equal(await page.evaluate(() => localStorage.getItem('lt41.theme')), themeBefore, `${width}/${theme}: 바깥 누름이 다른 동작을 실행하지 않는다`);
+
+        // 안쪽 화면(iframe)을 눌러도 닫힌다.
+        await open();
+        // 목록 아래쪽의 안쪽 화면을 실제 마우스로 누른다(목록은 y≈497에서 끝난다).
+        await page.mouse.click(width - 40, 700);
+        assert.equal(await hidden(), true, `${width}/${theme}: 안쪽 화면 누름으로 닫힌다`);
+
+        // Esc로 닫고 초점은 트리 고르기 단추로 돌아온다.
+        await open();
+        await page.keyboard.press('Escape');
+        assert.equal(await hidden(), true, `${width}/${theme}: Esc로 닫힌다`);
+        assert.equal(await page.evaluate(() => document.activeElement?.id), 'record-menu', `${width}/${theme}: 닫힌 뒤 초점 복귀`);
+      } finally { await ctx.close(); }
+    }
+  } finally { await browser.close(); await new Promise((r) => server.close(r)); }
+});

@@ -94,7 +94,27 @@ function openTreeMenu(via='keyboard'){if(!treePopover)return;renderTreeMenu();tr
 function closeTreeMenu(){if(!treePopover)return;treePopover.hidden=true;treeTrigger.setAttribute('aria-expanded','false');}
 $('record-menu').addEventListener('click',event=>{event.stopPropagation();if(treePopover?.hidden)openTreeMenu(event.detail===0?'keyboard':'mouse');else closeTreeMenu();});
 if(treePopover)treePopover.addEventListener('keydown',event=>{const items=[...treePopover.querySelectorAll('button')].filter(b=>!b.hidden);const at=items.indexOf(document.activeElement);if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();const next=event.key==='ArrowDown'?(at+1)%items.length:(at-1+items.length)%items.length;items[next]?.focus();}else if(event.key==='Home'){event.preventDefault();items[0]?.focus();}else if(event.key==='End'){event.preventDefault();items.at(-1)?.focus();}});
-document.addEventListener('click',event=>{if(treePopover&&!treePopover.hidden&&!event.target.closest('.tree-slot'))closeTreeMenu();});
-document.addEventListener('keydown',event=>{if(event.key==='Escape'&&treePopover&&!treePopover.hidden){closeTreeMenu();treeTrigger.focus();}});
+// #1367 4번: 바깥을 누르면 닫기만 하고 그 누름으로 다른 단추가 동작하지 않게 한다.
+function outsideClick(event){
+ if(!treePopover||treePopover.hidden)return;
+ if(event.target?.closest?.('.tree-slot'))return;
+ event.preventDefault?.();event.stopPropagation?.();
+ closeTreeMenu();
+}
+function escKey(event){if(event.key==='Escape'&&treePopover&&!treePopover.hidden){event.preventDefault?.();event.stopPropagation?.();closeTreeMenu();treeTrigger.focus();}}
+document.addEventListener('click',outsideClick,true);
+document.addEventListener('keydown',escKey,true);
+// 안쪽 화면(iframe)을 눌러도 닫힌다 — 그 문서의 눌림도 여기서 먼저 본다.
+function bindFrame(frame){
+ try{
+  const doc=frame.contentDocument;if(!doc)return;
+  doc.addEventListener('click',outsideClick,true);
+  doc.addEventListener('keydown',escKey,true);
+ }catch{}
+}
+for(const frame of document.querySelectorAll('iframe')){
+ frame.addEventListener('load',()=>bindFrame(frame),true);
+ bindFrame(frame);
+}
 return { escHTML, treeMomentThumb, treeCoverMarkup, renderTreeMenu, scrollTreeItemIntoView, openTreeMenu, closeTreeMenu };
 }
