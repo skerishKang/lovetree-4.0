@@ -663,7 +663,7 @@ test('#1367 4번: 트리 고르기 목록은 바깥 누름·안쪽 화면 누름
 
 
 // #1350: 실제 머리줄에서 상태별 간격과 가로 넘침, 로그인 확정 CLS를 검증한다.
-const REQUIRE_GAP = process.env.LT_HEADER_GAP_REQUIRE === '1';
+const REQUIRE_GAP = process.env.LT_HEADER_GAP_REQUIRE === '1' || REQUIRE;
 test('#1350 머리줄 오른쪽 간격: 390·844·1440 × 밤·정원 × 로그인·로그아웃·확인 중', {
   skip: skip || !REQUIRE_GAP ? skip || '간격 시험을 실행하도록 설정하지 않음' : false,
   timeout: 240000
