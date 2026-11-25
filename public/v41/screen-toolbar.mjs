@@ -114,6 +114,18 @@ export function mountScreenToolbar({ screen, titleFrom, tools = [], initialBar =
     else target.insertBefore(shelfSearch, target.querySelector('#shelfNewTree'));
   };
   for (const tool of tools) if (tool && tool.parentElement !== group) group.append(tool);
+  if (screen === 'network') {
+    // ?? ??? ?? ?? ?? ?? ?? ?? ?? ??? ?? ? ?? ????.
+    const removeDuplicates = () => {
+      const active = document.getElementById('connectToggle')?.closest('.lt-screen-toolbar');
+      if (!active) return;
+      for (const other of document.querySelectorAll('.lt-screen-toolbar[data-screen="network"]')) {
+        if (other !== active) other.remove();
+      }
+    };
+    removeDuplicates();
+    requestAnimationFrame(removeDuplicates);
+  }
   keepBookPhonePlay();
   placeShelfSearch();
 
