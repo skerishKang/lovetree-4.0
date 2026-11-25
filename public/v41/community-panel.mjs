@@ -20,7 +20,9 @@ const el=(tag,className,text)=>{const node=document.createElement(tag);if(classN
 // 셸이 낯선 주소를 #home으로 바꾸기 전에(module import 시점) 직접 들어온 주소를 기억한다(#1025).
 const hashNow=()=>typeof location!=='undefined'?(location.hash||''):'';
 // #1356: 공유 트리 화면에서 들어온 경우 그 트리 아이디를 기억해 '이 트리만' 칩을 보여 준다.
-const rememberShare=()=>{const match=/^#share\/([^/]+)\//.exec(hashNow());if(match)dialog.dataset.ltShareContext=decodeURIComponent(match[1]);};
+// 모듈을 읽는 시점에는 대화 상자가 없을 수도 있으므로 문자열만 기억하고, 대화 상자는 부른 뒤에만 본다.
+let rememberedShareId='';
+const rememberShare=()=>{const match=/^#share\/([^/]+)\//.exec(hashNow());if(match)rememberedShareId=decodeURIComponent(match[1]);};
 rememberShare();
 if(typeof window!=='undefined'&&window.addEventListener)window.addEventListener('hashchange',rememberShare);
 const momentsHash=()=>{const match=/^#explore\/moments(?:\?(.*))?$/.exec(hashNow());if(!match)return null;const query=new URLSearchParams(match[1]||'');return {scope:query.get('scope')||'all',share:query.get('share')||''};};
@@ -92,7 +94,7 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
  // localDateOnly(#547 한 벌)로 기기 지역 날짜를 만들어 formatDisplayDate에 넘긴다.
  const when=value=>formatDisplayDate(localDateOnly(value),dateStyle());
  const historyLayers=createExploreLayers();
- const moments=momentsPanel?mountMoments({panel:momentsPanel,onOpenShare,onAddToTree,notify,memberLogin,api,when,historyLayers,isMember,getShareContext:()=>dialog.dataset.ltShareContext||'',onScopeChange:(scope,shareId)=>writeMomentsScopeHash(scope,shareId)}):null;
+ const moments=momentsPanel?mountMoments({panel:momentsPanel,onOpenShare,onAddToTree,notify,memberLogin,api,when,historyLayers,isMember,getShareContext:()=>rememberedShareId||dialog?.dataset?.ltShareContext||'',onScopeChange:(scope,shareId)=>writeMomentsScopeHash(scope,shareId)}):null;
  let currentTab='trees',hashGuard=false;
  const writeHash=value=>{
   if(typeof history==='undefined'||typeof history.pushState!=='function'||typeof history.replaceState!=='function')return;
