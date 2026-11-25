@@ -439,20 +439,15 @@ async function openLightbox(url,title='',verticalHint=null){
   if(!alive())return;
   if(!embed){stage.innerHTML='<p class="lt-lightbox-note">바로 재생할 수 없어요. 원본 링크에서 열어 주세요.</p>';return}
   const frame=document.createElement('iframe');
-  const apiUrl=new URL(embed);apiUrl.searchParams.set('enablejsapi','1');apiUrl.searchParams.set('origin',location.origin);
-  frame.className='lt-lightbox-media';frame.src=apiUrl.href;frame.title=title||'YouTube 영상';
+  frame.className='lt-lightbox-media';frame.src=embed;frame.title=title||'YouTube 영상';
   frame.allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';frame.allowFullscreen=true;
   // #584: 그 자리 재생과 같은 이유(오류 153)로 no-referrer 를 쓰지 않는다.
   frame.setAttribute('referrerpolicy','strict-origin-when-cross-origin');
   stage.replaceChildren(frame);
   // YouTube IFrame API 오류 101/150(임베드 거절)·153(플레이어 구성 실패) 등에서는
   // 재생할 수 없는 iframe을 걷고 원본 영상으로 이동할 수 있게 합니다.
-  lightboxErrorListener=event=>{
-   if(!alive()||event.source!==frame.contentWindow||
-      !['https://www.youtube.com','https://www.youtube-nocookie.com'].includes(event.origin))return;
-   let data=event.data;
-   if(typeof data==='string'){try{data=JSON.parse(data)}catch{return}}
-   if(data?.event!=='onError'||![2,5,100,101,150,153].includes(Number(data.info)))return;
+  const failEmbed=()=>{
+   if(!alive()||!frame.isConnected)return;
    const note=document.createElement('p');note.className='lt-lightbox-note';
    note.setAttribute('role','status');
    note.textContent='여기에서 재생할 수 없는 영상입니다.';
@@ -461,7 +456,18 @@ async function openLightbox(url,title='',verticalHint=null){
    link.textContent='YouTube에서 보기';
    stage.replaceChildren(note,link);
   };
+  lightboxErrorListener=event=>{
+   if(!alive()||event.source!==frame.contentWindow||
+      !['https://www.youtube.com','https://www.youtube-nocookie.com'].includes(event.origin))return;
+   let data=event.data;
+   if(typeof data==='string'){try{data=JSON.parse(data)}catch{return}}
+   if(data?.event==='onError'&&[2,5,100,101,150,153].includes(Number(data.info)))failEmbed();
+  };
   window.addEventListener('message',lightboxErrorListener);
+  // 임베드 금지·삭제·비공개는 기존 상태 API의 확인된 응답으로 판단합니다.
+  // 상태를 알 수 없으면 네트워크 일시 오류로 보고 플레이어를 임의로 제거하지 않습니다.
+  void loadVideoStatusModule().then(mod=>mod?.fetchVideoStatus?.(m.videoId))
+   .then(status=>{if(['noembed','gone','private'].includes(status))failEmbed()}).catch(()=>{});
  }else{
   let src=m.loadUrl;
   if(m.privateFile){

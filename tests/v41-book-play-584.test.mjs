@@ -1222,3 +1222,27 @@ test('#1378 크게 보기: 이미 재생 중인 인라인 영상과 자동 재�
     await browser.close();
   }
 });
+
+test('#1378 크게 보기: 임베드 거절 상태면 iframe을 걷고 원본 링크를 남긴다', { skip, timeout: 120000 }, async () => {
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const { ctx, frame } = await openBook(browser, 390, 844, [
+      ['**/api/youtube/oembed*', route => route.fulfill({
+        status: 401, contentType: 'application/json', body: '{"error":"youtube_embed_forbidden"}',
+      })],
+      ['**/youtube-nocookie.com/**', route => route.fulfill({
+        status: 200, contentType: 'text/html', body: '<title>YouTube video</title>',
+      })],
+    ]);
+    try {
+      await frame.locator('.media-links [data-yt-expand]').first().click({ force: true });
+      await frame.waitForSelector('.lt-lightbox-stage a[href*="youtube.com"]', { timeout: 10000 });
+      assert.equal(await frame.locator('.lt-lightbox iframe').count(), 0, '임베드 거절 후 플레이어 제거');
+      assert.equal(await frame.locator('.lt-lightbox-stage [role="status"]').count(), 1, '재생 불가 안내');
+    } finally {
+      await ctx.close();
+    }
+  } finally {
+    await browser.close();
+  }
+});
