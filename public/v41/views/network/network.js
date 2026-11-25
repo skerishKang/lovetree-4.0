@@ -1228,8 +1228,9 @@
   }
   function detailMediaHTML(n) {
     const m = LTDEMO.moments.find(x => x.id === n.id) || {};
-    if (m.url && window.LTMedia)
-      return window.LTMedia.markup(m.url, m.title, m.mediaMetadata, m.id, null, null, {
+    const url = m.url || m.externalUrl || '';
+    if (url && window.LTMedia)
+      return window.LTMedia.markup(url, m.title, m.mediaMetadata, m.id, null, null, {
         compact: true
       });
     const img = m.image || m.asset || '';
@@ -1254,7 +1255,8 @@
       media = detailMediaHTML(n);
     player.innerHTML = media;
     player.hidden = !media;
-    const ytUrl = /youtu/i.test(String(raw?.url || '')) ? raw.url : '';
+    const sourceUrl = raw?.url || raw?.externalUrl || '';
+    const ytUrl = /youtu/i.test(String(sourceUrl)) ? sourceUrl : '';
     const ytRow = $('ytLinkRow');
     if (ytRow) {
       ytRow.hidden = !ytUrl;
@@ -1298,7 +1300,9 @@
     menu.hidden = true;
     btn.setAttribute('aria-expanded', 'false');
   }
+  let mapViewerSerial = 0;
   function openViewer() {
+    const serial = ++mapViewerSerial;
     const n = state.selected;
     if (!n) return;
     const { clean } = autoTitleOf(n);
@@ -1312,13 +1316,86 @@
     v.classList.add('open');
     v.setAttribute('aria-hidden', 'false');
     $('closeViewer').focus();
+    const raw = LTDEMO.moments.find(moment => moment.id === n.id);
+    const source = raw?.url || raw?.externalUrl || '';
+    const descriptor = source && window.LTMedia?.describe(source);
+    if (descriptor?.kind === 'youtube' && descriptor.videoId) {
+      // 사용자가 재생 표시 또는 크게 보기를 누른 뒤에만 iframe 하나를 만듭니다.
+      void import('/v41/book-usability.mjs').then(({ embedUrl }) => {
+        if (serial !== mapViewerSerial || !v.classList.contains('open')) return;
+        const root = $('viewerMedia').querySelector('.lt-media');
+        const body = root?.querySelector('.lt-media-body');
+        const embed = embedUrl(descriptor.videoId, descriptor.startSeconds || 0);
+        if (!body || !embed) {
+          if (root) window.LTMedia?.applyNoEmbed?.(root);
+          return;
+        }
+        const iframe = document.createElement('iframe');
+        iframe.className = 'lt-yt-frame';
+        iframe.src = embed;
+        iframe.title = n.title || 'YouTube 영상';
+        iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';
+        iframe.allowFullscreen = true;
+        iframe.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
+        body.replaceChildren(iframe);
+      }).catch(() => {
+        if (serial === mapViewerSerial) {
+          const root = $('viewerMedia').querySelector('.lt-media');
+          if (root) window.LTMedia?.applyNoEmbed?.(root);
+        }
+      });
+    }
   }
   function closeViewer() {
+    mapViewerSerial++;
     const v = $('ltViewer');
+    $('viewerMedia').querySelectorAll('video').forEach(video => video.pause());
+    // #1378: 숨겨 둔 iframe에서 소리가 이어지지 않도록 DOM 자체를 해제합니다.
+    $('viewerMedia').replaceChildren();
     v.classList.remove('open');
     v.setAttribute('aria-hidden', 'true');
     $('detailOpen').focus();
   }
+  // #1378: 좁은 상세 판에는 썸네일과 재생 표시만 둡니다.
+  // 공용 미디어의 document 캡처 리스너보다 먼저 받아 카드 안 iframe 생성을 막습니다.
+  window.addEventListener('click', event => {
+    if (!event.target.closest?.('#detailPlayer [data-lt-play]')) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    openViewer();
+  }, true);
+  const mapVideoFrames = new MutationObserver(() => {
+    for (const frame of $('viewerMedia').querySelectorAll('iframe.lt-yt-frame')) {
+      if (frame.dataset.mapStatusChecked) continue;
+      frame.dataset.mapStatusChecked = '1';
+      const root = frame.closest('.lt-media');
+      const videoId = globalThis.LTYouTubeId?.extractYoutubeId?.(root?.dataset.ltUrl || '')
+        || (root?.dataset.ltUrl || '').match(/(?:youtu\.be\/|[?&]v=|\/shorts\/)([A-Za-z0-9_-]{11})/)?.[1];
+      const unavailable = () => {
+        if (!frame.isConnected || !root?.isConnected) return;
+        frame.remove();
+        window.LTMedia?.applyNoEmbed?.(root);
+      };
+      frame.addEventListener('error', unavailable, { once: true });
+      if (videoId) void import('/v41/video-status.mjs')
+        .then(module => module.fetchVideoStatus(videoId))
+        .then(status => { if (['noembed', 'gone', 'private'].includes(status)) unavailable(); })
+        .catch(() => {});
+      const controller = new AbortController();
+      const removed = new MutationObserver(() => {
+        if (!frame.isConnected) { controller.abort(); removed.disconnect(); }
+      });
+      removed.observe($('viewerMedia'), { childList: true, subtree: true });
+      window.addEventListener('message', event => {
+        if (!frame.isConnected || event.source !== frame.contentWindow ||
+            !['https://www.youtube.com', 'https://www.youtube-nocookie.com'].includes(event.origin)) return;
+        let data = event.data;
+        if (typeof data === 'string') { try { data = JSON.parse(data); } catch { return; } }
+        if (data?.event === 'onError' && [2, 5, 100, 101, 150, 153].includes(Number(data.info))) unavailable();
+      }, { signal: controller.signal });
+    }
+  });
+  mapVideoFrames.observe($('viewerMedia'), { childList: true, subtree: true });
   function wireDetail() {
     const back = $('detailClose');
     if (back) back.onclick = closeDetail;

@@ -378,3 +378,6 @@ html[data-v41-screen=network][data-lt-board-theme=night] body .detailPlayer{back
   html[data-v41-screen=network] .ribbon-groups button{min-height:44px;white-space:normal;text-align:left}
   html[data-v41-screen=network][data-lt-board-theme=night] body .ribbon-groups{background:var(--lt-map-panel);border-color:var(--lt-map-ui-border);color:var(--lt-map-ui-text)}
 }
+
+/* #1378: 지도 상세에는 재생 화면을 두지 않고 크게 보기에서만 최소 크기를 확보합니다. */
+#viewerMedia iframe.lt-yt-frame{width:100%;min-height:200px;display:block}
