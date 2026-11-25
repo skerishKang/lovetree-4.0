@@ -778,8 +778,8 @@
   }
   function layoutNetwork() {
     NETFIT = LT56Model.networkLayout(LTDEMO.moments, {
-      viewportWidth: vw,
       box: BOX,
+      viewportWidth: vw,
       dotR: 5,
       firstR: 20,
       gap: 8,
