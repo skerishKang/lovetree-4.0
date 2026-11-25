@@ -52,7 +52,13 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin,a
  const media=el('div','moments-media');
  const poster=el('img','moments-poster');poster.alt='';poster.loading='lazy';
  const posterFallback=el('div','moments-fallback');posterFallback.hidden=true;
- function showPosterFallback(){const item=current();if(!item)return;posterFallback.innerHTML=fallbackCardMarkup(item,{variant:'orbit',videoUnavailable:!!item.videoId});posterFallback.hidden=false;poster.hidden=true;}
+ function showPosterFallback(){
+  const item=current();if(!item)return;
+  // #1354: 재생 가능한 플레이어 앞에는 안내 카드를 올리지 않는다.
+  if(stage.dataset.ltMomentUnavailable!=='1'&&media.querySelector('.moments-frame:not(.moments-next)'))return;
+  posterFallback.innerHTML=fallbackCardMarkup(item,{variant:'orbit',videoUnavailable:!!item.videoId});
+  posterFallback.hidden=false;poster.hidden=true;
+ }
  poster.onload=()=>{if(isGrayThumbnail(poster))showPosterFallback();};
  // 썸네일이 안 떠도 판이 비지 않게 — 세로 포스터가 없으면 기존 가로 포스터로 한 번 더 시도한다.
  poster.onerror=()=>{const item=current();const src=poster.getAttribute('src')||'';if(item?.videoId&&!/hqdefault\.jpg/.test(src))poster.src=youtubeStageThumbUrl(item.videoId,'hqdefault');else showPosterFallback();};
@@ -454,7 +460,14 @@ let advancing=0,unavailableTimer=0,unavailableId='';
    if(!item||unavailableId===item.id)return;
    unavailableId=item.id;
    stage.dataset.ltMomentUnavailable='1';
-   showPosterFallback(); // 제목 카드는 그대로, '영상을 볼 수 없어요'를 겹치지 않게 표시
+   // #1354: 오류 플레이어와 미리 불러 둔 플레이어를 걷고 안내만 표시한다.
+   clearFrames();
+   media.querySelectorAll('.moments-frame').forEach(frame=>frame.remove());
+   currentFrame=null;
+   stage.dataset.ltMomentsCount='0';
+   media.classList.remove('is-playing');
+   stage.dataset.ltPlaying='0';
+   showPosterFallback();
    if(soundButton)soundButton.hidden=true;
    clearTimeout(unavailableTimer);
    unavailableTimer=setTimeout(()=>{

@@ -558,6 +558,8 @@ test('#1098 순간 댓글 창은 불투명하고 뒤 단추를 가린다', { ski
       const h = await boot(browser, { width, height, theme: 'night' });
       try {
         const panel = h.page.locator('#community-moments-panel');
+        // #1354 휴대폰 단추는 정보 판을 펼친 뒤에만 보인다.
+        if (width === 390) await h.page.locator('.moments-toolbar .moments-info-button').click();
         await panel.locator('.moments-rail-button', { hasText: '댓글' }).click();
         const dialog = panel.locator('.moments-comments-dialog');
         await dialog.waitFor({ state: 'visible', timeout: 5000 });
@@ -594,10 +596,17 @@ test('#1098 회색 썸네일이면 제목 카드로 바뀐다', { skip: REQUIRE 
     try {
       const panel = h.page.locator('#community-moments-panel');
       const fallback = panel.locator('.moments-fallback');
-      await fallback.waitFor({ state: 'visible', timeout: 10000 });
-      const text = (await fallback.textContent()) || '';
-      assert.ok(text.includes('세로 순간 1'), '제목이 있는 카드로 대체된다: ' + text.slice(0, 120));
-      assert.equal(await panel.locator('.moments-poster').isVisible(), false, '회색 점 그림은 숨는다');
+      // #1354 회색 썸네일은 유튜브 플레이어를 덮는 카드가 되면 안 된다.
+      const frame = panel.locator('.moments-frame:not(.moments-next)');
+      await frame.waitFor({ state: 'attached' });
+      const result = await panel.evaluate(el => {
+        const f = el.querySelector('.moments-frame:not(.moments-next)');
+        const r = f.getBoundingClientRect();
+        return { overlay: getComputedStyle(el.querySelector('.moments-fallback')).display,
+          top: document.elementFromPoint(r.left+r.width/2,r.top+r.height/2)===f };
+      });
+      assert.equal(result.overlay, 'none', '재생 가능한 영상 위 회색 썸네일 대체 안내 없음');
+      assert.equal(result.top, true, '유튜브 플레이어가 실제 클릭을 받는다');
     } finally { await h.ctx.close(); await new Promise(r => h.server.close(r)); }
   } finally { await browser.close(); }
 });
@@ -625,6 +634,7 @@ test('#1294 둘러보기 트리·순간 탭과 미리보기·그룹 찾기 뒤�
    await page.locator('#community-tab-moments').click();
    await page.waitForFunction(()=>!!document.querySelector('.moments-stage')?.dataset.ltMomentsId);
    assert.equal((await navState()).hash,'#explore/moments');
+   if (width === 390) await page.locator('.moments-toolbar .moments-info-button').click();
    await page.locator('#community-moments-panel .moments-rail-button').nth(2).click();
    await page.locator('.moments-add-dialog:not([hidden])').waitFor();
    await back();
@@ -684,7 +694,8 @@ test('#1294 순간 밀기 기록 누적 없음·댓글 뒤로 가기·탭 복원
    }
    assert.notEqual(await stage.getAttribute('data-lt-moments-id'),startId,width+' 다음 순간 이동');
    assert.equal(await page.evaluate(()=>history.length),start,width+' 5번 넘김 후 기록 증가 0');
-   await page.locator('.moments-rail-button').nth(1).click();
+   if(width===390)await page.locator('.moments-toolbar .moments-info-button').click();
+   await page.locator('#community-moments-panel .moments-rail-button').nth(1).click();
    await page.locator('.moments-comments-dialog:not([hidden])').waitFor();
    await page.goBack();await page.waitForTimeout(120);
    assert.equal(await page.locator('.moments-comments-dialog').evaluate(el=>el.hidden),true,width+' 댓글 뒤로 가기');

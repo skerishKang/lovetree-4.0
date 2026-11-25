@@ -404,3 +404,18 @@ html[data-lt-theme=garden] #community-panel:has(#community-tab-moments[aria-sele
 
 /* PC의 정보는 왼쪽 판에 항상 표시하므로 토글은 휴대폰에만 둔다. */
 @media(min-width:781px){#community-panel .moments-toolbar .moments-info-button{display:none}}
+
+/* #1354 2단계: PC 상단 도구도 플레이어 묶음과 같은 너비로 가운데 정렬한다. */
+@media(min-width:781px){
+ #community-panel .community-top-row.is-moments{width:min(1150px,100%);max-width:1150px;justify-content:flex-start}
+ #community-panel .community-top-row.is-moments .community-tabs{margin:0}
+ #community-panel .community-top-row.is-moments .moments-toolbar{margin-left:auto}
+ #community-moments-panel .moments-context{align-self:start}
+ #community-panel .moments-toolbar .moments-info-button{display:none}
+}
+/* 영상 재생 중에는 썸네일과 대체 안내를 절대 플레이어 앞에 두지 않는다. */
+#community-moments-panel .moments-media:has(.moments-frame:not(.moments-next)) .moments-fallback{display:none}
+#community-moments-panel .moments-media:has(.moments-frame:not(.moments-next)).is-playing .moments-poster{display:none}
+
+/* #1340 음소거 강조를 영상 바깥 상단 소리 단추에도 유지한다. */
+#community-panel .moments-toolbar .moments-rail-button.is-muted{color:var(--lt-rose)}

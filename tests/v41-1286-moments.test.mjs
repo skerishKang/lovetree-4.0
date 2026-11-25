@@ -33,7 +33,7 @@ const GROUPS = [{value:'아이유',count:8},{value:'다른가수',count:4}];
 
 async function step(page, panel, width, delta) {
   if (width <= 780) {
-    await panel.evaluate(el => el.querySelector('.moments-stage').dispatchEvent(new WheelEvent('wheel', { deltaY: 100, bubbles: true, cancelable: true })));
+    await panel.evaluate(el => el.querySelector('.moments-context').dispatchEvent(new WheelEvent('wheel', { deltaY: 100, bubbles: true, cancelable: true })));
   } else {
     await panel.locator('.moments-step').nth(delta > 0 ? 1 : 0).click();
   }
@@ -97,7 +97,131 @@ async function boot(browser, { width, height, theme, thumb = THUMB, moment = nul
 
 const CAPTURE=process.env.LT_1286_CAPTURE||'';
 const BEFORE=process.env.LT_1286_BEFORE==='1';
-test('#1286 휴대폰 쇼츠 폭·접근성·밀기 및 넓은 화면 유지', {skip:REQUIRE?false:skip,timeout:240000},async()=>{
+// 기존 #1286·#1305·#1332·#1340의 재생·접근성·넘기기 동작을 새 외부 도구 배치에서 유지한다.
+test('#1286 세로·가로 영상 방향, 카드 폭 및 접근 이름',{skip:REQUIRE?false:skip,timeout:240000},async()=>{
+ if(skip)assert.fail(skip);
+ const browser=await chromium.launch({headless:true});
+ try{for(const [width,height] of [[390,844],[1440,900]])for(const theme of ['night','garden']){
+  const h=await boot(browser,{width,height,theme});
+  try{
+   const panel=h.page.locator('#community-moments-panel');
+   const one=await panel.evaluate(el=>({orientation:el.querySelector('.moments-media').dataset.orientation,
+    frame:el.querySelector('.moments-card').getBoundingClientRect().width,
+    labels:[...el.querySelectorAll('.moments-rail .moments-rail-button')].map(x=>x.getAttribute('aria-label'))}));
+   assert.equal(one.orientation,'portrait','첫 영상 세로 분류');
+   assert.deepEqual(one.labels,['마음','댓글','담기','트리','공유'],'다섯 동작 접근 이름');
+   assert.ok(width===390?one.frame>=width-32:one.frame<width-120,'카드 너비 규칙');
+   await step(h.page,panel,width,1);
+   assert.equal(await panel.locator('.moments-media').getAttribute('data-orientation'),'landscape','두 번째 영상 가로 분류');
+   assert.equal(await h.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'가로 넘침 0');
+  }finally{await h.ctx.close();await new Promise(r=>h.server.close(r));}
+ }}finally{await browser.close();}
+});
+test('#1305 사용자 영상 클릭은 서비스 재생 제어를 호출하지 않는다',{skip:REQUIRE?false:skip,timeout:240000},async()=>{
+ if(skip)assert.fail(skip);
+ const browser=await chromium.launch({headless:true});
+ try{for(const [width,height] of [[390,844],[1440,900]]){
+  const h=await boot(browser,{width,height,theme:'night'});
+  try{
+   const panel=h.page.locator('#community-moments-panel'),stage=panel.locator('.moments-stage');
+   const before=await stage.getAttribute('data-lt-playing');
+   await panel.locator('.moments-media').evaluate(el=>el.click());
+   assert.equal(await stage.getAttribute('data-lt-playing'),before,'서비스 누름 동작은 재생 상태를 바꾸지 않음');
+   assert.equal(await panel.locator('.moments-frame:not(.moments-next)').evaluate(el=>new URL(el.src).searchParams.get('controls')),'1','유튜브 기본 재생 도구 유지');
+  }finally{await h.ctx.close();await new Promise(r=>h.server.close(r));}
+ }}finally{await browser.close();}
+});
+test('#1305 가수 단추·위 도구 영역은 영상 밖에 둔다',{skip:REQUIRE?false:skip,timeout:240000},async()=>{
+ if(skip)assert.fail(skip);
+ const browser=await chromium.launch({headless:true});
+ try{
+  const h=await boot(browser,{width:390,height:844,theme:'garden'});
+  try{
+   await h.page.locator('.moments-info-button').click();
+   const info=await h.page.evaluate(()=>{
+    const chips=document.querySelector('.moments-chips'),buttons=[...chips.querySelectorAll('button')],bar=document.querySelector('.community-top-row'),video=document.querySelector('.moments-frame:not(.moments-next)').getBoundingClientRect();
+    return{names:buttons.map(x=>x.textContent),barHeight:bar.getBoundingClientRect().height,barBottom:bar.getBoundingClientRect().bottom,playerTop:video.top,chipsBottom:chips.getBoundingClientRect().bottom,chipWidth:chips.clientWidth};
+   });
+   assert.ok(info.names.length>=2&&info.names.includes('아이유'),'가수 필터');
+   assert.equal(info.barHeight,48,'위 띠 48px');
+   assert.ok(info.barBottom<=info.playerTop,'도구 띠가 플레이어 바깥');
+   assert.ok(info.chipWidth>0,'가수 단추가 정보 판에 표시됨');
+  }finally{await h.ctx.close();await new Promise(r=>h.server.close(r));}
+ }finally{await browser.close();}
+});
+test('#1332 소리 단추 조작은 다음 순간에도 유지한다',{skip:REQUIRE?false:skip,timeout:240000},async()=>{
+ if(skip)assert.fail(skip);
+ const browser=await chromium.launch({headless:true});
+ try{for(const [width,height] of [[390,844],[1440,900]])for(const theme of ['night','garden']){
+  const h=await boot(browser,{width,height,theme});
+  try{
+   const panel=h.page.locator('#community-moments-panel'),stage=panel.locator('.moments-stage'),sound=h.page.locator('.moments-toolbar .is-sound');
+   assert.equal(await sound.getAttribute('aria-label'),'소리 켜기','처음 음소거 상태');
+   await sound.click();
+   assert.equal(await stage.getAttribute('data-lt-moments-muted'),'false','소리 켜짐');
+   assert.equal(await sound.getAttribute('aria-label'),'소리 끄기','접근성 이름 바뀜');
+   const before=await stage.getAttribute('data-lt-moments-id');
+   await step(h.page,panel,width,1);
+   assert.notEqual(await stage.getAttribute('data-lt-moments-id'),before,'다음 순간');
+   assert.equal(await stage.getAttribute('data-lt-moments-muted'),'false','소리 선택 유지');
+  }finally{await h.ctx.close();await new Promise(r=>h.server.close(r));}
+ }}finally{await browser.close();}
+});
+test('#1332 영상 상태 신호에 따라 소리 접근 이름을 고친다',{skip:REQUIRE?false:skip,timeout:240000},async()=>{
+ if(skip)assert.fail(skip);
+ const browser=await chromium.launch({headless:true});
+ try{
+  const h=await boot(browser,{width:390,height:844,theme:'night'});
+  try{
+   const sound=h.page.locator('.moments-toolbar .is-sound');
+   await sound.click();
+   for(const muted of [true,false]){
+    await h.page.evaluate(muted=>{
+     const f=document.querySelector('.moments-frame:not(.moments-next)');
+     window.dispatchEvent(new MessageEvent('message',{source:f.contentWindow,data:JSON.stringify({event:'infoDelivery',info:{muted}})}));
+    },muted);
+    assert.equal(await sound.getAttribute('aria-label'),muted?'소리 켜기':'소리 끄기','실제 플레이어 상태 반영');
+   }
+  }finally{await h.ctx.close();await new Promise(r=>h.server.close(r));}
+ }finally{await browser.close();}
+});
+test('#1340 음소거 강조와 도구의 44픽셀 누름 범위',{skip:REQUIRE?false:skip,timeout:240000},async()=>{
+ if(skip)assert.fail(skip);
+ const browser=await chromium.launch({headless:true});
+ try{for(const [width,height] of [[390,844],[1440,900]])for(const theme of ['night','garden']){
+  const h=await boot(browser,{width,height,theme});
+  try{
+   const sound=h.page.locator('.moments-toolbar .is-sound');
+   const before=await sound.evaluate(e=>({color:getComputedStyle(e).color,rose:getComputedStyle(document.documentElement).getPropertyValue('--lt-rose').trim(),w:e.getBoundingClientRect().width,h:e.getBoundingClientRect().height}));
+   assert.ok(before.w>=44&&before.h>=44,'소리 단추 최소 44픽셀');
+   assert.equal(before.color,(()=>{const x=before.rose;return /^#[0-9a-f]{6}$/i.test(x)?'rgb('+[1,3,5].map(i=>parseInt(x.slice(i,i+2),16)).join(', ')+')':x})(),'음소거는 장미색');
+   await sound.click();
+   const after=await sound.evaluate(e=>getComputedStyle(e).color);
+   assert.notEqual(after,before.color,'소리 켜면 강조 해제');
+  }finally{await h.ctx.close();await new Promise(r=>h.server.close(r));}
+ }}finally{await browser.close();}
+});
+test('#1340 영상 전면 소리 알약·투명 밀기층 제거, 모바일 보기 상태 복귀',{skip:REQUIRE?false:skip,timeout:240000},async()=>{
+ if(skip)assert.fail(skip);
+ const browser=await chromium.launch({headless:true});
+ try{
+  const h=await boot(browser,{width:390,height:844,theme:'night'});
+  try{
+   const page=h.page,stage=page.locator('.moments-stage'),info=page.locator('.moments-info-button');
+   const overlaps=await page.evaluate(()=>[...document.querySelectorAll('.moments-sound-pill,.moments-swipe-layer,.moments-swipe-hint')].filter(e=>e.getBoundingClientRect().height>0).length);
+   assert.equal(overlaps,0,'영상 전면 서비스 알약·밀기층 0');
+   await info.click();
+   assert.equal(await page.evaluate(()=>localStorage.getItem('lt41.momentInfoOpen')),'1','열림 상태 기억');
+   await page.locator('#community-tab-trees').click();
+   await page.locator('#community-tab-moments').click();
+   assert.equal(await stage.evaluate(e=>e.classList.contains('moments-info-open')),true,'탭 재진입 후 유지');
+   await info.click();
+   assert.equal(await page.evaluate(()=>localStorage.getItem('lt41.momentInfoOpen')),'0','닫힘 상태 기억');
+  }finally{await h.ctx.close();await new Promise(r=>h.server.close(r));}
+ }finally{await browser.close();}
+});
+// #1354: 영상 위 알약/투명층 시험은 서비스 요소 0 및 원본 재생 기능 유지 시험으로 교체한다.
+test('#1354 플레이어 겹침·가시성·자동재생·정보상태·중앙배치', {skip:REQUIRE?false:skip,timeout:240000},async()=>{
  if(skip)assert.fail(skip);
  const browser=await chromium.launch({headless:true});
  try{
@@ -105,378 +229,77 @@ test('#1286 휴대폰 쇼츠 폭·접근성·밀기 및 넓은 화면 유지', {
    const h=await boot(browser,{width,height,theme});
    try{
     const panel=h.page.locator('#community-moments-panel'),stage=panel.locator('.moments-stage');
-    for(const [orientation,offset] of [['portrait',0],['landscape',1]]){
-     if(offset)await stage.evaluate(el=>el.dispatchEvent(new WheelEvent('wheel',{deltaY:120,bubbles:true,cancelable:true})));
-     await h.page.waitForTimeout(100);
+    const info=h.page.locator('.moments-toolbar .moments-info-button');
+    assert.equal(await info.isVisible(),width===390,'정보 단추는 휴대폰에만 표시');
+    assert.equal(await h.page.locator('.moments-toolbar .moments-rail-button.is-sound').isVisible(),true,'소리 단추는 상단');
+    for(const open of [false,true]){
+     if(width===390&&(await info.getAttribute('aria-expanded'))!==String(open))await info.click();
+     await panel.evaluate(el=>{
+      const f=el.querySelector('.moments-frame:not(.moments-next)');
+      window.dispatchEvent(new MessageEvent('message',{source:f.contentWindow,data:JSON.stringify({event:'infoDelivery',info:{playerState:1,muted:true}})}));
+     });
+     const v=await panel.evaluate(el=>{
+      const f=el.querySelector('.moments-frame:not(.moments-next)'),n=el.querySelector('.moments-next'),r=f.getBoundingClientRect(),card=el.querySelector('.moments-card'),ctx=el.querySelector('.moments-context'),row=document.querySelector('.community-top-row.is-moments'),stage=el.querySelector('.moments-stage');
+      const rect=e=>e.getBoundingClientRect(),xs=[.1,.5,.9],ys=[.1,.5,.9];
+      return {w:r.width,h:r.height,blocked:xs.flatMap(x=>ys.map(y=>document.elementFromPoint(r.left+r.width*x,r.top+r.height*y))).filter(e=>e!==f).length,frames:el.querySelectorAll('.moments-frame').length,autoplay:[...el.querySelectorAll('.moments-frame')].filter(e=>new URL(e.src).searchParams.get('autoplay')==='1').length,nextAuto:n?new URL(n.src).searchParams.get('autoplay'):null,nextMute:n?new URL(n.src).searchParams.get('mute'):null,contextVisible:rect(ctx).height>0,infoOpen:stage.classList.contains('moments-info-open'),contextTop:rect(ctx).top,cardTop:rect(card).top,rowLeft:rect(row).left,rowRight:rect(row).right,stageLeft:rect(stage).left,stageRight:rect(stage).right,topHeight:rect(row).height};
+     });
+     assert.ok(v.w>=200&&v.h>=200,'플레이어 최소 200×200');
+     assert.equal(v.blocked,0,'플레이어 내부 9점의 맨 위 요소는 iframe');
+     assert.equal(v.frames,2,'현재 영상+준비 영상 2개');
+     assert.equal(v.autoplay,1,'자동재생 지정은 동시에 한 개');
+     assert.equal(v.nextAuto,'0','미리 불러 둔 영상 자동재생 금지');
+     assert.equal(v.nextMute,'1','미리 불러 둔 영상 음소거');
+     if(width===390){
+      assert.equal(v.topHeight,48,'상단 띠 48px');
+      assert.equal(v.contextVisible,open,'정보 판 보임·숨김');
+      assert.equal(v.infoOpen,open,'정보 판 상태');
+     }else{
+      assert.equal(v.contextVisible,true,'PC 왼쪽 정보 판은 항상 표시');
+      assert.ok(Math.abs(v.contextTop-v.cardTop)<=2,'PC 왼쪽 판 상단 플레이어와 정렬');
+      assert.ok(Math.abs(v.rowLeft-v.stageLeft)<=2&&Math.abs(v.rowRight-v.stageRight)<=2,'PC 위 도구와 가운데 묶음 좌우 정렬');
+     }
      if(CAPTURE){
       const {mkdir}=await import('node:fs/promises');await mkdir(CAPTURE,{recursive:true});
-      await h.page.screenshot({path:CAPTURE+'/'+width+'-'+theme+'-'+orientation+'.png',animations:'disabled'});
+      await h.page.screenshot({path:CAPTURE+'/'+width+'-'+theme+'-'+(open?'open':'closed')+'.png',animations:'disabled'});
      }
-     if(BEFORE)continue;
-     const m=await panel.evaluate(el=>{
-      const stage=el.querySelector('.moments-stage'),card=el.querySelector('.moments-card'),r=card.getBoundingClientRect();
-      return {width:innerWidth,left:r.left,right:r.right,cardWidth:r.width,overflow:document.documentElement.scrollWidth-innerWidth,
-       names:[...el.querySelectorAll('.moments-rail-button')].map(b=>b.getAttribute('aria-label')),
-       backgrounds:[...el.querySelectorAll('.moments-rail-button')].map(b=>getComputedStyle(b).backgroundColor),
-       arrows:[getComputedStyle(el.querySelector('.moments-nav')).display],
-       owner:el.querySelector('.moments-owner')?.textContent,tree:el.querySelector('.moments-tree-name')?.textContent,
-       orientation:el.querySelector('.moments-media').dataset.orientation,
-       progress:el.querySelector('.moments-progress').getBoundingClientRect().height,
-       soundName:el.querySelector('.moments-rail-button.is-sound')?.classList.contains('is-muted')?'소리 켜기':'소리 끄기'};
-     });
-     assert.deepEqual(m.names,['마음','댓글','담기','트리','공유',m.soundName],'여섯 단추 접근 이름');
-     assert.ok(m.overflow<=0,'가로 넘침 '+JSON.stringify(m));
-     assert.ok(m.owner&&m.tree,'주인 및 트리');
-     if(width===390){
-      assert.ok(m.cardWidth>=width-2&&Math.abs(m.left)<=2,'가로 끝까지 '+JSON.stringify(m));
-      assert.ok(m.arrows.every(x=>x==='none'),'▲▼ 숨김');
-      assert.ok(m.backgrounds.every(x=>x==='rgba(0, 0, 0, 0)'),'동그란 바탕 제거');
-      assert.equal(m.orientation,orientation,'화면 영상 방향');
-      assert.ok(m.progress>0&&m.progress<=4,'얇은 진행 막대');
-      await panel.locator('.moments-note').click();
-      assert.equal(await panel.locator('.moments-note').getAttribute('aria-expanded'),'true');
-      await panel.locator('.moments-note').click();
-      await panel.evaluate(el=>{
-       const f=el.querySelector('.moments-frame:not(.moments-next)');
-       window.dispatchEvent(new MessageEvent('message',{source:f.contentWindow,data:JSON.stringify({event:'infoDelivery',info:{currentTime:10,duration:100,muted:true}})}));
-      });
-      assert.equal(await panel.locator('.moments-progress').getAttribute('data-lt-progress'),'10','유튜브 재생 정보 진행 막대');
-      await panel.locator('.moments-rail-button.is-sound').click();
-      assert.equal(await panel.locator('.moments-rail-button.is-sound').getAttribute('aria-label'),'소리 끄기');
-     }else{
-      assert.ok(m.cardWidth<width-120,'넓은 화면 기존 판');
-      assert.ok(m.arrows.every(x=>x!=='none'),'PC ▲▼ 유지');
-     }
-     console.log('#1286',width,theme,orientation,JSON.stringify(m));
     }
-    if(BEFORE)continue;
     const before=await stage.getAttribute('data-lt-moments-id');
+    await step(h.page,panel,width,1);
+    assert.notEqual(await stage.getAttribute('data-lt-moments-id'),before,'다음 순간');
     if(width===390){
-     const swipe=(from,to)=>stage.evaluate((el,pair)=>{
-      const layer=el.querySelector('.moments-swipe-layer'),t=y=>new Touch({identifier:1,target:layer,clientX:180,clientY:y});
-      layer.dispatchEvent(new TouchEvent('touchstart',{bubbles:true,touches:[t(pair[0])],changedTouches:[t(pair[0])]}));
-      layer.dispatchEvent(new TouchEvent('touchend',{bubbles:true,touches:[],changedTouches:[t(pair[1])]}));
-     },[from,to]);
-     await swipe(650,340);assert.notEqual(await stage.getAttribute('data-lt-moments-id'),before,'밀어 다음');
-     await swipe(340,650);assert.equal(await stage.getAttribute('data-lt-moments-id'),before,'밀어 이전');
-     assert.equal(await h.page.evaluate(()=>localStorage.getItem('lt41.momentSwipeSeen')),'1','안내 저장');
-    }else{
-     await panel.locator('.moments-step').last().click();
-     assert.notEqual(await stage.getAttribute('data-lt-moments-id'),before,'PC ▼');
-     await h.page.keyboard.press('ArrowUp');
-     assert.equal(await stage.getAttribute('data-lt-moments-id'),before,'PC 키보드');
+     assert.equal(await stage.evaluate(e=>e.classList.contains('moments-info-open')),true,'다음 순간에도 정보 판 열림 유지');
+     await info.click();
+     assert.equal(await stage.evaluate(e=>e.classList.contains('moments-info-open')),false,'정보 판 다시 닫힘');
     }
    }finally{await h.ctx.close();await new Promise(r=>h.server.close(r));}
   }
  }finally{await browser.close();}
 });
-
-test('#1305 순간 보기 첫 영상은 소리 없이 자동 재생되고, 누르면 멈춤·재생이 바뀐다', {skip:REQUIRE?false:skip,timeout:240000}, async () => {
-  if(skip)assert.fail(skip);
-  const browser=await chromium.launch({headless:true});
-  try{
-   for(const [width,height] of [[390,844],[1440,900]]){
-    const h=await boot(browser,{width,height,theme:'night'});
-    try{
-     const panel=h.page.locator('#community-moments-panel'),stage=panel.locator('.moments-stage');
-     await h.page.waitForTimeout(300);
-     assert.equal(await stage.getAttribute('data-lt-autoplay'),'1','준비 뒤 재생 명령을 보냈다');
-     assert.equal(await stage.getAttribute('data-lt-moments-muted'),'true','첫 영상은 소리 없이');
-     await panel.locator('.moments-media').evaluate(el=>el.click());
-     assert.equal(await stage.getAttribute('data-lt-playing'),'1','화면 누르면 재생');
-     await panel.locator('.moments-media').evaluate(el=>el.click());
-     assert.equal(await stage.getAttribute('data-lt-playing'),'0','다시 누르면 멈춤');
-     // 소리 선택은 순간을 넘겨도 유지된다.
-     await panel.locator('.moments-rail-button.is-sound').evaluate(el=>el.click());
-     if(width===390)assert.equal(await stage.getAttribute('data-lt-moments-muted'),'false');
-     const before=await stage.getAttribute('data-lt-moments-id');
-     await step(h.page,panel,width,1);
-     await h.page.waitForTimeout(200);
-     assert.notEqual(await stage.getAttribute('data-lt-moments-id'),before,'넘기면 다음 순간');
-     if(width===390)assert.equal(await stage.getAttribute('data-lt-moments-muted'),'false','소리 선택 유지');
-     assert.equal(await panel.locator('.moments-frame').count(),2,'지금 것+다음 것만 남는다');
-    }finally{await h.ctx.close();await new Promise(r=>h.server.close(r));}
-   }
-  }finally{await browser.close();}
- });
-
-test('#1305 390 단추는 영상 위 빈 띠에 있고 가수 단추는 잘리지 않는다', {skip:REQUIRE?false:skip,timeout:240000}, async () => {
-  if(skip)assert.fail(skip);
-  const browser=await chromium.launch({headless:true});
-  try{
-   const h=await boot(browser,{width:390,height:844,theme:'night'});
+test('#1354 재생 불가 오류의 플레이어 제거 및 안내 분리',{skip:REQUIRE?false:skip,timeout:240000},async()=>{
+ if(skip)assert.fail(skip);
+ const browser=await chromium.launch({headless:true});
+ try{
+  for(const [width,height] of [[390,844],[1440,900]])for(const code of [100,101,150]){
+   const h=await boot(browser,{width,height,theme:'night'});
    try{
-    const m=await h.page.evaluate(()=>{
-     const tabs=document.querySelector('.community-tabs').getBoundingClientRect();
-     const card=document.querySelector('.moments-card').getBoundingClientRect();
-     const chips=document.querySelector('.moments-chips');
-     const chipRect=chips.getBoundingClientRect();
-     const cs=getComputedStyle(chips);
-     return {tabBottom:tabs.bottom,cardTop:card.top,chipsRight:chipRect.right,vw:innerWidth,
-      chipScroll:chips.scrollWidth,chipClient:chips.clientWidth,hidden:cs.scrollbarWidth,
-      names:[...chips.querySelectorAll('.moments-chip')].map(e=>e.textContent.trim()),tabW:Math.round(tabs.width)};
-    });
-    assert.ok(m.tabBottom<=m.cardTop,'단추가 영상 위 빈 띠에 있다: '+JSON.stringify(m));
-    assert.ok(m.chipsRight<=m.vw+1,'가수 단추 줄이 화면 밖으로 잘리지 않는다: '+JSON.stringify(m));
-    assert.ok(m.names.length>=2&&m.names.includes('아이유'),'가수 단추가 여러 개 보인다: '+JSON.stringify(m));
-    assert.equal(m.hidden,'none','회색 스크롤 막대를 숨긴다: '+JSON.stringify(m));
-    // 트리 화면의 전환 단추도 같은 자리·같은 크기다. 카드 한 장을 mock으로 채운 새 창에서 본다.
-    const card={shareId:'c0000000000000000000000a',title:'화면 확인용 공개 트리',subject:'확인 대상',summary:'첫 순간 소개',createdAt:'2026-11-15T09:00:00.000Z',momentCount:3,aiTester:false,emotions:['설렘'],cover:{url:'https://i.ytimg.com/vi/qaScreenAudit001/hqdefault.jpg',title:'첫 순간',emotion:'설렘'},stats:{favorites:0,hearts:0,favored:false,hearted:false,reactions:{},mine:[]}};
-    const treeCtx=await browser.newContext({viewport:{width:390,height:844},reducedMotion:'reduce'});
-    try{
-    await treeCtx.route('**/api/**',route=>route.fulfill({status:200,contentType:'application/json',body:'{"ok":true,"items":[]}'}));
-    await treeCtx.route('**/api/community/shares*',route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({items:[card],total:1,groups:[]})}));
-    const treePage=await treeCtx.newPage();
-    await treePage.goto(h.base+'/v41/#explore',{waitUntil:'domcontentloaded'});
-    await treePage.waitForSelector('#community-list .community-card',{timeout:10000});
-    const tree=await treePage.evaluate(()=>{
-     const tabs=document.querySelector('.community-tabs').getBoundingClientRect();
-     const first=document.querySelector('#community-list .community-card')?.getBoundingClientRect();
-     const heading=getComputedStyle(document.querySelector('#community-tree-panel .panel-heading')).display;
-     return {tabs:{top:Math.round(tabs.top),left:Math.round(tabs.left),w:Math.round(tabs.width),h:Math.round(tabs.height)},
-      firstTop:first?Math.round(first.top):null,firstBottom:first?Math.round(first.bottom):null,vh:innerHeight,heading,note:getComputedStyle(document.querySelector('#community-tree-panel > .panel-note')).display};
-    });
-    assert.equal(tree.heading,'none','큰 제목을 뺀다');
-    assert.equal(tree.note,'none','설명 글을 뺀다');
-    assert.equal(tree.tabs.w,m.tabW,'두 화면의 전환 단추 폭이 같다');
-    assert.ok(tree.firstTop!==null&&tree.firstTop<tree.vh&&tree.firstBottom>0,'트리 카드 첫 줄이 첫 화면에 보인다: '+JSON.stringify(tree));
-    }finally{await treeCtx.close();}
+    await h.page.evaluate(code=>{
+     const f=document.querySelector('#community-moments-panel .moments-frame:not(.moments-next)');
+     window.dispatchEvent(new MessageEvent('message',{source:f.contentWindow,data:JSON.stringify({event:'onError',data:code})}));
+    },code);
+    const v=await h.page.locator('#community-moments-panel').evaluate(el=>({
+     unavailable:el.querySelector('.moments-stage').dataset.ltMomentUnavailable,
+     frameCount:el.querySelectorAll('.moments-frame').length,
+     fallbackHeight:el.querySelector('.moments-fallback').getBoundingClientRect().height,
+     soundHeight:document.querySelector('.moments-toolbar .is-sound').getBoundingClientRect().height
+    }));
+    assert.equal(v.unavailable,'1','재생 불가 상태');
+    assert.equal(v.frameCount,0,'안내 카드와 겹칠 플레이어가 없음');
+    assert.ok(v.fallbackHeight>=200,'안내 카드 표시');
+    assert.equal(v.soundHeight,0,'재생 불가 영상의 소리 단추 숨김');
    }finally{await h.ctx.close();await new Promise(r=>h.server.close(r));}
-  }finally{await browser.close();}
- });
-
-
-const SOUND_CAPTURE = process.env.LT_1332_CAPTURE || '';
-if (SOUND_CAPTURE) mkdirSync(SOUND_CAPTURE, { recursive: true });
-const SOUND_KEY = 'lt41.momentSoundSeen';
-const soundSpy = () => {
-  window.__ltSoundPosts = [];
-  const original = Object.getOwnPropertyDescriptor(HTMLIFrameElement.prototype, 'contentWindow');
-  Object.defineProperty(HTMLIFrameElement.prototype, 'contentWindow', {
-    configurable: true,
-    get() {
-      const real = original.get.call(this);
-      if (!real) return real;
-      return new Proxy(real, {
-        get(target, key) {
-          if (key === 'postMessage') return (...args) => { window.__ltSoundPosts.push(String(args[0])); return target.postMessage(...args); };
-          const value = target[key];
-          return typeof value === 'function' ? value.bind(target) : value;
-        }
-      });
-    }
-  });
-};
-
-test('#1332 알약: 음소거 재생 중 보이고 누르면 소리가 켜진다', { skip: REQUIRE ? false : skip, timeout: 240000 }, async () => {
-  if (skip) assert.fail(skip);
-  const browser = await chromium.launch({ headless: true });
-  try {
-    for (const [width, height] of [[390, 844], [1440, 900]]) for (const theme of ['night', 'garden']) {
-      const h = await boot(browser, { width, height, theme, init: soundSpy });
-      try {
-        const panel = h.page.locator('#community-moments-panel');
-        const stage = panel.locator('.moments-stage');
-        const pill = panel.locator('.moments-sound-pill');
-        await h.page.waitForTimeout(250);
-        assert.equal(await stage.getAttribute('data-lt-moments-muted'), 'true', `${width}/${theme}: 첫 영상은 음소거`);
-        assert.equal(await pill.isVisible(), true, `${width}/${theme}: 알약이 보인다`);
-        assert.match(await pill.textContent(), /눌러서 소리 켜기/, `${width}/${theme}: 큰 안내 문구`);
-        assert.ok((await pill.boundingBox()).height >= 44, `${width}/${theme}: 누름 영역 44px 이상`);
-        if (SOUND_CAPTURE) await h.page.screenshot({ path: join(SOUND_CAPTURE, `sound-${width}-${theme}-before.png`), animations: 'disabled' });
-        const playingBefore = await stage.getAttribute('data-lt-playing');
-        await pill.click();
-        await h.page.waitForTimeout(150);
-        assert.equal(await stage.getAttribute('data-lt-moments-muted'), 'false', `${width}/${theme}: 소리가 켜졌다`);
-        assert.equal(await pill.isVisible(), false, `${width}/${theme}: 알약이 사라졌다`);
-        assert.equal(await stage.getAttribute('data-lt-playing'), playingBefore, `${width}/${theme}: 멈춤·재생은 그대로`);
-        const sent = await h.page.evaluate(() => (window.__ltSoundPosts || []).some((m) => m.includes('unMute')));
-        assert.equal(sent, true, `${width}/${theme}: unMute 명령을 보냈다`);
-        const remembered = await h.page.evaluate((key) => localStorage.getItem(key), SOUND_KEY);
-        assert.equal(remembered, '1', `${width}/${theme}: 이 기기에 기억했다`);
-        if (SOUND_CAPTURE) await h.page.screenshot({ path: join(SOUND_CAPTURE, `sound-${width}-${theme}-after.png`), animations: 'disabled' });
-        const beforeId = await stage.getAttribute('data-lt-moments-id');
-        await step(h.page, panel, width, 1);
-        await h.page.waitForTimeout(250);
-        assert.notEqual(await stage.getAttribute('data-lt-moments-id'), beforeId, `${width}/${theme}: 다음 순간`);
-        assert.equal(await pill.isVisible(), false, `${width}/${theme}: 다음 순간에도 알약 없음`);
-        assert.equal(await stage.getAttribute('data-lt-moments-muted'), 'false', `${width}/${theme}: 소리 유지`);
-      } finally { await h.ctx.close(); await new Promise((r) => h.server.close(r)); }
-    }
-  } finally { await browser.close(); }
+  }
+ }finally{await browser.close();}
 });
-
-test('#1332 다시 방문하면 작은 알약으로 안내한다', { skip: REQUIRE ? false : skip, timeout: 240000 }, async () => {
-  if (skip) assert.fail(skip);
-  const browser = await chromium.launch({ headless: true });
-  try {
-    for (const [width, height] of [[390, 844], [1440, 900]]) {
-      const h = await boot(browser, {
-        width, height, theme: 'night',
-        init: () => { try { localStorage.setItem('lt41.momentSoundSeen', '1'); } catch {} }
-      });
-      try {
-        const pill = h.page.locator('#community-moments-panel .moments-sound-pill');
-        assert.equal(await pill.isVisible(), true, `${width}: 작은 알약도 보인다`);
-        assert.equal((await pill.textContent()).trim(), '소리 켜기', `${width}: 짧은 문구`);
-        assert.ok(await pill.evaluate((el) => el.classList.contains('is-small')), `${width}: 작은 모양`);
-        assert.ok((await pill.boundingBox()).height >= 44, `${width}: 작은 알약도 누름 영역 44px 이상`);
-      } finally { await h.ctx.close(); await new Promise((r) => h.server.close(r)); }
-    }
-  } finally { await browser.close(); }
-});
-
-
-test('#1332 확인: 알약은 글자 묶음·밀기 안내와 겹치지 않고 가운데 아래에 있다', { skip: REQUIRE ? false : skip, timeout: 240000 }, async () => {
-  if (skip) assert.fail(skip);
-  const browser = await chromium.launch({ headless: true });
-  try {
-    for (const theme of ['night', 'garden']) {
-      const h = await boot(browser, {
-        width: 390, height: 844, theme,
-        init: () => { try { localStorage.removeItem('lt41.momentSwipeSeen'); } catch {} }
-      });
-      try {
-        const box = await h.page.evaluate(() => {
-          const panel = document.querySelector('#community-moments-panel');
-          const rect = (sel) => panel.querySelector(sel)?.getBoundingClientRect().toJSON() || null;
-          return {
-            pill: rect('.moments-sound-pill'),
-            overlay: rect('.moments-overlay'),
-            hint: rect('.moments-swipe-hint'),
-            media: rect('.moments-media'),
-            hintHidden: panel.querySelector('.moments-swipe-hint')?.hidden
-          };
-        });
-        assert.ok(box.pill && box.overlay && box.media, `${theme}: 요소가 있다`);
-        assert.equal(box.hintHidden, false, `${theme}: 밀기 안내가 떠 있다`);
-        const overlaps = (a, b) => !!a && !!b && a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
-        assert.equal(overlaps(box.pill, box.overlay), false, `${theme}: 글자 묶음과 겹침 0`);
-        assert.equal(overlaps(box.pill, box.hint), false, `${theme}: 밀기 안내와 겹침 0`);
-        assert.ok(box.pill.top > box.media.top + box.media.height / 2, `${theme}: 영상 가운데 아래`);
-        assert.ok(box.overlay.top - box.pill.bottom >= 11, `${theme}: 글자 묶음 윗변 12px 위`);
-      } finally { await h.ctx.close(); await new Promise((r) => h.server.close(r)); }
-    }
-  } finally { await browser.close(); }
-});
-
-test('#1332 확인: 유튜브가 음소거로 되돌리면 알약이 다시 보인다', { skip: REQUIRE ? false : skip, timeout: 240000 }, async () => {
-  if (skip) assert.fail(skip);
-  const browser = await chromium.launch({ headless: true });
-  try {
-    const h = await boot(browser, { width: 390, height: 844, theme: 'night' });
-    try {
-      const pill = h.page.locator('#community-moments-panel .moments-sound-pill');
-      await pill.click();
-      assert.equal(await pill.isVisible(), false, '누르면 사라진다');
-      await h.page.evaluate(() => {
-        const frame = document.querySelector('#community-moments-panel .moments-frame');
-        window.dispatchEvent(new MessageEvent('message', {
-          data: JSON.stringify({ event: 'infoDelivery', info: { muted: true } }),
-          source: frame.contentWindow
-        }));
-      });
-      assert.equal(await pill.isVisible(), true, '음소거로 돌아가면 다시 보인다');
-      await h.page.evaluate(() => {
-        const frame = document.querySelector('#community-moments-panel .moments-frame');
-        window.dispatchEvent(new MessageEvent('message', {
-          data: JSON.stringify({ event: 'infoDelivery', info: { muted: false } }),
-          source: frame.contentWindow
-        }));
-      });
-      assert.equal(await pill.isVisible(), false, '소리 켜짐을 알리면 다시 숨는다');
-    } finally { await h.ctx.close(); await new Promise((r) => h.server.close(r)); }
-  } finally { await browser.close(); }
-});
-
-
-const rgbOf = (value) => {
-  const hex = String(value || '').trim();
-  if (!/^#[0-9a-f]{6}$/i.test(hex)) return hex;
-  return `rgb(${parseInt(hex.slice(1, 3), 16)}, ${parseInt(hex.slice(3, 5), 16)}, ${parseInt(hex.slice(5, 7), 16)})`;
-};
-
-test('#1340 화면: 소리 아이콘은 음소거에 장미색, 누르면 흰색이고 줄은 화면 안', { skip: REQUIRE ? false : skip, timeout: 240000 }, async () => {
-  if (skip) assert.fail(skip);
-  const browser = await chromium.launch({ headless: true });
-  try {
-    for (const [width, height] of [[390, 844], [1440, 900]]) for (const theme of ['night', 'garden']) {
-      const h = await boot(browser, { width, height, theme });
-      try {
-        const state = await h.page.evaluate(() => {
-          const panel = document.querySelector('#community-moments-panel');
-          const sound = panel.querySelector('.moments-rail-button.is-sound');
-          const buttons = [...panel.querySelectorAll('.moments-rail-button')];
-          const overlay = panel.querySelector('.moments-overlay').getBoundingClientRect();
-          const rose = getComputedStyle(document.documentElement).getPropertyValue('--lt-rose').trim();
-          const hit = (a, b) => a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
-          return {
-            label: sound.getAttribute('aria-label'),
-            muted: sound.classList.contains('is-muted'),
-            hasIcon: !!sound.querySelector('.moments-rail-svg path'),
-            hasLabel: sound.querySelector('.moments-rail-label')?.textContent,
-            color: getComputedStyle(sound).color,
-            rose,
-            heartColor: getComputedStyle(panel.querySelector('.moments-rail-button.is-heart')).color,
-            allInView: buttons.every((el) => {
-              const r = el.getBoundingClientRect();
-              return r.top >= 0 && r.bottom <= innerHeight && r.left >= 0 && r.right <= innerWidth;
-            }),
-            overlaps: buttons.filter((el) => hit(el.getBoundingClientRect(), overlay)).map((el) => el.getAttribute('aria-label')),
-            pillShown: !panel.querySelector('.moments-sound-pill').hidden,
-            momentId: panel.querySelector('.moments-stage').dataset.ltMomentsId,
-            playing: panel.querySelector('.moments-stage').dataset.ltPlaying
-          };
-        });
-        assert.equal(state.label, '소리 켜기', `${width}/${theme}: 음소거 접근 이름`);
-        assert.equal(state.muted, true, `${width}/${theme}: 음소거 표시`);
-        assert.ok(state.hasIcon && state.hasLabel, `${width}/${theme}: 아이콘과 글자`);
-        assert.equal(state.color, rgbOf(state.rose), `${width}/${theme}: 장미색`);
-        assert.equal(state.allInView, true, `${width}/${theme}: 오른쪽 줄 전체가 화면 안`);
-        assert.deepEqual(state.overlaps, [], `${width}/${theme}: 글자 묶음과 겹침 0`);
-        assert.equal(state.pillShown, true, `${width}/${theme}: 첫 영상 큰 알약`);
-        await h.page.locator('#community-moments-panel .moments-rail-button.is-sound').click();
-        const after = await h.page.evaluate(() => {
-          const panel = document.querySelector('#community-moments-panel');
-          const sound = panel.querySelector('.moments-rail-button.is-sound');
-          return {
-            label: sound.getAttribute('aria-label'),
-            muted: sound.classList.contains('is-muted'),
-            color: getComputedStyle(sound).color,
-            heartColor: getComputedStyle(panel.querySelector('.moments-rail-button.is-heart')).color,
-            pillHidden: panel.querySelector('.moments-sound-pill').hidden,
-            momentId: panel.querySelector('.moments-stage').dataset.ltMomentsId,
-            playing: panel.querySelector('.moments-stage').dataset.ltPlaying
-          };
-        });
-        assert.equal(after.label, '소리 끄기', `${width}/${theme}: 켠 뒤 접근 이름`);
-        assert.equal(after.muted, false, `${width}/${theme}: 켠 뒤 표시`);
-        assert.equal(after.color, after.heartColor, `${width}/${theme}: 다른 단추와 같은 흰색`);
-        assert.equal(after.pillHidden, true, `${width}/${theme}: 누르면 알약 사라짐`);
-        assert.equal(after.momentId, state.momentId, `${width}/${theme}: 넘기기 없음`);
-        assert.equal(after.playing, state.playing, `${width}/${theme}: 멈춤·재생 없음`);
-      } finally { await h.ctx.close(); await new Promise((r) => h.server.close(r)); }
-    }
-  } finally { await browser.close(); }
-});
-
-test('#1340 화면: 큰 알약은 첫 방문 첫 영상에서만', { skip: REQUIRE ? false : skip, timeout: 240000 }, async () => {
-  if (skip) assert.fail(skip);
-  const browser = await chromium.launch({ headless: true });
-  try {
-    const h = await boot(browser, { width: 390, height: 844, theme: 'night' });
-    try {
-      const panel = h.page.locator('#community-moments-panel');
-      const pill = panel.locator('.moments-sound-pill');
-      assert.equal(await pill.isVisible(), true, '첫 영상에서 보인다');
-      await step(h.page, panel, 390, 1);
-      await h.page.waitForTimeout(200);
-      assert.equal(await pill.isVisible(), false, '다음 영상에서는 아이콘만');
-      assert.equal(await panel.locator('.moments-rail-button.is-sound').isVisible(), true, '아이콘은 그대로');
-    } finally { await h.ctx.close(); await new Promise((r) => h.server.close(r)); }
-  } finally { await browser.close(); }
-});
-
 // #1352·#1360: 재생 끝 다음 넘김, 구간 순간, 재생 불가 건너뛰기 — 화면 배치는 바꾸지 않는다.
 async function sendFromCurrent(page, payload) {
   const handle = await page.$('#community-moments-panel .moments-frame:not(.moments-next)');
