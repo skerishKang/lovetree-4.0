@@ -68,6 +68,9 @@ function fakeElement(extra = {}) {
     focus() {},
     replaceChildren(...k) { this.children = k; },
     append(...k) { this.children.push(...k); },
+    before() {}, prepend(...k) { this.children.unshift(...k); },
+    insertBefore(node) { this.children.unshift(node); },
+    contains(node) { return node === this || this.children.includes(node); },
     querySelector: () => fakeElement(), querySelectorAll: () => [],
     close() { this.open = false; }, showModal() { this.open = true; }
   }, extra);
@@ -226,8 +229,8 @@ test('4-1. 같은 이름과 순간은 공개 표시명만 쓰고 순번을 붙�
   try {
     await h.search();
     const cards = h.get('community-list').children;
-    const labels = cards.map(card => card.children.find(node => node.className === 'community-card-distinct')?.textContent || '');
-    assert.deepEqual(labels, ['AI 명예회원 하은님', '', '윤슬님', '']);
+    const labels = cards.map(card => card.children.find(node => node.className === 'community-card-owner')?.textContent || '');
+    assert.deepEqual(labels, ['AI 명예회원 하은', '', '', ''], 'AI 명예회원만 공개 이름 표시, 일반 사용자 이름 없음');
     assert.equal(cards.some(card => card.children.some(node => String(node.textContent).includes('같은 이름'))), false);
   } finally { h.restore(); }
 });
