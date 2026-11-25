@@ -72,10 +72,13 @@ export function createMemoryCommunityRepo({isPrivateTree=null,isDiscoverOn=null,
   // #627 3단계: 태그 검색이 훑을 공개 공유 행 — active, 사람×트리당 한 행(auto 우선), 숨김·비공개·
   // 차단(양방향)·요청자 본인을 뺀다. 2026-11-16 대표 결정: 소개 켜짐 + 순간 3개 이상만 훑는다
   // (둘러보기 목록과 같은 조건). isDiscoverOn 이 없으면(예전 모형) 켜짐으로 본다.
-  async listPublicTagShares({productId,viewerSubjectId,limit=400}){
+  async listPublicTagShares({productId,viewerSubjectId,limit=400,treeShareId=null}){
    const picked=new Map();
+   // #1356 '이 트리만': 주어진 공유가 속한 (계정, 트리) 한 쌍만 남긴다. 없는 공유면 아무것도 남기지 않는다.
+   const target=treeShareId===null?null:((this.shares||[]).find(r=>r.productId===productId&&r.shareId===treeShareId)||{subjectId:null,treeId:null});
    for(const row of (this.shares||[])){
     if(row.productId!==productId||row.status!=='active')continue;
+    if(target&&(row.subjectId!==target.subjectId||row.treeId!==target.treeId))continue;
     if(Number(row.momentCount??0)<3)continue;
     if(isDiscoverOn&&!await isDiscoverOn(productId,row.subjectId,row.treeId))continue;
     const pk=key(row.subjectId,row.treeId);
