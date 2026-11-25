@@ -15,6 +15,7 @@
 // 크롬이 없는 곳에서는 화면 시험을 건너뛰고, LT_635A_REQUIRE=1(미리보기 검사)에서는 건너뜀을 실패로 본다.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { inspectYoutubeIframe, countYoutubeAutoplay } from './helpers/youtube-embed-audit.mjs';
 import { createServer } from 'node:http';
 import { createReadStream, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
@@ -1147,4 +1148,37 @@ test('#1259 방문자 지도 시작 제목과 실제 연결선 교차 0', {skip:
    }finally{await context.close()}
   }
  }finally{await browser?.close();server.close()}
+});
+
+test('#1378 공유 감상: 390·1440 × 밤·정원 재생 iframe 최소 크기·가림·자동재생', { skip: REQUIRE ? false : skip, timeout: 240000 }, async () => {
+  const server = await serve();
+  const base = 'http://127.0.0.1:' + server.address().port;
+  const browser = await chromium.launch({ headless: true });
+  try {
+    for (const [width, height] of [[390, 844], [1440, 900]]) {
+      for (const theme of ['night', 'garden']) {
+        const { context, frame } = await openBook(browser, base + '/share-host.html', { width, height, theme,
+          route: route => route.fulfill({ status: 200, contentType: 'image/svg+xml',
+            body: '<svg xmlns="http://www.w3.org/2000/svg" width="160" height="90"/>' }),
+        });
+        try {
+          await context.route('**/api/youtube/oembed*', route => route.fulfill({
+            status: 200, contentType: 'application/json', body: '{"title":"기록 영상"}',
+          }));
+          await context.route('**/youtube-nocookie.com/**', route => route.fulfill({
+            status: 200, contentType: 'text/html', body: '<!doctype html><title>YouTube video</title>',
+          }));
+          await frame.locator('[data-yt-play]').first().click({ force: true });
+          await frame.waitForSelector('iframe.yt-frame', { timeout: 10000 });
+          const result = await inspectYoutubeIframe(frame.locator('iframe.yt-frame').first());
+          assert.ok(result.minimum200, width + '/' + theme + ': 공유 플레이어 ' + result.width + '×' + result.height);
+          assert.equal(result.blocked, 0, width + '/' + theme + ': 가림 ' + result.blockers.join(','));
+          assert.equal(await countYoutubeAutoplay(frame), 1, width + '/' + theme + ': 자동재생 하나');
+        } finally { await context.close(); }
+      }
+    }
+  } finally {
+    await browser.close();
+    await new Promise(resolve => server.close(resolve));
+  }
 });
