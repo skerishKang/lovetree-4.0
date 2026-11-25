@@ -13,7 +13,7 @@ import assert from 'node:assert/strict';
 import { existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { serve, auditPage, failuresOf } from './helpers/screen-audit.mjs';
+import { serve, auditPage, failuresOf, roleStyleFn, assertRolePair } from './helpers/screen-audit.mjs';
 import { createTree, addMoment } from '../public/v41/domain.mjs';
 
 const REQUIRE = process.env.LT_SCREEN_AUDIT_REQUIRE === '1';
@@ -28,6 +28,10 @@ try {
   if (!existsSync(chromium.executablePath())) skip = 'Playwright Chromium이 없어 화면 공통 검사를 건너뜀';
 } catch { skip = 'playwright 패키지가 없어 화면 공통 검사를 건너뜀'; }
 if (REQUIRE && !existsSync(new URL('../dist/v41/home.html', import.meta.url))) skip = '빌드 결과가 없어 화면 공통 검사를 건너뜀(npx vite build 필요)';
+
+// #1350: 글자 대비(상대 휘도) — 투명 단추는 글자와 무대 배경을 직접 잰다.
+const relL = color => (color.match(/[\d.]+/g)||[]).slice(0,3).map(v=>Number(v)/255).map(v=>v<=.04045?v/12.92:((v+.055)/1.055)**2.4).reduce((n,v,i)=>n+v*[.2126,.7152,.0722][i],0);
+const pairContrast = (a,b) => (Math.max(relL(a),relL(b))+.05)/(Math.min(relL(a),relL(b))+.05);
 
 // — 알려진 문제 목록 — main에서 이미 나는 것(기준을 낮추지 않고 따로 기록한다. 목록 밖의 새 실패만 빨강이 된다) —
 // 형식: { 화면(줄 맨 앞), 항목, 찾을: 줄에서 찾을 정규식, 이슈 }
@@ -99,7 +103,7 @@ test('#942 첫 화면 추가 단추와 숫자 묶음', { skip: REQUIRE ? false :
     let tree=createTree(input(0),clock(0));for(let i=1;i<count;i++)tree=addMoment(tree,input(i),tree.moments[0].id,clock(i));
     return tree;
   };
-  const trees=[make('좋아하는 순간들',8),make('여름',3),make('함께 부른 노래',3)];
+  const trees=[make('좋아하는 순간들',8),make('여름',3),{...make('함께 부른 노래',3),inbox:true}];
   const workspace={revision:1,state:{version:1,trees,prefs:{displayName:'화면검사 시험계정'}},subject:'visual-audit-fake',writeSubjectBound:true,savedAt:'2026-11-20T00:00:00.000Z'};
   const share={id:'audit-share-000000000001',treeId:trees[0].id,view:'book',status:'active',origin:'manual',createdAt:'2026-11-20T00:00:00.000Z'};
   const readHome = member => {
@@ -118,22 +122,27 @@ test('#942 첫 화면 추가 단추와 숫자 묶음', { skip: REQUIRE ? false :
       const s = e.ownerDocument.defaultView.getComputedStyle(e), r = e.getBoundingClientRect();
       const L=color=>(color.match(/[\d.]+/g)||[]).slice(0,3).map(v=>Number(v)/255).map(v=>v<=.04045?v/12.92:((v+.055)/1.055)**2.4).reduce((n,v,i)=>n+v*[.2126,.7152,.0722][i],0);
       const a=L(s.backgroundColor),b=L(s.color);
-      return {text:e.textContent.trim(),bg:s.backgroundColor,ink:s.color,border:s.borderTopWidth,contrast:(Math.max(a,b)+.05)/(Math.min(a,b)+.05),visible:!!e.getClientRects().length,x:r.x,y:r.y,w:r.width,h:r.height};
+      return {text:e.textContent.trim(),bg:s.backgroundColor,ink:s.color,border:s.borderTopWidth,borderColor:s.borderTopColor,font:parseFloat(s.fontSize),radius:parseFloat(s.borderTopLeftRadius),contrast:(Math.max(a,b)+.05)/(Math.min(a,b)+.05),visible:!!e.getClientRects().length,x:r.x,y:r.y,w:r.width,h:r.height};
     };
     const buttons = [...root.querySelectorAll('.center .actions > .subtleBtn,.center .actions > .home-action-group > .subtleBtn')].map(e => {
       const s = doc.defaultView.getComputedStyle(e);
-      return { text: e.textContent.trim(), bg: s.backgroundColor, border: s.borderTopWidth };
+      const icon=e.querySelector('svg.home-compass'), ir=icon?.getBoundingClientRect();
+      return { text:e.textContent.trim(),bg:s.backgroundColor,border:s.borderTopWidth,borderColor:s.borderTopColor,borderStyle:s.borderTopStyle,radius:parseFloat(s.borderTopLeftRadius),ink:s.color,icon:!!icon&&ir.width>0&&ir.height>0&&icon.getAttribute('aria-hidden')==='true'&&icon.getAttribute('fill')==='none'&&icon.getAttribute('stroke')==='currentColor' };
     });
     const headers = [...document.querySelectorAll('#write-menu,#mobile-add')].map(e => ({ id: e.id, visible: !!e.getClientRects().length }));
     const head = measure(document.getElementById('write-menu')), fab = measure(document.getElementById('mobile-add'));
     const add = root.querySelector('.home-add-top'), top = add ? measure(add) : null;
     const groups = [...root.querySelectorAll('.home-action-group')].map(e => {
       const b=e.querySelector('.subtleBtn'),n=e.querySelector('.home-count'),r=e.getBoundingClientRect(),br=b.getBoundingClientRect(),nr=n.getBoundingClientRect();
-      const range=doc.createRange();range.selectNodeContents(n);const tr=range.getBoundingClientRect();
       const lines=[...n.querySelectorAll('.home-count-line')].map(row=>row.textContent.trim());
-      return {label:b.textContent.trim(),count:n.hidden?'':lines.join('|'),x:r.x,y:r.y,w:r.width,h:r.height,inner:n.hidden?null:nr.top-br.bottom,center:n.hidden?null:(tr.left+tr.width/2)-(br.left+br.width/2),font:parseFloat(doc.defaultView.getComputedStyle(n).fontSize),overflow:n.hidden?0:Math.max(0,tr.right-br.right,br.left-tr.left)};
+      const rows=[...n.querySelectorAll('.home-count-item')].map(item=>{
+        const label=item.querySelector('.home-count-name'),value=item.querySelector('.home-count-value');
+        const lr=label.getBoundingClientRect(),vr=value.getBoundingClientRect(),ls=doc.defaultView.getComputedStyle(label),vs=doc.defaultView.getComputedStyle(value);
+        return {name:label.textContent,value:value.textContent,left:lr.left-br.left,right:br.right-vr.right,gap:vr.left-lr.right,dy:Math.abs(lr.top-vr.top),labelColor:ls.color,valueColor:vs.color,muted:ls.getPropertyValue('--lt-muted').trim(),pearl:vs.getPropertyValue('--lt-pearl').trim(),weight:parseInt(vs.fontWeight),numeric:vs.fontVariantNumeric,nowrap:vs.whiteSpace};
+      });
+      return {label:b.textContent.trim(),count:n.hidden?'':lines.join('|'),x:r.x,y:r.y,w:r.width,h:r.height,btnH:br.height,inner:n.hidden?null:nr.top-br.bottom,font:parseFloat(doc.defaultView.getComputedStyle(n).fontSize),widthDiff:Math.abs(nr.width-br.width),rows};
     });
-    return { buttons, headers, head, fab, top, groups };
+    return { buttons, headers, head, fab, top, groups, stageBg:doc.defaultView.getComputedStyle(doc.body).backgroundColor };
   };
   const failures=[];
   const check=(ok,message)=>{if(!ok)failures.push(message)};
@@ -148,7 +157,7 @@ test('#942 첫 화면 추가 단추와 숫자 묶음', { skip: REQUIRE ? false :
           if(u.origin!==base)return u.hostname==='i.ytimg.com'||u.hostname==='audit.invalid'?THUMB(r):r.abort();
           if(u.pathname==='/api/workspace'&&signedIn)return r.fulfill({status:200,json:{...workspace,state:{...workspace.state,trees:member?trees:[]}}});
           if(u.pathname==='/api/shares'&&member)return r.fulfill({status:200,json:{ok:true,items:[share],shares:[share]}});
-          if(u.pathname==='/api/community/stats')return r.fulfill({status:200,json:{trees:17,moments:123}});
+          if(u.pathname==='/api/community/stats')return r.fulfill({status:200,json:{trees:17,moments:1234}});
           if(u.pathname.startsWith('/api/'))return r.fulfill({status:200,json:{ok:true,items:[]}});
           return r.continue();
         });
@@ -166,26 +175,65 @@ test('#942 첫 화면 추가 단추와 숫자 묶음', { skip: REQUIRE ? false :
         const result = await page.waitForFunction(readHome, member);
         const values = await result.jsonValue();
         await result.dispose();
-        const { buttons, head, fab, top, groups } = values;
+        const { buttons, head, fab, top, groups, stageBg } = values;
         const key=width+'-'+theme+'-'+kind;
         console.log('#942',key,JSON.stringify(values));
         if(dest){
           if(width===1440)await page.frameLocator('#view').locator('.card:not(.off):not(.clash)').first().waitFor({state:'visible',timeout:8000});
+          // Capture the fully revealed center, not a transient animation frame.
+          await page.waitForFunction(()=>{
+            const f=document.getElementById('view'),root=f?.contentDocument?.getElementById('orbit')?.shadowRoot;
+            const center=root?.querySelector('.center'),actions=center?.querySelector('.actions');
+            if(!actions)return false;
+            const win=f.contentWindow;
+            return [center,actions,...center.querySelectorAll('.lt-home-enter,.home-action-group,.home-count-item')].every(e=>{
+              const s=win.getComputedStyle(e);
+              return Number(s.opacity)>=.99&&s.visibility==='visible'&&e.getAnimations().every(a=>a.playState==='finished'||a.playState==='idle');
+            });
+          },null,{timeout:10000});
           await page.screenshot({path:join(dest,'home-'+key+'.png'),animations:'allow'});
         }
         const rose=theme==='night'?'rgb(180, 87, 107)':'rgb(152, 80, 94)';
         const visibleAdds=[head,fab,top].filter(b=>b?.visible);
         check(visibleAdds.length===(member?(width===1440?2:1):0),key+' 추가 단추 개수 '+JSON.stringify(visibleAdds));
         if(top?.visible)check(top.bg===rose&&top.ink==='rgb(255, 255, 255)'&&top.contrast>=4.5,key+' 가운데 장미색·대비 '+JSON.stringify(top));
-        if(head.visible)check(head.bg!==rose&&head.border!=='0px'&&head.contrast>=4.5,key+' 머리줄은 밝은 테두리 '+JSON.stringify(head));
+        // #1246: 같은 추가 동작은 둘 다 장미색. 개수·위치·대비 기준은 그대로.
+        if(head.visible)check(head.bg===rose&&head.ink==='rgb(255, 255, 255)'&&head.border!=='0px'&&head.contrast>=4.5,key+' 머리줄 장미색·대비 '+JSON.stringify(head));
+        if(fab.visible)check(fab.bg===rose&&fab.ink==='rgb(255, 255, 255)'&&fab.contrast>=4.5,key+' 휴대폰 추가 장미색·대비 '+JSON.stringify(fab));
         check(head.visible===(member&&width===1440)&&!fab.visible&&!!top?.visible===member,key+' 추가 단추 위치');
+        // #1350: 두 순간 추가 단추는 색·글자 크기·모서리가 같다. 높이는 머리줄 안에 들어가는 만큼만 다르게 둔다.
+        if(head.visible&&top?.visible){
+          check(head.bg===top.bg&&head.ink===top.ink&&head.borderColor===top.borderColor,key+' 두 추가 단추 색 '+JSON.stringify({head:[head.bg,head.ink,head.borderColor],top:[top.bg,top.ink,top.borderColor]}));
+          check(head.font===top.font&&head.radius===top.radius,key+' 두 추가 단추 글자 크기·모서리 '+JSON.stringify({head:[head.font,head.radius],top:[top.font,top.radius]}));
+        }
         check(JSON.stringify(buttons.map(b=>b.text))===JSON.stringify(member?['순간 목록','둘러보기','서재']:['＋ 첫 순간 추가','둘러보기','어떻게 쓰나요']),key+' 가운데 순서');
         const light=theme==='night'?'rgb(238, 233, 224)':'rgb(255, 253, 248)';
-        check(member?buttons.every(b=>b.bg===light):buttons[0]?.bg===rose,key+' 자주색 하나·나머지는 밝은 단추(#1084) '+JSON.stringify(buttons.map(b=>b.bg)));
-        check(buttons.slice(member?0:1).every(b=>b.bg===light&&b.border!=='0px'),key+' 밝은 바탕·얇은 테두리 '+JSON.stringify(buttons));
+        check(member?buttons[0]?.bg===light:buttons[0]?.bg===rose,key+' 첫 단추의 기존 색 '+JSON.stringify(buttons[0]));
+        check(buttons[2]?.bg===light&&buttons[2].border!=='0px',key+' 셋째 밝은 단추 '+JSON.stringify(buttons[2]));
+        const explore=buttons[1];
+        check(explore.bg==='rgba(0, 0, 0, 0)'&&explore.border==='1px'&&explore.borderStyle==='solid'&&explore.radius>=22&&explore.icon&&explore.ink!==rose,key+' 둘러보기 투명·테두리·선 나침반 '+JSON.stringify(explore));
+        check(!buttons[0].icon&&!buttons[2].icon&&explore.bg!==buttons[0].bg&&explore.bg!==buttons[2].bg,key+' 둘러보기만 다른 모양');
+        // #1350: 둘러보기 글자 대비는 기존 접근성 기준(4.5:1)을 지킨다.
+        const ec=pairContrast(explore.ink,stageBg);
+        check(ec>=4.5,key+' 둘러보기 글자 대비 '+JSON.stringify({ink:explore.ink,stage:stageBg,contrast:Math.round(ec*100)/100}));
+        const exploreLocator=page.frameLocator('#view').locator('.center .actions [data-do=community]');
+        const hoverStyle=()=>exploreLocator.evaluate(e=>{const s=getComputedStyle(e);return {bg:s.backgroundColor,border:s.borderTopColor}});
+        await exploreLocator.hover();
+        const hovered=await hoverStyle();
+        check(hovered.bg!==explore.bg&&hovered.border!==explore.borderColor,key+' 둘러보기 올림 강조 '+JSON.stringify(hovered));
+        await page.mouse.move(0,0);
+        check((await hoverStyle()).bg===explore.bg,key+' 올림 해제 뒤 다시 투명');
         check(groups.length===3,key+' 묶음 3개');
-         check(JSON.stringify(groups.map(g=>g.count))===JSON.stringify(member?['순간 14|','공개 트리 17|공개 순간 123','트리 3|공개 트리 1']:['',(signedIn?'':'예시 ')+'공개 트리 17|순간 123','']),key+' 숫자 귀속');
-        for(const g of groups.filter(g=>g.count))check(g.inner>=4&&g.inner<=6&&Math.abs(g.center)<=2&&g.font>=12&&g.overflow<=1,key+' 숫자 간격 '+JSON.stringify(g));
+        // #1350: 단추 줄의 세 단추는 44px 이상 눌린다.
+        check(groups.every(g=>g.btnH>=44),key+' 단추 누름 높이 44px 이상 '+JSON.stringify(groups.map(g=>[g.label,g.btnH])));
+         check(JSON.stringify(groups.map(g=>g.count))===JSON.stringify(member?['순간 14|정리 전 3','공개 트리 17|공개 순간 1.2k','트리 3|공개 트리 1']:['',(signedIn?'':'예시 ')+'공개 트리 17|순간 1.2k','']),key+' 숫자 귀속');
+        for(const g of groups.filter(g=>g.count)){
+          check(g.inner>=4&&g.inner<=6&&g.font>=12&&g.widthDiff<=1,key+' 숫자 표 폭·간격 '+JSON.stringify(g));
+          for(const row of g.rows){
+            check(Math.abs(row.left)<=1&&Math.abs(row.right)<=1&&row.gap>=3&&row.dy<=1&&row.nowrap==='nowrap',key+' 이름 왼쪽·숫자 오른쪽·한 줄 '+JSON.stringify(row));
+            check(row.weight>=700&&row.numeric.includes('tabular-nums')&&row.valueColor!==rose&&row.valueColor===(theme==='night'?'rgb(245, 241, 233)':'rgb(64, 53, 54)')&&row.labelColor===(theme==='night'?'rgb(155, 152, 166)':'rgb(111, 96, 90)'),key+' 숫자 굵기·색·고정폭 '+JSON.stringify(row));
+          }
+        }
         for(let i=1;i<groups.length;i++){
           const a=groups[i-1],b=groups[i],gap=Math.abs(a.y-b.y)<2?b.x-a.x-a.w:b.y-a.y-a.h;
           check(gap>=Math.max(width===1440?16:14,3*5),key+' 묶음 간격 '+gap);
@@ -193,6 +241,69 @@ test('#942 첫 화면 추가 단추와 숫자 묶음', { skip: REQUIRE ? false :
       }finally{await ctx.close()}
     }
   }finally{await browser.close();await new Promise(r=>server.close(r))}
+  assert.deepEqual(failures,[]);
+});
+
+// #1246·#1026: delayed public statistics and font loading must not move the action group.
+test('#1246 첫 화면 단추 첫 표시 뒤 배치 고정', { skip: REQUIRE ? false : skip, timeout: 180000 }, async () => {
+  if (skip) assert.fail(skip);
+  const server=await serve(),base='http://127.0.0.1:'+server.address().port;
+  const browser=await chromium.launch({headless:true});
+  const tree=createTree({subject:'시험 트리',title:'시험 순간',date:'2026-11-20',emotion:'설렘',note:'가짜 기록'});
+  const failures=[];
+  try {
+    for(const width of [390,1440]) for(const kind of ['guest','empty','member']){
+      const member=kind==='member',signedIn=kind!=='guest',key=width+'-'+kind;
+      const ctx=await browser.newContext({viewport:{width,height:width===390?844:900},reducedMotion:'no-preference'});
+      let releaseStats;const statsGate=new Promise(r=>releaseStats=r);
+      let releaseFonts;const fontGate=new Promise(r=>releaseFonts=r);
+      try {
+        await ctx.addInitScript(()=>{
+          try{localStorage.setItem('lt41.theme','night');localStorage.setItem('lt41.tips.firstTree','1')}catch{}
+          if(window!==top)return;
+          const rows=window.__homeActionFrames=[];
+          const tick=()=>{
+            try{
+              const f=document.getElementById('view'),root=f?.contentDocument?.getElementById('orbit')?.shadowRoot;
+              const a=root?.querySelector('.center .actions'),c=root?.querySelector('.center'),bs=[...a?.querySelectorAll('.home-action-group > button')||[]];
+              if(f?.checkVisibility()&&a&&bs.length===3){
+                const w=f.contentWindow,style=w.getComputedStyle(a),r=a.getBoundingClientRect(),cr=c.getBoundingClientRect();
+                if(Number(style.opacity)>0&&r.width&&r.height){
+                  const translate=style.transform==='none'?0:new DOMMatrixReadOnly(style.transform).m42;
+                  const br=bs.map(b=>b.getBoundingClientRect());
+                  rows.push({height:r.height,top:r.top-translate,centerTop:cr.top,lines:new Set(br.map(b=>Math.round(b.top))).size,labels:bs.map(b=>b.textContent.trim()).join('|'),filled:!!a.querySelector('[data-do=community] + .home-count .home-count-value')});
+                }
+              }
+            }catch{}
+            requestAnimationFrame(tick);
+          };
+          requestAnimationFrame(tick);
+        });
+        await ctx.route('**/*',async r=>{
+          const u=new URL(r.request().url());
+          if(u.origin!==base)return r.abort();
+          if(r.request().resourceType()==='font'){await fontGate;return r.continue();}
+          if(u.pathname==='/api/workspace'&&signedIn){await new Promise(ok=>setTimeout(ok,300));return r.fulfill({status:200,json:{revision:1,state:{version:1,trees:member?[tree]:[],prefs:{}},subject:'visual-audit-fake',writeSubjectBound:true,savedAt:'2026-11-20T00:00:00.000Z'}});}
+          if(u.pathname==='/api/community/stats'){await statsGate;return r.fulfill({status:200,json:{trees:17,moments:1234}});}
+          if(u.pathname.startsWith('/api/'))return r.fulfill({status:200,json:{ok:true,items:[]}});
+          return r.continue();
+        });
+        const page=await ctx.newPage();
+        await page.goto(base+'/v41/'+(signedIn?'?account=1':'')+'#home',{waitUntil:'domcontentloaded'});
+        // Do not wait for fonts or counts before measuring the first visible group.
+        await page.waitForFunction(()=>window.__homeActionFrames.length>0,null,{timeout:15000});
+        await page.waitForTimeout(3000);releaseFonts();releaseStats();
+        await page.waitForFunction(()=>window.__homeActionFrames.some(r=>r.filled),null,{timeout:10000});
+        await page.waitForTimeout(700);
+        const rows=await page.evaluate(()=>window.__homeActionFrames);
+        const first=rows[0],last=rows.at(-1),expected=width===390&&!member?3:1;
+        const delta=k=>Math.max(...rows.map(r=>r[k]))-Math.min(...rows.map(r=>r[k]));
+        const result={key,samples:rows.length,first,last,heightDelta:delta('height'),topDelta:delta('top'),centerDelta:delta('centerTop'),lines:[...new Set(rows.map(r=>r.lines))],labels:[...new Set(rows.map(r=>r.labels))]};
+        console.log('#1246 FIRST',JSON.stringify(result));
+        if(first.filled||!last.filled||result.lines.length!==1||result.lines[0]!==expected||result.labels.length!==1||result.heightDelta>8||result.topDelta>8||result.centerDelta>8)failures.push(result);
+      }finally{releaseFonts();releaseStats();await ctx.close();}
+    }
+  }finally{await browser.close();await new Promise(r=>server.close(r));}
   assert.deepEqual(failures,[]);
 });
 
@@ -426,8 +537,7 @@ const thumbTree = (() => {
   t.moments[1].createdAt = '2026-11-12T09:00:00.000Z'; t.moments[1].updatedAt = t.moments[1].createdAt;
   t = addMoment(t, { subject: '시험', title: '사진 순간(정상)', note: '기록', emotion: '즐거움', date: '2026-11-10', url: '' }, t.moments[0].id, '2026-11-16T00:02:00.000Z');
   t.moments[2].mediaMetadata = { thumbnail: 'data:image/svg+xml;base64,' + Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><rect width="640" height="360" fill="#8a5a6e"/></svg>').toString('base64') };
-  // 261117 대표 결정: 이 상태는 390의 궤도 겹침 검사가 목적 — 9장 이상(표준 좁은 화면 궤도)이어야 한다.
-  // 8장 이하 390은 궤도 카드를 숨기는 계약(소수 카드는 가운데에 집중)이라 별도 단언(#657 후속 261117)이 본다.
+  // #1309: 390 리본은 8장을 유지하고 가운데·바닥 보호 구역과 겹치지 않는다.
   for (let fi = 0; fi < 6; fi++) {
     t = addMoment(t, { subject: '시험', title: '사진 순간 채우기 ' + (fi + 1), note: '기록', emotion: '즐거움', date: '2026-11-0' + (fi % 9 + 1), url: '' }, t.moments.at(-1).id, '2026-11-16T00:03:0' + fi + '.000Z');
     t.moments.at(-1).mediaMetadata = { thumbnail: 'data:image/svg+xml;base64,' + Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><rect width="640" height="360" fill="' + ['#5a6e8a', '#6e8a5a', '#8a7a5a', '#8a5a6e'][fi % 4] + '"/></svg>').toString('base64') };
@@ -604,9 +714,9 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
       const frame = [...document.querySelectorAll('iframe')].find((f) => { try { return /track56-network/.test(f.contentWindow.location.href); } catch { return false; } });
       if (!frame) return null;
       const doc = frame.contentDocument;
-      const bar = doc.querySelector('.topbar');
+      const bar = doc.querySelector('.lt-screen-toolbar');
       const switchBtns = [...doc.querySelectorAll('.view-switch .pill')];
-      const btns = [...doc.querySelectorAll('.top-actions button')].filter((b) => b.getBoundingClientRect().width > 0);
+      const btns = [...doc.querySelectorAll('.lt-screen-toolbar .lt-toolbar-tools button, .lt-screen-toolbar .lt-toolbar-menu button, .lt-screen-toolbar .lt-toolbar-more')].filter((b) => b.getBoundingClientRect().width > 0);
       const rects = btns.map((b) => b.getBoundingClientRect());
       const pairTexts = [];
       for (let i = 0; i < rects.length; i++) for (let j = i + 1; j < rects.length; j++) {
@@ -1566,13 +1676,10 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     const bookChips = await (await readyFrame(page6, /track59-sketchbook/, { why: '책 쪽 확정 꾀리표를 읽을 책 프레임' })).evaluate(() =>
       [...document.querySelectorAll('.moment-title .lt-tag-chip')].map((n) => n.textContent.trim()));
     assert.ok(bookChips.includes('Super Shy') && bookChips.includes('무대'), `책 쪽에 확정 꾀리표 칩이 그려져야 한다(실제: ${JSON.stringify(bookChips)})`);
-    // 보드 첫 진입 두 안내(390) — 셸 알림('내 기록을 불러왔어요.')과 보드 안내 말풍선('순간을 선택해…')이
-    // 같은 자리에 포개지지 않는다. 보드는 ≤700px에서 말풍선을 화면 아래 중앙(bottom 95px)에 띄우고,
-    // 셸 알림도 #666 규칙으로 아래 중앙(--lt-toast-bottom)에 뜬다. 보드는 셸 알림이 떠 있는 동안
-    // 기다렸다 말풍선을 띄운다 — 두 상자가 동시에 보이는 동안에는 겹침 면적이 0이어야 한다.
-    // 1440은 말풍선(오른쪽 아래)·알림(아래 중앙)이 다른 모서리라 기하학적으로 겹치지 않고, 선택 복원으로
-    // 상세 판이 열려 안내가 뜨지 않는 폭이어서 390에서만 잰다.
-    // 새 문맥으로 띄운다(저장된 보기·선택이 없어야 첫 진입 흐름 — 900ms 뒤 말풍선, 셸 알림은 약 3초 — 이 재현된다).
+    // 보드 첫 진입(390) — 셸 알림('내 기록을 불러왔어요.')은 그대로이고 보드 안내 말풍선은 이제 없다.
+    // 두 안내가 같은 자리에 포개지던 문제를 없애는 대신, 열 때 안내가 아예 뜨지 않는다.
+    // 1440은 예전에도 말풍선·알림이 다른 모서리라 기하학적으로 겹치지 않아 390에서만 잰다.
+    // 새 문맥으로 띄운다(저장된 보기·선택이 없어야 첫 진입 흐름이 재현된다).
     if (width === 390) {
       const ctxNotice = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
       await ctxNotice.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); } catch {} }, theme);
@@ -1601,9 +1708,7 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
           }
           return null;
         };
-        // 보드 안내는 셸 알림(약 3초)이 사라진 뒤 600ms마다 최대 10번 다시 시도해 뜬다(최대 약 7초).
-        // 고정 횟수로 재면 느린 기기에서 안내가 뜨기 전에 검사가 끝나 빈손 실패가 난다 —
-        // 두 안내를 모두 '실제로 본' 뒤에 끝내고, 못 보면 마지막 관찰 상태를 메시지에 남긴다.
+        // 셸 알림은 실제로 본 뒤, 보드 안내가 뜨지 않는지 한 번 더 지켜본다(빈손 통과 금지).
         const state = () => {
           const shell = document.getElementById('toast');
           const board = boardToast();
@@ -1616,8 +1721,8 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
           };
         };
         let sawShell = false, sawBoard = false, maxArea = 0, bothAt = -1, last = null, samples = 0;
-        const deadline = Date.now() + 15000;
-        while (Date.now() < deadline && !(sawShell && sawBoard)) {
+        const deadline = Date.now() + 15000, afterShell = Date.now() + 17000;
+        while (Date.now() < deadline || (sawShell && Date.now() < afterShell)) {
           last = state();
           if (last.shellUp) sawShell = true;
           if (last.boardUp) sawBoard = true;
@@ -1631,8 +1736,9 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
         const detail = `${samples}회 관찰, 마지막 상태: 셸 알림=${last?.shellUp ? '보임' : '없음'}(${last?.shellText ?? '요소 없음'}), 보드 말풍선=${last?.boardUp ? '보임' : '없음'}(${last?.boardText ?? '요소 없음'}), 보드 프레임=[${(last?.frames || []).join(' | ')}]`;
         return { sawShell, sawBoard, maxArea: Math.round(maxArea), bothAt, detail };
       });
-      assert.ok(twoNotices.sawShell, `390 셸 알림(기록 불러오기 안내)이 떠 있는 자리를 본다(빈손 통과 금지) — ${twoNotices.detail}`);
-      assert.ok(twoNotices.sawBoard, `390 보드 안내 말풍선이 뜨는 자리를 본다(빈손 통과 금지) — ${twoNotices.detail}`);
+      // #1320: 기록 불러오기 안내를 없앴으므로 이 자리는 비어 있어야 한다(겹침 검사는 빈손 통과가 아니다).
+      assert.equal(twoNotices.sawShell, false, `390 셸 기록 불러오기 안내가 없다 — ${twoNotices.detail}`);
+      assert.equal(twoNotices.sawBoard, false, `390 보드 첫 진입 안내 토스트가 없다 — ${twoNotices.detail}`);
       assert.equal(twoNotices.maxArea, 0, `390 셸 알림과 보드 안내 말풍선이 같은 자리에 포개지지 않는다(겹침 ${twoNotices.maxArea}px², 동시 노출: ${twoNotices.bothAt < 0 ? '없음' : twoNotices.bothAt + '번째 관찰'})`);
       await pageNotice.close();
       await ctxNotice.close();
@@ -1993,7 +2099,7 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     assert.equal(cardCheck.overflow, 0, `첫 화면 가로 넘침 0(실제 ${cardCheck.overflow})`);
     await take(page9, '첫 화면 글자 카드');
     await ctx9.close();
-    } // width 1440 — 390은 위 단언(궤도 카드 0장)이 대신한다
+    } // width 1440 — 390 리본은 별도 겹침 시험이 담당한다
 
     await context.close();
     return rows;
@@ -2148,10 +2254,8 @@ test('운영센터 머리줄이 본 화면 셸 머리줄과 같은 폭·위치�
   }
 });
 
-// 261117 대표 결정: 좁은 화면(390)에서 궤도 카드가 8장 이하인 계정은 궤도 카드를 숨긴다 —
-// 커진 가운데(위쪽 '+ 순간 추가'·정보 줄)가 소수 카드의 원을 덮어 밀어낸 카드가 한자리에 쌓였다
-// (실측 3장 동일 좌표). 9장 이상은 기존 좁은 화면 궤도를 그대로 쓴다(글자 카드 상태가 390 겹침을 잰다).
-test('#657 후속 261117: 좁은 화면 소수 카드(≤8) 계정은 궤도 카드 0장 — 가운데에 집중한다', { skip: REQUIRE ? false : skip, timeout: 120000 }, async () => {
+// #1309: 좁은 화면은 소수 카드도 8장 리본으로 유지한다. 카드는 가운데·바닥 보호 구역 위에 둔다.
+test('#1309 후속: 좁은 화면 소수 카드 계정은 있는 카드로 리본을 유지한다', { skip: REQUIRE ? false : skip, timeout: 120000 }, async () => {
   const { createTree, addMoment } = await import('../public/v41/domain.mjs');
   let t = createTree({ subject: '시험', title: '카드 적은 트리', note: '기록', emotion: '설렘', date: '2026-11-11', url: '' }, '2026-11-16T00:00:00.000Z');
   t = addMoment(t, { subject: '시험', title: '사진 순간', note: '기록', emotion: '즐거움', date: '2026-11-11', url: '' }, t.moments[0].id, '2026-11-16T00:01:00.000Z');
@@ -2186,7 +2290,7 @@ test('#657 후속 261117: 좁은 화면 소수 카드(≤8) 계정은 궤도 카
       if (!sh) return null;
       return [...sh.querySelectorAll('button.card')].filter((c) => getComputedStyle(c).display !== 'none').length;
     });
-    assert.equal(visible, 0, `390 소수 카드 계정: 궤도 카드 0장(실제 ${visible}장)`);
+    assert.ok(visible > 0 && visible <= 8, `390 소수 카드 계정: 있는 카드로 리본을 유지한다(실제 ${visible}장)`);
     await context.close();
   } finally {
     await browser.close();
@@ -2194,7 +2298,7 @@ test('#657 후속 261117: 좁은 화면 소수 카드(≤8) 계정은 궤도 카
   }
 });
 
-// 2026-11-17 CTO 캡처 후속: 390에서 궤도 카드가 0장이어도 다른 층 카드가 바닥 링크 줄에 겹치지 않는다.
+// #1309: 390의 리본도 다른 층 카드와 마찬가지로 바닥 링크 줄 위에서 자른다.
 // 눈이 아니라 수치로 판정한다 — 보이는 카드 수, 카드↔링크 겹침 쌍 0, 카드 아래끝 ≤ 링크 줄 top−8(1440도 겹침 0).
 test('#657 후속 261117: 카드 층은 바닥 링크 줄 위에서 자른다(390 few·many, 1440)', { skip: REQUIRE ? false : skip, timeout: 180000 }, async () => {
   const { createTree, addMoment } = await import('../public/v41/domain.mjs');
@@ -2236,7 +2340,7 @@ test('#657 후속 261117: 카드 층은 바닥 링크 줄 위에서 자른다(39
         return { count: cards.length, overlaps, ceiling: lr ? Math.round(lr.top) - 8 : null, lowest: rects.length ? Math.round(Math.max(...rects.map((c) => c.b))) : null, scroll };
       });
       assert.equal(measured.overlaps, 0, `${label}: 카드↔바닥 링크 겹침 ${measured.overlaps}쌍`);
-      if (label === 'few-390') assert.equal(measured.count, 0, `390 소수 카드 계정: 보이는 카드 ${measured.count}장(기존 궤도 숨김 유지)`);
+      if (label === 'few-390') assert.ok(measured.count > 0 && measured.count <= 8, `390 소수 카드 계정: 보이는 리본 카드 ${measured.count}장`);
       if (measured.ceiling > 0 && measured.lowest !== null) assert.ok(measured.lowest <= measured.ceiling, `${label}: 카드 아래끝 ${measured.lowest} > 링크 줄 위 ${measured.ceiling}`);
       assert.equal(measured.scroll.links.length, 4, `${label}: 바닥 링크 4개를 잰다`);
       assert.ok(measured.scroll.links.every((l) => l.inView), `${label}: 맨 아래 스크롤 뒤 링크가 화면 밖 — ${JSON.stringify(measured.scroll.links)}`);
@@ -2333,7 +2437,7 @@ test('#657 후속 261117: 상단 탭 글자 통일과 고른 탭 칸 높이(390�
   }
 });
 // 2026-11-17 대표 결정: 트리 0개 계정에서도 서재·책·보드·지도 탭이 보이고 각 화면의 빈 상태가 뜬다.
-test('#657 후속 261117: 트리 0개 계정의 탭 4개와 화면별 빈 상태(390·1440 × 정원·밤)', { skip: REQUIRE ? false : skip, timeout: 240000 }, async () => {
+test('#657 후속 261117: 트리 0개 계정의 탭 5개와 화면별 빈 상태(390·1440 × 정원·밤)', { skip: REQUIRE ? false : skip, timeout: 240000 }, async () => {
   const server = await serve();
   const base = `http://127.0.0.1:${server.address().port}`;
   const browser = await chromium.launch();
@@ -2355,7 +2459,7 @@ test('#657 후속 261117: 트리 0개 계정의 탭 4개와 화면별 빈 상태
           const chain=[];for(let e=document.querySelector('#tree-views button[data-view]');e;e=e.parentElement){const s=getComputedStyle(e),r=e.getBoundingClientRect();chain.push({id:e.id,tag:e.tagName,cls:e.className,hidden:e.hidden,display:s.display,visibility:s.visibility,w:r.width,h:r.height,data:{...e.dataset}})}
           return {chain,member:document.body.dataset.member,source:document.body.dataset.recordSource,treeCount:document.body.dataset.treeCount,loading:!document.getElementById('stage-loading')?.hidden};
         })));
-        const labels = { 'track32-bookshelf.html': '서재', 'track59-sketchbook.html': '책', 'track58-pinboard.html': '보드', 'track56-network.html': '지도' };
+        const labels = { 'track32-bookshelf.html': '서재', 'track61-tree.html': '트리', 'track59-sketchbook.html': '책', 'track58-pinboard.html': '보드', 'track56-network.html': '지도' };
         const openMore = async () => {
           if (width !== 390) return;
           const open = await page.locator('#header-overflow').evaluate((el) => el.classList.contains('is-open') && !el.hidden);
@@ -2374,7 +2478,7 @@ test('#657 후속 261117: 트리 0개 계정의 탭 4개와 화면별 빈 상태
           });
           return { buttons, folded, overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth, themeButtons: document.querySelectorAll('#theme-toggle').length };
         }, Object.values(labels));
-        assert.equal(tabs.buttons.length, 4, `${width}/${theme}: 탭 4개 — ${JSON.stringify(tabs.buttons)}`);
+        assert.equal(tabs.buttons.length, 5, `${width}/${theme}: 탭 5개 — ${JSON.stringify(tabs.buttons)}`);
         assert.ok(tabs.buttons.every((b) => b.w > 0 && b.h > 0), `${width}/${theme}: 탭 rect>0 — ${JSON.stringify(tabs.buttons)}`);
         assert.ok(tabs.overflow <= 0, `${width}/${theme}: 가로 넘침 ${tabs.overflow}px`);
         assert.equal(tabs.themeButtons, 1, `${width}/${theme}: 머리줄 테마 단추 1개`);
@@ -2382,6 +2486,7 @@ test('#657 후속 261117: 트리 0개 계정의 탭 4개와 화면별 빈 상태
         assert.equal(unselectedColors.length, 1, `${width}/${theme}: 고르지 않은 탭 글자색 RGB 같음 — ${JSON.stringify(tabs.buttons)}`);
         for (const [view, heading, action] of [
           ['track32-bookshelf.html', '아직 책장이 비어 있어요.', '＋ 새 트리'],
+          ['track61-tree.html', '아직 트리가 없어요.', '＋ 첫 순간 추가'],
           ['track59-sketchbook.html', '아직 트리가 없어요.', '＋ 첫 순간 추가'],
           ['track58-pinboard.html', '아직 트리가 없어요.', '＋ 첫 순간 추가'],
           ['track56-network.html', '아직 트리가 없어요.', '＋ 첫 순간 추가']
@@ -2410,11 +2515,11 @@ test('#657 후속 261117: 트리 0개 계정의 탭 4개와 화면별 빈 상태
               rectsOk: targets.every(([, t]) => t && t.w > 0 && t.h > 0),
               overlaps: targets.flatMap(([tn, t]) => blockers.map(([bn, b]) => [tn + '/' + bn, overlap(t, b)])),
               current: folded
-              ? Object.keys({ 'track32-bookshelf.html': '서재', 'track59-sketchbook.html': '책', 'track58-pinboard.html': '보드', 'track56-network.html': '지도' }).find((v) => { const b = [...document.querySelectorAll('#header-overflow button')].find((x) => x.getAttribute('aria-current') === 'true'); return b && b.textContent.trim() === { 'track32-bookshelf.html': '서재', 'track59-sketchbook.html': '책', 'track58-pinboard.html': '보드', 'track56-network.html': '지도' }[v]; }) || ''
+              ? Object.keys({ 'track32-bookshelf.html': '서재', 'track61-tree.html': '트리', 'track59-sketchbook.html': '책', 'track58-pinboard.html': '보드', 'track56-network.html': '지도' }).find((v) => { const b = [...document.querySelectorAll('#header-overflow button')].find((x) => x.getAttribute('aria-current') === 'true'); return b && b.textContent.trim() === { 'track32-bookshelf.html': '서재', 'track61-tree.html': '트리', 'track59-sketchbook.html': '책', 'track58-pinboard.html': '보드', 'track56-network.html': '지도' }[v]; }) || ''
               : document.querySelector('#tree-views button[aria-current="true"]')?.dataset.view || ''
             };
           }, tabs.folded);
-          assert.equal(state.hash, '#' + { 'track32-bookshelf.html': 'shelf', 'track59-sketchbook.html': 'book', 'track58-pinboard.html': 'board', 'track56-network.html': 'network' }[view], `${width}/${theme}/${view}: 주소가 탭에 남는다`);
+          assert.equal(state.hash, '#' + { 'track32-bookshelf.html': 'shelf', 'track61-tree.html': 'tree', 'track59-sketchbook.html': 'book', 'track58-pinboard.html': 'board', 'track56-network.html': 'network' }[view], `${width}/${theme}/${view}: 주소가 탭에 남는다`);
           assert.equal(state.home, false, `${width}/${theme}/${view}: 첫 화면으로 튕기지 않는다`);
           assert.ok(state.emptyShown, `${width}/${theme}/${view}: 빈 상태가 보인다`);
           assert.equal(state.heading, heading, `${width}/${theme}/${view}: 빈 상태 문구`);
@@ -2496,8 +2601,10 @@ test('#972 서재·책 상세·둘러보기·새 소식 화면 치수', { skip: 
           const rect = sel => el.querySelector(sel).getBoundingClientRect();
           const s = rect('.shelf-viewport'), c = rect('.shelf-controls'), h = rect('.resume-strip');
           const card = rect('.book-card'), cover = rect('.book-cover'), rail = rect('.shelf-rail'), base = rect('.shelf-base');
+          const bar = document.querySelector('.lt-screen-toolbar')?.getBoundingClientRect();
           return { count: el.querySelectorAll('.book-card').length, upper: c.top - h.bottom, lower: s.top - c.bottom,
-            balance: Math.abs(h.top - (innerHeight - s.bottom)), innerGap: cover.top - s.top,
+            barGap: bar ? Math.round(h.top - bar.bottom) : null,
+            innerGap: cover.top - s.top,
             cardToBase: base.top - card.bottom, firstLeft: card.left - rail.left,
             arrows: [...el.querySelectorAll('.shelf-arrow')].filter(n => !n.hidden).length,
             overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth };
@@ -2505,7 +2612,7 @@ test('#972 서재·책 상세·둘러보기·새 소식 화면 치수', { skip: 
         assert.equal(shelf.count, 1);
         assert.ok(shelf.upper >= 0 && shelf.upper <= 48, `${theme}/${width}: 펼쳐 보기 아래 여백 ${shelf.upper}px`);
         assert.ok(shelf.lower >= 0 && shelf.lower <= 24, `${theme}/${width}: 검색 아래 여백 ${shelf.lower}px`);
-        assert.ok(shelf.balance <= 40, `${theme}/${width}: 세 요소 묶음의 위·아래 여백 차이 ${shelf.balance}px`);
+        assert.ok(shelf.barGap !== null && shelf.barGap >= 0 && shelf.barGap <= 24, `${theme}/${width}: 이어 보기 띠는 도구 줄 아래에 붙는다(${shelf.barGap}px)`);
         assert.ok(shelf.innerGap >= 0 && shelf.innerGap <= 65, `${theme}/${width}: 책장 안 표지 위 여백 ${shelf.innerGap}px`);
         assert.ok(shelf.cardToBase >= -1 && shelf.cardToBase <= 8, `${theme}/${width}: 책과 선반 사이 ${shelf.cardToBase}px`);
         assert.ok(Math.abs(shelf.firstLeft) <= 4, `${theme}/${width}: 첫 책 왼쪽 오차 ${shelf.firstLeft}px`);
@@ -2534,19 +2641,31 @@ test('#972 서재·책 상세·둘러보기·새 소식 화면 치수', { skip: 
           await page.waitForFunction(() => typeof document.querySelector('#community-menu')?.onclick === 'function');
           await page.evaluate(() => document.getElementById('community-menu').click());
           await page.waitForSelector('#community-panel[open] .community-group-chip:nth-child(4)');
-          const discover = await page.evaluate(() => {
+          const discover = await page.evaluate((screenWidth) => {
             const rect = sel => document.querySelector(sel).getBoundingClientRect();
             const rail = rect('#community-groups'), last = rect('#community-groups .community-group-chip:last-child');
-            const button = rect('button.community-group-find'), popular = rect('#community-popular-stages');
+            const button = rect('#community-query'), popular = rect('#community-popular-stages');
             const form = rect('#community-search-form'), head = rect('#community-panel .panel-heading'), list = rect('.community-results');
-            const overlap = Math.max(0, Math.min(last.right, button.right) - Math.max(last.left, button.left)) *
+            // #1330: 칩 줄은 가로로 넘기므로 보이는 끝은 칸 오른쪽에서 잘린다 — 잘린 뒤의 칩과 찾기 단추는 겹치지 않는다.
+            const visibleLastRight = Math.min(last.right, rail.right);
+            const overlap = Math.max(0, Math.min(visibleLastRight, button.right) - Math.max(last.left, button.left)) *
               Math.max(0, Math.min(last.bottom, button.bottom) - Math.max(last.top, button.top));
-            return { clip: Math.max(0, last.right - rail.right), overlap, gap: button.left - rail.right,
-              chipHeight: last.height, alignment: Math.max(...[form, head, list].flatMap(r => [Math.abs(popular.left - r.left), Math.abs(popular.width - r.width)])) };
-          });
-          assert.ok(discover.clip <= 1, `${theme}/${width}: 마지막 칩 잘림 ${discover.clip}px`);
+            // 빈 인기 무대는 줄을 접는다 — 숨겨진 줄은 정렬에서 뺀다.
+            const popularVisible = !document.querySelector('#community-popular-stages').hidden;
+            const aligned = screenWidth === 390 ? [form, list] : [form, head, list];
+            const alignment = !popularVisible ? 0 : Math.max(...aligned.flatMap(r => [Math.abs(popular.left - r.left), Math.abs(popular.width - r.width)]));
+            const groups = document.querySelector('#community-groups');
+            const scrollable = groups.scrollWidth > groups.clientWidth + 1;
+            const lastChip = groups.querySelector('.community-group-chip:last-child');
+            groups.scrollLeft = groups.scrollWidth;
+            const reached = lastChip.getBoundingClientRect().right <= groups.getBoundingClientRect().right + 1;
+            return { clip: Math.max(0, last.right - rail.right), overlap, gap: rail.top - button.bottom, scrollable, reached,
+              chipHeight: last.height, alignment };
+          }, width);
+          // #1330: 390은 칩 줄을 밀어 넘기므로 처음에 마지막 칩이 밖에 있어도, 끝까지 밀면 닿아야 한다.
+          assert.ok(discover.clip <= 1 || (width === 390 && discover.scrollable && discover.reached), `${theme}/${width}: 마지막 칩 잘림 ${discover.clip}px`);
           assert.equal(discover.overlap, 0, `${theme}/${width}: 칩과 단추 겹침`);
-          assert.ok(discover.gap >= 8 && discover.chipHeight >= 44, '칩과 단추 사이 여백 및 터치 높이');
+          assert.ok(discover.gap >= 8 && discover.chipHeight >= 44, '칩과 윗줄 사이 여백 및 터치 높이');
           assert.ok(discover.alignment <= 1, `${theme}/${width}: 인기 무대 제목·검색·목록 정렬 오차 ${discover.alignment}px`);
         }
 
@@ -2678,7 +2797,7 @@ test('#987 보드 첫 줄과 모바일 셸 겹침·현재 표시', { skip: REQUI
         await frame.locator('#detail.open').waitFor();
         await page.waitForTimeout(600);
         const m = await frame.evaluate(() => {
-          const title = document.querySelector('.boardTitle').getBoundingClientRect(), vp = document.querySelector('#viewport').getBoundingClientRect(), btn = document.querySelector('#cinemaBtn').getBoundingClientRect();
+          const title = document.querySelector('.lt-screen-toolbar').getBoundingClientRect(), vp = document.querySelector('#viewport').getBoundingClientRect(), btn = document.querySelector('#cinemaBtn').getBoundingClientRect();
           const cards = [...document.querySelectorAll('.card[data-id]')].map(e => e.getBoundingClientRect());
           return { titleBottom: title.bottom, viewportTop: vp.top, firstTop: Math.min(...cards.map(r=>r.top)), overlap: Math.max(...cards.map(r=>Math.max(0,Math.min(r.right,btn.right,vp.right)-Math.max(r.left,btn.left,vp.left))*Math.max(0,Math.min(r.bottom,btn.bottom,vp.bottom)-Math.max(r.top,btn.top,vp.top)))), visible: cards.filter(r=>r.bottom>vp.top&&r.top<vp.bottom&&r.right>vp.left&&r.left<vp.right).length, horizontalFit: cards.filter(r=>r.left>=vp.left-1&&r.right<=vp.right+1).length };
         });
@@ -2820,7 +2939,9 @@ test('#1091: 서재·책·보드 화면 도구 줄의 계산값이 같고 390 �
       await page.waitForSelector('.lt-screen-toolbar', { timeout: 15000 });
       const value = await page.evaluate((name) => {
         const bar = document.querySelector('.lt-screen-toolbar');
-        const button = bar.querySelector('button');
+        // 제목 선택과 새 트리는 고유 단추이므로 공통 도구 단추의 기본 규격을 별도로 실측한다.
+        const button = document.createElement('button');
+        bar.querySelector('.lt-toolbar-tools').append(button);
         const barStyle = getComputedStyle(bar);
         const buttonStyle = getComputedStyle(button);
         const body = document.querySelector(name === 'book' ? '.stage' : name === 'board' ? '.boardFrame' : '.shelf-screen');
@@ -2837,14 +2958,14 @@ test('#1091: 서재·책·보드 화면 도구 줄의 계산값이 같고 390 �
       return value;
     };
     for (const [width, theme] of [[1440, 'night'], [1440, 'garden'], [390, 'night'], [390, 'garden']]) {
-      const values = [];
-      for (const screen of ['book', 'board', 'shelf']) values.push(await measure(screen, width, theme));
-      assert.deepEqual(values[0], values[1], `${width}·${theme}에서 책·보드 줄 계산값이 다르다`);
-      assert.deepEqual(values[0], values[2], `${width}·${theme}에서 책·서재 줄 계산값이 다르다`);
-      for (const value of values) {
+      const values = {};
+      for (const screen of ['book', 'board', 'shelf']) values[screen] = await measure(screen, width, theme);
+      assert.deepEqual({ ...values.book, shelfBack: undefined }, { ...values.board, shelfBack: undefined }, `${width}·${theme}에서 책·보드 줄 계산값이 다르다`);
+      assert.deepEqual({ ...values.book, shelfBack: undefined }, { ...values.shelf, shelfBack: undefined }, `${width}·${theme}에서 책·서재 줄 계산값이 다르다`);
+      for (const [screen, value] of Object.entries(values)) {
         assert.equal(value.height, width === 390 ? '48px' : '52px');
         assert.equal(value.buttonHeight, '36px');
-        assert.equal(value.shelfBack, false, '← 서재 단추가 남아 있다');
+        assert.equal(value.shelfBack, false, '공통 줄에 중복 서재 단추 없음');
         assert.equal(value.covered, false, '화면 본문이 도구 줄에 가려졌다');
       }
     }
@@ -2975,4 +3096,385 @@ test('#1026 무대 불러오는 중 표시 — 느림 표시·빠름 비표시·
       } finally { await ctx.close(); }
     }
   } finally { await browser.close(); await new Promise(resolve => server.close(resolve)); }
+});
+
+
+test('두 칸 전환: 책/목록·선반/회전·보드 같은 크기와 모서리(1440·390)', {skip, timeout:180000}, async()=>{
+ const server=await serve();const base='http://127.0.0.1:'+server.address().port;
+ const browser=await chromium.launch({headless:true});
+ try{
+ for(const width of [1440,390])for(const theme of ['night','garden']){
+  const ctx=await browser.newContext({viewport:{width,height:width===390?844:900}});
+  await ctx.addInitScript(t=>localStorage.setItem('lt41.theme',t),theme);
+  try{
+   const configs=[
+    ['/v41/views/track59-sketchbook.html','#book-display-inline',false],
+    ['/v41/views/track59-sketchbook.html','#book-view-toggle',false],
+    ['/v41/views/track32-bookshelf.html','#shelf-view-inline',false],
+    ['/v41/views/track58-pinboard.html','.boardModeSwitch',false]
+   ];
+   for(const [url,selector,reveal] of configs){
+    const page=await ctx.newPage();
+    try{
+      await page.goto(base+url,{waitUntil:'load',timeout:15000});
+      // 공통 줄이 화면 도구를 접어 정리할 때까지 기다린 뒤 잰다(첫 그림 순간의 빈 칸은 화면 값이 아니다).
+      await page.waitForFunction((sel)=>{
+        const el=document.querySelector(sel);
+        if(!el)return false;
+        const bs=[...el.children].filter(n=>n.tagName==='BUTTON');
+        return bs.length===2&&bs.every(b=>b.getBoundingClientRect().width>0);
+      },selector,{timeout:10000});
+      const data=await page.evaluate(({selector,reveal})=>{
+        const parent=document.querySelector(selector);
+        if(!parent)return null;
+        if(reveal)parent.hidden=false;
+        const buttons=[...parent.children].filter(n=>n.tagName==='BUTTON');
+        const measure=(el)=>{const r=el.getBoundingClientRect(),s=getComputedStyle(el);return {width:r.width,height:r.height,radius:s.borderRadius}};
+        return {group:measure(parent),buttons:buttons.map(measure)};
+      },{selector,reveal});
+      assert.ok(data,width+'/'+theme+'/'+selector+' 전환 없음');
+      assert.equal(data.buttons.length,2);
+      assert.ok(data.buttons[0].width>0&&data.buttons[0].height>0,width+'/'+theme+'/'+selector+' 빈 칸');
+      assert.deepEqual(data.buttons[0],data.buttons[1],width+'/'+theme+'/'+selector+' 두 칸 치수');
+    }finally{await page.close()}
+   }
+  }finally{await ctx.close()}
+ }
+ }finally{await browser.close();await new Promise(r=>server.close(r))}
+});
+
+// 화면 전체(머리줄 + 현재 보이는 책/서재/보드 iframe)를 함께 보며 같은 전환 두 벌을 금지한다.
+test('화면 전환 단추 중복 0: 서재·책·보드 1440·390 밤·정원', {skip, timeout:180000}, async()=>{
+ const server=await serve();
+ const base='http://127.0.0.1:'+server.address().port;
+ const browser=await chromium.launch({headless:true});
+ const workspace={revision:1,state:{version:1,trees:[firstTree],prefs:{}},subject:'시험계정',writeSubjectBound:true,savedAt:'2026-11-23T00:00:00.000Z'};
+ try{
+  for(const [width,height] of [[1440,900],[390,844]])for(const theme of ['night','garden'])for(const screen of ['shelf','book','board']){
+   const ctx=await browser.newContext({viewport:{width,height},reducedMotion:'reduce'});
+   await ctx.addInitScript(t=>{localStorage.setItem('lt41.theme',t);localStorage.setItem('lt41.tips.firstTree','1')},theme);
+   await ctx.route('**/api/**',r=>r.fulfill({status:200,contentType:'application/json',body:'{"ok":true,"items":[]}'}));
+   await ctx.route('**/api/workspace**',r=>r.fulfill({status:200,contentType:'application/json',body:JSON.stringify(workspace)}));
+   const page=await ctx.newPage();
+   try{
+    await page.goto(base+'/v41/?account=1#my/'+screen,{waitUntil:'load',timeout:20000});
+    await page.waitForFunction(screen=>{
+      const f=[...document.querySelectorAll('#view,#view-next')].find(f=>!f.hidden&&f.getClientRects().length>0);
+      const target={shelf:'track32-bookshelf',book:'track59-sketchbook',board:'track58-pinboard'}[screen];
+      try{return f?.contentWindow?.location?.pathname.includes(target)}catch{return false}
+    },screen,{timeout:20000});
+     // 주소가 바뀐 뒤 줄이 만들어지기 전을 재지 않는다 — 공통 줄과 전환 단추가 생길 때까지 기다린다(원인 대기).
+     await page.waitForFunction(()=>{
+       const f=[...document.querySelectorAll('#view,#view-next')].find(f=>!f.hidden&&f.getClientRects().length>0);
+       try{
+         const doc=f?.contentDocument;
+         const bar=doc?.querySelector('.lt-screen-toolbar');
+         return !!bar&&!!bar.querySelector('.lt-toolbar-tools')&&doc.querySelectorAll('.view-toggle,.boardModeSwitch,.shelf-view-inline').length>0;
+       }catch{return false}
+     },null,{timeout:20000});
+    const result=await page.evaluate(()=>{
+      const frame=[...document.querySelectorAll('#view,#view-next')].find(f=>!f.hidden&&f.getClientRects().length>0);
+      const inner=frame.contentDocument;
+      const visible=el=>{
+        if(!el||el.hidden||el.getClientRects().length===0)return false;
+        const box=el.getBoundingClientRect();
+        if(box.width===0||box.height===0)return false;
+        for(let n=el;n;n=n.parentElement){
+          const st=n.ownerDocument.defaultView.getComputedStyle(n);
+          if(st.display==='none'||st.visibility==='hidden'||st.opacity==='0')return false;
+        }
+        return true;
+      };
+      const groups=[...document.querySelectorAll('.view-toggle,.boardModeSwitch,.shelf-view-inline'),
+                    ...inner.querySelectorAll('.view-toggle,.boardModeSwitch,.shelf-view-inline')]
+        .filter(el=>visible(el))
+        .map(el=>[...el.children].filter(x=>x.tagName==='BUTTON').map(x=>x.textContent.trim()).join('|'))
+        .filter(Boolean);
+      return {
+        groups,
+        shelfInside:visible(inner.getElementById('shelf-view-inline')),
+        bookInside:visible(inner.getElementById('book-display-inline')),
+        bookPages:visible(inner.getElementById('book-view-toggle')),
+        boardInside:visible(inner.querySelector('.boardModeSwitch'))
+      };
+    });
+    const prefix=width+'/'+theme+'/'+screen;
+    assert.equal(new Set(result.groups).size,result.groups.length,prefix+' 같은 전환이 두 곳에 보인다: '+JSON.stringify(result.groups));
+    if(screen==='shelf'){
+      assert.equal(result.shelfInside,true,prefix+' 도구 줄 전환 보임(머리줄 토글은 걷어냈다)');
+      assert.equal(result.groups.filter(s=>s==='선반|회전').length,1,prefix+' 서재 전환 단추는 반드시 한 벌');
+    }
+    if(screen==='book'){
+      assert.equal(result.bookInside,true,prefix+' 책의 책/목록 전환 유지');
+      assert.equal(result.groups.filter(s=>s==='1장|2장').length,1,prefix+' 책의 1장/2장 전환 유지');
+      assert.equal(result.groups.filter(s=>s==='책|목록').length,1,prefix+' 책/목록 전환 한 벌');
+    }
+    if(screen==='board')assert.equal(result.boardInside,true,prefix+' 보드 전환 유지');
+   }finally{await ctx.close()}
+  }
+ }finally{await browser.close();await new Promise(resolve=>server.close(resolve))}
+});
+
+// #1026: 최초 진입의 셸 머리줄과 빈 화면 자리가 뒤늦게 밀리지 않는지 실제 렌더링으로 검증한다.
+test('#1026 서재·책·보드 390 첫 진입 CLS 0.01 이하', { skip: REQUIRE ? false : skip, timeout: 180000 }, async () => {
+  if (skip) assert.fail(skip);
+  const server = await serve();
+  const browser = await chromium.launch({ headless: true });
+  const base = 'http://127.0.0.1:' + server.address().port;
+  try {
+    const context = await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' });
+    await context.addInitScript(() => {
+      window.__firstLoadShifts1026 = [];
+      try {
+        const rect = r => ({ x: r.x, y: r.y, width: r.width, height: r.height });
+        new PerformanceObserver(list => {
+          for (const e of list.getEntries()) if (!e.hadRecentInput) {
+            window.__firstLoadShifts1026.push({
+              value: e.value, time: e.startTime,
+              sources: (e.sources || []).map(s => ({
+                node: s.node?.id || s.node?.className || s.node?.nodeName || '?',
+                previousRect: rect(s.previousRect), currentRect: rect(s.currentRect)
+              }))
+            });
+          }
+        }).observe({ type: 'layout-shift', buffered: true });
+      } catch {}
+    });
+    await context.route('**/api/**', route => route.fulfill({
+      status: 401, contentType: 'application/json', body: '{"error":"unauthorized"}'
+    }));
+    const page = await context.newPage();
+    for (const screen of ['shelf', 'book', 'board']) {
+      await page.goto(base + '/v41/?account=1#my/' + screen, { waitUntil: 'domcontentloaded' });
+      await page.waitForTimeout(2500);
+      const result = await page.evaluate(() => ({
+        screen: document.documentElement.dataset.ltShellEntry,
+        cls: (window.__firstLoadShifts1026 || []).reduce((sum, e) => sum + e.value, 0),
+        shifts: window.__firstLoadShifts1026 || [],
+        header: document.querySelector('.app-header')?.getBoundingClientRect().height,
+        stage: document.querySelector('#stage')?.getBoundingClientRect().height
+      }));
+      assert.equal(result.screen, screen, screen + ': 최초 경로가 첫 스타일에서 확인되어야 합니다');
+      assert.ok(result.stage > 0 && result.header > 0, screen + ': 실제 화면이 렌더링되어야 합니다');
+      assert.ok(result.cls <= 0.01, screen + ' 390 첫 진입 CLS ' + result.cls.toFixed(6) + ' > 0.01: ' + JSON.stringify(result.shifts.filter(e => e.value > 0.001)));
+    }
+    await context.close();
+  } finally {
+    await browser.close();
+    await new Promise(resolve => server.close(resolve));
+  }
+});
+
+// #1084: 로그인 첫 화면의 세로 쇼츠는 미디어 칸 양쪽에 원본 썸네일의 회색 여백을 남기면 안 된다.
+// 화면 전체 PNG의 실제 픽셀도 검사한다. 화면 크기와 대기 시간은 공통 시험 기준을 그대로 쓴다.
+test('#1084 세로 영상 첫 화면의 미디어 칸에는 회색 여백이 없다(정원·밤, 390·1440, 재생 전후)', {skip: REQUIRE ? false : skip, timeout: 90000}, async () => {
+  if (skip) assert.fail(skip);
+  const input = {subject: '세로 영상 확인', title: '첫 사진', date: '2026-11-20', emotion: '기쁨', note: '기록', url: ''};
+  let tree = createTree(input, '2026-11-20T10:00:00.000Z');
+  tree = addMoment(tree, {...input, title: '세로 쇼츠 마지막 순간', date: '2026-11-23', url: 'https://www.youtube.com/shorts/9NXOCr-T8LU'}, tree.moments[0].id, '2026-11-23T10:00:00.000Z');
+  const workspace = {revision: 1, state: {version: 1, trees: [tree], prefs: {displayName: '시험 계정'}}, subject: 'visual-audit-fake', writeSubjectBound: true, savedAt: '2026-11-23T10:00:00.000Z'};
+  // 회청색으로 레터박싱된 가로 썸네일: 가운데에만 세로 영상이 있는 실제 실패 조건.
+  const thumb = '<svg xmlns="http://www.w3.org/2000/svg" width="480" height="360"><defs><linearGradient id="g" x2="0" y2="1"><stop stop-color="#2e81a5"/><stop offset=".5" stop-color="#edb24d"/><stop offset="1" stop-color="#783e83"/></linearGradient></defs><rect width="480" height="360" fill="#465267"/><rect x="165" width="150" height="360" fill="url(#g)"/><circle cx="240" cy="130" r="53" fill="#e4f5ed"/><path d="M170 320 L240 195 L310 320" fill="#e14b60"/></svg>';
+  const server = await serve(), base = 'http://127.0.0.1:' + server.address().port;
+  const browser = await chromium.launch({headless: true});
+  try {
+    for (const theme of ['garden', 'night']) for (const width of [1440, 390]) {
+      const ctx = await browser.newContext({viewport: {width, height: width === 390 ? 844 : 900}, reducedMotion: 'reduce', deviceScaleFactor: 1});
+      try {
+        await ctx.addInitScript(t => {
+          localStorage.setItem('lt41.theme', t);
+          localStorage.setItem('lt41.tips.firstTree', '1');
+          localStorage.setItem('lt41.home.cards', 'mine');
+        }, theme);
+        await ctx.route('**/*', r => {
+          const url = new URL(r.request().url());
+          if (url.hostname === 'i.ytimg.com') return r.fulfill({status: 200, contentType: 'image/svg+xml', body: thumb});
+          if (url.origin !== base) return r.abort();
+          if (url.pathname === '/api/workspace') return r.fulfill({status: 200, json: workspace});
+          if (url.pathname === '/api/community/stats') return r.fulfill({status: 200, json: {trees: 8, moments: 21}});
+          if (url.pathname.startsWith('/api/')) return r.fulfill({status: 200, json: {ok: true, items: []}});
+          return r.continue();
+        });
+        const page = await ctx.newPage();
+        await page.goto(base + '/v41/?account=1#home', {waitUntil: 'load'});
+        await page.waitForFunction(() => window.LT41?.trees?.length === 1, null, {timeout: 15000});
+        const ask = page.locator('#discover-ask-no');
+        if (await ask.isVisible().catch(() => false)) await ask.click();
+        const media = page.frameLocator('#view').locator('.recent-media.vertical');
+        await media.locator('.recent-thumb').waitFor({state: 'visible', timeout: 15000});
+        await page.waitForFunction(() => {
+          const m = document.querySelector('#view')?.contentDocument?.getElementById('orbit')?.shadowRoot?.querySelector('.recent-media.vertical');
+          return m?.dataset.recentState === 'ready' && m.querySelector('img')?.naturalWidth > 0;
+        }, null, {timeout: 15000});
+        const geometry = await page.evaluate(() => {
+          const m = document.querySelector('#view').contentDocument.getElementById('orbit').shadowRoot.querySelector('.recent-media.vertical');
+          const doc = m.ownerDocument, pre = doc.defaultView.getComputedStyle(m, '::before'), r = m.getBoundingClientRect();
+          return {media: [r.width, r.height], background: doc.defaultView.getComputedStyle(m).backgroundColor, pseudo: {width: Number.parseFloat(pre.width), height: Number.parseFloat(pre.height), image: pre.backgroundImage, blur: pre.filter}, imageFit: doc.defaultView.getComputedStyle(m.querySelector('img')).objectFit};
+        });
+        assert.ok(geometry.pseudo.image.includes('url(') && geometry.pseudo.blur.includes('blur('), '세로 썸네일 흐림 층이 있어야 한다');
+        assert.ok(geometry.pseudo.width >= geometry.media[0] && geometry.pseudo.height >= geometry.media[1], '흐림 층이 미디어 칸 전체를 덮는다: ' + JSON.stringify(geometry));
+        for (const playing of [false, true]) {
+          if (playing) {
+            await media.locator('[data-recent-play]').click();
+            // 첫 화면의 재생 단추는 카드 위에 전체 미디어 뷰어를 연다.
+            await media.locator('.recent-frame').waitFor({state: 'attached', timeout: 10000});
+            assert.equal(await page.frameLocator('#view').locator('#mediaViewerHome').getAttribute('aria-hidden'), 'true', '재생 뷰어가 열린다');
+          }
+          if (process.env.LT_1084_CAPTURE_DIR) await page.screenshot({path: join(process.env.LT_1084_CAPTURE_DIR, `${playing ? 'playing' : 'after'}-${width}-${theme}.png`), animations: 'disabled'});
+          const snap = await media.screenshot({animations: 'disabled'});
+          const pixels = await page.evaluate(async data => {
+            const bmp = await createImageBitmap(await (await fetch('data:image/png;base64,' + data)).blob());
+            const canvas = new OffscreenCanvas(bmp.width, bmp.height), cx = canvas.getContext('2d');
+            cx.drawImage(bmp, 0, 0);
+            const rgba = cx.getImageData(0, 0, bmp.width, bmp.height).data;
+            let gray = 0; const samples = [];
+            for (let y = Math.floor(bmp.height * .4); y < Math.ceil(bmp.height * .6); y++) {
+              for (let x = 5; x < bmp.width - 5; x++) {
+                const i = (y * bmp.width + x) * 4;
+                const [r,g,b] = [rgba[i], rgba[i+1], rgba[i+2]];
+                // 재현 썸네일의 회청색 띠 (#465267) 및 흐림·혼합된 회청색.
+                if (b > r + 5 && g > r + 2 && b > g + 4) {
+                  gray++; if (samples.length < 3) samples.push({x,y,r,g,b});
+                }
+              }
+            }
+            return {gray, samples};
+          }, snap.toString('base64'));
+          console.log('#1084', width, theme, playing ? '재생' : '재생 전', JSON.stringify({geometry, pixels}));
+          assert.equal(pixels.gray, 0, width + ' ' + theme + ' ' + (playing ? '재생' : '재생 전') + ': 미디어 칸의 회청색 픽셀 0 (현재 ' + pixels.gray + ', ' + JSON.stringify(pixels.samples) + ')');
+        }
+        // 공용 책·보드 렌더러도 가로 썸네일의 회색 여백을 다시 노출하지 않는다.
+        if (theme === 'night' && width === 1440) {
+          await page.keyboard.press('Escape');
+          await media.locator('.recent-frame').waitFor({state:'detached', timeout: 3000});
+
+          // 순간 목록과 궤도 카드 상세도 같은 썸네일을 사용한다.
+          await page.evaluate(() => {
+            const root = document.querySelector('#view').contentDocument.getElementById('orbit').shadowRoot;
+            root.querySelector('[data-do=moments]').click();
+          });
+          for (const slot of ['moment-list', 'orbit-detail']) {
+            if (slot === 'orbit-detail') {
+              await page.evaluate(() => {
+                const root = document.querySelector('#view').contentDocument.getElementById('orbit').shadowRoot;
+                root.querySelector('.orbit-dialog[open] [data-next]').click();
+              });
+            }
+            const locator = page.frameLocator('#view').locator(slot === 'moment-list'
+              ? '.orbit-dialog[open] .index-row-thumb.is-vertical'
+              : '.orbit-dialog[open] .detail-vertical-stage');
+            await locator.waitFor({state: 'visible', timeout: 15000});
+            if (process.env.LT_1084_CAPTURE_DIR) await page.screenshot({path: join(process.env.LT_1084_CAPTURE_DIR, `${slot}-after-${width}-${theme}.png`), animations: 'disabled'});
+            const info = await locator.evaluate(el => {
+              const bg = getComputedStyle(el, '::before'), r = el.getBoundingClientRect();
+              return {image: bg.backgroundImage, filter: bg.filter, width: r.width, height: r.height};
+            });
+            assert.ok(info.image.includes('url(') && info.filter.includes('blur('), slot + ': 흐린 배경 사용');
+            const png = await locator.screenshot({animations: 'disabled'});
+            const count = await page.evaluate(async b64 => {
+              const blob = await (await fetch('data:image/png;base64,' + b64)).blob();
+              const bmp = await createImageBitmap(blob), cv = new OffscreenCanvas(bmp.width, bmp.height), cx = cv.getContext('2d');
+              cx.drawImage(bmp, 0, 0);
+              const pix = cx.getImageData(0, 0, bmp.width, bmp.height).data; let gray = 0;
+              for(let y=Math.floor(bmp.height*.4);y<Math.ceil(bmp.height*.6);y++)
+                for(let x=5;x<bmp.width-5;x++){const i=(y*bmp.width+x)*4, r=pix[i],g=pix[i+1],b=pix[i+2];if(b>r+5&&g>r+2&&b>g+4)gray++}
+              return gray;
+            }, png.toString('base64'));
+            console.log('#1084 공용', slot, JSON.stringify({...info, gray: count}));
+            assert.equal(count, 0, slot + ': 미디어 칸 회청색 픽셀 0');
+          }
+          await page.evaluate(() => {
+            const root = document.querySelector('#view').contentDocument.getElementById('orbit').shadowRoot;
+            root.querySelector('.orbit-dialog[open] [data-do=close]').click();
+          });
+          for (const slot of ['book', 'board']) {
+            await page.evaluate(({id, slot}) => { location.hash = 'my/' + slot + '?tree=' + id; }, {id: tree.id, slot});
+            const locator = page.frameLocator('#view').locator(slot === 'book' ? '#rightPage .yt-play.is-remote-vertical' : '.lt-media[data-lt-vertical="1"] .lt-yt-preview');
+            await locator.waitFor({state: 'visible', timeout: 15000});
+            if (process.env.LT_1084_CAPTURE_DIR) await page.screenshot({path: join(process.env.LT_1084_CAPTURE_DIR, `${slot}-after-${width}-${theme}.png`), animations: 'disabled'});
+            const info = await locator.evaluate(el => {
+              const layer = el.querySelector('.yt-vertical-backdrop,.lt-vertical-backdrop');
+              const pic = layer?.querySelector('img'), css = layer ? getComputedStyle(layer) : null, r = el.getBoundingClientRect();
+              return {image: pic?.currentSrc || '', loaded: (pic?.naturalWidth || 0) > 0, filter: css?.filter || '', width: r.width, height: r.height};
+            });
+            assert.ok(info.loaded && info.image && info.filter.includes('blur('), slot + ': 세로 썸네일 배경이 이미지로 채워진다');
+            const png = await locator.screenshot({animations: 'disabled'});
+            const count = await page.evaluate(async b64 => {
+              const blob = await (await fetch('data:image/png;base64,' + b64)).blob();
+              const bmp = await createImageBitmap(blob), cv = new OffscreenCanvas(bmp.width, bmp.height), cx = cv.getContext('2d');
+              cx.drawImage(bmp, 0, 0);
+              const pix = cx.getImageData(0, 0, bmp.width, bmp.height).data; let gray = 0;
+              for(let y=Math.floor(bmp.height*.4);y<Math.ceil(bmp.height*.6);y++)
+                for(let x=5;x<bmp.width-5;x++){const i=(y*bmp.width+x)*4, r=pix[i],g=pix[i+1],b=pix[i+2];if(b>r+5&&g>r+2&&b>g+4)gray++}
+              return gray;
+            }, png.toString('base64'));
+            console.log('#1084 공용', slot, JSON.stringify({...info, gray:count}));
+            assert.equal(count, 0, slot + ': 미디어 칸 회청색 픽셀 0');
+          }
+        }
+        await page.close();
+      } finally { await ctx.close(); }
+    }
+  } finally { await browser.close(); await new Promise(ok => server.close(ok)); }
+});
+
+
+test('#1362 확장: 여섯 화면 선택 탭 채움·쉬는 테두리 역할 변수·글자 대비 4.5:1(390·1440 × 밤·정원)', { skip: REQUIRE ? false : skip, timeout: 300000 }, async () => {
+  if (skip) assert.fail(skip);
+  const server = await serve(), base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch({ headless: true });
+  const mk = (i) => ({ subject: '화면 확인', title: '순간 ' + i, note: '기록', emotion: '설렘', date: '2026-11-01', url: '' });
+  let data = createTree(mk(1), '2026-11-01T00:00:00.000Z');
+  for (let i = 2; i <= 4; i++) data = addMoment(data, mk(i), data.moments[0].id, '2026-11-01T00:00:00.000Z');
+  const workspace = { revision: 1, state: { version: 1, trees: [data], prefs: {} }, subject: '화면확인', writeSubjectBound: true, savedAt: '2026-11-25T00:00:00.000Z' };
+  const screens = [
+    ['서재', '#shelf', 'track32-bookshelf', '#shelf-view-inline button[aria-checked="true"]', '#shelf-view-inline button[aria-checked="false"]'],
+    ['책', '#book', 'track59-sketchbook', '#book-view-toggle button[aria-pressed="true"]', '#book-view-toggle button[aria-pressed="false"]'],
+    ['보드', '#board', 'track58-pinboard', '.boardModeSwitch .modeSwitchBtn[aria-pressed="true"]', '.boardModeSwitch .modeSwitchBtn:not([aria-pressed="true"])'],
+    ['지도', '#network', 'track56-network', '.lt-screen-toolbar .view-switch .pill[aria-pressed="true"]', '.lt-screen-toolbar .view-switch']
+  ];
+  const roleFn = roleStyleFn.toString();
+  const pairs = [];
+  try {
+    for (const width of [390, 1440]) for (const theme of ['night', 'garden']) {
+      const ctx = await browser.newContext({ viewport: { width, height: width === 390 ? 844 : 900 } });
+      await ctx.addInitScript(({ theme, id }) => {
+        localStorage.setItem('lt41.theme', theme);
+        try { localStorage.setItem('lt41.discoverAsked', JSON.stringify([id])); } catch {}
+      }, { theme, id: data.id });
+      await ctx.route('**/*', (route) => {
+        const u = new URL(route.request().url());
+        if (u.origin !== base) return route.abort();
+        if (u.pathname === '/api/workspace') return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(workspace) });
+        if (u.pathname.startsWith('/api/')) return route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' });
+        if (/youtube|ytimg|googlevideo/.test(u.host)) return route.abort();
+        return route.continue();
+      });
+      try {
+        const page = await ctx.newPage();
+        await page.goto(base + '/v41/?account=1#home', { waitUntil: 'load' });
+        await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
+        const label = `${width}·${theme}`;
+        if (width === 390) {
+          const shellLook = await page.evaluate(new Function('selectors', 'return (' + roleFn + ')(selectors);'), ['.tree-frame .tree-views>button[aria-current="true"]', '.tree-frame .tree-views>button[aria-current="false"]']);
+          assertRolePair(assert, pairs, label + '·머리줄 탭', shellLook.vars, shellLook.looks['.tree-frame .tree-views>button[aria-current="true"]'], shellLook.looks['.tree-frame .tree-views>button[aria-current="false"]'], '--lt-role-line');
+        }
+        for (const [name, hash, file, selected, idle] of screens) {
+          await page.evaluate((h) => { location.hash = h; }, hash);
+          await page.waitForFunction((f) => [...document.querySelectorAll('#stage iframe')].some((el) => !el.hidden && el.contentWindow?.location?.href.includes(f)), file, { timeout: 20000 });
+          const frame = await (await page.$('#view:not([hidden])')).contentFrame();
+          const look = await frame.evaluate(new Function('selectors', 'return (' + roleFn + ')(selectors);'), [selected, idle]);
+          assertRolePair(assert, pairs, label + '·' + name, look.vars, look.looks[selected], look.looks[idle], '--lt-role-line');
+        }
+        await page.evaluate(() => document.getElementById('share-panel').showModal());
+        const share = await page.evaluate(new Function('selectors', 'return (' + roleFn + ')(selectors);'), ['#share-steps li[data-state="current"]', '#share-steps li[data-state="todo"]']);
+        assertRolePair(assert, pairs, label + '·공유 감상', share.vars, share.looks['#share-steps li[data-state="current"]'], share.looks['#share-steps li[data-state="todo"]'], '--lt-role-line');
+        await page.evaluate(() => document.getElementById('share-panel').close());
+        if (width === 390) { await page.locator('#mobile-more').click(); await page.locator('#header-overflow button.lt-discover-item').click(); } else await page.locator('#community-menu').click();
+        const explore = await page.evaluate(new Function('selectors', 'return (' + roleFn + ')(selectors);'), ['#community-tab-trees', '#community-tab-moments']);
+        assertRolePair(assert, pairs, label + '·둘러보기', explore.vars, explore.looks['#community-tab-trees'], explore.looks['#community-tab-moments'], '--lt-role-line');
+      } finally { await ctx.close(); }
+    }
+  } finally { await browser.close(); server.close(); }
+  assert.ok(pairs.length >= 24, `역할 색 검사 24쌓 — 실제 ${pairs.length}`);
 });

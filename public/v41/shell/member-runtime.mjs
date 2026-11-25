@@ -14,6 +14,7 @@ import {createNotifier, syncedNoticeText, newlyPublishedTrees, NOTICE_HIDE_MS} f
 import {normalizeTitleDisplay, normalizeAccentColor, normalizeDateStyle, normalizeStartPlace, normalizeShareView, normalizeHomeMoment, normalizeBookDisplay, normalizeShelfView, coverModeOf, normalizeCoverDesign} from "../domain.mjs";
 
 export function createMemberRuntime(ctx){
+  let memberCheckTimer = 0, checkingStill = false; // #1320: 확인이 5초를 넘겼을 때만 조용한 표시를 켠다.
   function memberStatus(status){
     ctx.shellIntake.flush();
     const failed=status.dirty&&['offline','rejected','conflict','login'].includes(status.phase);
@@ -77,8 +78,16 @@ export function createMemberRuntime(ctx){
     if(!status.actions.some(a=>a.name==='backup')){const b=document.createElement('button');b.textContent='현재 기록 백업';b.onclick=ctx.backup;(0,ctx.$)('save-actions').append(b);}
     }
    }
-   if(status.phase==='checking')(0,ctx.notify)('내 기록을 불러오고 있어요.');
-   else if(status.phase==='synced'){
+   // #1320: 배경 확인은 안내하지 않는다. 5초를 넘길 때만 머리줄에 조용한 점으로 알린다(글자 안내 아님).
+   if(status.phase==='checking'){
+    checkingStill=true;
+    if(!memberCheckTimer)memberCheckTimer=setTimeout(()=>{memberCheckTimer=0;if(checkingStill&&globalThis.document?.documentElement)globalThis.document.documentElement.dataset.ltAuthSlow='1';},5000);
+   }else{
+    checkingStill=false;
+    if(memberCheckTimer){clearTimeout(memberCheckTimer);memberCheckTimer=0;}
+    if(globalThis.document?.documentElement)delete globalThis.document.documentElement.dataset.ltAuthSlow;
+   }
+   if(status.phase==='synced'){
     // #984: 저장이 서버에서 확인되면(직전 미저장→synced) 열린 화면에 표지·이름 다시 그리기를 알린다.
     // 실패(rejected·offline·conflict·login)에서는 알리지 않는다 — 화면은 원래 표지를 그대로 두고 저장 안내 떠가 실패를 알린다.
     if(ctx.previousDirty){try{for(const f of (0,ctx.frames)())f.contentWindow?.postMessage({type:MSG.treesSaved},location.origin);}catch(error){report(error, '저장 알림 보내기');}}
@@ -87,7 +96,8 @@ export function createMemberRuntime(ctx){
     // 알림은 실패·오프라인·충돌(저장 안내 떠)과 사용자가 누른 큰 동작의 완료 확인만 띄운다.
     const momentCount=(ctx.model?.trees||[]).reduce((n,tree)=>n+((tree.moments||[]).length),0);
     // #1076: 서버 기록을 처음 불러왔을 때만 한 번 — 화면 이동·다시 띄우기로 오는 synced 상태에서는 띄우지 않는다.
-    if(!ctx.previousDirty){
+    // #1320: '불러왔어요' 안내는 없앤다. 남기는 것은 기록 0개 새 계정의 첫 순간 안내(#549)뿐이다.
+    if(!ctx.previousDirty&&status.writable&&momentCount===0){
      const text=syncedNoticeText({writable:status.writable,previousDirty:ctx.previousDirty,momentCount}),key='synced:'+String(ctx.member?.snapshot()?.subject||'session');
      // #952: 빈 첫 화면을 미리 열지 않으면 기록 응답이 새 소식 확인보다 앞설 수 있다.
      // 새 소식 띠가 줄에 들어온 뒤 안내를 올려야 먼저 보였다가 가려지는 일이 없다.
@@ -97,7 +107,9 @@ export function createMemberRuntime(ctx){
        if(generation!==ctx.loadGeneration||!ctx.member?.snapshot().owned||ctx.syncedNoticeKeys.has(key))return;
        ctx.syncedNoticeKeys.add(key);
        ctx.noticeQueue.request('toast',{maxWait:5000,
-        show:()=>ctx.shellNotice.notifyOnce(text,key),
+        // #1223: 앞선 우선순위 안내에 밀려 지나간 synced 알림이 notifyOnce 기록에 막혀 다시 뜨지 않았다.
+        // 중복은 위의 syncedNoticeKeys가 이미 막으므로 일반 notify로 띄운다(선점 뒤 대기열 재표시 허용).
+        show:()=>ctx.shellNotice.notify(text),
         hide:ctx.hideToast
        });
       }).catch(error=>report(error,'새 소식 확인'));
@@ -123,7 +135,7 @@ export function createMemberRuntime(ctx){
    else if(!status.dirty&&status.phase==='offline')(0,ctx.notify)(status.detail||'내 기록을 불러오지 못했어요.');
    (0,ctx.$)('write-menu').textContent=status.dirty?'저장 안 됨' :'＋ 순간 추가';
    // #1109: 내 화면을 먼저 고른 경우 빈 판 안내를 회원 상태 알림이 덮지 않는다.
-   if(ctx.current!=='src064-orbit.html'&&!window.LT41&&ctx.source!=='share'&&!(0,ctx.$)('empty').hidden)(0,ctx.paintEmptyForScreen)(ctx.current);
+   if(ctx.current!=='src064-orbit.html'&&ctx.source!=='share'&&!(0,ctx.$)('empty').hidden&&(!window.LT41||(0,ctx.$)('empty').dataset.emptyGuest==='1'))(0,ctx.paintEmptyForScreen)(ctx.current);
    else{(0,ctx.$)('empty-records').textContent=status.writable?'＋ 첫 트리 만들기':'내 기록 불러오기';(0,ctx.$)('empty-records').classList.toggle('primary',!!status.writable);(0,ctx.$)('empty-sample').classList.toggle('primary',!status.writable);}
    ctx.previousDirty=status.dirty;(0,ctx.renderAccount)();(0,ctx.flowNavigation)();document.body.dataset.member=ctx.member?.snapshot().owned?'in':'out';document.body.dataset.treeCount=String(ctx.model?.trees?.length||0);(0,ctx.applyAdvanced)();
   }
@@ -202,7 +214,12 @@ export function createMemberRuntime(ctx){
   async function sample(selection={},view){if(!(0,ctx.pauseMember)())return;const tree=await (0,ctx.loadExampleTree)();++ctx.loadGeneration;if(view)ctx.current=view;(0,ctx.load)(null,'example',selection,{},tree);if(view)(0,ctx.writeLocation)();(0,ctx.$)('save-feedback').hidden=true;if((0,ctx.$)('account-settings').open)(0,ctx.$)('account-settings').close();}
 
   // #1175: 공유 화면 밖으로 나가는 길 한 벌 — share 잔여를 치우고 예시 첫 화면으로 돌아가며, 화면에 남은 '감상' 안내를 거둔다.
-  function leaveShare(view){(0,ctx.hideToast)();void sample({},view);}
+  function leaveShare(view){
+    (0,ctx.hideToast)();
+    // 남의 공유에서 로고·뒤로가기로 나가면 방문자 자신의 첫 화면/계정으로 돌아간다.
+    if(ctx.member?.snapshot().owned||ctx.visitorAccount){ctx.current=view||'src064-orbit.html';void (0,ctx.startMember)();}
+    else void sample({},view);
+  }
   Object.defineProperties(ctx,{
     startMember:{value:startMember},
     sample:{value:sample},

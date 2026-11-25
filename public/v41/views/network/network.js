@@ -668,6 +668,41 @@
     } else {
       addFit();
     }
+    // #1249: 휴대폰에서는 묶음 선택을 한 개의 메뉴로 묶고 전체 맞춤을 항상 노출한다.
+    const chips = [...r.querySelectorAll('button[data-i]')];
+    if (chips.length) {
+      const more = document.createElement('button');
+      more.className = 'ribbon-more';
+      more.type = 'button';
+      more.textContent = '…';
+      more.setAttribute('aria-label', '묶음 선택');
+      more.setAttribute('aria-expanded', 'false');
+      more.setAttribute('aria-controls', 'ribbonGroups');
+      const groups = document.createElement('div');
+      groups.id = 'ribbonGroups';
+      groups.className = 'ribbon-groups';
+      const close = () => {
+        groups.classList.remove('is-open');
+        more.setAttribute('aria-expanded', 'false');
+      };
+      more.onclick = () => {
+        const open = groups.classList.toggle('is-open');
+        more.setAttribute('aria-expanded', String(open));
+        if (open) groups.querySelector('button')?.focus();
+      };
+      groups.addEventListener('keydown', e => {
+        if (e.key === 'Escape') { close(); more.focus(); }
+      });
+      r.insertBefore(more, chips[0]);
+      r.insertBefore(groups, chips[0]);
+      for (const chip of chips) {
+        groups.append(chip);
+        chip.addEventListener('click', () => {
+          close();
+          if (more.getClientRects().length) more.focus();
+        });
+      }
+    }
     syncRibbon();
   }
   function syncRibbon() {
@@ -728,13 +763,17 @@
     const detailOpen = vw > 980 && !!document.querySelector('#detail.open'),
       detailInset = detailOpen ? 446 : 0;
     const tops = ['.topbar', '.hero p'].map(s => box(document.querySelector(s))).filter(Boolean);
+    const topInset = Math.max(0, ...tops.map(r => r.bottom), picker ? pickerTop + picker.height + 4 : 0) +
+      (state.mobile ? 30 : 0);
+    const bottomInset = bottom ? vh - bottom.top : 0;
+    // #1249: 한 줄 도구로 줄어든 아래 여백을 보완해 지도 중심이 화면 아래로 쏠리지 않게 한다.
+    // 짧은 화면에서도 실제 조작 줄과 겹치지 않는 범위에서만 배치 영역을 조정한다.
+    const balance = state.mobile ? Math.min(topInset - vh * .16, vh - topInset - 152) : 0;
     return {
-      top:
-        Math.max(0, ...tops.map(r => r.bottom), picker ? pickerTop + picker.height + 4 : 0) +
-        (state.mobile ? 30 : 0),
+      top: topInset,
       left: left ? left.right : 0,
       right: Math.max(right ? vw - right.left : 0, detailInset),
-      bottom: bottom ? vh - bottom.top : 0
+      bottom: Math.max(bottomInset, balance)
     };
   }
   function layoutNetwork() {
@@ -787,7 +826,8 @@
     }
   }
   function layoutTime() {
-    TIMEFIT = LT56Model.timeLayout(LTDEMO.moments, { box: BOX, dotR: 5, gap: 8, hubR: 9 });
+    // #1273 3번: 첫 순간의 겹친 고리(반지름 약 48px)와 마지막 이름표가 화면 밖으로 나가지 않게 양끝 여백을 둔다.
+    TIMEFIT = LT56Model.timeLayout(LTDEMO.moments, { box: BOX, dotR: 5, gap: 8, hubR: 9, inset: 64 });
   }
   function paintTagEmpty() {
     const el = $('tagEmpty');
@@ -833,7 +873,8 @@
     canvas.style.width = vw + 'px';
     canvas.style.height = vh + 'px';
     state.mobile = vw <= 640;
-    BOX = LT56Model.fitBox(vw, vh, measureInsets(), 16);
+    // #1273 3번: 넓은 화면에서는 그림판 바깥 여백을 줄여 빈 공간을 줄인다(좁은 화면은 그대로).
+    BOX = LT56Model.fitBox(vw, vh, measureInsets(), vw >= 1200 ? 8 : 16);
     layoutNetwork();
     layoutTag();
     layoutTime();
@@ -947,7 +988,8 @@
   };
   function paintHero() {
     const p = document.querySelector('.hero p');
-    if (p) p.textContent = HERO_LINES[state.view] || HERO_LINES.network;
+    // #1285 4번: 시간 순에서는 가운데 줄에서 떨어진 '여기서 시작'을 제목 줄로 옮긴다.
+    if (p) p.textContent = state.view === 'time' ? `여기서 시작 · ${HERO_LINES.time}` : (HERO_LINES[state.view] || HERO_LINES.network);
   }
   function setView(v) {
     v = normView(v);
@@ -1186,8 +1228,9 @@
   }
   function detailMediaHTML(n) {
     const m = LTDEMO.moments.find(x => x.id === n.id) || {};
-    if (m.url && window.LTMedia)
-      return window.LTMedia.markup(m.url, m.title, m.mediaMetadata, m.id, null, null, {
+    const url = m.url || m.externalUrl || '';
+    if (url && window.LTMedia)
+      return window.LTMedia.markup(url, m.title, m.mediaMetadata, m.id, null, null, {
         compact: true
       });
     const img = m.image || m.asset || '';
@@ -1212,7 +1255,8 @@
       media = detailMediaHTML(n);
     player.innerHTML = media;
     player.hidden = !media;
-    const ytUrl = /youtu/i.test(String(raw?.url || '')) ? raw.url : '';
+    const sourceUrl = raw?.url || raw?.externalUrl || '';
+    const ytUrl = /youtu/i.test(String(sourceUrl)) ? sourceUrl : '';
     const ytRow = $('ytLinkRow');
     if (ytRow) {
       ytRow.hidden = !ytUrl;
@@ -1256,7 +1300,9 @@
     menu.hidden = true;
     btn.setAttribute('aria-expanded', 'false');
   }
+  let mapViewerSerial = 0;
   function openViewer() {
+    const serial = ++mapViewerSerial;
     const n = state.selected;
     if (!n) return;
     const { clean } = autoTitleOf(n);
@@ -1269,14 +1315,93 @@
     const v = $('ltViewer');
     v.classList.add('open');
     v.setAttribute('aria-hidden', 'false');
+    // #1298: 크게 보기는 기록에 넣는다 — 뒤로 가기 한 번에 상세 판으로 돌아온다.
+    try { history.pushState({ lt56Viewer: true }, ''); } catch {}
     $('closeViewer').focus();
+    const raw = LTDEMO.moments.find(moment => moment.id === n.id);
+    const source = raw?.url || raw?.externalUrl || '';
+    const descriptor = source && window.LTMedia?.describe(source);
+    if (descriptor?.kind === 'youtube' && descriptor.videoId) {
+      // 사용자가 재생 표시 또는 크게 보기를 누른 뒤에만 iframe 하나를 만듭니다.
+      void import('/v41/book-usability.mjs').then(({ embedUrl }) => {
+        if (serial !== mapViewerSerial || !v.classList.contains('open')) return;
+        const root = $('viewerMedia').querySelector('.lt-media');
+        const body = root?.querySelector('.lt-media-body');
+        const embed = embedUrl(descriptor.videoId, descriptor.startSeconds || 0);
+        if (!body || !embed) {
+          if (root) window.LTMedia?.applyNoEmbed?.(root);
+          return;
+        }
+        const iframe = document.createElement('iframe');
+        iframe.className = 'lt-yt-frame';
+        iframe.src = embed;
+        iframe.title = n.title || 'YouTube 영상';
+        iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';
+        iframe.allowFullscreen = true;
+        iframe.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
+        body.replaceChildren(iframe);
+      }).catch(() => {
+        if (serial === mapViewerSerial) {
+          const root = $('viewerMedia').querySelector('.lt-media');
+          if (root) window.LTMedia?.applyNoEmbed?.(root);
+        }
+      });
+    }
   }
   function closeViewer() {
+    mapViewerSerial++;
     const v = $('ltViewer');
+    $('viewerMedia').querySelectorAll('video').forEach(video => video.pause());
+    // #1378: 숨겨 둔 iframe에서 소리가 이어지지 않도록 DOM 자체를 해제합니다.
+    $('viewerMedia').replaceChildren();
     v.classList.remove('open');
     v.setAttribute('aria-hidden', 'true');
     $('detailOpen').focus();
   }
+  // #1298: 크게 보기 기록을 뒤로 가기로 되돌리면 상세 판은 그대로 두고 창만 닫는다.
+  addEventListener('popstate', () => {
+    if ($('ltViewer')?.classList.contains('open')) closeViewer();
+  });
+  // #1378: 좁은 상세 판에는 썸네일과 재생 표시만 둡니다.
+  // 공용 미디어의 document 캡처 리스너보다 먼저 받아 카드 안 iframe 생성을 막습니다.
+  window.addEventListener('click', event => {
+    if (!event.target.closest?.('#detailPlayer [data-lt-play]')) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    openViewer();
+  }, true);
+  const mapVideoFrames = new MutationObserver(() => {
+    for (const frame of $('viewerMedia').querySelectorAll('iframe.lt-yt-frame')) {
+      if (frame.dataset.mapStatusChecked) continue;
+      frame.dataset.mapStatusChecked = '1';
+      const root = frame.closest('.lt-media');
+      const videoId = globalThis.LTYouTubeId?.extractYoutubeId?.(root?.dataset.ltUrl || '')
+        || (root?.dataset.ltUrl || '').match(/(?:youtu\.be\/|[?&]v=|\/shorts\/)([A-Za-z0-9_-]{11})/)?.[1];
+      const unavailable = () => {
+        if (!frame.isConnected || !root?.isConnected) return;
+        frame.remove();
+        window.LTMedia?.applyNoEmbed?.(root);
+      };
+      frame.addEventListener('error', unavailable, { once: true });
+      if (videoId) void import('/v41/video-status.mjs')
+        .then(module => module.fetchVideoStatus(videoId))
+        .then(status => { if (['noembed', 'gone', 'private'].includes(status)) unavailable(); })
+        .catch(() => {});
+      const controller = new AbortController();
+      const removed = new MutationObserver(() => {
+        if (!frame.isConnected) { controller.abort(); removed.disconnect(); }
+      });
+      removed.observe($('viewerMedia'), { childList: true, subtree: true });
+      window.addEventListener('message', event => {
+        if (!frame.isConnected || event.source !== frame.contentWindow ||
+            !['https://www.youtube.com', 'https://www.youtube-nocookie.com'].includes(event.origin)) return;
+        let data = event.data;
+        if (typeof data === 'string') { try { data = JSON.parse(data); } catch { return; } }
+        if (data?.event === 'onError' && [2, 5, 100, 101, 150, 153].includes(Number(data.info))) unavailable();
+      }, { signal: controller.signal });
+    }
+  });
+  mapVideoFrames.observe($('viewerMedia'), { childList: true, subtree: true });
   function wireDetail() {
     const back = $('detailClose');
     if (back) back.onclick = closeDetail;
@@ -1541,6 +1666,8 @@
     for (let i = 1; i <= steps; i++) {
       const q = pointBezier(g, (t * i) / steps);
       ctx.lineTo(q.x, q.y);
+      DRAWN_EDGE_SEGMENTS.push({ a: p, b: q, pad: 2 + ctx.lineWidth / 2 });
+      p = q;
     }
     ctx.stroke();
   }
@@ -1649,7 +1776,11 @@
     const rawAlpha = nodeAlpha(n),
       al = paintAlpha(rawAlpha, 'node-alpha-min'),
       nodeColor = state.mode !== 'OVERVIEW' && rawAlpha < 0.5 ? paint('context') : colorOf(n),
-      rgb = hexRgb(nodeColor),
+      // 작은 꼬리표 점은 밝은 판에서 가장자리 혼합으로 대비가 약해진다.
+      // 점을 그리는 색만 진하게 하여 묶음 색의 관계와 공용 토큰을 유지한다.
+      rgb = hexRgb(nodeColor).map(v =>
+        state.mobile && state.view === 'tag' && readPlate() === 'paper' ? Math.round(v * 0.85) : v
+      ),
       sel = state.selected?.id === n.id || state.play?.currentId === n.id,
       hov = state.hover?.id === n.id;
     let r = dotRadius(n);
@@ -1775,6 +1906,7 @@
   // 자리는 LT56Model.placeLabels 한 벌이 고른다 — 다른 이름표·점과 겹치는 자리에는 붙이지 않는다. 글씨 12px.
   const LABEL_PX = 12;
   let LAST_LABELS = [];
+  let DRAWN_EDGE_SEGMENTS = [];
   let THUMB_RECTS = [];
   /* #951 (CTO 261120): 이름표를 글자 수로 자르면 남은 폭이 있어도 'Ditto …'로 잘렸다.
    남은 폭(BOX)에 맞춰 재어 자르고, 짧은 이름은 그대로 다 보인다 — 이름표끼리 겹침은 placeLabels가 지킨다. */
@@ -1834,8 +1966,19 @@
       .sort((a, b) => pri(a) - pri(b) || nodes.indexOf(a) - nodes.indexOf(b));
     const push = (n, text, p, r, dir, only) => {
       if (!visible(p, 0)) return;
-      const w = ctx.measureText(text).width;
-      out.push({ id: n.id, text, x: p.x, y: p.y, r, w, h, dir, only, tw: 0 });
+      const lines = [text];
+      const cap = Math.max(80, BOX.w - 16);
+      if (n.first && ctx.measureText(text).width > cap) {
+        lines.length = 0;
+        let line = '';
+        for (const ch of text) {
+          if (line && ctx.measureText(line + ch).width > cap) { lines.push(line.trimEnd()); line = ''; }
+          line += ch;
+        }
+        if (line) lines.push(line.trimStart());
+      }
+      const w = Math.max(...lines.map(line => ctx.measureText(line).width));
+      out.push({ id: n.id, text, lines, x: p.x, y: p.y, r, w, h: h * lines.length, lineH: h, dir, only, tw: 0, avoidEdges: !!n.first });
     };
     for (const n of moments.filter(n => pri(n) <= 1)) {
       const p = w2s(n.x, n.y);
@@ -1843,14 +1986,15 @@
       const full = state.selected?.id === n.id;
       push(
         n,
-        n.first
+        n.first && state.view !== 'time'
           ? `여기서 시작 · ${full ? t : LT56Model.shortTitle(t, max)}`
           : full
             ? t
             : fitLabel(t),
         p,
         dotRadius(n) + (n.first ? 9 : 0),
-        dirOf(p, centerOf(n))
+        // #1273 3번: 시작 이름표는 선 위에 얹히지 않도록 위쪽 자리를 먼저 고른다.
+        n.first ? { x: 0, y: -1 } : dirOf(p, centerOf(n))
       );
     }
     if (state.view === 'network')
@@ -1975,7 +2119,7 @@
         }
       });
     const b = { x: BOX.x - 12, y: BOX.y - 12, w: BOX.w + 24, h: BOX.h + 24 };
-    LAST_LABELS = LT56Model.placeLabels(labelCands(), obstacles, b);
+    LAST_LABELS = LT56Model.placeLabels(labelCands(), obstacles, b, { segments: DRAWN_EDGE_SEGMENTS });
     ctx.font = `600 ${LABEL_PX}px Pretendard,sans-serif`;
     ctx.textAlign = 'left';
     ctx.lineJoin = 'round';
@@ -1992,8 +2136,11 @@
       /* #951 ③: 사진은 점 자리로 옮겼다 — 이름표는 글자만 쓴다. */
       const tx = l.x;
       ctx.fillStyle = n?.kind === 'cluster' ? paint('cluster-text') : paint('text');
-      ctx.strokeText(l.text, tx, l.y);
-      ctx.fillText(l.text, tx, l.y);
+      for (const [i, line] of (l.lines || [l.text]).entries()) {
+        const y = l.y + i * (l.lineH || LABEL_PX);
+        ctx.strokeText(line, tx, y);
+        ctx.fillText(line, tx, y);
+      }
     }
     ctx.globalAlpha = 1;
     /* 이름표가 없는 순간에 올리면 그 순간 전체 제목(#601 — 줄임 없이). */ const hv = state.hover;
@@ -2085,6 +2232,7 @@
   }
   function draw() {
     THUMB_RECTS = [];
+    DRAWN_EDGE_SEGMENTS = [];
     ctx.save();
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     const bg = ctx.createLinearGradient(0, 0, 0, vh);
@@ -2096,7 +2244,8 @@
     drawRings();
     drawTimeLine();
     edges.forEach(drawEdge);
-    if (state.view === 'tag') TAG_CLUSTERS.forEach(drawHub);
+    // #1285 3번: 이름표가 없는 '아직 묶음에 안 든' 원은 그리지 않는다(범례·이름표와 같은 기준).
+    if (state.view === 'tag') TAG_CLUSTERS.filter((c) => !c.shelf).forEach(drawHub);
     else if (state.view === 'network') CLUSTERS.forEach(drawHub);
     if (state.view === 'network') {
       anchors.forEach(drawNode);
@@ -2632,6 +2781,7 @@
             }),
     box: () => BOX,
     labels: () => LAST_LABELS,
+    edgeSegments: () => DRAWN_EDGE_SEGMENTS,
     fan: () => !!NETFIT?.fan,
     thumbs: () => [...thumbs.entries()].map(([id, e]) => ({ id, ok: e.ok })),
     thumbsSettled: () => [...thumbs.values()].every(e => e.ready),

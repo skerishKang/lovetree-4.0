@@ -113,6 +113,12 @@ const STAGE_LABELS = [
 // 제목에서 흔히 잡동사니로 섞이는 표시 — 꼬리표 값에서 벗긴다.
 const NOISE = /#shorts|쇼츠|\b4k\b|\b60fps\b|\b2160p\b|\b1080p\b|\b60p\b/gi;
 const TAIL_MARKS = /\s*(M\/V|MV|Official (Music )?Video|Official MV|Performance Video|Dance Practice|Special Clip|Practice Video)\s*$/i;
+// 낱말 바로 뒤(한글 곡명 괄호를 건너뛴 뒤)에만 꼬리 표시가 올 때 그 낱말은 곡명이다.
+// 'BTS (방탄소년단) FIRE (불타오르네) Official MV'에서 BTS는 가수, FIRE는 곡명으로 가른다.
+const SONG_TAIL_RIGHT_AFTER = /^\s*(?:\([^()]*\)\s*)?(?:M\/V|MV|Official (Music )?Video|Official MV|Performance Video|Dance Practice|Special Clip|Practice Video)\s*$/i;
+const followsSongTail = (text, at) => SONG_TAIL_RIGHT_AFTER.test(String(text ?? '').slice(at));
+// 곡명으로 오해하면 안 되는 흔한 한글 낱말(무대·영상 종류).
+const KOREAN_NON_SONG = new Set(['무대', '직캠', '팬캠', '뮤직뱅크', '인기가요', '쇼', '공연', '하이라이트', '모음', '영상', '커버', '라이브', '퍼포먼스']);
 // 직캠 표시는 노래 제목 뒤에 붙는 대상이 아니라 찍은 대상의 표시라 값에서 벗긴다.
 const CAM_MARKS = /\s*(세로직캠|가로직캠|직캠|팬캠|fancam|fan cam)\s*$/gi;
 
@@ -201,6 +207,8 @@ function artistFromParens(t) {
     let name = '';
     if (/[가-힣]/.test(inner)) { // '영문(한글)' — 영문은 괄호 밖, 낱말 수가 맞는 꼬꼬 짝만
       const koWords = inner.match(/[가-힣]+/g) || [];
+      // 괄호가 곡명의 한글 표기이고 바로 뒤에 'Official MV' 같은 꼬리가 붙으면 앞 낱말도 곡명이다.
+      if (followsSongTail(t, m.index + m[0].length)) continue;
       const run = capsRunBefore(t, m.index);
       if (run.length >= 1 && run.length === koWords.length && run.length <= 2) name = run[0];
     } else if (!/[가-힣]/.test(inner) && /(?:^|[^A-Za-z0-9])[가-힣]\s*$/.test(t.slice(0, m.index))) {
@@ -228,7 +236,7 @@ function looksLikeCamCredit(name) {
 // 제안하지 않는다. 다만 두 낱말 이음 바로 뒤에 한글 괄호 표기가 붙으면('RESCENE ZENA (리센느 제나)')
 // 첫 낱말은 그룹 이름이다 — 첫 낱말만 가수로 제안한다(멤버는 membersFromParens가 꼬꼬 짝의 낱말 수가
 // 맞을 때 찾는다). 세 낱말 이상 이음(STRAY KIDS FELIX 같은 모양)은 그대로 제안하지 않는다.
-function artistFromWords(t, parens = []) {
+function artistFromWords(t, parens = [], original = t) {
   const inParens = (tok) => parens.some(([a, b]) => tok.i >= a && tok.end <= b);
   const out = [];
   const tokens = [...t.matchAll(/[A-Za-z0-9&'’-]+/g)].map((m) => ({ w: m[0], i: m.index, end: m.index + m[0].length }));
@@ -240,6 +248,10 @@ function artistFromWords(t, parens = []) {
     const w = tok.w;
     const before = t.charAt(tok.i - 1);
     const after = t.charAt(tok.end);
+    // 곡명 바로 뒤에 'Official MV'·'M/V' 같은 꼬리가 오면 그 낱말은 가수가 아니라 곡명이다.
+    // 따옴표 songChunk를 덜어 낸 자리에서 잡지 않고 원본 제목 위치로 본다(따옴표가 사이에 있으면 가수다).
+    const at = original.indexOf(tok.w);
+    if (at < 0 ? followsSongTail(t, tok.end) : followsSongTail(original, at + tok.w.length)) continue;
     // '15-LOVE'처럼 붙임표·숫자에 붙어 있거나 한글에 붙어 있는 조각(MIX직캠의 MIX)은 이름이 아니다.
     if (before === '-' || /\d/.test(before) || /[가-힣]/.test(before)) continue;
     if (after === '-' || /\d/.test(after) || /[가-힣]/.test(after)) continue;
@@ -358,7 +370,8 @@ const stageOfToken = (word) => {
 function titleRest(t) {
   let rest = t.replace(QUOTED_ALL, ' '); // 따옴표 안은 노래 제목이다
   const songChunk = findSong(t);
-  if (songChunk && !QUOTED.test(t)) rest = rest.split(songChunk).join(' '); // 붙임표 덩어리가 노래였으면 그것도 뺀다
+  // 꼬리 표시가 있는 제목은 songChunk를 빼지 않는다 — 빼면 곡명 바로 뒤의 가수가 곡명 자리로 읽힌다.
+  if (songChunk && !QUOTED.test(t) && !TAIL_MARKS.test(t)) rest = rest.split(songChunk).join(' ');
   return rest;
 }
 
@@ -370,7 +383,7 @@ function findArtists(t) {
   const add = (name) => { const k = tagKey(name); if (k && !seen.has(k)) { seen.add(k); out.push(name); } };
   for (const name of artistFromParens(rest)) add(name);
   const parens = [...rest.matchAll(/\([^()]*\)/g)].map((m) => [m.index, m.index + m[0].length]);
-  for (const name of artistFromWords(rest, parens)) add(name);
+  for (const name of artistFromWords(rest, parens, t)) add(name);
   for (const name of artistFromQuotedRun(t)) add(name); // 'STRAY KIDS "특"' 모양 — 원본 제목에서 본다
   return out;
 }
@@ -429,6 +442,27 @@ function findSong(t) {
     if (findStage(v)) return null;
     return v;
   }
+  // 3) 따옴표·붙임표가 없어도 '곡명 + Official MV' 모양은 곡명이다. 괄호는 곡명의 한글 표기로 보고
+  //    덜어 낸 뒤, 남은 마지막 낱말이 홀로 선 대문자 영문 또는 한글 실행일 때만 곡명으로 삼는다.
+  const tail = TAIL_MARKS.exec(t);
+  if (tail) {
+    const before = t.slice(0, tail.index).replace(/\([^()]*\)/g, ' ').replace(NOISE, '').trim();
+    const last = before.split(/\s+/).filter(Boolean).at(-1) || '';
+    if (isCapsName(last)) return last; // FIRE
+    const koRun = before.match(/[가-힣]+(?:\s+[가-힣]+)*$/)?.[0]?.trim() || '';
+    if (koRun && koRun.length <= TAG_MAX_LENGTH && !KOREAN_NON_SONG.has(koRun)) return koRun; // 봄날·피 땀 눈물
+    // 첫 글자만 대문자인 영문 곡명(Dynamite·How Sweet)은 뒤쪽 낱말 이음까지 곡명으로 본다.
+    const parts = before.split(/\s+/).filter(Boolean);
+    const titleWords = [];
+    for (let i = parts.length - 1; i >= 0 && /^[A-Z][a-z][A-Za-z0-9'’-]*$/.test(parts[i]); i -= 1) titleWords.unshift(parts[i]);
+    if (titleWords.length && titleWords.length <= 3) return titleWords.join(' ');
+  }
+  // 4) '가수 (한글 별칭) 한글 곡명'처럼 꼬리 표시가 없어도, 앞에 가수 자리가 있고 끝에 한글 실행이
+  //    남으면 그것은 곡명이다. 직캠 문맥에서는 곡명으로 단정하지 않는다.
+  const rest = t.replace(/\([^()]*\)/g, ' ').replace(NOISE, '').trim();
+  const koTail = rest.match(/(?:^|\s)([가-힣]+(?:\s+[가-힣]+)*)$/)?.[1]?.trim() || '';
+  const head = koTail ? rest.slice(0, rest.length - koTail.length) : '';
+  if (koTail && head.trim() && /[A-Z]{2,}/.test(head) && !findStage(koTail) && !KOREAN_NON_SONG.has(koTail) && !/직캠|팬캠|fancam/i.test(rest) && koTail.length <= TAG_MAX_LENGTH) return koTail;
   return null;
 }
 

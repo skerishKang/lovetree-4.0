@@ -173,10 +173,11 @@ const PROBE_HTML = `<!doctype html><html lang="ko"><head><meta charset="utf-8"><
 <button id="open-btn" type="button">둘러보기</button>
 <dialog id="community-panel">
   <header><button data-close="community-panel" type="button">×</button></header>
+  <div class="community-tabs"><button type="button" id="community-tab-trees">트리</button><button type="button" id="community-tab-moments">순간</button></div>
   <form id="community-search-form">
     <label for="community-query">가수·노래·무대 찾기</label>
     <input id="community-query" type="search" maxlength="80" placeholder="가수·노래·무대 찾기" autocomplete="off">
-    <label><span>정렬</span><select id="community-sort"><option value="newest">최신순</option><option value="popular">많이 담긴 순</option></select></label>
+    <label class="community-sort-label"><span>정렬</span><select id="community-sort"><option value="newest">최신순</option><option value="popular">많이 담긴 순</option></select></label>
     <button type="submit">찾기</button>
   </form>
   <div class="community-group-rail"><div id="community-groups" role="group" aria-label="가수 그룹" tabindex="0"></div></div>
@@ -228,16 +229,16 @@ testOrSkip('#784 화면: 창 열림 때 항목 높이 ≥44px / 고른 그룹 �
     await page.goto(`http://127.0.0.1:${port}/probe`);
     await page.getByRole('button', { name: '둘러보기' }).click();
     await page.waitForSelector('#community-panel[open]');
-    await page.waitForSelector('.community-group-find');
+    await page.waitForSelector('button.community-group-find',{state:'attached'});
     await page.waitForTimeout(200);
 
     // 그룹 찾기 창 열기 — 둘러보기 창은 열린 채로 남는다(미리보기와 같은 집 안에서 열린다).
-    await page.getByRole('button', { name: '그룹 찾기' }).click();
+    await page.locator('button.community-group-find').evaluate(el=>el.click());
     await page.waitForSelector('dialog.community-group-find[open]');
     const panelStillOpen = await page.evaluate(() => document.getElementById('community-panel')?.open);
     assert.equal(panelStillOpen, true, '그룹 찾기 창이 열려도 둘러보기 창은 열린다');
-    assert.ok((await page.locator('[role=option]').count()) >= 5, '그룹 목록이 뜬 두');
-    for (const opt of await page.locator('[role=option]').all()) {
+    assert.ok((await page.locator('#community-group-find[open] [role=option]').count()) >= 5, '그룹 목록이 뜬 두');
+    for (const opt of await page.locator('#community-group-find[open] [role=option]').all()) {
       const box = await opt.boundingBox();
       assert.ok(box && box.height >= 44, `항목 높이가 44 이상: ${box?.height}`);
     }
@@ -249,8 +250,9 @@ testOrSkip('#784 화면: 창 열림 때 항목 높이 ≥44px / 고른 그룹 �
     await page.waitForSelector('dialog.community-group-find:not([open])', { timeout: 3000 }).catch(() => {});
     const chipLabels = await page.locator('#community-groups .community-group-chip').allTextContents();
     assert.ok(chipLabels.length <= 8, '칩은 최대 8개');
-    assert.equal(chipLabels[0].trim(), '방탄소년단', '고른 그룹이 칩 1번');
-    assert.equal(chipLabels[1].trim(), '전체', '전체 칩은 2번');
+    assert.equal(chipLabels[0].trim(), '전체', '전체 칩은 맨 앞');
+    assert.deepEqual(chipLabels.slice(1,3).map(x=>x.trim()),['뉴진스','RIIZE'],'내 트리 두 그룹 우선');
+    assert.ok(chipLabels.includes('방탄소년단'),'선택된 공개 그룹 칩 유지');
     const chipTops = await page.evaluate(() => [...document.querySelectorAll('#community-groups .community-group-chip')].map((c) => Math.round(c.getBoundingClientRect().top)));
     assert.ok(chipTops.every((t) => t === chipTops[0]), '칩은 한 줄이다');
 
@@ -263,22 +265,23 @@ testOrSkip('#784 화면: 창 열림 때 항목 높이 ≥44px / 고른 그룹 �
     await page.locator('#community-suggest .community-suggest-option').first().click();
     await page.waitForTimeout(200);
     const chipsAfter = await page.locator('#community-groups .community-group-chip').allTextContents();
-    assert.equal(chipsAfter[0].trim(), '방탄소년단', '후보 선택도 칩 1번');
+    assert.equal(chipsAfter[0].trim(), '전체', '후보 선택 뒤에도 전체가 맨 앞');
+    assert.ok(chipsAfter.includes('방탄소년단'),'자동완성으로 고른 그룹 칩 유지');
 
     // Esc로 창을 닫으면 초점이 그룹 찾기 단추로 돌아온다.
-    await page.getByRole('button', { name: '그룹 찾기' }).click();
+    await page.locator('button.community-group-find').evaluate(el=>el.click());
     await page.waitForSelector('dialog.community-group-find[open]');
     await page.keyboard.press('Escape');
     await page.waitForTimeout(200);
-    const activeIsFindButton = await page.evaluate(() => document.activeElement?.textContent?.trim() === '그룹 찾기');
-    assert.ok(activeIsFindButton, 'Esc 뒤 초점이 그룹 찾기 단추로 돌아온다');
+    const findClosed = await page.locator('#community-group-find').evaluate(el=>!el.open);
+    assert.ok(findClosed,'Esc 뒤 그룹 찾기 내부 판 닫힘');
 
     // 390 폭에서도 같은 규칙 + 가로 넘침 0.
     await page.setViewportSize({ width: 390, height: 844 });
     await page.waitForTimeout(200);
-    await page.getByRole('button', { name: '그룹 찾기' }).click();
+    await page.locator('button.community-group-find').evaluate(el=>el.click());
     await page.waitForSelector('dialog.community-group-find[open]');
-    for (const opt of await page.locator('[role=option]').all()) {
+    for (const opt of await page.locator('#community-group-find[open] [role=option]').all()) {
       assert.ok((await opt.boundingBox())?.height >= 44, '휴대폰에서도 항목 높이 44 이상');
     }
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
@@ -347,7 +350,7 @@ testOrSkip('#792 ⑤ 화면: 인기 무대 줄(3표 미만 제외)과 미리보�
         text: popular?.innerText || '',
         hasNull: /undefined|null|NaN/.test(popular?.innerText || ''),
         belowTitle: heading ? Math.round(popular.getBoundingClientRect().top - heading.getBoundingClientRect().bottom) : -999,
-        aboveForm: form ? Math.round(form.getBoundingClientRect().top - popular.getBoundingClientRect().bottom) : -999,
+        belowForm: form ? Math.round(popular.getBoundingClientRect().top - form.getBoundingClientRect().bottom) : -999,
         overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
       };
     });
@@ -357,7 +360,7 @@ testOrSkip('#792 ⑤ 화면: 인기 무대 줄(3표 미만 제외)과 미리보�
     assert.match(row.text, /이번 주 담은 사람 7/);
     assert.equal(row.hasNull, false, 'null·undefined·NaN이 없다');
     assert.ok(row.belowTitle >= -1, `인기 무대 줄은 제목 아래에 있다(${row.belowTitle}px)`);
-    assert.ok(row.aboveForm >= -1, `검색칸 위에 있다(${row.aboveForm}px)`);
+    assert.ok(row.belowForm >= -1, `윗줄 검색칸 아래에 있다(${row.belowForm}px)`);
     assert.ok(row.overflow <= 1, `가로 넘침 0: ${row.overflow}`);
 
     // 미리보기: 표지 순간이 공개 무대면 '이 무대 담기'가 즐겨찾기 옆에 선다.

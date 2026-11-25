@@ -6,6 +6,11 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { FRAME_LOAD_COUNTER, FRAME_RELOAD_LIMIT, HOME_CARD_STATE, RELOAD_SCREENS, reloadCheckId } from './frame-reload.mjs';
+import { PREVIEW_SKIP_DETAIL, isPreviewTarget, previewSkippedConsoleErrors } from './preview-target.mjs';
+
+// #1254: 대상 주소가 *.pages.dev 미리보기 별칭이면 저장 API에 기대는 확인을 하지 않는다.
+// 운영 주소에서는 아래 분기들이 전부 지금처럼 동작한다.
+let previewTarget = false;
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 // 러너에는 Google Chrome이 없을 수 있다. LOVETREE_POSTDEPLOY_BROWSER=chromium 이면 함께 설치한
@@ -30,8 +35,9 @@ function expectedThemeAttribute(view) {
 // 로그아웃 3 · 로그인+트리 없음 3 · 로그인+트리 있음 7 이라 고정값으로는 상태를 가릴 수 없다.
 let headerPartsFor = null;
 let treePickerText = null;
+let treeViewsVisible = null;
 try {
-  ({ headerPartsFor, treePickerText } = await import(new URL('../../public/v41/header-state.mjs', import.meta.url).href));
+  ({ headerPartsFor, treePickerText, treeViewsVisible } = await import(new URL('../../public/v41/header-state.mjs', import.meta.url).href));
 } catch {
   headerPartsFor = null;
   treePickerText = null;
@@ -41,10 +47,10 @@ const BASE_HEADER_TABS = 0;
 function headerExpectation({ owned = false, treeCount = 0, publicReading = false } = {}) {
   if (!headerPartsFor) {
     const state = owned ? (Number(treeCount) > 0 ? 'in-trees' : 'in-empty') : 'out';
-    return { state, treePicker: state === 'in-trees', treeViews: state === 'in-trees', write: owned, tabs: state === 'in-trees' ? 6 : 0, source: 'fallback' };
+    return { state, treePicker: owned, treeViews: !publicReading, write: owned, tabs: publicReading ? 0 : (owned ? 7 : 6), source: 'fallback' };
   }
   const parts = headerPartsFor({ owned, treeCount, publicReading });
-  const tabs = BASE_HEADER_TABS + (parts.treePicker ? 1 : 0) + (parts.treeViews ? 5 : 0);
+  const tabs = BASE_HEADER_TABS + (parts.treePicker ? 1 : 0) + ((treeViewsVisible ? treeViewsVisible({ owned, publicReading }) : parts.treeViews) ? 6 : 0);
   return { ...parts, tabs, source: 'public/v41/header-state.mjs' };
 }
 function expectedPickerLabel({ owned, treeTitle = '', pendingDraft = false } = {}) {
@@ -267,6 +273,8 @@ async function accountPassword(opts) {
 }
 
 async function sessionLoggedIn(page, timeout) {
+  // 미리보기에는 저장 API가 없어 이 확인이 늘 503이다. 요청 자체를 하지 않고 비로그인으로 본다(#1254).
+  if (previewTarget) return false;
   try {
     const res = await page.request.get(new URL('/api/workspace', page.url()).href, {
       timeout,
@@ -455,6 +463,10 @@ async function autoLogin(page, opts, target) {
 }
 
 async function probeLogin(page, timeout) {
+  if (previewTarget) {
+    record('session-probe', 'auth', 'skip', PREVIEW_SKIP_DETAIL);
+    return {};
+  }
   const paths = ['/api/account', '/api/lovetree/account', '/api/session', '/api/workspace'];
   const out = {};
   for (const p of paths) {
@@ -547,6 +559,12 @@ async function readCommunity(page) {
 }
 
 async function checkCommunity(page, opts) {
+  // 공유 목록·집계는 저장 API를 읽는다 — 미리보기에서는 시작도 하지 않는다(#1254).
+  if (previewTarget) {
+    record('community-cards', 'community', 'skip', PREVIEW_SKIP_DETAIL);
+    record('browse-aggregates', 'community', 'skip', PREVIEW_SKIP_DETAIL);
+    return null;
+  }
   const { opened } = await openCommunity(page, opts);
   if (!opened) {
     record('community-open', 'community', 'fail', '#community-menu 로 둘러보기 대화상자를 열지 못함');
@@ -912,7 +930,11 @@ async function checkVisualTokens(page, target, opts, stamp) {
         // 셸이 적어 둔 상태(#222). 기대값은 이 값으로 제품 함수에서 계산한다.
         member: document.body.dataset.member || '',
         treeCount: Number(document.body.dataset.treeCount || (window.LT41?.trees?.length ?? 0)) || 0,
-        viewHidden: !fr || fr.hidden || getComputedStyle(fr).display === 'none'
+        viewHidden: !fr || fr.hidden || getComputedStyle(fr).display === 'none',
+        emptyVisible: vis(document.getElementById('empty')),
+        emptyTitle: (document.querySelector('#empty h1')?.textContent || '').trim(),
+        emptyAction: (document.getElementById('empty-records')?.textContent || '').trim(),
+        emptyGuest: document.getElementById('empty')?.dataset.emptyGuest === '1'
       };
     });
     let inner = null;
@@ -925,25 +947,40 @@ async function checkVisualTokens(page, target, opts, stamp) {
       })).catch(() => null);
     }
     seen.push({ id: s.id, top, inner });
-    if (s.id !== 'home' && top.viewHidden && top.avatarVisible) {
-      record(`visual-${s.id}`, 'visual', 'skip', `${s.id}: 로그인·트리 없음이라 안쪽 화면이 열리지 않음(로그아웃 실행에서 검사)`, { top });
-      continue;
+    if (s.id !== 'home' && top.viewHidden && top.emptyVisible) {
+      // 2026-11-23: 로그아웃이면 화면별 빈 상태 + 로그인 버튼을 정상 화면으로 검사한다.
+      if (top.member === 'out' || top.loginVisible) {
+        const name = {shelf:'서재',book:'책',board:'보드',network:'지도'}[s.id] || '기록';
+        const expected = `로그인하면 내 ${name}${name==='책'?'이':'가'} 보여요`;
+        const problems = [];
+        if (top.home) problems.push('빈 상태인데 첫 화면으로 돌아감');
+        if (top.treeViewsHidden) problems.push('로그아웃 화면 탐색 탭이 숨음');
+        if (!top.treePickerHidden || !top.writeMenuHidden) problems.push('로그아웃 권한 메뉴 노출');
+        if (!top.emptyGuest || top.emptyTitle !== expected) problems.push(`빈 상태 제목 ${top.emptyTitle} (기대 ${expected})`);
+        if (top.emptyAction !== '로그인') problems.push(`빈 상태 단추 ${top.emptyAction} (기대 로그인)`);
+        record(`visual-${s.id}`, 'visual', problems.length ? 'fail' : 'pass', problems.join('; ') || `로그아웃 ${s.id} 빈 상태·로그인`, {top});
+        continue;
+      }
+      if (top.avatarVisible) {
+        record(`visual-${s.id}`, 'visual', 'skip', `${s.id}: 로그인·트리 없음이라 안쪽 화면이 열리지 않음(별도 화면 검사)`, {top});
+        continue;
+      }
     }
     const problems = [];
-    // #213 3번: 로그아웃(out)은 트리 선택·트리 보기가 없고, 로그인해도 트리가 없으면(in-empty) 같은 모양이다.
-    // 트리가 있을 때(in-trees)만 트리 선택 + 책·보드·지도가 붙는다. 기대값은 header-state.mjs 가 계산한다.
+    // 2026-11-23: 계정과 무관하게 서재·책·보드·지도 탭을 유지한다(공유 읽기 제외).
+    // 트리 선택·순간 추가·공유만 권한에 따라 숨긴다. 기대값은 header-state.mjs가 계산한다.
     const owned = top.member ? top.member === 'in' : !top.loginVisible;
     const headerExpected = headerExpectation({ owned, treeCount: top.treeCount });
     const expectedTabs = headerExpected.tabs;
     if (headerExpected.state === 'out') {
-      if (!top.treeViewsHidden) problems.push('로그아웃인데 트리 보기 탭이 보임');
+      if (top.treeViewsHidden) problems.push('로그아웃인데 화면 탐색 탭이 숨음');
       if (!top.treePickerHidden) problems.push('로그아웃인데 트리 선택이 보임');
       if (!top.writeMenuHidden) problems.push('로그아웃인데 순간 남기기 버튼이 보임');
       const label = expectedPickerLabel({ owned: false });
       if (![label, '저장 안 된 기록'].includes(top.recordLabel)) problems.push(`로그아웃 트리 선택 글자 "${top.recordLabel}" (기대 "${label}")`);
     } else if (headerExpected.state === 'in-empty') {
-      if (!top.treeViewsHidden) problems.push('트리 없는 로그인인데 트리 보기 탭이 보임');
-      if (!top.treePickerHidden) problems.push('트리 없는 로그인인데 트리 선택이 보임');
+      if (top.treeViewsHidden) problems.push('트리 없는 로그인인데 화면 탐색 탭이 숨음');
+      if (top.treePickerHidden) problems.push('트리 없는 로그인인데 트리 고르기가 숨음');
       if (s.id !== 'home' && top.writeMenuHidden) problems.push('트리 없는 로그인인데 순간 남기기 버튼이 숨겨짐');
       const label = expectedPickerLabel({ owned: true });
       if (![label, '저장 안 된 기록'].includes(top.recordLabel)) problems.push(`트리 없는 로그인 트리 선택 글자 "${top.recordLabel}" (기대 "${label}")`);
@@ -2011,6 +2048,11 @@ async function checkThemeRoundTrip(page, base, opts, stamp) {
 }
 
 async function checkYoutubeEndpoint(page, videoId) {
+  // oEmbed 확인도 저장 API를 거친다 — 미리보기에서는 503을 실패로 세지 않고 확인 자체를 건너뛴다(#1254).
+  if (previewTarget) {
+    record('youtube-oembed', 'youtube', 'skip', PREVIEW_SKIP_DETAIL);
+    return { loggedIn: false, result: { status: 0 } };
+  }
   const result = await page.evaluate(async (id) => {
     const res = await fetch(`/api/youtube/oembed?v=${encodeURIComponent(id)}`, {
       headers: { accept: 'application/json' },
@@ -2342,6 +2384,8 @@ async function main() {
     console.error(`주소 형식이 올바르지 않습니다: ${opts.target}`);
     return 1;
   }
+  previewTarget = isPreviewTarget(target);
+  if (previewTarget) record('storage-api', 'api', 'skip', PREVIEW_SKIP_DETAIL);
 
   await mkdir(opts.out, { recursive: true });
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -2441,14 +2485,20 @@ async function main() {
       await page.setViewportSize({ width: 1440, height: 900 }).catch(() => {});
       oembed = await checkYoutubeEndpoint(page, opts.youtube);
       if (oembed.loggedIn) await checkYoutubeCaption(page, opts.youtube);
-      else record('youtube-caption', 'youtube', 'skip', '비로그인 상태라 YouTube 캡션 확인을 건너뜀');
+      else record('youtube-caption', 'youtube', 'skip', previewTarget ? PREVIEW_SKIP_DETAIL : '비로그인 상태라 YouTube 캡션 확인을 건너뜀');
 
       if (opts.write) await writeChecks(page, opts);
       else record('write', 'write', 'skip', '쓰기 검사는 기본 꺼짐(--write --share <id> 로 실행)');
       }
     }
 
-    const fatalConsole = consoleErrors.filter((text) => !isIgnorableConsoleError(text));
+    // 미리보기에서는 저장 API가 없어서 난 503 콘솔 줄만 제외한다(확인 자체는 skip으로 남는다).
+    // 저장 API가 아닌 곳의 503은 여기서 걸러지지 않아 그대로 실패다(#1254).
+    const storageConsoleSkipped = previewSkippedConsoleErrors(consoleErrors, target.href);
+    if (storageConsoleSkipped.length) {
+      record('console-storage-503', 'api', 'skip', PREVIEW_SKIP_DETAIL, { lines: storageConsoleSkipped.length });
+    }
+    const fatalConsole = consoleErrors.filter((text) => !isIgnorableConsoleError(text) && !storageConsoleSkipped.includes(text));
     const consoleOk = fatalConsole.length === 0 && pageErrors.length === 0;
     record('console-errors', 'console', consoleOk ? 'pass' : 'fail',
       consoleOk ? `콘솔 오류 0 (무시 ${consoleErrors.length - fatalConsole.length}건)` : `콘솔 ${fatalConsole.length}건 / 페이지 오류 ${pageErrors.length}건`,

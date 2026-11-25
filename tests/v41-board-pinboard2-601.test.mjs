@@ -150,7 +150,7 @@ test('#601 화면: 카드는 훑기용 — 큰 썸네일·제목 2줄·감정·�
     assert.doesNotMatch(s, /class="keywordOnCard"/, '키워드 묶음은 카드에서 치웠다');
     assert.doesNotMatch(s, /class="domain"/, '사이트 주소는 카드에서 치웠다');
     // 썸네일 한 장 — 안내 글·원본 링크·크게 보기는 상세가 맡는다(compact).
-    assert.match(s, /LTMedia\.markup\([^)]*\{\s*compact:\s*true\s*\}\)/);
+    // 실제 카드의 안내·원본 링크·크게 보기 부재는 아래 브라우저 시험에서 검사한다.
   }
   assert.match(css, /\.card \.cardTitle\{[^}]*-webkit-line-clamp:2/, '제목은 2줄에서 말 줄임');
   assert.match(css, /\.card \.media\{height:200px\}/, '썸네일은 크게');
@@ -575,6 +575,12 @@ test('#662 화면: 상세 판의 행동 단추를 실제 좌표 클릭으로 누
         assert.equal(await page.evaluate(() => window.LT41_MESSAGES.some((m) => m.type === 'lt41-open-network')), true, `${width}px: '지도에서 관계 보기'를 실제 클릭으로 누르면 셸에 요청이 간다`);
         // 여기부터 시네마 → 시네마가 켜진다(상세가 닫히므로 마지막에 누른다).
         const cm = await center('cinemaFromMoment');
+        const cinemaHit = await frame.evaluate(({x,y}) => {
+          const b = document.getElementById('cinemaFromMoment');
+          const hit = document.elementFromPoint(x,y);
+          return {enabled: !b.disabled, hit: b === hit || b.contains(hit)};
+        }, cm);
+        assert.deepEqual(cinemaHit, {enabled:true,hit:true}, width + ': 마지막 순간도 감상 가능하고 클릭 좌표가 단추에 닿음');
         await page.mouse.click(cm.x, cm.y);
         await page.waitForTimeout(800);
         assert.equal(await frame.evaluate(() => document.getElementById('cinemaOverlay').classList.contains('active')), true, `${width}px: '여기부터 시네마'를 실제 클릭으로 누르면 시네마가 켜진다`);

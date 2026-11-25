@@ -7,6 +7,7 @@ import fs from 'node:fs';
 
 globalThis.window = globalThis;
 import '../public/v41/html-escape.mjs'; // A-15: 글자 막기 정본을 먼저 등록한다.
+await import('../public/v41/toast-timer.js');
 await import('../public/v41/views/board/board-model.js');
 const M = globalThis.LT58Model;
 const REQUIRE = process.env.LT_BOARD_ORDER_619_REQUIRE === '1';
@@ -117,11 +118,21 @@ const starTree = (n, { old = false, mixed = false } = {}) => {
 const hostHTML = (tree) => `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>보드 호스트</title></head><body data-member="in" data-record-source="server">
 <script>window.LT41={source:'server',writable:true,owned:true,momentId:${JSON.stringify(tree.moments[0].id)},prefs:{},tree:${JSON.stringify(tree)}};window.LT41_MESSAGES=[];addEventListener('message',(e)=>{if(e.data&&e.data.type)window.LT41_MESSAGES.push({type:e.data.type,momentId:e.data.momentId,treeId:e.data.treeId,moments:e.data.moments})});</script>
 <iframe src="/v41/views/track58-pinboard.html" style="position:fixed;inset:0;width:100vw;height:100vh;border:0"></iframe></body></html>`;
+const hostHTMLWithSaveReplies = (tree, { saveOk = true } = {}) =>
+  hostHTML(tree).replace(
+    '</script>\n<iframe',
+    `window.LT41_SAVE_OK=${JSON.stringify(saveOk)};window.LT41_SAVES=[];addEventListener('message',(e)=>{if(e.data?.type!=='lt41-board-sync')return;const moments=Array.isArray(e.data.moments)?e.data.moments:[];window.LT41_SAVES.push(moments.map(m=>({...m})));if(window.LT41_SAVE_OK)window.LT41_REMOTE_ORDER=moments.map(m=>({id:m.id,x:m.x,y:m.y}));e.source?.postMessage({type:'lt41-board-saved',ok:window.LT41_SAVE_OK,error:window.LT41_SAVE_OK?undefined:'저장할 수 없어요.',requestId:e.data.requestId},location.origin);});</script>\n<iframe`
+  );
 
 const YT_THUMB_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1200"><rect width="1600" height="1200" fill="#8a7a92"/><path d="M700 350 L700 850 L1050 600 Z" fill="#fff"/></svg>';
 
-async function openHost(browser, url, { width, height }) {
-  const context = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
+async function openHost(browser, url, { width, height, touch = false, theme = '' }) {
+  const context = await browser.newContext({
+    viewport: { width, height },
+    reducedMotion: 'reduce',
+    ...(touch ? { hasTouch: true, isMobile: true } : {})
+  });
+  if (theme) await context.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); } catch {} }, theme);
   await context.route('**/i.ytimg.com/**', (route) => route.fulfill({ contentType: 'image/svg+xml', body: YT_THUMB_SVG }));
   const problems = [];
   const page = await context.newPage();
@@ -286,5 +297,395 @@ test('#1072 A-17 화면: 공유·예시로 보는 읽기 전용 보드에는 순
     const count = await frame.evaluate(() => document.querySelectorAll('.orderBtn').length);
     assert.equal(count, 0, '읽기 전용 보드에는 순서 단추를 만들지 않는다');
     await context.close();
+  } finally { await browser.close(); server.close(); }
+});
+
+test('#1245 화면: 날짜순에서 끌면 내 배치로 바뀌고 점선 칸·카드 이동·되돌리기 저장이 이어진다', { skip: REQUIRE ? false : skip, timeout: 300000 }, async () => {
+  if (skip) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip}`);
+  const tree = starTree(8);
+  tree.moments.forEach((m, i) => { m.x = 150; m.y = -10000 + i; });
+  const initialOrder = M.orderOfMoments(tree.moments);
+  const server = await serve({ '/__host-board-drag.html': hostHTMLWithSaveReplies(tree) });
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const { context, page, frame, problems } = await openHost(browser, `${base}/__host-board-drag.html`, { width: 1440, height: 900 });
+    const before = await frame.evaluate(() => Object.fromEntries([...document.querySelectorAll('#cardLayer .card')].map((el) => { const r = el.getBoundingClientRect(); return [el.dataset.id, { x: r.x, y: r.y }]; })));
+    assert.equal(await frame.locator('[data-board-mode="date"]').getAttribute('aria-pressed'), 'true', '처음은 날짜순이다');
+    const dragged = await frame.locator('.card[data-id="s2"]').boundingBox();
+    await page.mouse.move(dragged.x + dragged.width / 2, dragged.y + dragged.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(dragged.x + dragged.width / 2 + 9, dragged.y + dragged.height / 2 + 6);
+    await page.waitForTimeout(220);
+    assert.equal(await frame.locator('[data-board-mode="mine"]').getAttribute('aria-pressed'), 'true', '4px 넘게 움직이면 내 배치로 바뀐다');
+    const target = await frame.locator('.card[data-id="s7"]').boundingBox();
+    await page.mouse.move(target.x + target.width / 2, target.y + target.height / 2, { steps: 10 });
+    await page.waitForTimeout(250);
+    const preview = await frame.evaluate((old) => {
+      const dragged = document.querySelector('.card.dragLift');
+      const placeholder = document.querySelector('.boardDropPlaceholder');
+      const moved = [...document.querySelectorAll('#cardLayer .card')].filter((el) => {
+        if (el === dragged) return false;
+        const r = el.getBoundingClientRect();
+        const was = old[el.dataset.id];
+        return Math.abs(r.x - was.x) > 8 || Math.abs(r.y - was.y) > 8;
+      }).length;
+      return {
+        count: document.querySelectorAll('.boardDropPlaceholder').length,
+        border: placeholder && getComputedStyle(placeholder).borderTopStyle,
+        size: placeholder && { w: placeholder.offsetWidth, h: placeholder.offsetHeight },
+        draggedSize: dragged && { w: dragged.offsetWidth, h: dragged.offsetHeight },
+        duration: (() => { const moving = document.querySelector('.card.shiftPreview:not(.dragLift)'); return moving && getComputedStyle(moving).transitionDuration; })(),
+        moved
+      };
+    }, before);
+    assert.equal(preview.count, 1, '끄는 동안 빈 칸은 하나다');
+    assert.equal(preview.border, 'dashed', '빈 칸 테두리는 점선이다');
+    assert.deepEqual(preview.size, preview.draggedSize, '빈 칸 크기는 끄는 카드와 같다');
+    assert.match(preview.duration, /0\.2s/, '다른 카드는 약 200ms에 걸쳐 움직인다');
+    assert.ok(preview.moved > 0, '끄는 동안 다른 카드 위치가 바뀐다');
+    await page.mouse.up();
+    await frame.locator('.boardOrderUndo').waitFor({ state: 'visible', timeout: 5000 });
+    const saved = await page.evaluate(() => window.LT41_SAVES[0]);
+    assert.ok(saved, '놓은 순서가 저장 호출에 실린다');
+    assert.notDeepEqual(M.orderOfMoments(saved), initialOrder, '놓은 뒤 저장 순서가 달라진다');
+    assert.match(await frame.locator('#toast').innerText(), /배치를 저장했어요/);
+    assert.equal(await frame.locator('.boardOrderUndo').innerText(), '되돌리기');
+    await frame.locator('.boardOrderUndo').click();
+    await page.waitForFunction(() => window.LT41_SAVES.length === 2, undefined, { timeout: 5000 });
+    const restored = await page.evaluate(() => window.LT41_SAVES[1]);
+    assert.deepEqual(M.orderOfMoments(restored), initialOrder, '되돌리기가 이전 순서를 복원한다');
+    assert.equal((await page.evaluate(() => window.LT41_SAVES.length)), 2, '되돌리기도 저장 호출을 한 번 보낸다');
+    assert.equal(problems.length, 0, `화면 오류 없음 (${problems.join(' | ') || '없음'})`);
+    await context.close();
+  } finally { await browser.close(); server.close(); }
+});
+
+test('#1245 처음대로: 확인 한 번 뒤 순서 값이 비워지고 날짜순으로 돌아간다', { skip: REQUIRE ? false : skip, timeout: 300000 }, async () => {
+  if (skip) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip}`);
+  const tree = starTree(8);
+  tree.moments.forEach((m, i) => { m.x = 150; m.y = -10000 + i; });
+  const server = await serve({ '/__host-board-reset.html': hostHTMLWithSaveReplies(tree) });
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const { context, page, frame } = await openHost(browser, `${base}/__host-board-reset.html`, { width: 1440, height: 900 });
+    let confirmations = 0;
+    page.on('dialog', async (dialog) => { confirmations++; await dialog.dismiss(); });
+    await frame.locator('#boardResetOrderBtn').click();
+    const confirm = frame.locator('#lt-confirm');
+    await confirm.waitFor({ state: 'visible' });
+    assert.equal(confirmations, 0, '브라우저 기본 확인 창을 쓰지 않는다');
+    assert.equal(await confirm.locator('#lt-confirm-cancel').evaluate((el) => el === document.activeElement), true, '취소가 기본 초점이다');
+    await confirm.locator('#lt-confirm-ok').click();
+    await page.waitForFunction(() => window.LT41_SAVES.length === 1);
+    const saved = await page.evaluate(() => window.LT41_SAVES[0]);
+    assert.equal(await confirm.count(), 1, '확인 창은 한 번만 열리고 그대로 닫힌다');
+    assert.equal(await confirm.locator('#lt-confirm-ok').isVisible(), false);
+    assert.equal(M.orderOfMoments(saved), null, '저장 문서에 순서 값이 남지 않는다');
+    assert.ok(saved.every((m) => m.x === null && m.y === null), '기존 칸 위치도 함께 정리한다');
+    assert.equal(await frame.locator('[data-board-mode="date"]').getAttribute('aria-pressed'), 'true', '날짜순으로 돌아간다');
+    const top = await frame.evaluate(() => [...document.querySelectorAll('#cardLayer .card')].map((el) => ({ id: el.dataset.id, y: el.offsetTop, x: el.offsetLeft })).sort((a, b) => a.y - b.y || a.x - b.x)[0]?.id);
+    assert.equal(top, 's7', '날짜순의 최신 카드가 먼저 보인다');
+    await context.close();
+  } finally { await browser.close(); server.close(); }
+});
+
+test('#1245 저장 실패: 끌기 전 자리로 돌아가고 실패 안내를 보인다', { skip: REQUIRE ? false : skip, timeout: 300000 }, async () => {
+  if (skip) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip}`);
+  const tree = starTree(8);
+  tree.moments.forEach((m, i) => { m.x = 150; m.y = -10000 + i; });
+  const server = await serve({ '/__host-board-fail.html': hostHTMLWithSaveReplies(tree, { saveOk: false }) });
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const { context, page, frame } = await openHost(browser, `${base}/__host-board-fail.html`, { width: 1440, height: 900 });
+    const before = await frame.evaluate(() => Object.fromEntries([...document.querySelectorAll('#cardLayer .card')].map((el) => { const r = el.getBoundingClientRect(); return [el.dataset.id, { x: r.x, y: r.y }]; })));
+    const dragged = await frame.locator('.card[data-id="s2"]').boundingBox();
+    await page.mouse.move(dragged.x + dragged.width / 2, dragged.y + dragged.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(dragged.x + dragged.width / 2 + 9, dragged.y + dragged.height / 2 + 6);
+    await page.waitForTimeout(220);
+    const target = await frame.locator('.card[data-id="s7"]').boundingBox();
+    await page.mouse.move(target.x + target.width / 2, target.y + target.height / 2, { steps: 10 });
+    await page.waitForTimeout(250);
+    await page.mouse.up();
+    await frame.locator('#saveFail.show').waitFor({ state: 'visible', timeout: 5000 });
+    await page.waitForTimeout(250);
+    const restored = await frame.evaluate(() => ({
+      mode: document.querySelector('[data-board-mode="date"]').getAttribute('aria-pressed'),
+      positions: Object.fromEntries([...document.querySelectorAll('#cardLayer .card')].map((el) => { const r = el.getBoundingClientRect(); return [el.dataset.id, { x: r.x, y: r.y }]; }))
+    }));
+    assert.equal(restored.mode, 'true', '실패하면 시작한 날짜순으로 돌아간다');
+    for (const [id, pos] of Object.entries(before)) {
+      assert.ok(Math.abs(restored.positions[id].x - pos.x) <= 2, `${id}의 가로 자리를 되돌린다`);
+      assert.ok(Math.abs(restored.positions[id].y - pos.y) <= 2, `${id}의 세로 자리를 되돌린다`);
+    }
+    assert.match(await frame.locator('#saveFail').innerText(), /배치를 저장하지 못했어요/);
+    assert.equal(await frame.locator('.boardOrderUndo').count(), 0, '실패 때 되돌리기 단추는 띄우지 않는다');
+    await context.close();
+  } finally { await browser.close(); server.close(); }
+});
+
+test('#1245 390px 손가락: 짧게 누르면 순간을 열고 끌면 빈 칸·저장·되돌리기가 같다', { skip: REQUIRE ? false : skip, timeout: 300000 }, async () => {
+  if (skip) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip}`);
+  const tree = starTree(8);
+  tree.moments.forEach((m, i) => { m.x = 150; m.y = -10000 + i; });
+  const initialOrder = M.orderOfMoments(tree.moments);
+  const server = await serve({ '/__host-board-touch.html': hostHTMLWithSaveReplies(tree) });
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const { context, page, frame, problems } = await openHost(browser, `${base}/__host-board-touch.html`, { width: 390, height: 844, touch: true });
+    const tap = await frame.evaluate(() => {
+      const el = [...document.querySelectorAll('#cardLayer .card')].find((card) => { const r = card.getBoundingClientRect(); return r.right > 0 && r.left < innerWidth && r.bottom > 0 && r.top < innerHeight; });
+      const r = el.getBoundingClientRect();
+      return { id: el.dataset.id, x: r.x + r.width / 2, y: r.y + r.height / 2 };
+    });
+    await page.touchscreen.tap(tap.x, tap.y);
+    await frame.locator('#detail.open').waitFor({ state: 'visible', timeout: 3000 });
+    await frame.locator('#detailClose').click();
+    await page.waitForTimeout(350);
+    await frame.evaluate(() => {
+      window.__pointerTrace = [];
+      for (const type of ['pointerdown', 'pointermove', 'pointerup', 'pointercancel'])
+        document.addEventListener(type, (event) => window.__pointerTrace.push({ type, pointerType: event.pointerType, x: event.clientX, y: event.clientY, id: event.target?.dataset?.id || '' }), true);
+    });
+    const visible = await frame.evaluate(() => [...document.querySelectorAll('#cardLayer .card')].map((el) => { const r = el.getBoundingClientRect(); return { id: el.dataset.id, x: r.x, y: r.y, w: r.width, h: r.height, visible: r.right > 0 && r.left < innerWidth && r.bottom > 0 && r.top < innerHeight }; }).filter((item) => item.visible));
+    const dragged = visible.find((item) => item.id === tap.id) || visible[0];
+    const target = visible.find((item) => item.id !== dragged.id);
+    const cdp = await context.newCDPSession(page);
+    const point = (x, y) => ({ id: 1, x, y, radiusX: 2, radiusY: 2, force: 1, rotationAngle: 0 });
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point(dragged.x + dragged.w / 2, dragged.y + dragged.h / 2)] });
+    await page.waitForTimeout(60);
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [point(dragged.x + dragged.w / 2 + 10, dragged.y + dragged.h / 2 + 5)] });
+    await page.waitForTimeout(220);
+    const touchState = await frame.evaluate(() => ({
+      mode: document.querySelector('[data-board-mode="mine"]').getAttribute('aria-pressed'),
+      trace: window.__pointerTrace
+    }));
+    assert.equal(touchState.mode, 'true', `손가락 끌기도 내 배치로 바뀐다 ${JSON.stringify(touchState)}`);
+    assert.ok(touchState.trace.some((event) => event.type === 'pointerdown' && event.pointerType === 'touch'), '손가락 포인터 입력이 전달된다');
+    const targetBox = await frame.locator(`.card[data-id="${target.id}"]`).boundingBox();
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [point(targetBox.x + targetBox.width / 2, targetBox.y + targetBox.height / 2)] });
+    await page.waitForTimeout(250);
+    const preview = await frame.evaluate(() => {
+      const placeholder = document.querySelector('.boardDropPlaceholder');
+      return {
+        count: document.querySelectorAll('.boardDropPlaceholder').length,
+        dashed: placeholder && getComputedStyle(placeholder).borderTopStyle === 'dashed',
+        duration: (() => { const moving = document.querySelector('.card.shiftPreview:not(.dragLift)'); return moving && getComputedStyle(moving).transitionDuration; })(),
+        moved: [...document.querySelectorAll('#cardLayer .card.shiftPreview')].length
+      };
+    });
+    assert.equal(preview.count, 1, '손가락 끄는 동안 빈 칸 하나가 보인다');
+    assert.equal(preview.dashed, true, '빈 칸은 점선이다');
+    assert.match(preview.duration, /0\.2s/, '390px에서도 다른 카드는 약 200ms에 걸쳐 움직인다');
+    assert.ok(preview.moved > 0, '다른 카드가 움직인다');
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await frame.locator('.boardOrderUndo').waitFor({ state: 'visible', timeout: 5000 });
+    assert.equal((await page.evaluate(() => window.LT41_SAVES.length)), 1, '손가락으로 놓은 배치를 저장한다');
+    await frame.locator('.boardOrderUndo').click();
+    await page.waitForFunction(() => window.LT41_SAVES.length === 2, undefined, { timeout: 5000 });
+    const restored = await page.evaluate(() => window.LT41_SAVES[1]);
+    assert.deepEqual(M.orderOfMoments(restored), initialOrder, '손가락 끌기도 이전 순서로 되돌린다');
+    assert.equal(problems.length, 0, `화면 오류 없음 (${problems.join(' | ') || '없음'})`);
+    await context.close();
+  } finally { await browser.close(); server.close(); }
+});
+
+test('#1273 9번 되돌리기 토스트: 단추 있음 8초·없음 기존 시간·올려 두면 멈춤', () => {
+  const api = globalThis.LTToastTimer;
+  assert.equal(typeof api.createToastTimer, 'function');
+  assert.ok(api.ACTION_TOAST_MS >= 8000, `단추 있는 안내는 8초 이상(${api.ACTION_TOAST_MS})`);
+  assert.equal(api.PLAIN_TOAST_MS, 2200, '단추 없는 안내 시간은 그대로');
+
+  let clock = 0, seq = 0;
+  const timers = new Map();
+  const timer = api.createToastTimer({
+    now: () => clock,
+    setTimer: (fn, ms) => { const id = ++seq; timers.set(id, { fn, at: clock + ms }); return id; },
+    clearTimer: (id) => timers.delete(id)
+  });
+  const fire = () => {
+    for (const [id, entry] of [...timers]) if (entry.at <= clock) { timers.delete(id); entry.fn(); }
+  };
+  const el = {
+    listeners: {},
+    addEventListener(name, fn) { (this.listeners[name] = this.listeners[name] || []).push(fn); },
+    emit(name, extra = {}) { for (const fn of this.listeners[name] || []) fn({ currentTarget: this, ...extra }); }
+  };
+  let expired = 0;
+  timer.arm(el, api.ACTION_TOAST_MS, () => { expired += 1; });
+  assert.equal(timer.snapshot().remaining, 8000);
+  clock = 3000; fire();
+  assert.equal(expired, 0, '3초에는 사라지지 않는다');
+  el.emit('mouseenter');
+  assert.equal(timer.snapshot().paused, true);
+  assert.equal(timer.snapshot().remaining, 5000, '올린 시점의 남은 시간을 지킨다');
+  clock = 20000; fire();
+  assert.equal(expired, 0, '마우스를 올려 둔 동안에는 시간이 흐르지 않는다');
+  el.emit('mouseleave');
+  assert.equal(timer.snapshot().paused, false);
+  clock = 24000; fire();
+  assert.equal(expired, 0);
+  clock = 25000; fire();
+  assert.equal(expired, 1, '벗어난 뒤 남은 시간이 지나면 사라진다');
+
+  timer.arm(el, api.ACTION_TOAST_MS, () => { expired += 1; });
+  clock += 1000;
+  el.emit('focusin');
+  assert.equal(timer.snapshot().paused, true, '초점이 들어가도 멈춘다');
+  clock += 20000; fire();
+  assert.equal(expired, 1, '초점이 있는 동안에는 사라지지 않는다');
+  el.emit('focusout', { relatedTarget: null });
+  clock += 8000; fire();
+  assert.equal(expired, 2, '초점이 빠진 뒤 남은 시간 뒤 사라진다');
+});
+
+test('#1273 9번 보드 토스트는 공통 타이머를 쓰고 단추 없는 시간은 그대로다', () => {
+  const board = fs.readFileSync(new URL('../public/v41/views/board/board.js', import.meta.url), 'utf8');
+  const html = fs.readFileSync(new URL('../public/v41/views/track58-pinboard.html', import.meta.url), 'utf8');
+  assert.match(html, /\/v41\/toast-timer\.js/, '공통 타이머를 먼저 불러온다');
+  assert.match(board, /toastTimer\.arm\(el, window\.LTToastTimer\.PLAIN_TOAST_MS/, '안내 토스트도 공통 타이머');
+  assert.match(board, /toastTimer\.arm\(el, window\.LTToastTimer\.ACTION_TOAST_MS/, '되돌리기 토스트는 단추용 시간');
+  assert.doesNotMatch(board, /setTimeout\(\(\) => el\.classList\.remove\('show'\), 2200\)/, '옛 개별 시계 없음');
+  assert.doesNotMatch(board, /\}, 6000\);/, '옛 6초 되돌리기 시계 없음');
+});
+
+test('#1273 처음대로 취소: 공통 확인 창에서 취소하면 아무것도 바뀌지 않는다', { skip: REQUIRE ? false : skip, timeout: 300000 }, async () => {
+  if (skip) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip}`);
+  const tree = starTree(8);
+  tree.moments.forEach((m, i) => { m.x = 150; m.y = -10000 + i; });
+  const server = await serve({ '/__host-board-reset-cancel.html': hostHTMLWithSaveReplies(tree) });
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const { context, page, frame } = await openHost(browser, `${base}/__host-board-reset-cancel.html`, { width: 1440, height: 900 });
+    let nativeDialogs = 0;
+    page.on('dialog', async (dialog) => { nativeDialogs++; await dialog.dismiss(); });
+    const before = await frame.evaluate(() => [...document.querySelectorAll('#cardLayer .card')].map((el) => el.dataset.id));
+    const beforeMode = await frame.locator('[data-board-mode="date"]').getAttribute('aria-pressed');
+    await frame.locator('#boardResetOrderBtn').click();
+    const confirm = frame.locator('#lt-confirm');
+    await confirm.waitFor({ state: 'visible' });
+    await confirm.locator('#lt-confirm-cancel').click();
+    assert.equal(await confirm.isVisible(), false, '취소하면 확인 창이 닫힌다');
+    assert.equal(nativeDialogs, 0, '브라우저 기본 확인 창을 쓰지 않는다');
+    assert.equal(await page.evaluate(() => window.LT41_SAVES.length), 0, '저장 요청을 보내지 않는다');
+    const after = await frame.evaluate(() => [...document.querySelectorAll('#cardLayer .card')].map((el) => el.dataset.id));
+    assert.deepEqual(after, before, '카드 순서가 그대로다');
+    assert.equal(await frame.locator('[data-board-mode="date"]').getAttribute('aria-pressed'), beforeMode, '배치 모드가 그대로다');
+    await context.close();
+  } finally { await browser.close(); server.close(); }
+});
+
+test('#1273 공통 확인 창 연결과 기본 창 미사용(코드 검사)', () => {
+  const board = fs.readFileSync(new URL('../public/v41/views/board/board.js', import.meta.url), 'utf8');
+  const html = fs.readFileSync(new URL('../public/v41/views/track58-pinboard.html', import.meta.url), 'utf8');
+  assert.equal(/window\.confirm\s*\(/.test(board), false, '보드에 브라우저 기본 confirm 호출이 남지 않는다');
+  assert.match(board, /LT41Confirm/);
+  assert.ok(html.indexOf('/v41/confirm-dialog.js') > 0, '보드가 공통 확인 창을 읽는다');
+  assert.ok(html.indexOf('/v41/confirm-dialog.js') < html.indexOf('/v41/views/board/board.js'), '확인 창이 보드보다 먼저 온다');
+});
+
+
+test('#1321 화면: 넓은 화면의 빈 판 안내는 자리가 넉넉할 때만 보인다', { skip: REQUIRE ? false : skip, timeout: 300000 }, async () => {
+  if (skip) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip}`);
+  const server = await serve({
+    '/__host-board-hint-3.html': hostHTMLWithSaveReplies(starTree(3)),
+    '/__host-board-hint-30.html': hostHTMLWithSaveReplies(starTree(30))
+  });
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch({ headless: true });
+  try {
+    for (const theme of ['night', 'garden']) {
+      for (const count of [3, 30]) {
+        const { context, frame, problems } = await openHost(browser, `${base}/__host-board-hint-${count}.html`, { width: 1440, height: 900, theme });
+        const hint = await frame.evaluate(() => {
+          const el = document.getElementById('boardEmptyHint');
+          if (!el) return null;
+          const s = getComputedStyle(el);
+          return {
+            hidden: el.hidden,
+            text: el.textContent.trim(),
+            pointerEvents: s.pointerEvents,
+            borderStyle: s.borderTopStyle,
+            borderColor: s.borderTopColor,
+            count: document.querySelectorAll('#boardEmptyHint').length
+          };
+        });
+        assert.deepEqual(problems, [], `${theme}/${count}: 화면 오류 없음`);
+        assert.ok(hint, `${theme}/${count}: 안내 요소가 있다`);
+        assert.equal(hint.count, 1, `${theme}/${count}: 안내는 하나다`);
+        assert.equal(hint.hidden, count === 30, `${theme}/${count}: 3장은 보이고 30장은 숨는다`);
+        if (count === 3) {
+          assert.equal(hint.text, '순간을 끌어 여기에 놓아 보세요', `${theme}: 안내 문구`);
+          assert.equal(hint.pointerEvents, 'none', `${theme}: 누르기에 영향을 주지 않는다`);
+          assert.equal(hint.borderStyle, 'dashed', `${theme}: 점선 테두리`);
+        }
+        await context.close();
+      }
+    }
+  } finally { await browser.close(); server.close(); }
+});
+
+test('#1321 화면: 끄는 동안 점선이 진해지고 놓으면 돌아온다', { skip: REQUIRE ? false : skip, timeout: 300000 }, async () => {
+  if (skip) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip}`);
+  const server = await serve({ '/__host-board-hint-drag.html': hostHTMLWithSaveReplies(starTree(3)) });
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const { context, page, frame } = await openHost(browser, `${base}/__host-board-hint-drag.html`, { width: 1440, height: 900, theme: 'night' });
+    const before = await frame.evaluate(() => getComputedStyle(document.getElementById('boardEmptyHint')).borderTopColor);
+    const box = await frame.locator('#cardLayer .card').first().boundingBox();
+    assert.ok(box, '끌 카드가 있다');
+    await page.mouse.move(box.x + 48, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + 108, box.y + box.height / 2 + 40, { steps: 8 });
+    await page.waitForTimeout(200);
+    const during = await frame.evaluate(() => ({
+      dragging: document.body.classList.contains('board-hint-drag'),
+      color: getComputedStyle(document.getElementById('boardEmptyHint')).borderTopColor
+    }));
+    assert.equal(during.dragging, true, '끄는 동안 표시한다');
+    assert.notEqual(during.color, before, '점선 색이 진해진다');
+    await page.mouse.up();
+    await page.waitForTimeout(200);
+    const after = await frame.evaluate(() => ({
+      dragging: document.body.classList.contains('board-hint-drag'),
+      color: getComputedStyle(document.getElementById('boardEmptyHint')).borderTopColor
+    }));
+    assert.equal(after.dragging, false, '놓으면 표시가 사라진다');
+    assert.notEqual(after.color, during.color, '놓으면 강조 색이 풀린다');
+    await context.close();
+  } finally { await browser.close(); server.close(); }
+});
+
+test('#1321 화면: 390와 공유 보기에는 안내가 없다', { skip: REQUIRE ? false : skip, timeout: 300000 }, async () => {
+  if (skip) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip}`);
+  const shareTree = starTree(3);
+  const shareHost = hostHTML(shareTree)
+    .replace('data-member="in"', 'data-member="out"')
+    .replace('source:\'server\',writable:true,owned:true', 'source:\'share\',writable:false,owned:false');
+  const server = await serve({
+    '/__host-board-hint-390.html': hostHTMLWithSaveReplies(starTree(3)),
+    '/__host-board-hint-share.html': shareHost
+  });
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch({ headless: true });
+  try {
+    for (const [label, url, vp] of [
+      ['390', `${base}/__host-board-hint-390.html`, { width: 390, height: 844, touch: true }],
+      ['공유 보기', `${base}/__host-board-hint-share.html`, { width: 1440, height: 900 }]
+    ]) {
+      const { context, frame } = await openHost(browser, url, vp);
+      const hidden = await frame.evaluate(() => {
+        const el = document.getElementById('boardEmptyHint');
+        return !el || el.hidden;
+      });
+      assert.equal(hidden, true, `${label}: 안내가 보이지 않는다`);
+      await context.close();
+    }
   } finally { await browser.close(); server.close(); }
 });

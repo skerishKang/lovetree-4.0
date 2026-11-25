@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { checkScreenResults } from '../tools/ci/screen-results.mjs';
 
-const SCREENS = ['screen-board', 'screen-home', 'screen-book', 'screen-reload', 'screen-shell', 'screen-map-a', 'screen-map-b', 'screen-book-screen', 'screen-audit-a', 'screen-audit-b', 'screen-audit-c'];
+const SCREENS = ['screen-board', 'screen-home', 'screen-home-followup', 'screen-book', 'screen-reload', 'screen-shell', 'screen-map-a', 'screen-map-b', 'screen-book-screen', 'screen-audit-a', 'screen-audit-b', 'screen-audit-c'];
 const gate = (result, changed) => ({ result, outputs: { changed } });
 const results = (screenResult, gateResult = gate('success', 'false')) => {
   const needs = { 'screen-changes': gateResult };

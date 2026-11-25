@@ -3,33 +3,91 @@ import {memberLoginUrl} from './member-entry.mjs';
 import {readTheme} from './header-state.mjs';
 import {displayTreeTitle} from './tree-name.mjs';
 import {tagKey} from './tags.mjs';
+import {youtubeIdFrom,youtubeStageThumbUrl} from './youtube-id.mjs';
 // #480 L13: 둘러보기 카드·댓글의 날짜도 책·보드·지도와 같은 한 벌로 적는다.
 import {formatDisplayDate} from './book-usability.mjs';
 import {matchGroups,sectionGroups} from './group-search.mjs';
 // #547·#701 규칙: 서버가 내려주는 시각(UTC 타임스탬프)은 기기 지역 날짜로 바꿔 보여 준다(#547 한 벌).
 import {localDateOnly} from './local-date.mjs';
 // #792 4단계 ⑤: 공개 무대 담기 단추와 '이번 주 인기 무대' 줄의 규칙은 community-stages.mjs 한 곳에 둔다.
-import {POPULAR_STAGE_TITLE,POPULAR_STAGE_EMPTY,POPULAR_STAGE_WEEK_LABEL,publicStageCount,stageVoteLabel,stageVoteNotice,stageMomentTitle,readStage,toggleStage} from './community-stages.mjs';
+import {POPULAR_STAGE_TITLE,POPULAR_STAGE_WEEK_LABEL,publicStageCount,stageVoteLabel,stageVoteNotice,stageMomentTitle,readStage,toggleStage} from './community-stages.mjs';
 // #1025: [순간] 탭 — 공개 세로 순간 숏츠 보기(서버 조회·세로 판정은 기존 한 벌 재사용).
 import {mountMoments} from './community-moments.mjs';
+import {createExploreLayers} from './community-history.mjs';
 // #1098 2단계: 판의 순간 목록 — 순간 카드에 그 순간의 ♡·댓글 수, ♡ 누르기·댓글 쓰기는 순간 단위 API(서버 #1136).
 import {mountMomentList} from './community-moment-list.mjs';
 const el=(tag,className,text)=>{const node=document.createElement(tag);if(className)node.className=className;if(text!=null)node.textContent=text;return node;};
 // 셸이 낯선 주소를 #home으로 바꾸기 전에(module import 시점) 직접 들어온 주소를 기억한다(#1025).
 const hashNow=()=>typeof location!=='undefined'?(location.hash||''):'';
-const ENTER_MOMENTS=typeof location!=='undefined'&&location.hash==='#explore/moments';
 export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareOwn,hasOwnTree,getDateStyle,getArtistGroups=()=>[],onAddToTree,notify,memberLogin}){
  const api=createCommunityApi(),form=dialog.querySelector('#community-search-form'),query=dialog.querySelector('#community-query'),list=dialog.querySelector('#community-list'),groups=dialog.querySelector('#community-groups'),feedback=dialog.querySelector('#community-feedback'),more=dialog.querySelector('#community-more'),preview=dialog.querySelector('#community-preview'),sortSelect=dialog.querySelector('#community-sort');
  // #1025: [트리] [순간] 탭 — 주소 #explore/moments 는 새로고침·공유로 유지한다.
  const treeTab=dialog.querySelector('#community-tab-trees'),momentsTab=dialog.querySelector('#community-tab-moments');
  const treePanel=dialog.querySelector('#community-tree-panel'),momentsPanel=dialog.querySelector('#community-moments-panel');
+ // 탭·찾기·정렬을 어느 보기에서나 같은 높이의 한 줄에 둔다.
+ const toolbarTabs=dialog.querySelector('.community-tabs'),topRow=el('div','community-top-row'),sortLabel=form.querySelector('.community-sort-label');
+ toolbarTabs.before(topRow);topRow.append(toolbarTabs,form,sortLabel);
+ // 검색칸은 처음부터 열어 두고, 제출 단추 없이 입력 후 자동으로 찾는다.
+ query.placeholder='🔍 찾기';query.setAttribute('aria-label','가수·노래·무대 찾기');
+ const searchClear=el('button','community-search-clear','×');
+ searchClear.type='button';searchClear.setAttribute('aria-label','찾기 지우기');
+ form.append(searchClear);
+ sortSelect.setAttribute('aria-hidden','true');sortSelect.tabIndex=-1;
+ const popularOption=sortSelect?.querySelector('option[value=popular]');
+ if(popularOption)popularOption.textContent='많이 담긴 순';
+ // 값은 기존 select에 남겨 API·설정 계약을 유지하고, 실제 고르는 판은 화면 안에서 그린다.
+ const sortButton=el('button','community-sort-trigger','↕');
+ sortButton.type='button';sortButton.setAttribute('aria-label','정렬');
+ sortButton.setAttribute('aria-haspopup','listbox');sortButton.setAttribute('aria-expanded','false');
+ const sortMenu=el('div','community-sort-menu');
+ sortMenu.id='community-sort-menu';sortMenu.setAttribute('role','listbox');sortMenu.setAttribute('aria-label','정렬 선택');sortMenu.hidden=true;
+ const sortItems=[['newest','최신순'],['popular','많이 담긴 순']];
+ let sortActive=0;
+ const sortOptions=sortItems.map(([value,label])=>{
+  const option=el('button','community-sort-option');option.type='button';option.dataset.sort=value;
+  option.setAttribute('role','option');option.id='community-sort-'+value;
+  option.onclick=()=>chooseSort(value);
+  sortMenu.append(option);return option;
+ });
+ const paintSort=()=>{
+  sortItems.forEach(([value,label],i)=>{
+   sortOptions[i].textContent=(sortSelect.value===value?'✓  ':'　')+label;
+   sortOptions[i].setAttribute('aria-selected',String(sortSelect.value===value));
+   sortOptions[i].classList.toggle('is-selected',sortSelect.value===value);
+   sortOptions[i].classList.toggle('is-active',i===sortActive);
+  });
+  sortButton.setAttribute('aria-activedescendant',sortOptions[sortActive]?.id||'');
+ };
+ const closeSort=()=>{sortMenu.hidden=true;sortButton.setAttribute('aria-expanded','false');sortButton.removeAttribute('aria-activedescendant');};
+ const openSort=()=>{sortActive=Math.max(0,sortItems.findIndex(([v])=>v===sortSelect.value));paintSort();sortMenu.hidden=false;sortButton.setAttribute('aria-expanded','true');};
+ function chooseSort(value){
+  const changed=sortSelect.value!==value;sortSelect.value=value;paintSort();closeSort();sortButton.focus();
+  if(changed)sortSelect.onchange?.();
+ }
+ sortButton.onclick=()=>sortMenu.hidden?openSort():closeSort();
+ sortButton.addEventListener('keydown',event=>{
+  if(event.key==='Escape'){if(!sortMenu.hidden){event.preventDefault();event.stopPropagation();closeSort();}return;}
+  if(event.key==='ArrowDown'||event.key==='ArrowUp'){
+   event.preventDefault();if(sortMenu.hidden)openSort();
+   else{sortActive=(sortActive+(event.key==='ArrowDown'?1:-1)+sortItems.length)%sortItems.length;paintSort();}
+  }
+  if(event.key==='Enter'&& !sortMenu.hidden){event.preventDefault();chooseSort(sortItems[sortActive][0]);}
+ });
+ sortMenu.addEventListener('keydown',event=>{if(event.key==='Escape'){event.preventDefault();closeSort();sortButton.focus();}});
+ sortLabel.append(sortButton,sortMenu);
+ // 바깥 누름 및 탭 이동 시 접고, 선택값은 유지한다.
+ dialog.addEventListener('pointerdown',event=>{if(!sortMenu.hidden&&!sortLabel.contains(event.target))closeSort();});
+ sortButton.addEventListener('blur',()=>{setTimeout(()=>{if(!sortLabel.contains(document.activeElement))closeSort();},0);});
+ paintSort();
+
  // #480 L13: 계정 설정의 날짜 표기. 넘겨받지 않으면 기본(dot) — 새 규칙을 만들지 않는다.
  const dateStyle=()=>(typeof getDateStyle==='function'?getDateStyle():'dot');
  // 하은 1회차(261116,#728 후속): 새벽(KST 0~9시, UTC 전날)에 담은 순간의 둘러보기 카드가
  // '2026. 11. 15'(UTC 날짜 절단)로 나왔다. 예전 String(createdAt).slice(0,10) 절단 대신
  // localDateOnly(#547 한 벌)로 기기 지역 날짜를 만들어 formatDisplayDate에 넘긴다.
  const when=value=>formatDisplayDate(localDateOnly(value),dateStyle());
- const moments=momentsPanel?mountMoments({panel:momentsPanel,onOpenShare,onAddToTree,notify,memberLogin,api,when}):null;
+ const historyLayers=createExploreLayers();
+ const moments=momentsPanel?mountMoments({panel:momentsPanel,onOpenShare,onAddToTree,notify,memberLogin,api,when,historyLayers}):null;
  let currentTab='trees',hashGuard=false;
  const writeHash=value=>{
   if(typeof history==='undefined'||typeof history.pushState!=='function'||typeof history.replaceState!=='function')return;
@@ -51,7 +109,12 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
   for(const g of publicGroups||[])add(g.value,g.count);
   return [...seen.values()].sort((a,b)=>String(a.group).localeCompare(String(b.group),'ko'));
  };
- const message=text=>{feedback.textContent=text;const previewMessage=preview.querySelector('[data-community-preview-message]');if(previewMessage)previewMessage.textContent=text;};
+ const message=text=>{
+  feedback.textContent=text;
+  const unfiltered=!selectedArtist&&!query.value.trim();
+  feedback.hidden=unfiltered&&(/^(공개된 트리 |아직 공개된 트리|공개 트리를 불러오는 중)/).test(text);
+  const previewMessage=preview.querySelector('[data-community-preview-message]');if(previewMessage)previewMessage.textContent=text;
+ };
  const loginMessage=answer=>answer.status===401?'로그인하면 이 기능을 사용할 수 있어요.':answer.message||'요청을 처리하지 못했어요.';
  // #824 결정 7: 3 미만 숫자는 보여 주지 않는다 — 라벨만 남긴다(0·1·2 모두 같은 규칙, 3부터 숫자가 보인다).
  // '이번 주 담은 사람 수'(결정 1)도 같은 규칙 — 3 이상일 때만 카드·미리보기에 한 줄로 따라온다.
@@ -88,7 +151,7 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
  function statButton(item,kind,label,voteNote){
   if(kind==='reaction')return reactionButtons(item,label,voteNote);
   const active=kind==='favorite'?item.stats.favored:item.stats.hearted,count=kind==='favorite'?item.stats.favorites:item.stats.hearts,b=el('button','community-mini',`${active?'✓ ':''}${smallCountLabel(label,count)}`);b.type='button';b.dataset.communityAction=kind;b.setAttribute('aria-pressed',String(active));
-  b.onclick=async()=>{const answer=await api.favorite(item.shareId,!active);if(!answer.ok){const text=loginMessage(answer);if(voteBlocked(answer))setVoteNote(voteNote,text);else message(text);return;}item.stats=answer.stats;render();};return b;
+  b.onclick=async()=>{const answer=await api.favorite(item.shareId,!active);if(!answer.ok){const text=loginMessage(answer);if(voteBlocked(answer))setVoteNote(voteNote,text);else message(text);return;}item.stats=answer.stats;render();if(kind==='favorite'&&!active)message('즐겨찾기에 넣었어요. 주인이 공개를 끄면 목록에서 사라져요.');};return b;
  }
  // #678 후속·#1098 1단계: 반응은 ♡(공감) 하나를 크게 기본으로 보이고, 길게 누르면 7종 칩이 그 자리에서
  // 펼쳐진다 — 예전 '반응 남기기' 펼침 규칙(host를 칩들로 갈아끼우기)을 그대로 재사용한다. 펼침은
@@ -188,21 +251,20 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
   cancel.onclick=()=>{delete row.dataset.editing;row.replaceChildren();if(head)row.append(head);if(body)row.append(body);if(tools)row.append(tools);};
   row.append(form);
  }
-  function artistGroupList(){
-   let mine=[];try{mine=getArtistGroups?.()||[];}catch{}
-   const available=new Map();
-   for(const group of publicGroups){
-    const value=String(group?.value??group??'').trim(),key=tagKey(value);
-    if(value&&key&&!available.has(key))available.set(key,value);
+   function artistGroupList(){
+    let mine=[];try{mine=getArtistGroups?.()||[];}catch{}
+    const publicSorted=[...(publicGroupsAll.length?publicGroupsAll:publicGroups)]
+     .filter(group=>tagKey(String(group?.value??group??'').trim()))
+     .sort((a,b)=>Number(b?.count||0)-Number(a?.count||0)||String(a?.value||'').localeCompare(String(b?.value||''),'ko'));
+    const out=[],seen=new Set();
+    const add=value=>{const text=String(value||'').trim(),key=tagKey(text);if(!key||seen.has(key))return;seen.add(key);out.push(text);};
+    // 내 트리 가수는 로그인된 때만 데이터가 내려온다. 방문자는 공개 트리 수로만 정렬한다.
+    for(const value of Array.isArray(mine)?mine:[])add(value);
+    for(const group of publicSorted)add(group?.value);
+    return out;
    }
-   const seen=new Set(),out=[];
-   const add=key=>{if(key&&available.has(key)&&!seen.has(key)){seen.add(key);out.push(available.get(key));}};
-   for(const raw of Array.isArray(mine)?mine:[])add(tagKey(String(raw??'').trim()));
-   for(const key of available.keys())add(key);
-   return out.slice(0,7);
-  }
  function renderGroups(){
-  // 고른 그룹 → 전체 → 내 가수 → 공개 많은 순(최대 8칩, 한 줄 — #914 규칙 그대로).
+  // 전체 → 내 그룹 → 공개 트리 수 많은 순서로 표시한다.
   // artistGroupList가 내 가수·공개 상위 8을 tagKey 한 줄로 맞춘 순서를 준다.
   const seen=new Set();
   const choices=[];
@@ -211,9 +273,13 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
    if(seen.has(key))return;
    seen.add(key);choices.push({value,label});
   };
-  if(selectedArtist)push(selectedArtist,selectedArtist);
   push('','전체');
   for(const value of artistGroupList())if(choices.length<8)push(value,value);
+  // 지금 고른 그룹이 상위 칩 밖이라도 선택을 잃지 않도록 마지막 칩에 남긴다.
+  if(selectedArtist&&!choices.some(choice=>tagKey(choice.value)===tagKey(selectedArtist))){
+   if(choices.length>=8)choices.pop();
+   push(selectedArtist,selectedArtist);
+  }
   const visible=choices.slice(0,8);
   groups.replaceChildren(...visible.map(choice=>{
    const chip=el('button',`community-group-chip${choice.value===selectedArtist?' is-active':''}`,choice.label);
@@ -222,37 +288,48 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
    return chip;
   }));
  }
- function duplicateLabel(item){
-  const title=displayTreeTitle(item.title),moment=item.cover?.title||'';
-  const matches=items.filter(value=>displayTreeTitle(value.title)===title&&(value.cover?.title||'')===moment);
-  if(matches.length<2)return '';
-  const publicName=String(item.publicDisplayName||'').trim();
-  if(!publicName)return '';
-  return `${item.aiTester===true?'AI 명예회원 ':''}${publicName}님`;
- }
  function renderCover(item,{loading='lazy'}={}){
   const cover=el('div','community-cover'),youtube=item.cover?.type==='youtube',video=['video','youtube'].includes(item.cover?.type),vertical=video&&item.cover?.vertical===true;
-  cover.dataset.mediaKind=vertical?'video-vertical':youtube?'video-youtube':video?'video':'photo';
-  const url=item.cover?.thumbnailUrl||item.cover?.url||'';
-  if(url){
+  // #1322: 한 겹 규칙 — 흐린 배경+가운데 그림은 세로 영상만. 그 밖은 표지 한 장을 꽉 채운다.
+  cover.dataset.mediaKind=vertical?'video-vertical':video?'video-landscape':'photo';
+  // #1330: 위아래 띠 없는 썸네일(mqdefault·maxresdefault)을 먼저 쓰고, 없을 때만 나머지로 내려간다.
+  const raw=item.cover?.thumbnailUrl||item.cover?.url||'';
+  const youtubeId=youtubeIdFrom(item.cover?.url||'')||youtubeIdFrom(raw);
+  const candidates=[];
+  const add=url=>{if(url&&!candidates.includes(url))candidates.push(url)};
+  // 가로는 띠 없는 썸네일을 먼저, 세로는 서버가 준 세로 원본을 먼저 쓴다.
+  if(youtubeId&&!vertical){add(youtubeStageThumbUrl(youtubeId,'mqdefault'));add(youtubeStageThumbUrl(youtubeId,'maxresdefault'));}
+  add(raw);
+  if(youtubeId){add(youtubeStageThumbUrl(youtubeId,'mqdefault'));add(youtubeStageThumbUrl(youtubeId,'maxresdefault'));add(youtubeStageThumbUrl(youtubeId,'hqdefault'));}
+  if(candidates.length){
    // #1026 묶음 D: 칸은 처음부터 같은 크기로 잡혀 있다(community-cover의 aspect-ratio).
    // 사진은 다 받은 뒤에만 0.2초로 나타난다 — 반쯤 내려온 그림이나 빈 칸→일부→완성 단계가 보이지 않는다.
    const art=el('span','community-cover-art');
    const ready=img=>{if(img.isConnected)img.classList?.add('is-ready')};
-   if(vertical||youtube){
-    const backdrop=el('img','community-cover-backdrop');backdrop.alt='';backdrop.setAttribute('aria-hidden','true');backdrop.loading=loading;backdrop.classList?.add('is-loading');
+   let backdrop=null;
+   if(vertical){
+    backdrop=el('img','community-cover-backdrop');backdrop.alt='';backdrop.setAttribute('aria-hidden','true');backdrop.loading=loading;backdrop.classList?.add('is-loading');
     backdrop.addEventListener('load',()=>ready(backdrop),{once:true});
     backdrop.addEventListener('error',()=>{if(backdrop.isConnected)backdrop.remove()},{once:true});
-    backdrop.src=url;if(backdrop.complete&&backdrop.naturalWidth)ready(backdrop);art.append(backdrop);
+    backdrop.src=candidates[0];if(backdrop.complete&&backdrop.naturalWidth)ready(backdrop);art.append(backdrop);
    }
    const image=el('img','community-cover-image');image.alt='';image.loading=loading;image.decoding='async';image.referrerPolicy='no-referrer';image.classList?.add('is-loading');
    image.addEventListener('load',()=>ready(image),{once:true});
-   image.onerror=()=>{if(image.isConnected)image.replaceWith(el('span','community-cover-fallback',item.cover?.title||'순간 사진을 불러오지 못했어요.'));};
-   image.src=url;if(image.complete&&image.naturalWidth)ready(image);
+   let at=0;
+   image.onerror=()=>{
+    at+=1;
+    if(at<candidates.length){image.src=candidates[at];if(backdrop)backdrop.src=candidates[at];return;}
+    if(image.isConnected)image.replaceWith(el('span','community-cover-fallback',item.cover?.title||'순간 사진을 불러오지 못했어요.'));
+   };
+   image.src=candidates[0];if(image.complete&&image.naturalWidth)ready(image);
    art.append(image);cover.append(art);
   }else cover.append(el('span','community-cover-fallback',item.cover?.title||'공개된 순간'));
-  if(item.aiTester===true)cover.append(el('span','community-cover-badge community-ai','AI 명예회원'));
-  cover.append(el('span','community-cover-badge community-count',`순간 ${item.momentCount}`));
+  // #1322: 카드 위 배지는 모두 같은 자리·같은 크기로 아래 한 줄에 모은다.
+  // #1330: 배지는 한 줄에 하나 — 명예회원 표시와 순간 수를 같은 단추에 담는다.
+  const badges=el('span','community-cover-badges');
+  const ai=item.aiTester===true;
+  badges.append(el('span','community-cover-badge'+(ai?' community-ai':' community-count'),`${ai?'✦ AI · ':''}순간 ${item.momentCount}`));
+  cover.append(badges);
   return cover;
  }
  function moreMenu(item){
@@ -270,7 +347,7 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
  function renderPreview(item){
   if(!item){preview.replaceChildren();return;}
   const head=el('div','community-preview-head'),eyebrow=el('p','community-preview-kicker','공개 순간 미리보기'),close=el('button','community-preview-close','×');
-  close.type='button';close.setAttribute('aria-label','미리보기 닫기');close.onclick=()=>preview.close();head.append(eyebrow,close);
+  close.type='button';close.setAttribute('aria-label','미리보기 닫기');close.onclick=()=>historyLayers.dismiss('tree-preview');head.append(eyebrow,close);
   const body=el('div','community-preview-body'),title=el('h3','',displayTreeTitle(item.title));title.id='community-preview-title';
   const subject=el('p','community-preview-subject',item.subject||''),moment=el('p','community-preview-moment-title',item.cover?.title||'공개된 순간');
   const summary=item.summary?el('p','community-preview-summary',item.summary):null;
@@ -283,10 +360,17 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
   // #792 ⑤: 담기 단추 자리. 무대가 확인되기 전에는 비어 있고(자리도 차지하지 않는다), 확인되면 그 자리에서 열린다.
   const stageBox=el('div','community-stage-box');stageBox.hidden=true;
   actions.append(favWrap,statButton(item,'reaction','공감',voteNote),stageBox);
-  const open=el('button','community-preview-open','대표 순간부터 감상');open.type='button';open.onclick=()=>onOpenShare(item);
-  const start=el('button','community-preview-start','내 기록 새로 시작');start.type='button';start.onclick=()=>onStartRecord(item.subject);
+  const open=el('button','community-preview-open','대표 순간부터 감상');open.type='button';open.onclick=()=>{
+    historyLayers.suspend('tree-preview',()=>{if(!dialog.open)openPanel();selectedId=item.shareId;renderPreview(item);if(!preview.open)preview.showModal();});
+    onOpenShare(item);
+   };
+  const start=el('button','community-preview-start','내 기록 새로 시작');start.type='button';start.onclick=()=>{
+    historyLayers.suspend('tree-preview',()=>{if(!dialog.open)openPanel();selectedId=item.shareId;renderPreview(item);if(!preview.open)preview.showModal();});
+    onStartRecord(item.subject);
+   };
   const status=el('p','community-preview-message','');status.dataset.communityPreviewMessage='';status.setAttribute('role','status');
   const choices=el('div','community-preview-choices');choices.append(open,start);
+   const startHelp=el('p','community-preview-start-help','이 트리를 복사하지 않고 같은 주제로 내 트리를 새로 만들어요.');
   // #1098 1단계: 댓글을 판 아래 바로 — 최근 3개 + '댓글 모두 보기'(⋯ 메뉴에는 신고·차단만 남는다).
   const commentSection=el('section','community-preview-comments');commentSection.setAttribute('aria-label','댓글');
   const commentHeading=el('h4','community-menu-title','댓글'),commentHost=el('div','community-comment-host');
@@ -295,22 +379,24 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
   const momentSection=el('section','community-moment-list');momentSection.setAttribute('aria-label','순간 목록');momentSection.hidden=true;
   const momentHeading=el('h4','community-menu-title','순간 목록'),momentHost=el('div','community-moment-host');
   momentSection.append(momentHeading,momentHost);
-  body.append(title,subject,moment);if(summary)body.append(summary);body.append(meta,actions,commentSection,momentSection,choices,moreMenu(item),status);
+  body.append(title,subject,moment);if(summary)body.append(summary);body.append(meta,actions,commentSection,momentSection,choices,startHelp,moreMenu(item),status);
   preview.replaceChildren(head,renderCover(item,{loading:'eager'}),body);
   // 순간 목록은 판을 그릴 때 한 번 — 응답이 늦게 와도 다시 그리기(렌더 토큰)로 오래된 표시가 남지 않게 한다.
   mountMomentList({section:momentSection,host:momentHost,api,shareId:item.shareId,when,countLabel:smallCountLabel});
   if(item.cover?.momentId)mountStageVote(item,stageBox);
   comments(item,{host:commentHost,heading:commentHeading,meta});
  }
- function openPreview(item){selectedId=item.shareId;renderPreview(item);if(!preview.open)preview.showModal();}
+ function openPreview(item){selectedId=item.shareId;renderPreview(item);if(!preview.open){preview.showModal();historyLayers.open('tree-preview',()=>preview.close());}}
  function card(item){
   const titleText=displayTreeTitle(item.title),momentText=item.cover?.title||'공개된 순간';
   const weekly=weeklyNote(item),metaText=`${item.cover?.emotion||item.emotions?.[0]||'공개'} · ${when(item.createdAt)} · ${smallCountLabel('공감',item.stats?.hearts||0)}${weekly?` · ${weekly}`:''}`;
   const article=el('button','community-card');article.type='button';article.dataset.shareId=item.shareId;
   article.setAttribute('aria-label',`${titleText}. ${momentText}. ${metaText}`);
-  const distinct=duplicateLabel(item);
-  article.append(renderCover(item),el('h3','community-card-title',titleText),el('p','community-card-moment',momentText));
-  if(distinct)article.append(el('small','community-card-distinct',distinct));
+  article.append(renderCover(item),el('h3','community-card-title',titleText));
+  // 서버가 AI 명예회원으로 표시한 트리에만 공개 이름을 붙인다.
+  const owner=item.aiTester===true?String(item.publicDisplayName||'').trim():'';
+  if(owner)article.append(el('small','community-card-owner','AI 명예회원 '+owner));
+  article.append(el('p','community-card-moment',momentText));
   article.append(el('p','community-card-meta',metaText));
   article.onclick=()=>openPreview(item);return article;
  }
@@ -328,11 +414,12 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
   }
   if(preview.open&&selectedId){const selected=items.find(item=>item.shareId===selectedId);if(selected){renderPreview(selected);if(focusedAction)preview.querySelector(`[data-community-action="${focusedAction}"]`)?.focus();}}
  }
- async function load(append=false){
+ async function load(append=false,settleStages=null){
   if(append&&loading)return;
   const requestId=++loadId;loading=true;more.disabled=true;message('공개 트리를 불러오는 중이에요.');
   if(!append){items=[];cursor='';render();}
   const answer=await api.discover({q:query.value.trim(),artist:selectedArtist,cursor,limit:12,sort:sortSelect?.value||''});
+  if(settleStages)await settleStages();
   if(requestId!==loadId)return;
   loading=false;
   if(!answer.ok){message(answer.message||'공개 트리를 불러오지 못했어요.');more.hidden=true;more.disabled=false;render();return;}
@@ -348,7 +435,7 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
  for(const link of dialog.querySelectorAll('[data-community-view]'))link.onclick=()=>{dialog.close();[...document.querySelectorAll('[data-view]')].find(node=>node.dataset.view===link.dataset.communityView)?.click();};
  const tabs=()=>[...document.querySelectorAll('nav [data-view]')];
   // #1025: 탭을 바꿀 때마다 주소를 갱신한다(새로고침·공유로 같은 보기를 연다).
-  function selectTab(which,{writeHash=true}={}){
+  function selectTab(which,{syncHash=true}={}){
    currentTab=which;
    const momentsOn=which==='moments';
    if(treeTab){treeTab.setAttribute('aria-selected',String(!momentsOn));treeTab.tabIndex=momentsOn?-1:0;}
@@ -356,7 +443,9 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
    if(treePanel)treePanel.hidden=momentsOn;
    if(momentsPanel)momentsPanel.hidden=!momentsOn;
    if(moments)momentsOn?moments.activate():moments.deactivate();
-   if(writeHash&&hashNow()!==(momentsOn?'#explore/moments':'#explore'))writeHash(momentsOn?'#explore/moments':'#explore');
+   topRow.classList.toggle('is-moments',momentsOn);
+   if(momentsOn)closeSort();
+   if(syncHash&&hashNow()!==(momentsOn?'#explore/moments':'#explore'))writeHash(momentsOn?'#explore/moments':'#explore');
   }
   treeTab?.addEventListener('click',()=>selectTab('trees'));
   momentsTab?.addEventListener('click',()=>selectTab('moments'));
@@ -364,19 +453,20 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
    if(dialog.open)return;
    dialog.showModal();button.setAttribute('aria-current','true');
    for(const t of tabs()){if(t.getAttribute('aria-current')==='true'){t.dataset.wasCurrent='1';t.setAttribute('aria-current','false');}}
-   const wantMoments=ENTER_MOMENTS||hashNow()==='#explore/moments';
-   selectTab(wantMoments?'moments':'trees',{writeHash:false});
-   if(!wantMoments){load(false);loadPopularStages();}
+   const wantMoments=hashNow()==='#explore/moments';
+   selectTab(wantMoments?'moments':'trees',{syncHash:false});
+   // 카드 요청은 인기 무대와 동시에 시작하고, 카드 응답 뒤 첫 그리기만 무대 결과를 최대 300ms 기다린다.
+   if(!wantMoments){const settleStages=startPopularStages();void load(false,settleStages);}
   };
   if(typeof window!=='undefined'&&typeof window.addEventListener==='function')window.addEventListener('hashchange',()=>{
    if(hashGuard)return;
-   if(hashNow()==='#explore/moments'){openPanel();selectTab('moments',{writeHash:false});}
+   if(hashNow()==='#explore/moments'||hashNow()==='#explore'){openPanel();selectTab(hashNow()==='#explore/moments'?'moments':'trees',{syncHash:false});}
   });
  dialog.addEventListener('close',()=>{if(preview.open)preview.close();moments?.deactivate();button.setAttribute('aria-current','false');const emptyShown=!document.getElementById('empty')?.hidden;for(const t of tabs()){if(t.dataset.wasCurrent){delete t.dataset.wasCurrent;if(!emptyShown)t.setAttribute('aria-current','true');}}button.focus();
-  if(hashNow()==='#explore/moments'||hashNow()==='#explore')writeHash('');
+  if(!historyLayers.suspended('tree-preview')&&(hashNow()==='#explore/moments'||hashNow()==='#explore'))writeHash('');
  });
- preview.addEventListener('close',()=>[...list.querySelectorAll('.community-card')].find(node=>node.dataset.shareId===selectedId)?.focus());
- preview.addEventListener('click',event=>{if(event.target===preview)preview.close();});
+ preview.addEventListener('close',()=>{if(historyLayers.active('tree-preview'))historyLayers.dismiss('tree-preview');[...list.querySelectorAll('.community-card')].find(node=>node.dataset.shareId===selectedId)?.focus();});
+ preview.addEventListener('click',event=>{if(event.target===preview)historyLayers.dismiss('tree-preview');});
  // #784 자동완성(#784 ②): 검색칸 입력마다 화면에서만 돌린다(네트워크 왕복 없음).
  // 후보를 누르거나 Enter하면 그 그룹을 고른 것으로(칩 맨 앞 + 목록 거름) 동작한다.
  const chooseGroup=name=>{selectedArtist=name;renderGroups();load(false);hideSuggest();};
@@ -404,7 +494,15 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
   opts.forEach((opt,i)=>opt.setAttribute('aria-selected',String(i===suggestActive)));
   query.setAttribute('aria-activedescendant',`community-suggest-option-${suggestActive}`);
  };
- query.addEventListener('input',updateSuggest);
+ let searchTimer=null;
+ const scheduleSearch=()=>{
+  clearTimeout(searchTimer);
+  searchClear.hidden=!query.value;
+  searchTimer=setTimeout(()=>{load(false);},320);
+ };
+ searchClear.hidden=!query.value;
+ searchClear.onclick=()=>{clearTimeout(searchTimer);query.value='';hideSuggest();searchClear.hidden=true;load(false);query.focus();};
+ query.addEventListener('input',()=>{updateSuggest();scheduleSearch();});
  query.addEventListener('keydown',event=>{
   if(suggestions.hidden)return;
   if(event.key==='ArrowDown'){event.preventDefault();suggestMove(1);}
@@ -414,7 +512,7 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
  });
  query.setAttribute('aria-expanded','false');
  form.append(suggestions);
- form.onsubmit=event=>{event.preventDefault();hideSuggest();load(false);};more.onclick=()=>load(true);dialog.querySelector('[data-close="community-panel"]').onclick=()=>dialog.close();
+ form.onsubmit=event=>{event.preventDefault();clearTimeout(searchTimer);hideSuggest();load(false);};more.onclick=()=>load(true);dialog.querySelector('[data-close="community-panel"]').onclick=()=>dialog.close();
  // #784 그룹 찾기 창. 미리보기·둘러보기 판과 같은 <dialog showModal> 한 벌을 쓴다.
  const findDialog=el('dialog','community-group-find');findDialog.id='community-group-find';
  const findHead=el('div','community-group-find-head'),findClose=el('button','community-group-find-close','×');
@@ -440,7 +538,7 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
     const opt=el('button','community-group-find-option',`${g.group}  ·  공개 트리 ${g.count??0}`);
     opt.type='button';opt.setAttribute('role','option');opt.setAttribute('aria-selected','false');
     opt.dataset.groupName=g.group;
-    opt.onclick=()=>{chooseGroup(g.group);findDialog.close();};
+    opt.onclick=()=>{chooseGroup(g.group);historyLayers.dismiss('group-find');};
     findList.append(opt);
    }
   }
@@ -457,39 +555,57 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
   if(event.key==='ArrowDown'){event.preventDefault();findMove(1);}
   if(event.key==='ArrowUp'){event.preventDefault();findMove(-1);}
   if(event.key==='Enter'&&findActive>=0){event.preventDefault();findOptions()[findActive]?.click();}
-  if(event.key==='Escape'){event.preventDefault();findDialog.close();}
+  if(event.key==='Escape'){event.preventDefault();historyLayers.dismiss('group-find');}
  });
  // #784: 미리보기(#community-preview)처럼 찾기 창은 둘러보기 창 안에 둔다 —
  // 바깥에 뜨면 또 다른 modal dialog는 부모 modal을 닫아 버린다(Chromium). 미리보기와 같은 집 안에서 열린다.
  (dialog||document.body)?.appendChild?.(findDialog) ?? (() => { try { document.body?.appendChild?.(findDialog); } catch {} })();
  const findButton=el('button','community-group-find','그룹 찾기');findButton.type='button';
- findButton.onclick=()=>{renderFindList('');findQuery.value='';if(!findDialog.open)findDialog.showModal();findQuery.focus();};
+ findButton.onclick=()=>{renderFindList('');findQuery.value='';if(!findDialog.open){findDialog.showModal();historyLayers.open('group-find',()=>findDialog.close());}findQuery.focus();};
  // Esc 기본 동작(바깥 dialog 닫기 복원)을 막고 직접 닫아, 초점을 그룹 찾기 단추로 돌린다.
- findDialog.addEventListener('close',()=>{findButton.focus();});
- findClose.onclick=()=>findDialog.close();
+ findDialog.addEventListener('close',()=>{if(historyLayers.active('group-find'))historyLayers.dismiss('group-find');findButton.focus();});
+ findClose.onclick=()=>historyLayers.dismiss('group-find');
  const rail=dialog.querySelector('.community-group-rail');
- if(rail&&typeof rail.appendChild==='function')rail.appendChild(findButton);
+ findButton.hidden=true;dialog.append(findButton);
  // #792 ⑤: 둘러보기 제목 아래·검색칸 위에 '이번 주 인기 무대' 한 줄. 서버가 3표 미만을 빼고 내리므로
  // 화면도 같은 규칙으로 거른다(3 미만 숫자는 null과 함께 사라진다 — #824 결정 7).
  const popular=el('section','community-stages');popular.id='community-popular-stages';popular.setAttribute('aria-label',POPULAR_STAGE_TITLE);
  const popularList=el('div','community-stage-list');
  popular.append(el('h3','community-stages-title',POPULAR_STAGE_TITLE),popularList);
- if(typeof form.before==='function')form.before(popular);else dialog.append(popular);
+ if(rail&&typeof rail.before==='function')rail.before(popular);else treePanel.append(popular);
+ const skeleton=el('div','community-stages-skeleton');skeleton.setAttribute('aria-hidden','true');
  const renderPopularStages=rows=>{
   const shown=(Array.isArray(rows)?rows:[]).filter(stage=>stage&&stage.stageId&&publicStageCount(stage.weeklyVoters)!==null);
   popularList.replaceChildren();
-  if(!shown.length){popularList.append(el('p','community-stages-empty',POPULAR_STAGE_EMPTY));return;}
+  // 빈 응답이면 뼈대와 제목을 통째로 접어 빈칸을 남기지 않는다.
+  if(!shown.length){popular.hidden=true;popularList.replaceChildren();return;}
+  popular.hidden=false;
   for(const stage of shown){
    const row=el('span','community-stage');row.dataset.stageId=stage.stageId;
    row.append(el('span','community-stage-title',stageMomentTitle(stage)),el('span','community-stage-count',`${POPULAR_STAGE_WEEK_LABEL} ${publicStageCount(stage.weeklyVoters)}`));
    popularList.append(row);
   }
  };
- async function loadPopularStages(){
-  const answer=await api.popularStages();
-  renderPopularStages(answer?.ok?answer.items:[]);
+ function startPopularStages(){
+  // 인기 무대 요청은 카드와 동시에 시작한다. 두 응답은 보통 비슷하게 온다(운영 측정 중앙값 각각 약 0.8초, #1343).
+  // 카드 응답이 온 뒤 300ms 안에 무대가 오면 함께 그리고, 그보다 늦은 결과는 카드 위치를 밀지 않도록 버린다.
+  // 카드보다 먼저 온 무대 결과는 바로 그린다(카드가 아직 없으니 밀림이 없다).
+  // 300ms 안에 무대가 오지 않으면 뼈대 줄을 먼저 접어 둔다(불러오는 중 안내가 늦게 크게 밀리지 않게).
+  const stage={done:false,late:false};
+  const early=setTimeout(()=>{if(!stage.done)renderPopularStages([]);},300);
+  const request=Promise.resolve().then(()=>api.popularStages()).catch(()=>null).then(answer=>{
+   if(stage.late)return;
+   stage.done=true;clearTimeout(early);renderPopularStages(answer?.ok?answer.items:[]);
+  });
+  return async()=>{
+   if(stage.done)return;
+   let timer;
+   await Promise.race([request,new Promise(resolve=>{timer=setTimeout(resolve,300);})]);
+   clearTimeout(timer);
+   if(!stage.done){stage.late=true;clearTimeout(early);renderPopularStages([]);}
+  };
  }
- popularList.append(el('p','community-stages-empty',POPULAR_STAGE_EMPTY));
+ popularList.append(skeleton); // 불러오는 동안만 자리를 고정하는 뼈대
  button.onclick=openPanel;
  button.hidden=false;
  // 직접 들어온 주소와 연결 전에 접기 메뉴에서 고른 주소를 같은 길로 연다.

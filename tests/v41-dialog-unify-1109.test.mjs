@@ -1,7 +1,8 @@
 // #1109: 정리 창과 순간 목록 창의 닫기 단추·뒤 덮개·390 크기를 같게, 정리 창 아래 단추는 스크롤 끝에서 보이게.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync } from 'node:fs';
+import { existsSync, mkdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { serve } from './helpers/screen-audit.mjs';
 import { createTree, addMoment } from '../public/v41/domain.mjs';
 
@@ -292,22 +293,90 @@ test('#1109 회원 기록 확인 중과 읽기 실패에도 빈 화면 탐색을
      assert.equal(await page.locator('#account-avatar').isHidden(),true,'확인 전 계정 표시 없음');
      if(width===390)await page.locator('#header-overflow button').filter({hasText:/^서재$/}).click();
      else await page.locator('#tree-views button[data-view="track32-bookshelf.html"]').click();
-     assert.equal(await page.locator('#empty h1').textContent(),'아직 책장이 비어 있어요.');
+     assert.equal(await page.locator('#empty h1').textContent(),'로그인하면 내 서재가 보여요','인증 확인 중에는 개인 기록을 미리 공개하지 않는다');
      release();
     }
     await page.waitForFunction(wanted=>document.body.dataset.recordSource==='server'&&document.body.dataset.member===wanted,['empty','delayed'].includes(state)?'in':'out');
     if(state==='login'){
-     assert.equal(await page.locator('#tree-views').evaluate(e=>e.hidden),true,'인증 실패가 확정되면 회원 탭을 숨긴다');
+     assert.equal(await page.locator('#tree-views').evaluate(e=>e.hidden),false,'인증 실패 후에도 화면 탐색 탭은 유지한다(#1231)');
      continue;
     }
     await check('응답 후');
     if(state==='delayed'||state==='offline'){
      assert.equal(new URL(page.url()).hash,'#shelf','먼저 고른 서재 주소 유지');
-     assert.equal(await page.locator('#empty h1').textContent(),'아직 책장이 비어 있어요.');
-     assert.equal(await page.locator('#empty-records').textContent(),'＋ 새 트리');
+     assert.equal(await page.locator('#empty h1').textContent(),state==='offline'?'로그인하면 내 서재가 보여요':'아직 책장이 비어 있어요.');
+     assert.equal(await page.locator('#empty-records').textContent(),state==='offline'?'로그인':'＋ 새 트리');
     }
     if(state==='offline')assert.equal(await page.locator('#account-avatar').isHidden(),true,'읽기 실패를 로그인 성공으로 보지 않는다');
    } finally {release();await ctx.close();}
   }
  } finally {await browser.close();await new Promise(resolve=>server.close(resolve));}
+});
+
+
+test('#1231 로그아웃 서재·책·보드·지도 빈 상태와 화면별 로그인 복귀(1440·390)', { skip: skip || undefined, timeout: 180000 }, async () => {
+ const server=await serve(),base=`http://127.0.0.1:${server.address().port}`;
+ const browser=await chromium.launch({headless:true});
+ const cases=[
+  ['서재','track32-bookshelf.html','shelf'],
+  ['트리','track61-tree.html','tree'],
+  ['책','track59-sketchbook.html','book'],
+  ['보드','track58-pinboard.html','board'],
+  ['지도','track56-network.html','network']
+ ];
+ const dest=process.env.LT_1231_CAPTURE_DIR;
+ if(dest)mkdirSync(dest,{recursive:true});
+ try {
+  for(const [width,height] of [[1440,900],[390,844]]){
+   const ctx=await browser.newContext({viewport:{width,height},reducedMotion:'reduce'});
+   try {
+    await ctx.addInitScript(()=>localStorage.setItem('lt41.theme','night'));
+    await ctx.route('**/api/**',r=>r.fulfill({status:401,json:{ok:false,code:'unauthenticated'}}));
+    await ctx.route('**/auth/login?**',r=>r.fulfill({status:200,contentType:'text/html',body:'<!doctype html><title>로그인 확인</title>'}));
+    const page=await ctx.newPage();
+    const errors=[];page.on('pageerror',e=>errors.push(e.message));
+    await page.goto(`${base}/v41/#home`,{waitUntil:'load'});
+    // 인증 표시가 먼저 확정되어도 비동기 예시 트리는 뒤늦게 화면을 다시 그릴 수 있다.
+    // 예시 데이터까지 준비된 로그아웃 상태에서 탭을 누른다(#1109는 인증 확인 중 탭 유지도 별도로 검사).
+    await page.waitForFunction(()=>document.documentElement.dataset.ltAuthPhase==='ready'&&document.documentElement.dataset.ltAuthHint==='out'&&document.body.dataset.member==='out'&&document.body.dataset.recordSource==='example'&&window.LT41?.source==='example'&&document.querySelector('#tree-views')?.hidden===false);
+    const initial=await page.evaluate(()=>({member:document.body.dataset.member,views:[...document.querySelectorAll('#tree-views button[data-view]')].map(b=>b.textContent.trim()),header:document.querySelector('.app-header').getBoundingClientRect().height}));
+    assert.equal(initial.member,'out',`${width}: 로그아웃`);
+    assert.deepEqual(initial.views,['서재','트리','보드','책','지도'],`${width}: 다섯 탭 그대로 유지`);
+    if(width===390)assert.ok(initial.header<=62,`${width}: 기존 모바일 한 줄 높이`);
+    else assert.ok(initial.header>=56,`${width}: 데스크톱 머리줄 높이 유지`);
+    if(dest)await page.locator('.app-header').screenshot({path:join(dest,`guest-header-${width}.png`),animations:'disabled'});
+    for(const [name,file,key] of cases){
+     if(width===390){
+      await page.locator('#mobile-more').click();
+      await page.locator('#header-overflow [role=menuitem]').filter({hasText:new RegExp(`^${name}$`)}).click();
+     }else await page.locator(`#tree-views [data-view="${file}"]`).click();
+     const expected=`로그인하면 내 ${name}${name==='책'?'이':'가'} 보여요`;
+     await page.waitForFunction(title=>document.querySelector('#empty h1')?.textContent===title,expected).catch(async error=>{
+       const state=await page.evaluate(()=>({hash:location.hash,title:document.querySelector('#empty h1')?.textContent,emptyHidden:document.getElementById('empty')?.hidden,guest:document.getElementById('empty')?.dataset.emptyGuest,member:document.body.dataset.member,source:document.body.dataset.recordSource,auth:document.documentElement.dataset.ltAuthPhase,frame:document.getElementById('view')?.getAttribute('src'),current:[...document.querySelectorAll('[data-view][aria-current=true]')].map(x=>x.textContent)}));
+       throw new Error(`${width}/${name}: ${error.message} — ${JSON.stringify(state)}`);
+     });
+     const state=await page.evaluate(()=>({hash:location.hash,home:document.body.classList.contains('home-screen'),visible:!document.getElementById('empty').hidden,guest:document.getElementById('empty').dataset.emptyGuest,button:document.getElementById('empty-records').textContent.trim(),loginVisible:!!document.querySelector('#account-entry')?.getClientRects().length,tabHidden:document.getElementById('tree-views').hidden,current:[...document.querySelectorAll('#tree-views button[data-view]')].filter(b=>b.getAttribute('aria-current')==='true').map(b=>b.textContent.trim())}));
+     assert.equal(state.hash,'#'+key,`${width}/${name}: 화면 주소 유지`);
+     assert.equal(state.home,false,`${width}/${name}: 첫 화면으로 되돌아가지 않음`);
+     assert.equal(state.visible,true,`${width}/${name}: 빈 상태 표시`);
+     assert.equal(state.guest,'1');
+     assert.equal(state.button,'로그인');
+     assert.equal(state.loginVisible,true);
+     assert.equal(state.tabHidden,false);
+     assert.deepEqual(state.current,[name],`${width}/${name}: 현재 탭`);
+     if(dest&&key==='shelf')await page.screenshot({path:join(dest,`guest-shelf-${width}.png`),animations:'disabled',fullPage:true});
+    }
+    if(width===390){
+     await page.locator('#mobile-more').click();
+     await page.locator('#header-overflow [role=menuitem]').filter({hasText:/^서재$/}).click();
+    }else await page.locator('#tree-views [data-view="track32-bookshelf.html"]').click();
+    await page.locator('#empty-records').click();
+    await page.waitForURL('**/auth/login?*');
+    const login=new URL(page.url());
+    assert.equal(login.pathname,'/auth/login');
+    assert.equal(login.searchParams.get('next'),'/v41/#shelf',`${width}: 로그인하면 서재 복귀`);
+    assert.deepEqual(errors,[],`${width}: 페이지 예외 없음`);
+   }finally{await ctx.close()}
+  }
+ }finally{await browser.close();await new Promise(resolve=>server.close(resolve))}
 });

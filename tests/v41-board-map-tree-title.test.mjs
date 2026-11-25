@@ -68,95 +68,35 @@ async function openHost(browser, url) {
     if (!frame) await page.waitForTimeout(250);
   }
   assert.ok(frame, '보드 프레임이 열린다');
-  await frame.waitForSelector('#treeTitleBtn', { timeout: 20000 });
+  await frame.waitForSelector('.lt-screen-toolbar .lt-toolbar-title', { timeout: 20000 });
   await page.waitForTimeout(400);
   return { context, page, frame, problems };
 }
 
-test('#417 화면: 제목 ▾는 셸 목록을 정리 전 트리부터 보여 주고, 행을 누르면 같은 보기로 열어 달라 한다', { skip: REQUIRE ? false : skip, timeout: 240000 }, async (t) => {
-  const browser = await chromium.launch();
-  const server = await serve({ '/host.html': hostHTML({ source: 'server', writable: true, trees: TREES, treeId: 't1' }) });
-  const { context, page, frame, problems } = await openHost(browser, `http://127.0.0.1:${server.address().port}/host.html`);
-  t.after(async () => { await context.close().catch(() => {}); await browser.close(); server.close(); });
-  assert.deepEqual(problems, [], '화면 오류 없음: ' + problems.join(' | '));
-
-  // 머리 줄: 지금 트리 제목과 ▾ — ← 서재는 공통 도구 줄 개편으로 없다.
-  const head = await frame.evaluate(() => ({
-    back: !!document.getElementById('shelfBackBtn') && document.getElementById('shelfBackBtn').hidden === false,
-    title: document.getElementById('treeTitleText')?.textContent.trim(),
-    caretHidden: document.querySelector('.tree-title-caret')?.hidden === true,
-    menuHidden: document.getElementById('treeMenuPanel').hidden
-  }));
-  assert.equal(head.back, false, '← 서재 단추가 없다');
-  assert.equal(head.title, '지금 보는 트리', `제목은 지금 트리(${head.title})`);
-  assert.equal(head.caretHidden, false, '▾ 표시가 보인다');
-  assert.equal(head.menuHidden, true, '목록은 처음에 닫혀 있다');
-
-  // 단추를 누르면 목록이 열리고, 행 순서는 셸과 같다(정리 전이 먼저).
-  await frame.click('#treeTitleBtn');
-  await frame.waitForSelector('#treeMenuPanel:not([hidden])', { timeout: 5000 });
-  const menu = await frame.evaluate(() => {
-    const rows = [...document.querySelectorAll('#treeMenuPanel .tree-item')];
-    return {
-      expanded: document.getElementById('treeTitleBtn').getAttribute('aria-expanded'),
-      role: document.getElementById('treeMenuPanel').getAttribute('role'),
-      ids: rows.map((r) => r.dataset.treeId),
-      checked: rows.filter((r) => r.getAttribute('aria-checked') === 'true').map((r) => r.dataset.treeId),
-      counts: rows.map((r) => r.querySelector('.tree-count')?.textContent.trim()),
-      focusedRow: document.activeElement?.dataset?.treeId || null
-    };
+// #1249: 트리 선택은 셸의 공통 메뉴로 통합되었다. 메뉴의 키보드/선택 동작은
+// v41-topmenu-885.test.mjs에서 검증하고, 보드에서는 중복 메뉴가 없는지 확인한다.
+for (const [source, writable] of [['server', true], ['share', false]]) {
+  test(`#417 #1249 보드 공통 줄: ${source} 트리 이름 한 번 표시, 이전 선택 메뉴 숨김`, { skip: REQUIRE ? false : skip, timeout: 240000 }, async (t) => {
+    const browser = await chromium.launch();
+    const server = await serve({ '/host.html': hostHTML({ source, writable, trees: TREES, treeId: 't1' }) });
+    t.after(async () => { await browser.close(); server.close(); });
+    const { context, page, frame, problems } = await openHost(browser, `http://127.0.0.1:${server.address().port}/host.html`);
+    assert.deepEqual(problems, [], '화면 오류 없음: ' + problems.join(' | '));
+    await frame.waitForFunction(title => document.querySelector('.lt-toolbar-title')?.textContent.trim() === title, TREES[0].title);
+    const head = await frame.evaluate(title => {
+      const visible = el => !!el && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
+      const names = [...document.querySelectorAll('*')].filter(el => el.children.length === 0 && el.textContent.trim() === title && visible(el));
+      return {
+        title: document.querySelector('.lt-toolbar-title').textContent.trim(),
+        names: names.length,
+        oldButton: visible(document.getElementById('treeTitleBtn')),
+        oldMenu: visible(document.getElementById('treeMenuPanel'))
+      };
+    }, TREES[0].title);
+    assert.deepEqual(head, { title: TREES[0].title, names: 1, oldButton: false, oldMenu: false });
+    await frame.click('.lt-toolbar-title');
+    assert.equal(await frame.locator('#treeMenuPanel').isVisible(), false);
+    assert.deepEqual(await page.evaluate(() => window.__msgs.filter(m => m.type === 'lt41-open-view')), []);
+    await context.close();
   });
-  assert.equal(menu.expanded, 'true', '열림 상태를 단추에 남긴다');
-  assert.equal(menu.role, 'menu', '목록은 메뉴로 알린다');
-  assert.deepEqual(menu.ids, ['t2', 't1', 't3'], '정리 전 트리가 먼저 온다');
-  assert.deepEqual(menu.checked, ['t1'], '지금 트리 하나만 체크된다');
-  assert.deepEqual(menu.counts, ['정리 전 1', '2개의 순간', '1개의 순간'], '개수 문구는 셸과 같다');
-  assert.equal(menu.focusedRow, 't2', '열면 첫 행에 초점이 간다');
-
-  // 위아래 이동·Esc 닫기(단추로 초점 복귀) — 책(#416)과 같은 규칙.
-  await page.keyboard.press('ArrowDown');
-  await frame.waitForTimeout(120);
-  assert.equal(await frame.evaluate(() => document.activeElement?.dataset?.treeId), 't1', '아래로 가면 다음 행');
-  await page.keyboard.press('ArrowUp');
-  await frame.waitForTimeout(120);
-  assert.equal(await frame.evaluate(() => document.activeElement?.dataset?.treeId), 't2', '위로 가면 앞 행');
-  await page.keyboard.press('Escape');
-  await frame.waitForTimeout(200);
-  const closed = await frame.evaluate(() => ({ hidden: document.getElementById('treeMenuPanel').hidden, expanded: document.getElementById('treeTitleBtn').getAttribute('aria-expanded'), focused: document.activeElement?.id }));
-  assert.equal(closed.hidden, true, 'Esc 로 닫는다');
-  assert.equal(closed.expanded, 'false', '닫힘을 단추에 알린다');
-  assert.equal(closed.focused, 'treeTitleBtn', 'Esc 뒤 초점은 단추로 돌아온다');
-
-  // 바깥을 누르면 닫힌다.
-  await frame.click('#treeTitleBtn');
-  await frame.waitForSelector('#treeMenuPanel:not([hidden])', { timeout: 5000 });
-  await page.mouse.click(720, 700);
-  await frame.waitForTimeout(250);
-  assert.equal(await frame.evaluate(() => document.getElementById('treeMenuPanel').hidden), true, '바깥을 누르면 닫힌다');
-
-  // 다른 트리를 누르면 셸에 같은 보기로 열어 달라고 한다(보드가 스스로 화면을 바꾸지 않는다).
-  await frame.click('#treeTitleBtn');
-  await frame.waitForSelector('#treeMenuPanel:not([hidden])', { timeout: 5000 });
-  await frame.click('#treeMenuPanel .tree-item[data-tree-id="t3"]');
-  await page.waitForTimeout(300);
-  const msgs = await page.evaluate(() => window.__msgs);
-  assert.deepEqual(msgs.at(-1), { type: 'lt41-open-view', treeId: 't3', view: 'board' }, '행을 누르면 lt41-open-view로 같은 보기를 연다');
-});
-
-test('#417 화면: 공유·예시(읽기 전용)에서는 ▾와 ← 서재를 숨기고 목록을 열지 않는다', { skip: REQUIRE ? false : skip, timeout: 240000 }, async (t) => {
-  const browser = await chromium.launch();
-  const server = await serve({ '/host.html': hostHTML({ source: 'share', writable: false, trees: TREES, treeId: 't1' }) });
-  const { context, page, frame, problems } = await openHost(browser, `http://127.0.0.1:${server.address().port}/host.html`);
-  t.after(async () => { await context.close().catch(() => {}); await browser.close(); server.close(); });
-  assert.deepEqual(problems, [], '화면 오류 없음: ' + problems.join(' | '));
-  const ro = await frame.evaluate(() => ({
-    caret: document.querySelector('.tree-title-caret')?.hidden === true,
-    back: !document.getElementById('shelfBackBtn')
-  }));
-  assert.equal(ro.caret, true, '읽기 전용에서는 ▾를 숨긴다');
-  assert.equal(ro.back, true, '← 서재 단추가 없다');
-  await frame.click('#treeTitleBtn');
-  await page.waitForTimeout(300);
-  assert.equal(await frame.evaluate(() => document.getElementById('treeMenuPanel').hidden), true, '읽기 전용에서는 목록을 열지 않는다');
-  assert.deepEqual(await page.evaluate(() => window.__msgs), [], '셸로 보내는 메시지가 없다');
-});
+}

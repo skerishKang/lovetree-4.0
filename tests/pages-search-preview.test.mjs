@@ -279,3 +279,24 @@ test('검색을 열기 전에는 개발·운영 주소 문서 모두 X-Robots-Ta
   assert.equal(await devV41.text(), '<html>app</html>');
   assert.equal(devV41.headers.get('x-robots-tag'), 'noindex');
 });
+
+test('#1250: 사이트맵·공유 미리보기가 서버를 직접 부를 때도 출처 확인 머리말을 붙인다', async () => {
+  const proof = 'p'.repeat(48);
+  const seen = [];
+  const fetcher = async (url, init) => {
+    seen.push({ url: String(url), proof: init?.headers?.['x-lovetree-proxy-proof'] ?? null });
+    return String(url).includes('/api/community/shares') ? jsonReply({ items: [], nextCursor: null }) : jsonReply(READ);
+  };
+  const env = { ...ENV, LOVETREE_PROXY_SECRET: ` ${proof} ` };
+  const sitemap = createSitemap({ fetcher, searchOpen: true });
+  assert.equal((await sitemap({ request: new Request(`${PROD}/sitemap.xml`), env })).status, 200);
+  const preview = createTreePreview({ fetcher });
+  await preview({ request: new Request(`${DEV}/t/${SHARE_ID}`, { headers: { 'user-agent': 'facebookexternalhit/1.1' } }), env });
+  assert.ok(seen.length >= 2, '두 경로 모두 서버를 불렀다');
+  for (const call of seen) assert.equal(call.proof, proof, `${call.url}에 앞뒤 공백을 뺀 머리말이 붙는다`);
+  // 비밀값이 없으면 머리말을 붙이지 않는다(빈 머리말로 서버를 헷갈리게 하지 않는다).
+  seen.length = 0;
+  await createSitemap({ fetcher, searchOpen: true })({ request: new Request(`${PROD}/sitemap.xml`), env: ENV });
+  assert.ok(seen.length >= 1);
+  for (const call of seen) assert.equal(call.proof, null);
+});

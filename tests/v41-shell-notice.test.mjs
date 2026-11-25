@@ -144,14 +144,15 @@ function tree952(n, momentCount = 1) {
   return t;
 }
 
-test('952 실행: 부팅이 끝나면 synced 안내가 토스트에 뜬다(기록 있음·없음)', { skip: skip952n || undefined }, async () => {
+// #1320: '불러왔어요' 안내는 없애고, 기록 0개 새 계정의 첫 순간 안내만 남긴다.
+test('952 실행: 부팅 뒤 첫 순간 안내는 기록 0개 계정에만 뜬다', { skip: skip952n || undefined }, async () => {
   const { serve } = await import('./helpers/screen-audit.mjs');
   const server = await serve({});
   const base = `http://127.0.0.1:${server.address().port}`;
   const browser = await chromium952n.launch();
   try {
     for (const [trees, expected] of [
-      [[tree952(1)], '내 기록을 불러왔어요.'],
+      [[tree952(1)], null],
       [[], '반가워요. 첫 순간을 남겨 보세요.']
     ]) {
       const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
@@ -174,16 +175,27 @@ test('952 실행: 부팅이 끝나면 synced 안내가 토스트에 뜬다(기�
       try {
         await page.goto(`${base}/v41/?account=1`, { waitUntil: 'load' });
         // #1103: 안내는 차례로 온다 — 첫 트리 판·새 소식 띠를 닫으면 정보 안내가 그 자리에 뜬다.
-        if (!await page.evaluate(() => document.getElementById('tree-tips')?.hidden)) await page.click('#tree-tips-close');
-        await page.waitForFunction(() => {
-          const card = document.getElementById('updates-card'), toast = document.getElementById('toast');
-          return (card && !card.hidden) || (toast && !toast.hidden && toast.textContent.includes('불러왔어요'));
-        }, null, { timeout: 10000 });
-        if (!await page.evaluate(() => document.getElementById('updates-card')?.hidden)) await page.click('#updates-dismiss');
-        await page.waitForFunction((want) => {
-          const toast = document.getElementById('toast');
-          return !!toast && !toast.hidden && toast.textContent === want;
-        }, expected, { timeout: 20000 });
+        // 첫 트리 판·새 소식 띠는 부팅 뒤 늦게 나타날 수 있다. 한 번만 보고 지나가면, 늦게 뜬 판이 줄을 잡아
+        // 정보 안내가 5초 대기 규칙(#1103)으로 건너뛰어져 시험이 흔들렸다. 그래서 끝까지 지켜보며 나타나는 대로 닫는다.
+        // 판정은 그대로다: 20초 안에 기대한 문구의 토스트가 떠야 한다.
+        const deadline = Date.now() + (expected ? 20000 : 4000);
+        let seen = false;
+        while (Date.now() < deadline) {
+          const state = await page.evaluate((want) => {
+            const tips = document.getElementById('tree-tips'), card = document.getElementById('updates-card'), toast = document.getElementById('toast');
+            const shown = !!toast && !toast.hidden && toast.textContent;
+            return { tips: !!tips && !tips.hidden, card: !!card && !card.hidden, done: want ? shown === want : false };
+          }, expected);
+          if (state.done) { seen = true; break; }
+          if (state.tips) await page.click('#tree-tips-close').catch(() => {});
+          else if (state.card) await page.click('#updates-dismiss').catch(() => {});
+          await page.waitForTimeout(100);
+        }
+        if (expected) assert.ok(seen, `20초 안에 '${expected}' 안내가 토스트에 떠야 한다`);
+        else {
+          const trace = await page.evaluate(() => window.__noticeTrace);
+          assert.equal(trace.some(row => row[1][2] && row[1][2].includes('불러왔어요')), false, '기록이 있으면 불러왔어요 안내가 없다');
+        }
       } catch (error) {
         console.log('안내 변화', trees.length, JSON.stringify(await page.evaluate(() => window.__noticeTrace)));
         throw error;
@@ -208,7 +220,7 @@ test('#952: 늦은 새 소식·회원 응답에서도 부팅 완료 안내는 �
       { name: '조회 실패', trees: [], status: 503, delay: 600, cpu: 4 }
     ]) {
       const { name, trees, status, delay, cpu } = scenario;
-      const expected = trees.length ? '내 기록을 불러왔어요.' : '반가워요. 첫 순간을 남겨 보세요.';
+      const expected = trees.length ? null : '반가워요. 첫 순간을 남겨 보세요.';
       const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
       try {
         await ctx.addInitScript(() => {
@@ -246,20 +258,26 @@ test('#952: 늦은 새 소식·회원 응답에서도 부팅 완료 안내는 �
           await page.waitForFunction(id => !document.getElementById(id)?.hidden, id, { timeout: 10000 });
           await page.click(id === 'tree-tips' ? '#tree-tips-close' : '#updates-dismiss');
         }
-        if (status === 200) {
+        if (status === 200 && expected) {
           await page.waitForFunction(want => {
             const t = document.getElementById('toast');
             return !!t && !t.hidden && t.textContent === want;
           }, expected, { timeout: 20000 });
           // 같은 안내가 다시 나타나지 않으며 기존 표시 시간이 지나면 사라진다.
           await page.waitForFunction(() => document.getElementById('toast').hidden, null, { timeout: 10000 });
+        } else if (status === 200) {
+          await page.waitForTimeout(2000);
+          assert.equal(await page.evaluate(() => {
+            const t = document.getElementById('toast');
+            return !!t && !t.hidden && t.textContent.includes('불러왔어요');
+          }), false, name + ': 기록이 있으면 완료 안내가 없다');
         } else {
           await page.waitForFunction(() => document.body.dataset.member === 'out' && document.getElementById('account-avatar').hidden, null, { timeout: 10000 });
           if (status === 503) assert.equal(await page.evaluate(() => window.__bootNotices.some(t => t.includes('확인하지 못했어요'))), true, name);
         }
         const notices = await page.evaluate(() => window.__bootNotices);
         const count = notices.filter(text => ['내 기록을 불러왔어요.', '반가워요. 첫 순간을 남겨 보세요.'].includes(text)).length;
-        assert.equal(count, status === 200 ? 1 : 0, name + ': ' + JSON.stringify(notices));
+        assert.equal(count, status === 200 && !trees.length ? 1 : 0, name + ': ' + JSON.stringify(notices));
         console.log(name, '완료 안내', count, '회');
       } finally { await ctx.close(); }
     }
@@ -283,7 +301,8 @@ test('#1076: 같은 열쇠 안내는 한 번만, 다른 안내는 그 뒤에도 
 
 /* #1076 화면: 첫 진입에서만 synced 안내가 뜨고, 책→지도→첫 화면 이동에서는 0번. 계정 메뉴를 열면 바로 숨는다.
    CI 셸 화면 잡(LT_SHELL_952_REQUIRE=1)에서 돈다 — 건너뜀=실패. */
-test('1076 실행: synced 안내는 첫 진입 1번, 화면 이동 0번, 계정 메뉴를 열면 숨는다', { skip: REQUIRE952N ? false : skip952n || undefined, timeout: 180000 }, async () => {
+// #1320: '불러왔어요'는 없애고 기록 0개 새 계정의 첫 순간 안내만 첫 진입에 한 번 뜬다.
+test('1076 실행: 첫 순간 안내는 첫 진입 1번, 화면 이동 0번, 계정 메뉴를 열면 숨는다', { skip: REQUIRE952N ? false : skip952n || undefined, timeout: 180000 }, async () => {
   if (skip952n) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip952n}`);
   const { serve } = await import('./helpers/screen-audit.mjs');
   const server = await serve({});
@@ -297,23 +316,30 @@ test('1076 실행: synced 안내는 첫 진입 1번, 화면 이동 0번, 계정 
       let wasVisible = false;
       setInterval(() => {
         const t = document.getElementById('toast');
-        const visible = !!t && !t.hidden && t.textContent.includes('불러왔어요');
+        const visible = !!t && !t.hidden && t.textContent.includes('반가워요');
         if (visible && !wasVisible) window.__toastShows += 1;
         wasVisible = visible;
       }, 20);
     });
     await ctx.route('**/api/**', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
-    await ctx.route('**/api/workspace*', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ revision: 1, state: { version: 1, trees: [tree952(1)] }, subject: '검사기계정', writeSubjectBound: true, savedAt: '2026-11-16T09:00:00.000Z' }) }));
+    await ctx.route('**/api/workspace*', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ revision: 1, state: { version: 1, trees: [] }, subject: '검사기계정', writeSubjectBound: true, savedAt: '2026-11-16T09:00:00.000Z' }) }));
     const page = await ctx.newPage();
     try {
       await page.goto(`${base}/v41/?account=1`, { waitUntil: 'load' });
-      if (!await page.evaluate(() => document.getElementById('tree-tips')?.hidden)) await page.click('#tree-tips-close');
-      await page.waitForFunction(() => {
-        const card = document.getElementById('updates-card'), toast = document.getElementById('toast');
-        return (card && !card.hidden) || (toast && !toast.hidden && toast.textContent.includes('불러왔어요'));
-      }, null, { timeout: 10000 });
-      if (!await page.evaluate(() => document.getElementById('updates-card')?.hidden)) await page.click('#updates-dismiss');
-      await page.waitForFunction(() => window.__toastShows === 1, null, { timeout: 20000 });
+      // 952 실행 시험과 같은 까닭: 첫 트리 판·새 소식 띠가 늦게 뜰 수 있어 한 번만 보고 닫으면 흔들린다.
+      // 나타나는 대로 닫으며 20초 안에 안내가 정확히 1번 뜨기를 기다린다. 판정(1번)은 그대로다.
+      const deadline = Date.now() + 20000;
+      while (Date.now() < deadline) {
+        const state = await page.evaluate(() => {
+          const tips = document.getElementById('tree-tips'), card = document.getElementById('updates-card');
+          return { tips: !!tips && !tips.hidden, card: !!card && !card.hidden, shows: window.__toastShows };
+        });
+        if (state.shows >= 1) break;
+        if (state.tips) await page.click('#tree-tips-close').catch(() => {});
+        else if (state.card) await page.click('#updates-dismiss').catch(() => {});
+        await page.waitForTimeout(100);
+      }
+      assert.equal(await page.evaluate(() => window.__toastShows), 1, '20초 안에 synced 안내가 정확히 1번 떠야 한다');
       for (const view of ['track59-sketchbook.html', 'track56-network.html']) {
         await page.evaluate((v) => document.querySelector(`button[data-view="${v}"]`)?.click(), view);
         await page.waitForTimeout(700);
@@ -326,6 +352,78 @@ test('1076 실행: synced 안내는 첫 진입 1번, 화면 이동 0번, 계정 
       await page.waitForTimeout(200);
       assert.equal(await page.evaluate(() => document.getElementById('toast').hidden), true, '계정 메뉴를 열면 안내가 바로 사라진다');
     } finally { await ctx.close(); }
+  } finally { await browser.close(); server.close(); }
+});
+
+// #1320: 열자마자 글자 안내 0개·로그인 글자 0번을 화면에서 직접 본다(CI 화면 잡 — 건너뜀=실패).
+const REQUIRE1320 = process.env.LT_SHELL_1320_REQUIRE === '1';
+test('1320 실행: 로그인·로그아웃 × 390·1440 × 첫 화면·둘러보기·서재에서 열자마자 글자 안내 0개', { skip: REQUIRE1320 ? false : skip952n || undefined, timeout: 300000 }, async () => {
+  if (skip952n) assert.fail(skip952n);
+  const { serve } = await import('./helpers/screen-audit.mjs');
+  const server = await serve({});
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium952n.launch();
+  try {
+    for (const width of [390, 1440]) for (const signed of [true, false]) for (const hash of ['#home', '#explore', '#my/shelf']) {
+      const ctx = await browser.newContext({ viewport: { width, height: width === 390 ? 844 : 900 } });
+      await ctx.addInitScript(() => {
+        window.__toastTexts = [];
+        const rec = () => { const t = document.getElementById('toast'); if (t && !t.hidden && t.textContent) window.__toastTexts.push(t.textContent); };
+        new MutationObserver(rec).observe(document, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden'] });
+      });
+      await ctx.route('**/api/**', route => route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
+      await ctx.route('**/api/workspace*', route => route.fulfill({ status: signed ? 200 : 401, contentType: 'application/json', body: JSON.stringify({ revision: 1, state: { version: 1, trees: [tree952(1)] }, subject: '검사기계정', writeSubjectBound: true }) }));
+      const page = await ctx.newPage();
+      try {
+        await page.goto(`${base}/v41/${signed ? '?account=1' : ''}${hash}`, { waitUntil: 'load' });
+        const firstLogin = await page.evaluate(() => {
+          const el = document.querySelector('.app-header #account-entry');
+          return !!el && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden' && (el.innerText || '').includes('로그인');
+        });
+        if (signed) assert.equal(firstLogin, false, `${width} ${hash}: 로그인 사용자의 첫 칠에 로그인 글자 0`);
+        await page.waitForTimeout(3000);
+        const texts = await page.evaluate(() => window.__toastTexts);
+        assert.equal(texts.filter(text => /불러오고 있어요|불러왔어요/.test(text)).length, 0, `${width} ${hash} signed=${signed}: 글자 안내 0 (${JSON.stringify(texts)})`);
+      } finally { await ctx.close(); }
+    }
+    // 기록 0개 새 계정은 첫 순간 안내가 한 번 남는다.
+    {
+      const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+      await ctx.route('**/api/**', route => route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
+      await ctx.route('**/api/workspace*', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ revision: 1, state: { version: 1, trees: [] }, subject: '검사기계정', writeSubjectBound: true }) }));
+      const page = await ctx.newPage();
+      try {
+        await page.goto(`${base}/v41/?account=1#home`, { waitUntil: 'load' });
+        const deadline = Date.now() + 20000;
+        let seen = false;
+        while (Date.now() < deadline) {
+          const state = await page.evaluate(() => {
+            const tips = document.getElementById('tree-tips'), card = document.getElementById('updates-card'), t = document.getElementById('toast');
+            return { tips: !!tips && !tips.hidden, card: !!card && !card.hidden, done: !!t && !t.hidden && t.textContent.includes('반가워요') };
+          });
+          if (state.done) { seen = true; break; }
+          if (state.card) await page.click('#updates-dismiss').catch(() => {});
+          else if (state.tips) await page.click('#tree-tips-close').catch(() => {});
+          await page.waitForTimeout(100);
+        }
+        assert.equal(seen, true, '기록 0개 새 계정은 첫 순간 안내가 한 번 뜬다');
+      } finally { await ctx.close(); }
+    }
+    // 오프라인 저장 실패 안내는 그대로 뜬다.
+    {
+      const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+      await ctx.addInitScript(() => {
+        window.__offlineNotices = [];
+        const rec = () => { const t = document.getElementById('toast'); if (t && !t.hidden && t.textContent) window.__offlineNotices.push(t.textContent); };
+        new MutationObserver(rec).observe(document, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden'] });
+      });
+      await ctx.route('**/api/workspace*', route => route.fulfill({ status: 503, contentType: 'application/json', body: '{}' }));
+      const page = await ctx.newPage();
+      try {
+        await page.goto(`${base}/v41/?account=1#home`, { waitUntil: 'load' });
+        await page.waitForFunction(() => (window.__offlineNotices || []).some(text => /확인하지 못했어요|불러오지 못했어요/.test(text)), null, { timeout: 20000 });
+      } finally { await ctx.close(); }
+    }
   } finally { await browser.close(); server.close(); }
 });
 

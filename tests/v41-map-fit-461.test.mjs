@@ -117,3 +117,15 @@ test('#461 이름표 자리: 우선순위대로, 서로·점과 겹치지 않게
     for (const o of obstacles) { const cx = Math.max(a.l, Math.min(o.x, a.r)), cy = Math.max(a.t, Math.min(o.y, a.b)); assert.ok(Math.hypot(o.x - cx, o.y - cy) >= o.r, `${out[i].id}가 점 ${o.id}을 덮음`); }
   }
 });
+
+
+test('#1259 시작 순간 이름표는 선분과 교차하지 않는 방향에 놓인다', () => {
+ const bounds={x:0,y:0,w:500,h:350};
+ const c={id:'first',text:'여기서 시작 · 긴 제목',x:200,y:150,r:20,w:180,h:16,dir:{x:1,y:0},avoidEdges:true};
+ const segments=[{a:{x:200,y:150},b:{x:450,y:160},pad:3}];
+ const plain=M.placeLabels([c],[],bounds);
+ assert.ok(plain[0].rect.l>200,'기존 우선 방향은 오른쪽');
+ const out=M.placeLabels([c],[],bounds,{segments});
+ assert.equal(out.length,1,'시작 제목을 유지한다');
+ assert.ok(out[0].rect.r<200||out[0].rect.b<147||out[0].rect.t>163,'교차하지 않는 방향');
+});

@@ -95,12 +95,9 @@ async function close1010({ server, ctx }) {
   await new Promise(r => server.close(r));
 }
 
-const noteState = (frame) => frame.locator('.center-note').evaluate(el => ({
-  text: el.textContent,
-  hidden: getComputedStyle(el).display === 'none',
-  dataOff: el.hasAttribute('data-off'),
-  hint: el.querySelector('.center-hint')?.textContent || ''
-}));
+// #1204(대표 결정 11-23): 첫 화면 단추 아래의 안내 문장(감상 예시·테두리 카드·드래그 힌트)을 모든 상태에서 없앴다.
+// 아래 네 시험은 상태마다 안내 줄이 다시 생기지 않는지 확인한다.
+const noteCount = (frame) => frame.locator('.center-note,.center-hint').count();
 
 test('#1010 기존 사용자(예시만 궤도) 안내 줄 — 금테를 빼고 떠다니는 카드를 가리킨다(1440, 카드가 보일 때)', { skip: REQUIRE1010 ? false : skip1010, timeout: 180000 }, async () => {
   if (skip1010) assert.fail(skip1010);
@@ -108,28 +105,22 @@ test('#1010 기존 사용자(예시만 궤도) 안내 줄 — 금테를 빼고 �
   try {
     const h = await boot1010(browser, { width: 1440 });
     try {
-      const note = await noteState(h.frame);
-      assert.ok(!note.hidden, '카드가 보이는 화면에서는 안내 줄도 보인다');
-      assert.match(note.text, /뒤에 떠다니는 카드는 감상 예시예요/, '안내 줄이 떠다니는 예시 카드를 가리킨다: ' + note.text);
-      assert.equal(note.hint, '눌러서 감상', '힌트는 누름을 안내한다: ' + note.hint);
-      assert.doesNotMatch(note.text, /금테/, '안내 줄에 금테가 없다(마지막 순간 카드와 헷갈리지 않게): ' + note.text);
-      assert.ok(note.text.includes('·'), '안내 줄에 가름점(·)이 그려진다 — 문구와 힌트 사이: ' + note.text);
+      assert.equal(await noteCount(h.frame), 0, '기존 사용자 1440 첫 화면에 단추 아래 안내 줄이 없다(#1204)');
       const visibleCards = await h.frame.locator('.card').evaluateAll(es => es.filter(e => !e.classList.contains('off')).length);
       assert.ok(visibleCards > 0, `떠다니는 예시 카드가 실제로 보인다(보이는 카드 ${visibleCards}장)`);
     } finally { await close1010(h); }
   } finally { await browser.close(); }
 });
 
-test('#1010 기존 사용자 390 — 떠다니는 예시 카드가 숨으면 안내 줄도 숨긴다', { skip: REQUIRE1010 ? false : skip1010, timeout: 180000 }, async () => {
+test('#1010 기존 사용자 390 — 떠다니는 예시 카드 대신 8장 리본을 유지한다', { skip: REQUIRE1010 ? false : skip1010, timeout: 180000 }, async () => {
   if (skip1010) assert.fail(skip1010);
   const browser = await chromium1010.launch({ headless: true });
   try {
     const h = await boot1010(browser, { width: 390 });
     try {
-      const note = await noteState(h.frame);
-      assert.ok(note.hidden && note.dataOff, '카드가 숨은 좁은 화면에서는 안내 줄도 숨는다: ' + JSON.stringify(note));
+      assert.equal(await noteCount(h.frame), 0, '기존 사용자 390 첫 화면에 안내 줄이 없다(#1204)');
       const visibleCards = await h.frame.locator('.card').evaluateAll(es => es.filter(e => !e.classList.contains('off')).length);
-      assert.equal(visibleCards, 0, '이 화면(390·로그인 예시)에서는 궤도 카드가 보이지 않는다(#780 후속): ' + visibleCards);
+      assert.equal(visibleCards, 8, '이 화면(390·로그인 예시)에서는 8장 리본을 유지한다: ' + visibleCards);
     } finally { await close1010(h); }
   } finally { await browser.close(); }
 });
@@ -140,9 +131,7 @@ test('#1010 신규 사용자(로그아웃 예시) 안내 줄은 그대로다', {
   try {
     const h = await boot1010(browser, { member: false });
     try {
-      const note = await noteState(h.frame);
-      assert.match(note.text, /감상 예시 · 내 기록에는 저장되지 않아요/, '신규 사용자 안내 줄 문구를 바꾸지 않는다: ' + note.text);
-      assert.equal(note.hint, '드래그 · 금테 카드를 눌러 감상', '신규 사용자 힌트도 그대로다: ' + note.hint);
+      assert.equal(await noteCount(h.frame), 0, '로그아웃 첫 화면에도 안내 줄이 없다(#1204)');
     } finally { await close1010(h); }
   } finally { await browser.close(); }
 });
@@ -153,9 +142,7 @@ test('#1010 섞어서(내 카드가 있는) 기존 사용자의 안내 줄은 �
   try {
     const h = await boot1010(browser, { mix: true });
     try {
-      const note = await noteState(h.frame);
-      assert.match(note.text, /테두리가 있는 카드는 내가 남긴 순간이에요/, '섞어서 안내는 이번에 바꾸지 않는다: ' + note.text);
-      assert.doesNotMatch(note.text, /감상 예시/, '섞어서 화면에 예시 안내 줄이 덧씌워지지 않는다: ' + note.text);
+      assert.equal(await noteCount(h.frame), 0, '섞어서(내 카드가 있는) 첫 화면에도 안내 줄이 없다(#1204)');
     } finally { await close1010(h); }
   } finally { await browser.close(); }
 });
@@ -189,7 +176,7 @@ test('#1010 떠 있는 카드를 누르면 그 자리에서 크게 보고 책 �
   } finally { await browser.close(); }
 });
 
-test('#1010 숫자 두 줄 — 순간 N / 모아둔 M이 겹치지 않고 각자 눌린다(#1087)', { skip: REQUIRE1010 ? false : skip1010, timeout: 180000 }, async () => {
+test('#1010 숫자 두 줄 — 순간 N / 정리 전 M이 겹치지 않고 각자 눌린다(#1087)', { skip: REQUIRE1010 ? false : skip1010, timeout: 180000 }, async () => {
   if (skip1010) assert.fail(skip1010);
   const browser = await chromium1010.launch({ headless: true });
   try {
@@ -205,14 +192,15 @@ test('#1010 숫자 두 줄 — 순간 N / 모아둔 M이 겹치지 않고 각자
       });
       assert.equal(line.text.length, 2, '숫자는 두 줄: ' + JSON.stringify(line));
       assert.match(line.text[0], /^순간 \d+$/, '첫 줄 ' + line.text[0]);
-      assert.match(line.text[1], /^모아둔 \d+$/, '둘 줄 ' + line.text[1]);
+      assert.match(line.text[1], /^정리 전 \d+$/, '둘 줄 ' + line.text[1]);
       assert.deepEqual(line.buttons, [true, true], '두 숫자 모두 단추다');
       assert.ok(line.gap >= 0, '두 줄이 겹치지 않는다: ' + JSON.stringify(line));
     } finally { await close1010(h); }
   } finally { await browser.close(); }
 });
 
-test('#1010 390 바닥 링크 — 넷 모두 보이고 줄바꿈으로 왼쪽 아래에, ＋ 단추와 겹치지 않는다', { skip: REQUIRE1010 ? false : skip1010, timeout: 180000 }, async () => {
+// #1284 대표 결정(PR #1300): 링크는 숫자판 아래 본문 흐름에 놓는다. 1~2줄(높이 66px 이하)을 허용하며 #535의 카드 9장을 유지한다.
+test('#1010 390 본문 링크 — 넷 모두 보이고 높이 66px 이하이며 ＋ 단추와 겹치지 않는다', { skip: REQUIRE1010 ? false : skip1010, timeout: 180000 }, async () => {
   if (skip1010) assert.fail(skip1010);
   const browser = await chromium1010.launch({ headless: true });
   try {
@@ -222,7 +210,7 @@ test('#1010 390 바닥 링크 — 넷 모두 보이고 줄바꿈으로 왼쪽 �
         const row = document.querySelector('.home-links');
         const items = [...row.querySelectorAll('.feedback-link')].map(el => {
           const r = el.getBoundingClientRect();
-          return { label: el.textContent, visible: r.width > 0 && r.height > 0, top: Math.round(r.top), left: Math.round(r.left), right: Math.round(r.right) };
+          return { label: el.textContent, visible: r.width > 0 && r.height > 0, top: r.top, bottom: r.bottom, left: r.left, right: r.right };
         });
         const rowRect = row.getBoundingClientRect();
         const fab = document.getElementById('mobile-add');
@@ -233,10 +221,9 @@ test('#1010 390 바닥 링크 — 넷 모두 보이고 줄바꿈으로 왼쪽 �
       });
       const labels = links.items.filter(i => i.visible).map(i => i.label);
       for (const want of ['새 소식', '의견 보내기', '개인정보 처리방침', '이용약관']) {
-        assert.ok(labels.includes(want), `390 첫 화면 바닥에 "${want}" 링크가 있다: ` + JSON.stringify(labels));
+        assert.ok(labels.includes(want), `390 첫 화면 본문에 "${want}" 링크가 있다: ` + JSON.stringify(labels));
       }
-      assert.ok(links.rowH >= 56 && links.rowH <= 66, `링크가 두 줄로 카드 아래 자리에 들어간다(줄 높이 ${links.rowH}px — 66px 안)`);
-      assert.ok(links.rowTop >= links.viewportH - 76, `링크 줄이 새 소식 카드 자리(아래 76px) 아래에 있다(윗변 ${links.rowTop}px / ${links.viewportH - 76}px)`);
+      assert.ok(links.rowH > 0 && links.rowH <= 66, `링크는 1~2줄로 보이고 높이 66px 이하(${links.rowH}px)`);
       assert.ok(!links.overlap, '링크 줄이 오른쪽 아래 ＋ 단추와 겹치지 않는다');
       assert.ok(!links.fabVisible, '첫 화면에서는 ＋가 가운데만 남는다(#1084)');
       if (links.fabVisible) assert.ok(links.rowRight <= links.fabLeft, `링크 줄이 ＋ 단추 왼쪽 끝(${links.fabLeft}px)을 넘지 않는다(끝 ${links.rowRight}px)`);

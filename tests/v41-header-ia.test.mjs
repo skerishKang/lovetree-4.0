@@ -188,12 +188,12 @@ test('트리 선택 글자는 로그인 상태에서만 "트리: 이름"이고 �
   assert.equal(treePickerText({owned: true, treeTitle: '그날의 공기', pendingDraft: true}), '트리: 그날의 공기');
 });
 
-test('트리 보기 탭은 로그인한 내 트리에서만 보인다', () => {
+test('서재·책·보드·지도 화면 탭은 로그인 여부·방문자 읽기와 무관하게 보인다', () => {
   assert.equal(treeViewsVisible({owned: true}), true);
-  assert.equal(treeViewsVisible({owned: false}), false);
-  // 공유로 남의 트리를 감상할 때도 숨긴다.
-  assert.equal(treeViewsVisible({owned: true, publicReading: true}), false);
-  assert.equal(treeViewsVisible({owned: false, publicReading: true}), false);
+  assert.equal(treeViewsVisible({owned: false}), true);
+  // 방문자도 같은 책·보드·지도 탭을 쓰고 서재·트리 선택·쓰기만 별도로 숨긴다.
+  assert.equal(treeViewsVisible({owned: true, publicReading: true}), true);
+  assert.equal(treeViewsVisible({owned: false, publicReading: true}), true);
 });
 
 test('브라우저에만 남은 미저장 기록을 찾아낸다', () => {
@@ -808,7 +808,7 @@ test('이슈 905 화면(1440): 자동 저장 성공은 알림이 없고, 저장 
     await p1.goto(`${base}/v41/?account=1`, { waitUntil: 'load' });
     await waitSynced644(p1);
     // 토스트 관측기: #905 검사는 '뜬 적이 없다'를 봐야 하므로 뜨는 순간마다 기록해 둔다.
-    // (첫 안내 '내 기록을 불러왔어요.'는 남아 있을 수 있으니, 기록을 비운 뒤부터 잰다.)
+    // #1320: '불러왔어요' 안내는 없어졌다(기록 0개 첫 순간 안내만 남음) — 저장 안내만 재기 위해 기록을 비운 뒤부터 잰다.
     const watchToasts = () => p1.evaluate(() => {
       window.__n905 = [];
       const t = document.getElementById('toast');

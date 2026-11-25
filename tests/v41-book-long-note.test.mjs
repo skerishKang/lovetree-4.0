@@ -111,6 +111,9 @@ test('#295 화면: 넘친 페이지만 그 안에서 세로로 넘겨 보고, �
         box.style.cssText = 'height:700px;flex:none';
         target.appendChild(box);
         window.__TRACK59__?.rejudgeOverflow?.();
+        // #1231: 돋보기 복제가 뒤늦게 갱신되는 CI 시점도 재현한다.
+        // 숨겨진 복제본은 실제 책의 별도 넘침 페이지로 집계하면 안 된다.
+        window.syncLensClone?.();
         return true;
       };
       window.__LT_SHRINK__ = () => {

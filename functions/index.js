@@ -1,18 +1,11 @@
-// Serve 4.1 at the custom host root; the pages.dev root remains 4.0.
-// #541: 개발 주소(*.pages.dev)는 검색 제외 — 루트(4.0) 문서에 X-Robots-Tag noindex 를 붙인다.
-// 운영 주소 루트는 기존처럼 /v41/ 앱 문서로 바꿔 serve 한다. 검색을 열기 전(SEARCH_OPEN=false)에는 여기도 noindex.
-import { isProductionHost, isSearchOpenHost } from './_lib/search-meta.mjs';
+// 어느 주소로 들어와도 루트(/)는 4.1 앱 문서를 serve 한다. 예전에는 pages.dev 루트에 4.0을 남겨 두었지만,
+// 사용자가 pages.dev로 들어와 옛 화면을 보는 일이 생겨 4.1로 하나로 맞춘다(대표 결정 2026-11-23).
+// #541: 운영 주소 밖(*.pages.dev 등)은 검색 제외. 운영 주소도 검색을 열기 전(SEARCH_OPEN=false)에는 noindex.
+import { isSearchOpenHost } from './_lib/search-meta.mjs';
 
 export async function onRequest({request,next,env}) {
  const url=new URL(request.url);
- if(!isProductionHost(url.hostname)&&url.pathname==='/'&&request.method==='GET'){
-  const response=await env.ASSETS.fetch(new Request(new URL('/',url.origin),request));
-  if(!response.ok)return response;
-  const html=await response.text();
-  const headers=new Headers(response.headers);headers.set('x-robots-tag','noindex');headers.delete('content-length');
-  return new Response(html,{status:response.status,headers});
- }
- if(isProductionHost(url.hostname)&&url.pathname==='/'&&request.method==='GET'){
+ if(url.pathname==='/'&&request.method==='GET'){
   const asset=new URL('/v41/',url.origin);
   const response=await env.ASSETS.fetch(new Request(asset,request));
   if(!response.ok)return response;

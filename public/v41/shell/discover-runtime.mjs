@@ -16,6 +16,7 @@ export function createDiscoverRuntime(ctx){
   async function askDiscover(treeId){
    try{
     const discover=await refreshTreeDiscover(treeId);
+    if(ctx.source!=='server'||/^#share\//.test(globalThis.location?.hash||''))return; // 공유 주소로 이동한 뒤 늦은 응답은 이전 계정 질문을 열지 않는다.
     if(discover===null)return; // 확인 실패 — 마킹하지 않아 다음 저장 때 다시 본다
     markDiscoverAsked(treeId);
     if(discover===true)return; // 이미 소개 켜진 트리(#739 백필)는 묻지 않는다

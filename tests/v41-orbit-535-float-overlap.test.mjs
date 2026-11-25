@@ -33,11 +33,12 @@ const measureHome = async (frame, { worst = false } = {}) => {
     const sr = document.querySelector('main#orbit').shadowRoot;
     const c = sr.querySelector('.center');
     const zone = c ? window.__ltZoneOf(c.getBoundingClientRect(), sr.querySelector('.app').getBoundingClientRect()) : null;
-    const nodes = [...sr.querySelectorAll('.card')], hook=globalThis.__LT_ORBIT_TEST__, poses=hook?.poses()||[], rasters=hook?.rasterStats()||[];
+    const nodes = [...sr.querySelectorAll('.card')], hook=globalThis.__LT_ORBIT_TEST__, poses=hook?.poses()||[], rasters=hook?.rasterStats()||[],ribbon=document.querySelector('main#orbit').dataset.ltLayout==='ribbon';
     const origin=sr.querySelector('.app').getBoundingClientRect(),visible=[],rects=[];
     for(let i=0;i<nodes.length;i++){
       const el=nodes[i],p=poses[i],s=rasters[i];
-      if(!p||!s||el.classList.contains('clash')||getComputedStyle(el).display==='none')continue;
+      if(!p||(!ribbon&&!s)||el.classList.contains('clash')||el.classList.contains('off')||getComputedStyle(el).display==='none')continue;
+      if(ribbon){const r={l:origin.left+p.box.l,t:origin.top+p.box.t,r:origin.left+p.box.r,b:origin.top+p.box.b};if(r.r-r.l<2||r.r<0||r.b<0||r.l>innerWidth||r.t>innerHeight)continue;visible.push(el);rects.push(r);continue;}
       const xs=[],ys=[];
       for(const x of [-s.guardW/2,s.guardW/2])for(const y of [-s.guardH/2,s.guardH/2]){
         const u=x+p.fx,v=y+p.fy,q=1-(p.zx*u+p.zy*v)/1200;
@@ -284,11 +285,13 @@ s('#535 카드끼리 겹친 면적을 줄였다(1440·1920·390, 안전 구역 �
           best.intrude = Math.max(best.intrude, d.intrude);
           await page.waitForTimeout(500);
         }
+        const activeCards = w === 390 ? await frame.evaluate(() => [...document.querySelector('main#orbit').shadowRoot.querySelectorAll('.card')].filter(e => !e.classList.contains('off')).length) : null;
         await context.close();
         console.log('OVERLAP_949', tag, member, JSON.stringify({ cards: best.cards, pairs: best.pairs, area: best.area, intrude: best.intrude, zone: best.zone, centerRect: best.centerRect, font: best.font }));
         assert.equal(best.intrude, 0, `${tag}/${member}: 가운데 안전 구역 침범 0`);
-        // 261116 PR 2: 로그인 첫 화면은 위쪽 '+ 순간 추가'·정보 줄이 가운데를 차지해 좁은 폭에서 궤도가 더 숨긴다. #780 후속: 390 로그인 예시(mix-empty 포함)는 궤도를 숨기므로 기준 0장, 나머지는 9장을 유지한다.
-        const minCards = (w === 390 && member === 'in') ? 0 : 9;
+        // #1309: 390은 8장 리본을 유지하고, 흐름상 화면에 보이는 카드는 6장 이상이다.
+        const minCards = w === 390 ? 6 : 9;
+        if (w === 390) assert.equal(activeCards, 8, '390 리본은 8장을 유지한다');
         assert.ok(best.cards >= minCards, `${tag}/${member}: 카드가 사라지지 않는다(실제 ${best.cards}장, 기준 ${minCards}장)`);
         // 전 값: 1440 269k·292k / 1920 277k·301k / 390 44k·36k
         assert.ok(best.area <= limit.area, `${tag}/${member}: 겹친 면적 합이 줄었다(실제 ${best.area}px², 한도 ${limit.area})`);

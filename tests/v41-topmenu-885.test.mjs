@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { serve } from './helpers/screen-audit.mjs';
+import { testBackNavigation } from './helpers/history-assert.mjs';
 import { createTree, addMoment } from '../public/v41/domain.mjs';
 
 const REQUIRE = process.env.LT_TOPMENU_REQUIRE === '1';
@@ -40,9 +41,26 @@ test('상단 메뉴: 같은 글자 크기·테두리 0·세로선 0·현재 탭 
         await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
         await page.locator('#discover-ask-no').click().catch(() => {});
         const perScreen = {};
+        // 대표 11-23: 화면마다 머리줄 높이·단추 줄 높이가 달라 서재·책에서 단추와 아래 선이 내려와 보였다.
+        const headerGeom = () => page.evaluate(() => {
+          const h = document.querySelector('.app-header') || document.querySelector('header');
+          const record = document.getElementById('record-menu');
+          const label = document.getElementById('source-label');
+          const caret = record?.querySelector('svg');
+          const r = record?.getBoundingClientRect();
+          return {
+            headerH: Math.round(h.getBoundingClientRect().height),
+            tops: [...h.querySelectorAll('#tree-views > button, .header-actions > button, .header-actions > .view-toggle, .account-slot > *')]
+              .filter((e) => e.getClientRects().length).map((e) => Math.round(e.getBoundingClientRect().top + e.getBoundingClientRect().height / 2)),
+            caretRightGap: r && caret ? Math.round((r.right - caret.getBoundingClientRect().right) * 10) / 10 : null,
+            labelLeftGap: r && label ? Math.round((label.getBoundingClientRect().left - r.left) * 10) / 10 : null
+          };
+        });
+        const geoms = { home: await headerGeom() };
         for (const [name, hash] of SCREENS) {
           await page.evaluate((h) => { location.hash = h; }, hash);
           await page.waitForTimeout(900);
+          geoms[name] = await headerGeom();
           perScreen[name] = await page.evaluate(() => {
             const record = document.getElementById('record-menu');
             const tabs = [...document.querySelectorAll('#tree-views > button')];
@@ -59,6 +77,46 @@ test('상단 메뉴: 같은 글자 크기·테두리 0·세로선 0·현재 탭 
             };
           });
         }
+
+        // #1367: DOM and focus order match the visual header order.
+        const order = await page.evaluate(() => {
+          const nav = document.querySelector('.main-nav');
+          const ids = [...nav.querySelectorAll('button')].map((b) => b.id || b.dataset.view);
+          const rect = (sel) => {
+            const b = document.querySelector(sel)?.getBoundingClientRect();
+            return b ? { left: b.left, right: b.right } : null;
+          };
+          return {
+            ids,
+            shelf: rect('[data-view="track32-bookshelf.html"]'),
+            tree: rect('[data-view="track61-tree.html"]'),
+            explore: rect('#community-menu'),
+            picker: rect('#record-menu'),
+            overflow: Math.max(0, document.documentElement.scrollWidth - innerWidth),
+          };
+        });
+        assert.deepEqual(order.ids, [
+          'community-menu', 'record-menu', 'track32-bookshelf.html',
+          'track61-tree.html', 'track58-pinboard.html',
+          'track59-sketchbook.html', 'track56-network.html',
+        ], width + '/' + theme + ': header DOM order matches Tab order');
+        assert.equal(order.overflow, 0, width + '/' + theme + ': horizontal page overflow is zero');
+        if (width === 1440) {
+          assert.ok(order.explore.right <= order.picker.left, 'explore precedes picker');
+          assert.ok(order.tree.left - order.shelf.right >= 8, 'shelf and tree views have an actual gap');
+        } else {
+          await page.locator('#mobile-more').click();
+          const folded = await page.locator('#header-overflow [role="menuitem"]').allTextContents();
+          const labels = [
+            '\uB458\uB7EC\uBCF4\uAE30', '\uC11C\uC7AC', '\uD2B8\uB9AC',
+            '\uBCF4\uB4DC', '\uCC45', '\uC9C0\uB3C4',
+          ];
+          assert.deepEqual(folded.map((x) => x.trim()).filter((x) => labels.includes(x)), labels,
+            width + '/' + theme + ': folded menu follows the same order');
+          await page.keyboard.press('Escape');
+        }
+
+
         const base = perScreen.shelf;
         const xsStable = SCREENS.every(([name]) => JSON.stringify(perScreen[name].xs) === JSON.stringify(base.xs));
         assert.deepEqual([...new Set([base.recordFont, ...base.tabFonts])].length, 1, '트리 단추·탭 글자 크기 같음');
@@ -67,12 +125,30 @@ test('상단 메뉴: 같은 글자 크기·테두리 0·세로선 0·현재 탭 
         assert.equal(base.current, 1, '현재 탭 1개');
         assert.equal(base.recordVisible, true, '서재에서 트리 단추 보임');
         assert.equal(xsStable, true, '4화면 탭 x 좌표 동일');
+        // 390은 서재·책에서 보기 전환이 둘째 줄로 내려가는 것이 정한 배치라 넓은 화면만 잰다.
+        const hs = width < 780 ? [0] : [...new Set(Object.values(geoms).map((g) => g.headerH))];
+        assert.equal(hs.length, 1, `${width}/${theme}: 첫 화면·서재·책·보드·지도 머리줄 높이가 같다 ${JSON.stringify(geoms)}`);
+        for (const [name, g] of width < 780 ? [] : Object.entries(geoms)) {
+          const mids = [...new Set(g.tops)];
+          assert.ok(Math.max(...mids) - Math.min(...mids) <= 1, `${width}/${theme}/${name}: 머리줄 탭·단추의 세로 가운데가 한 줄이다 ${JSON.stringify(g.tops)}`);
+          if (g.caretRightGap !== null) assert.ok(g.caretRightGap >= 11 && g.caretRightGap <= 15, `${width}/${theme}/${name}: 짧은 트리 이름에서도 ⌄는 단추 오른쪽 끝(여백 13±2) — ${g.caretRightGap}`);
+        }
         results.push({ width, theme, ...base, xsStable });
         if (SHOT) {
           mkdirSync(SHOT, { recursive: true });
           await page.evaluate(() => { for (const d of document.querySelectorAll('dialog[open]')) d.close(); });
           await page.screenshot({ path: `${SHOT}/menu-${width}-${theme}.png` });
         }
+        await testBackNavigation(page, {
+          recorded: true,
+          settleMs: 300,
+          action: width === 390
+            ? async () => {
+                await page.locator('#mobile-more').click();
+                await page.locator('#header-overflow [role="menuitem"]').filter({ hasText: /\uB458\uB7EC\uBCF4\uAE30/ }).click();
+              }
+            : () => page.locator('#community-menu').click(),
+        });
         await ctx.close();
       }
     }
@@ -146,6 +222,8 @@ test('상단 메뉴 261119: 트리 단추 폭·⌄ 자리·목록 규칙·메뉴
         const ccs = cur ? getComputedStyle(cur) : null;
         return {
           recordW: Math.round(r.width), recordMax: parseFloat(getComputedStyle(record).maxWidth) || 0,
+          recordWidth: parseFloat(getComputedStyle(record).width) || 0,
+          paddingRight: parseFloat(getComputedStyle(record).paddingRight) || 0,
           caretRightGap: Math.round((r.right - caret.right) * 10) / 10,
           labelClipped: label.scrollWidth > label.clientWidth + 1,
           frameBg: fcs.backgroundColor, frameBorder: parseFloat(fcs.borderTopWidth) || 0,
@@ -157,8 +235,14 @@ test('상단 메뉴 261119: 트리 단추 폭·⌄ 자리·목록 규칙·메뉴
           currentCount: tabs.filter((b) => b.getAttribute('aria-current') === 'true').length
         };
       });
-      assert.ok(bar.caretRightGap >= 11 && bar.caretRightGap <= 15, `${width}: ⌄ 오른쪽 여백 ${bar.caretRightGap}px 는 13±2`);
-      assert.ok(bar.recordW <= bar.recordMax + 1, `${width}: 단추 폭 ${bar.recordW} ≤ 최대 ${bar.recordMax}`);
+      // ⌄는 단추 오른쪽 끝에 붙는다 — 여백은 그 폭의 단추 안쪽 여백(padding-right)을 따른다.
+      // 넓은 화면은 12px(고정 폭 180), 좁은 화면은 8px라서 기대값을 너비마다 따로 잰다.
+      assert.ok(bar.caretRightGap >= bar.paddingRight - 1 && bar.caretRightGap <= bar.paddingRight + 3,
+        `${width}: ⌄ 오른쪽 여백 ${bar.caretRightGap}px 는 단추 안쪽 여백 ${bar.paddingRight}px 기준`);
+      // 넓은 화면은 max-width:none 대신 폭 180px로 고정된다 — 고정 폭이 상한이다.
+      const recordLimit = bar.recordMax || bar.recordWidth;
+      assert.ok(recordLimit > 0 && bar.recordW <= recordLimit + 1,
+        `${width}: 단추 폭 ${bar.recordW} ≤ ${bar.recordMax ? '최대' : '고정 폭'} ${recordLimit}`);
       assert.equal(bar.labelClipped, true, `${width}: 긴 이름은 말줄임(글자가 칸을 넘지 않는다)`);
       assert.equal(bar.frameBg, 'rgba(0, 0, 0, 0)', `${width}: 탭을 감싸는 판 배경 없음`);
       assert.equal(bar.frameBorder, 0, `${width}: 탭을 감싸는 판 테두리 없음`);
@@ -441,4 +525,138 @@ test('1028 실행: 트리 목록만 스크롤하고 동작 칸은 고정이며 �
     if (SHOT) writeFileSync(`${SHOT}/numbers.json`, JSON.stringify(numbers, null, 2));
     console.log('MENU_1028_NUMBERS', JSON.stringify(numbers));
   } finally { await browser.close(); await new Promise((ok) => server.close(ok)); }
+});
+
+
+test('#1246 모든 화면의 순간 추가만 장미색·둘러보기 테두리', {skip: REQUIRE ? false : skip || 'LT_TOPMENU_REQUIRE=1 일 때 실행', timeout:180000}, async()=>{
+  if(skip)assert.fail(skip);
+  const server=await serve(),base='http://127.0.0.1:'+server.address().port;
+  const browser=await chromium.launch({headless:true});
+  try{
+    for(const width of [1440,390])for(const theme of ['night','garden']){
+      const ctx=await browser.newContext({viewport:{width,height:width===390?844:900},reducedMotion:'reduce'});
+      try{
+        await ctx.addInitScript(t=>{localStorage.setItem('lt41.theme',t);localStorage.setItem('lt41.tips.firstTree','1')},theme);
+        const state={version:1,trees:[tree(1),tree(2)],prefs:{}};
+        await ctx.route('**/*',r=>{
+          const u=new URL(r.request().url());
+          if(u.origin!==base)return r.abort();
+          if(u.pathname==='/api/workspace')return r.fulfill({status:200,json:{revision:1,state,subject:'header-color-test',writeSubjectBound:true,savedAt:'2026-11-18T09:00:00Z'}});
+          if(u.pathname.startsWith('/api/'))return r.fulfill({status:200,json:{ok:true,items:[],trees:0,moments:0}});
+          return r.continue();
+        });
+        const page=await ctx.newPage();
+        await page.goto(base+'/v41/?account=1#home');
+        await page.waitForFunction(()=>window.LT41?.trees?.length===2&&document.body.dataset.member==='in');
+        const ask=page.locator('#discover-ask-no');
+        await ask.waitFor({state:'visible',timeout:4000}).catch(()=>{});
+        if(await ask.isVisible())await ask.click();
+        const read=()=>page.evaluate(()=>{
+          const sample=document.createElement('span');
+          sample.style.backgroundColor='var(--lt-cta-rose)';sample.style.color='var(--lt-cta-white)';document.body.append(sample);
+          const rose=getComputedStyle(sample).backgroundColor,white=getComputedStyle(sample).color;sample.remove();
+          const info=e=>{const s=getComputedStyle(e);return{id:e.id,bg:s.backgroundColor,ink:s.color,visible:e.checkVisibility({checkVisibilityCSS:true})}};
+          const explore=document.getElementById('community-menu'),cs=getComputedStyle(explore),er=explore.getBoundingClientRect();
+          const icon=explore.querySelector('svg'),ir=icon.getBoundingClientRect(),header=document.querySelector('.app-header').getBoundingClientRect();
+          const picker=document.getElementById('record-menu').getBoundingClientRect();
+          const hit=document.elementFromPoint(er.x+er.width/2,er.y+er.height/2);
+          return {rose,white,head:info(document.getElementById('write-menu')),fab:info(document.getElementById('mobile-add')),
+            explore:{...info(explore),current:explore.getAttribute('aria-current')==='true',border:cs.borderTopWidth,borderColor:cs.borderTopColor,borderStyle:cs.borderTopStyle,radius:parseFloat(cs.borderTopLeftRadius),deco:cs.textDecorationLine,weight:cs.fontWeight,icon:ir.width>0&&ir.height>0&&icon.getAttribute('stroke')==='currentColor'&&icon.getAttribute('fill')==='none'&&icon.getAttribute('aria-hidden')==='true',labelVisible:explore.querySelector('.community-menu-label').checkVisibility(),width:er.width,height:er.height,inside:er.left>=header.left&&er.right<=header.right&&er.top>=header.top&&er.bottom<=header.bottom,hit:hit===explore||explore.contains(hit),pickerOverlap:Math.max(0,Math.min(er.right,picker.right)-Math.max(er.left,picker.left))},
+            headerHeight:Math.round(header.height),overflow:document.documentElement.scrollWidth-innerWidth,
+            tabs:[...document.querySelectorAll('#tree-views button[data-view]')].map(e=>({border:getComputedStyle(e).borderTopWidth,deco:getComputedStyle(e).textDecorationLine,current:e.getAttribute('aria-current')==='true'})),
+            other:[...document.querySelectorAll('.app-header button,.app-header a')].filter(e=>!['write-menu','mobile-add'].includes(e.id)&&e.checkVisibility({checkVisibilityCSS:true})).map(info)};
+        });
+        let idleExplore;
+        for(const [name,hash] of [['home','#home'],...SCREENS,['community','#explore']]){
+          if(name==='community'){
+            if(width===390){await page.locator('#mobile-more').click();await page.locator('#header-overflow button').filter({hasText:/^둘러보기$/}).click();}
+            else await page.locator('#community-menu').click();
+          }
+          else await page.evaluate(h=>location.hash=h,hash);
+          await page.mouse.move(2,300);
+          if(name==='community')await page.waitForFunction(()=>document.body.classList.contains('community-screen'));
+          else if(name==='home')await page.waitForFunction(()=>document.body.classList.contains('home-existing'));
+          else await page.waitForFunction(h=>[...document.querySelectorAll('iframe')].some(f=>f.checkVisibility()&&f.contentWindow?.location.href.includes(h)),({shelf:'track32-bookshelf',book:'track59-sketchbook',board:'track58-pinboard',map:'track56-network'})[name]);
+          const m=await read(),key=[width,theme,name].join('/');
+          assert.equal(m.head.bg,m.rose,key+' 머리줄 배경');
+          assert.equal(m.head.ink,m.white,key+' 머리줄 글자');
+          if(width===390){assert.equal(m.fab.bg,m.rose,key+' 휴대폰 배경');assert.equal(m.fab.ink,m.white,key+' 휴대폰 글자');}
+          assert.deepEqual(m.other.filter(b=>b.bg===m.rose),[],key+' 다른 머리줄 단추에 장미색 없음');
+          if(width===1440)assert.equal(m.head.visible,true,key+' 머리줄 순간 추가 표시');
+          else if(!['home','community'].includes(name))assert.equal(m.fab.visible,true,key+' 휴대폰 순간 추가 표시');
+          const e=m.explore;
+          if(width===390){
+            assert.equal(e.visible,false,key+' 둘러보기는 더보기 안으로 접힘');
+            await page.locator('#mobile-more').click();
+            await page.locator('#header-overflow button').filter({hasText:/^둘러보기$/}).waitFor({state:'visible'});
+            await page.locator('#mobile-more').click();
+          }else{
+          assert.ok(e.visible&&e.icon&&e.inside&&e.hit&&e.pickerOverlap===0,key+' 둘러보기 아이콘·실제 누름 영역·겹침 0 '+JSON.stringify(e));
+          assert.ok(e.width>=44&&e.height>=44,key+' 둘러보기 44px 누름 영역');
+          assert.equal(e.bg,'rgba(0, 0, 0, 0)',key+' 투명 배경');
+          assert.equal(e.border,'1px',key+' 테두리');
+          assert.equal(e.borderStyle,'solid',key+' 테두리 모양');
+          assert.ok(e.radius>=22,key+' 둥근 단추');
+          assert.equal(e.deco,'none',key+' 밑줄 없음');
+          assert.equal(e.labelVisible,width===1440,key+' 넓은 화면만 글자 표시');
+          }
+          assert.equal(e.current,name==='community',key+' 현재 둘러보기 표시');
+          assert.ok(m.tabs.every(t=>t.border==='0px'),key+' 내 트리 탭은 테두리 없음');
+          assert.equal(m.overflow,0,key+' 가로 넘침 0');
+          if(width===390)assert.equal(m.headerHeight,57,key+' 머리줄 57px');
+          if(name==='home')idleExplore=e;
+          if(name==='community'&&width===1440){
+            assert.notEqual(e.borderColor,idleExplore.borderColor,key+' 현재 테두리 강조');
+            assert.notEqual(e.ink,idleExplore.ink,key+' 현재 글자 강조');
+            assert.ok(Number(e.weight)>Number(idleExplore.weight),key+' 현재 글자 굵기');
+          }
+          console.log(key,JSON.stringify(m));
+        }
+      }finally{await ctx.close();}
+    }
+  }finally{await browser.close();await new Promise(r=>server.close(r));}
+});
+
+test('#1367 4번: 트리 고르기 목록은 바깥 누름·안쪽 화면 누름·Esc로 닫히고 초점이 돌아온다(390·1440 × 밤·정원)', { skip: skip || !REQUIRE ? skip || 'LT_TOPMENU_REQUIRE=1 일 때 실행' : false, timeout: 240000 }, async () => {
+  if (skip) assert.fail(skip);
+  const server = await serve();
+  const origin = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch({ headless: true });
+  try {
+    for (const width of [1440, 390]) for (const theme of ['night', 'garden']) {
+      const ctx = await browser.newContext({ viewport: { width, height: width === 390 ? 844 : 900 }, reducedMotion: 'reduce' });
+      await ctx.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); } catch {} }, theme);
+      await ctx.route('**://i.ytimg.com/**', (r) => r.fulfill({ status: 200, contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="10" height="10" fill="#333"/></svg>' }));
+      await ctx.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
+      const state = { version: 1, trees: [tree(1), tree(2)], prefs: {} };
+      await ctx.route('**/api/workspace**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ revision: 1, state, subject: '시험계정', writeSubjectBound: true, savedAt: '2026-11-18T09:00:00.000Z' }) }));
+      const page = await ctx.newPage();
+      try {
+        await page.goto(`${origin}/v41/?account=1`, { waitUntil: 'load', timeout: 60000 });
+        await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
+        await page.locator('#discover-ask-no').click().catch(() => {});
+        const hidden = () => page.evaluate(() => document.getElementById('tree-popover')?.hidden !== false);
+        const open = async () => { assert.equal(await hidden(), true, '처음에는 닫혀 있다'); await page.click('#record-menu'); assert.equal(await hidden(), false, '트리 고르기를 누르면 열린다'); };
+
+        // 머리줄 빈 곳(테마 단추)을 눌러도 창을 닫기만 하고 테마는 바뀌지 않는다.
+        await open();
+        const themeBefore = await page.evaluate(() => localStorage.getItem('lt41.theme'));
+        await page.click('#theme-toggle');
+        assert.equal(await hidden(), true, `${width}/${theme}: 바깥 누름으로 닫힌다`);
+        assert.equal(await page.evaluate(() => localStorage.getItem('lt41.theme')), themeBefore, `${width}/${theme}: 바깥 누름이 다른 동작을 실행하지 않는다`);
+
+        // 안쪽 화면(iframe)을 눌러도 닫힌다.
+        await open();
+        // 목록 아래쪽의 안쪽 화면을 실제 마우스로 누른다(목록은 y≈497에서 끝난다).
+        await page.mouse.click(width - 40, 700);
+        assert.equal(await hidden(), true, `${width}/${theme}: 안쪽 화면 누름으로 닫힌다`);
+
+        // Esc로 닫고 초점은 트리 고르기 단추로 돌아온다.
+        await open();
+        await page.keyboard.press('Escape');
+        assert.equal(await hidden(), true, `${width}/${theme}: Esc로 닫힌다`);
+        assert.equal(await page.evaluate(() => document.activeElement?.id), 'record-menu', `${width}/${theme}: 닫힌 뒤 초점 복귀`);
+      } finally { await ctx.close(); }
+    }
+  } finally { await browser.close(); await new Promise((r) => server.close(r)); }
 });

@@ -45,7 +45,12 @@ function renderTreeMenu(){
  // '정리 전 N개 정리하기'는 #380 5번대로 목록 바로 아래(맨 앞)에 둔다.
  const searchBox=ordered.length>=8?'<div class="tree-search" role="none"><input type="search" data-tree-search placeholder="트리 찾기" aria-label="트리 찾기" autocomplete="off" /></div>':'';
  const list=`${searchBox}<div class="tree-list" role="none">${rows}</div>`;
- treePopover.innerHTML=list+`<div class="tree-foot" role="none">${cleanupRow}<button type="button" role="menuitem" data-tree-action="new">＋ 새 트리</button>${manage?'<button type="button" role="menuitem" data-tree-action="manage">이 트리 관리 (이름·표지)</button><button type="button" role="menuitem" data-tree-action="share">이 트리 공유</button>':''}${tagsRow}${shelfEntry}${momentsEntry}</div>`;
+  // #1285 6번: 보기·관리·공유·위험 동작을 구분선으로 나눈다. 단추 순서는 그대로 둔다.
+  const divider = '<div class="tree-group-divider" role="separator" aria-hidden="true"></div>';
+  const viewGroup = `${shelfEntry}${momentsEntry}`;
+  const shareButtons = manage ? '<button type="button" role="menuitem" data-tree-action="manage">이 트리 관리 (이름·표지)</button><button type="button" role="menuitem" data-tree-action="share">이 트리 공유</button>' : '';
+  const dangerRow = cleanupRow ? divider + cleanupRow.replace('tree-item tree-cleanup', 'tree-item tree-cleanup tree-danger') : '';
+  treePopover.innerHTML = list + `<div class="tree-foot" role="none"><button type="button" role="menuitem" data-tree-action="new">＋ 새 트리</button>${manage ? divider + shareButtons : ''}${tagsRow}${viewGroup ? divider + viewGroup : ''}${dangerRow}</div>`;
  const search=treePopover.querySelector('[data-tree-search]');
  search?.addEventListener('input',()=>{
   const q=search.value.trim().toLowerCase();
@@ -54,7 +59,7 @@ function renderTreeMenu(){
   if(active&&!active.hidden)scrollTreeItemIntoView(active);
  });
   // 트리를 누르면 그 트리로 이동한다: 책·보드·지도를 보던 중이면 같은 보기로, 그 외(첫 화면·내 트리·둘러보기)에는 그 트리의 책으로. 주소도 따라오게 남긴다.
-  const TREE_VIEWS=new Set(['track32-bookshelf.html','track59-sketchbook.html','track58-pinboard.html','track56-network.html']);
+  const TREE_VIEWS=new Set(['track32-bookshelf.html','track61-tree.html','track59-sketchbook.html','track58-pinboard.html','track56-network.html']);
   treePopover.querySelectorAll('[data-tree-id]').forEach(b=>b.onclick=()=>{
    const id=b.dataset.treeId;closeTreeMenu();if(!id)return;
    // 서재는 프레임을 다시 띄우지 않고 가운데 책만 고른 트리로 옮긴다(2026-11-18 13:49 결정).
@@ -89,7 +94,27 @@ function openTreeMenu(via='keyboard'){if(!treePopover)return;renderTreeMenu();tr
 function closeTreeMenu(){if(!treePopover)return;treePopover.hidden=true;treeTrigger.setAttribute('aria-expanded','false');}
 $('record-menu').addEventListener('click',event=>{event.stopPropagation();if(treePopover?.hidden)openTreeMenu(event.detail===0?'keyboard':'mouse');else closeTreeMenu();});
 if(treePopover)treePopover.addEventListener('keydown',event=>{const items=[...treePopover.querySelectorAll('button')].filter(b=>!b.hidden);const at=items.indexOf(document.activeElement);if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();const next=event.key==='ArrowDown'?(at+1)%items.length:(at-1+items.length)%items.length;items[next]?.focus();}else if(event.key==='Home'){event.preventDefault();items[0]?.focus();}else if(event.key==='End'){event.preventDefault();items.at(-1)?.focus();}});
-document.addEventListener('click',event=>{if(treePopover&&!treePopover.hidden&&!event.target.closest('.tree-slot'))closeTreeMenu();});
-document.addEventListener('keydown',event=>{if(event.key==='Escape'&&treePopover&&!treePopover.hidden){closeTreeMenu();treeTrigger.focus();}});
+// #1367 4번: 바깥을 누르면 닫기만 하고 그 누름으로 다른 단추가 동작하지 않게 한다.
+function outsideClick(event){
+ if(!treePopover||treePopover.hidden)return;
+ if(event.target?.closest?.('.tree-slot'))return;
+ event.preventDefault?.();event.stopPropagation?.();
+ closeTreeMenu();
+}
+function escKey(event){if(event.key==='Escape'&&treePopover&&!treePopover.hidden){event.preventDefault?.();event.stopPropagation?.();closeTreeMenu();treeTrigger.focus();}}
+document.addEventListener('click',outsideClick,true);
+document.addEventListener('keydown',escKey,true);
+// 안쪽 화면(iframe)을 눌러도 닫힌다 — 그 문서의 눌림도 여기서 먼저 본다.
+function bindFrame(frame){
+ try{
+  const doc=frame.contentDocument;if(!doc)return;
+  doc.addEventListener('click',outsideClick,true);
+  doc.addEventListener('keydown',escKey,true);
+ }catch{}
+}
+for(const frame of document.querySelectorAll('iframe')){
+ frame.addEventListener('load',()=>bindFrame(frame),true);
+ bindFrame(frame);
+}
 return { escHTML, treeMomentThumb, treeCoverMarkup, renderTreeMenu, scrollTreeItemIntoView, openTreeMenu, closeTreeMenu };
 }

@@ -29,6 +29,9 @@ function fakeElement(extra = {}) {
     focus() {},
     replaceChildren(...k) { this.children = k; },
     append(...k) { this.children.push(...k); },
+    before() {}, prepend(...k) { this.children.unshift(...k); },
+    insertBefore(node) { this.children.unshift(node); },
+    contains(node) { return node === this || this.children.includes(node); },
     querySelector: () => fakeElement(), querySelectorAll: () => [],
     close() { this.open = false; }, showModal() { this.open = true; }
   }, extra);

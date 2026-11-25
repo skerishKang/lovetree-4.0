@@ -122,6 +122,7 @@ test('#1025 순간 보기 — iframe 2개 이하·10회 넘기기 같은 영상 
       const h = await boot(browser, { width, height, theme });
       try {
         const panel = h.page.locator('#community-moments-panel');
+        if(width<=780)await h.page.locator('.moments-toolbar .moments-info-button').click();
         const seen = [];
         let maxFrames = 0;
         for (let i = 0; i < 11; i++) {
@@ -150,17 +151,20 @@ test('#1025 순간 보기 — iframe 2개 이하·10회 넘기기 같은 영상 
           const overlay = el.querySelector('.moments-overlay');
           return {
             cardBg: getComputedStyle(card).backgroundColor,
+            mediaBg: getComputedStyle(el.querySelector('.moments-media')).backgroundColor,
+            posterPointer: getComputedStyle(poster).pointerEvents,
             posterOpacity: Number(getComputedStyle(poster).opacity),
             posterZ: Number(getComputedStyle(poster).zIndex),
             frameZ: frame ? Number(getComputedStyle(frame).zIndex) : 0,
             overlayBg: getComputedStyle(overlay).backgroundImage,
-            color: getComputedStyle(overlay).color
+            color: getComputedStyle(overlay).color,
+            contextBg: getComputedStyle(el.querySelector('.moments-context')).backgroundColor
           };
         });
-        assert.equal(look.cardBg, 'rgb(0, 0, 0)', `${width}·${theme}: 판 바탕은 테마와 무관한 검정 — ${look.cardBg}`);
-        assert.ok(look.posterOpacity > 0 && look.posterZ > look.frameZ, `${width}·${theme}: 썸네일이 iframe 위에 늘 보인다 — ${JSON.stringify(look)}`);
-        assert.match(look.overlayBg, /rgba\(0, 0, 0, 0\.92\)/, `${width}·${theme}: 판 아래 검은 그라데이션`);
-        assert.equal(look.color, 'rgb(255, 255, 255)', `${width}·${theme}: 겹친 글은 흰색`);
+        assert.equal(look.cardBg,look.mediaBg,"영상 영역 바탕과 카드 바탕 토큰 일치");
+        assert.equal(look.posterPointer,"none","썸네일이 플레이어 입력을 가로채지 않음");
+        assert.equal(look.overlayBg,"none","플레이어 전면 서비스 그라데이션 0");
+        assert.match(look.color,/^rgb/,"서비스 정보 판 글자 색 표시");
         // 판 전체와 오른쪽 단추 4개가 화면 안에 있다(낮은 화면 1440×700 포함).
         const bounds = await panel.evaluate(el => {
           const card = el.querySelector('.moments-card').getBoundingClientRect();
@@ -168,14 +172,20 @@ test('#1025 순간 보기 — iframe 2개 이하·10회 넘기기 같은 영상 
           return { viewport: innerHeight, cardBottom: Math.round(card.bottom), cardTop: Math.round(card.top), railCount: rail.length, railBottom: Math.round(Math.max(...rail.map(r => r.bottom))), railTop: Math.round(Math.min(...rail.map(r => r.top))) };
         });
         assert.ok(bounds.cardTop >= 0 && bounds.cardBottom <= bounds.viewport, `${width}·${theme}: 판이 화면 밖 — ${JSON.stringify(bounds)}`);
-        assert.equal(bounds.railCount, 5, `${width}·${theme}: 단추 다섯(마음·댓글·트리·담기·공유)`);
+        assert.equal(bounds.railCount,5,"정보 판의 동작 단추 다섯");
+        assert.equal(await h.page.locator(".moments-toolbar .is-sound").isVisible(),true,"별도 상단 소리 단추 표시");
         assert.ok(bounds.railTop >= 0 && bounds.railBottom <= bounds.viewport, `${width}·${theme}: 단추가 화면 밖 — ${JSON.stringify(bounds)}`);
         const tags = await panel.locator('.moments-tags').textContent();
         assert.ok(!tags.includes(':'), `${width}·${theme}: 꼬리표 머리말을 뺀 값만 — ${tags}`);
-        // 흰 글자 대비 — 그라데이션 최약 지점(alpha .55) 위에 하얀 썸네일이 있어도 4.5:1 이상.
-        const bg = 255 * (1 - 0.55), lin = v => { v /= 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
-        const contrast = 1.05 / (lin(bg) + 0.05);
-        assert.ok(contrast >= 4.5, `${width}·${theme}: 글 대비 ${contrast.toFixed(2)}:1 < 4.5:1`);
+        // #1354 실제 정보 판 텍스트/바탕 대비를 검사한다(4.5:1 유지).
+        const lum=v=>{
+          const c=String(v).match(/[\d.]+/g).slice(0,3).map(Number);
+          return c.map(x=>{x/=255;return x<=.04045?x/12.92:((x+.055)/1.055)**2.4})
+            .reduce((sum,x,i)=>sum+x*[.2126,.7152,.0722][i],0);
+        };
+        const a=lum(look.color),b=lum(look.contextBg);
+        const contrast=(Math.max(a,b)+.05)/(Math.min(a,b)+.05);
+        assert.ok(contrast>=4.5,'정보 판 글자 대비 '+contrast.toFixed(2)+':1');
         // ↑ 단추와 키보드도 같은 동작
         const beforeUp = await panel.locator('.moments-stage').getAttribute('data-lt-moments-id');
         if (width <= 780) await panel.evaluate(el => el.querySelector('.moments-stage').dispatchEvent(new WheelEvent('wheel', { deltaY: -100, bubbles: true, cancelable: true })));
@@ -234,77 +244,39 @@ test('#1025 2단계 — 가수 칩 필터·구간 주소·나무 선 아이콘·
  } finally { await browser.close(); }
 });
 
-test('#1075 — 밝은 영상 위에서도 390·1440의 단추 일곱 개가 보이고 눌린다', { skip: REQUIRE ? false : skip, timeout: 240000 }, async () => {
-  if (skip) assert.fail(skip);
-  const browser = await chromium.launch({ headless: true });
-  try {
-   for (const [width, height] of [[390, 844], [1440, 900]]) for (const theme of ['night', 'garden']) {
-    const h = await boot(browser, { width, height, theme, thumb: BRIGHT_THUMB });
-    try {
-     const panel = h.page.locator('#community-moments-panel');
-     const nodes = await panel.evaluate(el => [...el.querySelectorAll('.moments-rail-button, .moments-step')].map(node => {
-      const r = node.getBoundingClientRect();
-      const x = Math.round(r.left + r.width / 2), y = Math.round(r.top + r.height / 2);
-      const hit = document.elementFromPoint(x, y);
-      const cs = getComputedStyle(node);
-      return {
-       label: node.getAttribute('aria-label') || node.textContent.trim(),
-       visible: cs.display !== 'none' && r.width > 0 && r.height > 0,
-       inView: r.top >= 0 && r.bottom <= innerHeight && r.left >= 0 && r.right <= innerWidth,
-       reaches: node === hit || node.contains(hit),
-       hit: hit ? String(hit.className || hit.tagName) : '',
-       color: cs.color, background: cs.backgroundColor, opacity: cs.opacity,
-       rect: [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)]
-      };
-     }));
-     const room = await panel.evaluate(el => {
-      const card = el.querySelector('.moments-card').getBoundingClientRect();
-      const buttons = [...el.querySelectorAll('.moments-rail-button, .moments-step')].map(node => node.getBoundingClientRect());
-      const text = Math.max(...[...el.querySelectorAll('.moments-overlay > *')].map(node => node.getBoundingClientRect().right));
-      return { cardRight: Math.round(card.right), buttonRight: Math.round(Math.max(...buttons.map(r => r.right))), buttonLeft: Math.round(Math.min(...buttons.map(r => r.left))), textRight: Math.round(text) };
-     });
-     assert.equal(nodes.length, 7, `${width}·${theme}: 오른쪽 다섯(마음·댓글·트리·담기·공유) + 위아래 둘`);
-     for (const node of nodes) {
-      assert.ok(node.visible, `${width}·${theme}: ${node.label}이 보이지 않음 — ${JSON.stringify(node)}`);
-      assert.ok(node.inView, `${width}·${theme}: ${node.label}이 화면 밖 — ${JSON.stringify(node)}`);
-      assert.ok(node.reaches, `${width}·${theme}: ${node.label}을 다른 요소가 가림 — ${JSON.stringify(node)}`);
-     }
-      if (width <= 780) {
-       for (const node of nodes) {
-        assert.equal(node.color, 'rgb(255, 255, 255)', `${width}·${theme}: 밝은 영상 위 흰 글자 — ${node.label} ${node.color}`);
-        assert.equal(node.opacity, '1', `${width}·${theme}: ${node.label}만 흐리게 남음 — ${node.opacity}`);
-        const parts = node.background.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
-        assert.ok(parts, `${width}·${theme}: ${node.label}에 어두운 배경이 없음 — ${node.background}`);
-        assert.ok(Number(parts[1]) < 40 && Number(parts[2]) < 40 && Number(parts[3]) < 40 && Number(parts[4] ?? 1) > 0.5, `${width}·${theme}: ${node.label} 스크림이 너무 옅음 — ${node.background}`);
-       }
-       const inset = room.cardRight - room.buttonRight;
-       assert.ok(inset >= 10 && inset <= 12, `${width}·${theme}: 단추가 카드 가장자리에서 ${inset}px — ${JSON.stringify(room)}`);
-       assert.ok(room.textRight <= room.buttonLeft, `${width}·${theme}: 아래 글이 단추와 겹침 — ${JSON.stringify(room)}`);
-       const top = await panel.evaluate(el => ({
-        navBottom: Math.max(...[...el.querySelectorAll('.moments-step')].map(n => n.getBoundingClientRect().bottom)),
-        railTop: Math.min(...[...el.querySelectorAll('.moments-rail-button')].map(n => n.getBoundingClientRect().top))
-       }));
-       assert.ok(top.navBottom < top.railTop, `${width}·${theme}: 위아래 단추가 오른쪽 넷과 겹침 — ${JSON.stringify(top)}`);
-       const heart = panel.locator('.moments-rail-button').first();
-       assert.equal(await heart.locator('.moments-rail-icon').textContent(), '♡', '기본 마음은 빈 하트');
-       assert.equal(await heart.getAttribute('aria-pressed'), 'false', '기본 누름 상태 아님');
-       await heart.click();
-       assert.equal(await heart.locator('.moments-rail-icon').textContent(), '♥', '누른 마음은 채운 하트');
-       assert.equal(await heart.getAttribute('aria-pressed'), 'true', '누름 상태 표시');
-       await heart.click();
-       assert.equal(await heart.locator('.moments-rail-icon').textContent(), '♡', '다시 누르면 빈 하트');
-       const before = await panel.locator('.moments-stage').getAttribute('data-lt-moments-id');
-       await panel.locator('.moments-step').nth(1).click();
-       const after = await panel.locator('.moments-stage').getAttribute('data-lt-moments-id');
-       assert.notEqual(before, after, `${width}·${theme}: 다음 순간 단추가 실제로 눌린다`);
-      } else {
-      const rail = await panel.locator('.moments-rail-button').first().evaluate(el => getComputedStyle(el).backgroundColor);
-      assert.equal(rail, 'rgba(0, 0, 0, 0)', `${width}·${theme}: 데스크톱 단추는 그대로 — ${rail}`);
-     }
-     console.log('#1075', width, theme, JSON.stringify({ reached: nodes.filter(n => n.reaches).length, nav: nodes.slice(5).map(n => n.rect), rail: nodes.slice(0, 5).map(n => n.rect) }));
-    } finally { await h.ctx.close(); await new Promise(r => h.server.close(r)); }
+test('#1075 밝은 영상에서도 여섯 조작 단추와 PC 위아래 이동이 보이고 눌린다',{skip:REQUIRE?false:skip,timeout:240000},async()=>{
+ if(skip)assert.fail(skip);
+ const browser=await chromium.launch({headless:true});
+ try{for(const [width,height] of [[390,844],[1440,900]])for(const theme of ['night','garden']){
+  const h=await boot(browser,{width,height,theme,thumb:BRIGHT_THUMB});
+  try{
+   const panel=h.page.locator('#community-moments-panel');
+   if(width<=780)await h.page.locator('.moments-toolbar .moments-info-button').click();
+   const nodes=await panel.evaluate(el=>{
+    const frame=el.querySelector('.moments-frame:not(.moments-next)').getBoundingClientRect();
+    const actions=[...el.querySelectorAll('.moments-rail .moments-rail-button'),...el.querySelectorAll('.moments-nav .moments-step'),document.querySelector('.moments-toolbar .is-sound')];
+    return actions.filter(node=>node&&getComputedStyle(node).display!=='none'&&node.getBoundingClientRect().height>0).map(node=>{
+     const r=node.getBoundingClientRect(),x=r.left+r.width/2,y=r.top+r.height/2,hit=document.elementFromPoint(x,y);
+     const overlap=r.left<frame.right&&r.right>frame.left&&r.top<frame.bottom&&r.bottom>frame.top;
+     return {label:node.getAttribute('aria-label'),w:r.width,h:r.height,inView:r.left>=0&&r.top>=0&&r.right<=innerWidth&&r.bottom<=innerHeight,hit:node===hit||node.contains(hit),overlap,opacity:getComputedStyle(node).opacity};
+    });
+   });
+   assert.equal(nodes.length,width<=780?6:8,'외부 조작 단추 수, PC 방향 단추 두 개 추가');
+   for(const n of nodes){
+    assert.ok(n.w>=44&&n.h>=44,'누름 영역 44px 이상: '+n.label);
+    assert.equal(n.inView,true,'화면 밖 잘림 0: '+n.label);
+    assert.equal(n.hit,true,'실제 좌표에서 누름 방해 0: '+n.label);
+    assert.equal(n.overlap,false,'유튜브 플레이어 앞 단추 0: '+n.label);
+    assert.equal(n.opacity,'1','단추 흐림 0: '+n.label);
    }
-  } finally { await browser.close(); }
+   const heart=panel.locator('.moments-rail-button.is-heart');
+   assert.equal(await heart.getAttribute('aria-pressed'),'false','처음 공감 미선택');
+   await heart.click();
+   assert.equal(await heart.getAttribute('aria-pressed'),'true','공감 선택');
+   await heart.click();
+   assert.equal(await heart.getAttribute('aria-pressed'),'false','다시 공감 해제');
+  }finally{await h.ctx.close();await new Promise(r=>h.server.close(r));}
+ }}finally{await browser.close();}
 });
 
 // ── #1098 2단계 — 쇼츠(순간 보기)의 그 순간 ♡·댓글: 레일에 ♡ 수·댓글 수(3 미만은 숫자 없음),
@@ -393,10 +365,10 @@ test('#1098 2단계 — 쇼츠의 그 순간 ♡·댓글 수와 순간 단위 �
     await h.page.setViewportSize({ width: 390, height: 844 });
     await h.page.waitForTimeout(200);
     const mobile = await h.page.evaluate(() => {
-     const nodes = [...document.querySelectorAll('#community-moments-panel .moments-rail-button, #community-moments-panel .moments-step')];
+     const nodes = [...document.querySelectorAll('#community-moments-panel .moments-rail-button')];
      return { inView: nodes.every((n) => { const r = n.getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight && r.left >= 0 && r.right <= innerWidth; }), overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth };
     });
-    assert.equal(mobile.inView, true, '390 단추 일곱 개가 화면 안에 있다');
+    assert.equal(mobile.inView, true, '390 단추 여섯 개가 화면 안에 있다');
     assert.ok(mobile.overflow <= 1, `390 가로 넉침 0: ${mobile.overflow}`);
    } finally { await h.ctx.close(); await new Promise(r => h.server.close(r)); }
   } finally { await browser.close(); }
@@ -562,6 +534,8 @@ test('#1098 순간 댓글 창은 불투명하고 뒤 단추를 가린다', { ski
       const h = await boot(browser, { width, height, theme: 'night' });
       try {
         const panel = h.page.locator('#community-moments-panel');
+        // #1354 휴대폰 단추는 정보 판을 펼친 뒤에만 보인다.
+        if (width === 390) await h.page.locator('.moments-toolbar .moments-info-button').click();
         await panel.locator('.moments-rail-button', { hasText: '댓글' }).click();
         const dialog = panel.locator('.moments-comments-dialog');
         await dialog.waitFor({ state: 'visible', timeout: 5000 });
@@ -598,10 +572,480 @@ test('#1098 회색 썸네일이면 제목 카드로 바뀐다', { skip: REQUIRE 
     try {
       const panel = h.page.locator('#community-moments-panel');
       const fallback = panel.locator('.moments-fallback');
-      await fallback.waitFor({ state: 'visible', timeout: 10000 });
-      const text = (await fallback.textContent()) || '';
-      assert.ok(text.includes('세로 순간 1'), '제목이 있는 카드로 대체된다: ' + text.slice(0, 120));
-      assert.equal(await panel.locator('.moments-poster').isVisible(), false, '회색 점 그림은 숨는다');
+      // #1354 회색 썸네일은 유튜브 플레이어를 덮는 카드가 되면 안 된다.
+      const frame = panel.locator('.moments-frame:not(.moments-next)');
+      await frame.waitFor({ state: 'attached' });
+      const result = await panel.evaluate(el => {
+        const f = el.querySelector('.moments-frame:not(.moments-next)');
+        const r = f.getBoundingClientRect();
+        return { overlay: getComputedStyle(el.querySelector('.moments-fallback')).display,
+          top: document.elementFromPoint(r.left+r.width/2,r.top+r.height/2)===f };
+      });
+      assert.equal(result.overlay, 'none', '재생 가능한 영상 위 회색 썸네일 대체 안내 없음');
+      assert.equal(result.top, true, '유튜브 플레이어가 실제 클릭을 받는다');
     } finally { await h.ctx.close(); await new Promise(r => h.server.close(r)); }
   } finally { await browser.close(); }
+});
+
+import {expectNoHistoryGrowth} from './helpers/history-assert.mjs';
+
+test('#1294 둘러보기 트리·순간 탭과 미리보기·그룹 찾기 뒤로 가기', {skip:REQUIRE?false:skip,timeout:240000},async()=>{
+ if(skip)assert.fail(skip);
+ const browser=await chromium.launch({headless:true});
+ try{
+ for(const [width,height] of [[390,844],[1440,900]]){
+  const h=await bootExploreTab(browser,{width,height,theme:'night'});
+  let cdp;
+  try{
+   await openExploreTab(h.page,width);
+   const page=h.page;
+   cdp=await page.context().newCDPSession(page);
+   await cdp.send('Emulation.setCPUThrottlingRate',{rate:width===1440?6:1});
+   await page.waitForSelector('#community-list .community-card');
+   const back=async()=>{await page.goBack();await page.waitForTimeout(110);};
+   const navState=()=>page.evaluate(()=>({hash:location.hash,trees:!document.getElementById('community-tree-panel').hidden,moments:!document.getElementById('community-moments-panel').hidden}));
+   const home=await navState();assert.equal(home.hash,'#explore');
+   await expectNoHistoryGrowth(page,async()=>page.locator('#community-sort').selectOption({index:1}),width+' 정렬');
+   await page.route('**/api/public/moments**',route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({items:items.slice(0,6),total:6,groups:GROUPS})}));
+   await page.locator('#community-tab-moments').click();
+   await page.waitForFunction(()=>!!document.querySelector('.moments-stage')?.dataset.ltMomentsId);
+   assert.equal((await navState()).hash,'#explore/moments');
+   if (width === 390) await page.locator('.moments-toolbar .moments-info-button').click();
+   await page.locator('#community-moments-panel .moments-rail-button').nth(2).click();
+   await page.locator('.moments-add-dialog:not([hidden])').waitFor();
+   await back();
+   assert.equal(await page.locator('.moments-add-dialog').evaluate(el=>el.hidden),true,width+' 담기 창 한 번 뒤로 가기');
+   assert.equal((await navState()).hash,'#explore/moments',width+' 담기 창 화면 유지');
+   await back();assert.deepEqual(await navState(),home,width+' 순간 → 트리 복원');
+   await page.locator('#community-tab-moments').click();
+   await page.locator('#community-tab-trees').click();
+   await back();
+   assert.equal((await navState()).hash,'#explore/moments',width+' 트리 → 순간 복원');
+   await back();assert.deepEqual(await navState(),home,width+' 이전 트리 복원');
+   await page.locator('#community-list .community-card').first().click();
+   assert.equal(await page.locator('#community-preview').evaluate(el=>el.open),true,width+' 미리보기 열기');
+   await back();
+   assert.equal(await page.locator('#community-preview').evaluate(el=>el.open),false,width+' 미리보기 복귀');
+   assert.deepEqual(await navState(),home,width+' 미리보기 후 화면');
+    // 그룹 찾기 칩이 없어졌으므로 상단 검색 확장에 기록이 쌓이지 않는지 확인한다.
+    await expectNoHistoryGrowth(page,async()=>page.locator('#community-query').focus(),width+' 찾기 확장');
+    assert.equal(await page.locator('#community-query').evaluate(el=>document.activeElement===el),true,width+' 찾기 입력 초점');
+    assert.deepEqual(await navState(),home,width+' 찾기 확장 후 화면');
+   // 감상 화면 이동은 별도 URL이며 뒤로 가기 한 번에 둘러보기 미리보기를 복원한다.
+   const sharedTree=exploreTree(1);
+   await page.route('**/api/public/shares/*',async route=>{if(width===1440)await new Promise(resolve=>setTimeout(resolve,700));await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({ok:true,share:{id:EXPLORE_CARD(0).shareId,view:'book',entryMomentId:sharedTree.moments[0].id},tree:sharedTree})});});
+   await page.locator('#community-list .community-card').first().click();
+   await page.locator('.community-preview-open').click();
+   await page.waitForFunction(()=>location.hash.startsWith('#share/'),null,{timeout:15000});
+   if(width===390)await page.waitForFunction(()=>document.body.dataset.recordSource==='share'&&document.getElementById('empty')?.hidden,null,{timeout:15000});
+   await back();
+   assert.equal((await navState()).hash,'#explore',width+' 공유 감상에서 뒤로 가기 주소');
+   assert.equal(await page.locator('#community-panel').evaluate(el=>el.open),true,width+' 공유 감상에서 둘러보기 복귀');
+   await page.waitForFunction(()=>document.getElementById('community-preview')?.open===true,null,{timeout:5000});
+   assert.equal(await page.locator('#community-preview').evaluate(el=>el.open),true,width+' 공유 감상에서 미리보기 상태 복원');
+
+   console.log('#1294 TREES',width,'OK');
+  }finally{await cdp?.detach();await h.ctx.close();await new Promise(ok=>h.server.close(ok));}
+ }
+ }finally{await browser.close();}
+});
+
+test('#1294 순간 밀기 기록 누적 없음·댓글 뒤로 가기·탭 복원', {skip:REQUIRE?false:skip,timeout:240000},async()=>{
+ if(skip)assert.fail(skip);
+ const browser=await chromium.launch({headless:true});
+ try{
+ for(const [width,height] of [[390,844],[1440,900]]){
+  const h=await boot(browser,{width,height,theme:'night'});
+  try{
+   const page=h.page,stage=page.locator('#community-moments-panel .moments-stage');
+   const start=await page.evaluate(()=>history.length);
+   const startId=await stage.getAttribute('data-lt-moments-id');
+   for(let i=0;i<5;i++){
+    if(width===390)await stage.evaluate(el=>{
+     const t=y=>new Touch({identifier:1,target:el,clientX:180,clientY:y});
+     el.dispatchEvent(new TouchEvent('touchstart',{bubbles:true,touches:[t(620)],changedTouches:[t(620)]}));
+     el.dispatchEvent(new TouchEvent('touchend',{bubbles:true,touches:[],changedTouches:[t(320)]}));
+    });
+    else await page.locator('.moments-step').nth(1).click();
+   }
+   assert.notEqual(await stage.getAttribute('data-lt-moments-id'),startId,width+' 다음 순간 이동');
+   assert.equal(await page.evaluate(()=>history.length),start,width+' 5번 넘김 후 기록 증가 0');
+   if(width===390)await page.locator('.moments-toolbar .moments-info-button').click();
+   await page.locator('#community-moments-panel .moments-rail-button').nth(1).click();
+   await page.locator('.moments-comments-dialog:not([hidden])').waitFor();
+   await page.goBack();await page.waitForTimeout(120);
+   assert.equal(await page.locator('.moments-comments-dialog').evaluate(el=>el.hidden),true,width+' 댓글 뒤로 가기');
+   assert.equal(await page.evaluate(()=>location.hash),'#explore/moments',width+' 댓글 뒤로 가기 주소 유지');
+   const selected=await stage.getAttribute('data-lt-moments-id');
+   await page.locator('#community-tab-trees').click();
+   await page.goBack();await page.waitForTimeout(130);
+   assert.equal(await page.evaluate(()=>location.hash),'#explore/moments',width+' 탭 돌아오기');
+   assert.equal(await stage.getAttribute('data-lt-moments-id'),selected,width+' 순간 위치 복원');
+   // 분류·화면 설명·소리·공감은 같은 순간 안의 옵션이므로 기록이 늘지 않는다.
+   await expectNoHistoryGrowth(page,async()=>page.locator('.moments-chip').last().click(),width+' 가수 필터');
+   if(width===390){
+    await expectNoHistoryGrowth(page,async()=>page.locator('.moments-note').click(),width+' 설명 펼치기');
+    await expectNoHistoryGrowth(page,async()=>page.locator('.moments-rail-button.is-sound').click(),width+' 소리 전환');
+   }
+   console.log('#1294 MOMENTS',width,'OK');
+  }finally{await h.ctx.close();await new Promise(ok=>h.server.close(ok));}
+ }
+ }finally{await browser.close();}
+});
+
+test('#1322 트리 카드 표지는 한 겹 — 가로·세로·그림 없음 높이 차 1px 이하(390·1440 × 밤·정원)', { skip: REQUIRE ? false : skip, timeout: 240000 }, async () => {
+  if (skip) assert.fail(skip);
+  const svg = (w, h, color) => 'data:image/svg+xml,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><rect width="100%" height="100%" fill="${color}"/></svg>`);
+  const card = (i, extra) => ({
+    shareId: 'share' + String(i).padStart(20, '0'), title: '트리 ' + (i + 1), subject: '공개자', summary: '첫 기록',
+    momentCount: 3 + i, createdAt: '2026-11-20T09:30:00.000Z', publicDisplayName: '공개자', emotions: ['설렘'],
+    stats: { hearts: 3, favorites: 1, hearted: false, favored: false, reactions: { heart: 3 }, mine: [] }, ...extra
+  });
+  const cards = [
+    card(0, { cover: { emotion: '설렘', title: '가로 순간', type: 'photo', thumbnailUrl: svg(640, 360, '#3d5a80') } }),
+    card(1, { cover: { emotion: '설렘', title: '세로 순간', type: 'youtube', vertical: true, thumbnailUrl: svg(360, 640, '#7b3f61') }, aiTester: true }),
+    card(2, { cover: { emotion: '설렘', title: '제목 카드', type: 'photo', url: '' } })
+  ];
+  const browser = await chromium.launch({ headless: true });
+  try {
+    for (const [width, height] of [[390, 844], [1440, 900]]) for (const theme of ['night', 'garden']) {
+      const server = await serve();
+      try {
+        const base = `http://127.0.0.1:${server.address().port}`;
+        const ctx = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
+        await ctx.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); } catch {} }, theme);
+        await ctx.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
+        await ctx.route('**/api/community/shares**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, items: cards, totalVisible: 3, nextCursor: '', groups: [], groupsAll: [] }) }));
+        await ctx.route('**/api/workspace**', (r) => r.fulfill({ status: 401, contentType: 'application/json', body: '{"ok":false,"code":"unauthenticated"}' }));
+        const page = await ctx.newPage();
+        await page.goto(`${base}/v41/#explore`, { waitUntil: 'load' });
+        await page.waitForSelector('#community-list .community-card');
+        const facts = await page.evaluate(() => [...document.querySelectorAll('#community-list .community-cover')].map((c) => {
+          const badges = [...c.querySelectorAll('.community-cover-badge')].map((b) => {
+            const r = b.getBoundingClientRect();
+            return { top: Math.round(r.top), height: Math.round(r.height) };
+          });
+          return {
+            h: c.getBoundingClientRect().height, kind: c.dataset.mediaKind,
+            backdrop: !!c.querySelector('.community-cover-backdrop'),
+            grad: getComputedStyle(c, '::after').backgroundImage,
+            badges
+          };
+        }));
+        assert.equal(facts.length, 3, `${width}/${theme}: 세 카드가 보인다`);
+        const heights = facts.map((f) => f.h);
+        assert.ok(Math.max(...heights) - Math.min(...heights) <= 1, `${width}/${theme}: 표지 높이 차 1px 이하 ${JSON.stringify(heights)}`);
+        assert.deepEqual(facts.map((f) => f.backdrop), [false, true, false], `${width}/${theme}: 흐린 배경은 세로 영상만`);
+        for (const f of facts) {
+          assert.match(f.grad, /linear-gradient/, `${width}/${theme}: 아래쪽 그라데이션 한 겹`);
+          assert.ok(f.badges.every((b) => b.height === f.badges[0].height && b.top === f.badges[0].top), `${width}/${theme}: 배지 위치·크기 통일 ${JSON.stringify(f.badges)}`);
+        }
+        await ctx.close();
+      } finally { await new Promise((r) => server.close(r)); }
+    }
+  } finally { await browser.close(); }
+});
+
+test('#1330 휴대폰 상단·카드 다듬기 — 캡슐 없음, 검색·정렬 같은 높이, 칩 밀기, 빈 인기 무대 숨김, 배지 한 줄', { skip: REQUIRE ? false : skip, timeout: 240000 }, async () => {
+  if (skip) assert.fail(skip);
+  const card = (i, extra) => ({
+    shareId: 'share' + String(i).padStart(20, '0'), title: '트리 ' + (i + 1), subject: '공개자', summary: '첫 기록',
+    momentCount: 3 + i, createdAt: '2026-11-20T09:30:00.000Z', publicDisplayName: '공개자', emotions: ['설렘'],
+    stats: { hearts: 3, favorites: 1, hearted: false, favored: false, reactions: { heart: 3 }, mine: [] }, ...extra
+  });
+  const cards = [
+    card(0, { cover: { emotion: '설렘', title: '가로', type: 'youtube', thumbnailUrl: 'https://i.ytimg.com/vi/j-XAL0kGh_E/mqdefault.jpg' } }),
+    card(1, { cover: { emotion: '설렘', title: '띠 있는 가로', type: 'youtube', thumbnailUrl: 'https://i.ytimg.com/vi/y234b8-jqVw/hqdefault.jpg' }, aiTester: true }),
+    card(2, { cover: { emotion: '설렘', title: '세로', type: 'youtube', vertical: true, thumbnailUrl: 'https://i.ytimg.com/vi/TkV6B6j06NA/oardefault.jpg' } })
+  ];
+  const browser = await chromium.launch({ headless: true });
+  try {
+    for (const [width, height] of [[390, 844], [1440, 900]]) for (const theme of ['night', 'garden']) {
+      const server = await serve();
+      try {
+        const base = `http://127.0.0.1:${server.address().port}`;
+        const ctx = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
+        await ctx.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); } catch {} }, theme);
+        await ctx.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
+        await ctx.route('**/api/community/shares**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, items: cards, totalVisible: 3, nextCursor: '', groups: [], groupsAll: [] }) }));
+        await ctx.route('**/api/community/stages/popular**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
+        await ctx.route('**/api/workspace**', (r) => r.fulfill({ status: 401, contentType: 'application/json', body: '{"ok":false,"code":"unauthenticated"}' }));
+        const page = await ctx.newPage();
+        await page.goto(`${base}/v41/#explore`, { waitUntil: 'load' });
+        await page.waitForSelector('#community-list .community-card');
+        await page.waitForTimeout(300);
+        const facts = await page.evaluate(() => {
+          const tabs = document.querySelector('.community-tabs'), q = document.querySelector('#community-query'), s = document.querySelector('.community-sort-trigger');
+          const groups = document.querySelector('#community-groups'), find = document.querySelector('button.community-group-find');
+          const badges = [...document.querySelectorAll('#community-list .community-cover-badges')];
+          return {
+            tabBg: getComputedStyle(tabs).backgroundImage, tabPad: getComputedStyle(tabs).padding,
+            queryH: q.getBoundingClientRect().height, sortH: s.getBoundingClientRect().height,
+            scrollbar: getComputedStyle(groups).scrollbarWidth, snap: getComputedStyle(groups).scrollSnapType,
+            fade: getComputedStyle(groups).maskImage, findRight: find.getBoundingClientRect().right, railRight: document.querySelector('.community-group-rail').getBoundingClientRect().right,
+            popularHidden: document.querySelector('#community-popular-stages').hidden,
+            badgeRows: badges.map((b) => ({ group: Math.round(b.getBoundingClientRect().height), one: Math.round(b.firstElementChild?.getBoundingClientRect().height || 0) })),
+            thumb: document.querySelector('#community-list .community-cover-image')?.src || ''
+          };
+        });
+        assert.equal(facts.tabBg, 'none', `${width}/${theme}: 탭을 감싼 캡슐 없음`);
+        assert.equal(facts.tabPad, '0px', `${width}/${theme}: 캡슐 안쪽 여백 없음`);
+        assert.equal(facts.queryH, facts.sortH, `${width}/${theme}: 검색·정렬 높이 차 0`);
+        assert.equal(facts.queryH, 48, `${width}/${theme}: 검색·정렬 48px`);
+        if (width === 390) {
+          assert.equal(facts.scrollbar, 'none', `${width}/${theme}: 칩 줄 막대 숨김`);
+          assert.match(facts.snap, /x/, `${width}/${theme}: 칩 줄 밀기 가능`);
+          assert.match(facts.fade, /gradient/, `${width}/${theme}: 오른쪽 끝 흐림`);
+          assert.ok(facts.findRight <= facts.railRight + 1, `${width}/${theme}: 그룹 찾기 줄 끝 고정`);
+        }
+        assert.equal(facts.popularHidden, true, `${width}/${theme}: 빈 인기 무대 줄을 접는다`);
+        for (const badge of facts.badgeRows) assert.equal(badge.group, badge.one, `${width}/${theme}: 배지 한 줄`);
+        assert.match(facts.thumb, /mqdefault/, `${width}/${theme}: 띠 없는 썸네일 먼저`);
+        await ctx.close();
+      } finally { await new Promise((r) => server.close(r)); }
+    }
+  } finally { await browser.close(); }
+});
+
+test('빈 인기 무대는 줄을 접고 칩 줄 아래 간격을 다른 정보 줄과 같게 둔다(390·1440 × 밤·정원)', { skip: REQUIRE ? false : skip, timeout: 240000 }, async () => {
+  if (skip) assert.fail(skip);
+  const share = { shareId: 'share' + '0'.repeat(19) + '1', title: '공개 트리', subject: '주인', summary: '첫 기록', momentCount: 3, createdAt: '2026-11-20T09:30:00.000Z', publicDisplayName: '공개자', emotions: ['설렘'], cover: { title: '첫 순간', type: 'photo', url: '' }, stats: { hearts: 3, favorites: 1, hearted: false, favored: false, reactions: { heart: 3 }, mine: [] } };
+  const browser = await chromium.launch({ headless: true });
+  try {
+    for (const [width, height] of [[390, 844], [1440, 900]]) for (const theme of ['night', 'garden']) {
+      const server = await serve();
+      try {
+        const base = `http://127.0.0.1:${server.address().port}`;
+        const ctx = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
+        await ctx.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); } catch {} }, theme);
+        await ctx.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
+        await ctx.route('**/api/community/shares**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, items: [share], totalVisible: 1, nextCursor: '', groups: [], groupsAll: [] }) }));
+        await ctx.route('**/api/community/stages/popular**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
+        await ctx.route('**/api/workspace**', (r) => r.fulfill({ status: 401, contentType: 'application/json', body: '{"ok":false,"code":"unauthenticated"}' }));
+        const page = await ctx.newPage();
+        await page.goto(`${base}/v41/#explore`, { waitUntil: 'load' });
+        await page.waitForSelector('#community-list .community-card');
+        const facts = await page.evaluate(() => {
+          const rail = document.querySelector('.community-group-rail').getBoundingClientRect();
+          const feedback = document.querySelector('#community-feedback');
+          const card = document.querySelector('#community-list .community-card').getBoundingClientRect();
+          return { hidden: document.querySelector('#community-popular-stages').hidden, feedbackHidden: feedback.hidden, railToCard: Math.round(card.top - rail.bottom) };
+        });
+        assert.equal(facts.hidden, true, `${width}/${theme}: 빈 인기 무대 줄을 접는다`);
+        assert.equal(facts.feedbackHidden,true,'필터가 없을 때 결과 안내 숨김'); assert.equal(facts.railToCard,10,'빈 인기 무대 줄이 없을 때 칩 아래 간격 10px');
+        await ctx.close();
+      } finally { await new Promise((r) => server.close(r)); }
+    }
+  } finally { await browser.close(); }
+});
+
+test('#1338 인기 무대 오류·2초 지연에도 트리 카드를 1초 안에 표시하고 자리 밀림을 막는다', { skip: REQUIRE ? false : skip, timeout: 240000 }, async () => {
+ if(skip)assert.fail(skip);
+ const sample={
+  shareId:'share'+String(1).padStart(20,'0'),title:'무대 지연 점검 트리',subject:'공개자',summary:'공개된 순간',
+  momentCount:3,createdAt:'2026-11-20T09:30:00.000Z',publicDisplayName:'공개자',emotions:['설렘'],
+  cover:{title:'첫 순간',type:'photo',url:''},
+  stats:{hearts:3,favorites:1,hearted:false,favored:false,reactions:{heart:3},mine:[]}
+ };
+ const shots=process.env.LT_STAGE_1338_SHOTS||'';
+ const browser=await chromium.launch({headless:true});
+ try{
+  for(const mode of ['failed','late','both'])for(const [width,height] of [[390,844],[1440,900]])for(const theme of ['night','garden']){
+   const server=await serve();
+   try{
+    const base='http://127.0.0.1:'+server.address().port;
+    const ctx=await browser.newContext({viewport:{width,height},reducedMotion:'reduce'});
+    try{
+     await ctx.addInitScript(t=>{try{localStorage.setItem('lt41.theme',t)}catch{}},theme);
+     // #1380: 시간은 페이지 안의 같은 시계로 잰다 — 카드 요청 시작(Resource Timing)부터 카드가 문서에 들어간 순간까지.
+     // 바깥(Node) 시계와 waitFor 확인 간격은 실행기가 바쁘면 수 초씩 늘어나 화면 동작과 무관하게 흔들렸다.
+     await ctx.addInitScript(()=>{
+      const watch=()=>new MutationObserver((_,observer)=>{
+       if(document.querySelector('#community-list .community-card')){window.__ltCardAt=performance.now();observer.disconnect();}
+      }).observe(document.documentElement,{subtree:true,childList:true});
+      if(document.documentElement)watch();else document.addEventListener('DOMContentLoaded',watch);
+     });
+     let cardRequestAt=0;
+     await ctx.route('**/api/**',r=>r.fulfill({status:200,contentType:'application/json',body:'{"ok":true,"items":[]}'}));
+     await ctx.route('**/api/community/shares**',async r=>{
+      cardRequestAt=Date.now();
+      // 'both': 운영 측정(#1343)처럼 카드·무대 응답이 둘 다 느리고 무대가 카드보다 조금 늦게 오는 경우.
+      if(mode==='both')await new Promise(resolve=>setTimeout(resolve,800));
+      return r.fulfill({status:200,contentType:'application/json',
+       body:JSON.stringify({ok:true,items:[sample],totalVisible:1,nextCursor:'',groups:[],groupsAll:[]})});
+     });
+     await ctx.route('**/api/community/stages/popular**',async r=>{
+      if(mode==='failed')return r.abort('failed');
+      await new Promise(resolve=>setTimeout(resolve,mode==='both'?950:2000));
+      return r.fulfill({status:200,contentType:'application/json',body:JSON.stringify({ok:true,items:[{stageId:'late-stage',weeklyVoters:5,title:'늦게 도착한 무대'}]})});
+     });
+     const page=await ctx.newPage();
+     await page.goto(base+'/v41/#explore',{waitUntil:'domcontentloaded'});
+     await page.locator('#community-list .community-card').first().waitFor({state:'visible',timeout:5000});
+     assert.ok(cardRequestAt>0,mode+'/'+width+'/'+theme+': 트리 요청이 시작됐다');
+     const elapsed=await page.evaluate(()=>{
+      const entry=performance.getEntriesByType('resource').find(e=>/\/api\/community\/shares\?/.test(e.name));
+      return entry&&window.__ltCardAt?Math.round(window.__ltCardAt-entry.startTime):Infinity;
+     });
+     assert.ok(elapsed<(mode==='both'?1500:1000),mode+'/'+width+'/'+theme+': 카드 요청부터 제때 보여야 함 ('+elapsed+'ms)');
+     const before=await page.evaluate(()=>{
+      const card=document.querySelector('#community-list .community-card'),popular=document.querySelector('#community-popular-stages');
+      return {y:card.getBoundingClientRect().top,hidden:popular.hidden,cardCount:document.querySelectorAll('#community-list .community-card').length,
+       stageHeight:popular.getBoundingClientRect().height};
+     });
+     assert.equal(before.cardCount,1,mode+'/'+width+'/'+theme+': 공개 트리 카드 표시');
+     if(mode==='both'){
+      assert.equal(before.hidden,false,mode+'/'+width+'/'+theme+': 카드 응답 뒤 300ms 안에 온 인기 무대는 함께 보인다');
+      assert.ok(before.stageHeight>0,mode+'/'+width+'/'+theme+': 인기 무대 줄 높이');
+     }else{
+      assert.equal(before.hidden,true,mode+'/'+width+'/'+theme+': 실패·초과 시간에는 인기 무대 줄 접기');
+      assert.equal(before.stageHeight,0,mode+'/'+width+'/'+theme+': 빈 띠 높이 0');
+     }
+     if(mode==='late')await page.waitForTimeout(2100);
+     const after=await page.evaluate(()=>{
+      const card=document.querySelector('#community-list .community-card'),popular=document.querySelector('#community-popular-stages');
+      return {y:card.getBoundingClientRect().top,hidden:popular.hidden,stageHeight:popular.getBoundingClientRect().height};
+     });
+     assert.equal(after.y,before.y,mode+'/'+width+'/'+theme+': 카드 뒤 자리 밀림 0');
+     assert.equal(after.hidden,before.hidden,mode+'/'+width+'/'+theme+': 처음 그린 뒤 무대 줄 상태가 바뀌지 않음');
+     assert.equal(after.stageHeight,before.stageHeight,mode+'/'+width+'/'+theme+': 줄 높이 유지');
+     if(shots){
+      const {mkdir}=await import('node:fs/promises');
+      await mkdir(shots,{recursive:true});
+      await page.screenshot({path:shots+'/'+mode+'-'+width+'-'+theme+'.png',animations:'disabled'});
+     }
+     console.log('#1338',mode,width,theme,'카드',elapsed+'ms','이동',after.y-before.y+'px');
+    }finally{await ctx.close();}
+   }finally{await new Promise(resolve=>server.close(resolve));}
+  }
+ }finally{await browser.close();}
+});
+
+test('둘러보기 윗줄·역할별 색·마우스 올림·칩 크기 — 390·1440 × 밤·정원', {skip:REQUIRE?false:skip,timeout:240000},async()=>{
+ if(skip)assert.fail(skip);
+ const card=(n,ai)=>({
+  shareId:'share'+String(n).padStart(20,'0'),title:ai?'명예회원 공개 트리':'일반 공개 트리',subject:'가수',summary:'공개 기록',
+  momentCount:3,createdAt:'2026-11-20T09:30:00.000Z',publicDisplayName:ai?'하늘':'노출되면 안 되는 이름',
+  aiTester:ai,cover:{title:'첫 순간',type:'photo',url:''},
+  stats:{hearts:3,favorites:1,hearted:false,favored:false,reactions:{heart:3},mine:[]}
+ });
+ const parseColor=value=>{const parts=value.match(/[\d.]+/g)?.map(Number)||[];return {r:parts[0]||0,g:parts[1]||0,b:parts[2]||0,a:parts[3]??1};};
+ const over=(fg,bg)=>({r:fg.r*fg.a+bg.r*(1-fg.a),g:fg.g*fg.a+bg.g*(1-fg.a),b:fg.b*fg.a+bg.b*(1-fg.a),a:1});
+ const luminance=color=>{const channel=value=>{value/=255;return value<=.04045?value/12.92:((value+.055)/1.055)**2.4;};return .2126*channel(color.r)+.7152*channel(color.g)+.0722*channel(color.b);};
+ const contrast=(fg,bg)=>{const a=luminance(fg),b=luminance(bg);return (Math.max(a,b)+.05)/(Math.min(a,b)+.05);};
+ const browser=await chromium.launch({headless:true});
+ try{
+ for(const [width,height] of [[390,844],[1440,900]])for(const theme of ['night','garden']){
+  const server=await serve();
+  try{
+   const base='http://127.0.0.1:'+server.address().port,ctx=await browser.newContext({viewport:{width,height},reducedMotion:'reduce'});
+   try{
+    await ctx.addInitScript(t=>localStorage.setItem('lt41.theme',t),theme);
+    const body=JSON.stringify({ok:true,items:[card(1,true),card(2,false)],totalVisible:2,nextCursor:'',
+      groups:[{value:'적은 그룹',count:2},{value:'많은 그룹',count:9}],
+      groupsAll:[{value:'적은 그룹',count:2},{value:'많은 그룹',count:9}]});
+    await ctx.route('**/api/**',r=>r.fulfill({status:200,contentType:'application/json',body:'{"ok":true,"items":[]}'}));
+    await ctx.route('**/api/community/shares**',r=>r.fulfill({status:200,contentType:'application/json',body}));
+    await ctx.route('**/api/community/stages/popular**',r=>r.fulfill({status:200,contentType:'application/json',body:'{"ok":true,"items":[]}'}));
+    const page=await ctx.newPage();
+    await page.goto(base+'/v41/#explore',{waitUntil:'domcontentloaded'});
+    await page.locator('.community-card').first().waitFor();
+    const initial=await page.evaluate(()=>{
+     const r=s=>{const b=document.querySelector(s).getBoundingClientRect();return {x:b.x,y:b.y,w:b.width,h:b.height}};
+     return {viewport:innerWidth,scroll:document.documentElement.scrollWidth,row:r('.community-top-row'),tabs:r('.community-tabs'),
+      search:r('#community-search-form'),sort:r('.community-sort-label'),icon:r('.community-sort-label'),
+      firstTab:r('#community-tab-trees'),secondTab:r('#community-tab-moments'),queryName:document.querySelector('#community-query').getAttribute('aria-label'),
+      feedbackHidden:document.querySelector('#community-feedback').hidden,
+      findVisible:[...document.querySelectorAll('button.community-group-find')].some(e=>e.getBoundingClientRect().width>0),
+      names:[...document.querySelectorAll('.community-card-owner')].map(e=>e.textContent),
+      groups:[...document.querySelectorAll('#community-groups button')].map(e=>e.textContent),
+      ownerLink:document.querySelector('.community-card-owner a')!==null};
+    });
+    assert.equal(initial.scroll,initial.viewport,width+'/'+theme+': 가로 넘침 0');
+    assert.equal(initial.tabs.y,initial.search.y,width+'/'+theme+': 탭·찾기 한 줄');
+    assert.equal(initial.search.y,initial.sort.y,width+'/'+theme+': 찾기·정렬 한 줄');
+    assert.equal(initial.row.h,48,width+'/'+theme+': 윗줄 높이');
+    for(const size of [initial.firstTab.h,initial.secondTab.h,initial.icon.w,initial.icon.h,initial.search.h,initial.sort.h])
+     assert.ok(size>=44,width+'/'+theme+': 단추 44픽셀 이상 '+size);
+    assert.equal(initial.queryName,'가수·노래·무대 찾기');
+    assert.equal(initial.feedbackHidden,true,width+'/'+theme+': 검색·필터 없는 안내 숨김');
+    assert.equal(initial.findVisible,false,width+'/'+theme+': 그룹 찾기 칩 제거');
+    assert.deepEqual(initial.names,['AI 명예회원 하늘'],width+'/'+theme+': AI 카드만 이름');
+    assert.equal(initial.ownerLink,false,width+'/'+theme+': 만든 사람은 링크 아님');
+    assert.deepEqual(initial.groups.slice(0,3),['전체','많은 그룹','적은 그룹'],width+'/'+theme+': 방문자 공개 수 순서');
+    assert.deepEqual([initial.firstTab.w,initial.firstTab.h],[initial.secondTab.w,initial.secondTab.h],width+'/'+theme+': 선택·비선택 탭 크기 같음');
+    const roles=await page.evaluate(()=>{
+     const probe=document.createElement('span');probe.style.display='none';document.body.append(probe);
+     const read=name=>{probe.style.color='var('+name+')';return getComputedStyle(probe).color;};
+     const names=['--lt-role-bg','--lt-role-accent-bg','--lt-role-accent-ink','--lt-role-secondary-border','--lt-role-secondary-ink','--lt-role-input-bg','--lt-role-input-border','--lt-role-input-ink','--lt-role-idle-border','--lt-role-idle-ink','--lt-role-hover-bg','--lt-role-hover-border','--lt-role-hover-ink','--lt-role-text-strong','--lt-role-text-muted','--lt-role-text-faint','--lt-role-border','--lt-rose','--lt-rose-ink'];
+     const result=Object.fromEntries(names.map(name=>[name,read(name)]));probe.remove();return result;
+    });
+    const roleBg=parseColor(roles['--lt-role-bg']);
+    // #1362: 선택 탭은 강조 채움이고 비선택 탭과 다르다. 밤의 비선택 탭·칩 테두리는 금색이 아니다.
+    const tabLook=await page.evaluate(()=>{const look=id=>{const e=document.getElementById(id),s=getComputedStyle(e);return {selected:e.getAttribute('aria-selected'),bg:s.backgroundColor,border:s.borderTopColor};};return {trees:look('community-tab-trees'),moments:look('community-tab-moments')};});
+    assert.equal(tabLook.trees.selected,'true',width+'/'+theme+': 기본 선택 탭은 트리');
+    assert.equal(tabLook.trees.bg,roles['--lt-role-accent-bg'],width+'/'+theme+': 선택 탭 강조 채움');
+    assert.notEqual(tabLook.moments.bg,tabLook.trees.bg,width+'/'+theme+': 선택·비선택 탭 바탕 다름');
+    if(theme==='night'){
+     const notGold=c=>{const v=parseColor(c);return v.r-v.b<40;};
+     assert.ok(notGold(tabLook.moments.border),width+'/밤: 비선택 탭 테두리 금색 아님 '+tabLook.moments.border);
+     const chipBorder=await page.locator('#community-groups .community-group-chip:not(.is-active)').first().evaluate(el=>getComputedStyle(el).borderTopColor);
+     assert.ok(notGold(chipBorder),width+'/밤: 비선택 칩 테두리 금색 아님 '+chipBorder);
+    }
+    const pairs=[
+     ['강조',roles['--lt-role-accent-ink'],roles['--lt-role-accent-bg']],
+     ['보조 단추',roles['--lt-role-secondary-ink'],roles['--lt-role-bg']],
+     ['입력 칸',roles['--lt-role-input-ink'],roles['--lt-role-input-bg']],
+     ['선택 안 됨',roles['--lt-role-idle-ink'],roles['--lt-role-bg']],
+     ['마우스 올림',roles['--lt-role-hover-ink'],roles['--lt-role-hover-bg']],
+     ['글자 진함',roles['--lt-role-text-strong'],roles['--lt-role-bg']],
+     ['글자 중간',roles['--lt-role-text-muted'],roles['--lt-role-bg']],
+     ['글자 흐림',roles['--lt-role-text-faint'],roles['--lt-role-bg']]
+    ];
+    for(const [label,fg,bg] of pairs){const f=over(parseColor(fg),parseColor(bg)),b=over(parseColor(bg),roleBg),value=contrast(f,b);assert.ok(value>=4.5,width+'/'+theme+': '+label+' 대비 '+value.toFixed(2)+':1');}
+    if(theme==='night'){
+     const rose=[roles['--lt-rose'],roles['--lt-rose-ink']];
+     assert.ok(Object.entries(roles).filter(([name])=>name.startsWith('--lt-role-')).every(([,value])=>!rose.includes(value)),width+'/밤: 역할 색에 분홍 없음');
+    }
+    const idleTab=page.locator('#community-tab-moments'),tabBefore=await idleTab.evaluate(el=>{const s=getComputedStyle(el);return {bg:s.backgroundColor,color:s.color,cursor:s.cursor};});
+    await idleTab.hover();const tabAfter=await idleTab.evaluate(el=>{const s=getComputedStyle(el);return {bg:s.backgroundColor,color:s.color,cursor:s.cursor};});
+    assert.notDeepEqual([tabAfter.bg,tabAfter.color],[tabBefore.bg,tabBefore.color],width+'/'+theme+': 비선택 탭 마우스 올림 변화');
+    assert.equal(tabAfter.cursor,'pointer');await page.mouse.move(0,0);
+    const sortBefore=await page.locator('.community-sort-trigger').evaluate(el=>{const s=getComputedStyle(el);return {bg:s.backgroundColor,color:s.color};});
+    await page.locator('.community-sort-trigger').hover();const sortAfter=await page.locator('.community-sort-trigger').evaluate(el=>{const s=getComputedStyle(el);return {bg:s.backgroundColor,color:s.color};});
+    assert.notDeepEqual(sortAfter,sortBefore,width+'/'+theme+': 정렬 단추 마우스 올림 변화');await page.mouse.move(0,0);
+    const chip=page.locator('#community-groups .community-group-chip').filter({hasText:'많은 그룹'}).first(),chipBefore=await chip.evaluate(el=>{const r=el.getBoundingClientRect();return [r.width,r.height]});
+    await chip.click();await page.locator('.community-card').first().waitFor();const chipAfter=await chip.evaluate(el=>{const r=el.getBoundingClientRect();return [r.width,r.height]});
+    assert.deepEqual(chipAfter,chipBefore,width+'/'+theme+': 칩 선택 전후 크기 같음');
+    await chip.click();
+    await page.locator('#community-query').focus();
+    assert.equal(await page.locator('#community-query').evaluate(e=>document.activeElement===e),true,width+'/'+theme+': 검색칸 직접 입력');
+    assert.ok(await page.locator('#community-query').evaluate(e=>e.getBoundingClientRect().width)>20,width+'/'+theme+': 입력칸 확장');
+    const inputLook=await page.locator('#community-query').evaluate(el=>{const s=getComputedStyle(el);return {bg:s.backgroundColor,color:s.color,border:s.borderTopColor};});
+    assert.deepEqual(inputLook,{bg:roles['--lt-role-input-bg'],color:roles['--lt-role-input-ink'],border:roles['--lt-role-input-border']},width+'/'+theme+': 입력 칸 역할 색 적용');
+    await page.locator('#community-query').fill('가수');
+    await page.locator('#community-query').press('Enter');
+    assert.equal(await page.locator('#community-query').inputValue(),'가수');
+    await page.locator('.community-sort-trigger').click();
+    await page.locator('.community-sort-option[data-sort="popular"]').click();
+    assert.equal(await page.locator('#community-sort option[value="popular"]').textContent(),'많이 담긴 순',width+'/'+theme+': 정렬 선택 이름');
+    assert.equal(await page.locator('#community-sort').inputValue(),'popular',width+'/'+theme+': 인기순 선택 유지');
+    const yBefore=await page.locator('.community-top-row').evaluate(e=>e.getBoundingClientRect().height);
+    await page.locator('#community-tab-moments').click();
+    const moment=await page.evaluate(()=>({
+     row:document.querySelector('.community-top-row').getBoundingClientRect().height,
+     search:getComputedStyle(document.querySelector('#community-search-form')).visibility,
+     sort:getComputedStyle(document.querySelector('.community-sort-label')).visibility,
+     scroll:document.documentElement.scrollWidth,view:innerWidth}));
+    assert.equal(moment.row,yBefore,width+'/'+theme+': 순간 전환 높이 변화 0');
+    assert.equal(moment.search,'hidden',width+'/'+theme+': 순간 찾기 숨김');
+    assert.equal(moment.sort,'hidden',width+'/'+theme+': 순간 정렬 숨김');
+    assert.equal(moment.scroll,moment.view,width+'/'+theme+': 순간 가로 넘침 0');
+    await page.locator('#community-tab-trees').click();
+    assert.equal(await page.locator('#community-sort').inputValue(),'popular',width+'/'+theme+': 돌아와도 인기순 유지');
+    console.log('윗줄 점검',width,theme,'통과');
+   }finally{await ctx.close();}
+  }finally{await new Promise(r=>server.close(r));}
+ }
+ }finally{await browser.close();}
 });

@@ -72,7 +72,7 @@ async function fingerprint(frame) {
     const pixels = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
     const digest = await crypto.subtle.digest('SHA-256', pixels);
     const canvas = [...new Uint8Array(digest)].map(n => n.toString(16).padStart(2, '0')).join('');
-    const surfaces = ['.legend', '.controls', '.detail', '.top-actions .pill', '.hero p'].map(sel => {
+    const surfaces = ['.legend', '.controls', '.detail', '.lt-screen-toolbar .view-switch .pill', '.hero p'].map(sel => {
       const cs = getComputedStyle(document.querySelector(sel));
       return [sel, cs.color, cs.backgroundColor, cs.backgroundImage, cs.borderColor];
     });
@@ -165,6 +165,18 @@ async function clickMapObject(frame, kind) {
 }
 
 async function interactions({ page, frame, width }) {
+  const clickToolbar = async (id) => {
+    const button = frame.locator(`#${id}`);
+    let openedMore = false;
+    if (!(await button.isVisible())) {
+      const more = frame.locator('.lt-screen-toolbar .lt-toolbar-more');
+      await more.click();
+      openedMore = true;
+      await button.waitFor({ state: 'visible', timeout: 5000 });
+    }
+    await button.click();
+    if (openedMore) await frame.locator('.lt-screen-toolbar .lt-toolbar-more').click();
+  };
   const stored = await page.evaluate(() => localStorage.getItem('lt41.boardTheme'));
   for (const surface of [page, frame]) await surface.evaluate(() => {
     window.__mapThemeNotices = [];
@@ -186,7 +198,7 @@ async function interactions({ page, frame, width }) {
     document.activeElement?.blur?.();
     return [left, app.scrollLeft, app.scrollTop];
   }), [0, 0, 0], '닫힌 상세 창에 초점이 가도 지도가 밀리지 않는다');
-  await frame.locator('#overviewBtn').click();
+  await clickToolbar('overviewBtn');
   const hub = await clickMapObject(frame, 'hub');
   assert.equal(await frame.evaluate(() => window.__lt.state.cluster?.id), hub.id, '묶음 클릭');
   if (width === 1440) {
@@ -199,17 +211,17 @@ async function interactions({ page, frame, width }) {
     }, hub.id);
     assert.equal(centered.id, hub.id, '크기 변경 뒤 고른 묶음 유지');
     assert.ok(centered.dx < 1 && centered.dy < 1, `크기 변경 뒤 묶음을 새 상자 가운데에 유지 (${centered.dx}, ${centered.dy})`);
-    await frame.locator('#overviewBtn').click();
+    await clickToolbar('overviewBtn');
     await page.setViewportSize(viewport);
     await page.waitForTimeout(120);
   }
-  await frame.locator('#overviewBtn').click();
-  await frame.locator('#viewConc').click();
+  await clickToolbar('overviewBtn');
+  await clickToolbar('viewConc');
   assert.equal(await frame.evaluate(() => window.__lt.state.view), 'tag', '묶음 전환');
   await clickMapObject(frame, 'dot');
   await frame.locator('#detailClose').click();
-  await frame.locator('#overviewBtn').click();
-  await frame.locator('#viewNet').click();
+  await clickToolbar('overviewBtn');
+  await clickToolbar('viewNet');
   assert.equal(await frame.evaluate(() => window.__lt.state.view), 'network', '그물형 전환');
   if (width > 980) {
     // #951 ⑥: 큰 탐색 판은 숨고 아래 단추 줄이 같은 단추를 맡는다 — 클릭 대상만 줄로 옮긴다(배율 단언 그대로).
@@ -235,7 +247,7 @@ async function interactions({ page, frame, width }) {
   }
   assert.equal(await frame.evaluate(() => window.__lt.state.selected?.id), await frame.evaluate(() => window.__lt.FIRST.id), '첫 순간 보기');
   await frame.locator('#detailClose').click();
-  await frame.locator('#overviewBtn').click();
+  await clickToolbar('overviewBtn');
   assert.equal(await frame.evaluate(() => window.__lt.state.scale), 1, '전체 보기 배율');
   assert.equal(await frame.evaluate(() => window.__lt.state.selected), null, '전체 보기 선택 해제');
   await page.mouse.move(0, 0);

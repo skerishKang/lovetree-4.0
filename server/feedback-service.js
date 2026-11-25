@@ -103,7 +103,7 @@ function publicFollowup(row,viewer){
   return {id:row.id,body:row.body,createdAt:row.createdAt,edited:!!row.editedAt,mine,canEdit:mine,canDelete:mine};
 }
 
-export function createFeedbackService({feedbackRepo,productId,admin=null,opsNotify=null,outbox=null,now=()=>Date.now()}={}){
+export function createFeedbackService({feedbackRepo,productId,admin=null,opsNotify=null,outbox=null,nameOf=null,now=()=>Date.now()}={}){
   if(!feedbackRepo)throw new Error('feedbackRepo가 필요합니다.');
   // 속도 제한은 공용 한 벌(server/rate-limit.js)로 — 의견 창구는 10분 창을 쓴다(#1073 B-19).
   const limiter=createRateLimiter({now,windowMs:10*60_000});
@@ -117,13 +117,24 @@ export function createFeedbackService({feedbackRepo,productId,admin=null,opsNoti
   function requirePrincipal(principal){if(!principal)throw new ApiError(401,'unauthenticated','로그인이 필요해요.');return principal;}
 
   // #1190: 저장과 보낼 줄 넣기를 같은 트랜잭션에 담는다. 보낼 값에 이메일·소개는 넣지 않는다.
-  function outboxEvent(event, {feedbackId,body='',status='',append=null,isAiCustomer=false,accountSubjectId=null,category='',title='',createdAt='',eventKey=''}={}) {
+  // 보낸 사람 닉네임(운영센터 표시용). nameOf가 없거나(받는 쪽이 아직 모름) 비어 있으면 보내지 않는다.
+  // 이메일·소개는 보내지 않는다. 60자까지만, 제어 문자는 뺀다.
+  async function accountNameOf(subjectId){
+    if(!nameOf||!subjectId)return '';
+    try{
+      const raw=String(await nameOf(subjectId)||'').replace(/[\u0000-\u001f\u007f]/g,'').trim();
+      return raw.slice(0,60);
+    }catch{return '';}
+  }
+  function outboxEvent(event, {feedbackId,body='',status='',append=null,isAiCustomer=false,accountSubjectId=null,accountName='',category='',title='',createdAt='',eventKey=''}={}) {
+    const payload={event,feedbackId:Number(feedbackId),body,status,append,isAiCustomer,accountSubjectId,category,title,createdAt};
+    if(accountName)payload.accountName=accountName;
     return {
       productId,
       feedbackId:Number(feedbackId),
       eventKey:eventKey || (event==='new'?'new':`${event}:${status}:${createdAt}`),
       kind:event,
-      payload:{event,feedbackId:Number(feedbackId),body,status,append,isAiCustomer,accountSubjectId,category,title,createdAt}
+      payload
     };
   }
   async function saveWithOutbox(work,events){
@@ -168,13 +179,15 @@ export function createFeedbackService({feedbackRepo,productId,admin=null,opsNoti
     else rate('ip:'+clientKey(request),3,'같은 곳에서 10분에 3번까지 보낼 수 있어요. 잠시 뒤 다시 시도해 주세요.');
     const masked=maskPersonal(text);
     const isAi=await isAiCustomer(principal);
+    const accountName=await accountNameOf(subjectId);
     const audience=await notifyAudience(principal);
     const row=await saveWithOutbox(
       client=>feedbackRepo.create({productId,subjectId,kind:'opinion',category,title:firstLine(masked),body:masked,context:sanitizeContext(context)},client),
-      saved=>outboxEvent('new',{feedbackId:saved.id,body:masked,status:saved.status,isAiCustomer:isAi,accountSubjectId:subjectId,category,title:saved.title,createdAt:saved.createdAt})
+      saved=>outboxEvent('new',{feedbackId:saved.id,body:masked,status:saved.status,isAiCustomer:isAi,accountSubjectId:subjectId,accountName,category,title:saved.title,createdAt:saved.createdAt})
     );
     notifySaved('feedback_new',row.title||firstLine(masked),String(row.id),audience);
-    return {id:row.id,status:row.status,createdAt:row.createdAt};
+    // #1273 6번: 보낸 직후 '내 의견' 목록에 같은 글을 바로 넣을 수 있게 저장된 값을 함께 돌려준다.
+    return {id:row.id,status:row.status,createdAt:row.createdAt,kind:row.kind,category:row.category,title:row.title,body:row.body};
    },
 
    /** 2차: AI 고객 '오늘 사용 일지'(게시판 글쓰기). 하루 한 건, 다시 쓰면 고친다. */
@@ -241,6 +254,7 @@ export function createFeedbackService({feedbackRepo,productId,admin=null,opsNoti
     if(!text)throw new ApiError(400,'body_required','덧붙일 말을 입력해 주세요.');
     rate('followup:'+principal.subjectId,20,'잠시 뒤 다시 시도해 주세요.');
     const isAi=await isAiCustomer(principal);
+    const accountName=await accountNameOf(principal.subjectId);
     const audience=await notifyAudience(principal);
     const result=await saveWithOutbox(async client=>{
      const reply=await feedbackRepo.addReply({productId,postId:post.id,authorType:'customer',authorSubjectId:principal.subjectId,body:maskPersonal(text)},client);
@@ -251,8 +265,8 @@ export function createFeedbackService({feedbackRepo,productId,admin=null,opsNoti
      }
      return {reply,status};
     },({reply,status})=>[
-     outboxEvent('append',{feedbackId:post.id,body:reply.body,status,append:reply.body,isAiCustomer:isAi,accountSubjectId:principal.subjectId,createdAt:reply.createdAt,eventKey:'reply:'+reply.id}),
-     status!==post.status?outboxEvent('status',{feedbackId:post.id,body:post.body,status,isAiCustomer:isAi,accountSubjectId:principal.subjectId,createdAt:reply.createdAt}):null
+     outboxEvent('append',{feedbackId:post.id,body:reply.body,status,append:reply.body,isAiCustomer:isAi,accountSubjectId:principal.subjectId,accountName,createdAt:reply.createdAt,eventKey:'reply:'+reply.id}),
+     status!==post.status?outboxEvent('status',{feedbackId:post.id,body:post.body,status,isAiCustomer:isAi,accountSubjectId:principal.subjectId,accountName,createdAt:reply.createdAt}):null
     ]);
     notifySaved('feedback_append',post.title||firstLine(post.body),String(result.reply.id),audience);
     return {id:result.reply.id,postId:post.id,status:result.status,createdAt:result.reply.createdAt};
@@ -346,7 +360,17 @@ export function createFeedbackService({feedbackRepo,productId,admin=null,opsNoti
     if(patch.score!==undefined&&patch.score!==null&&patch.score!==''){pscore=Number(patch.score);if(!Number.isInteger(pscore)||pscore<1||pscore>5)throw new ApiError(400,'score_invalid','점수는 1~5로 주세요.');}
     const row=await saveWithOutbox(
      client=>feedbackRepo.update({productId,id,status:status||null,memo,issueNumber:pint,title,pbody,score:pscore},client),
-     saved=>status?outboxEvent('status',{feedbackId:saved.id,body:saved.body,status:saved.status,accountSubjectId:saved.subjectId,createdAt:saved.updatedAt}):null
+     async saved=>{
+      if(!status||!saved)return null;
+      const events=[];
+      // 상태 수신은 대상 의견이 이미 있어야 하므로, 누락된 최초 전송을 같은 거래에서 먼저 채운다.
+      if(saved.kind==='opinion'){
+       const isAi=await roleOf({productId,subjectId:saved.subjectId}).catch(()=>null)===ROLE_AI_CUSTOMER;
+       events.push(outboxEvent('new',{feedbackId:saved.id,body:saved.body,status:saved.status,isAiCustomer:isAi,accountSubjectId:saved.subjectId,accountName:await accountNameOf(saved.subjectId),category:saved.category,title:saved.title||firstLine(saved.body),createdAt:saved.createdAt}));
+      }
+      events.push(outboxEvent('status',{feedbackId:saved.id,body:saved.body,status:saved.status,accountSubjectId:saved.subjectId,createdAt:saved.updatedAt}));
+      return events;
+     }
     );
     if(!row)throw new ApiError(404,'feedback_not_found','글을 찾을 수 없어요.');
     return boardRow(row);

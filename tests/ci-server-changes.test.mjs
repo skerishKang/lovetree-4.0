@@ -12,7 +12,7 @@ test('서버 코드·배포 스크립트·의존성이 바뀌면 서버 바뀜�
 });
 
 test('서버 관련 시험이 바뀌면 서버 바뀜이다', () => {
-  assert.equal(changed(['tests/login-state-postgres.test.mjs']), true);
+  assert.equal(changed(['tests/admin-roles-postgres.test.mjs']), true);
   assert.equal(changed(['tests/migrations-postgres.test.mjs']), true);
   assert.equal(changed(['tests/install-preflight.test.mjs']), true);
 });

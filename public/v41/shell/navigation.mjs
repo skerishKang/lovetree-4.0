@@ -6,6 +6,7 @@
 export const screens = [
   ['home', 'src064-orbit.html', '첫 화면'],
   ['shelf', 'track32-bookshelf.html', '서재'],
+  ['tree', 'track61-tree.html', '트리'],
   ['book', 'track59-sketchbook.html', '책'],
   ['board', 'track58-pinboard.html', '보드'],
   ['network', 'track56-network.html', '지도'],
@@ -23,6 +24,7 @@ export function themedViewFor(file) {
   if (file === 'src064-orbit.html') return 'home';
   if (file === 'first-journey.html') return 'journey';
   if (file === 'track32-bookshelf.html') return 'shelf';
+  if (file === 'track61-tree.html') return 'tree';
   if (file === 'track59-sketchbook.html') return 'book';
   if (file === 'track58-pinboard.html') return 'board';
   if (file === 'track56-network.html') return 'network';

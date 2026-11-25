@@ -73,8 +73,8 @@ test('#464 눌린 보기 단추의 금테가 identity.css 마지막 규칙으로
   assert.ok(idxIdentity > 0, 'identity.css에 눌린 쪽 규칙이 있다');
   const rule = identity.slice(idxIdentity - 200, idxIdentity + 260);
   assert.match(rule, /view-toggle/, '보기 단추(view-toggle)를 겨냥한다');
-  assert.match(rule, /background:var\(--lt-gold\)/, '눌린 쪽은 금빛 바탕(맨 위 메뉴의 지금 보기와 같은 결)');
-  assert.match(rule, /border-color:var\(--lt-gold\)/, '금테');
+  assert.match(rule, /background:var\(--lt-role-accent-bg\)/, '눌린 쪽은 강조 역할 바탕(맨 위 메뉴의 지금 보기와 같은 결)');
+  assert.match(rule, /border-color:var\(--lt-role-accent-bg\)/, '강조 테두리');
   // book.css의 옛 규칙은 남겨 두되(문서화), identity.css가 덮는다는 사실을 여기서 고정한다.
   assert.match(bookCss, /\.view-toggle \.ui-btn\[aria-pressed=true\]/, 'book.css의 원래 규칙은 그대로 있다');
 });
@@ -91,10 +91,10 @@ test('#464 보기 단추는 aria-pressed로 상태를 알리고, 눌린 쪽과 �
   assert.match(book, /one\.setAttribute\('aria-pressed',String\(s\)\)/, '한 장: aria-pressed로 알린다');
   assert.match(book, /two\.setAttribute\('aria-pressed',String\(!s\)\)/, '두 장: aria-pressed로 알린다');
   // 두 쪽의 배경 규칙이 서로 다른 값을 낸다(같은 값이면 #464가 다시 생긴다).
-  const goldRule = /view-toggle \.ui-btn\[aria-pressed=true\][^{]*\{[^}]*background:var\(--lt-gold\)/;
+  const goldRule = /view-toggle \.ui-btn\[aria-pressed=true\][^{]*\{[^}]*background:var\(--lt-role-accent-bg\)/;
   // 이슈 584: 두 칸이 한 묶음(테두리 안)이라 눌리지 않은 칸은 묶음 바탕을 그대로 쓴다 — 눌린 칸 금색과 같지 않다.
-  const mutedRule = /view-toggle\{[^}]*background:rgba\(9,8,14,\.35\)/;
-  const cellRule = /view-toggle \.ui-btn\[aria-pressed=false\]\{[^}]*background:transparent/;
+  const mutedRule = /view-toggle\{[^}]*background:var\(--lt-role-bg\)/;
+  const cellRule = /view-toggle \.ui-btn\[aria-pressed=false\]\{[^}]*background:var\(--lt-role-idle-bg\)/;
   assert.match(identity, goldRule, '눌린 칸 배경은 금빛');
   assert.match(identity, mutedRule, '묶음 바탕은 눌러 둔 색');
   assert.match(identity, cellRule, '안 눌린 칸은 묶음 바탕을 그대로 — 눌린 칸과 같지 않다');

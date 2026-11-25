@@ -35,13 +35,14 @@ function tree952({ subject, count, youtube = false }) {
   return t;
 }
 
-async function boot952(browser, { width = 1440, member = false, motion = 'reduce', initStorage = {}, routes = {}, thumb = THUMB, waitUntil = 'load' } = {}) {
+async function boot952(browser, { width = 1440, height = width === 390 ? 844 : 900, member = false, motion = 'reduce', initStorage = {}, routes = {}, thumb = THUMB, waitUntil = 'load', initScript = null } = {}) {
   const server = await serve({});
   const base = `http://127.0.0.1:${server.address().port}`;
-  const ctx = await browser.newContext({ viewport: { width, height: width === 390 ? 844 : 900 }, reducedMotion: motion });
+  const ctx = await browser.newContext({ viewport: { width, height }, reducedMotion: motion });
   await ctx.addInitScript((entries) => {
     for (const [k, v] of Object.entries(entries)) { try { localStorage.setItem(k, v); } catch {} }
   }, initStorage);
+  if (initScript) await ctx.addInitScript(initScript);
   const trees = [tree952({ subject: '좋아하는 순간들', count: 8, youtube: true }), tree952({ subject: '여름', count: 3 })];
   const workspace = { revision: 1, state: { version: 1, trees, prefs: { displayName: '화면검사 시험계정' } }, subject: 'visual-audit-fake', writeSubjectBound: true, savedAt: '2026-11-20T00:00:00.000Z' };
   await ctx.route('**/*', (route) => {
@@ -323,7 +324,7 @@ test('#1027 정원 이어 보기 카드의 종이색과 글 대비, 세로 영�
               const style = el => getComputedStyle(el);
               return {card:style(card).backgroundColor,media:style(media).backgroundColor,meta:style(meta).backgroundColor,
                 border:style(meta).borderTopWidth, width:media.getBoundingClientRect().width, metaWidth:meta.getBoundingClientRect().width,
-                height:media.getBoundingClientRect().height, fit:thumb && style(thumb).objectFit,
+                height:media.getBoundingClientRect().height, fit:thumb && style(thumb).objectFit, thumbW:thumb && thumb.getBoundingClientRect().width, thumbH:thumb && thumb.getBoundingClientRect().height,
                 blur:before.filter, opacity:before.opacity, bgImage:before.backgroundImage, thumbSrc:thumb && thumb.src,
                 colors:[...card.querySelectorAll('.recent-head,.recent-head-arrow,.recent-meta strong,.recent-meta small,.recent-memo')].map(e=>style(e).color)};
             });
@@ -335,8 +336,12 @@ test('#1027 정원 이어 보기 카드의 종이색과 글 대비, 세로 영�
               assert.ok(stats.colors.every(color=>contrast(color,stats.meta)>=4.5), JSON.stringify(stats));
               assert.ok(Math.abs(stats.width-stats.metaWidth)<1, JSON.stringify(stats));
               if (kind === 'vertical') {
-                assert.equal(stats.fit,'contain');
-                assert.match(stats.blur,/blur\(18px\)/);
+                // #1084: 세로 영상은 16:9 칸 가운데에 9:16 크기로 놓고(cover), 양옆은 흐린 같은 썸네일이 카드 끝까지 채운다.
+                assert.equal(stats.fit,'cover');
+                assert.ok(stats.thumbW/stats.thumbH<=9/16+0.02&&stats.thumbW/stats.thumbH>=0.35, '세로 썸네일은 9:16 이하 폭(쇼츠 썸네일 양옆 띠는 잘라 냄): '+JSON.stringify(stats));
+                assert.ok(stats.thumbW<stats.width*0.4, '가운데 좁은 칸만 원래 썸네일, 나머지는 흐린 배경: '+JSON.stringify(stats));
+                // 대표 11-24: 뒤에 같은 영상이 크고 흐리게 보여야 한다 — 2.8배·blur 6px(실제 약 17px). 3.6배·18px는 칸 전체가 한 색으로 뭉개졌다.
+                assert.match(stats.blur,/blur\(6px\)/);
                 assert.equal(stats.opacity,'0.7');
                 assert.ok(stats.bgImage.includes(stats.thumbSrc),'같은 썸네일을 CSS 변수로 깐다(#1084): '+JSON.stringify(stats));
               }
@@ -406,7 +411,7 @@ test('#1087 카드 바꾸기·숫자 두 줄·숫자 누르기', { skip: REQUIRE
       assert.equal(await groups.count(), 3);
       for (const group of await groups.all()) assert.equal(await group.locator('.home-count-line').count(), 2, '단추마다 두 줄');
       const texts = await groups.evaluateAll(es => es.map(e => [...e.querySelectorAll('.home-count-line')].map(row => row.textContent.trim())));
-      assert.deepEqual(texts, [['순간 4', '모아둔 2'], ['공개 트리 11', '공개 순간 42'], ['트리 2', '공개 트리 1']], JSON.stringify(texts));
+      assert.deepEqual(texts, [['순간 4', '정리 전 2'], ['공개 트리 11', '공개 순간 42'], ['트리 2', '공개 트리 1']], JSON.stringify(texts));
 
       await frame.locator('.recent-change').click();
       await frame.locator('.recent-menu').waitFor({ state: 'visible', timeout: 5000 });
@@ -428,7 +433,7 @@ test('#1087 카드 바꾸기·숫자 두 줄·숫자 누르기', { skip: REQUIRE
       await frame.locator('.orbit-dialog .index-list').waitFor({ state: 'visible', timeout: 5000 });
       await h.page.keyboard.press('Escape');
       await frame.locator('.orbit-dialog[open]').waitFor({ state: 'detached', timeout: 5000 });
-      await groups.nth(0).locator('.home-count button', { hasText: '모아둔 2' }).evaluate(el => el.click());
+      await groups.nth(0).locator('.home-count button', { hasText: '정리 전 2' }).evaluate(el => el.click());
       await h.page.waitForFunction(() => window.__msgs1087.includes('lt41-cleanup'), null, { timeout: 5000 });
       await groups.nth(1).locator('.home-count button', { hasText: '공개 트리 11' }).evaluate(el => el.click());
       await groups.nth(1).locator('.home-count button', { hasText: '공개 순간 42' }).evaluate(el => el.click());
@@ -487,6 +492,7 @@ test('#1087 390 새 소식 띠와 숫자 두 줄 겹침 0', { skip: REQUIRE952 ?
           return { theme: localStorage.getItem('lt41.theme'), bandTop: Math.round(band.top), bandBottom: Math.round(band.bottom), rows, overlaps: rows.map(area), links: area(links) };
         });
         console.log('#1087 BAND', JSON.stringify(geo));
+        if(process.env.LT_1284_BAND_CAPTURE_DIR)await h.page.screenshot({path:`${process.env.LT_1284_BAND_CAPTURE_DIR}/band-${theme}-390.png`,animations:'disabled'});
         assert.ok(geo.rows.length >= 2, '두 줄 숫자가 실제로 그려진다: ' + JSON.stringify(geo));
         assert.ok(geo.overlaps.every(v => Math.round(v) === 0), '띠와 숫자 두 줄 겹침 0: ' + JSON.stringify(geo));
         assert.equal(Math.round(geo.links), 0, '띠와 바닥 링크 겹침 0: ' + JSON.stringify(geo));
@@ -512,9 +518,12 @@ test('#1088 가운데 카드 누름은 화면 이동 없이 크게 보기를 연
       await h.page.evaluate(() => { window.__nav1088 = []; addEventListener('message', e => { if (['lt41-navigate', 'lt41-community', 'lt41-cleanup'].includes(e.data?.type)) window.__nav1088.push(e.data.type); }); });
       const hashBefore = await h.page.evaluate(() => location.hash);
       const viewer = frame.locator('#mediaViewerHome');
-      const open = async () => { await frame.locator('.recent-play').click(); await viewer.waitFor({ state: 'visible', timeout: 5000 }); };
+      const open = async () => { await frame.locator('.recent-meta strong').click(); await viewer.waitFor({ state: 'visible', timeout: 5000 }); };
       await open();
       assert.equal(await viewer.getAttribute('aria-hidden'), 'false', '크게 보기 열림');
+      assert.equal(await frame.evaluate(() => document.querySelector('#orbit').shadowRoot.activeElement?.id || ''),'mediaCloseHome','설명 창 열면 닫기에 초점');
+      assert.equal(await frame.locator('#mediaVisualHome iframe').count(),0,'설명 창은 영상이 즉시 재생되지 않는다');
+      await frame.locator('#mediaPlayHome').click();
       const src = await frame.locator('#mediaVisualHome iframe').getAttribute('src');
       assert.match(src, /a1111111111/, '영상 id');
       assert.match(src, /autoplay=1/, '누름 안에서 재생 시작');
@@ -523,8 +532,7 @@ test('#1088 가운데 카드 누름은 화면 이동 없이 크게 보기를 연
       assert.ok(await h.page.evaluate(() => getComputedStyle(document.getElementById('updates-card')).display === 'none'), '열린 동안 아래 띠가 숨는다');
       assert.equal(await h.page.evaluate(() => location.hash), hashBefore, '주소 moved 0');
       assert.deepEqual(await h.page.evaluate(() => window.__nav1088), [], '화면 이동 요청 0');
-      const focusAfterOpen = await frame.evaluate(() => document.querySelector('#orbit').shadowRoot.activeElement?.id || '');
-      assert.equal(focusAfterOpen, 'mediaCloseHome', '열면 닫기 단추에 초점');
+
 
       await h.page.keyboard.press('Escape');
       assert.equal(await viewer.getAttribute('aria-hidden'), 'true', 'Esc로 닫힘');
@@ -633,4 +641,454 @@ test('#1088 2단계 떠 있는 카드도 그 자리에서 크게 보기', { skip
       await h.page.keyboard.press('Escape');
     } finally { await close952(h); }
   } finally { await browser.close(); }
+});
+
+
+// #1204: Pixel regression for the glow over the orbit. Inspect the *real*
+// page theme toggle or a saved theme; never change just the iframe host.
+test('#1204 실제 테마 전환·저장값 및 가운데 빛 직선 경계 픽셀 검사', {skip: REQUIRE952 ? false : skip952, timeout: 180000}, async () => {
+  if (skip952) assert.fail(skip952);
+  const {inflateSync} = await import('node:zlib');
+  function rgbRows(png) {
+    assert.equal(png.subarray(1,4).toString(),'PNG');
+    let width=0,height=0,channels=0,pos=8,parts=[];
+    while(pos<png.length){
+      const len=png.readUInt32BE(pos),tag=png.toString('ascii',pos+4,pos+8),data=png.subarray(pos+8,pos+8+len);
+      if(tag==='IHDR'){width=data.readUInt32BE(0);height=data.readUInt32BE(4);assert.equal(data[8],8);channels=data[9]===6?4:data[9]===2?3:0;assert.ok(channels,'expected RGB/RGBA PNG');}
+      if(tag==='IDAT')parts.push(data);
+      pos+=len+12;
+      if(tag==='IEND')break;
+    }
+    const packed=inflateSync(Buffer.concat(parts)),stride=width*channels,rows=[];
+    let previous=new Uint8Array(stride);
+    let offset=0;
+    for(let y=0;y<height;y++){
+      const filter=packed[offset++],row=new Uint8Array(stride);
+      for(let i=0;i<stride;i++){
+        const raw=packed[offset++],left=i>=channels?row[i-channels]:0,up=previous[i],ul=i>=channels?previous[i-channels]:0;
+        const p=left+up-ul,pa=Math.abs(p-left),pb=Math.abs(p-up),pc=Math.abs(p-ul);
+        const predict=pa<=pb&&pa<=pc?left:pb<=pc?up:ul;
+        row[i]=(raw+(filter===1?left:filter===2?up:filter===3?Math.floor((left+up)/2):filter===4?predict:0))&255;
+      }
+      rows.push(row);previous=row;
+    }
+    return {width,height,pixel:(x,y)=>{const i=(y*0+Math.max(0,Math.min(width-1,x)))*channels,r=rows[Math.max(0,Math.min(height-1,y))];return [r[i],r[i+1],r[i+2]];}};
+  }
+  const browser=await chromium952.launch({headless:true});
+  try {
+    for(const width of [1440,390]) for(const theme of ['garden','night']) for(const route of ['stored','toggle']){
+      const initStorage=route==='stored'?{'lt41.theme':theme}:{'lt41.theme':'night'};
+      const h=await boot952(browser,{width,motion:'reduce',initStorage});
+      try {
+        if(route==='toggle'&&theme==='garden'){
+          await h.page.locator('#theme-toggle').click();
+          await h.page.waitForFunction(()=>document.documentElement.getAttribute('data-lt-theme')==='garden');
+        }
+        await h.frame.waitForFunction(expected=>(document.querySelector('#orbit')?.getAttribute('data-lt-theme')||'night')===expected,theme,{timeout:10000});
+        const state=await h.page.evaluate(()=>{
+          const frame=document.querySelector('#view')?.contentDocument;
+          const host=frame?.querySelector('#orbit'),root=host?.shadowRoot;
+          const app=root?.querySelector('.app'),scrim=root?.querySelector('.center-scrim');
+          const a=app?.getBoundingClientRect(),b=scrim?.getBoundingClientRect();
+          return {shell:document.documentElement.getAttribute('data-lt-theme')||'night',
+            frame:frame?.documentElement.getAttribute('data-lt-theme')||'night',
+            host:host?.getAttribute('data-lt-theme')||'night',
+            stage:getComputedStyle(app).backgroundImage,
+            glow:getComputedStyle(scrim).backgroundImage,
+            box:a&&b?{app:[a.x,a.y,a.width,a.height],glow:[b.x,b.y,b.width,b.height]}:null};
+        });
+        assert.equal(state.shell,theme,'shell header must follow actual theme');
+        assert.equal(state.frame,theme,'iframe document must follow actual theme');
+        assert.equal(state.host,theme,'orbit must follow actual theme');
+        assert.ok(state.box,JSON.stringify(state));
+        // 가운데 빛은 원래 크기 이내로 유지하고, 바깥 테두리의 빛 0은 아래 픽셀 검사로 확인한다.
+        assert.ok(state.box.glow[2]<=820&&state.box.glow[3]<=560&&
+          (width===1440 ? state.box.glow[2]<state.box.app[2] : state.box.glow[2]<=state.box.app[2]*1.04+2),
+          'glow stays in original bounded box: '+JSON.stringify(state.box));
+        const capture=process.env.LT_HOME_1204_CAPTURE_DIR;
+        if(capture){const {mkdirSync}=await import('node:fs');mkdirSync(capture,{recursive:true});await h.page.screenshot({path:`${capture}/home-1204-${width}-${theme}-${route}.png`});}
+        // Render the computed live scrim into a separate, static pixel stage:
+        // isolate the gradient from animated orbit canvases and GPU repaints.
+        // Keep the actual geometry, gradient, clip and mask properties.
+        await h.frame.evaluate(()=>{
+          const scrim=document.querySelector('#orbit').shadowRoot.querySelector('.center-scrim');
+          const computed=getComputedStyle(scrim),rect=scrim.getBoundingClientRect();
+          const stage=document.createElement('div');stage.id='lt1204-pixel-stage';
+          stage.style.cssText='position:fixed;inset:0;z-index:2147483647;background:#050509;pointer-events:none';
+          const overlay=document.createElement('div');overlay.id='lt1204-pixel-glow';
+          Object.assign(overlay.style,{position:'absolute',left:rect.left+'px',top:rect.top+'px',
+            width:rect.width+'px',height:rect.height+'px',backgroundImage:computed.backgroundImage,
+            backgroundRepeat:'no-repeat',borderRadius:computed.borderRadius,
+            maskImage:computed.maskImage,clipPath:computed.clipPath});
+          stage.append(overlay);document.body.append(stage);
+        });
+        const element=h.frame.locator('body');
+        const on=rgbRows(await element.screenshot({animations:'disabled'}));
+        await h.frame.evaluate(()=>document.querySelector('#lt1204-pixel-glow').style.display='none');
+        const off=rgbRows(await element.screenshot({animations:'disabled'}));
+        assert.equal(on.width,off.width);assert.equal(on.height,off.height);
+        const delta=(x,y)=>on.pixel(x,y).reduce((s,c,i)=>s+Math.abs(c-off.pixel(x,y)[i]),0);
+        const midX=Math.floor(on.width/2),midY=Math.floor(on.height/2);
+        // Rectangular clipping used to create a discontinuity on horizontal/
+        // vertical scanlines, whereas a feathered radial must change smoothly.
+        const hline=Array.from({length:on.width},(_,x)=>delta(x,midY));
+        const vline=Array.from({length:on.height},(_,y)=>delta(midX,y));
+        // Screenshot pixels must show a fully feathered perimeter at every
+        // edge. Together with the original bounded scrim geometry assertion
+        // above, this excludes the previous interior rectangular clipping
+        // without treating isolated GPU/color-management pixels as a border.
+        for(const fraction of [0,.25,.5,.75,1]){
+          const x=Math.round((on.width-1)*fraction),y=Math.round((on.height-1)*fraction);
+          assert.ok(delta(x,0)<=3&&delta(x,on.height-1)<=3,
+            'glow must fade at top/bottom: '+JSON.stringify({width,theme,route,x}));
+          assert.ok(delta(0,y)<=3&&delta(on.width-1,y)<=3,
+            'glow must fade at left/right: '+JSON.stringify({width,theme,route,y}));
+        }
+        if(theme==='garden')assert.ok(delta(midX,midY)>120,'garden center glow must be visible in rendered screenshot');
+      } finally {await close952(h);}
+    }
+  } finally {await browser.close();}
+});
+
+// 안내 시계는 페이지 안에서 잰다(addInitScript). 나타난 순간부터 0·150·300ms 시점의 카드·투영 사각형을 기록하고,
+// Node는 기록을 읽어 단정만 한다. 기준값과 대기 시간은 바꾸지 않는다.
+function TIP_RECORDER() {
+  if (window.__LT_TIP_REC__) return;
+  const rec = (window.__LT_TIP_REC__ = { tipAt: null, appearAt: null, removedAt: null, snaps: [] });
+  const snap = (label) => {
+    try {
+      const root = document.querySelector('#orbit').shadowRoot, hook = window.__LT_ORBIT_TEST__;
+      const index = hook.hintIndex(), card = root.querySelectorAll('.card')[index], tip = card?.querySelector('.lt-card-tip');
+      hook.syncDomPoses();
+      const app = root.querySelector('.app')?.getBoundingClientRect(), cr = card?.getBoundingClientRect(), tr = tip?.getBoundingClientRect(), pose = hook.poses()[index], box = pose?.box;
+      rec.snaps.push({
+        label, dt: performance.now() - rec.appearAt, index,
+        shown: !!tip && getComputedStyle(tip).opacity === '1' && root.querySelector('.world').classList.contains('lt-hint-ready'),
+        bound: tip?.parentElement === card,
+        domInside: !!tr && !!cr && tr.left >= cr.left && tr.right <= cr.right && tr.top >= cr.top && tr.bottom <= cr.bottom,
+        projected: !!box,
+        projInside: !!tr && !!app && !!box && tr.left - app.left >= box.l && tr.top - app.top >= box.t && tr.right - app.left <= box.r && tr.bottom - app.top <= box.b,
+        bottomGap: tr && cr ? cr.bottom - tr.bottom : null,
+        floatingTip: !!root.querySelector('.lt-orbit-tip'), pulse: card ? getComputedStyle(card, '::after').animationName : null,
+        canvasReady: hook.canvasReady(),
+      });
+    } catch (e) { rec.snaps.push({ label, error: String(e) }); }
+  };
+  const watch = (root, world) => {
+    const check = () => {
+      const now = performance.now(), on = world.classList.contains('lt-hint-ready');
+      if (rec.tipAt === null && root.querySelector('.lt-card-tip')) rec.tipAt = now;
+      if (on && rec.appearAt === null) {
+        rec.appearAt = now;
+        setTimeout(() => snap('0ms'), 0);
+        setTimeout(() => snap('150ms'), 150);
+        setTimeout(() => snap('300ms'), 300);
+      }
+      if (!on && rec.appearAt !== null && rec.removedAt === null) rec.removedAt = now;
+    };
+    new MutationObserver(check).observe(root, { subtree: true, childList: true, attributes: true, attributeFilter: ['class'] });
+    check();
+  };
+  const find = () => {
+    const root = document.querySelector('#orbit')?.shadowRoot, world = root?.querySelector('.world');
+    if (world && window.__LT_ORBIT_TEST__) watch(root, world);
+    else requestAnimationFrame(find);
+  };
+  find();
+}
+
+test('#1309 첫 방문 안내는 나타나 3초 뒤 사라지고, 누르면 바로 사라지며 재방문에는 나오지 않는다', { skip: REQUIRE952 ? false : skip952, timeout: 240000 }, async () => {
+ if (skip952) assert.fail(skip952);
+ const browser = await chromium952.launch({ headless: true });
+ try {
+  const h = await boot952(browser, { width: 1440, motion: 'no-preference', initStorage: { 'lt41.theme': 'night' }, initScript: TIP_RECORDER });
+  try {
+   await h.frame.waitForFunction(() => window.__LT_TIP_REC__?.snaps.length >= 1, null, { timeout: 20000, polling: 50 });
+   const capture = process.env.LT_HOME_1204_CAPTURE_DIR;
+   if (capture) { const { mkdirSync } = await import('node:fs'); mkdirSync(capture, { recursive: true }); await h.page.screenshot({ path: capture + '/home-1309-hint-1440-night.png' }); }
+   await h.frame.waitForFunction(() => { const r = window.__LT_TIP_REC__; return r.snaps.length >= 3 && r.removedAt !== null; }, null, { timeout: 30000, polling: 50 });
+   const rec = await h.frame.evaluate(() => window.__LT_TIP_REC__);
+   assert.deepEqual(rec.snaps.map(s => s.label), ['0ms', '150ms', '300ms'], JSON.stringify(rec));
+   // 정확한 정렬 2px는 #1382에서 모든 카드에 적용한다. 여기서는 안내 글자가 카드 안, 투영 사각형이 있으면 그 안에 있는지만 본다.
+   assert.ok(rec.snaps.every(s => s.index >= 0 && s.shown && s.bound && s.domInside && s.bottomGap >= 0 && s.bottomGap < 40 && !s.floatingTip && s.pulse === 'lt-card-pulse' && (!s.projected || s.projInside)), JSON.stringify(rec.snaps));
+   const visibleMs = rec.removedAt - rec.appearAt;
+   assert.ok(visibleMs >= 2500 && visibleMs <= 3500, '안내는 약 3초 보인다: ' + visibleMs);
+   assert.equal(await h.frame.locator('.lt-card-tip').count(), 0, '3초가 지나면 사라진다');
+   assert.equal(await h.frame.evaluate(() => localStorage.getItem('lt41-orbit-card-opened')), '1');
+   console.log('TIP_MEASURE ' + JSON.stringify({ tipAt: rec.tipAt, appearAt: rec.appearAt, removedAt: rec.removedAt, visibleMs, snaps: rec.snaps.map(s => ({ label: s.label, dt: Math.round(s.dt), domInside: s.domInside, projected: s.projected, projInside: s.projInside, canvasReady: s.canvasReady })) }));
+  } finally { await close952(h); }
+  const clicked = await boot952(browser, { width: 1440, motion: 'no-preference', initStorage: { 'lt41.theme': 'night' }, initScript: TIP_RECORDER });
+  try {
+   await clicked.frame.waitForFunction(() => window.__LT_TIP_REC__?.appearAt != null, null, { timeout: 20000, polling: 50 });
+   const index = await clicked.frame.evaluate(() => globalThis.__LT_ORBIT_TEST__.hintIndex());
+   await clicked.frame.locator('.card').nth(index).locator('.surface').evaluate(e => e.click());
+   assert.equal(await clicked.frame.locator('.lt-card-tip').count(), 0, '누르면 즉시 사라진다');
+   assert.equal(await clicked.frame.evaluate(() => localStorage.getItem('lt41-orbit-card-opened')), '1');
+   await clicked.page.reload({ waitUntil: 'load' });
+   await clicked.page.waitForTimeout(2400);
+   assert.equal(await clicked.page.frameLocator('#view').locator('.lt-card-tip').count(), 0, '다음 방문에는 나오지 않는다');
+  } finally { await close952(clicked); }
+  const returning = await boot952(browser, { width: 1440, initStorage: { 'lt41-orbit-card-opened': '1' } });
+  try {
+   await returning.page.waitForTimeout(1800);
+   assert.equal(await returning.frame.locator('.lt-card-tip').count(), 0, '저장된 첫 방문 기록은 새 문맥에서도 적용된다');
+  } finally { await close952(returning); }
+ } finally { await browser.close(); }
+});
+
+test('#1309 움직임 줄이기에서는 카드 안 글자만 보이고 반짝임은 없다', { skip: REQUIRE952 ? false : skip952, timeout: 180000 }, async () => {
+ if (skip952) assert.fail(skip952);
+ const browser = await chromium952.launch({ headless: true });
+ try {
+  const h = await boot952(browser, { width: 1440, motion: 'reduce' }); // #1314 이후 390 세로 리본은 글자가 없어 괤도 배치에서 본다
+  try {
+   await h.frame.locator('.lt-card-tip').waitFor({ state: 'visible', timeout: 20000 });
+   const sample = () => h.frame.evaluate(() => {
+    const root = document.querySelector('#orbit').shadowRoot, card = root.querySelector('.lt-card-hint'), tip = card.querySelector('.lt-card-tip');
+    const r = tip.getBoundingClientRect(); return { x: r.x, y: r.y, opacity: getComputedStyle(tip).opacity, pulse: getComputedStyle(card, '::after').animationName, rate: card.getAnimations().filter(a => a.effect.target === card).map(a => a.playbackRate) };
+   });
+   const first = await sample(); await h.page.waitForTimeout(550); const next = await sample();
+   assert.equal(first.opacity, '1'); assert.equal(next.opacity, '1');
+   assert.equal(first.pulse, 'none'); assert.equal(next.pulse, 'none');
+   assert.deepEqual([next.x, next.y], [first.x, first.y]);
+   assert.ok(first.rate.every(rate => rate === 0), '움직임 줄이기에서는 띠도 멈춘다');
+  } finally { await close952(h); }
+ } finally { await browser.close(); }
+});
+
+test('#1309 휴대폰 세로는 8장 리본이 흐르고 숫자판·단추·링크와 겹치지 않는다', { skip: REQUIRE952 ? false : skip952, timeout: 240000 }, async () => {
+ if (skip952) assert.fail(skip952);
+ const browser = await chromium952.launch({ headless: true });
+ const sample = (frame) => frame.evaluate(() => {
+  const host = document.querySelector('#orbit'), root = host.shadowRoot, hook = globalThis.__LT_ORBIT_TEST__, app = root.querySelector('.app').getBoundingClientRect();
+  const all = [...root.querySelectorAll('.card')], cards = all.filter(e => !e.classList.contains('off'));
+  const boxes = hook.poses().map((p, i) => p && !p.hidden && cards.includes(all[i]) ? { l: app.left + p.box.l, t: app.top + p.box.t, r: app.left + p.box.r, b: app.top + p.box.b } : null).filter(Boolean);
+  const rect = e => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 ? { l: r.left, t: r.top, r: r.right, b: r.bottom } : null; };
+  const protectedZones = [...root.querySelectorAll('.home-count,.subtleBtn')].map(rect).filter(Boolean);
+  const shell = parent.document, ox = frameElement.getBoundingClientRect().left, oy = frameElement.getBoundingClientRect().top;
+  for (const e of shell.querySelectorAll('.home-links a,.home-links button,#updates-card,#mobile-add')) {
+   const r = rect(e); if (r) protectedZones.push({ l: r.l - ox, t: r.t - oy, r: r.r - ox, b: r.b - oy });
+  }
+  const hit = (a, b) => Math.max(0, Math.min(a.r, b.r) - Math.max(a.l, b.l)) * Math.max(0, Math.min(a.b, b.b) - Math.max(a.t, b.t));
+  let overlaps = 0;
+  for (const box of boxes) for (const zone of protectedZones) if (hit(box, zone) > 1) overlaps++;
+  const first = boxes[0];
+  const bandBottom = protectedZones.length ? Math.min(...protectedZones.map(zone => zone.t)) : null;
+  const inBand = bandBottom === null ? boxes.length === 0 : boxes.every(box => box.t >= app.top - 1 && box.b <= bandBottom + 1);
+  return { mode: host.dataset.ltLayout, active: cards.length, visible: boxes.length, overlaps, zones: protectedZones.length, first: first && [(first.l + first.r) / 2, (first.t + first.b) / 2], rates: cards.flatMap(e => e.getAnimations().filter(a => a.effect.target === e && !a.effect.pseudoElement).map(a => a.playbackRate)), bandBottom, inBand };
+ });
+ try {
+  for (const theme of ['night', 'garden']) {
+   const h = await boot952(browser, { width: 390, height: 844, motion: 'no-preference', initStorage: { 'lt41.theme': theme } });
+   try {
+    await h.frame.waitForFunction(() => globalThis.__LT_ORBIT_TEST__?.canvasReady(), null, { timeout: 20000 });
+    await h.frame.waitForFunction(() => {
+     const host=document.querySelector('#orbit'),cards=[...host.shadowRoot.querySelectorAll('.card:not(.off)')];
+     return host.dataset.ltLayout==='ribbon'&&cards.length===8&&cards.every(card=>card.getAnimations().filter(a=>a.effect.target===card&&!a.effect.pseudoElement).length===1);
+    },null,{timeout:20000});
+    // #1314 리본은 배경 띠라서 안내 글자를 띄우지 않는다(테두리 반짝임만 유지). 글자가 제목과 겹치는 것을 막는다.
+    await h.frame.waitForFunction(() => document.querySelector('#orbit').shadowRoot.querySelector('.world.lt-hint-ready'), null, { timeout: 20000 });
+    const ribbonHint = await h.frame.evaluate(() => { const root = document.querySelector('#orbit').shadowRoot; return { tips: root.querySelectorAll('.lt-card-tip').length, hinted: root.querySelectorAll('.lt-card-hint').length }; });
+    assert.equal(ribbonHint.tips, 0, '390 세로 리본에서는 첫 방문 안내 글자를 띄우지 않는다');
+    assert.equal(ribbonHint.hinted, 1, '390 세로 리본에서도 첫 방문 테두리 반짝임은 남는다');
+    const samples = [];
+    for (let i = 0; i < 7; i++) { samples.push(await sample(h.frame)); if (i < 6) await h.page.waitForTimeout(500); }
+    assert.ok(samples.every(s => s.mode === 'ribbon' && s.active === 8), JSON.stringify(samples[0]));
+    assert.ok(samples.every(s => s.visible >= 3 && s.zones >= 4 && s.overlaps === 0 && s.inBand), JSON.stringify(samples));
+    assert.ok(samples.every(s => s.rates.length === 8 && s.rates.every(rate => rate === 1)), '여덟 카드가 같은 느린 흐름으로 움직인다: '+JSON.stringify(samples.map(s=>s.rates)));
+    const distance = Math.hypot(samples[6].first[0] - samples[0].first[0], samples[6].first[1] - samples[0].first[1]);
+    assert.ok(distance > 3, '3초 동안 카드가 실제로 흐른다: ' + distance);
+    console.log('#1309 RIBBON', theme, JSON.stringify({ active: samples[0].active, visible: samples.map(s => s.visible), overlaps: samples.reduce((n, s) => n + s.overlaps, 0), distance: Math.round(distance * 10) / 10 }));
+    const capture = process.env.LT_HOME_1204_CAPTURE_DIR;
+    if (capture) { const { mkdirSync } = await import('node:fs'); mkdirSync(capture, { recursive: true }); await h.page.screenshot({ path: capture + '/home-1309-ribbon-390-' + theme + '.png' }); }
+   } finally { await close952(h); }
+  }
+ } finally { await browser.close(); }
+});
+
+test('#1309 가로 화면과 폴더블 펼침은 겹침·잘림 0이고 궤도 성능을 측정한다', { skip: REQUIRE952 ? false : skip952, timeout: 300000 }, async () => {
+ if (skip952) assert.fail(skip952);
+ const browser = await chromium952.launch({ headless: true });
+ const inspect = (frame, phase) => frame.evaluate(async phase => {
+  const host = document.querySelector('#orbit'), root = host.shadowRoot, hook = globalThis.__LT_ORBIT_TEST__, app = root.querySelector('.app').getBoundingClientRect(), center = root.querySelector('.center').getBoundingClientRect();
+  hook.seek(phase); await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+  const zone = { l: center.left - 32, t: center.top - 32, r: center.right + 32, b: center.bottom + 32 };
+  const hit = (a, b) => Math.max(0, Math.min(a.r, b.r) - Math.max(a.l, b.l)) * Math.max(0, Math.min(a.b, b.b) - Math.max(a.t, b.t));
+  const cards = [...root.querySelectorAll('.card')], poses = hook.poses();
+  const visible = poses.map((p, i) => p && !p.hidden && !cards[i].classList.contains('off') && !cards[i].classList.contains('clash') ? { l: app.left + p.box.l, t: app.top + p.box.t, r: app.left + p.box.r, b: app.top + p.box.b } : null).filter(Boolean);
+  const intrude = visible.filter(b => hit(zone, b) > 1).length;
+  const clipped = visible.filter(b => b.l < app.left - 1 || b.t < app.top - 1 || b.r > app.right + 1 || b.b > app.bottom + 1).length;
+  const controls = [...root.querySelectorAll('.center h1,.center .actions,.home-count')].map(e => e.getBoundingClientRect());
+  const controlClipped = controls.filter(r => r.width > 0 && r.height > 0 && (r.left < app.left - 1 || r.top < app.top - 1 || r.right > app.right + 1 || r.bottom > app.bottom + 1)).length;
+  return { mode: host.dataset.ltLayout, visible: visible.length, intrude, clipped, controlClipped, app: { l: app.left, t: app.top, r: app.right, b: app.bottom } };
+ }, phase);
+ try {
+  for (const [width, height, mode] of [[844, 390, 'compact'], [800, 900, 'orbit']]) for (const theme of ['night', 'garden']) {
+   const h = await boot952(browser, { width, height, motion: 'reduce', initStorage: { 'lt41.theme': theme } });
+   try {
+    await h.frame.waitForFunction(() => globalThis.__LT_ORBIT_TEST__?.canvasReady(), null, { timeout: 20000 });
+    const samples = [];
+    for (const phase of [0, .2, .5, .8]) samples.push(await inspect(h.frame, phase));
+    assert.ok(samples.every(s => s.mode === mode && s.visible > 0), JSON.stringify(samples));
+    assert.ok(samples.every(s => s.intrude === 0 && s.controlClipped === 0), JSON.stringify(samples));
+    if (mode === 'compact') assert.ok(samples.every(s => s.clipped === 0), '가로 카드 잘림 0: ' + JSON.stringify(samples));
+    console.log('#1309 VIEWPORT', width, theme, JSON.stringify(samples.map(s => ({ visible: s.visible, intrude: s.intrude, clipped: s.clipped, controlClipped: s.controlClipped }))));
+    const capture = process.env.LT_HOME_1204_CAPTURE_DIR;
+    if (capture) { const { mkdirSync } = await import('node:fs'); mkdirSync(capture, { recursive: true }); await h.page.screenshot({ path: capture + '/home-1309-' + width + '-' + theme + '.png' }); }
+   } finally { await close952(h); }
+  }
+ } finally { await browser.close(); }
+});
+
+test('#1026 첫 화면 카드는 첫 궤도 자리를 받은 뒤에만 보이고 글귀와 같은 프레임에 풀린다', { skip: REQUIRE952 ? false : skip952, timeout: 180000 }, async () => {
+  if (skip952) assert.fail(skip952);
+  const browser = await chromium952.launch({ headless: true });
+  try {
+    const h = await boot952(browser, {
+      width: 1440, member: false, motion: 'no-preference',
+      initScript: () => {
+        window.__firstFrame1026 = [];
+        const timer = setInterval(() => {
+          const sr = document.querySelector('#orbit')?.shadowRoot;
+          if (!sr) return;
+          const cards = [...sr.querySelectorAll('button.card')];
+          const hidden = cards.filter(e => e.classList.contains('lt-first-frame'));
+          if (hidden.some(e => e.style.transform)) window.__firstFrame1026.push({ kind: 'hidden-with-position' });
+          if (!hidden.length) {
+            const shown = cards.filter(e => !e.classList.contains('off'));
+            window.__firstFrame1026.push({ kind: 'shown', missing: shown.filter(e => !e.style.transform).length, wait: sr.querySelector('.center')?.hasAttribute('data-lt-home-wait') ? 1 : 0 });
+            clearInterval(timer);
+          }
+        }, 16);
+      }
+    });
+    try {
+      await h.frame.waitForFunction(() => window.__firstFrame1026?.some(x => x.kind === 'shown'), null, { timeout: 15000 });
+      const frames = await h.frame.evaluate(() => window.__firstFrame1026);
+      // 첫 자리를 받은 뒤에도 공개 전까지는 숨겨 유지된다(hidden-with-position은 정상 중간 상태).
+      const shown = frames.find(x => x.kind === 'shown');
+      assert.equal(shown.missing, 0, '보이는 순간 모든 카드에 궤도 자리가 있다: ' + JSON.stringify(shown));
+      assert.equal(shown.wait, 0, '카드와 글귀의 시작이 같은 프레임이다: ' + JSON.stringify(shown));
+    } finally { await close952(h); }
+  } finally { await browser.close(); }
+});
+
+// #1365: 지도에서 첫 화면으로 돌아올 때 빈 구간이 없음을 페이지 안 시계로 잰다.
+// 고치기 전 1440·390 모두 약 1.05~1.10초였고, 지금은 0.2초 안이다.
+// 최종 기준은 실측 보고로 정하므로 여기서는 '고치기 전보다 빠르다'만 확인하고 측정값을 출력에 남긴다.
+test('#1365 지도→첫 화면 전환에서 뼈대가 고치기 전보다 빨리 보인다', { skip: REQUIRE952 ? false : skip952, timeout: 180000 }, async () => {
+  if (skip952) assert.fail(skip952);
+  const browser = await chromium952.launch({ headless: true });
+  try {
+    for (const width of [390, 1440]) {
+      const h = await boot952(browser, { width, member: true, motion: 'no-preference' });
+      try {
+        await h.page.evaluate(() => { location.hash = '#network'; });
+        await h.page.waitForFunction(() => {
+          try { return /track56-network\.html/.test(document.querySelector('#view:not([hidden])')?.contentWindow.location.pathname || ''); }
+          catch { return false; }
+        }, null, { timeout: 20000 });
+        await h.page.waitForTimeout(1200);
+        await h.page.evaluate(() => {
+          const R = { t0: null, marks: {} };
+          window.__LT1365 = R;
+          const mark = k => { if (R.t0 !== null && !(k in R.marks)) R.marks[k] = Math.round(performance.now() - R.t0); };
+          const poll = () => {
+            for (const f of document.querySelectorAll('iframe')) {
+              try {
+                if (f.hidden || f.closest('[hidden]') || !/home\.html$/.test(f.contentWindow.location.pathname)) continue;
+              } catch { continue; }
+              mark('frameRevealed');
+              const sr = f.contentDocument?.getElementById('orbit')?.shadowRoot;
+              const center = sr?.querySelector('.center'), card = sr?.querySelector('.card');
+              if (center && !center.hasAttribute('data-lt-home-wait') && card && !card.classList.contains('lt-first-frame')) mark('skeletonVisible');
+            }
+            if (!('skeletonVisible' in R.marks)) requestAnimationFrame(poll);
+          };
+          document.querySelector('.brand').addEventListener('click', () => { R.t0 = performance.now(); poll(); }, { once: true, capture: true });
+        });
+        await h.page.locator('.brand').first().click();
+        await h.page.waitForFunction(() => 'skeletonVisible' in window.__LT1365.marks, null, { timeout: 15000 });
+        const marks = await h.page.evaluate(() => window.__LT1365.marks);
+        console.log(`#1365 ${width} 지도→첫 화면: ${JSON.stringify(marks)}`);
+        assert.ok(marks.skeletonVisible < 800, `${width} 뼈대가 고치기 전(약 1050ms)보다 빨라야 한다: ${marks.skeletonVisible}ms`);
+      } finally { await close952(h); }
+    }
+  } finally { await browser.close(); }
+});
+
+test('#1378 첫 화면 YouTube 크게 보기 390·1440 × 밤·정원과 닫기', {skip: REQUIRE952 ? false : skip952,timeout:180000},async()=>{
+  if(skip952)assert.fail(skip952);
+  const {inspectYoutubeIframe,countYoutubeAutoplay}=await import('./helpers/youtube-embed-audit.mjs');
+  const browser=await chromium952.launch({headless:true});
+  try{
+    for(const width of [390,1440])for(const theme of ['night','garden']){
+      const tree=createTree({subject:'기억',title:'첫 번째 영상',date:'2026-11-20',emotion:'설렘',note:'기록',url:'https://www.youtube.com/watch?v=dQw4w9WgXcQ'},'2026-11-20T00:00:00Z');
+      tree.moments[0].image='https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg';
+      tree.moments[0].youtubeThumb=true;
+      const workspace={revision:1,state:{version:1,trees:[tree],prefs:{}},subject:'visual-audit-fake',writeSubjectBound:true,savedAt:'2026-11-20T00:00:00Z'};
+      const h=await boot952(browser,{member:true,width,initStorage:{'lt41.theme':theme,'lt41.boardTheme':theme==='night'?'night':'paper'},routes:{
+        '/api/workspace':r=>r.fulfill({status:200,contentType:'application/json',body:JSON.stringify(workspace)}),
+        '/api/youtube/oembed':r=>r.fulfill({status:200,contentType:'application/json',body:'{"title":"Test"}'})
+      }});
+      try{
+        const frame=h.frame;
+        await frame.locator('.recent-card').waitFor({state:'visible',timeout:15000});
+        const capture=process.env.LT_HOME_YT_CAPTURE_DIR;
+        if(capture){const fs=await import('node:fs');fs.mkdirSync(capture,{recursive:true});await h.page.screenshot({path:`${capture}/before-${width}-${theme}.png`});}
+        assert.equal(await frame.locator('#mediaVisualHome iframe').count(),0,'카드 상태에서 iframe 없음');
+        await frame.locator('.recent-meta strong').click();
+        await frame.locator('#mediaViewerHome.open').waitFor({state:'visible'});
+        const play=frame.locator('#mediaPlayHome');
+        await play.waitFor({state:'visible',timeout:10000});
+        await play.click();
+        const iframe=frame.locator('#mediaVisualHome iframe');
+        await iframe.waitFor({state:'visible'});
+        await h.page.locator('body.lt-viewer-open').waitFor({state:'attached'});
+        const m=await inspectYoutubeIframe(iframe);
+        const outerBlockers=await h.page.evaluate(()=>{
+          const host=document.querySelector('#view'),root=host.contentDocument.querySelector('#orbit').shadowRoot;
+          const video=root.querySelector('#mediaVisualHome iframe');
+          const a=host.getBoundingClientRect(),b=video.getBoundingClientRect();
+          return [0.1,0.5,0.9].flatMap(y=>[0.1,0.5,0.9].filter(x=>document.elementFromPoint(a.left+b.left+b.width*x,a.top+b.top+b.height*y)!==host)).length;
+        });
+        console.log('HOME_PLAYER',JSON.stringify({width,theme,w:m.width,h:m.height,blocked:m.blocked,outerBlockers}));
+          assert.equal(m.minimum200,true,`${width} ${theme} player ${m.width}x${m.height}`);
+          assert.equal(m.blocked,0,`${width} ${theme} blockers ${m.blockers}`);
+          assert.equal(outerBlockers,0,`${width} ${theme} shell overlays on player`);
+          assert.ok(await countYoutubeAutoplay(frame)<=1,'autoplay <=1');
+          if(capture)await h.page.screenshot({path:`${capture}/after-${width}-${theme}.png`});
+          await frame.locator('#mediaCloseHome').evaluate(button=>button.click());
+          assert.equal(await frame.locator('#mediaVisualHome iframe').count(),0,'닫은 후 iframe 0');
+          assert.equal(await frame.locator('#mediaViewerHome.open').count(),0,'뷰어 닫힘');
+      }finally{await close952(h);}
+    }
+  }finally{await browser.close();}
+});
+
+test('#1378 첫 화면 YouTube 재생 불가 시 iframe 제거·원본 링크', {skip: REQUIRE952 ? false : skip952,timeout:120000},async()=>{
+  if(skip952)assert.fail(skip952);
+  const browser=await chromium952.launch({headless:true});
+  try{
+    for(const status of [401,404]){
+      const tree=createTree({subject:'기억',title:'재생 불가 순간',date:'2026-11-20',emotion:'설렘',note:'기록',url:'https://www.youtube.com/watch?v=dQw4w9WgXcQ'},'2026-11-20T00:00:00Z');
+      tree.moments[0].image='https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg';
+      tree.moments[0].youtubeThumb=true;
+      const workspace={revision:1,state:{version:1,trees:[tree],prefs:{}},subject:'visual-audit-fake',writeSubjectBound:true,savedAt:'2026-11-20T00:00:00Z'};
+      const h=await boot952(browser,{member:true,width:390,routes:{
+        '/api/workspace':r=>r.fulfill({status:200,contentType:'application/json',body:JSON.stringify(workspace)}),
+        '/api/youtube/oembed':r=>r.fulfill({status,contentType:'application/json',body:'{}'})
+      }});
+      try{
+        await h.frame.locator('.recent-meta strong').click();
+        await h.frame.locator('#mediaViewerHome.open').waitFor({state:'visible'});
+        await h.frame.locator('#mediaExternalHome').waitFor({state:'visible',timeout:15000});
+        assert.equal(await h.frame.locator('#mediaVisualHome iframe').count(),0,'재생 불가에서 iframe 0');
+        assert.equal(await h.frame.locator('#mediaPlayHome').isVisible(),false,'재생 단추 숨김');
+        assert.match(await h.frame.locator('#mediaExternalHome').getAttribute('href'),/youtube\.com\/watch\?v=dQw4w9WgXcQ/,'원본 링크');
+        await h.frame.locator('#mediaCloseHome').evaluate(el=>el.click());
+        assert.equal(await h.frame.locator('#mediaVisualHome iframe').count(),0,'닫기 후 iframe 0');
+      }finally{await close952(h);}
+    }
+  }finally{await browser.close();}
 });

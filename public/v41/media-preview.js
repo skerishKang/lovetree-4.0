@@ -286,7 +286,9 @@ function markup(url,title='',mediaMetadata=null,momentId='',context=null,momentM
   const canLoad=!!m.loadUrl&&(new URL(m.loadUrl).protocol==='https:'||m.privateFile);
  const ctx=context||mediaContext();
  const ownedServer=autoLoadMedia(ctx.source,ctx.owned);
- const auto=canLoad&&m.kind==='youtube'&&ownedServer;
+ // #1259: 공개 보드의 표지만 책과 같은 유튜브 후보를 표시한다. 외부 사진과 예시·파일 기록은 기존 동의 규칙을 유지한다.
+ const visitorCover=ctx.source==='share'&&opts?.visitorYoutubeCover===true;
+ const auto=canLoad&&m.kind==='youtube'&&(ownedServer||visitorCover);
  const vertical=verticalVideo(url,mediaMetadata);
  const caption=[mediaMetadata?.title,mediaMetadata?.channel,mediaMetadata?.source].filter(value=>typeof value==='string'&&value.trim()).join(' · ');
  const cached=(caption&&!compact)?'<p class="lt-media-title">'+esc(caption)+'</p>':'';
@@ -305,7 +307,7 @@ function markup(url,title='',mediaMetadata=null,momentId='',context=null,momentM
  const body=auto
   // 내 기록: 썸네일을 처음부터 보여 준다(no-referrer·lazy). 재생 표시는 썸네일 전체를 덮는 단추라
   // 썸네일 아무 곳이나 눌러도 그 자리에서 재생한다. autoplay 는 누른 뒤 만들어지는 embed 주소에만 있다.
-  ?'<figure class="lt-yt-preview" data-lt-thumb-host><img src="'+esc(previewSrc)+'" alt="'+esc(title||'YouTube 영상 썸네일')+'"'+previewFallback+' referrerpolicy="no-referrer" loading="lazy" decoding="async"><button type="button" class="lt-yt-play" data-lt-play aria-label="바로 재생"><span aria-hidden="true">▶</span></button></figure>'+cached
+  ?'<figure class="lt-yt-preview" data-lt-thumb-host><img src="'+esc(previewSrc)+'" alt="'+esc(title||'YouTube 영상 썸네일')+'"'+previewFallback+' referrerpolicy="no-referrer" loading="lazy" decoding="async">'+(vertical?'<span class="lt-vertical-backdrop" aria-hidden="true"><img src="'+esc(previewSrc)+'" alt="" referrerpolicy="no-referrer" loading="lazy" decoding="async"></span>':'')+'<button type="button" class="lt-yt-play" data-lt-play aria-label="바로 재생"><span aria-hidden="true">▶</span></button></figure>'+cached
   :(linkCard?linkCard:(canLoad?'<button type="button" data-lt-load>'+esc(m.loadLabel)+'</button>':'<span>'+esc(m.label)+'</span>')+cached);
  const status=compact?'':(auto?'재생을 누르면 여기서 바로 재생해요.':(canLoad?'불러오기를 누르면 원본 사이트에 연결됩니다.':'원본 사이트에서 확인할 수 있어요.'));
  // #393 2: 크게 보기 — 영상을 어두운 깔개 위 화면 가운데 크게 연다(바깥 클릭·Esc로 복귀).
@@ -313,7 +315,7 @@ function markup(url,title='',mediaMetadata=null,momentId='',context=null,momentM
  // #792: 기억할 구간 표 — 순간의 시작·끝(저장 값)이 있을 때만 작은 한 줄을 보인다. 재생은 그 구간만(data-lt-end).
  const rangeText=(m.kind==='youtube'&&momentMeta)?formatRange(momentMeta.startSeconds,momentMeta.endSeconds):'';
  const rangeLine=rangeText?'<div class="lt-media-range"><span class="lt-media-range-mark" aria-hidden="true">기억할 구간</span><strong>'+esc(rangeText)+'</strong></div>':'';
- let html = '<div class="lt-media" data-lt-url="'+esc(url)+'" data-lt-title="'+esc(title)+'"'+(momentId?' data-lt-moment-id="'+esc(momentId)+'"':'')+(m.kind==='youtube'?' data-lt-youtube="1"':'')+(auto?' data-lt-auto="1"':'')+(vertical?' data-lt-vertical="1"':'')+(momentMeta&&Number(momentMeta.endSeconds)>0?' data-lt-end="'+Number(momentMeta.endSeconds)+'"':'')+(momentMeta&&Number(momentMeta.startSeconds)>0?' data-lt-start="'+Number(momentMeta.startSeconds)+'"':'')+'>'+expand+'<div class="lt-media-body">'+body+'</div>'+rangeLine+(compact?'':'<p class="lt-media-status" role="status">'+status+'</p><a href="'+esc(m.openUrl)+'" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">'+esc(m.kind==='youtube'?m.actionLabel+(m.startSeconds?' · 시작 '+formatStart(m.startSeconds):''):'원본 링크 열기')+' ↗</a>')+'</div>';
+ let html = '<div class="lt-media" data-lt-url="'+esc(url)+'" data-lt-title="'+esc(title)+'"'+(momentId?' data-lt-moment-id="'+esc(momentId)+'"':'')+(m.kind==='youtube'?' data-lt-youtube="1"':'')+(auto&&ownedServer?' data-lt-auto="1"':'')+(vertical?' data-lt-vertical="1"':'')+(momentMeta&&Number(momentMeta.endSeconds)>0?' data-lt-end="'+Number(momentMeta.endSeconds)+'"':'')+(momentMeta&&Number(momentMeta.startSeconds)>0?' data-lt-start="'+Number(momentMeta.startSeconds)+'"':'')+'>'+expand+'<div class="lt-media-body">'+body+'</div>'+rangeLine+(compact?'':'<p class="lt-media-status" role="status">'+status+'</p><a href="'+esc(m.openUrl)+'" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">'+esc(m.kind==='youtube'?m.actionLabel+(m.startSeconds?' · 시작 '+formatStart(m.startSeconds):''):'원본 링크 열기')+' ↗</a>')+'</div>';
  if(m.privateFile)html=html.replace('불러오기를 누르면 원본 사이트에 연결됩니다.','내 계정에 보관한 파일입니다. 불러오기를 눌러 확인하세요.').replace(/<a href=[\s\S]*?<\/a>/,'');
  return html;
 }
@@ -398,13 +400,15 @@ const ownedUrls=new Map();
 // #393 2: 크게 보기 — 지금 문서(책·보드 등)를 어둡게 깔고 영상을 화면 가운데 크게 연다.
 // 세로 영상은 화면 높이 가득, 가로는 폭 가득. 바깥 클릭·Esc·닫기 단추로 복귀하고,
 // 닫으면 iframe/video 를 치워 재생도 멈춘다. 유튜브 자체 전체 화면은 iframe allowFullscreen 그대로.
-let lightbox=null,lightboxOpener=null,lightboxBlob=null;
+let lightbox=null,lightboxOpener=null,lightboxBlob=null,lightboxErrorListener=null;
 function closeLightbox(){
  if(!lightbox)return;
  const node=lightbox;lightbox=null;
  document.removeEventListener('keydown',lightboxKey,true);
+ if(lightboxErrorListener){window.removeEventListener('message',lightboxErrorListener);lightboxErrorListener=null}
  if(lightboxBlob){URL.revokeObjectURL(lightboxBlob);lightboxBlob=null}
  node.remove();
+ document.dispatchEvent(new Event('lt-media-lightbox-close'));
  const opener=lightboxOpener;lightboxOpener=null;
  if(opener&&opener.isConnected)try{opener.focus({preventScroll:true})}catch{}
 }
@@ -423,6 +427,7 @@ async function openLightbox(url,title='',verticalHint=null){
  const stage=overlay.querySelector('.lt-lightbox-stage');
  document.body.append(overlay);
  lightbox=overlay;
+ document.dispatchEvent(new Event('lt-media-lightbox-open'));
  document.addEventListener('keydown',lightboxKey,true);
  overlay.addEventListener('click',e=>{if(e.target===overlay)closeLightbox()});
  overlay.querySelector('.lt-lightbox-close').addEventListener('click',closeLightbox);
@@ -439,6 +444,30 @@ async function openLightbox(url,title='',verticalHint=null){
   // #584: 그 자리 재생과 같은 이유(오류 153)로 no-referrer 를 쓰지 않는다.
   frame.setAttribute('referrerpolicy','strict-origin-when-cross-origin');
   stage.replaceChildren(frame);
+  // YouTube IFrame API 오류 101/150(임베드 거절)·153(플레이어 구성 실패) 등에서는
+  // 재생할 수 없는 iframe을 걷고 원본 영상으로 이동할 수 있게 합니다.
+  const failEmbed=()=>{
+   if(!alive()||!frame.isConnected)return;
+   const note=document.createElement('p');note.className='lt-lightbox-note';
+   note.setAttribute('role','status');
+   note.textContent='여기에서 재생할 수 없는 영상입니다.';
+   const link=document.createElement('a');link.href=m.openUrl||url;
+   link.target='_blank';link.rel='noopener noreferrer';
+   link.textContent='YouTube에서 보기';
+   stage.replaceChildren(note,link);
+  };
+  lightboxErrorListener=event=>{
+   if(!alive()||event.source!==frame.contentWindow||
+      !['https://www.youtube.com','https://www.youtube-nocookie.com'].includes(event.origin))return;
+   let data=event.data;
+   if(typeof data==='string'){try{data=JSON.parse(data)}catch{return}}
+   if(data?.event==='onError'&&[2,5,100,101,150,153].includes(Number(data.info)))failEmbed();
+  };
+  window.addEventListener('message',lightboxErrorListener);
+  // 임베드 금지·삭제·비공개는 기존 상태 API의 확인된 응답으로 판단합니다.
+  // 상태를 알 수 없으면 네트워크 일시 오류로 보고 플레이어를 임의로 제거하지 않습니다.
+  void loadVideoStatusModule().then(mod=>mod?.fetchVideoStatus?.(m.videoId))
+   .then(status=>{if(['noembed','gone','private'].includes(status))failEmbed()}).catch(()=>{});
  }else{
   let src=m.loadUrl;
   if(m.privateFile){
@@ -604,4 +633,16 @@ if(typeof document!=='undefined'){
  document.addEventListener('pointerdown',e=>{if(e.target.closest?.('.lt-media')&&!e.target.closest?.('.card'))e.stopPropagation();},true);
  document.addEventListener('click',e=>{if(e.target.closest?.('[data-lt-title-edit]'))return;const root=e.target.closest?.('.lt-media');if(!root)return;e.stopImmediatePropagation();if(e.target.closest('[data-lt-expand]')){e.preventDefault();void openLightbox(root.dataset.ltUrl,root.dataset.ltTitle,root.hasAttribute('data-lt-vertical')?true:null);return;}if(e.target.closest('[data-lt-from-start]')){e.preventDefault();delete root.dataset.ltEnd;root.dataset.ltFromStart='1';void playInPlace(root);return;}if(e.target.closest('[data-lt-play]')){e.preventDefault();void playInPlace(root);return;}if(e.target.closest('[data-lt-load]')){e.preventDefault();load(root);}},true);
 }
+ // #1084 후속(운영 11-23): 세로 영상의 흐린 배경 그림은 가운데 썸네일의 첫 후보(oardefault)로 깔린다. 그 그림이 없는
+ // 영상은 YouTube가 120×90 회색 자리 그림을 돌려줘, 가운데는 다른 후보로 내려가도 배경만 회색이 된다.
+ // 가운데 썸네일이 실제로 불러온 그림으로 배경도 맞춘다(보드·책 공통).
+ const BACKDROP='.lt-vertical-backdrop img,.yt-vertical-backdrop img';
+ const syncBackdrop=img=>{
+  if(!(img instanceof HTMLImageElement))return;
+  const host=img.closest?.('[data-lt-thumb-host],.yt-play');if(!host)return;
+  const back=host.querySelector(BACKDROP);if(!back)return;
+  const main=img.matches(BACKDROP)?[...host.querySelectorAll('img')].find(x=>!x.matches(BACKDROP)&&x.naturalWidth>120):(img.naturalWidth>120?img:null);
+  if(main&&main.currentSrc&&back.src!==main.currentSrc&&(back.naturalWidth<=120||img===main))back.src=main.currentSrc;
+ };
+ if(typeof document!=='undefined')document.addEventListener('load',e=>syncBackdrop(e.target),true);
 })();

@@ -368,7 +368,9 @@ test('#460 화면은 처음 자리·전체 보기·기억을 이 계산으로 �
   assert.match(BOARD, /LT58Model\.rememberView\(/);
   // #662(CTO 지시): 좁은 판 초기 화면은 전체 맞춤(40장을 손톱만 하게 몰아 넣음)이 아니라 지금 순간 카드를
   // 읽히는 배율로 크게 보이는 초점 보기다. 판이 아직 없으면(모듈 로드 순서) 전체 맞춤으로 대체한다.
-  assert.match(BOARD, /function\s+boardStartView\(\)\s*\{\s*if\s*\(innerWidth\s*<\s*700\)\s*\{\s*if\s*\(typeof\s+focusBoardMoment\s*===\s*'function'\)\s*focusBoardMoment\(LTDEMO\.get\(\),\s*false\);?\s*else\s+fitAll\(false\);?\s*viewMode\s*=\s*'start';?\s*return;?\s*\}/);
+  // #1249: 일반 진입은 첫 카드부터 실제 스크롤, 명시한 순간 진입은 해당 카드에 초점.
+  assert.match(BOARD, /function\s+boardStartView\(\)[\s\S]*?mobileBoardBounds\(\)[\s\S]*?view\.z = 1;[\s\S]*?boardSafeArea\(\)\.y - bounds\.top/);
+  assert.match(BOARD, /viewport\.scrollTop = Math\.max\(0, mobileBoardBaseY - view\.y\)/);
   // #490: 숨은 프레임(폭 0)에서 한 맞춤은 '전체 보기'가 아니다 — 드러난 뒤 resize가 처음 자리(또는 기억한 자리)를 다시 계산한다.
   assert.match(BOARD, /function\s+boardResize\(\)\s*\{\s*if\s*\(innerWidth\s*<\s*700\s*\|\|\s*cinema\)\s*return;?\s*placeAll\(\);?\s*if\s*\(viewMode\s*===\s*'fit'\)\s*fitAll\(false\);?\s*else\s+boardStartView\(\);?\s*\}/, "boardResize: 저장 자리 없는 카드 재꽂기 포함")
   assert.match(DETAIL, /boardStartView\(\);applyPathHighlight\(\)/);
