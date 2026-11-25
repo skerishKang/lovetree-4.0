@@ -215,7 +215,7 @@ html[data-v41-screen=shelf] .shelf-new-tree:hover { border-color: var(--lt-gold-
 html[data-v41-screen=shelf] .shelf-new-tree:focus-visible { outline: 3px solid var(--lt-gold); outline-offset: 2px; }
 html[data-v41-screen=shelf][data-lt-theme=garden] .shelf-new-tree {
   border-color: var(--lt-line-paper);
-  background: #fffaf5;
+  background: var(--paper-strong);
   color: #704b55;
 }
 html[data-v41-screen=shelf][data-lt-theme=garden] .shelf-new-tree:focus-visible { outline-color: var(--lt-gold-ink); }
