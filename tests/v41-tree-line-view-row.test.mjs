@@ -39,9 +39,10 @@ test('화면 줄: 보드 첫 진입 안내 토스트를 없앴다', () => {
   assert.ok(!ex.includes('순간을 선택해 연결된 기록을 살펴보세요'), '안내 문구도 없어야 한다');
 });
 
-test('화면 줄: 사진 표지에는 제목을 올리지 않고 표지 아래 두 줄을 쓴다', () => {
+test('화면 줄: 사진 표지 이름은 아래 띠에 두고 표지 아래 두 줄을 쓴다', () => {
   const shelf = read('public/v41/views/shelf/shelf.js');
-  assert.ok(shelf.includes("book.coverMedia?'':"), '사진 표지면 제목을 그리지 않는다');
+  // #1366: 사진 표지에 가운데 제목을 겹치지 않고 아래 띠에 이름을 둔다. 낡은 글자 단정은 제거했다.
+  assert.ok(shelf.includes('cover-name-band'), '사진 표지 이름은 아래 띠에 있다');
   assert.ok(shelf.includes('book-card-meta-title') && shelf.includes('book-card-meta-date'), '표지 아래 두 줄이 있다');
 });
 
