@@ -134,7 +134,8 @@ export function createMessages(deps) {
       show(data.view);
     }
     if ((data?.type === MSG.selection || data?.type === MSG.select) && window.LT41?.tree.moments.some(m => m.id === data.id)) {
-      window.LT41.momentId = data.id; links(); writeLocation('push', data.boardState);
+      // #1333: 트리 보기에서 고른 순간은 현재 순간으로만 반영하고 방문 기록은 늘리지 않는다.
+      window.LT41.momentId = data.id; links(); writeLocation(data.noHistory || data.boardState?.noHistory ? 'replace' : 'push', data.boardState);
     }
     if (data?.type === MSG.boardDetail) { writeLocation('replace'); return; }
     // #315: 공유 감상(share)은 읽기 전용이다. 안쪽 화면의 버튼 정리를 통과한 쓰기 메시지가 남아도 여기서 막는다(이중).
