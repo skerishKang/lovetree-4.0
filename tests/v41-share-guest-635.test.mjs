@@ -1170,6 +1170,10 @@ test('#1378 공유 감상: 390·1440 × 밤·정원 재생 iframe 최소 크기�
           }));
           await frame.locator('[data-yt-play]').first().click({ force: true });
           await frame.waitForSelector('iframe.yt-frame', { timeout: 10000 });
+          if (process.env.LT_1378_SHARE_CAPTURE_DIR) {
+            mkdirSync(process.env.LT_1378_SHARE_CAPTURE_DIR, { recursive: true });
+            await frame.page().screenshot({ path: path.join(process.env.LT_1378_SHARE_CAPTURE_DIR, 'share-' + width + '-' + theme + '.png') });
+          }
           const result = await inspectYoutubeIframe(frame.locator('iframe.yt-frame').first());
           assert.ok(result.minimum200, width + '/' + theme + ': 공유 플레이어 ' + result.width + '×' + result.height);
           assert.equal(result.blocked, 0, width + '/' + theme + ': 가림 ' + result.blockers.join(','));
