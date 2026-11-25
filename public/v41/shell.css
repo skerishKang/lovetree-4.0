@@ -1046,6 +1046,7 @@ body.community-screen #stage>iframe,body.community-screen #empty{display:none}
 #community-panel .community-cover-image.is-ready{opacity:1}
 #community-panel .community-cover-backdrop.is-ready{opacity:.78}
 #community-panel .community-card-title{margin:12px 14px 0;color:var(--lt-ink);font-size:16px;font-weight:700;line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#community-panel .community-card-owner{display:block;min-width:0;margin:3px 14px 0;color:var(--lt-ink);font-size:12px;line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #community-panel .community-card-moment{margin:4px 14px 0;color:var(--lt-ink);font-size:14px;line-height:1.45;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #community-panel .community-card-distinct{display:block;margin:4px 14px 0;color:var(--lt-ink);font-size:12px;line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #community-panel .community-card-meta{margin:7px 14px 14px;color:var(--lt-ink);font-size:13px;line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -1329,3 +1330,5 @@ body[data-record-source=share][data-fab-lift=book] #toast[data-visitor-intro]:no
  body[data-record-source=share][data-fab-lift=book] #toast[data-visitor-intro]:not([hidden]){margin:2px auto max(2px,env(safe-area-inset-bottom));padding:6px 10px;line-height:1.4}
 }
 body[data-record-source=share][data-fab-lift=book].lt-book-lightbox-open #toast[data-visitor-intro]{display:none}
+
+@media(max-width:780px){#community-panel .community-card-owner{margin:3px 10px 0;font-size:11px}}
