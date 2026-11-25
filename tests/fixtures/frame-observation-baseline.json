@@ -1,0 +1,366 @@
+{
+  "basis": "d3d36d32d621341d4fa40fe55df371a36f40ee86",
+  "viewports": {
+    "390": { "width": 390, "height": 844 },
+    "1440": { "width": 1440, "height": 900 }
+  },
+  "screenGroups": {
+    "home": "home",
+    "shelf": "iframe",
+    "book": "iframe",
+    "board": "iframe",
+    "map": "iframe",
+    "tree": "iframe",
+    "explore": "explore",
+    "settings": "settings",
+    "share-guest": "share-guest"
+  },
+  "screens": {
+    "home": {
+      "stage": {
+        "padding": {
+          "390": ["0px", "0px", "0px", "0px"],
+          "1440": ["0px", "0px", "0px", "0px"]
+        },
+        "height": { "390": 733, "1440": 781 },
+        "borderWidth": ["0px", "0px", "0px", "0px"],
+        "borderStyle": ["none", "none", "none", "none"],
+        "borderColor": {
+          "night": "rgb(245, 241, 233)",
+          "garden": "rgb(64, 53, 54)"
+        },
+        "borderRadius": {
+          "390": ["0px", "0px", "0px", "0px"],
+          "1440": ["0px", "0px", "0px", "0px"]
+        },
+        "boxShadow": "none",
+        "background": {
+          "night": { "background": "rgb(4, 4, 7)", "backgroundImage": "none" },
+          "garden": { "background": "rgb(247, 240, 232)", "backgroundImage": "none" }
+        }
+      },
+      "frame": {
+        "padding": {
+          "390": ["0px", "0px", "0px", "0px"],
+          "1440": ["0px", "0px", "0px", "0px"]
+        },
+        "borderWidth": ["0px", "0px", "0px", "0px"],
+        "borderStyle": ["none", "none", "none", "none"],
+        "borderColor": {
+          "night": "rgb(245, 241, 233)",
+          "garden": "rgb(64, 53, 54)"
+        },
+        "borderRadius": {
+          "390": ["0px", "0px", "0px", "0px"],
+          "1440": ["0px", "0px", "0px", "0px"]
+        },
+        "boxShadow": "none",
+        "background": {
+          "night": { "background": "rgb(4, 4, 7)", "backgroundImage": "none" },
+          "garden": { "background": "rgb(247, 240, 232)", "backgroundImage": "none" }
+        }
+      },
+      "panel": null,
+      "scroll": {
+        "home": {
+          "owner": "iframe:html",
+          "overflowY": { "390": "auto", "1440": "auto" }
+        }
+      }
+    },
+    "iframe": {
+      "stage": {
+        "padding": {
+          "390": ["6px", "6px", "8px", "6px"],
+          "1440": ["10px", "14px", "14px", "14px"]
+        },
+        "height": { "390": 787, "1440": 835 },
+        "borderWidth": ["0px", "0px", "0px", "0px"],
+        "borderStyle": ["none", "none", "none", "none"],
+        "borderColor": {
+          "night": "rgb(245, 241, 233)",
+          "garden": "rgb(64, 53, 54)"
+        },
+        "borderRadius": {
+          "390": ["0px", "0px", "0px", "0px"],
+          "1440": ["0px", "0px", "0px", "0px"]
+        },
+        "boxShadow": "none",
+        "background": {
+          "night": {
+            "background": "rgba(0, 0, 0, 0)",
+            "backgroundImage": "radial-gradient(circle at 50% 0px, rgb(10, 10, 17), rgb(4, 4, 7) 55%, rgb(0, 0, 0))"
+          },
+          "garden": { "background": "rgb(247, 240, 232)", "backgroundImage": "none" }
+        }
+      },
+      "frame": {
+        "padding": {
+          "390": ["0px", "0px", "0px", "0px"],
+          "1440": ["0px", "0px", "0px", "0px"]
+        },
+        "borderWidth": ["1px", "1px", "1px", "1px"],
+        "borderStyle": ["solid", "solid", "solid", "solid"],
+        "borderColor": {
+          "night": "rgba(255, 230, 166, 0.45)",
+          "garden": "rgba(152, 80, 94, 0.38)"
+        },
+        "borderRadius": {
+          "390": ["12px", "12px", "12px", "12px"],
+          "1440": ["16px", "16px", "16px", "16px"]
+        },
+        "boxShadow": "rgba(255, 230, 166, 0.1) 0px 0px 0px 1px, rgba(238, 190, 104, 0.16) 0px 0px 32px 0px, rgba(0, 0, 0, 0.5) 0px 24px 60px 0px",
+        "background": {
+          "night": { "background": "rgb(4, 4, 7)", "backgroundImage": "none" },
+          "garden": { "background": "rgb(247, 240, 232)", "backgroundImage": "none" }
+        }
+      },
+      "panel": null,
+      "scroll": {
+        "shelf": {
+          "owner": "iframe:html",
+          "overflowY": { "390": "visible", "1440": "visible" }
+        },
+        "book": {
+          "owner": "iframe:html",
+          "overflowY": { "390": "auto", "1440": "hidden" }
+        },
+        "board": {
+          "owner": "world:world",
+          "overflowY": { "390": "visible", "1440": "visible" }
+        },
+        "map": {
+          "owner": "iframe:stage",
+          "overflowY": { "390": "clip", "1440": "clip" }
+        },
+        "tree": {
+          "owner": "iframe:html",
+          "overflowY": { "390": "visible", "1440": "visible" }
+        }
+      }
+    },
+    "explore": {
+      "stage": {
+        "padding": {
+          "390": ["6px", "6px", "8px", "6px"],
+          "1440": ["10px", "14px", "14px", "14px"]
+        },
+        "height": { "390": 787, "1440": 835 },
+        "borderWidth": ["0px", "0px", "0px", "0px"],
+        "borderStyle": ["none", "none", "none", "none"],
+        "borderColor": {
+          "night": "rgb(245, 241, 233)",
+          "garden": "rgb(64, 53, 54)"
+        },
+        "borderRadius": {
+          "390": ["0px", "0px", "0px", "0px"],
+          "1440": ["0px", "0px", "0px", "0px"]
+        },
+        "boxShadow": "none",
+        "background": {
+          "night": {
+            "background": "rgba(0, 0, 0, 0)",
+            "backgroundImage": "radial-gradient(circle at 50% 0px, rgb(10, 10, 17), rgb(4, 4, 7) 55%, rgb(0, 0, 0))"
+          },
+          "garden": { "background": "rgb(247, 240, 232)", "backgroundImage": "none" }
+        }
+      },
+      "frame": null,
+      "panel": {
+        "open": true,
+        "padding": {
+          "390": ["14px", "14px", "28px", "14px"],
+          "1440": ["20px", "43.2px", "40px", "43.2px"]
+        },
+        "borderWidth": ["0px", "0px", "0px", "0px"],
+        "borderStyle": ["none", "none", "none", "none"],
+        "borderColor": {
+          "night": "rgb(245, 241, 233)",
+          "garden": "rgb(64, 53, 54)"
+        },
+        "borderRadius": {
+          "390": ["0px", "0px", "0px", "0px"],
+          "1440": ["0px", "0px", "0px", "0px"]
+        },
+        "boxShadow": "none",
+        "background": {
+          "night": { "background": "rgb(4, 4, 7)", "backgroundImage": "none" },
+          "garden": { "background": "rgb(247, 240, 232)", "backgroundImage": "none" }
+        },
+        "backdrop": {
+          "night": {
+            "background": "color(srgb 0.0156863 0.0156863 0.027451 / 0.74)",
+            "filter": "none",
+            "backdropFilter": "blur(2px)"
+          },
+          "garden": {
+            "background": "color(srgb 0.968627 0.941176 0.909804 / 0.74)",
+            "filter": "none",
+            "backdropFilter": "blur(2px)"
+          }
+        }
+      },
+      "scroll": {
+        "explore": {
+          "owner": "shell:community-panel",
+          "overflowY": { "390": "auto", "1440": "auto" }
+        }
+      }
+    },
+    "settings": {
+      "stage": {
+        "padding": {
+          "390": ["6px", "6px", "8px", "6px"],
+          "1440": ["10px", "14px", "14px", "14px"]
+        },
+        "height": { "390": 787, "1440": 835 },
+        "borderWidth": ["0px", "0px", "0px", "0px"],
+        "borderStyle": ["none", "none", "none", "none"],
+        "borderColor": {
+          "night": "rgb(245, 241, 233)",
+          "garden": "rgb(64, 53, 54)"
+        },
+        "borderRadius": {
+          "390": ["0px", "0px", "0px", "0px"],
+          "1440": ["0px", "0px", "0px", "0px"]
+        },
+        "boxShadow": "none",
+        "background": {
+          "night": {
+            "background": "rgba(0, 0, 0, 0)",
+            "backgroundImage": "radial-gradient(circle at 50% 0px, rgb(10, 10, 17), rgb(4, 4, 7) 55%, rgb(0, 0, 0))"
+          },
+          "garden": { "background": "rgb(247, 240, 232)", "backgroundImage": "none" }
+        }
+      },
+      "frame": {
+        "padding": {
+          "390": ["0px", "0px", "0px", "0px"],
+          "1440": ["0px", "0px", "0px", "0px"]
+        },
+        "borderWidth": ["1px", "1px", "1px", "1px"],
+        "borderStyle": ["solid", "solid", "solid", "solid"],
+        "borderColor": {
+          "night": "rgba(255, 230, 166, 0.45)",
+          "garden": "rgba(152, 80, 94, 0.38)"
+        },
+        "borderRadius": {
+          "390": ["12px", "12px", "12px", "12px"],
+          "1440": ["16px", "16px", "16px", "16px"]
+        },
+        "boxShadow": "rgba(255, 230, 166, 0.1) 0px 0px 0px 1px, rgba(238, 190, 104, 0.16) 0px 0px 32px 0px, rgba(0, 0, 0, 0.5) 0px 24px 60px 0px",
+        "background": {
+          "night": { "background": "rgb(4, 4, 7)", "backgroundImage": "none" },
+          "garden": { "background": "rgb(247, 240, 232)", "backgroundImage": "none" }
+        }
+      },
+      "panel": {
+        "open": true,
+        "padding": {
+          "390": ["22px", "18px", "22px", "18px"],
+          "1440": ["28px", "360px", "28px", "360px"]
+        },
+        "borderWidth": ["0px", "0px", "0px", "0px"],
+        "borderStyle": ["none", "none", "none", "none"],
+        "borderColor": {
+          "night": "rgb(245, 241, 233)",
+          "garden": "rgb(64, 53, 54)"
+        },
+        "borderRadius": {
+          "390": ["0px", "0px", "0px", "0px"],
+          "1440": ["0px", "0px", "0px", "0px"]
+        },
+        "boxShadow": "none",
+        "background": {
+          "night": { "background": "rgba(7, 7, 12, 0.9)", "backgroundImage": "none" },
+          "garden": { "background": "rgba(255, 253, 248, 0.98)", "backgroundImage": "none" }
+        },
+        "backdrop": {
+          "night": {
+            "background": "rgba(0, 0, 0, 0.55)",
+            "filter": "none",
+            "backdropFilter": "blur(3px)"
+          },
+          "garden": {
+            "background": "rgba(0, 0, 0, 0.55)",
+            "filter": "none",
+            "backdropFilter": "blur(3px)"
+          }
+        }
+      },
+      "scroll": {
+        "settings": {
+          "owner": "shell:account-settings",
+          "overflowY": { "390": "auto", "1440": "auto" }
+        }
+      }
+    },
+    "share-guest": {
+      "stage": {
+        "padding": {
+          "390": ["6px", "6px", "8px", "6px"],
+          "1440": ["10px", "14px", "14px", "14px"]
+        },
+        "height": { "390": 750.813, "1440": 736 },
+        "borderWidth": ["0px", "0px", "0px", "0px"],
+        "borderStyle": ["none", "none", "none", "none"],
+        "borderColor": {
+          "night": "rgb(245, 241, 233)",
+          "garden": "rgb(64, 53, 54)"
+        },
+        "borderRadius": {
+          "390": ["0px", "0px", "0px", "0px"],
+          "1440": ["0px", "0px", "0px", "0px"]
+        },
+        "boxShadow": "none",
+        "background": {
+          "night": {
+            "background": "rgba(0, 0, 0, 0)",
+            "backgroundImage": "radial-gradient(circle at 50% 0px, rgb(10, 10, 17), rgb(4, 4, 7) 55%, rgb(0, 0, 0))"
+          },
+          "garden": { "background": "rgb(247, 240, 232)", "backgroundImage": "none" }
+        }
+      },
+      "frame": {
+        "padding": {
+          "390": ["0px", "0px", "0px", "0px"],
+          "1440": ["0px", "0px", "0px", "0px"]
+        },
+        "borderWidth": ["1px", "1px", "1px", "1px"],
+        "borderStyle": ["solid", "solid", "solid", "solid"],
+        "borderColor": {
+          "night": "rgba(255, 230, 166, 0.45)",
+          "garden": "rgba(152, 80, 94, 0.38)"
+        },
+        "borderRadius": {
+          "390": ["12px", "12px", "12px", "12px"],
+          "1440": ["16px", "16px", "16px", "16px"]
+        },
+        "boxShadow": "rgba(255, 230, 166, 0.1) 0px 0px 0px 1px, rgba(238, 190, 104, 0.16) 0px 0px 32px 0px, rgba(0, 0, 0, 0.5) 0px 24px 60px 0px",
+        "background": {
+          "night": { "background": "rgb(4, 4, 7)", "backgroundImage": "none" },
+          "garden": { "background": "rgb(247, 240, 232)", "backgroundImage": "none" }
+        }
+      },
+      "panel": null,
+      "scroll": {
+        "share-guest": {
+          "owner": "iframe:html",
+          "overflowY": { "390": "auto", "1440": "hidden" }
+        }
+      },
+      "toast": {
+        "hidden": false,
+        "visitorIntro": true,
+        "position": "relative",
+        "flex": "0 0 auto",
+        "height": { "390": 32.188, "1440": 41 },
+        "margin": {
+          "390": ["2px", "40.0781px", "2px", "40.0781px"],
+          "1440": ["4px", "557.078px", "54px", "557.078px"]
+        }
+      },
+      "stageShortfall": { "390": 36.187, "1440": 99 }
+    }
+  }
+}

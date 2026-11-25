@@ -10,11 +10,12 @@
 // 크롬(Playwright chromium)이 없는 곳에서는 건너뛴다 — CI(LT_SCREEN_AUDIT_REQUIRE=1)에서는 건너뜀을 실패로 본다.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { serve, auditPage, failuresOf, roleStyleFn, assertRolePair } from './helpers/screen-audit.mjs';
 import { createTree, addMoment } from '../public/v41/domain.mjs';
+import { observeFrameMatrix, compareScreenshotBuffers } from './helpers/frame-observation.mjs';
 
 const REQUIRE = process.env.LT_SCREEN_AUDIT_REQUIRE === '1';
 const SCREEN_AUDIT_CAPTURE_DIR = fileURLToPath(new URL('../test-results/v41-screen-audit/', import.meta.url));
@@ -582,6 +583,81 @@ const readyFrame = async (page, test_, { root = null, view = null, timeout = 450
   }
   assert.fail(`${why} 실패 — ${detail} (최대 ${timeout / 1000}초). 현재 프레임 URL: [${frameUrls(page).join(' | ')}]`);
 };
+
+test('#657 화면 공통 검사기: 아홉 화면 둘레·스크롤 주인 관측 기반선(390·1440 × 밤·정원)', { skip: REQUIRE ? false : skip, timeout: 300000 }, async () => {
+  if (skip) assert.fail(`미리보기 검사에서는 건너뜀이 실패다 — ${skip}`);
+  const baseline = JSON.parse(readFileSync(new URL('./fixtures/frame-observation-baseline.json', import.meta.url), 'utf8'));
+  const shard = process.env.LT_SCREEN_AUDIT_SHARD || '';
+  const outputDir = fileURLToPath(new URL('../test-results/v41-frame-observation/' + (shard || 'all') + '/', import.meta.url));
+  const beforeDir = process.env.LT_FRAME_OBSERVATION_BEFORE_DIR || '';
+  const server = await serve();
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch({ headless: true });
+  const started = Date.now();
+  try {
+    const report = await observeFrameMatrix({ browser, base, outputDir, shard });
+    assert.deepEqual(report.errors, [], '관측 중 화면 오류가 없다');
+    assert.equal(report.screens.length, !shard ? 36 : shard === 'c' ? 18 : 9, '선택한 shard의 아홉 화면을 모두 관측했다');
+    const assertObservedStyle = (actual, expected, width, theme, label) => {
+      assert.ok(actual, `${label} 요소가 있다`);
+      assert.deepEqual(actual.padding, expected.padding[width], `${label} padding`);
+      assert.deepEqual(actual.borderWidth, expected.borderWidth, `${label} 테두리 두께`);
+      assert.deepEqual(actual.borderStyle, expected.borderStyle, `${label} 테두리 선`);
+      assert.deepEqual(actual.borderColor, Array(4).fill(expected.borderColor[theme]), `${label} 테두리 색`);
+      assert.deepEqual(actual.borderRadius, expected.borderRadius[width], `${label} 모서리 반경`);
+      assert.equal(actual.boxShadow, expected.boxShadow, `${label} 그림자`);
+      assert.deepEqual([actual.background, actual.backgroundImage], [expected.background[theme].background, expected.background[theme].backgroundImage], `${label} 배경`);
+    };
+    const pixelResults = [];
+    for (const row of report.screens) {
+      const width = String(row.viewport.width), id = row.screen, label = `${width}/${row.theme}/${id}`;
+      const expected = baseline.screens[baseline.screenGroups[id]];
+      const stage = row.shell.stage, frame = row.shell.frame, panel = row.shell.panel;
+      assert.ok(expected, `${label} 기준선이 있다`);
+      assertObservedStyle(stage, expected.stage, width, row.theme, `${label} stage`);
+      assert.ok(Math.abs(stage.rect.height - expected.stage.height[width]) <= 0.002, `${label} stage 높이 ${stage.rect.height}`);
+      assert.equal(row.scroll.shellDocumentScrollable, false, `${label} 셸 문서는 스크롤 주인이 아니다`);
+      assert.equal(row.scroll.frameDocumentScrollable, false, `${label} iframe 문서도 스크롤 주인이 아니다`);
+      const owner = row.scroll.owner, scroll = expected.scroll[id];
+      assert.ok(scroll, `${label} 스크롤 기준선이 있다`);
+      assert.equal(`${owner?.owner}:${owner?.id}`, scroll.owner, `${label} 주 스크롤 주인`);
+      assert.equal(owner?.overflowY, scroll.overflowY[width], `${label} 주 스크롤 주인 overflowY`);
+      if (expected.frame) assertObservedStyle(frame, expected.frame, width, row.theme, `${label} iframe`);
+      else assert.equal(frame, null, `${label} iframe을 쓰지 않는다`);
+      if (expected.panel) {
+        assertObservedStyle(panel, expected.panel, width, row.theme, `${label} panel`);
+        assert.equal(panel.open, expected.panel.open, `${label} panel 열림 상태`);
+        assert.deepEqual(row.shell.backdrop, expected.panel.backdrop[row.theme], `${label} panel 배경 덮개`);
+      } else assert.equal(panel, null, `${label} 셸 패널을 쓰지 않는다`);
+      for (const suffix of ['.png', '-surface.png', '-roi-top.png', '-roi-bottom.png', '-roi-left.png', '-roi-right.png', '.json']) assert.ok(existsSync(join(outputDir, `${width}-${row.theme}-${id}${suffix}`)), `${label} 관측 파일 ${suffix}`);
+      if (id === 'share-guest') {
+        const toast = expected.toast;
+        assert.equal(row.shell.toastHidden, toast.hidden, `${label} 안내가 보인다`);
+        assert.equal(row.shell.visitorIntro, toast.visitorIntro, `${label} 방문자 안내다`);
+        assert.equal(row.shell.toast.position, toast.position, `${label} 안내는 문서 흐름 칸이다`);
+        assert.equal(row.shell.toast.flex, toast.flex, `${label} 안내는 flex 고정 칸이다`);
+        assert.ok(Math.abs(row.shell.toast.rect.height - toast.height[width]) <= 0.002, `${label} 안내 높이`);
+        assert.deepEqual(row.shell.toast.margin, toast.margin[width], `${label} 안내 여백`);
+        const shortfall = baseline.screens.iframe.stage.height[width] - stage.rect.height;
+        assert.ok(Math.abs(shortfall - expected.stageShortfall[width]) <= 0.002, `${label} 안내가 줄인 stage 높이 ${shortfall}`);
+      }
+      if (beforeDir) {
+        const result = await compareScreenshotBuffers(browser, readFileSync(join(beforeDir, `${width}-${row.theme}-${id}.png`)), readFileSync(join(outputDir, `${width}-${row.theme}-${id}.png`)));
+        assert.equal(result.changedPixels, 0, `${label} 전체 화면 RGBA 변경 픽셀 0: ${JSON.stringify(result)}`);
+        assert.equal(result.maxChannelDelta, 0, `${label} 전체 화면 RGBA 최대 채널 차이 0`);
+        pixelResults.push({ label, ...result });
+      }
+    }
+    if (beforeDir) assert.equal(pixelResults.length, report.screens.length, '모든 관측 화면을 전후 픽셀 비교했다');
+    const result = { basis: baseline.basis, shard: shard || 'all', screens: report.screens.length, pixelResults, elapsedMs: Date.now() - started };
+    mkdirSync(outputDir, { recursive: true });
+    writeFileSync(join(outputDir, 'result.json'), JSON.stringify(result, null, 2));
+    console.log('#1365 둘레 관측', JSON.stringify(result));
+  } finally {
+    await browser.close();
+    await new Promise(resolve => server.close(resolve));
+  }
+});
 
 test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤·정원에서 겹침·잘림·흔적 값·작은 글자가 0이다', { skip: REQUIRE ? false : skip, timeout: 900000 }, async () => {
   if (skip) assert.fail(`미리보기 검사에서는 건너뜀이 실패다 — ${skip}`);
