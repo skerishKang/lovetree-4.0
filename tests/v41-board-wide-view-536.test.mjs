@@ -307,3 +307,66 @@ test('#972 cinema button stays outside cards and mobile selection is opaque', { 
     }
   } finally { await browser.close(); server.close(); }
 });
+
+test('#1359 넓은 보드와 지도, 최근 순간 및 휴대폰 회귀', {skip: REQUIRE ? false : skip, timeout: 300000}, async () => {
+  if (skip) assert.fail(String(skip));
+  const server = await serve();
+  const base = 'http://127.0.0.1:' + server.address().port;
+  const browser = await chromium.launch({headless:true});
+  async function open(screen, width, height, theme, n, baseline = false) {
+    const page = await browser.newPage({viewport:{width,height},reducedMotion:'reduce',deviceScaleFactor:1});
+    await page.route('**/*', route => {
+      const url = route.request().url();
+      if (!url.startsWith(base)) return route.abort();
+      if (baseline && /wide-1359\.(js|css)$/.test(url)) return route.fulfill({status:200,contentType:url.endsWith('.js')?'text/javascript':'text/css',body:''});
+      return route.continue();
+    });
+    await page.addInitScript(({tree,theme}) => {
+      localStorage.setItem('lt41.theme',theme);
+      window.LT41={tree,source:'example',writable:false,momentId:tree.moments[0].id,prefs:{titleDisplay:'both'}};
+    },{tree:chainTree(n),theme});
+    await page.goto(base + '/v41/views/track' + (screen==='board'?'58-pinboard':'56-network') + '.html');
+    await page.waitForFunction(screen => screen==='board' ? document.querySelectorAll('#cardLayer .card').length>0 : !!window.__lt, screen);
+    await page.evaluate(() => document.fonts.ready);
+    return page;
+  }
+  try {
+    for(const screen of ['board','network']) for(const [width,height] of [[1280,800],[1440,900],[1920,1080]]) for(const theme of ['night','garden']) for(const n of [5,54]) {
+      const page = await open(screen,width,height,theme,n);
+      try {
+        const g = await page.evaluate(() => {
+          const app=document.querySelector('.app'), surface=document.querySelector('.surface');
+          const style=el=>getComputedStyle(el);
+          return {overflow:document.documentElement.scrollWidth-innerWidth, panel:!!document.querySelector('.lt1359-info'),cols:window.LT58Model?.gridColumns(innerWidth),
+            appBg:style(app).backgroundColor, surfaceBg:surface?style(surface).backgroundColor:null,
+            appImage:style(app).backgroundImage,surfaceImage:surface?style(surface).backgroundImage:null};
+        });
+        assert.equal(g.overflow,0);
+        assert.equal(g.panel,n===5);
+        if(screen==='board' && n===54){
+          assert.equal(g.cols,width===1280?4:width===1440?5:7);
+          assert.equal(g.appBg,g.surfaceBg);
+          assert.equal(g.appImage,'none');assert.equal(g.surfaceImage,'none');
+        }
+        if(n===5){
+          const button=page.locator('.lt1359-info button').first();
+          assert.equal(await page.locator('.lt1359-info button').count(),3);
+          const box=await button.boundingBox();assert.ok(box.width>=44&&box.height>=44);
+          const id=await button.getAttribute('data-moment-id');
+          if(theme==='garden'){await button.focus();await button.press('Enter');}else await button.click();
+          await page.waitForSelector('#detail.open');
+          assert.equal(await page.locator(screen==='board'?'#dTitle':'#detailTitle').textContent(),chainTree(n).moments.find(m=>m.id===id).title);
+        }
+      } finally {await page.close();}
+    }
+    for(const screen of ['board','network']) for(const theme of ['night','garden']) for(const n of [5,54]){
+      const before=await open(screen,390,844,theme,n,true);
+      const after=await open(screen,390,844,theme,n);
+      try{
+        assert.equal(await after.locator('.lt1359-info').count(),0);
+        const a=await before.screenshot({animations:'disabled'}),b=await after.screenshot({animations:'disabled'});
+        assert.ok(a.equals(b),screen+' '+theme+' '+n+' 휴대폰 픽셀 변경');
+      }finally{await before.close();await after.close();}
+    }
+  } finally {await browser.close();server.close();}
+});

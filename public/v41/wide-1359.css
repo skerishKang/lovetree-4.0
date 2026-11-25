@@ -18,3 +18,14 @@
   .lt1359-next{margin-top:18px;color:var(--lt-muted,var(--muted))}
 }
 @media (max-width:1199px){.lt1359-info{display:none}}
+
+@media (min-width:1200px){
+  html[data-v41-screen=board].lt1359-wide:not(.lt1359-sparse) body .app,
+  html[data-v41-screen=board].lt1359-wide:not(.lt1359-sparse) body .surface{background:var(--lt-stage-2);box-shadow:none}
+  html[data-v41-screen=board].lt1359-wide:not(.lt1359-sparse) body .surface::before,
+  html[data-v41-screen=board].lt1359-wide:not(.lt1359-sparse) body .surface::after,
+  html[data-v41-screen=board].lt1359-wide:not(.lt1359-sparse) .spaceGlow{display:none}
+  .lt1359-info button{display:block;width:100%;min-height:44px;text-align:left;padding:8px;border:1px solid var(--lt-line);border-radius:var(--lt-r-card);background:var(--lt-glass);color:var(--lt-pearl);pointer-events:auto;overflow-wrap:anywhere}
+  .lt1359-info button:focus-visible{outline:2px solid var(--lt-gold);outline-offset:2px}
+  .app:has(.detail.open) .lt1359-info{visibility:hidden}
+}

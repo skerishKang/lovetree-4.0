@@ -35,9 +35,20 @@
     const heading = document.createElement('h3');
     heading.textContent = '최근 순간';
     const list = document.createElement('ol');
-    data.slice(-3).reverse().forEach((moment) => {
+    [...data].sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')) || String(b.createdAt || '').localeCompare(String(a.createdAt || ''))).slice(0, 3).forEach((moment) => {
       const item = document.createElement('li');
-      item.textContent = String(moment.title || moment.name || '이름 없는 순간');
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.dataset.momentId = moment.id;
+      button.textContent = String(moment.title || moment.name || '이름 없는 순간');
+      button.addEventListener('click', () => {
+        if (screen === 'board') selectMoment(moment.id, true);
+        else {
+          const node = window.__lt?.nodes.find(n => n.id === moment.id);
+          if (node) window.__lt.selectMoment(node, true);
+        }
+      });
+      item.append(button);
       list.append(item);
     });
     const hint = document.createElement('p');
