@@ -54,6 +54,9 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin,a
  const noteLine=el('button','moments-note');noteLine.type='button';noteLine.setAttribute('aria-label','설명 펼치기');
  noteLine.onclick=()=>{const expanded=noteLine.getAttribute('aria-expanded')==='true';noteLine.setAttribute('aria-expanded',String(!expanded));noteLine.setAttribute('aria-label',expanded?'설명 펼치기':'설명 접기');};
  const mute=el('button','moments-mute','소리 켜기');mute.type='button';mute.setAttribute('aria-label','소리 켜기');
+  // #1332: 음소거 재생 중 가운데 아래에 띄우는 소리 켜기 알약. 기존 소리 단추는 끄기용으로 남긴다.
+  const soundPill=el('button','moments-sound-pill','🔇 눌러서 소리 켜기');soundPill.type='button';soundPill.hidden=true;
+  soundPill.setAttribute('aria-label','눌러서 소리 켜기');
  const progressButton=el('div','moments-player-controls');
  overlay.append(treeLine,titleLine,tagLine,noteLine);
  const progress=el('div','moments-progress');const progressFill=el('span','moments-progress-fill');
@@ -62,7 +65,7 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin,a
  const swipeLayer=el('div','moments-swipe-layer');swipeLayer.setAttribute('aria-hidden','true');
  const hint=el('div','moments-swipe-hint','위로 밀어 다음 순간');hint.setAttribute('role','status');hint.hidden=true;
  progressButton.append(mute);
- media.append(poster,posterFallback,swipeLayer,overlay,progress,progressButton,hint);
+ media.append(poster,posterFallback,swipeLayer,overlay,progress,progressButton,soundPill,hint);
  card.append(media);
  const rail=el('div','moments-rail');
  const nav=el('div','moments-nav');
@@ -227,6 +230,33 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin,a
 
  let items=[],index=0,loading=false,token=0,frames=[],seen=new Set(),unmuted=false,touchY=null,activeTag='',groups=[];
  const current=()=>items[index]||null;
+  // #1332: 이 기기에서 한 번이라도 소리를 켠 적이 있으면 작은 알약으로 안내한다.
+  const SOUND_SEEN_KEY='lt41.momentSoundSeen';
+  const soundSeen=()=>{try{return localStorage.getItem(SOUND_SEEN_KEY)==='1';}catch{return false;}};
+  function paintSoundPill(){
+    const small=soundSeen();
+    soundPill.hidden=unmuted||!current();
+    soundPill.textContent=small?'소리 켜기':'🔇 눌러서 소리 켜기';
+    soundPill.classList.toggle('is-small',small);
+    soundPill.setAttribute('aria-label',small?'소리 켜기':'눌러서 소리 켜기');
+    placeSoundPill();
+  }
+  // #1332 확인: 글자 묶음 윗변 12px 위에 붙이고, 밀기 안내가 있으면 그 아래로 내린다.
+  function placeSoundPill(){
+    if(soundPill.hidden)return;
+    const mediaBox=media.getBoundingClientRect(),overlayBox=overlay.getBoundingClientRect();
+    if(!mediaBox.height||!overlayBox.height)return;
+    const pillH=soundPill.offsetHeight||44;
+    const overlayTop=overlayBox.top-mediaBox.top;
+    let top=overlayTop-12-pillH;
+    if(!hint.hidden){
+      const hintBox=hint.getBoundingClientRect();
+      if(hintBox.height)top=Math.max(top,hintBox.bottom-mediaBox.top+12);
+    }
+    const centerTop=mediaBox.height/2+8;
+    top=Math.max(centerTop,Math.min(top,overlayTop-12-pillH));
+    soundPill.style.top=Math.round(top)+'px';
+  }
  // 칩 줄: 전체 + 서버가 센 공개 쇼츠 가수 꼬리표 상위 6개. 누르면 그 가수만 다시 섞는다.
  function renderChips(){
   const choices=[{value:'',label:'전체'},...(groups||[]).map(g=>({value:tagKey(g.value)||g.value,label:g.value,tag:'가수:'+g.value}))];
@@ -324,9 +354,11 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin,a
   // #1305: 소리 선택은 이번 방문 동안 유지 — 순간을 넘겨도 되돌리지 않는다.
   mute.textContent=unmuted?'소리 끄기':'소리 켜기';mute.setAttribute('aria-label',mute.textContent);
   stage.dataset.ltMomentsMuted=String(!unmuted);
+  paintSoundPill();
   stage.dataset.ltAutoplay='';stage.dataset.ltPlaying='0';
   media.dataset.orientation=item.vertical===false||item.isVertical===false?'landscape':'portrait';
   if(matchMedia('(max-width:780px)').matches){try{hint.hidden=localStorage.getItem('lt41.momentSwipeSeen')==='1';}catch{hint.hidden=false;}}else hint.hidden=true;
+   placeSoundPill();
   currentFrame=now;
   stage.dataset.ltMomentsCount=String(frames.length);
   stage.dataset.ltMomentsId=item.videoId||item.id;
@@ -364,6 +396,7 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin,a
   if(nextIndex<0)return;
   index=nextIndex;
   if(matchMedia('(max-width:780px)').matches){hint.hidden=true;try{localStorage.setItem('lt41.momentSwipeSeen','1');}catch{}}
+   placeSoundPill();
   render();
  }
  up.onclick=()=>step(-1);
@@ -377,7 +410,7 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin,a
     const info=data.info;const duration=Number(info.duration),time=Number(info.currentTime);
     if(Number.isFinite(duration)&&duration>0&&Number.isFinite(time)){const value=Math.max(0,Math.min(100,time/duration*100));playerProgress.value=value;progress.dataset.ltProgress=String(Math.round(value));}
     if(info.playerState===1){media.classList.add('is-playing');stage.dataset.ltPlaying='1';}
-    if(typeof info.muted==='boolean'){unmuted=!info.muted;mute.textContent=unmuted?'소리 끄기':'소리 켜기';mute.setAttribute('aria-label',mute.textContent);stage.dataset.ltMomentsMuted=String(!unmuted);}
+    if(typeof info.muted==='boolean'){unmuted=!info.muted;mute.textContent=unmuted?'소리 끄기':'소리 켜기';mute.setAttribute('aria-label',mute.textContent);stage.dataset.ltMomentsMuted=String(!unmuted);paintSoundPill();}
   }
   if(data?.event==='onStateChange'){
    const state=Number(data.info),item=current(),start=Number(item?.startSeconds);
@@ -407,6 +440,16 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin,a
     if(!currentFrame)return;
     command(currentFrame,unmuted?'mute':'unMute');
     unmuted=!unmuted;mute.textContent=unmuted?'소리 끄기':'소리 켜기';mute.setAttribute('aria-label',mute.textContent);stage.dataset.ltMomentsMuted=String(!unmuted);
+    paintSoundPill();
+  };
+  // #1332: 알약은 소리만 켠다. 화면 누름(멈춤·재생)과 손짓 넘기기에 번지지 않게 막는다.
+  soundPill.onclick=event=>{
+    event.stopPropagation();event.preventDefault();
+    if(!currentFrame||unmuted)return;
+    command(currentFrame,'unMute');
+    unmuted=true;mute.textContent='소리 끄기';mute.setAttribute('aria-label','소리 끄기');stage.dataset.ltMomentsMuted='false';
+    try{localStorage.setItem(SOUND_SEEN_KEY,'1');}catch{}
+    paintSoundPill();
   };
   // #1305: 화면 한 번 누르면 멈춤·재생이 바뀐다. 소리는 '소리 켜기' 단추만 맡는다.
   media.addEventListener('click',event=>{
