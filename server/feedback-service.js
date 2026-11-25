@@ -360,7 +360,17 @@ export function createFeedbackService({feedbackRepo,productId,admin=null,opsNoti
     if(patch.score!==undefined&&patch.score!==null&&patch.score!==''){pscore=Number(patch.score);if(!Number.isInteger(pscore)||pscore<1||pscore>5)throw new ApiError(400,'score_invalid','점수는 1~5로 주세요.');}
     const row=await saveWithOutbox(
      client=>feedbackRepo.update({productId,id,status:status||null,memo,issueNumber:pint,title,pbody,score:pscore},client),
-     saved=>status?outboxEvent('status',{feedbackId:saved.id,body:saved.body,status:saved.status,accountSubjectId:saved.subjectId,createdAt:saved.updatedAt}):null
+     async saved=>{
+      if(!status||!saved)return null;
+      const events=[];
+      // 상태 수신은 대상 의견이 이미 있어야 하므로, 누락된 최초 전송을 같은 거래에서 먼저 채운다.
+      if(saved.kind==='opinion'){
+       const isAi=await roleOf({productId,subjectId:saved.subjectId}).catch(()=>null)===ROLE_AI_CUSTOMER;
+       events.push(outboxEvent('new',{feedbackId:saved.id,body:saved.body,status:saved.status,isAiCustomer:isAi,accountSubjectId:saved.subjectId,accountName:await accountNameOf(saved.subjectId),category:saved.category,title:saved.title||firstLine(saved.body),createdAt:saved.createdAt}));
+      }
+      events.push(outboxEvent('status',{feedbackId:saved.id,body:saved.body,status:saved.status,accountSubjectId:saved.subjectId,createdAt:saved.updatedAt}));
+      return events;
+     }
     );
     if(!row)throw new ApiError(404,'feedback_not_found','글을 찾을 수 없어요.');
     return boardRow(row);
