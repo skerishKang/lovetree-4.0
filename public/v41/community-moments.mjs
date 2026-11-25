@@ -412,9 +412,12 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin,a
     const info=data.info;const duration=Number(info.duration),time=Number(info.currentTime);
     if(Number.isFinite(duration)&&duration>0&&Number.isFinite(time)){const value=Math.max(0,Math.min(100,time/duration*100));playerProgress.value=value;progress.dataset.ltProgress=String(Math.round(value));}
     if(info.playerState===1){media.classList.add('is-playing');stage.dataset.ltPlaying='1';}
-    // 새 영상은 주소의 mute=1로 음소거 상태를 알려 온다 — 소리를 켜 둔 사람의 선택을 덮지 않고 소리를 다시 켠다.
-    if(typeof info.muted==='boolean'&&info.muted&&wantSound&&(currentFrame._ltSoundTries=(currentFrame._ltSoundTries||0)+1)<=8){command(currentFrame,'unMute');}
-    else if(typeof info.muted==='boolean'){unmuted=!info.muted;mute.textContent=unmuted?'소리 끄기':'소리 켜기';mute.setAttribute('aria-label',mute.textContent);stage.dataset.ltMomentsMuted=String(!unmuted);paintSoundPill();}
+    // 화면 표시는 유튜브가 알려 준 실제 상태를 따른다. 새 영상은 주소의 mute=1로 음소거 상태를 알려 오므로,
+    // 소리를 켜 둔 사람의 선택(wantSound)이 있으면 몇 번 더 소리를 다시 켠다(브라우저가 막으면 알약이 다시 보인다).
+    if(typeof info.muted==='boolean'){
+     unmuted=!info.muted;mute.textContent=unmuted?'소리 끄기':'소리 켜기';mute.setAttribute('aria-label',mute.textContent);stage.dataset.ltMomentsMuted=String(!unmuted);paintSoundPill();
+     if(info.muted&&wantSound&&(currentFrame._ltSoundTries=(currentFrame._ltSoundTries||0)+1)<=8)command(currentFrame,'unMute');
+    }
   }
   if(data?.event==='onStateChange'){
    const state=Number(data.info),item=current(),start=Number(item?.startSeconds);
