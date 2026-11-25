@@ -81,11 +81,12 @@ test('화면 줄 E2E: 세 화면 줄 높이·위치 같음, 이어 보기 하나
         const geo = await frame.evaluate(([screenKind, phoneShaped]) => {
           const bar = document.querySelector('.lt-screen-toolbar');
           const r = bar.getBoundingClientRect();
-          const visible = [...document.querySelectorAll('*')].filter((e) => { if (e.textContent.trim() !== '리센느') return false; const r = e.getBoundingClientRect(); return r.width > 2 && r.height > 2 && r.bottom > 0 && r.right > 0 && r.left < innerWidth && r.top < innerHeight && getComputedStyle(e).visibility !== 'hidden' && getComputedStyle(e).display !== 'none'; }).length;
+          const visible = [...document.querySelectorAll('.lt-toolbar-tree-name')].filter((e) => { if (e.textContent.trim() !== '리센느') return false; const r = e.getBoundingClientRect(); return r.width > 2 && r.height > 2 && r.bottom > 0 && r.right > 0 && r.left < innerWidth && r.top < innerHeight && getComputedStyle(e).visibility !== 'hidden' && getComputedStyle(e).display !== 'none'; }).length;
           const inBar = [...bar.querySelectorAll('button')].filter((b) => /이어 보기/.test(b.textContent)).length;
           const inNav = [...document.querySelectorAll('.nav-pill button')].filter((b) => /이어 보기/.test(b.textContent)).length;
           const buttons = [...bar.querySelectorAll('button,select')].filter((b) => b.getClientRects().length > 0 && getComputedStyle(b).display !== 'none');
-          const heights = [...new Set(buttons.map((b) => Math.round(b.getBoundingClientRect().height)))];
+          const heights = [...new Set(buttons.filter((b) => !b.classList.contains('lt-toolbar-tree-choice')).map((b) => Math.round(b.getBoundingClientRect().height)))];
+          const choiceHeight = Math.round(bar.querySelector('button.lt-toolbar-tree-choice')?.getBoundingClientRect().height || 0);
           const crossLine = buttons.filter((b) => { const q = b.getBoundingClientRect(); return q.top < r.top - 1 || q.bottom > r.bottom + 1; }).map((b) => b.id || b.className);
           const style = getComputedStyle(bar);
           const contentLeft = r.left + Number.parseFloat(style.paddingLeft);
@@ -99,7 +100,7 @@ test('화면 줄 E2E: 세 화면 줄 높이·위치 같음, 이어 보기 하나
             return range.getBoundingClientRect().width > b.clientWidth - padding + 1;
           }).map((b) => b.id || b.className || b.textContent.trim());
           const back = bar.querySelector('.shelf-back');
-          return { h: Math.round(r.height), top: Math.round(r.top), plays: inBar + (screenKind === 'book' && phoneShaped ? inNav : 0), nameCount: visible, toastVisible: !!document.querySelector('#toast.show, .toast.show'), heights, crossLine, clipped, textClipped, back: back ? back.textContent.trim() : null, backTarget: back ? back.getAttribute('href') : null };
+          return { h: Math.round(r.height), top: Math.round(r.top), plays: inBar + (screenKind === 'book' && phoneShaped ? inNav : 0), nameCount: visible, toastVisible: !!document.querySelector('#toast.show, .toast.show'), heights, choiceHeight, crossLine, clipped, textClipped, back: back ? back.textContent.trim() : null, backTarget: back ? back.getAttribute('href') : null };
         }, [screen, vp.width === 390]);
         const label = `${screen} ${vp.width}`;
         assert.equal(geo.top, 4, `${label}: 줄 위쪽 위치`);
@@ -107,6 +108,7 @@ test('화면 줄 E2E: 세 화면 줄 높이·위치 같음, 이어 보기 하나
         assert.equal(geo.plays, 1, `${label}: 이어 보기 하나`);
         assert.equal(geo.nameCount, 1, `${label}: 트리 이름 한 번`);
         assert.equal(geo.toastVisible, false, `${label}: 열 때 안내 토스트 없음`);
+        assert.equal(geo.choiceHeight, 44, label + ': #1367 tree selector 44px');
         assert.deepEqual(geo.heights, [36], `${label}: 줄 안 모든 단추 높이는 36px 하나`);
         assert.deepEqual(geo.crossLine, [], `${label}: 선택 단추가 줄 아래 선을 넘지 않음`);
         assert.deepEqual(geo.clipped, [], `${label}: 보이는 단추가 머리줄 안에 들어간다`);
@@ -163,7 +165,7 @@ test('화면 줄 E2E: 방문자 책·보드·지도는 공통 줄을 쓰고 쓰�
             rowHeight: Math.round(row.getBoundingClientRect().height),
             displayToggleInRow: !!row.querySelector('.lt-toolbar-tools #book-display-inline'),
             displayLabels: [...row.querySelectorAll('#book-display-inline button')].map((button) => button.textContent.trim()),
-            titleCount: [...document.querySelectorAll('.lt-toolbar-title')].filter((title) => visible(title) && title.textContent.trim() === '리센느').length,
+            titleCount: [...document.querySelectorAll('.lt-toolbar-tree-name')].filter((title) => visible(title) && title.textContent.trim() === '리센느').length,
             writeCount: writes.length,
             playCount: [...document.querySelectorAll('button')].filter((button) => visible(button) && /이어\s*보기/.test(button.textContent)).length,
             overflow: Math.max(0, document.documentElement.scrollWidth - innerWidth),
@@ -306,7 +308,7 @@ test('휴대폰 책: 초기화 순서와 관계없이 이어 보기는 아래 �
       document.documentElement.dataset.bookShape = 'phone';
       document.getElementById('sourceTitle').textContent = '긴 제목의 시험용 책';
     });
-    await page.waitForFunction(() => document.querySelector('.lt-toolbar-title').textContent === '긴 제목의 시험용 책');
+    await page.waitForFunction(() => document.querySelector('.lt-toolbar-tree-name').textContent === '긴 제목의 시험용 책');
     await check();
   } finally {
     await browser.close();
