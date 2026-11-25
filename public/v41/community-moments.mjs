@@ -17,6 +17,11 @@ function treeIcon(){
  return svg;
 }
 const EMBED='https://www.youtube-nocookie.com/embed/';
+// #1352·#1360: 연속 재생은 기본 켜짐(선택만 이 기기에 기억), 재생 불가 오류는 잠시 뒤 다음으로 넘긴다.
+const AUTO_NEXT_KEY='lt41.momentAutoNext';
+const AUTO_NEXT_ERROR_MS=1500;
+const AUTO_NEXT_ERROR_CODES=new Set(['100','101','150']);
+const autoNextEnabled=()=>{try{return localStorage.getItem(AUTO_NEXT_KEY)!=='0';}catch{return true;}};
 // #1098 2단계: 댓글 단추 아이콘 — 나무 선 아이콘과 같은 선 굵기·currentColor 한 벌.
 function soundIcon(muted){
  const svg=document.createElementNS(SVG_NS,'svg');for(const [key,value] of Object.entries({viewBox:'0 0 24 24',width:'24',height:'24',fill:'none',stroke:'currentColor','stroke-width':'1.6','stroke-linecap':'round','stroke-linejoin':'round','aria-hidden':'true'}))svg.setAttribute(key,value);
@@ -32,8 +37,8 @@ function bubbleIcon(){
  return svg;
 }
 // 구간 재생: 시작·끝 초가 있으면 기존 구간 재생 규칙(start·end)대로 주소에 넣는다.
-const embedSrc=(id,item={})=>{
- const params=['autoplay=1','mute=1','playsinline=1','controls=0','rel=0','modestbranding=1','enablejsapi=1'];
+const embedSrc=(id,item={},{autoplay=true}={})=>{
+ const params=[autoplay?'autoplay=1':'autoplay=0','mute=1','playsinline=1','controls=0','rel=0','modestbranding=1','enablejsapi=1'];
  const start=Number(item.startSeconds),end=Number(item.endSeconds);
  if(Number.isSafeInteger(start)&&start>0)params.push('start='+start);
  if(Number.isSafeInteger(end)&&end>start)params.push('end='+end);
@@ -240,12 +245,15 @@ let soundButton=null;
  }
 
  let items=[],index=0,loading=false,token=0,frames=[],seen=new Set(),unmuted=false,wantSound=false,touchY=null,activeTag='',groups=[];
+ let advancing=0,unavailableTimer=0,unavailableId='';
  const current=()=>items[index]||null;
   // #1332: 이 기기에서 한 번이라도 소리를 켠 적이 있으면 작은 알약으로 안내한다.
   const SOUND_SEEN_KEY='lt41.momentSoundSeen';
   const soundSeen=()=>{try{return localStorage.getItem(SOUND_SEEN_KEY)==='1';}catch{return false;}};
   function paintSound(){
     if(!soundButton)return;
+    // #1360: 재생 못 하는 영상에서는 소리 단추를 숨긴다(재생 중이 아니다).
+    soundButton.hidden=stage.dataset.ltMomentUnavailable==='1';
     soundButton.textContent='';
     const icon=soundIcon(!unmuted);icon.setAttribute('class','moments-rail-svg');
     soundButton.append(icon,el('span','moments-rail-label',unmuted?'소리 끄기':'소리 켜기'));
@@ -324,7 +332,7 @@ let soundButton=null;
   for(const frame of frames){frame.onload=null;frame.src='about:blank';frame.remove();}
   frames=[];
  }
- function makeFrame(item){
+ function makeFrame(item,{preload=false}={}){
   if(!item?.videoId)return null;
   const frame=document.createElement('iframe');
   frame.className='moments-frame';
@@ -332,7 +340,8 @@ let soundButton=null;
   frame.allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';
   frame.referrerpolicy='strict-origin-when-cross-origin';
   frame.setAttribute('allowfullscreen','');
-  frame.src=embedSrc(item.videoId,item);
+  // 미리 불러 둔 다음 플레이어는 자동 재생하지 않는다(#1352 주의).
+  frame.src=embedSrc(item.videoId,item,{autoplay:!preload});
   // #1305: 재생이 막히던 원인 — 'listening'만 보내고 재생 명령을 보내지 않았다.
   //에이피아이가 켜진 iframe은 주소의 autoplay=1만으로 시작하지 않으므로 준비 뒤 playVideo를 보낸다.
   frame.onload=()=>{
@@ -343,6 +352,8 @@ let soundButton=null;
   return frame;
  }
  function render(){
+  advancing=0;unavailableId='';clearTimeout(unavailableTimer);unavailableTimer=0;
+  delete stage.dataset.ltMomentUnavailable;
   const item=current();
   if(!item){empty.hidden=false;stage.hidden=true;return;}
   empty.hidden=true;stage.hidden=false;
@@ -366,7 +377,7 @@ let soundButton=null;
   noteLine.hidden=!item.note;
   // 지금 것 + 다음 것만 iframe — 나머지는 포스터로 남긴다.
   clearFrames();
-  const now=makeFrame(item),next=makeFrame(items[index+1]);
+  const now=makeFrame(item),next=makeFrame(items[index+1],{preload:true});
   media.querySelectorAll('.moments-frame').forEach(node=>node.remove());
   if(now)media.append(now);
   if(next){next.classList.add('moments-next');media.append(next);}
@@ -411,6 +422,12 @@ let soundButton=null;
    if(id===token&&!items.length){empty.hidden=false;empty.textContent='공개 세로 순간을 불러오지 못했어요.';stage.hidden=true;}
   }finally{loading=false;}
  }
+ // 재생이 끝난 뒤 한 번만 넘긴다(유튜브가 같은 상태를 여러 번 보낼 수 있다).
+ function advanceAfterEnd(){
+  if(advancing)return;
+  advancing=1;
+  step(1); // render()가 advancing을 되돌린다
+ }
  function step(delta){
   const nextIndex=index+delta;
   if(nextIndex>=items.length){void load();index=Math.min(index,items.length-1);return;}
@@ -438,11 +455,32 @@ let soundButton=null;
      if(info.muted&&wantSound&&(currentFrame._ltSoundTries=(currentFrame._ltSoundTries||0)+1)<=8)command(currentFrame,'unMute');
     }
   }
+  if(data?.event==='onError'){
+   const code=String(data.data??data.info??'');
+   if(!AUTO_NEXT_ERROR_CODES.has(code))return;
+   const item=current();
+   if(!item||unavailableId===item.id)return;
+   unavailableId=item.id;
+   stage.dataset.ltMomentUnavailable='1';
+   showPosterFallback(); // 제목 카드는 그대로, '영상을 볼 수 없어요'를 겹치지 않게 표시
+   if(soundButton)soundButton.hidden=true;
+   soundPill.hidden=true;
+   clearTimeout(unavailableTimer);
+   unavailableTimer=setTimeout(()=>{
+    if(unavailableId===current()?.id&&autoNextEnabled())advanceAfterEnd();
+   },AUTO_NEXT_ERROR_MS);
+   return;
+  }
   if(data?.event==='onStateChange'){
-   const state=Number(data.info),item=current(),start=Number(item?.startSeconds);
-   // 구간이 있는 순간은 끝나면 그 구간 처음으로 돌아간다(기존 구간 재생 규칙과 같은 동작).
-   if(state===0&&item&&Number.isSafeInteger(start)&&start>=0&&Number.isSafeInteger(Number(item.endSeconds))&&Number(item.endSeconds)>start){
-    try{currentFrame.contentWindow.postMessage('{"event":"command","func":"seekTo","args":['+start+',true]}','https://www.youtube-nocookie.com');currentFrame.contentWindow.postMessage('{"event":"command","func":"playVideo","args":[]}','https://www.youtube-nocookie.com');}catch{}
+   const state=Number(data.info),item=current(),start=Number(item?.startSeconds),end=Number(item?.endSeconds);
+   if(state===0&&item){
+    // #1352: 연속 재생이 켜져 있으면 구간이 있는 순간도 끝에서 다음으로 넘어간다.
+    if(autoNextEnabled())advanceAfterEnd();
+    // 꺼져 있을 때만 기존 구간 반복을 유지한다.
+    else if(Number.isSafeInteger(start)&&start>=0&&Number.isSafeInteger(end)&&end>start){
+     try{currentFrame.contentWindow.postMessage('{"event":"command","func":"seekTo","args":['+start+',true]}','https://www.youtube-nocookie.com');currentFrame.contentWindow.postMessage('{"event":"command","func":"playVideo","args":[]}','https://www.youtube-nocookie.com');}catch{}
+    }
+    media.classList.remove('is-playing');stage.dataset.ltPlaying='0';
     return;
    }
    media.classList.toggle('is-playing',state===1);

@@ -476,3 +476,91 @@ test('#1340 화면: 큰 알약은 첫 방문 첫 영상에서만', { skip: REQUI
     } finally { await h.ctx.close(); await new Promise((r) => h.server.close(r)); }
   } finally { await browser.close(); }
 });
+
+// #1352·#1360: 재생 끝 다음 넘김, 구간 순간, 재생 불가 건너뛰기 — 화면 배치는 바꾸지 않는다.
+async function sendFromCurrent(page, payload) {
+  const handle = await page.$('#community-moments-panel .moments-frame:not(.moments-next)');
+  assert.ok(handle, '지금 재생 중인 플레이어가 있다');
+  const frame = await handle.contentFrame();
+  await frame.evaluate(p => window.parent.postMessage(JSON.stringify(p), '*'), payload);
+}
+const momentId = (page) => page.evaluate(() => document.querySelector('#community-moments-panel .moments-stage')?.dataset.ltMomentsId || '');
+
+test('#1352 동작: 재생이 끝나면 구간 순간도 다음 순간으로 넘어간다', { skip: REQUIRE ? false : skip, timeout: 240000 }, async () => {
+  if (skip) assert.fail(skip);
+  const browser = await chromium.launch({ headless: true });
+  try {
+    for (const [width, height] of [[390, 844], [1440, 900]]) {
+      const h = await boot(browser, { width, height, theme: 'night' });
+      try {
+        const before = await momentId(h.page);
+        assert.equal(before, IDS[0], '첫 순간(구간 있음)에서 시작');
+        await sendFromCurrent(h.page, { event: 'onStateChange', info: 0 });
+        await h.page.waitForFunction(id => document.querySelector('#community-moments-panel .moments-stage')?.dataset.ltMomentsId !== id, before, { timeout: 5000 });
+        assert.equal(await momentId(h.page), IDS[1], '구간이 있어도 다음으로 넘어간다');
+        assert.equal(await h.page.evaluate(() => history.length >= 1), true, '페이지 기록은 유지된다');
+        const frames = await h.page.evaluate(() => document.querySelectorAll('#community-moments-panel .moments-frame').length);
+        assert.ok(frames <= 2, `동시에 있는 플레이어는 최대 2개(${frames})`);
+      } finally { await h.ctx.close(); await new Promise((r) => h.server.close(r)); }
+    }
+  } finally { await browser.close(); }
+});
+
+test('#1352 동작: 연속 재생 선택을 끄면 구간 반복을 유지한다', { skip: REQUIRE ? false : skip, timeout: 240000 }, async () => {
+  if (skip) assert.fail(skip);
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const h = await boot(browser, { width: 1440, height: 900, theme: 'night', init: () => localStorage.setItem('lt41.momentAutoNext', '0') });
+    try {
+      const before = await momentId(h.page);
+      await sendFromCurrent(h.page, { event: 'onStateChange', info: 0 });
+      await h.page.waitForTimeout(700);
+      assert.equal(await momentId(h.page), before, '꺼져 있으면 다음으로 넘어가지 않는다');
+    } finally { await h.ctx.close(); await new Promise((r) => h.server.close(r)); }
+  } finally { await browser.close(); }
+});
+
+test('#1360 동작: 재생 불가 알림 100·101·150은 1.5초 뒤 다음으로 넘어간다', { skip: REQUIRE ? false : skip, timeout: 300000 }, async () => {
+  if (skip) assert.fail(skip);
+  const browser = await chromium.launch({ headless: true });
+  try {
+    for (const [width, height] of [[390, 844], [1440, 900]]) for (const code of [100, 101, 150]) {
+      const h = await boot(browser, { width, height, theme: 'night' });
+      try {
+        const before = await momentId(h.page);
+        await sendFromCurrent(h.page, { event: 'onError', data: code });
+        await h.page.waitForFunction(() => document.querySelector('#community-moments-panel .moments-stage')?.dataset.ltMomentUnavailable === '1', null, { timeout: 5000 });
+        const notice = await h.page.evaluate(() => {
+          const f = document.querySelector('#community-moments-panel .moments-fallback');
+          const n = f?.querySelector('.lt-fallback-notice');
+          const t = f?.querySelector('.lt-fallback-title');
+          if (!n) return { text: '', overlap: true };
+          const a = n.getBoundingClientRect(), b = t?.getBoundingClientRect();
+          return { text: n.textContent, overlap: !!b && a.top < b.bottom && a.bottom > b.top };
+        });
+        assert.match(notice.text, /영상을 볼 수 없어요/);
+        assert.equal(notice.overlap, false, '문구가 제목과 겹치지 않는다');
+        assert.equal(await h.page.locator('#community-moments-panel .moments-rail-button.is-sound').isVisible(), false, '소리 단추가 숨는다');
+        await h.page.waitForFunction(id => document.querySelector('#community-moments-panel .moments-stage')?.dataset.ltMomentsId !== id, before, { timeout: 5000 });
+        assert.equal(await momentId(h.page), IDS[1], `${code}: 다음 순간으로 넘어간다`);
+      } finally { await h.ctx.close(); await new Promise((r) => h.server.close(r)); }
+    }
+  } finally { await browser.close(); }
+});
+
+test('#1352 동작: 마지막 순간에서 끝나도 멈추고 다음 것을 더 찾는다', { skip: REQUIRE ? false : skip, timeout: 240000 }, async () => {
+  if (skip) assert.fail(skip);
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const h = await boot(browser, { width: 1440, height: 900, theme: 'night' });
+    try {
+      const panel = h.page.locator('#community-moments-panel');
+      for (let i = 0; i < IDS.length - 1; i += 1) await step(h.page, panel, 1440, 1);
+      const before = await momentId(h.page);
+      assert.equal(before, IDS[IDS.length - 1], '마지막 순간이다');
+      await sendFromCurrent(h.page, { event: 'onStateChange', info: 0 });
+      await h.page.waitForTimeout(2200);
+      assert.equal(await momentId(h.page), before, '더 불러올 것이 없으면 그대로 멈춘다');
+    } finally { await h.ctx.close(); await new Promise((r) => h.server.close(r)); }
+  } finally { await browser.close(); }
+});
