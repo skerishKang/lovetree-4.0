@@ -74,7 +74,7 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin,a
 let soundButton=null;
  const toolbar=el('div','moments-toolbar');toolbar.setAttribute('role','group');toolbar.setAttribute('aria-label','순간 영상 도구');
  const infoButton=el('button','moments-info-button','ⓘ 정보');infoButton.type='button';infoButton.setAttribute('aria-label','순간 정보 열기');infoButton.setAttribute('aria-expanded','false');
- const closeButton=el('button','moments-close-button','×');closeButton.type='button';closeButton.setAttribute('aria-label','둘러보기 닫기');closeButton.onclick=()=>panel.closest('dialog')?.close();
+ const closeButton=el('button','moments-close-button','×');closeButton.type='button';closeButton.setAttribute('aria-label','둘러보기 닫기');closeButton.onclick=()=>panel.closest?.('dialog')?.close();
  toolbar.append(infoButton,closeButton);
  overlay.append(treeLine,titleLine,tagLine,noteLine);
  const progress=el('div','moments-progress');const progressFill=el('span','moments-progress-fill');
@@ -153,7 +153,7 @@ let soundButton=null;
  const empty=el('p','moments-empty','아직 공개 세로 순간이 없어요. 쇼츠를 담은 공개 트리가 늘면 여기에 나타나요.');
  empty.hidden=true;
  context.append(chips);
- panel.closest('dialog')?.querySelector('.community-top-row')?.append(toolbar);
+ panel.closest?.('dialog')?.querySelector('.community-top-row')?.append(toolbar);
  panel.append(stage,empty);
 
  // 담기 창 — 기존 트리 고르기 창이 따로 없어 이 보기 안에 작은 창을 둔다(트리 목록은 셸 모델을 쓴다).
@@ -254,12 +254,12 @@ let soundButton=null;
  let items=[],index=0,loading=false,token=0,frames=[],seen=new Set(),unmuted=false,wantSound=false,touchY=null,activeTag='',groups=[];
 let advancing=0,unavailableTimer=0,unavailableId='';
  let enoughVisible=false;
- const observer=new IntersectionObserver(entries=>{
+ const observer=typeof IntersectionObserver==='function'?new IntersectionObserver(entries=>{
    enoughVisible=entries.some(entry=>entry.isIntersecting&&entry.intersectionRatio>0.5);
    if(!enoughVisible&&currentFrame)command(currentFrame,'pauseVideo');
    else if(enoughVisible&&currentFrame)kickPlay(currentFrame);
- },{root:panel.closest('dialog'),threshold:[0,0.5,0.51,1]});
- observer.observe(card);
+ },{root:panel.closest?.('dialog')||null,threshold:[0,0.5,0.51,1]}):null;
+ observer?.observe(card);
  const current=()=>items[index]||null;
  const INFO_KEY='lt41.momentInfoOpen';
  let infoOpen=false;try{infoOpen=localStorage.getItem(INFO_KEY)==='1';}catch{}
@@ -492,7 +492,7 @@ let advancing=0,unavailableTimer=0,unavailableId='';
   }
  });
  if(typeof window!=='undefined'&&typeof window.addEventListener==='function')window.addEventListener('keydown',event=>{
-  if(!panel.closest('dialog')?.open||panel.hidden)return;
+  if(!panel.closest?.('dialog')?.open||panel.hidden)return;
   if(event.key==='ArrowDown'){event.preventDefault();step(1);}
   if(event.key==='ArrowUp'){event.preventDefault();step(-1);}
  });
