@@ -87,8 +87,8 @@ test('카드 3D 사선 잘림 방지: .world는 flat, 카드 transform은 각자
   assert.doesNotMatch(orbitCSS, /preserve-3d/, 'orbit-source.css에 preserve-3d가 없다');
   const world = ruleOf(orbitCSS, '.world{');
   assert.doesNotMatch(world, /perspective\s*:/, '.world 규칙에 공유 perspective 속성이 없다');
-  // 키프레임(궤도)과 끌기(setProperty) 두 곳 모두 카드 transform 맨 앞에 perspective(1200px)가 온다.
-  assert.doesNotMatch(orbit, /transform:`translate3d/, '키프레임 카드 transform이 translate3d로 시작하지 않는다');
+  // 궤도 키프레임과 끌기 transform은 perspective로 시작한다. 세로 리본은 회전이 없는 2D 변환이다.
+  assert.doesNotMatch(orbit, /out\.push\(\{offset:k\/ORBIT_STEPS,transform:`translate3d/, '궤도 키프레임 카드 transform이 translate3d로 시작하지 않는다');
   assert.doesNotMatch(orbit, /setProperty\('transform',`translate3d/, '끌기 카드 transform이 translate3d로 시작하지 않는다');
   assert.match(orbit, /transform:`perspective\(1200px\) translate3d/, '키프레임 카드 transform이 perspective(1200px)로 시작한다');
   assert.match(orbit, /const tf\s*=\s*`perspective\(1200px\) translate3d/, '끌기에도 같은 원근 행렬을 쓴다');

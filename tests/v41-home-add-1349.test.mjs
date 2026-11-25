@@ -61,18 +61,21 @@ test('#1349 가운데 순간 추가: 390·1440 × 밤·정원 × 로그인·방�
                 await intro.waitFor({state:'hidden',timeout:5000});
               }
             }
+            // 누르기 전에 셸이 로그인 기록·쓰기 권한을 다 받고 무대 준비 가리개가 내려가기를 기다린다.
+            // 이 신호가 없으면 단추가 보인 뒤 셸 상태가 바뀌며 프레임이 다시 그려질 수 있어 누름이 사라진다.
+            if(member)await page.waitForFunction(()=>document.body.dataset.member==='in'&&window.LT41?.writable===true&&document.getElementById('stage-loading')?.hidden===true);
             const frame=page.frameLocator('#view');
             const button=member?frame.locator('.home-add-top'):frame.locator('.center .actions button').first();
             await button.waitFor({state:'visible',timeout:15000});
             const box=await button.boundingBox();
             assert.ok(box && box.width>=44 && box.height>=35,'가운데 버튼이 실제로 보입니다.');
-            const x=box.x+box.width/2,y=box.y+box.height/2;
             assert.equal(await button.evaluate(el=>{
               const rect=el.getBoundingClientRect(),root=el.getRootNode();
               return root.elementFromPoint(rect.left+rect.width/2,rect.top+rect.height/2)===el;
             }),true,'단추 중심에 다른 궤도·카드 층이 걸리지 않습니다.');
-            if(input==='mouse')await page.mouse.click(x,y);
-            else await page.touchscreen.tap(x,y);
+            // 프레임 안 단추를 눌러 누름 순간에 대상을 다시 찾는다. 좌표만 기억해 두면 다시 그리기 뒤 낡은 자리를 누를 수 있다.
+            if(input==='mouse')await button.click();
+            else await button.tap();
             if(member){
               await page.waitForFunction(()=>document.getElementById('write-panel')?.open===true,null,{timeout:4500});
               checkInput(await page.locator('#write-panel').evaluate(e=>e.open),true);

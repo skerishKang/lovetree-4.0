@@ -537,6 +537,15 @@ jobs:
           LT_BOOK_584_REQUIRE=1 node --test --test-concurrency=1 --test-name-pattern='^(584|#800|642|26|792|1030)' tests/v41-book-play-584.test.mjs
           echo "책 재생·두 장 모드 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
 
+      - name: 책 열 때 YouTube API 늦게 받기 시험(건너뜀=실패 — #1365)
+        env:
+          LT_BOOK_584_REQUIRE: '1'
+        if: needs.screen-changes.outputs.changed == 'true'
+        run: |
+          start=$(date +%s)
+          LT_BOOK_584_REQUIRE=1 node --test --test-concurrency=1 tests/v41-book-youtube-lazy-1365.test.mjs
+          echo "책 YouTube API 늦게 받기 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+
       - name: 감상 화면 흔적 값·어떻게 쓰나요 안내 시험(건너뜀=실패 — #635)
         env:
           LT_635A_REQUIRE: '1'

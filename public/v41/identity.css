@@ -17,6 +17,14 @@
  --lt-glass:rgba(10,10,16,.78);--lt-glass-strong:rgba(7,7,12,.9);--lt-line:rgba(255,255,255,.14);--lt-line-paper:rgba(73,61,58,.2);
  --lt-primary:#eee9e0;--lt-primary-ink:#0a090d;      /* 1차 버튼 (첫 화면 감상창과 같음) */
  --lt-btn-ink:#1a1620;                                /* 어두운 공통 단추 바탕 (#886) */
+ --lt-role-bg:var(--lt-stage);--lt-role-accent-bg:var(--lt-gold-deep);--lt-role-accent-ink:var(--lt-stage);
+ /* #1362: 밤의 선 색은 회색 펄 계열. 금색은 선택 채움과 마우스 올림에만 쓴다. */
+ --lt-role-line:rgba(245,241,233,.4);
+ --lt-role-secondary-bg:transparent;--lt-role-secondary-border:var(--lt-role-line);--lt-role-secondary-ink:var(--lt-pearl);
+ --lt-role-input-bg:var(--lt-glass-strong);--lt-role-input-border:var(--lt-role-line);--lt-role-input-ink:var(--lt-pearl);
+ --lt-role-idle-bg:transparent;--lt-role-idle-border:var(--lt-role-line);--lt-role-idle-ink:var(--lt-pearl);
+ --lt-role-hover-bg:rgba(255,230,166,.10);--lt-role-hover-border:var(--lt-gold);--lt-role-hover-ink:var(--lt-gold);--lt-role-hover-cursor:pointer;
+ --lt-role-text-strong:var(--lt-pearl);--lt-role-text-muted:var(--lt-muted);--lt-role-text-faint:rgba(245,241,233,.64);--lt-role-border:var(--lt-role-line);
  --lt-r-pill:999px;--lt-r-panel:22px;--lt-r-card:14px;--lt-track:.2em;
  /* 보드 실·핀, 지도 그룹색: 원본 네온/인포그래픽 6색을 첫 화면 색상으로 옮긴 값. JS가 읽는다. */
  --lt-thread-rose:#d88f9c;--lt-thread-violet:#a99ac9;--lt-thread-cyan:#7892c9;--lt-thread-amber:#e6b14c;
@@ -194,6 +202,12 @@ html[data-lt-theme=garden]{
  --lt-glass:rgba(255,253,248,.92);--lt-glass-strong:rgba(255,253,248,.98);
  --lt-line:rgba(119,91,82,.18);--lt-line-paper:rgba(119,91,82,.3);
  --lt-primary:#98505e;--lt-primary-ink:#fffdf8;
+ --lt-role-bg:var(--lt-stage);--lt-role-accent-bg:var(--lt-rose-ink);--lt-role-accent-ink:var(--lt-paper);
+ --lt-role-secondary-bg:transparent;--lt-role-secondary-border:rgba(152,80,94,.72);--lt-role-secondary-ink:var(--lt-rose-ink);
+ --lt-role-input-bg:var(--lt-paper);--lt-role-input-border:rgba(152,80,94,.72);--lt-role-input-ink:var(--lt-ink);
+ --lt-role-idle-bg:transparent;--lt-role-idle-border:rgba(152,80,94,.72);--lt-role-idle-ink:var(--lt-ink);
+ --lt-role-hover-bg:rgba(152,80,94,.08);--lt-role-hover-border:var(--lt-rose-ink);--lt-role-hover-ink:var(--lt-rose-ink);--lt-role-hover-cursor:pointer;
+ --lt-role-text-strong:var(--lt-ink);--lt-role-text-muted:var(--lt-muted);--lt-role-text-faint:rgba(64,53,54,.72);--lt-role-border:rgba(152,80,94,.72);
  --lt-cta-rose:var(--lt-rose-ink);
  --lt-garden-edge:#eee3d5;--lt-garden-shadow:0 18px 40px rgba(75,51,42,.16);
  --lt-tree-1:#6a5a9e;--lt-tree-2:#4f7e6a;--lt-tree-3:#96704f;--lt-tree-4:#5b7295;--lt-tree-5:#96637a;--lt-tree-6:#7a7a4f;
@@ -271,18 +285,20 @@ html[data-lt-theme=garden] body,html[data-lt-theme=garden] .app-header{transitio
 :host .center .actions .subtleBtn:hover,:host .center .actions .subtleBtn:active{filter:brightness(.94)}
 :host([data-lt-theme=garden]) .center .actions .subtleBtn{background:var(--lt-paper);color:var(--lt-ink);border-color:var(--lt-line-paper)}
 :host .center .actions .primary-cta,:host .center .actions .primary-cta:hover,:host([data-lt-theme=garden]) .center .actions .primary-cta,:host([data-lt-theme=garden]) .center .actions .primary-cta:hover{background:var(--lt-cta-rose);border-color:var(--lt-cta-rose);color:var(--lt-cta-white)}
-/* #1246: 첫 화면 둘러보기만 채움 없는 나침반 단추. */
+/* #1246: 첫 화면 둘러보기만 채움 없는 나침반 단추.
+   #1350: 자리·투명 배경은 그대로 두고 테두리·글자를 역할 변수로 진하게 한다(순간 추가보다 한 단계 낮은 무게).
+   새 색 값·color-mix 없이 --lt-role-* 만 쓴다. */
 :host .center .actions .subtleBtn[data-do=community],
 :host([data-lt-theme=garden]) .center .actions .subtleBtn[data-do=community]{
  display:inline-flex;align-items:center;justify-content:center;gap:5px;white-space:nowrap;
- background:transparent;border:1px solid color-mix(in srgb,var(--lt-pearl) 55%,transparent);
- border-radius:var(--lt-r-pill);color:var(--lt-pearl);filter:none
+ background:transparent;border:1px solid var(--lt-role-text-strong);
+ border-radius:var(--lt-r-pill);color:var(--lt-role-text-strong);filter:none
 }
 :host .center .actions .subtleBtn[data-do=community]:hover,
 :host .center .actions .subtleBtn[data-do=community]:active,
 :host([data-lt-theme=garden]) .center .actions .subtleBtn[data-do=community]:hover,
 :host([data-lt-theme=garden]) .center .actions .subtleBtn[data-do=community]:active{
- background:color-mix(in srgb,var(--lt-pearl) 9%,transparent);border-color:var(--lt-pearl);filter:none
+ background:var(--lt-role-hover-bg);border-color:var(--lt-role-hover-border);filter:none
 }
 :host .center .actions .home-compass{width:15px;height:15px;flex:none}
 :host([data-lt-theme=garden]) .hint,:host([data-lt-theme=garden]) .caption{color:var(--lt-muted);text-shadow:none}

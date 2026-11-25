@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 // #1163(#1068 2단계): 보이게 하는 동기화를 저장 응답 뒤로 미루고, 실패하면 계정별 표식으로 다시 한다.
 // 판정: ① 보임 동기화가 실패해도 저장 응답은 성공하고, 다음 요청에서 다시 해서 반영된다.
 // ② 숨김(회수·소개 정리)은 보임 실패와 무관하게 저장 응답 시점에 이미 반영돼 있다.
-// ③ 저장 응답은 보임 동기화를 기다리지 않는다(가짜 지연으로 확인).
+// ③ 저장 응답은 보임 동기화(수 갱신)가 아직 끝나지 않았어도 돌아온다(막아 둔 동기화 앞에서 응답을 확인).
 import { createTree, addMoment } from '../src/domain.js';
 import { createWorkspaceService } from '../server/workspace-service.js';
 import { createMemoryWorkspaceRepo } from '../server/testing/memory-workspace-repo.js';
@@ -24,7 +24,7 @@ function treeWithMoments(count) {
   return tree;
 }
 
-async function setup({ failFirstUpdate = false, updateDelayMs = 0 } = {}) {
+async function setup({ failFirstUpdate = false, updateGate = null } = {}) {
   const workspaceRepo = createMemoryWorkspaceRepo();
   const inner = createMemoryShareRepo();
   const visibilityRepo = createMemoryTreeVisibilityRepo();
@@ -40,7 +40,7 @@ async function setup({ failFirstUpdate = false, updateDelayMs = 0 } = {}) {
     },
     async updateMomentCount(input) {
       updateCalls += 1;
-      if (updateDelayMs) await new Promise(resolve => setTimeout(resolve, updateDelayMs));
+      if (updateGate) await updateGate;
       if (failFirstUpdate && updateCalls === 1) throw new Error('test failure');
       return inner.updateMomentCount(input);
     },
@@ -122,15 +122,16 @@ test('비공개·삭제 같은 숨김은 보임 실패와 무관하게 저장 �
   assert.equal(await h.pendingShowSync.has({ productId: PRODUCT, subjectId: 'alice' }), true, '보임 동기화는 실패해 표식이 남는다');
 });
 
-test('저장 응답이 보임 동기화(수 갱신·자동 공개 행)를 기다리지 않는다(#1163 판정 — 가짜 지연)', async () => {
-  const h = await setup({ updateDelayMs: 150 });
+test('저장 응답은 보임 동기화(수 갱신)가 막혀 있어도 돌아온다 — 기다리지 않는다(#1163 판정)', { timeout: 10000 }, async () => {
+  // 수 갱신을 열어 주기 전까지 막아 둔다. 저장이 동기화를 기다렸다면 여기서 멈추고, 제한 시간이 실패로 잡는다.
+  let openGate;
+  const gate = new Promise(resolve => { openGate = resolve; });
+  const h = await setup({ updateGate: gate });
   const trees = [treeWithMoments(3), treeWithMoments(3)];
-  const start = Date.now();
   await h.workspace.write(principal('alice'), { state: { version: 1, trees }, expectedRevision: 0, clientKey: 'seed-slow' });
-  const elapsed = Date.now() - start;
-  assert.ok(elapsed < 150, `저장 응답이 보임 동기화 지연(수 갱신 2회 × 150ms)을 기다리지 않는다 — ${elapsed}ms`);
   const rows = await h.shareRepo.list({ productId: PRODUCT, subjectId: 'alice' });
-  assert.equal(rows.length, 0, '응답 시점에는 보임 동기화가 아직 진행 중일 수 있다');
+  assert.equal(rows.length, 0, '응답 시점에는 수 갱신이 막혀 있어 자동 공개 행이 아직 없다');
+  openGate();
   await h.shareService.waitForShowSync();
   const done = await h.shareRepo.list({ productId: PRODUCT, subjectId: 'alice' });
   assert.equal(done.length, 2, '보임 동기화가 끝나면 자동 공개 행이 생긴다');

@@ -29,6 +29,10 @@ try {
 } catch { skip = 'playwright 패키지가 없어 화면 공통 검사를 건너뜀'; }
 if (REQUIRE && !existsSync(new URL('../dist/v41/home.html', import.meta.url))) skip = '빌드 결과가 없어 화면 공통 검사를 건너뜀(npx vite build 필요)';
 
+// #1350: 글자 대비(상대 휘도) — 투명 단추는 글자와 무대 배경을 직접 잰다.
+const relL = color => (color.match(/[\d.]+/g)||[]).slice(0,3).map(v=>Number(v)/255).map(v=>v<=.04045?v/12.92:((v+.055)/1.055)**2.4).reduce((n,v,i)=>n+v*[.2126,.7152,.0722][i],0);
+const pairContrast = (a,b) => (Math.max(relL(a),relL(b))+.05)/(Math.min(relL(a),relL(b))+.05);
+
 // — 알려진 문제 목록 — main에서 이미 나는 것(기준을 낮추지 않고 따로 기록한다. 목록 밖의 새 실패만 빨강이 된다) —
 // 형식: { 화면(줄 맨 앞), 항목, 찾을: 줄에서 찾을 정규식, 이슈 }
 // #662에서 보드·안내·책의 항목을 모두 고쳐 KNOWN에서 뺐다 — 이제 검사기가 지켜서 새로 생기면 빨강이 된다.
@@ -118,7 +122,7 @@ test('#942 첫 화면 추가 단추와 숫자 묶음', { skip: REQUIRE ? false :
       const s = e.ownerDocument.defaultView.getComputedStyle(e), r = e.getBoundingClientRect();
       const L=color=>(color.match(/[\d.]+/g)||[]).slice(0,3).map(v=>Number(v)/255).map(v=>v<=.04045?v/12.92:((v+.055)/1.055)**2.4).reduce((n,v,i)=>n+v*[.2126,.7152,.0722][i],0);
       const a=L(s.backgroundColor),b=L(s.color);
-      return {text:e.textContent.trim(),bg:s.backgroundColor,ink:s.color,border:s.borderTopWidth,contrast:(Math.max(a,b)+.05)/(Math.min(a,b)+.05),visible:!!e.getClientRects().length,x:r.x,y:r.y,w:r.width,h:r.height};
+      return {text:e.textContent.trim(),bg:s.backgroundColor,ink:s.color,border:s.borderTopWidth,borderColor:s.borderTopColor,font:parseFloat(s.fontSize),radius:parseFloat(s.borderTopLeftRadius),contrast:(Math.max(a,b)+.05)/(Math.min(a,b)+.05),visible:!!e.getClientRects().length,x:r.x,y:r.y,w:r.width,h:r.height};
     };
     const buttons = [...root.querySelectorAll('.center .actions > .subtleBtn,.center .actions > .home-action-group > .subtleBtn')].map(e => {
       const s = doc.defaultView.getComputedStyle(e);
@@ -136,9 +140,9 @@ test('#942 첫 화면 추가 단추와 숫자 묶음', { skip: REQUIRE ? false :
         const lr=label.getBoundingClientRect(),vr=value.getBoundingClientRect(),ls=doc.defaultView.getComputedStyle(label),vs=doc.defaultView.getComputedStyle(value);
         return {name:label.textContent,value:value.textContent,left:lr.left-br.left,right:br.right-vr.right,gap:vr.left-lr.right,dy:Math.abs(lr.top-vr.top),labelColor:ls.color,valueColor:vs.color,muted:ls.getPropertyValue('--lt-muted').trim(),pearl:vs.getPropertyValue('--lt-pearl').trim(),weight:parseInt(vs.fontWeight),numeric:vs.fontVariantNumeric,nowrap:vs.whiteSpace};
       });
-      return {label:b.textContent.trim(),count:n.hidden?'':lines.join('|'),x:r.x,y:r.y,w:r.width,h:r.height,inner:n.hidden?null:nr.top-br.bottom,font:parseFloat(doc.defaultView.getComputedStyle(n).fontSize),widthDiff:Math.abs(nr.width-br.width),rows};
+      return {label:b.textContent.trim(),count:n.hidden?'':lines.join('|'),x:r.x,y:r.y,w:r.width,h:r.height,btnH:br.height,inner:n.hidden?null:nr.top-br.bottom,font:parseFloat(doc.defaultView.getComputedStyle(n).fontSize),widthDiff:Math.abs(nr.width-br.width),rows};
     });
-    return { buttons, headers, head, fab, top, groups };
+    return { buttons, headers, head, fab, top, groups, stageBg:doc.defaultView.getComputedStyle(doc.body).backgroundColor };
   };
   const failures=[];
   const check=(ok,message)=>{if(!ok)failures.push(message)};
@@ -171,7 +175,7 @@ test('#942 첫 화면 추가 단추와 숫자 묶음', { skip: REQUIRE ? false :
         const result = await page.waitForFunction(readHome, member);
         const values = await result.jsonValue();
         await result.dispose();
-        const { buttons, head, fab, top, groups } = values;
+        const { buttons, head, fab, top, groups, stageBg } = values;
         const key=width+'-'+theme+'-'+kind;
         console.log('#942',key,JSON.stringify(values));
         if(dest){
@@ -197,6 +201,11 @@ test('#942 첫 화면 추가 단추와 숫자 묶음', { skip: REQUIRE ? false :
         if(head.visible)check(head.bg===rose&&head.ink==='rgb(255, 255, 255)'&&head.border!=='0px'&&head.contrast>=4.5,key+' 머리줄 장미색·대비 '+JSON.stringify(head));
         if(fab.visible)check(fab.bg===rose&&fab.ink==='rgb(255, 255, 255)'&&fab.contrast>=4.5,key+' 휴대폰 추가 장미색·대비 '+JSON.stringify(fab));
         check(head.visible===(member&&width===1440)&&!fab.visible&&!!top?.visible===member,key+' 추가 단추 위치');
+        // #1350: 두 순간 추가 단추는 색·글자 크기·모서리가 같다. 높이는 머리줄 안에 들어가는 만큼만 다르게 둔다.
+        if(head.visible&&top?.visible){
+          check(head.bg===top.bg&&head.ink===top.ink&&head.borderColor===top.borderColor,key+' 두 추가 단추 색 '+JSON.stringify({head:[head.bg,head.ink,head.borderColor],top:[top.bg,top.ink,top.borderColor]}));
+          check(head.font===top.font&&head.radius===top.radius,key+' 두 추가 단추 글자 크기·모서리 '+JSON.stringify({head:[head.font,head.radius],top:[top.font,top.radius]}));
+        }
         check(JSON.stringify(buttons.map(b=>b.text))===JSON.stringify(member?['순간 목록','둘러보기','서재']:['＋ 첫 순간 추가','둘러보기','어떻게 쓰나요']),key+' 가운데 순서');
         const light=theme==='night'?'rgb(238, 233, 224)':'rgb(255, 253, 248)';
         check(member?buttons[0]?.bg===light:buttons[0]?.bg===rose,key+' 첫 단추의 기존 색 '+JSON.stringify(buttons[0]));
@@ -204,6 +213,9 @@ test('#942 첫 화면 추가 단추와 숫자 묶음', { skip: REQUIRE ? false :
         const explore=buttons[1];
         check(explore.bg==='rgba(0, 0, 0, 0)'&&explore.border==='1px'&&explore.borderStyle==='solid'&&explore.radius>=22&&explore.icon&&explore.ink!==rose,key+' 둘러보기 투명·테두리·선 나침반 '+JSON.stringify(explore));
         check(!buttons[0].icon&&!buttons[2].icon&&explore.bg!==buttons[0].bg&&explore.bg!==buttons[2].bg,key+' 둘러보기만 다른 모양');
+        // #1350: 둘러보기 글자 대비는 기존 접근성 기준(4.5:1)을 지킨다.
+        const ec=pairContrast(explore.ink,stageBg);
+        check(ec>=4.5,key+' 둘러보기 글자 대비 '+JSON.stringify({ink:explore.ink,stage:stageBg,contrast:Math.round(ec*100)/100}));
         const exploreLocator=page.frameLocator('#view').locator('.center .actions [data-do=community]');
         const hoverStyle=()=>exploreLocator.evaluate(e=>{const s=getComputedStyle(e);return {bg:s.backgroundColor,border:s.borderTopColor}});
         await exploreLocator.hover();
@@ -212,6 +224,8 @@ test('#942 첫 화면 추가 단추와 숫자 묶음', { skip: REQUIRE ? false :
         await page.mouse.move(0,0);
         check((await hoverStyle()).bg===explore.bg,key+' 올림 해제 뒤 다시 투명');
         check(groups.length===3,key+' 묶음 3개');
+        // #1350: 단추 줄의 세 단추는 44px 이상 눌린다.
+        check(groups.every(g=>g.btnH>=44),key+' 단추 누름 높이 44px 이상 '+JSON.stringify(groups.map(g=>[g.label,g.btnH])));
          check(JSON.stringify(groups.map(g=>g.count))===JSON.stringify(member?['순간 14|정리 전 3','공개 트리 17|공개 순간 1.2k','트리 3|공개 트리 1']:['',(signedIn?'':'예시 ')+'공개 트리 17|순간 1.2k','']),key+' 숫자 귀속');
         for(const g of groups.filter(g=>g.count)){
           check(g.inner>=4&&g.inner<=6&&g.font>=12&&g.widthDiff<=1,key+' 숫자 표 폭·간격 '+JSON.stringify(g));
@@ -523,8 +537,7 @@ const thumbTree = (() => {
   t.moments[1].createdAt = '2026-11-12T09:00:00.000Z'; t.moments[1].updatedAt = t.moments[1].createdAt;
   t = addMoment(t, { subject: '시험', title: '사진 순간(정상)', note: '기록', emotion: '즐거움', date: '2026-11-10', url: '' }, t.moments[0].id, '2026-11-16T00:02:00.000Z');
   t.moments[2].mediaMetadata = { thumbnail: 'data:image/svg+xml;base64,' + Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><rect width="640" height="360" fill="#8a5a6e"/></svg>').toString('base64') };
-  // 261117 대표 결정: 이 상태는 390의 궤도 겹침 검사가 목적 — 9장 이상(표준 좁은 화면 궤도)이어야 한다.
-  // 8장 이하 390은 궤도 카드를 숨기는 계약(소수 카드는 가운데에 집중)이라 별도 단언(#657 후속 261117)이 본다.
+  // #1309: 390 리본은 8장을 유지하고 가운데·바닥 보호 구역과 겹치지 않는다.
   for (let fi = 0; fi < 6; fi++) {
     t = addMoment(t, { subject: '시험', title: '사진 순간 채우기 ' + (fi + 1), note: '기록', emotion: '즐거움', date: '2026-11-0' + (fi % 9 + 1), url: '' }, t.moments.at(-1).id, '2026-11-16T00:03:0' + fi + '.000Z');
     t.moments.at(-1).mediaMetadata = { thumbnail: 'data:image/svg+xml;base64,' + Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><rect width="640" height="360" fill="' + ['#5a6e8a', '#6e8a5a', '#8a7a5a', '#8a5a6e'][fi % 4] + '"/></svg>').toString('base64') };
@@ -2086,7 +2099,7 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     assert.equal(cardCheck.overflow, 0, `첫 화면 가로 넘침 0(실제 ${cardCheck.overflow})`);
     await take(page9, '첫 화면 글자 카드');
     await ctx9.close();
-    } // width 1440 — 390은 위 단언(궤도 카드 0장)이 대신한다
+    } // width 1440 — 390 리본은 별도 겹침 시험이 담당한다
 
     await context.close();
     return rows;
@@ -2241,10 +2254,8 @@ test('운영센터 머리줄이 본 화면 셸 머리줄과 같은 폭·위치�
   }
 });
 
-// 261117 대표 결정: 좁은 화면(390)에서 궤도 카드가 8장 이하인 계정은 궤도 카드를 숨긴다 —
-// 커진 가운데(위쪽 '+ 순간 추가'·정보 줄)가 소수 카드의 원을 덮어 밀어낸 카드가 한자리에 쌓였다
-// (실측 3장 동일 좌표). 9장 이상은 기존 좁은 화면 궤도를 그대로 쓴다(글자 카드 상태가 390 겹침을 잰다).
-test('#657 후속 261117: 좁은 화면 소수 카드(≤8) 계정은 궤도 카드 0장 — 가운데에 집중한다', { skip: REQUIRE ? false : skip, timeout: 120000 }, async () => {
+// #1309: 좁은 화면은 소수 카드도 8장 리본으로 유지한다. 카드는 가운데·바닥 보호 구역 위에 둔다.
+test('#1309 후속: 좁은 화면 소수 카드 계정은 있는 카드로 리본을 유지한다', { skip: REQUIRE ? false : skip, timeout: 120000 }, async () => {
   const { createTree, addMoment } = await import('../public/v41/domain.mjs');
   let t = createTree({ subject: '시험', title: '카드 적은 트리', note: '기록', emotion: '설렘', date: '2026-11-11', url: '' }, '2026-11-16T00:00:00.000Z');
   t = addMoment(t, { subject: '시험', title: '사진 순간', note: '기록', emotion: '즐거움', date: '2026-11-11', url: '' }, t.moments[0].id, '2026-11-16T00:01:00.000Z');
@@ -2279,7 +2290,7 @@ test('#657 후속 261117: 좁은 화면 소수 카드(≤8) 계정은 궤도 카
       if (!sh) return null;
       return [...sh.querySelectorAll('button.card')].filter((c) => getComputedStyle(c).display !== 'none').length;
     });
-    assert.equal(visible, 0, `390 소수 카드 계정: 궤도 카드 0장(실제 ${visible}장)`);
+    assert.ok(visible > 0 && visible <= 8, `390 소수 카드 계정: 있는 카드로 리본을 유지한다(실제 ${visible}장)`);
     await context.close();
   } finally {
     await browser.close();
@@ -2287,7 +2298,7 @@ test('#657 후속 261117: 좁은 화면 소수 카드(≤8) 계정은 궤도 카
   }
 });
 
-// 2026-11-17 CTO 캡처 후속: 390에서 궤도 카드가 0장이어도 다른 층 카드가 바닥 링크 줄에 겹치지 않는다.
+// #1309: 390의 리본도 다른 층 카드와 마찬가지로 바닥 링크 줄 위에서 자른다.
 // 눈이 아니라 수치로 판정한다 — 보이는 카드 수, 카드↔링크 겹침 쌍 0, 카드 아래끝 ≤ 링크 줄 top−8(1440도 겹침 0).
 test('#657 후속 261117: 카드 층은 바닥 링크 줄 위에서 자른다(390 few·many, 1440)', { skip: REQUIRE ? false : skip, timeout: 180000 }, async () => {
   const { createTree, addMoment } = await import('../public/v41/domain.mjs');
@@ -2329,7 +2340,7 @@ test('#657 후속 261117: 카드 층은 바닥 링크 줄 위에서 자른다(39
         return { count: cards.length, overlaps, ceiling: lr ? Math.round(lr.top) - 8 : null, lowest: rects.length ? Math.round(Math.max(...rects.map((c) => c.b))) : null, scroll };
       });
       assert.equal(measured.overlaps, 0, `${label}: 카드↔바닥 링크 겹침 ${measured.overlaps}쌍`);
-      if (label === 'few-390') assert.equal(measured.count, 0, `390 소수 카드 계정: 보이는 카드 ${measured.count}장(기존 궤도 숨김 유지)`);
+      if (label === 'few-390') assert.ok(measured.count > 0 && measured.count <= 8, `390 소수 카드 계정: 보이는 리본 카드 ${measured.count}장`);
       if (measured.ceiling > 0 && measured.lowest !== null) assert.ok(measured.lowest <= measured.ceiling, `${label}: 카드 아래끝 ${measured.lowest} > 링크 줄 위 ${measured.ceiling}`);
       assert.equal(measured.scroll.links.length, 4, `${label}: 바닥 링크 4개를 잰다`);
       assert.ok(measured.scroll.links.every((l) => l.inView), `${label}: 맨 아래 스크롤 뒤 링크가 화면 밖 — ${JSON.stringify(measured.scroll.links)}`);
