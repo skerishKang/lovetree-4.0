@@ -1016,3 +1016,79 @@ test('#1365 지도→첫 화면 전환에서 뼈대가 고치기 전보다 빨�
     }
   } finally { await browser.close(); }
 });
+
+test('#1378 첫 화면 YouTube 크게 보기 390·1440 × 밤·정원과 닫기', {skip: REQUIRE952 ? false : skip952,timeout:180000},async()=>{
+  if(skip952)assert.fail(skip952);
+  const {inspectYoutubeIframe,countYoutubeAutoplay}=await import('./helpers/youtube-embed-audit.mjs');
+  const browser=await chromium952.launch({headless:true});
+  try{
+    for(const width of [390,1440])for(const theme of ['night','garden']){
+      const tree=createTree({subject:'기억',title:'첫 번째 영상',date:'2026-11-20',emotion:'설렘',note:'기록',url:'https://www.youtube.com/watch?v=dQw4w9WgXcQ'},'2026-11-20T00:00:00Z');
+      tree.moments[0].image='https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg';
+      tree.moments[0].youtubeThumb=true;
+      const workspace={revision:1,state:{version:1,trees:[tree],prefs:{}},subject:'visual-audit-fake',writeSubjectBound:true,savedAt:'2026-11-20T00:00:00Z'};
+      const h=await boot952(browser,{member:true,width,initStorage:{'lt41.theme':theme,'lt41.boardTheme':theme==='night'?'night':'paper'},routes:{
+        '/api/workspace':r=>r.fulfill({status:200,contentType:'application/json',body:JSON.stringify(workspace)}),
+        '/api/youtube/oembed':r=>r.fulfill({status:200,contentType:'application/json',body:'{"title":"Test"}'})
+      }});
+      try{
+        const frame=h.frame;
+        await frame.locator('.recent-card').waitFor({state:'visible',timeout:15000});
+        const capture=process.env.LT_HOME_YT_CAPTURE_DIR;
+        if(capture){const fs=await import('node:fs');fs.mkdirSync(capture,{recursive:true});await h.page.screenshot({path:`${capture}/before-${width}-${theme}.png`});}
+        assert.equal(await frame.locator('#mediaVisualHome iframe').count(),0,'카드 상태에서 iframe 없음');
+        await frame.locator('.recent-meta strong').click();
+        await frame.locator('#mediaViewerHome.open').waitFor({state:'visible'});
+        const play=frame.locator('#mediaPlayHome');
+        await play.waitFor({state:'visible',timeout:10000});
+        await play.click();
+        const iframe=frame.locator('#mediaVisualHome iframe');
+        await iframe.waitFor({state:'visible'});
+        await h.page.locator('body.lt-viewer-open').waitFor({state:'attached'});
+        const m=await inspectYoutubeIframe(iframe);
+        const outerBlockers=await h.page.evaluate(()=>{
+          const host=document.querySelector('#view'),root=host.contentDocument.querySelector('#orbit').shadowRoot;
+          const video=root.querySelector('#mediaVisualHome iframe');
+          const a=host.getBoundingClientRect(),b=video.getBoundingClientRect();
+          return [0.1,0.5,0.9].flatMap(y=>[0.1,0.5,0.9].filter(x=>document.elementFromPoint(a.left+b.left+b.width*x,a.top+b.top+b.height*y)!==host)).length;
+        });
+        console.log('HOME_PLAYER',JSON.stringify({width,theme,w:m.width,h:m.height,blocked:m.blocked,outerBlockers}));
+          assert.equal(m.minimum200,true,`${width} ${theme} player ${m.width}x${m.height}`);
+          assert.equal(m.blocked,0,`${width} ${theme} blockers ${m.blockers}`);
+          assert.equal(outerBlockers,0,`${width} ${theme} shell overlays on player`);
+          assert.ok(await countYoutubeAutoplay(frame)<=1,'autoplay <=1');
+          if(capture)await h.page.screenshot({path:`${capture}/after-${width}-${theme}.png`});
+          await frame.locator('#mediaCloseHome').evaluate(button=>button.click());
+          assert.equal(await frame.locator('#mediaVisualHome iframe').count(),0,'닫은 후 iframe 0');
+          assert.equal(await frame.locator('#mediaViewerHome.open').count(),0,'뷰어 닫힘');
+      }finally{await close952(h);}
+    }
+  }finally{await browser.close();}
+});
+
+test('#1378 첫 화면 YouTube 재생 불가 시 iframe 제거·원본 링크', {skip: REQUIRE952 ? false : skip952,timeout:120000},async()=>{
+  if(skip952)assert.fail(skip952);
+  const browser=await chromium952.launch({headless:true});
+  try{
+    for(const status of [401,404]){
+      const tree=createTree({subject:'기억',title:'재생 불가 순간',date:'2026-11-20',emotion:'설렘',note:'기록',url:'https://www.youtube.com/watch?v=dQw4w9WgXcQ'},'2026-11-20T00:00:00Z');
+      tree.moments[0].image='https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg';
+      tree.moments[0].youtubeThumb=true;
+      const workspace={revision:1,state:{version:1,trees:[tree],prefs:{}},subject:'visual-audit-fake',writeSubjectBound:true,savedAt:'2026-11-20T00:00:00Z'};
+      const h=await boot952(browser,{member:true,width:390,routes:{
+        '/api/workspace':r=>r.fulfill({status:200,contentType:'application/json',body:JSON.stringify(workspace)}),
+        '/api/youtube/oembed':r=>r.fulfill({status,contentType:'application/json',body:'{}'})
+      }});
+      try{
+        await h.frame.locator('.recent-meta strong').click();
+        await h.frame.locator('#mediaViewerHome.open').waitFor({state:'visible'});
+        await h.frame.locator('#mediaExternalHome').waitFor({state:'visible',timeout:15000});
+        assert.equal(await h.frame.locator('#mediaVisualHome iframe').count(),0,'재생 불가에서 iframe 0');
+        assert.equal(await h.frame.locator('#mediaPlayHome').isVisible(),false,'재생 단추 숨김');
+        assert.match(await h.frame.locator('#mediaExternalHome').getAttribute('href'),/youtube\.com\/watch\?v=dQw4w9WgXcQ/,'원본 링크');
+        await h.frame.locator('#mediaCloseHome').evaluate(el=>el.click());
+        assert.equal(await h.frame.locator('#mediaVisualHome iframe').count(),0,'닫기 후 iframe 0');
+      }finally{await close952(h);}
+    }
+  }finally{await browser.close();}
+});

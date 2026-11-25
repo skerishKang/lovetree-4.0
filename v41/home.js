@@ -88,7 +88,7 @@ const renderedTitleDisplay=titleDisplayOf(readTitleDisplay(parent.LT41));
 if(momentsRequest){try{parent.postMessage({type:MSG.momentsOpened},location.origin)}catch{}}
 const shadow=document.getElementById('orbit').shadowRoot;
 const viewerStyle=document.createElement('style');
-viewerStyle.textContent=`#mediaViewerHome .mediaVisual iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#000}#mediaViewerHome .mediaActions button,#mediaViewerHome .mediaActions a{display:inline-flex;align-items:center;justify-content:center;font-size:13px;min-height:44px;padding:8px 14px}#mediaViewerHome .mediaWhy[hidden]{display:none}#mediaViewerHome .mediaVisual [hidden]{display:none}#mediaViewerHome .mediaVisual .videoPlay{z-index:3}#mediaViewerHome .mediaVisual .mediaClose{z-index:4}`;
+viewerStyle.textContent=`#mediaViewerHome .mediaVisual iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#000}#mediaViewerHome .mediaActions button,#mediaViewerHome .mediaActions a{display:inline-flex;align-items:center;justify-content:center;font-size:13px;min-height:44px;padding:8px 14px}#mediaViewerHome .mediaWhy[hidden]{display:none}#mediaViewerHome .mediaVisual [hidden]{display:none}#mediaViewerHome .mediaVisual .videoPlay{z-index:3}#mediaViewerHome .mediaVisual .mediaClose{z-index:4}#mediaViewerHome .mediaVisual.lt-home-youtube-playing iframe{top:64px;height:calc(100% - 64px);min-height:200px}`;
 shadow.append(viewerStyle);
 const viewer=document.createElement('div');viewer.className='mediaViewer';viewer.id='mediaViewerHome';viewer.setAttribute('aria-hidden','true');
 viewer.innerHTML=`<div class="mediaShell" role="dialog" aria-modal="true" aria-labelledby="mediaTitleHome"><div class="mediaVisual" id="mediaVisualHome"><button class="mediaClose" id="mediaCloseHome" aria-label="미디어 닫기">×</button><div class="videoBadge" id="mediaTypeBadgeHome">사진</div><img id="mediaImageHome" alt="" src="" hidden><button class="videoPlay" id="mediaPlayHome" aria-label="미디어 미리보기 재생">▶</button><div class="mediaMemo" id="mediaMemoHome" hidden><div class="memoLabel">순간 기록</div><div class="memoMain" id="mediaMemoBodyHome"></div><div class="memoDate" id="mediaMemoDateHome"></div></div></div><div class="mediaInfo"><div class="mediaKicker" id="mediaKickerHome">순간</div><h3 id="mediaTitleHome"></h3><div class="mediaMeta" id="mediaMetaHome"></div><div class="mediaWhy" hidden><b>이어지는 이야기</b><p id="mediaWhyHome"></p></div><div class="mediaActions"><button class="primary" id="mediaBookHome">책에서 이어 보기</button><a id="mediaExternalHome" href="#" target="_blank" rel="noopener" hidden>원본 보기 ↗</a></div></div></div>`;
@@ -102,7 +102,7 @@ const mediaKind=(videoId,moment)=>videoId?'동영상':moment.image?'사진':'기
 const fallbackVideoTitle='함께 간직한 영상';
 function closeHomeViewer(){
  if(!viewer.classList.contains('open'))return;
- viewerSequence++;viewerSignal.abort();viewer.querySelector('iframe')?.remove();
+ viewerSequence++;viewerSignal.abort();viewer.querySelector('iframe')?.remove();vEl('mediaVisualHome').classList.remove('lt-home-youtube-playing');
  viewer.classList.remove('open');viewer.setAttribute('aria-hidden','true');
  homeHistory.dismiss('viewer');
  try{parent.postMessage({type:MSG.viewer,open:false},location.origin)}catch{}
@@ -135,8 +135,9 @@ function openHomeViewer(moment,opener=null){
  const visual=vEl('mediaVisualHome');
  visual.querySelector('iframe')?.remove();
  if(videoId){
-  const showExternalOnly=()=>{if(sequence!==viewerSequence)return;visual.querySelector('iframe')?.remove();img.hidden=!moment.image;play.hidden=true;external.hidden=false;external.textContent='YouTube에서 보기';};
+  const showExternalOnly=()=>{if(sequence!==viewerSequence)return;visual.querySelector('iframe')?.remove();visual.classList.remove('lt-home-youtube-playing');img.hidden=!moment.image;play.hidden=true;external.hidden=false;external.textContent='YouTube에서 보기';};
   const startEmbed=()=>{if(sequence!==viewerSequence||!viewer.classList.contains('open'))return;visual.querySelector('iframe')?.remove();
+   visual.classList.add('lt-home-youtube-playing');
    const frame=document.createElement('iframe');frame.src=`https://www.youtube-nocookie.com/embed/${encodeURIComponent(videoId)}?autoplay=1&playsinline=1&enablejsapi=1&origin=${encodeURIComponent(location.origin)}`;
    frame.allow='autoplay; encrypted-media; picture-in-picture';frame.allowFullscreen=true;frame.title=vEl('mediaTitleHome').textContent;
    img.hidden=true;play.hidden=true;visual.append(frame);};
@@ -147,7 +148,8 @@ function openHomeViewer(moment,opener=null){
   }).catch(()=>{if(sequence===viewerSequence)play.hidden=false;});
   addEventListener('message',event=>{if(sequence!==viewerSequence||!['https://www.youtube.com','https://www.youtube-nocookie.com'].includes(event.origin))return;
    let data=event.data;try{if(typeof data==='string')data=JSON.parse(data);}catch{return;}
-   if(data?.event==='onError'&&[101,150].includes(Number(data.info)))showExternalOnly();
+   if(event.source!==visual.querySelector('iframe')?.contentWindow)return;
+    if(data?.event==='onError'&&[2,5,100,101,150,153].includes(Number(data.info)))showExternalOnly();
   },{signal:viewerSignal.signal});
  }
  viewer.classList.add('open');viewer.setAttribute('aria-hidden','false');
