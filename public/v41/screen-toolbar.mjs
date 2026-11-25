@@ -31,6 +31,19 @@ function prepareTreeChoice(bar, screen, title, titleFrom) {
     choice.type = 'button';
     choice.setAttribute('aria-label', '\uD2B8\uB9AC \uACE0\uB974\uAE30');
     choice.title = '\uD2B8\uB9AC \uACE0\uB974\uAE30';
+    choice.setAttribute('aria-haspopup', 'dialog');
+    choice.setAttribute('aria-expanded', 'false');
+    choice.setAttribute('aria-pressed', 'true');
+    choice.addEventListener('click', event => {
+      event.stopPropagation();
+      const box = choice.getBoundingClientRect();
+      window.parent.postMessage({type:'lt41-toolbar-tree-picker', rect:{left:box.left,top:box.top,right:box.right,bottom:box.bottom}, via:event.detail===0?'keyboard':'mouse'}, location.origin);
+    });
+    window.addEventListener('message', event => {
+      if(event.source!==window.parent || event.origin!==location.origin || event.data?.type!=='lt41-toolbar-tree-picker-state')return;
+      choice.setAttribute('aria-expanded',String(!!event.data.open));
+      if(event.data.focus) choice.focus();
+    });
   }
   const thumb = document.createElement('span');
   thumb.className = 'lt-toolbar-tree-thumb';

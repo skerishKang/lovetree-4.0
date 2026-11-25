@@ -1356,3 +1356,24 @@ body[data-record-source=share][data-fab-lift=book].lt-book-lightbox-open #toast[
 
 /* #1362: 휴대폰에서만 선택 탭을 채운다(넓은 화면의 기존 모양은 그대로). */
 @media(max-width:780px){nav button[aria-current=true],.tree-frame .tree-views>button[aria-current=true]{background:var(--lt-role-accent-bg);color:var(--lt-role-accent-ink)}}
+
+/* #1367: shared picker is anchored to the active screen, not the top navigation. */
+.app-header .tree-slot:has(>#record-menu[hidden]){display:none}
+body>.tree-popover.lt-toolbar-picker{position:fixed;top:var(--lt-picker-top);left:clamp(8px,var(--lt-picker-left),calc(100vw - 370px));right:auto;width:min(354px,calc(100vw - 16px));min-width:0;max-height:min(75dvh,650px);overflow:hidden;z-index:220;display:flex;flex-direction:column;gap:4px;background:var(--lt-role-bg);color:var(--lt-role-text-strong);border:1px solid var(--lt-role-border);border-radius:var(--lt-r-card)}
+body>.tree-popover.lt-toolbar-picker[hidden]{display:none}
+.lt-toolbar-picker .lt-tree-picker-heading{display:flex;justify-content:space-between;align-items:center;padding:4px 8px}
+.lt-toolbar-picker .lt-tree-picker-heading button{min-width:44px;min-height:44px;background:var(--lt-role-idle-bg);color:var(--lt-role-idle-ink);border:1px solid var(--lt-role-idle-border);border-radius:var(--lt-r-pill)}
+.lt-toolbar-picker .tree-list{flex:1 1 auto;min-height:0;max-height:none;overflow:auto}
+.lt-toolbar-picker .tree-foot{flex:0 0 auto;overflow:auto;max-height:32dvh}
+.lt-toolbar-picker .tree-item{color:var(--lt-role-text-strong);background:var(--lt-role-bg)}
+.lt-toolbar-picker .tree-item[aria-checked=true]{background:var(--lt-role-accent-bg);color:var(--lt-role-accent-ink)}
+.lt-toolbar-picker .tree-item[aria-checked=true] .tree-name,.lt-toolbar-picker .tree-item[aria-checked=true] .tree-count{color:inherit}
+.lt-toolbar-picker .tree-item:is(:hover,:focus-visible),.lt-toolbar-picker .tree-foot button:is(:hover,:focus-visible){background:var(--lt-role-hover-bg);color:var(--lt-role-hover-ink)}
+.lt-toolbar-picker .tree-foot button{color:var(--lt-role-text-strong)}
+.lt-toolbar-picker .tree-search input{color:var(--lt-role-text-strong);background:var(--lt-role-bg);border-color:var(--lt-role-border)}
+@media(max-width:900px){
+ body>.tree-popover.lt-toolbar-picker{top:8dvh;left:0;right:0;bottom:0;width:100%;max-height:92dvh;border-radius:var(--lt-r-card) var(--lt-r-card) 0 0}
+ .lt-toolbar-picker .tree-foot{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));max-height:28dvh}
+ .lt-toolbar-picker .tree-group-divider{grid-column:1/-1}
+}
+@media(min-width:601px) and (max-width:900px){.lt-toolbar-picker .tree-foot{grid-template-columns:repeat(3,minmax(0,1fr))}}
