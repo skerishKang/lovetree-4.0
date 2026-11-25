@@ -314,7 +314,7 @@ test('1001b 실행: 지도 순간 변경(고치기·연결·삭제) — 재적�
 test('#1096 지도 잇기 — 끔 끌기 0회, 켬 옮기기·잇기·끊기 각 1회, 고리 막힘, 390 두 번 누르기, 재적재 0', { skip: skip || !REQUIRE ? skip || 'LT_MAP_RELATIONS_REQUIRE=1 일 때 실행' : false, timeout: 240000 }, async () => {
   if (skip) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip}`);
   const {createTree: makeTree, addMoment: growTree} = await import('../public/v41/domain.mjs');
-  const {serve: serveApp} = await import('./helpers/screen-audit.mjs');
+  const serveApp = serve; // ? ??? ?? ??? ?? ??? ??? ?? ???? ??? ?? ??.
   const {waitForShownScreen: waitShown} = await import('./helpers/visible-frame.mjs');
   const CLOCK = '2026-11-01T00:00:00Z';
   let tree = makeTree({subject: '시험', title: '지도 잇기 트리', note: '', emotion: '설렘', date: '2026-11-01', url: ''}, CLOCK);
@@ -396,6 +396,8 @@ test('#1096 지도 잇기 — 끔 끌기 0회, 켬 옮기기·잇기·끊기 각
     assert.equal(await frame.evaluate(() => window.__lt.sheet().open), false, '끈 상태에서는 선택 창이 뜨지 않는다');
 
     // ② 잇기 켜기 — 공통 도구 줄의 단추다.
+    assert.equal(await frame.evaluate(() => document.querySelectorAll('.lt-screen-toolbar[data-screen="network"]').length),
+      1, '1440 지도 저장 화면에는 도구 줄이 하나만 생성된다');
     const initialConnectHit = await frame.evaluate(() => {
       const button = document.getElementById('connectToggle');
       const rect = button.getBoundingClientRect();
@@ -558,6 +560,8 @@ test('#1096 체험 — 미리보기 예시 지도에서만 켜지고, 저장 없
           };
         });
         const label = width + '/' + theme;
+        assert.equal(await mobile.frame.evaluate(() => document.querySelectorAll('.lt-screen-toolbar[data-screen="network"]').length),
+          1, label + ': 지도 도구 줄은 하나만 생성된다');
         assert.equal(measured.exists, true, label + ': 잇기 단추가 존재합니다');
         assert.equal(measured.hidden, false, label + ': 잇기 단추에 숨김 속성이 없습니다');
         assert.equal(measured.visible, true, label + ': 표시 크기가 충분합니다 ' + JSON.stringify(measured));
