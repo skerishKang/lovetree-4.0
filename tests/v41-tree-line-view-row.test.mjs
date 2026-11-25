@@ -308,7 +308,7 @@ test('휴대폰 책: 초기화 순서와 관계없이 이어 보기는 아래 �
       document.documentElement.dataset.bookShape = 'phone';
       document.getElementById('sourceTitle').textContent = '긴 제목의 시험용 책';
     });
-    await page.waitForFunction(() => document.querySelector('.lt-toolbar-title').textContent === '긴 제목의 시험용 책');
+    await page.waitForFunction(() => document.querySelector('.lt-toolbar-tree-name').textContent === '긴 제목의 시험용 책');
     await check();
   } finally {
     await browser.close();
