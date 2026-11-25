@@ -6,7 +6,8 @@
   const sparse = data.length <= 8;
   document.documentElement.classList.add('lt1359-wide');
   document.documentElement.classList.toggle('lt1359-sparse', sparse);
-  if (screen === 'board' && !sparse && globalThis.LT58Model) {
+  // 기존 40개 보드의 4열·10줄 배치 계약은 유지하고, 더 밀집한 트리에서만 열을 확장한다.
+  if (screen === 'board' && data.length >= 48 && globalThis.LT58Model) {
     const original = LT58Model.gridColumns;
     LT58Model.gridColumns = width => width >= 1200
       ? Math.max(original(width), Math.floor((width - 44) / 265))
