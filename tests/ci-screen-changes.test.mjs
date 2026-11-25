@@ -49,8 +49,8 @@ test('#1069 화면 잡의 Playwright 버전은 잠금 파일에서 읽는다', (
   assert.ok(!/1\.49\.1/.test(workflow), '옛 하드코딩 버전이 남아 있지 않다');
   assert.ok(workflow.includes("hashFiles('package-lock.json')"), '캐시 키가 잠금 파일에서 유도된다');
   const installs = workflow.match(/playwright@\$\(node -p "require\('\.\/package-lock\.json'\)\.packages\['node_modules\/playwright'\]\.version"\)/g) || [];
-  // 2026-11-24: #1086 궤도 잡은 매일 밤 측정으로 옮겨 PR 화면 잡은 12곳이다. 밤 측정 쪽도 같은 규칙을 지킨다.
-  assert.equal(installs.length, 12, `PR 화면 잡 12곳이 모두 잠금 파일 버전을 쓴다(실측 ${installs.length})`);
+  // 2026-11-24: #1086 궤도 잡은 매일 밤 측정으로 옮겨 PR 화면 잡은 13곳이다. 밤 측정 쪽도 같은 규칙을 지킨다.
+  assert.equal(installs.length, 13, `PR 화면 잡 13곳이 모두 잠금 파일 버전을 쓴다(실측 ${installs.length})`);
   const nightly = readFileSync(new URL('../.github/workflows/nightly-screen-perf.yml', import.meta.url), 'utf8');
   assert.ok(!/playwright@\d/.test(nightly) && nightly.includes("hashFiles('package-lock.json')"), '밤 측정도 하드코딩 버전 없이 잠금 파일을 쓴다');
   const actual = execFileSync(process.execPath, ['-p', "require('./package-lock.json').packages['node_modules/playwright'].version"], { cwd: new URL('..', import.meta.url), encoding: 'utf8' }).trim();
@@ -99,6 +99,8 @@ test('화면 잡 고르기: 보드만 바뀌면 보드 잡, 공용 파일이 섞
   assert.equal(selectJobs(['public/v41/views/board/board.js', 'public/v41/views/track58-pinboard.html'], jobs, screen, helpers), 'screen-board');
   assert.equal(selectJobs(['tests/v41-board-pinboard-582.test.mjs', 'docs/a.md', 'server/x.js'], jobs, screen, helpers), 'screen-board', '화면 밖 파일은 고르기에 영향이 없다');
   assert.equal(selectJobs(['tests/v41-book-single-537.test.mjs'], jobs, screen, helpers), 'screen-book');
+  assert.equal(selectJobs(['tests/v41-explore-moments-1025.test.mjs'], jobs, screen, helpers), 'screen-home');
+  assert.equal(selectJobs(['tests/v41-home-screen-952.test.mjs'], jobs, screen, helpers), 'screen-home');
   assert.equal(selectJobs(['public/v41/views/board/board.js', 'public/v41/shell.css'], jobs, screen, helpers), 'all', '공용 CSS가 섞이면 전부');
   assert.equal(selectJobs(['tests/helpers/screen-audit.mjs'], jobs, screen, helpers), 'all', 'helpers는 전부');
   assert.equal(selectJobs(['src/views/orbit.js'], jobs, screen, helpers), 'all');
@@ -111,6 +113,10 @@ test('결과 모으기: 고르지 않은 화면 잡의 건너뜀만 통과', asy
   const gate = (jobs) => ({ result: 'success', outputs: { changed: 'true', jobs } });
   const ok = checkScreenResults({ 'screen-changes': gate('screen-board'), 'screen-board': { result: 'success' }, 'screen-book': { result: 'skipped' }, deploy: { result: 'success' } });
   assert.equal(ok.ok, true, ok.failures.join(','));
+  const home = checkScreenResults({ 'screen-changes': gate('screen-home'), 'screen-home': { result: 'success' }, 'screen-home-followup': { result: 'skipped' }, deploy: { result: 'success' } });
+  assert.equal(home.ok, false);
+  const other = checkScreenResults({ 'screen-changes': gate('screen-board'), 'screen-home-followup': { result: 'skipped' }, deploy: { result: 'success' } });
+  assert.equal(other.ok, true);
   const bad = checkScreenResults({ 'screen-changes': gate('screen-board'), 'screen-board': { result: 'skipped' }, deploy: { result: 'success' } });
   assert.equal(bad.ok, false, '고른 잡이 건너뛰면 실패');
   const all = checkScreenResults({ 'screen-changes': gate('all'), 'screen-book': { result: 'skipped' }, deploy: { result: 'success' } });

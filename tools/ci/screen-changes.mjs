@@ -84,7 +84,7 @@ export function selectJobs(changedFiles, jobTests, screenTests, screenHelpers) {
     const one = classify([f], screenTests, screenHelpers);
     if (!one.changed) continue;
     if (screenTests.has(f)) {
-      for (const [job, files] of Object.entries(jobTests)) if (files.has(f) && SELECTABLE_JOBS.includes(job)) picked.add(job);
+      for (const [job, files] of Object.entries(jobTests)) if (files.has(f) && SELECTABLE_JOBS.includes(job === 'screen-home-followup' ? 'screen-home' : job)) picked.add(job === 'screen-home-followup' ? 'screen-home' : job);
       continue;
     }
     const area = AREA_SOURCES.find(([re]) => re.test(f));
