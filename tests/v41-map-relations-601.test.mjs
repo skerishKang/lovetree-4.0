@@ -523,7 +523,16 @@ test('#1096 체험 — 미리보기 예시 지도에서만 켜지고, 저장 없
           const row = bar?.querySelector('.lt-toolbar-tools');
           const rect = button?.getBoundingClientRect();
           const css = button ? getComputedStyle(button) : null;
+          const rowRect = row?.getBoundingClientRect();
+          const barRect = bar?.getBoundingClientRect();
+          const hit = rect ? document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2) : null;
           return {
+            hit: hit === button || button?.contains(hit) || false,
+            hitTarget: hit?.id || hit?.className || hit?.tagName,
+            pointer: css?.pointerEvents,
+            top: rect?.top, bottom: rect?.bottom,
+            groupLeft: rowRect?.left, groupRight: rowRect?.right,
+            barTop: barRect?.top, barBottom: barRect?.bottom,
             exists: !!button, hidden: button?.hidden,
             visible: !!rect && rect.width >= 40 && rect.height >= 36 && css.display !== 'none',
             inRow: !!row?.contains(button),
@@ -540,6 +549,7 @@ test('#1096 체험 — 미리보기 예시 지도에서만 켜지고, 저장 없
         assert.equal(measured.inBar, true, label + ': ?? ?? ?? ???');
         assert.ok(measured.left >= -0.5 && measured.right <= measured.viewport + 0.5,
           label + ': ??? ?? ?? ?? ?? ??');
+        assert.equal(measured.hit, true, label + ': ?? ?? ??? ?? ??? ' + JSON.stringify(measured));
         assert.equal(measured.pressed, 'false', label + ': ?? ?? ??? ???');
         await mobile.frame.click('#connectToggle');
         assert.equal(await mobile.frame.evaluate(() => window.__lt.connect().mode), true,
