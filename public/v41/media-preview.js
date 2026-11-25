@@ -407,6 +407,7 @@ function closeLightbox(){
  document.removeEventListener('keydown',lightboxKey,true);
  if(lightboxBlob){URL.revokeObjectURL(lightboxBlob);lightboxBlob=null}
  node.remove();
+ document.dispatchEvent(new Event('lt-media-lightbox-close'));
  const opener=lightboxOpener;lightboxOpener=null;
  if(opener&&opener.isConnected)try{opener.focus({preventScroll:true})}catch{}
 }
@@ -425,6 +426,7 @@ async function openLightbox(url,title='',verticalHint=null){
  const stage=overlay.querySelector('.lt-lightbox-stage');
  document.body.append(overlay);
  lightbox=overlay;
+ document.dispatchEvent(new Event('lt-media-lightbox-open'));
  document.addEventListener('keydown',lightboxKey,true);
  overlay.addEventListener('click',e=>{if(e.target===overlay)closeLightbox()});
  overlay.querySelector('.lt-lightbox-close').addEventListener('click',closeLightbox);

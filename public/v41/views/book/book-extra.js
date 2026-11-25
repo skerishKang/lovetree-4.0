@@ -70,10 +70,14 @@ function requestNextMoment(parentId){
 let detailAnchor=null;
 const nextMomentOf=id=>LT59Model.nextMomentOf(id,LTDEMO.moments,LTDEMO.edges,titleMainFor);
 function closeDetail(){
+ closeBookHistory('detailSide');
  const panel=$b('#detailSide'),card=detailAnchor;
  if(panel){panel.hidden=true;panel.replaceChildren()}
  detailAnchor=null;
+ const pageDetail=document.querySelector('.page-detail');
+ if(pageDetail){pageDetail.remove();selectedMomentId=null;renderSpread(current,LTDEMO.get(),false)}
  setBookOpen($b('#detail'),false);
+ for(const id of ['detailTag','detailTitle','detailBody','detailChips','detailWhy']){const el=$b('#'+id);if(el)el.replaceChildren()}
  if(card&&card.isConnected){card.classList.remove('detail-open');card.setAttribute('tabindex','-1');try{card.focus({preventScroll:true})}catch{}}
 }
 function detailMeta(m){return t(LTLabels.type(m.kind))+' · '+t(formatDisplayDate(m.date,ltDateStyle()))+' · '+t(m.emotion)}
@@ -154,12 +158,18 @@ function placeDetail(id,card){
 }
 const originalShowDetail=showDetail;
 showDetail=function(id){
- originalShowDetail(id);
+ if(!metadataFor(id)||!cardFor(id))return;
+ const existing=history.state?.ltBookOverlay==='detailSide';
+ if(!existing)recordBookOpen('detailSide');
+ bookHistoryTransferring=true;
+ try{originalShowDetail(id);
  const m=metadataFor(id);if(m){const view=titleViewFor(m);$b('#detailTitle').textContent=view.main;if(view.sub)$b('#detailTag').textContent+=' · ▶ '+view.sub;}
  setBookOpen($b('#detail'),false);
  const card=cardFor(id);
- if(card)placeDetail(id,card);
+ if(card){placeDetail(id,card);card.classList.add('focused')}
+ }finally{bookHistoryTransferring=false}
 };
+if(window.__TRACK59__)window.__TRACK59__.showDetail=showDetail;
 document.addEventListener('keydown',e=>{if(e.key!=='Escape')return;if(document.querySelector('.lt-lightbox'))return;const panel=$b('#detailSide');if(panel&&!panel.hidden){e.preventDefault();closeDetail();}},true);
 /* 1. 실제 기록에서 재생 단추가 눌리지 않던 문제(2026-11-08): 카드 위 겹침·다른 리스너의 전파 차단에
    영향받지 않도록 pointerdown에서 먼저 잡고, 재생 주소를 못 만들면 원본 링크를 새 창으로 연다. */
@@ -229,7 +239,7 @@ document.addEventListener('click',e=>{
  // #327 2부: 옮기기는 셸 정리 창이 맡는다(여기는 요청만 보낸다).
  const move=e.target.closest('[data-detail-move]');
  if(move){e.preventDefault();e.stopPropagation();parent.postMessage({type:MSG.move,momentId:move.dataset.detailMove},location.origin);return}
- if(e.target.closest('[data-detail-index]')){e.preventDefault();closeDetail();openArchive();return}
+ if(e.target.closest('[data-detail-index]')){e.preventDefault();openArchive();return}
  if(e.target.closest('[data-detail-close]')){e.preventDefault();closeDetail();return}
 },true);
 /* #800: 모든 순간 카드는 정보 줄 → 제목 → 메모 순서로 한 번만 그린다. */
@@ -512,6 +522,7 @@ function journeyMarkup(journey){
  }).join('');
 }
 function openJourney(){
+ if(!$b('#overview').classList.contains('open'))recordBookOpen('overview');
  journeyOpener=document.activeElement;
  const journey=LT59Model.journeyTimeline(LTDEMO.moments,LTDEMO.edges,LTDEMO.get(),titleMainFor);
  $b('#overviewFlow').innerHTML=journeyMarkup(journey);
@@ -520,7 +531,7 @@ function openJourney(){
  setTimeout(()=>$b('#overviewClose').focus(),40);
 }
 function closeJourney(){
- const overlay=$b('#overview');overlay.classList.remove('open');overlay.inert=true;
+ const overlay=$b('#overview');if(overlay.classList.contains('open'))closeBookHistory('overview');overlay.classList.remove('open');overlay.inert=true;
  if(journeyOpener&&journeyOpener.isConnected)try{journeyOpener.focus({preventScroll:true})}catch{}
  journeyOpener=null;
 }
@@ -531,7 +542,7 @@ $b('#overview').addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDef
 $b('#overviewFlow').addEventListener('click',e=>{
  const item=e.target.closest('[data-journey]');if(!item)return;
  const focus=item.dataset.focus||'';
- closeJourney();
+ bookHistoryTransferring=true;try{closeJourney();completeBookJump(focus,posOfMoment(focus))}finally{bookHistoryTransferring=false}
  // #537: 가는 자리는 보기 모드가 정한다(한 장은 그 순간, 두 장은 그 순간이 든 펼침면).
  const target=posOfMoment(focus);
  if(target===current)renderSpread(target,focus,false);
@@ -602,7 +613,7 @@ mountTips();
 window.__TRACK59__.overflowRejudge=createOverflowRejudge({judge:()=>window.__TRACK59__.rejudgeOverflow(),raf:f=>requestAnimationFrame(f),cancelRaf:id=>cancelAnimationFrame(id),addDocListener:(t,f,o)=>document.addEventListener(t,f,o),addWinListener:(t,f)=>addEventListener(t,f),ResizeObserver:typeof ResizeObserver==='undefined'?null:ResizeObserver,isPageImage:n=>n instanceof HTMLImageElement&&!!n.closest('.page-content,.mobile-content')});
 renderSpread(current,LTDEMO.get(),false);
 syncLensClone();
-window.__BOOK_USABILITY__={titleParts,closeDetail,placeDetail,nextMomentOf,paintTitle,openJourney,get lensPref(){return lensPref}};
+window.__BOOK_USABILITY__={titleParts,closeDetail,closeJourney,placeDetail,nextMomentOf,paintTitle,openJourney,get lensPref(){return lensPref}};
 
 // #347 후속: 계정 제목 보기 설정이 바뀌면 지금 펼침면·상세를 다시 그린다.
 addEventListener('message',e=>{if(e.data?.type!==MSG.titleDisplay||!isShellMessage(e))return;try{LTDEMO.prefs={...(LTDEMO.prefs||{}),titleDisplay:e.data.value}}catch{}try{renderSpread(current,LTDEMO.get(),false)}catch{}if($b('#detail')?.classList.contains('open')&&selectedMomentId)showDetail(selectedMomentId);});
