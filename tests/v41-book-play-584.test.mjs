@@ -11,6 +11,7 @@
 import {waitForShownScreen} from './helpers/visible-frame.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { inspectYoutubeIframe, countYoutubeAutoplay } from './helpers/youtube-embed-audit.mjs';
 import { readFileSync, existsSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { createReadStream } from 'node:fs';
@@ -1135,4 +1136,113 @@ test('#1288 그림만 있는 단추는 접근 이름이 있다(예외는 이유�
   assert.match(read('public/v41/views/book/book-extra.js'), /aria-label','돋보기'/, '돋보기 접근 이름');
   assert.match(read('public/v41/views/track56-network.html'), /aria-label="전체 맞춤"[^>]*>⤢/, '전체 맞춤 접근 이름');
   assert.match(read('public/v41/views/track56-network.html'), /aria-label="더 보기"[^>]*>⋯/, '더 보기 접근 이름');
+});
+
+test('#1378 크게 보기: 390·1440 × 밤·정원, 공용 유튜브 9지점·크기·자동재생', { skip, timeout: 240000 }, async () => {
+  const browser = await chromium.launch({ headless: true });
+  const embed = (route) => route.fulfill({
+    status: 200,
+    contentType: 'text/html',
+    body: '<!doctype html><html><head><title>YouTube video</title></head><body></body></html>',
+  });
+  try {
+    for (const [width, height] of [[390, 844], [1440, 900]]) {
+      for (const theme of ['night', 'garden']) {
+        const { ctx, frame } = await openBook(browser, width, height, [
+          ['**/youtube-nocookie.com/**', embed],
+          ['**/www.youtube.com/embed/**', embed],
+        ]);
+        try {
+          await frame.evaluate((value) => {
+            localStorage.setItem('lt41.theme', value);
+            document.documentElement.setAttribute('data-lt-theme', value);
+          }, theme);
+          await frame.locator('.media-links [data-yt-expand]').first().click({ force: true });
+          await frame.waitForSelector('.lt-lightbox iframe', { timeout: 10000 });
+          const inspected = await inspectYoutubeIframe(frame.locator('.lt-lightbox iframe'));
+          assert.equal(inspected.blocked, 0,
+            width + '/' + theme + ' 크게 보기 iframe 앞 우리 요소 0: ' + inspected.blockers.join(','));
+          assert.equal(inspected.minimum200, true,
+            width + '/' + theme + ' 최소 200×200: ' + inspected.width + '×' + inspected.height);
+          assert.equal(await countYoutubeAutoplay(frame), 1,
+            width + '/' + theme + ' 자동 재생 지정 한 개');
+          assert.equal(await frame.locator('.lt-lightbox-stage .lt-yt-preview,.lt-lightbox-stage [data-lt-play]').count(), 0,
+            width + '/' + theme + ' 재생 중 표지·재생 단추 없음');
+          if (width === 390 && theme === 'night') {
+            await frame.evaluate(() => {
+              const player = document.querySelector('.lt-lightbox iframe');
+              window.dispatchEvent(new MessageEvent('message', {
+                origin: 'https://www.youtube-nocookie.com',
+                source: player.contentWindow,
+                data: JSON.stringify({ event: 'onError', info: 150 }),
+              }));
+            });
+            assert.equal(await frame.locator('.lt-lightbox iframe').count(), 0,
+              'YouTube 임베드 거절이면 플레이어 제거');
+            assert.equal(await frame.locator('.lt-lightbox-stage a[href*="youtube.com"]').count(), 1,
+              '재생 불가 안내와 원본 보기 경로');
+          }
+          await frame.locator('.lt-lightbox-close').click();
+          assert.equal(await frame.locator('.lt-lightbox iframe').count(), 0,
+            width + '/' + theme + ' 크게 보기 닫으면 플레이어 제거');
+        } finally {
+          await ctx.close();
+        }
+      }
+    }
+  } finally {
+    await browser.close();
+  }
+});
+
+test('#1378 크게 보기: 이미 재생 중인 인라인 영상과 자동 재생이 중복되지 않는다', { skip, timeout: 120000 }, async () => {
+  const browser = await chromium.launch({ headless: true });
+  const mock = route => route.fulfill({
+    status: 200, contentType: 'text/html',
+    body: '<!doctype html><title>YouTube video</title>',
+  });
+  try {
+    const { ctx, frame } = await openBook(browser, 390, 844, [
+      ['**/youtube-nocookie.com/**', mock],
+      ['**/www.youtube.com/embed/**', mock],
+    ]);
+    try {
+      await frame.locator('[data-yt-play]').first().click({ force: true });
+      await frame.waitForSelector('iframe.yt-frame', { timeout: 10000 });
+      assert.equal(await countYoutubeAutoplay(frame), 1, '인라인 재생 하나');
+      await frame.locator('.yt-video-expand').first().click({ force: true });
+      await frame.waitForFunction(() => !!document.fullscreenElement || !!document.querySelector('.lt-lightbox iframe'), null, { timeout: 10000 });
+      assert.equal(await countYoutubeAutoplay(frame), 1, '크게 보기 시작 후 동시 자동재생 지정 하나');
+      if (await frame.locator('.lt-lightbox-close').count()) await frame.locator('.lt-lightbox-close').click();
+      else await frame.evaluate(() => document.exitFullscreen?.());
+    } finally {
+      await ctx.close();
+    }
+  } finally {
+    await browser.close();
+  }
+});
+
+test('#1378 크게 보기: 임베드 거절 상태면 iframe을 걷고 원본 링크를 남긴다', { skip, timeout: 120000 }, async () => {
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const { ctx, frame } = await openBook(browser, 390, 844, [
+      ['**/api/youtube/oembed*', route => route.fulfill({
+        status: 401, contentType: 'application/json', body: '{"error":"youtube_embed_forbidden"}',
+      })],
+      ['**/youtube-nocookie.com/**', route => route.fulfill({
+        status: 200, contentType: 'text/html', body: '<title>YouTube video</title>',
+      })],
+    ]);
+    try {
+      await frame.locator('.media-links [data-yt-expand]').first().click({ force: true });
+      await frame.waitForSelector('.lt-lightbox-stage a[href*="youtube.com"]', { timeout: 10000 });
+      assert.equal(await frame.locator('.lt-lightbox iframe').count(), 0, '임베드 거절 후 플레이어 제거');
+      assert.equal(await frame.locator('.lt-lightbox-stage [role="status"]').count(), 1, '재생 불가 안내');
+    } finally {
+      await ctx.close();
+    }
+  } finally {
+    await browser.close();
+  }
 });
