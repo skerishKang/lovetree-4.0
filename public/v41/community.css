@@ -68,8 +68,8 @@ dialog.community-group-find::backdrop{background:transparent}
 
 /* #1025 1단계 — 둘러보기 [트리] [순간] 탭과 세로 순간 숏츠 보기. 색·모서리는 identity 토큰만 쓴다. */
 .community-tabs{display:flex;gap:8px;justify-content:center;margin:6px auto 14px;max-width:1500px}
-.community-tabs button{min-width:88px;min-height:44px;padding:0 18px;border:1px solid var(--lt-line);border-radius:var(--lt-r-pill);background:var(--lt-glass);color:var(--lt-muted);font:inherit;font-size:14px;cursor:pointer}
-.community-tabs button[aria-selected="true"]{border-color:var(--lt-gold);background:var(--lt-primary);color:var(--lt-primary-ink)}
+.community-tabs button{min-width:88px;min-height:44px;padding:0 18px;border:1px solid var(--lt-role-idle-border);border-radius:var(--lt-r-pill);background:var(--lt-role-idle-bg);color:var(--lt-role-idle-ink);font:inherit;font-size:14px;cursor:pointer}
+.community-tabs button[aria-selected="true"]{border-color:var(--lt-role-accent-bg);background:var(--lt-role-accent-bg);color:var(--lt-role-accent-ink)}
 /* 판 높이를 먼저 정하고(화면 - 머리줄 - 탭 - 위아래 여백) 너비는 9:16로 그 높이에서 계산한다 —
    판 아래 글과 오른쪽 단추 4개가 낮은 화면(1440×700)에서도 화면 밖으로 나가지 않는다(#1025 재검수). */
 .moments-stage{position:relative;display:flex;align-items:center;justify-content:center;gap:18px;max-width:1500px;margin:0 auto;height:calc(100dvh - 313px);min-height:320px;max-height:1180px}
@@ -114,8 +114,8 @@ dialog.community-group-find::backdrop{background:transparent}
 /* #1025 2단계 — 가수 칩 줄·담기 창·선 아이콘. 색은 identity 토큰만 쓴다. */
 .moments-chips{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;max-width:1500px;margin:0 auto 12px}
 .moments-chips[hidden]{display:none}
-.moments-chip{min-height:40px;padding:0 14px;border:1px solid var(--lt-line);border-radius:var(--lt-r-pill);background:var(--lt-glass);color:var(--lt-muted);font:inherit;font-size:13px;cursor:pointer}
-.moments-chip.is-active{border-color:var(--lt-gold);background:var(--lt-primary);color:var(--lt-primary-ink)}
+.moments-chip{min-height:40px;padding:0 14px;border:1px solid var(--lt-role-idle-border);border-radius:var(--lt-r-pill);background:var(--lt-role-idle-bg);color:var(--lt-role-idle-ink);font:inherit;font-size:13px;cursor:pointer}
+.moments-chip.is-active{border-color:var(--lt-role-accent-bg);background:var(--lt-role-accent-bg);color:var(--lt-role-accent-ink)}
 .moments-rail-svg{width:24px;height:24px;display:block;color:currentColor}
 .moments-add-dialog{position:fixed;z-index:60;inset:0;margin:auto;width:min(420px,92vw);height:fit-content;max-height:80dvh;padding:20px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-panel);background:var(--lt-glass-strong);color:var(--lt-pearl);overflow:auto}
 .moments-add-dialog[hidden]{display:none}
@@ -162,10 +162,9 @@ html[data-lt-theme=garden] .moments-comments-dialog{background:var(--lt-paper);c
  }
  #community-panel:has(#community-tab-moments[aria-selected="true"]) .community-tabs button,
  #community-panel:has(#community-tab-trees[aria-selected="true"]) .community-tabs button{
-  min-width:52px;min-height:32px;padding:0 9px;font-size:13px;border:1px solid var(--lt-line);border-radius:var(--lt-r-pill);background:var(--lt-glass);color:var(--lt-muted)
+  min-width:52px;min-height:32px;padding:0 9px;font-size:13px;border:1px solid var(--lt-role-idle-border);border-radius:var(--lt-r-pill);background:var(--lt-role-idle-bg);color:var(--lt-role-idle-ink)
  }
- #community-panel .community-tabs button[aria-selected="true"]{background:var(--lt-rose);border-color:var(--lt-rose);color:var(--lt-stage)}
- html[data-lt-theme=garden] #community-panel .community-tabs button[aria-selected="true"]{background:var(--lt-rose-ink);border-color:var(--lt-rose-ink);color:var(--lt-paper)}
+ #community-panel .community-tabs button[aria-selected="true"]{background:var(--lt-role-accent-bg);border-color:var(--lt-role-accent-bg);color:var(--lt-role-accent-ink)}
  #community-moments-panel{width:100%;min-width:0;overflow-x:clip}
  /* #1305: 가수 단추 줄도 같은 빈 띠에, 옆으로 넘기게, 끝은 흐리게. */
  #community-moments-panel .moments-chips{position:absolute;z-index:19;top:calc(env(safe-area-inset-top) + 6px);right:8px;left:132px;max-width:none;justify-content:flex-start;flex-wrap:nowrap;gap:4px;overflow-x:auto;scrollbar-width:none;padding-right:18px;-webkit-mask-image:linear-gradient(to right,#000 0,#000 calc(100% - 18px),transparent 100%);mask-image:linear-gradient(to right,#000 0,#000 calc(100% - 18px),transparent 100%);margin:0}
@@ -247,10 +246,6 @@ html[data-lt-theme=garden] .moments-comments-dialog{background:var(--lt-paper);c
 }
 
 /* #1330 상단·배지 다듬기 — 새 색 없이 기존 토큰만 쓴다. */
-#community-panel:has(#community-tab-trees[aria-selected="true"]) .community-tabs #community-tab-trees,
-#community-panel:has(#community-tab-moments[aria-selected="true"]) .community-tabs #community-tab-moments{background:var(--lt-rose);border-color:var(--lt-rose);color:var(--lt-stage)}
-html[data-lt-theme=garden] #community-panel:has(#community-tab-trees[aria-selected="true"]) .community-tabs #community-tab-trees,
-html[data-lt-theme=garden] #community-panel:has(#community-tab-moments[aria-selected="true"]) .community-tabs #community-tab-moments{background:var(--lt-rose-ink);border-color:var(--lt-rose-ink);color:var(--lt-paper)}
 #community-panel #community-query,#community-panel #community-sort{min-height:48px;height:48px;border-radius:var(--lt-r-pill)}
 #community-panel .community-stages-skeleton{height:18px;border-radius:var(--lt-r-pill);background:color-mix(in srgb,var(--lt-gold-line) 22%,transparent)}
 #community-panel .community-cover-badges{flex-wrap:nowrap}
@@ -268,12 +263,19 @@ html[data-lt-theme=garden] #community-panel:has(#community-tab-moments[aria-sele
 #community-panel #community-search-form.is-expanded .community-search-trigger{flex:0 0 44px;width:44px;font-size:0}
 #community-panel #community-search-form.is-expanded .community-search-trigger::before{content:"🔍";font-size:16px}
 #community-panel .community-top-row #community-query{flex:0 0 0;width:0;min-width:0;height:48px;min-height:48px;margin:0;padding:0;border:0;opacity:0;pointer-events:none}
-#community-panel .community-top-row #community-search-form.is-expanded #community-query{flex:1 1 auto;width:auto;min-width:0;padding:0 12px;border:1px solid var(--lt-line-paper);border-radius:var(--lt-r-pill);opacity:1;pointer-events:auto}
+#community-panel .community-top-row #community-search-form.is-expanded #community-query{flex:1 1 auto;width:auto;min-width:0;padding:0 12px;border:1px solid var(--lt-role-input-border);border-radius:var(--lt-r-pill);opacity:1;pointer-events:auto}
 #community-panel .community-top-row .community-search-submit{display:none}
 #community-panel .community-top-row .community-sort-label{position:relative;display:flex;align-items:center;justify-content:center;flex:0 0 48px;width:48px;height:48px;cursor:pointer}
-#community-panel .community-top-row .community-sort-label::before{content:"↕";display:flex;align-items:center;justify-content:center;width:44px;height:44px;border:1px solid var(--lt-line-paper);border-radius:var(--lt-r-pill);background:var(--lt-paper);color:var(--lt-ink);font-size:22px;pointer-events:none}
+#community-panel .community-top-row .community-sort-label::before{content:"↕";display:flex;align-items:center;justify-content:center;width:44px;height:44px;border:1px solid var(--lt-role-secondary-border);border-radius:var(--lt-r-pill);background:var(--lt-role-secondary-bg);color:var(--lt-role-secondary-ink);font-size:22px;pointer-events:none}
 #community-panel .community-top-row #community-sort{position:absolute;inset:0;width:48px;min-width:0;height:48px;min-height:48px;margin:0;padding:0;opacity:0;cursor:pointer}
 #community-panel .community-top-row .community-sort-label:focus-within::before{outline:2px solid var(--lt-gold);outline-offset:2px}
+#community-panel:has(#community-tab-trees) .community-tabs button:not([aria-selected="true"]):hover,
+#community-panel .moments-chip:not(.is-active):hover,
+#community-panel .community-group-chip:not(.is-active):hover,
+#community-panel .community-top-row .community-sort-trigger:hover{background:var(--lt-role-hover-bg);border-color:var(--lt-role-hover-border);color:var(--lt-role-hover-ink);cursor:var(--lt-role-hover-cursor)}
+#community-panel:has(#community-tab-trees) .community-tabs button:not([aria-selected="true"]):focus-visible,
+#community-panel .moments-chip:not(.is-active):focus-visible,
+#community-panel .community-group-chip:not(.is-active):focus-visible{background:var(--lt-role-hover-bg);border-color:var(--lt-role-hover-border);color:var(--lt-role-hover-ink)}
 #community-panel .community-top-row.is-moments #community-search-form,#community-panel .community-top-row.is-moments .community-sort-label{visibility:hidden;pointer-events:none}
 #community-panel #community-feedback[hidden]{display:none}
 @media(max-width:780px){
@@ -298,17 +300,17 @@ html[data-lt-theme=garden] #community-panel:has(#community-tab-moments[aria-sele
 
 /* #1363: 입력칸을 직접 노출하고, 정렬은 자체 메뉴를 사용한다. */
 #community-panel .community-top-row #community-search-form{flex:0 1 220px;min-width:92px;margin-left:auto}
-#community-panel .community-top-row #community-query{flex:1 1 auto;width:100%;min-width:0;opacity:1;pointer-events:auto;padding:0 34px 0 12px;border:1px solid var(--lt-line-paper);border-radius:var(--lt-r-pill);background:var(--lt-paper);color:var(--lt-ink)}
-#community-panel .community-top-row .community-search-clear{position:absolute;right:2px;top:2px;z-index:2;display:flex;align-items:center;justify-content:center;width:44px;min-width:44px;height:44px;min-height:44px;padding:0;border:0;border-radius:var(--lt-r-pill);background:transparent;color:var(--lt-ink);font-size:20px}
+#community-panel .community-top-row #community-query{flex:1 1 auto;width:100%;min-width:0;opacity:1;pointer-events:auto;padding:0 34px 0 12px;border:1px solid var(--lt-role-input-border);border-radius:var(--lt-r-pill);background:var(--lt-role-input-bg);color:var(--lt-role-input-ink)}
+#community-panel .community-top-row .community-search-clear{position:absolute;right:2px;top:2px;z-index:2;display:flex;align-items:center;justify-content:center;width:44px;min-width:44px;height:44px;min-height:44px;padding:0;border:0;border-radius:var(--lt-r-pill);background:transparent;color:var(--lt-role-input-ink);font-size:20px}
 #community-panel .community-search-clear[hidden]{display:none}
 #community-panel .community-top-row .community-sort-label::before{display:none}
 #community-panel .community-top-row #community-sort{position:absolute;width:1px;height:1px;min-height:0;opacity:0;pointer-events:none}
-#community-panel .community-top-row .community-sort-trigger{display:flex;align-items:center;justify-content:center;width:48px;height:48px;min-width:48px;min-height:48px;padding:0;border:1px solid var(--lt-line-paper);border-radius:var(--lt-r-pill);background:var(--lt-paper);color:var(--lt-ink);font-size:22px;cursor:pointer}
-#community-panel .community-top-row .community-sort-menu{position:absolute;top:calc(100% + 6px);right:0;z-index:30;display:grid;gap:4px;width:max-content;min-width:168px;padding:6px;border:1px solid var(--lt-line-paper);border-radius:var(--lt-r-card);background:var(--lt-paper);color:var(--lt-ink)}
+#community-panel .community-top-row .community-sort-trigger{display:flex;align-items:center;justify-content:center;width:48px;height:48px;min-width:48px;min-height:48px;padding:0;border:1px solid var(--lt-role-secondary-border);border-radius:var(--lt-r-pill);background:var(--lt-role-secondary-bg);color:var(--lt-role-secondary-ink);font-size:22px;cursor:pointer}
+#community-panel .community-top-row .community-sort-menu{position:absolute;top:calc(100% + 6px);right:0;z-index:30;display:grid;gap:4px;width:max-content;min-width:168px;padding:6px;border:1px solid var(--lt-role-input-border);border-radius:var(--lt-r-card);background:var(--lt-role-input-bg);color:var(--lt-role-input-ink)}
 #community-panel .community-sort-menu[hidden]{display:none}
-#community-panel .community-sort-option{display:flex;align-items:center;width:100%;min-height:44px;padding:9px 12px;border:0;border-radius:var(--lt-r-card);background:transparent;color:var(--lt-ink);font-size:14px;text-align:left;white-space:nowrap;cursor:pointer}
+#community-panel .community-sort-option{display:flex;align-items:center;width:100%;min-height:44px;padding:9px 12px;border:0;border-radius:var(--lt-r-card);background:transparent;color:var(--lt-role-input-ink);font-size:14px;text-align:left;white-space:nowrap;cursor:pointer}
 #community-panel .community-sort-option.is-active,#community-panel .community-sort-option:focus-visible{outline:2px solid var(--lt-gold);outline-offset:-2px}
-#community-panel .community-sort-option.is-selected{font-weight:700;background:var(--lt-primary);color:var(--lt-primary-ink)}
+#community-panel .community-sort-option.is-selected{font-weight:700;background:var(--lt-role-accent-bg);color:var(--lt-role-accent-ink)}
 #community-panel .community-top-row .community-sort-label:focus-within::before{outline:0}
 @media(max-width:780px){#community-panel .community-top-row #community-search-form{flex:1 1 auto;min-width:0;margin-left:auto}}
 
