@@ -1037,6 +1037,20 @@ function boardStartView() {
   }
   Object.assign(view, { x: v.x, y: v.y, z: v.z });
   applyView(false);
+  // #987: 상세를 여는 여덟 카드 트리는 실제 회전 카드 경계를 기준으로 판을 다시 맞춘다.
+  if (vw >= 1200 && cards.length === 8 && viewMode !== 'user') {
+    const bounds = [...cardLayer.querySelectorAll('.card[data-id]')].map(el => el.getBoundingClientRect());
+    const frame = viewport.getBoundingClientRect();
+    const left = Math.min(...bounds.map(r => r.left)) - frame.left;
+    const right = Math.max(...bounds.map(r => r.right)) - frame.left;
+    const width = right - left;
+    if (left < 16 || right > vw - 16) {
+      const worldLeft = (left - view.x) / view.z;
+      view.z = Math.min(view.z, (vw - 48) / width * view.z);
+      view.x = (vw - width * view.z / v.z) / 2 - worldLeft * view.z;
+      applyView(false);
+    }
+  }
 }
 // 전체 보기: 순간이 있는 곳 전부를 보이는 칸에 맞춘다(최대 0.92배). 순간이 없으면 무대 전체.
 // #856의 '제목 자리 함께 재기'는 판 제목이 무대 밖 머리글로 나가면서(#891 CTO) 필요 없어졌다 —
