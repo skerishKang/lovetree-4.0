@@ -31,7 +31,7 @@
 <script src="/v41/views/network/network-model.js"></script><script type="module" src="/v41/views/network/network-thumb.mjs"></script><script type="module" src="/v41/tag-line.mjs"></script><script src="/v41/views/network/network.js"></script>
 <script type="module" src="/v41/views/tree-title.mjs"></script><script type="module">
 import { mountScreenToolbar } from '/v41/screen-toolbar.mjs';
-mountScreenToolbar({ screen: 'network', titleFrom: document.getElementById('treeTitleText'), meta: true, tools: [document.querySelector('.view-switch'), document.getElementById('overviewBtn'), document.getElementById('netBgDrop'), document.getElementById('mapPlayBtn'), document.getElementById('connectToggle'), document.getElementById('demoToggle')] });
+mountScreenToolbar({ screen: 'network', initialBar: document.querySelector('.lt-screen-toolbar'), titleFrom: document.getElementById('treeTitleText'), meta: true, tools: [document.querySelector('.view-switch'), document.getElementById('overviewBtn'), document.getElementById('netBgDrop'), document.getElementById('mapPlayBtn'), document.getElementById('connectToggle'), document.getElementById('demoToggle')] });
 const mapPlay=document.getElementById('mapPlayBtn');if(mapPlay)mapPlay.addEventListener('click',()=>{try{window.__lt&&window.__lt.startPlayback&&window.__lt.startPlayback()}catch{}});
 </script><script type="module">
 import { MSG, isShellMessage } from '/v41/frame-messages.mjs';
