@@ -1,5 +1,5 @@
 {
-  "basis": "d3d36d32d621341d4fa40fe55df371a36f40ee86",
+  "basis": "b41636d4dbe54ae551eec1576467429cf9392cd9",
   "viewports": {
     "390": { "width": 390, "height": 844 },
     "1440": { "width": 1440, "height": 900 }
@@ -64,7 +64,8 @@
       "scroll": {
         "home": {
           "owner": "iframe:html",
-          "overflowY": { "390": "auto", "1440": "auto" }
+          "overflowY": { "390": "auto", "1440": "auto" },
+          "frameDocumentScrollable": { "390": false, "1440": false }
         }
       }
     },
@@ -119,23 +120,28 @@
       "scroll": {
         "shelf": {
           "owner": "iframe:html",
-          "overflowY": { "390": "visible", "1440": "visible" }
+          "overflowY": { "390": "visible", "1440": "visible" },
+          "frameDocumentScrollable": { "390": false, "1440": false }
         },
         "book": {
           "owner": "iframe:html",
-          "overflowY": { "390": "auto", "1440": "hidden" }
+          "overflowY": { "390": "auto", "1440": "hidden" },
+          "frameDocumentScrollable": { "390": true, "1440": false }
         },
         "board": {
           "owner": "world:world",
-          "overflowY": { "390": "visible", "1440": "visible" }
+          "overflowY": { "390": "visible", "1440": "visible" },
+          "frameDocumentScrollable": { "390": false, "1440": false }
         },
         "map": {
           "owner": "iframe:stage",
-          "overflowY": { "390": "clip", "1440": "clip" }
+          "overflowY": { "390": "clip", "1440": "clip" },
+          "frameDocumentScrollable": { "390": false, "1440": false }
         },
         "tree": {
           "owner": "iframe:html",
-          "overflowY": { "390": "visible", "1440": "visible" }
+          "overflowY": { "390": "visible", "1440": "visible" },
+          "frameDocumentScrollable": { "390": false, "1440": false }
         }
       }
     },
@@ -203,7 +209,8 @@
       "scroll": {
         "explore": {
           "owner": "shell:community-panel",
-          "overflowY": { "390": "auto", "1440": "auto" }
+          "overflowY": { "390": "auto", "1440": "auto" },
+          "frameDocumentScrollable": { "390": false, "1440": false }
         }
       }
     },
@@ -291,7 +298,8 @@
       "scroll": {
         "settings": {
           "owner": "shell:account-settings",
-          "overflowY": { "390": "auto", "1440": "auto" }
+          "overflowY": { "390": "auto", "1440": "auto" },
+          "frameDocumentScrollable": { "390": false, "1440": false }
         }
       }
     },
@@ -346,7 +354,8 @@
       "scroll": {
         "share-guest": {
           "owner": "iframe:html",
-          "overflowY": { "390": "auto", "1440": "hidden" }
+          "overflowY": { "390": "auto", "1440": "hidden" },
+          "frameDocumentScrollable": { "390": true, "1440": false }
         }
       },
       "toast": {

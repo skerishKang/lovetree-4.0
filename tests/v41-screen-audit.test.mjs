@@ -617,9 +617,9 @@ test('#657 화면 공통 검사기: 아홉 화면 둘레·스크롤 주인 관�
       assertObservedStyle(stage, expected.stage, width, row.theme, `${label} stage`);
       assert.ok(Math.abs(stage.rect.height - expected.stage.height[width]) <= 0.002, `${label} stage 높이 ${stage.rect.height}`);
       assert.equal(row.scroll.shellDocumentScrollable, false, `${label} 셸 문서는 스크롤 주인이 아니다`);
-      assert.equal(row.scroll.frameDocumentScrollable, false, `${label} iframe 문서도 스크롤 주인이 아니다`);
       const owner = row.scroll.owner, scroll = expected.scroll[id];
       assert.ok(scroll, `${label} 스크롤 기준선이 있다`);
+      assert.equal(row.scroll.frameDocumentScrollable, scroll.frameDocumentScrollable[width], `${label} iframe 문서 스크롤 여부`);
       assert.equal(`${owner?.owner}:${owner?.id}`, scroll.owner, `${label} 주 스크롤 주인`);
       assert.equal(owner?.overflowY, scroll.overflowY[width], `${label} 주 스크롤 주인 overflowY`);
       if (expected.frame) assertObservedStyle(frame, expected.frame, width, row.theme, `${label} iframe`);
