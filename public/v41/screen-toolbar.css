@@ -46,7 +46,7 @@ html[data-v41-screen=board] .lt-screen-toolbar #shelfBackBtn{height:36px;min-hei
 .lt-toolbar-menu{
   position:absolute;right:var(--lt-toolbar-pad,24px);top:var(--lt-toolbar-height);z-index:70;
   display:flex;flex-direction:column;gap:6px;padding:10px;border:1px solid var(--lt-line);
-  border-radius:14px;background:var(--lt-glass-strong);color:var(--lt-pearl);
+  border-radius:var(--lt-r-card);background:var(--lt-glass-strong);color:var(--lt-pearl);
 }
 .lt-toolbar-menu[hidden]{display:none}
 .lt-toolbar-more[hidden]{display:none}
