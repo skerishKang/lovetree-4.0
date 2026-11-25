@@ -1,7 +1,10 @@
 import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { createServer } from 'node:http';
 import net from 'node:net';
+import { createWorkspaceApi } from '../public/v41/api.mjs';
+import { createMemberSession } from '../public/v41/member-session.mjs';
 import { addMoment, createTree, linkMoments, validateState } from '../src/domain.js';
 import { ApiError } from '../server/errors.js';
 import { createApiHandler, createNodeHandler } from '../server/http.js';
@@ -55,6 +58,61 @@ test('save then read preserves ids, parents, links and order', async () => {
   assert.deepEqual(moments.map(m => m.id), state.trees[0].moments.map(m => m.id));
   assert.deepEqual(moments.map(m => m.parentId), state.trees[0].moments.map(m => m.parentId));
   assert.deepEqual(moments.map(m => m.links), state.trees[0].moments.map(m => m.links));
+});
+
+test('트리별 열 화면은 서버에 저장되고 한 트리를 바꿔도 재로그인 뒤 다른 트리의 값이 유지된다', async (t) => {
+  const { handle } = buildHandle();
+  const views = ['tree', 'board', 'book', 'network'];
+  const trees = views.map(openView => createTree({ ...base, title: '첫 순간', openView }, CLOCK));
+  const saved = await put(handle, { state: { version: 1, trees }, expectedRevision: 0, clientKey: 'open-view-1' });
+  assert.equal(saved.status, 200);
+  const viewList = state => state.trees.map(tree => tree.openView);
+  assert.deepEqual(viewList((await get(handle)).body.state), views);
+
+  const api = createWorkspaceApi({ fetchImpl: async (path, request) => {
+    if (path === '/auth/logout') return Response.json({ ok: true });
+    const result = await handle({ ...request, path, query: new URLSearchParams({ features: 'bound-writes' }) });
+    return Response.json(result.body, { status: result.status });
+  } });
+  const login = () => {
+    const session = createMemberSession({ api, draftStorage: null, cacheStorage: null, delay: () => new Promise(() => {}) });
+    t.after(() => session.dispose());
+    return session;
+  };
+  const first = login();
+  await first.start();
+  first.apply('editTree', { ...trees[0], openView: 'book' }, { treeId: trees[0].id });
+  await first.act('retry');
+  assert.equal(first.snapshot().dirty, false);
+  await first.act('logout');
+  assert.equal(first.snapshot().owned, false);
+  assert.equal(first.state().trees.length, 0);
+
+  const next = login();
+  await next.start();
+  assert.equal(next.snapshot().writable, true);
+  assert.deepEqual(viewList(next.state()), ['book', 'board', 'book', 'network']);
+  assert.deepEqual(next.state().trees.slice(1), trees.slice(1));
+});
+
+test('열 화면이 없던 저장 요청은 배포 뒤에도 재전송할 수 있고 다른 열 화면이면 충돌한다', async () => {
+  const { handle, repo } = buildHandle();
+  const doc = validateState(sampleState());
+  for (const tree of doc.trees) delete tree.openView;
+  const clientKey = 'saved-before-open-view';
+  const expectedRevision = 0;
+  const requestHash = createHash('sha256').update(JSON.stringify(doc) + '\n' + expectedRevision, 'utf8').digest('hex');
+  const previous = await repo.commit({ productId: PRODUCT, subjectId: 'usr_a', doc, clientKey, expectedRevision, requestHash });
+  assert.equal(previous.status, 'saved');
+  assert.equal((await get(handle)).body.state.trees[0].openView, 'tree');
+
+  const replay = await put(handle, { state: doc, expectedRevision, clientKey });
+  assert.equal(replay.status, 200);
+  assert.equal(replay.body.revision, previous.revision);
+  doc.trees[0].openView = 'board';
+  const conflict = await put(handle, { state: doc, expectedRevision, clientKey });
+  assert.equal(conflict.status, 409);
+  assert.equal(conflict.body.error.code, 'client_key_conflict');
 });
 
 test('cached media metadata survives a save and is returned on the next read', async () => {
