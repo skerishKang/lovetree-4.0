@@ -45,7 +45,12 @@ function renderTreeMenu(){
  // '정리 전 N개 정리하기'는 #380 5번대로 목록 바로 아래(맨 앞)에 둔다.
  const searchBox=ordered.length>=8?'<div class="tree-search" role="none"><input type="search" data-tree-search placeholder="트리 찾기" aria-label="트리 찾기" autocomplete="off" /></div>':'';
  const list=`${searchBox}<div class="tree-list" role="none">${rows}</div>`;
- treePopover.innerHTML=list+`<div class="tree-foot" role="none">${cleanupRow}<button type="button" role="menuitem" data-tree-action="new">＋ 새 트리</button>${manage?'<button type="button" role="menuitem" data-tree-action="manage">이 트리 관리 (이름·표지)</button><button type="button" role="menuitem" data-tree-action="share">이 트리 공유</button>':''}${tagsRow}${shelfEntry}${momentsEntry}</div>`;
+  // #1285 6번: 보기·관리·공유·위험 동작을 구분선으로 나눈다. 단추 순서는 그대로 둔다.
+  const divider = '<div class="tree-group-divider" role="separator" aria-hidden="true"></div>';
+  const viewGroup = `${shelfEntry}${momentsEntry}`;
+  const shareButtons = manage ? '<button type="button" role="menuitem" data-tree-action="manage">이 트리 관리 (이름·표지)</button><button type="button" role="menuitem" data-tree-action="share">이 트리 공유</button>' : '';
+  const dangerRow = cleanupRow ? divider + cleanupRow.replace('tree-item tree-cleanup', 'tree-item tree-cleanup tree-danger') : '';
+  treePopover.innerHTML = list + `<div class="tree-foot" role="none"><button type="button" role="menuitem" data-tree-action="new">＋ 새 트리</button>${manage ? divider + shareButtons : ''}${tagsRow}${viewGroup ? divider + viewGroup : ''}${dangerRow}</div>`;
  const search=treePopover.querySelector('[data-tree-search]');
  search?.addEventListener('input',()=>{
   const q=search.value.trim().toLowerCase();

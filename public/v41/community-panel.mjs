@@ -3,13 +3,14 @@ import {memberLoginUrl} from './member-entry.mjs';
 import {readTheme} from './header-state.mjs';
 import {displayTreeTitle} from './tree-name.mjs';
 import {tagKey} from './tags.mjs';
+import {youtubeIdFrom,youtubeStageThumbUrl} from './youtube-id.mjs';
 // #480 L13: 둘러보기 카드·댓글의 날짜도 책·보드·지도와 같은 한 벌로 적는다.
 import {formatDisplayDate} from './book-usability.mjs';
 import {matchGroups,sectionGroups} from './group-search.mjs';
 // #547·#701 규칙: 서버가 내려주는 시각(UTC 타임스탬프)은 기기 지역 날짜로 바꿔 보여 준다(#547 한 벌).
 import {localDateOnly} from './local-date.mjs';
 // #792 4단계 ⑤: 공개 무대 담기 단추와 '이번 주 인기 무대' 줄의 규칙은 community-stages.mjs 한 곳에 둔다.
-import {POPULAR_STAGE_TITLE,POPULAR_STAGE_EMPTY,POPULAR_STAGE_WEEK_LABEL,publicStageCount,stageVoteLabel,stageVoteNotice,stageMomentTitle,readStage,toggleStage} from './community-stages.mjs';
+import {POPULAR_STAGE_TITLE,POPULAR_STAGE_WEEK_LABEL,publicStageCount,stageVoteLabel,stageVoteNotice,stageMomentTitle,readStage,toggleStage} from './community-stages.mjs';
 // #1025: [순간] 탭 — 공개 세로 순간 숏츠 보기(서버 조회·세로 판정은 기존 한 벌 재사용).
 import {mountMoments} from './community-moments.mjs';
 import {createExploreLayers} from './community-history.mjs';
@@ -235,28 +236,43 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
   const cover=el('div','community-cover'),youtube=item.cover?.type==='youtube',video=['video','youtube'].includes(item.cover?.type),vertical=video&&item.cover?.vertical===true;
   // #1322: 한 겹 규칙 — 흐린 배경+가운데 그림은 세로 영상만. 그 밖은 표지 한 장을 꽉 채운다.
   cover.dataset.mediaKind=vertical?'video-vertical':video?'video-landscape':'photo';
-  const url=item.cover?.thumbnailUrl||item.cover?.url||'';
-  if(url){
+  // #1330: 위아래 띠 없는 썸네일(mqdefault·maxresdefault)을 먼저 쓰고, 없을 때만 나머지로 내려간다.
+  const raw=item.cover?.thumbnailUrl||item.cover?.url||'';
+  const youtubeId=youtubeIdFrom(item.cover?.url||'')||youtubeIdFrom(raw);
+  const candidates=[];
+  const add=url=>{if(url&&!candidates.includes(url))candidates.push(url)};
+  // 가로는 띠 없는 썸네일을 먼저, 세로는 서버가 준 세로 원본을 먼저 쓴다.
+  if(youtubeId&&!vertical){add(youtubeStageThumbUrl(youtubeId,'mqdefault'));add(youtubeStageThumbUrl(youtubeId,'maxresdefault'));}
+  add(raw);
+  if(youtubeId){add(youtubeStageThumbUrl(youtubeId,'mqdefault'));add(youtubeStageThumbUrl(youtubeId,'maxresdefault'));add(youtubeStageThumbUrl(youtubeId,'hqdefault'));}
+  if(candidates.length){
    // #1026 묶음 D: 칸은 처음부터 같은 크기로 잡혀 있다(community-cover의 aspect-ratio).
    // 사진은 다 받은 뒤에만 0.2초로 나타난다 — 반쯤 내려온 그림이나 빈 칸→일부→완성 단계가 보이지 않는다.
    const art=el('span','community-cover-art');
    const ready=img=>{if(img.isConnected)img.classList?.add('is-ready')};
+   let backdrop=null;
    if(vertical){
-    const backdrop=el('img','community-cover-backdrop');backdrop.alt='';backdrop.setAttribute('aria-hidden','true');backdrop.loading=loading;backdrop.classList?.add('is-loading');
+    backdrop=el('img','community-cover-backdrop');backdrop.alt='';backdrop.setAttribute('aria-hidden','true');backdrop.loading=loading;backdrop.classList?.add('is-loading');
     backdrop.addEventListener('load',()=>ready(backdrop),{once:true});
     backdrop.addEventListener('error',()=>{if(backdrop.isConnected)backdrop.remove()},{once:true});
-    backdrop.src=url;if(backdrop.complete&&backdrop.naturalWidth)ready(backdrop);art.append(backdrop);
+    backdrop.src=candidates[0];if(backdrop.complete&&backdrop.naturalWidth)ready(backdrop);art.append(backdrop);
    }
    const image=el('img','community-cover-image');image.alt='';image.loading=loading;image.decoding='async';image.referrerPolicy='no-referrer';image.classList?.add('is-loading');
    image.addEventListener('load',()=>ready(image),{once:true});
-   image.onerror=()=>{if(image.isConnected)image.replaceWith(el('span','community-cover-fallback',item.cover?.title||'순간 사진을 불러오지 못했어요.'));};
-   image.src=url;if(image.complete&&image.naturalWidth)ready(image);
+   let at=0;
+   image.onerror=()=>{
+    at+=1;
+    if(at<candidates.length){image.src=candidates[at];if(backdrop)backdrop.src=candidates[at];return;}
+    if(image.isConnected)image.replaceWith(el('span','community-cover-fallback',item.cover?.title||'순간 사진을 불러오지 못했어요.'));
+   };
+   image.src=candidates[0];if(image.complete&&image.naturalWidth)ready(image);
    art.append(image);cover.append(art);
   }else cover.append(el('span','community-cover-fallback',item.cover?.title||'공개된 순간'));
   // #1322: 카드 위 배지는 모두 같은 자리·같은 크기로 아래 한 줄에 모은다.
+  // #1330: 배지는 한 줄에 하나 — 명예회원 표시와 순간 수를 같은 단추에 담는다.
   const badges=el('span','community-cover-badges');
-  if(item.aiTester===true)badges.append(el('span','community-cover-badge community-ai','✦ AI 명예회원'));
-  badges.append(el('span','community-cover-badge community-count',`순간 ${item.momentCount}`));
+  const ai=item.aiTester===true;
+  badges.append(el('span','community-cover-badge'+(ai?' community-ai':' community-count'),`${ai?'✦ AI · ':''}순간 ${item.momentCount}`));
   cover.append(badges);
   return cover;
  }
@@ -486,10 +502,13 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
  const popularList=el('div','community-stage-list');
  popular.append(el('h3','community-stages-title',POPULAR_STAGE_TITLE),popularList);
  if(typeof form.before==='function')form.before(popular);else dialog.append(popular);
+ const skeleton=el('div','community-stages-skeleton');skeleton.setAttribute('aria-hidden','true');
  const renderPopularStages=rows=>{
   const shown=(Array.isArray(rows)?rows:[]).filter(stage=>stage&&stage.stageId&&publicStageCount(stage.weeklyVoters)!==null);
   popularList.replaceChildren();
-  if(!shown.length){popularList.append(el('p','community-stages-empty',POPULAR_STAGE_EMPTY));return;}
+  // #1330: 보여 줄 무대가 없으면 제목을 감춘다. 칸 높이는 그대로 두어 카드가 밀리지 않게 한다.
+  if(!shown.length){popular.classList.add('is-empty');popularList.replaceChildren(skeleton);return;}
+  popular.classList.remove('is-empty');
   for(const stage of shown){
    const row=el('span','community-stage');row.dataset.stageId=stage.stageId;
    row.append(el('span','community-stage-title',stageMomentTitle(stage)),el('span','community-stage-count',`${POPULAR_STAGE_WEEK_LABEL} ${publicStageCount(stage.weeklyVoters)}`));
@@ -500,7 +519,7 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
   const answer=await api.popularStages();
   renderPopularStages(answer?.ok?answer.items:[]);
  }
- popularList.append(el('p','community-stages-empty',POPULAR_STAGE_EMPTY));
+ popularList.append(skeleton); // 불러오는 동안만 자리를 고정하는 뼈대
  button.onclick=openPanel;
  button.hidden=false;
  // 직접 들어온 주소와 연결 전에 접기 메뉴에서 고른 주소를 같은 길로 연다.
