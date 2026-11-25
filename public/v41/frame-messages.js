@@ -10,7 +10,7 @@
   }
 
   const messages = Object.freeze({
-    selection: fromView('lt-selection', 'id, boardState?'),
+    selection: fromView('lt-selection', 'id, boardState? (noHistory: 기록 없이 현재 순간만 갱신)'),
     account: fromView('lt41-account', '없음'),
     advanced: fromShell('lt41-advanced', 'value'),
     boardSaved: fromShell('lt41-board-saved', 'ok, error?'),

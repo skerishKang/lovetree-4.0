@@ -18,6 +18,12 @@ function treeIcon(){
 }
 const EMBED='https://www.youtube-nocookie.com/embed/';
 // #1098 2단계: 댓글 단추 아이콘 — 나무 선 아이콘과 같은 선 굵기·currentColor 한 벌.
+function soundIcon(muted){
+ const svg=document.createElementNS(SVG_NS,'svg');for(const [key,value] of Object.entries({viewBox:'0 0 24 24',width:'24',height:'24',fill:'none',stroke:'currentColor','stroke-width':'1.6','stroke-linecap':'round','stroke-linejoin':'round','aria-hidden':'true'}))svg.setAttribute(key,value);
+ const body=document.createElementNS(SVG_NS,'path');body.setAttribute('d','M4 9h4l5-4v14l-5-4H4z');svg.append(body);
+ const wave=document.createElementNS(SVG_NS,'path');wave.setAttribute('d','M16 9a4 4 0 0 1 0 6m3-9a8 8 0 0 1 0 12');svg.append(wave);
+ return svg;
+}
 function bubbleIcon(){
  const svg=document.createElementNS(SVG_NS,'svg');
  for(const [key,value] of Object.entries({viewBox:'0 0 24 24',width:'24',height:'24',fill:'none',stroke:'currentColor','stroke-width':'1.6','stroke-linecap':'round','stroke-linejoin':'round','aria-hidden':'true'}))svg.setAttribute(key,value);
@@ -53,7 +59,7 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin,a
  const tagLine=el('div','moments-tags');
  const noteLine=el('button','moments-note');noteLine.type='button';noteLine.setAttribute('aria-label','설명 펼치기');
  noteLine.onclick=()=>{const expanded=noteLine.getAttribute('aria-expanded')==='true';noteLine.setAttribute('aria-expanded',String(!expanded));noteLine.setAttribute('aria-label',expanded?'설명 펼치기':'설명 접기');};
- const mute=el('button','moments-mute','소리 켜기');mute.type='button';mute.setAttribute('aria-label','소리 켜기');
+let soundButton=null;
   // #1332: 음소거 재생 중 가운데 아래에 띄우는 소리 켜기 알약. 기존 소리 단추는 끄기용으로 남긴다.
   const soundPill=el('button','moments-sound-pill','🔇 눌러서 소리 켜기');soundPill.type='button';soundPill.hidden=true;
   soundPill.setAttribute('aria-label','눌러서 소리 켜기');
@@ -64,8 +70,8 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin,a
  progress.append(progressFill,playerProgress);
  const swipeLayer=el('div','moments-swipe-layer');swipeLayer.setAttribute('aria-hidden','true');
  const hint=el('div','moments-swipe-hint','위로 밀어 다음 순간');hint.setAttribute('role','status');hint.hidden=true;
- progressButton.append(mute);
- media.append(poster,posterFallback,swipeLayer,overlay,progress,progressButton,soundPill,hint);
+
+ media.append(poster,posterFallback,swipeLayer,overlay,progress,soundPill,hint);
  card.append(media);
  const rail=el('div','moments-rail');
  const nav=el('div','moments-nav');
@@ -128,6 +134,11 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin,a
   if(spec.label==='댓글'){commentsCount=el('span','moments-rail-count','');button.append(commentsCount);}
   rail.append(button);
  }
+  soundButton=el('button','moments-rail-button is-sound');soundButton.type='button';
+  const soundStart=soundIcon(true);soundStart.setAttribute('class','moments-rail-svg');
+  soundButton.append(soundStart,el('span','moments-rail-label','소리 켜기'));
+  soundButton.setAttribute('aria-label','소리 켜기');soundButton.onclick=toggleSound;
+  rail.append(soundButton);
  const chips=el('div','moments-chips');chips.setAttribute('role','group');chips.setAttribute('aria-label','가수 고르기');
  const empty=el('p','moments-empty','아직 공개 세로 순간이 없어요. 쇼츠를 담은 공개 트리가 늘면 여기에 나타나요.');
  empty.hidden=true;
@@ -228,14 +239,24 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin,a
   }catch{notify?.('주소를 복사하지 못했어요.');}
  }
 
- let items=[],index=0,loading=false,token=0,frames=[],seen=new Set(),unmuted=false,touchY=null,activeTag='',groups=[];
+ let items=[],index=0,loading=false,token=0,frames=[],seen=new Set(),unmuted=false,wantSound=false,touchY=null,activeTag='',groups=[];
  const current=()=>items[index]||null;
   // #1332: 이 기기에서 한 번이라도 소리를 켠 적이 있으면 작은 알약으로 안내한다.
   const SOUND_SEEN_KEY='lt41.momentSoundSeen';
   const soundSeen=()=>{try{return localStorage.getItem(SOUND_SEEN_KEY)==='1';}catch{return false;}};
+  function paintSound(){
+    if(!soundButton)return;
+    soundButton.textContent='';
+    const icon=soundIcon(!unmuted);icon.setAttribute('class','moments-rail-svg');
+    soundButton.append(icon,el('span','moments-rail-label',unmuted?'소리 끄기':'소리 켜기'));
+    soundButton.setAttribute('aria-label',unmuted?'소리 끄기':'소리 켜기');
+    soundButton.classList.toggle('is-muted',!unmuted);
+    stage.dataset.ltMomentsMuted=String(!unmuted);
+    paintSoundPill();
+  }
   function paintSoundPill(){
     const small=soundSeen();
-    soundPill.hidden=unmuted||!current();
+    soundPill.hidden=unmuted||!current()||(!soundSeen()&&index!==0);
     soundPill.textContent=small?'소리 켜기':'🔇 눌러서 소리 켜기';
     soundPill.classList.toggle('is-small',small);
     soundPill.setAttribute('aria-label',small?'소리 켜기':'눌러서 소리 켜기');
@@ -287,8 +308,10 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin,a
    if(!frame.isConnected||frame!==currentFrame||stage.dataset.ltPlaying==='1'||tries++>=32){clearInterval(frame._ltKick);return;}
    try{frame.contentWindow?.postMessage('{"event":"listening"}',YT_ORIGIN);}catch{}
    // 소리를 켠 채로는 휴대폰이 자동 재생을 막는다 — 2초 안에 시작하지 않으면 음소거로 시작한다.
-   if(!unmuted||tries>8)command(frame,'mute');
-   command(frame,'playVideo');
+   // 소리를 켜 둔 사람은 새 영상에서도 소리로 시작한다(주소의 mute=1을 풀어 준다).
+   // 휴대폰이 소리 자동 재생을 막아 2초 안에 시작하지 않으면 음소거로 시작한다.
+   if(wantSound&&tries<=8){command(frame,'playVideo');command(frame,'unMute');}
+   else{command(frame,'mute');command(frame,'playVideo');}
    stage.dataset.ltAutoplay='1';
   };
   send();
@@ -352,9 +375,7 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin,a
   progress.dataset.ltProgress='0';
   if(!matchMedia('(max-width:780px)').matches){void progressFill.offsetWidth;progressFill.classList.add('is-running');}
   // #1305: 소리 선택은 이번 방문 동안 유지 — 순간을 넘겨도 되돌리지 않는다.
-  mute.textContent=unmuted?'소리 끄기':'소리 켜기';mute.setAttribute('aria-label',mute.textContent);
-  stage.dataset.ltMomentsMuted=String(!unmuted);
-  paintSoundPill();
+  paintSound();
   stage.dataset.ltAutoplay='';stage.dataset.ltPlaying='0';
   media.dataset.orientation=item.vertical===false||item.isVertical===false?'landscape':'portrait';
   if(matchMedia('(max-width:780px)').matches){try{hint.hidden=localStorage.getItem('lt41.momentSwipeSeen')==='1';}catch{hint.hidden=false;}}else hint.hidden=true;
@@ -410,7 +431,12 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin,a
     const info=data.info;const duration=Number(info.duration),time=Number(info.currentTime);
     if(Number.isFinite(duration)&&duration>0&&Number.isFinite(time)){const value=Math.max(0,Math.min(100,time/duration*100));playerProgress.value=value;progress.dataset.ltProgress=String(Math.round(value));}
     if(info.playerState===1){media.classList.add('is-playing');stage.dataset.ltPlaying='1';}
-    if(typeof info.muted==='boolean'){unmuted=!info.muted;mute.textContent=unmuted?'소리 끄기':'소리 켜기';mute.setAttribute('aria-label',mute.textContent);stage.dataset.ltMomentsMuted=String(!unmuted);paintSoundPill();}
+    // 화면 표시는 유튜브가 알려 준 실제 상태를 따른다. 새 영상은 주소의 mute=1로 음소거 상태를 알려 오므로,
+    // 소리를 켜 둔 사람의 선택(wantSound)이 있으면 몇 번 더 소리를 다시 켠다(브라우저가 막으면 알약이 다시 보인다).
+    if(typeof info.muted==='boolean'){
+     unmuted=!info.muted;paintSound();
+     if(info.muted&&wantSound&&(currentFrame._ltSoundTries=(currentFrame._ltSoundTries||0)+1)<=8)command(currentFrame,'unMute');
+    }
   }
   if(data?.event==='onStateChange'){
    const state=Number(data.info),item=current(),start=Number(item?.startSeconds);
@@ -435,19 +461,18 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin,a
   if(Math.abs(dy)>55&&Math.abs(dy)>Math.abs(dx)*1.4&&!(event.target?.closest?.('button,textarea,select,input')))step(dy<0?1:-1);
   touchY=null;
  },{passive:true});
-  mute.onclick=event=>{
+  function toggleSound(event){
     event.stopPropagation();
     if(!currentFrame)return;
     command(currentFrame,unmuted?'mute':'unMute');
-    unmuted=!unmuted;mute.textContent=unmuted?'소리 끄기':'소리 켜기';mute.setAttribute('aria-label',mute.textContent);stage.dataset.ltMomentsMuted=String(!unmuted);
-    paintSoundPill();
+    unmuted=!unmuted;wantSound=unmuted;paintSound();
   };
   // #1332: 알약은 소리만 켠다. 화면 누름(멈춤·재생)과 손짓 넘기기에 번지지 않게 막는다.
   soundPill.onclick=event=>{
     event.stopPropagation();event.preventDefault();
     if(!currentFrame||unmuted)return;
     command(currentFrame,'unMute');
-    unmuted=true;mute.textContent='소리 끄기';mute.setAttribute('aria-label','소리 끄기');stage.dataset.ltMomentsMuted='false';
+    unmuted=true;wantSound=true;paintSound();
     try{localStorage.setItem(SOUND_SEEN_KEY,'1');}catch{}
     paintSoundPill();
   };
