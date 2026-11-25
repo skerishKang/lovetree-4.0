@@ -164,7 +164,9 @@ html[data-lt-theme=garden] .moments-comments-dialog{background:var(--lt-paper);c
  #community-panel:has(#community-tab-trees[aria-selected="true"]) .community-tabs button{
   min-width:52px;min-height:32px;padding:0 9px;font-size:13px;border:1px solid var(--lt-role-idle-border);border-radius:var(--lt-r-pill);background:var(--lt-role-idle-bg);color:var(--lt-role-idle-ink)
  }
- #community-panel .community-tabs button[aria-selected="true"]{background:var(--lt-role-accent-bg);border-color:var(--lt-role-accent-bg);color:var(--lt-role-accent-ink)}
+ /* #1362: 390에서 위 idle 규칙이 선택 단추 채움을 덮지 않도록 특이도를 올린다. */
+ #community-panel:has(#community-tab-moments[aria-selected="true"]) .community-tabs button[aria-selected="true"],
+ #community-panel:has(#community-tab-trees[aria-selected="true"]) .community-tabs button[aria-selected="true"]{background:var(--lt-role-accent-bg);border-color:var(--lt-role-accent-bg);color:var(--lt-role-accent-ink)}
  #community-moments-panel{width:100%;min-width:0;overflow-x:clip}
  /* #1305: 가수 단추 줄도 같은 빈 띠에, 옆으로 넘기게, 끝은 흐리게. */
  #community-moments-panel .moments-chips{position:absolute;z-index:19;top:calc(env(safe-area-inset-top) + 6px);right:8px;left:132px;max-width:none;justify-content:flex-start;flex-wrap:nowrap;gap:4px;overflow-x:auto;scrollbar-width:none;padding-right:18px;-webkit-mask-image:linear-gradient(to right,#000 0,#000 calc(100% - 18px),transparent 100%);mask-image:linear-gradient(to right,#000 0,#000 calc(100% - 18px),transparent 100%);margin:0}

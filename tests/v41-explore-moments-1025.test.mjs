@@ -983,6 +983,17 @@ test('둘러보기 윗줄·역할별 색·마우스 올림·칩 크기 — 390·
      const result=Object.fromEntries(names.map(name=>[name,read(name)]));probe.remove();return result;
     });
     const roleBg=parseColor(roles['--lt-role-bg']);
+    // #1362: 선택 탭은 강조 채움이고 비선택 탭과 다르다. 밤의 비선택 탭·칩 테두리는 금색이 아니다.
+    const tabLook=await page.evaluate(()=>{const look=id=>{const e=document.getElementById(id),s=getComputedStyle(e);return {selected:e.getAttribute('aria-selected'),bg:s.backgroundColor,border:s.borderTopColor};};return {trees:look('community-tab-trees'),moments:look('community-tab-moments')};});
+    assert.equal(tabLook.trees.selected,'true',width+'/'+theme+': 기본 선택 탭은 트리');
+    assert.equal(tabLook.trees.bg,roles['--lt-role-accent-bg'],width+'/'+theme+': 선택 탭 강조 채움');
+    assert.notEqual(tabLook.moments.bg,tabLook.trees.bg,width+'/'+theme+': 선택·비선택 탭 바탕 다름');
+    if(theme==='night'){
+     const notGold=c=>{const v=parseColor(c);return v.r-v.b<40;};
+     assert.ok(notGold(tabLook.moments.border),width+'/밤: 비선택 탭 테두리 금색 아님 '+tabLook.moments.border);
+     const chipBorder=await page.locator('#community-groups .community-group-chip:not(.is-active)').first().evaluate(el=>getComputedStyle(el).borderTopColor);
+     assert.ok(notGold(chipBorder),width+'/밤: 비선택 칩 테두리 금색 아님 '+chipBorder);
+    }
     const pairs=[
      ['강조',roles['--lt-role-accent-ink'],roles['--lt-role-accent-bg']],
      ['보조 단추',roles['--lt-role-secondary-ink'],roles['--lt-role-bg']],

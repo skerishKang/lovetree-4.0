@@ -18,11 +18,13 @@
  --lt-primary:#eee9e0;--lt-primary-ink:#0a090d;      /* 1차 버튼 (첫 화면 감상창과 같음) */
  --lt-btn-ink:#1a1620;                                /* 어두운 공통 단추 바탕 (#886) */
  --lt-role-bg:var(--lt-stage);--lt-role-accent-bg:var(--lt-gold-deep);--lt-role-accent-ink:var(--lt-stage);
- --lt-role-secondary-bg:transparent;--lt-role-secondary-border:var(--lt-gold-line);--lt-role-secondary-ink:var(--lt-gold);
- --lt-role-input-bg:var(--lt-glass-strong);--lt-role-input-border:var(--lt-gold-line);--lt-role-input-ink:var(--lt-pearl);
- --lt-role-idle-bg:transparent;--lt-role-idle-border:var(--lt-gold-line);--lt-role-idle-ink:var(--lt-pearl);
+ /* #1362: 밤의 선 색은 회색 펄 계열. 금색은 선택 채움과 마우스 올림에만 쓴다. */
+ --lt-role-line:rgba(245,241,233,.4);
+ --lt-role-secondary-bg:transparent;--lt-role-secondary-border:var(--lt-role-line);--lt-role-secondary-ink:var(--lt-pearl);
+ --lt-role-input-bg:var(--lt-glass-strong);--lt-role-input-border:var(--lt-role-line);--lt-role-input-ink:var(--lt-pearl);
+ --lt-role-idle-bg:transparent;--lt-role-idle-border:var(--lt-role-line);--lt-role-idle-ink:var(--lt-pearl);
  --lt-role-hover-bg:rgba(255,230,166,.10);--lt-role-hover-border:var(--lt-gold);--lt-role-hover-ink:var(--lt-gold);--lt-role-hover-cursor:pointer;
- --lt-role-text-strong:var(--lt-pearl);--lt-role-text-muted:var(--lt-muted);--lt-role-text-faint:rgba(245,241,233,.64);--lt-role-border:var(--lt-gold-line);
+ --lt-role-text-strong:var(--lt-pearl);--lt-role-text-muted:var(--lt-muted);--lt-role-text-faint:rgba(245,241,233,.64);--lt-role-border:var(--lt-role-line);
  --lt-r-pill:999px;--lt-r-panel:22px;--lt-r-card:14px;--lt-track:.2em;
  /* 보드 실·핀, 지도 그룹색: 원본 네온/인포그래픽 6색을 첫 화면 색상으로 옮긴 값. JS가 읽는다. */
  --lt-thread-rose:#d88f9c;--lt-thread-violet:#a99ac9;--lt-thread-cyan:#7892c9;--lt-thread-amber:#e6b14c;
