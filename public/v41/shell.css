@@ -1332,3 +1332,5 @@ body[data-record-source=share][data-fab-lift=book] #toast[data-visitor-intro]:no
 body[data-record-source=share][data-fab-lift=book].lt-book-lightbox-open #toast[data-visitor-intro]{display:none}
 
 @media(max-width:780px){#community-panel .community-card-owner{margin:3px 10px 0;font-size:11px}}
+
+#community-preview .community-preview-start-help{margin:6px 0 12px;color:var(--lt-ink);font-size:12px;line-height:1.5}

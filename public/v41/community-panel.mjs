@@ -27,15 +27,58 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
  // 탭·찾기·정렬을 어느 보기에서나 같은 높이의 한 줄에 둔다.
  const toolbarTabs=dialog.querySelector('.community-tabs'),topRow=el('div','community-top-row'),sortLabel=form.querySelector('.community-sort-label');
  toolbarTabs.before(topRow);topRow.append(toolbarTabs,form,sortLabel);
- const searchTrigger=el('button','community-search-trigger','🔍 찾기');
- searchTrigger.type='button';searchTrigger.setAttribute('aria-label','찾기 열기');
- form.insertBefore(searchTrigger,query);
- query.placeholder='찾기';query.setAttribute('aria-label','가수·노래·무대 찾기');
- const popularOption=sortSelect?.querySelector("option[value=popular]");
- if(popularOption)popularOption.textContent="인기순";
- const expandSearch=()=>{form.classList.add('is-expanded');searchTrigger.setAttribute('aria-expanded','true');query.focus();};
- searchTrigger.setAttribute('aria-expanded','false');searchTrigger.onclick=expandSearch;
- query.addEventListener('blur',()=>{setTimeout(()=>{if(!form.contains(document.activeElement)&&!query.value.trim()){form.classList.remove('is-expanded');searchTrigger.setAttribute('aria-expanded','false');}},0);});
+ // 검색칸은 처음부터 열어 두고, 제출 단추 없이 입력 후 자동으로 찾는다.
+ query.placeholder='🔍 찾기';query.setAttribute('aria-label','가수·노래·무대 찾기');
+ const searchClear=el('button','community-search-clear','×');
+ searchClear.type='button';searchClear.setAttribute('aria-label','찾기 지우기');
+ form.append(searchClear);
+ sortSelect.setAttribute('aria-hidden','true');sortSelect.tabIndex=-1;
+ const popularOption=sortSelect?.querySelector('option[value=popular]');
+ if(popularOption)popularOption.textContent='많이 담긴 순';
+ // 값은 기존 select에 남겨 API·설정 계약을 유지하고, 실제 고르는 판은 화면 안에서 그린다.
+ const sortButton=el('button','community-sort-trigger','↕');
+ sortButton.type='button';sortButton.setAttribute('aria-label','정렬');
+ sortButton.setAttribute('aria-haspopup','listbox');sortButton.setAttribute('aria-expanded','false');
+ const sortMenu=el('div','community-sort-menu');
+ sortMenu.id='community-sort-menu';sortMenu.setAttribute('role','listbox');sortMenu.setAttribute('aria-label','정렬 선택');sortMenu.hidden=true;
+ const sortItems=[['newest','최신순'],['popular','많이 담긴 순']];
+ let sortActive=0;
+ const sortOptions=sortItems.map(([value,label])=>{
+  const option=el('button','community-sort-option');option.type='button';option.dataset.sort=value;
+  option.setAttribute('role','option');option.id='community-sort-'+value;
+  option.onclick=()=>chooseSort(value);
+  sortMenu.append(option);return option;
+ });
+ const paintSort=()=>{
+  sortItems.forEach(([value,label],i)=>{
+   sortOptions[i].textContent=(sortSelect.value===value?'✓  ':'　')+label;
+   sortOptions[i].setAttribute('aria-selected',String(sortSelect.value===value));
+   sortOptions[i].classList.toggle('is-selected',sortSelect.value===value);
+   sortOptions[i].classList.toggle('is-active',i===sortActive);
+  });
+  sortButton.setAttribute('aria-activedescendant',sortOptions[sortActive]?.id||'');
+ };
+ const closeSort=()=>{sortMenu.hidden=true;sortButton.setAttribute('aria-expanded','false');sortButton.removeAttribute('aria-activedescendant');};
+ const openSort=()=>{sortActive=Math.max(0,sortItems.findIndex(([v])=>v===sortSelect.value));paintSort();sortMenu.hidden=false;sortButton.setAttribute('aria-expanded','true');};
+ function chooseSort(value){
+  const changed=sortSelect.value!==value;sortSelect.value=value;paintSort();closeSort();sortButton.focus();
+  if(changed)sortSelect.onchange?.();
+ }
+ sortButton.onclick=()=>sortMenu.hidden?openSort():closeSort();
+ sortButton.addEventListener('keydown',event=>{
+  if(event.key==='Escape'){if(!sortMenu.hidden){event.preventDefault();event.stopPropagation();closeSort();}return;}
+  if(event.key==='ArrowDown'||event.key==='ArrowUp'){
+   event.preventDefault();if(sortMenu.hidden)openSort();
+   else{sortActive=(sortActive+(event.key==='ArrowDown'?1:-1)+sortItems.length)%sortItems.length;paintSort();}
+  }
+  if(event.key==='Enter'&& !sortMenu.hidden){event.preventDefault();chooseSort(sortItems[sortActive][0]);}
+ });
+ sortMenu.addEventListener('keydown',event=>{if(event.key==='Escape'){event.preventDefault();closeSort();sortButton.focus();}});
+ sortLabel.append(sortButton,sortMenu);
+ // 바깥 누름 및 탭 이동 시 접고, 선택값은 유지한다.
+ dialog.addEventListener('pointerdown',event=>{if(!sortMenu.hidden&&!sortLabel.contains(event.target))closeSort();});
+ sortButton.addEventListener('blur',()=>{setTimeout(()=>{if(!sortLabel.contains(document.activeElement))closeSort();},0);});
+ paintSort();
 
  // #480 L13: 계정 설정의 날짜 표기. 넘겨받지 않으면 기본(dot) — 새 규칙을 만들지 않는다.
  const dateStyle=()=>(typeof getDateStyle==='function'?getDateStyle():'dot');
@@ -108,7 +151,7 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
  function statButton(item,kind,label,voteNote){
   if(kind==='reaction')return reactionButtons(item,label,voteNote);
   const active=kind==='favorite'?item.stats.favored:item.stats.hearted,count=kind==='favorite'?item.stats.favorites:item.stats.hearts,b=el('button','community-mini',`${active?'✓ ':''}${smallCountLabel(label,count)}`);b.type='button';b.dataset.communityAction=kind;b.setAttribute('aria-pressed',String(active));
-  b.onclick=async()=>{const answer=await api.favorite(item.shareId,!active);if(!answer.ok){const text=loginMessage(answer);if(voteBlocked(answer))setVoteNote(voteNote,text);else message(text);return;}item.stats=answer.stats;render();};return b;
+  b.onclick=async()=>{const answer=await api.favorite(item.shareId,!active);if(!answer.ok){const text=loginMessage(answer);if(voteBlocked(answer))setVoteNote(voteNote,text);else message(text);return;}item.stats=answer.stats;render();if(kind==='favorite'&&!active)message('즐겨찾기에 넣었어요. 주인이 공개를 끄면 목록에서 사라져요.');};return b;
  }
  // #678 후속·#1098 1단계: 반응은 ♡(공감) 하나를 크게 기본으로 보이고, 길게 누르면 7종 칩이 그 자리에서
  // 펼쳐진다 — 예전 '반응 남기기' 펼침 규칙(host를 칩들로 갈아끼우기)을 그대로 재사용한다. 펼침은
@@ -327,6 +370,7 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
    };
   const status=el('p','community-preview-message','');status.dataset.communityPreviewMessage='';status.setAttribute('role','status');
   const choices=el('div','community-preview-choices');choices.append(open,start);
+   const startHelp=el('p','community-preview-start-help','이 트리를 복사하지 않고 같은 주제로 내 트리를 새로 만들어요.');
   // #1098 1단계: 댓글을 판 아래 바로 — 최근 3개 + '댓글 모두 보기'(⋯ 메뉴에는 신고·차단만 남는다).
   const commentSection=el('section','community-preview-comments');commentSection.setAttribute('aria-label','댓글');
   const commentHeading=el('h4','community-menu-title','댓글'),commentHost=el('div','community-comment-host');
@@ -335,7 +379,7 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
   const momentSection=el('section','community-moment-list');momentSection.setAttribute('aria-label','순간 목록');momentSection.hidden=true;
   const momentHeading=el('h4','community-menu-title','순간 목록'),momentHost=el('div','community-moment-host');
   momentSection.append(momentHeading,momentHost);
-  body.append(title,subject,moment);if(summary)body.append(summary);body.append(meta,actions,commentSection,momentSection,choices,moreMenu(item),status);
+  body.append(title,subject,moment);if(summary)body.append(summary);body.append(meta,actions,commentSection,momentSection,choices,startHelp,moreMenu(item),status);
   preview.replaceChildren(head,renderCover(item,{loading:'eager'}),body);
   // 순간 목록은 판을 그릴 때 한 번 — 응답이 늦게 와도 다시 그리기(렌더 토큰)로 오래된 표시가 남지 않게 한다.
   mountMomentList({section:momentSection,host:momentHost,api,shareId:item.shareId,when,countLabel:smallCountLabel});
@@ -400,7 +444,7 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
    if(momentsPanel)momentsPanel.hidden=!momentsOn;
    if(moments)momentsOn?moments.activate():moments.deactivate();
    topRow.classList.toggle('is-moments',momentsOn);
-   if(momentsOn){form.classList.remove('is-expanded');searchTrigger.setAttribute('aria-expanded','false');}
+   if(momentsOn)closeSort();
    if(syncHash&&hashNow()!==(momentsOn?'#explore/moments':'#explore'))writeHash(momentsOn?'#explore/moments':'#explore');
   }
   treeTab?.addEventListener('click',()=>selectTab('trees'));
@@ -450,7 +494,15 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
   opts.forEach((opt,i)=>opt.setAttribute('aria-selected',String(i===suggestActive)));
   query.setAttribute('aria-activedescendant',`community-suggest-option-${suggestActive}`);
  };
- query.addEventListener('input',updateSuggest);
+ let searchTimer=null;
+ const scheduleSearch=()=>{
+  clearTimeout(searchTimer);
+  searchClear.hidden=!query.value;
+  searchTimer=setTimeout(()=>{hideSuggest();load(false);},320);
+ };
+ searchClear.hidden=!query.value;
+ searchClear.onclick=()=>{clearTimeout(searchTimer);query.value='';hideSuggest();searchClear.hidden=true;load(false);query.focus();};
+ query.addEventListener('input',()=>{updateSuggest();scheduleSearch();});
  query.addEventListener('keydown',event=>{
   if(suggestions.hidden)return;
   if(event.key==='ArrowDown'){event.preventDefault();suggestMove(1);}
@@ -460,7 +512,7 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
  });
  query.setAttribute('aria-expanded','false');
  form.append(suggestions);
- form.onsubmit=event=>{event.preventDefault();hideSuggest();load(false);};more.onclick=()=>load(true);dialog.querySelector('[data-close="community-panel"]').onclick=()=>dialog.close();
+ form.onsubmit=event=>{event.preventDefault();clearTimeout(searchTimer);hideSuggest();load(false);};more.onclick=()=>load(true);dialog.querySelector('[data-close="community-panel"]').onclick=()=>dialog.close();
  // #784 그룹 찾기 창. 미리보기·둘러보기 판과 같은 <dialog showModal> 한 벌을 쓴다.
  const findDialog=el('dialog','community-group-find');findDialog.id='community-group-find';
  const findHead=el('div','community-group-find-head'),findClose=el('button','community-group-find-close','×');
