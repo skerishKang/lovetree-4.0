@@ -396,6 +396,22 @@ test('#1096 지도 잇기 — 끔 끌기 0회, 켬 옮기기·잇기·끊기 각
     assert.equal(await frame.evaluate(() => window.__lt.sheet().open), false, '끈 상태에서는 선택 창이 뜨지 않는다');
 
     // ② 잇기 켜기 — 공통 도구 줄의 단추다.
+    const initialConnectHit = await frame.evaluate(() => {
+      const button = document.getElementById('connectToggle');
+      const rect = button.getBoundingClientRect();
+      const point = {x: rect.left + rect.width / 2, y: rect.top + rect.height / 2};
+      const hit = document.elementFromPoint(point.x, point.y);
+      const bars = [...document.querySelectorAll('.lt-screen-toolbar')].map((bar, i) => {
+        const r = bar.getBoundingClientRect();
+        return {index:i, top:r.top, left:r.left, right:r.right, bottom:r.bottom,
+          contains:bar.contains(button), display:getComputedStyle(bar).display};
+      });
+      return {button: {left:rect.left, right:rect.right, top:rect.top, bottom:rect.bottom,
+        hidden:button.hidden, parent:button.parentElement?.className},
+        hit:hit?.id || hit?.className || hit?.tagName, actual:hit === button || button.contains(hit), bars};
+    });
+    assert.equal(initialConnectHit.actual, true,
+      '? ?? ?? ??? ?? ??? ?? ?? ?? ???? ???: ' + JSON.stringify(initialConnectHit));
     await frame.click('#connectToggle');
     assert.equal(await frame.evaluate(() => window.__lt.connect().mode), true, '잇기가 켜진다');
     const bar = await frame.evaluate(() => {
