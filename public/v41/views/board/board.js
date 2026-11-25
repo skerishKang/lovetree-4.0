@@ -1052,6 +1052,12 @@ function boardStartView() {
     }
   }
 }
+// 상세 창과 함께 판 표시 폭이 달라질 때 실제 카드 전체 범위를 다시 맞춘다.
+if (typeof ResizeObserver === 'function') {
+  new ResizeObserver(() => {
+    if (innerWidth >= 1200 && moments.length === 8 && viewMode === 'start' && $('#detail').classList.contains('open')) boardStartView();
+  }).observe(viewport);
+}
 // 전체 보기: 순간이 있는 곳 전부를 보이는 칸에 맞춘다(최대 0.92배). 순간이 없으면 무대 전체.
 // #856의 '제목 자리 함께 재기'는 판 제목이 무대 밖 머리글로 나가면서(#891 CTO) 필요 없어졌다 —
 // 제목은 판(#viewport) 바깥에 있고 판은 제목 아래끝 + 16px부터 시작하므로 카드가 제목에 닿거나 잘릴 수 없다.
@@ -1253,8 +1259,7 @@ function selectMoment(id, open = true) {
         ? ins.map(c => _row(c, 'prev')).join('<br><br>')
         : '아직 다음 순간이 없어요';
     $('#detail').classList.add('open');
-    // 상세 창으로 보드 표시 폭이 줄어든 경우에도 여덟 순간 모두 프레임 안에 놓는다.
-    if (innerWidth >= 1200 && moments.length === 8 && viewMode === 'start') boardStartView();
+    // 상세 창의 판 폭 변화는 아래 ResizeObserver에서 실제 크기로 다시 맞춘다.
   }
 }
 
