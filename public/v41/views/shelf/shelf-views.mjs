@@ -2,6 +2,7 @@
 // 데이터·카드 마크업·저장·메시지·주소·읽기 화면은 shelf.js(공용)에 그대로 둔다.
 // 2026-11-25: 기존 분기를 값·조건·문구 변경 없이 옮긴다(겉모습 변화 0).
 import { shelfRowLayout, shelfRotationLayout } from './shelf-model.mjs';
+import { MSG } from '../../frame-messages.mjs';
 
 // 셸의 값 목록을 그대로 쓴다(화면에서 새로 만들지 않는다). 시험이 이름만 바꿔 같은 검사를 돈다.
 export { SHELF_VIEWS as SHELF_VIEW_NAMES } from '../../domain.mjs';
@@ -29,10 +30,10 @@ function decorate(ctx, grid) {
   var list = ctx.books(), railWidth = ctx.railWidth();
   if (list.length > 0 && list.length < 4 && railWidth >= 1200) {
     var row = shelfRowLayout(list.length, railWidth);
-    for (var slot = list.length; slot < 4; slot += 1) {
-      var at = grid ? '' : ' style="--x:' + row.xOf(slot) + 'px"';
-      rail.insertAdjacentHTML('beforeend', '<div class="shelf-empty-slot" aria-hidden="true"' + at + '><span>새 트리 자리</span></div>');
-    }
+    var at = grid ? '' : ' style="--x:' + row.xOf(list.length) + 'px"';
+    rail.insertAdjacentHTML('beforeend', '<button type="button" class="shelf-empty-slot"' + at + '><span>＋ 새 트리</span></button>');
+    var slot = rail.querySelector ? rail.querySelector('.shelf-empty-slot') : null;
+    if (slot) slot.onclick = function () { try { parent.postMessage({ type: MSG.newTree }, location.origin); } catch (e) {} };
   }
 }
 
@@ -54,6 +55,8 @@ function bindRail(ctx, policy) {
     }
   }
   function onDown(event) {
+    // 빈 칸은 단추다 — 레일이 포인터를 붙잡아 클릭을 삼키지 않게 여기서 걷어낸다.
+    if (event.target.closest && event.target.closest('.shelf-empty-slot')) return;
     if (event.target.closest('[data-manage-id]')) return;
     var card = event.target.closest('.book-card');
     lpFired = false;
