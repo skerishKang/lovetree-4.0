@@ -1,3 +1,4 @@
+import {createHomeHistory} from './home-history.mjs';
 import { MSG, isShellMessage } from '../public/v41/frame-messages.mjs';
 // #586: 첫 화면 문서는 src/styles.css 를 읽지 않는다(vite가 styles-*.css link를 주입해 궤도 그림자의
 // 스타일 재계산이 프레임당 수십 ms가 걸렸다). 그림자가 쓰는 --ui 토큰은 v41/home.html 의 style에 둔다.
@@ -62,6 +63,8 @@ setHomePortrait(homeMomentChoice.moment);
 const renderedDateStyle=dateStyleOf(ltDateStyle());
 // #481: 이 문서가 그릴 때 쓴 제목 보기. 받은 값이 이것과 다를 때만 다시 띄운다.
 const renderedTitleDisplay=titleDisplayOf(readTitleDisplay(parent.LT41));
+ const homeHistory=createHomeHistory(document.getElementById('orbit'));
+ window.LTHomeHistory=homeHistory;
  const orbit=mountOrbit(document.getElementById('orbit'),{
  trees:cardTrees,examples:cardsPlan.examples?ORBIT_EXAMPLE.moments.slice(0,cardsPlan.examples):[],
  // 내 것만 0장은 예시로 대체하지 않고 빈 궤도와 첫 순간 안내를 남긴다.
@@ -101,6 +104,7 @@ function closeHomeViewer(){
  if(!viewer.classList.contains('open'))return;
  viewerSequence++;viewerSignal.abort();viewer.querySelector('iframe')?.remove();
  viewer.classList.remove('open');viewer.setAttribute('aria-hidden','true');
+ homeHistory.dismiss('viewer');
  try{parent.postMessage({type:MSG.viewer,open:false},location.origin)}catch{}
  vEl('mediaImageHome').hidden=true;vEl('mediaMemoHome').hidden=true;
  viewerOpener?.focus?.();viewerOpener=null;
@@ -147,6 +151,7 @@ function openHomeViewer(moment,opener=null){
   },{signal:viewerSignal.signal});
  }
  viewer.classList.add('open');viewer.setAttribute('aria-hidden','false');
+ homeHistory.open('viewer',closeHomeViewer);
  try{parent.postMessage({type:MSG.viewer,open:true},location.origin)}catch{}
  vEl('mediaCloseHome').focus();
 }
