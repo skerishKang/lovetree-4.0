@@ -333,3 +333,10 @@ export function createProxy({ fetcher = (...args) => fetch(...args), timeoutMs =
 
 // 프록시가 넘기는 전체 경로 — 서버 진입 분기 표 검사에서 쓴다(#1047). 값은 그대로 두고 읽기용으로만 내보낸다.
 export const ALLOWED_PATHS = ALLOWED;
+
+// #1250: Pages Functions가 서버를 직접 부를 때도 프록시와 같은 출처 확인 머리말을 붙인다.
+// (사이트맵·공유 미리보기는 프록시를 거치지 않고 서버를 부르므로, 빠지면 서버가 '머리말 없음'으로 기록하고 막기 모드에서 거절한다.)
+export function proxyProofHeaders(env) {
+  const proof = typeof env?.LOVETREE_PROXY_SECRET === 'string' ? env.LOVETREE_PROXY_SECRET.trim() : '';
+  return proof ? { 'x-lovetree-proxy-proof': proof } : {};
+}

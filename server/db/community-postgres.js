@@ -1,7 +1,7 @@
 import { countedVoterSql, rankingOwnerSql } from './ranking-policy-sql.js';
 
 const iso=value=>value instanceof Date?value.toISOString():value?String(value):null;
-const shareRow=value=>value&&({shareId:value.share_id,subjectId:value.subject_id,treeId:value.tree_id,entryMomentId:value.entry_moment_id,view:value.initial_view,status:value.status,createdAt:iso(value.created_at)});
+const shareRow=value=>value&&({shareId:value.share_id,subjectId:value.subject_id,treeId:value.tree_id,entryMomentId:value.entry_moment_id,view:value.initial_view,status:value.status,momentCount:Number(value.moment_count)||0,createdAt:iso(value.created_at)});
 // #1098 2단계: 대상 칸(target_kind·moment_id)을 함께 내려준다. 기존 행(트리 단위)은 'tree'·빈 값이다.
 const commentRow=value=>value&&({id:value.comment_id,shareId:value.share_id,subjectId:value.subject_id,body:value.body,status:value.status,targetKind:value.target_kind||'tree',momentId:value.moment_id||'',createdAt:iso(value.created_at),updatedAt:iso(value.updated_at),editedAt:value.edited_at?iso(value.edited_at):null});
 const reportRow=value=>value&&({id:value.report_id,shareId:value.share_id,reporterSubjectId:value.reporter_subject_id,reason:value.reason,status:value.status,commentId:value.comment_id||null,createdAt:iso(value.created_at),resolvedAt:iso(value.resolved_at),hidden:value.is_hidden===true||value.hidden===true});
@@ -141,7 +141,7 @@ export function createCommunityRepo(pool, { hasRealCustomers = false } = {}){
   // 트리당 한 행(auto 우선)만 고른다. 2026-11-16 대표 결정: 소개 켜짐 + 순간 3개 이상만 훑는다
   // (둘러보기 목록과 같은 조건 — 꺼둔 트리의 순간은 다른 팬 보기에도 나오지 않는다).
   // 공개 판정은 공유 읽기 경로(read())와 같게 active+비공개만 본다. 차단은 양방향(isBlocked과 같게)으로 뺀다.
-  async listPublicTagShares({productId,viewerSubjectId=null,limit=400}){
+  async listPublicTagShares({productId,viewerSubjectId=null,limit=400,treeShareId=null}){
    const {rows}=await pool.query(
     `WITH picked AS (
        SELECT DISTINCT ON (s.subject_id,s.tree_id) s.*
@@ -169,8 +169,12 @@ export function createCommunityRepo(pool, { hasRealCustomers = false } = {}){
            AND ((b.blocker_subject_id=$2 AND b.blocked_subject_id=s.subject_id)
              OR (b.blocker_subject_id=s.subject_id AND b.blocked_subject_id=$2))
        ))
+       AND ($4::text IS NULL OR EXISTS (
+         SELECT 1 FROM lovetree_shares t
+         WHERE t.product_id=s.product_id AND t.share_id=$4 AND t.subject_id=s.subject_id AND t.tree_id=s.tree_id
+       ))
      ORDER BY s.created_at DESC,s.share_id DESC LIMIT $3`,
-    [productId,viewerSubjectId,limit]
+    [productId,viewerSubjectId,limit,treeShareId]
    );
    return rows.map(shareRow);
   },

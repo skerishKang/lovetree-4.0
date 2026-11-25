@@ -7,8 +7,24 @@ const DEMO_VIDEO='data:video/mp4;base64,AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMW1w
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 /* #519: 닫힌 창(opacity 0) 안의 입력칸이 Tab 초점을 받던 문제 — open일 때만 inert를 뺀다.
    책의 닫힌 창(상세·크게 보기·링크·갈림길·목차·이어진 순간)은 처음부터 inert다. */
+// #1291: 창과 판 열기, 목록에서 이동은 방문 기록을 한 번만 남긴다.
+let bookHistoryRestoring=false,bookHistoryTransferring=false;
+try{history.scrollRestoration='manual'}catch{}
+const bookState=()=>({...(history.state||{}),ltBookPage:current,ltBookMoment:LTDEMO.get()||null,ltBookScrollY:window.scrollY,ltBookInnerScroll:['mobileContent','leftPage','rightPage','detailSide'].map(id=>document.getElementById(id)?.scrollTop||0)});
+function recordBookOpen(id){
+ if(bookHistoryRestoring||bookHistoryTransferring||history.state?.ltBookOverlay===id)return;
+ if(!history.state?.ltBookOverlay)history.replaceState(bookState(),'',location.href);
+ history.pushState({...bookState(),ltBookOverlay:id},'',location.href);
+}
+function closeBookHistory(id){
+ if(!bookHistoryRestoring&&!bookHistoryTransferring&&history.state?.ltBookOverlay===id)history.back();
+}
+function completeBookJump(id,page){
+ const state={...history.state,ltBookOverlay:null,ltBookMoment:id,ltBookPage:page,ltBookScrollY:window.scrollY};
+ history.replaceState(state,'',location.href);
+}
 const bookDialogs=[]; /* 열린 창 스택 — Esc는 맨 위 창 하나만 닫는다(공통 창 닫기 규칙과 같은 방식). */
-function setBookOpen(el, open){if(!el)return;el.classList.toggle('open',!!open);const i=bookDialogs.indexOf(el);if(i>=0)bookDialogs.splice(i,1);if(open){el.removeAttribute('inert');bookDialogs.push(el)}else el.setAttribute('inert','')}
+function setBookOpen(el, open){if(!el)return;if(open&&!el.classList.contains('open'))recordBookOpen(el.id);if(!open&&el.classList.contains('open'))closeBookHistory(el.id);el.classList.toggle('open',!!open);if(el.id==='viewer'&&!open)$('#viewerMedia')?.replaceChildren();const i=bookDialogs.indexOf(el);if(i>=0)bookDialogs.splice(i,1);if(open){el.removeAttribute('inert');bookDialogs.push(el)}else el.setAttribute('inert','')}
 const topBookDialog=()=>bookDialogs[bookDialogs.length-1]||null;
 const bookWrap=$('#bookWrap'),book=$('#book'),leftPage=$('#leftPage'),rightPage=$('#rightPage'),mobilePage=$('#mobilePage'),mobileContent=$('#mobileContent');
 let current=0,recent=[],lastMoment=null,selectedMomentId=null,lensOn=true,machineState='IDLE',turn=null,turnAnim=null,focusAfter=null;
@@ -27,15 +43,115 @@ window.setPageTurnMode=setPageTurnMode;
    읽지 못하면 기본값(컴퓨터 두 장·좁은 화면 한 장)으로 동작한다. 폰 폭(600px 미만)에서는 두 장을 쓰지 않는다. */
 const VIEW_KEY='lt41-book-view';
 function storedView(){try{const v=localStorage.getItem(VIEW_KEY);return v==='single'||v==='double'?v:null}catch{return null}}
-function defaultView(){return innerWidth<=820?'single':'double'}
+/* #1358: 셸이 화면을 드러내기 전에는 안쪽 폭이 0이라 기본 보기가 한 장으로 잡힌다.
+   부모 창 폭을 대신 보면 첫 그리기에서 최종 쪽 수가 정해진다. */
+function layoutWidth(){return innerWidth>0?innerWidth:(()=>{try{return parent!==window?parent.innerWidth:0}catch{return 0}})()}
+function defaultView(){const w=layoutWidth();return w>0&&w<=820?'single':'double'}
 let viewChoice=storedView();
 /* #537: 폰 폭(600px 미만)은 화면 모양이 휴대폰(스크롤 흐름)이고, 넓은 화면의 한 장은 두 장 책의 한 쪽을 크게 보여 준다. */
 function narrow(){return innerWidth<600}
-function single(){return narrow()||(viewChoice??defaultView())==='single'}
-function applyViewAttr(){document.documentElement.dataset.bookView=single()?'single':'double';document.documentElement.dataset.bookShape=narrow()?'phone':'wide';syncViewButtons()}
-function syncViewButtons(){const s=single();const one=$('#singleViewBtn'),two=$('#doubleViewBtn');if(one)one.setAttribute('aria-pressed',String(s));if(two)two.setAttribute('aria-pressed',String(!s));if(two)two.hidden=narrow()}
-/* #537 9: 보기를 바꿔도 보던 순간을 그대로 둔다 — 두 장의 오른쪽 순간이면 한 장에서 그 순간, 한 장의 순간이면 그 순간이 든 묶음. */
-function setViewChoice(v){if(machineState!=='IDLE'){/* 넘기는 동안에는 모드를 바꾸지 않는다 — 잠깐 뒤 다시 시도한다. */setTimeout(()=>setViewChoice(v),120);return}const focus=LTDEMO.get()||'';viewChoice=v;try{localStorage.setItem(VIEW_KEY,v)}catch{}applyViewAttr();renderSpread(posOfMoment(focus),focus||null,false)}
+function phoneSession(){try{if(parent!==window)return Math.min(parent.innerWidth,parent.innerHeight)<600}catch{}return narrow()||(matchMedia('(pointer:coarse)').matches&&Math.min(screen.width,screen.height)<600)}
+let mobileDoubleActive=false;
+let mobileSpreadHistory=false;
+function single(){return phoneSession()?!mobileDoubleActive:(viewChoice??defaultView())==='single'}
+function applyViewAttr(){
+ document.documentElement.dataset.bookView=single()?'single':'double';
+ document.documentElement.dataset.bookShape=phoneSession()&&!mobileDoubleActive?'phone':'wide';
+ document.documentElement.classList.toggle('book-mobile-spread',mobileDoubleActive);
+ syncViewButtons();
+}
+function syncViewButtons(){
+ const s=single(),one=$('#singleViewBtn'),two=$('#doubleViewBtn');
+ if(one)one.setAttribute('aria-pressed',String(s));
+ if(two){two.setAttribute('aria-pressed',String(!s));two.hidden=false;two.disabled=false;two.setAttribute('aria-label','2장 — 펼친 책처럼 두 쪽 보기')}
+}
+function mobileSpreadExitControl(){
+ let control=document.getElementById('mobile-spread-exit');
+ if(!control){
+  control=document.createElement('button');
+  control.id='mobile-spread-exit';control.type='button';control.textContent='1장';
+  control.setAttribute('aria-label','한 장 보기로 돌아가기');
+  control.addEventListener('click',()=>setViewChoice('single'));
+  bookWrap.append(control);
+ }
+ control.hidden=!mobileDoubleActive;
+}
+function spreadOrientationNotice(show){
+ let hint=document.getElementById('book-rotate-hint');
+ if(!hint){hint=document.createElement('div');hint.id='book-rotate-hint';hint.setAttribute('role','status');hint.textContent='휴대폰을 가로로 돌려 주세요';bookWrap.append(hint)}
+ hint.hidden=!show;
+}
+function finishMobileSpread(){
+ if(!mobileDoubleActive)return;
+ mobileDoubleActive=false;
+ mobileSpreadExitControl();
+ spreadOrientationNotice(false);
+ try{screen.orientation?.unlock?.()}catch{}
+ if(document.fullscreenElement===bookWrap)document.exitFullscreen?.().catch(()=>{});
+ applyViewAttr();const focus=LTDEMO.get()||null;renderSpread(posOfMoment(focus),focus,false);
+}
+async function beginMobileSpread(){
+ if(mobileDoubleActive)return;
+ mobileDoubleActive=true;
+ mobileSpreadExitControl();
+ if(!mobileSpreadHistory){
+  history.pushState({...history.state,ltBookSpread:true},'',location.href);
+  mobileSpreadHistory=true;
+ }
+ applyViewAttr();const focus=LTDEMO.get()||null;renderSpread(posOfMoment(focus),focus,false);
+ try{await bookWrap.requestFullscreen?.()}catch{}
+ try{await screen.orientation?.lock?.('landscape')}catch{}
+ spreadOrientationNotice(innerWidth<innerHeight);
+}
+window.addEventListener('popstate',event=>{if(mobileDoubleActive&&!event.state?.ltBookSpread){mobileSpreadHistory=false;finishMobileSpread()}});
+window.addEventListener('popstate',event=>{
+ const target=event.state?.ltBookOverlay||null;
+ bookHistoryRestoring=true;
+ try{
+  for(const id of ['viewer','detail','branchModal']){
+   const panel=$('#'+id);
+   if(panel?.classList.contains('open')&&target!==id){
+    if(id==='branchModal')closeBranch();
+    else setBookOpen(panel,false);
+   }
+  }
+  if($('#archivePanel')?.classList.contains('open')&&target!=='archivePanel')closeArchive();
+  if($('#overview')?.classList.contains('open')&&target!=='overview')window.__BOOK_USABILITY__?.closeJourney?.();
+  if(target!=='lightbox'&&document.querySelector('.lt-lightbox'))LTMedia.closeLightbox();
+  if(!['detailSide','viewer','lightbox'].includes(target)&&(document.querySelector('.page-detail')||($('#detailSide')&&!$('#detailSide').hidden)))window.__BOOK_USABILITY__?.closeDetail?.();
+  const state=event.state||{};
+  if(Number.isInteger(state.ltBookPage)&&state.ltBookMoment&&
+     (state.ltBookPage!==current||state.ltBookMoment!==LTDEMO.get())){
+   renderSpread(posOfMoment(state.ltBookMoment),state.ltBookMoment,false);
+  }
+  if(Number.isFinite(state.ltBookScrollY))window.scrollTo(0,state.ltBookScrollY);
+  if(Array.isArray(state.ltBookInnerScroll))['mobileContent','leftPage','rightPage','detailSide'].forEach((id,i)=>{const el=document.getElementById(id);if(el&&Number.isFinite(state.ltBookInnerScroll[i])){el.scrollTop=state.ltBookInnerScroll[i];requestAnimationFrame(()=>{if(history.state===event.state)el.scrollTop=state.ltBookInnerScroll[i]})}});
+ }finally{bookHistoryRestoring=false}
+});
+
+document.addEventListener('lt-media-lightbox-open',()=>recordBookOpen('lightbox'));
+document.addEventListener('lt-media-lightbox-close',()=>closeBookHistory('lightbox'));
+// #1287: book scrolling temporarily reduces the parent's floating add button.
+let bookScrollIdle;
+document.addEventListener('scroll',()=>{
+ if(!phoneSession())return;
+ try{parent.document.body.classList.add('lt-book-scrolling')}catch{return}
+ clearTimeout(bookScrollIdle);
+ bookScrollIdle=setTimeout(()=>{try{parent.document.body.classList.remove('lt-book-scrolling')}catch{}},180);
+},true);
+window.addEventListener('pagehide',()=>{clearTimeout(bookScrollIdle);try{parent.document.body.classList.remove('lt-book-scrolling')}catch{}});
+
+function setViewChoice(v){
+ if(machineState!=='IDLE'){setTimeout(()=>setViewChoice(v),120);return}
+ if(phoneSession()){
+  if(v==='double'){beginMobileSpread();return}
+  if(mobileDoubleActive){if(mobileSpreadHistory){history.back()}else finishMobileSpread();return}
+  return;
+ }
+ const focus=LTDEMO.get()||'';
+ viewChoice=v;try{localStorage.setItem(VIEW_KEY,v)}catch{}
+ applyViewAttr();renderSpread(posOfMoment(focus),focus||null,false);
+}
 const allMoments=()=>SPREADS.flatMap((s,i)=>[{...s.left,spread:i,side:'left'},{...s.right,spread:i,side:'right'}]).filter(m=>!m.synthetic);
 const esc=globalThis.LTEscapeHtml; // A-15: 글자 막기 정본(html-escape.js) 한 벌
 function titleMainOf(m){try{const v=window.LTBookTitle?.view?.(m);return v?.main||m?.title||''}catch{return m?.title||''}}
@@ -183,7 +299,24 @@ function isYouTubeUrl(raw){return !!youtubeId(raw)}
 
 /* Index */
 function renderArchive(){const all=allMoments();$('#archiveList').innerHTML=all.map(m=>{const at=posOfMoment(m.id);return `<button class="archive-item ${at===current?'current':''}" data-jump="${at}" data-focus="${m.id}"><b>${pad2(at+1)} · ${esc(titleMainOf(m))}</b><small>${esc(LTLabels.type(m.kind))} · ${esc(m.emotion)} · ${esc(m.source)}</small></button>`}).join('');$('#pathViz').innerHTML=SPREADS.map((s,i)=>`${i?'<span class="path-line"></span>':''}<span class="path-dot ${spreadOfPos(current)===i?'current':''}" title="${esc(s.left.title)}"></span>`).join('');$('#recentList').innerHTML=[...recent].reverse().map(id=>metadataFor(id)).filter(Boolean).map(m=>`<button class="archive-item" data-jump="${posOfMoment(m.id)}" data-focus="${esc(m.id)}"><b>${posOfMoment(m.id)+1}</b><small>${esc(titleMainOf(m))}</small></button>`).join('')}
-let archiveOpener=null;function closeArchive(){const panel=$('#archivePanel');panel.classList.remove('open');panel.inert=true;$('#archiveBtn').setAttribute('aria-expanded','false');archiveOpener?.focus()}function openArchive(){archiveOpener=document.activeElement;renderArchive();const panel=$('#archivePanel');panel.inert=false;panel.classList.add('open');$('#archiveBtn').setAttribute('aria-expanded','true');$('#archiveClose').focus()}$('#archiveBtn').setAttribute('aria-expanded','false');$('#archiveBtn').setAttribute('aria-controls','archivePanel');$('#archiveBtn').onclick=openArchive;$('#archiveClose').onclick=closeArchive;$('#archivePanel').addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();closeArchive()}});$('#archivePanel').addEventListener('click',e=>{const b=e.target.closest('[data-jump]');if(!b)return;const target=+b.dataset.jump,focus=b.dataset.focus||(momentAtPos(target)?.id||'');closeArchive();if(target===current){renderSpread(current,focus,false)}else autoTurn(target>current?'next':'prev',target,focus)});$('#detailIndexBtn').onclick=()=>{setBookOpen($('#detail'),false);openArchive()};
+let archiveOpener=null,archiveByDisplay=false;
+function paintInlineBookDisplay(mode){
+ const toggle=$('#book-display-inline');
+ toggle?.querySelectorAll('[data-book-display]').forEach(b=>b.setAttribute('aria-checked',String(b.dataset.bookDisplay===mode)));
+}
+function closeArchive(){if(archiveByDisplay){
+ archiveByDisplay=false;
+ paintInlineBookDisplay('book');
+ try{localStorage.setItem('lt41.bookDisplay','book')}catch{}
+ try{parent.postMessage({type:globalThis.LT41_MSG.prefs,patch:{bookDisplay:'book'}},location.origin)}catch{}
+ }
+const panel=$('#archivePanel');if(panel.classList.contains('open'))closeBookHistory(panel.id);panel.classList.remove('open');panel.inert=true;$('#archiveBtn').setAttribute('aria-expanded','false');archiveOpener?.focus()}function openArchive(){archiveOpener=document.activeElement;renderArchive();const panel=$('#archivePanel');if(!panel.classList.contains('open'))recordBookOpen(panel.id);panel.inert=false;panel.classList.add('open');$('#archiveBtn').setAttribute('aria-expanded','true');$('#archiveClose').focus()}$('#archiveBtn').setAttribute('aria-expanded','false');$('#archiveBtn').setAttribute('aria-controls','archivePanel');$('#archiveBtn').onclick=openArchive;$('#book-display-inline')?.addEventListener('click',e=>{
+ const choice=e.target.closest('[data-book-display]')?.dataset.bookDisplay;
+ if(!choice)return;
+ paintInlineBookDisplay(choice);
+ if(choice==='list'){archiveByDisplay=true;openArchive()}
+ else if($('#archivePanel').classList.contains('open'))closeArchive();
+});$('#archiveClose').onclick=closeArchive;$('#archivePanel').addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();closeArchive()}});$('#archivePanel').addEventListener('click',e=>{const b=e.target.closest('[data-jump]');if(!b)return;const target=+b.dataset.jump,focus=b.dataset.focus||(momentAtPos(target)?.id||'');bookHistoryTransferring=true;try{closeArchive();completeBookJump(focus,target)}finally{bookHistoryTransferring=false}if(target===current){renderSpread(current,focus,false)}else autoTurn(target>current?'next':'prev',target,focus)});$('#detailIndexBtn').onclick=()=>{bookHistoryTransferring=true;try{setBookOpen($('#detail'),false);history.replaceState({...history.state,ltBookOverlay:'archivePanel'},'',location.href);openArchive()}finally{bookHistoryTransferring=false}};
 /* Branch chooser */
 /* 갈림길 고르는 창 — 맨 위 창 하나만 닫고, 초점은 연 책갈피로 돌려 준다. */
 let branchOpener=null,branchTargets=[],branchCurrentId='',branchExpanded=false,branchQuery='';
@@ -199,7 +332,7 @@ $('#branchClose').onclick=closeBranch;
 $('#branchModal').addEventListener('click',e=>{if(e.target===$('#branchModal'))closeBranch()});
 $('#branchSearch').addEventListener('input',e=>{branchQuery=e.target.value;renderBranchChoices()});
 $('#branchMore').onclick=()=>{branchExpanded=true;renderBranchChoices();$('#branchChoices').scrollTop=0};
-$('#branchChoices').onclick=e=>{if(e.target.closest('#branchMore'))return;const b=e.target.closest('[data-branch-target]');if(!b)return;const t=+b.dataset.branchTarget;closeBranch();t===current?renderSpread(t,b.dataset.focus,false):autoTurn(t>current?'next':'prev',t,b.dataset.focus)};
+$('#branchChoices').onclick=e=>{if(e.target.closest('#branchMore'))return;const b=e.target.closest('[data-branch-target]');if(!b)return;const t=+b.dataset.branchTarget;bookHistoryTransferring=true;try{closeBranch();completeBookJump(b.dataset.focus,t)}finally{bookHistoryTransferring=false}t===current?renderSpread(t,b.dataset.focus,false):autoTurn(t>current?'next':'prev',t,b.dataset.focus)};
 document.addEventListener('keydown',e=>{if(e.key!=='Escape'||topBookDialog()!==$('#branchModal'))return;e.preventDefault();e.stopPropagation();closeBranch()},true);
 $('#lensBtn').onclick=()=>{lensOn=!lensOn;$('#lensBtn').classList.toggle('active',lensOn);if(!lensOn)hideLens()};
 /* #642: 전체 화면 단추로도 resize 가 일어난다. 그때 renderSpread 가 장을 처음부터 다시 그려
@@ -211,7 +344,7 @@ $('#lensBtn').onclick=()=>{lensOn=!lensOn;$('#lensBtn').classList.toggle('active
 let fullscreenGuardUntil=0,fullscreenRecheck=0;
 document.addEventListener('fullscreenchange',()=>{fullscreenGuardUntil=Date.now()+800;clearTimeout(fullscreenRecheck);fullscreenRecheck=setTimeout(()=>{fullscreenGuardUntil=0;if(machineState==='IDLE'&&!document.fullscreenElement&&!playingInBook())renderSpread(current,null,false)},850)});
 const playingInBook=()=>book.querySelector('.yt-frame,.lt-yt-frame')||[...book.querySelectorAll('video.lt-user-video')].some(v=>!v.paused);
-window.addEventListener('resize',()=>{applyViewAttr();if(machineState!=='IDLE')return;if(document.fullscreenElement||Date.now()<fullscreenGuardUntil||playingInBook())return;renderSpread(current,null,false);setTimeout(syncLensClone,70)});
+window.addEventListener('resize',()=>{if(mobileDoubleActive)spreadOrientationNotice(innerWidth<innerHeight);applyViewAttr();if(machineState!=='IDLE')return;if(document.fullscreenElement||Date.now()<fullscreenGuardUntil||playingInBook())return;renderSpread(current,null,false);setTimeout(syncLensClone,70)});
 /* #393 4: 한 장/두 장 보기 단추 — 고른 값은 기억되고, 지금 보던 순간은 그대로 둔다. 첫 그림 전에 속성부터 정한다. */
 applyViewAttr();
 $('#singleViewBtn').onclick=()=>setViewChoice('single');

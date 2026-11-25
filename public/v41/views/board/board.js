@@ -347,6 +347,7 @@ function placeStacked() {
 // 날짜순·내 배치 모두 쌓기 배치다(순서만 다르다). 전환·처음 열기·창 크기 변경이 함께 쓴다.
 function placeAll() {
   placeStacked();
+  updateEmptyHint();
 }
 // #619-6: 끼워 넣기 — 끄는 동안 자리를 보이기 위해 끌고 있는 카드를 뺀 나머지 카드를 현재 순서로 다시 쌓은 자리다.
 function insertCells(excludeId) {
@@ -407,6 +408,7 @@ function commitInsert(id, index, { before = captureBoardOrderState(), snapshot: 
   else {
     placeAll();
     settlePlacedCards();
+    if (mobileBoardScroll()) applyView(false);
   }
   if (exampleBoard) {
     persistBoard();
@@ -449,13 +451,16 @@ function moveCardOrder(id, dir) {
   else {
     placeAll();
     settlePlacedCards();
+    if (mobileBoardScroll()) applyView(false);
   }
   persistBoard();
   return true;
 }
-function resetBoardOrder() {
+// 브라우저 기본 확인 창은 쓰지 않는다 — 공통 앱 안 확인 창이 없으면 취소로 처리한다.
+const askConfirm = (message) => (globalThis.LT41Confirm?.ask ? globalThis.LT41Confirm.ask(message) : Promise.resolve(false));
+async function resetBoardOrder() {
   if (!boardSaveEnabled()) return;
-  if (!window.confirm('내 배치를 처음대로 돌릴까요? 날짜순 배치로 돌아갑니다.')) return;
+  if (!await askConfirm('내 배치를 처음대로 돌릴까요? 날짜순으로 돌아갑니다.')) return;
   const before = captureBoardOrderState();
   const undoSnapshot = snapshot();
   momentOrder = LT58Model.dateDescOrder(moments).map(m => m.id);
@@ -733,7 +738,7 @@ function dateText(v) {
 function cardHTML(m) {
   let media = '';
   if (m.url)
-    media = LTMedia.markup(m.url, m.title, m.mediaMetadata, m.id, null, null, { compact: true });
+    media = LTMedia.markup(m.url, m.title, m.mediaMetadata, m.id, null, null, { compact: true, visitorYoutubeCover: true });
   else if (m.type === 'note') media = `<div class="noteText">“${esc(m.cardMemo || m.memo)}”</div>`;
   else if (m.type === 'video')
     media = `<div class="media"><video muted playsinline loop poster="${m.asset}" src="${m.video}"></video><span class="playBadge">▶</span><span class="duration">${m.duration || '00:03'}</span></div>`;
@@ -747,6 +752,7 @@ function renderCards() {
   cardLayer.innerHTML = moments.map(cardHTML).join('');
   cardLayer.querySelectorAll('.card').forEach(el => bindCard(el));
   settlePlacedCards();
+  if (typeof updateEmptyHint === 'function') updateEmptyHint();
   if (selected) selectMoment(selected, false);
 }
 
@@ -759,7 +765,9 @@ function settlePlacedCards() {
     .filter(m => els.has(m.id))
     .map(m => ({ id: m.id, x: m.x, y: m.y, h: reservedHeights.get(m.id) || BASE_RESERVED_H }));
   // #619-6: 카드 전부가 쌓기 배치라서 저장 자리가 따로 없고, 전부 열 안에서 벌림 대상이다.
-  const moved = LT58Model.settleColumnGaps(list, new Set(moments.map(m => m.id)), 24);
+  // #1273 8번: 휴대폰에서는 같은 열의 빈 틈을 조금 줄인다(예약 높이 330px 기준은 그대로).
+  const narrow = typeof matchMedia === 'function' && matchMedia('(max-width: 640px)').matches;
+  const moved = LT58Model.settleColumnGaps(list, new Set(moments.map(m => m.id)), narrow ? 16 : 24);
   let changed = false;
   for (const m of moments) {
     const y = moved.get(m.id);
@@ -771,8 +779,51 @@ function settlePlacedCards() {
   if (changed) rerenderThreads();
 }
 
+let mobileBoardBaseY = 0;
+function mobileBoardScroll() { return innerWidth < 700 && !cinema; }
+function mobileBoardBounds() {
+  const cards = boardCards();
+  if (!cards.length) return null;
+  return {
+    top: Math.min(...cards.map(c => c.y)),
+    bottom: Math.max(...cards.map(c => c.y + c.h)),
+    left: Math.min(...cards.map(c => c.x)),
+    right: Math.max(...cards.map(c => c.x + c.w))
+  };
+}
+function boardResizeMobile() {
+  placeAll();
+  const bounds = mobileBoardBounds();
+  if (bounds) view.x = viewport.clientWidth / 2 - (bounds.left + bounds.right) * view.z / 2;
+  applyView(false);
+}
+viewport.addEventListener('scroll', () => {
+  if (viewport.classList.contains('board-scroll')) view.y = mobileBoardBaseY - viewport.scrollTop;
+}, { passive: true });
 function applyView(animated = false) {
   growBoard();
+  updateEmptyHint();
+  const scroll = mobileBoardScroll();
+  const space = $('#boardScrollSpace');
+  viewport.classList.toggle('board-scroll', scroll);
+  viewport.classList.toggle('board-scroll-editing', scroll && boardMode === 'mine');
+  if (scroll) {
+    const bounds = mobileBoardBounds(), safe = boardSafeArea();
+    if (bounds) {
+      mobileBoardBaseY = safe.y - bounds.top * view.z;
+      if (viewMode === 'fit') mobileBoardBaseY = Math.max(mobileBoardBaseY, view.y);
+      // 실제 카드 끝을 지나 빈 판이 끝없이 이어지지 않도록 스크롤 길이를 정한다.
+      space.style.height = Math.max(viewport.clientHeight, Math.ceil(mobileBoardBaseY + bounds.bottom * view.z + (viewport.clientHeight - safe.y - safe.h) + 24)) + 'px';
+      world.classList.remove('lt-view-pan');
+      world.style.transform = `translate(${view.x}px,${mobileBoardBaseY}px) scale(${view.z})`;
+      viewport.scrollTop = Math.max(0, mobileBoardBaseY - view.y);
+      view.y = mobileBoardBaseY - viewport.scrollTop;
+      $('#zoomLabel').textContent = Math.round(view.z * 100) + '%';
+      return;
+    }
+  }
+  space.style.height = '';
+  viewport.scrollTop = 0;
   world.classList.toggle('lt-view-pan', animated);
   world.style.transform = `translate(${view.x}px,${view.y}px) scale(${view.z})`;
   $('#zoomLabel').textContent = Math.round(view.z * 100) + '%';
@@ -803,6 +854,38 @@ function boardCards() {
     return { id: m.id, x: m.x, y: m.y, w: el?.offsetWidth || 242, h: el?.offsetHeight || 260 };
   });
 }
+// #1321: 카드 묶음 아래 빈 판이 240px 이상일 때만 점선 자리를 보여 준다.
+// 판 높이는 그대로 두고, 자리 표시는 얹기만 한다. 쓰기 가능·넓은 화면·시네마 밖에서만 쓴다.
+function updateEmptyHint() {
+  // 카드를 다시 그리면 안내도 함께 지워진다 — 그릴 때마다 다시 붙인다.
+  let emptyHint = document.getElementById('boardEmptyHint');
+  if (!emptyHint) {
+    emptyHint = document.createElement('div');
+    emptyHint.id = 'boardEmptyHint';
+    emptyHint.className = 'board-empty-hint';
+    emptyHint.setAttribute('aria-hidden', 'true');
+    emptyHint.innerHTML = '<span>순간을 끌어 여기에 놓아 보세요</span>';
+    emptyHint.hidden = true;
+    cardLayer.appendChild(emptyHint);
+  }
+  if (!boardSaveEnabled() || mobileBoardScroll() || cinema || !moments.length) {
+    emptyHint.hidden = true;
+    return;
+  }
+  const cards = boardCards();
+  if (!cards.length) { emptyHint.hidden = true; return; }
+  const left = Math.min(...cards.map((c) => c.x));
+  const right = Math.max(...cards.map((c) => c.x + c.w));
+  const bottom = Math.max(...cards.map((c) => c.y + c.h));
+  // 무대 안쪽 여백 48px는 CSS의 .surface inset과 같은 값이다(새 상수를 만들지 않는다).
+  const free = worldSize.h - 48 - bottom - 24;
+  if (free < 240) { emptyHint.hidden = true; return; }
+  emptyHint.hidden = false;
+  emptyHint.style.left = left + 'px';
+  emptyHint.style.top = bottom + 24 + 'px';
+  emptyHint.style.width = Math.max(520, right - left) + 'px';
+  emptyHint.style.height = Math.min(free, 320) + 'px';
+}
 // 보이는 칸: 왼쪽 도구 창·오른쪽 상세 창(열려 있거나 곧 열릴 때)을 뺀 자리. 좁은 화면(760 미만)은 두 창이 아래에서 올라오므로 빼지 않는다.
 function boardSafeArea(expectDetail = false) {
   let vw = viewport.clientWidth,
@@ -829,8 +912,9 @@ function boardSafeArea(expectDetail = false) {
       const r = pk.getBoundingClientRect();
       if (r.width) top = Math.max(top, r.bottom - vr.top + 12);
     }
+    // 이어 보기가 공통 도구 줄로 옮겨가면 더 이상 판 위에 떠 있지 않다 — 판 아래 여백을 차지하지 않는다.
     const cb = $('.cinemaBtn');
-    if (cb) {
+    if (cb && !cb.closest('.lt-screen-toolbar')) {
       const r = cb.getBoundingClientRect();
       if (r.width) bottom = Math.max(bottom, vr.bottom - r.top + 12);
     }
@@ -882,15 +966,20 @@ function noteUserView() {
 }
 // #490: 화면 전환(두 장 앞뒤 바꿈)에서는 이 문서가 숨은 프레임(폭 0)에서 먼저 뜬다. 그때 한 맞춤을 '전체 보기'로
 // 기억하면 드러난 뒤 resize가 맞춤(55%)을 다시 적용해 처음 80%·기억한 자리가 무시됐다 → 처음 자리 대기로 둔다.
-// #662(CTO 지시): 좁은 판(<700)에서도 전체 맞춤은 순간이 많으면 카드를 손톱만 하게 몰아 넣는다 — 예전처럼 지금(또는 첫)
-// 순간 카드가 읽히는 배율(카드 폭 ≥ 화면의 6할)로 크게 보이게 초점을 맞춘다. 머리글·탐색 판 비켜 두기는
-// focusBoardMoment가 판 아래끝을 실측해 해준다(#662). 초점 보기는 캔버스 설계상 이웃 카드가 도구 밑으로 슬라이드된다 —
-// 검사기는 보드의 도구×캔버스 겹침을 설계대로 제외하고 대신 '작은카드' 기준으로 읽히는 배율을 지킨다.
+// #1249: 휴대폰 일반 진입은 첫 카드부터 100% 크기로 실제 스크롤한다.
+// 명시적으로 선택한 순간으로 진입할 때는 그 카드로 이동하되 모든 카드에 닿을 수 있다.
 function boardStartView() {
   if (innerWidth < 700) {
-    if (typeof focusBoardMoment === 'function') focusBoardMoment(LTDEMO.get(), false);
-    else fitAll(false);
+    const bounds = mobileBoardBounds();
     viewMode = 'start';
+    const openId = new URLSearchParams(location.search).get('open');
+    if (openId && typeof focusBoardMoment === 'function') focusBoardMoment(openId, false);
+    else if (bounds) {
+      view.z = 1;
+      view.x = viewport.clientWidth / 2 - (bounds.left + bounds.right) / 2;
+      view.y = boardSafeArea().y - bounds.top;
+      applyView(false);
+    } else fitAll(false);
     return;
   }
   let vw = viewport.clientWidth,
@@ -1127,6 +1216,8 @@ function selectMoment(id, open = true) {
   }
 }
 
+// #1273 9번: 안내 시간은 공통 타이머 한 벌에서 잰다(단추 있음 8초 / 없음 2.2초, 올려 두면 멈춤).
+const toastTimer = window.LTToastTimer.createToastTimer();
 function toast(t) {
   dismissBoardOrderUndo();
   let el = $('#toast');
@@ -1134,22 +1225,21 @@ function toast(t) {
   delete el.dataset.boardOrderUndo;
   el.textContent = t;
   el.classList.add('show');
-  clearTimeout(toast.t);
-  toast.t = setTimeout(() => el.classList.remove('show'), 2200);
+  toastTimer.arm(el, window.LTToastTimer.PLAIN_TOAST_MS, () => el.classList.remove('show'));
 }
 // #662 후속(CTO 지시): 상세 판이 열리면 안내 풍선은 즉시 치운다 — 안내는 '순간을 선택하라'는 뜻이라 이미 선택해
 // 판이 열렸으면 필요 없고, 넓은 판에서는 풍선 자리가 판 안쪽('이어진 순간' 줄)과 포개진다. 다른 풍선(마음 저장 등)은 그대로 뜬다.
 function hideToast() {
   dismissBoardOrderUndo();
   const el = $('#toast');
-  clearTimeout(toast.t);
+  toastTimer.cancel();
   el.classList.remove('show');
 }
 function dismissBoardOrderUndo() {
   const active = activeBoardOrderUndo;
   if (!active) return;
   activeBoardOrderUndo = null;
-  clearTimeout(toast.t);
+  toastTimer.cancel();
   const el = $('#toast');
   if (el?.dataset.boardOrderUndo === active.token) {
     delete el.dataset.boardOrderUndo;
@@ -1173,11 +1263,10 @@ function showBoardOrderUndo({ before, snapshot: undoSnapshot }) {
   el.dataset.boardOrderUndo = action.token;
   el.classList.add('boardOrderToast', 'show');
   activeBoardOrderUndo = action;
-  clearTimeout(toast.t);
-  toast.t = setTimeout(() => {
+  toastTimer.arm(el, window.LTToastTimer.ACTION_TOAST_MS, () => {
     if (activeBoardOrderUndo === action) dismissBoardOrderUndo();
     el.classList.remove('show');
-  }, 6000);
+  });
 }
 function undoBoardOrder(action) {
   if (activeBoardOrderUndo !== action) return;
@@ -1236,6 +1325,7 @@ function formFor(type) {
 
 function openAdd() {
   formFor(addType);
+  if (typeof pushBoardPanel === 'function') pushBoardPanel('add');
   $('#addModal').classList.add('open');
 }
 
@@ -1300,9 +1390,14 @@ function openViewer(id) {
     box.innerHTML = `<video src="${m.video}" poster="${m.asset}" controls autoplay muted playsinline class="viewerFitVideo"></video>`;
   else if (m.type === 'note') box.innerHTML = `<div class="viewerNoteQuote">“${esc(m.memo)}”</div>`;
   else box.innerHTML = `<img src="${m.asset}" alt="${esc(m.title)}" class="viewerFitImg">`;
-  $('#vMeta').innerHTML =
-    (_vi.sub ? '<div class="videoTitle">▶ ' + esc(_vi.sub) + '</div>' : '') +
-    `${esc(LTLabels.type(m.originalType || m.type))} · ${esc(dateText(m.date))} · ${esc(m.emotion)}<br>출처: ${esc(m.source)}${m.url ? `<br>URL: ${esc(m.url)}` : ''}<br>마음 한마디: ${esc(m.memo)}`;
+  $('#vMeta').innerHTML = window.viewerMetaHTML({
+    head: `${esc(LTLabels.type(m.originalType || m.type))} · ${esc(dateText(m.date))} · ${esc(m.emotion)}`,
+    source: esc(m.source),
+    url: m.url ? esc(m.url) : '',
+    keywords: (m.keywords || []).map((keyword) => esc(keyword)),
+    memo: esc(m.memo || ''),
+    mediaTitle: _vi.sub ? esc(_vi.sub) : ''
+  });
   $('#viewerModal').classList.add('open');
 }
 
@@ -1410,7 +1505,7 @@ function headerFade(on) {
 let boardTouches = new Map(),
   pinch = null;
 viewport.addEventListener('pointerdown', e => {
-  if (cinema || e.target.closest('.card,button,a,input,textarea,select')) return;
+  if (cinema || mobileBoardScroll() || e.target.closest('.card,button,a,input,textarea,select')) return;
   if (e.pointerType === 'touch') {
     boardTouches.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (boardTouches.size === 1) {
@@ -1495,7 +1590,7 @@ function zoomDecorPause() {
 viewport.addEventListener(
   'wheel',
   e => {
-    if (cinema) return;
+    if (cinema || mobileBoardScroll()) return;
     e.preventDefault();
     let before = screenToWorld(e.clientX, e.clientY),
       factor = Math.exp(-e.deltaY * 0.0012),
@@ -1524,6 +1619,7 @@ $('#typeGrid').onclick = e => {
 $('#detailClose').onclick = () => {
   $('#detail').classList.remove('open');
   syncBoardPush();
+  if (window.parent !== window) parent.postMessage({ type: globalThis.LT41_MSG.boardDetail, open: false }, location.origin);
 };
 $('#openMoment').onclick = () => openViewer(selected);
 $('#closeViewer').onclick = () => {

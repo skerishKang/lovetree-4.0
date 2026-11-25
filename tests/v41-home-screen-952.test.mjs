@@ -35,10 +35,10 @@ function tree952({ subject, count, youtube = false }) {
   return t;
 }
 
-async function boot952(browser, { width = 1440, member = false, motion = 'reduce', initStorage = {}, routes = {}, thumb = THUMB, waitUntil = 'load', initScript = null } = {}) {
+async function boot952(browser, { width = 1440, height = width === 390 ? 844 : 900, member = false, motion = 'reduce', initStorage = {}, routes = {}, thumb = THUMB, waitUntil = 'load', initScript = null } = {}) {
   const server = await serve({});
   const base = `http://127.0.0.1:${server.address().port}`;
-  const ctx = await browser.newContext({ viewport: { width, height: width === 390 ? 844 : 900 }, reducedMotion: motion });
+  const ctx = await browser.newContext({ viewport: { width, height }, reducedMotion: motion });
   await ctx.addInitScript((entries) => {
     for (const [k, v] of Object.entries(entries)) { try { localStorage.setItem(k, v); } catch {} }
   }, initStorage);
@@ -411,7 +411,7 @@ test('#1087 카드 바꾸기·숫자 두 줄·숫자 누르기', { skip: REQUIRE
       assert.equal(await groups.count(), 3);
       for (const group of await groups.all()) assert.equal(await group.locator('.home-count-line').count(), 2, '단추마다 두 줄');
       const texts = await groups.evaluateAll(es => es.map(e => [...e.querySelectorAll('.home-count-line')].map(row => row.textContent.trim())));
-      assert.deepEqual(texts, [['순간 4', '모아둔 2'], ['공개 트리 11', '공개 순간 42'], ['트리 2', '공개 트리 1']], JSON.stringify(texts));
+      assert.deepEqual(texts, [['순간 4', '정리 전 2'], ['공개 트리 11', '공개 순간 42'], ['트리 2', '공개 트리 1']], JSON.stringify(texts));
 
       await frame.locator('.recent-change').click();
       await frame.locator('.recent-menu').waitFor({ state: 'visible', timeout: 5000 });
@@ -433,7 +433,7 @@ test('#1087 카드 바꾸기·숫자 두 줄·숫자 누르기', { skip: REQUIRE
       await frame.locator('.orbit-dialog .index-list').waitFor({ state: 'visible', timeout: 5000 });
       await h.page.keyboard.press('Escape');
       await frame.locator('.orbit-dialog[open]').waitFor({ state: 'detached', timeout: 5000 });
-      await groups.nth(0).locator('.home-count button', { hasText: '모아둔 2' }).evaluate(el => el.click());
+      await groups.nth(0).locator('.home-count button', { hasText: '정리 전 2' }).evaluate(el => el.click());
       await h.page.waitForFunction(() => window.__msgs1087.includes('lt41-cleanup'), null, { timeout: 5000 });
       await groups.nth(1).locator('.home-count button', { hasText: '공개 트리 11' }).evaluate(el => el.click());
       await groups.nth(1).locator('.home-count button', { hasText: '공개 순간 42' }).evaluate(el => el.click());
@@ -492,6 +492,7 @@ test('#1087 390 새 소식 띠와 숫자 두 줄 겹침 0', { skip: REQUIRE952 ?
           return { theme: localStorage.getItem('lt41.theme'), bandTop: Math.round(band.top), bandBottom: Math.round(band.bottom), rows, overlaps: rows.map(area), links: area(links) };
         });
         console.log('#1087 BAND', JSON.stringify(geo));
+        if(process.env.LT_1284_BAND_CAPTURE_DIR)await h.page.screenshot({path:`${process.env.LT_1284_BAND_CAPTURE_DIR}/band-${theme}-390.png`,animations:'disabled'});
         assert.ok(geo.rows.length >= 2, '두 줄 숫자가 실제로 그려진다: ' + JSON.stringify(geo));
         assert.ok(geo.overlaps.every(v => Math.round(v) === 0), '띠와 숫자 두 줄 겹침 0: ' + JSON.stringify(geo));
         assert.equal(Math.round(geo.links), 0, '띠와 바닥 링크 겹침 0: ' + JSON.stringify(geo));
@@ -517,9 +518,12 @@ test('#1088 가운데 카드 누름은 화면 이동 없이 크게 보기를 연
       await h.page.evaluate(() => { window.__nav1088 = []; addEventListener('message', e => { if (['lt41-navigate', 'lt41-community', 'lt41-cleanup'].includes(e.data?.type)) window.__nav1088.push(e.data.type); }); });
       const hashBefore = await h.page.evaluate(() => location.hash);
       const viewer = frame.locator('#mediaViewerHome');
-      const open = async () => { await frame.locator('.recent-play').click(); await viewer.waitFor({ state: 'visible', timeout: 5000 }); };
+      const open = async () => { await frame.locator('.recent-meta strong').click(); await viewer.waitFor({ state: 'visible', timeout: 5000 }); };
       await open();
       assert.equal(await viewer.getAttribute('aria-hidden'), 'false', '크게 보기 열림');
+      assert.equal(await frame.evaluate(() => document.querySelector('#orbit').shadowRoot.activeElement?.id || ''),'mediaCloseHome','설명 창 열면 닫기에 초점');
+      assert.equal(await frame.locator('#mediaVisualHome iframe').count(),0,'설명 창은 영상이 즉시 재생되지 않는다');
+      await frame.locator('#mediaPlayHome').click();
       const src = await frame.locator('#mediaVisualHome iframe').getAttribute('src');
       assert.match(src, /a1111111111/, '영상 id');
       assert.match(src, /autoplay=1/, '누름 안에서 재생 시작');
@@ -528,8 +532,7 @@ test('#1088 가운데 카드 누름은 화면 이동 없이 크게 보기를 연
       assert.ok(await h.page.evaluate(() => getComputedStyle(document.getElementById('updates-card')).display === 'none'), '열린 동안 아래 띠가 숨는다');
       assert.equal(await h.page.evaluate(() => location.hash), hashBefore, '주소 moved 0');
       assert.deepEqual(await h.page.evaluate(() => window.__nav1088), [], '화면 이동 요청 0');
-      const focusAfterOpen = await frame.evaluate(() => document.querySelector('#orbit').shadowRoot.activeElement?.id || '');
-      assert.equal(focusAfterOpen, 'mediaCloseHome', '열면 닫기 단추에 초점');
+
 
       await h.page.keyboard.press('Escape');
       assert.equal(await viewer.getAttribute('aria-hidden'), 'true', 'Esc로 닫힘');
@@ -747,107 +750,194 @@ test('#1204 실제 테마 전환·저장값 및 가운데 빛 직선 경계 픽�
   } finally {await browser.close();}
 });
 
-test('#1204 첫 화면 순차 등장·안내 삭제·WebGL 말풍선·기억·겹침·접근성', { skip: REQUIRE952 ? false : skip952, timeout: 180000 }, async () => {
-  if (skip952) assert.fail(skip952);
-  const browser = await chromium952.launch({headless:true});
-  try {
-    for (const width of [1440,390]) for (const theme of ['garden','night']) {
-      const h=await boot952(browser,{width,motion:'no-preference',initStorage:{'lt41.theme':theme}});
-      try {
-        const inspect=()=>h.frame.evaluate(()=>{
-          const root=document.querySelector('#orbit').shadowRoot;
-          const tip=root.querySelector('.lt-orbit-tip'),center=root.querySelector('.center'),actions=center.querySelector('.actions');
-          const tr=tip.getBoundingClientRect(),cr=center.getBoundingClientRect(),ar=actions.getBoundingClientRect();
-          const intersects=(a,b)=>a.left<b.right&&a.right>b.left&&a.top<b.bottom&&a.bottom>b.top;
-          const poses=globalThis.__LT_ORBIT_TEST__?.poses()||[];
-          const host=document.querySelector('#orbit').getBoundingClientRect();
-          const closeToCard=poses.some(p=>p&&!p.hidden&&p.box&&(
-            // Orbit projections and the HTML hint share the same local canvas coordinates.
-            (tr.left-host.left>=p.box.l-125&&tr.left-host.left<=p.box.r+125)&&
-            (tr.top-host.top>=p.box.t-50&&tr.top-host.top<=p.box.b+50)
-          ));
-          return {visible:tip.hasAttribute('data-visible'),x:tr.x,y:tr.y,closeToCard,
-            overlaps:intersects(tr,cr)||intersects(tr,ar),pointer:getComputedStyle(tip).pointerEvents,
-            labels:[...root.querySelectorAll('.card .surface')].map(e=>e.getAttribute('aria-label')),
-            notes:root.querySelectorAll('.center-note').length,centerRect:{x:cr.x,y:cr.y,w:cr.width,h:cr.height},
-            animations:[...root.querySelectorAll('.center .lt-home-enter')].map(e=>({delay:getComputedStyle(e).animationDelay,duration:getComputedStyle(e).animationDuration}))};
-        });
-        await h.frame.waitForFunction(()=>globalThis.__LT_ORBIT_TEST__?.canvasReady(),null,{timeout:20000});
-        await h.frame.locator('.center .actions .home-action-group').first().waitFor({state:'visible',timeout:15000});
-        const opening=await inspect();
-        assert.equal(opening.notes,0,'두 안내 줄을 그리지 않는다');
-        assert.ok(opening.animations.length>=4,'머리말·제목·설명·단추가 차례로 나타난다');
-        const delays=opening.animations.map(a=>parseFloat(a.delay));
-        assert.ok(delays.every((v,i)=>i===0||v-delays[i-1]>=.08&&v-delays[i-1]<=.12),JSON.stringify(delays));
-        assert.ok(opening.animations.every(a=>parseFloat(a.duration)>=.4&&parseFloat(a.duration)<=.5));
-        assert.ok(opening.labels.length>0&&opening.labels.every(x=>x?.includes('눌러서 크게 보기')));
-        await h.frame.waitForFunction(()=>document.querySelector('#orbit')?.shadowRoot?.querySelector('.lt-orbit-tip')?.hasAttribute('data-visible'),null,{timeout:15000});
-        for (let sample=0;sample<3;sample++){
-          const state=await inspect();
-          assert.equal(state.visible,true);
-          assert.equal(state.pointer,'none');
-          assert.equal(state.closeToCard,true,'말풍선은 투영된 카드 곁에 있다: '+JSON.stringify(state));
-          assert.equal(state.overlaps,false,'중앙 글자·단추와 겹치지 않는다');
-          await h.page.waitForTimeout(440);
-        }
-        // #1204: Scrub several real WebGL orbit phases, not just adjacent frames.
-        // The hint must hand off to an on-screen card instead of holding a rear card.
-        for (const phase of [0.2, 0.5, 0.8]) {
-          await h.frame.evaluate(t => globalThis.__LT_ORBIT_TEST__.seek(t), phase);
-          await h.page.waitForTimeout(1050);
-          const state=await inspect();
-          assert.equal(state.visible,true,'말풍선이 단계별로 앞 카드에 나타난다');
-          assert.equal(state.closeToCard,true,'투영 카드 곁에 남는다: '+JSON.stringify(state));
-          assert.equal(state.overlaps,false,'중앙 내용·단추를 가리지 않는다');
-        }
-        await h.frame.evaluate(()=>globalThis.__LT_ORBIT_TEST__.restore());
-        await h.page.waitForTimeout(1100);
-        assert.deepEqual((await inspect()).centerRect,opening.centerRect,'중앙 영역은 등장 전후에도 재배치되지 않는다');
-        const {mkdirSync}=await import('node:fs');
-        const capture=process.env.LT_HOME_1204_CAPTURE_DIR;
-        if(capture){mkdirSync(capture,{recursive:true});await h.page.screenshot({path: `${capture}/home-1204-${width}-${theme}.png`});}
-        const clicked=await h.frame.evaluate(()=>{
-          const host=document.querySelector('#orbit'),root=host.shadowRoot;
-          const world=root.querySelector('.world'),board=[...world.querySelectorAll('.orbit-canvas')].find(e=>getComputedStyle(e).display!=='none');
-          const poses=globalThis.__LT_ORBIT_TEST__.poses();
-          if(!board)return {board:false};
-          const r=board.getBoundingClientRect();
-          let hit=null;
-          for(const p of poses){
-            if(!p||p.hidden||!p.box||p.box.r<0||p.box.l>world.clientWidth)continue;
-            for(const fx of [.3,.5,.7])for(const fy of [.3,.5,.7]){
-              const x=r.left+p.box.l+(p.box.r-p.box.l)*fx,y=r.top+p.box.t+(p.box.b-p.box.t)*fy;
-              board.dispatchEvent(new PointerEvent('pointermove',{bubbles:true,clientX:x,clientY:y,pointerId:1,pointerType:'mouse'}));
-              if(board.style.cursor==='pointer'){hit={x,y};break;}
-            }
-            if(hit)break;
-          }
-          if(!hit)return {board:true,position:false};
-          board.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,clientX:hit.x,clientY:hit.y,pointerId:1,pointerType:'mouse'}));
-          board.dispatchEvent(new MouseEvent('click',{bubbles:true,clientX:hit.x,clientY:hit.y,detail:1}));
-          return {board:true,position:true,stored:localStorage.getItem('lt41-orbit-card-opened')};
-        });
-        assert.equal(clicked.stored,'1','실제 캔버스 클릭 경로에서 기기에 기억한다: '+JSON.stringify(clicked));
-        assert.equal((await inspect()).visible,false,'누른 즉시 말풍선이 사라진다');
-        await h.page.reload({waitUntil:'load'});
-        await h.page.waitForTimeout(2400);
-        assert.equal(await h.page.frameLocator('#view').locator('.lt-orbit-tip').evaluate(e=>e.hasAttribute('data-visible')),false,'새로고침해도 말풍선이 나타나지 않는다');
-      } finally {await close952(h);}
-    }
-    const reduced=await boot952(browser,{width:390,motion:'reduce'});
-    try{
-      await reduced.frame.waitForFunction(()=>globalThis.__LT_ORBIT_TEST__?.canvasReady(),null,{timeout:20000});
-      await reduced.page.waitForTimeout(2400);
-      const snapshot=()=>reduced.frame.evaluate(()=>{
-        const root=document.querySelector('#orbit').shadowRoot,tip=root.querySelector('.lt-orbit-tip');
-        return {x:tip.getBoundingClientRect().x,y:tip.getBoundingClientRect().y,
-          styles:[...root.querySelectorAll('.center .lt-home-enter')].map(e=>({animation:getComputedStyle(e).animationName,opacity:getComputedStyle(e).opacity}))};
+// 안내 시계는 페이지 안에서 잰다(addInitScript). 나타난 순간부터 0·150·300ms 시점의 카드·투영 사각형을 기록하고,
+// Node는 기록을 읽어 단정만 한다. 기준값과 대기 시간은 바꾸지 않는다.
+function TIP_RECORDER() {
+  if (window.__LT_TIP_REC__) return;
+  const rec = (window.__LT_TIP_REC__ = { tipAt: null, appearAt: null, removedAt: null, snaps: [] });
+  const snap = (label) => {
+    try {
+      const root = document.querySelector('#orbit').shadowRoot, hook = window.__LT_ORBIT_TEST__;
+      const index = hook.hintIndex(), card = root.querySelectorAll('.card')[index], tip = card?.querySelector('.lt-card-tip');
+      hook.syncDomPoses();
+      const app = root.querySelector('.app')?.getBoundingClientRect(), cr = card?.getBoundingClientRect(), tr = tip?.getBoundingClientRect(), pose = hook.poses()[index], box = pose?.box;
+      rec.snaps.push({
+        label, dt: performance.now() - rec.appearAt, index,
+        shown: !!tip && getComputedStyle(tip).opacity === '1' && root.querySelector('.world').classList.contains('lt-hint-ready'),
+        bound: tip?.parentElement === card,
+        domInside: !!tr && !!cr && tr.left >= cr.left && tr.right <= cr.right && tr.top >= cr.top && tr.bottom <= cr.bottom,
+        projected: !!box,
+        projInside: !!tr && !!app && !!box && tr.left - app.left >= box.l && tr.top - app.top >= box.t && tr.right - app.left <= box.r && tr.bottom - app.top <= box.b,
+        bottomGap: tr && cr ? cr.bottom - tr.bottom : null,
+        floatingTip: !!root.querySelector('.lt-orbit-tip'), pulse: card ? getComputedStyle(card, '::after').animationName : null,
+        canvasReady: hook.canvasReady(),
       });
-      const first=await snapshot();await reduced.page.waitForTimeout(550);const next=await snapshot();
-      assert.deepEqual([next.x,next.y],[first.x,first.y],'움직임 줄이기에서는 말풍선 좌표 고정');
-      assert.ok(first.styles.every(x=>x.animation==='none'&&x.opacity==='1'));
-    }finally{await close952(reduced);}
-  }finally{await browser.close();}
+    } catch (e) { rec.snaps.push({ label, error: String(e) }); }
+  };
+  const watch = (root, world) => {
+    const check = () => {
+      const now = performance.now(), on = world.classList.contains('lt-hint-ready');
+      if (rec.tipAt === null && root.querySelector('.lt-card-tip')) rec.tipAt = now;
+      if (on && rec.appearAt === null) {
+        rec.appearAt = now;
+        setTimeout(() => snap('0ms'), 0);
+        setTimeout(() => snap('150ms'), 150);
+        setTimeout(() => snap('300ms'), 300);
+      }
+      if (!on && rec.appearAt !== null && rec.removedAt === null) rec.removedAt = now;
+    };
+    new MutationObserver(check).observe(root, { subtree: true, childList: true, attributes: true, attributeFilter: ['class'] });
+    check();
+  };
+  const find = () => {
+    const root = document.querySelector('#orbit')?.shadowRoot, world = root?.querySelector('.world');
+    if (world && window.__LT_ORBIT_TEST__) watch(root, world);
+    else requestAnimationFrame(find);
+  };
+  find();
+}
+
+test('#1309 첫 방문 안내는 나타나 3초 뒤 사라지고, 누르면 바로 사라지며 재방문에는 나오지 않는다', { skip: REQUIRE952 ? false : skip952, timeout: 240000 }, async () => {
+ if (skip952) assert.fail(skip952);
+ const browser = await chromium952.launch({ headless: true });
+ try {
+  const h = await boot952(browser, { width: 1440, motion: 'no-preference', initStorage: { 'lt41.theme': 'night' }, initScript: TIP_RECORDER });
+  try {
+   await h.frame.waitForFunction(() => window.__LT_TIP_REC__?.snaps.length >= 1, null, { timeout: 20000, polling: 50 });
+   const capture = process.env.LT_HOME_1204_CAPTURE_DIR;
+   if (capture) { const { mkdirSync } = await import('node:fs'); mkdirSync(capture, { recursive: true }); await h.page.screenshot({ path: capture + '/home-1309-hint-1440-night.png' }); }
+   await h.frame.waitForFunction(() => { const r = window.__LT_TIP_REC__; return r.snaps.length >= 3 && r.removedAt !== null; }, null, { timeout: 30000, polling: 50 });
+   const rec = await h.frame.evaluate(() => window.__LT_TIP_REC__);
+   assert.deepEqual(rec.snaps.map(s => s.label), ['0ms', '150ms', '300ms'], JSON.stringify(rec));
+   // 정확한 정렬 2px는 #1382에서 모든 카드에 적용한다. 여기서는 안내 글자가 카드 안, 투영 사각형이 있으면 그 안에 있는지만 본다.
+   assert.ok(rec.snaps.every(s => s.index >= 0 && s.shown && s.bound && s.domInside && s.bottomGap >= 0 && s.bottomGap < 40 && !s.floatingTip && s.pulse === 'lt-card-pulse' && (!s.projected || s.projInside)), JSON.stringify(rec.snaps));
+   const visibleMs = rec.removedAt - rec.appearAt;
+   assert.ok(visibleMs >= 2500 && visibleMs <= 3500, '안내는 약 3초 보인다: ' + visibleMs);
+   assert.equal(await h.frame.locator('.lt-card-tip').count(), 0, '3초가 지나면 사라진다');
+   assert.equal(await h.frame.evaluate(() => localStorage.getItem('lt41-orbit-card-opened')), '1');
+   console.log('TIP_MEASURE ' + JSON.stringify({ tipAt: rec.tipAt, appearAt: rec.appearAt, removedAt: rec.removedAt, visibleMs, snaps: rec.snaps.map(s => ({ label: s.label, dt: Math.round(s.dt), domInside: s.domInside, projected: s.projected, projInside: s.projInside, canvasReady: s.canvasReady })) }));
+  } finally { await close952(h); }
+  const clicked = await boot952(browser, { width: 1440, motion: 'no-preference', initStorage: { 'lt41.theme': 'night' }, initScript: TIP_RECORDER });
+  try {
+   await clicked.frame.waitForFunction(() => window.__LT_TIP_REC__?.appearAt != null, null, { timeout: 20000, polling: 50 });
+   const index = await clicked.frame.evaluate(() => globalThis.__LT_ORBIT_TEST__.hintIndex());
+   await clicked.frame.locator('.card').nth(index).locator('.surface').evaluate(e => e.click());
+   assert.equal(await clicked.frame.locator('.lt-card-tip').count(), 0, '누르면 즉시 사라진다');
+   assert.equal(await clicked.frame.evaluate(() => localStorage.getItem('lt41-orbit-card-opened')), '1');
+   await clicked.page.reload({ waitUntil: 'load' });
+   await clicked.page.waitForTimeout(2400);
+   assert.equal(await clicked.page.frameLocator('#view').locator('.lt-card-tip').count(), 0, '다음 방문에는 나오지 않는다');
+  } finally { await close952(clicked); }
+  const returning = await boot952(browser, { width: 1440, initStorage: { 'lt41-orbit-card-opened': '1' } });
+  try {
+   await returning.page.waitForTimeout(1800);
+   assert.equal(await returning.frame.locator('.lt-card-tip').count(), 0, '저장된 첫 방문 기록은 새 문맥에서도 적용된다');
+  } finally { await close952(returning); }
+ } finally { await browser.close(); }
+});
+
+test('#1309 움직임 줄이기에서는 카드 안 글자만 보이고 반짝임은 없다', { skip: REQUIRE952 ? false : skip952, timeout: 180000 }, async () => {
+ if (skip952) assert.fail(skip952);
+ const browser = await chromium952.launch({ headless: true });
+ try {
+  const h = await boot952(browser, { width: 1440, motion: 'reduce' }); // #1314 이후 390 세로 리본은 글자가 없어 괤도 배치에서 본다
+  try {
+   await h.frame.locator('.lt-card-tip').waitFor({ state: 'visible', timeout: 20000 });
+   const sample = () => h.frame.evaluate(() => {
+    const root = document.querySelector('#orbit').shadowRoot, card = root.querySelector('.lt-card-hint'), tip = card.querySelector('.lt-card-tip');
+    const r = tip.getBoundingClientRect(); return { x: r.x, y: r.y, opacity: getComputedStyle(tip).opacity, pulse: getComputedStyle(card, '::after').animationName, rate: card.getAnimations().filter(a => a.effect.target === card).map(a => a.playbackRate) };
+   });
+   const first = await sample(); await h.page.waitForTimeout(550); const next = await sample();
+   assert.equal(first.opacity, '1'); assert.equal(next.opacity, '1');
+   assert.equal(first.pulse, 'none'); assert.equal(next.pulse, 'none');
+   assert.deepEqual([next.x, next.y], [first.x, first.y]);
+   assert.ok(first.rate.every(rate => rate === 0), '움직임 줄이기에서는 띠도 멈춘다');
+  } finally { await close952(h); }
+ } finally { await browser.close(); }
+});
+
+test('#1309 휴대폰 세로는 8장 리본이 흐르고 숫자판·단추·링크와 겹치지 않는다', { skip: REQUIRE952 ? false : skip952, timeout: 240000 }, async () => {
+ if (skip952) assert.fail(skip952);
+ const browser = await chromium952.launch({ headless: true });
+ const sample = (frame) => frame.evaluate(() => {
+  const host = document.querySelector('#orbit'), root = host.shadowRoot, hook = globalThis.__LT_ORBIT_TEST__, app = root.querySelector('.app').getBoundingClientRect();
+  const all = [...root.querySelectorAll('.card')], cards = all.filter(e => !e.classList.contains('off'));
+  const boxes = hook.poses().map((p, i) => p && !p.hidden && cards.includes(all[i]) ? { l: app.left + p.box.l, t: app.top + p.box.t, r: app.left + p.box.r, b: app.top + p.box.b } : null).filter(Boolean);
+  const rect = e => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 ? { l: r.left, t: r.top, r: r.right, b: r.bottom } : null; };
+  const protectedZones = [...root.querySelectorAll('.home-count,.subtleBtn')].map(rect).filter(Boolean);
+  const shell = parent.document, ox = frameElement.getBoundingClientRect().left, oy = frameElement.getBoundingClientRect().top;
+  for (const e of shell.querySelectorAll('.home-links a,.home-links button,#updates-card,#mobile-add')) {
+   const r = rect(e); if (r) protectedZones.push({ l: r.l - ox, t: r.t - oy, r: r.r - ox, b: r.b - oy });
+  }
+  const hit = (a, b) => Math.max(0, Math.min(a.r, b.r) - Math.max(a.l, b.l)) * Math.max(0, Math.min(a.b, b.b) - Math.max(a.t, b.t));
+  let overlaps = 0;
+  for (const box of boxes) for (const zone of protectedZones) if (hit(box, zone) > 1) overlaps++;
+  const first = boxes[0];
+  const bandBottom = protectedZones.length ? Math.min(...protectedZones.map(zone => zone.t)) : null;
+  const inBand = bandBottom === null ? boxes.length === 0 : boxes.every(box => box.t >= app.top - 1 && box.b <= bandBottom + 1);
+  return { mode: host.dataset.ltLayout, active: cards.length, visible: boxes.length, overlaps, zones: protectedZones.length, first: first && [(first.l + first.r) / 2, (first.t + first.b) / 2], rates: cards.flatMap(e => e.getAnimations().filter(a => a.effect.target === e && !a.effect.pseudoElement).map(a => a.playbackRate)), bandBottom, inBand };
+ });
+ try {
+  for (const theme of ['night', 'garden']) {
+   const h = await boot952(browser, { width: 390, height: 844, motion: 'no-preference', initStorage: { 'lt41.theme': theme } });
+   try {
+    await h.frame.waitForFunction(() => globalThis.__LT_ORBIT_TEST__?.canvasReady(), null, { timeout: 20000 });
+    await h.frame.waitForFunction(() => {
+     const host=document.querySelector('#orbit'),cards=[...host.shadowRoot.querySelectorAll('.card:not(.off)')];
+     return host.dataset.ltLayout==='ribbon'&&cards.length===8&&cards.every(card=>card.getAnimations().filter(a=>a.effect.target===card&&!a.effect.pseudoElement).length===1);
+    },null,{timeout:20000});
+    // #1314 리본은 배경 띠라서 안내 글자를 띄우지 않는다(테두리 반짝임만 유지). 글자가 제목과 겹치는 것을 막는다.
+    await h.frame.waitForFunction(() => document.querySelector('#orbit').shadowRoot.querySelector('.world.lt-hint-ready'), null, { timeout: 20000 });
+    const ribbonHint = await h.frame.evaluate(() => { const root = document.querySelector('#orbit').shadowRoot; return { tips: root.querySelectorAll('.lt-card-tip').length, hinted: root.querySelectorAll('.lt-card-hint').length }; });
+    assert.equal(ribbonHint.tips, 0, '390 세로 리본에서는 첫 방문 안내 글자를 띄우지 않는다');
+    assert.equal(ribbonHint.hinted, 1, '390 세로 리본에서도 첫 방문 테두리 반짝임은 남는다');
+    const samples = [];
+    for (let i = 0; i < 7; i++) { samples.push(await sample(h.frame)); if (i < 6) await h.page.waitForTimeout(500); }
+    assert.ok(samples.every(s => s.mode === 'ribbon' && s.active === 8), JSON.stringify(samples[0]));
+    assert.ok(samples.every(s => s.visible >= 3 && s.zones >= 4 && s.overlaps === 0 && s.inBand), JSON.stringify(samples));
+    assert.ok(samples.every(s => s.rates.length === 8 && s.rates.every(rate => rate === 1)), '여덟 카드가 같은 느린 흐름으로 움직인다: '+JSON.stringify(samples.map(s=>s.rates)));
+    const distance = Math.hypot(samples[6].first[0] - samples[0].first[0], samples[6].first[1] - samples[0].first[1]);
+    assert.ok(distance > 3, '3초 동안 카드가 실제로 흐른다: ' + distance);
+    console.log('#1309 RIBBON', theme, JSON.stringify({ active: samples[0].active, visible: samples.map(s => s.visible), overlaps: samples.reduce((n, s) => n + s.overlaps, 0), distance: Math.round(distance * 10) / 10 }));
+    const capture = process.env.LT_HOME_1204_CAPTURE_DIR;
+    if (capture) { const { mkdirSync } = await import('node:fs'); mkdirSync(capture, { recursive: true }); await h.page.screenshot({ path: capture + '/home-1309-ribbon-390-' + theme + '.png' }); }
+   } finally { await close952(h); }
+  }
+ } finally { await browser.close(); }
+});
+
+test('#1309 가로 화면과 폴더블 펼침은 겹침·잘림 0이고 궤도 성능을 측정한다', { skip: REQUIRE952 ? false : skip952, timeout: 300000 }, async () => {
+ if (skip952) assert.fail(skip952);
+ const browser = await chromium952.launch({ headless: true });
+ const inspect = (frame, phase) => frame.evaluate(async phase => {
+  const host = document.querySelector('#orbit'), root = host.shadowRoot, hook = globalThis.__LT_ORBIT_TEST__, app = root.querySelector('.app').getBoundingClientRect(), center = root.querySelector('.center').getBoundingClientRect();
+  hook.seek(phase); await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+  const zone = { l: center.left - 32, t: center.top - 32, r: center.right + 32, b: center.bottom + 32 };
+  const hit = (a, b) => Math.max(0, Math.min(a.r, b.r) - Math.max(a.l, b.l)) * Math.max(0, Math.min(a.b, b.b) - Math.max(a.t, b.t));
+  const cards = [...root.querySelectorAll('.card')], poses = hook.poses();
+  const visible = poses.map((p, i) => p && !p.hidden && !cards[i].classList.contains('off') && !cards[i].classList.contains('clash') ? { l: app.left + p.box.l, t: app.top + p.box.t, r: app.left + p.box.r, b: app.top + p.box.b } : null).filter(Boolean);
+  const intrude = visible.filter(b => hit(zone, b) > 1).length;
+  const clipped = visible.filter(b => b.l < app.left - 1 || b.t < app.top - 1 || b.r > app.right + 1 || b.b > app.bottom + 1).length;
+  const controls = [...root.querySelectorAll('.center h1,.center .actions,.home-count')].map(e => e.getBoundingClientRect());
+  const controlClipped = controls.filter(r => r.width > 0 && r.height > 0 && (r.left < app.left - 1 || r.top < app.top - 1 || r.right > app.right + 1 || r.bottom > app.bottom + 1)).length;
+  return { mode: host.dataset.ltLayout, visible: visible.length, intrude, clipped, controlClipped, app: { l: app.left, t: app.top, r: app.right, b: app.bottom } };
+ }, phase);
+ try {
+  for (const [width, height, mode] of [[844, 390, 'compact'], [800, 900, 'orbit']]) for (const theme of ['night', 'garden']) {
+   const h = await boot952(browser, { width, height, motion: 'reduce', initStorage: { 'lt41.theme': theme } });
+   try {
+    await h.frame.waitForFunction(() => globalThis.__LT_ORBIT_TEST__?.canvasReady(), null, { timeout: 20000 });
+    const samples = [];
+    for (const phase of [0, .2, .5, .8]) samples.push(await inspect(h.frame, phase));
+    assert.ok(samples.every(s => s.mode === mode && s.visible > 0), JSON.stringify(samples));
+    assert.ok(samples.every(s => s.intrude === 0 && s.controlClipped === 0), JSON.stringify(samples));
+    if (mode === 'compact') assert.ok(samples.every(s => s.clipped === 0), '가로 카드 잘림 0: ' + JSON.stringify(samples));
+    console.log('#1309 VIEWPORT', width, theme, JSON.stringify(samples.map(s => ({ visible: s.visible, intrude: s.intrude, clipped: s.clipped, controlClipped: s.controlClipped }))));
+    const capture = process.env.LT_HOME_1204_CAPTURE_DIR;
+    if (capture) { const { mkdirSync } = await import('node:fs'); mkdirSync(capture, { recursive: true }); await h.page.screenshot({ path: capture + '/home-1309-' + width + '-' + theme + '.png' }); }
+   } finally { await close952(h); }
+  }
+ } finally { await browser.close(); }
 });
 
 test('#1026 첫 화면 카드는 첫 궤도 자리를 받은 뒤에만 보이고 글귀와 같은 프레임에 풀린다', { skip: REQUIRE952 ? false : skip952, timeout: 180000 }, async () => {
@@ -881,4 +971,124 @@ test('#1026 첫 화면 카드는 첫 궤도 자리를 받은 뒤에만 보이고
       assert.equal(shown.wait, 0, '카드와 글귀의 시작이 같은 프레임이다: ' + JSON.stringify(shown));
     } finally { await close952(h); }
   } finally { await browser.close(); }
+});
+
+// #1365: 지도에서 첫 화면으로 돌아올 때 빈 구간이 없음을 페이지 안 시계로 잰다.
+// 고치기 전 1440·390 모두 약 1.05~1.10초였고, 지금은 0.2초 안이다.
+// 최종 기준은 실측 보고로 정하므로 여기서는 '고치기 전보다 빠르다'만 확인하고 측정값을 출력에 남긴다.
+test('#1365 지도→첫 화면 전환에서 뼈대가 고치기 전보다 빨리 보인다', { skip: REQUIRE952 ? false : skip952, timeout: 180000 }, async () => {
+  if (skip952) assert.fail(skip952);
+  const browser = await chromium952.launch({ headless: true });
+  try {
+    for (const width of [390, 1440]) {
+      const h = await boot952(browser, { width, member: true, motion: 'no-preference' });
+      try {
+        await h.page.evaluate(() => { location.hash = '#network'; });
+        await h.page.waitForFunction(() => {
+          try { return /track56-network\.html/.test(document.querySelector('#view:not([hidden])')?.contentWindow.location.pathname || ''); }
+          catch { return false; }
+        }, null, { timeout: 20000 });
+        await h.page.waitForTimeout(1200);
+        await h.page.evaluate(() => {
+          const R = { t0: null, marks: {} };
+          window.__LT1365 = R;
+          const mark = k => { if (R.t0 !== null && !(k in R.marks)) R.marks[k] = Math.round(performance.now() - R.t0); };
+          const poll = () => {
+            for (const f of document.querySelectorAll('iframe')) {
+              try {
+                if (f.hidden || f.closest('[hidden]') || !/home\.html$/.test(f.contentWindow.location.pathname)) continue;
+              } catch { continue; }
+              mark('frameRevealed');
+              const sr = f.contentDocument?.getElementById('orbit')?.shadowRoot;
+              const center = sr?.querySelector('.center'), card = sr?.querySelector('.card');
+              if (center && !center.hasAttribute('data-lt-home-wait') && card && !card.classList.contains('lt-first-frame')) mark('skeletonVisible');
+            }
+            if (!('skeletonVisible' in R.marks)) requestAnimationFrame(poll);
+          };
+          document.querySelector('.brand').addEventListener('click', () => { R.t0 = performance.now(); poll(); }, { once: true, capture: true });
+        });
+        await h.page.locator('.brand').first().click();
+        await h.page.waitForFunction(() => 'skeletonVisible' in window.__LT1365.marks, null, { timeout: 15000 });
+        const marks = await h.page.evaluate(() => window.__LT1365.marks);
+        console.log(`#1365 ${width} 지도→첫 화면: ${JSON.stringify(marks)}`);
+        assert.ok(marks.skeletonVisible < 800, `${width} 뼈대가 고치기 전(약 1050ms)보다 빨라야 한다: ${marks.skeletonVisible}ms`);
+      } finally { await close952(h); }
+    }
+  } finally { await browser.close(); }
+});
+
+test('#1378 첫 화면 YouTube 크게 보기 390·1440 × 밤·정원과 닫기', {skip: REQUIRE952 ? false : skip952,timeout:180000},async()=>{
+  if(skip952)assert.fail(skip952);
+  const {inspectYoutubeIframe,countYoutubeAutoplay}=await import('./helpers/youtube-embed-audit.mjs');
+  const browser=await chromium952.launch({headless:true});
+  try{
+    for(const width of [390,1440])for(const theme of ['night','garden']){
+      const tree=createTree({subject:'기억',title:'첫 번째 영상',date:'2026-11-20',emotion:'설렘',note:'기록',url:'https://www.youtube.com/watch?v=dQw4w9WgXcQ'},'2026-11-20T00:00:00Z');
+      tree.moments[0].image='https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg';
+      tree.moments[0].youtubeThumb=true;
+      const workspace={revision:1,state:{version:1,trees:[tree],prefs:{}},subject:'visual-audit-fake',writeSubjectBound:true,savedAt:'2026-11-20T00:00:00Z'};
+      const h=await boot952(browser,{member:true,width,initStorage:{'lt41.theme':theme,'lt41.boardTheme':theme==='night'?'night':'paper'},routes:{
+        '/api/workspace':r=>r.fulfill({status:200,contentType:'application/json',body:JSON.stringify(workspace)}),
+        '/api/youtube/oembed':r=>r.fulfill({status:200,contentType:'application/json',body:'{"title":"Test"}'})
+      }});
+      try{
+        const frame=h.frame;
+        await frame.locator('.recent-card').waitFor({state:'visible',timeout:15000});
+        const capture=process.env.LT_HOME_YT_CAPTURE_DIR;
+        if(capture){const fs=await import('node:fs');fs.mkdirSync(capture,{recursive:true});await h.page.screenshot({path:`${capture}/before-${width}-${theme}.png`});}
+        assert.equal(await frame.locator('#mediaVisualHome iframe').count(),0,'카드 상태에서 iframe 없음');
+        await frame.locator('.recent-meta strong').click();
+        await frame.locator('#mediaViewerHome.open').waitFor({state:'visible'});
+        const play=frame.locator('#mediaPlayHome');
+        await play.waitFor({state:'visible',timeout:10000});
+        await play.click();
+        const iframe=frame.locator('#mediaVisualHome iframe');
+        await iframe.waitFor({state:'visible'});
+        await h.page.locator('body.lt-viewer-open').waitFor({state:'attached'});
+        const m=await inspectYoutubeIframe(iframe);
+        const outerBlockers=await h.page.evaluate(()=>{
+          const host=document.querySelector('#view'),root=host.contentDocument.querySelector('#orbit').shadowRoot;
+          const video=root.querySelector('#mediaVisualHome iframe');
+          const a=host.getBoundingClientRect(),b=video.getBoundingClientRect();
+          return [0.1,0.5,0.9].flatMap(y=>[0.1,0.5,0.9].filter(x=>document.elementFromPoint(a.left+b.left+b.width*x,a.top+b.top+b.height*y)!==host)).length;
+        });
+        console.log('HOME_PLAYER',JSON.stringify({width,theme,w:m.width,h:m.height,blocked:m.blocked,outerBlockers}));
+          assert.equal(m.minimum200,true,`${width} ${theme} player ${m.width}x${m.height}`);
+          assert.equal(m.blocked,0,`${width} ${theme} blockers ${m.blockers}`);
+          assert.equal(outerBlockers,0,`${width} ${theme} shell overlays on player`);
+          assert.ok(await countYoutubeAutoplay(frame)<=1,'autoplay <=1');
+          if(capture)await h.page.screenshot({path:`${capture}/after-${width}-${theme}.png`});
+          await frame.locator('#mediaCloseHome').evaluate(button=>button.click());
+          assert.equal(await frame.locator('#mediaVisualHome iframe').count(),0,'닫은 후 iframe 0');
+          assert.equal(await frame.locator('#mediaViewerHome.open').count(),0,'뷰어 닫힘');
+      }finally{await close952(h);}
+    }
+  }finally{await browser.close();}
+});
+
+test('#1378 첫 화면 YouTube 재생 불가 시 iframe 제거·원본 링크', {skip: REQUIRE952 ? false : skip952,timeout:120000},async()=>{
+  if(skip952)assert.fail(skip952);
+  const browser=await chromium952.launch({headless:true});
+  try{
+    for(const status of [401,404]){
+      const tree=createTree({subject:'기억',title:'재생 불가 순간',date:'2026-11-20',emotion:'설렘',note:'기록',url:'https://www.youtube.com/watch?v=dQw4w9WgXcQ'},'2026-11-20T00:00:00Z');
+      tree.moments[0].image='https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg';
+      tree.moments[0].youtubeThumb=true;
+      const workspace={revision:1,state:{version:1,trees:[tree],prefs:{}},subject:'visual-audit-fake',writeSubjectBound:true,savedAt:'2026-11-20T00:00:00Z'};
+      const h=await boot952(browser,{member:true,width:390,routes:{
+        '/api/workspace':r=>r.fulfill({status:200,contentType:'application/json',body:JSON.stringify(workspace)}),
+        '/api/youtube/oembed':r=>r.fulfill({status,contentType:'application/json',body:'{}'})
+      }});
+      try{
+        await h.frame.locator('.recent-meta strong').click();
+        await h.frame.locator('#mediaViewerHome.open').waitFor({state:'visible'});
+        await h.frame.locator('#mediaExternalHome').waitFor({state:'visible',timeout:15000});
+        assert.equal(await h.frame.locator('#mediaVisualHome iframe').count(),0,'재생 불가에서 iframe 0');
+        assert.equal(await h.frame.locator('#mediaPlayHome').isVisible(),false,'재생 단추 숨김');
+        assert.match(await h.frame.locator('#mediaExternalHome').getAttribute('href'),/youtube\.com\/watch\?v=dQw4w9WgXcQ/,'원본 링크');
+        await h.frame.locator('#mediaCloseHome').evaluate(el=>el.click());
+        assert.equal(await h.frame.locator('#mediaVisualHome iframe').count(),0,'닫기 후 iframe 0');
+      }finally{await close952(h);}
+    }
+  }finally{await browser.close();}
 });

@@ -93,7 +93,12 @@ async function openBookWithCard(browser, theme, width, height) {
     if (!frame) await page.waitForTimeout(200);
   }
   assert.ok(frame, '책 프레임이 열린다');
-  await frame.waitForSelector('#archiveBtn', { timeout: 15000 });
+  await frame.waitForSelector('#archiveBtn', { state: 'attached', timeout: 15000 });
+  // #1249: 휴대폰의 보관함은 공통 줄의 더 보기 안에 들어갈 수 있다.
+  if (!(await frame.locator('#archiveBtn').isVisible())) {
+    await frame.locator('.lt-toolbar-more').click();
+    await frame.waitForSelector('#archiveBtn', { timeout: 15000 });
+  }
   await page.waitForTimeout(700);
   return { ctx, page, frame, errors };
 }

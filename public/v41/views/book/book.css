@@ -37,7 +37,7 @@ body:before{content:"MEMORY\A SKETCHBOOK";white-space:pre;position:fixed;left:3.
 .view-toggle{display:inline-flex;flex:none}
 .view-toggle .ui-btn{min-height:44px}
 .view-toggle .ui-btn[aria-pressed=true]{background:var(--gold);border-color:var(--gold);color:#fff}
-@media(max-width:599px){#doubleViewBtn{display:none}}
+
 .ui-btn{border:1px solid rgba(255,255,255,.13);background:rgba(255,255,255,.055);color:#f5ece6;border-radius:999px;padding:8px 12px;cursor:pointer;transition:.18s}
 .ui-btn:hover,.ui-btn.active{background:rgba(205,137,163,.15);border-color:rgba(228,189,203,.4);transform:translateY(-1px)}
 .shelf-back{margin-right:auto;min-height:44px;padding:8px 14px;flex:0 0 auto}
@@ -202,10 +202,14 @@ html[data-lt-theme=garden] .shelf-back:hover{background:var(--lt-glass-strong);b
 .detail-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:15px}
 .viewer{position:fixed;z-index:140;inset:0;display:grid;place-items:center;padding:20px;background:rgba(16,11,14,.78);backdrop-filter:blur(13px);opacity:0;pointer-events:none;transition:.2s}
 .viewer.open{opacity:1;pointer-events:auto}
-.viewer-card{width:min(840px,94vw);max-height:90vh;overflow:auto;padding:17px;background:#f3ecdf;color:#433a34;border-radius:17px;box-shadow:0 28px 60px rgba(0,0,0,.45)}
+.viewer-card{width:min(840px,94vw);max-height:90vh;overflow:auto;padding:17px;background:var(--lt-paper);color:var(--lt-ink);border-radius:17px;box-shadow:0 28px 60px rgba(0,0,0,.45)}
+/* #1285 8번: 밤에는 종이 대신 무대 토큰 — 밝은 흰 카드로 눈이 부시지 않게 한다. */
+html:not([data-lt-theme=garden]) .viewer-card{background:var(--lt-stage-2);color:var(--lt-pearl)}
 .viewer-top{display:flex;justify-content:flex-end}
 .viewer-top .close{background:#decfc2;color:#5b4943}
-.viewer-media{height:min(56vh,500px);display:grid;place-items:center;overflow:hidden;background:#e7ddcf;border-radius:10px}
+html:not([data-lt-theme=garden]) .viewer-top .close{background:var(--lt-glass-strong);color:var(--lt-pearl)}
+.viewer-media{height:min(56vh,500px);display:grid;place-items:center;overflow:hidden;background:var(--lt-paper);border-radius:10px}
+html:not([data-lt-theme=garden]) .viewer-media{background:var(--lt-stage)}
 .viewer-note{padding:10px;text-align:center}
 .viewer-link-card{padding:38px;font-family:var(--book-serif);font-size:24px;line-height:1.6;text-align:center}
 .viewer-link-meta{font:11px var(--ui-sans);color:#89776f}
@@ -426,9 +430,7 @@ html[data-lt-theme=garden] .book-empty{color:var(--lt-ink)}
 .playback-controls button:disabled{opacity:.38;cursor:not-allowed}
 #pbToggle{border-color:var(--gold);background:var(--gold);color:#24170d}
 #pbCloseBottom{margin-left:auto}
-#playAllBtn.playback-launch{width:auto;height:44px;min-height:44px;padding:8px 13px;border:1px solid var(--gold);border-radius:999px;background:var(--gold);color:#24170d;font:700 13px/1 var(--ui-sans);white-space:nowrap}
-#playAllBtn.playback-launch:hover{background:#d8ad77;border-color:#d8ad77}
-html[data-lt-theme=garden] #playAllBtn.playback-launch{border-color:var(--lt-primary,#c76e8b);background:var(--lt-primary,#c76e8b);color:var(--lt-paper,#fffdf8)}
+#playAllBtn.playback-launch{width:auto;height:44px;min-height:44px;padding:8px 13px;white-space:nowrap}
 .playback-status{min-height:20px;margin:8px 2px 0;font-size:12px;line-height:1.5;color:#c8b6ab}
 html[data-lt-theme=garden] .playback{background:rgba(247,240,232,.86)}
 html[data-lt-theme=garden] .playback-card{border-color:rgba(119,91,82,.28);background:linear-gradient(160deg,#fffdf8,#f3e9dc);color:var(--lt-ink,#433a34);box-shadow:0 30px 80px rgba(75,51,42,.24)}

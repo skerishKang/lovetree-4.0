@@ -22,12 +22,18 @@ export function createNavigationMenu(ctx){
    // #458: 지금 보고 있는 화면 항목에 aria-current를 남긴다(메뉴를 열 때마다 다시 만들어 지금 상태를 반영한다).
    add('첫 화면',()=>document.querySelector('.brand').click(),ctx.current==='src064-orbit.html');
    add('둘러보기',()=>(0,ctx.$)('community-menu').click());
+   // #1285 11번: 390에서는 접힌 메뉴 안에서도 둘러보기를 테두리·나침반으로 구분한다.
+   const discoverItem=moreMenu.lastElementChild;
+   discoverItem.classList.add('lt-discover-item');
+   const compass=ctx.$('community-menu')?.querySelector('.header-compass');
+   if(compass)discoverItem.prepend(compass.cloneNode(true));
    // 2026-11-23: 모바일 접기 메뉴도 머리줄 탭과 같은 동작 — 로그아웃이면 해당 빈 화면을 연다.
    // 방문자에게는 서재가 없으므로 접기 메뉴에서도 숨긴다.
    if(ctx.source!=='share')add('서재',()=>(0,ctx.show)('track32-bookshelf.html',true,'',true),ctx.current==='track32-bookshelf.html');
    // 2026-11-17 대표 결정: 트리 0개여도 네 화면이 모두 열리므로 접기 메뉴에서도 책·보드·지도를 늘 둔다.
-   add('책',()=>(0,ctx.show)('track59-sketchbook.html',true,'',true),ctx.current==='track59-sketchbook.html');
+   add('트리',()=>(0,ctx.show)('track61-tree.html',true,'',true),ctx.current==='track61-tree.html');
    add('보드',()=>(0,ctx.show)('track58-pinboard.html',true,'',true),ctx.current==='track58-pinboard.html');
+   add('책',()=>(0,ctx.show)('track59-sketchbook.html',true,'',true),ctx.current==='track59-sketchbook.html');
    add('지도',()=>(0,ctx.show)('track56-network.html',true,'',true),ctx.current==='track56-network.html');
     if(!(0,ctx.$)('write-menu').hidden)add('＋ 순간 추가',()=>(0,ctx.$)('write-menu').click());
     add('의견 보내기',()=>ctx.shellSettings.getFeedbackDialog().open());

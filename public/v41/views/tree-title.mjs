@@ -62,14 +62,14 @@ export function mountTreeTitle({view}) {
   const menu = document.getElementById('treeMenuPanel');
   const title = document.getElementById('treeTitleText');
   const back = document.getElementById('shelfBackBtn');
-  if (!trigger || !menu || !title) return;
   const ro = readOnly();
-  const caret = trigger.querySelector('.tree-title-caret');
+  const caret = trigger ? trigger.querySelector('.tree-title-caret') : null;
   if (ro) { if (caret) caret.hidden = true; if (back) back.hidden = true; }
+  // ← 서재: 제목·메뉴 유무와 무관하게 붙인다(띠를 걷어내면 제목만 사라지고 단추 자체는 남는다).
+  if (back && !ro) back.addEventListener('click', () => { parent.postMessage({type: MSG.navigate, view: 'track32-bookshelf.html'}, location.origin); });
+  if (!trigger || !menu || !title) return;
   const name = treeTitleText(context()?.tree?.title || '');
   if (name) title.textContent = name;
-  // ← 내 트리: 내 트리 전체 보기(책장). 셸이 이미 듣고 있는 lt41-navigate 메시지로 간다.
-  if (back && !ro) back.addEventListener('click', () => { parent.postMessage({type: MSG.navigate, view: 'track32-bookshelf.html'}, location.origin); });
   // (#420의 '.app 굴림 0 복귀' 임시 가드는 #428에서 숨은 프레임을 inert로 막으면서 걷어냈다 —
   //  숨은 프레임 문서가 초점을 청해도 초점 자체가 일어나지 않아 .app이 굴러가지 않는다.)
   if (ro) return; /* 공유·예시에서는 트리를 고르지 못한다(셸과 같다) */

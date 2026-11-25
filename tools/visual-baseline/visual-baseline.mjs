@@ -37,7 +37,9 @@ const SCENES = [
 const ACCOUNT = { name: 'account', hash: '', expect: '/v41/home', openAccount: true };
 const WIDTHS = [
   { width: 1440, height: 900, tag: '1440' },
-  { width: 390, height: 844, tag: '390' }
+  { width: 390, height: 844, tag: '390' },
+  { width: 844, height: 390, tag: 'landscape', scenes: ['home'] },
+  { width: 800, height: 900, tag: 'wide', scenes: ['home'] }
 ];
 const THEMES = ['night', 'garden'];
 
@@ -202,8 +204,8 @@ async function settleInside(frame, page) {
 }
 
 // 남은 그림·글꼴이 없고, 자료 요청도 새로 늘어나지 않을 때까지 기다린다(최대 6초). true면 자료 다 익음.
-async function assetsReady(frame, page) {
-  for (let attempt = 0; attempt < 24; attempt += 1) {
+async function assetsReady(frame, page, deadline = Infinity) {
+  for (let attempt = 0; attempt < 24 && Date.now() < deadline; attempt += 1) {
     const inside = await frame.evaluate(ASSETS_PENDING).catch(() => 0);
     const shell = await page.evaluate(ASSETS_PENDING).catch(() => 0);
     const before = await page.evaluate(() => performance.getEntriesByType('resource').length).catch(() => 0);
@@ -214,15 +216,20 @@ async function assetsReady(frame, page) {
   return false;
 }
 
+// 2026-11-24: 장마다 기다림 상한. 자료가 끝내 다 익지 않는 화면(계속 도는 그림 등)에서 한 장이 2분 넘게
+// 걸려 캡처 단계 전체가 40분 잡 시간을 다 먹었다. 상한이 지나면 마지막 그림을 '고정 실패'로 남기고 넘어간다.
+const SHOT_BUDGET_MS = 25000;
+
 async function stableShot(frame, page, file) {
+  const deadline = Date.now() + SHOT_BUDGET_MS;
   // 데이터 요청도 기다린다 — 늦게 도착한 데이터는 패널 높이를 바꿔 지도 배치를 다시 그린다.
   // (캡처당 한 번만 기다린다. 매 settle마다 기다리면 계속 연결이 남는 화면에서 8초씩 반복된다.)
   await page.waitForLoadState('networkidle', { timeout: 8000 }).catch(() => {});
   await settleInside(frame, page);
   let previous = null;
-  for (let attempt = 0; attempt < 8; attempt += 1) {
+  for (let attempt = 0; attempt < 8 && Date.now() < deadline; attempt += 1) {
     // 자료가 다 익지 않았으면 찍지 않고 기다린다 — 읽는 중 화면도 "안정"으로 둔갑하기 때문.
-    if (!(await assetsReady(frame, page))) { previous = null; await settleInside(frame, page); continue; }
+    if (!(await assetsReady(frame, page, deadline))) { previous = null; await settleInside(frame, page); continue; }
     const buffer = await page.screenshot();
     if (previous && buffer.equals(previous)) {
       writeFileSync(file, buffer);
@@ -230,10 +237,12 @@ async function stableShot(frame, page, file) {
     }
     previous = buffer;
     await settleInside(frame, page);
-    if (!(await assetsReady(frame, page))) { previous = null; continue; }
+    if (!(await assetsReady(frame, page, deadline))) { previous = null; continue; }
     await page.waitForTimeout(250);
   }
-  writeFileSync(file, previous);
+  // 끝까지 안정되지 않으면 마지막으로 한 장을 찍어 남긴다(고정 실패로 표시). 예전에는 자료 대기가 끝나지 않으면
+  // previous가 null인 채로 저장을 시도해 예외가 나고, 캡처 전체가 한 장도 남기지 못한 채 끝났다(11-24 CI).
+  writeFileSync(file, previous ?? await page.screenshot());
   return false;
 }
 
@@ -250,10 +259,22 @@ async function capture(argv) {
   const manifest = [];
   let count = 0;
   let unstable = 0;
+  // 2026-11-24: 캡처 전체 상한(기본 5분). 넘으면 남은 장은 찍지 않고 '시간 초과로 건너뜀'으로 남긴다.
+  // 겉모습 비교는 알림용이라, 일부 장만 비교되더라도 잡 전체가 늘어지는 것보다 낫다.
+  const budgetMs = Number(options.budget || process.env.LT_VISUAL_BUDGET_MS || 300000);
+  const stopAt = Date.now() + budgetMs;
+  let skipped = 0;
   try {
     for (const viewport of WIDTHS) {
+      const scenes = [...SCENES, ACCOUNT].filter(scene => (!viewport.scenes || viewport.scenes.includes(scene.name)) && (!options.scenes || options.scenes.split(',').includes(scene.name)));
       for (const theme of THEMES) {
-        for (const scene of [...SCENES, ACCOUNT]) {
+        for (const scene of scenes) {
+          if (Date.now() > stopAt) {
+            const name = scene.openAccount ? `account-${viewport.tag}-${theme}.png` : shotName(scene.name, viewport, theme);
+            manifest.push({ shot: name, scene: scene.name, opened: false, skipped: 'budget' });
+            skipped += 1;
+            continue;
+          }
           // 장마다 새 context·새 페이지. 크기·테마는 context를 만들 때 정하고, 같은 페이지에서 크기를 바꾸지 않는다.
           const context = await browser.newContext({
             viewport: { width: viewport.width, height: viewport.height },
@@ -270,7 +291,16 @@ async function capture(argv) {
           const page = await context.newPage();
           const name = scene.openAccount ? `account-${viewport.tag}-${theme}.png` : shotName(scene.name, viewport, theme);
           try {
-            const { frame, href } = await openScene(page, options.base, scene);
+            let opened;
+            try { opened = await openScene(page, options.base, scene); }
+            catch (error) {
+              // 한 장이 실패해도 나머지 장은 계속 찍는다.
+              manifest.push({ shot: name, scene: scene.name, opened: false, error: String(error?.message || error).split('\n')[0] });
+              console.log(`! ${name}: 화면을 열다 오류 (${String(error?.message || error).split('\n')[0]})`);
+              unstable += 1;
+              continue;
+            }
+            const { frame, href } = opened;
             if (!frame) {
               manifest.push({ shot: name, scene: scene.name, opened: false, shown: href });
               console.log(`! ${name}: 화면이 열리지 않음 (${href || '주소 없음'})`);
@@ -286,7 +316,14 @@ async function capture(argv) {
               }).catch(() => {});
               await page.waitForTimeout(400);
             }
-            const stable = await stableShot(frame, page, path.join(out, name));
+            let stable = false;
+            try { stable = await stableShot(frame, page, path.join(out, name)); }
+            catch (error) {
+              manifest.push({ shot: name, scene: scene.name, opened: true, shown: href, stable: false, error: String(error?.message || error).split('\n')[0] });
+              console.log(`! ${name}: 찍다 오류 (${String(error?.message || error).split('\n')[0]})`);
+              unstable += 1;
+              continue;
+            }
             manifest.push({ shot: name, scene: scene.name, opened: true, shown: href, stable });
             if (!stable) unstable += 1;
             count += 1;
@@ -301,7 +338,7 @@ async function capture(argv) {
   }
   writeFileSync(path.join(out, 'manifest.json'), JSON.stringify(manifest, null, 1));
   console.log(`${count}장 저장: ${out}`);
-  console.log(`도착 ${manifest.filter((row) => row.opened).length}장 / 고정 실패 ${unstable}장`);
+  console.log(`도착 ${manifest.filter((row) => row.opened).length}장 / 고정 실패 ${unstable}장 / 시간 상한으로 건너뜀 ${skipped}장`);
   return unstable ? 1 : 0;
 }
 

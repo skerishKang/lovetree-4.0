@@ -7,7 +7,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
-import { serve } from './helpers/screen-audit.mjs';
+import { serve, auditPage, failuresOf } from './helpers/screen-audit.mjs';
+import { SHELF_VIEW_NAMES } from '../public/v41/views/shelf/shelf-views.mjs';
 import { createTree, addMoment } from '../public/v41/domain.mjs';
 import { localDateOnly, localDaysBetween, relativeDayLabel } from '../public/v41/local-date.mjs';
 import { formatDisplayDate } from '../public/v41/book-usability.mjs';
@@ -135,6 +136,33 @@ test('서재 — 390에서 넘칠 때만 화살표가 뜨고 누르면 한 칸 �
     assert.equal(after.cards.find((c) => c.center)?.i, centeredBefore, '고른 책은 그대로');
     assert.deepEqual(errors, [], '페이지 오류 없음');
   });
+});
+
+// #1376 1단계: 보기 이름만 바꿔 같은 화면 수치 검사를 돌린다(기준·대기 시간은 그대로).
+test('서재 — 보기 이름만 바꿔도 겹침·가로 넘침이 0이다', async (t) => {
+  if (skip) { if (REQUIRE) assert.fail(`화면 시험을 건너뛸 수 없습니다: ${skip}`); t.skip(skip); return; }
+  for (const name of SHELF_VIEW_NAMES) {
+    for (const vp of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
+      await withShelf(books(4), vp, async ({ page, frame, errors }) => {
+        if (name !== 'shelf') {
+          await frame.evaluate((n) => document.querySelector(`#shelf-view-inline [data-shelf-view="${n}"]`).click(), name);
+          await frame.waitForTimeout(600);
+          const applied = await frame.evaluate((n) => document.querySelector('#shelfViewport')?.dataset.shelfView === n, name);
+          assert.equal(applied, true, `${name}: 고른 보기로 바뀐다`);
+        }
+        const audit = await auditPage(page, `서재 ${name}`);
+        // 화살표는 원래 레일 가장자리 카드 위에 얹힌다(#889). 이 설계 겹침 두 쌍만 빼고
+        // 나머지 겹침·가로 넘침·가려짐·검사오류가 0인지 보기 이름마다 같은 기준으로 잰다.
+        const hits = failuresOf(audit, `${vp.width}`, 'dark').filter((r) =>
+          ['검사오류', '가로넘침', '겹침', '가려짐'].includes(r.항목) && !/shelfPrev|shelfNext/.test(r.줄));
+        assert.deepEqual(hits, [], `${name} ${vp.width}: 겹침·가로 넘침 0`);
+        const g = await geometry(frame);
+        assert.equal(g.cards.length, 4, `${name} ${vp.width}: 책 4권`);
+        assert.ok(g.cards.every((c) => Number.isFinite(c.left) && Number.isFinite(c.cy)), `${name}: 모든 카드에 위치가 있다`);
+        assert.deepEqual(errors, [], `${name}: 페이지 오류 없음`);
+      });
+    }
+  }
 });
 
 test('날짜 표시 — 시계를 고정하면 오늘·어제·지난 날짜가 지역 날짜대로 나온다', () => {

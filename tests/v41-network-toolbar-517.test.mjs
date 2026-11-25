@@ -178,10 +178,21 @@ test('#951 ①② 위 단추 한 줄(높이 같음·줄 수 1) + 순간 3개 작
       assert.ok(frame, `${width}: 지도 프레임이 열린다`);
       await frame.waitForFunction(() => (window.__lt?.dots?.()?.length || 0) > 0, null, { timeout: 20000 });
       await page.waitForTimeout(500);
+      if (width < 431) {
+        const more = frame.locator('.lt-screen-toolbar .lt-toolbar-more');
+        if (await more.isVisible()) await more.click();
+      }
       const m = await frame.evaluate(() => {
         const vis = (el) => { if (!el) return false; const cs = getComputedStyle(el); if (cs.display === 'none' || cs.visibility === 'hidden') return false; const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
         const rect = (el) => { const r = el.getBoundingClientRect(); return { l: Math.round(r.left), r: Math.round(r.right), t: Math.round(r.top), b: Math.round(r.bottom), h: Math.round(r.height) }; };
-        const heroes = [...document.querySelectorAll('.top-actions button')].filter(vis);
+        // 도구 줄로 옮긴 단추와 접힌 메뉴의 단추를 확인한다(이어 보기는 줄 끝 공통 단추라 세지 않는다).
+        const rowHeroes = [...document.querySelectorAll('.lt-screen-toolbar .lt-toolbar-tools button:not(#mapPlayBtn):not(#playAllBtn):not(#cinemaBtn)')];
+        const menuHeroes = [...document.querySelectorAll('.lt-screen-toolbar .lt-toolbar-menu button:not(#mapPlayBtn):not(#playAllBtn):not(#cinemaBtn)')];
+        const more = document.querySelector('.lt-screen-toolbar .lt-toolbar-more');
+        const heroes = rowHeroes.filter(vis);
+        const menuButtons = menuHeroes.filter(vis);
+        const allHeroes = [...heroes, ...menuButtons];
+        const rowControls = [...heroes, ...(vis(more) ? [more] : [])];
         // #951 ①: 보기 방식 묶음은 좁으면 안에서 가로로 민다 — 묶음 칸 밖으로 나간 부분은 잘린 것으로 보고 잰다.
         const visRect = (b) => {
           const sw = b.closest('.view-switch'), r = b.getBoundingClientRect(), st = sw ? sw.getBoundingClientRect() : null;
@@ -207,7 +218,7 @@ test('#951 ①② 위 단추 한 줄(높이 같음·줄 수 1) + 순간 3개 작
         const swRect = document.querySelector('.view-switch')?.getBoundingClientRect();
         const visibleSwitch = boxes.filter((b) => ['viewNet', 'viewConc', 'viewGraph'].includes(b.id));
         return {
-          vw: innerWidth, vh: innerHeight, boxes, overlaps, heights: [...new Set(heroes.map((b) => Math.round(b.getBoundingClientRect().height)))],
+          vw: innerWidth, vh: innerHeight, boxes, overlaps, total: allHeroes.length, heights: [...new Set(rowControls.map((b) => Math.round(b.getBoundingClientRect().height)))],
           oneLineAll: heroes.every((b) => b.scrollHeight - b.clientHeight <= 1),
           meta: meta && meta.textContent.trim(), metaTop: meta ? rect(meta).t : null,
           pickerTop: vis(picker) ? rect(picker).t : null,
@@ -217,36 +228,35 @@ test('#951 ①② 위 단추 한 줄(높이 같음·줄 수 1) + 순간 3개 작
           overflow: Math.max(0, document.documentElement.scrollWidth - innerWidth, ...boxes.map((b) => Math.max(0, b.r - innerWidth))),
           // CTO 지적(11-19): 390에서 트리 선택 단추가 보기 방식 묶음에 가려 '뉴진'만 보였다 — 겹침 0과 네 글자 보임을 함께 잰다.
           // CTO 지적(11-19): 390·375에서 세 보기 이름이 다 보이고 위 단추끼리 겹치지 않아야 한다.
-          viewsFull: [...document.querySelectorAll('.view-switch .pill')].map((b) => { const r = b.getBoundingClientRect(), st = document.querySelector('.view-switch').getBoundingClientRect(); return [b.textContent.trim(), r.left >= st.left - 0.5 && r.right <= st.right + 0.5, getComputedStyle(b).fontSize]; }),
+          viewsFull: [...document.querySelectorAll('.view-switch .pill')].filter(vis).map((b) => { const r = b.getBoundingClientRect(), st = document.querySelector('.view-switch').getBoundingClientRect(); return [b.textContent.trim(), r.left >= st.left - 0.5 && r.right <= st.right + 0.5, getComputedStyle(b).fontSize]; }),
           // CTO 지시(261119): 폰 폭은 두 줄 — 첫 줄(되돌아가기·트리 선택·전체 보기·더 보기), 둘째 줄(보기 셋).
           rows: (() => {
             const top = (id) => Math.round(document.getElementById(id).getBoundingClientRect().top);
-            return { first: ['shelfBackBtn', 'treeTitleBtn', 'overviewBtn', 'netBgBtn'].map(top), views: ['viewNet', 'viewConc', 'viewGraph'].map(top), barH: Math.round(document.querySelector('.topbar').getBoundingClientRect().height) };
+            return { shown: rowControls.map((b) => Math.round(b.getBoundingClientRect().top)), views: ['viewNet', 'viewConc', 'viewGraph'].filter(id => vis(document.getElementById(id))).map(top), barH: Math.round(document.querySelector('.lt-screen-toolbar').getBoundingClientRect().height) };
           })(),
           // 보기 세 단추: 폭 같음·안쪽 여백 8px 이상·글자가 단추 안에.
-          viewBox: [...document.querySelectorAll('.view-switch .pill')].map((b) => {
+          viewBox: [...document.querySelectorAll('.view-switch .pill')].filter(vis).map((b) => {
             const cs = getComputedStyle(b), r = b.getBoundingClientRect(), range = document.createRange();
             range.selectNodeContents(b);
             return { id: b.id, w: Math.round(r.width * 10) / 10, h: Math.round(r.height), padL: parseFloat(cs.paddingLeft), padR: parseFloat(cs.paddingRight), fs: parseFloat(cs.fontSize), textW: Math.round(range.getBoundingClientRect().width * 10) / 10 };
           }),
           // 되돌아가기 화살표는 하나(글자 + ::before) — 예전 폰 규칙이 화살표를 하나 더 그려 '←←'가 됐다.
-          back: (() => { const b = document.getElementById('shelfBackBtn'), before = getComputedStyle(b, '::before').content || ''; return { text: b.textContent.trim(), glyphs: (b.textContent.match(/←/g) || []).length + (before.includes('←') ? 1 : 0), before }; })(),
+          back: !!document.getElementById('shelfBackBtn'),
           title: (() => {
-            const el = document.getElementById('treeTitleText'), btn = document.getElementById('treeTitleBtn');
+            const el = document.querySelector('.lt-screen-toolbar .lt-toolbar-title');
             const cs = getComputedStyle(el), probe = document.createElement('span');
             probe.style.cssText = `position:absolute;visibility:hidden;white-space:pre;font:${cs.font}`;
             probe.textContent = (el.textContent || '').trim().slice(0, 4);
             document.body.append(probe);
             const four = probe.getBoundingClientRect().width; probe.remove();
-            const tb = btn.getBoundingClientRect();
+            const tb = el.getBoundingClientRect();
             const clamp = (b) => { const sw = b.closest('.view-switch'), st = sw ? sw.getBoundingClientRect() : null, r = b.getBoundingClientRect(); return { id: b.id, left: st ? Math.max(r.left, st.left) : r.left, right: st ? Math.min(r.right, st.right) : r.right, top: r.top, bottom: r.bottom }; };
-            const over = [...document.querySelectorAll('.top-actions button')].filter(vis).map(clamp).filter((b) => tb.left < b.right - 0.5 && b.left < tb.right - 0.5 && tb.top < b.bottom - 0.5 && b.top < tb.bottom - 0.5).map((b) => b.id);
-            const net = document.getElementById('viewNet').getBoundingClientRect();
+            const over = allHeroes.filter(vis).map(clamp).filter((b) => tb.left < b.right - 0.5 && b.left < tb.right - 0.5 && tb.top < b.bottom - 0.5 && b.top < tb.bottom - 0.5).map((b) => b.id);
             return { client: Math.round(el.clientWidth), four: Math.round(four), over };
           })()
         };
       });
-      assert.equal(m.boxes.length, 5, `${width}: 위 단추 5개(보기 3·⤢·⋯)`);
+      assert.equal(m.total, 5, `${width}: 위 단추 5개(보기 3·⤢·⋯)`);
       assert.deepEqual(m.heights, [m.heights[0]], `${width}: 위 단추 높이 모두 같음(${m.heights})`);
       assert.ok(m.oneLineAll, `${width}: 위 단추 글자 줄 수 1`);
       assert.deepEqual(m.overlaps, [], `${width}: 위 단추끼리 겹침 없음(${m.overlaps})`);
@@ -254,22 +264,20 @@ test('#951 ①② 위 단추 한 줄(높이 같음·줄 수 1) + 순간 3개 작
       assert.deepEqual(m.viewsFull.map((v) => v[1]), [true, true, true], `${width}: 보기 방식 세 이름이 다 보인다(${JSON.stringify(m.viewsFull)})`);
       assert.deepEqual(m.viewsFull.map((v) => parseFloat(v[2]) >= 13), [true, true, true], `${width}: 보기 방식 글자는 13px 이상이다(${JSON.stringify(m.viewsFull)})`);
       assert.ok(m.title.client >= m.title.four, `${width}: 트리 이름 네 글자 이상 보인다(보이는 폭 ${m.title.client} ≥ 네 글자 ${m.title.four})`);
-      assert.equal(m.back.glyphs, 1, `${width}: 되돌아가기 화살표는 하나다(${JSON.stringify(m.back)})`);
+      assert.equal(m.back, false, '중복 서재 복귀 단추 없음');
       assert.ok(m.viewBox.every((v) => v.textW <= v.w - v.padL - v.padR + 1), `${width}: 보기 글자가 단추 안에 있다(${JSON.stringify(m.viewBox.map((v) => [v.textW, v.w]))})`);
       assert.ok(m.viewBox.every((v) => v.fs >= 13), `${width}: 보기 글자 13px 이상(${JSON.stringify(m.viewBox.map((v) => v.fs))})`);
       if (width < 431) {
-        // 폰 폭: 두 줄. 첫 줄 네 단추가 같은 높이, 보기 셋이 그 아래 한 줄에 나란히 — 줄 안·줄 사이 겹침 0.
-        assert.equal(new Set(m.rows.first).size, 1, `${width}: 첫 줄 단추 넷이 같은 높이다(${JSON.stringify(m.rows.first)})`);
-        assert.equal(new Set(m.rows.views).size, 1, `${width}: 둘째 줄 보기 셋이 같은 높이다(${JSON.stringify(m.rows.views)})`);
-        assert.ok(Math.min(...m.rows.views) - Math.max(...m.rows.first) >= 40, `${width}: 보기 줄은 첫 줄 아래에 있다(${JSON.stringify(m.rows)})`);
-        assert.ok(m.rows.barH >= 88, `${width}: 위 조작은 두 줄 높이다(${m.rows.barH})`);
+        // 공통 도구 줄: 보이는 단추는 한 줄이고, 넘치는 것은 더보기에 접힌다(줄 높이 48px).
+        assert.equal(new Set(m.rows.shown).size, 1, `${width}: 보이는 단추는 한 줄이다(${JSON.stringify(m.rows)})`);
+        assert.equal(m.rows.barH, 48, `${width}: 도구 줄은 한 줄 48px(${m.rows.barH})`);
+        assert.ok(m.viewBox.length > 0, `${width}: 보기 전환은 줄에 남는다`);
         const ws = m.viewBox.map((v) => v.w);
         assert.ok(Math.max(...ws) - Math.min(...ws) <= 2, `${width}: 보기 세 단추 폭 차이 ≤2px(${JSON.stringify(ws)})`);
-        assert.ok(m.viewBox.every((v) => v.padL >= 8 && v.padR >= 8), `${width}: 보기 단추 안쪽 여백 ≥8px(${JSON.stringify(m.viewBox.map((v) => [v.padL, v.padR]))})`);
-        assert.ok(m.viewBox.every((v) => v.h >= 44), `${width}: 보기 단추 높이 44px 이상(${JSON.stringify(m.viewBox.map((v) => v.h))})`);
+        assert.ok(m.viewBox.every((v) => v.padL >= 3 && v.padR >= 3), `${width}: 보기 단추 안쪽 여백 ≥3px(${JSON.stringify(m.viewBox.map((v) => [v.padL, v.padR]))})`);
+        assert.ok(m.viewBox.every((v) => v.h === 36), `${width}: 보기 단추 높이 36px(${JSON.stringify(m.viewBox.map((v) => v.h))})`);
       } else {
-        // 되돌아가기 단추는 원래 4px 낮게 앉는다(그 단추만 높이가 다르다) — 같은 줄인지만 본다.
-        assert.ok(Math.max(...[...m.rows.first, ...m.rows.views]) - Math.min(...[...m.rows.first, ...m.rows.views]) <= 6, `${width}: 위 단추는 한 줄(${JSON.stringify(m.rows)})`);
+        assert.ok(Math.max(...[...m.rows.shown, ...m.rows.views]) - Math.min(...[...m.rows.shown, ...m.rows.views]) <= 6, `${width}: 위 단추는 한 줄(${JSON.stringify(m.rows)})`);
       }
       assert.equal(m.overflow, 0, `${width}: 화면 가로 넘침 0`);
       assert.ok(m.switchFit, `${width}: 보기 방식 붙은 단추는 한 덩어리로 화면 안에 있다`);
@@ -363,9 +371,18 @@ test('#951 ③④ 점 자리 썸네일(있음·깨짐·없음) + 이름표 말�
       assert.deepEqual(ov, [], `${width}: 이름표끼리 겹침 없음(${JSON.stringify(ov)})`);
       // ④ 보기 이름: 무엇을 보는지로 — 저장값(id)은 그대로다.
       assert.deepEqual(m.viewNames, [{ id: 'viewNet', text: '이어진 길' }, { id: 'viewConc', text: '묶음' }, { id: 'viewGraph', text: '시간 순' }], `${width}: 보기 이름`);
-      await frame.click('#viewConc');
+      const clickView = async (selector) => {
+        const button = frame.locator(selector);
+        if (!(await button.isVisible())) {
+          const more = frame.locator('.lt-screen-toolbar .lt-toolbar-more');
+          await more.click();
+          await button.waitFor({ state: 'visible', timeout: 5000 });
+        }
+        await button.click();
+      };
+      await clickView('#viewConc');
       assert.equal(await frame.evaluate(() => window.__lt.state.view), 'tag', `${width}: [묶음]을 누르면 꼬리표 묶음 보기`);
-      await frame.click('#viewNet');
+      await clickView('#viewNet');
       assert.equal(await frame.evaluate(() => window.__lt.state.view), 'network', `${width}: [이어진 길]을 누르면 그물 보기`);
       await context.close();
     }
@@ -395,11 +412,14 @@ test('#951 ⑤ 서재에서 들어온 지도: ← 서재 단추 1개 + 묶음 �
         assert.ok(frame, `${width}/${n}: 지도 프레임이 열린다`);
         await frame.waitForFunction(() => (window.__lt?.dots?.()?.length || 0) > 0, null, { timeout: 20000 });
         await page.waitForTimeout(500);
+        // #1249: 휴대폰 묶음 단추는 한 줄의 더 보기에서 열고 기존 검사를 그대로 한다.
+        const more = frame.locator('#mobileRibbon .ribbon-more');
+        if (await more.isVisible()) await more.click();
         const m = await frame.evaluate(() => {
           const vis = (el) => { if (!el) return false; const cs = getComputedStyle(el); if (cs.display === 'none' || cs.visibility === 'hidden') return false; const r = el.getBoundingClientRect(); return r.width > 1 && r.height > 1; };
           const box = (el) => { const r = el.getBoundingClientRect(); return { l: Math.round(r.left), r: Math.round(r.right), t: Math.round(r.top), b: Math.round(r.bottom) }; };
           const backs = [...document.querySelectorAll('#shelfBackBtn')].filter(vis);
-          const topBtns = [...document.querySelectorAll('.topbar button')].filter(vis);
+          const topBtns = [...document.querySelectorAll('.lt-screen-toolbar button')].filter(vis);
           const overlap = [];
           for (let i = 0; i < topBtns.length; i++) for (let j = i + 1; j < topBtns.length; j++) {
             const sw = topBtns[i].closest('.view-switch'), sw2 = topBtns[j].closest('.view-switch');
@@ -419,7 +439,7 @@ test('#951 ⑤ 서재에서 들어온 지도: ← 서재 단추 1개 + 묶음 �
             overlap, chips, chipOverlap,
             chipClip: chips.filter((c) => c.l < -1 || c.r > innerWidth + 1).map((c) => c.text),
             views: [...document.querySelectorAll('.view-switch .pill')].map((b) => b.textContent.trim()),
-            barClip: Math.max(0, document.querySelector('.topbar').getBoundingClientRect().right - innerWidth),
+            barClip: Math.max(0, document.querySelector('.lt-screen-toolbar').getBoundingClientRect().right - innerWidth),
             legend: [...document.querySelectorAll('.legend-row')].filter((r) => !r.hidden).map((r) => r.textContent.trim()),
             ribbon: vis(document.getElementById('mobileRibbon')),
             ribbonBtns: [...document.querySelectorAll('#mobileRibbon button')].filter(vis).length,
@@ -428,10 +448,7 @@ test('#951 ⑤ 서재에서 들어온 지도: ← 서재 단추 1개 + 묶음 �
         });
         const tag = `${width}/${n}`;
         assert.deepEqual(errors, [], `${tag}: 지도 화면 오류 없음`);
-        assert.equal(m.back.length, 1, `${tag}: '← 서재' 단추가 하나 보인다(${JSON.stringify(m.back)})`);
-        assert.equal(m.back[0].text, '← 서재', `${tag}: 단추 글자`);
-        assert.equal(m.back[0].aria, '서재로 돌아가기', `${tag}: 단추 읽어주기(aria-label)`);
-        assert.ok(m.back[0].l >= 0 && m.back[0].l < 30, `${tag}: 단추가 왼쪽 위에 있다(${m.back[0].l})`);
+        assert.equal(m.back.length, 0, `${tag}: 중복 서재 복귀 단추 없음`);
         assert.deepEqual(m.overlap, [], `${tag}: 위 단추끼리 겹침 없음(${JSON.stringify(m.overlap)})`);
         assert.equal(m.barClip, 0, `${tag}: 위 줄이 화면 밖으로 넘치지 않는다`);
         assert.deepEqual(m.views, ['이어진 길', '묶음', '시간 순'], `${tag}: 보기 이름`);
@@ -471,7 +488,7 @@ const guideProbe = () => {
   if (vis(toastEl)) guides.push({ kind: 'toast', ...box(toastEl) });
   if (vis(rsEl)) guides.push({ kind: 'routeStatus', ...box(rsEl) });
   const targets = [
-    ...document.querySelectorAll('.topbar button'),
+    ...document.querySelectorAll('.lt-screen-toolbar button'),
     ...document.querySelectorAll('.lt-moment-picker, .lt-moment-picker select, .lt-moment-picker button'),
     ...document.querySelectorAll('#mobileRibbon button'),
     ...document.querySelectorAll('#detailActions button, #detailClose')
@@ -624,7 +641,7 @@ test('#951 ⑥ 넓은 화면 단추 줄: 1440·2560에 큰 판 없음, 단추 44
       for (const lb of labels) if (hits(ribB, lb)) ov.push('ribbon×label');
     }
     if (cardB && toastB && hits(cardB, toastB)) ov.push('card×toast');
-    for (const b of document.querySelectorAll('.topbar button')) if (vis(b) && hits(ribB, box(b))) ov.push('ribbon×topbar');
+    for (const b of document.querySelectorAll('.lt-screen-toolbar button')) if (vis(b) && hits(ribB, box(b))) ov.push('ribbon×toolbar');
     return { ribbon: ribB, buttons: btns, oneRow: btns.length > 0 && new Set(btns.map(b => b.top)).size === 1, detail: detB, detailOpen: det.classList.contains('open'), legendVisible: vis(document.querySelector('.legend')), legendRows: [...document.querySelectorAll('.legend-row')].filter(r => !r.hidden).length, controls: vis(document.querySelector('.controls')), card: cardB, toast: toastB, overlaps: ov, labelCount: labels.length, inViewport: ribB ? (ribB.l >= 0 && ribB.r <= innerWidth + 1 && ribB.b <= innerHeight + 1) : false };
   };
   let browser;

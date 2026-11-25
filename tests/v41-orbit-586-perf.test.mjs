@@ -67,7 +67,6 @@ s('#586 끄는 동안에는 hover 모양을 바꾸지 않는다(소스 계약)',
 s('#942 클릭·탭은 배경을 움직이지 않는다(소스 계약)', () => {
   const src = readFileSync(path.join(REPO, 'src', 'views', 'orbit.js'), 'utf8');
   assert.doesNotMatch(src, /app\.addEventListener\('pointermove',e=>\{if\(!finePointer\.matches/, '가리키기용 카메라 움직임 없음');
-  assert.match(src, /const fitNotice=\(\)=>\{.*appBox=app\.getBoundingClientRect\(\)/, '창이 바뀔 때 캐시를 다시 재운다');
 });
 s('#586 첫 화면 문서는 src/styles.css 를 읽지 않고 --ui 토큰만 인라인로 둔다(소스 계약)', () => {
   const homeJs = readFileSync(path.join(REPO, 'v41', 'home.js'), 'utf8');

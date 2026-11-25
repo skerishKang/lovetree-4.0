@@ -101,6 +101,8 @@ html[data-v41-screen=book] .yt-placeholder{display:grid;place-items:center;width
 html[data-v41-screen=book] .yt-play .lt-fallback-card{width:100%;height:100%;display:flex;flex-direction:column;justify-content:center}
 html[data-v41-screen=book] .yt-placeholder .yt-play-label{position:static;transform:none}
 html[data-v41-screen=book] .yt-frame{display:block;width:100%;aspect-ratio:16/9;border:0;background:#000}
+/* #1378: 좁은 책 화면의 재생 iframe은 검은 여백을 허용해 세로 200px을 확보합니다. */
+@media(max-width:600px){html[data-v41-screen=book] .yt-frame:not(.is-vertical){min-height:200px}}
 html[data-v41-screen=book] .yt-frame.is-vertical{width:auto;height:clamp(240px,52vh,400px);max-width:100%;aspect-ratio:9/16;margin:0 auto}
 /* 이슈 584: 크게 보기 단추를 영상 위(yt-expand)에서 카드 아래 한 줄로 옮긴다.
    왼쪽 YouTube ↗(원본 링크), 오른쪽 크게 보기 — 영상 위에는 단추가 겹치지 않는다. */
@@ -213,6 +215,11 @@ html[data-book-view=double][data-v41-screen=book] .title-edit-hint:focus-visible
 html[data-book-view=single][data-book-shape=wide][data-v41-screen=book] .moment-heading:hover .title-edit-hint,
 html[data-book-view=single][data-book-shape=wide][data-v41-screen=book] .moment-heading:focus-within .title-edit-hint,
 html[data-book-view=single][data-book-shape=wide][data-v41-screen=book] .title-edit-hint:focus-visible{opacity:.72;pointer-events:auto}
+/* #1288: 마우스가 없는 기기에서는 '고치기'를 올림으로 감추지 않는다. */
+@media (hover: none){
+  html[data-book-view=double][data-v41-screen=book] .title-edit-hint,
+  html[data-book-view=single][data-book-shape=wide][data-v41-screen=book] .title-edit-hint{opacity:.72;pointer-events:auto}
+}
 html[data-v41-screen=book] .media-source{display:flex;align-items:center;gap:8px;margin:10px 0 2px;min-width:0;font-size:12px;line-height:1.5;color:var(--lt-ink)}
 html[data-v41-screen=book] .media-source-mark{flex:0 0 auto;font-size:12px;color:var(--lt-ink)}/* #662: 10px는 #548 기준(12px)에 못 미쳐 검사기에 걸렸다 — 12px로. */
 html[data-v41-screen=book] .media-source-text{flex:0 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -350,8 +357,8 @@ html[data-v41-screen=book][data-lt-theme=garden] .why-margin{padding:0;border:0;
 html[data-book-shape=phone][data-v41-screen=book] .why-margin{order:1;top:auto;bottom:auto;margin:0 76px 0 10px;position:static;left:auto;transform:none;width:auto}
 html[data-book-shape=phone][data-v41-screen=book] .nav-pill{order:2;position:static;bottom:auto;margin:2px auto 0}
 html[data-book-shape=phone][data-v41-screen=book] .branch-tab{order:3}
-html[data-book-shape=phone][data-v41-screen=book] .yt-play.is-vertical,
-html[data-book-shape=phone][data-v41-screen=book] .yt-frame.is-vertical{height:clamp(190px,26vh,230px)}
+html[data-book-shape=phone][data-v41-screen=book] .yt-play.is-vertical{height:clamp(190px,26vh,230px)}
+html[data-book-shape=phone][data-v41-screen=book] .yt-frame.is-vertical{height:clamp(200px,26vh,230px)}
 /* #792: 구간 재생 뒤 '처음부터 보기' — 터치 영역 44px. */
 html[data-v41-screen=book] .yt-from-start{align-self:flex-start;margin:8px 0 2px;min-height:44px;padding:8px 12px;border:1px solid var(--lt-line,#c9b8a8);border-radius:999px;background:none;color:var(--lt-ink);font:inherit;font-size:12px;cursor:pointer}
 
@@ -360,3 +367,31 @@ html[data-v41-screen=book] .yt-from-start{align-self:flex-start;margin:8px 0 2px
 html[data-v41-screen=book] .detail-actions [data-detail-stage][hidden]{display:none}
 html[data-v41-screen=book] .detail-stage-note{flex:1 0 100%;margin:0;color:var(--lt-ink);font-size:12px;line-height:1.5}
 html[data-v41-screen=book] .detail-stage-note[hidden]{display:none}
+/* #1287: leave mobile toolbar room for controls and move editing to the card corner. */
+@media(max-width:600px){
+ html[data-v41-screen=book] .topbar .book-title{display:none}
+ html[data-v41-screen=book] .book-card-moment{position:relative;padding-top:46px}
+ html[data-v41-screen=book] .book-card-moment .moment-edit{position:absolute;right:12px;top:4px;z-index:2}
+ html[data-v41-screen=book] #book-display-inline{overflow:visible}
+ html[data-v41-screen=book] .lt-toolbar-tools{overflow:visible}
+ html[data-v41-screen=book] #book-display-inline button{position:relative;height:36px;min-height:36px;min-width:44px}
+ html[data-v41-screen=book] #book-display-inline button::after{content:"";position:absolute;inset:-4px 0}
+ html[data-v41-screen=book] .book-wrap{margin-bottom:16px}
+ html[data-v41-screen=book] .stage{padding-bottom:calc(16px + env(safe-area-inset-bottom,0px))}
+}
+
+/* #1287: expanded mobile spread uses the same wide book pages. */
+html.book-mobile-spread #bookWrap:fullscreen{box-sizing:border-box;width:100vw;height:100dvh;min-height:0;max-height:none;margin:0;padding:12px;background:var(--lt-stage)}
+html.book-mobile-spread #bookWrap:fullscreen .book{width:100%;height:100%}
+html.book-mobile-spread #book-rotate-hint{position:absolute;inset:0;z-index:30;display:grid;place-items:center;text-align:center;background:var(--lt-stage);color:var(--lt-ink);font:600 18px/1.5 var(--lt-ui)}
+html.book-mobile-spread #book-rotate-hint[hidden],#book-rotate-hint[hidden]{display:none}
+
+/* #1287: reserve room for the floating add control below long mobile moments. */
+html[data-v41-screen=book][data-book-shape=phone] .mobile-content{padding-bottom:72px}
+
+/* #1287: a reachable 1-page action remains inside the fullscreen book. */
+#mobile-spread-exit[hidden]{display:none}
+html.book-mobile-spread #mobile-spread-exit{position:absolute;right:12px;top:12px;z-index:31;min-width:44px;min-height:44px;border:1px solid var(--lt-line-paper);border-radius:var(--lt-r-pill);background:var(--lt-paper);color:var(--lt-ink);font:600 14px var(--lt-ui);cursor:pointer}
+/* #1287: the visible common toolbar is mounted outside the hidden legacy topbar. */
+@media(max-width:600px){html[data-v41-screen=book] .lt-screen-toolbar-title{display:none}html[data-v41-screen=book] .why-margin{margin-top:14px}}
+@media(max-width:600px){html[data-book-shape=phone][data-v41-screen=book] .why-margin{margin-top:14px}}

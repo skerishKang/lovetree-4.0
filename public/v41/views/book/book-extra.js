@@ -6,6 +6,7 @@ import {coverChoice,COVER_PALETTE} from '/v41/views/shelf/shelf-model.mjs';
 import {coverMomentFor} from '/v41/views/shelf/shelf-model.mjs';
 import {thumbnailCandidates,thumbFallbackAttrs,coverFallbackAttrs,fallbackCardMarkup,mountThumbFallback,VIDEO_UNAVAILABLE_TEXT} from '/v41/thumb-fallback.mjs';
 import {mountExpandControls,ytOpenUrl} from '/v41/yt-expand.mjs';
+import {monitorBookYoutubeFrame} from '/v41/views/book/book-youtube-availability.mjs';
 import {createCommunityApi} from '/v41/community-api.mjs';
 // #792 4단계 ⑤: 공유 책의 순간 상세에서도 같은 규칙으로 '이 무대 담기' 단추를 붙인다.
 import {stageShareId,stageVoteLabel,stageVoteNotice,readStage,toggleStage} from '/v41/community-stages.mjs';
@@ -45,9 +46,11 @@ function showTip(el){
 }
 function hideTip(){tipTarget=null;clearTimeout(tipTimer);const bubble=$b('#lt-tip-bubble');if(bubble)bubble.hidden=true}
 function mountTips(){
- document.addEventListener('mouseover',e=>{const el=e.target.closest?.('[data-lt-tip]');if(el)showTip(el)});
+ // #1288: 휴대폰(마우스 없는 기기)에서는 올림·초점 말풍선을 띄우지 않는다. 돌아온 뒤 남는 것도 감춘다.
+ window.LTHoverTip.mountHoverTipGuard(document);
+ document.addEventListener('mouseover',e=>{if(!window.LTHoverTip.isHoverDevice())return;const el=e.target.closest?.('[data-lt-tip]');if(el)showTip(el)});
  document.addEventListener('mouseout',e=>{if(tipTarget&&(!e.relatedTarget||!tipTarget.contains(e.relatedTarget)))hideTip()});
- document.addEventListener('focusin',e=>{const el=e.target.closest?.('[data-lt-tip]');if(el)showTip(el)});
+ document.addEventListener('focusin',e=>{if(!window.LTHoverTip.isHoverDevice())return;const el=e.target.closest?.('[data-lt-tip]');if(el)showTip(el)});
  document.addEventListener('focusout',()=>hideTip());
  addEventListener('scroll',hideTip,true);
  document.addEventListener('keydown',e=>{if(e.key==='Escape')hideTip()});
@@ -68,10 +71,14 @@ function requestNextMoment(parentId){
 let detailAnchor=null;
 const nextMomentOf=id=>LT59Model.nextMomentOf(id,LTDEMO.moments,LTDEMO.edges,titleMainFor);
 function closeDetail(){
+ closeBookHistory('detailSide');
  const panel=$b('#detailSide'),card=detailAnchor;
  if(panel){panel.hidden=true;panel.replaceChildren()}
  detailAnchor=null;
+ const pageDetail=document.querySelector('.page-detail');
+ if(pageDetail){pageDetail.remove();selectedMomentId=null;renderSpread(current,LTDEMO.get(),false)}
  setBookOpen($b('#detail'),false);
+ for(const id of ['detailTag','detailTitle','detailBody','detailChips','detailWhy']){const el=$b('#'+id);if(el)el.replaceChildren()}
  if(card&&card.isConnected){card.classList.remove('detail-open');card.setAttribute('tabindex','-1');try{card.focus({preventScroll:true})}catch{}}
 }
 function detailMeta(m){return t(LTLabels.type(m.kind))+' · '+t(formatDisplayDate(m.date,ltDateStyle()))+' · '+t(m.emotion)}
@@ -152,12 +159,18 @@ function placeDetail(id,card){
 }
 const originalShowDetail=showDetail;
 showDetail=function(id){
- originalShowDetail(id);
+ if(!metadataFor(id)||!cardFor(id))return;
+ const existing=history.state?.ltBookOverlay==='detailSide';
+ if(!existing)recordBookOpen('detailSide');
+ bookHistoryTransferring=true;
+ try{originalShowDetail(id);
  const m=metadataFor(id);if(m){const view=titleViewFor(m);$b('#detailTitle').textContent=view.main;if(view.sub)$b('#detailTag').textContent+=' · ▶ '+view.sub;}
  setBookOpen($b('#detail'),false);
  const card=cardFor(id);
- if(card)placeDetail(id,card);
+ if(card){placeDetail(id,card);card.classList.add('focused')}
+ }finally{bookHistoryTransferring=false}
 };
+if(window.__TRACK59__)window.__TRACK59__.showDetail=showDetail;
 document.addEventListener('keydown',e=>{if(e.key!=='Escape')return;if(document.querySelector('.lt-lightbox'))return;const panel=$b('#detailSide');if(panel&&!panel.hidden){e.preventDefault();closeDetail();}},true);
 /* 1. 실제 기록에서 재생 단추가 눌리지 않던 문제(2026-11-08): 카드 위 겹침·다른 리스너의 전파 차단에
    영향받지 않도록 pointerdown에서 먼저 잡고, 재생 주소를 못 만들면 원본 링크를 새 창으로 연다. */
@@ -173,6 +186,7 @@ function playInline(yt,media){
  const watch=(media&&media.openUrl)?media.openUrl:('https://www.youtube.com/watch?v='+yt.dataset.ytPlay);
  const cell=mountExpandControls(host,{url:watch,openUrl:watch,vertical:yt.dataset.ytVertical==='1',lightbox:(u,ti,v)=>{window.LTMedia&&LTMedia.openLightbox(u,ti,v)}});
  cell.stage.append(frame);
+ monitorBookYoutubeFrame(frame,cell.stage,yt.dataset.ytPlay,watch);
  if(end>start)host.insertAdjacentHTML('beforeend','<button type="button" class="yt-from-start" data-yt-from-start="'+t(yt.dataset.ytPlay)+'">처음부터 보기</button>');
 }
 /* #791: 공식 재생기 iframe을 직접 넣는다(섀도우 루트의 블록을 스크립트가 찾지 못한다). */
@@ -203,7 +217,8 @@ document.addEventListener('pointerdown',e=>{
   frame.setAttribute('referrerpolicy','strict-origin-when-cross-origin');
   // #833: '처음부터 보기' 재생 칸도 같은 모서리 단추를 둔다.
   const cell=mountExpandControls(host,{url:ytOpenUrl(fromStart.dataset.ytFromStart),openUrl:ytOpenUrl(fromStart.dataset.ytFromStart),lightbox:(u,ti,v)=>{window.LTMedia&&LTMedia.openLightbox(u,ti,v)}});
-  cell.stage.append(frame);return}
+  cell.stage.append(frame);
+  monitorBookYoutubeFrame(frame,cell.stage,fromStart.dataset.ytFromStart,ytOpenUrl(fromStart.dataset.ytFromStart));return}
  const tt=e.target.closest&&e.target.closest('[data-tt-play]');
  if(tt){e.preventDefault();e.stopPropagation();playTiktokInline(tt);return}
  const ig=e.target.closest&&e.target.closest('[data-ig-play]');
@@ -253,7 +268,7 @@ document.addEventListener('click',e=>{
  // #327 2부: 옮기기는 셸 정리 창이 맡는다(여기는 요청만 보낸다).
  const move=e.target.closest('[data-detail-move]');
  if(move){e.preventDefault();e.stopPropagation();parent.postMessage({type:MSG.move,momentId:move.dataset.detailMove},location.origin);return}
- if(e.target.closest('[data-detail-index]')){e.preventDefault();closeDetail();openArchive();return}
+ if(e.target.closest('[data-detail-index]')){e.preventDefault();openArchive();return}
  if(e.target.closest('[data-detail-close]')){e.preventDefault();closeDetail();return}
 },true);
 /* #800: 모든 순간 카드는 정보 줄 → 제목 → 메모 순서로 한 번만 그린다. */
@@ -426,8 +441,8 @@ renderSpread=function(idx,focusId=null,land=true){
 /* 연결 한마디는 두 페이지의 가운데에 둔다. 빈 관계는 입력 버튼으로, 저장된 관계는 다시 편집할 수 있는 문장으로 보인다. */
 const STORY_TIP_KEY='lt41.tips.bookStory';
 let storyTipOpen=false,storyRequest=null;
-try{storyTipOpen=LTDEMO.moments.length>=2&&localStorage.getItem(STORY_TIP_KEY)!=='1';if(storyTipOpen)localStorage.setItem(STORY_TIP_KEY,'1')}catch{storyTipOpen=LTDEMO.moments.length>=2}
-function storyTipMarkup(){return storyTipOpen?'<div class="story-tip" role="note"><span>두 순간 사이에 한마디를 남기면, 책이 이야기처럼 이어져요. 안 적어도 괜찮아요.</span><button type="button" data-story-tip-dismiss>알겠어요</button></div>':''}
+try{storyTipOpen=!LTDEMO.readOnly&&LTDEMO.moments.length>=2&&localStorage.getItem(STORY_TIP_KEY)!=='1';if(storyTipOpen)localStorage.setItem(STORY_TIP_KEY,'1')}catch{storyTipOpen=!LTDEMO.readOnly&&LTDEMO.moments.length>=2}
+function storyTipMarkup(){return !LTDEMO.readOnly&&storyTipOpen?'<div class="story-tip" role="note"><span>두 순간 사이에 한마디를 남기면, 책이 이야기처럼 이어져요. 안 적어도 괜찮아요.</span><button type="button" data-story-tip-dismiss>알겠어요</button></div>':''}
 updateConnectionSummary=function(id){
  const next=nextMomentOf(id),host=$b('#whyMargin'),tipHost=$b('#storyTipHost'),momentId=String(id||'');
  if(!host)return;
@@ -562,6 +577,7 @@ function journeyMarkup(journey){
  }).join('');
 }
 function openJourney(){
+ if(!$b('#overview').classList.contains('open'))recordBookOpen('overview');
  journeyOpener=document.activeElement;
  const journey=LT59Model.journeyTimeline(LTDEMO.moments,LTDEMO.edges,LTDEMO.get(),titleMainFor);
  $b('#overviewFlow').innerHTML=journeyMarkup(journey);
@@ -570,7 +586,7 @@ function openJourney(){
  setTimeout(()=>$b('#overviewClose').focus(),40);
 }
 function closeJourney(){
- const overlay=$b('#overview');overlay.classList.remove('open');overlay.inert=true;
+ const overlay=$b('#overview');if(overlay.classList.contains('open'))closeBookHistory('overview');overlay.classList.remove('open');overlay.inert=true;
  if(journeyOpener&&journeyOpener.isConnected)try{journeyOpener.focus({preventScroll:true})}catch{}
  journeyOpener=null;
 }
@@ -581,7 +597,7 @@ $b('#overview').addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDef
 $b('#overviewFlow').addEventListener('click',e=>{
  const item=e.target.closest('[data-journey]');if(!item)return;
  const focus=item.dataset.focus||'';
- closeJourney();
+ bookHistoryTransferring=true;try{closeJourney();completeBookJump(focus,posOfMoment(focus))}finally{bookHistoryTransferring=false}
  // #537: 가는 자리는 보기 모드가 정한다(한 장은 그 순간, 두 장은 그 순간이 든 펼침면).
  const target=posOfMoment(focus);
  if(target===current)renderSpread(target,focus,false);
@@ -652,7 +668,7 @@ mountTips();
 window.__TRACK59__.overflowRejudge=createOverflowRejudge({judge:()=>window.__TRACK59__.rejudgeOverflow(),raf:f=>requestAnimationFrame(f),cancelRaf:id=>cancelAnimationFrame(id),addDocListener:(t,f,o)=>document.addEventListener(t,f,o),addWinListener:(t,f)=>addEventListener(t,f),ResizeObserver:typeof ResizeObserver==='undefined'?null:ResizeObserver,isPageImage:n=>n instanceof HTMLImageElement&&!!n.closest('.page-content,.mobile-content')});
 renderSpread(current,LTDEMO.get(),false);
 syncLensClone();
-window.__BOOK_USABILITY__={titleParts,closeDetail,placeDetail,nextMomentOf,paintTitle,openJourney,get lensPref(){return lensPref}};
+window.__BOOK_USABILITY__={titleParts,closeDetail,closeJourney,placeDetail,nextMomentOf,paintTitle,openJourney,get lensPref(){return lensPref}};
 
 // #347 후속: 계정 제목 보기 설정이 바뀌면 지금 펼침면·상세를 다시 그린다.
 addEventListener('message',e=>{if(e.data?.type!==MSG.titleDisplay||!isShellMessage(e))return;try{LTDEMO.prefs={...(LTDEMO.prefs||{}),titleDisplay:e.data.value}}catch{}try{renderSpread(current,LTDEMO.get(),false)}catch{}if($b('#detail')?.classList.contains('open')&&selectedMomentId)showDetail(selectedMomentId);});

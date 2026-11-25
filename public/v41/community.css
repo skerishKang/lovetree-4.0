@@ -9,20 +9,26 @@
 .community-suggest li{margin:0;padding:0}
 .community-suggest-option{display:flex;align-items:center;gap:8px;width:100%;min-height:44px;padding:10px 12px;border:0;border-radius:8px;background:none;text-align:left;font-size:14px;color:var(--lt-pearl)}
 .community-suggest-option small{margin-left:auto;color:var(--lt-muted);font-size:12px;white-space:nowrap}
-.community-suggest-option[aria-selected="true"]{background:rgba(255,230,166,.12);box-shadow:inset 0 0 0 1px var(--lt-gold-line)}
+.community-suggest-option[aria-selected="true"]{background:var(--lt-role-accent-bg);box-shadow:none;color:var(--lt-role-accent-ink)}
 .community-suggest-empty{padding:10px 12px;color:var(--lt-muted);font-size:13px}
 
 /* 그룹 찾기 단추 — 칩 줄은 shell.css의 flex 한 줄(#community-groups)을 그대로 두고
    단추는 같은 행의 끝자리에 둔다. */
 #community-panel .community-group-rail{display:flex;align-items:center;gap:8px}
 #community-panel #community-groups{flex:1 1 auto;min-width:0}
+/* #1305: 가수 단추 줄은 옆으로 넘기고, 회색 막대를 숨기고 오른쪽 끝만 흐린다. */
+#community-panel #community-groups{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding-right:18px;-webkit-mask-image:linear-gradient(to right,#000 0,#000 calc(100% - 18px),transparent 100%);mask-image:linear-gradient(to right,#000 0,#000 calc(100% - 18px),transparent 100%)}
+#community-panel #community-groups::-webkit-scrollbar{display:none}
+#community-panel #community-groups .community-group-chip{flex:none;white-space:nowrap}
 /* #972: 그룹 찾기 단추 위를 덮던 흐림 막을 없애고, 작은 화면에서 칩을 끝까지 읽는다. */
 #community-panel .community-group-rail::after{display:none}
-@media(max-width:520px){
- #community-panel .community-group-rail{gap:10px}
- #community-panel #community-groups{gap:6px;scrollbar-width:thin}
- #community-panel #community-groups::-webkit-scrollbar{display:block;height:4px}
- #community-panel .community-group-chip{padding-inline:8px}
+@media(max-width:780px){
+ /* #1330: 손가락으로 밀어 넘기고, 막대는 숨기고, 오른쪽 끝은 바탕색으로 흐린다. */
+ #community-panel .community-group-rail{gap:8px}
+ #community-panel #community-groups{gap:6px;scrollbar-width:none;scroll-snap-type:x proximity;-webkit-mask-image:linear-gradient(to right,#000 0,#000 calc(100% - 22px),var(--lt-stage) 100%);mask-image:linear-gradient(to right,#000 0,#000 calc(100% - 22px),var(--lt-stage) 100%)}
+ #community-panel #community-groups::-webkit-scrollbar{display:none}
+ #community-panel #community-groups .community-group-chip{scroll-snap-align:start}
+ #community-panel .community-group-find{flex:0 0 auto}
 }
 .community-group-find{min-height:44px;flex-shrink:0;padding:8px 14px;border:1px dashed var(--lt-gold-line);border-radius:var(--lt-r-pill);background:rgba(255,230,166,.06);color:var(--lt-pearl);font-size:13px}
 
@@ -37,7 +43,7 @@ dialog.community-group-find::backdrop{background:transparent}
 .community-group-find-section{margin:0 0 4px;padding:10px 2px 4px;border-top:1px solid var(--line);font-size:12px;font-weight:700;color:var(--lt-muted)}
 .community-group-find-option{display:flex;align-items:center;gap:8px;width:100%;min-height:44px;padding:10px 12px;border:0;border-radius:8px;background:none;text-align:left;font-size:14px;color:var(--lt-pearl)}
 .community-group-find-option small{margin-left:auto;color:var(--lt-muted);font-size:12px;white-space:nowrap}
-.community-group-find-option[aria-selected="true"]{background:rgba(255,230,166,.12);box-shadow:inset 0 0 0 1px var(--lt-gold-line)}
+.community-group-find-option[aria-selected="true"]{background:var(--lt-role-accent-bg);box-shadow:none;color:var(--lt-role-accent-ink)}
 .community-group-find-empty{padding:18px 12px;color:var(--lt-muted);font-size:13px;line-height:1.7}
 /* 휴대폰: 아래서 올라오는 판. */
 @media(max-width:780px){
@@ -62,8 +68,8 @@ dialog.community-group-find::backdrop{background:transparent}
 
 /* #1025 1단계 — 둘러보기 [트리] [순간] 탭과 세로 순간 숏츠 보기. 색·모서리는 identity 토큰만 쓴다. */
 .community-tabs{display:flex;gap:8px;justify-content:center;margin:6px auto 14px;max-width:1500px}
-.community-tabs button{min-width:88px;min-height:44px;padding:0 18px;border:1px solid var(--lt-line);border-radius:var(--lt-r-pill);background:var(--lt-glass);color:var(--lt-muted);font:inherit;font-size:14px;cursor:pointer}
-.community-tabs button[aria-selected="true"]{border-color:var(--lt-gold);background:var(--lt-primary);color:var(--lt-primary-ink)}
+.community-tabs button{min-width:88px;min-height:44px;padding:0 18px;border:1px solid var(--lt-role-idle-border);border-radius:var(--lt-r-pill);background:var(--lt-role-idle-bg);color:var(--lt-role-idle-ink);font:inherit;font-size:14px;cursor:pointer}
+.community-tabs button[aria-selected="true"]{border-color:var(--lt-role-accent-bg);background:var(--lt-role-accent-bg);color:var(--lt-role-accent-ink)}
 /* 판 높이를 먼저 정하고(화면 - 머리줄 - 탭 - 위아래 여백) 너비는 9:16로 그 높이에서 계산한다 —
    판 아래 글과 오른쪽 단추 4개가 낮은 화면(1440×700)에서도 화면 밖으로 나가지 않는다(#1025 재검수). */
 .moments-stage{position:relative;display:flex;align-items:center;justify-content:center;gap:18px;max-width:1500px;margin:0 auto;height:calc(100dvh - 313px);min-height:320px;max-height:1180px}
@@ -77,7 +83,8 @@ dialog.community-group-find::backdrop{background:transparent}
 .moments-media.is-playing .moments-poster{opacity:0;pointer-events:none}
 .moments-overlay{position:absolute;z-index:3;left:0;right:0;bottom:0;padding:38px 16px 22px;display:grid;gap:6px;color:#fff;background:linear-gradient(to bottom,rgba(0,0,0,0) 0%,rgba(0,0,0,.55) 30%,rgba(0,0,0,.92) 100%);text-shadow:0 1px 3px #000,0 2px 10px #000;pointer-events:none}
 .moments-tree{display:flex;align-items:center;gap:8px;font-size:13px}
-.moments-ai{padding:2px 8px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-pill);color:var(--lt-gold);font-size:12px}
+/* #1273 7번: 사람 회원(이름·첫 글자)과 AI 명예회원을 바로 구분한다 — 기존 장미 토큰만 쓴다. */
+.moments-ai{padding:2px 8px;border:1px solid var(--lt-rose);border-radius:var(--lt-r-pill);background:color-mix(in srgb,var(--lt-rose) 18%,transparent);color:var(--lt-rose-ink,var(--lt-rose));font-size:12px;font-weight:700}
 .moments-title{font-size:17px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .moments-tags,.moments-note{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .moments-progress{position:absolute;left:0;right:0;bottom:0;height:3px;background:var(--lt-glass)}
@@ -106,8 +113,9 @@ dialog.community-group-find::backdrop{background:transparent}
 
 /* #1025 2단계 — 가수 칩 줄·담기 창·선 아이콘. 색은 identity 토큰만 쓴다. */
 .moments-chips{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;max-width:1500px;margin:0 auto 12px}
-.moments-chip{min-height:40px;padding:0 14px;border:1px solid var(--lt-line);border-radius:var(--lt-r-pill);background:var(--lt-glass);color:var(--lt-muted);font:inherit;font-size:13px;cursor:pointer}
-.moments-chip.is-active{border-color:var(--lt-gold);background:var(--lt-primary);color:var(--lt-primary-ink)}
+.moments-chips[hidden]{display:none}
+.moments-chip{min-height:40px;padding:0 14px;border:1px solid var(--lt-role-idle-border);border-radius:var(--lt-r-pill);background:var(--lt-role-idle-bg);color:var(--lt-role-idle-ink);font:inherit;font-size:13px;cursor:pointer}
+.moments-chip.is-active{border-color:var(--lt-role-accent-bg);background:var(--lt-role-accent-bg);color:var(--lt-role-accent-ink)}
 .moments-rail-svg{width:24px;height:24px;display:block;color:currentColor}
 .moments-add-dialog{position:fixed;z-index:60;inset:0;margin:auto;width:min(420px,92vw);height:fit-content;max-height:80dvh;padding:20px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-panel);background:var(--lt-glass-strong);color:var(--lt-pearl);overflow:auto}
 .moments-add-dialog[hidden]{display:none}
@@ -132,8 +140,295 @@ html[data-lt-theme=garden] .moments-comments-dialog{background:var(--lt-paper);c
 .moments-fallback{position:absolute;inset:0;z-index:3;display:grid;place-items:center}
 .moments-fallback[hidden]{display:none}
 .moments-fallback .lt-fallback-card{width:100%;height:100%;border:0;border-radius:0}
+/* #1360: 재생 불가 문구를 제목 아래 흐름으로 둔다(바닥 고정 문구가 긴 제목과 겹치지 않게). */
+#community-moments-panel .moments-fallback .lt-fallback-card[data-lt-variant="orbit"] .lt-fallback-notice{position:static;display:block;margin-top:12px;padding:0 15px 15px}
 /* #1098 2단계: 쇼츠 댓글 창의 쓰기 단추 — 판의 '댓글 남기기'(#community-preview .community-mini)와 같은 모양(테마 색·둥근 모서리). */
 .moments-comments-dialog .community-mini{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:9px 14px;border:1px solid var(--lt-line-paper);border-radius:var(--lt-r-pill);background:var(--lt-paper);color:var(--lt-ink);font-size:14px;font-weight:600;cursor:pointer}
 .moments-comments-dialog .community-mini:disabled{opacity:.6}
 /* #1098 2단계: 레일 숫자 — ♡·댓글 수(3 미만은 숫자 없음). 390에서도 아이콘 아래 숫자가 같은 자리에 온다. */
 .moments-rail-count{font-size:12px;color:var(--lt-pearl);min-height:14px}
+
+.moments-owner,.moments-owner-text,.moments-swipe-layer,.moments-player-controls,.moments-swipe-hint{display:none}
+
+/* #1286 휴대폰 순간 보기: 공통 색 토큰만 사용, 넓은 화면은 기존 규칙 유지. */
+@media(max-width:780px){
+ #community-panel:has(#community-tab-moments[aria-selected="true"]){padding-inline:0;overflow-x:clip}
+ #community-panel:has(#community-tab-moments[aria-selected="true"]) .community-top{height:0;margin:0;padding:0}
+ /* #1330: 감싼 캡슐 없이 단추 두 개만 둔다. 고른 쪽은 장미 토큰 채움. */
+ #community-panel:has(#community-tab-moments[aria-selected="true"]) .community-tabs,
+ #community-panel:has(#community-tab-trees[aria-selected="true"]) .community-tabs{
+  position:absolute;z-index:19;top:calc(env(safe-area-inset-top) + 6px);left:8px;
+  gap:6px;width:max-content;margin:0;padding:0;border:0;border-radius:0;background:none
+ }
+ #community-panel:has(#community-tab-moments[aria-selected="true"]) .community-tabs button,
+ #community-panel:has(#community-tab-trees[aria-selected="true"]) .community-tabs button{
+  min-width:52px;min-height:32px;padding:0 9px;font-size:13px;border:1px solid var(--lt-role-idle-border);border-radius:var(--lt-r-pill);background:var(--lt-role-idle-bg);color:var(--lt-role-idle-ink)
+ }
+ /* #1362: 390에서 위 idle 규칙이 선택 단추 채움을 덮지 않도록 특이도를 올린다. */
+ #community-panel:has(#community-tab-moments[aria-selected="true"]) .community-tabs button[aria-selected="true"],
+ #community-panel:has(#community-tab-trees[aria-selected="true"]) .community-tabs button[aria-selected="true"]{background:var(--lt-role-accent-bg);border-color:var(--lt-role-accent-bg);color:var(--lt-role-accent-ink)}
+ #community-moments-panel{width:100%;min-width:0;overflow-x:clip}
+ /* #1305: 가수 단추 줄도 같은 빈 띠에, 옆으로 넘기게, 끝은 흐리게. */
+ #community-moments-panel .moments-chips{position:absolute;z-index:19;top:calc(env(safe-area-inset-top) + 6px);right:8px;left:132px;max-width:none;justify-content:flex-start;flex-wrap:nowrap;gap:4px;overflow-x:auto;scrollbar-width:none;padding-right:18px;-webkit-mask-image:linear-gradient(to right,#000 0,#000 calc(100% - 18px),transparent 100%);mask-image:linear-gradient(to right,#000 0,#000 calc(100% - 18px),transparent 100%);margin:0}
+ #community-moments-panel .moments-chips::-webkit-scrollbar{display:none}
+ #community-moments-panel .moments-chip{min-height:30px;padding:0 9px;font-size:11px;white-space:nowrap;flex:none}
+ /* #1305: 위쪽 단추 띠만큼 영상을 아래로 내려 자막을 가리지 않게 한다. */
+ #community-moments-panel .moments-stage{width:100%;max-width:none;height:calc(100dvh - 129px - env(safe-area-inset-bottom));min-height:0;margin:38px 0 0;gap:0}
+ #community-moments-panel .moments-card{height:100%;width:100%;max-width:none;aspect-ratio:auto;border:0;border-radius:0;box-shadow:none}
+ #community-moments-panel .moments-media{background:var(--lt-stage)}
+ #community-moments-panel .moments-poster{object-fit:cover}
+ #community-moments-panel .moments-media[data-orientation="landscape"] .moments-frame:not(.moments-next){width:100%;height:100%;transform:scale(2.2);transform-origin:center}
+ #community-moments-panel .moments-swipe-layer{position:absolute;inset:0;z-index:2;touch-action:pan-x}
+ /* #1340: 소리 단추가 추가되어도 아래 글자 묶음과 겹치지 않도록 줄 전체를 올린다. */
+ #community-moments-panel .moments-rail{position:absolute;right:7px;bottom:calc(180px + env(safe-area-inset-bottom));z-index:5;gap:4px;padding:0}
+ #community-moments-panel .moments-rail-button{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  width:54px;min-width:54px;min-height:60px;gap:4px;padding:3px 2px;
+  border:0;border-radius:0;background:transparent;color:white;
+  text-shadow:0 2px 6px var(--lt-stage);box-shadow:none
+ }
+ #community-moments-panel .moments-rail-icon{font-size:27px;filter:drop-shadow(0 2px 3px var(--lt-stage))}
+ #community-moments-panel .moments-rail-svg{width:27px;height:27px;filter:drop-shadow(0 2px 3px var(--lt-stage))}
+ #community-moments-panel .moments-rail-label{display:block;color:inherit;font-size:11px;line-height:1.1}
+ /* #1340: 음소거 상태만 장미색으로 강조한다. 새 색 없이 기존 토큰만 쓴다. */
+ #community-moments-panel .moments-rail-count{color:inherit;font-size:11px;line-height:1.1;min-height:0}
+ #community-moments-panel .moments-nav{display:none}
+ #community-moments-panel .moments-overlay{padding:56px 68px calc(26px + env(safe-area-inset-bottom)) 14px;gap:5px}
+ #community-moments-panel .moments-tree{gap:5px;flex-wrap:wrap;font-size:12px}
+ #community-moments-panel .moments-owner{display:grid;place-items:center;width:30px;height:30px;flex:none;border-radius:50%;background:var(--lt-glass-strong);color:white;border:1px solid var(--lt-line);font-weight:700}
+ #community-moments-panel .moments-owner-text{font-size:12px;font-weight:700}
+ #community-moments-panel .moments-tree-name{font-size:12px}
+ #community-moments-panel .moments-ai{font-size:10px;padding:1px 5px}
+ #community-moments-panel .moments-title{font-size:15px;white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+ #community-moments-panel .moments-note{display:-webkit-box;max-width:100%;padding:0;border:0;background:transparent;color:inherit;text-align:left;font:inherit;font-size:12px;line-height:1.45;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;pointer-events:auto;cursor:pointer}
+ #community-moments-panel .moments-note[aria-expanded="true"]{display:block;max-height:40dvh;overflow-y:auto}
+ #community-moments-panel .moments-tags{font-size:11px}
+ #community-moments-panel .moments-progress{height:3px;z-index:8;bottom:env(safe-area-inset-bottom)}
+ #community-moments-panel .moments-player-controls{position:absolute;z-index:6;right:10px;bottom:calc(12px + env(safe-area-inset-bottom))}
+ #community-moments-panel .moments-swipe-hint{position:absolute;left:50%;top:46%;transform:translate(-50%,-50%);z-index:8;max-width:80%;padding:8px 12px;border-radius:var(--lt-r-pill);background:var(--lt-glass-strong);color:var(--lt-pearl);font-size:13px;pointer-events:none}
+ #community-moments-panel .moments-swipe-hint[hidden]{display:none}
+}
+
+/* #1332: 음소거 재생 중 소리 켜기 알약 — 기존 테마 토큰만 쓴다. */
+#community-moments-panel .moments-sound-pill{position:absolute;z-index:7;left:50%;bottom:auto;top:62%;transform:translateX(-50%);min-height:44px;max-width:calc(100% - 32px);padding:10px 20px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-pill);background:var(--lt-glass-strong);color:var(--lt-pearl);font:inherit;font-size:14px;font-weight:600;white-space:nowrap;cursor:pointer}
+#community-moments-panel .moments-sound-pill[hidden]{display:none}
+#community-moments-panel .moments-sound-pill.is-small{padding:8px 16px;font-size:13px;font-weight:400}
+#community-moments-panel .moments-rail-button.is-muted{color:var(--lt-rose)}
+#community-moments-panel .moments-rail-button.is-sound{order:-1}
+@media(max-width:780px){#community-moments-panel .moments-player-controls,#community-moments-panel .moments-swipe-layer,#community-moments-panel .moments-owner,#community-moments-panel .moments-owner-text{display:flex}#community-moments-panel .moments-owner{display:grid}#community-moments-panel .moments-swipe-hint:not([hidden]){display:block}#community-moments-panel .moments-note[hidden]{display:none}}
+.moments-note{padding:0;border:0;background:transparent;color:inherit;font:inherit;font-size:13px;text-align:left;line-height:1.3}
+
+/* #1286: 유튜브 시간은 모바일 기본 진행 요소로 표시하여 인라인 스타일을 만들지 않는다. */
+.moments-progress-native{display:none}
+@media(max-width:780px){
+ #community-moments-panel .moments-progress-fill{display:none}
+ #community-moments-panel .moments-progress-native{display:block;width:100%;height:3px;appearance:none;border:0;border-radius:0;background:var(--lt-glass)}
+ #community-moments-panel .moments-progress-native::-webkit-progress-bar{background:var(--lt-glass)}
+ #community-moments-panel .moments-progress-native::-webkit-progress-value{background:var(--lt-gold)}
+ #community-moments-panel .moments-progress-native::-moz-progress-bar{background:var(--lt-gold)}
+}
+
+@media(min-width:781px){#community-moments-panel .moments-note{display:block;width:auto;min-width:0;min-height:0;height:auto;margin:0;padding:0;border:0;border-radius:0;background:transparent;box-shadow:none;color:inherit;font:inherit;font-size:13px;line-height:1.3;appearance:none;text-align:left}}
+
+/* #1305 휴대폰 트리 화면 — 큰 제목·설명을 빼고 검색·정렬 → 가수 단추 → 카드 순으로. */
+@media(max-width:780px){
+ #community-tree-panel{display:flex;flex-direction:column}
+ #community-tree-panel .panel-heading,
+ #community-tree-panel > .panel-note{display:none}
+ #community-search-form{order:1;margin:44px 0 0;width:100%;box-sizing:border-box}
+ #community-tree-panel .community-group-rail{order:2;margin:8px 0 10px}
+ #community-popular-stages{order:3;margin:0}
+ #community-popular-stages .community-stage-list,
+ #community-popular-stages .community-stages-empty{display:none}
+ #community-popular-stages .community-stages-title{margin:0;font-size:12px;line-height:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ #community-tree-panel .community-results{order:4;margin:0;width:100%;box-sizing:border-box}
+ #community-tree-panel .community-policy{order:5}
+ /* 그룹 찾기는 가수 단추 줄 맨 끝에 같은 모양으로 붙는다. */
+ #community-panel .community-group-find{min-height:40px;padding:0 12px;font-size:13px}
+}
+
+/* #1330 상단·배지 다듬기 — 새 색 없이 기존 토큰만 쓴다. */
+#community-panel #community-query,#community-panel #community-sort{min-height:48px;height:48px;border-radius:var(--lt-r-pill)}
+#community-panel .community-stages-skeleton{height:18px;border-radius:var(--lt-r-pill);background:color-mix(in srgb,var(--lt-gold-line) 22%,transparent)}
+#community-panel .community-cover-badges{flex-wrap:nowrap}
+#community-panel .community-cover-badge{white-space:nowrap}
+/* 빈 인기 무대를 접었을 때 칩 줄 아래 간격을 다른 줄 간격과 같게(10px). */
+#community-panel > #community-tree-panel .community-group-rail{margin:0 auto 10px}
+
+/* 둘러보기: 탭·검색·정렬을 고정 높이의 한 줄로. 색은 기존 토큰만 사용한다. */
+#community-panel .community-top-row{position:relative;z-index:22;display:flex;align-items:center;gap:8px;width:100%;max-width:1500px;min-width:0;height:48px;margin:0 auto 12px}
+#community-panel .community-top-row .community-tabs{position:static;inset:auto;z-index:auto;display:flex;align-items:center;flex:0 0 auto;width:auto;max-width:none;height:48px;margin:0;padding:0;gap:6px;border:0;border-radius:0;background:none}
+#community-panel .community-top-row .community-tabs button{min-height:44px}
+#community-panel .community-top-row #community-search-form{position:relative;display:flex;flex:0 0 108px;align-items:center;gap:0;min-width:0;max-width:100%;height:48px;margin:0 0 0 auto;padding:0}
+#community-panel .community-top-row #community-search-form.is-expanded{flex:1 1 auto}
+#community-panel .community-search-trigger{display:inline-flex;align-items:center;justify-content:center;flex:0 0 108px;width:108px;min-width:0;height:48px;padding:0 10px;border:1px solid var(--lt-line-paper);border-radius:var(--lt-r-pill);background:var(--lt-paper);color:var(--lt-ink);font-size:13px;white-space:nowrap;cursor:pointer}
+#community-panel #community-search-form.is-expanded .community-search-trigger{flex:0 0 44px;width:44px;font-size:0}
+#community-panel #community-search-form.is-expanded .community-search-trigger::before{content:"🔍";font-size:16px}
+#community-panel .community-top-row #community-query{flex:0 0 0;width:0;min-width:0;height:48px;min-height:48px;margin:0;padding:0;border:0;opacity:0;pointer-events:none}
+#community-panel .community-top-row #community-search-form.is-expanded #community-query{flex:1 1 auto;width:auto;min-width:0;padding:0 12px;border:1px solid var(--lt-role-input-border);border-radius:var(--lt-r-pill);opacity:1;pointer-events:auto}
+#community-panel .community-top-row .community-search-submit{display:none}
+#community-panel .community-top-row .community-sort-label{position:relative;display:flex;align-items:center;justify-content:center;flex:0 0 48px;width:48px;height:48px;cursor:pointer}
+#community-panel .community-top-row .community-sort-label::before{content:"↕";display:flex;align-items:center;justify-content:center;width:44px;height:44px;border:1px solid var(--lt-role-secondary-border);border-radius:var(--lt-r-pill);background:var(--lt-role-secondary-bg);color:var(--lt-role-secondary-ink);font-size:22px;pointer-events:none}
+#community-panel .community-top-row #community-sort{position:absolute;inset:0;width:48px;min-width:0;height:48px;min-height:48px;margin:0;padding:0;opacity:0;cursor:pointer}
+#community-panel .community-top-row .community-sort-label:focus-within::before{outline:2px solid var(--lt-gold);outline-offset:2px}
+#community-panel:has(#community-tab-trees) .community-tabs button:not([aria-selected="true"]):hover,
+#community-panel .moments-chip:not(.is-active):hover,
+#community-panel .community-group-chip:not(.is-active):hover,
+#community-panel .community-top-row .community-sort-trigger:hover{background:var(--lt-role-hover-bg);border-color:var(--lt-role-hover-border);color:var(--lt-role-hover-ink);cursor:var(--lt-role-hover-cursor)}
+#community-panel:has(#community-tab-trees) .community-tabs button:not([aria-selected="true"]):focus-visible,
+#community-panel .moments-chip:not(.is-active):focus-visible,
+#community-panel .community-group-chip:not(.is-active):focus-visible{background:var(--lt-role-hover-bg);border-color:var(--lt-role-hover-border);color:var(--lt-role-hover-ink)}
+#community-panel .community-top-row.is-moments #community-search-form,#community-panel .community-top-row.is-moments .community-sort-label{visibility:hidden;pointer-events:none}
+#community-panel #community-feedback[hidden]{display:none}
+@media(max-width:780px){
+ #community-panel .community-top-row{gap:6px;margin:0 auto 10px}
+ #community-panel .community-top-row .community-tabs button{min-width:52px;min-height:44px;padding:0 9px;font-size:13px}
+ #community-panel:has(#community-tab-moments[aria-selected="true"]) .community-top-row .community-tabs,
+ #community-panel:has(#community-tab-trees[aria-selected="true"]) .community-top-row .community-tabs{position:static;top:auto;left:auto;right:auto;width:auto;height:48px;margin:0;padding:0}
+ #community-panel #community-search-form{order:initial;margin:0}
+ #community-panel .community-top-row #community-search-form{margin:0 0 0 auto;flex-basis:90px}
+ #community-panel .community-search-trigger{width:90px;flex-basis:90px}
+ #community-panel .community-group-rail{margin-top:0}
+ #community-moments-panel .moments-stage{margin-top:0}
+}
+
+@media(max-width:780px){
+ #community-panel:has(#community-tab-trees[aria-selected="true"]) .community-top-row .community-tabs button,
+ #community-panel:has(#community-tab-moments[aria-selected="true"]) .community-top-row .community-tabs button{min-height:44px}
+}
+
+#community-panel .community-top-row.is-moments{pointer-events:none}
+#community-panel .community-top-row.is-moments .community-tabs{pointer-events:auto}
+
+/* #1363: 입력칸을 직접 노출하고, 정렬은 자체 메뉴를 사용한다. */
+#community-panel .community-top-row #community-search-form{flex:0 1 220px;min-width:92px;margin-left:auto}
+#community-panel .community-top-row #community-query{flex:1 1 auto;width:100%;min-width:0;opacity:1;pointer-events:auto;padding:0 34px 0 12px;border:1px solid var(--lt-role-input-border);border-radius:var(--lt-r-pill);background:var(--lt-role-input-bg);color:var(--lt-role-input-ink)}
+#community-panel .community-top-row .community-search-clear{position:absolute;right:2px;top:2px;z-index:2;display:flex;align-items:center;justify-content:center;width:44px;min-width:44px;height:44px;min-height:44px;padding:0;border:0;border-radius:var(--lt-r-pill);background:transparent;color:var(--lt-role-input-ink);font-size:20px}
+#community-panel .community-search-clear[hidden]{display:none}
+#community-panel .community-top-row .community-sort-label::before{display:none}
+#community-panel .community-top-row #community-sort{position:absolute;width:1px;height:1px;min-height:0;opacity:0;pointer-events:none}
+#community-panel .community-top-row .community-sort-trigger{display:flex;align-items:center;justify-content:center;width:48px;height:48px;min-width:48px;min-height:48px;padding:0;border:1px solid var(--lt-role-secondary-border);border-radius:var(--lt-r-pill);background:var(--lt-role-secondary-bg);color:var(--lt-role-secondary-ink);font-size:22px;cursor:pointer}
+#community-panel .community-top-row .community-sort-menu{position:absolute;top:calc(100% + 6px);right:0;z-index:30;display:grid;gap:4px;width:max-content;min-width:168px;padding:6px;border:1px solid var(--lt-role-input-border);border-radius:var(--lt-r-card);background:var(--lt-role-input-bg);color:var(--lt-role-input-ink)}
+#community-panel .community-sort-menu[hidden]{display:none}
+#community-panel .community-sort-option{display:flex;align-items:center;width:100%;min-height:44px;padding:9px 12px;border:0;border-radius:var(--lt-r-card);background:transparent;color:var(--lt-role-input-ink);font-size:14px;text-align:left;white-space:nowrap;cursor:pointer}
+#community-panel .community-sort-option.is-active,#community-panel .community-sort-option:focus-visible{outline:2px solid var(--lt-gold);outline-offset:-2px}
+#community-panel .community-sort-option.is-selected{font-weight:700;background:var(--lt-role-accent-bg);color:var(--lt-role-accent-ink)}
+#community-panel .community-top-row .community-sort-label:focus-within::before{outline:0}
+@media(max-width:780px){#community-panel .community-top-row #community-search-form{flex:1 1 auto;min-width:0;margin-left:auto}}
+
+#community-panel #community-query::-webkit-search-cancel-button{display:none}
+/* #1354 1단계 시안 — 유튜브 재생 면과 서비스 정보·조작 면을 분리한다. */
+#community-panel .community-top-row.is-moments .moments-toolbar{display:flex;align-items:center;justify-content:flex-end;gap:6px;margin-left:auto;pointer-events:auto}
+#community-panel .community-top-row:not(.is-moments) .moments-toolbar{display:none}
+#community-panel .community-top-row.is-moments #community-search-form,
+#community-panel .community-top-row.is-moments .community-sort-label{display:none}
+#community-panel .moments-toolbar button{display:inline-flex;align-items:center;justify-content:center;gap:4px;min-height:44px;padding:0 12px;border:1px solid var(--lt-line);border-radius:var(--lt-r-pill);background:var(--lt-glass-strong);color:var(--lt-pearl);font:inherit;font-size:13px;white-space:nowrap}
+#community-panel .moments-toolbar .moments-rail-button.is-sound{width:48px;min-width:48px;padding:0}
+#community-panel .moments-toolbar .moments-rail-svg{width:22px;height:22px}
+#community-panel .moments-toolbar .moments-rail-label{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+#community-moments-panel .moments-stage{display:grid;grid-template-columns:minmax(180px,250px) minmax(260px,420px) 64px 52px;align-items:center;justify-content:center;gap:14px;width:100%;max-width:1150px;height:min(calc(100dvh - 184px),740px);min-height:420px;max-height:none;margin:0 auto}
+#community-moments-panel .moments-context{grid-column:1;grid-row:1;display:flex;flex-direction:column;gap:18px;align-self:center;min-width:0;max-height:100%;overflow-y:auto;padding:24px 18px;border:1px solid var(--lt-line);border-radius:var(--lt-r-card);background:var(--lt-stage-2);color:var(--lt-pearl)}
+#community-moments-panel .moments-context .moments-overlay{position:static;display:grid;gap:12px;padding:0;background:none;color:inherit;text-shadow:none;pointer-events:auto}
+#community-moments-panel .moments-context .moments-tree{flex-wrap:wrap;align-items:center;gap:8px}
+#community-moments-panel .moments-context .moments-title{font-size:20px;line-height:1.45;white-space:normal;overflow-wrap:anywhere}
+#community-moments-panel .moments-context .moments-note{display:block;white-space:normal;overflow:visible;text-overflow:clip;line-height:1.6}
+#community-moments-panel .moments-context .moments-tags{white-space:normal;line-height:1.5}
+#community-moments-panel .moments-context .moments-chips{position:static;display:flex;flex-wrap:wrap;justify-content:flex-start;max-width:100%;margin:0;mask-image:none;-webkit-mask-image:none}
+#community-moments-panel .moments-context .moments-chips[hidden]{display:none}
+#community-moments-panel .moments-card{grid-column:2;grid-row:1;position:relative;width:min(100%,calc((100dvh - 184px)*9/16));min-width:200px;height:100%;min-height:200px;max-width:100%;aspect-ratio:auto;justify-self:center;overflow:hidden;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-card);background:var(--lt-stage)}
+#community-moments-panel .moments-media{position:absolute;inset:0;overflow:hidden;background:var(--lt-stage)}
+#community-moments-panel .moments-frame{position:absolute;inset:0;width:100%;height:100%;transform:none}
+#community-moments-panel .moments-frame.moments-next{visibility:hidden;pointer-events:none}
+#community-moments-panel .moments-poster{z-index:2;pointer-events:none}
+#community-moments-panel .moments-media.is-playing .moments-poster{visibility:hidden;opacity:0}
+#community-moments-panel .moments-rail{grid-column:3;grid-row:1;position:static;display:flex;flex-direction:column;align-self:center;gap:6px;min-width:0;padding:0}
+#community-moments-panel .moments-rail-button{position:relative;display:grid;justify-items:center;gap:3px;min-width:54px;min-height:62px;padding:6px 3px;background:none;color:var(--lt-pearl);text-shadow:none}
+#community-moments-panel .moments-rail-label{display:block;color:var(--lt-muted);font-size:11px}
+#community-moments-panel .moments-nav{grid-column:4;grid-row:1;position:static;display:grid;align-self:center;gap:12px;transform:none}
+#community-moments-panel .moments-step{width:46px;height:46px}
+#community-moments-panel .moments-sound-pill,
+#community-moments-panel .moments-swipe-layer,
+#community-moments-panel .moments-swipe-hint,
+#community-moments-panel .moments-player-controls{display:none}
+#community-moments-panel .moments-progress{display:none}
+#community-moments-panel .moments-owner,#community-moments-panel .moments-owner-text{display:inline-flex}
+#community-moments-panel .moments-owner{display:grid;place-items:center;flex:none;width:32px;height:32px;border:1px solid var(--lt-line);border-radius:50%;background:var(--lt-glass)}
+@media(max-width:780px){
+ #community-panel:has(#community-tab-moments[aria-selected="true"]){padding:0 8px 8px;overflow:hidden}
+ #community-panel:has(#community-tab-moments[aria-selected="true"]) .community-top-row{position:relative;z-index:25;width:100%;height:48px;margin:0;padding:0 3px}
+ #community-panel:has(#community-tab-moments[aria-selected="true"]) .community-top-row .community-tabs{position:static;display:flex;width:auto;height:48px;min-width:0;margin:0}
+ #community-panel:has(#community-tab-moments[aria-selected="true"]) .community-top-row .community-tabs button{min-height:44px;min-width:49px;padding:0 9px}
+ #community-panel:has(#community-tab-moments[aria-selected="true"]) .community-top-row .moments-toolbar{display:flex;position:static;z-index:1;gap:4px;margin-left:auto}
+ #community-panel .moments-toolbar button{min-height:44px}
+ #community-panel .moments-toolbar .moments-info-button{padding:0 11px}
+ #community-moments-panel{width:100%;min-width:0;overflow:visible}
+ #community-moments-panel .moments-stage{display:grid;grid-template-columns:minmax(0,1fr) 70px;grid-template-rows:minmax(200px,1fr);column-gap:0;row-gap:0;width:100%;height:calc(100dvh - 68px - env(safe-area-inset-bottom));min-height:0;margin:0;max-width:none}
+ #community-moments-panel .moments-card{grid-area:1/1/2/3;width:100%;min-width:200px;min-height:200px;height:100%;max-width:100%;border:0;border-radius:0;box-shadow:none}
+ #community-moments-panel .moments-media[data-orientation="landscape"] .moments-frame:not(.moments-next){width:100%;height:100%;transform:none}
+ #community-moments-panel .moments-context,
+ #community-moments-panel .moments-rail{display:none}
+ #community-moments-panel .moments-nav{display:none}
+ #community-moments-panel .moments-stage.moments-info-open{grid-template-rows:minmax(200px,1fr) minmax(0,252px)}
+ #community-moments-panel .moments-stage.moments-info-open .moments-card{grid-area:1/1/2/3}
+ #community-moments-panel .moments-stage.moments-info-open .moments-context{grid-area:2/1/3/2;display:flex;align-self:stretch;gap:10px;max-height:none;min-width:0;padding:13px 12px;overflow-y:auto;border:1px solid var(--lt-line);border-right:0;border-radius:0;background:var(--lt-stage-2)}
+ #community-moments-panel .moments-stage.moments-info-open .moments-rail{grid-area:2/2/3/3;display:flex;align-self:stretch;justify-content:flex-start;align-items:center;gap:2px;overflow-y:auto;padding:6px 3px;border:1px solid var(--lt-line);border-left:0;background:var(--lt-stage-2)}
+ #community-moments-panel .moments-context .moments-overlay{padding:0;gap:8px}
+ #community-moments-panel .moments-context .moments-title{font-size:16px}
+ #community-moments-panel .moments-context .moments-tree{font-size:11px}
+ #community-moments-panel .moments-context .moments-ai{font-size:10px}
+ #community-moments-panel .moments-context .moments-note{font-size:13px;line-height:1.5}
+ #community-moments-panel .moments-context .moments-chips{position:static;width:100%;height:auto;max-width:100%;padding:0;overflow-x:auto;flex-wrap:nowrap;-webkit-mask-image:none;mask-image:none}
+ #community-moments-panel .moments-rail-button{display:flex;flex-direction:column;justify-content:center;gap:2px;width:58px;min-width:58px;min-height:48px;padding:3px;color:var(--lt-pearl);text-shadow:none}
+ #community-moments-panel .moments-rail-label{font-size:10px;color:inherit}
+ #community-moments-panel .moments-rail-icon{font-size:21px;filter:none}
+ #community-moments-panel .moments-rail-svg{width:21px;height:21px;filter:none}
+ #community-moments-panel .moments-rail-count{font-size:10px;min-height:0}
+ #community-moments-panel .moments-owner,#community-moments-panel .moments-owner-text{display:inline-flex}
+}
+
+/* #1354 휴대폰: 전체 화면 대화창에서 48px 도구 띠만 예약한다. */
+#community-moments-panel .moments-context{margin:0}
+@media(max-width:780px){
+ #community-panel[data-lt-panel=full]:has(#community-tab-moments[aria-selected="true"]){inset:0;width:100vw;max-width:none;height:100dvh;max-height:100dvh;padding:0 8px;overflow:hidden}
+ #community-panel:has(#community-tab-moments[aria-selected="true"]) .community-top{display:none}
+ #community-panel:has(#community-tab-moments[aria-selected="true"]) .community-top-row{height:48px}
+ #community-moments-panel .moments-stage{height:calc(100dvh - 48px - env(safe-area-inset-bottom))}
+ #community-moments-panel .moments-stage.moments-info-open .moments-context{margin:0;max-height:none}
+ #community-panel .moments-toolbar .moments-close-button{width:38px;min-width:38px;padding:0;font-size:21px}
+}
+
+@media(max-width:780px){
+ body:has(#community-panel[open] #community-tab-moments[aria-selected="true"]) .app-header{visibility:hidden;pointer-events:none}
+}
+
+@media(max-width:780px){
+ /* 재생 면 좌우에 손가락 이동용 좁은 여백을 둔다. 영상 위에는 층을 올리지 않는다. */
+ #community-moments-panel .moments-card{width:calc(100% - 16px);justify-self:center}
+}
+
+/* PC의 정보는 왼쪽 판에 항상 표시하므로 토글은 휴대폰에만 둔다. */
+@media(min-width:781px){#community-panel .moments-toolbar .moments-info-button{display:none}}
+
+/* #1354 2단계: PC 상단 도구도 플레이어 묶음과 같은 너비로 가운데 정렬한다. */
+@media(min-width:781px){
+ #community-panel .community-top-row.is-moments{width:min(1150px,100%);max-width:1150px;justify-content:flex-start}
+ #community-panel .community-top-row.is-moments .community-tabs{margin:0}
+ #community-panel .community-top-row.is-moments .moments-toolbar{margin-left:auto}
+ #community-moments-panel .moments-context{align-self:start}
+ #community-panel .moments-toolbar .moments-info-button{display:none}
+}
+/* 영상 재생 중에는 썸네일과 대체 안내를 절대 플레이어 앞에 두지 않는다. */
+#community-moments-panel .moments-media:has(.moments-frame:not(.moments-next)) .moments-fallback{display:none}
+#community-moments-panel .moments-media:has(.moments-frame:not(.moments-next)).is-playing .moments-poster{display:none}
+
+/* #1340 음소거 강조를 영상 바깥 상단 소리 단추에도 유지한다. */
+#community-panel .moments-toolbar .moments-rail-button.is-muted{color:var(--lt-rose)}
+
+/* #1354: 열린 휴대폰 정보 판에서 다섯 동작 단추가 하단을 넘지 않게 한다. */
+@media(max-width:780px){
+ #community-moments-panel .moments-stage.moments-info-open .moments-rail{gap:1px;padding:3px;overflow-y:hidden}
+ #community-moments-panel .moments-stage.moments-info-open .moments-rail-button{flex:0 0 44px;min-height:44px;height:44px}
+}
+
+/* #1354: 마음 단추도 100% 불투명하게 표시하여 정보 판의 대비를 유지한다. */
+#community-moments-panel .moments-rail-button.is-heart{opacity:1}

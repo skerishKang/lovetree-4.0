@@ -20,7 +20,7 @@ const themeToggleTop=$('theme-toggle');if(themeToggleTop)themeToggleTop.onclick=
  $('settings-advanced').onclick=()=>{const next=!readAdvanced();try{localStorage.setItem(advancedKey(),next?'1':'0')}catch{}applyAdvanced();};
  $('account-open-settings').onclick=()=>{closeAccountMenu();void openAccountSettings();};
  // 고객 의견 창구 (#540): 로그인=계정 메뉴, 로그아웃=첫 화면 아래 작은 링크·접기 메뉴. 모두 같은 창을 쓴다.
- const FEEDBACK_SCREEN={'src064-orbit.html':'첫 화면','track59-sketchbook.html':'책','track58-pinboard.html':'보드','track56-network.html':'지도','track32-bookshelf.html':'서재'};
+ const FEEDBACK_SCREEN={'src064-orbit.html':'첫 화면','track59-sketchbook.html':'책','track58-pinboard.html':'보드','track56-network.html':'지도','track61-tree.html':'트리','track32-bookshelf.html':'서재'};
  function feedbackContext(){
   const owned=!!deps.member?.snapshot().owned;
   const screen=$('community-panel')?.open?'둘러보기':$('account-settings')?.open?'설정':(FEEDBACK_SCREEN[deps.current]||'첫 화면');
@@ -29,7 +29,7 @@ const themeToggleTop=$('theme-toggle');if(themeToggleTop)themeToggleTop.onclick=
   const recentErrors=reportEntries();
   return {screen,viewport:window.innerWidth+'x'+window.innerHeight,theme:readTheme(localStorage),version:'4.1',loggedIn:owned,treeId,recentErrors};
  }
- const feedbackDialog=createFeedbackDialog({$,notify,getContext:feedbackContext,show:()=>panel('feedback-panel'),openMyPosts:()=>{shellDialogs.requestClose('feedback-panel');feedbackBoard.openMyPosts();}});
+ const feedbackDialog=createFeedbackDialog({$,notify,getContext:feedbackContext,show:()=>panel('feedback-panel'),openMyPosts:()=>{shellDialogs.requestClose('feedback-panel');feedbackBoard.openMyPosts();},onSent:post=>feedbackBoard.addSentPost(post)});
  // 2026-11-16 계정 메뉴 정리: 메뉴의 '의견 보내기' 칸을 없애고 내 의견 창 안에서 바로 보내게 했다.
  // 보내기 창은 로그아웃 첫 화면 작은 링크($('feedback-link'))와 같은 창을 쓴다(feedbackDialog).
  $('myposts-send').onclick=()=>{shellDialogs.requestClose('myposts-panel');feedbackDialog.open();};
@@ -75,7 +75,7 @@ const themeToggleTop=$('theme-toggle');if(themeToggleTop)themeToggleTop.onclick=
   if(newsCount){const n=myNewsMount?.lastCount?.()||0;newsCount.hidden=!(n>0);if(n>0)newsCount.textContent=String(n);}
  }
  function onReplyCount(count){const badge=$('account-my-posts-count');if(badge){badge.hidden=!(count>0);if(count>0)badge.textContent=String(count);}dotState.replies=count>0;paintAccountDots();}
- const feedbackBoard=createFeedbackBoard({$,notify,show:()=>panel('journal-panel'),showFull:()=>panel('myposts-panel'),onReplyCount,onOpenUpdates:version=>{void updatesMount.openUpdates(version);}});
+ const feedbackBoard=createFeedbackBoard({$,notify,show:()=>panel('journal-panel'),showFull:()=>panel('myposts-panel'),onReplyCount,onOpenUpdates:version=>{void updatesMount.openUpdates(version);},isLoggedIn:()=>!!deps.member?.snapshot().owned, memberPhase:()=>deps.member?.snapshot().phase||''});
  $('account-journal').onclick=()=>{closeAccountMenu();feedbackBoard.openJournal();};
  $('account-my-posts').onclick=()=>{closeAccountMenu();feedbackBoard.openMyPosts();};
  // #540 마무리: 운영센터 입구. 계정 메뉴·설정의 '운영' 묶음에서 같은 화면을 새 탭으로 연다.
@@ -530,17 +530,18 @@ function publicProblem(answer){
  const [title,detail]=messages[answer.code]||['공유 기록을 불러오지 못했어요.',answer.code==='timeout'?'서버 응답 시간이 초과됐어요. 다시 시도해 주세요.':'잠시 뒤 다시 시도해 주세요.'];$('empty').querySelector('h1').textContent=title;$('empty').querySelector('p').textContent=detail;links();
 }
 async function showPublicRoute(route){
+ const requestedHash=location.hash;
  // 로그인한 방문자의 계정 연결은 보존하고, 이 트리의 데이터만 읽기 전용으로 싣는다.
  if(deps.member&&!(deps.member.snapshot().owned?pauseMember():leaveMember())){writeLocation('replace');return;}
  const generation=++deps.loadGeneration;
  deps.activeShareId=route.shareId;
- deps.current=screenForView(['book','board','network'].includes(route.view)?route.view:'book')[1];
+ deps.current=screenForView(['tree','book','board','network'].includes(route.view)?route.view:'book')[1];
  deps.handledHash=location.hash;
  $('empty').querySelector('h1').textContent='공유된 순간을 펼치고 있어요.';
  $('empty').querySelector('p').textContent='소유자가 공개한 트리 한 개만 확인합니다.';
  $('empty-sample').hidden=true;$('empty-records').hidden=true;$('view').hidden=true;$('empty').hidden=false;
- const answer=await shareApi.read(route.shareId||'');if(generation!==deps.loadGeneration)return;if(!answer.ok){publicProblem(answer);return;}
- deps.activeShareId=answer.share.id;const view=['book','board','network'].includes(route.view)?route.view:answer.share.view;deps.current=screenForView(view)[1];load({revision:0,state:{version:1,trees:[answer.tree]}},'share',{treeId:answer.tree.id,momentId:answer.share.entryMomentId});
+ const answer=await shareApi.read(route.shareId||'');if(generation!==deps.loadGeneration||location.hash!==requestedHash)return;if(!answer.ok){publicProblem(answer);return;}
+ deps.activeShareId=answer.share.id;const view=['tree','book','board','network'].includes(route.view)?route.view:answer.share.view;deps.current=screenForView(view)[1];load({revision:0,state:{version:1,trees:[answer.tree]}},'share',{treeId:answer.tree.id,momentId:answer.share.entryMomentId});
  // #891: 공유 주소가 특정 순간을 가리키면(시작 순간) 보드만 그 순간의 상세 판을 열어 보여 준다.
  if(view==='board'&&answer.share.entryMomentId)requestBoardOpen(answer.share.entryMomentId);
  deps.activeShareId=answer.share.id;show(deps.current,false);writeLocation('replace');
@@ -548,7 +549,7 @@ async function showPublicRoute(route){
  if(!deps.member?.snapshot().owned)void accountApi.account().then(account=>{
    if(generation===deps.loadGeneration&&deps.source==='share')deps.onVisitorAccount?.(account?.ok?account:null);
  }).catch(()=>{});
- notify('공개된 트리를 감상하는 화면이에요. 감상만 할 수 있어요.'+(answer.aiTester?' AI 명예회원이 만든 트리예요.':'')+(answer.omittedPrivateMedia?' 올린 사진 '+answer.omittedPrivateMedia+'장은 나만 볼 수 있어요.':''));
+ notify('공개된 트리를 감상하는 화면이에요. 감상만 할 수 있어요.'+(answer.aiTester?' AI 명예회원이 만든 트리예요.':'')+(answer.omittedPrivateMedia?' 올린 사진 '+answer.omittedPrivateMedia+'장은 나만 볼 수 있어요.':''),{visitorIntro:true});
 }
 document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{
  // 2026-11-23: 로그아웃 서재 탭도 로그인으로 즉시 이동시키지 않고 빈 상태에서 로그인 단추를 안내한다.

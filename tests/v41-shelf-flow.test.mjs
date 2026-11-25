@@ -9,6 +9,9 @@ import {
 } from '../public/v41/views/shelf/shelf-model.mjs';
 import { youtubeIdFrom } from '../public/v41/youtube-id.mjs';
 import { createReader } from '../public/v41/views/shelf/shelf-reader.js';
+import { VIEWS, SHELF_VIEW_NAMES } from '../public/v41/views/shelf/shelf-views.mjs';
+import { nextMomentMessage } from '../public/v41/book-usability.mjs';
+import { MSG } from '../public/v41/frame-messages.mjs';
 import { fakeEl } from './helpers/fake-dom.mjs';
 
 const moment = (id, extra = {}) => ({ id, title: id + ' 순간', date: '2026-10-0' + (id.length % 9 + 1), emotion: '설렘', type: 'photo', ...extra });
@@ -480,4 +483,142 @@ test('#1093 회전 배치는 가운데 책을 중심으로 하고 모든 책을 
   assert.equal(layout.rotate(5, 6), 22, '왼쪽 책은 안쪽으로 기운다');
   assert.equal(layout.scale(6, 6), 1.06, '가운데 책만 살짝 앞으로');
   assert.equal(layout.depth(6, 6), 0);
+});
+
+// ── #1376 1단계: 보기 이름만 바꿔 같은 계약을 검사한다 ──
+function styleBag() {
+  const props = {};
+  return { props, setProperty(k, v) { props[k] = String(v); }, removeProperty(k) { delete props[k]; } };
+}
+
+function viewHarness(name, { count = 20, railWidth = 400 } = {}) {
+  const listeners = {};
+  const rail = fakeEl({
+    clientWidth: railWidth,
+    style: styleBag(),
+    addEventListener(type, fn) { (listeners[type] ||= []).push(fn); },
+    removeEventListener(type, fn) { listeners[type] = (listeners[type] || []).filter((f) => f !== fn); },
+    setPointerCapture() {}, querySelectorAll() { return []; }, insertAdjacentHTML() {}
+  });
+  const cards = Array.from({ length: count }, (_, i) => fakeEl({ dataset: { bookIndex: String(i) }, style: styleBag() }));
+  let center = 0, offset = 0, saves = 0;
+  const opens = [], reports = [];
+  let arrows = 0, atmospheres = 0;
+  const view = VIEWS.create(name);
+  const ctx = {
+    rail: () => rail,
+    books: () => cards.map((_, i) => ({ id: 't' + i })),
+    cards: () => cards,
+    railWidth: () => railWidth,
+    center: () => center,
+    setCenter: (i) => { center = i; },
+    offset: () => offset,
+    setOffset: (i) => { offset = i; },
+    save: () => { saves += 1; },
+    open: (i) => { opens.push(i); },
+    arrows: () => { arrows += 1; },
+    atmosphere: () => { atmospheres += 1; },
+    reported: (i) => { reports.push(i); },
+    relayout: () => { view.layout(ctx); }
+  };
+  return {
+    view, ctx, rail, cards, listeners,
+    state: { get center() { return center; }, get offset() { return offset; } },
+    counts: () => ({ saves, opens: [...opens], reports: [...reports], arrows, atmospheres })
+  };
+}
+
+test('#1376 두 보기가 같은 mount·layout·move·destroy 약속을 지킨다', () => {
+  assert.deepEqual([...SHELF_VIEW_NAMES].sort(), ['carousel', 'shelf'], '보기 이름은 셸 값 목록과 같다');
+  const savedRO = globalThis.ResizeObserver, savedSetTimeout = globalThis.setTimeout, savedClearTimeout = globalThis.clearTimeout;
+  const savedParent = globalThis.parent;
+  const observers = [], timers = [], messages = [];
+  globalThis.ResizeObserver = class {
+    constructor(cb) { this.cb = cb; this.disconnected = false; observers.push(this); }
+    observe() {}
+    disconnect() { this.disconnected = true; }
+  };
+  globalThis.setTimeout = (fn, ms) => { const t = { fn, ms, cleared: false }; timers.push(t); return t; };
+  globalThis.clearTimeout = (id) => { if (id) id.cleared = true; };
+  globalThis.parent = { postMessage: (...args) => { messages.push(args); } };
+  try {
+    for (const name of SHELF_VIEW_NAMES) {
+      const h = viewHarness(name);
+      h.view.mount(h.ctx);
+      assert.equal(h.listeners.pointerdown.length, 1, `${name}: 누르기 귀 등록`);
+      assert.equal(h.listeners.pointermove.length, 1, `${name}: 밀기 귀 등록`);
+      h.view.layout(h.ctx);
+      assert.ok(h.counts().arrows >= 1, `${name}: 화살표 계산 호출`);
+      assert.ok(h.counts().atmospheres >= 1, `${name}: 책장 분위기 공용 호출`);
+      assert.deepEqual(h.counts().reports, [0], `${name}: 마지막 본 트리 보고`);
+
+      // 클릭은 열기 공용 동작만 부른다.
+      h.listeners.click[0]({ target: { closest: (sel) => (sel === '[data-manage-id]' ? null : h.cards[2]) }, detail: 0 });
+      assert.deepEqual(h.counts().opens, [2], `${name}: 카드는 공용 열기로 간다`);
+
+      // 화살표 이동은 보기 규칙대로 가운데 또는 오프셋을 바꾼다.
+      h.view.move(1);
+      assert.ok(h.state.center === 1 || h.state.offset === 1, `${name}: 한 칸 이동`);
+
+      // 길게 누르기 타이머를 남긴 채 떠나면, 귀·타이머·관찰자가 모두 정리된다.
+      const timerCount = timers.length;
+      h.listeners.pointerdown[0]({ target: { closest: (sel) => (sel === '[data-manage-id]' ? null : h.cards[1]) }, clientX: 0, clientY: 0, pointerId: 1 });
+      assert.equal(timers.length, timerCount + 1, `${name}: 길게 누르기 타이머가 생긴다`);
+      h.view.destroy();
+      assert.equal(timers[timers.length - 1].cleared, true, `${name}: 타이머 해제`);
+      for (const type of ['click', 'pointerdown', 'pointermove', 'pointerup', 'pointercancel']) {
+        assert.equal(h.listeners[type].length, 0, `${name}: ${type} 귀 해제`);
+      }
+      assert.equal(observers[observers.length - 1].disconnected, true, `${name}: 크기 관찰자 해제`);
+    }
+    assert.deepEqual(messages, [], '보기는 저장·메시지·주소를 직접 보내지 않는다');
+    assert.ok(MSG.setShelfView && MSG.shelfView && MSG.setShelfView !== MSG.shelfView, '전환 메시지 이름은 공용에 그대로 있다');
+  } finally {
+    globalThis.ResizeObserver = savedRO;
+    globalThis.setTimeout = savedSetTimeout;
+    globalThis.clearTimeout = savedClearTimeout;
+    if (savedParent === undefined) delete globalThis.parent; else globalThis.parent = savedParent;
+  }
+});
+
+test('#1376 순간 추가·새 트리 목적지는 보기 밖 공용 경로에 있다', () => {
+  assert.deepEqual(nextMomentMessage('m2'), { type: MSG.write, mode: 'add', parentId: 'm2' }, '다음 순간 추가는 공용 쓰기 메시지');
+  assert.equal(typeof MSG.newTree, 'string', '새 트리 입구도 공용 메시지');
+});
+
+test('#1376 뒤로 가기는 보기와 무관하게 서재 선택을 되돌린다', () => {
+  const h = readerHarness();
+  h.state.selectedId = 'tree1';
+  h.state.open = true;
+  const nodes = h.nodes;
+  nodes.bookCoverFace = fakeEl({ getBoundingClientRect: () => ({ left: 0, top: 0, width: 100, height: 100 }), style: styleBag(), querySelector: () => fakeEl() });
+  nodes.readerScreen = fakeEl();
+  nodes.shelfScreen = fakeEl();
+  nodes.crumbLabel = fakeEl();
+  let rendered = 0;
+  const reader = createReader({
+    $: (selector) => nodes[selector.replace('#', '')] || fakeEl({ style: styleBag() }),
+    $$: () => [],
+    state: h.state,
+    getBook: () => h.book,
+    showToast: () => {}, save: () => {},
+    renderShelf: () => { rendered += 1; },
+    getShelfCard: () => null
+  });
+  const savedWindow = globalThis.window;
+  globalThis.window = { scrollTo() {} };
+  try {
+    reader.backToShelf();
+    assert.equal(h.state.open, false, '책을 닫는다');
+    assert.equal(h.state.openProgress, 0, '펼침 진행값을 되돌린다');
+    assert.equal(nodes.shelfScreen.classList.contains('is-covered'), false, '서재를 다시 보인다');
+    assert.equal(rendered, 1, '서재를 다시 그린다');
+    assert.equal(nodes.turnSheet.className, 'sheet');
+    assert.equal(h.state.selectedId, null, '선택이 풀린다');
+    assert.equal(nodes.readerScreen.classList.contains('active'), false, '리더 화면이 내려간다');
+    assert.equal(nodes.readerScreen.classList.contains('is-preparing'), false, '준비 상태도 풀린다');
+    assert.equal(nodes.crumbLabel.textContent, '서재');
+  } finally {
+    if (savedWindow === undefined) delete globalThis.window; else globalThis.window = savedWindow;
+  }
 });
