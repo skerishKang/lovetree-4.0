@@ -424,6 +424,7 @@ export function createPanels(deps) {
   const instagramLimited = new Set();
   let editorInstagramUrl = '';
   let editorInstagramMeta = null;
+  let editorPendingInstagram = null;
   // #792 2단계: 영상을 보다가 지금 위치를 담는 재생기 연결. 주소·제목이 바뀌면 끊고 새로 잇는다.
   let segmentToken = 0, segmentPlayer = null, segmentCapture = null;
   function hideSegmentCapture() {
@@ -539,6 +540,7 @@ export function createPanels(deps) {
     editorTikTokMeta = null;
     editorInstagramUrl = '';
     editorInstagramMeta = null;
+    editorPendingInstagram = null;
     editorVideoUrl = info.kind === 'youtube' && info.videoId ? url : '';
     if (editorVideoUrl) {
       const videoId = info.videoId;
@@ -573,6 +575,14 @@ export function createPanels(deps) {
         instagramMetaCache.set(url, saved);
         editorInstagramMeta = saved;
         if (saved.title) editorVideoTitle = saved.title;
+        if(editorPendingInstagram?.url===url){
+          const mediaMetadata={};
+          if(saved.title)mediaMetadata.title=saved.title;
+          if(saved.author){mediaMetadata.channel=saved.author;mediaMetadata.instagramAuthor=saved.author;}
+          if(saved.shortcode)mediaMetadata.instagramShortcode=saved.shortcode;
+          try{getMember().apply('backfillTitles',{items:[{treeId:editorPendingInstagram.treeId,momentId:editorPendingInstagram.momentId,url,mediaMetadata}]});}catch{}
+          editorPendingInstagram=null;
+        }
       });
     }
   }
@@ -790,7 +800,18 @@ export function createPanels(deps) {
         input.image = String(input.url).trim();
         input.url = editorInstagramUrl;
       }
-      getMember().apply(editorMode, input, sel, editorMode === 'add' ? {moment:true} : undefined);
+      const savedResult=getMember().apply(editorMode, input, sel, editorMode === 'add' ? {moment:true} : undefined);
+      if(editorMode==='add'&&editorInstagramUrl&&!editorInstagramMeta&&!instagramLimited.has(editorInstagramUrl)&&savedResult?.treeId&&savedResult?.momentId){
+        editorPendingInstagram={treeId:savedResult.treeId,momentId:savedResult.momentId,url:editorInstagramUrl};
+        void fetchInstagramMetadata(editorInstagramUrl).then(meta=>{
+          if(!meta||meta.limited||editorPendingInstagram?.url!==editorInstagramUrl)return;
+          const saved={title:meta.title||'',author:meta.authorName||'',shortcode:meta.shortcode||''};
+          instagramMetaCache.set(editorInstagramUrl,saved);editorInstagramMeta=saved;
+          const mediaMetadata={};if(saved.title)mediaMetadata.title=saved.title;if(saved.author){mediaMetadata.channel=saved.author;mediaMetadata.instagramAuthor=saved.author;}if(saved.shortcode)mediaMetadata.instagramShortcode=saved.shortcode;
+          try{getMember().apply('backfillTitles',{items:[{treeId:editorPendingInstagram.treeId,momentId:editorPendingInstagram.momentId,url:editorInstagramUrl,mediaMetadata}]});}catch{}
+          editorPendingInstagram=null;
+        });
+      }
       formBaseline = new URLSearchParams(new FormData(e.target)).toString();
       const failedNotes = [];
       if (editorMode === 'edit') {

@@ -314,13 +314,11 @@ export function createQuickAdd(deps) {
     const saved = { title: meta.title || '', author: meta.authorName || '', shortcode: meta.shortcode || '' };
     instagramCache.set(url, saved);
     instagramLimited.delete(url);
-    if (saved.title) {
-      const mediaMetadata = { channel: saved.author };
-      if (saved.title) mediaMetadata.title = saved.title;
-      if (saved.shortcode) mediaMetadata.instagramShortcode = saved.shortcode;
-      if (saved.author) mediaMetadata.instagramAuthor = saved.author;
-      fillPendingTitle(url, saved.title, mediaMetadata);
-    }
+    const mediaMetadata = {};
+    if (saved.title) mediaMetadata.title = saved.title;
+    if (saved.shortcode) mediaMetadata.instagramShortcode = saved.shortcode;
+    if (saved.author) { mediaMetadata.channel = saved.author; mediaMetadata.instagramAuthor = saved.author; }
+    if (Object.keys(mediaMetadata).length) fillPendingTitle(url, saved.title, mediaMetadata);
     if (node && token === previewToken && node.isConnected !== false && saved.title) node.textContent = saved.title;
   }
 
@@ -376,7 +374,7 @@ export function createQuickAdd(deps) {
   // 자동으로 고치지 않는다 — 그 길은 기존 title-backfill이 맡는다).
   function fillPendingTitle(videoId, title, mediaMetadata = null) {
     const pending = pendingTitleFill;
-    if (!pending || pending.videoId !== videoId || !title) return;
+    if (!pending || pending.videoId !== videoId || (!title && !mediaMetadata)) return;
     pendingTitleFill = null;
     try {
       deps.getMember().apply('backfillTitles', { items: [{ treeId: pending.treeId, momentId: pending.momentId, url: pending.url, mediaMetadata: mediaMetadata || { title } }] });

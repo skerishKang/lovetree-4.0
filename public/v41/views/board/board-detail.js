@@ -175,9 +175,10 @@
   new MutationObserver(labelBoardYoutube).observe($('#cardLayer'),{childList:true,subtree:true});
   let boardYoutubePointer=null,boardYoutubeOpener=null;
   const cardLayerYoutube=$('#cardLayer');
+  const boardPlayable=moment=>!!ytId(originalUrl(moment))||['tiktok','instagram'].includes(window.LTMedia?.describe?.(originalUrl(moment))?.kind);
   cardLayerYoutube.addEventListener('pointerdown',e=>{
     const card=e.target.closest('.card[data-id]');
-    if(card&&ytId(originalUrl(moments.find(m=>m.id===card.dataset.id)))){
+    if(card&&boardPlayable(moments.find(m=>m.id===card.dataset.id))){
       boardYoutubePointer={id:card.dataset.id,x:e.clientX,y:e.clientY,moved:false};
     }else boardYoutubePointer=null;
   },true);
@@ -189,14 +190,16 @@
   cardLayerYoutube.addEventListener('pointercancel',()=>{boardYoutubePointer=null},true);
   window.addEventListener('click',e=>{
     const card=e.target.closest('.card[data-id]');
-    if(!card||!ytId(originalUrl(moments.find(m=>m.id===card.dataset.id))))return;
+    const moment=moments.find(m=>m.id===card?.dataset.id);
+    if(!card||!boardPlayable(moment))return;
     // 본문 선택·끌기는 그대로 두고 영상의 재생 표시만 크게 보기로 연결합니다.
     if(!e.target.closest('[data-lt-play]'))return;
     if(e.detail!==0&&boardYoutubePointer?.id===card.dataset.id&&boardYoutubePointer.moved)return;
     e.preventDefault();e.stopImmediatePropagation();
     boardYoutubeOpener=e.target.closest('button')||card.querySelector('[data-lt-play]');
-    openViewer(card.dataset.id);
-    $('#closeViewer').focus();
+    const kind=window.LTMedia?.describe?.(originalUrl(moment))?.kind;
+    if(kind==='tiktok'||kind==='instagram')window.LTMedia.openLightbox(originalUrl(moment),titleMain(moment)||'순간',true,moment.mediaMetadata?.tiktokId||'');
+    else{openViewer(card.dataset.id);$('#closeViewer').focus();}
     boardYoutubePointer=null;
   },true);
   $('#closeViewer').addEventListener('click',()=>{

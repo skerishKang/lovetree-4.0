@@ -346,7 +346,8 @@ function harness638({ trees = [inboxTree, secondTree], currentTreeId = 't-second
   };
   let resolveTitle = null;
   const pendingFetch = new Promise(resolve => { resolveTitle = resolve; });
-  const titleFetch = fetchImpl || ((url) => pendingFetch.then(title => ({ ok: true, json: async () => ({ title }) })));
+  const titleFetch = fetchImpl || ((url) => pendingFetch.then(value => value && typeof value === 'object' && 'ok' in value
+    ? value : { ok: true, json: async () => ({ title: value }) }));
   const api = createQuickAdd({
     $,
     document: doc,
@@ -374,7 +375,7 @@ function harness638({ trees = [inboxTree, secondTree], currentTreeId = 't-second
     isFinePointer: () => false,
     fetchImpl: titleFetch
   });
-  return { api, els, calls, resolveTitle: value => resolveTitle(value) };
+  return { api, els, calls, resolveTitle: value => resolveTitle(value), resolveMeta: value => resolveTitle(value) };
 }
 
 test('#638 담기 창은 고른 트리 이름을 한 줄 보이고, 그 자리에서 바꿀 수 있다', () => {
@@ -503,6 +504,45 @@ test('#638 제목이 늦게 도착하면 방금 담은 순간의 영상 제목�
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(h.calls.apply.length, 2, '제목이 도착하면 한 번 더 저장한다');
   assert.deepEqual(h.calls.apply[1], ['backfillTitles', { items: [{ treeId: 't-second', momentId: 'm-new', url: URL_OK, mediaMetadata: { title: VIDEO_TITLE } }] }]);
+});
+
+test('#791 인스타 429는 링크 저장을 막지 않고 메타데이터를 덧붙이지 않는다', async () => {
+  const url = 'https://www.instagram.com/reel/C0abc123XYZ/';
+  const h = harness638({ fetchImpl: async () => ({ ok: false, status: 429, json: async () => ({}) }) });
+  h.els['quick-url'].value = url;
+  h.api.renderPreview();
+  await new Promise(resolve => setImmediate(resolve));
+  h.api.submitQuick({ preventDefault() {} });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(h.calls.apply, [['quickAdd', { url, treeId: 't-second' }, undefined, { moment: true }]]);
+});
+
+test('#791 인스타 캡션·@계정·코드는 저장 입력에 함께 간다', async () => {
+  const url = 'https://www.instagram.com/reel/C0abc123XYZ/';
+  const h = harness638({ fetchImpl: async () => ({ ok: true, json: async () => ({ title: '바다에서 보낸 순간', authorName: '원본계정', shortcode: 'C0abc123XYZ' }) }) });
+  h.els['quick-url'].value = url;
+  h.api.renderPreview();
+  await new Promise(resolve => setImmediate(resolve));
+  h.api.submitQuick({ preventDefault() {} });
+  assert.deepEqual(h.calls.apply[0], ['quickAdd', {
+    url, treeId: 't-second',
+    mediaMetadata: { title: '바다에서 보낸 순간', instagramShortcode: 'C0abc123XYZ', channel: '원본계정', instagramAuthor: '원본계정' }
+  }, undefined, { moment: true }]);
+});
+
+test('#791 인스타 @계정·코드가 늦게 도착하면 제목 없이도 방금 담은 순간을 보정한다', async () => {
+  const url = 'https://www.instagram.com/reel/C0abc123XYZ/';
+  const h = harness638();
+  h.els['quick-url'].value = url;
+  h.api.renderPreview();
+  h.api.submitQuick({ preventDefault() {} });
+  assert.equal(h.calls.apply.length, 1);
+  h.resolveMeta({ ok: true, json: async () => ({ title: '', authorName: '원본계정', shortcode: 'C0abc123XYZ' }) });
+  await new Promise(resolve => setImmediate(resolve));
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(h.calls.apply[1], ['backfillTitles', {
+    items: [{ treeId: 't-second', momentId: 'm-new', url, mediaMetadata: { instagramShortcode: 'C0abc123XYZ', channel: '원본계정', instagramAuthor: '원본계정' } }]
+  }]);
 });
 
 test('#638 제목을 받아 둔 뒤 담으면 mediaMetadata가 저장 입력에 함께 간다(채움 저장 없음)', async () => {

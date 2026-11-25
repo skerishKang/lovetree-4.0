@@ -22,7 +22,7 @@ function fakeElement(extra = {}) {
   return Object.assign(node, extra);
 }
 
-function harness({ owned = true, writable = true, source = 'server', busy = false, tree = null, view = 'track59-sketchbook.html', applyImpl = null } = {}) {
+function harness({ owned = true, writable = true, source = 'server', busy = false, tree = null, view = 'track59-sketchbook.html', applyImpl = null, fetchImpl = null, describe = null } = {}) {
   const calls = [];
   const notes = [];
   const els = {};
@@ -50,7 +50,8 @@ function harness({ owned = true, writable = true, source = 'server', busy = fals
 
   const saved = {
     document: globalThis.document, window: globalThis.window,
-    FormData: globalThis.FormData, LTMedia: globalThis.LTMedia, confirm: globalThis.confirm, location: globalThis.location
+    FormData: globalThis.FormData, LTMedia: globalThis.LTMedia, confirm: globalThis.confirm, location: globalThis.location,
+    fetch: globalThis.fetch
   };
   const LT41 = tree ? { tree, momentId: tree.moments[0]?.id, trees: [tree] } : null;
   globalThis.window = { LT41 };
@@ -60,8 +61,9 @@ function harness({ owned = true, writable = true, source = 'server', busy = fals
     constructor(form) { this.pairs = Object.entries(form.elements).map(([key, field]) => [key, field.value ?? '']); }
     *[Symbol.iterator]() { yield* this.pairs; }
   };
-  globalThis.LTMedia = { describe: url => ({ kind: url ? 'photo' : 'none', label: url ? '사진' : '' }), markup: () => '' };
+  globalThis.LTMedia = { describe: describe || (url => ({ kind: url ? 'photo' : 'none', label: url ? '사진' : '' })), markup: () => '' };
   globalThis.confirm = () => true;
+  globalThis.fetch = fetchImpl || globalThis.fetch;
 
   const member = { snapshot: () => ({ owned, writable, dirty: false, subject: 'sub_test0001' }), apply: (...args) => { calls.push(args); return applyImpl ? applyImpl(...args) : {}; }, dispose() {} };
   const uploads = { busy, resets: 0, reset() { this.resets += 1; } };
@@ -90,6 +92,7 @@ function harness({ owned = true, writable = true, source = 'server', busy = fals
     globalThis.LTMedia = saved.LTMedia;
     globalThis.confirm = saved.confirm;
     globalThis.location = saved.location;
+    globalThis.fetch = saved.fetch;
   };
   return {
     panels, els, calls, notes, uploads, coverSlotParts, coverSlot,
@@ -227,6 +230,54 @@ test('편집기 저장은 editorMode와 폼 값·선택을 member.apply에 그�
     assert.equal(h.calls[0][2].treeId, 'tree1', '선택을 그대로 넘긴다');
     assert.equal(h.els['write-panel'].open, false, '저장하면 닫는다');
     assert.deepEqual(h.notes, [], '#905: 자동 저장 성공은 알리지 않는다');
+  } finally { h.restore(); }
+});
+
+test('#791 자세한 추가는 인스타 429에도 링크를 저장하고 메타데이터는 보정하지 않는다', async () => {
+  const url = 'https://www.instagram.com/reel/C0abc123XYZ/';
+  const h = harness({
+    tree: sampleTree(), applyImpl: () => ({ treeId: 'tree1', momentId: 'm9' }),
+    describe: value => ({ kind: value === url ? 'instagram' : value ? 'photo' : 'none', openUrl: value, label: '인스타그램 릴스' }),
+    fetchImpl: async () => ({ ok: false, status: 429, json: async () => ({}) })
+  });
+  try {
+    h.panels.setEditorMode('add');
+    const form = h.els['moment-form'];
+    form.elements.url.value = url;
+    form.elements.url.listeners.input();
+    await new Promise(resolve => setImmediate(resolve));
+    form.onsubmit({ preventDefault() {}, target: form });
+    assert.equal(h.calls.length, 1);
+    assert.equal(h.calls[0][0], 'add');
+    assert.equal(h.calls[0][1].url, url);
+    assert.equal(h.calls[0][1].mediaMetadata, undefined);
+  } finally { h.restore(); }
+});
+
+test('#791 자세한 추가는 늦게 도착한 인스타 @계정·코드를 방금 저장한 순간에 보정한다', async () => {
+  const url = 'https://www.instagram.com/reel/C0abc123XYZ/';
+  let resolveMeta;
+  const pending = new Promise(resolve => { resolveMeta = resolve; });
+  const h = harness({
+    tree: sampleTree(), applyImpl: () => ({ treeId: 'tree1', momentId: 'm9' }),
+    describe: value => ({ kind: value === url ? 'instagram' : value ? 'photo' : 'none', openUrl: value, label: '인스타그램 릴스' }),
+    fetchImpl: () => pending
+  });
+  try {
+    h.panels.setEditorMode('add');
+    const form = h.els['moment-form'];
+    form.elements.url.value = url;
+    form.elements.url.listeners.input();
+    form.onsubmit({ preventDefault() {}, target: form });
+    assert.deepEqual(h.calls.map(call => call[0]), ['add']);
+    resolveMeta({ ok: true, json: async () => ({ title: '', authorName: '원본계정', shortcode: 'C0abc123XYZ' }) });
+    await new Promise(resolve => setImmediate(resolve));
+    await new Promise(resolve => setImmediate(resolve));
+    assert.deepEqual(h.calls.map(call => call[0]), ['add', 'backfillTitles']);
+    assert.deepEqual(h.calls[1][1], { items: [{
+      treeId: 'tree1', momentId: 'm9', url,
+      mediaMetadata: { instagramShortcode: 'C0abc123XYZ', channel: '원본계정', instagramAuthor: '원본계정' }
+    }] });
   } finally { h.restore(); }
 });
 

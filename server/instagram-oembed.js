@@ -16,7 +16,6 @@ const THUMBNAIL_HOST = /(?:^|\.)(?:cdninstagram\.com|instagram\.com|fbcdn\.net)$
 export const DEFAULT_TIMEOUT_MS = 3000;
 export const DEFAULT_TTL_MS = 24 * 60 * 60 * 1000;
 const MAX_CACHE_ENTRIES = 500;
-const MAX_TITLE = 500;
 const MAX_AUTHOR = 120;
 const MAX_THUMBNAIL = 2048;
 
@@ -50,7 +49,7 @@ function safeThumbnail(value) {
 export function exposedMetadata(shortcode, data) {
   return {
     shortcode,
-    title: safeText(data?.title, MAX_TITLE),
+    title: safeText(data?.caption, 240) || safeText(data?.title, 240),
     authorName: safeText(data?.author_name, MAX_AUTHOR),
     thumbnailUrl: safeThumbnail(data?.thumbnail_url)
   };
@@ -95,6 +94,8 @@ export function createInstagramOembedClient({ fetchImpl = (...args) => fetch(...
       }
       // 호출 한도(429)는 화면에 그대로 전달한다 — 링크 저장은 막지 않고 다음에 다시 조회한다.
       if (response.status === 429) throw new ApiError(429, 'instagram_rate_limited', '인스타그램 조회 한도에 걸렸어요. 잠시 뒤 다시 시도할게요.');
+      if (response.status === 404 || response.status === 410) throw new ApiError(404, 'instagram_gone', '삭제되었거나 찾을 수 없는 릴스예요.');
+      if (response.status === 403) throw new ApiError(403, 'instagram_private', '비공개 릴스는 여기에서 재생할 수 없어요.');
       if (!response.ok) throw new ApiError(502, 'instagram_metadata', '릴스 정보를 불러오지 못했어요.');
       let data;
       try { data = await response.json(); } catch { throw new ApiError(502, 'instagram_metadata', '릴스 정보 형식을 알아보지 못했어요.'); }

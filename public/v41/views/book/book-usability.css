@@ -119,7 +119,7 @@ html[data-book-shape=phone][data-v41-screen=book] .yt-frame.is-vertical{height:c
 html[data-v41-screen=book] .tt-play{overflow:hidden;border-radius:8px;background:var(--lt-ink)}
 html[data-v41-screen=book] .tt-backdrop{position:absolute;inset:-12px;background-image:var(--lt-tt-bg);background-size:cover;background-position:center;filter:blur(18px) brightness(.72);opacity:.86;transform:scale(1.06);pointer-events:none}
 html[data-v41-screen=book] .yt-play.is-vertical .tt-thumb{position:relative;z-index:1;width:100%;height:100%;object-fit:contain}
-html[data-v41-screen=book] .tt-mark{position:absolute;top:10px;right:10px;z-index:2;padding:3px 9px;border-radius:var(--lt-r-pill);background:rgba(0,0,0,.55);color:var(--lt-paper);font-size:11px;font-weight:700;letter-spacing:.06em}
+html[data-v41-screen=book] .tt-mark{position:absolute;top:10px;right:10px;z-index:2;padding:3px 9px;border-radius:var(--lt-r-pill);background:var(--lt-role-scrim);color:var(--lt-role-text-strong);font-size:11px;font-weight:700;letter-spacing:.06em}
 html[data-v41-screen=book] .tt-author{position:absolute;left:12px;bottom:52px;z-index:2;max-width:calc(100% - 24px);color:var(--lt-paper);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 html[data-v41-screen=book] .tt-play .tiktok-embed{position:relative;z-index:3;width:100%;height:100%;margin:0;overflow:auto;background:var(--lt-ink);color:var(--lt-paper)}
 /* #791 2단계: 릴스 글 카드(캡션·@계정)와 올린 그림 썸네일. */

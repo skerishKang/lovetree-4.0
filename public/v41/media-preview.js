@@ -45,22 +45,24 @@ function tiktokPlayerId(value) {
 }
 const tiktokFrames=new Map();
 // 공식 메시지는 실제로 등록한 재생 칸의 창과 출처가 모두 맞을 때만 처리한다.
-function watchTiktokFrame(frame,originalUrl){
+function watchTiktokFrame(frame,originalUrl,onError){
  const link=describe(originalUrl);
  if(link.kind!=='tiktok')return;
- tiktokFrames.set(frame,link.openUrl);
+ tiktokFrames.set(frame,{url:link.openUrl,onError:typeof onError==='function'?onError:null});
 }
 function tiktokPlayerMessage(event){
  if(event.origin!=='https://www.tiktok.com'||event.data?.['x-tiktok-player']!==true||event.data.type!==globalThis.LT41_MSG.tiktokPlayerError)return;
  const code=event.data.value?.errorCode;
  if(![1001,2001,3001].includes(code))return; // 3002: 공식 재생기의 수동 재생 단추를 유지한다.
- for(const [frame,url] of tiktokFrames){
+ for(const [frame,entry] of tiktokFrames){
   if(!frame.isConnected){tiktokFrames.delete(frame);continue;}
   if(event.source!==frame.contentWindow)continue;
+  tiktokFrames.delete(frame);
+  if(entry.onError){entry.onError();break;}
   const note=frame.ownerDocument.createElement('p');note.className='lt-lightbox-note';note.setAttribute('data-lt-tiktok-error','');note.setAttribute('role','status');
   note.textContent='틱톡에서 영상을 재생하지 못했어요. ';
-  const a=frame.ownerDocument.createElement('a');a.href=url;a.target='_blank';a.rel='noopener noreferrer';a.textContent='원본에서 열기 ↗';note.append(a);
-  tiktokFrames.delete(frame);frame.replaceWith(note);break;
+  const a=frame.ownerDocument.createElement('a');a.href=entry.url;a.target='_blank';a.rel='noopener noreferrer';a.textContent='원본에서 열기 ↗';note.append(a);
+  frame.replaceWith(note);break;
  }
 }
 function tiktokPlayerUrl(value) {
@@ -463,21 +465,10 @@ async function playInPlace(root){
  if((m.kind!=='youtube'&&m.kind!=='tiktok'&&m.kind!=='instagram')||root.dataset.ltPlaying||root.dataset.ltVanished==='1')return;
  root.dataset.ltPlaying='1';
  const body=root.querySelector('.lt-media-body'),status=root.querySelector('.lt-media-status');
- // #791: 공식 재생기 iframe을 직접 넣는다(섀도우 루트의 블록을 스크립트가 찾지 못한다).
-if(m.kind==='tiktok'||m.kind==='instagram'){
-   const src=m.kind==='tiktok'?tiktokPlayerUrl(root.dataset.ltTiktokId||m.videoId):instagramPlayerUrl(root.dataset.ltInstagramCode||m.shortcode);
-   if(!src||!root.isConnected){delete root.dataset.ltPlaying;if(status&&!src)status.textContent='바로 재생할 수 없어요. 아래 원본 링크에서 열어 주세요.';return;}
-   const frame=document.createElement('iframe');
-   frame.className=m.kind==='tiktok'?'lt-yt-frame lt-tt-frame':'lt-yt-frame lt-ig-frame';
-   frame.src=src;frame.title=root.dataset.ltTitle||(m.kind==='tiktok'?'TikTok 영상':'인스타그램 릴스');
-   frame.allow='accelerometer; autoplay; clipboard-write; encrypted-media; fullscreen; gyroscope; picture-in-picture; web-share';
-   frame.allowFullscreen=true;
-   frame.setAttribute('referrerpolicy','strict-origin-when-cross-origin');
-   if(m.kind==='tiktok')watchTiktokFrame(frame,m.openUrl);
-   body.replaceChildren(frame);
-   delete root.dataset.ltPlaying;
-   if(status)status.textContent=m.kind==='tiktok'?'공식 재생기를 열었어요. 아래 원본 링크로도 열 수 있어요.':'재생 중이에요. 아래 원본 링크로도 열 수 있어요.';
-   return;
+ if(m.kind==='tiktok'||m.kind==='instagram'){
+  delete root.dataset.ltPlaying;
+  await openLightbox(root.dataset.ltUrl,root.dataset.ltTitle||(m.kind==='tiktok'?'TikTok 영상':'인스타그램 릴스'),true,root.dataset.ltTiktokId||m.videoId);
+  return;
  }
 // #792: 기억할 구간 — 순간의 시작·끝(카드가 들고 있는 저장 값)이 있으면 그 구간만 재생한다.
  // '처음부터 보기'를 누른 뒤엔 시작 시점도 없이 처음부터. 끝이 없으면 시작 시점부터.
@@ -579,6 +570,7 @@ let lightbox=null,lightboxOpener=null,lightboxBlob=null,lightboxErrorListener=nu
 function closeLightbox(){
  if(!lightbox)return;
  const node=lightbox;lightbox=null;
+ try{parent.postMessage({type:globalThis.LT41_MSG?.viewer,open:false},location.origin)}catch{}
  document.removeEventListener('keydown',lightboxKey,true);
  if(lightboxErrorListener){window.removeEventListener('message',lightboxErrorListener);lightboxErrorListener=null}
  if(lightboxBlob){URL.revokeObjectURL(lightboxBlob);lightboxBlob=null}
@@ -602,6 +594,7 @@ async function openLightbox(url,title='',verticalHint=null,tiktokId=''){
  const stage=overlay.querySelector('.lt-lightbox-stage');
  document.body.append(overlay);
  lightbox=overlay;
+ try{parent.postMessage({type:globalThis.LT41_MSG?.viewer,open:true},location.origin)}catch{}
  document.dispatchEvent(new Event('lt-media-lightbox-open'));
  document.addEventListener('keydown',lightboxKey,true);
  overlay.addEventListener('click',e=>{if(e.target===overlay)closeLightbox()});
@@ -610,13 +603,34 @@ async function openLightbox(url,title='',verticalHint=null,tiktokId=''){
  const alive=()=>lightbox===overlay;
  if(m.kind==='instagram'||m.kind==='tiktok'){
   if(!alive())return;
+  const original=m.openUrl||url;
+  const unavailable=()=>{
+   if(!alive())return;
+   const note=document.createElement('p');note.className='lt-lightbox-note';note.setAttribute('role','status');
+   note.textContent='여기에서 재생할 수 없는 영상입니다. ';
+   const link=document.createElement('a');link.href=original;link.target='_blank';link.rel='noopener noreferrer';
+   link.textContent=m.kind==='tiktok'?'틱톡에서 보기':'인스타그램에서 보기';note.append(link);stage.replaceChildren(note);
+  };
   const src=m.kind==='tiktok'?tiktokPlayerUrl(tiktokId||m.videoId):instagramPlayerUrl(m.shortcode);
-  if(!src){stage.innerHTML='<p class="lt-lightbox-note">바로 재생할 수 없어요. 원본 링크에서 열어 주세요.</p>';return;}
+  if(!src){unavailable();return;}
+  if(m.kind==='instagram'){
+   try{
+    const answer=await fetch('/api/instagram/oembed?url='+encodeURIComponent(original),{headers:{accept:'application/json'}});
+    if(!alive())return;
+    if(answer.status===404||answer.status===410){unavailable();return;}
+    if(answer.status===429||answer.status>=500||!answer.ok){
+     const data=await answer.json().catch(()=>null);
+     if(['instagram_gone','instagram_private','instagram_not_video'].includes(data?.error?.code)){unavailable();return;}
+    }
+   }catch{}
+  }
+  if(!alive())return;
   const frame=document.createElement('iframe');
   frame.className='lt-lightbox-media';frame.src=src;frame.title=title||(m.kind==='tiktok'?'TikTok 영상':'인스타그램 릴스');
   frame.allow='accelerometer; autoplay; clipboard-write; encrypted-media; fullscreen; gyroscope; picture-in-picture; web-share';
   frame.allowFullscreen=true;frame.setAttribute('referrerpolicy','strict-origin-when-cross-origin');
-  if(m.kind==='tiktok')watchTiktokFrame(frame,m.openUrl);
+  frame.addEventListener('error',unavailable,{once:true});
+  if(m.kind==='tiktok')watchTiktokFrame(frame,original);
   stage.replaceChildren(frame);
   return;
  }

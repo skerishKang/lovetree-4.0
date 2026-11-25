@@ -189,23 +189,13 @@ function playInline(yt,media){
  monitorBookYoutubeFrame(frame,cell.stage,yt.dataset.ytPlay,watch);
  if(end>start)host.insertAdjacentHTML('beforeend','<button type="button" class="yt-from-start" data-yt-from-start="'+t(yt.dataset.ytPlay)+'">처음부터 보기</button>');
 }
-/* #791: 공식 재생기 iframe을 직접 넣는다(섀도우 루트의 블록을 스크립트가 찾지 못한다). */
-function playOfficialInline(btn,src,title,className){
- if(!src||!btn.parentElement||btn.parentElement.querySelector('iframe.lt-tt-frame,iframe.lt-ig-frame'))return !!src;
- const frame=document.createElement('iframe');
- frame.className=className;frame.src=src;frame.title=title;
- frame.allow='accelerometer; autoplay; clipboard-write; encrypted-media; fullscreen; gyroscope; picture-in-picture; web-share';
- frame.allowFullscreen=true;frame.setAttribute('referrerpolicy','strict-origin-when-cross-origin');
- if(btn.hasAttribute('data-tt-play'))window.LTMedia.watchTiktokFrame(frame,btn.dataset.ttCite);
- btn.replaceWith(frame);return true;
-}
 function playTiktokInline(btn){
- const src=window.LTMedia?.tiktokPlayerUrl?.(btn.dataset.ttPlay||'');
- return playOfficialInline(btn,src,btn.dataset.ttTitle||'TikTok 영상','yt-frame is-vertical lt-tt-frame');
+ btn.focus?.();
+ window.LTMedia?.openLightbox?.(btn.dataset.ttCite,btn.dataset.ttTitle||'TikTok 영상',true,btn.dataset.ttPlay||'');
 }
 function playInstagramInline(btn){
- const src=window.LTMedia?.instagramPlayerUrl?.(btn.dataset.igPlay||'');
- return playOfficialInline(btn,src,btn.dataset.igTitle||'인스타그램 릴스','yt-frame is-vertical lt-ig-frame');
+ btn.focus?.();
+ window.LTMedia?.openLightbox?.(btn.dataset.igCite,btn.dataset.igTitle||'인스타그램 릴스',true);
 }
 document.addEventListener('pointerdown',e=>{
  if(!isPrimaryButton(e))return;
