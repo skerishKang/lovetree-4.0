@@ -463,9 +463,9 @@ const treeWorkspace = () => {
   }] } };
 };
 
-async function openShellTree(browser, base, width) {
+async function openShellTree(browser, base, width, theme = 'night') {
   const context = await browser.newContext({ viewport: { width, height: width === 390 ? 844 : 900 }, reducedMotion: 'reduce' });
-  await context.addInitScript(() => localStorage.setItem('lt41.tips.firstTree', '1'));
+  await context.addInitScript(theme => { localStorage.setItem('lt41.tips.firstTree', '1'); localStorage.setItem('lt41.theme', theme); }, theme);
   const page = await context.newPage();
   await page.route('**/api/workspace*', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(treeWorkspace()) }));
   await page.goto(`${base}/v41/?account=1`, { waitUntil: 'load' });
@@ -524,5 +524,64 @@ test('#1333 화면: 트리 보기에서 고른 순간이 책·보드로 옮겨�
     await book.waitForFunction(() => !!window.LTDEMO, null, { timeout: 20000 });
     assert.equal(await book.evaluate(() => String(window.LTDEMO.get() || '')), target, `${width}: 책에서 방금 고른 순간이 열린다`);
     await context.close();
+  }
+});
+
+
+/* #1368: 트리 상세는 DOM [open]뿐 아니라 실제 픽셀에서도 글자가 읽혀야 한다. */
+test('#1368 트리 상세 판 글자 대비와 무대 흐림 — 390·1440 밤·정원', {
+  skip: REQUIRE ? false : skip, timeout: 180000
+}, async (t) => {
+  if (skip) assert.fail(`필수 화면 시험 환경 누락: ${skip}`);
+  const { serve } = await import('./helpers/screen-audit.mjs');
+  const server = await serve();
+  const browser = await chromium.launch({ headless: true });
+  t.after(async () => { await browser.close(); server.close(); });
+  for (const width of [390, 1440]) for (const theme of ['night', 'garden']) {
+    await t.test(`${width} ${theme} 상세 판 실제 픽셀`, async () => {
+      const { page, frame, context } = await openShellTree(browser, `http://127.0.0.1:${server.address().port}`, width, theme);
+      try {
+        const card = frame.locator('#cards [data-kind="moment"]:not(.is-root)').first();
+        const rect = await card.boundingBox();
+        assert.ok(rect && rect.width > 0, '실제 누를 카드가 있다');
+        await page.mouse.click(rect.x + rect.width / 2, rect.y + rect.height / 2);
+        const dialog = frame.locator('#treeDetail[open]');
+        await dialog.waitFor({ state: 'visible' });
+        for (const selector of ['#treeDetailTitle', '#treeDetailNote', '#treeDetailClose', '#openMoment']) {
+          assert.ok(await frame.locator(selector).isVisible(), `${selector} 화면에 표시`);
+        }
+        const png = await dialog.screenshot({
+          path: process.env.LT_DETAIL_1368_SHOTS ? `${process.env.LT_DETAIL_1368_SHOTS}/tree-${width}-${theme}.png` : undefined
+        });
+        // PNG의 제목 글자 영역을 캔버스로 읽어, 계산된 색만 정상인 가림 현상을 잡는다.
+        const pixels = await page.evaluate(async data => {
+          const img = new Image();
+          img.src = 'data:image/png;base64,' + data;
+          await img.decode();
+          const canvas = document.createElement('canvas');
+          canvas.width = img.naturalWidth; canvas.height = img.naturalHeight;
+          const ctx = canvas.getContext('2d', { willReadFrequently: true });
+          ctx.drawImage(img, 0, 0);
+          const { width, data: rgb } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          let min = 255, max = 0, changed = 0;
+          const lum = i => .2126 * rgb[i] + .7152 * rgb[i + 1] + .0722 * rgb[i + 2];
+          const base = lum((Math.min(10, canvas.height - 1) * width + 5) * 4);
+          for (let y = 15; y < Math.min(48, canvas.height); y++) for (let x = 16; x < Math.min(150, width); x++) {
+            const l = lum((y * width + x) * 4);
+            min = Math.min(min, l); max = Math.max(max, l);
+            if (Math.abs(l - base) >= 80) changed++;
+          }
+          return { min, max, contrast: max - min, changed };
+        }, png.toString('base64'));
+        assert.ok(pixels.contrast >= 125 && pixels.changed >= 20,
+          `${width} ${theme}: 상세 판 제목 실제 픽셀 대비가 충분해야 함 ${JSON.stringify(pixels)}`);
+        const outside = await frame.evaluate(() => ({
+          blur: getComputedStyle(document.querySelector('.ts-world')).filter,
+          backdrop: getComputedStyle(document.querySelector('#treeDetail'), '::backdrop').backgroundColor
+        }));
+        assert.match(outside.blur, /blur\(3px\)/, '판 바깥 트리 무대만 흐려짐');
+        assert.equal(outside.backdrop, 'rgba(0, 0, 0, 0)', '상세 판을 가리는 덮개 효과 제거');
+      } finally { await context.close(); }
+    });
   }
 });
