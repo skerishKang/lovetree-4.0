@@ -345,11 +345,11 @@ test('#book-dup 실제 화면: 메모 장에서 제목·본문을 두 번 쓰지
     // 390 머리줄: 20자가 넘는 트리 이름도 '목차' 단추와 겹치지 않고 말줄임(…)으로 끊긴다.
     const longName = '좋아하는 순간들이 이어지는 우리의 오래된 기록 저장소';
     await phone.frame.evaluate((name) => { document.getElementById('bookTitleText').textContent = name; }, longName);
-    await phone.frame.waitForFunction((name) => document.querySelector('.lt-toolbar-title')?.textContent === name, longName, { timeout: 5000 });
+    await phone.frame.waitForFunction((name) => document.querySelector('.lt-toolbar-tree-name')?.textContent === name, longName, { timeout: 5000 });
     const head = await phone.frame.evaluate(() => {
       const box = (q) => { const b = document.querySelector(q)?.getBoundingClientRect(); return b ? { l: b.left, r: b.right } : null; };
       const title = box('.lt-toolbar-left'), index = box('#archiveBtn');
-      const span = document.querySelector('.lt-toolbar-title');
+      const span = document.querySelector('.lt-toolbar-tree-name');
       return {
         overlap: title && index ? Math.max(0, Math.min(title.r, index.r) - Math.max(title.l, index.l)) : null,
         ellipsized: span.scrollWidth > span.clientWidth + 1,
