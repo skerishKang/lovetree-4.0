@@ -8,7 +8,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
-import { createReadStream, existsSync } from 'node:fs';
+import { createReadStream, existsSync, mkdirSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -488,8 +488,9 @@ test('#1096 체험 — 미리보기 예시 지도에서만 켜지고, 저장 없
   const port = server.address().port;
   const browser = await chromium.launch();
   try {
-    const open = async (hostname, file) => {
-      const ctx = await browser.newContext({viewport: {width: 1440, height: 900}, reducedMotion: 'reduce', locale: 'ko-KR'});
+    const open = async (hostname, file, width = 1440, theme = 'night') => {
+      const ctx = await browser.newContext({viewport: {width, height: width <= 390 ? 844 : 900}, reducedMotion: 'reduce', locale: 'ko-KR'});
+      await ctx.addInitScript(themeName => { try { localStorage.setItem('lt41.theme', themeName); } catch {} }, theme);
       await ctx.route('**/*', async route => {
         const req = route.request(), u = new URL(req.url());
         const simulated = u.hostname === 'lovetree.padiem.net' || u.hostname === 'lovetree-4-0.pages.dev' || u.hostname.endsWith('.lovetree-4-0.pages.dev');
@@ -590,5 +591,50 @@ test('#1096 체험 — 미리보기 예시 지도에서만 켜지고, 저장 없
       assert.equal(await logged.frame.evaluate(() => document.getElementById('demoToggle').hidden), true, '로그인 상태에는 체험 단추가 없다');
       assert.equal(await logged.frame.evaluate(() => document.getElementById('connectToggle').hidden), false, '대신 실제 잇기 단추가 보인다');
     } finally { await logged.ctx.close(); }
+
+    // #1219: ?? ???? ??? ?? ?? ??? ?? ?? ?? ? ??? ??.
+    for (const width of [390, 360]) for (const theme of ['night', 'garden']) {
+      const mobile = await open('preview.lovetree-4-0.pages.dev', 'login-host.html', width, theme);
+      try {
+        const measured = await mobile.frame.evaluate(() => {
+          const button = document.getElementById('connectToggle');
+          const bar = document.querySelector('.lt-screen-toolbar');
+          const row = bar?.querySelector('.lt-toolbar-tools');
+          const rect = button?.getBoundingClientRect();
+          const css = button ? getComputedStyle(button) : null;
+          return {
+            exists: !!button, hidden: button?.hidden,
+            visible: !!rect && rect.width >= 40 && rect.height >= 36 && css.display !== 'none',
+            inRow: !!row?.contains(button),
+            inBar: !!bar?.contains(button),
+            left: rect?.left, right: rect?.right, viewport: innerWidth,
+            pressed: button?.getAttribute('aria-pressed')
+          };
+        });
+        const label = width + '/' + theme;
+        assert.equal(measured.exists, true, label + ': ?? ??? ????');
+        assert.equal(measured.hidden, false, label + ': ?? ??? ?? ??? ??');
+        assert.equal(measured.visible, true, label + ': ??? ??? ??? ????');
+        assert.equal(measured.inRow, true, label + ': ??? ? ?? ?? ?? ?? ?? ??');
+        assert.equal(measured.inBar, true, label + ': ?? ?? ?? ???');
+        assert.ok(measured.left >= -0.5 && measured.right <= measured.viewport + 0.5,
+          label + ': ??? ?? ?? ?? ?? ??');
+        assert.equal(measured.pressed, 'false', label + ': ?? ?? ??? ???');
+        await mobile.frame.click('#connectToggle');
+        assert.equal(await mobile.frame.evaluate(() => window.__lt.connect().mode), true,
+          label + ': ?? ???? ??? ???');
+        assert.equal(await mobile.frame.locator('#connectToggle').getAttribute('aria-pressed'), 'true',
+          label + ': ?? ?? ??? ???');
+        if (process.env.LT_MAP_CONNECT_CAPTURE_DIR) {
+          mkdirSync(process.env.LT_MAP_CONNECT_CAPTURE_DIR, { recursive: true });
+          await mobile.page.screenshot({
+            path: path.join(process.env.LT_MAP_CONNECT_CAPTURE_DIR, '??-' + width + '-' + theme + '.png')
+          });
+        }
+        await mobile.frame.click('#connectToggle');
+        assert.equal(await mobile.frame.evaluate(() => window.__lt.connect().mode), false,
+          label + ': ?? ? ?? ???? ??? ???');
+      } finally { await mobile.ctx.close(); }
+    }
   } finally { await browser.close(); server.close(); }
 });
