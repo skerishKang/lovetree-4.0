@@ -236,6 +236,41 @@ test('952 실행: 쉬운 추가 창은 처음에 담기가 막혀 있고, 안내
   } finally { await browser.close(); server.close(); }
 });
 
+// #788: 공유로 받은 주소가 정원 테마에서도 채워지고, 글자·저장 단추 대비가 4.5:1 이상이다(390).
+test('788 실행: 공유로 받은 주소 창은 정원 테마에서도 주소가 채워지고 글자 대비가 4.5:1 이상이다(390)', { skip: skip952 || !REQUIRE952 ? skip952 || 'LT_MEDIA_952_REQUIRE=1 에서만 실행' : undefined }, async () => {
+  if (skip952) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip952}`);
+  const server = await serve({});
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium952.launch();
+  const SHARED = 'https://youtu.be/jNQXAC9IVRw';
+  try {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' });
+    await ctx.addInitScript(() => { try { localStorage.setItem('lt41.theme', 'garden'); } catch {} });
+    await ctx.route('**/api/**', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
+    await ctx.route('**/api/workspace*', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ revision: 1, state: { version: 1, trees: [] }, subject: '검사기계정', writeSubjectBound: true, savedAt: '2026-11-16T09:00:00.000Z' }) }));
+    const page = await ctx.newPage();
+    await page.goto(`${base}/v41/`, { waitUntil: 'load' });
+    await page.waitForTimeout(1000);
+    await page.goto(`${base}/v41/?quickadd=${encodeURIComponent(SHARED)}`, { waitUntil: 'load' });
+    await page.waitForFunction(() => !!document.getElementById('quick-url')?.value, null, { timeout: 10000 });
+    const got = await page.evaluate(() => {
+      const parse = (c) => (c.match(/[\d.]+/g) || [0, 0, 0, 1]).slice(0, 4).map(Number);
+      const lum = ([r, g, b]) => { const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
+      const bgOf = (el) => { for (let n = el; n; n = n.parentElement) { const c = parse(getComputedStyle(n).backgroundColor); if (c[3] === undefined || c[3] >= 0.99) return c.slice(0, 3); } return [255, 255, 255]; };
+      const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+      const panel = document.getElementById('write-panel');
+      const texts = [...panel.querySelectorAll('button, p, span, small, label, a')].filter((el) => (el.textContent || '').trim() && el.getClientRects().length && !el.closest('[hidden]'));
+      const low = texts.map((el) => ({ t: el.textContent.trim().slice(0, 20), r: ratio(parse(getComputedStyle(el).color).slice(0, 3), bgOf(el)) })).filter((x) => x.r < 4.5);
+      return { theme: document.documentElement.getAttribute('data-lt-theme'), url: document.getElementById('quick-url').value, count: texts.length, low };
+    });
+    assert.equal(got.theme, 'garden', '정원 테마가 적용된 상태에서 연다');
+    assert.equal(got.url, SHARED, '받은 주소가 쉬운 추가 입력란에 채워진다');
+    assert.ok(got.count > 5, '창 안의 글자를 실제로 쟀다');
+    assert.deepEqual(got.low, [], `4.5:1 미만 글자가 없다(${JSON.stringify(got.low)})`);
+    await ctx.close();
+  } finally { await browser.close(); server.close(); }
+});
+
 // ---- 이슈 638 ②: 주소 형태별 영상 ID (media-preview.js를 실제로 실행해 본다) ----
 // #1060: 정본이 등록한 globalThis.LTYouTubeId 를 vm 에도 넣는다.
 const scope = { LT41_MSG: MSG, window: {}, URL, URLSearchParams, LTYouTubeId: globalThis.LTYouTubeId, LTEscapeHtml: globalThis.LTEscapeHtml };
