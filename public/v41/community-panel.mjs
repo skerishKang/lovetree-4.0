@@ -393,7 +393,8 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
    for(const t of tabs()){if(t.getAttribute('aria-current')==='true'){t.dataset.wasCurrent='1';t.setAttribute('aria-current','false');}}
    const wantMoments=hashNow()==='#explore/moments';
    selectTab(wantMoments?'moments':'trees',{syncHash:false});
-   if(!wantMoments){load(false);loadPopularStages();}
+   // 빈 인기 무대 줄을 접기 전에 카드를 그리면 자리가 밀린다 — 먼저 접고 카드를 그린다.
+   if(!wantMoments){void loadPopularStages().then(()=>load(false));}
   };
   if(typeof window!=='undefined'&&typeof window.addEventListener==='function')window.addEventListener('hashchange',()=>{
    if(hashGuard)return;
@@ -506,9 +507,9 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
  const renderPopularStages=rows=>{
   const shown=(Array.isArray(rows)?rows:[]).filter(stage=>stage&&stage.stageId&&publicStageCount(stage.weeklyVoters)!==null);
   popularList.replaceChildren();
-  // #1330: 보여 줄 무대가 없으면 제목을 감춘다. 칸 높이는 그대로 두어 카드가 밀리지 않게 한다.
-  if(!shown.length){popular.classList.add('is-empty');popularList.replaceChildren(skeleton);return;}
-  popular.classList.remove('is-empty');
+  // 빈 응답이면 뼈대와 제목을 통째로 접어 빈칸을 남기지 않는다.
+  if(!shown.length){popular.hidden=true;popularList.replaceChildren();return;}
+  popular.hidden=false;
   for(const stage of shown){
    const row=el('span','community-stage');row.dataset.stageId=stage.stageId;
    row.append(el('span','community-stage-title',stageMomentTitle(stage)),el('span','community-stage-count',`${POPULAR_STAGE_WEEK_LABEL} ${publicStageCount(stage.weeklyVoters)}`));

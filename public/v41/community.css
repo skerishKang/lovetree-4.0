@@ -226,7 +226,7 @@ html[data-lt-theme=garden] .moments-comments-dialog{background:var(--lt-paper);c
  #community-tree-panel .panel-heading,
  #community-tree-panel > .panel-note{display:none}
  #community-search-form{order:1;margin:44px 0 0;width:100%;box-sizing:border-box}
- #community-tree-panel .community-group-rail{order:2;margin:8px 0 4px}
+ #community-tree-panel .community-group-rail{order:2;margin:8px 0 10px}
  #community-popular-stages{order:3;margin:0}
  #community-popular-stages .community-stage-list,
  #community-popular-stages .community-stages-empty{display:none}
@@ -246,5 +246,5 @@ html[data-lt-theme=garden] #community-panel:has(#community-tab-moments[aria-sele
 #community-panel .community-stages-skeleton{height:18px;border-radius:var(--lt-r-pill);background:color-mix(in srgb,var(--lt-gold-line) 22%,transparent)}
 #community-panel .community-cover-badges{flex-wrap:nowrap}
 #community-panel .community-cover-badge{white-space:nowrap}
-/* #1330: 빈 인기 무대는 제목만 감추고 칸은 유지해 뒤의 카드가 밀리지 않게 한다. */
-#community-panel #community-popular-stages.is-empty .community-stages-title{visibility:hidden}
+/* 빈 인기 무대를 접었을 때 칩 줄 아래 간격을 다른 줄 간격과 같게(10px). */
+#community-panel > #community-tree-panel .community-group-rail{margin:0 auto 10px}
