@@ -353,7 +353,7 @@ jobs:
           fi
 
   screen-home-followup:
-    name: 화면 시험 — 첫 화면 후속둘둘보기
+    name: 화면 시험 — 첫 화면 후속·둘러보기
     # 2026-11-22: 호스트 실행기 대기(동시 3개 안팎)를 피해 같은 저장소 PR은 CGI 자체 실행기에서 돈다(보드 잡과 같은 식).
     runs-on: ${{ fromJSON((github.event.pull_request.head.repo.full_name == github.repository && vars.USE_CGI_RUNNER == '1') && '["self-hosted","Linux","X64","cgi"]' || '["ubuntu-latest"]') }}
     timeout-minutes: 12
