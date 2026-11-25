@@ -648,12 +648,27 @@ test('#1294 둘러보기 트리·순간 탭과 미리보기·그룹 찾기 뒤�
    // 감상 화면 이동은 별도 URL이며 뒤로 가기 한 번에 둘러보기 미리보기를 복원한다.
    const sharedTree=exploreTree(1);
    await page.route('**/api/public/shares/*',async route=>{if(width===1440)await new Promise(resolve=>setTimeout(resolve,700));await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({ok:true,share:{id:EXPLORE_CARD(0).shareId,view:'book',entryMomentId:sharedTree.moments[0].id},tree:sharedTree})});});
+   await page.evaluate(()=>{
+    const trace=[];window.__exploreHistoryTrace=trace;
+    const push=history.pushState.bind(history),replace=history.replaceState.bind(history);
+    history.pushState=(state,title,url)=>{trace.push({kind:'push',url,hash:location.hash,state,at:performance.now(),stack:new Error().stack?.split('\n').slice(2,5).join(' / ')});return push(state,title,url)};
+    history.replaceState=(state,title,url)=>{trace.push({kind:'replace',url,hash:location.hash,state,at:performance.now(),stack:new Error().stack?.split('\n').slice(2,5).join(' / ')});return replace(state,title,url)};
+    addEventListener('popstate',e=>trace.push({kind:'pop',hash:location.hash,state:e.state,at:performance.now()}));
+    addEventListener('hashchange',()=>trace.push({kind:'hash',hash:location.hash,at:performance.now()}));
+   });
    await page.locator('#community-list .community-card').first().click();
    await page.locator('.community-preview-open').click();
    await page.waitForFunction(()=>location.hash.startsWith('#share/'),null,{timeout:15000});
    if(width===390)await page.waitForFunction(()=>document.body.dataset.recordSource==='share'&&document.getElementById('empty')?.hidden,null,{timeout:15000});
    await back();
-   assert.equal((await navState()).hash,'#explore',width+' 공유 감상에서 뒤로 가기 주소');
+   const firstBackHash=(await navState()).hash;
+   if(firstBackHash!=='#explore'){
+    const atBack=await page.evaluate(()=>({hash:location.hash,length:history.length,state:history.state,dialogs:[...document.querySelectorAll('dialog[open]')].map(d=>d.id),trace:window.__exploreHistoryTrace}));
+    await page.waitForTimeout(500);
+    const later=await page.evaluate(()=>({hash:location.hash,length:history.length,state:history.state,dialogs:[...document.querySelectorAll('dialog[open]')].map(d=>d.id),trace:window.__exploreHistoryTrace}));
+    console.log('#1294 이전 주소 관찰',JSON.stringify({width,atBack,later}));
+   }
+   assert.equal(firstBackHash,'#explore',width+' 공유 감상에서 뒤로 가기 주소');
    assert.equal(await page.locator('#community-panel').evaluate(el=>el.open),true,width+' 공유 감상에서 둘러보기 복귀');
    await page.waitForFunction(()=>document.getElementById('community-preview')?.open===true,null,{timeout:5000});
    assert.equal(await page.locator('#community-preview').evaluate(el=>el.open),true,width+' 공유 감상에서 미리보기 상태 복원');
