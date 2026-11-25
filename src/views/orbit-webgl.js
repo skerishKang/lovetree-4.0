@@ -13,6 +13,7 @@ precision mediump float;
 uniform sampler2D uTexture;
 uniform vec2 uSize;
 uniform float uOutline;
+uniform float uPulse;
 uniform sampler2D uVignette;
 uniform float uShade;
 uniform vec2 uViewport;
@@ -22,7 +23,7 @@ void main(){
   vec2 p=abs((vUV-0.5)*uSize)-(uSize*0.5-12.0);
   float distance=length(max(p,0.0))+min(max(p.x,p.y),0.0)-12.0;
   float alpha=1.0-smoothstep(0.5,1.5,abs(distance));
-  gl_FragColor=vec4(vec3(1.0,0.902,0.651)*alpha,alpha);
+  gl_FragColor=vec4(vec3(1.0,0.902,0.651)*alpha,alpha*uPulse);
  }else gl_FragColor=texture2D(uTexture,vUV);
  if(uShade>0.5)gl_FragColor.rgb*=1.0-texture2D(uVignette,gl_FragCoord.xy/uViewport).a;
 }`;
@@ -47,7 +48,7 @@ export function createOrbitGL(canvas){
  if(!gl.getProgramParameter(program,gl.LINK_STATUS))throw Error('궤도 셰이더 연결');
  const buffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([0,0,1,0,0,1,0,1,1,0,1,1]),gl.STATIC_DRAW);
  gl.useProgram(program);const a=gl.getAttribLocation(program,'aUnit');gl.enableVertexAttribArray(a);gl.vertexAttribPointer(a,2,gl.FLOAT,false,0,0);
- const matrix=gl.getUniformLocation(program,'uMatrix'),rect=gl.getUniformLocation(program,'uRect'),size=gl.getUniformLocation(program,'uSize'),outline=gl.getUniformLocation(program,'uOutline');
+ const matrix=gl.getUniformLocation(program,'uMatrix'),rect=gl.getUniformLocation(program,'uRect'),size=gl.getUniformLocation(program,'uSize'),outline=gl.getUniformLocation(program,'uOutline'),pulse=gl.getUniformLocation(program,'uPulse');
  gl.uniform1i(gl.getUniformLocation(program,'uTexture'),0);gl.activeTexture(gl.TEXTURE0);
  gl.enable(gl.BLEND);gl.blendFunc(gl.ONE,gl.ONE_MINUS_SRC_ALPHA);gl.clearColor(0,0,0,0);
  const shade=gl.getUniformLocation(program,'uShade'),viewport=gl.getUniformLocation(program,'uViewport');
@@ -84,12 +85,22 @@ export function createOrbitGL(canvas){
     prepareShade(options);discard(textures);textures=next;return true;
    }catch{discard(next);return false;}
   },
+  update(i,s){
+   const t=gl.createTexture();try{
+    gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,t);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,s.image);
+    if(gl.getError()!==gl.NO_ERROR)throw Error('카드 질감 갱신');
+    const old=textures.get(i);textures.set(i,t);if(old)gl.deleteTexture(old);return true;
+   }catch{gl.deleteTexture(t);return false;}
+  },
   begin(){gl.uniform2f(viewport,canvas.width,canvas.height);gl.viewport(0,0,canvas.width,canvas.height);gl.clear(gl.COLOR_BUFFER_BIT);},
-  draw(i,s,p,w,h,focused){
+  draw(i,s,p,w,h,focused,hintPulse=0){
    const t=textures.get(i);if(!t)return;
    gl.uniformMatrix4fv(matrix,false,orbitMatrix(p,w,h,m));gl.bindTexture(gl.TEXTURE_2D,t);
-   gl.uniform1f(outline,0);gl.uniform4f(rect,s.drawX,s.drawY,s.drawW,s.drawH);gl.drawArrays(gl.TRIANGLES,0,6);
-   if(focused){gl.uniform1f(outline,1);gl.uniform2f(size,s.w,s.h);gl.uniform4f(rect,-s.w/2,-s.h/2,s.w,s.h);gl.drawArrays(gl.TRIANGLES,0,6);}
+   gl.uniform1f(outline,0);gl.uniform1f(pulse,1);gl.uniform4f(rect,s.drawX,s.drawY,s.drawW,s.drawH);gl.drawArrays(gl.TRIANGLES,0,6);
+   if(focused||hintPulse>0){gl.uniform1f(outline,1);gl.uniform1f(pulse,focused?1:hintPulse);gl.uniform2f(size,s.w,s.h);gl.uniform4f(rect,-s.w/2,-s.h/2,s.w,s.h);gl.drawArrays(gl.TRIANGLES,0,6);}
   },
   dispose(){discard(textures);if(vignette)gl.deleteTexture(vignette);gl.deleteBuffer(buffer);gl.deleteProgram(program);}
  };

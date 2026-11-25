@@ -523,8 +523,7 @@ const thumbTree = (() => {
   t.moments[1].createdAt = '2026-11-12T09:00:00.000Z'; t.moments[1].updatedAt = t.moments[1].createdAt;
   t = addMoment(t, { subject: '시험', title: '사진 순간(정상)', note: '기록', emotion: '즐거움', date: '2026-11-10', url: '' }, t.moments[0].id, '2026-11-16T00:02:00.000Z');
   t.moments[2].mediaMetadata = { thumbnail: 'data:image/svg+xml;base64,' + Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><rect width="640" height="360" fill="#8a5a6e"/></svg>').toString('base64') };
-  // 261117 대표 결정: 이 상태는 390의 궤도 겹침 검사가 목적 — 9장 이상(표준 좁은 화면 궤도)이어야 한다.
-  // 8장 이하 390은 궤도 카드를 숨기는 계약(소수 카드는 가운데에 집중)이라 별도 단언(#657 후속 261117)이 본다.
+  // #1309: 390 리본은 8장을 유지하고 가운데·바닥 보호 구역과 겹치지 않는다.
   for (let fi = 0; fi < 6; fi++) {
     t = addMoment(t, { subject: '시험', title: '사진 순간 채우기 ' + (fi + 1), note: '기록', emotion: '즐거움', date: '2026-11-0' + (fi % 9 + 1), url: '' }, t.moments.at(-1).id, '2026-11-16T00:03:0' + fi + '.000Z');
     t.moments.at(-1).mediaMetadata = { thumbnail: 'data:image/svg+xml;base64,' + Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><rect width="640" height="360" fill="' + ['#5a6e8a', '#6e8a5a', '#8a7a5a', '#8a5a6e'][fi % 4] + '"/></svg>').toString('base64') };
@@ -2086,7 +2085,7 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     assert.equal(cardCheck.overflow, 0, `첫 화면 가로 넘침 0(실제 ${cardCheck.overflow})`);
     await take(page9, '첫 화면 글자 카드');
     await ctx9.close();
-    } // width 1440 — 390은 위 단언(궤도 카드 0장)이 대신한다
+    } // width 1440 — 390 리본은 별도 겹침 시험이 담당한다
 
     await context.close();
     return rows;
@@ -2241,10 +2240,8 @@ test('운영센터 머리줄이 본 화면 셸 머리줄과 같은 폭·위치�
   }
 });
 
-// 261117 대표 결정: 좁은 화면(390)에서 궤도 카드가 8장 이하인 계정은 궤도 카드를 숨긴다 —
-// 커진 가운데(위쪽 '+ 순간 추가'·정보 줄)가 소수 카드의 원을 덮어 밀어낸 카드가 한자리에 쌓였다
-// (실측 3장 동일 좌표). 9장 이상은 기존 좁은 화면 궤도를 그대로 쓴다(글자 카드 상태가 390 겹침을 잰다).
-test('#657 후속 261117: 좁은 화면 소수 카드(≤8) 계정은 궤도 카드 0장 — 가운데에 집중한다', { skip: REQUIRE ? false : skip, timeout: 120000 }, async () => {
+// #1309: 좁은 화면은 소수 카드도 8장 리본으로 유지한다. 카드는 가운데·바닥 보호 구역 위에 둔다.
+test('#1309 후속: 좁은 화면 소수 카드 계정은 있는 카드로 리본을 유지한다', { skip: REQUIRE ? false : skip, timeout: 120000 }, async () => {
   const { createTree, addMoment } = await import('../public/v41/domain.mjs');
   let t = createTree({ subject: '시험', title: '카드 적은 트리', note: '기록', emotion: '설렘', date: '2026-11-11', url: '' }, '2026-11-16T00:00:00.000Z');
   t = addMoment(t, { subject: '시험', title: '사진 순간', note: '기록', emotion: '즐거움', date: '2026-11-11', url: '' }, t.moments[0].id, '2026-11-16T00:01:00.000Z');
@@ -2279,7 +2276,7 @@ test('#657 후속 261117: 좁은 화면 소수 카드(≤8) 계정은 궤도 카
       if (!sh) return null;
       return [...sh.querySelectorAll('button.card')].filter((c) => getComputedStyle(c).display !== 'none').length;
     });
-    assert.equal(visible, 0, `390 소수 카드 계정: 궤도 카드 0장(실제 ${visible}장)`);
+    assert.ok(visible > 0 && visible <= 8, `390 소수 카드 계정: 있는 카드로 리본을 유지한다(실제 ${visible}장)`);
     await context.close();
   } finally {
     await browser.close();
@@ -2287,7 +2284,7 @@ test('#657 후속 261117: 좁은 화면 소수 카드(≤8) 계정은 궤도 카
   }
 });
 
-// 2026-11-17 CTO 캡처 후속: 390에서 궤도 카드가 0장이어도 다른 층 카드가 바닥 링크 줄에 겹치지 않는다.
+// #1309: 390의 리본도 다른 층 카드와 마찬가지로 바닥 링크 줄 위에서 자른다.
 // 눈이 아니라 수치로 판정한다 — 보이는 카드 수, 카드↔링크 겹침 쌍 0, 카드 아래끝 ≤ 링크 줄 top−8(1440도 겹침 0).
 test('#657 후속 261117: 카드 층은 바닥 링크 줄 위에서 자른다(390 few·many, 1440)', { skip: REQUIRE ? false : skip, timeout: 180000 }, async () => {
   const { createTree, addMoment } = await import('../public/v41/domain.mjs');
@@ -2329,7 +2326,7 @@ test('#657 후속 261117: 카드 층은 바닥 링크 줄 위에서 자른다(39
         return { count: cards.length, overlaps, ceiling: lr ? Math.round(lr.top) - 8 : null, lowest: rects.length ? Math.round(Math.max(...rects.map((c) => c.b))) : null, scroll };
       });
       assert.equal(measured.overlaps, 0, `${label}: 카드↔바닥 링크 겹침 ${measured.overlaps}쌍`);
-      if (label === 'few-390') assert.equal(measured.count, 0, `390 소수 카드 계정: 보이는 카드 ${measured.count}장(기존 궤도 숨김 유지)`);
+      if (label === 'few-390') assert.ok(measured.count > 0 && measured.count <= 8, `390 소수 카드 계정: 보이는 리본 카드 ${measured.count}장`);
       if (measured.ceiling > 0 && measured.lowest !== null) assert.ok(measured.lowest <= measured.ceiling, `${label}: 카드 아래끝 ${measured.lowest} > 링크 줄 위 ${measured.ceiling}`);
       assert.equal(measured.scroll.links.length, 4, `${label}: 바닥 링크 4개를 잰다`);
       assert.ok(measured.scroll.links.every((l) => l.inView), `${label}: 맨 아래 스크롤 뒤 링크가 화면 밖 — ${JSON.stringify(measured.scroll.links)}`);
