@@ -18,8 +18,9 @@ function fakeTree(){
 }
 async function open(browser,base,width,theme){
  const ctx=await browser.newContext({viewport:{width,height:width===390?844:900},reducedMotion:'reduce'});
- await ctx.addInitScript(theme=>localStorage.setItem('lt41.theme',theme),theme);
- const workspace={revision:1,state:{version:1,trees:[fakeTree()],prefs:{}},subject:'시험계정',writeSubjectBound:true,savedAt:'2026-11-20T00:00:00.000Z'};
+ const testTree=fakeTree();
+ await ctx.addInitScript(({theme,treeId})=>{localStorage.setItem('lt41.theme',theme);localStorage.setItem('lt41.discoverAsked',JSON.stringify([treeId]))},{theme,treeId:testTree.id});
+ const workspace={revision:1,state:{version:1,trees:[testTree],prefs:{}},subject:'시험계정',writeSubjectBound:true,savedAt:'2026-11-20T00:00:00.000Z'};
  await ctx.route('**/*',route=>{
   const u=new URL(route.request().url());
   if(u.origin!==base)return route.abort();
