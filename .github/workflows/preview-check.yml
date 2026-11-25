@@ -394,6 +394,33 @@ jobs:
             echo "건너뜀(화면 변경 없음)" | tee -a "$GITHUB_STEP_SUMMARY"
           fi
 
+  # #1284: 휴대폰 첫 화면 링크·쇼츠 카드·재생·막힌 동영상 회귀를 별도 검사한다.
+  screen-home-1284:
+    name: 화면 시험 — 첫 화면 휴대폰 #1284
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    needs: screen-changes
+    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || needs.screen-changes.outputs.jobs == '' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-home,'))
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          clean: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: 화면 시험 환경 준비
+        run: |
+          npm ci --no-audit --no-fund
+          npx playwright install --with-deps chromium
+          npm run build
+      - name: 첫 화면 휴대폰 12조합 회귀 시험
+        env:
+          LT_1284_REQUIRE: '1'
+        run: node --test --test-concurrency=1 tests/v41-1284-home.test.mjs
+
   screen-book:
     name: 화면 시험 — 책·감상
     # 책 화면 잡은 글자 줄바꿈·페이지 넘침을 재므로 글꼴이 다른 CGI가 아니라 호스트에서 돈다(2026-11-22 CGI에서 넘침 실측이 달라 실패).

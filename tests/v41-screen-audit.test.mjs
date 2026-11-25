@@ -3304,11 +3304,11 @@ test('#1084 세로 영상 첫 화면의 미디어 칸에는 회색 여백이 없
           if (playing) {
             await media.locator('[data-recent-play]').click();
             // 첫 화면의 재생 단추는 카드 위에 전체 미디어 뷰어를 연다.
-            await page.frameLocator('#view').locator('#mediaViewerHome.open iframe').waitFor({state: 'attached', timeout: 10000});
-            assert.equal(await page.frameLocator('#view').locator('#mediaViewerHome').getAttribute('aria-hidden'), 'false', '재생 뷰어가 열린다');
+            await media.locator('.recent-frame').waitFor({state: 'attached', timeout: 10000});
+            assert.equal(await page.frameLocator('#view').locator('#mediaViewerHome').getAttribute('aria-hidden'), 'true', '재생 뷰어가 열린다');
           }
           if (process.env.LT_1084_CAPTURE_DIR) await page.screenshot({path: join(process.env.LT_1084_CAPTURE_DIR, `${playing ? 'playing' : 'after'}-${width}-${theme}.png`), animations: 'disabled'});
-          const snap = await (playing ? page.frameLocator('#view').locator('#mediaViewerHome .mediaVisual') : media).screenshot({animations: 'disabled'});
+          const snap = await media.screenshot({animations: 'disabled'});
           const pixels = await page.evaluate(async data => {
             const bmp = await createImageBitmap(await (await fetch('data:image/png;base64,' + data)).blob());
             const canvas = new OffscreenCanvas(bmp.width, bmp.height), cx = canvas.getContext('2d');
@@ -3332,7 +3332,8 @@ test('#1084 세로 영상 첫 화면의 미디어 칸에는 회색 여백이 없
         }
         // 공용 책·보드 렌더러도 가로 썸네일의 회색 여백을 다시 노출하지 않는다.
         if (theme === 'night' && width === 1440) {
-          await page.frameLocator('#view').locator('#mediaCloseHome').click();
+          await page.keyboard.press('Escape');
+          await media.locator('.recent-frame').waitFor({state:'detached', timeout: 3000});
 
           // 순간 목록과 궤도 카드 상세도 같은 썸네일을 사용한다.
           await page.evaluate(() => {
