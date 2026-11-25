@@ -30,6 +30,8 @@ function treeSnapshot(panel) {
     lt41Tree: true,
     lt41TreePanel: panel || null,
     lt41TreePick: state.pick,
+    // #1333: 셸의 현재 순간도 함께 적어 두면 뒤로 가기로 되돌릴 때 같이 복원된다.
+    lt41TreeShellMoment: window.LT41?.momentId || (typeof data?.get === 'function' ? String(data.get() || '') : ''),
     lt41TreeExpanded: [...state.expanded],
     lt41TreeView: { scale: state.scale, tx: state.tx, ty: state.ty, mode: state.mode }
   };
@@ -51,6 +53,8 @@ function restoreTree(st) {
   state.expanded = new Set(st.lt41TreeExpanded || []);
   const v = st.lt41TreeView;
   if (v) { state.scale = v.scale; state.tx = v.tx; state.ty = v.ty; state.mode = v.mode || 'free'; }
+  const shellMoment = st.lt41TreeShellMoment || state.pick || (typeof data?.get === 'function' ? String(data.get() || '') : '');
+  if (shellMoment && typeof data?.select === 'function') data.select(shellMoment, { noHistory: true });
   if (wantDetail && detail && !detail.open && state.pick) openDetail(state.pick);
   else draw();
   applyNow();
@@ -375,7 +379,8 @@ const titleSource=el('span','',data.title||'트리');
 mountScreenToolbar({screen:'tree',titleFrom:titleSource,initialBar:document.querySelector('.lt-screen-toolbar'),tools:['goRoot','goFit','zoomOut','zoomIn'].map($)});
 function openDetail(id){
  const m=data.moments.find(m=>m.id===id);if(!m)return;
- // #1295: 셸 주소 기록과 안쪽 기록이 겹치면 뒤로 가기가 두 번 쌓인다 — 선택은 프레임 상태로만 남긴다.
+ // #1333: 고른 순간을 셸의 현재 순간으로 넘긴다. #1295 기록 중복을 피하려고 '기록하지 않음'을 함께 보낸다.
+ if(typeof data.select==='function')data.select(id,{noHistory:true});
  $('treeDetailTitle').textContent=m.title||'제목 없음';
  $('treeDetailNote').textContent=[m.date,m.emotion,m.memo].filter(Boolean).join(' · ');
  const host=$('treeDetailMedia');host.replaceChildren();
