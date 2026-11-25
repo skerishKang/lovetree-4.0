@@ -1182,3 +1182,34 @@ test('#1378 공유 감상: 390·1440 × 밤·정원 재생 iframe 최소 크기�
     await new Promise(resolve => server.close(resolve));
   }
 });
+
+test('#1378 공유 감상: 읽기 전용 영상의 임베드 거절은 플레이어 대신 원본 링크를 남긴다', { skip: REQUIRE ? false : skip, timeout: 90000 }, async () => {
+  const server = await serve();
+  const base = 'http://127.0.0.1:' + server.address().port;
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const { context, frame } = await openBook(browser, base + '/share-host.html', {
+      width: 390, height: 844, theme: 'garden', route: route => route.fulfill({
+        status: 200, contentType: 'image/svg+xml',
+        body: '<svg xmlns="http://www.w3.org/2000/svg" width="160" height="90"/>',
+      }),
+    });
+    try {
+      assert.equal(await frame.evaluate(() => window.parent.LT41?.writable), false, '공유 감상 쓰기 불가');
+      await context.route('**/api/youtube/oembed*', route => route.fulfill({
+        status: 401, contentType: 'application/json', body: '{"error":"youtube_embed_forbidden"}',
+      }));
+      await context.route('**/youtube-nocookie.com/**', route => route.fulfill({
+        status: 200, contentType: 'text/html', body: '<title>YouTube video</title>',
+      }));
+      await frame.locator('[data-yt-play]').first().click({ force: true });
+      await frame.waitForSelector('.yt-unavailable-note', { timeout: 10000 });
+      assert.equal(await frame.locator('iframe.yt-frame').count(), 0, '재생 불가 iframe 제거');
+      assert.equal(await frame.locator('.yt-unavailable-link[href*="youtube.com"]').count(), 1,
+        '원본 YouTube 영상 링크 유지');
+    } finally { await context.close(); }
+  } finally {
+    await browser.close();
+    await new Promise(resolve => server.close(resolve));
+  }
+});
