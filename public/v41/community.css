@@ -170,7 +170,7 @@ html[data-lt-theme=garden] .moments-comments-dialog{background:var(--lt-paper);c
  #community-moments-panel .moments-chips::-webkit-scrollbar{display:none}
  #community-moments-panel .moments-chip{min-height:30px;padding:0 9px;font-size:11px;white-space:nowrap;flex:none}
  /* #1305: 위쪽 단추 띠만큼 영상을 아래로 내려 자막을 가리지 않게 한다. */
- #community-moments-panel .moments-stage{width:100%;max-width:none;height:calc(100dvh - 128px - env(safe-area-inset-bottom));min-height:0;margin:38px 0 0;gap:0}
+ #community-moments-panel .moments-stage{width:100%;max-width:none;height:calc(100dvh - 129px - env(safe-area-inset-bottom));min-height:0;margin:38px 0 0;gap:0}
  #community-moments-panel .moments-card{height:100%;width:100%;max-width:none;aspect-ratio:auto;border:0;border-radius:0;box-shadow:none}
  #community-moments-panel .moments-media{background:var(--lt-stage)}
  #community-moments-panel .moments-poster{object-fit:cover}
@@ -255,3 +255,41 @@ html[data-lt-theme=garden] #community-panel:has(#community-tab-moments[aria-sele
 #community-panel .community-cover-badge{white-space:nowrap}
 /* 빈 인기 무대를 접었을 때 칩 줄 아래 간격을 다른 줄 간격과 같게(10px). */
 #community-panel > #community-tree-panel .community-group-rail{margin:0 auto 10px}
+
+/* 둘러보기: 탭·검색·정렬을 고정 높이의 한 줄로. 색은 기존 토큰만 사용한다. */
+#community-panel .community-top-row{position:relative;z-index:22;display:flex;align-items:center;gap:8px;width:100%;max-width:1500px;min-width:0;height:48px;margin:0 auto 12px}
+#community-panel .community-top-row .community-tabs{position:static;inset:auto;z-index:auto;display:flex;align-items:center;flex:0 0 auto;width:auto;max-width:none;height:48px;margin:0;padding:0;gap:6px;border:0;border-radius:0;background:none}
+#community-panel .community-top-row .community-tabs button{min-height:44px}
+#community-panel .community-top-row #community-search-form{position:relative;display:flex;flex:0 0 108px;align-items:center;gap:0;min-width:0;max-width:100%;height:48px;margin:0 0 0 auto;padding:0}
+#community-panel .community-top-row #community-search-form.is-expanded{flex:1 1 auto}
+#community-panel .community-search-trigger{display:inline-flex;align-items:center;justify-content:center;flex:0 0 108px;width:108px;min-width:0;height:48px;padding:0 10px;border:1px solid var(--lt-line-paper);border-radius:var(--lt-r-pill);background:var(--lt-paper);color:var(--lt-ink);font-size:13px;white-space:nowrap;cursor:pointer}
+#community-panel #community-search-form.is-expanded .community-search-trigger{flex:0 0 44px;width:44px;font-size:0}
+#community-panel #community-search-form.is-expanded .community-search-trigger::before{content:"🔍";font-size:16px}
+#community-panel .community-top-row #community-query{flex:0 0 0;width:0;min-width:0;height:48px;min-height:48px;margin:0;padding:0;border:0;opacity:0;pointer-events:none}
+#community-panel .community-top-row #community-search-form.is-expanded #community-query{flex:1 1 auto;width:auto;min-width:0;padding:0 12px;border:1px solid var(--lt-line-paper);border-radius:var(--lt-r-pill);opacity:1;pointer-events:auto}
+#community-panel .community-top-row .community-search-submit{display:none}
+#community-panel .community-top-row .community-sort-label{position:relative;display:flex;align-items:center;justify-content:center;flex:0 0 48px;width:48px;height:48px;cursor:pointer}
+#community-panel .community-sort-symbol{display:flex;align-items:center;justify-content:center;width:44px;height:44px;border:1px solid var(--lt-line-paper);border-radius:var(--lt-r-pill);background:var(--lt-paper);color:var(--lt-ink);font-size:22px;pointer-events:none}
+#community-panel .community-top-row #community-sort{position:absolute;inset:0;width:48px;min-width:0;height:48px;min-height:48px;margin:0;padding:0;opacity:0;cursor:pointer}
+#community-panel .community-top-row .community-sort-label:focus-within .community-sort-symbol{outline:2px solid var(--lt-gold);outline-offset:2px}
+#community-panel .community-top-row.is-moments #community-search-form,#community-panel .community-top-row.is-moments .community-sort-label{visibility:hidden;pointer-events:none}
+#community-panel #community-feedback[hidden]{display:none}
+@media(max-width:780px){
+ #community-panel .community-top-row{gap:6px;margin:0 auto 10px}
+ #community-panel .community-top-row .community-tabs button{min-width:52px;min-height:44px;padding:0 9px;font-size:13px}
+ #community-panel:has(#community-tab-moments[aria-selected="true"]) .community-top-row .community-tabs,
+ #community-panel:has(#community-tab-trees[aria-selected="true"]) .community-top-row .community-tabs{position:static;top:auto;left:auto;right:auto;width:auto;height:48px;margin:0;padding:0}
+ #community-panel #community-search-form{order:initial;margin:0}
+ #community-panel .community-top-row #community-search-form{margin:0 0 0 auto;flex-basis:90px}
+ #community-panel .community-search-trigger{width:90px;flex-basis:90px}
+ #community-panel .community-group-rail{margin-top:0}
+ #community-moments-panel .moments-stage{margin-top:0}
+}
+
+@media(max-width:780px){
+ #community-panel:has(#community-tab-trees[aria-selected="true"]) .community-top-row .community-tabs button,
+ #community-panel:has(#community-tab-moments[aria-selected="true"]) .community-top-row .community-tabs button{min-height:44px}
+}
+
+#community-panel .community-top-row.is-moments{pointer-events:none}
+#community-panel .community-top-row.is-moments .community-tabs{pointer-events:auto}
