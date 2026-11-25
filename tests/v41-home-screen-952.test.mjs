@@ -750,59 +750,84 @@ test('#1204 실제 테마 전환·저장값 및 가운데 빛 직선 경계 픽�
   } finally {await browser.close();}
 });
 
-test('#1309 첫 방문 안내는 앞 카드 안에서 함께 움직이고 누름·3초·재방문에서 사라진다', { skip: REQUIRE952 ? false : skip952, timeout: 240000 }, async () => {
+// 안내 시계는 페이지 안에서 잰다(addInitScript). 나타난 순간부터 0·150·300ms 시점의 카드·투영 사각형을 기록하고,
+// Node는 기록을 읽어 단정만 한다. 기준값과 대기 시간은 바꾸지 않는다.
+function TIP_RECORDER() {
+  if (window.__LT_TIP_REC__) return;
+  const rec = (window.__LT_TIP_REC__ = { tipAt: null, appearAt: null, removedAt: null, snaps: [] });
+  const snap = (label) => {
+    try {
+      const root = document.querySelector('#orbit').shadowRoot, hook = window.__LT_ORBIT_TEST__;
+      const index = hook.hintIndex(), card = root.querySelectorAll('.card')[index], tip = card?.querySelector('.lt-card-tip');
+      hook.syncDomPoses();
+      const app = root.querySelector('.app')?.getBoundingClientRect(), cr = card?.getBoundingClientRect(), tr = tip?.getBoundingClientRect(), pose = hook.poses()[index], box = pose?.box;
+      rec.snaps.push({
+        label, dt: performance.now() - rec.appearAt, index,
+        shown: !!tip && getComputedStyle(tip).opacity === '1' && root.querySelector('.world').classList.contains('lt-hint-ready'),
+        bound: tip?.parentElement === card,
+        domInside: !!tr && !!cr && tr.left >= cr.left && tr.right <= cr.right && tr.top >= cr.top && tr.bottom <= cr.bottom,
+        projected: !!box,
+        projInside: !!tr && !!app && !!box && tr.left - app.left >= box.l && tr.top - app.top >= box.t && tr.right - app.left <= box.r && tr.bottom - app.top <= box.b,
+        bottomGap: tr && cr ? cr.bottom - tr.bottom : null,
+        floatingTip: !!root.querySelector('.lt-orbit-tip'), pulse: card ? getComputedStyle(card, '::after').animationName : null,
+        canvasReady: hook.canvasReady(),
+      });
+    } catch (e) { rec.snaps.push({ label, error: String(e) }); }
+  };
+  const watch = (root, world) => {
+    const check = () => {
+      const now = performance.now(), on = world.classList.contains('lt-hint-ready');
+      if (rec.tipAt === null && root.querySelector('.lt-card-tip')) rec.tipAt = now;
+      if (on && rec.appearAt === null) {
+        rec.appearAt = now;
+        setTimeout(() => snap('0ms'), 0);
+        setTimeout(() => snap('150ms'), 150);
+        setTimeout(() => snap('300ms'), 300);
+      }
+      if (!on && rec.appearAt !== null && rec.removedAt === null) rec.removedAt = now;
+    };
+    new MutationObserver(check).observe(root, { subtree: true, childList: true, attributes: true, attributeFilter: ['class'] });
+    check();
+  };
+  const find = () => {
+    const root = document.querySelector('#orbit')?.shadowRoot, world = root?.querySelector('.world');
+    if (world && window.__LT_ORBIT_TEST__) watch(root, world);
+    else requestAnimationFrame(find);
+  };
+  find();
+}
+
+test('#1309 첫 방문 안내는 나타나 3초 뒤 사라지고, 누르면 바로 사라지며 재방문에는 나오지 않는다', { skip: REQUIRE952 ? false : skip952, timeout: 240000 }, async () => {
  if (skip952) assert.fail(skip952);
  const browser = await chromium952.launch({ headless: true });
- const hintState = (frame) => frame.evaluate(() => {
-  const root = document.querySelector('#orbit').shadowRoot, hook = globalThis.__LT_ORBIT_TEST__, index = hook.hintIndex();
-  const card = root.querySelectorAll('.card')[index], tip = card?.querySelector('.lt-card-tip');
-  hook.syncDomPoses();
-  const app = root.querySelector('.app')?.getBoundingClientRect(), cr = card?.getBoundingClientRect(), tr = tip?.getBoundingClientRect(), pose = hook.poses()[index];
-  const center = r => r ? [r.left + r.width / 2, r.top + r.height / 2] : null;
-  // 정확한 정렬 2px는 #1382에서 모든 카드에 적용한다. 여기서는 안내 글자가
-  // 멈추지 않은 궤도의 그려진(투영) 카드 사각형 안에 머문는지만 잰다.
-  const projectedInside = !!tr && !!pose?.box && app && tr.left - app.left >= pose.box.l && tr.top - app.top >= pose.box.t && tr.right - app.left <= pose.box.r && tr.bottom - app.top <= pose.box.b;
-  return { index, bound: tip?.parentElement === card, visible: !!tip && getComputedStyle(tip).opacity === '1' && root.querySelector('.world').classList.contains('lt-hint-ready'),
-   inside: !!tr && !!cr && tr.left >= cr.left && tr.right <= cr.right && tr.top >= cr.top && tr.bottom <= cr.bottom, projectedInside,
-   bottomGap: tr && cr ? cr.bottom - tr.bottom : null, cardCenter: center(cr), tipCenter: center(tr), poseCenter: pose ? [pose.x, pose.y] : null,
-   floatingTip: !!root.querySelector('.lt-orbit-tip'), pulse: getComputedStyle(card, '::after').animationName };
- });
  try {
-  const h = await boot952(browser, { width: 1440, motion: 'no-preference', initStorage: { 'lt41.theme': 'night' } });
+  const h = await boot952(browser, { width: 1440, motion: 'no-preference', initStorage: { 'lt41.theme': 'night' }, initScript: TIP_RECORDER });
   try {
-   await h.frame.waitForFunction(() => globalThis.__LT_ORBIT_TEST__?.canvasReady(), null, { timeout: 20000 });
-   await h.frame.locator('.lt-card-tip').waitFor({ state: 'visible', timeout: 15000 });
-   const opening = await hintState(h.frame);
-   assert.ok(opening.bound && opening.index >= 0 && opening.visible && opening.inside && opening.projectedInside, JSON.stringify(opening));
-   assert.ok(opening.bottomGap >= 0 && opening.bottomGap < 40, '안내는 카드 아래쪽 안에 있다: ' + JSON.stringify(opening));
-   assert.equal(opening.floatingTip, false, '떠 있는 말풍선은 없다');
-   assert.equal(opening.pulse, 'lt-card-pulse');
-   await h.page.waitForTimeout(80);
-   const moved = await hintState(h.frame);
-   await h.page.waitForTimeout(80);
-   const later = await hintState(h.frame);
-   assert.ok([opening, moved, later].every(state => state.bound && state.visible && state.projectedInside), JSON.stringify([opening, moved, later]));
-   const cardDelta = Math.hypot(later.cardCenter[0] - moved.cardCenter[0], later.cardCenter[1] - moved.cardCenter[1]);
-   const tipDelta = Math.hypot(later.tipCenter[0] - moved.tipCenter[0], later.tipCenter[1] - moved.tipCenter[1]);
-   assert.ok(later.bound && cardDelta > 3 && tipDelta > 3 && tipDelta / cardDelta > .8 && tipDelta / cardDelta < 1.2, '안내는 카드의 자식 노드로 함께 움직인다: ' + JSON.stringify({ cardDelta, tipDelta }));
-   assert.ok(later.inside && later.visible);
+   await h.frame.waitForFunction(() => window.__LT_TIP_REC__?.snaps.length >= 1, null, { timeout: 20000, polling: 50 });
    const capture = process.env.LT_HOME_1204_CAPTURE_DIR;
    if (capture) { const { mkdirSync } = await import('node:fs'); mkdirSync(capture, { recursive: true }); await h.page.screenshot({ path: capture + '/home-1309-hint-1440-night.png' }); }
-   await h.frame.evaluate(() => globalThis.__LT_ORBIT_TEST__.restore());
-   await h.frame.locator('.card').nth(opening.index).locator('.surface').evaluate(e => e.click());
-   assert.equal(await h.frame.locator('.lt-card-tip').count(), 0, '누르면 즉시 사라진다');
+   await h.frame.waitForFunction(() => { const r = window.__LT_TIP_REC__; return r.snaps.length >= 3 && r.removedAt !== null; }, null, { timeout: 30000, polling: 50 });
+   const rec = await h.frame.evaluate(() => window.__LT_TIP_REC__);
+   assert.deepEqual(rec.snaps.map(s => s.label), ['0ms', '150ms', '300ms'], JSON.stringify(rec));
+   // 정확한 정렬 2px는 #1382에서 모든 카드에 적용한다. 여기서는 안내 글자가 카드 안, 투영 사각형이 있으면 그 안에 있는지만 본다.
+   assert.ok(rec.snaps.every(s => s.index >= 0 && s.shown && s.bound && s.domInside && s.bottomGap >= 0 && s.bottomGap < 40 && !s.floatingTip && s.pulse === 'lt-card-pulse' && (!s.projected || s.projInside)), JSON.stringify(rec.snaps));
+   const visibleMs = rec.removedAt - rec.appearAt;
+   assert.ok(visibleMs >= 2500 && visibleMs <= 3500, '안내는 약 3초 보인다: ' + visibleMs);
+   assert.equal(await h.frame.locator('.lt-card-tip').count(), 0, '3초가 지나면 사라진다');
    assert.equal(await h.frame.evaluate(() => localStorage.getItem('lt41-orbit-card-opened')), '1');
-   await h.page.reload({ waitUntil: 'load' });
-   await h.page.waitForTimeout(2400);
-   assert.equal(await h.page.frameLocator('#view').locator('.lt-card-tip').count(), 0, '다음 방문에는 나오지 않는다');
+   console.log('TIP_MEASURE ' + JSON.stringify({ tipAt: rec.tipAt, appearAt: rec.appearAt, removedAt: rec.removedAt, visibleMs, snaps: rec.snaps.map(s => ({ label: s.label, dt: Math.round(s.dt), domInside: s.domInside, projected: s.projected, projInside: s.projInside, canvasReady: s.canvasReady })) }));
   } finally { await close952(h); }
-  const timed = await boot952(browser, { width: 1440, motion: 'no-preference' });
+  const clicked = await boot952(browser, { width: 1440, motion: 'no-preference', initStorage: { 'lt41.theme': 'night' }, initScript: TIP_RECORDER });
   try {
-   await timed.frame.locator('.lt-card-tip').waitFor({ state: 'visible', timeout: 20000 });
-   await timed.page.waitForTimeout(3100);
-   assert.equal(await timed.frame.locator('.lt-card-tip').count(), 0, '3초가 지나면 사라진다');
-   assert.equal(await timed.frame.evaluate(() => localStorage.getItem('lt41-orbit-card-opened')), '1');
-  } finally { await close952(timed); }
+   await clicked.frame.waitForFunction(() => window.__LT_TIP_REC__?.appearAt != null, null, { timeout: 20000, polling: 50 });
+   const index = await clicked.frame.evaluate(() => globalThis.__LT_ORBIT_TEST__.hintIndex());
+   await clicked.frame.locator('.card').nth(index).locator('.surface').evaluate(e => e.click());
+   assert.equal(await clicked.frame.locator('.lt-card-tip').count(), 0, '누르면 즉시 사라진다');
+   assert.equal(await clicked.frame.evaluate(() => localStorage.getItem('lt41-orbit-card-opened')), '1');
+   await clicked.page.reload({ waitUntil: 'load' });
+   await clicked.page.waitForTimeout(2400);
+   assert.equal(await clicked.page.frameLocator('#view').locator('.lt-card-tip').count(), 0, '다음 방문에는 나오지 않는다');
+  } finally { await close952(clicked); }
   const returning = await boot952(browser, { width: 1440, initStorage: { 'lt41-orbit-card-opened': '1' } });
   try {
    await returning.page.waitForTimeout(1800);
