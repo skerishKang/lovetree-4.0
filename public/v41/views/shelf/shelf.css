@@ -59,14 +59,14 @@
       gap: 20px;
       padding: 10px 20px;
       border: 1px solid rgba(119,91,82,.13);
-      border-radius: 999px;
+      border-radius: var(--lt-r-pill);
       background: rgba(255,253,249,.88);
       box-shadow: 0 8px 21px rgba(66,46,40,.09);
       backdrop-filter: blur(14px);
     }
     .brand { display: flex; align-items: center; gap: 9px; min-width: 220px; color: var(--rose-deep); text-decoration: none; }
     .brand-mark { position: relative; display: block; width: 29px; height: 30px; flex: 0 0 auto; }
-    .brand-mark::before { content: ""; position: absolute; left: 13px; top: 2px; width: 2px; height: 25px; border-radius: 999px; background: var(--sage-deep); transform: rotate(7deg); }
+    .brand-mark::before { content: ""; position: absolute; left: 13px; top: 2px; width: 2px; height: 25px; border-radius: var(--lt-r-pill); background: var(--sage-deep); transform: rotate(7deg); }
     .brand-mark i, .brand-mark b { position: absolute; display: block; border-radius: 100% 0; }
     .brand-mark i { left: 1px; top: 8px; width: 14px; height: 8px; background: var(--sage); transform: rotate(-24deg); }
     .brand-mark b { right: 0; top: 2px; width: 12px; height: 8px; background: var(--rose); transform: scaleX(-1) rotate(-25deg); }
@@ -75,7 +75,7 @@
     .crumbs { color: var(--muted); font-size: 12px; }
     .crumbs span { padding: 0 8px; color: #c3aaa0; }
     .top-actions { display: flex; gap: 8px; margin-left: auto; }
-    .ghost { min-height: 38px; padding: 0 15px; border: 1px solid var(--line); border-radius: 999px; color: var(--ink); background: rgba(255,250,245,.74); font-size: 12px; }
+    .ghost { min-height: 38px; padding: 0 15px; border: 1px solid var(--line); border-radius: var(--lt-r-pill); color: var(--ink); background: rgba(255,250,245,.74); font-size: 12px; }
     .ghost:hover { border-color: var(--rose); color: var(--rose-deep); background: #fffaf5; }
 
     .page { position: relative; z-index: 10; max-width: 1480px; margin: 16px auto 0; }
@@ -98,7 +98,7 @@
     .hero h1 { margin: 0 0 13px; font: 400 clamp(31px,3.7vw,53px)/1.2 var(--display); letter-spacing: -.08em; }
     .hero h1 em { color: var(--rose-deep); font-style: normal; }
     .hero-copy p:not(.eyebrow) { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.8; }
-    .shelf-jump { margin-top:14px; min-height:44px; padding:0 18px; border:1px solid #b99d99; border-radius:999px; background:#fffaf5; color:#704b55; font:inherit; font-size:12px; font-weight:700; cursor:pointer; }
+    .shelf-jump { margin-top:14px; min-height:44px; padding:0 18px; border:1px solid #b99d99; border-radius:var(--lt-r-pill); background:#fffaf5; color:#704b55; font:inherit; font-size:12px; font-weight:700; cursor:pointer; }
     .shelf-jump:focus-visible { outline:3px solid #85536c; outline-offset:3px; }
     .hero-shelf { position: absolute; left: 5%; right: 5%; bottom: 35px; height: 11px; border-radius: 3px; background: linear-gradient(#6e4536,#2d1c1a); box-shadow: 0 9px 0 #151214,0 17px 22px rgba(0,0,0,.55); }
     .hero-books { position: absolute; left: 8%; right: 8%; bottom: 45px; display: flex; align-items: end; justify-content: center; gap: 17px; }
@@ -113,10 +113,10 @@
     html[data-v41-screen=shelf] .hero.strip-mode .hero-copy { display: none; }
     .shelf-controls { display: flex; align-items: center; gap: 8px; margin: 16px 0 11px; }
     .search { position: relative; flex: 1; max-width: 390px; }
-    .search input { width: 100%; min-height: 43px; padding: 0 15px 0 39px; border: 1px solid var(--line); border-radius: 999px; color: var(--ink); background: rgba(255,252,247,.86); font-size: 12px; }
+    .search input { width: 100%; min-height: 43px; padding: 0 15px 0 39px; border: 1px solid var(--line); border-radius: var(--lt-r-pill); color: var(--ink); background: rgba(255,252,247,.86); font-size: 12px; }
     .search::before { content: "⌕"; position: absolute; left: 15px; top: 7px; color: var(--muted); font-size: 22px; pointer-events: none; }
     .filter-row { display: flex; flex-wrap: wrap; gap: 5px; }
-    .filter { min-height: 37px; padding: 0 12px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); background: rgba(255,252,247,.7); font-size: 11px; }
+    .filter { min-height: 37px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--lt-r-pill); color: var(--muted); background: rgba(255,252,247,.7); font-size: 11px; }
     .filter.active,.filter:hover { border-color: var(--rose); color: var(--rose-deep); background: #fff8f4; }
     .count { margin-left: auto; color: var(--muted); font-size: 11px; white-space: nowrap; }
     .shelf-viewport { --shelf-accent: var(--rose); position: relative; height: 445px; padding: 18px 51px 31px; overflow: hidden; border: 1px solid rgba(119,91,82,.14); border-radius: 25px; background: radial-gradient(circle at 50% 13%,rgba(217,120,137,.18),transparent 31%), linear-gradient(180deg,rgba(247,239,229,.72),rgba(232,221,209,.82)); box-shadow: var(--shadow-lg); transition: background .5s ease; }
@@ -167,7 +167,7 @@
     .book-card-meta strong { display: -webkit-box; max-height: 3.45em; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 3; font: 700 16px/1.15 var(--display); }
     .book-card-meta span { display: -webkit-box; max-height: 2.8em; overflow: hidden; color: var(--muted); font-size: 10px; line-height: 1.4; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
     .book-tags { display: flex; justify-content: center; gap: 4px; margin-top: 7px; }
-    .book-tags span { padding: 4px 7px; border-radius: 999px; color: var(--cover-accent,var(--rose-deep)); background: rgba(255,255,255,.67); font-size: 9px; }
+    .book-tags span { padding: 4px 7px; border-radius: var(--lt-r-pill); color: var(--cover-accent,var(--rose-deep)); background: rgba(255,255,255,.67); font-size: 9px; }
     .empty { width: 100%; padding: 120px 20px; color: var(--muted); text-align: center; }
     .empty strong { display: block; margin-bottom: 7px; color: var(--ink); font: 700 20px var(--display); }
 /* 이슈 327 2부: 모아둔 순간 트리 표시. 순서·판정은 inbox-model.mjs가 계산한다. */
