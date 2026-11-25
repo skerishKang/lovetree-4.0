@@ -69,6 +69,8 @@ extraCSS+=`.recent-card{pointer-events:auto;position:relative;display:block;widt
 // 261116 PR 2: 머리글 단추(카드 모드 고르기). 눈에 보이는 글자 12px 이상·대비 4.5:1 위, 누름 영역은 :after로 44px를 채운다(menuBtn과 같은 판). 카드 열림(recent-open)과 갈라진다 — 단추 자체가 위에 있어 그쪽이 눌린다.
 /* #1284: 세로 영상 카드가 길어져도 상단 안내가 화면 밖으로 밀리지 않도록 위에서부터 배치한다. */
 extraCSS+=`@media(max-width:650px){:host([data-lt-home-portrait]) .center{top:18px;transform:translateX(-50%)}:host([data-lt-home-portrait]) .center.dim{transform:translateX(-50%) scale(.96)}}`;
+// 세로 터치는 안쪽 문서 스크롤에 넘기고 가로 끌기는 궤도가 계속 받는다.
+extraCSS+=`.app{touch-action:pan-y}`;
 extraCSS+=`.recent-head{position:relative;display:inline-flex;align-items:baseline;gap:1px;min-height:24px;margin:-4px 0;padding:2px 0;border:0;background:none;cursor:pointer;font:inherit;font-size:13px;letter-spacing:.04em;color:#cdc5da;text-align:left;white-space:nowrap}.recent-head:after{content:'';position:absolute;inset:-10px -12px -10px -8px;border-radius:8px}.recent-head:focus-visible{outline:3px solid #e8b8c9;outline-offset:2px}.recent-head-arrow{font-size:12px;color:#a79db8}.recent-head:hover{color:#eee6f6}.recent-head-row{display:flex;align-items:center;justify-content:space-between;gap:10px}.recent-change{position:relative;min-height:24px;padding:2px 0;border:0;background:none;cursor:pointer;font:inherit;font-size:13px;color:#cdc5da;white-space:nowrap;text-decoration:underline;text-underline-offset:3px}.recent-change:after{content:'';position:absolute;inset:-10px -8px;border-radius:8px}.recent-change:hover{color:#eee6f6}.recent-change:focus-visible{outline:3px solid #e8b8c9;outline-offset:2px}:host([data-lt-theme=garden]) .recent-head,:host([data-lt-theme=garden]) .recent-change,:host([data-lt-theme=garden]) .recent-head-arrow{color:var(--lt-muted)}`;
 // #1109: 정리 창과 같은 닫기 단추·뒤 덮개·390 꽉 찬 창 규칙.
 extraCSS+=`.orbit-dialog:not(#guidePanel)::backdrop{background:rgba(3,3,7,.85);backdrop-filter:blur(12px)}.orbit-dialog:not(#guidePanel) .close{box-sizing:border-box;width:44px;height:44px;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;padding:0;border:1px solid #615364;border-radius:50%;background:#ffffff07;font-size:24px;line-height:1;color:inherit;position:absolute;right:12px;top:10px;z-index:7}@media(max-width:520px){.orbit-dialog:not(#guidePanel){width:100vw;max-width:none;height:100dvh;max-height:100dvh;inset:0;margin:0;border:0;border-radius:0}.orbit-dialog:not(#guidePanel) .close{top:8px;right:8px;background:#151118e6}}`;
@@ -1035,7 +1037,13 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
  // 측정은 getBoundingClientRect 강제 레이아웃을 일으키므로 첫 프레임으로 미룬다(#400 뼈대 완성 보호).
  let safeZone=null,safeZoneDirty=true;
  const measureSafeZone=()=>{const c=shadow.querySelector('.center');if(!c){safeZone=null;return;}safeZone=safeZoneOf(c.getBoundingClientRect(),app.getBoundingClientRect());measureBottomZones();};
- const fitNotice=()=>{host.style.height=`calc(100dvh - ${noticeOuter()}px)`;appBox=app.getBoundingClientRect();safeZoneDirty=true;schedule();};
+ const fitNotice=()=>{
+  const viewportHeight=Math.max(0,innerHeight-noticeOuter()),centerHeight=shadow.querySelector('.center')?.getBoundingClientRect().height||0;
+  const portrait=host.hasAttribute('data-lt-home-portrait')&&innerWidth<=650;
+  // 가운데 덩어리가 화면보다 길면 iframe 문서가 스크롤하도록 실제 높이를 넘긴다.
+  const contentHeight=portrait?Math.max(app.clientWidth+372,centerHeight+34):centerHeight+32;
+  host.style.height=`${Math.ceil(Math.max(viewportHeight,contentHeight))}px`;appBox=app.getBoundingClientRect();safeZoneDirty=true;schedule();
+ };
  const noticeResize=typeof ResizeObserver==="function"?new ResizeObserver(fitNotice):null;
  const barNow=document.getElementById("sync-bar");
  if(noticeResize&&barNow)noticeResize.observe(barNow);
@@ -1046,7 +1054,7 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
  // fonts.ready 접근은 뼈대 완성 뒤로 미룬다(#400) — 첫 그리기를 막지 않는다.
  const remeasure=()=>{safeZoneDirty=true;schedule();};
  const centerNow=shadow.querySelector('.center');
- const centerResize=typeof ResizeObserver==="function"&&centerNow?new ResizeObserver(remeasure):null;
+ const centerResize=typeof ResizeObserver==="function"&&centerNow?new ResizeObserver(()=>{fitNotice();remeasure();}):null;
  if(centerResize)centerResize.observe(centerNow);
  setTimeout(()=>{document.fonts?.ready?.then(remeasure).catch(()=>{});},0);
  track(()=>centerResize?.disconnect());
