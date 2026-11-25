@@ -641,11 +641,10 @@ test('#1294 둘러보기 트리·순간 탭과 미리보기·그룹 찾기 뒤�
    await back();
    assert.equal(await page.locator('#community-preview').evaluate(el=>el.open),false,width+' 미리보기 복귀');
    assert.deepEqual(await navState(),home,width+' 미리보기 후 화면');
-   await page.locator('button.community-group-find').click();
-   assert.equal(await page.locator('#community-group-find').evaluate(el=>el.open),true,width+' 그룹 찾기 열기');
-   await back();
-   assert.equal(await page.locator('#community-group-find').evaluate(el=>el.open),false,width+' 그룹 찾기 복귀');
-   assert.deepEqual(await navState(),home,width+' 그룹 찾기 후 화면');
+    // 그룹 찾기 칩이 없어졌으므로 상단 검색 확장에 기록이 쌓이지 않는지 확인한다.
+    await expectNoHistoryGrowth(page,async()=>page.locator('.community-search-trigger').click(),width+' 찾기 확장');
+    assert.equal(await page.locator('#community-query').evaluate(el=>document.activeElement===el),true,width+' 찾기 입력 초점');
+    assert.deepEqual(await navState(),home,width+' 찾기 확장 후 화면');
    // 감상 화면 이동은 별도 URL이며 뒤로 가기 한 번에 둘러보기 미리보기를 복원한다.
    const sharedTree=exploreTree(1);
    await page.route('**/api/public/shares/*',async route=>{if(width===1440)await new Promise(resolve=>setTimeout(resolve,700));await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({ok:true,share:{id:EXPLORE_CARD(0).shareId,view:'book',entryMomentId:sharedTree.moments[0].id},tree:sharedTree})});});
@@ -841,12 +840,12 @@ test('빈 인기 무대는 줄을 접고 칩 줄 아래 간격을 다른 정보 
         await page.waitForSelector('#community-list .community-card');
         const facts = await page.evaluate(() => {
           const rail = document.querySelector('.community-group-rail').getBoundingClientRect();
-          const feedback = document.querySelector('#community-feedback').getBoundingClientRect();
+          const feedback = document.querySelector('#community-feedback');
           const card = document.querySelector('#community-list .community-card').getBoundingClientRect();
-          return { hidden: document.querySelector('#community-popular-stages').hidden, railToFeedback: Math.round(feedback.top - rail.bottom), feedbackToCard: Math.round(card.top - feedback.bottom) };
+          return { hidden: document.querySelector('#community-popular-stages').hidden, feedbackHidden: feedback.hidden, railToCard: Math.round(card.top - rail.bottom) };
         });
         assert.equal(facts.hidden, true, `${width}/${theme}: 빈 인기 무대 줄을 접는다`);
-        assert.ok(Math.abs(facts.railToFeedback - facts.feedbackToCard) <= 1, `${width}/${theme}: 칩 줄 아래 간격이 다른 줄 간격과 같다 ${JSON.stringify(facts)}`);
+        assert.equal(facts.feedbackHidden,true,'필터가 없을 때 결과 안내 숨김'); assert.equal(facts.railToCard,10,'빈 인기 무대 줄이 없을 때 칩 아래 간격 10px');
         await ctx.close();
       } finally { await new Promise((r) => server.close(r)); }
     }
@@ -921,5 +920,82 @@ test('#1338 인기 무대 오류·2초 지연에도 트리 카드를 1초 안에
     }finally{await ctx.close();}
    }finally{await new Promise(resolve=>server.close(resolve));}
   }
+ }finally{await browser.close();}
+});
+
+test('둘러보기 윗줄과 AI 명예회원 공개 이름 — 390·1440 × 밤·정원', {skip:REQUIRE?false:skip,timeout:240000},async()=>{
+ if(skip)assert.fail(skip);
+ const card=(n,ai)=>({
+  shareId:'share'+String(n).padStart(20,'0'),title:ai?'명예회원 공개 트리':'일반 공개 트리',subject:'가수',summary:'공개 기록',
+  momentCount:3,createdAt:'2026-11-20T09:30:00.000Z',publicDisplayName:ai?'하늘':'노출되면 안 되는 이름',
+  aiTester:ai,cover:{title:'첫 순간',type:'photo',url:''},
+  stats:{hearts:3,favorites:1,hearted:false,favored:false,reactions:{heart:3},mine:[]}
+ });
+ const browser=await chromium.launch({headless:true});
+ try{
+ for(const [width,height] of [[390,844],[1440,900]])for(const theme of ['night','garden']){
+  const server=await serve();
+  try{
+   const base='http://127.0.0.1:'+server.address().port,ctx=await browser.newContext({viewport:{width,height},reducedMotion:'reduce'});
+   try{
+    await ctx.addInitScript(t=>localStorage.setItem('lt41.theme',t),theme);
+    const body=JSON.stringify({ok:true,items:[card(1,true),card(2,false)],totalVisible:2,nextCursor:'',
+      groups:[{value:'적은 그룹',count:2},{value:'많은 그룹',count:9}],
+      groupsAll:[{value:'적은 그룹',count:2},{value:'많은 그룹',count:9}]});
+    await ctx.route('**/api/**',r=>r.fulfill({status:200,contentType:'application/json',body:'{"ok":true,"items":[]}'}));
+    await ctx.route('**/api/community/shares**',r=>r.fulfill({status:200,contentType:'application/json',body}));
+    await ctx.route('**/api/community/stages/popular**',r=>r.fulfill({status:200,contentType:'application/json',body:'{"ok":true,"items":[]}'}));
+    const page=await ctx.newPage();
+    await page.goto(base+'/v41/#explore',{waitUntil:'domcontentloaded'});
+    await page.locator('.community-card').first().waitFor();
+    const initial=await page.evaluate(()=>{
+     const r=s=>{const b=document.querySelector(s).getBoundingClientRect();return {x:b.x,y:b.y,w:b.width,h:b.height}};
+     return {viewport:innerWidth,scroll:document.documentElement.scrollWidth,row:r('.community-top-row'),tabs:r('.community-tabs'),
+      search:r('#community-search-form'),sort:r('.community-sort-label'),icon:r('.community-sort-label'),
+      firstTab:r('#community-tab-trees'),secondTab:r('#community-tab-moments'),queryName:document.querySelector('#community-query').getAttribute('aria-label'),
+      feedbackHidden:document.querySelector('#community-feedback').hidden,
+      findVisible:[...document.querySelectorAll('button.community-group-find')].some(e=>e.getBoundingClientRect().width>0),
+      names:[...document.querySelectorAll('.community-card-owner')].map(e=>e.textContent),
+      groups:[...document.querySelectorAll('#community-groups button')].map(e=>e.textContent),
+      ownerLink:document.querySelector('.community-card-owner a')!==null};
+    });
+    assert.equal(initial.scroll,initial.viewport,width+'/'+theme+': 가로 넘침 0');
+    assert.equal(initial.tabs.y,initial.search.y,width+'/'+theme+': 탭·찾기 한 줄');
+    assert.equal(initial.search.y,initial.sort.y,width+'/'+theme+': 찾기·정렬 한 줄');
+    assert.equal(initial.row.h,48,width+'/'+theme+': 윗줄 높이');
+    for(const size of [initial.firstTab.h,initial.secondTab.h,initial.icon.w,initial.icon.h,initial.search.h,initial.sort.h])
+     assert.ok(size>=44,width+'/'+theme+': 단추 44픽셀 이상 '+size);
+    assert.equal(initial.queryName,'가수·노래·무대 찾기');
+    assert.equal(initial.feedbackHidden,true,width+'/'+theme+': 검색·필터 없는 안내 숨김');
+    assert.equal(initial.findVisible,false,width+'/'+theme+': 그룹 찾기 칩 제거');
+    assert.deepEqual(initial.names,['AI 명예회원 하늘'],width+'/'+theme+': AI 카드만 이름');
+    assert.equal(initial.ownerLink,false,width+'/'+theme+': 만든 사람은 링크 아님');
+    assert.deepEqual(initial.groups.slice(0,3),['전체','많은 그룹','적은 그룹'],width+'/'+theme+': 방문자 공개 수 순서');
+    await page.locator('.community-search-trigger').click();
+    assert.equal(await page.locator('#community-query').evaluate(e=>document.activeElement===e),true,width+'/'+theme+': 찾기 확장 후 입력 초점');
+    assert.ok(await page.locator('#community-query').evaluate(e=>e.getBoundingClientRect().width)>20,width+'/'+theme+': 입력칸 확장');
+    await page.locator('#community-query').fill('가수');
+    await page.locator('#community-query').press('Enter');
+    await page.waitForFunction(()=>!document.querySelector('#community-feedback').hidden);
+    await page.locator('#community-sort').selectOption('popular');
+    assert.equal(await page.locator('#community-sort option[value="popular"]').textContent(),'인기순',width+'/'+theme+': 정렬 선택 이름');
+    assert.equal(await page.locator('#community-sort').inputValue(),'popular',width+'/'+theme+': 인기순 선택 유지');
+    const yBefore=await page.locator('.community-top-row').evaluate(e=>e.getBoundingClientRect().height);
+    await page.locator('#community-tab-moments').click();
+    const moment=await page.evaluate(()=>({
+     row:document.querySelector('.community-top-row').getBoundingClientRect().height,
+     search:getComputedStyle(document.querySelector('#community-search-form')).visibility,
+     sort:getComputedStyle(document.querySelector('.community-sort-label')).visibility,
+     scroll:document.documentElement.scrollWidth,view:innerWidth}));
+    assert.equal(moment.row,yBefore,width+'/'+theme+': 순간 전환 높이 변화 0');
+    assert.equal(moment.search,'hidden',width+'/'+theme+': 순간 찾기 숨김');
+    assert.equal(moment.sort,'hidden',width+'/'+theme+': 순간 정렬 숨김');
+    assert.equal(moment.scroll,moment.view,width+'/'+theme+': 순간 가로 넘침 0');
+    await page.locator('#community-tab-trees').click();
+    assert.equal(await page.locator('#community-sort').inputValue(),'popular',width+'/'+theme+': 돌아와도 인기순 유지');
+    console.log('윗줄 점검',width,theme,'통과');
+   }finally{await ctx.close();}
+  }finally{await new Promise(r=>server.close(r));}
+ }
  }finally{await browser.close();}
 });

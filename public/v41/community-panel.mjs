@@ -24,6 +24,19 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
  // #1025: [트리] [순간] 탭 — 주소 #explore/moments 는 새로고침·공유로 유지한다.
  const treeTab=dialog.querySelector('#community-tab-trees'),momentsTab=dialog.querySelector('#community-tab-moments');
  const treePanel=dialog.querySelector('#community-tree-panel'),momentsPanel=dialog.querySelector('#community-moments-panel');
+ // 탭·찾기·정렬을 어느 보기에서나 같은 높이의 한 줄에 둔다.
+ const toolbarTabs=dialog.querySelector('.community-tabs'),topRow=el('div','community-top-row'),sortLabel=form.querySelector('.community-sort-label');
+ toolbarTabs.before(topRow);topRow.append(toolbarTabs,form,sortLabel);
+ const searchTrigger=el('button','community-search-trigger','🔍 찾기');
+ searchTrigger.type='button';searchTrigger.setAttribute('aria-label','찾기 열기');
+ form.insertBefore(searchTrigger,query);
+ query.placeholder='찾기';query.setAttribute('aria-label','가수·노래·무대 찾기');
+ const popularOption=sortSelect?.querySelector("option[value=popular]");
+ if(popularOption)popularOption.textContent="인기순";
+ const expandSearch=()=>{form.classList.add('is-expanded');searchTrigger.setAttribute('aria-expanded','true');query.focus();};
+ searchTrigger.setAttribute('aria-expanded','false');searchTrigger.onclick=expandSearch;
+ query.addEventListener('blur',()=>{setTimeout(()=>{if(!form.contains(document.activeElement)&&!query.value.trim()){form.classList.remove('is-expanded');searchTrigger.setAttribute('aria-expanded','false');}},0);});
+
  // #480 L13: 계정 설정의 날짜 표기. 넘겨받지 않으면 기본(dot) — 새 규칙을 만들지 않는다.
  const dateStyle=()=>(typeof getDateStyle==='function'?getDateStyle():'dot');
  // 하은 1회차(261116,#728 후속): 새벽(KST 0~9시, UTC 전날)에 담은 순간의 둘러보기 카드가
@@ -53,7 +66,12 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
   for(const g of publicGroups||[])add(g.value,g.count);
   return [...seen.values()].sort((a,b)=>String(a.group).localeCompare(String(b.group),'ko'));
  };
- const message=text=>{feedback.textContent=text;const previewMessage=preview.querySelector('[data-community-preview-message]');if(previewMessage)previewMessage.textContent=text;};
+ const message=text=>{
+  feedback.textContent=text;
+  const unfiltered=!selectedArtist&&!query.value.trim();
+  feedback.hidden=unfiltered&&(/^(공개된 트리 |아직 공개된 트리|공개 트리를 불러오는 중)/).test(text);
+  const previewMessage=preview.querySelector('[data-community-preview-message]');if(previewMessage)previewMessage.textContent=text;
+ };
  const loginMessage=answer=>answer.status===401?'로그인하면 이 기능을 사용할 수 있어요.':answer.message||'요청을 처리하지 못했어요.';
  // #824 결정 7: 3 미만 숫자는 보여 주지 않는다 — 라벨만 남긴다(0·1·2 모두 같은 규칙, 3부터 숫자가 보인다).
  // '이번 주 담은 사람 수'(결정 1)도 같은 규칙 — 3 이상일 때만 카드·미리보기에 한 줄로 따라온다.
@@ -190,21 +208,20 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
   cancel.onclick=()=>{delete row.dataset.editing;row.replaceChildren();if(head)row.append(head);if(body)row.append(body);if(tools)row.append(tools);};
   row.append(form);
  }
-  function artistGroupList(){
-   let mine=[];try{mine=getArtistGroups?.()||[];}catch{}
-   const available=new Map();
-   for(const group of publicGroups){
-    const value=String(group?.value??group??'').trim(),key=tagKey(value);
-    if(value&&key&&!available.has(key))available.set(key,value);
+   function artistGroupList(){
+    let mine=[];try{mine=getArtistGroups?.()||[];}catch{}
+    const publicSorted=[...(publicGroupsAll.length?publicGroupsAll:publicGroups)]
+     .filter(group=>tagKey(String(group?.value??group??'').trim()))
+     .sort((a,b)=>Number(b?.count||0)-Number(a?.count||0)||String(a?.value||'').localeCompare(String(b?.value||''),'ko'));
+    const out=[],seen=new Set();
+    const add=value=>{const text=String(value||'').trim(),key=tagKey(text);if(!key||seen.has(key))return;seen.add(key);out.push(text);};
+    // 내 트리 가수는 로그인된 때만 데이터가 내려온다. 방문자는 공개 트리 수로만 정렬한다.
+    for(const value of Array.isArray(mine)?mine:[])add(value);
+    for(const group of publicSorted)add(group?.value);
+    return out;
    }
-   const seen=new Set(),out=[];
-   const add=key=>{if(key&&available.has(key)&&!seen.has(key)){seen.add(key);out.push(available.get(key));}};
-   for(const raw of Array.isArray(mine)?mine:[])add(tagKey(String(raw??'').trim()));
-   for(const key of available.keys())add(key);
-   return out.slice(0,7);
-  }
  function renderGroups(){
-  // 고른 그룹 → 전체 → 내 가수 → 공개 많은 순(최대 8칩, 한 줄 — #914 규칙 그대로).
+  // 전체 → 내 그룹 → 공개 트리 수 많은 순서로 표시한다.
   // artistGroupList가 내 가수·공개 상위 8을 tagKey 한 줄로 맞춘 순서를 준다.
   const seen=new Set();
   const choices=[];
@@ -213,9 +230,13 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
    if(seen.has(key))return;
    seen.add(key);choices.push({value,label});
   };
-  if(selectedArtist)push(selectedArtist,selectedArtist);
   push('','전체');
   for(const value of artistGroupList())if(choices.length<8)push(value,value);
+  // 지금 고른 그룹이 상위 칩 밖이라도 선택을 잃지 않도록 마지막 칩에 남긴다.
+  if(selectedArtist&&!choices.some(choice=>tagKey(choice.value)===tagKey(selectedArtist))){
+   if(choices.length>=8)choices.pop();
+   push(selectedArtist,selectedArtist);
+  }
   const visible=choices.slice(0,8);
   groups.replaceChildren(...visible.map(choice=>{
    const chip=el('button',`community-group-chip${choice.value===selectedArtist?' is-active':''}`,choice.label);
@@ -223,14 +244,6 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
    chip.onclick=()=>{selectedArtist=choice.value;renderGroups();load(false);};
    return chip;
   }));
- }
- function duplicateLabel(item){
-  const title=displayTreeTitle(item.title),moment=item.cover?.title||'';
-  const matches=items.filter(value=>displayTreeTitle(value.title)===title&&(value.cover?.title||'')===moment);
-  if(matches.length<2)return '';
-  const publicName=String(item.publicDisplayName||'').trim();
-  if(!publicName)return '';
-  return `${item.aiTester===true?'AI 명예회원 ':''}${publicName}님`;
  }
  function renderCover(item,{loading='lazy'}={}){
   const cover=el('div','community-cover'),youtube=item.cover?.type==='youtube',video=['video','youtube'].includes(item.cover?.type),vertical=video&&item.cover?.vertical===true;
@@ -335,9 +348,11 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
   const weekly=weeklyNote(item),metaText=`${item.cover?.emotion||item.emotions?.[0]||'공개'} · ${when(item.createdAt)} · ${smallCountLabel('공감',item.stats?.hearts||0)}${weekly?` · ${weekly}`:''}`;
   const article=el('button','community-card');article.type='button';article.dataset.shareId=item.shareId;
   article.setAttribute('aria-label',`${titleText}. ${momentText}. ${metaText}`);
-  const distinct=duplicateLabel(item);
-  article.append(renderCover(item),el('h3','community-card-title',titleText),el('p','community-card-moment',momentText));
-  if(distinct)article.append(el('small','community-card-distinct',distinct));
+  article.append(renderCover(item),el('h3','community-card-title',titleText));
+  // 서버가 AI 명예회원으로 표시한 트리에만 공개 이름을 붙인다.
+  const owner=item.aiTester===true?String(item.publicDisplayName||'').trim():'';
+  if(owner)article.append(el('small','community-card-owner','AI 명예회원 '+owner));
+  article.append(el('p','community-card-moment',momentText));
   article.append(el('p','community-card-meta',metaText));
   article.onclick=()=>openPreview(item);return article;
  }
@@ -384,6 +399,8 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
    if(treePanel)treePanel.hidden=momentsOn;
    if(momentsPanel)momentsPanel.hidden=!momentsOn;
    if(moments)momentsOn?moments.activate():moments.deactivate();
+   topRow.classList.toggle('is-moments',momentsOn);
+   if(momentsOn){form.classList.remove('is-expanded');searchTrigger.setAttribute('aria-expanded','false');}
    if(syncHash&&hashNow()!==(momentsOn?'#explore/moments':'#explore'))writeHash(momentsOn?'#explore/moments':'#explore');
   }
   treeTab?.addEventListener('click',()=>selectTab('trees'));
@@ -497,13 +514,13 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
  findDialog.addEventListener('close',()=>{if(historyLayers.active('group-find'))historyLayers.dismiss('group-find');findButton.focus();});
  findClose.onclick=()=>historyLayers.dismiss('group-find');
  const rail=dialog.querySelector('.community-group-rail');
- if(rail&&typeof rail.appendChild==='function')rail.appendChild(findButton);
+ findButton.hidden=true;dialog.append(findButton);
  // #792 ⑤: 둘러보기 제목 아래·검색칸 위에 '이번 주 인기 무대' 한 줄. 서버가 3표 미만을 빼고 내리므로
  // 화면도 같은 규칙으로 거른다(3 미만 숫자는 null과 함께 사라진다 — #824 결정 7).
  const popular=el('section','community-stages');popular.id='community-popular-stages';popular.setAttribute('aria-label',POPULAR_STAGE_TITLE);
  const popularList=el('div','community-stage-list');
  popular.append(el('h3','community-stages-title',POPULAR_STAGE_TITLE),popularList);
- if(typeof form.before==='function')form.before(popular);else dialog.append(popular);
+ if(rail&&typeof rail.before==='function')rail.before(popular);else treePanel.append(popular);
  const skeleton=el('div','community-stages-skeleton');skeleton.setAttribute('aria-hidden','true');
  const renderPopularStages=rows=>{
   const shown=(Array.isArray(rows)?rows:[]).filter(stage=>stage&&stage.stageId&&publicStageCount(stage.weeklyVoters)!==null);

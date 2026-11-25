@@ -2633,7 +2633,7 @@ test('#972 서재·책 상세·둘러보기·새 소식 화면 치수', { skip: 
           const discover = await page.evaluate((screenWidth) => {
             const rect = sel => document.querySelector(sel).getBoundingClientRect();
             const rail = rect('#community-groups'), last = rect('#community-groups .community-group-chip:last-child');
-            const button = rect('button.community-group-find'), popular = rect('#community-popular-stages');
+            const button = rect('.community-search-trigger'), popular = rect('#community-popular-stages');
             const form = rect('#community-search-form'), head = rect('#community-panel .panel-heading'), list = rect('.community-results');
             // #1330: 칩 줄은 가로로 넘기므로 보이는 끝은 칸 오른쪽에서 잘린다 — 잘린 뒤의 칩과 찾기 단추는 겹치지 않는다.
             const visibleLastRight = Math.min(last.right, rail.right);
@@ -2648,13 +2648,13 @@ test('#972 서재·책 상세·둘러보기·새 소식 화면 치수', { skip: 
             const lastChip = groups.querySelector('.community-group-chip:last-child');
             groups.scrollLeft = groups.scrollWidth;
             const reached = lastChip.getBoundingClientRect().right <= groups.getBoundingClientRect().right + 1;
-            return { clip: Math.max(0, last.right - rail.right), overlap, gap: button.left - rail.right, scrollable, reached,
+            return { clip: Math.max(0, last.right - rail.right), overlap, gap: rail.top - button.bottom, scrollable, reached,
               chipHeight: last.height, alignment };
           }, width);
           // #1330: 390은 칩 줄을 밀어 넘기므로 처음에 마지막 칩이 밖에 있어도, 끝까지 밀면 닿아야 한다.
           assert.ok(discover.clip <= 1 || (width === 390 && discover.scrollable && discover.reached), `${theme}/${width}: 마지막 칩 잘림 ${discover.clip}px`);
           assert.equal(discover.overlap, 0, `${theme}/${width}: 칩과 단추 겹침`);
-          assert.ok(discover.gap >= 8 && discover.chipHeight >= 44, '칩과 단추 사이 여백 및 터치 높이');
+          assert.ok(discover.gap >= 8 && discover.chipHeight >= 44, '칩과 윗줄 사이 여백 및 터치 높이');
           assert.ok(discover.alignment <= 1, `${theme}/${width}: 인기 무대 제목·검색·목록 정렬 오차 ${discover.alignment}px`);
         }
 
