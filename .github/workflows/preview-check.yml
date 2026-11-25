@@ -334,6 +334,7 @@ jobs:
           start=$(date +%s)
           npx vite build > /dev/null
           node --test --test-concurrency=1 tests/v41-home-screen-952.test.mjs
+          LT_HOME_1289_REQUIRE=1 node --test tests/v41-home-back-1289.test.mjs
           echo "첫 화면 화면 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
 
       # #1349: 가운데 순간 추가를 실제 마우스와 터치로 누르고 쓰기 창·로그인 안내를 확인한다.

@@ -238,10 +238,12 @@ export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSel
  let lastInputWasKeyboard=false;
  shadow.addEventListener('keydown',()=>{lastInputWasKeyboard=true;},{capture:true,signal});
  shadow.addEventListener('pointerdown',()=>{lastInputWasKeyboard=false;},{capture:true,signal});
- const openDialogCentered=(d)=>{d.dataset.ltOpenedBy=lastInputWasKeyboard?'keyboard':'mouse';d.showModal();};
+ const openDialogCentered=(d)=>{d.dataset.ltOpenedBy=lastInputWasKeyboard?'keyboard':'mouse';d.showModal();d.dataset.ltHomeKind=d.querySelector('.index-list')?'index':'detail';globalThis.LTHomeHistory?.open(d.dataset.ltHomeKind,()=>d.close());};
  function stepDetail(dir){const order=listRows();const at=order.findIndex(x=>x.key===detailMoment?.key);const next=order[at+dir];if(!next)return;renderDetail(next);dialog.querySelector(dir<0?'[data-do=prev]':'[data-do=next]')?.focus();}
  function focus(c){if(!c)return;dismissOrbitTip();if(!c.example){onSelect(c.id);rememberCard(c);}if(!dialog.open)opener=shadow.activeElement;renderDetail(c);}
- function renderDetail(c){detailMoment=c;
+ function renderDetail(c){
+  if(dialog.open&&dialog.dataset.ltHomeKind==='index'){dialog.dataset.ltHomeKind='detail';globalThis.LTHomeHistory?.open('detail',()=>{index();dialog.dataset.ltHomeKind='index'});}
+  detailMoment=c;
   const children=c.example?[all.find(x=>x.id===c.next),all.find(x=>x.id===c.branch)].filter(Boolean):demo?[all.find(x=>x.id===c.next),all.find(x=>x.id===c.branch)].filter(Boolean):poolFor(c).filter(x=>x.treeId===c.treeId&&x.parentId===c.id);
   const link = mediaLinkView(c.url);
   // #393: 순간 상세 창도 같은 틀 규칙 — 세로 영상(쇼츠·세로 비율 정보)은 세로 틀, 썸네일 잘림 없음.
@@ -428,7 +430,7 @@ export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSel
   dialog.querySelectorAll('[data-tag-more]').forEach(b=>b.onclick=()=>{const kind=b.dataset.tagMore||'plain';if(tagExpanded.has(kind))tagExpanded.delete(kind);else tagExpanded.add(kind);index();});
   dialog.querySelectorAll('[data-tag-pick]').forEach(b=>b.onclick=()=>{tagSelected.delete(b.dataset.tagPick||'');index();});
   dialog.querySelector('[data-tag-clear]')?.addEventListener('click',()=>{tagSelected.clear();index();});
-  openDialogCentered(dialog);}
+  if(!dialog.open)openDialogCentered(dialog);}
  // #426: 최근 순간 카드 — 본문을 누르면(클릭·Enter·Space) 그 순간을 연다(궤도 카드와 같은 onOpen 경로). ▶는 카드 안 재생/정지로 구분하고, 플레이어는 누른 뒤에만 만든다(첫 화면 열 때 YouTube 요청 0건).
 const openRecent=()=>{if(!recentMoment)return;if(onOpen&&!recentMoment.example){onOpen(recentMoment);return;}actions.openBook(recentMoment.treeId,recentMoment.id,demo);};
 let recentFrame=null,recentHistory=false,recentCardSlot=null;
