@@ -28,7 +28,7 @@ function readBoardTheme() {
     if (a === 'night' || a === 'paper') return a;
     const s = localStorage.getItem('lt41.boardTheme');
     if (s === 'night' || s === 'paper') return s;
-    return document.documentElement.getAttribute('data-lt-theme') === 'garden' ? 'paper' : 'night';
+    return LT41_THEME_REGISTRY.tone(document.documentElement.getAttribute('data-lt-theme')) === 'light' ? 'paper' : 'night';
   } catch {
     return 'night';
   }
