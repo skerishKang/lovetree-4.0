@@ -419,3 +419,12 @@ html[data-lt-theme=garden] #community-panel:has(#community-tab-moments[aria-sele
 
 /* #1340 음소거 강조를 영상 바깥 상단 소리 단추에도 유지한다. */
 #community-panel .moments-toolbar .moments-rail-button.is-muted{color:var(--lt-rose)}
+
+/* #1354: 열린 휴대폰 정보 판에서 다섯 동작 단추가 하단을 넘지 않게 한다. */
+@media(max-width:780px){
+ #community-moments-panel .moments-stage.moments-info-open .moments-rail{gap:1px;padding:3px;overflow-y:hidden}
+ #community-moments-panel .moments-stage.moments-info-open .moments-rail-button{flex:0 0 44px;min-height:44px;height:44px}
+}
+
+/* #1354: 마음 단추도 100% 불투명하게 표시하여 정보 판의 대비를 유지한다. */
+#community-moments-panel .moments-rail-button.is-heart{opacity:1}
