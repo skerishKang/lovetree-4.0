@@ -78,7 +78,7 @@ test('상단 메뉴: 같은 글자 크기·테두리 0·세로선 0·현재 탭 
           });
         }
 
-        // #1367: DOM and focus order match the visual header order.
+        // #1367: ???? ?? ??? ??? ?? ??? ?? ?? ??? ???.
         const order = await page.evaluate(() => {
           const nav = document.querySelector('.main-nav');
           const ids = [...nav.querySelectorAll('button')].map((b) => b.id || b.dataset.view);
@@ -99,11 +99,11 @@ test('상단 메뉴: 같은 글자 크기·테두리 0·세로선 0·현재 탭 
           'community-menu', 'record-menu', 'track32-bookshelf.html',
           'track61-tree.html', 'track58-pinboard.html',
           'track59-sketchbook.html', 'track56-network.html',
-        ], width + '/' + theme + ': header DOM order matches Tab order');
-        assert.equal(order.overflow, 0, width + '/' + theme + ': horizontal page overflow is zero');
+        ], width + '/' + theme + ': ??? ?? ??? Tab ?? ??? ??');
+        assert.equal(order.overflow, 0, width + '/' + theme + ': ??? ?? ??? ??');
         if (width === 1440) {
-          assert.ok(order.explore.right <= order.picker.left, 'explore precedes picker');
-          assert.ok(order.tree.left - order.shelf.right >= 8, 'shelf and tree views have an actual gap');
+          assert.ok(order.explore.right <= order.picker.left, '????? ?? ????? ?? ??');
+          assert.ok(order.tree.left - order.shelf.right >= 8, '??? ?? ?? ?? ??? ?? ??? ??');
         } else {
           await page.locator('#mobile-more').click();
           const folded = await page.locator('#header-overflow [role="menuitem"]').allTextContents();
@@ -112,7 +112,7 @@ test('상단 메뉴: 같은 글자 크기·테두리 0·세로선 0·현재 탭 
             '\uBCF4\uB4DC', '\uCC45', '\uC9C0\uB3C4',
           ];
           assert.deepEqual(folded.map((x) => x.trim()).filter((x) => labels.includes(x)), labels,
-            width + '/' + theme + ': folded menu follows the same order');
+            width + '/' + theme + ': ?? ?? ??? ?? ??? ??');
           await page.keyboard.press('Escape');
         }
 
@@ -659,4 +659,124 @@ test('#1367 4번: 트리 고르기 목록은 바깥 누름·안쪽 화면 누름
       } finally { await ctx.close(); }
     }
   } finally { await browser.close(); await new Promise((r) => server.close(r)); }
+});
+
+
+// #1350: 실제 머리줄에서 상태별 간격과 가로 넘침, 로그인 확정 CLS를 검증한다.
+const REQUIRE_GAP = process.env.LT_HEADER_GAP_REQUIRE === '1' || REQUIRE;
+test('#1350 머리줄 오른쪽 간격: 390·844·1440 × 밤·정원 × 로그인·로그아웃·확인 중', {
+  skip: skip || !REQUIRE_GAP ? skip || '간격 시험을 실행하도록 설정하지 않음' : false,
+  timeout: 240000
+}, async () => {
+  const server = await serve();
+  const base = 'http://127.0.0.1:' + server.address().port;
+  const browser = await chromium.launch({ headless: true });
+  const measurements = [];
+  try {
+    for (const width of [390, 844, 1440]) for (const theme of ['night', 'garden']) {
+      const ctx = await browser.newContext({
+        viewport: { width, height: width === 390 ? 844 : width === 844 ? 390 : 900 },
+        reducedMotion: 'reduce'
+      });
+      try {
+        await ctx.route('**/api/**', route => route.fulfill({ status: 200,
+          contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
+        const page = await ctx.newPage();
+        await page.goto(base + '/v41/#home', { waitUntil: 'load' });
+        await page.waitForSelector('#theme-toggle');
+        for (const auth of ['로그아웃', '로그인', '확인 중']) {
+          const result = await page.evaluate(async ({ theme, auth }) => {
+            const root = document.documentElement;
+            root.dataset.ltTheme = theme;
+            root.dataset.ltAuthPhase = auth === '확인 중' ? 'pending' : 'ready';
+            root.dataset.ltAuthHint = auth === '로그아웃' ? 'out' : 'in';
+            const write = document.getElementById('write-menu');
+            write.hidden = auth !== '로그인';
+            await new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done)));
+            const themeButton = document.getElementById('theme-toggle').getBoundingClientRect();
+            const slot = document.querySelector('.header-actions > .account-slot').getBoundingClientRect();
+            const entry = document.getElementById('account-entry').getBoundingClientRect();
+            return { gap: Math.round((slot.left - themeButton.right) * 100) / 100,
+              slotWidth: Math.round(slot.width), entryWidth: Math.round(entry.width),
+              overflow: Math.max(0, document.documentElement.scrollWidth - innerWidth) };
+          }, { theme, auth });
+          const label = width + '/' + theme + '/' + auth;
+          if (width >= 781) {
+            const expected = auth === '로그아웃' ? (width === 1440 ? 12 : 8)
+              : (width === 1440 ? 146 : 138);
+            assert.equal(result.gap, expected, label + ': 테마와 계정 사이 간격');
+            assert.equal(result.slotWidth, 80, label + ': 계정 칸 폭');
+          } else {
+            assert.equal(result.slotWidth, 66, label + ': 휴대폰 계정 칸 66px 유지');
+            if (auth === '로그아웃') assert.equal(result.entryWidth, 56,
+              label + ': 휴대폰 로그아웃 단추 56px 유지');
+          }
+          assert.equal(result.overflow, 0, label + ': 가로 넘침 0');
+          measurements.push({ width, theme, auth, ...result });
+          if (process.env.LT_HEADER_GAP_SHOT_DIR &&
+              (auth === '로그인' || auth === '로그아웃')) {
+            mkdirSync(process.env.LT_HEADER_GAP_SHOT_DIR, { recursive: true });
+            await page.screenshot({ path: process.env.LT_HEADER_GAP_SHOT_DIR +
+              '/머리줄-' + width + '-' + theme + '-' + auth + '.png' });
+          }
+        }
+
+        // #1350: 로그인 흔적이 없는 확인 중 상태에서는 hidden 속성이 늦어도 예약 칸이 없어야 한다.
+        const noHint = await page.evaluate(async () => {
+          const root = document.documentElement;
+          const write = document.getElementById('write-menu');
+          root.dataset.ltAuthPhase = 'pending';
+          delete root.dataset.ltAuthHint;
+          write.hidden = false;
+          await new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done)));
+          const gap = () => {
+            const a = document.getElementById('theme-toggle').getBoundingClientRect();
+            const b = document.querySelector('.header-actions > .account-slot').getBoundingClientRect();
+            return Math.round((b.left - a.right) * 100) / 100;
+          };
+          const before = gap();
+          let cls = 0;
+          const observer = new PerformanceObserver(list => {
+            for (const entry of list.getEntries()) if (!entry.hadRecentInput) cls += entry.value;
+          });
+          observer.observe({ type: 'layout-shift', buffered: false });
+          root.dataset.ltAuthPhase = 'ready';
+          root.dataset.ltAuthHint = 'out';
+          write.hidden = true;
+          await new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done)));
+          observer.disconnect();
+          return { before, after: gap(), cls };
+        });
+        const compactGap = width === 1440 ? 12 : width === 844 ? 8 : 4;
+        assert.equal(noHint.before, compactGap,
+          width + '/' + theme + ': 로그인 흔적이 없으면 확인 중에도 예약 칸을 두지 않는다');
+        assert.equal(noHint.after, compactGap,
+          width + '/' + theme + ': 로그아웃 확정 후 같은 간격을 유지한다');
+        assert.ok(noHint.cls <= 0.01,
+          width + '/' + theme + ': 로그인 흔적 없는 상태의 로그아웃 확정 CLS 0.01 이하');
+        measurements.push({ width, theme, auth: '로그인 흔적 없는 확인 중', ...noHint });
+        const cls = await page.evaluate(async () => {
+          const root = document.documentElement;
+          const write = document.getElementById('write-menu');
+          root.dataset.ltAuthPhase = 'pending';
+          root.dataset.ltAuthHint = 'in';
+          write.hidden = true;
+          await new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done)));
+          let total = 0;
+          const observer = new PerformanceObserver(list => {
+            for (const entry of list.getEntries()) if (!entry.hadRecentInput) total += entry.value;
+          });
+          observer.observe({ type: 'layout-shift', buffered: false });
+          root.dataset.ltAuthPhase = 'ready';
+          write.hidden = false;
+          await new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done)));
+          observer.disconnect();
+          return total;
+        });
+        assert.ok(cls <= 0.01, width + '/' + theme + ': 로그인 확정 CLS ' + cls + ' ≤ 0.01');
+        measurements.push({ width, theme, auth: '확정 전환', cls });
+      } finally { await ctx.close(); }
+    }
+  } finally { await browser.close(); server.close(); }
+  console.log('#1350 머리줄 측정 결과', JSON.stringify(measurements));
 });
