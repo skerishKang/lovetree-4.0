@@ -498,3 +498,31 @@ test('#1295 화면: 트리 보기 동작별 뒤로 가기 기록', { skip: REQUI
     await context.close();
   }
 });
+
+test('#1333 화면: 트리 보기에서 고른 순간이 책·보드로 옮겨도 이어진다', { skip: REQUIRE ? false : skip, timeout: 300000 }, async (t) => {
+  if (skip) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip}`);
+  const browser = await chromium.launch();
+  const { serve } = await import('./helpers/screen-audit.mjs');
+  const server = await serve();
+  const base = `http://127.0.0.1:${server.address().port}`;
+  t.after(async () => { await browser.close(); server.close(); });
+  for (const width of [390, 1440]) {
+    const { context, page, frame } = await openShellTree(browser, base, width);
+    const target = await frame.evaluate(() => {
+      const cards = [...document.querySelectorAll('#cards [data-kind="moment"]:not(.is-root)')];
+      return cards[0]?.dataset.id || '';
+    });
+    assert.ok(target, `${width}: 고를 순간이 있다`);
+    await frame.evaluate(id => document.querySelector(`#cards [data-id="${id}"]`)?.click(), target);
+    await frame.waitForSelector('#treeDetail[open]', { timeout: 5000 });
+    await frame.click('#treeDetailClose');
+    assert.equal(await page.evaluate(() => window.LT41?.momentId || ''), target, `${width}: 셸의 현재 순간이 고른 순간이다`);
+    await page.evaluate(() => document.querySelector('button[data-view="track59-sketchbook.html"]')?.click());
+    await page.waitForFunction(() => /track59-sketchbook/.test(document.querySelector('#view')?.contentWindow?.location?.href || ''), null, { timeout: 20000 });
+    const handle = await page.$('#view');
+    const book = await handle.contentFrame();
+    await book.waitForFunction(() => !!window.LTDEMO, null, { timeout: 20000 });
+    assert.equal(await book.evaluate(() => String(window.LTDEMO.get() || '')), target, `${width}: 책에서 방금 고른 순간이 열린다`);
+    await context.close();
+  }
+});
