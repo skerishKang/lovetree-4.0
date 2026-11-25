@@ -149,11 +149,12 @@ const frameOf = async (page) => {
   return frame;
 };
 
-const openHome = async (browser, base, { width, height, member, reducedMotion = 'no-preference' }) => {
+const openHome = async (browser, base, { width, height, member, reducedMotion = 'no-preference', theme = null }) => {
   const mobile = width <= 650;
   const context = await browser.newContext({ viewport: { width, height }, isMobile: mobile, hasTouch: mobile, reducedMotion });
   const page = await context.newPage();
   await addCiFont(page);
+  if (theme) await page.addInitScript((t) => localStorage.setItem('lt41.theme', t), theme);
   await page.goto(`${base}${member === 'in' ? '/__lt535-host.html' : '/v41/'}`, { waitUntil: 'domcontentloaded' });
   const frame = await frameOf(page);
   assert.ok(frame, '첫 화면 안쪽 문서가 열린다');
@@ -481,4 +482,42 @@ s('#942 모든 자리 lg 카드도 가운데를 침범하지 않는다(390·1440
     }
   } finally { await browser.close(); }
 }, { timeout: 300000 });
+
+// #1382: 부유가 살아 있는 동안에도 접근성 상자(.card)가 캔버스에 그린 카드와 같은 자리에 있어야 한다.
+// 누름 판정(hitProjective)은 캔버스 투영을 그대로 쓰므로 바꾸지 않는다 — 여기서는 상자만 잰다.
+s('#1382 카드 DOM 상자 중심과 그려진 카드 중심 차이 4px 이하(1440·844·390 × 밤·정원)', async () => {
+  const browser = await chromium.launch({ headless: true });
+  const rows = [];
+  try {
+    for (const [width, height] of [[1440, 900], [844, 390], [390, 844]]) for (const theme of ['night', 'garden']) {
+      const { context, frame } = await openHome(browser, lib.base, { width, height, member: 'in', theme });
+      try {
+        await frame.waitForFunction(() => globalThis.__LT_ORBIT_TEST__?.canvasReady());
+        await frame.waitForTimeout(600);
+        const d = await frame.evaluate(() => {
+          const host = document.getElementById('orbit'), root = host.shadowRoot;
+          const api = globalThis.__LT_ORBIT_TEST__, poses = api.poses();
+          const cards = [...root.querySelectorAll('.card')];
+          const origin = root.querySelector('.app').getBoundingClientRect();
+          const errors = [];
+          for (let i = 0; i < cards.length; i++) {
+            const p = poses[i], el = cards[i];
+            if (!p || p.hidden || el.classList.contains('off') || el.classList.contains('clash') || getComputedStyle(el).display === 'none') continue;
+            const r = el.getBoundingClientRect();
+            errors.push(Math.hypot((r.left + r.right) / 2 - origin.left - (p.box.l + p.box.r) / 2,
+              (r.top + r.bottom) / 2 - origin.top - (p.box.t + p.box.b) / 2));
+          }
+          return { total: cards.length, measured: errors.length, max: errors.length ? Math.max(...errors) : 0 };
+        });
+        rows.push({ width, height, theme, ...d });
+      } finally { await context.close(); }
+    }
+  } finally { await browser.close(); }
+  console.log('#1382 DOM/그림 중심 차이', JSON.stringify(rows));
+  for (const r of rows) {
+    assert.ok(r.total >= 20, `${r.width}x${r.height} ${r.theme}: 카드 20장 이상(실제 ${r.total}장)`);
+    assert.ok(r.measured > 0, `${r.width}x${r.height} ${r.theme}: 잰 카드가 있다`);
+    assert.ok(r.max <= 4, `${r.width}x${r.height} ${r.theme}: 중심 차이 4px 이하(실제 ${Math.round(r.max * 100) / 100}px)`);
+  }
+});
 

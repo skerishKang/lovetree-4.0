@@ -744,6 +744,8 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
    const fp=floatOffset(i,testFloatPaused||(seek!==null&&!testFloatActive)||!animRunning()?0:elapsed,floatPool[i]);
    const pose=cardPose(values,w,h,sprite.w,sprite.h,fp.x-sprite.offset.x,fp.y-sprite.offset.y,posePool[i]);
    poses[i]=pose;const box=pose.box;
+   // #1382: 같은 프레임·같은 위상으로 DOM 상자도 그림 자리에 맞춘다(누름 판정 hitProjective는 그대로).
+   syncDomPose(i);
    const gx=(Math.abs(pose.a)*sprite.guardW+Math.abs(pose.c)*sprite.guardH)/2,gy=(Math.abs(pose.b)*sprite.guardW+Math.abs(pose.d)*sprite.guardH)/2;
    screenBox.l=pose.x-gx;screenBox.r=pose.x+gx;screenBox.t=pose.y-gy;screenBox.b=pose.y+gy;
    const centerHit=zone&&zoneOverlapArea(zone,screenBox)>1;
@@ -766,7 +768,15 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
   return .2+.6*(1-Math.cos(elapsed*Math.PI*2))/2;
  };
 
- const syncDomPose=(i,t=null)=>{const el=elements[i],f=orbitFrames[i];if(!el||!f?.length)return;const tf=orbitTransform(f,t??testSeek??fractionAt(i,lastPoseAt||performance.now()));if(tf){el.style.transform=tf;el.__orbitTf=tf;}};
+ // #1382: 캔버스 경로에서는 .lt-lift 의 WAAPI 부유가 끊기므로(697행) 그림에 쓰인 포즈 행렬을
+ // 같은 시각에 DOM 상자에도 쓴다. 부유 오프셋은 회전·배율 안쪽에서 적용돼야 하므로 translate에 더하지 않는다.
+ const syncDomPose=(i,t=null)=>{const el=elements[i],f=orbitFrames[i];if(!el||!f?.length)return;
+  if(spritesReady&&poses[i]&&!el.__dragTf){const p=poses[i];
+   const cx=(p.box.l+p.box.r)/2,cy=(p.box.t+p.box.b)/2;
+   const tf=`matrix(${p.a.toFixed(4)},${p.b.toFixed(4)},${p.c.toFixed(4)},${p.d.toFixed(4)},${(cx-p.ox).toFixed(2)},${(cy-p.oy).toFixed(2)})`;
+   if(el.__orbitTf!==tf){el.__orbitTf=tf;el.style.transform=tf;}return;}
+  const tf=orbitTransform(f,t??testSeek??fractionAt(i,lastPoseAt||performance.now()));
+  if(tf&&el.__orbitTf!==tf){el.__orbitTf=tf;el.style.transform=tf;}};
  const orbitWrite=(now)=>{lastWriteAt=now;if(layoutMode==='ribbon'){if(!firstFrameDone){firstFrameDone=true;tryReveal();}return;}if(spritesReady){if(!firstFrameDone){firstFrameDone=true;tryReveal();}drawCanvas(now);return;}for(let i=0;i<elements.length;i++){
    const frames=orbitFrames[i],el=elements[i];if(!frames||!frames.length||!el||el.classList.contains('off'))continue;
    const cfg=orbitRings(layoutBox?.w||0,layoutBox?.h||0)[cards[i].ring];
