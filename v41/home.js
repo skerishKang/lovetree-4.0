@@ -56,7 +56,7 @@ const momentList=loggedIn?{
 }:null;
 const homeMomentChoice=homeMomentPick(momentList?.entries,homeMomentValue,{day:homeMomentDay,trees:momentList?.trees||[]});
 if(momentList){momentList.recent=homeMomentChoice.moment;momentList.recentHeader=homeMomentChoice.header;}
-const setHomePortrait=moment=>{const vertical=!!(moment&&isVerticalMoment(moment));shellBody.classList.toggle('lt-home-portrait',vertical);document.getElementById('orbit')?.toggleAttribute('data-lt-home-portrait',vertical);};
+const setHomePortrait=moment=>{const vertical=!!(moment&&isVerticalMoment(moment));document.getElementById('orbit')?.toggleAttribute('data-lt-home-portrait',vertical);};
 setHomePortrait(homeMomentChoice.moment);
 // 이 문서가 그려질 때 쓴 날짜 표기. 셸이 같은 값을 다시 보내면 새로고침하지 않는다(아래 메시지 처리).
 const renderedDateStyle=dateStyleOf(ltDateStyle());
