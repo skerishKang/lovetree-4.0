@@ -17,6 +17,8 @@ export const QUICK_PASTE_EMPTY = '붙여 넣을 주소가 없어요.';
 export const QUICK_PASTE_ERROR = '주소를 읽지 못했어요. 직접 붙여 넣어 주세요.';
 export const DROP_LOGIN_NOTICE = '로그인한 뒤 순간을 담을 수 있어요.';
 export const DROP_READONLY_NOTICE = '서버 편집 연결이 아직 준비되지 않았어요. 기록은 안전하게 읽을 수 있습니다.';
+// #791 미리보기 체험: 담기는 동작은 로그인 뒤에만. 결과만 보여 준다.
+export const QUICK_PREVIEW_NOTICE = '체험 — 실제 담기는 로그인 뒤';
 // #638(고른 트리 우선): 담기 창의 트리 한 줄·단추·담은 안내는 고른 트리 이름을 따른다.
 // 트리가 0개일 때는 기본 트리('모아둔 순간')가 새로 만들어지므로 QUICK_INBOX_LABEL을 쓴다.
 export function quickTreeLineText(name) { return `${name}에 담겨요`; }
@@ -79,12 +81,17 @@ export function parseQuickUrl(url, describe) {
   return { status: 'ok', kind: media.kind, value, videoId: media.videoId || '', label: media.label || '', thumb: media.loadUrl || '' };
 }
 
-// 미리보기 카드가 그릴 것: empty(빗금 안내) · invalid(같은 틀에 안내) · youtube · link.
+// 미리보기 카드가 그릴 것: empty(빗금 안내) · invalid(같은 틀에 안내) · youtube · tiktok · link.
 // 화면(shell/quick-add.mjs)은 이 판정만 보고 그리고, 시험은 표로 확인한다.
 export function previewState(parsed) {
   if (!parsed || parsed.status === 'empty') return 'empty';
   if (parsed.status !== 'ok') return 'invalid';
-  return parsed.kind === 'youtube' ? 'youtube' : 'link';
+  if (parsed.kind === 'youtube') return 'youtube';
+  // #791: 틱톡은 저장 전에 제목을 받아 두고 세로 미리보기를 그린다.
+  if (parsed.kind === 'tiktok') return 'tiktok';
+  // #791 2단계: 릴스는 도착 전 caption을 받아 글 카드로 미리본다.
+  if (parsed.kind === 'instagram') return 'instagram';
+  return 'link';
 }
 
 // 금테 꼬리표: 어디서 온 주소인지 한눈에. YouTube는 Shorts·Live 모양까지 구분한다.
@@ -97,7 +104,11 @@ export function previewTag(url, kind = '') {
     const shape = (parsed.pathname.match(/^\/(shorts|live)\//) || [])[1];
     return shape ? `YOUTUBE · ${shape.toUpperCase()}` : 'YOUTUBE';
   }
-  return kind === 'youtube' ? 'YOUTUBE' : host;
+  // #791: 틱톡 정본·짧은 주소는 모두 TIKTOK 꼬리표.
+  if (host === 'tiktok.com' || host === 'vm.tiktok.com' || host === 'vt.tiktok.com') return 'TIKTOK';
+  // #791 2단계: 인스타그램 릴스와 짧은 공유 주소는 모두 INSTAGRAM 꼬리표.
+  if (host === 'instagram.com' || host === 'instagr.am') return 'INSTAGRAM';
+  return kind === 'youtube' ? 'YOUTUBE' : kind === 'tiktok' ? 'TIKTOK' : kind === 'instagram' ? 'INSTAGRAM' : host;
 }
 
 // 안내 줄 제목 요약: 한 줄로 접고 max자 뒤는 말줄임(안내 줄 높이가 고정이라서).
@@ -109,6 +120,13 @@ export function noticeSummary(title, max = 32) {
 }
 
 // 담은 뒤 안내: "✓ 담았어요 · 제목 요약". 제목이 없으면 담긴 사실만 남긴다.
+export function quickPreviewNoticeText(platform = '', videoId = '') {
+  const parts = [QUICK_PREVIEW_NOTICE];
+  if (platform) parts.push(platform);
+  if (videoId) parts.push('영상 ' + String(videoId).trim());
+  return parts.join(' · ');
+}
+
 export function savedNoticeText(title) {
   const summary = noticeSummary(title);
   return summary ? `✓ 담았어요 · ${summary}` : '✓ 담았어요';

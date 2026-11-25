@@ -25,6 +25,7 @@
  --lt-role-idle-bg:transparent;--lt-role-idle-border:var(--lt-role-line);--lt-role-idle-ink:var(--lt-pearl);
  --lt-role-hover-bg:rgba(255,230,166,.10);--lt-role-hover-border:var(--lt-gold);--lt-role-hover-ink:var(--lt-gold);--lt-role-hover-cursor:pointer;
  --lt-role-text-strong:var(--lt-pearl);--lt-role-text-muted:var(--lt-muted);--lt-role-text-faint:rgba(245,241,233,.64);--lt-role-border:var(--lt-role-line);
+ --lt-role-scrim:rgba(0,0,0,.55);--lt-role-player-bg:#000;
  --lt-r-pill:999px;--lt-r-panel:22px;--lt-r-card:14px;--lt-track:.2em;
  /* 보드 실·핀, 지도 그룹색: 원본 네온/인포그래픽 6색을 첫 화면 색상으로 옮긴 값. JS가 읽는다. */
  --lt-thread-rose:#d88f9c;--lt-thread-violet:#a99ac9;--lt-thread-cyan:#7892c9;--lt-thread-amber:#e6b14c;
@@ -130,10 +131,30 @@ html[data-lt-theme=garden] .lt-media-body button{color:var(--lt-paper)}
 .lt-media[data-lt-vertical="1"] .lt-media-body img{width:100%!important;height:100%!important;max-height:none!important;object-fit:cover!important}
 .lt-media[data-lt-vertical="1"] .lt-yt-frame{width:auto;height:100%;max-width:100%;aspect-ratio:9/16}
 .lt-media[data-lt-vertical="1"] .lt-media-body video{width:auto!important;height:100%!important;max-height:none!important;object-fit:contain!important}
+/* #791: 틱톡 세로 패널 — 저장된 썸네일을 흐린 배경으로 채우고 가운데는 원본 비율(쇼츠와 같은 모양). */
+.lt-tt-preview{position:relative;margin:0;width:100%;aspect-ratio:9/16;max-height:360px;border-radius:8px;overflow:hidden;background:var(--lt-ink)}
+.lt-media[data-lt-vertical="1"] .lt-tt-preview{height:100%;max-height:none}
+.lt-tt-backdrop{position:absolute;inset:-12px;background-image:var(--lt-tt-bg);background-size:cover;background-position:center;filter:blur(18px) brightness(.72);opacity:.86;transform:scale(1.06);pointer-events:none}
+.lt-tt-thumb{position:relative;z-index:1;display:block;width:100%;height:100%;object-fit:contain}
+.lt-tt-mark{position:absolute;top:10px;right:10px;z-index:2;padding:3px 9px;border-radius:var(--lt-r-pill);background:var(--lt-role-scrim);color:var(--lt-role-text-strong);font-size:11px;font-weight:700;letter-spacing:.06em}
+.lt-tt-author{position:absolute;left:12px;right:12px;bottom:34px;z-index:2;color:var(--lt-paper);font-size:11px;line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;pointer-events:none}
+.lt-tt-refresh{position:absolute;left:12px;bottom:8px;z-index:3;min-height:28px;padding:3px 9px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-pill);background:var(--lt-role-scrim);color:var(--lt-role-text-strong);font-size:11px;cursor:pointer}
+.lt-tt-embed{display:block;width:100%;height:100%;overflow:auto;border-radius:8px}
+.lt-tt-preview .tiktok-embed{position:relative;z-index:4;width:100%;height:100%;margin:0;overflow:auto;background:var(--lt-ink);color:var(--lt-paper)}
+/* #791 2단계: 인스타그램 릴스는 썸네일이 없어 글 카드가 기본. 올린 그림이 있으면 세로 썸네일을 쓴다. */
+.lt-ig-card{position:relative;box-sizing:border-box;margin:0;width:100%;min-height:320px;max-height:420px;padding:56px 18px 64px;border-radius:8px;overflow:hidden;background:var(--lt-ink);color:var(--lt-paper);display:flex;flex-direction:column;justify-content:center}
+.lt-ig-card.has-image{aspect-ratio:9/16;max-height:none;padding:0}
+.lt-ig-backdrop{position:absolute;inset:-12px;background-image:var(--lt-ig-bg);background-size:cover;background-position:center;filter:blur(18px) brightness(.72);opacity:.86;transform:scale(1.06);pointer-events:none}
+.lt-ig-thumb{position:relative;z-index:1;display:block;width:100%;height:100%;object-fit:contain}
+.lt-ig-mark{position:absolute;top:10px;right:10px;z-index:2;padding:3px 9px;border-radius:var(--lt-r-pill);background:var(--lt-role-scrim);color:var(--lt-role-text-strong);font-size:11px;font-weight:700;letter-spacing:.06em}
+.lt-ig-caption{position:relative;z-index:2;font-size:15px;line-height:1.5;overflow:hidden;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical}
+.lt-ig-author{position:absolute;left:12px;bottom:12px;z-index:2;font-size:12px;opacity:.85;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lt-ig-card .lt-yt-play{position:absolute;inset:0;z-index:3;place-items:center}
+.lt-ig-card .instagram-media{position:relative;z-index:4;width:100%;height:100%;margin:0;overflow:auto;background:var(--lt-ink);color:var(--lt-paper)}
 /* #393 2: 크게 보기 — 어두운 깔개 위 화면 가운데 크게(세로 높이 가득·가로 폭 가득). 바깥 클릭·Esc로 복귀. */
 .lt-lightbox{position:fixed;inset:0;z-index:400;display:grid;place-items:center;padding:24px;background:rgba(4,4,7,.93);backdrop-filter:blur(10px)}
 .lt-lightbox-stage{display:grid;place-items:center;max-width:100%;max-height:100%}
-.lt-lightbox-media{display:block;border:0;border-radius:12px;background:#000;width:min(94vw,calc((100dvh - 96px)*16/9));max-height:calc(100dvh - 96px);aspect-ratio:16/9}
+.lt-lightbox-media{display:block;border:0;border-radius:12px;background:var(--lt-role-player-bg);width:min(94vw,calc((100dvh - 96px)*16/9));max-height:calc(100dvh - 96px);aspect-ratio:16/9}
 video.lt-lightbox-media{object-fit:contain}
 .lt-lightbox-vertical .lt-lightbox-media{width:auto;height:min(calc(100dvh - 72px),calc(94vw*16/9));max-width:94vw;max-height:calc(100dvh - 72px);aspect-ratio:9/16}
 .lt-lightbox-close{position:absolute;top:14px;right:16px;min-width:44px;min-height:44px;border:1px solid var(--lt-line);border-radius:50%;background:var(--lt-glass);color:var(--lt-pearl);font-size:20px;line-height:1;cursor:pointer}
@@ -209,6 +230,7 @@ html[data-lt-theme=garden]{
  --lt-role-line:var(--lt-role-idle-border);
  --lt-role-hover-bg:rgba(152,80,94,.08);--lt-role-hover-border:var(--lt-rose-ink);--lt-role-hover-ink:var(--lt-rose-ink);--lt-role-hover-cursor:pointer;
  --lt-role-text-strong:var(--lt-ink);--lt-role-text-muted:var(--lt-muted);--lt-role-text-faint:rgba(64,53,54,.72);--lt-role-border:rgba(152,80,94,.72);
+ --lt-role-scrim:rgba(64,53,54,.72);--lt-role-player-bg:var(--lt-ink);
  --lt-cta-rose:var(--lt-rose-ink);
  --lt-garden-edge:#eee3d5;--lt-garden-shadow:0 18px 40px rgba(75,51,42,.16);
  --lt-tree-1:#6a5a9e;--lt-tree-2:#4f7e6a;--lt-tree-3:#96704f;--lt-tree-4:#5b7295;--lt-tree-5:#96637a;--lt-tree-6:#7a7a4f;

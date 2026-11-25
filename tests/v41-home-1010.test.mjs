@@ -15,6 +15,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 import { serve } from './helpers/screen-audit.mjs';
+import { inspectEmbedIframe, countEmbedAutoplay } from './helpers/youtube-embed-audit.mjs';
 import { createTree, addMoment } from '../public/v41/domain.mjs';
 
 const REQUIRE1010 = process.env.LT_HOME_1010_REQUIRE === '1';
@@ -378,4 +379,200 @@ test('지연 창 모듈 — 정리·꼬리표 첫 클릭으로 창이 열린다'
       } finally { await close1010(h); }
     }
   } finally { await browser.close(); }
+});
+
+// #791·#1378: 체험 카드는 작은 iframe을 만들지 않고 shadowRoot #mediaViewerHome에서만 재생합니다.
+const PREVIEW_CASES = [
+  { id: 'pv-tt-1', kind: 'tiktok', origin: 'tiktok.com', src: 'https://www.tiktok.com/player/v1/7709419447567551775?autoplay=1' },
+  { id: 'pv-ig-1', kind: 'instagram', origin: 'instagram.com', src: 'https://www.instagram.com/reel/DR_TeHFCB9m/embed' }
+];
+const PREVIEW_IG_URL = 'https://www.instagram.com/reel/DR_TeHFCB9m/';
+const PREVIEW_EMBED_HTML = '<!doctype html><meta charset="utf-8"><style>html,body{margin:0;width:100%;height:100%;background:#121212}</style><main aria-label="mocked official player"></main>';
+
+async function startPreviewServer() {
+  const http = await import('node:http');
+  const path = await import('node:path');
+  const { readFileSync } = await import('node:fs');
+  const { fileURLToPath } = await import('node:url');
+  const rootPath = fileURLToPath(new URL('../dist/', import.meta.url));
+  const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp' };
+  const server = http.createServer((req, res) => {
+    const u = new URL(req.url, 'http://localhost');
+    let file = path.join(rootPath, decodeURIComponent(u.pathname));
+    if (u.pathname === '/v41/' || u.pathname === '/v41' || (u.pathname.startsWith('/v41/') && !path.extname(u.pathname))) file = path.join(rootPath, 'v41/index.html');
+    try { res.writeHead(200, { 'content-type': TYPES[path.extname(file)] || 'application/octet-stream' }); res.end(readFileSync(file)); }
+    catch { res.writeHead(404); res.end('not found'); }
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  return { server, port: server.address().port, host: 'pv.lovetree-4-0.pages.dev' };
+}
+
+async function findPreviewHome(page) {
+  for (const frame of page.frames()) {
+    const found = await frame.evaluate(() => !!document.getElementById('orbit')?.shadowRoot?.querySelector('.lt-preview-strip')).catch(() => false);
+    if (found) return frame;
+  }
+  return null;
+}
+
+async function openPreview(browser, preview, { width, theme, instagramUnavailable = false }) {
+  const context = await browser.newContext({ viewport: { width, height: width === 390 ? 844 : 900 }, reducedMotion: 'reduce' });
+  await context.addInitScript(({ theme, host }) => {
+    if (location.hostname !== host) return;
+    try { localStorage.setItem('lt41.theme', theme); localStorage.setItem('lt41.boardTheme', theme); } catch {}
+  }, { theme, host: preview.host });
+  const unexpected = [];
+  await context.route('**/*', async route => {
+    const u = new URL(route.request().url());
+    if (u.origin === `https://${preview.host}`) {
+      if (u.pathname === '/api/account') return route.fulfill({ status: 401, contentType: 'application/json', body: '{"ok":false}' });
+      if (u.pathname === '/api/instagram/oembed') return instagramUnavailable
+        ? route.fulfill({ status: 404, headers: { 'cache-control': 'no-store' }, contentType: 'application/json', body: '{"ok":false,"error":{"code":"instagram_gone"}}' })
+        : route.fulfill({ status: 200, headers: { 'cache-control': 'no-store' }, contentType: 'application/json', body: '{"ok":true,"html":"<blockquote class=\\"instagram-media\\"></blockquote>"}' });
+      if (u.pathname.startsWith('/api/')) return route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"state":{"version":1,"trees":[]},"items":[],"shares":[]}' });
+      if (u.pathname.startsWith('/auth/')) return route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
+      const local = await fetch(`http://127.0.0.1:${preview.port}${u.pathname}${u.search}`);
+      return route.fulfill({ status: local.status, contentType: local.headers.get('content-type') || 'application/octet-stream', body: Buffer.from(await local.arrayBuffer()) });
+    }
+    if (u.origin === 'https://www.tiktok.com' && /^\/player\/v1\/\d+$/.test(u.pathname))
+      return route.fulfill({ contentType: 'text/html', body: PREVIEW_EMBED_HTML });
+    if (u.origin === 'https://www.tiktok.com' && u.pathname === '/oembed')
+      return route.fulfill({ json: { thumbnail_url: '' } });
+    if (u.origin === 'https://www.instagram.com' && /^\/reel\/[A-Za-z0-9_-]+\/embed\/?$/.test(u.pathname))
+      return route.fulfill({ contentType: 'text/html', body: PREVIEW_EMBED_HTML });
+    unexpected.push(u.href);
+    return route.abort();
+  });
+  const page = await context.newPage();
+  await page.goto(`https://${preview.host}/v41/?lt791=1`, { waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(3500);
+  const home = await findPreviewHome(page);
+  assert.ok(home, '체험 모드 홈 프레임을 찾았다');
+  await home.locator('.lt-preview-card').first().waitFor({ state: 'visible', timeout: 15000 });
+  return { context, page, home, unexpected };
+}
+
+async function openPreviewCard(home, id) {
+  const card = home.locator(`[data-lt-preview-card="${id}"]`);
+  await card.waitFor({ state: 'visible', timeout: 15000 });
+  assert.equal(await card.locator('iframe').count(), 0, id + ': 작은 체험 카드 iframe 0');
+  await card.locator('[data-lt-preview-play]').click();
+  await home.locator('#mediaViewerHome.open').waitFor({ state: 'visible', timeout: 15000 });
+  return card;
+}
+
+function previewPlayer(home, kind) {
+  return home.locator('#mediaViewerHome #mediaVisualHome iframe[src*="' + (kind === 'tiktok' ? '/player/v1/' : '/reel/') + '"]');
+}
+
+async function assertPreviewClean(home) {
+  assert.equal(await home.locator('iframe').count(), 0, '재생 불가·닫기 뒤 홈 iframe 0');
+  assert.equal(await countEmbedAutoplay(home), 0, '홈 자동 재생 iframe 0');
+}
+
+async function previewShellBlockers(page, player) {
+  const rect = await player.evaluate(element => {
+    const r = element.getBoundingClientRect();
+    return { left: r.left, top: r.top, width: r.width, height: r.height };
+  });
+  return page.evaluate(rect => {
+    const host = [...document.querySelectorAll('#view,#view-next')].find(x => !x.hidden && x.getClientRects().length), h = host?.getBoundingClientRect();
+    if (!h) return 9;
+    return [0.1, 0.5, 0.9].flatMap(y => [0.1, 0.5, 0.9].filter(x =>
+      document.elementFromPoint(h.left + rect.left + rect.width * x, h.top + rect.top + rect.height * y) !== host
+    )).length;
+  }, rect);
+}
+
+async function closePreview(home) {
+  await home.locator('#mediaCloseHome').click();
+  await home.waitForFunction(() => !document.getElementById('orbit').shadowRoot.querySelector('#mediaViewerHome').classList.contains('open'));
+  await assertPreviewClean(home);
+}
+
+async function auditPreviewPlayback(page, home, item, label) {
+  const addBefore = await page.locator('#mobile-add').isVisible();
+  const card = await openPreviewCard(home, item.id);
+  const player = previewPlayer(home, item.kind);
+  await player.waitFor({ state: 'visible', timeout: 15000 });
+  assert.equal(await card.locator('iframe').count(), 0, label + ': 재생 중에도 작은 체험 카드 iframe 0');
+  assert.equal(await player.getAttribute('src'), item.src, label + ' 공식 주소');
+  const audit = await inspectEmbedIframe(player);
+  assert.equal(audit.minimum200, true, label + ' 큰 보기 200×200 이상: ' + JSON.stringify(audit));
+  assert.equal(audit.blocked, 0, label + ' iframe 9지점 맨 위 요소 0: ' + JSON.stringify(audit.blockers));
+  assert.ok(audit.points.every(point => point.withinViewport), label + ' 9지점이 화면 안에 있다');
+  assert.equal(audit.autoplay, true, label + ' 공식 자동 재생');
+  assert.equal(await countEmbedAutoplay(home), 1, label + ' 동시 자동 재생은 1개');
+  assert.equal(await previewShellBlockers(page, player), 0, label + ' 셸 요소가 가리지 않는다');
+  if (addBefore) assert.equal(await page.locator('#mobile-add').isVisible(), false, label + ' 큰 보기 동안 #mobile-add 숨김');
+  await closePreview(home);
+  assert.equal(await page.locator('#mobile-add').isVisible(), addBefore, label + ' 닫은 뒤 #mobile-add 표시 복귀');
+}
+
+// #791: '스크립트를 불렀다'가 아니라 '재생기가 실제로 보인다'를 확인한다(실제 브라우저).
+test('체험 카드 ▶를 누르면 공식 iframe이 화면에 보인다(390·1440 × 밤·정원)', { skip: skip1010, timeout: 180000 }, async () => {
+  if (skip1010) assert.fail(skip1010);
+  const preview = await startPreviewServer(), browser = await chromium1010.launch({ headless: true });
+  try {
+    for (const theme of ['night', 'garden']) for (const width of [390, 1440]) {
+      const h = await openPreview(browser, preview, { width, theme });
+      try {
+        assert.equal(await h.home.locator('.lt-preview-card').count(), 3, width + '·' + theme + ': 체험 카드 3장이 없다');
+        for (const item of PREVIEW_CASES) {
+          await openPreviewCard(h.home, item.id);
+          const player = previewPlayer(h.home, item.kind);
+          await player.waitFor({ state: 'visible', timeout: 15000 });
+          const src = await player.getAttribute('src');
+          const rect = await player.evaluate(element => {
+            const r = element.getBoundingClientRect();
+            return { w: Math.round(r.width), h: Math.round(r.height) };
+          });
+          assert.ok(player, width + '/' + item.id + ': 재생기 iframe이 없다');
+          assert.match(src, new RegExp(item.origin));
+          assert.ok(rect.w > 0 && rect.h > 0, width + '/' + item.id + ': 재생기 크기가 0이다');
+          await closePreview(h.home);
+        }
+        assert.deepEqual(h.unexpected, [], width + '·' + theme + ': 모의하지 않은 외부 요청 0');
+      } finally { await h.context.close(); }
+    }
+  } finally { await browser.close(); await new Promise(resolve => preview.server.close(resolve)); }
+});
+
+test('#1378 홈 체험 틱톡·인스타그램 9지점·autoplay·닫기(390·1440 × 밤·정원)', { skip: skip1010, timeout: 180000 }, async () => {
+  if (skip1010) assert.fail(skip1010);
+  const preview = await startPreviewServer(), browser = await chromium1010.launch({ headless: true });
+  try {
+    for (const theme of ['night', 'garden']) for (const width of [390, 1440]) {
+      const h = await openPreview(browser, preview, { width, theme });
+      try {
+        for (const item of PREVIEW_CASES)
+          await auditPreviewPlayback(h.page, h.home, item, width + '·' + theme + '·home·' + item.kind);
+        assert.deepEqual(h.unexpected, [], width + '·' + theme + ': 모의하지 않은 외부 요청 0');
+      } finally { await h.context.close(); }
+    }
+  } finally { await browser.close(); await new Promise(resolve => preview.server.close(resolve)); }
+});
+
+test('#1378 홈 인스타그램 모의 oEmbed 404 — iframe 제거·원본 링크·닫기', { skip: skip1010, timeout: 180000 }, async () => {
+  if (skip1010) assert.fail(skip1010);
+  const preview = await startPreviewServer(), browser = await chromium1010.launch({ headless: true });
+  try {
+    for (const theme of ['night', 'garden']) for (const width of [390, 1440]) {
+      const h = await openPreview(browser, preview, { width, theme, instagramUnavailable: true });
+      try {
+        const addBefore = await h.page.locator('#mobile-add').isVisible();
+        await openPreviewCard(h.home, 'pv-ig-1');
+        await h.home.waitForFunction(() => {
+          const root = document.getElementById('orbit').shadowRoot;
+          return root.querySelector('#mediaPlayHome').hidden && root.querySelector('#mediaExternalHome').textContent === '인스타그램에서 보기';
+        });
+        assert.equal(await h.home.locator('#mediaExternalHome').getAttribute('href'), PREVIEW_IG_URL, '재생 불가 원본 릴스 링크');
+        if (addBefore) assert.equal(await h.page.locator('#mobile-add').isVisible(), false, width + '·' + theme + ' 재생 불가 큰 보기 동안 #mobile-add 숨김');
+        await assertPreviewClean(h.home);
+        await closePreview(h.home);
+        assert.equal(await h.page.locator('#mobile-add').isVisible(), addBefore, width + '·' + theme + ' 재생 불가 닫은 뒤 #mobile-add 표시 복귀');
+        assert.deepEqual(h.unexpected, [], width + '·' + theme + ': 모의하지 않은 외부 요청 0');
+      } finally { await h.context.close(); }
+    }
+  } finally { await browser.close(); await new Promise(resolve => preview.server.close(resolve)); }
 });

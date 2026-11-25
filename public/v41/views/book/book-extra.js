@@ -87,7 +87,7 @@ function detailMarkup(m,showMeta=true){
  /* #815: 연결 이유는 적었을 때만 보인다(비면 아무것도 그리지 않는다). */
  const line=connectionLine(nextInfo?.title,nextInfo?.reason,{hideEmptyWhy:true});
  const rangeLine=formatRange(m.startSeconds,m.endSeconds);
- const open=m.url&&isYouTubeUrl(m.url)?'YouTube에서 열기 ↗':'원본 링크 열기 ↗';
+ const open=m.url&&isYouTubeUrl(m.url)?'YouTube에서 열기 ↗':(m.url&&window.LTMedia&&LTMedia.describe?.(m.url)?.kind==='tiktok'?'원본에서 열기 ↗':'원본 링크 열기 ↗');
  // #327 2부: 내 기록(서버)의 순간 상세에서 다른 트리로 옮길 수 있다. 공유·예시는 숨긴다.
  const canMove=(window.parent&&window.parent.LT41)?window.parent.LT41.source==='server':false;
  const view=titleViewFor(m);
@@ -189,6 +189,14 @@ function playInline(yt,media){
  monitorBookYoutubeFrame(frame,cell.stage,yt.dataset.ytPlay,watch);
  if(end>start)host.insertAdjacentHTML('beforeend','<button type="button" class="yt-from-start" data-yt-from-start="'+t(yt.dataset.ytPlay)+'">처음부터 보기</button>');
 }
+function playTiktokInline(btn){
+ btn.focus?.();
+ window.LTMedia?.openLightbox?.(btn.dataset.ttCite,btn.dataset.ttTitle||'TikTok 영상',true,btn.dataset.ttPlay||'');
+}
+function playInstagramInline(btn){
+ btn.focus?.();
+ window.LTMedia?.openLightbox?.(btn.dataset.igCite,btn.dataset.igTitle||'인스타그램 릴스',true);
+}
 document.addEventListener('pointerdown',e=>{
  if(!isPrimaryButton(e))return;
  if(e.target.closest&&e.target.closest('[data-lt-title-edit]'))return;
@@ -201,6 +209,10 @@ document.addEventListener('pointerdown',e=>{
   const cell=mountExpandControls(host,{url:ytOpenUrl(fromStart.dataset.ytFromStart),openUrl:ytOpenUrl(fromStart.dataset.ytFromStart),lightbox:(u,ti,v)=>{window.LTMedia&&LTMedia.openLightbox(u,ti,v)}});
   cell.stage.append(frame);
   monitorBookYoutubeFrame(frame,cell.stage,fromStart.dataset.ytFromStart,ytOpenUrl(fromStart.dataset.ytFromStart));return}
+ const tt=e.target.closest&&e.target.closest('[data-tt-play]');
+ if(tt){e.preventDefault();e.stopPropagation();playTiktokInline(tt);return}
+ const ig=e.target.closest&&e.target.closest('[data-ig-play]');
+ if(ig){e.preventDefault();e.stopPropagation();playInstagramInline(ig);return}
  const yt=e.target.closest&&e.target.closest('[data-yt-play]');
  if(!yt||yt.querySelector('.lt-fallback-card'))return;
  e.preventDefault();e.stopPropagation();
@@ -215,13 +227,17 @@ document.addEventListener('click',e=>{
  // #393 2: 크게 보기 — 어두운 깔개 위 화면 가운데 크게(세로 높이 가득·가로 폭 가득). 바깥 클릭·Esc로 책 복귀.
  const expand=e.target.closest('[data-yt-expand]');
  if(expand){e.preventDefault();e.stopPropagation();const m=metadataFor(expand.dataset.ytExpand);
-  if(m&&m.url&&window.LTMedia&&LTMedia.openLightbox)LTMedia.openLightbox(m.url,titleViewFor(m).main,LTMedia.verticalVideo(m.url,m.mediaMetadata));return}
+  if(m&&m.url&&window.LTMedia&&LTMedia.openLightbox)LTMedia.openLightbox(m.url,titleViewFor(m).main,LTMedia.verticalVideo(m.url,m.mediaMetadata),m.mediaMetadata?.tiktokId||'');return}
  const next=e.target.closest('[data-next-moment]');
  if(next){if(LTDEMO.readOnly)return;e.preventDefault();e.stopPropagation();requestNextMoment(next.dataset.nextMoment||selectedMomentId);return}
  // #393 5: 마지막 장의 다른 트리 표지 — 셸이 이미 듣고 있는 lt41-open-book(view-navigation의 openBook)으로 그 트리 책으로 간다.
  const openTree=e.target.closest('[data-open-tree]');
  if(openTree){e.preventDefault();e.stopPropagation();const momentId=openTree.dataset.openMoment,treeId=openTree.dataset.openTree;if(momentId&&treeId)LTDEMO.openBook(momentId,treeId);return}
  /* 1. YouTube 그 자리 재생: 누른 뒤에만 iframe을 만든다(시작 시점 반영, referrerpolicy 엄격). */
+ const tt=e.target.closest('[data-tt-play]');
+ if(tt){e.preventDefault();e.stopPropagation();playTiktokInline(tt);return}
+ const ig=e.target.closest('[data-ig-play]');
+ if(ig){e.preventDefault();e.stopPropagation();playInstagramInline(ig);return}
  const yt=e.target.closest('[data-yt-play]');
  if(yt){if(yt.querySelector('.lt-fallback-card'))return;e.preventDefault();e.stopPropagation();if(!yt.parentElement||yt.parentElement.querySelector('iframe.yt-frame'))return;
   playInline(yt,{openUrl:'https://www.youtube.com/watch?v='+yt.dataset.ytPlay});return}
@@ -324,6 +340,32 @@ momentContent=function(m,compact=false){
     (vertical&&!thumb?'<span class="yt-vertical-backdrop" aria-hidden="true"><img src="'+t(remoteThumb)+'" alt="" referrerpolicy="no-referrer" loading="lazy" decoding="async"></span>':'')+face+
     '<span class="yt-play-label">'+t(label)+'</span></button>'+
     '<div class="media-links"><a class="media-source-link" href="'+t(media.openUrl)+'" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">YouTube ↗</a>'+
+    '<button type="button" data-yt-expand="'+t(safe.id)+'">크게 보기</button></div></div>';
+   return piece+paintTitle(safe);
+  }
+  // #791: 틱톡 — 세로 썸네일(흐린 배경 채움) + 구석 표식 + 원본 열기. 재생기는 누를 때만.
+  if(media.kind==='tiktok'){
+   const thumb=(window.LTMedia?.tiktokThumbCandidates?.(safe.mediaMetadata)||[])[0]||'';
+   const id=(window.LTMedia?.tiktokPlayerId?.(safe.mediaMetadata?.tiktokId||media.videoId))||'';
+   const author=t(safe.mediaMetadata?.tiktokAuthor||'');
+   const face=thumb?'<span class="tt-backdrop" aria-hidden="true" style="--lt-tt-bg:url('+t(thumb)+')"></span><img class="tt-thumb" src="'+t(thumb)+'" alt="'+t(safe.title||'TikTok 영상 썸네일')+'" referrerpolicy="no-referrer" loading="lazy" decoding="async">':'';
+   const piece='<div class="clipping moment" data-moment="'+t(safe.id)+'">'+
+    '<button type="button" class="yt-play is-vertical tt-play" data-lt-thumb-host data-tt-play="'+t(id)+'" data-tt-cite="'+t(media.openUrl||safe.url)+'" data-tt-title="'+t(safe.title||'TikTok 영상')+'">'+
+    face+'<span class="tt-mark" aria-hidden="true">TikTok</span>'+(author?'<span class="tt-author">@'+author+'</span>':'')+'<span class="yt-play-label">▶ 재생</span></button>'+
+    '<div class="media-links"><a class="media-source-link" href="'+t(media.openUrl)+'" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">원본에서 열기 ↗</a>'+
+    '<button type="button" data-yt-expand="'+t(safe.id)+'">크게 보기</button></div></div>';
+   return piece+paintTitle(safe);
+  }
+  // #791 2단계: 릴스는 썸네일이 없어 글 카드가 기본이다. 올린 그림이 있으면 그걸 썸네일로 쓴다.
+  if(media.kind==='instagram'){
+   const thumb=localThumb(safe)||'';
+   const author=t(safe.mediaMetadata?.instagramAuthor||safe.mediaMetadata?.channel||'');
+   const caption=t(String(safe.mediaMetadata?.title||safe.title||'인스타그램 릴스').slice(0,80));
+   const face=thumb?'<span class="ig-backdrop" aria-hidden="true" style="--lt-ig-bg:url('+t(thumb)+')"></span><img class="ig-thumb" src="'+t(thumb)+'" alt="" referrerpolicy="no-referrer" loading="lazy" decoding="async">':'';
+   const piece='<div class="clipping moment" data-moment="'+t(safe.id)+'">'+
+    '<button type="button" class="yt-play is-vertical tt-play ig-play'+(thumb?' has-image':'')+'" data-lt-thumb-host data-ig-play="'+t(media.shortcode||'')+'" data-ig-cite="'+t(media.openUrl||safe.url)+'" data-ig-title="'+t(safe.title||'인스타그램 릴스')+'">'+
+    face+'<span class="tt-mark" aria-hidden="true">Instagram</span>'+(author?'<span class="ig-author">@'+author+'</span>':'')+(thumb?'':'<span class="ig-caption">'+caption+'</span>')+'<span class="yt-play-label">▶ 재생</span></button>'+
+    '<div class="media-links"><a class="media-source-link" href="'+t(media.openUrl)+'" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">원본에서 열기 ↗</a>'+
     '<button type="button" data-yt-expand="'+t(safe.id)+'">크게 보기</button></div></div>';
    return piece+paintTitle(safe);
   }
@@ -623,7 +665,8 @@ addEventListener('message',e=>{if(e.data?.type!==MSG.titleDisplay||!isShellMessa
 // #368 2차: 설정의 페이지 넘김(종이처럼/부드럽게)이 바뀌면 다음 넘김부터 적용한다. book.js가 노출한
 // setPageTurnMode로만 값을 바꾼다(모르는 값은 book.js 쪽 기본 규칙으로 돌아간다).
 addEventListener('message',e=>{if(e.data?.type!==MSG.pageTurn||!isShellMessage(e))return;if(typeof window.setPageTurnMode==='function')window.setPageTurnMode(e.data.value);});
-addEventListener('message',e=>{if(e.data?.type!==MSG.dateStyle||!isShellMessage(e))return;try{document.documentElement.setAttribute('data-lt-date-style',e.data.value==='dash'||e.data.value==='long'?e.data.value:'dot')}catch{}try{renderSpread(current,LTDEMO.get(),false)}catch{}if($b('#detail')?.classList.contains('open')&&selectedMomentId)showDetail(selectedMomentId);});
+let paintedDateStyle=ltDateStyle();
+addEventListener('message',e=>{if(e.data?.type!==MSG.dateStyle||!isShellMessage(e))return;const next=e.data.value==='dash'||e.data.value==='long'?e.data.value:'dot';try{document.documentElement.setAttribute('data-lt-date-style',next)}catch{}if(next===paintedDateStyle)return;paintedDateStyle=next;try{renderSpread(current,LTDEMO.get(),false)}catch{}if($b('#detail')?.classList.contains('open')&&selectedMomentId)showDetail(selectedMomentId);});
 // book-extra는 book.js 뒤에 불러오므로, 첫 렌더 제목을 한 벌 규칙으로 다시 그린다.
 // #379 후속: 재그림은 현재 선택 순간(LTDEMO.get())을 유지해, 펼침면 오른쪽 페이지의 순간을 열면
 // 왼쪽 페이지 순간으로 선택이 돌아가는 문제를 막는다(renderSpread의 land가 기본 true여 focusId 없으면 left.id로 재선택).

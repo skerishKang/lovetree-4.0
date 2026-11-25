@@ -14,6 +14,11 @@ const MAX_START_SECONDS = 12 * 60 * 60;
 const YOUTUBE_HOSTS = new Set(['youtube.com', 'www.youtube.com', 'm.youtube.com', 'music.youtube.com', 'youtu.be']);
 const VIDEO_ID = /^[A-Za-z0-9_-]{11}$/;
 const MAX_URL_LENGTH = 2048;
+// #791: 틱톡 정본 주소(@사용자/video/{숫자})와 짧은 주소(vm·vt.tiktok.com).
+const TIKTOK_HOSTS = new Set(['www.tiktok.com', 'tiktok.com']);
+const TIKTOK_SHORT_HOSTS = new Set(['vm.tiktok.com', 'vt.tiktok.com']);
+// #791 2단계: 인스타그램 릴스(/reel·/reels·/p 중 영상)와 짧은 공유 주소(instagr.am).
+const INSTAGRAM_HOSTS = new Set(['www.instagram.com', 'instagram.com', 'instagr.am']);
 
 /** '83' · '1:23' · '1:02:03' · '1h2m3s' · 한국어 단위까지 → 초. 0 이하·형식 외는 null. */
 export function parseTimeToSeconds(value = '') {
@@ -77,7 +82,7 @@ function youtubeVideoId(parsed) {
 
 /**
  * 입력 링크를 표시용 정보로 바꾼다. 원본은 그대로 두고(`original`), 여는 주소만 계산한다.
- * kind: 'youtube' | 'link' | 'invalid' | 'none'
+ * kind: 'youtube' | 'tiktok' | 'instagram' | 'link' | 'invalid' | 'none'
  */
 export function parseMomentLink(value = '') {
   const original = String(value ?? '').trim();
@@ -101,6 +106,35 @@ export function parseMomentLink(value = '') {
         openUrl,
         label: startSeconds ? `YouTube 링크 · 시작 ${formatStart(startSeconds)}` : 'YouTube 링크',
         actionLabel: 'YouTube에서 열기'
+      };
+    }
+  }
+
+  // #791: 틱톡 — 정본 주소는 숫자 id를, 짧은 주소(vm·vt)는 id를 못 알지만 틱톡으로 인정한다.
+  // 세로(9:16)라 vertical은 항상 참. 짧은 주소의 id는 서버 oEmbed가 풀어 준다.
+  if (TIKTOK_HOSTS.has(parsed.hostname) || TIKTOK_SHORT_HOSTS.has(parsed.hostname)) {
+    const matched = (parsed.pathname || '').match(/^\/@[A-Za-z0-9_.]+\/video\/(\d{15,25})\/?$/);
+    const videoId = TIKTOK_SHORT_HOSTS.has(parsed.hostname) ? '' : (matched ? matched[1] : '');
+    if (videoId || TIKTOK_SHORT_HOSTS.has(parsed.hostname)) {
+      return {
+        kind: 'tiktok', original, videoId, short: TIKTOK_SHORT_HOSTS.has(parsed.hostname), vertical: true,
+        openUrl: parsed.href,
+        label: 'TikTok 링크',
+        actionLabel: 'TikTok에서 열기'
+      };
+    }
+  }
+
+  // #791 2단계: 인스타그램 릴스(/reel·/reels·/p·/tv)와 짧은 공유 주소(instagr.am).
+  // 썸네일이 없으므로 카드는 글 카드로 그린다. code는 짧은 코드 그대로 쓴다.
+  if (INSTAGRAM_HOSTS.has(parsed.hostname)) {
+    const matched = (parsed.pathname || '').match(/^\/(?:reel|reels|p|tv)\/([A-Za-z0-9_-]{8,30})\/?$/);
+    if (matched) {
+      return {
+        kind: 'instagram', original, shortcode: matched[1], videoId: matched[1], vertical: true,
+        openUrl: parsed.href,
+        label: '인스타그램 릴스',
+        actionLabel: '원본에서 열기'
       };
     }
   }

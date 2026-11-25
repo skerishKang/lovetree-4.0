@@ -35,8 +35,8 @@ const ORBIT = read('src/views/orbit.js');
 test('584-1: 그 자리 재생·크게 보기 iframe은 strict-origin-when-cross-origin을 쓴다(오류 153 수정)', () => {
   // iframe 두 자리(그 자리 재생·크게 보기)만 바꾼다. img·a의 no-referrer는 그대로 둔다(요청 헤더용).
   const iframePolicies = [...MP.matchAll(/frame\.setAttribute\('referrerpolicy','([^']+)'\)/g)].map(m => m[1]);
-  assert.equal(iframePolicies.length, 2, 'iframe referrerpolicy 지정은 두 자리뿐이다');
-  for (const policy of iframePolicies) assert.equal(policy, 'strict-origin-when-cross-origin', 'iframe은 strict-origin-when-cross-origin');
+  assert.ok(iframePolicies.length >= 2, '재생 iframe이 있다');
+  for (const policy of iframePolicies) assert.equal(policy, 'strict-origin-when-cross-origin', '모든 재생 iframe은 strict-origin-when-cross-origin');
   // 안내 문구도 함께 맞춘다.
   // 첫 화면(궤도)의 재생 단추도 같은 이름.
 });

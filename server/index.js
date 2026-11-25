@@ -31,7 +31,9 @@ import { createAdminCustomersService, createAdminCustomersHandler } from './admi
 import { createFeedbackService, createFeedbackHandler } from './feedback-service.js';
 import { createOpsNotifier } from './ops-notify.js';
 import { createYoutubeOembedHandler } from './youtube-oembed.js';
-import { createSharedAccessAuth } from './padiem-access-auth.mjs';
+import { createTiktokOembedHandler } from './tiktok-oembed.js';
+import { createInstagramOembedHandler } from './instagram-oembed.js';
+import { createSharedAccessAuth, sharedAuthEnabled } from './padiem-access-auth.mjs';
 import { ApiError } from './errors.js';
 import { createAccountRepo } from './db/account-postgres.js';
 import { createAccountDeleteRpcRepo } from './db/account-delete-rpc-postgres.js';
@@ -216,6 +218,8 @@ const adminCustomersHandler = createAdminCustomersHandler({
  productId: LOVETREE_PRODUCT_ID
 });
 const youtubeOembedHandler = createYoutubeOembedHandler({ authenticate: guardedAuthenticate, productId: LOVETREE_PRODUCT_ID });
+const tiktokOembedHandler = createTiktokOembedHandler({ authenticate: guardedAuthenticate, productId: LOVETREE_PRODUCT_ID });
+const instagramOembedHandler = createInstagramOembedHandler({ authenticate: guardedAuthenticate, productId: LOVETREE_PRODUCT_ID });
 const mediaHandler = createMediaHandler({
  authenticate: guardedAuthenticate, productId: LOVETREE_PRODUCT_ID,
  store: mediaStore,
@@ -233,6 +237,8 @@ const handlers = {
   feedback: (request) => feedbackHandler(request),
   adminCustomers: (request) => adminCustomersHandler(request),
   youtube: (request) => youtubeOembedHandler(request),
+  tiktok: (request) => tiktokOembedHandler(request),
+  instagram: (request) => instagramOembedHandler(request),
   storage: (request) => storageHandler(request)
 };
 const proxyProofLog = entry => console.warn('[lovetree-proxy-proof]', JSON.stringify(entry));

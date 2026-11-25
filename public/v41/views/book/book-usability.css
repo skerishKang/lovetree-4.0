@@ -115,6 +115,22 @@ html[data-lt-theme=garden] .media-links button{background:var(--lt-paper);color:
 html[data-v41-screen=book] .media-links button:hover{background:rgba(255,230,166,.22)}
 html[data-book-shape=phone][data-v41-screen=book] .yt-play.is-vertical,
 html[data-book-shape=phone][data-v41-screen=book] .yt-frame.is-vertical{height:clamp(220px,44vh,360px)}
+/* #791: 틱톡 카드 — 썸네일을 흐린 배경으로 채우고 가운데는 원본 비율. 재생기는 누를 때만 붙는다. */
+html[data-v41-screen=book] .tt-play{overflow:hidden;border-radius:8px;background:var(--lt-ink)}
+html[data-v41-screen=book] .tt-backdrop{position:absolute;inset:-12px;background-image:var(--lt-tt-bg);background-size:cover;background-position:center;filter:blur(18px) brightness(.72);opacity:.86;transform:scale(1.06);pointer-events:none}
+html[data-v41-screen=book] .yt-play.is-vertical .tt-thumb{position:relative;z-index:1;width:100%;height:100%;object-fit:contain}
+html[data-v41-screen=book] .tt-mark{position:absolute;top:10px;right:10px;z-index:2;padding:3px 9px;border-radius:var(--lt-r-pill);background:var(--lt-role-scrim);color:var(--lt-role-text-strong);font-size:11px;font-weight:700;letter-spacing:.06em}
+html[data-v41-screen=book] .tt-author{position:absolute;left:12px;bottom:52px;z-index:2;max-width:calc(100% - 24px);color:var(--lt-paper);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+html[data-v41-screen=book] .tt-play .tiktok-embed{position:relative;z-index:3;width:100%;height:100%;margin:0;overflow:auto;background:var(--lt-ink);color:var(--lt-paper)}
+/* #791 2단계: 릴스 글 카드(캡션·@계정)와 올린 그림 썸네일. */
+html[data-v41-screen=book] .ig-play{box-sizing:border-box;display:flex;flex-direction:column;justify-content:center;gap:10px;padding:24px 16px 56px;border-radius:8px;background:var(--lt-ink);color:var(--lt-paper);overflow:hidden}
+html[data-v41-screen=book] .ig-play.has-image{padding:0}
+html[data-v41-screen=book] .ig-backdrop{position:absolute;inset:-12px;background-image:var(--lt-ig-bg);background-size:cover;background-position:center;filter:blur(18px) brightness(.72);opacity:.86;transform:scale(1.06);pointer-events:none}
+html[data-v41-screen=book] .ig-thumb{position:relative;z-index:1;width:100%;height:100%;object-fit:contain}
+html[data-v41-screen=book] .ig-caption{position:relative;z-index:2;font-size:14px;line-height:1.5;text-align:left;overflow:hidden}
+html[data-v41-screen=book] .ig-author{position:absolute;left:12px;bottom:52px;z-index:2;font-size:11px;color:var(--lt-paper)}
+html[data-v41-screen=book] .ig-play .instagram-media{position:relative;z-index:3;width:100%;height:100%;margin:0;overflow:auto;background:var(--lt-ink);color:var(--lt-paper)}
+html[data-v41-screen=book] .tt-play iframe.lt-tt-frame,html[data-v41-screen=book] .ig-play iframe.lt-ig-frame{position:relative;z-index:3;display:block;width:100%;height:100%;border:0;border-radius:8px;background:var(--lt-ink)}
 /* 4·5. 오른쪽 빈 페이지 안내와 '다음 순간 남기기' */
 html[data-v41-screen=book] .next-page{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;height:100%;padding:24px 18px;text-align:center}
 html[data-v41-screen=book] .next-page b{font-family:var(--lt-reading);font-size:19px;font-weight:400;color:var(--lt-ink);word-break:keep-all}

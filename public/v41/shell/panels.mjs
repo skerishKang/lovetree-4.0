@@ -9,7 +9,7 @@ import {formatDisplayDate} from '../book-usability.mjs';
 import {localDateOnly} from '../local-date.mjs';
 import {displayTreeTitle} from '../tree-name.mjs';
 import {mountPrivateUpload} from '../private-upload.mjs';
-import {fetchVideoTitle} from '../video-title.mjs';
+import {fetchVideoTitle, fetchTikTokMetadata, fetchInstagramMetadata} from '../video-title.mjs';
 import {loadYouTubeIframeApi, createSegmentCapture} from '../segment-capture.mjs';
 
 // #934: 링크 칸에 열 수 없는 주소가 남았을 때의 안내 — 미리보기 경고('링크를 열 수 없어요')와
@@ -82,6 +82,10 @@ export function createPanels(deps) {
     try {
       const info = LTMedia.describe(moment.url);
       if (info.kind === 'youtube' && info.videoId && LTMedia.youtubeThumbUrl) return LTMedia.youtubeThumbUrl(info.videoId, !!info.vertical);
+      // #791: 틱톡은 저장된 썸네일 주소를 그대로 쓴다(새 요청 없이 그린다).
+      if (info.kind === 'tiktok' && LTMedia.tiktokThumbCandidates) return LTMedia.tiktokThumbCandidates(moment.mediaMetadata)[0] || '';
+      // #791 2단계: 릴스는 올린 그림이 있을 때만 썸네일이 있다.
+      if (info.kind === 'instagram') return String(moment?.image || '').startsWith('/api/media/') ? moment.image : '';
       if (info.kind === 'photo') return moment.url;
     } catch {}
     return '';
@@ -412,6 +416,15 @@ export function createPanels(deps) {
   const videoTitleCache = new Map();
   let editorVideoTitle = '';
   let editorVideoUrl = '';
+  // #791: 틱톡 oEmbed 미리보기 값(제목·id·@계정·썸네일).
+  const tiktokMetaCache = new Map();
+  let editorTikTokMeta = null;
+  // #791 2단계: 릴스 — 한도(429)면 메타 없이 링크만 저장하고 다음에 다시 조회한다.
+  const instagramMetaCache = new Map();
+  const instagramLimited = new Set();
+  let editorInstagramUrl = '';
+  let editorInstagramMeta = null;
+  let editorPendingInstagram = null;
   // #792 2단계: 영상을 보다가 지금 위치를 담는 재생기 연결. 주소·제목이 바뀌면 끊고 새로 잇는다.
   let segmentToken = 0, segmentPlayer = null, segmentCapture = null;
   function hideSegmentCapture() {
@@ -493,7 +506,7 @@ export function createPanels(deps) {
       open.target = '_blank';
       open.rel = 'noopener noreferrer';
       open.referrerPolicy = 'no-referrer';
-      open.textContent = (info.kind === 'youtube' ? 'YouTube에서 열기' : '원본 링크 열기') + ' ↗';
+      open.textContent = (info.kind === 'youtube' ? 'YouTube에서 열기' : (info.kind === 'tiktok' || info.kind === 'instagram') ? '원본에서 열기' : '원본 링크 열기') + ' ↗';
       host.append(open);
     }
   }
@@ -524,16 +537,77 @@ export function createPanels(deps) {
     }
     // #344: 미리보기 때 서버 oEmbed 프록시로 영상 제목을 받아 둔다(실패는 조용히). 저장 시 mediaMetadata.title로 함께 넘긴다.
     editorVideoTitle = '';
+    editorTikTokMeta = null;
+    editorInstagramUrl = '';
+    editorInstagramMeta = null;
+    editorPendingInstagram = null;
     editorVideoUrl = info.kind === 'youtube' && info.videoId ? url : '';
     if (editorVideoUrl) {
       const videoId = info.videoId;
       void fetchVideoTitle(videoId).then(title => { if (title && editorVideoUrl === url) { editorVideoTitle = title; videoTitleCache.set(videoId, title); } });
+    }
+    // #791: 틱톡은 제목·영상 id·@계정·썸네일을 미리 받아 저장값에 함께 넘긴다.
+    if (info.kind === 'tiktok') {
+      editorVideoUrl = url;
+      const known = tiktokMetaCache.get(url);
+      if (known) { editorTikTokMeta = known; if (known.title) editorVideoTitle = known.title; }
+      else void fetchTikTokMetadata(url).then(meta => {
+        if (!meta || editorVideoUrl !== url) return;
+        const saved = {
+          title: meta.title || '', tiktokId: meta.videoId || '',
+          tiktokAuthor: meta.author || '', thumbnail: meta.thumbnailUrl || ''
+        };
+        tiktokMetaCache.set(url, saved);
+        editorTikTokMeta = saved;
+        editorVideoTitle = saved.title;
+      });
+    }
+    // #791 2단계: 릴스 caption·@계정. 한도면 링크만 둔다.
+    if (info.kind === 'instagram') {
+      editorInstagramUrl = url;
+      const known = instagramMetaCache.get(url);
+      if (known) { editorInstagramMeta = known; if (known.title) editorVideoTitle = known.title; }
+      else if (!instagramLimited.has(url)) void fetchInstagramMetadata(url).then(meta => {
+        if (editorInstagramUrl !== url) return;
+        if (!meta) return;
+        if (meta.limited) { instagramLimited.add(url); return; }
+        const saved = { title: meta.title || '', author: meta.authorName || '', shortcode: meta.shortcode || '' };
+        instagramMetaCache.set(url, saved);
+        editorInstagramMeta = saved;
+        if (saved.title) editorVideoTitle = saved.title;
+        if(editorPendingInstagram?.url===url){
+          const mediaMetadata={};
+          if(saved.title)mediaMetadata.title=saved.title;
+          if(saved.author){mediaMetadata.channel=saved.author;mediaMetadata.instagramAuthor=saved.author;}
+          if(saved.shortcode)mediaMetadata.instagramShortcode=saved.shortcode;
+          try{getMember().apply('backfillTitles',{items:[{treeId:editorPendingInstagram.treeId,momentId:editorPendingInstagram.momentId,url,mediaMetadata}]});}catch{}
+          editorPendingInstagram=null;
+        }
+      });
     }
   }
   function editorMediaTitle() {
     if (!editorVideoUrl) return {};
     const url = $('moment-form').elements.url.value.trim();
     if (url !== editorVideoUrl) return {};
+    if (LTMedia.describe(url).kind === 'tiktok') {
+      const meta = editorTikTokMeta || {};
+      const mediaMetadata = {};
+      if (meta.title) mediaMetadata.title = meta.title;
+      if (meta.tiktokId) mediaMetadata.tiktokId = meta.tiktokId;
+      if (meta.tiktokAuthor) mediaMetadata.tiktokAuthor = meta.tiktokAuthor;
+      if (meta.thumbnail) mediaMetadata.thumbnail = meta.thumbnail;
+      return Object.keys(mediaMetadata).length ? { mediaMetadata } : {};
+    }
+    if (LTMedia.describe(url).kind === 'instagram') {
+      if (!editorInstagramMeta || instagramLimited.has(url)) return {};
+      const meta = editorInstagramMeta;
+      const mediaMetadata = {};
+      if (meta.title) mediaMetadata.title = meta.title;
+      if (meta.author) { mediaMetadata.channel = meta.author; mediaMetadata.instagramAuthor = meta.author; }
+      if (meta.shortcode) mediaMetadata.instagramShortcode = meta.shortcode;
+      return Object.keys(mediaMetadata).length ? { mediaMetadata } : {};
+    }
     return editorVideoTitle ? { mediaMetadata: { title: editorVideoTitle } } : {};
   }
   // 계정 메뉴·편집기 버튼은 셸이 열고, 이 파일은 폼 상태만 본다.
@@ -720,7 +794,24 @@ export function createPanels(deps) {
       //  각 단계는 member-session의 meta 모델 전용 길(재적재 0)을 그대로 쓴다. 한 단계가 실패하면
       //  성공한 단계의 기준값만 갱신하고, 무엇이 안 됐는지 폼 오류 줄로 알린다(#905: 성공 진행 안내는 띄우지 않는다).
       const sel = editorMode === 'add' ? { ...selection(), momentId: addParentMomentId() } : selection();
-      getMember().apply(editorMode, {...Object.fromEntries(new FormData(e.target)), ...editorMediaTitle()}, sel, editorMode === 'add' ? {moment:true} : undefined);
+      const input = {...Object.fromEntries(new FormData(e.target)), ...editorMediaTitle()};
+      // #791 2단계: 릴스 링크를 적어 둔 채 캡처 그림을 올리면 그림은 썸네일로, 링크는 원본으로 남긴다.
+      if (editorInstagramUrl && LTMedia.describe(String(input.url ?? '')).privateFile) {
+        input.image = String(input.url).trim();
+        input.url = editorInstagramUrl;
+      }
+      const savedResult=getMember().apply(editorMode, input, sel, editorMode === 'add' ? {moment:true} : undefined);
+      if(editorMode==='add'&&editorInstagramUrl&&!editorInstagramMeta&&!instagramLimited.has(editorInstagramUrl)&&savedResult?.treeId&&savedResult?.momentId){
+        editorPendingInstagram={treeId:savedResult.treeId,momentId:savedResult.momentId,url:editorInstagramUrl};
+        void fetchInstagramMetadata(editorInstagramUrl).then(meta=>{
+          if(!meta||meta.limited||editorPendingInstagram?.url!==editorInstagramUrl)return;
+          const saved={title:meta.title||'',author:meta.authorName||'',shortcode:meta.shortcode||''};
+          instagramMetaCache.set(editorInstagramUrl,saved);editorInstagramMeta=saved;
+          const mediaMetadata={};if(saved.title)mediaMetadata.title=saved.title;if(saved.author){mediaMetadata.channel=saved.author;mediaMetadata.instagramAuthor=saved.author;}if(saved.shortcode)mediaMetadata.instagramShortcode=saved.shortcode;
+          try{getMember().apply('backfillTitles',{items:[{treeId:editorPendingInstagram.treeId,momentId:editorPendingInstagram.momentId,url:editorInstagramUrl,mediaMetadata}]});}catch{}
+          editorPendingInstagram=null;
+        });
+      }
       formBaseline = new URLSearchParams(new FormData(e.target)).toString();
       const failedNotes = [];
       if (editorMode === 'edit') {

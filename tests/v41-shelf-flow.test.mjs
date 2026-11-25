@@ -33,6 +33,15 @@ test('표지 색은 테마 변수를 순서대로 돌려 쓰고 이름은 표시
   assert.equal(treeTitleOf('그대로', null), '그대로');
 });
 
+// #791 2단계: 릴스가 고른 표지일 때 같은 트리의 다른 썸네일을 먼저 쓴다.
+test('릴스 표지는 같은 트리의 다른 썸네일로 채우고 없으면 색 표지로 남는다', () => {
+  const reel = moment('ig', { type: 'video', url: 'https://www.instagram.com/reel/C0abc123XYZ/', mediaMetadata: { title: '릴스 캡션', instagramAuthor: 'fan' } });
+  const withPhoto = tree({ coverMomentId: 'ig', moments: [reel, moment('p2', { type: 'photo', image: 'https://img.test/2.jpg' })] });
+  assert.equal(buildShelf([withPhoto], COVER_PALETTE, (v) => v)[0].coverMedia, 'https://img.test/2.jpg');
+  const solo = tree({ coverMomentId: 'ig', moments: [reel] });
+  assert.equal(buildShelf([solo], COVER_PALETTE, (v) => v)[0].coverMedia, '');
+});
+
 test('책 설명·꼬리표·장 목록은 실제 기록에서 오고 note는 memo를 먼저 쓴다', () => {
   const book = shelfBook(tree(), 0, COVER_PALETTE, (v) => v);
   assert.equal(book.description, '좋아하는 대상 · 첫사랑');

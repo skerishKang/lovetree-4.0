@@ -3,7 +3,7 @@
 // 썸네일은 저장된 값 중 data: 이미지와 같은 출처 경로만 인정한다. 단 내 기록(서버 기록·로그인
 // 소유자)의 YouTube 순간은 #330과 같은 판정(autoLoad)으로 ytimg 썸네일 카드를 처음부터 만든다
 // (2026-11-10 CTO 결정, lovetree-4.0 #340) — 판정·주소는 LTMedia 한 벌을 재사용한다.
-import { thumbnailCandidates } from '../public/v41/thumb-fallback.mjs';
+import { thumbnailCandidates, isInstagramMoment } from '../public/v41/thumb-fallback.mjs';
 // #368 3차: 첫 화면 순간 목록의 날짜 표기도 같은 한 벌(formatDisplayDate)을 따른다. 스타일은 프레임 속성(셸이 심는다).
 import { formatDisplayDate } from '../public/v41/book-usability.mjs';
 export const ltDateStyle = () => {
@@ -78,7 +78,7 @@ const mediaImage = (moment, currentOrigin) => {
 const noteOf = moment => text(moment?.note) || text(moment?.memo) || text(moment?.whyNext) || text(moment?.title);
 const recent = (a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt);
 
-export function cardOf(treeId, moment, currentOrigin, youtube = null) {
+export function cardOf(treeId, moment, currentOrigin, youtube = null, fallbackImage = '') {
   const image = mediaImage(moment, currentOrigin);
   const video = !image && privateMediaKind(moment?.url, currentOrigin)?.kind === 'video';
   // #330 판정 재사용: 내 기록(서버 기록·로그인 소유자)만 YouTube 썸네일을 처음부터 카드로 쓴다.
@@ -88,7 +88,10 @@ export function cardOf(treeId, moment, currentOrigin, youtube = null) {
     ? thumbnailCandidates(moment, { autoLoad: true, currentOrigin })
     : [];
   const thumb = ytCandidates[0] || (media?.kind === 'youtube' && media.loadUrl ? media.loadUrl : '');
-  const thumbCandidates = image ? [image] : ytCandidates;
+  // #791 2단계: 썸네일 없는 릴스를 첫 화면 카드로 쓸 때는 같은 트리의 다른 썸네일을 먼저 쓴다.
+  // 없으면 image가 빈 채로 남아 글 카드가 된다.
+  const coverImage = !image && !thumb && isInstagramMoment(moment) ? fallbackImage : '';
+  const thumbCandidates = image ? [image] : (ytCandidates.length ? ytCandidates : (coverImage ? [coverImage] : []));
   return {
     ...moment,
     key: `${treeId}/${text(moment?.id)}`,
@@ -99,14 +102,22 @@ export function cardOf(treeId, moment, currentOrigin, youtube = null) {
     date: text(formatDisplayDate(moment?.date, ltDateStyle())),
     emotion: text(moment?.emotion),
     note: noteOf(moment),
-    image: image || thumb,
+    image: image || thumb || coverImage,
     thumbCandidates,
-    type: image ? 'photo' : (thumb || video) ? 'video' : 'memo',
-    // 궤도 렌더러가 재생 표시를 붙일 때만 보는 표시자다. 저장 값이 보낸 같은 이름 값은 덮어쓴다.
+    type: image ? 'photo' : (thumb || video || coverImage) ? 'video' : 'memo',
+    // 궤도 렌더러가 재생 표시를 붙일 때만 보는 표시자다. 릴스 표지는 다른 순간의 그림이므로 재생 표시를 붙이지 않는다.
     youtubeThumb: thumb ? true : false,
     // orbitRecords는 createdAt 내림차순이므로 최근 수정 순서를 그대로 옮긴다.
     createdAt: new Date(stamp(moment) || 0).toISOString(),
   };
+}
+
+// #791 2단계: 같은 트리에서 썸네일이 있는 다른 순간 하나(릴스 표지 우선순위).
+export function otherMomentThumb(moments, excludeId, currentOrigin) {
+  return (Array.isArray(moments) ? moments : [])
+    .filter((other) => text(other?.id) !== excludeId)
+    .map((other) => mediaImage(other, currentOrigin) || thumbnailCandidates(other, { autoLoad: true, currentOrigin })[0] || '')
+    .find(Boolean) || '';
 }
 
 export function homeMomentCards(context, limit = HOME_ORBIT_LIMIT, currentOrigin = globalThis.location?.origin, youtube = null) {
@@ -121,7 +132,7 @@ export function homeMomentCards(context, limit = HOME_ORBIT_LIMIT, currentOrigin
       const key = `${treeId}/${id}`;
       if (seen.has(key)) continue;
       seen.add(key);
-      const card = cardOf(treeId, moment, currentOrigin, youtube);
+      const card = cardOf(treeId, moment, currentOrigin, youtube, otherMomentThumb(tree.moments, id, currentOrigin));
       (card.image ? photos : memos).push(card);
     }
   }

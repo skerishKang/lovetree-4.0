@@ -1,0 +1,178 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { tiktokVideoId, tiktokShortUrl, tiktokAuthor, exposedMetadata, thumbnailFromPage, createTiktokOembedClient, createTiktokOembedHandler } from '../server/tiktok-oembed.js';
+import { ApiError } from '../server/errors.js';
+
+// #791: 틱톡 oEmbed 프록시 — 유튜브와 같은 길. 외부 호출은 가짜 응답으로만 시험한다.
+const ID = '7252913073450106158';
+const CANONICAL = `https://www.tiktok.com/@tiktokofficial/video/${ID}`;
+const SHORT = 'https://vm.tiktok.com/ZGd3XTri5/';
+const jsonResponse = (data, status = 200, extra = {}) => ({ ok: status >= 200 && status < 300, status, url: extra.url || '', async json() { return data; } });
+const meta = {
+  title: '바다에서 보낸 순간 #ILLIT #SuperShy', author_name: 'tiktokofficial',
+  thumbnail_url: 'https://v16m-default.tiktokcdn.com/frame.jpg', width: '325', height: '578',
+  html: `<iframe src="https://www.tiktok.com/player/v1/${ID}"></iframe>`
+};
+
+test('영상 id는 정본 주소와 숫자 id만 받고 닮은 호스트·사진 주소는 거부한다', () => {
+  assert.equal(tiktokVideoId(ID), ID);
+  assert.equal(tiktokVideoId(CANONICAL), ID);
+  assert.equal(tiktokVideoId(`https://tiktok.com/@some.user/video/${ID}`), ID);
+  assert.equal(tiktokVideoId(`${CANONICAL}?_t=abc&u_code=x`), ID);
+  for (const bad of ['', '   ', '123', 'abcdefghijk', 'https://www.tiktok.com/@x/photo/' + ID, 'https://www.tiktok.com/@x/video/123', `https://www.tiktok.com.evil.example/@x/video/${ID}`, 'https://evil.example/@x/video/' + ID, 'javascript:alert(1)', `http://www.tiktok.com/@x/video/${ID}`]) {
+    assert.equal(tiktokVideoId(bad), null, bad);
+  }
+});
+
+test('짧은 주소는 vm·vt만 받고 코드 모양이 아니면 거부한다', () => {
+  assert.equal(tiktokShortUrl(SHORT), SHORT);
+  assert.equal(tiktokShortUrl('https://vt.tiktok.com/ZS1234abc/'), 'https://vt.tiktok.com/ZS1234abc/');
+  for (const bad of ['', 'https://www.tiktok.com/ZGd3XTri5/', 'https://vm.tiktok.com/', 'http://vm.tiktok.com/ZGd3XTri5/', 'https://vm.tiktok.com.evil.example/x/']) {
+    assert.equal(tiktokShortUrl(bad), null, bad);
+  }
+});
+
+test('표시 필드만 남기고 썸네일은 https + 틱톡 CDN일 때만 통과시킨다', () => {
+  const clean = exposedMetadata(ID, { ...meta, author_url: 'https://www.tiktok.com/@x', html: '<iframe>' });
+  assert.deepEqual(Object.keys(clean).sort(), ['authorName', 'height', 'thumbnailUrl', 'title', 'videoId', 'width']);
+  assert.equal(clean.width, 325);
+  assert.equal(clean.height, 578);
+  assert.equal(clean.title, meta.title);
+  assert.equal(clean.authorName, 'tiktokofficial');
+  assert.equal(clean.thumbnailUrl, meta.thumbnail_url);
+  assert.equal(exposedMetadata(ID, { thumbnail_url: 'https://evil.example/x.jpg' }).thumbnailUrl, '');
+  assert.equal(exposedMetadata(ID, { thumbnail_url: 'http://v16m-default.tiktokcdn.com/x.jpg' }).thumbnailUrl, '');
+  // oEmbed가 메타를 담지 않으면 빈 문자열로 둔다(제목 조회는 도메인 규칙으로 물러난다).
+  const empty = exposedMetadata(ID, { title: '', author_name: '', thumbnail_url: '' });
+  assert.equal(empty.title, '');
+  assert.equal(empty.thumbnailUrl, '');
+});
+
+test('oEmbed에 썸네일이 없으면 영상 페이지의 같은 id 표지를 쓴다', () => {
+  const cover = 'https://p16-common-sign.tiktokcdn.com/origin.jpg?x-expires=1';
+  const html = '<script id="__UNIVERSAL_DATA_FOR_REHYDRATION__" type="application/json">' + JSON.stringify({
+    __DEFAULT_SCOPE__: { 'webapp.video-detail': { itemInfo: { itemStruct: { id: ID, video: { originCover: cover, cover: 'https://p16.tiktokcdn.com/other.jpg' } } } } }
+  }) + '</script>';
+  assert.equal(thumbnailFromPage(html, ID), cover);
+  assert.equal(thumbnailFromPage(html, '9999999999999999999'), '', '다른 영상 id는 거부');
+  assert.equal(thumbnailFromPage('<p>no data</p>', ID), '');
+  assert.equal(thumbnailFromPage('<script id="__UNIVERSAL_DATA_FOR_REHYDRATION__">not json</script>', ID), '');
+  assert.equal(thumbnailFromPage(html.replace(/p16(?:-common-sign)?\.tiktokcdn\.com/g, 'evil.example'), ID), '', '틱톡 CDN이 아닌 주소는 거부');
+});
+
+test('oEmbed에 썸네일이 없으면 같은 호스트의 영상 페이지를 한 번 더 부른다', async () => {
+  const seen = [];
+  const cover = 'https://p19-common-sign.tiktokcdn.com/origin.jpg?x-expires=1';
+  const html = '<script id="__UNIVERSAL_DATA_FOR_REHYDRATION__">' + JSON.stringify({
+    __DEFAULT_SCOPE__: { 'webapp.video-detail': { itemInfo: { itemStruct: { id: ID, video: { originCover: cover } } } } }
+  }) + '</script>';
+  const client = createTiktokOembedClient({ fetchImpl: async (url, init) => {
+    seen.push([url, init]);
+    if (url.startsWith('https://www.tiktok.com/oembed')) return jsonResponse({ width: '325', height: '578' });
+    return { ok: true, status: 200, headers: { get: () => undefined }, text: async () => html };
+  } });
+  const value = await client.metadata(ID);
+  assert.equal(value.thumbnailUrl, cover);
+  assert.equal(seen.length, 2);
+  assert.match(seen[1][0], /^https:\/\/www\.tiktok\.com\/@tiktok\/video\//);
+  assert.equal(seen[1][1].redirect, 'error');
+  assert.equal(seen[1][1].headers.accept, 'text/html');
+});
+
+test('영상 페이지를 읽지 못해도 링크 정보는 그대로 돌려준다', async () => {
+  let calls = 0;
+  const client = createTiktokOembedClient({ fetchImpl: async () => { calls += 1; if (calls === 1) return jsonResponse({ width: '325', height: '578' }); throw new Error('blocked'); } });
+  const value = await client.metadata(ID);
+  assert.equal(value.videoId, ID);
+  assert.equal(value.thumbnailUrl, '');
+});
+
+test('@계정 이름은 정본 주소 경로에서만 풀고 짧은 주소·평문 id는 모른다', () => {
+  assert.equal(tiktokAuthor(CANONICAL), 'tiktokofficial');
+  assert.equal(tiktokAuthor('https://tiktok.com/@some.user/video/' + ID), 'some.user');
+  assert.equal(tiktokAuthor(SHORT), '');
+  assert.equal(tiktokAuthor(ID), '');
+  assert.equal(tiktokAuthor('https://www.tiktok.com/@x/photo/' + ID), '');
+  assert.equal(tiktokAuthor('https://evil.example/@x/video/' + ID), '');
+});
+
+test('성공 응답은 캐시하고 두 번째부터는 업스트림을 다시 부르지 않는다', async () => {
+  let calls = 0;
+  const client = createTiktokOembedClient({ fetchImpl: async (url, init) => {
+    calls += 1;
+    assert.match(url, /^https:\/\/www\.tiktok\.com\/oembed\?url=https%3A%2F%2Fwww\.tiktok\.com%2F%40tiktok%2Fvideo%2F7252913073450106158&format=json$/);
+    assert.equal(init.redirect, 'error');
+    assert.equal(init.headers.accept, 'application/json');
+    return jsonResponse(meta);
+  } });
+  const first = await client.metadata(CANONICAL);
+  assert.equal(first.cached, false);
+  assert.equal(first.videoId, ID);
+  const second = await client.metadata(ID);
+  assert.equal(second.cached, true);
+  assert.equal(calls, 1);
+  assert.equal(client.size(), 1);
+});
+
+test('refresh 요청은 캐시를 지우고 oEmbed를 다시 부른다(썸네일이 막혔을 때 다시 받기)', async () => {
+  let calls = 0;
+  const thumbs = ['https://v16m-default.tiktokcdn.com/old.jpg', 'https://v16m-default.tiktokcdn.com/new.jpg'];
+  const client = createTiktokOembedClient({ fetchImpl: async () => jsonResponse({ ...meta, thumbnail_url: thumbs[calls++] }) });
+  const first = await client.metadata(ID);
+  assert.equal(first.cached, false);
+  assert.equal(first.thumbnailUrl, thumbs[0]);
+  const cached = await client.metadata(ID);
+  assert.equal(cached.cached, true);
+  assert.equal(cached.thumbnailUrl, thumbs[0]);
+  const refreshed = await client.metadata(ID, { refresh: true });
+  assert.equal(refreshed.cached, false);
+  assert.equal(refreshed.thumbnailUrl, thumbs[1]);
+  assert.equal(calls, 2);
+});
+
+test('짧은 주소는 서버에서 따라가 정본 id와 @계정 이름을 푼다', async () => {
+  const seen = [];
+  const client = createTiktokOembedClient({ fetchImpl: async (url, init) => {
+    seen.push([url, init]);
+    if (url.startsWith('https://vm.tiktok.com/')) return jsonResponse({}, 200, { url: CANONICAL });
+    return jsonResponse(meta);
+  } });
+  const resolved = await client.metadata(SHORT);
+  assert.equal(resolved.videoId, ID);
+  assert.equal(resolved.author, 'tiktokofficial');
+  assert.equal(seen[0][0], SHORT);
+  assert.equal(seen[0][1].redirect, 'follow');
+  assert.equal(seen.length, 2);
+});
+
+test('짧은 주소가 틱톡 영상으로 열리지 않으면 400으로 끊는다', async () => {
+  const client = createTiktokOembedClient({ fetchImpl: async () => jsonResponse({}, 200, { url: 'https://www.tiktok.com/?_r=1' }) });
+  await assert.rejects(
+    () => client.metadata(SHORT),
+    (error) => error instanceof ApiError && error.code === 'tiktok_unresolved' && error.status === 400
+  );
+});
+
+test('틱톡이 아닌 입력은 400, 업스트림 실패는 캐시하지 않고 502로 끊는다', async () => {
+  const client = createTiktokOembedClient({ fetchImpl: async () => jsonResponse({}, 500) });
+  await assert.rejects(() => client.metadata('https://www.youtube.com/watch?v=dQw4w9WgXcQ'), (error) => error.code === 'tiktok_id' && error.status === 400);
+  await assert.rejects(() => client.metadata(CANONICAL), (error) => error.code === 'tiktok_metadata' && error.status === 502);
+  assert.equal(client.size(), 0);
+});
+
+test('핸들러는 인증·경로·메서드를 지키고 refresh 값을 넘긴다', async () => {
+  const seen = [];
+  const handler = createTiktokOembedHandler({
+    authenticate: async () => ({ productId: 'p', subjectId: 's' }), productId: 'p',
+    client: { metadata: async (v, options) => { seen.push([v, options]); return { videoId: ID, title: '', authorName: '', thumbnailUrl: '', width: 325, height: 578, cached: false }; } }
+  });
+  const ok = await handler({ path: '/api/tiktok/oembed', method: 'GET', query: new URLSearchParams({ url: SHORT, refresh: '1' }) });
+  assert.equal(ok.status, 200);
+  assert.equal(ok.body.videoId, ID);
+  assert.deepEqual(seen[0], [SHORT, { refresh: true }]);
+  assert.equal((await handler({ path: '/api/youtube/oembed', method: 'GET', query: new URLSearchParams() })).status, 404);
+  assert.equal((await handler({ path: '/api/tiktok/oembed', method: 'POST', query: new URLSearchParams() })).status, 405);
+  assert.equal((await handler({ path: '/api/tiktok/oembed', method: 'GET', query: new URLSearchParams() })).status, 400);
+  const denied = await createTiktokOembedHandler({ authenticate: async () => ({ productId: 'other' }), productId: 'p', client: { metadata: async () => ({}) } })({ path: '/api/tiktok/oembed', method: 'GET', query: new URLSearchParams({ v: ID }) });
+  assert.equal(denied.status, 401);
+});

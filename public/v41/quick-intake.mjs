@@ -5,7 +5,7 @@
 import { parseQuickUrl } from './quick-add.mjs';
 import { rangeFields } from './domain.mjs';
 import { videoKey } from './same-stage.mjs';
-import { fetchVideoTitle } from './video-title.mjs';
+import { fetchVideoTitle, fetchTikTokMetadata, fetchInstagramMetadata } from './video-title.mjs';
 
 // share_target params 가 싣고 오는 쿼리 이름(매니페스트와 한 벌).
 export const INTAKE_URL_PARAM = 'quickadd';
@@ -40,12 +40,36 @@ export const INTAKE_TITLE_WAIT_MS = 4000;
 
 export async function resolveMediaMetadata(url, { describe, timeoutMs = INTAKE_TITLE_WAIT_MS, fetchImpl } = {}) {
   const parsed = parseQuickUrl(url, describe);
-  if (parsed.status !== 'ok' || parsed.kind !== 'youtube' || !parsed.videoId) return {};
+  if (parsed.status !== 'ok') return {};
   let timer = null;
   const timedOut = new Promise((resolve) => { timer = setTimeout(() => resolve(''), Math.max(0, timeoutMs)); });
   try {
-    const title = await Promise.race([fetchVideoTitle(parsed.videoId, fetchImpl), timedOut]);
-    return title ? { mediaMetadata: { title } } : {};
+    if (parsed.kind === 'youtube' && parsed.videoId) {
+      const title = await Promise.race([fetchVideoTitle(parsed.videoId, fetchImpl), timedOut]);
+      return title ? { mediaMetadata: { title } } : {};
+    }
+    // #791: 틱톡은 제목·id·@계정·썸네일을 함께 받는다(짧은 주소는 서버가 푼다).
+    if (parsed.kind === 'tiktok') {
+      const meta = await Promise.race([fetchTikTokMetadata(parsed.value, fetchImpl), timedOut]);
+      if (!meta) return {};
+      const mediaMetadata = {};
+      if (meta.title) mediaMetadata.title = meta.title;
+      if (meta.videoId) mediaMetadata.tiktokId = meta.videoId;
+      if (meta.author) mediaMetadata.tiktokAuthor = meta.author;
+      if (meta.thumbnailUrl) mediaMetadata.thumbnail = meta.thumbnailUrl;
+      return Object.keys(mediaMetadata).length ? { mediaMetadata } : {};
+    }
+    // #791 2단계: 릴스도 caption·@계정을 받는다. 한도(429)면 빈 값 — 링크만 저장한다.
+    if (parsed.kind === 'instagram') {
+      const meta = await Promise.race([fetchInstagramMetadata(parsed.value, fetchImpl), timedOut]);
+      if (!meta || meta.limited) return {};
+      const mediaMetadata = {};
+      if (meta.title) mediaMetadata.title = meta.title;
+      if (meta.authorName) { mediaMetadata.channel = meta.authorName; mediaMetadata.instagramAuthor = meta.authorName; }
+      if (meta.shortcode) mediaMetadata.instagramShortcode = meta.shortcode;
+      return Object.keys(mediaMetadata).length ? { mediaMetadata } : {};
+    }
+    return {};
   } finally {
     clearTimeout(timer);
   }

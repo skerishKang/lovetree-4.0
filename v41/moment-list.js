@@ -1,7 +1,7 @@
 // #394: 첫 화면 "순간 목록"의 순수 계산 한 벌.
 // 모든 트리의 순간을 최근 순으로 모으고, 트리별로 걸러 보기와 상세 창 제목 규칙을 여기서 정한다.
 // 데이터는 v41/home.js가, 그리기는 src/views/orbit.js가 이 결과로 한다. 조건·문구는 시험이 고정한다.
-import { cardOf } from './home-moments.js';
+import { cardOf, otherMomentThumb } from './home-moments.js';
 import { pickerLabel, isInboxTree, shelfOrder } from '../public/v41/inbox-model.mjs';
 import { titleView } from '../public/v41/book-usability.mjs';
 const text = value => (typeof value === 'string' ? value.trim() : '');
@@ -27,7 +27,7 @@ export function momentListEntries({ trees = [], origin = globalThis.location?.or
       if (!id) continue;
       // 카드 한 벌(cardOf)을 재사용해 썸네일·종류를 정한다. 마음 한마디는 제목으로 대체하지 않는다(#394 3번).
       entries.push({
-        ...cardOf(treeId, moment, origin, youtube),
+        ...cardOf(treeId, moment, origin, youtube, otherMomentThumb(tree.moments, id, origin)),
         note: text(moment?.note),
         relation: text(moment?.relation),
         treeLabel: label,

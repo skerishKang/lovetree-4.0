@@ -1,9 +1,10 @@
 // 예시 기록의 지연 불러오기.
+import { withPreviewExamples } from '../preview-examples.mjs';
 
 
 export function createExampleLoader(ctx){
   let exampleTree, examplePromise, exampleInitializing;
-  function loadExampleTree(){if(!examplePromise)examplePromise=import('../example.mjs').then(mod=>{exampleTree=mod.exampleTree;return exampleTree});return examplePromise;}
+  function loadExampleTree(){if(!examplePromise)examplePromise=import('../example.mjs').then(mod=>{exampleTree=withPreviewExamples(mod.exampleTree,globalThis.location?.hostname,globalThis.location?.search);return exampleTree});return examplePromise;}
   Object.defineProperties(ctx,{
     exampleTree:{get:()=>exampleTree,set:value=>{exampleTree=value;}},
     exampleInitializing:{get:()=>exampleInitializing,set:value=>{exampleInitializing=value;}},

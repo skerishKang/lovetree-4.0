@@ -10,7 +10,7 @@ import {ROLE_TESTER,ROLE_UNKNOWN,isAiTesterRole,aiTesterFor} from './admin-roles
 import {coverModeOf} from '../src/domain.js';
 // 꼬리표 판정은 화면과 같은 한 벌 — 서버에 규칙을 복사하지 않는다(#627 3단계 '다른 팬 보기').
 import {parseTag, tagKey, isChannelLikeArtist} from '../public/v41/tags.mjs';
-import {isVerticalMoment,safeYoutubeThumb,youtubeIdFrom,youtubeStageThumbUrl} from '../public/v41/youtube-id.mjs';
+import {isVerticalMoment,safeYoutubeThumb,youtubeIdFrom,youtubeStageThumbUrl,isInstagramMoment,safeTiktokThumb} from '../public/v41/youtube-id.mjs';
 
 export const REACTION_KINDS=Object.freeze(['heart','like','love','laugh','wow','sad','angry']);
 const isReactionKind=value=>typeof value==='string'&&REACTION_KINDS.includes(value);
@@ -154,14 +154,24 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
   // 기본·디자인 표지 트리도 썸네일을 비워 보내면 카드가 글자 칸만 남는다(운영 7카드 전부 해당 — 261118 확인).
   // 사진 주소는 #425 규칙 그대로 모드가 'moment'일 때만 내보내고, 없는 트리는 공개 YouTube 썸네일
   // (i.ytimg.com mqdefault)로만 채운다 — 개인 미디어 주소는 흘리지 않는다.
+  // #791 2단계: 릴스 주소는 그림이 아니라 링크다 — 표지로 쓰면 같은 트리의 다른 썸네일을 먼저 찾는다.
+  const reelCover=isInstagramMoment(cover);
   let thumbnailUrl=coverIsMoment
-   ? coverType==='youtube'?youtubeThumbnail:coverUrl
+   ? coverType==='youtube'?youtubeThumbnail:(reelCover?'':coverUrl)
    : '';
   let cardCoverType=coverType,cardVertical=vertical;
   if(!thumbnailUrl){
-   const ytMoment=tree.moments.find(moment=>youtubeIdFrom(moment.url||moment.externalUrl));
-   const fallbackThumb=youtubeStageThumbUrl(ytMoment?youtubeIdFrom(ytMoment.url||ytMoment.externalUrl):null,'mqdefault')||'';
-   if(fallbackThumb){thumbnailUrl=fallbackThumb;cardCoverType='youtube';cardVertical=isVerticalMoment(ytMoment);}
+   const other=tree.moments.find(moment=>moment.id!==cover?.id&&(
+     !!youtubeIdFrom(moment.url||moment.externalUrl)
+     ||!!safeTiktokThumb(moment.mediaMetadata?.thumbnail||moment.mediaMetadata?.thumbnailUrl)
+   ));
+   if(other){
+    const id=youtubeIdFrom(other.url||other.externalUrl);
+    const savedTiktok=safeTiktokThumb(other.mediaMetadata?.thumbnail||other.mediaMetadata?.thumbnailUrl);
+    if(id){thumbnailUrl=youtubeStageThumbUrl(id,'mqdefault')||'';cardCoverType='youtube';}
+    else{savedTiktok&&(thumbnailUrl=savedTiktok);cardCoverType='tiktok';}
+    cardVertical=isVerticalMoment(other);
+   }
   }
   const emotions=[...new Set(tree.moments.map(moment=>moment.emotion).filter(Boolean))];
   const stats=statsOverride||await communityRepo.stats({productId,shareId:share.shareId,viewerSubjectId});

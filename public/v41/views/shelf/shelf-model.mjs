@@ -2,7 +2,7 @@
 // views/shelf/shelf.js 안에 있던 계산을 화면(DOM) 없이 시험할 수 있게 그대로 옮겼다.
 // 조건·문구·계산식 변경 0.
 import { normalizeCoverDesign, coverDesignPaletteIndex, coverModeOf } from '../../domain.mjs';
-import { thumbnailCandidates, thumbFallbackAttrs, fallbackCardMarkup } from '../../thumb-fallback.mjs';
+import { thumbnailCandidates, thumbFallbackAttrs, fallbackCardMarkup, isInstagramMoment } from '../../thumb-fallback.mjs';
 import { youtubeIdFrom } from '../../youtube-id.mjs';
 
 // A-15: 글자 막기 정본(html-escape.mjs) 한 벌 — 쓰던 이름은 그대로 다시 내보낸다.
@@ -28,12 +28,19 @@ export function coverMomentFor(tree) {
   if (!tree) return null;
   const mode = coverModeOf(tree);
   if (mode === 'design') return null;
+  const usable = (moment) => !!moment && (
+    ((moment.type === 'photo' || moment.youtubeThumb) && !!moment.image)
+    || thumbnailCandidates(moment, { autoLoad: true }).length > 0
+  );
   if (mode === 'basic') {
     const first = Array.isArray(tree.moments) ? tree.moments[0] : null;
-    return first && (first.type === 'photo' || first.youtubeThumb) && first.image ? first : null;
+    return usable(first) ? first : null;
   }
   const cover = (tree.moments || []).find((moment) => moment.id === tree.coverMomentId);
-  return cover && (cover.type === 'photo' || cover.youtubeThumb) && cover.image ? cover : null;
+  if (usable(cover)) return cover;
+  // #791 2단계: 릴스가 표지로 고여 있으면 같은 트리의 다른 썸네일을 먼저 쓴다(다른 순간은 종전 규칙).
+  if (cover && isInstagramMoment(cover)) return (tree.moments || []).find((moment) => moment.id !== cover.id && usable(moment)) || null;
+  return null;
 }
 
 export function coverChoice(tree, index, palette) {
@@ -50,7 +57,7 @@ export function coverChoice(tree, index, palette) {
   }
   // 첫 순간(기본)은 첫 순간에 사진/썸네일이 있으면 쓰고 없으면 색 표지다. 저장해 둔 표지 순간·디자인은 지우지 않는다.
   const cover = coverMomentFor(tree);
-  const coverMedia = cover ? cover.image || '' : '';
+  const coverMedia = cover ? (cover.image || thumbnailCandidates(cover, { autoLoad: true })[0] || '') : '';
   if (coverMedia) return { color, accent: color, coverMedia, design: '' };
   return { color, accent: color, coverMedia: '', design: '' };
 }

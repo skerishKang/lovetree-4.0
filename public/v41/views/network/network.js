@@ -1369,6 +1369,14 @@
     if (!event.target.closest?.('#detailPlayer [data-lt-play]')) return;
     event.preventDefault();
     event.stopImmediatePropagation();
+    const raw = LTDEMO.moments.find(moment => moment.id === state.selected?.id);
+    const source = raw?.url || raw?.externalUrl || '';
+    const kind = source && window.LTMedia?.describe?.(source)?.kind;
+    if (kind === 'tiktok' || kind === 'instagram') {
+      const { clean } = autoTitleOf(state.selected);
+      window.LTMedia.openLightbox(source, clean, true, raw?.mediaMetadata?.tiktokId || '');
+      return;
+    }
     openViewer();
   }, true);
   const mapVideoFrames = new MutationObserver(() => {

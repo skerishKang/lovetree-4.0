@@ -81,6 +81,10 @@ const ALLOWED = new Map([
   ['/api/admin/feedback', new Set(['GET'])],
   ['/api/admin/journals', new Set(['GET'])],
   ['/api/youtube/oembed', new Set(['GET'])],
+  // #791: 틱톡 oEmbed도 유튜브와 같은 길로 넣는다. GET만 허용한다.
+  ['/api/tiktok/oembed', new Set(['GET'])],
+  // #791 2단계: 인스타그램 릴스 oEmbed도 GET만 허용한다.
+  ['/api/instagram/oembed', new Set(['GET'])],
   ['/api/admin/session', new Set(['GET'])],
   ['/api/admin/roles', new Set(['GET'])],
   // 운영센터 '한눈에' 숫자(#671 후속) — 서버 경로는 있었지만 프록시 허용 목록에 없어 404였다. GET만 넘긴다.
