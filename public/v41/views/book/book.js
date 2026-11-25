@@ -43,7 +43,10 @@ window.setPageTurnMode=setPageTurnMode;
    읽지 못하면 기본값(컴퓨터 두 장·좁은 화면 한 장)으로 동작한다. 폰 폭(600px 미만)에서는 두 장을 쓰지 않는다. */
 const VIEW_KEY='lt41-book-view';
 function storedView(){try{const v=localStorage.getItem(VIEW_KEY);return v==='single'||v==='double'?v:null}catch{return null}}
-function defaultView(){return innerWidth<=820?'single':'double'}
+/* #1358: 셸이 화면을 드러내기 전에는 안쪽 폭이 0이라 기본 보기가 한 장으로 잡힌다.
+   부모 창 폭을 대신 보면 첫 그리기에서 최종 쪽 수가 정해진다. */
+function layoutWidth(){return innerWidth>0?innerWidth:(()=>{try{return parent!==window?parent.innerWidth:0}catch{return 0}})()}
+function defaultView(){const w=layoutWidth();return w>0&&w<=820?'single':'double'}
 let viewChoice=storedView();
 /* #537: 폰 폭(600px 미만)은 화면 모양이 휴대폰(스크롤 흐름)이고, 넓은 화면의 한 장은 두 장 책의 한 쪽을 크게 보여 준다. */
 function narrow(){return innerWidth<600}

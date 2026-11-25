@@ -95,7 +95,7 @@ function serve(root) {
 
 async function openBook(browser, base, width, height, view, theme = null) {
   const ctx = await browser.newContext({ viewport: { width, height } });
-  await ctx.addInitScript((v) => { try { localStorage.setItem('lt41-book-view', v); } catch {} }, view);
+  await ctx.addInitScript((v) => { try { if (v) localStorage.setItem('lt41-book-view', v); else localStorage.removeItem('lt41-book-view'); } catch {} }, view);
   if (theme) await ctx.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); } catch {} }, theme);
   const page = await ctx.newPage();
   const errors = [];
@@ -662,4 +662,46 @@ test('#1291 책 판 열기와 옵션 전환의 뒤로 가기', {skip: REQUIRE ? 
   await browser?.close();
   await new Promise(r=>server.close(r));
  }
+});
+
+
+test('#1358 책 첫 그리기에서 쪽 표시가 바뀌지 않는다(저장값 없음)', { skip: REQUIRE ? false : skip, timeout: 240000 }, async () => {
+  if (skip) assert.fail(skip);
+  const browser = await chromium.launch({ headless: true });
+  const server = await serve(ROOT);
+  const base = `http://127.0.0.1:${server.address().port}`;
+  try {
+    for (const [width, height] of [[390, 844], [844, 390], [1440, 900]]) {
+      const ctx = await browser.newContext({ viewport: { width, height } });
+      await ctx.addInitScript(() => {
+        try { localStorage.removeItem('lt41-book-view'); } catch {}
+        window.__pageLabels = [];
+        const watch = () => {
+          const el = document.querySelector('#pageLabel');
+          if (!el) { setTimeout(watch, 5); return; }
+          window.__pageLabels.push(el.textContent.trim());
+          new MutationObserver(() => window.__pageLabels.push(el.textContent.trim())).observe(el, { childList: true, characterData: true, subtree: true });
+        };
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', watch); else watch();
+      });
+      const page = await ctx.newPage();
+      const errors = [];
+      page.on('pageerror', (e) => errors.push(String(e.message || e)));
+      await page.goto(`${base}/v41/#book`, { waitUntil: 'load' });
+      let frame = null;
+      for (let k = 0; k < 80 && !frame; k += 1) {
+        frame = page.frames().find((f) => /track59-sketchbook/.test(f.url()));
+        if (!frame) await page.waitForTimeout(50);
+      }
+      assert.ok(frame, '책 프레임이 열리지 않음');
+      await page.waitForTimeout(700);
+      const labels = await frame.evaluate(() => window.__pageLabels || []);
+      const unique = [...new Set(labels)];
+      assert.equal(unique.length, 1, `${width}×${height}: 쪽 표시가 한 번도 바뀌지 않음 — ${JSON.stringify(labels)}`);
+      const state = await frame.evaluate(() => window.__TRACK59__.getState());
+      assert.equal(unique[0], `01 / ${String(state.total).padStart(2, '0')}`, `${width}×${height}: 첫 라벨이 최종 쪽 수`);
+      assert.deepEqual(errors, [], `${width}×${height}: 화면 오류 없음`);
+      await ctx.close();
+    }
+  } finally { await browser.close(); await new Promise((r) => server.close(r)); }
 });
