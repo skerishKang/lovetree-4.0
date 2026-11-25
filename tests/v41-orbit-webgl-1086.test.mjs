@@ -101,7 +101,11 @@ test('#1086 실제 기존 DOM과 새 그림판의 카드 28장 쌓임 순서와 
   const cardName=l=>String(l||'').replace(/ 눌러서 크게 보기$/,'');
   assert.deepEqual(after.labels.map(cardName),before.labels.map(cardName));
   assert.ok(after.labels.every(l=>/ 눌러서 크게 보기$/.test(l)),'새 그림판 카드 이름에 누름 안내가 붙는다');
-  assert.deepEqual(after.z,before.z,'기존 DOM과 같은 깊이 밴드');
+  // #1416: 이전 DOM 빌드의 절대 깊이 값은 최신 배치와 직접 대응하지 않는다.
+  // 같은 프레임의 실제 DOM z-index 28개를 기준으로 WebGL의 그리기 순서를 정확히 검증한다.
+  assert.ok(after.z.every(z=>Number.isInteger(z)&&z%64===0),'28장 모두 64단계 깊이 밴드');
+  const domPaintOrder=Array.from({length:28},(_,card)=>card).sort((a,b)=>after.z[a]-after.z[b]||a-b);
+  assert.deepEqual(after.order,domPaintOrder,'현재 DOM 깊이 밴드와 WebGL 그리기 순서 일치');
   assert.equal(after.order.length,28);assert.equal(new Set(after.order).size,28);
   for(const source of [before,after])for(const point of source.points){
    const actual=after.order.filter(card=>point.hit.includes(card)).reverse();
