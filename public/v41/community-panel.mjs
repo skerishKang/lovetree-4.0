@@ -19,7 +19,12 @@ import {mountMomentList} from './community-moment-list.mjs';
 const el=(tag,className,text)=>{const node=document.createElement(tag);if(className)node.className=className;if(text!=null)node.textContent=text;return node;};
 // 셸이 낯선 주소를 #home으로 바꾸기 전에(module import 시점) 직접 들어온 주소를 기억한다(#1025).
 const hashNow=()=>typeof location!=='undefined'?(location.hash||''):'';
-export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareOwn,hasOwnTree,getDateStyle,getArtistGroups=()=>[],onAddToTree,notify,memberLogin}){
+// #1356: 공유 트리 화면에서 들어온 경우 그 트리 아이디를 기억해 '이 트리만' 칩을 보여 준다.
+const rememberShare=()=>{const match=/^#share\/([^/]+)\//.exec(hashNow());if(match)dialog.dataset.ltShareContext=decodeURIComponent(match[1]);};
+rememberShare();
+if(typeof window!=='undefined'&&window.addEventListener)window.addEventListener('hashchange',rememberShare);
+const momentsHash=()=>{const match=/^#explore\/moments(?:\?(.*))?$/.exec(hashNow());if(!match)return null;const query=new URLSearchParams(match[1]||'');return {scope:query.get('scope')||'all',share:query.get('share')||''};};
+export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareOwn,hasOwnTree,getDateStyle,getArtistGroups=()=>[],onAddToTree,notify,memberLogin,isMember=()=>false}){
  const api=createCommunityApi(),form=dialog.querySelector('#community-search-form'),query=dialog.querySelector('#community-query'),list=dialog.querySelector('#community-list'),groups=dialog.querySelector('#community-groups'),feedback=dialog.querySelector('#community-feedback'),more=dialog.querySelector('#community-more'),preview=dialog.querySelector('#community-preview'),sortSelect=dialog.querySelector('#community-sort');
  // #1025: [트리] [순간] 탭 — 주소 #explore/moments 는 새로고침·공유로 유지한다.
  const treeTab=dialog.querySelector('#community-tab-trees'),momentsTab=dialog.querySelector('#community-tab-moments');
@@ -87,7 +92,7 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
  // localDateOnly(#547 한 벌)로 기기 지역 날짜를 만들어 formatDisplayDate에 넘긴다.
  const when=value=>formatDisplayDate(localDateOnly(value),dateStyle());
  const historyLayers=createExploreLayers();
- const moments=momentsPanel?mountMoments({panel:momentsPanel,onOpenShare,onAddToTree,notify,memberLogin,api,when,historyLayers}):null;
+ const moments=momentsPanel?mountMoments({panel:momentsPanel,onOpenShare,onAddToTree,notify,memberLogin,api,when,historyLayers,isMember,getShareContext:()=>dialog.dataset.ltShareContext||'',onScopeChange:(scope,shareId)=>writeMomentsScopeHash(scope,shareId)}):null;
  let currentTab='trees',hashGuard=false;
  const writeHash=value=>{
   if(typeof history==='undefined'||typeof history.pushState!=='function'||typeof history.replaceState!=='function')return;
@@ -95,6 +100,15 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
   (value?history.pushState:history.replaceState).call(history,null,'',value||'#home');
   setTimeout(()=>{hashGuard=false;},0);
  };
+  function writeMomentsScopeHash(scope,shareId){
+   let value='#explore/moments';
+   if(scope==='mine')value+='?scope=mine';
+   else if(scope==='tree'&&shareId)value+='?scope=tree&share='+encodeURIComponent(shareId);
+   if(hashNow()===value)return;
+   hashGuard=true;
+   history.pushState(null,'',value);
+   setTimeout(()=>{hashGuard=false;},0);
+  }
   let cursor='',loading=false,items=[],selectedId=null,selectedArtist='',loadId=0,publicGroups=[];
  // #784 그룹 찾기 창·자동완성 상태. publicGroupsAll는 서버가 내려주는 전체 목록(discover)이며
  // publicGroups(칩용 상위 8)와 내 트리의 가수(getArtistGroups)를 tagKey로 하나로 합쳐 쓴다.
@@ -445,7 +459,15 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
    if(moments)momentsOn?moments.activate():moments.deactivate();
    topRow.classList.toggle('is-moments',momentsOn);
    if(momentsOn)closeSort();
-   if(syncHash&&hashNow()!==(momentsOn?'#explore/moments':'#explore'))writeHash(momentsOn?'#explore/moments':'#explore');
+   if(syncHash){
+    let value=momentsOn?'#explore/moments':'#explore';
+    if(momentsOn){
+     const state=moments?.state?.();
+     if(state?.scope==='mine')value='#explore/moments?scope=mine';
+     else if(state?.scope==='tree'&&state.scopeShareId)value='#explore/moments?scope=tree&share='+encodeURIComponent(state.scopeShareId);
+    }
+    if(hashNow()!==value)writeHash(value);
+   }
   }
   treeTab?.addEventListener('click',()=>selectTab('trees'));
   momentsTab?.addEventListener('click',()=>selectTab('moments'));
@@ -453,17 +475,18 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
    if(dialog.open)return;
    dialog.showModal();button.setAttribute('aria-current','true');
    for(const t of tabs()){if(t.getAttribute('aria-current')==='true'){t.dataset.wasCurrent='1';t.setAttribute('aria-current','false');}}
-   const wantMoments=hashNow()==='#explore/moments';
+   const wantMoments=!!momentsHash();
    selectTab(wantMoments?'moments':'trees',{syncHash:false});
    // 카드 요청은 인기 무대와 동시에 시작하고, 카드 응답 뒤 첫 그리기만 무대 결과를 최대 300ms 기다린다.
    if(!wantMoments){const settleStages=startPopularStages();void load(false,settleStages);}
   };
   if(typeof window!=='undefined'&&typeof window.addEventListener==='function')window.addEventListener('hashchange',()=>{
    if(hashGuard)return;
-   if(hashNow()==='#explore/moments'||hashNow()==='#explore'){openPanel();selectTab(hashNow()==='#explore/moments'?'moments':'trees',{syncHash:false});}
+   const scope=momentsHash();
+   if(scope||hashNow()==='#explore'){openPanel();selectTab(scope?'moments':'trees',{syncHash:false});if(scope)moments?.applyScope(scope.scope,scope.share);}
   });
  dialog.addEventListener('close',()=>{if(preview.open)preview.close();moments?.deactivate();button.setAttribute('aria-current','false');const emptyShown=!document.getElementById('empty')?.hidden;for(const t of tabs()){if(t.dataset.wasCurrent){delete t.dataset.wasCurrent;if(!emptyShown)t.setAttribute('aria-current','true');}}button.focus();
-  if(!historyLayers.suspended('tree-preview')&&(hashNow()==='#explore/moments'||hashNow()==='#explore'))writeHash('');
+  if(!historyLayers.suspended('tree-preview')&&/^#explore(?:\/moments)?(?:\?|$)/.test(hashNow()))writeHash('');
  });
  preview.addEventListener('close',()=>{if(historyLayers.active('tree-preview'))historyLayers.dismiss('tree-preview');[...list.querySelectorAll('.community-card')].find(node=>node.dataset.shareId===selectedId)?.focus();});
  preview.addEventListener('click',event=>{if(event.target===preview)historyLayers.dismiss('tree-preview');});
@@ -609,5 +632,5 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
  button.onclick=openPanel;
  button.hidden=false;
  // 직접 들어온 주소와 연결 전에 접기 메뉴에서 고른 주소를 같은 길로 연다.
- if(hashNow()==='#explore'||hashNow()==='#explore/moments')openPanel();
+ if(/^#explore(?:\/moments)?(?:\?|$)/.test(hashNow())){const scope=momentsHash();if(scope)moments?.applyScope(scope.scope,scope.share);openPanel();}
 }

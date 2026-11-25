@@ -115,7 +115,15 @@ dialog.community-group-find::backdrop{background:transparent}
 .moments-chips{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;max-width:1500px;margin:0 auto 12px}
 .moments-chips[hidden]{display:none}
 .moments-chip{min-height:40px;padding:0 14px;border:1px solid var(--lt-role-idle-border);border-radius:var(--lt-r-pill);background:var(--lt-role-idle-bg);color:var(--lt-role-idle-ink);font:inherit;font-size:13px;cursor:pointer}
-.moments-chip.is-active{border-color:var(--lt-role-accent-bg);background:var(--lt-role-accent-bg);color:var(--lt-role-accent-ink)}
+".moments-chip.is-active{border-color:var(--lt-role-accent-bg);background:var(--lt-role-accent-bg);color:var(--lt-role-accent-ink)}
+/* #1356: 순간 보기 범위 칩(전체·이 트리만·내 순간) — 가수 칩과 같은 역할 색 한 벌. */
+.moments-scope-chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 2px}
+.moments-scope-chips[hidden]{display:none}
+.moments-scope-chip{min-height:44px;padding:0 13px;border:1px solid var(--lt-role-idle-border);border-radius:var(--lt-r-pill);background:var(--lt-role-idle-bg);color:var(--lt-role-idle-ink);font:inherit;font-size:13px;cursor:pointer}
+.moments-scope-chip.is-active{border-color:var(--lt-role-accent-bg);background:var(--lt-role-accent-bg);color:var(--lt-role-accent-ink)}
+.moments-scope-chip:focus-visible{outline:2px solid var(--lt-role-hover-border);outline-offset:2px}
+.moments-empty-retry{min-height:40px;margin-top:8px;padding:0 14px;border:1px solid var(--lt-role-secondary-border);border-radius:var(--lt-r-pill);background:var(--lt-role-secondary-bg);color:var(--lt-role-secondary-ink);font:inherit;font-size:13px;cursor:pointer}
+.moments-empty-retry[hidden]{display:none}
 .moments-rail-svg{width:24px;height:24px;display:block;color:currentColor}
 .moments-add-dialog{position:fixed;z-index:60;inset:0;margin:auto;width:min(420px,92vw);height:fit-content;max-height:80dvh;padding:20px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-panel);background:var(--lt-glass-strong);color:var(--lt-pearl);overflow:auto}
 .moments-add-dialog[hidden]{display:none}
@@ -197,7 +205,7 @@ html[data-lt-theme=garden] .moments-comments-dialog{background:var(--lt-paper);c
  #community-moments-panel .moments-tree{gap:5px;flex-wrap:wrap;font-size:12px}
  #community-moments-panel .moments-owner{display:grid;place-items:center;width:30px;height:30px;flex:none;border-radius:50%;background:var(--lt-glass-strong);color:white;border:1px solid var(--lt-line);font-weight:700}
  #community-moments-panel .moments-owner-text{font-size:12px;font-weight:700}
- #community-moments-panel .moments-tree-name{font-size:12px}
+ #community-moments-panel .moments-tree-name{font-size:12px;border:0;padding:0;background:none;color:inherit;text-decoration:underline;cursor:pointer;font:inherit;font-size:12px}
  #community-moments-panel .moments-ai{font-size:10px;padding:1px 5px}
  #community-moments-panel .moments-title{font-size:15px;white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
  #community-moments-panel .moments-note{display:-webkit-box;max-width:100%;padding:0;border:0;background:transparent;color:inherit;text-align:left;font:inherit;font-size:12px;line-height:1.45;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;pointer-events:auto;cursor:pointer}
@@ -432,3 +440,7 @@ html[data-lt-theme=garden] .moments-comments-dialog{background:var(--lt-paper);c
 
 /* #1354: 마음 단추도 100% 불투명하게 표시하여 정보 판의 대비를 유지한다. */
 #community-moments-panel .moments-rail-button.is-heart{opacity:1}
+
+/* #1356: 범위 칩 줄만큼 무대 높이에서 뺀다 — 기존 조작 단추가 화면 밖으로 밀리지 않게 한다. */
+#community-moments-panel .moments-stage{height:min(calc(100dvh - 230px),740px)}
+@media(max-width:780px){#community-moments-panel .moments-stage{height:calc(100dvh - 94px - env(safe-area-inset-bottom))}}

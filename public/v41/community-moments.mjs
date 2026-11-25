@@ -46,7 +46,7 @@ const embedSrc=(id,item={},{autoplay=true}={})=>{
  return `${EMBED}${encodeURIComponent(id)}?${params.join('&')}`;
 };
 
-export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin,api=null,when=null,historyLayers=null}){
+export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin,api=null,when=null,historyLayers=null,isMember=()=>false,getShareContext=()=>'',onScopeChange=null}){
  const stage=el('div','moments-stage');
  const card=el('div','moments-card');
  const media=el('div','moments-media');
@@ -90,6 +90,8 @@ let soundButton=null;
  nav.append(up,down);
  stage.append(context,card,rail,nav);
  let liked=false,heartButton=null,heartCount=null,commentsCount=null;
+ // #1356: 순간 보기 범위. '이 트리만'은 공유 트리 문맥이 있을 때만, '내 순간'은 로그인했을 때만 보인다.
+ let scope='all',scopeShareId='';
  const setLiked=(value)=>{
   liked=!!value;
   if(!heartButton)return;
@@ -149,12 +151,16 @@ let soundButton=null;
   soundButton.append(soundStart,el('span','moments-rail-label','소리 켜기'));
   soundButton.setAttribute('aria-label','소리 켜기');soundButton.onclick=toggleSound;
   toolbar.prepend(soundButton);
+ const scopeChips=el('div','moments-scope-chips');scopeChips.setAttribute('role','group');scopeChips.setAttribute('aria-label','순간 보기 범위');
+ const scopeButtons={};
+ const emptyRetry=el('button','moments-empty-retry','다시 시도');emptyRetry.type='button';emptyRetry.hidden=true;
+ emptyRetry.onclick=()=>{empty.hidden=true;emptyRetry.hidden=true;void load();};
  const chips=el('div','moments-chips');chips.setAttribute('role','group');chips.setAttribute('aria-label','가수 고르기');
  const empty=el('p','moments-empty','아직 공개 세로 순간이 없어요. 쇼츠를 담은 공개 트리가 늘면 여기에 나타나요.');
  empty.hidden=true;
  context.append(chips);
  panel.closest?.('dialog')?.querySelector('.community-top-row')?.append(toolbar);
- panel.append(stage,empty);
+ panel.append(scopeChips,stage,empty,emptyRetry);
 
  // 담기 창 — 기존 트리 고르기 창이 따로 없어 이 보기 안에 작은 창을 둔다(트리 목록은 셸 모델을 쓴다).
  const addDialog=el('div','moments-add-dialog');addDialog.setAttribute('role','dialog');addDialog.setAttribute('aria-modal','true');addDialog.setAttribute('aria-label','어느 트리에 담을까요');addDialog.hidden=true;
@@ -285,6 +291,45 @@ let advancing=0,unavailableTimer=0,unavailableId='';
    soundButton.classList.toggle('is-muted',!unmuted);
    stage.dataset.ltMomentsMuted=String(!unmuted);
  }
+ // #1356: 순간 보기 범위 칩. 문맥(공유 트리에서 들어옴)·로그인 여부에 따라 보이는 칸이 달라진다.
+ function renderScopeChips(){
+  const choices=[['all','전체',true],['tree','이 트리만',!!scopeShareId],['mine','내 순간',!!isMember()]];
+  if(!choices.some(([value,shown])=>value===scope&&shown))scope='all';
+  scopeChips.replaceChildren(...choices.filter(choice=>choice[2]).map(([value,label])=>{
+   const button=el('button','moments-scope-chip',label);button.type='button';button.dataset.scope=value;
+   const active=scope===value;
+   button.classList.toggle('is-active',active);button.setAttribute('aria-pressed',String(active));
+   button.onclick=()=>chooseScope(value);
+   scopeButtons[value]=button;
+   return button;
+  }));
+ }
+ function setScopeContext(shareId){
+  const next=String(shareId||'');
+  const changed=next!==scopeShareId;
+  scopeShareId=next;
+  renderScopeChips();
+  if(changed&&scope==='tree'&&!scopeShareId)scope='all';
+ }
+ function chooseScope(value,{syncHash=true}={}){
+  if(value===scope)return;
+  if(value==='tree'&&!scopeShareId)return;
+  if(value==='mine'&&!isMember())return;
+  scope=value;
+  items=[];seen=new Set();index=0;
+  clearFrames();media.querySelectorAll('.moments-frame').forEach(node=>node.remove());
+  currentFrame=null;stage.hidden=true;
+  empty.hidden=true;emptyRetry.hidden=true;
+  panel.scrollTop=0;stage.scrollTop=0;
+  renderScopeChips();renderChips();
+  void load();
+  if(syncHash)onScopeChange?.(scope,scopeShareId);
+ }
+ function applyScope(value,shareId=''){
+  setScopeContext(shareId||getShareContext?.()||'');
+  const wanted=['all','tree','mine'].includes(value)?value:'all';
+  if(wanted!==scope)chooseScope(wanted,{syncHash:false});
+ }
  // 칩 줄: 전체 + 서버가 센 공개 쇼츠 가수 꼬리표 상위 6개. 누르면 그 가수만 다시 섞는다.
  function renderChips(){
   const choices=[{value:'',label:'전체'},...(groups||[]).map(g=>({value:tagKey(g.value)||g.value,label:g.value,tag:'가수:'+g.value}))];
@@ -368,7 +413,10 @@ let advancing=0,unavailableTimer=0,unavailableId='';
   ownerText.textContent=displayOwner;
   treeLine.append(owner,ownerText);
   if(item.aiTester)treeLine.append(el('span','moments-ai','✦ AI 명예회원'));
-  treeLine.append(el('span','moments-tree-name',item.treeTitle||''));
+  const treeName=el('button','moments-tree-name',item.treeTitle||item.ownerName||'트리');treeName.type='button';
+  treeName.title=item.treeTitle||'';
+  treeName.onclick=()=>{if(!item.shareId)return;setScopeContext(item.shareId);chooseScope('tree');};
+  treeLine.append(treeName);
   titleLine.textContent=item.title||'';
   // 꼬리표는 '가수:아이유' 같은 머리말을 뺀 값만 — 기존 parseTag 한 벌을 그대로 쓴다.
   tagLine.textContent=(item.keywords||[]).slice(0,4).map(raw=>parseTag(raw)?.value||raw).filter(Boolean).join(' · ');
@@ -400,25 +448,30 @@ let advancing=0,unavailableTimer=0,unavailableId='';
  let currentFrame=null;
  async function load(){
   if(loading)return;
+  if(scope==='tree'&&!scopeShareId)return;
+  if(scope==='mine'&&!isMember())return;
   loading=true;
   const id=++token;
   const exclude=[...seen].join(',');
-  const query='/api/public/moments?limit=12'+(exclude?'&exclude='+encodeURIComponent(exclude):'')+(activeTag?'&tag='+encodeURIComponent(activeTag):'');
+  empty.hidden=true;emptyRetry.hidden=true;
   try{
-   const answer=await fetch(query,{headers:{accept:'application/json'}});
-   if(!answer.ok)throw new Error('moments_load_failed');
-   const data=await answer.json();
+   const answer=scope==='mine'
+    ? await api.myMoments({exclude,limit:12})
+    : await api.publicMoments({shareId:scope==='tree'?scopeShareId:'',exclude,tag:activeTag,limit:12});
+   if(!answer?.ok)throw new Error('moments_load_failed');
    if(id!==token)return;
-   if(activeTag&&!items.length&&!(Array.isArray(data.items)?data.items:[]).length){empty.hidden=false;empty.textContent=`${activeTag.slice('가수:'.length)} 쇼츠가 아직 없어요.`;stage.hidden=true;renderChips();return;}
+   const data=answer;
+   const listed=(Array.isArray(data.items)?data.items:[]).filter(item=>scope!=='mine'||!activeTag||(Array.isArray(item?.keywords)&&item.keywords.includes(activeTag)));
+   if(activeTag&&!items.length&&!listed.length){empty.hidden=false;empty.textContent=`${activeTag.slice('가수:'.length)} 쇼츠가 아직 없어요.`;stage.hidden=true;renderChips();return;}
    if(Array.isArray(data.groups)){groups=data.groups;renderChips();}
-   const fresh=(Array.isArray(data.items)?data.items:[]).filter(item=>item&&item.videoId&&!seen.has(item.videoId));
+   const fresh=listed.filter(item=>item&&item.videoId&&!seen.has(item.videoId));
    if(!fresh.length&&!items.length){items=[];render();return;}
    items=[...items,...fresh];
    for(const item of fresh)seen.add(item.videoId);
    if(!current())index=0;
    render();
   }catch{
-   if(id===token&&!items.length){empty.hidden=false;empty.textContent='공개 세로 순간을 불러오지 못했어요.';stage.hidden=true;}
+   if(id===token&&!items.length){empty.hidden=false;empty.textContent=scope==='mine'?'내 순간을 불러오지 못했어요.':scope==='tree'?'이 트리의 순간을 불러오지 못했어요.':'공개 세로 순간을 불러오지 못했어요.';emptyRetry.hidden=false;stage.hidden=true;}
   }finally{loading=false;}
  }
  // 재생이 끝난 뒤 한 번만 넘긴다(유튜브가 같은 상태를 여러 번 보낼 수 있다).
@@ -515,7 +568,7 @@ let advancing=0,unavailableTimer=0,unavailableId='';
   };
  // 플레이어 위에는 어떤 클릭·제스처 층도 두지 않는다.
  // 재생·일시 정지는 유튜브 기본 컨트롤이 전담한다.
- function activate(){if(!items.length&&!loading)void load();else render();}
+ function activate(){scopeShareId=getShareContext?.()||scopeShareId;renderScopeChips();if(!items.length&&!loading)void load();else render();}
  function deactivate(){clearFrames();media.querySelectorAll('.moments-frame').forEach(node=>node.remove());}
- return {activate,deactivate,load,step,state:()=>({count:frames.length,id:stage.dataset.ltMomentsId||'',index,loaded:items.length})};
+ return {activate,deactivate,load,step,setScopeContext,applyScope,state:()=>({count:frames.length,id:stage.dataset.ltMomentsId||'',index,loaded:items.length,scope,scopeShareId})};
 }
