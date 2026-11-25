@@ -494,22 +494,41 @@ s('#1382 카드 DOM 상자 중심과 그려진 카드 중심 차이 4px 이하(1
       try {
         await frame.waitForFunction(() => globalThis.__LT_ORBIT_TEST__?.canvasReady());
         await frame.waitForTimeout(600);
-        const d = await frame.evaluate(() => {
+        // 정지 상태에서는 모든 보이는 카드가 4px 이하여야 한다(멈출 때 전부 맞춘다).
+        const stopped = await frame.evaluate(() => {
+          const api = globalThis.__LT_ORBIT_TEST__; api.hold(true);
           const host = document.getElementById('orbit'), root = host.shadowRoot;
-          const api = globalThis.__LT_ORBIT_TEST__, poses = api.poses();
-          const cards = [...root.querySelectorAll('.card')];
+          const poses = api.poses(), cards = [...root.querySelectorAll('.card')];
           const origin = root.querySelector('.app').getBoundingClientRect();
-          const errors = [];
+          const errors = []; let first = -1;
           for (let i = 0; i < cards.length; i++) {
             const p = poses[i], el = cards[i];
             if (!p || p.hidden || el.classList.contains('off') || el.classList.contains('clash') || getComputedStyle(el).display === 'none') continue;
             const r = el.getBoundingClientRect();
             errors.push(Math.hypot((r.left + r.right) / 2 - origin.left - (p.box.l + p.box.r) / 2,
               (r.top + r.bottom) / 2 - origin.top - (p.box.t + p.box.b) / 2));
+            if (first < 0) first = i;
           }
-          return { total: cards.length, measured: errors.length, max: errors.length ? Math.max(...errors) : 0 };
+          return { total: cards.length, measured: errors.length, max: errors.length ? Math.max(...errors) : 0, first };
         });
-        rows.push({ width, height, theme, ...d });
+        // 움직이는 중에는 초점 카드만 매 프레임 맞는다 — 그 카드도 4px 이하여야 한다.
+        await frame.evaluate((idx) => {
+          const api = globalThis.__LT_ORBIT_TEST__; api.hold(false);
+          const root = document.getElementById('orbit').shadowRoot;
+          const surface = [...root.querySelectorAll('.card')][idx]?.querySelector('.surface');
+          surface?.focus({ preventScroll: true });
+        }, stopped.first);
+        await frame.waitForTimeout(200);
+        const focused = await frame.evaluate((idx) => {
+          const api = globalThis.__LT_ORBIT_TEST__, poses = api.poses();
+          const host = document.getElementById('orbit'), root = host.shadowRoot;
+          const el = [...root.querySelectorAll('.card')][idx], p = poses[idx];
+          if (!el || !p) return { max: null };
+          const r = el.getBoundingClientRect(), origin = root.querySelector('.app').getBoundingClientRect();
+          return { max: Math.hypot((r.left + r.right) / 2 - origin.left - (p.box.l + p.box.r) / 2,
+            (r.top + r.bottom) / 2 - origin.top - (p.box.t + p.box.b) / 2) };
+        }, stopped.first);
+        rows.push({ width, height, theme, ...stopped, focusedMax: focused.max });
       } finally { await context.close(); }
     }
   } finally { await browser.close(); }
@@ -517,7 +536,8 @@ s('#1382 카드 DOM 상자 중심과 그려진 카드 중심 차이 4px 이하(1
   for (const r of rows) {
     assert.ok(r.total >= 20, `${r.width}x${r.height} ${r.theme}: 카드 20장 이상(실제 ${r.total}장)`);
     assert.ok(r.measured > 0, `${r.width}x${r.height} ${r.theme}: 잰 카드가 있다`);
-    assert.ok(r.max <= 4, `${r.width}x${r.height} ${r.theme}: 중심 차이 4px 이하(실제 ${Math.round(r.max * 100) / 100}px)`);
+    assert.ok(r.max <= 4, `${r.width}x${r.height} ${r.theme}: 정지 상태 중심 차이 4px 이하(실제 ${Math.round(r.max * 100) / 100}px)`);
+    assert.ok(r.focusedMax !== null && r.focusedMax <= 4, `${r.width}x${r.height} ${r.theme}: 초점 카드 중심 차이 4px 이하(실제 ${Math.round(r.focusedMax * 100) / 100}px)`);
   }
 });
 
