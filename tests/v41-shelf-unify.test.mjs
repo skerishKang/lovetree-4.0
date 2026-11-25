@@ -80,7 +80,9 @@ test('#212 "한 권의 책" 강조는 장미색이 아니라 흐린 진주색이
 
 // 2. 책 카드 정보 줄.
 test('#212 사진 표지에는 이름을 올리지 않고 아래 두 줄에 이름·날짜를 둔다(261124 정리)', () => {
-  assert.match(shelf, /book\.coverMedia\?'':/, '사진 표지에는 제목을 겹치지 않는다');
+  // #1366: 사진 표지에는 이름을 가운데에 겹치지 않고 아래 띠(.cover-name-band)에 둔다.
+  // 낡은 글자 단정은 사진 표지에 제목을 아예 두지 않던 시절의 것이라 제거했다.
+  assert.ok(shelf.includes('cover-name-band'), '사진 표지 이름은 아래 띠에 둔다');
   assert.ok(shelf.includes('book-card-meta-title') && shelf.includes('book-card-meta-date'), '이름·날짜는 표지 아래 두 줄이다');
   assert.ok(!/book-card-meta"><strong>/.test(shelf), '표지 아래 중복 제목을 두지 않는다');
   // 2026-11-09: 정보 줄 계산은 shelf-model.mjs로 옮겼다. 261118: '마지막 YYYY-MM-DD' 대신 쉰 말('어제 추가'·'3일 전 추가', 7일 넘으면 날짜).

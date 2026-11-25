@@ -63,6 +63,10 @@ fi
 # 새 소스에서 .js가 빠지면 install-preflight의 import 그래프 시험이 잡는다.
 install -d -m 0755 "$app/public/v41"
 install -m 0644 "$source_root/public/v41/tags.mjs" "$app/public/v41/tags.mjs"
+# 트리별 열 화면을 읽는 src/domain.js와 함께 설치한다. 이전 소스로 되돌릴 때는 이 모듈이 없다.
+if [[ -f "$source_root/public/v41/tree-open-view.mjs" ]]; then
+  install -m 0644 "$source_root/public/v41/tree-open-view.mjs" "$app/public/v41/tree-open-view.mjs"
+fi
 install -m 0644 "$source_root/public/v41/youtube-id.mjs" "$app/public/v41/youtube-id.mjs"
 if [[ -f "$source_root/public/v41/youtube-id.js" ]]; then
   install -m 0644 "$source_root/public/v41/youtube-id.js" "$app/public/v41/youtube-id.js"

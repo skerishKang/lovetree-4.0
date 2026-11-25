@@ -1316,10 +1316,18 @@ html .main-nav>button#community-menu[aria-current=true]{font-weight:600}
 html[data-lt-auth-phase=pending] .app-header .tree-prefix{visibility:hidden}
 @media(min-width:781px){
  .app-header .brand{flex:0 0 112px;width:112px}
- .app-header .header-actions{display:grid;grid-template-columns:44px 122px 80px;align-items:center}
+ /* #1350: 로그아웃 확정 시 숨겨진 순간 추가 칸을 접어 테마와 계정 사이 간격을 복원합니다. */
+ .app-header .header-actions{display:grid;grid-template-columns:44px 80px;align-items:center}
  .app-header .header-actions>#theme-toggle{grid-column:1;grid-row:1}
  .app-header .header-actions>#write-menu{grid-column:2;grid-row:1;width:122px}
- .app-header .header-actions>.account-slot{grid-column:3;grid-row:1;width:80px;justify-content:flex-end}
+ .app-header .header-actions>.account-slot{grid-column:2;grid-row:1;width:80px;justify-content:flex-end}
+ /* 로그인 흔적이 있는 확인 중에는 122px를 예약하며, 확정 로그인에서도 유지합니다. */
+ html[data-lt-auth-phase=pending][data-lt-auth-hint=in] .app-header .header-actions,
+ html[data-lt-auth-phase=ready][data-lt-auth-hint=in] .app-header .header-actions,
+ html:not([data-lt-auth-phase=pending]) .app-header .header-actions:has(>#write-menu:not([hidden])){grid-template-columns:44px 122px 80px}
+ html[data-lt-auth-phase=pending][data-lt-auth-hint=in] .app-header .header-actions>.account-slot,
+ html[data-lt-auth-phase=ready][data-lt-auth-hint=in] .app-header .header-actions>.account-slot,
+ html:not([data-lt-auth-phase=pending]) .app-header .header-actions:has(>#write-menu:not([hidden]))>.account-slot{grid-column:3}
  .app-header .tree-slot{flex:0 0 208px;width:208px}
  .app-header .tree-prefix{flex:0 0 21px;width:21px;margin-right:8px}
  .app-header .tree-frame .tree-views{display:grid;grid-template-columns:56px 68px 56px 44px 56px;gap:2px}

@@ -76,7 +76,7 @@
     .crumbs span { padding: 0 8px; color: #c3aaa0; }
     .top-actions { display: flex; gap: 8px; margin-left: auto; }
     .ghost { min-height: 38px; padding: 0 15px; border: 1px solid var(--line); border-radius: var(--lt-r-pill); color: var(--ink); background: rgba(255,250,245,.74); font-size: 12px; }
-    .ghost:hover { border-color: var(--rose); color: var(--rose-deep); background: #fffaf5; }
+    .ghost:hover { border-color: var(--rose); color: var(--rose-deep); background: var(--paper-strong); }
 
     .page { position: relative; z-index: 10; max-width: 1480px; margin: 16px auto 0; }
     .shelf-screen { display: block; transition: opacity .48s ease, filter .48s ease; }
@@ -98,7 +98,7 @@
     .hero h1 { margin: 0 0 13px; font: 400 clamp(31px,3.7vw,53px)/1.2 var(--display); letter-spacing: -.08em; }
     .hero h1 em { color: var(--rose-deep); font-style: normal; }
     .hero-copy p:not(.eyebrow) { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.8; }
-    .shelf-jump { margin-top:14px; min-height:44px; padding:0 18px; border:1px solid #b99d99; border-radius:var(--lt-r-pill); background:#fffaf5; color:#704b55; font:inherit; font-size:12px; font-weight:700; cursor:pointer; }
+    .shelf-jump { margin-top:14px; min-height:44px; padding:0 18px; border:1px solid #b99d99; border-radius:var(--lt-r-pill); background:var(--paper-strong); color:#704b55; font:inherit; font-size:12px; font-weight:700; cursor:pointer; }
     .shelf-jump:focus-visible { outline:3px solid #85536c; outline-offset:3px; }
     .hero-shelf { position: absolute; left: 5%; right: 5%; bottom: 35px; height: 11px; border-radius: 3px; background: linear-gradient(#6e4536,#2d1c1a); box-shadow: 0 9px 0 #151214,0 17px 22px rgba(0,0,0,.55); }
     .hero-books { position: absolute; left: 8%; right: 8%; bottom: 45px; display: flex; align-items: end; justify-content: center; gap: 17px; }

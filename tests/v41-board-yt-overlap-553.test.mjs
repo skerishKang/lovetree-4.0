@@ -11,6 +11,8 @@ import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { createReadStream, readFileSync, mkdirSync } from 'node:fs';
 import { inspectYoutubeIframe, countYoutubeAutoplay } from './helpers/youtube-embed-audit.mjs';
+import { testBackNavigation } from './helpers/history-assert.mjs';
+import { createTree } from '../public/v41/domain.mjs';
 import { stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -513,4 +515,48 @@ test('#1378 보드: 재생 불가면 크게 보기 iframe 제거·원본 링크'
       assert.equal(await frame.locator('#viewerMedia iframe').count(),0,'닫은 뒤 iframe 0');
     }finally{await context.close();}
   }finally{await browser.close();await new Promise(r=>server.close(r));}
+});
+
+// #1298: 보드 영상 크게 보기 — 뒤로 가기 한 번으로 닫히고 스크롤은 그대로다.
+test('#1298 보드 영상 크게 보기 뒤로 가기: 창 닫힘·iframe 0·스크롤 유지(390·1440)', { skip: REQUIRE ? false : skip, timeout: 240000 }, async () => {
+  if (skip) assert.fail(skip);
+  const tree = createTree({ subject: '시험', title: '시험 순간', date: '2026-11-20', emotion: '설렘', note: '', url: 'https://youtu.be/dQw4w9WgXcQ' }, '2026-11-20T00:00:00.000Z');
+  const workspace = { revision: 1, subject: '시험계정', writeSubjectBound: true, savedAt: '2026-01-01T00:00:00.000Z', state: { version: 1, trees: [tree], prefs: {} } };
+  const server = await serve();
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch({ headless: true });
+  try {
+    for (const width of [390, 1440]) {
+      const context = await browser.newContext({ viewport: { width, height: width === 390 ? 844 : 900 }, reducedMotion: 'no-preference' });
+      try {
+        await context.route('**/api/**', r => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
+        await context.route('**/api/account**', r => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"email":"measure@example.invalid","subject":"시험계정"}' }));
+        await context.route('**/api/workspace**', r => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(workspace) }));
+        await context.route('**/i.ytimg.com/**', r => r.fulfill({ status: 200, contentType: 'image/svg+xml', body: YT_THUMB_SVG }));
+        await context.route('**/www.youtube-nocookie.com/**', r => r.fulfill({ status: 200, contentType: 'text/html', body: '<title>YouTube</title>' }));
+        await context.route('**/api/youtube/oembed*', r => r.fulfill({ status: 200, contentType: 'application/json', body: '{"title":"영상"}' }));
+        const page = await context.newPage();
+        await page.goto(base + '/v41/?account=1#home', { waitUntil: 'domcontentloaded' });
+        await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 30000 });
+        await page.locator('#discover-ask-no').click().catch(() => {});
+        await page.evaluate(() => document.querySelector('[data-view="track58-pinboard.html"]').click());
+        await page.waitForFunction(() => { const f = document.querySelector('#view:not([hidden])'); try { return !!f && /track58-pinboard/.test(f.contentWindow.location.href); } catch { return false; } }, null, { timeout: 20000 });
+        const frame = await (await page.$('#view:not([hidden])')).contentFrame();
+        await frame.waitForSelector('#cardLayer .card', { timeout: 20000 });
+        await frame.waitForFunction(() => { const a = [...document.querySelectorAll('#cardLayer .lt-yt-preview img')]; return a.length > 0 && a.every(i => i.complete); }, null, { timeout: 15000 }).catch(() => {});
+        await frame.evaluate(() => { const v = document.getElementById('viewport'); v.scrollTop = 120; v.scrollLeft = 40; });
+        const scroll = () => frame.evaluate(() => { const v = document.getElementById('viewport'); return { top: v.scrollTop, left: v.scrollLeft }; });
+        const before = await scroll();
+        await testBackNavigation(page, { frame, recorded: true, panels: ['#viewerModal.open'], settleMs: 400, timeoutMs: 10000, action: async () => {
+          await frame.evaluate(() => document.querySelector('#cardLayer .card [data-lt-play]').click());
+          await frame.waitForSelector('#viewerModal.open', { timeout: 8000 });
+        } });
+        const after = await frame.evaluate(() => ({ open: document.getElementById('viewerModal').classList.contains('open'), iframes: document.querySelectorAll('#viewerMedia iframe').length }));
+        assert.equal(after.open, false, '뒤로 가기로 크게 보기가 닫힌다');
+        assert.equal(after.iframes, 0, '뒤로 가기 뒤 iframe 0');
+        assert.deepEqual(await scroll(), before, '보드 스크롤 위치 유지');
+        console.log('BOARD_BACK', width, JSON.stringify({ before, after }));
+      } finally { await context.close(); }
+    }
+  } finally { await browser.close(); await new Promise(r => server.close(r)); }
 });
