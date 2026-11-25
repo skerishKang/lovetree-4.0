@@ -237,8 +237,8 @@ testOrSkip('#784 화면: 창 열림 때 항목 높이 ≥44px / 고른 그룹 �
     await page.waitForSelector('dialog.community-group-find[open]');
     const panelStillOpen = await page.evaluate(() => document.getElementById('community-panel')?.open);
     assert.equal(panelStillOpen, true, '그룹 찾기 창이 열려도 둘러보기 창은 열린다');
-    assert.ok((await page.locator('[role=option]').count()) >= 5, '그룹 목록이 뜬 두');
-    for (const opt of await page.locator('[role=option]').all()) {
+    assert.ok((await page.locator('#community-group-find[open] [role=option]').count()) >= 5, '그룹 목록이 뜬 두');
+    for (const opt of await page.locator('#community-group-find[open] [role=option]').all()) {
       const box = await opt.boundingBox();
       assert.ok(box && box.height >= 44, `항목 높이가 44 이상: ${box?.height}`);
     }
@@ -257,7 +257,6 @@ testOrSkip('#784 화면: 창 열림 때 항목 높이 ≥44px / 고른 그룹 �
     assert.ok(chipTops.every((t) => t === chipTops[0]), '칩은 한 줄이다');
 
     // 자동완성: 검색칸에 '방 탄'을 치면 후보 1위가 방탄소년단 — 공백을 무시한다.
-    await page.locator('.community-search-trigger').click();
     await page.locator('#community-query').click();
     await page.locator('#community-query').fill('방 탄');
     await page.waitForSelector('#community-suggest .community-suggest-option', { timeout: 3000 });
@@ -282,7 +281,7 @@ testOrSkip('#784 화면: 창 열림 때 항목 높이 ≥44px / 고른 그룹 �
     await page.waitForTimeout(200);
     await page.locator('button.community-group-find').evaluate(el=>el.click());
     await page.waitForSelector('dialog.community-group-find[open]');
-    for (const opt of await page.locator('[role=option]').all()) {
+    for (const opt of await page.locator('#community-group-find[open] [role=option]').all()) {
       assert.ok((await opt.boundingBox())?.height >= 44, '휴대폰에서도 항목 높이 44 이상');
     }
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);

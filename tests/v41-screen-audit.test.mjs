@@ -2633,7 +2633,7 @@ test('#972 서재·책 상세·둘러보기·새 소식 화면 치수', { skip: 
           const discover = await page.evaluate((screenWidth) => {
             const rect = sel => document.querySelector(sel).getBoundingClientRect();
             const rail = rect('#community-groups'), last = rect('#community-groups .community-group-chip:last-child');
-            const button = rect('.community-search-trigger'), popular = rect('#community-popular-stages');
+            const button = rect('#community-query'), popular = rect('#community-popular-stages');
             const form = rect('#community-search-form'), head = rect('#community-panel .panel-heading'), list = rect('.community-results');
             // #1330: 칩 줄은 가로로 넘기므로 보이는 끝은 칸 오른쪽에서 잘린다 — 잘린 뒤의 칩과 찾기 단추는 겹치지 않는다.
             const visibleLastRight = Math.min(last.right, rail.right);

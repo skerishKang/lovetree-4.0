@@ -378,7 +378,7 @@ jobs:
         run: |
           start=$(date +%s)
           npx vite build > /dev/null
-          node --test --test-concurrency=1 tests/v41-explore-moments-1025.test.mjs tests/v41-1286-moments.test.mjs
+          node --test --test-concurrency=1 tests/v41-explore-moments-1025.test.mjs tests/v41-1286-moments.test.mjs tests/v41-explore-sort-search-1363.test.mjs
           echo "둘러보기 순간 보기 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
 
       # #631: 의견 보내기 창 — 1440×900 에서 스크롤 없이 들어오고, 체크 상자와 글자가 같은 줄이며,

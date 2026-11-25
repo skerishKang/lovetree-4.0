@@ -642,7 +642,7 @@ test('#1294 둘러보기 트리·순간 탭과 미리보기·그룹 찾기 뒤�
    assert.equal(await page.locator('#community-preview').evaluate(el=>el.open),false,width+' 미리보기 복귀');
    assert.deepEqual(await navState(),home,width+' 미리보기 후 화면');
     // 그룹 찾기 칩이 없어졌으므로 상단 검색 확장에 기록이 쌓이지 않는지 확인한다.
-    await expectNoHistoryGrowth(page,async()=>page.locator('.community-search-trigger').click(),width+' 찾기 확장');
+    await expectNoHistoryGrowth(page,async()=>page.locator('#community-query').focus(),width+' 찾기 확장');
     assert.equal(await page.locator('#community-query').evaluate(el=>document.activeElement===el),true,width+' 찾기 입력 초점');
     assert.deepEqual(await navState(),home,width+' 찾기 확장 후 화면');
    // 감상 화면 이동은 별도 URL이며 뒤로 가기 한 번에 둘러보기 미리보기를 복원한다.
@@ -788,7 +788,7 @@ test('#1330 휴대폰 상단·카드 다듬기 — 캡슐 없음, 검색·정렬
         await page.waitForSelector('#community-list .community-card');
         await page.waitForTimeout(300);
         const facts = await page.evaluate(() => {
-          const tabs = document.querySelector('.community-tabs'), q = document.querySelector('#community-query'), s = document.querySelector('#community-sort');
+          const tabs = document.querySelector('.community-tabs'), q = document.querySelector('#community-query'), s = document.querySelector('.community-sort-trigger');
           const groups = document.querySelector('#community-groups'), find = document.querySelector('button.community-group-find');
           const badges = [...document.querySelectorAll('#community-list .community-cover-badges')];
           return {
@@ -971,14 +971,15 @@ test('둘러보기 윗줄과 AI 명예회원 공개 이름 — 390·1440 × 밤�
     assert.deepEqual(initial.names,['AI 명예회원 하늘'],width+'/'+theme+': AI 카드만 이름');
     assert.equal(initial.ownerLink,false,width+'/'+theme+': 만든 사람은 링크 아님');
     assert.deepEqual(initial.groups.slice(0,3),['전체','많은 그룹','적은 그룹'],width+'/'+theme+': 방문자 공개 수 순서');
-    await page.locator('.community-search-trigger').click();
-    assert.equal(await page.locator('#community-query').evaluate(e=>document.activeElement===e),true,width+'/'+theme+': 찾기 확장 후 입력 초점');
+    await page.locator('#community-query').focus();
+    assert.equal(await page.locator('#community-query').evaluate(e=>document.activeElement===e),true,width+'/'+theme+': 검색칸 직접 입력');
     assert.ok(await page.locator('#community-query').evaluate(e=>e.getBoundingClientRect().width)>20,width+'/'+theme+': 입력칸 확장');
     await page.locator('#community-query').fill('가수');
     await page.locator('#community-query').press('Enter');
-    await page.waitForFunction(()=>!document.querySelector('#community-feedback').hidden);
-    await page.locator('#community-sort').selectOption('popular');
-    assert.equal(await page.locator('#community-sort option[value="popular"]').textContent(),'인기순',width+'/'+theme+': 정렬 선택 이름');
+    assert.equal(await page.locator('#community-query').inputValue(),'가수');
+    await page.locator('.community-sort-trigger').click();
+    await page.locator('.community-sort-option[data-sort="popular"]').click();
+    assert.equal(await page.locator('#community-sort option[value="popular"]').textContent(),'많이 담긴 순',width+'/'+theme+': 정렬 선택 이름');
     assert.equal(await page.locator('#community-sort').inputValue(),'popular',width+'/'+theme+': 인기순 선택 유지');
     const yBefore=await page.locator('.community-top-row').evaluate(e=>e.getBoundingClientRect().height);
     await page.locator('#community-tab-moments').click();
