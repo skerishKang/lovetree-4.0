@@ -42,7 +42,7 @@ test('validateState(서버 벌)는 coverDesign을 저장하고 모르는 트리 
   const missing = serverDomain.validateState(stateOf(treeOf({})));
   assert.equal(missing.trees[0].coverDesign, '', '없으면 \'\'');
   // 표지 방법은 고른 저장본에만 있다 — 방법이 없던 옛 저장본에는 빈 값을 심지 않는다.
-  assert.deepEqual(Object.keys(missing.trees[0]).sort(), ['coverDesign', 'coverMomentId', 'createdAt', 'id', 'inbox', 'moments', 'subject', 'title', 'updatedAt'], '트리 필드는 이것만');
+  assert.deepEqual(Object.keys(missing.trees[0]).sort(), ['coverDesign', 'coverMomentId', 'createdAt', 'id', 'inbox', 'moments', 'openView', 'subject', 'title', 'updatedAt'], '트리 필드는 이것만');
   const chosen = serverDomain.validateState(stateOf(treeOf({ coverMode: 'design', coverDesign: 'texture-2' })));
   assert.equal(chosen.trees[0].coverMode, 'design', '고른 방법은 그대로 남는다(되돌리면 그대로 다시 보인다)');
   const junkMode = serverDomain.validateState(stateOf(treeOf({ coverMode: 'nope' })));

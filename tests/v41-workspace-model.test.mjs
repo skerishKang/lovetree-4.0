@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { resolveObjectURL } from 'node:buffer';
 import { workspaceModel } from '../public/v41/workspace-model.mjs';
+import { createBootRuntime } from '../public/v41/shell/boot-runtime.mjs';
 import vm from 'node:vm';
 import { MSG } from '../public/v41/frame-messages.mjs';
 import fs from 'node:fs';
@@ -20,6 +22,25 @@ test('all children and related connections survive without being confused',()=>{
   assert.deepEqual(result.trees[0].moments,input.state.trees[0].moments);
   assert.equal(result.trees[0].subject,'대상');assert.equal(result.trees[0].coverMomentId,'a');
 });
+test('백업 파일로 내보낸 네 트리의 열 화면을 파일 가져오기에서 그대로 읽는다', async () => {
+  const { state } = document();
+  const views = ['tree', 'board', 'book', 'network'];
+  state.trees = views.map(openView => ({ ...state.trees[0], id: 'tree-' + openView, openView }));
+  const runtime = { member: { state: () => state } };
+  createBootRuntime(runtime);
+  let downloaded;
+  const original = Object.getOwnPropertyDescriptor(globalThis, 'document');
+  try {
+    globalThis.document = { createElement: () => ({ click() { downloaded = resolveObjectURL(this.href); } }) };
+    runtime.backup();
+  } finally {
+    if (original) Object.defineProperty(globalThis, 'document', original);
+    else delete globalThis.document;
+  }
+  const imported = workspaceModel({ revision: 0, state: JSON.parse(await downloaded.text()) });
+  assert.deepEqual(imported.trees.map(tree => [tree.id, tree.openView]), views.map(view => ['tree-' + view, view]));
+});
+
 test('empty account stays empty; stale selection falls back to root',()=>{
   assert.deepEqual(workspaceModel({revision:0,state:{version:1,trees:[]}}).selection,{treeId:null,momentId:null});
   assert.equal(workspaceModel(document(),{momentId:'missing'}).selection.momentId,'root');
