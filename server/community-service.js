@@ -6,7 +6,7 @@ import {createRateLimiter} from './rate-limit.js';
 import {projectSharedTree,projectSharedTreeFromScan} from './share-service.js';
 import {readStoredDocument} from './workspace-service.js';
 import {refreshStageIndex} from './stage-index-refresh.js';
-import {ROLE_TESTER,ROLE_UNKNOWN,isAiTesterRole} from './admin-roles.js';
+import {ROLE_TESTER,ROLE_UNKNOWN,isAiTesterRole,aiTesterFor} from './admin-roles.js';
 import {coverModeOf} from '../src/domain.js';
 // 꼬리표 판정은 화면과 같은 한 벌 — 서버에 규칙을 복사하지 않는다(#627 3단계 '다른 팬 보기').
 import {parseTag, tagKey, isChannelLikeArtist} from '../public/v41/tags.mjs';
@@ -24,6 +24,38 @@ const TAG_MOMENT_LIMIT=30;
 // #1025 1단계 '순간' 보기 — 한 번에 내려주는 세로 순간 상한(요청으로 늘리지 않는다).
 const MOMENT_FEED_LIMIT=30;
 const clean=(value,max)=>typeof value==='string'?value.trim().slice(0,max):'';
+// 세로 순간 한 줄 모양 — 공개 목록(moments)과 내 순간(myMoments)이 같은 모양을 쓴다.
+function feedMomentItem(moment,tree,shareId,aiTester,videoId){
+ return {
+  id:moment.id,
+  videoId,
+  shareId,
+  treeTitle:tree.title,
+  title:moment.title,
+  url:moment.url||'',
+  thumbnail:safeYoutubeThumb(moment.mediaMetadata?.thumbnail||'')||(videoId?youtubeStageThumbUrl(videoId,'oardefault'):'')||moment.mediaMetadata?.thumbnail||'',
+  note:moment.note||'',
+  emotion:moment.emotion||'',
+  date:moment.date||'',
+  keywords:Array.isArray(moment.keywords)?moment.keywords.slice(0,12):[],
+  startSeconds:Number.isSafeInteger(moment.startSeconds)&&moment.startSeconds>=0?moment.startSeconds:null,
+  endSeconds:Number.isSafeInteger(moment.endSeconds)&&moment.endSeconds>Number(moment.startSeconds||0)?moment.endSeconds:null,
+  aiTester
+ };
+}
+// 2단계 칩: 세로 순간에서 가수 꼬리표를 센다(순간당 한 번, 채널성 이름 제외) — discover의 같은 규칙.
+function countArtistTags(keywords,groupCounts){
+ const counted=new Set();
+ for(const raw of (Array.isArray(keywords)?keywords:[])){
+  const parsed=parseTag(raw);
+  if(!parsed||parsed.kindId!=='artist'||isChannelLikeArtist(parsed.value))continue;
+  const key=tagKey(parsed.value);
+  if(counted.has(key))continue;
+  counted.add(key);
+  const rec=groupCounts.get(key);
+  if(rec)rec.count+=1;else groupCounts.set(key,{value:parsed.value,count:1});
+ }
+}
 function jsonBody(request){
  if(!String(request?.headers?.['content-type']||'').toLowerCase().startsWith('application/json'))throw new ApiError(415,'unsupported_media_type','JSON 요청만 사용할 수 있어요.');
  try{return JSON.parse(typeof request.body==='string'?request.body:String(request.body||''));}
@@ -343,38 +375,41 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
      const id=videoId||moment.id;
      if(seen.has(id)||seen.has(moment.id))continue;
      seen.add(id);seen.add(moment.id);
-     // 2단계 칩: 공개 세로 순간에서 가수 꼬리표를 센다(순간당 한 번, 채널성 이름 제외) — discover의 같은 규칙.
-     const counted=new Set();
-     for(const raw of (Array.isArray(moment.keywords)?moment.keywords:[])){
-      const parsed=parseTag(raw);
-      if(!parsed||parsed.kindId!=='artist'||isChannelLikeArtist(parsed.value))continue;
-      const key=tagKey(parsed.value);
-      if(counted.has(key))continue;
-      counted.add(key);
-      const rec=groupCounts.get(key);
-      if(rec)rec.count+=1;else groupCounts.set(key,{value:parsed.value,count:1});
-     }
+     countArtistTags(moment.keywords,groupCounts);
      if(!matchesTag(moment))continue;
-     found.push({
-      id:moment.id,
-      videoId,
-      shareId:share.shareId,
-      treeTitle:tree.title,
-      title:moment.title,
-      url:moment.url||'',
-      thumbnail:safeYoutubeThumb(moment.mediaMetadata?.thumbnail||'')||(videoId?youtubeStageThumbUrl(videoId,'oardefault'):'')||moment.mediaMetadata?.thumbnail||'',
-      note:moment.note||'',
-      emotion:moment.emotion||'',
-      date:moment.date||'',
-      keywords:Array.isArray(moment.keywords)?moment.keywords.slice(0,12):[],
-      startSeconds:Number.isSafeInteger(moment.startSeconds)&&moment.startSeconds>=0?moment.startSeconds:null,
-      endSeconds:Number.isSafeInteger(moment.endSeconds)&&moment.endSeconds>Number(moment.startSeconds||0)?moment.endSeconds:null,
-      aiTester
-     });
+     found.push(feedMomentItem(moment,tree,share.shareId,aiTester,videoId));
     }
    }
    // Fisher-Yates — 무작위 순서지만 같은 배열 안에서 중복은 없다. random 은 시험에서 고정할 수 있다.
    for(let i=found.length-1;i>0;i--){const j=Math.floor(random()*(i+1));[found[i],found[j]]=[found[j],found[i]];}
+   const groups=[...groupCounts.values()].sort((a,b)=>b.count-a.count||String(a.value).localeCompare(String(b.value),'ko')).slice(0,6);
+   return {items:found.slice(0,want),total:found.length,groups};
+  },
+  // #1356 2단계 '내 순간': 로그인한 본인 작업공간의 세로 영상 순간만 최신순으로 준다.
+  // 비공개 트리의 순간도 본인 것이면 넣는다. 공개 조건·숨김·차단은 적용하지 않는다. 타인 지정 인자는 받지 않는다.
+  // 세로 판정(isVerticalMoment)·한 줄 모양(feedMomentItem)·칩 규칙(countArtistTags)은 공개 목록과 같은 한 벌을 쓴다.
+  async myMoments(subjectId,{limit=MOMENT_FEED_LIMIT,exclude=[]}={}){
+   const want=Number.isFinite(Number(limit))?Math.max(1,Math.min(MOMENT_FEED_LIMIT,Math.floor(Number(limit)||MOMENT_FEED_LIMIT))):MOMENT_FEED_LIMIT;
+   const seen=new Set((Array.isArray(exclude)?exclude:[]).map(x=>String(x||'').trim()).filter(Boolean));
+   const stored=await workspaceRepo.load({productId,subjectId});
+   const scan=stored?validateDocument(stored.doc):null;
+   if(!scan)return {items:[],total:0,groups:[]};
+   const shareOf=new Map();
+   for(const row of await shareRepo.list({productId,subjectId})){if(row.status==='active'&&!shareOf.has(row.treeId))shareOf.set(row.treeId,row.shareId);}
+   const aiTester=await aiTesterFor({admin,productId,subjectId});
+   const groupCounts=new Map(),found=[];
+   for(const source of scan.state.trees){
+    const tree=projectSharedTreeFromScan(scan,source.id).tree;
+    for(const moment of tree.moments){
+     if(!isVerticalMoment(moment))continue;
+     const videoId=youtubeIdFrom(moment.url||moment.externalUrl||'');
+     if(seen.has(videoId||moment.id)||seen.has(moment.id))continue;
+     countArtistTags(moment.keywords,groupCounts);
+     found.push(feedMomentItem(moment,tree,shareOf.get(source.id)||null,aiTester,videoId));
+    }
+   }
+   // 최신순(무대 날짜). 같은 날짜는 트리 순서를 그대로 둔다(Array.prototype.sort는 안정 정렬).
+   found.sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
    const groups=[...groupCounts.values()].sort((a,b)=>b.count-a.count||String(a.value).localeCompare(String(b.value),'ko')).slice(0,6);
    return {items:found.slice(0,want),total:found.length,groups};
   },
@@ -474,6 +509,8 @@ export function createCommunityHandler({authenticate,service,productId}){
   if(path==='/api/public/moments'&&method==='GET'){const who=await principal(request,false);return {status:200,body:await service.moments({limit:query.get('limit')||MOMENT_FEED_LIMIT,exclude:String(query.get('exclude')||'').split(',').map(x=>x.trim()).filter(Boolean),tag:String(query.get('tag')||''),viewerSubjectId:who?.subjectId||null,shareId:query.has('shareId')?String(query.get('shareId')):null}),headers:NO_STORE};}
   if(path==='/api/community/stats'&&method==='GET'){return {status:200,body:await service.discoverTotals(),headers:{...NO_STORE,'cache-control':'public, max-age=60'}};}
   if(path==='/api/community/shares'&&method==='GET'){const who=await principal(request,false);return {status:200,body:await service.discover({query:query.get('q')||'',emotion:query.get('emotion')||'',artistGroup:query.get('artist')||'',cursor:query.get('cursor')||'',limit:query.get('limit')||12,viewerSubjectId:who?.subjectId||null,sort:query.get('sort')||'latest'}),headers:NO_STORE};}
+  // #1356 2단계 '내 순간': 로그인 전용. 본인 작업공간의 세로 순간만 준다(타인 지정 인자는 무시).
+  if(path==='/api/community/me/moments'&&method==='GET'){const who=await principal(request);return {status:200,body:await service.myMoments(who.subjectId,{limit:query.get('limit')||MOMENT_FEED_LIMIT,exclude:String(query.get('exclude')||'').split(',').map(x=>x.trim()).filter(Boolean)}),headers:NO_STORE};}
   if(path==='/api/community/me/favorites'&&method==='GET'){const who=await principal(request);return {status:200,body:{shareIds:await service.favorites(who.subjectId)},headers:NO_STORE};}
   if(path==='/api/community/admin/reports'&&method==='GET'){const who=await principal(request);return {status:200,body:{reports:await service.reports(who)},headers:NO_STORE};}
   const moderate=path.match(/^\/api\/community\/admin\/reports\/([^/]+)$/);
