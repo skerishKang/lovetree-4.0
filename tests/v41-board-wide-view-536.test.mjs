@@ -331,6 +331,8 @@ test('#1359 넓은 보드와 지도, 최근 순간 및 휴대폰 회귀', {skip:
     },{tree:chainTree(n),theme});
     await page.goto(base + '/v41/views/track' + (screen==='board'?'58-pinboard':'56-network') + '.html', { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(screen => screen==='board' ? document.querySelectorAll('#cardLayer .card').length>0 : !!window.__lt, screen);
+    // 지도 도구 줄은 모듈에서 장착되므로 초기 화면 이동 중에 전후를 비교하지 않는다.
+    if (screen === 'network') await page.waitForSelector('.lt-screen-toolbar', { state: 'attached' });
     await page.evaluate(() => document.fonts.ready);
     return page;
   }
