@@ -637,7 +637,10 @@ test('#657 화면 공통 검사기: 아홉 화면 둘레·스크롤 주인 관�
         assert.equal(row.shell.toast.position, toast.position, `${label} 안내는 문서 흐름 칸이다`);
         assert.equal(row.shell.toast.flex, toast.flex, `${label} 안내는 flex 고정 칸이다`);
         assert.ok(Math.abs(row.shell.toast.rect.height - toast.height[width]) <= 0.002, `${label} 안내 높이`);
-        assert.deepEqual(row.shell.toast.margin, toast.margin[width], `${label} 안내 여백`);
+        assert.deepEqual([row.shell.toast.margin[0], row.shell.toast.margin[2]], [toast.margin[width].top, toast.margin[width].bottom], `${label} 안내 세로 여백`);
+        assert.ok(row.shell.toastCenterDelta <= toast.centeringTolerance, `${label} 안내 좌우 여백 차이 ${row.shell.toastCenterDelta}px`);
+        assert.equal(row.shell.toastHorizontalOverflow, toast.horizontalOverflow, `${label} 안내 가로 넘침`);
+        assert.equal(row.shell.toastWithinViewport, toast.withinViewport, `${label} 안내가 화면 안에 있다`);
         const shortfall = baseline.screens.iframe.stage.height[width] - stage.rect.height;
         assert.ok(Math.abs(shortfall - expected.stageShortfall[width]) <= 0.002, `${label} 안내가 줄인 stage 높이 ${shortfall}`);
       }

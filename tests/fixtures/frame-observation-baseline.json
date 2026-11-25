@@ -365,9 +365,12 @@
         "flex": "0 0 auto",
         "height": { "390": 32.188, "1440": 41 },
         "margin": {
-          "390": ["2px", "40.0781px", "2px", "40.0781px"],
-          "1440": ["4px", "557.078px", "54px", "557.078px"]
-        }
+          "390": { "top": "2px", "bottom": "2px" },
+          "1440": { "top": "4px", "bottom": "54px" }
+        },
+        "centeringTolerance": 1,
+        "horizontalOverflow": 0,
+        "withinViewport": true
       },
       "stageShortfall": { "390": 36.187, "1440": 99 }
     }

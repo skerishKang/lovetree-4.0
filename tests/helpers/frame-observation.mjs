@@ -72,7 +72,11 @@ export async function measureFrame(page, screen, theme, width, height) {
     const panel = screen.panel ? document.querySelector(screen.panel) : null;
     const stage = document.getElementById('stage');
     const toast = document.getElementById('toast');
-    const shell = { bodyClass: document.body.className, body: style(document.body), stage: style(stage), frame: style(frame), panel: panel ? { ...style(panel), open: panel.open } : null, toast: style(toast), toastHidden: toast?.hidden ?? null, visitorIntro: toast?.hasAttribute('data-visitor-intro') ?? null, children: [...document.body.children].map(e => ({ id: e.id, tag: e.tagName, className: String(e.className || ''), hidden: e.hidden, ...style(e) })) };
+    const bodyRect = document.body.getBoundingClientRect(), toastRect = toast?.getBoundingClientRect();
+    const toastCenterDelta = toastRect ? Math.abs((toastRect.left - bodyRect.left) - (bodyRect.right - toastRect.right)) : null;
+    const toastHorizontalOverflow = toast ? toast.scrollWidth - toast.clientWidth : null;
+    const toastWithinViewport = !!toastRect && toastRect.left >= bodyRect.left && toastRect.right <= bodyRect.right;
+    const shell = { bodyClass: document.body.className, body: style(document.body), stage: style(stage), frame: style(frame), panel: panel ? { ...style(panel), open: panel.open } : null, toast: style(toast), toastCenterDelta, toastHorizontalOverflow, toastWithinViewport, toastHidden: toast?.hidden ?? null, visitorIntro: toast?.hasAttribute('data-visitor-intro') ?? null, children: [...document.body.children].map(e => ({ id: e.id, tag: e.tagName, className: String(e.className || ''), hidden: e.hidden, ...style(e) })) };
     const candidates = [];
     const collect = (doc, owner) => {
       for (const e of doc.querySelectorAll('body,body *')) {
