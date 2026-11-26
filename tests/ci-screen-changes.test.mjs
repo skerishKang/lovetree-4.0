@@ -226,4 +226,11 @@ test('#1413 5단계: 옮긴 시험 위치·보드 둘째 잡 고르기·공통 �
   const shardTests = auditNames.filter((n) => /^#657 화면 공통 검사기/.test(n));
   assert.equal(shardTests.length, 2, '#657 거르기에 걸리는 시험은 조합을 나눠 도는 두 시험뿐이다');
   assert.ok(auditSrc.includes('process.env.LT_SCREEN_AUDIT_SHARD'), '두 시험은 shard 환경값으로 조합을 고른다');
+  // 겉모습 비교(알림용): deploy 하나만 기다리고, before·after 캡처를 한 단계에서 동시에 찍은 뒤 둘 다 기다린다.
+  const visual = jobBody('visual');
+  assert.match(header(visual), /\n    needs: deploy\n/, '알림용 잡은 deploy만 기다린다');
+  assert.match(visual, /shoot before "\$BEFORE_BASE" visual-before & p1=\$!\n\s+shoot after "\$AFTER_BASE" visual-after & p2=\$!\n\s+wait \$p1; wait \$p2/, 'before·after를 동시에 찍고 둘 다 기다린다');
+  assert.match(visual, /timeout -k 15 420 node tools\/visual-baseline\/visual-baseline\.mjs capture/, '캡처 명령 상한 7분은 그대로다');
+  assert.ok(!/capture-(before|after)/.test(visual), '옛 단계 출력 이름이 남지 않는다');
+  assert.match(visual, /steps\.capture\.outputs\.before_status[\s\S]*steps\.capture\.outputs\.after_status/, '요약 표가 두 캡처의 종료 코드를 읽는다');
 });

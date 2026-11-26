@@ -1918,40 +1918,40 @@ jobs:
             echo "기준 커밋 배포 주소를 못 찾아 운영으로 대체: $(sed -n 's/.*reason=//p' "$RUNNER_TEMP/base.log" | head -1)"
           fi
       # ---- 겉모습 비교(visual-baseline, 2026-11-08): 알림만 하고 실패로 만들지 않는다 ----
-      - name: 기준 커밋 화면 캡처 — before
+      # #1413 5단계: 기준 커밋(before)과 미리보기(after) 캡처는 서로 다른 주소·폴더를 쓰는 독립 작업이라 동시에 찍는다.
+      # 둘을 차례로 찍던 때는 이 잡이 약 11분 동안 실행기 한 자리를 잡았다(호스트 실행기는 동시에 20자리뿐이라 겹친 PR의
+      # 화면 잡이 줄을 섰다). 필수 검사(미리보기 postdeploy)는 이 잡을 기다리지 않는다 — needs는 그대로 deploy 하나다.
+      # 명령마다 7분 상한(timeout 420)·로그·종료 코드·초는 전과 같고, 단계는 둘 다 끝날 때까지 기다린다.
+      - name: 기준·미리보기 화면 캡처 — before·after 동시
         if: needs.deploy.outputs.previewUrl != '' && steps.changes.outputs.ui == 'true'
-        id: capture-before
+        id: capture
         continue-on-error: true
         env:
           LOVETREE_POSTDEPLOY_BROWSER: chromium
+          BEFORE_BASE: ${{ steps.base.outputs.baseUrl }}/v41/
+          AFTER_BASE: ${{ needs.deploy.outputs.previewUrl }}/v41/
         run: |
           # 캡처가 일부 실패해도 종료 코드·로그 끝줄을 남긴다(bash -e면 echo·tail 전에 끝나 원인이 안 보였다).
           set +e
-          start=$(date +%s)
           # 2026-11-24: 단계 timeout-minutes로 끊으면 continue-on-error여도 잡 전체가 취소(빨강)된다.
           # 도구 안 상한(5분)에 더해 명령만 7분에서 끊어 단계는 종료 코드로 끝나게 한다(알림용 유지).
-          timeout -k 15 420 node tools/visual-baseline/visual-baseline.mjs capture \
-            --base "${{ steps.base.outputs.baseUrl }}/v41/" --out visual-before > "$RUNNER_TEMP/before.log" 2>&1
-          echo "status=$?" >> "$GITHUB_OUTPUT"
-          echo "seconds=$(( $(date +%s) - start ))" >> "$GITHUB_OUTPUT"
-          tail -5 "$RUNNER_TEMP/before.log" || true
-      - name: 미리보기 화면 캡처 — after
-        if: needs.deploy.outputs.previewUrl != '' && steps.changes.outputs.ui == 'true'
-        id: capture-after
-        continue-on-error: true
-        env:
-          LOVETREE_POSTDEPLOY_BROWSER: chromium
-        run: |
-          # 캡처가 일부 실패해도 종료 코드·로그 끝줄을 남긴다(bash -e면 echo·tail 전에 끝나 원인이 안 보였다).
-          set +e
-          start=$(date +%s)
-          # 2026-11-24: 단계 timeout-minutes로 끊으면 continue-on-error여도 잡 전체가 취소(빨강)된다.
-          # 도구 안 상한(5분)에 더해 명령만 7분에서 끊어 단계는 종료 코드로 끝나게 한다(알림용 유지).
-          timeout -k 15 420 node tools/visual-baseline/visual-baseline.mjs capture \
-            --base "${{ needs.deploy.outputs.previewUrl }}/v41/" --out visual-after > "$RUNNER_TEMP/after.log" 2>&1
-          echo "status=$?" >> "$GITHUB_OUTPUT"
-          echo "seconds=$(( $(date +%s) - start ))" >> "$GITHUB_OUTPUT"
-          tail -5 "$RUNNER_TEMP/after.log" || true
+          shoot() {
+            local name=$1 base=$2 out=$3 start
+            start=$(date +%s)
+            timeout -k 15 420 node tools/visual-baseline/visual-baseline.mjs capture \
+              --base "$base" --out "$out" > "$RUNNER_TEMP/$name.log" 2>&1
+            echo "$? $(( $(date +%s) - start ))" > "$RUNNER_TEMP/$name.result"
+          }
+          shoot before "$BEFORE_BASE" visual-before & p1=$!
+          shoot after "$AFTER_BASE" visual-after & p2=$!
+          wait $p1; wait $p2
+          for name in before after; do
+            read -r status seconds < "$RUNNER_TEMP/$name.result" || { status=1; seconds=0; }
+            echo "${name}_status=$status" >> "$GITHUB_OUTPUT"
+            echo "${name}_seconds=$seconds" >> "$GITHUB_OUTPUT"
+            echo "— $name 캡처 종료 코드 $status · ${seconds}초 —"
+            tail -5 "$RUNNER_TEMP/$name.log" || true
+          done
       - name: 화면 비교(장별 차이 %)
         if: needs.deploy.outputs.previewUrl != '' && steps.changes.outputs.ui == 'true'
         id: compare
@@ -1972,7 +1972,7 @@ jobs:
             {
               echo "## 겉모습 비교(visual-baseline) — 건너뜀"
               echo ""
-              echo "- 이유: 캡처/비교 산출물이 없습니다(before=${{ steps.capture-before.outputs.status }} after=${{ steps.capture-after.outputs.status }})."
+              echo "- 이유: 캡처/비교 산출물이 없습니다(before=${{ steps.capture.outputs.before_status }} after=${{ steps.capture.outputs.after_status }})."
               echo "- 캡처 로그: \`$RUNNER_TEMP/before.log\`, \`$RUNNER_TEMP/after.log\`"
             } >> "$GITHUB_STEP_SUMMARY"
             exit 0
@@ -1990,7 +1990,7 @@ jobs:
             --head-sha "$PR_SHA" \
             --base-label "${{ steps.base.outputs.baseLabel }}" \
             $LAG_ARG | head -40
-          echo "- 소요: 캡처 before ${{ steps.capture-before.outputs.seconds }}초 · after ${{ steps.capture-after.outputs.seconds }}초 · 비교 ${{ steps.compare.outputs.seconds }}초" >> "$GITHUB_STEP_SUMMARY"
+          echo "- 소요: 캡처 before ${{ steps.capture.outputs.before_seconds }}초 · after ${{ steps.capture.outputs.after_seconds }}초 · 비교 ${{ steps.compare.outputs.seconds }}초" >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         if: always() && needs.deploy.outputs.previewUrl != '' && steps.changes.outputs.ui == 'true'
         with:
