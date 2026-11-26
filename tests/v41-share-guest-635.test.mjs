@@ -874,7 +874,7 @@ test('방문자 공용 화면: 1440·390 책·보드·지도, 옛 공유 주소,
               assert.deepEqual(m.tabs,['트리','보드','책','지도'],width+' '+theme+' '+view+': 공유 탭 구성');
               assert.equal(m.browseVisible,true,'데스크톱 둘러보기 단추');
             } else {
-              assert.deepEqual(m.tabs,[],'모바일은 내 화면처럼 접기 메뉴에서 탭을 표시한다');
+              assert.deepEqual(m.tabs,[{book:'\uCC45',board:'\uBCF4\uB4DC',network:'\uC9C0\uB3C4'}[view]],'모바일은 내 화면처럼 접기 메뉴에서 탭을 표시한다');
               await visiting.page.locator('#mobile-more').click();
               const items=await visiting.page.locator('#header-overflow button').allTextContents();
               for(const name of ['트리','책','보드','지도','둘러보기'])assert.ok(items.includes(name),'모바일 메뉴 '+name);
@@ -889,7 +889,8 @@ test('방문자 공용 화면: 1440·390 책·보드·지도, 옛 공유 주소,
             assert.equal(m.pickerVisible,false,'트리 고르기 화면이 없다');
             const baseline=ownerLayouts[width][view];
             assert.ok(Math.abs(m.header.height-baseline.header.height)<=2,'공용 머리줄 높이 오차 2px 이하: '+JSON.stringify({width,view,theme,visitor:m.header,owner:baseline.header}));
-            assert.ok(Math.abs(m.stage.y-baseline.stage.y)<=2,'공용 화면 시작 위치 오차 2px 이하');
+            const ribbonHeight=await visiting.page.locator('#lt-visitor-caption').evaluate(el=>el.getBoundingClientRect().height);
+            assert.ok(Math.abs(m.stage.y-baseline.stage.y-ribbonHeight)<=2,'공용 화면 시작 위치 오차 2px 이하');
             if(view==='book'){
               assert.ok(m.toolbar && baseline.toolbar,'책 도구 줄을 실제로 표시한다');
               assert.ok(Math.abs(m.toolbar.height-baseline.toolbar.height)<=2,'책 도구 줄 높이 오차 2px 이하');
@@ -983,9 +984,9 @@ test('#1259 방문자 책 첫 안내가 제목과 크게 보기 영상 조작부
     const p=await context.newPage();await p.goto(base+'/v41/#share/'+shareId+'/book',{waitUntil:'domcontentloaded'});
     await p.waitForFunction(()=>window.LT41?.source==='share'&&!document.querySelector('#view').hidden&&!!document.querySelector('#view').contentDocument?.querySelector('.moment-title'),null,{timeout:15000});
     const f=p.frameLocator('#view'),toast=p.locator('#toast');
-    await toast.filter({hasText:'공개된 트리를 감상하는 화면이에요'}).waitFor({state:'visible'});
+    await p.locator('#lt-visitor-caption').waitFor({state:'visible'});
     const measure=()=>p.evaluate(()=>{
-     const t=document.querySelector('#toast'),f=document.querySelector('#view'),d=f.contentDocument;
+     const t=document.querySelector('#lt-visitor-caption'),f=document.querySelector('#view'),d=f.contentDocument;
      const box=(e,dx=0,dy=0)=>{const r=e.getBoundingClientRect();return {left:r.left+dx,right:r.right+dx,top:r.top+dy,bottom:r.bottom+dy,width:r.width,height:r.height}};
      const shown=e=>!!e&&e.checkVisibility({checkOpacity:true,checkVisibilityCSS:true});
      const tr=shown(t)?box(t):null,fr=box(f);

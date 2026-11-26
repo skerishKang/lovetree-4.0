@@ -227,3 +227,22 @@ button.lt-toolbar-tree-choice[aria-pressed=true]{background:var(--lt-role-accent
 button.lt-toolbar-tree-choice[aria-pressed=true]:is(:hover,:focus-visible){background:var(--lt-role-accent-bg);color:var(--lt-role-accent-ink)}
 button.lt-toolbar-tree-choice[aria-pressed=true] .lt-toolbar-tree-name,
 button.lt-toolbar-tree-choice[aria-pressed=true] .lt-toolbar-tree-caret{color:inherit}
+
+/* #1448: 도구 줄 트리 고르기 단추는 이름 길이만큼 넓어지고 화면 폭 안에서 줄어든다. 표지 칸은 고른 디자인 표지를 따른다. */
+.lt-toolbar-tree-choice{width:max-content;max-width:min(560px,calc(100vw - 200px));min-width:0;flex:0 1 auto}
+.lt-toolbar-tree-name{flex:0 1 auto;max-width:100%}
+.lt-toolbar-tree-thumb{border-radius:var(--lt-r-card);background:var(--lt-cover-1);flex-basis:30px}
+.lt-toolbar-tree-thumb[data-cover-design="texture-1"]{background:linear-gradient(180deg,var(--lt-stage-2),var(--lt-gold-line))}
+.lt-toolbar-tree-thumb[data-cover-design="texture-2"]{background:linear-gradient(90deg,var(--lt-stage-2),var(--lt-gold-line))}
+.lt-toolbar-tree-thumb[data-cover-design="texture-3"]{background:repeating-linear-gradient(0deg,var(--lt-line) 0 1px,transparent 1px 7px),var(--lt-paper)}
+.lt-toolbar-tree-thumb[data-cover-design="texture-4"]{background:radial-gradient(var(--lt-gold-line) 1px,transparent 1.4px),var(--lt-stage-2);background-size:7px 7px}
+.lt-toolbar-tree-thumb[data-cover-design="texture-5"]{background:linear-gradient(135deg,var(--lt-stage-2),var(--lt-gold-line),var(--lt-stage-2))}
+.lt-toolbar-tree-thumb[data-cover-design="texture-6"]{background:linear-gradient(180deg,var(--lt-gold-line),var(--lt-stage-2) 38%,var(--lt-gold-line))}
+@media(max-width:600px){.lt-toolbar-tree-choice{max-width:min(240px,calc(100vw - 160px))}}
+
+/* #1448: selector starts at the same left x in the five views, including first paint. */
+html[data-v41-screen]:is([data-v41-screen=shelf],[data-v41-screen=tree],[data-v41-screen=board],[data-v41-screen=book],[data-v41-screen=network]){--lt-toolbar-pad:24px}
+@media(max-width:600px){html[data-v41-screen]:is([data-v41-screen=shelf],[data-v41-screen=tree],[data-v41-screen=board],[data-v41-screen=book],[data-v41-screen=network]){--lt-toolbar-pad:10px}}
+
+/* #1448: identical typography gives identical intrinsic picker width in every view. */
+.lt-toolbar-tree-choice{font-family:'Pretendard Variable','Noto Sans KR',system-ui,sans-serif}
