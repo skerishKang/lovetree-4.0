@@ -1418,3 +1418,6 @@ body.lt-header-visitor #toast[data-visitor-intro]{display:none}
 .lt-toolbar-picker .tree-cover{position:relative;background:var(--lt-cover-1)}
 .lt-toolbar-picker .tree-cover-letter{position:absolute;inset:0;display:grid;place-items:center;color:var(--lt-role-text-strong);font-weight:700}
 .lt-toolbar-picker .tree-cover img{position:relative;z-index:1;background:var(--lt-cover-1)}
+
+/* #1350: ??? ?? ??? ?? ?? ?? ????. */
+@media(max-width:780px){.app-header .header-actions>.account-slot{flex:0 0 66px;width:66px}}
