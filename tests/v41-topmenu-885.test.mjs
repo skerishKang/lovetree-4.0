@@ -365,11 +365,17 @@ test('970 실행: 트리 드롭다운은 Esc·바깥 누르기로 닫히고, 키
       assert.ok(page.url().includes(`tree=${wantTree}`), `${width}: Enter로 고른 트리가 열린다(${page.url().split('#')[1] || ''})`);
 
       // 바깥 누르기로 닫기: aria-expanded가 false로 돌아온다.
+      await page.waitForFunction(() => {
+        const frame = document.querySelector('iframe#view');
+        return frame?.contentWindow?.location.pathname.endsWith('/track61-tree.html') &&
+          !!frame.contentDocument?.querySelector('button.lt-toolbar-tree-choice');
+      }, null, { timeout: 5000 });
       await clickToolbarTreeChoice(page);
       await page.waitForFunction(() => !document.getElementById('tree-popover')?.hidden, null, { timeout: 5000 });
       // 아이프레임 위 좌표는 부모 문서까지 클릭이 오지 않으므로 부모 머리줄 빈 곳을 누른다.
       await page.click(".app-header", { position: { x: 5, y: 5 } });
       await page.waitForFunction(() => document.getElementById('tree-popover')?.hidden, null, { timeout: 5000 });
+      await page.waitForFunction(() => document.querySelector('iframe#view')?.contentDocument?.querySelector('button.lt-toolbar-tree-choice')?.getAttribute('aria-expanded') === 'false', null, { timeout: 5000 });
       assert.equal(await treeChoiceExpanded(page), 'false', `${width}: 바깥을 누르면 닫히고 aria-expanded=false`);
       assert.equal(await page.evaluate(() => document.getElementById('tree-popover')?.contains(document.activeElement)), false, `${width}: 닫힌 목록 안에 초점이 남지 않는다`);
       await ctx.close();
