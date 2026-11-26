@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { serve, auditPage, failuresOf } from './helpers/screen-audit.mjs';
 import { waitForShownScreen } from './helpers/visible-frame.mjs';
 import { createTree, addMoment } from '../public/v41/domain.mjs';
+import './helpers/explore-moments-1441.mjs';
 
 const REQUIRE = process.env.LT_MOMENTS_1025_REQUIRE === '1';
 let chromium, skip = false;

@@ -6,7 +6,7 @@ import {join,resolve,extname} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {chromium} from 'playwright';
 
-const ROOT=resolve(fileURLToPath(new URL('..',import.meta.url)));
+const ROOT=resolve(fileURLToPath(new URL('../..',import.meta.url)));
 const PORT=4614;
 const SHOTS=process.env.LT_1441_SHOT_DIR||'';
 const ONLY=process.env.LT_1441_CAPTURE_ONLY==='1';
