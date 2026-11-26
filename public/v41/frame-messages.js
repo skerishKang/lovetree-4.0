@@ -24,7 +24,7 @@
     // 옛 화면에서 선택을 알릴 때 받던 이름이다.
     choose: fromView('lt41-choose', '없음'),
     cleanup: fromView('lt41-cleanup', '없음'),
-    community: fromView('lt41-community', '없음'),
+    community: fromView('lt41-community', 'tab? (trees|moments)'),
     dateStyle: fromShell('lt41-date-style', 'value'),
     example: fromView('lt41-example', 'view, momentId'),
     homeCards: fromShell('lt41-home-cards', 'mode'),
@@ -45,7 +45,7 @@
     move: fromView('lt41-move', 'momentId'),
     // pairs의 항목에는 id와 출발·도착 트리 식별값을 담는다.
     moveMoments: fromView('lt41-move-moments', 'momentIds, pairs, fromTreeId, toTreeId, targetLabel, noticeText, keepTreeId?'),
-    navigate: fromView('lt41-navigate', 'view'),
+    navigate: fromView('lt41-navigate', 'view, filter? (all|public)'),
     networkView: fromShell('lt41-network-view', 'value'),
     newTree: fromView('lt41-new-tree', '없음'),
     openBook: fromView('lt41-open-book', 'treeId, id'),
@@ -61,6 +61,7 @@
     report: fromView('lt41-report', 'message, where, at'),
     select: fromView('lt41-select', 'id'),
     setShelfView: fromView('lt41-set-shelf-view', 'value'),
+    shelfFilter: fromShell('lt41-shelf-filter', 'value'),
     shelfSelectTree: fromShell('lt41-shelf-select-tree', 'treeId'),
     shelfTree: fromView('lt41-shelf-tree', 'treeId'),
     shelfView: fromShell('lt41-shelf-view', 'value'),

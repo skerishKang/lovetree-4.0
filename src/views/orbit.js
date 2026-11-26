@@ -1,4 +1,6 @@
 import { MSG } from '../../public/v41/frame-messages.mjs';
+import {homeTitleDecision} from '../../public/v41/home-title-state.mjs';
+import {homeCenterState} from '../../public/v41/header-state.mjs';
 import {fetchVideoStatus} from '../../public/v41/video-status.mjs';
 import originalCSS from './orbit-source.css?inline';
 import {titleView, formatDisplayDate, embedUrl} from '../../public/v41/book-usability.mjs';
@@ -85,6 +87,22 @@ extraCSS+=`@keyframes lt-home-rise{from{opacity:0;transform:translateY(12px)}to{
 @media(prefers-reduced-motion:reduce){.center .lt-home-enter{animation:none;opacity:1;transform:none}}
 .card.lt-first-frame{visibility:hidden}
 .center[data-lt-home-wait] .lt-home-enter{animation-play-state:paused;opacity:0}
+.center .eyebrow{min-height:1.3em}.center h1{min-height:1em}.center>p:not(.center-note){min-height:3.6em}.center:has(.recent-card)>p:not(.center-note){min-height:1.9em}.center .actions{min-height:44px}
+.center[data-lt-title-pending] .lt-home-enter{animation:none;opacity:0;pointer-events:none}
+.center[data-lt-title-pending] .actions{visibility:hidden}
+.center .lt-home-pending-indicator{position:absolute;top:27%;left:50%;transform:translateX(-50%);width:min(240px,85vw);display:grid;justify-items:center;gap:9px;z-index:2;color:var(--lt-pearl);pointer-events:none}
+.center .lt-home-pending-indicator[hidden]{display:none}
+.lt-home-pending-orbit[hidden],.lt-home-pending-label[hidden]{display:none}
+.center[data-lt-empty-owned]>p:not(.center-note){min-height:3.6em}
+@media(max-width:650px){.center[data-lt-empty-owned] .actions{padding-bottom:44px}}
+.lt-home-pending-orbit{width:42px;height:42px;border-radius:50%;border:1px solid var(--lt-gold-line);display:grid;place-items:center;box-shadow:0 0 28px var(--lt-gold-glow);animation:lt-home-wait-pulse 2.8s ease-in-out infinite}
+.lt-home-pending-orbit:before{content:'';width:8px;height:8px;border-radius:50%;background:var(--lt-gold-deep);box-shadow:0 0 14px var(--lt-gold-glow)}
+.lt-home-pending-label{font-size:12px;letter-spacing:.06em;white-space:nowrap}
+.lt-home-pending-retry{font:inherit;font-size:12px;min-height:44px;padding:5px 12px;border:1px solid var(--lt-gold-line);border-radius:999px;background:var(--lt-stage);color:var(--lt-pearl);pointer-events:auto;cursor:pointer}
+@keyframes lt-home-wait-pulse{0%,100%{opacity:.58;transform:scale(.94)}50%{opacity:1;transform:scale(1.06)}}
+@media(prefers-reduced-motion:reduce){.lt-home-pending-orbit{animation:none}}
+
+@media(max-width:650px){.center:has(.recent-media.vertical) .actions{position:relative;top:-4px}}
 .lt-card-tip{position:absolute;z-index:4;left:50%;bottom:8px;transform:translateX(-50%);padding:3px 7px;border:1px solid var(--lt-gold-line);border-radius:999px;background:var(--lt-stage);color:var(--lt-pearl);font-size:12px;line-height:16px;white-space:nowrap;pointer-events:none;opacity:0}
 .card:has(.lt-fallback-notice) .lt-card-tip{bottom:44px}
 .world.lt-hint-ready .lt-card-tip{opacity:1}
@@ -97,7 +115,7 @@ extraCSS+=`@keyframes lt-home-rise{from{opacity:0;transform:translateY(12px)}to{
 @media(max-height:500px){.center{width:min(500px,62vw);top:45%}.center .eyebrow{margin-bottom:6px;font-size:10px}.center h1{font-size:30px}.center>p:not(.center-note){display:none}.center .actions{margin-top:12px}.center .recent-card{width:min(300px,40vw);margin-top:10px}.center .recent-media{aspect-ratio:16/7}.center-scrim{width:min(700px,90vw);height:min(300px,80dvh)}}
 `;
 
-export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSelect=()=>{},recordNote=null,examples=[],onOpen=null,empty=false,titleDisplay='both',momentList=null,dateStyle='dot',prefs=null,initialPicking=false,initialNotice=null,homePin=null,loggedIn}) {
+export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSelect=()=>{},recordNote=null,examples=[],onOpen=null,empty=false,titleDisplay='both',momentList=null,dateStyle='dot',prefs=null,initialPicking=false,initialNotice=null,homePin=null,loggedIn,homeTitlePending=false,homeTitleHint=false}) {
  performance.mark('m0');
  const example=context.readOnly;
  const {root:shadow, signal, track, dispose}=createView(host);
@@ -106,7 +124,9 @@ export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSel
  // mix-empty(사진 3장 미만)에서도 로그인 상태면 회원 문구가 나와야 한다. loggedIn을 넘기지 않으면(4.0) 기존 demo 규칙을 그대로 쓴다.
  // 카드는 demo대로 예시를 유지하고, 안내 줄(center-note)과 힌트도 카드 상태(demo)를 따른다 — mix-empty는 카드·안내 줄에만 영향을 준다.
  const noOwnMoments=loggedIn===true&&Array.isArray(momentList?.entries)&&momentList.entries.length===0;
- const titleDemo=noOwnMoments||(loggedIn===true?false:(loggedIn===false?true:demo));
+ const titleState=homeTitleDecision({pending:homeTitlePending,hint:homeTitleHint,loggedIn,momentCount:Array.isArray(momentList?.entries)?momentList.entries.length:null});
+ const titlePending=titleState==='pending';
+ const titleDemo=titleState==='guest';
  const records=orbitRecords(trees);
  // #347 후속: 화면 제목 한 벌(book-usability)로 큰 제목·작은 영상 제목·날짜를 그린다.
  const titleMode=titleDisplay;
@@ -192,8 +212,70 @@ export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSel
   // ▶ 단추·제목 달기는 그대로 따로 눌린다(마우스 클릭 범위·Enter·Space는 이전과 같다).
   return `<div class="recent-card mine" data-do="recent"><button type="button" class="recent-open" data-do="recent" aria-label="${esc(head)} 이어 보기"></button>${media}<span class="recent-meta"><span class="recent-head-row"><button type="button" class="recent-head" data-recent-head aria-haspopup="true" aria-expanded="false" aria-label="첫 화면 카드 고르기: ${recentHeader!==null?esc(recentHeader):'마지막 순간'}">${recentHeader!==null?esc(recentHeader):`마지막 순간${days===null?'':` · ${relativeDayLabel(days)}`}`}<span class="recent-head-arrow" aria-hidden="true"> ▾</span></button><button type="button" class="recent-change" data-recent-change aria-haspopup="true" aria-expanded="false" aria-label="첫 화면 카드 바꾸기">바꾸기</button></span><strong>${esc(head)}</strong><small>${esc(c.subject||'내 트리')} · 이어 보기 →</small></span></div>`;
  };
- performance.mark('m1');shadow.innerHTML=`<style>${originalCSS}${extraCSS}.auth-entry{white-space:nowrap}</style><section class="app" aria-label="${SERVICE} 첫 화면"><div class="topbar"><span class="brand">${SERVICE} · MEMORY ORBIT</span><div class="top-actions"><button class="menuBtn" data-do="index">순간 목록</button>${authHtml}</div></div><div class="world"></div><div class="center-scrim" aria-hidden="true"></div><div class="center" data-lt-keep-clear><div class="eyebrow lt-home-enter" style="--lt-home-order:0">${titleDemo?'나의 첫 순간':'다시 만나 반가워요'}</div><h1 class="lt-home-enter" style="--lt-home-order:1">${titleDemo?'좋아하는 순간부터.':'다시, 그 순간으로.'}</h1><p class="lt-home-enter" style="--lt-home-order:2">${titleDemo?'간직하고 싶은 장면에 마음을 남겨 보세요.<br>지금 떠오르는 순간 하나면 충분해요.':'기억은 아직 여기에서 이어지고 있어요.'}</p>${recentMoment?recentMarkup(recentMoment):''}<div class="actions lt-home-enter" style="--lt-home-order:4"><button class="subtleBtn primary-cta" data-do="${titleDemo?'new':'continue'}">${titleDemo?NEW_TREE:'이어 보던 순간'}</button><button class="subtleBtn" data-do="${titleDemo?'continue':'new'}">${titleDemo?'예시 순간 감상':NEW_TREE}</button><button class="subtleBtn" data-do="trees">${GO_TREES}</button></div></div></section><dialog class="orbit-dialog" aria-label="순간 감상"></dialog>`;
+ performance.mark('m1');shadow.innerHTML=`<style>${originalCSS}${extraCSS}.auth-entry{white-space:nowrap}</style><section class="app" aria-label="${SERVICE} 첫 화면"><div class="topbar"><span class="brand">${SERVICE} · MEMORY ORBIT</span><div class="top-actions"><button class="menuBtn" data-do="index">순간 목록</button>${authHtml}</div></div><div class="world"></div><div class="center-scrim" aria-hidden="true"></div><div class="center" data-lt-keep-clear${titlePending?' data-lt-title-pending':''}>${titlePending?'<div class="lt-home-pending-indicator" role="status" aria-live="polite" hidden><span class="lt-home-pending-orbit" aria-hidden="true"></span><span class="lt-home-pending-label">순간을 불러오는 중</span><button class="lt-home-pending-retry" type="button" data-do="title-retry" hidden>느리게 불러오고 있어요 · 다시 시도</button></div>':''}<div class="eyebrow lt-home-enter" style="--lt-home-order:0">${titlePending?'':titleDemo?'나의 첫 순간':'다시 만나 반가워요'}</div><h1 class="lt-home-enter" style="--lt-home-order:1">${titlePending?'':titleDemo?'좋아하는 순간부터.':'다시, 그 순간으로.'}</h1><p class="lt-home-enter" style="--lt-home-order:2">${titlePending?'':titleDemo?'간직하고 싶은 장면에 마음을 남겨 보세요.<br>지금 떠오르는 순간 하나면 충분해요.':'기억은 아직 여기에서 이어지고 있어요.'}</p>${recentMoment?recentMarkup(recentMoment):''}<div class="actions lt-home-enter"${titlePending?' inert aria-hidden="true"':''} style="--lt-home-order:4"><button class="subtleBtn primary-cta" data-do="${titleDemo?'new':'continue'}">${titlePending?'':titleDemo?NEW_TREE:'이어 보던 순간'}</button><button class="subtleBtn" data-do="${titleDemo?'continue':'new'}">${titlePending?'':titleDemo?'예시 순간 감상':NEW_TREE}</button><button class="subtleBtn" data-do="trees">${titlePending?'':GO_TREES}</button></div></div></section><dialog class="orbit-dialog" aria-label="순간 감상"></dialog>`;
  const app=shadow.querySelector('.app'),world=shadow.querySelector('.world'),dialog=shadow.querySelector('dialog');
+ const centerTitle=shadow.querySelector('.center');
+ const pendingIndicator=centerTitle?.querySelector('.lt-home-pending-indicator');
+ let pendingShowTimer=0,pendingSlowTimer=0;
+ if(titlePending&&pendingIndicator){
+  pendingShowTimer=setTimeout(()=>{if(centerTitle?.hasAttribute('data-lt-title-pending'))pendingIndicator.hidden=false;},400);
+  pendingSlowTimer=setTimeout(()=>{
+   if(!centerTitle?.hasAttribute('data-lt-title-pending'))return;
+   pendingIndicator.hidden=false;
+   pendingIndicator.querySelector('.lt-home-pending-orbit').hidden=true;
+   pendingIndicator.querySelector('.lt-home-pending-label').hidden=true;
+   pendingIndicator.querySelector('.lt-home-pending-retry').hidden=false;
+  },5000);
+  track(()=>{clearTimeout(pendingShowTimer);clearTimeout(pendingSlowTimer)});
+ }
+
+ const updateTitle=(isMember)=>{
+  if(!centerTitle || !centerTitle.isConnected)return;
+  clearTimeout(pendingShowTimer);clearTimeout(pendingSlowTimer);
+  pendingIndicator?.remove();
+  const owned=window.parent.document.body.dataset.member==='in';
+  const trees=window.parent.LT41?.trees||[];
+  const treeCount=Number(window.parent.document.body.dataset.treeCount||trees.length);
+  const treeZero=owned&&treeCount===0;
+  if(treeZero){centerTitle.dataset.ltEmptyOwned='1';world.querySelectorAll('.card').forEach(card=>card.remove());}
+  const guest=!isMember;
+  centerTitle.querySelector('.eyebrow').textContent=treeZero?'처음 시작해요':guest?'나의 첫 순간':'다시 만나 반가워요';
+  centerTitle.querySelector('h1').textContent=treeZero?'내 첫 순간':guest?'좋아하는 순간부터.':'다시, 그 순간으로.';
+  const p=centerTitle.querySelector('p.lt-home-enter, p:not(.center-note)');
+  if(p){const copy=treeZero?['첫 순간을 남겨 보세요.']:guest?['간직하고 싶은 장면에 마음을 남겨 보세요.','지금 떠오르는 순간 하나면 충분해요.']:['기억은 아직 여기에서 이어지고 있어요.'];p.classList.remove('lt-home-enter');p.innerHTML=copy.map((line,i)=>`<span class="lt-home-line lt-home-enter" style="--lt-home-order:${2+i}">${line}</span>`).join('');}
+  const momentCount=trees.reduce((n,t)=>n+(t?.moments?.length||0),0);
+  const plan=homeCenterState({member:isMember?'in':'out',treeCount:trees.length,momentCount});
+  const buttons=[...centerTitle.querySelectorAll('.actions button')].slice(0,3);
+  buttons.forEach((b,i)=>{
+   if(treeZero){
+    b.hidden=i===2;
+    if(i===0){b.dataset.do='new';b.textContent='첫 순간 추가';b.classList.add('primary-cta');b.onclick=e=>{e.stopPropagation();actions.requestMoment('new');};}
+    if(i===1){b.dataset.do='example';b.textContent='예시 둘러보기';b.classList.remove('primary-cta');}
+    return;
+   }
+   const item=plan.buttons[i];if(!item)return;b.hidden=false;b.dataset.do=item.key;b.textContent=item.label;b.classList.toggle('primary-cta',item.emphasis);
+  });
+  centerTitle.querySelector('.actions')?.removeAttribute('inert');
+  centerTitle.querySelector('.actions')?.removeAttribute('aria-hidden');
+  centerTitle.removeAttribute('data-lt-title-pending');
+ };
+ if(!homeTitlePending&&loggedIn===true&&empty)updateTitle(false);
+ if(homeTitlePending){
+  const parentRoot=window.parent.document.documentElement;
+  const finish=()=>{
+   if(parentRoot.dataset.ltAuthPhase!=='ready')return;
+   const owned=window.parent.document.body.dataset.member==='in';
+   const trees=window.parent.LT41?.trees||[];
+   const total=trees.reduce((n,t)=>n+(t?.moments?.length||0),0);
+   updateTitle(owned&&total>0);
+   observer.disconnect();
+  };
+  const observer=new MutationObserver(finish);
+  observer.observe(parentRoot,{attributes:true,attributeFilter:['data-lt-auth-phase']});
+  finish();
+  track(()=>observer.disconnect());
+ }
+
  shadow.querySelector('.center')?.setAttribute('data-lt-home-wait','');
  // Separate the two descriptive lines without inserting or removing any layout box.
  const description=shadow.querySelector('.center > p.lt-home-enter');
@@ -456,7 +538,7 @@ const toggleRecentPlay=btn=>{if(!recentMoment)return;const card=shadow.querySele
  const frame=document.createElement('iframe');frame.className='recent-frame';frame.src=embed;frame.title=mainOf(recentMoment)||'YouTube 영상';frame.allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';frame.allowFullscreen=true;frame.setAttribute('referrerpolicy','strict-origin-when-cross-origin');media.querySelector('img')?.setAttribute('hidden','');media.append(frame);recentFrame=frame;if(matchMedia('(max-width:650px)').matches){recentCardSlot=document.createComment('recent-card-slot');card.before(recentCardSlot);shadow.append(card);card.classList.add('is-playing-mobile');signalRecentView(true);history.pushState({...history.state,ltRecentPlaying:true},'');recentHistory=true;}btn.setAttribute('aria-label','정지');const glyph=btn.querySelector('span');if(glyph)glyph.textContent='■';btn.focus();};
 addEventListener('popstate',()=>{if(recentFrame&&recentHistory){recentHistory=false;const btn=shadow.querySelector('[data-recent-play]');if(btn){toggleRecentPlay(btn);btn.focus();}}},{signal});
 shadow.addEventListener('keydown',e=>{if(e.key==='Escape'&&recentFrame){const btn=shadow.querySelector('[data-recent-play]');if(btn){e.preventDefault();toggleRecentPlay(btn);btn.focus();}}},{signal});
-shadow.addEventListener('click',e=>{const play=e.target.closest('[data-recent-play]');if(play){e.stopPropagation();toggleRecentPlay(play);return;}const b=e.target.closest('button');if(!b){if(!e.target.closest?.('[data-lt-title-edit]')&&e.target.closest?.('[data-do=recent]'))openRecent();return;}if(b.dataset.next){if(suppressClickKey&&suppressClickKey===b.dataset.next){suppressClickKey='';return;}if(picking){const key=b.dataset.next;if(pickedKeys.has(key))pickedKeys.delete(key);else pickedKeys.add(key);index();return;}focus(findMoment(b.dataset.next));return;}switch(b.dataset.do){case'close':dialog.close();break;case'new':actions.requestMoment('new');break;case'trees':actions.navigate('trees');break;case'continue':focus(lastCard);break;case'index':index();break;case'recent':if(!e.target.closest?.('[data-lt-title-edit]'))openRecent();break;}},{signal});
+shadow.addEventListener('click',e=>{const play=e.target.closest('[data-recent-play]');if(play){e.stopPropagation();toggleRecentPlay(play);return;}const b=e.target.closest('button');if(!b){if(!e.target.closest?.('[data-lt-title-edit]')&&e.target.closest?.('[data-do=recent]'))openRecent();return;}if(b.dataset.next){if(suppressClickKey&&suppressClickKey===b.dataset.next){suppressClickKey='';return;}if(picking){const key=b.dataset.next;if(pickedKeys.has(key))pickedKeys.delete(key);else pickedKeys.add(key);index();return;}focus(findMoment(b.dataset.next));return;}switch(b.dataset.do){case'close':dialog.close();break;case'new':actions.requestMoment('new');break;case'example':actions.community();break;case'title-retry':window.parent.location.reload();break;case'trees':actions.navigate('trees');break;case'continue':focus(lastCard);break;case'index':index();break;case'recent':if(!e.target.closest?.('[data-lt-title-edit]'))openRecent();break;}},{signal});
  dialog.addEventListener('close',()=>{opener?.focus();syncMotion();schedule();tagSelected.clear();tagExpanded.clear();picking=false;pickedKeys.clear();moveMenuFor=null;suppressClickKey='';indexNotice=null;},{signal});
  dialog.addEventListener('close',()=>{opener?.focus();syncMotion();schedule();tagSelected.clear();tagExpanded.clear();},{signal});
  // 목록 창도 바깥(동영상 뒤 배경)을 누르면 닫힌다(2026-11-16 대표 지적) — 상세 창은 '맨 위 창 하나' 규칙 그대로.

@@ -16,7 +16,9 @@ test('4.0 book and workspace actions preserve the selected 4.1 moment',()=>{
 });
 test('home writing modes are closed and library action uses the existing shelf',()=>{
  const f=setup();f.actions.requestMoment('new');f.actions.requestMoment('unsafe');f.actions.navigate('trees');
- assert.deepEqual(f.sent,[{type:'lt41-write',mode:'new'},{type:'lt41-navigate',view:'track32-bookshelf.html'}]);
+ assert.deepEqual(f.sent,[{type:'lt41-write',mode:'new'},{type:'lt41-navigate',view:'track32-bookshelf.html',filter:'all'}]);
+ f.actions.navigate('trees','public');
+ assert.deepEqual(f.sent.at(-1),{type:'lt41-navigate',view:'track32-bookshelf.html',filter:'public'});
 });
 test('login returns to a path accepted by shared auth and reloads a shared account',()=>{
  assert.equal(new URL(MEMBER_LOGIN_URL,'https://lovetree-4-0.pages.dev').searchParams.get('next'),'/v41/');
@@ -41,7 +43,7 @@ test('4.0 gold cards and the four 4.1 views refer to the same moments and edges'
  assert.deepEqual(links,exampleTree.edges.map(e=>`${e.from}/${e.to}`).sort());
 });
 
-test('home account and discovery buttons delegate to the existing shell actions',()=>{const f=setup();f.actions.account();f.actions.community();assert.deepEqual(f.sent,[{type:'lt41-account'},{type:'lt41-community'}]);});
+test('home account and discovery buttons delegate to the existing shell actions',()=>{const f=setup();f.actions.account();f.actions.community();f.actions.community('moments');assert.deepEqual(f.sent,[{type:'lt41-account'},{type:'lt41-community',tab:'trees'},{type:'lt41-community',tab:'moments'}]);});
 
 import {homePresentation} from '../v41/home-presentation.js';
 test('member homes with zero, one, or many records keep the same read-only original gallery',()=>{
@@ -56,7 +58,7 @@ test('gallery clicks never select a member moment, even when IDs overlap; naviga
  const c={source:'server',...context,momentId:'m02'},sent=[];
  const f=createHomeActions({getContext:()=>c,send:m=>sent.push(m),gallery:true});
  assert.equal(f.select('m01'),false);f.actions.openBook('orbit-example','m01');f.actions.navigate('trees');
- assert.deepEqual(sent,[{type:'lt41-example',view:'track59-sketchbook.html',momentId:'m01'},{type:'lt41-navigate',view:'track32-bookshelf.html'}]);
+ assert.deepEqual(sent,[{type:'lt41-example',view:'track59-sketchbook.html',momentId:'m01'},{type:'lt41-navigate',view:'track32-bookshelf.html',filter:'all'}]);
  assert.equal(c.momentId,'m02');
 });
 
