@@ -14,6 +14,8 @@ export function createScreens(deps) {
     isGuest = () => false,
     flowNavigation,
     paintEmptyForScreen,
+    authPending = () => false,
+    waitAuth,
     paintEmptyCopy,
     applyTheme,
     writeLocation,
@@ -224,6 +226,15 @@ export function createScreens(deps) {
       document.body.classList.remove('home-screen');
       hideFrames();
       document.querySelectorAll('[data-view]').forEach(b => b.setAttribute('aria-current', String(b.dataset.view === file || (file === 'track60-graph.html' && b.dataset.view === 'track56-network.html'))));
+      // #1487 후속(CTO 결정): 로그인 확인 중에 탭으로 연 안쪽 화면도 주소로 들어올 때처럼 '불러오는 중'을 보인다.
+      // 로그인 안내 같은 빈 상태는 확인이 끝난 뒤 셸이 그린다(workspace-runtime의 확인 대기).
+      if (authPending()) {
+        waitAuth?.();
+        if (write) writeLocation();
+        links();
+        syncTips?.();
+        return;
+      }
       paintEmptyForScreen?.(file);
       $('empty').hidden = false;
       if (write) writeLocation();
