@@ -3,7 +3,7 @@
 // 그 되돌리기는 'undoOrganize'. 같은 순간 판정은 quick-intake 한 벌(#876·#1439), 안내 시간은 공통 타이머(#1273).
 import { cleanupState, cleanupTargets, cleanupAvailable, moveAvailable, isInboxTree, pickerLabel, movedNotice, organizedNotice } from '../inbox-model.mjs';
 import { duplicatesByTree, sameMomentNoun } from '../quick-intake.mjs';
-import { thumbFallbackAttrs } from '../thumb-fallback.mjs';
+import { recentVideoFallbackMarkup, isVideoMoment } from '../thumb-fallback.mjs';
 import '../toast-timer.js';
 
 export function createCleanup(deps) {
@@ -89,10 +89,14 @@ export function createCleanup(deps) {
         thumbNode.alt = '';
         thumbNode.loading = 'lazy';
         thumbNode.referrerPolicy = 'no-referrer';
-        const attrs = thumbFallbackAttrs(moment, { candidates: candidates.length ? candidates : [thumb], mode: 'thumb-slot' });
-        const template = document.createElement('template');
-        template.innerHTML = `<img${attrs}>`;
-        for (const attr of template.content.firstElementChild.attributes) thumbNode.setAttribute(attr.name, attr.value);
+        const tone = emotionToneOf(moment.emotion);
+        const fallbackHtml = isVideoMoment(moment)
+          ? recentVideoFallbackMarkup(moment)
+          : `<span class="lt-thumb-tone" data-tone="${tone}" aria-hidden="true"></span>`;
+        thumbNode.setAttribute('data-lt-candidates', JSON.stringify(candidates.length ? candidates : [thumb]));
+        thumbNode.setAttribute('data-lt-cand-index', '0');
+        thumbNode.setAttribute('data-lt-fallback-mode', 'thumb-slot');
+        thumbNode.setAttribute('data-lt-fallback-html', fallbackHtml);
         thumbNode.src = thumb;
         slot.append(thumbNode);
         thumbNode = slot;
