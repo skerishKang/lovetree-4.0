@@ -1,5 +1,6 @@
 // 회원 기록 불러오기와 저장 상태 반영.
 import { MSG } from "../frame-messages.mjs";
+import {settleHomeTitleHint} from "../home-title-state.mjs";
 import {memberLoginUrl,shouldLoadMemberRecords} from "../member-entry.mjs";
 import {workspaceModel} from "../workspace-model.mjs";
 import {createWorkspaceApi, setMemberRefreshStarted} from "../api.mjs";
@@ -87,6 +88,7 @@ export function createMemberRuntime(ctx){
     if(memberCheckTimer){clearTimeout(memberCheckTimer);memberCheckTimer=0;}
     if(globalThis.document?.documentElement)delete globalThis.document.documentElement.dataset.ltAuthSlow;
    }
+   if(status.phase==='login'&&!status.dirty)settleHomeTitleHint(false,0,localStorage);
    if(status.phase==='synced'){
     // #984: 저장이 서버에서 확인되면(직전 미저장→synced) 열린 화면에 표지·이름 다시 그리기를 알린다.
     // 실패(rejected·offline·conflict·login)에서는 알리지 않는다 — 화면은 원래 표지를 그대로 두고 저장 안내 떠가 실패를 알린다.
@@ -95,6 +97,7 @@ export function createMemberRuntime(ctx){
     // #905: 자동 저장이 성공하면 알리지 않는다 — 직전에 저장 안 됨이었다면(previousDirty) 방금 저장된 것이다.
     // 알림은 실패·오프라인·충돌(저장 안내 떠)과 사용자가 누른 큰 동작의 완료 확인만 띄운다.
     const momentCount=(ctx.model?.trees||[]).reduce((n,tree)=>n+((tree.moments||[]).length),0);
+    settleHomeTitleHint(!!ctx.member?.snapshot()?.owned, momentCount, localStorage);
     // #1076: 서버 기록을 처음 불러왔을 때만 한 번 — 화면 이동·다시 띄우기로 오는 synced 상태에서는 띄우지 않는다.
     // #1320: '불러왔어요' 안내는 없앤다. 남기는 것은 기록 0개 새 계정의 첫 순간 안내(#549)뿐이다.
     if(!ctx.previousDirty&&status.writable&&momentCount===0){

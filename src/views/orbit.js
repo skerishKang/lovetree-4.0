@@ -1,4 +1,6 @@
-import { MSG } from '../../public/v41/frame-messages.mjs';
+﻿import { MSG } from '../../public/v41/frame-messages.mjs';
+import {homeTitleDecision} from '../../public/v41/home-title-state.mjs';
+import {homeCenterState} from '../../public/v41/header-state.mjs';
 import {fetchVideoStatus} from '../../public/v41/video-status.mjs';
 import originalCSS from './orbit-source.css?inline';
 import {titleView, formatDisplayDate, embedUrl} from '../../public/v41/book-usability.mjs';
@@ -85,6 +87,9 @@ extraCSS+=`@keyframes lt-home-rise{from{opacity:0;transform:translateY(12px)}to{
 @media(prefers-reduced-motion:reduce){.center .lt-home-enter{animation:none;opacity:1;transform:none}}
 .card.lt-first-frame{visibility:hidden}
 .center[data-lt-home-wait] .lt-home-enter{animation-play-state:paused;opacity:0}
+.center .eyebrow{min-height:1.3em}.center h1{min-height:1em}.center>p{min-height:3.6em}.center .actions{min-height:44px}
+.center[data-lt-title-pending] .lt-home-enter{animation:none;opacity:0;pointer-events:none}
+.center[data-lt-title-pending] .actions{visibility:hidden}
 .lt-card-tip{position:absolute;z-index:4;left:50%;bottom:8px;transform:translateX(-50%);padding:3px 7px;border:1px solid var(--lt-gold-line);border-radius:999px;background:var(--lt-stage);color:var(--lt-pearl);font-size:12px;line-height:16px;white-space:nowrap;pointer-events:none;opacity:0}
 .card:has(.lt-fallback-notice) .lt-card-tip{bottom:44px}
 .world.lt-hint-ready .lt-card-tip{opacity:1}
@@ -97,7 +102,7 @@ extraCSS+=`@keyframes lt-home-rise{from{opacity:0;transform:translateY(12px)}to{
 @media(max-height:500px){.center{width:min(500px,62vw);top:45%}.center .eyebrow{margin-bottom:6px;font-size:10px}.center h1{font-size:30px}.center>p:not(.center-note){display:none}.center .actions{margin-top:12px}.center .recent-card{width:min(300px,40vw);margin-top:10px}.center .recent-media{aspect-ratio:16/7}.center-scrim{width:min(700px,90vw);height:min(300px,80dvh)}}
 `;
 
-export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSelect=()=>{},recordNote=null,examples=[],onOpen=null,empty=false,titleDisplay='both',momentList=null,dateStyle='dot',prefs=null,initialPicking=false,initialNotice=null,homePin=null,loggedIn}) {
+export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSelect=()=>{},recordNote=null,examples=[],onOpen=null,empty=false,titleDisplay='both',momentList=null,dateStyle='dot',prefs=null,initialPicking=false,initialNotice=null,homePin=null,loggedIn,homeTitlePending=false,homeTitleHint=false}) {
  performance.mark('m0');
  const example=context.readOnly;
  const {root:shadow, signal, track, dispose}=createView(host);
@@ -106,7 +111,9 @@ export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSel
  // mix-empty(사진 3장 미만)에서도 로그인 상태면 회원 문구가 나와야 한다. loggedIn을 넘기지 않으면(4.0) 기존 demo 규칙을 그대로 쓴다.
  // 카드는 demo대로 예시를 유지하고, 안내 줄(center-note)과 힌트도 카드 상태(demo)를 따른다 — mix-empty는 카드·안내 줄에만 영향을 준다.
  const noOwnMoments=loggedIn===true&&Array.isArray(momentList?.entries)&&momentList.entries.length===0;
- const titleDemo=noOwnMoments||(loggedIn===true?false:(loggedIn===false?true:demo));
+ const titleState=homeTitleDecision({pending:homeTitlePending,hint:homeTitleHint,loggedIn,momentCount:Array.isArray(momentList?.entries)?momentList.entries.length:null});
+ const titlePending=titleState==='pending';
+ const titleDemo=titleState==='guest';
  const records=orbitRecords(trees);
  // #347 후속: 화면 제목 한 벌(book-usability)로 큰 제목·작은 영상 제목·날짜를 그린다.
  const titleMode=titleDisplay;
@@ -192,8 +199,41 @@ export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSel
   // ▶ 단추·제목 달기는 그대로 따로 눌린다(마우스 클릭 범위·Enter·Space는 이전과 같다).
   return `<div class="recent-card mine" data-do="recent"><button type="button" class="recent-open" data-do="recent" aria-label="${esc(head)} 이어 보기"></button>${media}<span class="recent-meta"><span class="recent-head-row"><button type="button" class="recent-head" data-recent-head aria-haspopup="true" aria-expanded="false" aria-label="첫 화면 카드 고르기: ${recentHeader!==null?esc(recentHeader):'마지막 순간'}">${recentHeader!==null?esc(recentHeader):`마지막 순간${days===null?'':` · ${relativeDayLabel(days)}`}`}<span class="recent-head-arrow" aria-hidden="true"> ▾</span></button><button type="button" class="recent-change" data-recent-change aria-haspopup="true" aria-expanded="false" aria-label="첫 화면 카드 바꾸기">바꾸기</button></span><strong>${esc(head)}</strong><small>${esc(c.subject||'내 트리')} · 이어 보기 →</small></span></div>`;
  };
- performance.mark('m1');shadow.innerHTML=`<style>${originalCSS}${extraCSS}.auth-entry{white-space:nowrap}</style><section class="app" aria-label="${SERVICE} 첫 화면"><div class="topbar"><span class="brand">${SERVICE} · MEMORY ORBIT</span><div class="top-actions"><button class="menuBtn" data-do="index">순간 목록</button>${authHtml}</div></div><div class="world"></div><div class="center-scrim" aria-hidden="true"></div><div class="center" data-lt-keep-clear><div class="eyebrow lt-home-enter" style="--lt-home-order:0">${titleDemo?'나의 첫 순간':'다시 만나 반가워요'}</div><h1 class="lt-home-enter" style="--lt-home-order:1">${titleDemo?'좋아하는 순간부터.':'다시, 그 순간으로.'}</h1><p class="lt-home-enter" style="--lt-home-order:2">${titleDemo?'간직하고 싶은 장면에 마음을 남겨 보세요.<br>지금 떠오르는 순간 하나면 충분해요.':'기억은 아직 여기에서 이어지고 있어요.'}</p>${recentMoment?recentMarkup(recentMoment):''}<div class="actions lt-home-enter" style="--lt-home-order:4"><button class="subtleBtn primary-cta" data-do="${titleDemo?'new':'continue'}">${titleDemo?NEW_TREE:'이어 보던 순간'}</button><button class="subtleBtn" data-do="${titleDemo?'continue':'new'}">${titleDemo?'예시 순간 감상':NEW_TREE}</button><button class="subtleBtn" data-do="trees">${GO_TREES}</button></div></div></section><dialog class="orbit-dialog" aria-label="순간 감상"></dialog>`;
+ performance.mark('m1');shadow.innerHTML=`<style>${originalCSS}${extraCSS}.auth-entry{white-space:nowrap}</style><section class="app" aria-label="${SERVICE} 첫 화면"><div class="topbar"><span class="brand">${SERVICE} · MEMORY ORBIT</span><div class="top-actions"><button class="menuBtn" data-do="index">순간 목록</button>${authHtml}</div></div><div class="world"></div><div class="center-scrim" aria-hidden="true"></div><div class="center" data-lt-keep-clear${titlePending?' data-lt-title-pending':''}><div class="eyebrow lt-home-enter" style="--lt-home-order:0">${titlePending?'':titleDemo?'나의 첫 순간':'다시 만나 반가워요'}</div><h1 class="lt-home-enter" style="--lt-home-order:1">${titlePending?'':titleDemo?'좋아하는 순간부터.':'다시, 그 순간으로.'}</h1><p class="lt-home-enter" style="--lt-home-order:2">${titlePending?'':titleDemo?'간직하고 싶은 장면에 마음을 남겨 보세요.<br>지금 떠오르는 순간 하나면 충분해요.':'기억은 아직 여기에서 이어지고 있어요.'}</p>${recentMoment?recentMarkup(recentMoment):''}<div class="actions lt-home-enter"${titlePending?' inert aria-hidden="true"':''} style="--lt-home-order:4"><button class="subtleBtn primary-cta" data-do="${titleDemo?'new':'continue'}">${titlePending?'':titleDemo?NEW_TREE:'이어 보던 순간'}</button><button class="subtleBtn" data-do="${titleDemo?'continue':'new'}">${titlePending?'':titleDemo?'예시 순간 감상':NEW_TREE}</button><button class="subtleBtn" data-do="trees">${titlePending?'':GO_TREES}</button></div></div></section><dialog class="orbit-dialog" aria-label="순간 감상"></dialog>`;
  const app=shadow.querySelector('.app'),world=shadow.querySelector('.world'),dialog=shadow.querySelector('dialog');
+ const centerTitle=shadow.querySelector('.center');
+ const updateTitle=(isMember)=>{
+  if(!centerTitle || !centerTitle.isConnected)return;
+  const guest=!isMember;
+  centerTitle.querySelector('.eyebrow').textContent=guest?'나의 첫 순간':'다시 만나 반가워요';
+  centerTitle.querySelector('h1').textContent=guest?'좋아하는 순간부터.':'다시, 그 순간으로.';
+  const p=centerTitle.querySelector('p.lt-home-enter, p:not(.center-note)');
+  if(p){const copy=guest?['간직하고 싶은 장면에 마음을 남겨 보세요.','지금 떠오르는 순간 하나면 충분해요.']:['기억은 아직 여기에서 이어지고 있어요.'];p.classList.remove('lt-home-enter');p.innerHTML=copy.map((line,i)=>`<span class="lt-home-line lt-home-enter" style="--lt-home-order:${2+i}">${line}</span>`).join('');}
+  const trees=window.parent.LT41?.trees||[];
+  const momentCount=trees.reduce((n,t)=>n+(t?.moments?.length||0),0);
+  const plan=homeCenterState({member:isMember?'in':'out',treeCount:trees.length,momentCount});
+  const buttons=[...centerTitle.querySelectorAll('.actions button')].slice(0,3);
+  buttons.forEach((b,i)=>{const item=plan.buttons[i];if(!item)return;b.dataset.do=item.key;b.textContent=item.label;b.classList.toggle('primary-cta',item.emphasis);});
+  centerTitle.querySelector('.actions')?.removeAttribute('inert');
+  centerTitle.querySelector('.actions')?.removeAttribute('aria-hidden');
+  centerTitle.removeAttribute('data-lt-title-pending');
+ };
+ if(homeTitlePending){
+  const parentRoot=window.parent.document.documentElement;
+  const finish=()=>{
+   if(parentRoot.dataset.ltAuthPhase!=='ready')return;
+   const owned=window.parent.document.body.dataset.member==='in';
+   const trees=window.parent.LT41?.trees||[];
+   const total=trees.reduce((n,t)=>n+(t?.moments?.length||0),0);
+   updateTitle(owned&&total>0);
+   observer.disconnect();
+  };
+  const observer=new MutationObserver(finish);
+  observer.observe(parentRoot,{attributes:true,attributeFilter:['data-lt-auth-phase']});
+  finish();
+  track(()=>observer.disconnect());
+ }
+
  shadow.querySelector('.center')?.setAttribute('data-lt-home-wait','');
  // Separate the two descriptive lines without inserting or removing any layout box.
  const description=shadow.querySelector('.center > p.lt-home-enter');

@@ -1,3 +1,4 @@
+import * as homeTitleState from '../public/v41/home-title-state.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -215,3 +216,27 @@ test('카드 메뉴: shadow DOM 클릭은 document retarget에도 안쪽으로 �
 
 // #952: 설정 창의 카드 출처·움직임 배선(#380 5번)과 날짜 표기 다시 띄우기 판정(#466 M2·2026-11-12 사고)
 // 은 실제 화면에서 잰다 — tests/v41-home-screen-952.test.mjs.
+
+
+test('#1437 pending home title hint preserves confirmed member without account data', () => {
+  const {readHomeTitleHint,settleHomeTitleHint,homeTitleDecision,HOME_TITLE_HINT_KEY} = homeTitleState;
+  const values=new Map();
+  const store={getItem:key=>values.get(key)||null,setItem:(key,value)=>values.set(key,value),removeItem:key=>values.delete(key)};
+  assert.equal(homeTitleDecision({pending:true,hint:false,loggedIn:false,momentCount:0}),'pending');
+  settleHomeTitleHint(true,3,store);
+  assert.equal(readHomeTitleHint(store),true);
+  assert.deepEqual([...values.entries()],[[HOME_TITLE_HINT_KEY,'1']]);
+  assert.equal(homeTitleDecision({pending:true,hint:true,loggedIn:false,momentCount:0}),'member');
+  assert.equal(homeTitleDecision({pending:false,hint:true,loggedIn:false,momentCount:0}),'guest');
+  assert.equal(homeTitleDecision({pending:false,hint:true,loggedIn:true,momentCount:0}),'guest');
+  assert.equal(homeTitleDecision({pending:false,hint:false,loggedIn:true,momentCount:2}),'member');
+  settleHomeTitleHint(true,0,store);
+  assert.equal(readHomeTitleHint(store),false);
+  settleHomeTitleHint(true,3,store);
+  settleHomeTitleHint(false,3,store);
+  assert.equal(values.size,0);
+  const blocked={getItem(){throw Error('blocked')},setItem(){throw Error('blocked')},removeItem(){throw Error('blocked')}};
+  assert.equal(readHomeTitleHint(blocked),false);
+  assert.doesNotThrow(()=>settleHomeTitleHint(true,3,blocked));
+  assert.doesNotThrow(()=>settleHomeTitleHint(false,0,blocked));
+});

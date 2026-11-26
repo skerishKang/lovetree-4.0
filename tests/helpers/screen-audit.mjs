@@ -24,7 +24,7 @@ export function distOrPublic() {
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.woff2': 'font/woff2' };
 
 // extraRoutes: { '/share-host.html': html } 처럼 시험용 호스트 페이지를 얹는다(#635 방식).
-export function serve(extraRoutes = {}) {
+export function serve(extraRoutes = {}, port = 0) {
   const ROOT = distOrPublic();
   const server = createServer(async (req, res) => {
     const clean = decodeURIComponent((req.url || '/').split('?')[0]);
@@ -39,7 +39,7 @@ export function serve(extraRoutes = {}) {
     }
     res.writeHead(404); res.end('not found');
   });
-  return new Promise((ok) => server.listen(0, '127.0.0.1', () => ok(server)));
+  return new Promise((ok) => server.listen(port, '127.0.0.1', () => ok(server)));
 }
 
 // 한 문서(프레임) 안의 네 가지 검사. 페이지·프레임마다 이 함수를 evaluate로 돌린다.

@@ -8,6 +8,7 @@ import {HOME_ORBIT_LIMIT, ltDateStyle, dateStyleOf, shouldReloadForDateStyle} fr
 import {fetchPopularCards} from './home-popular.js';
 import {createHomeActions} from './home-actions.js';
 import {homePresentation} from './home-presentation.js';
+import {readHomeTitleHint} from '../public/v41/home-title-state.mjs';
 import {applyHomeCenter} from './home-center.js';
 import {readTheme,writeTheme,appliedTheme,applyThemeAttribute} from '../public/v41/header-state.mjs';
 import {readTitleDisplay, titleDisplayOf, shouldReloadForTitleDisplay} from '../public/v41/book-usability.mjs';
@@ -28,6 +29,8 @@ const bridge=createHomeActions({getContext:()=>parent.LT41,send:message=>parent.
 const presentation=homePresentation(context);
 const loggedIn=presentation.centerState.member==='in';
 const hasMoments=presentation.centerState.momentCount>0;
+const homeTitlePending=parent.document.documentElement.dataset.ltAuthPhase==='pending';
+const homeTitleHint=homeTitlePending&&(()=>{try{return readHomeTitleHint(parent.localStorage)}catch{return false}})();
 // 2026-11-08 카드 출처: 예시/인기/내 것만/섞어서. 저장값이 없으면 로그인=섞어서, 로그아웃=예시.
 const mode=readHomeCardsMode(localStorage,{loggedIn});
 const popular=mode==='popular'?await fetchPopularCards({limit:HOME_ORBIT_LIMIT}):[];
@@ -70,7 +73,7 @@ const renderedTitleDisplay=titleDisplayOf(readTitleDisplay(parent.LT41));
  // 내 것만 0장은 예시로 대체하지 않고 빈 궤도와 첫 순간 안내를 남긴다.
  empty:cardsPlan.kind==='mine-empty',
  // #780: 큰 제목·부제목은 카드(mix-empty)가 비었는지보다 로그인 여부를 먼저 본다. 카드는 그대로 예시다.
- loggedIn,
+ loggedIn,homeTitlePending,homeTitleHint,
  momentList,
  prefs:parent.LT41?.prefs||null,
  titleDisplay:readTitleDisplay(parent.LT41),

@@ -1092,3 +1092,122 @@ test('#1378 첫 화면 YouTube 재생 불가 시 iframe 제거·원본 링크', 
     }
   }finally{await browser.close();}
 });
+
+
+test('#1437 delayed member response does not paint guest title, corrects stale hint without CLS', {skip:REQUIRE952?false:skip952,timeout:180000}, async()=>{
+ if(skip952)assert.fail(skip952);
+ const {mkdirSync}=await import('node:fs');
+ const {join}=await import('node:path');
+ const browser=await chromium952.launch({headless:true});
+ const server=await serve({},4143),base='http://127.0.0.1:4143';
+ const tree=tree952({subject:'시험 순간',count:3});
+ const testCases=[
+  {key:'member',member:true,trees:[tree],hint:false,expected:'다시, 그 순간으로.',neverGuest:true},
+  {key:'remembered',member:true,trees:[tree],hint:true,expected:'다시, 그 순간으로.',neverGuest:true},
+  {key:'empty',member:true,trees:[],hint:true,expected:'좋아하는 순간부터.'},
+  {key:'logout',member:false,trees:[],hint:true,expected:'좋아하는 순간부터.'}
+ ];
+ try{
+  for(const width of [1440,390])for(const scenario of testCases){
+   const ctx=await browser.newContext({viewport:{width,height:width===390?844:900},reducedMotion:'reduce'});
+   try{
+    await ctx.addInitScript(hint=>{
+     if(hint){try{localStorage.setItem('lt41.homeTitleHasMoments.v1','1')}catch{}}
+     globalThis.__1437Titles=[];
+     if(location.pathname.endsWith('/home.html')){
+      const probe=()=>{
+       const root=document.querySelector('#orbit')?.shadowRoot,center=root?.querySelector('.center');
+       if(center){const title=center.querySelector('h1')?.textContent||'',r=center.getBoundingClientRect();
+        const last=globalThis.__1437Titles.at(-1);
+        if(!last||last.title!==title||last.pending!==center.hasAttribute('data-lt-title-pending'))globalThis.__1437Titles.push({title,pending:center.hasAttribute('data-lt-title-pending'),height:r.height});}
+       requestAnimationFrame(probe);
+      };requestAnimationFrame(probe);
+     }
+    },scenario.hint);
+    const workspace={revision:1,state:{version:1,trees:scenario.trees,prefs:{}},subject:'home-title-test',writeSubjectBound:true,savedAt:'2026-11-26T00:00:00Z'};
+    await ctx.route('**/*',async route=>{
+     const u=new URL(route.request().url());
+     if(u.origin!==base)return route.abort();
+     if(u.pathname==='/api/workspace'){
+      await new Promise(resolve=>setTimeout(resolve,1500));
+      return scenario.member?route.fulfill({status:200,json:workspace}):route.fulfill({status:401,json:{error:'unauthorized'}});
+     }
+     if(u.pathname.startsWith('/api/'))return route.fulfill({status:200,json:{ok:true,items:[]}});
+     return route.continue();
+    });
+    const page=await ctx.newPage();
+    const capture=process.env.LT_HOME_1437_CAPTURE_DIR;
+    await page.goto(base+'/v41/'+(scenario.member?'?account=1':'')+'#home',{waitUntil:'domcontentloaded'});
+    if(capture&&scenario.key==='member'){
+     mkdirSync(capture,{recursive:true});
+     await page.screenshot({path:join(capture,`home-${width}-before.png`)});
+     await page.waitForTimeout(700);
+     await page.screenshot({path:join(capture,`home-${width}-during.png`)});
+    }
+    await page.waitForFunction(expect=>{
+     const frame=document.querySelector('#view');
+     return frame?.contentDocument?.querySelector('#orbit')?.shadowRoot?.querySelector('.center h1')?.textContent===expect;
+    },scenario.expected,{timeout:20000});
+    if(capture&&scenario.key==='member')await page.screenshot({path:join(capture,`home-${width}-after.png`)});
+    const result=await page.evaluate(()=>{
+     const f=document.querySelector('#view'),doc=f.contentDocument;
+     return {titles:doc.defaultView.__1437Titles||[],phase:document.documentElement.dataset.ltAuthPhase,headline:doc.querySelector('#orbit')?.shadowRoot?.querySelector('.center h1')?.textContent};
+    });
+    if(scenario.neverGuest)assert.ok(result.titles.every(row=>row.title!=='좋아하는 순간부터.'),JSON.stringify({width,scenario:scenario.key,result}));
+    assert.equal(result.headline,scenario.expected);
+    assert.equal(result.phase,'ready');
+    const h=result.titles.filter(t=>t.height>0).map(t=>t.height);
+    if(h.length>1)assert.ok(Math.max(...h)-Math.min(...h)<=1,`${width} ${scenario.key}: center shift ${h.join(',')}`);
+    console.log('#1437',width,scenario.key,JSON.stringify(result));
+    await page.close();
+   }finally{await ctx.close()}
+  }
+ }finally{await browser.close();await new Promise(ok=>server.close(ok));}
+});
+
+
+test('#1437 pending center is text-free until confirmed response and reserves stable height', {skip:REQUIRE952?false:skip952,timeout:90000},async()=>{
+ if(skip952)assert.fail(skip952);
+ const browser=await chromium952.launch({headless:true,args:['--disable-gpu']});
+ const server=await serve({'/1437-harness.html':'<!doctype html><html><head><script>document.documentElement.dataset.ltAuthPhase="pending";</script></head><body data-member="out" style="margin:0"><iframe src="/v41/home.html" style="border:0;width:100vw;height:100vh"></iframe></body></html>'},4144),base='http://127.0.0.1:4144';
+ const {mkdirSync}=await import('node:fs');const {join}=await import('node:path');
+ const tree=tree952({subject:'시험 순간',count:3});
+ try{
+  for(const width of [1440,390]){
+   const ctx=await browser.newContext({viewport:{width,height:width===390?844:900},reducedMotion:'reduce'});
+   try{
+    await ctx.route('**/*',route=>{
+     const u=new URL(route.request().url());if(u.origin!==base)return route.abort();
+     if(u.pathname.startsWith('/api/'))return route.fulfill({status:200,json:{ok:true,items:[]}});
+     return route.continue();
+    });
+    const page=await ctx.newPage();
+    await page.goto(base+'/1437-harness.html',{waitUntil:'domcontentloaded'});
+    const frame=await (await page.$('iframe')).contentFrame();
+    await frame.waitForFunction(()=>document.querySelector('#orbit')?.shadowRoot?.querySelector('.center[data-lt-title-pending]'),null,{timeout:15000});
+    const measure=()=>frame.evaluate(()=>{
+     const center=document.querySelector('#orbit').shadowRoot.querySelector('.center');
+     return {title:center.querySelector('h1')?.textContent||'',eyebrow:center.querySelector('.eyebrow')?.textContent||'',p:center.querySelector('p')?.textContent||'',actions:[...center.querySelectorAll('.actions button')].map(b=>b.textContent),pending:center.hasAttribute('data-lt-title-pending'),actionsHidden:getComputedStyle(center.querySelector('.actions')).visibility==='hidden',height:center.getBoundingClientRect().height};
+    });
+    const before=await measure();
+    assert.ok(before.pending&&!before.title&&!before.eyebrow&&!before.p&&before.actionsHidden,JSON.stringify(before));
+    const capture=process.env.LT_HOME_1437_PENDING_CAPTURE_DIR;
+    if(capture){mkdirSync(capture,{recursive:true});await page.screenshot({path:join(capture,`pending-${width}-before.png`),animations:'disabled',timeout:15000});}
+    await page.waitForTimeout(750);
+    const middle=await measure();assert.equal(middle.title,'');assert.equal(middle.pending,true);
+    if(capture)await page.screenshot({path:join(capture,`pending-${width}-during.png`),animations:'disabled',timeout:15000});
+    await page.waitForTimeout(750);
+    await page.evaluate(t=>{
+     window.LT41={trees:[t]};document.body.dataset.member='in';document.documentElement.dataset.ltAuthPhase='ready';
+    },tree);
+    await frame.waitForFunction(()=>document.querySelector('#orbit')?.shadowRoot?.querySelector('.center h1')?.textContent==='다시, 그 순간으로.',null,{timeout:5000});
+    const after=await measure();
+    if(capture)await page.screenshot({path:join(capture,`pending-${width}-after.png`),animations:'disabled',timeout:15000});
+    assert.equal(after.pending,false);assert.equal(after.actionsHidden,false);assert.ok(after.actions.every(Boolean));
+    assert.ok(Math.abs(after.height-before.height)<=1,`${width}: ${before.height} -> ${after.height}`);
+    console.log('#1437 PENDING',width,JSON.stringify({before,middle,after}));
+    await page.close();
+   }finally{await ctx.close()}
+  }
+ }finally{await browser.close();await new Promise(ok=>server.close(ok));}
+});
