@@ -25,6 +25,25 @@ test('자기 트리 화면의 공개 질문은 계속 열린다',async()=>{
  assert.equal(s.dialog.opened,1);
 });
 
+function setupWithDiscover(answer){
+ const dialog={dataset:{},showModal(){this.opened=(this.opened||0)+1;}};
+ const controls={'discover-ask':dialog,'discover-ask-feedback':{textContent:''},'discover-ask-yes':{},'discover-ask-no':{}};
+ const ctx={$:id=>controls[id],source:'server',model:{trees:[]},shareApi:{getTreeDiscover:async()=>answer}};
+ createDiscoverRuntime(ctx).mount();
+ return {ctx,dialog};
+}
+test('#1446 이미 소개 중인 트리(백필)에는 질문 창을 띄우지 않는다',async()=>{
+ const s=setupWithDiscover({ok:true,discover:true});
+ await s.ctx.askDiscover('tree1');
+ assert.equal(s.dialog.opened||0,0);
+});
+
+test('#1446 소개 값 확인에 실패하면 질문 창을 띄우지 않는다',async()=>{
+ const s=setupWithDiscover({ok:false});
+ await s.ctx.askDiscover('tree1');
+ assert.equal(s.dialog.opened||0,0);
+});
+
 test('공유 주소로 바뀐 직후 계정 상태가 남아 있어도 공개 질문을 열지 않는다',async()=>{
  const original=globalThis.location;
  globalThis.location={hash:'#share/example/book'};

@@ -73,6 +73,13 @@ test('검색은 이름·설명·꼬리표·장 제목을 보고 앞뒤 공백은
   assert.equal(findBook(books, 'tree2').name, '바다');
 });
 
+test('#1446 공개만 필터는 서버 shares로 표시된 책만 남긴다', () => {
+  const books = buildShelf([tree(), tree({ id: 'tree2', title: '바다', subject: '여름', moments: [moment('s1')] })], COVER_PALETTE, (v) => v);
+  books[1].public = true;
+  assert.deepEqual(filterShelf(books, 'public', '').map((b) => b.id), ['tree2']);
+  assert.deepEqual(filterShelf(books, 'all', '').map((b) => b.id), ['tree1', 'tree2']);
+});
+
 test('목록이 바뀌면 가운데 책을 다시 고른다', () => {
   const books = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
   assert.equal(resolveShelfIndex([], 'b', 2), 0);
