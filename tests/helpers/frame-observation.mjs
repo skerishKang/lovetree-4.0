@@ -119,6 +119,14 @@ async function finishBookObservation(page) {
     frame.contentWindow.dispatchEvent(new frame.contentWindow.Event('lt41-tagline-ready'));
   });
   await page.waitForFunction(() => { const frame = [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length); const doc = frame?.contentDocument; return !!doc?.querySelector('.moment') && !doc.querySelector('.moment.focused') && !doc.querySelector('.moment.landed'); }, null, { timeout: 30000 });
+  await page.evaluate(() => {
+    const frame = [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length), doc = frame.contentDocument;
+    const clean = () => doc.querySelectorAll('.moment.focused,.moment.landed').forEach(element => element.classList.remove('focused', 'landed'));
+    clean();
+    const observer = new MutationObserver(clean);
+    observer.observe(doc.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['class'] });
+    frame.contentWindow.__LT_FRAME_OBSERVATION_BOOK_GUARD__ = observer;
+  });
   await page.clock.fastForward(0);
 }
 
