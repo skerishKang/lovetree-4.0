@@ -194,6 +194,8 @@ export async function observeFrameMatrix({ browser, base, outputDir, shard = '' 
       await activePage.evaluate(() => {
         const frame = [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length);
         if (!frame) return;
+        const stage = document.getElementById('stage');
+        if (stage) { stage.style.willChange = 'transform'; stage.style.transform = 'translateZ(0)'; }
         frame.style.willChange = 'transform';
         frame.style.transform = 'translateZ(0)';
         frame.contentDocument?.querySelectorAll('.lt-screen-toolbar,button,select,.pill,.mini,.action,.close,.edge-tip,.recent-card,.leftPanel,.rightPanel,.detail-panel,.note-piece,.mobile-page,.mobile-content,.page-content,.photo-piece,.clipping,.letter,.film-piece')?.forEach(element => { element.style.willChange = 'transform'; const transform = getComputedStyle(element).transform; element.style.transform = transform === 'none' ? 'translateZ(0)' : transform + ' translateZ(0)'; });
