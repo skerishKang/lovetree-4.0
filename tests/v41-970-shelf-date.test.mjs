@@ -307,6 +307,62 @@ test('서재 — 회전 보기 휠은 레일에서만 한 칸, 연속 휠은 건
   });
 });
 
+// #1468: 회전 보기 밀기 — 판 폭 15%(최소 40px)부터 한 칸, 빠르게 튕기면 거리가 짧아도 한 칸. 휠 한 칸(#1438)은 그대로.
+test('서재 — #1468 회전 보기 밀기: 390에서 60px로 한 칸·빠른 튕기기 한 칸·짧고 느린 밀기는 제자리, 1440 휠은 한 칸', async (t) => {
+  if (skip) { if (REQUIRE) assert.fail(`화면 시험을 건너뛸 수 없습니다: ${skip}`); t.skip(skip); return; }
+  const center = (frame) => frame.evaluate(() => [...document.querySelectorAll('#shelfRail .book-card')].findIndex((c) => c.classList.contains('is-center')));
+  await withShelf(books(6), { width: 390, height: 844, view: 'carousel' }, async ({ page, frame, errors }) => {
+    // 진짜 포인터로 민다: stepPx만큼씩 옮기고 gap(ms)마다 다음 움직임 — gap이 크면 느린 밀기, 0이면 튕기기다.
+    const drag = async (dx, { stepPx = 15, gap = 60, pause = 0 } = {}) => {
+      const box = await frame.locator('#shelfRail .book-card.is-center').boundingBox();
+      const x = box.x + box.width / 2, y = box.y + box.height / 2;
+      await page.mouse.move(x, y);
+      await page.mouse.down();
+      await page.waitForTimeout(30);
+      for (let moved = 0; Math.abs(moved) < Math.abs(dx);) {
+        const rest = dx - moved, piece = Math.sign(rest) * Math.min(stepPx, Math.abs(rest));
+        moved += piece;
+        await page.mouse.move(x + moved, y);
+        if (gap) await page.waitForTimeout(gap);
+      }
+      if (pause) await page.waitForTimeout(pause);
+      await page.mouse.up();
+      await page.waitForTimeout(300);
+    };
+    const start = await center(frame);
+    await drag(-60);
+    assert.equal(await center(frame), start + 1, '390: 60px 왼쪽 밀기 → 다음 책 한 칸');
+    await drag(-30);
+    assert.equal(await center(frame), start + 1, '390: 30px 천천히 밀기 → 제자리');
+    await drag(-30, { stepPx: 30, gap: 0 });
+    assert.equal(await center(frame), start + 2, '390: 30px 빠른 튕기기 → 다음 책 한 칸');
+    await drag(-30, { stepPx: 30, gap: 0, pause: 260 });
+    assert.equal(await center(frame), start + 2, '390: 30px 밀고 멈춘 뒤 놓기 → 제자리');
+    await drag(60);
+    assert.equal(await center(frame), start + 1, '390: 오른쪽 60px 밀기 → 앞 책 한 칸');
+    await drag(-450, { stepPx: 50, gap: 40 });
+    assert.equal(await center(frame), start + 3, '390: 450px 밀기 → 두 칸(간격 200px로 센다)');
+    const stayed = await frame.evaluate(() => ({
+      cards: document.querySelectorAll('#shelfRail .book-card').length,
+      readerOpen: document.getElementById('readerScreen')?.classList.contains('active') === true
+    }));
+    assert.deepEqual(stayed, { cards: 6, readerOpen: false }, '밀기로 책을 열지 않고 책장에 그대로 있다');
+    assert.deepEqual(errors, [], '390: 페이지 오류 없음');
+  });
+  await withShelf(books(6), { width: 1440, height: 900, view: 'carousel' }, async ({ page, frame, errors }) => {
+    const box = await frame.locator('#shelfRail').boundingBox();
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    const start = await center(frame);
+    await page.mouse.wheel(0, 120);
+    assert.equal(await center(frame), start + 1, '1440: 휠 한 번에 한 칸(#1438 그대로)');
+    await page.waitForTimeout(400);
+    await page.mouse.wheel(0, 120);
+    await page.mouse.wheel(0, 120);
+    assert.equal(await center(frame), start + 2, '1440: 빠른 연속 휠은 건너뛰지 않는다');
+    assert.deepEqual(errors, [], '1440: 페이지 오류 없음');
+  });
+});
+
 // #1366 ⑧: 움직임 줄이기에서 회전 카드 전환이 없다.
 test('서재 — reduced-motion에서 회전 카드 전환이 없다', async (t) => {
   if (skip) { if (REQUIRE) assert.fail(`화면 시험을 건너뛸 수 없습니다: ${skip}`); t.skip(skip); return; }

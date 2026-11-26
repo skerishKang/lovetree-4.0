@@ -1314,3 +1314,80 @@ test('#1378 책: 임베드 금지 때 플레이어 제거 후 원본 링크', { 
     await browser.close();
   }
 });
+
+/* ── #1468: 재생기 로드 실패 경로(점검 #1429 — 재생기 불러오기가 막힌 환경) ── */
+test('792 실행: #1468 재생기를 불러오지 못해도 이어 보기의 이전·다음이 멈추지 않는다 — 무대는 표지·볼 수 없는 영상(1440·390)', { skip, timeout: 180000 }, async () => {
+  const browser = await chromium.launch();
+  try {
+    // 1440은 썸네일은 받고 재생기만 막힌다(표지 그림), 390은 썸네일도 막힌다(글 카드와 '영상을 볼 수 없어요').
+    const runs = [
+      { width: 1440, height: 900, routes: [], cover: '표지 그림' },
+      { width: 390, height: 844, routes: [['**/i.ytimg.com/**', (route) => route.abort()]], cover: '글 카드' }
+    ];
+    for (const run of runs) {
+      const { ctx, frame, errors } = await openBook(browser, run.width, run.height, run.routes);
+      try {
+        const read = () => frame.evaluate(() => ({
+          open: document.getElementById('playback').classList.contains('open'),
+          meta: document.getElementById('pbMeta').textContent,
+          title: document.getElementById('pbTitle').textContent,
+          status: document.getElementById('pbStatus').textContent,
+          toggleDisabled: document.getElementById('pbToggle').disabled,
+          doneHidden: document.getElementById('pbDone').hidden,
+          nextDisabled: document.getElementById('pbNext').disabled,
+          playerIsFrame: document.getElementById('pbPlayer')?.tagName === 'IFRAME',
+          covers: document.querySelectorAll('#pbPlayer .playback-cover').length,
+          images: [...document.querySelectorAll('#pbPlayer .playback-cover img')].map((img) => img.complete && img.naturalWidth > 0),
+          cards: document.querySelectorAll('#pbPlayer .playback-cover .lt-fallback-card').length,
+          notice: document.querySelector('#pbPlayer .playback-cover .lt-fallback-notice')?.textContent || ''
+        }));
+        const click = (id) => frame.evaluate((x) => document.getElementById(x).click(), id);
+        await click('playAllBtn');
+        await frame.waitForFunction(() => document.getElementById('playback').classList.contains('open')
+          && document.getElementById('pbToggle').disabled === true, null, { timeout: 20000 });
+        // 표지가 자리 잡을 때까지: 그림은 불러오기가 끝나고, 글 카드는 그림 자리가 치워진 뒤다.
+        await frame.waitForFunction((card) => {
+          const img = document.querySelector('#pbPlayer .playback-cover img');
+          return card ? !img : (!!img && img.complete);
+        }, run.cover === '글 카드', { timeout: 10000 });
+        const first = await read();
+        assert.equal(first.open, true, `${run.width}: 이어 보기 창이 열린다`);
+        assert.equal(first.playerIsFrame, false, `${run.width}: 재생기 틀이 아니다`);
+        assert.equal(first.toggleDisabled, true, `${run.width}: 멈춤 단추는 할 일이 없어 꺼 둔다`);
+        assert.equal(first.status, 'YouTube 재생기를 불러오지 못했어요. 원본 링크에서 확인해 주세요.');
+        assert.match(first.meta, / · 1 \/ 26$/, `${run.width}: 첫 순간(표시줄: ${first.meta})`);
+        assert.equal(first.covers, 1, `${run.width}: 무대에 표지 한 장`);
+        if (run.cover === '표지 그림') {
+          assert.deepEqual(first.images, [true], `${run.width}: 썸네일을 받으면 그 그림을 표지로 보인다`);
+        } else {
+          assert.deepEqual(first.images, [], `${run.width}: 썸네일이 없으면 그림 자리를 치운다`);
+          assert.equal(first.cards, 1, `${run.width}: 글 카드 한 장`);
+          assert.equal(first.notice, '영상을 볼 수 없어요', `${run.width}: 볼 수 없는 영상 안내`);
+        }
+        // 다음: 재생기가 없어도 순간마다 무대의 표지가 바뀐다.
+        await click('pbNext');
+        const second = await read();
+        assert.match(second.meta, / · 2 \/ 26$/, `${run.width}: 다음 순간으로 간다(표시줄: ${second.meta})`);
+        assert.equal(second.title, '순간 2', `${run.width}: 순간 제목도 바뀐다`);
+        assert.equal(second.covers, 1, `${run.width}: 다음 순간의 표지 한 장`);
+        // 이전: 첫 순간으로 돌아온다.
+        await click('pbPrev');
+        assert.match((await read()).meta, / · 1 \/ 26$/, `${run.width}: 이전 순간으로 돌아온다`);
+        // 마지막 순간(칩으로 간다): 다음은 잠기고 '다 봤어요'가 아니다 — 아무것도 재생하지 않았다.
+        await frame.evaluate(() => document.querySelector('#pbChips .playback-chip:last-child').click());
+        const last = await read();
+        assert.match(last.meta, / · 26 \/ 26$/, `${run.width}: 마지막 순간(표시줄: ${last.meta})`);
+        assert.equal(last.nextDisabled, true, `${run.width}: 마지막에서 다음은 잠긴다`);
+        assert.equal(last.doneHidden, true, `${run.width}: 재생하지 않았으니 '다 봤어요'가 아니다`);
+        assert.equal(last.covers, 1, `${run.width}: 마지막 순간의 표지 한 장`);
+        await click('pbClose');
+        assert.equal((await read()).open, false, `${run.width}: 닫는다`);
+        assert.deepEqual(errors, [], `${run.width}: 페이지 예외 없음`);
+      } finally {
+        await ctx.close();
+      }
+    }
+  } finally {
+    await browser.close();
+  }
+});
