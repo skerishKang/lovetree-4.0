@@ -155,7 +155,8 @@ if(treePopover)treePopover.addEventListener('keydown',event=>{
 // Keep the paired click in its source document, including clicks inside the view iframe.
 let pendingOutsideClick=null;
 function shellPointerPosition(event){
- const doc=event.currentTarget;
+ const current=event.currentTarget;
+ const doc=current?.document||current;
  const frame=doc===document?null:[...document.querySelectorAll('iframe')].find(f=>f.contentDocument===doc);
  const rect=frame?.getBoundingClientRect();
  return {x:event.clientX+(rect?.left||0),y:event.clientY+(rect?.top||0)};
@@ -185,9 +186,16 @@ function escKey(event){
 document.addEventListener('pointerdown',outsidePointerDown,true);
 document.addEventListener('click',outsideClick,true);
 document.addEventListener('keydown',escKey,true);
+const boundFrameDocuments=new WeakSet();
 function bindFrame(frame){
  try{
-  const doc=frame.contentDocument;if(!doc)return;
+  const doc=frame.contentDocument,win=frame.contentWindow;
+  if(!doc||!win||boundFrameDocuments.has(doc))return;
+  boundFrameDocuments.add(doc);
+  // ?? ???? ?? iframe ?? ?? ???? ?? ??? ????.
+  win.addEventListener('pointerdown',outsidePointerDown,true);
+  win.addEventListener('click',outsideClick,true);
+  doc.addEventListener('pointerdown',outsidePointerDown,true);
   doc.addEventListener('click',outsideClick,true);
   doc.addEventListener('keydown',escKey,true);
  }catch{}
