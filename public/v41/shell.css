@@ -206,9 +206,7 @@ html[data-lt-auth-phase=pending] .app-header #account-entry{visibility:hidden;po
 html[data-lt-auth-phase=pending][data-lt-auth-hint=out] .app-header #account-entry{visibility:visible;pointer-events:auto}
 html[data-lt-auth-phase=pending][data-lt-auth-hint=in] .app-header #account-entry{display:none}
 html[data-lt-auth-phase=pending][data-lt-auth-hint=in] .app-header #account-avatar[hidden]{display:flex;visibility:visible;pointer-events:none}
-html[data-lt-auth-phase=pending][data-lt-auth-hint=in] .app-header #record-menu{display:flex;visibility:visible;pointer-events:none}
-/* #1026: cached member picker stays in place while authentication is checked. */
-html[data-lt-auth-phase=pending][data-lt-auth-hint=in] .app-header nav #record-menu[hidden]{display:flex;visibility:visible;pointer-events:none}
+/* #1433: 머리줄 트리 고르기는 확인 중에도 펼치지 않는다(#1421로 도구 줄로 옮김). 펼쳤다 접으면 둘러보기·화면 탭이 밀린다. */
 html[data-lt-auth-phase=pending] #mobile-add{visibility:hidden;pointer-events:none}
 /* #1231: 데스크톱은 권한 메뉴의 폭을 예약하고 화면 탭 좌표를 고정한다.
    인증 전후 트리 선택·쓰기·계정의 존재 변화가 탭/테마를 밀지 않게 한다. */
