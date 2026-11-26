@@ -77,6 +77,10 @@ async function withShelfSession(fn) {
       geometry: () => geometry(frame),
       setData: async (count) => { trees = books(count); await openShelf(); },
       setViewport: async (width, height) => { await page.setViewportSize({ width, height }); await page.waitForTimeout(600); },
+      setTheme: async (name) => {
+        await page.evaluate((theme) => window.LT41_THEME_REGISTRY.apply(document.documentElement, theme), name);
+        await frame.evaluate((theme) => window.LT41_THEME_REGISTRY.apply(document.documentElement, theme), name);
+      },
       setView: async (name) => { view = name; await frame.evaluate((n) => document.querySelector(`#shelf-view-inline [data-shelf-view="${n}"]`).click(), name); await frame.waitForTimeout(600); }
     });
   } finally {
@@ -325,6 +329,12 @@ test('서재 — 최근 순간 줄과 숫자, 순간 0개에서는 숨김', asyn
     assert.ok(shown.count > 0 && shown.count <= 6, '최근 순간은 최대 여섯 개');
     assert.match(shown.stats, /순간/, '순간 수와 마지막 추가가 적힌다');
     assert.deepEqual(errors, [], '페이지 오류 없음');
+  });
+});
+
+// #1418: 병합된 선반·회전 화면을 한 세션에서 시험한다. 기준값과 기다림은 그대로다.
+test('서재 — 책 수·폭·보기별 첫 카드 잘림 0', async (t) => {
+  if (skip) { if (REQUIRE) assert.fail('화면 시험을 건너뛸 수 없습니다: '+skip); t.skip(skip); return; }
   await withShelfSession(async ({ errors, getFrame, geometry, setData, setViewport, setView }) => {
     for (const count of [1, 4, 20]) {
       await setData(count);
@@ -343,5 +353,77 @@ test('서재 — 최근 순간 줄과 숫자, 순간 0개에서는 숨김', asyn
         }
       }
     }
+  });
+});
+
+
+// #1366 ⑥·#1415·#1418: 한 브라우저에서 폭·테마·책 수를 바꿔 빈 띠, 넘침, 대비를 확인한다.
+test('서재 — 최근 순간 책장 바로 아래, 4폭×2테마×3책 수 가로 넘침·대비 0', async (t) => {
+  if (skip) { if (REQUIRE) assert.fail('화면 시험을 건너뛸 수 없습니다: '+skip); t.skip(skip); return; }
+  await withShelfSession(async ({ errors, getFrame, setData, setViewport, setView, setTheme }) => {
+    for (const count of [1, 4, 20]) {
+      await setData(count);
+      for (const width of [390, 844, 1440, 2560]) {
+        await setViewport(width, width === 390 ? 844 : 900);
+        for (const theme of ['night', 'garden']) {
+          await setTheme(theme);
+          for (const name of SHELF_VIEW_NAMES) {
+            await setView(name);
+            const frame = getFrame();
+            const actual = await frame.evaluate(() => {
+              const shelf=document.getElementById('shelfViewport');
+              const recent=document.getElementById('shelfRecent');
+              const row=document.getElementById('shelfRecentRow');
+              const title=recent.querySelector('h2');
+              const card=recent.querySelector('.shelf-recent-item');
+              const caption=card?.querySelector('.shelf-recent-name');
+              const backdrop=getComputedStyle(card).backgroundColor;
+              const parse=(color)=>[...color.matchAll(/[\d.]+/g)].map(v=>Number(v[0])).slice(0,3);
+              const linear=(x)=>{x/=255;return x<=0.04045?x/12.92:Math.pow((x+0.055)/1.055,2.4)};
+              const luminance=(color)=>{const [r,g,b]=parse(color);return 0.2126*linear(r)+0.7152*linear(g)+0.0722*linear(b)};
+              const contrast=(a,b)=>{const aa=luminance(a),bb=luminance(b);return (Math.max(aa,bb)+0.05)/(Math.min(aa,bb)+0.05)};
+              return {
+                gap:recent.getBoundingClientRect().top-shelf.getBoundingClientRect().bottom,
+                scrollOverflow:document.documentElement.scrollWidth-window.innerWidth,
+                hidden:recent.hidden, title:title.textContent.trim(),
+                cardCount:recent.querySelectorAll('.shelf-recent-item').length,
+                rowScrollable:getComputedStyle(row).overflowX==='auto',
+                rowWidth:row.getBoundingClientRect().width,
+                rowScrollWidth:row.scrollWidth,
+                cardContrast:caption?contrast(getComputedStyle(caption).color,backdrop):0,
+                titleContrast:contrast(getComputedStyle(title).color,getComputedStyle(recent).backgroundColor),
+                coverRadius:getComputedStyle(card).borderTopLeftRadius,
+                baseOpacity:getComputedStyle(document.querySelector('.shelf-base')).opacity
+              };
+            });
+            const label=width+' '+theme+' '+name+' '+count+'권';
+            assert.equal(actual.hidden,false,label+': 최근 순간 보여야 함');
+            assert.equal(actual.title,'최근 순간',label+': 제목 띄어쓰기');
+            assert.ok(actual.cardCount>0&&actual.cardCount<=6,label+': 최근 최대 6개');
+            assert.ok(actual.gap>=-1&&actual.gap<=24,label+': 책장 아래 빈 띠 24px 이내 '+actual.gap);
+            assert.ok(actual.scrollOverflow<=1,label+': 전체 가로 넘침 0 '+actual.scrollOverflow);
+            assert.equal(actual.rowScrollable,true,label+': 줄 안에서만 가로 스크롤');
+            assert.ok(actual.rowWidth>0,label+': 줄 넓이 존재');
+            assert.ok(actual.cardContrast>=4.5,label+': 카드 글자 대비 '+actual.cardContrast);
+            assert.ok(actual.titleContrast>=4.5,label+': 제목 대비 '+actual.titleContrast);
+            assert.notEqual(actual.coverRadius,'0px',label+': 알약이 아닌 둥근 카드');
+            if(name==='carousel')assert.equal(actual.baseOpacity,'0',label+': 회전 갈색 막대 숨김');
+            assert.deepEqual(errors,[],label+': 페이지 오류 0');
+          }
+        }
+      }
+    }
+  });
+});
+
+test('서재 — 최근 순간 카드를 누르면 크게 보기, 닫으면 원래 카드로 초점 복귀', async (t) => {
+  if (skip) { if (REQUIRE) assert.fail('화면 시험을 건너뛸 수 없습니다: '+skip); t.skip(skip); return; }
+  await withShelf(books(1), { width: 390, height: 844, view:'carousel' }, async ({frame,errors}) => {
+    await frame.locator('#shelfRecent .shelf-recent-item').first().click();
+    assert.equal(await frame.locator('.shelf-recent-viewer[role="dialog"]').count(),1,'순간 크게 보기');
+    await frame.locator('.shelf-recent-viewer .lt-lightbox-close').click();
+    assert.equal(await frame.locator('.shelf-recent-viewer').count(),0,'닫힌다');
+    assert.equal(await frame.evaluate(() => document.activeElement?.classList.contains('shelf-recent-item')),true,'원래 카드로 초점 복귀');
+    assert.deepEqual(errors,[],'페이지 오류 0');
   });
 });
