@@ -17,7 +17,7 @@ const makePath = (d) => {
 const pathD = (edge, curve) => 'M' + branchPoints(edge, curve, 24).map(([x, y]) => x.toFixed(2) + ' ' + y.toFixed(2)).join('L');
 
 export function createTreePathPlayer({ layer, cards, controls, isReduced, onState }) {
-  let route = [], index = 0, current = null, raf = 0, started = 0;
+  let route = [], index = 0, current = null, currentLength = 0, raf = 0, started = 0;
   let elapsed = 0, speed = 1, status = 'idle', stamps = [], pulses = new Set();
   const duration = 620;
   const metrics = { frames: 0, over20: 0, maxGap: 0, finished: false };
@@ -46,7 +46,7 @@ export function createTreePathPlayer({ layer, cards, controls, isReduced, onStat
   };
   const end = () => {
     if (raf) cancelAnimationFrame(raf);
-    raf = 0; current = null; status = 'done'; metrics.finished = true;
+    raf = 0; current = null; currentLength = 0; status = 'done'; metrics.finished = true;
     notify();
   };
   const startSegment = () => {
@@ -55,9 +55,9 @@ export function createTreePathPlayer({ layer, cards, controls, isReduced, onStat
     const path = makePath(item.d);
     layer.append(path);
     current = path;
-    const length = path.getTotalLength();
-    path.style.strokeDasharray = String(length);
-    path.style.strokeDashoffset = String(length);
+    currentLength = path.getTotalLength();
+    path.style.strokeDasharray = String(currentLength);
+    path.style.strokeDashoffset = String(currentLength);
     if (isReduced()) {
       path.style.strokeWidth = '5.5px';
       path.style.strokeDashoffset = '0';
@@ -79,8 +79,7 @@ export function createTreePathPlayer({ layer, cards, controls, isReduced, onStat
     stamps.push(now);
     if (!started) started = now;
     const progress = Math.min(1, (elapsed + (now - started) * speed) / duration);
-    const length = current.getTotalLength();
-    current.style.strokeDashoffset = String(length * (1 - progress));
+    current.style.strokeDashoffset = String(currentLength * (1 - progress));
     if (progress >= 1) {
       pulse(route[index].to);
       index += 1;
@@ -92,7 +91,7 @@ export function createTreePathPlayer({ layer, cards, controls, isReduced, onStat
   const stop = () => {
     if (raf) cancelAnimationFrame(raf);
     raf = 0;
-    status = 'idle'; index = 0; current = null; elapsed = 0;
+    status = 'idle'; index = 0; current = null; currentLength = 0; elapsed = 0;
     clearPulse(); layer.replaceChildren(); notify();
   };
   const configure = (layout, target, curve) => {
@@ -113,7 +112,7 @@ export function createTreePathPlayer({ layer, cards, controls, isReduced, onStat
     if (!route.length) { status = 'done'; metrics.finished = true; notify(); return; }
     if (status === 'done' || status === 'idle') {
       if (status === 'done') { layer.replaceChildren(); clearPulse(); }
-      index = 0; current = null; resetMetrics();
+      index = 0; current = null; currentLength = 0; resetMetrics();
     }
     if (isReduced()) {
       layer.replaceChildren();
