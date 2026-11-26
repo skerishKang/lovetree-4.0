@@ -225,3 +225,53 @@ test('서재 — 390·844·1440 × 선반·회전 × 책 1·4·20권에서 왼�
     });
   }
 });
+
+// #1366 ⑧: 세로 휠은 레일에서만 한 칸, 가로 트랙패드와 레일 밖은 기본 스크롤에 맡긴다.
+test('서재 — 회전 보기 휠은 레일에서만 한 칸, 연속 휠은 건너뛰지 않는다', async (t) => {
+  if (skip) { if (REQUIRE) assert.fail(`화면 시험을 건너뛸 수 없습니다: ${skip}`); t.skip(skip); return; }
+  await withShelf(books(4), { width: 1440, height: 900, view: 'carousel' }, async ({ frame, errors }) => {
+    const fire = (dy, dx, outside) => frame.evaluate(([dy, dx, outside]) => {
+      const el = outside ? document.querySelector('.shelf-screen') : document.querySelector('#shelfRail');
+      return !el.dispatchEvent(new WheelEvent('wheel', { deltaY: dy, deltaX: dx, bubbles: true, cancelable: true }));
+    }, [dy, dx, outside]);
+    const center = () => frame.evaluate(() => [...document.querySelectorAll('.book-card')].findIndex((c) => c.classList.contains('is-center')));
+    const before = await center();
+    assert.equal(await fire(120, 0, false), true, '세로 휠은 레일에서 넘김으로 소비된다');
+    assert.equal(await center(), before + 1, '휠 한 번에 한 칸');
+    for (let i = 0; i < 5; i += 1) await fire(120, 0, false);
+    assert.equal(await center(), before + 1, '빠른 연속 휠은 건너뛰지 않는다');
+    await frame.waitForTimeout(400);
+    assert.equal(await fire(120, 0, false), true, '잠금 뒤에는 다시 한 칸');
+    assert.equal(await center(), before + 2, '두 번째 휠도 한 칸');
+    assert.equal(await fire(0, 120, false), false, '가로 트랙패드는 소비하지 않는다');
+    assert.equal(await center(), before + 2, '가로 트랙패드는 넘기지 않는다');
+    assert.equal(await fire(120, 0, true), false, '레일 밖 세로 휠은 소비하지 않는다');
+    assert.equal(await center(), before + 2, '레일 밖 휠은 넘기지 않는다');
+    assert.deepEqual(errors, [], '페이지 오류 없음');
+  });
+});
+
+// #1366 ⑧: 움직임 줄이기에서 회전 카드 전환이 없다.
+test('서재 — reduced-motion에서 회전 카드 전환이 없다', async (t) => {
+  if (skip) { if (REQUIRE) assert.fail(`화면 시험을 건너뛸 수 없습니다: ${skip}`); t.skip(skip); return; }
+  await withShelf(books(4), { width: 1440, height: 900, view: 'carousel' }, async ({ frame, errors }) => {
+    const duration = await frame.evaluate(() => getComputedStyle(document.querySelector('.book-card')).transitionDuration);
+    assert.equal(duration, '0s', '회전 카드 전환 없음');
+    assert.deepEqual(errors, [], '페이지 오류 없음');
+  });
+});
+
+// #1366 ⑥: 최근 순간 줄이 고른 트리를 따라가고, 순간이 없으면 숨는다.
+test('서재 — 최근 순간 줄과 숫자, 순간 0개에서는 숨김', async (t) => {
+  if (skip) { if (REQUIRE) assert.fail(`화면 시험을 건너뛸 수 없습니다: ${skip}`); t.skip(skip); return; }
+  await withShelf(books(1), { width: 1440, height: 900 }, async ({ frame, errors }) => {
+    const shown = await frame.evaluate(() => {
+      const sec = document.querySelector('#shelfRecent');
+      return { hidden: sec.hidden, count: sec.querySelectorAll('.shelf-recent-item').length, stats: document.querySelector('#shelfRecentStats').textContent.trim() };
+    });
+    assert.equal(shown.hidden, false, '최근 순간 영역이 보인다');
+    assert.ok(shown.count > 0 && shown.count <= 6, '최근 순간은 최대 여섯 개');
+    assert.match(shown.stats, /순간/, '순간 수와 마지막 추가가 적힌다');
+    assert.deepEqual(errors, [], '페이지 오류 없음');
+  });
+});

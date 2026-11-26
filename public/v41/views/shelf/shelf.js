@@ -5,7 +5,7 @@ import { MSG, isShellMessage } from '../../frame-messages.mjs';
 import {
   COVER_PALETTE, allBooks as allBooksOf, bookMeta, buildShelf,
   escapeShelf, filterShelf, findBook, lastMomentDate as lastMomentDateOf,
-  resolveShelfIndex, resumeCard, resumeName, shelfBook, shelfRowLayout,
+  recentChapters, resolveShelfIndex, resumeCard, resumeName, shelfBook, shelfRowLayout,
   treeTitleOf, youtubeId as youtubeIdOf
 } from './shelf-model.mjs';
 import { shelfOrder } from '../../inbox-model.mjs';
@@ -176,8 +176,8 @@ import { VIEWS } from './shelf-views.mjs';
         var sec=$('#shelfRecent'),row=$('#shelfRecentRow'),stats=$('#shelfRecentStats');
         if(!sec||!row||!stats)return;
         var book=state.shelfList[state.shelfIndex];
-        if(!book||!book.chapters.length){sec.hidden=true;row.replaceChildren();stats.textContent='';return;}
-        var list=book.chapters.slice().sort(function(a,b){return String(b.date||'').localeCompare(String(a.date||''))}).slice(0,6);
+        if(!book||!book.chapters.length){sec.hidden=true;row.innerHTML='';stats.textContent='';return;}
+        var list=recentChapters(book.chapters);
         stats.textContent=bookMeta(book);
         row.innerHTML=list.map(function(chapter){
           var src=chapter.image||(chapter.thumbCandidates&&chapter.thumbCandidates[0])||book.coverMedia||'';
@@ -238,10 +238,13 @@ import { VIEWS } from './shelf-views.mjs';
         $$('.filter').forEach(function(button){button.addEventListener('click',function(){state.filter=button.dataset.filter;$$('.filter').forEach(function(item){item.classList.toggle('active',item===button);});renderShelf();});});
         $('#shelfPrev').addEventListener('click',function(){view.move(-1);});
         $('#shelfNext').addEventListener('click',function(){view.move(1);});
-        // #1366 ⑧: 회전 보기에서 휠 한 묶음당 한 칸만 넘긴다. 연속 휠은 잠깐 무시해 건너뛰기를 막는다.
+        // #1366 ⑧: 세로 휠만 회전 넘김으로 쓴다. 레일 밖과 가로 트랙패드는 기본 스크롤에 맡긴다.
+        // 한 묶음당 한 칸, 연속 휠은 잠깐 무시해 건너뛰기를 막는다.
         var wheelAt=0;
         $('#shelfRail').addEventListener('wheel',function(event){
-          if(shelfView()!=='carousel'||event.ctrlKey||Math.abs(event.deltaY)<2)return;
+          if(shelfView()!=='carousel'||event.ctrlKey)return;
+          if(Math.abs(event.deltaX)>Math.abs(event.deltaY))return;
+          if(Math.abs(event.deltaY)<2)return;
           event.preventDefault();
           var at=Date.now();
           if(at-wheelAt<320)return;

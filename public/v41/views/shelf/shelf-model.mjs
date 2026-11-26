@@ -224,6 +224,11 @@ export function shelfRotationLayout(count, railWidth, { pitch = 200, cardW = 190
   };
 }
 
+// #1366 ⑥: 고른 트리의 최근 순간 줄. 순간이 없으면 빈 줄을 만들지 않는다.
+export function recentChapters(chapters = [], limit = 6) {
+  return chapters.slice().sort((a, b) => String(b.date || '').localeCompare(String(a.date || ''))).slice(0, limit);
+}
+
 // 책 안 페이지 표시와 화살표 상태.
 export function pageMeta(index, count) {
   return {
