@@ -548,3 +548,6 @@ html[data-lt-theme=garden] .moments-comments-dialog{background:var(--lt-paper);c
  #community-moments-panel{margin-top:99px}
  #community-moments-panel .moments-stage{height:calc(100dvh - 147px - env(safe-area-inset-bottom))}
 }
+
+#community-panel .community-top-row.is-moments .moments-toolbar{order:3;margin-left:0}
+#community-panel .community-top-row.is-moments .moments-scope-control{order:2;margin-left:auto}

@@ -17,7 +17,7 @@ const B=item('다음 순간','b2222222222','2026-11-01','첫 순간');
 const C=item('마지막 순간','c3333333333','2026-11-02','다음 순간');
 const visible=[C,A,B];
 const reply=(route,data,status=200)=>route.fulfill({status,contentType:'application/json',body:JSON.stringify(data)});
-const embed='<html><style>html,body{height:100%;margin:0;background:radial-gradient(ellipse at 45% 38%,#775c89,#29283f 52%,#0e1221 90%)}body:after{content:"모의 영상";display:block;text-align:center;padding-top:45vh;color:#f1e7fc;font:16px sans-serif}</style><script>window.__commands=[];window.addEventListener("message",e=>{let d;try{d=typeof e.data==="string"?JSON.parse(e.data):e.data}catch{return}if(d?.event!=="command")return;window.__commands.push(d.func);if(d.func==="mute"||d.func==="unMute")parent.postMessage(JSON.stringify({event:"infoDelivery",info:{muted:d.func==="mute",playerState:1}}),"*")});</script></html>';
+const embed='<html><meta charset="utf-8"><style>html,body{height:100%;margin:0;background:radial-gradient(ellipse at 45% 38%,#775c89,#29283f 52%,#0e1221 90%)}body:after{content:"모의 영상";display:block;text-align:center;padding-top:45vh;color:#f1e7fc;font:16px sans-serif}</style><script>window.__commands=[];window.addEventListener("message",e=>{let d;try{d=typeof e.data==="string"?JSON.parse(e.data):e.data}catch{return}if(d?.event!=="command")return;window.__commands.push(d.func);if(d.func==="mute"||d.func==="unMute")parent.postMessage(JSON.stringify({event:"infoDelivery",info:{muted:d.func==="mute",playerState:1}}),"*")});</script></html>';
 
 function serve(){
  const root=existsSync(join(ROOT,'dist','v41','home.html'))?join(ROOT,'dist'):join(ROOT,'public');
@@ -73,6 +73,9 @@ test('#1441 두 보기 자리·범위·길·주소·공개 제한·세로 줄·�
     aligned(treeRect,await rect(page.locator('.community-tabs')),key+' tabs');
     const trigger=page.locator('.moments-scope-trigger');
     assert.equal(await trigger.isVisible(),true,key+' 범위 메뉴');
+    const scopeRect=await rect(trigger),closeRect=await rect(page.locator('.moments-toolbar .moments-close-button'));
+    assert.ok(closeRect.x>=scopeRect.x+scopeRect.width,key+' 닫기 단추는 범위 오른쪽');
+    assert.ok(Math.abs(closeRect.y-scopeRect.y)<=1,key+' 범위와 닫기 같은 줄');
     assert.equal(await page.locator('.moments-scope-chip:visible').count(),0,key+' 범위 칩 별도 줄 없음');
     const rail=page.locator('.moments-rail');
     const names=await rail.locator('button').evaluateAll(nodes=>nodes.map(n=>n.getAttribute('aria-label')));
