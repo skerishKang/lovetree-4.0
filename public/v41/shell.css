@@ -1039,10 +1039,11 @@ body.community-screen #stage>iframe,body.community-screen #empty{display:none}
 /* #1322: 가독성 그라데이션은 제목·배지 아래쪽 한 겹만. */
 #community-panel .community-cover::after{content:"";position:absolute;inset:auto 0 0;height:56%;z-index:2;pointer-events:none;background:linear-gradient(to top,color-mix(in srgb,var(--lt-ink) 78%,transparent),transparent)}
 #community-panel .community-cover-art{position:absolute;inset:0;display:grid;place-items:center;overflow:hidden}
-#community-panel .community-cover-image{position:relative;z-index:1;display:block;width:100%;height:100%;object-fit:cover}
+#community-panel .community-cover-image{position:relative;z-index:1;display:block;width:100%;height:100%;object-fit:cover;object-position:center}
 /* #1322: 흐린 실제 썸네일 배경+가운데 세로 그림은 세로 영상 한 가지에만. */
 #community-panel .community-cover[data-media-kind="video-vertical"] .community-cover-backdrop{position:absolute;inset:-10px;display:block;width:calc(100% + 20px);height:calc(100% + 20px);object-fit:cover;filter:blur(18px);opacity:.78;transform:scale(1.06)}
-#community-panel .community-cover[data-media-kind="video-vertical"] .community-cover-image{object-fit:contain}
+/* #1446: 세로 영상도 같은 비율로 잘라 맞춘다 — 가운데 기준이라 얼굴·무대가 한쪽으로 치우치지 않는다. */
+#community-panel .community-cover[data-media-kind="video-vertical"] .community-cover-image{object-fit:cover;object-position:center}
 #community-panel .community-cover-fallback{position:absolute;inset:0;display:grid;place-items:center;padding:20px;color:var(--lt-pearl);font-size:14px;text-align:center}
 /* #1322: 모든 배지는 같은 자리·같은 크기로 아래 한 줄에 모인다. */
 #community-panel .community-cover-badges{position:absolute;z-index:3;left:10px;right:10px;bottom:10px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}

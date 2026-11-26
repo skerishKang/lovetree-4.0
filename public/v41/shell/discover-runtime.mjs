@@ -13,6 +13,9 @@ export function createDiscoverRuntime(ctx){
     discoverState.set(treeId,answer.discover===true);return answer.discover===true;}catch{return null}
   }
 
+  // #1446 재현 조건: 서버 저장이 확인된 뒤(status=synced·직전 dirty) 쓰기 가능한 계정에서,
+  // 순간이 2개→3개가 된 트리(newlyPublishedTrees) 중 아직 묻지 않은 것에만 한 번 부른다.
+  // 이미 소개 중이면 건너뛰고, 공유 주소로 이동한 뒤 늦은 응답은 창을 열지 않는다.
   async function askDiscover(treeId){
    try{
     const discover=await refreshTreeDiscover(treeId);

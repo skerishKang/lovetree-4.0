@@ -49,8 +49,9 @@ test('#1069 화면 잡의 Playwright 버전은 잠금 파일에서 읽는다', (
   assert.ok(!/1\.49\.1/.test(workflow), '옛 하드코딩 버전이 남아 있지 않다');
   assert.ok(workflow.includes("hashFiles('package-lock.json')"), '캐시 키가 잠금 파일에서 유도된다');
   const installs = workflow.match(/playwright@\$\(node -p "require\('\.\/package-lock\.json'\)\.packages\['node_modules\/playwright'\]\.version"\)/g) || [];
-  // #1413: 셸 화면 잡을 둘로 나눠 Playwright 설치 구간은 14곳이다. 밤 측정 쪽도 같은 규칙을 지킨다.
-  assert.equal(installs.length, 14, `PR 화면 잡 14곳이 모두 잠금 파일 버전을 쓴다(실측 ${installs.length})`);
+  // #1413: 셸 화면 잡을 둘로 나누고(3단계) 지도 대비 잡에서 서재·날짜 잡을 떼어 내(4단계) Playwright 설치 구간은 15곳이다.
+  // 밤 측정 쪽도 같은 규칙을 지킨다.
+  assert.equal(installs.length, 15, `PR 화면 잡 15곳이 모두 잠금 파일 버전을 쓴다(실측 ${installs.length})`);
   const nightly = readFileSync(new URL('../.github/workflows/nightly-screen-perf.yml', import.meta.url), 'utf8');
   assert.ok(!/playwright@\d/.test(nightly) && nightly.includes("hashFiles('package-lock.json')"), '밤 측정도 하드코딩 버전 없이 잠금 파일을 쓴다');
   const actual = execFileSync(process.execPath, ['-p', "require('./package-lock.json').packages['node_modules/playwright'].version"], { cwd: new URL('..', import.meta.url), encoding: 'utf8' }).trim();
@@ -110,6 +111,32 @@ test('화면 잡 고르기: 보드만 바뀌면 보드 잡, 공용 파일이 섞
   assert.equal(selectJobs(['tests/v41-screen-audit.test.mjs'], jobs, screen, helpers), 'none', '공통 검사기 시험만 바뀌면 고를 잡 없음(빈 값 아님)');
 });
 
+// #1413 4단계: 지도 대비 잡에 함께 있던 서재·날짜 시험은 새 잡(screen-shelf)으로, 둘러보기 칩·머리줄 시험은 공통 검사기 a로 옮겼다.
+test('서재·날짜 잡 떼어 내기: 시험 위치·고르기·모음 잡', async () => {
+  const { selectJobs, jobTestFiles, screenTestFiles, helperFiles, mapChanged } = await import('../tools/ci/screen-changes.mjs');
+  const tests = screenTestFiles();
+  const screen = new Set(tests), helpers = new Set(helperFiles(tests)), jobs = jobTestFiles();
+  const shelf = 'tests/v41-970-shelf-date.test.mjs';
+  assert.ok(jobs['screen-shelf'].has(shelf), '서재·날짜 시험은 새 잡이 돌린다');
+  assert.ok(!jobs['screen-map-a'].has(shelf), '지도 대비 잡에는 서재·날짜 시험이 없다');
+  assert.deepEqual([...jobs['screen-map-a']].sort(), ['tests/v41-map-contrast.test.mjs', 'tests/v41-map-fan-open.test.mjs'], '지도 대비 잡에는 지도 시험만 남는다');
+  for (const f of ['tests/v41-community-chips-784.test.mjs', 'tests/v41-header-ia.test.mjs']) {
+    assert.ok(jobs['screen-audit-a'].has(f), `${f}는 공통 검사기 a가 돌린다`);
+    assert.equal(Object.entries(jobs).filter(([, files]) => files.has(f)).length, 1, `${f}는 한 잡에서만 돈다`);
+  }
+  assert.ok(helpers.has('tests/helpers/screen-audit.mjs') && screen.has(shelf), '새 잡의 시험과 helpers가 화면 판정에 들어간다');
+  assert.equal(selectJobs([shelf], jobs, screen, helpers), 'screen-shelf', '서재·날짜 시험만 바뀌면 새 잡만 고른다');
+  assert.equal(mapChanged([shelf]), false, '서재·날짜 시험만 바뀌면 지도 시험은 돌지 않는다');
+  assert.equal(selectJobs(['public/v41/views/shelf/shelf-views.mjs'], jobs, screen, helpers), 'all', '서재 소스는 다른 화면 잡도 지나므로 전부(새 잡 포함)');
+  assert.equal(selectJobs(['tests/v41-map-contrast.test.mjs'], jobs, screen, helpers), 'none', '지도 시험만 바뀌면 고를 잡 없음 — 새 잡은 건너뛴다');
+  assert.equal(mapChanged(['tests/v41-map-contrast.test.mjs']), true, '지도 시험만 바뀌면 지도 대비는 돈다');
+  const workflow = readFileSync(new URL('../.github/workflows/preview-check.yml', import.meta.url), 'utf8');
+  const needs = workflow.slice(workflow.indexOf('  preview:')).match(/needs: \[([^\]]+)\]/)[1].split(',').map((s) => s.trim());
+  assert.ok(needs.includes('screen-shelf') && needs.includes('screen-map-a') && needs.includes('screen-audit-a'), '새 잡·지도 대비·공통 검사기 a가 모음 잡 needs에 있다');
+  assert.match(workflow, /\n    name: 화면 시험 — 서재·날짜\n/, '새 잡 이름');
+  assert.match(workflow, /\n    name: 미리보기 postdeploy\(로그아웃\)\n/, '필수 검사 이름은 그대로다');
+});
+
 test('결과 모으기: 고르지 않은 화면 잡의 건너뜀만 통과', async () => {
   const { checkScreenResults } = await import('../tools/ci/screen-results.mjs');
   const gate = (jobs) => ({ result: 'success', outputs: { changed: 'true', jobs } });
@@ -131,4 +158,12 @@ test('결과 모으기: 고르지 않은 화면 잡의 건너뜀만 통과', asy
   assert.equal(extraFails.ok, false, '새 셸 잡 실패는 필수 집계 실패');
   const extraSkipped = checkScreenResults({ 'screen-changes': gate('screen-shell'), 'screen-shell': { result: 'success' }, 'screen-shell-extra': { result: 'skipped' }, deploy: { result: 'success' } });
   assert.equal(extraSkipped.ok, true, '새 셸 잡이 선택되지 않았을 때만 건너뜀을 통과시킨다');
+  const shelfFails = checkScreenResults({ 'screen-changes': gate('all'), 'screen-map-a': { result: 'success' }, 'screen-shelf': { result: 'failure' }, deploy: { result: 'success' } });
+  assert.equal(shelfFails.ok, false, '서재·날짜 잡 실패는 필수 집계 실패');
+  const shelfCancelled = checkScreenResults({ 'screen-changes': gate('all'), 'screen-shelf': { result: 'cancelled' }, deploy: { result: 'success' } });
+  assert.equal(shelfCancelled.ok, false, '서재·날짜 잡 취소도 필수 집계 실패');
+  const shelfPickedSkipped = checkScreenResults({ 'screen-changes': gate('screen-shelf'), 'screen-shelf': { result: 'skipped' }, deploy: { result: 'success' } });
+  assert.equal(shelfPickedSkipped.ok, false, '서재·날짜 잡을 골랐는데 건너뛰면 실패');
+  const shelfNotPicked = checkScreenResults({ 'screen-changes': gate('none'), 'screen-map-a': { result: 'success' }, 'screen-shelf': { result: 'skipped' }, deploy: { result: 'success' } });
+  assert.equal(shelfNotPicked.ok, true, '고르지 않은 서재·날짜 잡의 건너뜀은 통과');
 });

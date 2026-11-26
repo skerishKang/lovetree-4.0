@@ -58,7 +58,9 @@ async function withShelfSession(fn) {
       await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
       // 무대 준비가 끝나기 전의 클릭은 '불러오는 중' 덮개에 가로챼진다.
       await page.waitForFunction(() => document.getElementById('stage-loading')?.hidden === true, null, { timeout: 20000 });
-      await page.locator('#discover-ask-no').click().catch(() => {});
+      // #1413: 둘러보기 소개 질문 창은 순간 2→3개 저장 직후에만 뜬다. 떠 있을 때만 '아니요'를 누른다(보이지 않는
+      // 단추를 누르려고 Playwright 기본 제한 30초를 기다리던 헛대기를 없앤다 — isVisible은 기다리지 않는다).
+      if (await page.locator('#discover-ask-no').isVisible().catch(() => false)) await page.locator('#discover-ask-no').click().catch(() => {});
       await page.locator('[data-view="track32-bookshelf.html"]').first().evaluate(button => button.click());
       frame = null;
       for (let i = 0; i < 80 && !frame; i += 1) {
@@ -108,7 +110,9 @@ async function withShelf(trees, { width, height, view }, fn) {
     page.on('pageerror', (error) => errors.push(String(error.message || error)));
     await page.goto(`${origin}/v41/?account=1`, { waitUntil: 'load' });
     await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
-    await page.locator('#discover-ask-no').click().catch(() => {});
+    // #1413: 둘러보기 소개 질문 창은 순간 2→3개 저장 직후에만 뜬다. 떠 있을 때만 '아니요'를 누른다(보이지 않는
+    // 단추를 누르려고 Playwright 기본 제한 30초를 기다리던 헛대기를 없앤다 — isVisible은 기다리지 않는다).
+    if (await page.locator('#discover-ask-no').isVisible().catch(() => false)) await page.locator('#discover-ask-no').click().catch(() => {});
     // 서재는 트리 ▾의 '서재 전체 보기'로 연다(실제 입구).
     // #1367: the shelf tab itself is the entry; the header tree menu no longer exists.
     await page.locator('[data-view="track32-bookshelf.html"]').first().evaluate(button => button.click());

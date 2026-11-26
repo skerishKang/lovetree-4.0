@@ -150,6 +150,20 @@ async function openHost(browser, url, { width, height, touch = false, theme = ''
   return { context, page, frame, problems };
 }
 
+// #1245: compare restored positions only after card motion and the next paint settle.
+const waitForBoardCardsToSettle = (frame) => frame.evaluate(async () => {
+  const cards = [...document.querySelectorAll('#cardLayer .card')];
+  const motions = cards.flatMap((card) => card.getAnimations({ subtree: true }))
+    .filter((a) => Number.isFinite(a.effect?.getComputedTiming()?.endTime));
+  // Replaced transitions reject their finished promise; the replacement is captured below.
+  await Promise.all(motions.map((a) => a.finished.catch(() => {})));
+  await new Promise((resolve) => requestAnimationFrame(resolve));
+  const replacements = cards.flatMap((card) => card.getAnimations({ subtree: true }))
+    .filter((a) => Number.isFinite(a.effect?.getComputedTiming()?.endTime));
+  await Promise.all(replacements.map((a) => a.finished.catch(() => {})));
+  await new Promise((resolve) => requestAnimationFrame(resolve));
+});
+
 const geometry = (frame) => frame.evaluate(() => {
   const cards = [...document.querySelectorAll('#cardLayer .card')].map((c) => ({ id: c.dataset.id, x: c.offsetLeft, y: c.offsetTop, w: c.offsetWidth, h: c.offsetHeight }));
   let pairs = 0;
@@ -411,7 +425,7 @@ test('#1245 저장 실패: 끌기 전 자리로 돌아가고 실패 안내를 �
     await page.waitForTimeout(250);
     await page.mouse.up();
     await frame.locator('#saveFail.show').waitFor({ state: 'visible', timeout: 5000 });
-    await page.waitForTimeout(250);
+    await waitForBoardCardsToSettle(frame);
     const restored = await frame.evaluate(() => ({
       mode: document.querySelector('[data-board-mode="date"]').getAttribute('aria-pressed'),
       positions: Object.fromEntries([...document.querySelectorAll('#cardLayer .card')].map((el) => { const r = el.getBoundingClientRect(); return [el.dataset.id, { x: r.x, y: r.y }]; }))

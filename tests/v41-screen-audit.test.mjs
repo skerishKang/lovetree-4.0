@@ -11,11 +11,12 @@ import {clickToolbarTreeChoice,treeChoiceExpanded,treeChoiceFocused} from './hel
 // 크롬(Playwright chromium)이 없는 곳에서는 건너뛴다 — CI(LT_SCREEN_AUDIT_REQUIRE=1)에서는 건너뜀을 실패로 본다.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { serve, auditPage, failuresOf, roleStyleFn, assertRolePair } from './helpers/screen-audit.mjs';
 import { createTree, addMoment } from '../public/v41/domain.mjs';
+import { observeFrameMatrix } from './helpers/frame-observation.mjs';
 
 const REQUIRE = process.env.LT_SCREEN_AUDIT_REQUIRE === '1';
 const SCREEN_AUDIT_CAPTURE_DIR = fileURLToPath(new URL('../test-results/v41-screen-audit/', import.meta.url));
@@ -107,16 +108,17 @@ test('#942 첫 화면 추가 단추와 숫자 묶음', { skip: REQUIRE ? false :
   const trees=[make('좋아하는 순간들',8),make('여름',3),{...make('함께 부른 노래',3),inbox:true}];
   const workspace={revision:1,state:{version:1,trees,prefs:{displayName:'화면검사 시험계정'}},subject:'visual-audit-fake',writeSubjectBound:true,savedAt:'2026-11-20T00:00:00.000Z'};
   const share={id:'audit-share-000000000001',treeId:trees[0].id,view:'book',status:'active',origin:'manual',createdAt:'2026-11-20T00:00:00.000Z'};
-  const readHome = member => {
+  const readHome = kind => {
+     const member=kind==='member';
     const frame = document.getElementById('view');
     if (!frame?.checkVisibility()) return false;
     const doc = frame.contentDocument;
     const root = doc?.getElementById('orbit')?.shadowRoot;
-    const first = root?.querySelector(member ? '.actions [data-do=moments]' : '.actions [data-do=start]');
+    const first = root?.querySelector(member ? '.actions [data-do=moments]' : kind==='empty' ? '.actions [data-do=new]' : '.actions [data-do=start]');
     if (!first?.checkVisibility() || doc.fonts.status !== 'loaded') return false;
     // 공개 집계와 공유 목록은 따로 도착한다. 숫자의 값과 치수는 아래에서 그대로 판정한다.
     const countFor = action => root.querySelector('.actions [data-do='+action+']')?.parentElement.querySelector('.home-count');
-    if (!countFor('community')?.checkVisibility()) return false;
+    if (kind!=='empty' && !countFor('community')?.checkVisibility()) return false;
     if (member && !countFor('trees')?.querySelector('.home-count-line:nth-child(2) > *')) return false;
 
     const measure = e => {
@@ -125,7 +127,7 @@ test('#942 첫 화면 추가 단추와 숫자 묶음', { skip: REQUIRE ? false :
       const a=L(s.backgroundColor),b=L(s.color);
       return {text:e.textContent.trim(),bg:s.backgroundColor,ink:s.color,border:s.borderTopWidth,borderColor:s.borderTopColor,font:parseFloat(s.fontSize),radius:parseFloat(s.borderTopLeftRadius),contrast:(Math.max(a,b)+.05)/(Math.min(a,b)+.05),visible:!!e.getClientRects().length,x:r.x,y:r.y,w:r.width,h:r.height};
     };
-    const buttons = [...root.querySelectorAll('.center .actions > .subtleBtn,.center .actions > .home-action-group > .subtleBtn')].map(e => {
+    const buttons = [...root.querySelectorAll('.center .actions > .subtleBtn,.center .actions > .home-action-group > .subtleBtn')].filter(e=>e.checkVisibility()).map(e => {
       const s = doc.defaultView.getComputedStyle(e);
       const icon=e.querySelector('svg.home-compass'), ir=icon?.getBoundingClientRect();
       return { text:e.textContent.trim(),bg:s.backgroundColor,border:s.borderTopWidth,borderColor:s.borderTopColor,borderStyle:s.borderTopStyle,radius:parseFloat(s.borderTopLeftRadius),ink:s.color,icon:!!icon&&ir.width>0&&ir.height>0&&icon.getAttribute('aria-hidden')==='true'&&icon.getAttribute('fill')==='none'&&icon.getAttribute('stroke')==='currentColor' };
@@ -173,12 +175,26 @@ test('#942 첫 화면 추가 단추와 숫자 묶음', { skip: REQUIRE ? false :
           await ask.waitFor({state:'hidden'});
         }
         // 두 프레임의 이름은 화면을 넘길 때 바뀐다. 지금 보이는 문서에서 모든 치수를 한 번에 읽는다.
-        const result = await page.waitForFunction(readHome, member);
+        const result = await page.waitForFunction(readHome, kind);
         const values = await result.jsonValue();
         await result.dispose();
         const { buttons, head, fab, top, groups, stageBg } = values;
         const key=width+'-'+theme+'-'+kind;
         console.log('#942',key,JSON.stringify(values));
+         if(kind==='empty'){
+          check(JSON.stringify(buttons.map(b=>b.text))===JSON.stringify(['첫 순간 추가','예시 둘러보기']),key+' 빈 기록 단추 순서 '+JSON.stringify(buttons));
+          check(buttons.length===2&&groups.length===2,key+' 빈 기록 단추/집계 묶음 개수 '+JSON.stringify(groups));
+          check(groups.every(g=>g.btnH>=44),key+' 빈 기록 단추 높이 44px 이상 '+JSON.stringify(groups));
+          check(buttons[0]?.radius>=22&&buttons[1]?.radius>=22,key+' 빈 기록 둥근 단추 모양 '+JSON.stringify(buttons));
+          check(!head.visible&&!fab.visible&&!top?.visible,key+' 빈 기록에서 쓰기 단추는 가운데 한 곳만 표시');
+          check(buttons.every(b=>b.border==='1px'&&b.radius>=22&&pairContrast(b.ink,b.bg)>=4.5),key+' 빈 기록 단추 글자 대비 4.5:1 이상 및 테두리 '+JSON.stringify(buttons));
+          if(groups.length===2){const a=groups[0],b=groups[1],gap=Math.abs(a.y-b.y)<2?b.x-a.x-a.w:b.y-a.y-a.h;check(gap>=Math.max(width===1440?16:14,15),key+' 빈 기록 단추 간격 '+gap);}
+
+          const emptyView=await page.evaluate(()=>{const root=document.getElementById('view')?.contentDocument?.getElementById('orbit')?.shadowRoot;return {cards:root?.querySelectorAll('.card').length,headline:root?.querySelector('.center h1')?.textContent}});
+          check(emptyView.cards===0&&emptyView.headline==='내 첫 순간',key+' 빈 기록 예시 카드 0개/제목 '+JSON.stringify(emptyView));
+          continue;
+         }
+
         if(dest){
           if(width===1440)await page.frameLocator('#view').locator('.card:not(.off):not(.clash)').first().waitFor({state:'visible',timeout:8000});
           // Capture the fully revealed center, not a transient animation frame.
@@ -227,7 +243,7 @@ test('#942 첫 화면 추가 단추와 숫자 묶음', { skip: REQUIRE ? false :
         check(groups.length===3,key+' 묶음 3개');
         // #1350: 단추 줄의 세 단추는 44px 이상 눌린다.
         check(groups.every(g=>g.btnH>=44),key+' 단추 누름 높이 44px 이상 '+JSON.stringify(groups.map(g=>[g.label,g.btnH])));
-         check(JSON.stringify(groups.map(g=>g.count))===JSON.stringify(member?['순간 14|정리 전 3','공개 트리 17|공개 순간 1.2k','트리 3|공개 트리 1']:['',(signedIn?'':'예시 ')+'공개 트리 17|순간 1.2k','']),key+' 숫자 귀속');
+         check(JSON.stringify(groups.map(g=>g.count))===JSON.stringify(member?['순간 14|정리 전 3','모두의 트리 17|모두의 순간 1.2k','내 트리 3|내 공개 트리 1']:['',(signedIn?'':'예시 ')+'모두의 트리 17|모두의 순간 1.2k','']),key+' 숫자 귀속');
         for(const g of groups.filter(g=>g.count)){
           check(g.inner>=4&&g.inner<=6&&g.font>=12&&g.widthDiff<=1,key+' 숫자 표 폭·간격 '+JSON.stringify(g));
           for(const row of g.rows){
@@ -267,7 +283,7 @@ test('#1246 첫 화면 단추 첫 표시 뒤 배치 고정', { skip: REQUIRE ? f
             try{
               const f=document.getElementById('view'),root=f?.contentDocument?.getElementById('orbit')?.shadowRoot;
               const a=root?.querySelector('.center .actions'),c=root?.querySelector('.center'),bs=[...a?.querySelectorAll('.home-action-group > button')||[]];
-              if(f?.checkVisibility()&&a&&bs.length===3){
+              if(f?.checkVisibility()&&a&&bs.length===(document.body.dataset.member==='in'&&document.body.dataset.treeCount==='0'?2:3)){
                 const w=f.contentWindow,style=w.getComputedStyle(a),r=a.getBoundingClientRect(),cr=c.getBoundingClientRect();
                 if(Number(style.opacity)>0&&r.width&&r.height){
                   const translate=style.transform==='none'?0:new DOMMatrixReadOnly(style.transform).m42;
@@ -294,14 +310,15 @@ test('#1246 첫 화면 단추 첫 표시 뒤 배치 고정', { skip: REQUIRE ? f
         // Do not wait for fonts or counts before measuring the first visible group.
         await page.waitForFunction(()=>window.__homeActionFrames.length>0,null,{timeout:15000});
         await page.waitForTimeout(3000);releaseFonts();releaseStats();
-        await page.waitForFunction(()=>window.__homeActionFrames.some(r=>r.filled),null,{timeout:10000});
+        if(kind==='empty')await page.evaluate(()=>document.fonts.ready);
+         else await page.waitForFunction(()=>window.__homeActionFrames.some(r=>r.filled),null,{timeout:10000});
         await page.waitForTimeout(700);
         const rows=await page.evaluate(()=>window.__homeActionFrames);
-        const first=rows[0],last=rows.at(-1),expected=width===390&&!member?3:1;
+        const first=rows[0],last=rows.at(-1),expected=width===390?(kind==='guest'?3:kind==='empty'?2:1):1;
         const delta=k=>Math.max(...rows.map(r=>r[k]))-Math.min(...rows.map(r=>r[k]));
         const result={key,samples:rows.length,first,last,heightDelta:delta('height'),topDelta:delta('top'),centerDelta:delta('centerTop'),lines:[...new Set(rows.map(r=>r.lines))],labels:[...new Set(rows.map(r=>r.labels))]};
         console.log('#1246 FIRST',JSON.stringify(result));
-        if(first.filled||!last.filled||result.lines.length!==1||result.lines[0]!==expected||result.labels.length!==1||result.heightDelta>8||result.topDelta>8||result.centerDelta>8)failures.push(result);
+        if(first.filled||(kind!=='empty'&&!last.filled)||result.lines.length!==1||result.lines[0]!==expected||result.labels.length!==1||result.heightDelta>8||result.topDelta>8||result.centerDelta>8)failures.push(result);
       }finally{releaseFonts();releaseStats();await ctx.close();}
     }
   }finally{await browser.close();await new Promise(r=>server.close(r));}
@@ -582,6 +599,75 @@ const readyFrame = async (page, test_, { root = null, view = null, timeout = 450
   }
   assert.fail(`${why} 실패 — ${detail} (최대 ${timeout / 1000}초). 현재 프레임 URL: [${frameUrls(page).join(' | ')}]`);
 };
+
+test('#657 화면 공통 검사기: 아홉 화면 둘레·스크롤 주인 관측 기반선(390·1440 × 밤·정원)', { skip: REQUIRE ? false : skip, timeout: 300000 }, async () => {
+  if (skip) assert.fail(`미리보기 검사에서는 건너뜀이 실패다 — ${skip}`);
+  const baseline = JSON.parse(readFileSync(new URL('./fixtures/frame-observation-baseline.json', import.meta.url), 'utf8'));
+  const shard = process.env.LT_SCREEN_AUDIT_SHARD || '';
+  const outputDir = fileURLToPath(new URL('../test-results/v41-frame-observation/' + (shard || 'all') + '/', import.meta.url));
+  const server = await serve({}, { port: 4401 });
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch({ headless: true });
+  const started = Date.now();
+  try {
+    const report = await observeFrameMatrix({ browser, base, outputDir, shard });
+    assert.deepEqual(report.errors, [], '관측 중 화면 오류가 없다');
+    assert.equal(report.screens.length, !shard ? 36 : shard === 'c' ? 18 : 9, '선택한 shard의 아홉 화면을 모두 관측했다');
+    const assertObservedStyle = (actual, expected, width, theme, label) => {
+      assert.ok(actual, `${label} 요소가 있다`);
+      assert.deepEqual(actual.padding, expected.padding[width], `${label} padding`);
+      assert.deepEqual(actual.borderWidth, expected.borderWidth, `${label} 테두리 두께`);
+      assert.deepEqual(actual.borderStyle, expected.borderStyle, `${label} 테두리 선`);
+      assert.deepEqual(actual.borderColor, Array(4).fill(expected.borderColor[theme]), `${label} 테두리 색`);
+      assert.deepEqual(actual.borderRadius, expected.borderRadius[width], `${label} 모서리 반경`);
+      assert.equal(actual.boxShadow, expected.boxShadow, `${label} 그림자`);
+      assert.deepEqual([actual.background, actual.backgroundImage], [expected.background[theme].background, expected.background[theme].backgroundImage], `${label} 배경`);
+    };
+    for (const row of report.screens) {
+      const width = String(row.viewport.width), id = row.screen, label = `${width}/${row.theme}/${id}`;
+      const expected = baseline.screens[baseline.screenGroups[id]];
+      const stage = row.shell.stage, frame = row.shell.frame, panel = row.shell.panel;
+      assert.ok(expected, `${label} 기준선이 있다`);
+      assertObservedStyle(stage, expected.stage, width, row.theme, `${label} stage`);
+      assert.ok(Math.abs(stage.rect.height - expected.stage.height[width]) <= 0.002, `${label} stage 높이 ${stage.rect.height}`);
+      assert.equal(row.scroll.shellDocumentScrollable, false, `${label} 셸 문서는 스크롤 주인이 아니다`);
+      const owner = row.scroll.owner, scroll = expected.scroll[id];
+      assert.ok(scroll, `${label} 스크롤 기준선이 있다`);
+      assert.equal(row.scroll.frameDocumentScrollable, scroll.frameDocumentScrollable[width], `${label} iframe 문서 스크롤 여부`);
+      assert.equal(`${owner?.owner}:${owner?.id}`, scroll.owner, `${label} 주 스크롤 주인`);
+      assert.equal(owner?.overflowY, scroll.overflowY[width], `${label} 주 스크롤 주인 overflowY`);
+      if (expected.frame) assertObservedStyle(frame, expected.frame, width, row.theme, `${label} iframe`);
+      else assert.equal(frame, null, `${label} iframe을 쓰지 않는다`);
+      if (expected.panel) {
+        assertObservedStyle(panel, expected.panel, width, row.theme, `${label} panel`);
+        assert.equal(panel.open, expected.panel.open, `${label} panel 열림 상태`);
+        assert.deepEqual(row.shell.backdrop, expected.panel.backdrop[row.theme], `${label} panel 배경 덮개`);
+      } else assert.equal(panel, null, `${label} 셸 패널을 쓰지 않는다`);
+      for (const suffix of ['.png', '-surface.png', '-roi-top.png', '-roi-bottom.png', '-roi-left.png', '-roi-right.png', '.json']) assert.ok(existsSync(join(outputDir, `${width}-${row.theme}-${id}${suffix}`)), `${label} 관측 파일 ${suffix}`);
+      if (id === 'share-guest') {
+        const toast = expected.toast;
+        assert.equal(row.shell.toastHidden, toast.hidden, `${label} 안내가 보인다`);
+        assert.equal(row.shell.visitorIntro, toast.visitorIntro, `${label} 방문자 안내다`);
+        assert.equal(row.shell.toast.position, toast.position, `${label} 안내는 문서 흐름 칸이다`);
+        assert.equal(row.shell.toast.flex, toast.flex, `${label} 안내는 flex 고정 칸이다`);
+        assert.ok(Math.abs(row.shell.toast.rect.height - toast.height[width]) <= 0.002, `${label} 안내 높이`);
+        assert.deepEqual([row.shell.toast.margin[0], row.shell.toast.margin[2]], [toast.margin[width].top, toast.margin[width].bottom], `${label} 안내 세로 여백`);
+        assert.ok(row.shell.toastCenterDelta <= toast.centeringTolerance, `${label} 안내 좌우 여백 차이 ${row.shell.toastCenterDelta}px`);
+        assert.equal(row.shell.toastHorizontalOverflow, toast.horizontalOverflow, `${label} 안내 가로 넘침`);
+        assert.equal(row.shell.toastWithinViewport, toast.withinViewport, `${label} 안내가 화면 안에 있다`);
+        const shortfall = baseline.screens.iframe.stage.height[width] - stage.rect.height;
+        assert.ok(Math.abs(shortfall - expected.stageShortfall[width]) <= 0.002, `${label} 안내가 줄인 stage 높이 ${shortfall}`);
+      }
+    }
+    const result = { basis: baseline.basis, shard: shard || 'all', screens: report.screens.length, elapsedMs: Date.now() - started };
+    mkdirSync(outputDir, { recursive: true });
+    writeFileSync(join(outputDir, 'result.json'), JSON.stringify(result, null, 2));
+    console.log('#1365 둘레 관측', JSON.stringify(result));
+  } finally {
+    await browser.close();
+    await new Promise(resolve => server.close(resolve));
+  }
+});
 
 test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤·정원에서 겹침·잘림·흔적 값·작은 글자가 0이다', { skip: REQUIRE ? false : skip, timeout: 900000 }, async () => {
   if (skip) assert.fail(`미리보기 검사에서는 건너뜀이 실패다 — ${skip}`);
