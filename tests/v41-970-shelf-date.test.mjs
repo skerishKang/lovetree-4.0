@@ -59,8 +59,7 @@ async function withShelfSession(fn) {
       // 무대 준비가 끝나기 전의 클릭은 '불러오는 중' 덮개에 가로챼진다.
       await page.waitForFunction(() => document.getElementById('stage-loading')?.hidden === true, null, { timeout: 20000 });
       await page.locator('#discover-ask-no').click().catch(() => {});
-      await page.locator('#record-menu').click();
-      await page.locator('[data-tree-action="shelf"]').click();
+      await page.locator('[data-view="track32-bookshelf.html"]').first().evaluate(button => button.click());
       frame = null;
       for (let i = 0; i < 80 && !frame; i += 1) {
         frame = page.frames().find((f) => /track32-bookshelf/.test(f.url()));
