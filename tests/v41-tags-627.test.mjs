@@ -98,6 +98,7 @@ const TITLES = [
   ['BTS (방탄소년단) \'Dynamite\' Official MV', ['artist:BTS', 'song:Dynamite']],
   ['BTS (\uBC29\uD0C4\uC18C\uB144\uB2E8) FIRE (\uBD88\uD0C0\uC624\uB974\uB124) Official MV', ['artist:BTS', 'song:FIRE']],
   ['BTS (\uBC29\uD0C4\uC18C\uB144\uB2E8) FIRE Official MV', ['artist:BTS', 'song:FIRE']],
+  ['BTS (\uBC29\uD0C4\uC18C\uB144\uB2E8) FIRE @ M COUNTDOWN', ['artist:BTS', 'song:FIRE', 'stage:\uC5E0\uCE74\uC6B4\uD2B8\uB2E4\uC6B4']],
   ['FIRE', [], 'No artist label is inferred from one uppercase word'],
   ['BLACKPINK - ‘Pink Venom’ M/V', ['artist:BLACKPINK', 'song:Pink Venom']],
   ['르세라핌(LE SSERAFIM) \'UNFORGIVEN (feat. Nile Rodgers)\' Official MV', ['artist:LE SSERAFIM', 'song:UNFORGIVEN (feat. Nile Rodgers)(너무 길다)'], '24자를 넘는 노래 제목은 너무 길다는 표시로 남긴다(조용히 버리지 않는다)'],

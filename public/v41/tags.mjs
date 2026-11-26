@@ -459,6 +459,10 @@ function findSong(t) {
     for (let i = parts.length - 1; i >= 0 && /^[A-Z][a-z][A-Za-z0-9'’-]*$/.test(parts[i]); i -= 1) titleWords.unshift(parts[i]);
     if (titleWords.length && titleWords.length <= 3) return titleWords.join(' ');
   }
+  // An unquoted performance clip can place one song word after a confirmed
+  // artist alias, before its broadcast stage label.
+  const stageCaps = t.match(/\([^()]*[??-??[^()]*\)\s+([A-Z][A-Z0-9&'??]+)(?:\s+\([^()]*\))?\s*@/);
+  if (stageCaps && findStage(t)) return stageCaps[1];
   // 4) '가수 (한글 별칭) 한글 곡명'처럼 꼬리 표시가 없어도, 앞에 가수 자리가 있고 끝에 한글 실행이
   //    남으면 그것은 곡명이다. 직캠 문맥에서는 곡명으로 단정하지 않는다.
   const rest = t.replace(/\([^()]*\)/g, ' ').replace(NOISE, '').trim();
