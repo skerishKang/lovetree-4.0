@@ -552,6 +552,12 @@ label.cleanup-moment{display:flex;align-items:center;gap:12px;min-height:48px;ma
 /* 순간 추가 폼 입력칸과 같은 규칙: 정원(밝은 바탕)에서는 정리 창의 입력칸도 정원 종이·선 토큰으로 흰 칸과 견준다. 밤은 기본값 그대로다. */
 html[data-lt-theme=garden] #cleanup-panel input:not([type=checkbox]),html[data-lt-theme=garden] #cleanup-panel select{background:var(--lt-paper);border-color:var(--lt-line-paper)}
 #cleanup-count{margin:10px 0 0}
+/* #1439: 대상 트리 고르기 — 순간 줄과 같은 칸 모양. 목록이 길면 이 칸 안에서만 넘긴다. '이미 있음'은 줄 오른쪽 작은 표시. */
+#cleanup-panel .cleanup-targets{max-height:min(32vh,280px);margin-top:10px}
+#cleanup-target-hint{margin:6px 0 0}
+.cleanup-target span{flex:1 1 auto}
+.cleanup-dup{flex:0 0 auto;margin-left:auto;padding:2px 10px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-pill);color:var(--lt-gold);font-size:12px;line-height:1.6;white-space:nowrap}
+.cleanup-dup[hidden]{display:none}
 #cleanup-error{color:var(--lt-rose);font-weight:600}
 #move-feedback{flex:0 0 auto;position:relative;z-index:26;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;padding:10px 22px;background:rgba(238,190,104,.08);border-bottom:1px solid rgba(255,230,166,.35);font-size:13px;line-height:1.7}
 #move-feedback[hidden]{display:none}
@@ -1198,6 +1204,8 @@ body.lt-frame-dialog-open .app-header::after,body.lt-frame-dialog-open .home-lin
 #cleanup-panel .panel-foot{flex:0 0 auto;display:flex;flex-wrap:wrap;gap:8px;padding:12px 0 20px;border-top:1px solid var(--line);background:var(--lt-glass-strong)}
 #cleanup-panel .panel-foot button{min-height:44px;border-radius:var(--lt-r-pill);border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.04);padding:10px 14px}
 #cleanup-panel .panel-foot .primary{background:var(--lt-primary);color:var(--lt-primary-ink)}
+/* #1439: 정원(밝은 종이)에서는 위 흰 반투명 테두리가 묻혀 옮기기·복사하기가 글자처럼 보인다 — 닫기 확인 창과 같은 종이 단추로 둔다. */
+html[data-lt-theme=garden] #cleanup-panel .panel-foot button:not(.primary){background:var(--lt-paper);color:var(--lt-ink);border-color:var(--lt-line-paper)}
 
 
 /* #1097: 순간 수정 창 — 영상 먼저, 저장 하나, 이어짐 한 칸. 색은 --lt-* 토큰만 쓴다. */
