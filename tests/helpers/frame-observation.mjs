@@ -196,7 +196,7 @@ export async function observeFrameMatrix({ browser, base, outputDir, shard = '' 
         if (!frame) return;
         frame.style.willChange = 'transform';
         frame.style.transform = 'translateZ(0)';
-        frame.contentDocument?.querySelectorAll('.lt-screen-toolbar,button,select,.pill,.mini,.action,.close,.edge-tip,.recent-card,.leftPanel,.rightPanel,.detail-panel,.note-piece,.mobile-page,.mobile-content,.page-content,.photo-piece,.clipping,.letter,.film-piece')?.forEach(element => { element.style.willChange = 'transform'; if (element.matches('.recent-card') || getComputedStyle(element).transform === 'none') element.style.transform = 'translateZ(0)'; });
+        frame.contentDocument?.querySelectorAll('.lt-screen-toolbar,button,select,.pill,.mini,.action,.close,.edge-tip,.recent-card,.leftPanel,.rightPanel,.detail-panel,.note-piece,.mobile-page,.mobile-content,.page-content,.photo-piece,.clipping,.letter,.film-piece')?.forEach(element => { element.style.willChange = 'transform'; const transform = getComputedStyle(element).transform; element.style.transform = transform === 'none' ? 'translateZ(0)' : transform + ' translateZ(0)'; });
       });
       if (screen.id === 'map') await activePage.evaluate(() => { const frame = [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length); frame.contentWindow.__lt?.resize(); });
       if (clockPaused) { await activePage.clock.runFor(32); await activePage.clock.fastForward(0); }
