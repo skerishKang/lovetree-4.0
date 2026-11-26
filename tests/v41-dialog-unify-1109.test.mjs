@@ -27,7 +27,7 @@ const otherTree = () => createTree({ subject: '다른 트리', title: '다른 �
 const workspace = (tree) => JSON.stringify({ revision: 1, state: { version: 1, trees: [tree, otherTree()], prefs: {} }, subject: '시험계정', writeSubjectBound: true, savedAt: '2026-11-20T09:00:00.000Z' });
 
 async function withShell(tree, { width, height, theme, deferred = false, cached = deferred, hash = '' }, fn) {
-  const server = await serve();
+  const server = await serve({}, {port:Number(process.env.LT_TEST_PORT)||0});
   const base = `http://127.0.0.1:${server.address().port}`;
   const browser = await chromium.launch({ headless: true });
   const ctx = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
@@ -215,7 +215,7 @@ test('#1109 저장본 뒤 서버 기록이 도착해도 네 화면은 같은 문
    release(changed);
    await page.waitForFunction(id=>window.LT41?.tree?.moments.some(m=>m.id===id),added,{timeout:20000});
    await frame.waitForFunction(({view,id})=>{
-    if(view==='home')return document.getElementById('orbit').shadowRoot.querySelector('.recent-card strong')?.textContent==='서버에서 도착한 순간';
+    if(view==='home')return document.getElementById('orbit').shadowRoot.querySelector('.recent-card .recent-title-text')?.textContent==='서버에서 도착한 순간';
     if(view==='book')return window.__TRACK59__?.getState().pageIds.includes(id);
     if(view==='board')return !!document.querySelector('.card[data-id="'+id+'"]');
     return [...document.querySelectorAll('.book-card-meta')].some(el=>el.textContent.includes('13개 순간'));

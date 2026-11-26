@@ -110,6 +110,7 @@ let viewerOpener=null;
 let viewerMoment=null;
 let viewerFocusObserver=null;
 let viewerFocusTimer=0;
+let viewerFocusFrame=0;
 let viewerSequence=0;
 let viewerSignal=new AbortController();
 const mediaKind=(videoId,moment)=>videoId?'동영상':moment.image?'사진':'기록';
@@ -157,6 +158,7 @@ function renderMoreMenu(){
 }
 function closeHomeViewer(){
  if(!viewer.classList.contains('open'))return;
+ cancelAnimationFrame(viewerFocusFrame);viewerFocusFrame=0;
  closeMoreMenu();viewerSequence++;viewerSignal.abort();viewer.querySelector('iframe')?.remove();vEl('mediaVisualHome').classList.remove('lt-home-youtube-playing');
  viewer.classList.remove('open');viewer.setAttribute('aria-hidden','true');viewerMoment=null;
  homeHistory.dismiss('viewer');
@@ -170,6 +172,7 @@ function closeHomeViewer(){
  viewerFocusTimer=setTimeout(()=>{viewerFocusObserver?.disconnect();viewerFocusObserver=null;},3000);
 }
 function paintHomeViewer(moment){
+ cancelAnimationFrame(viewerFocusFrame);viewerFocusFrame=0;
  const videoId=youtubeIdFrom(moment.url||''),sequence=++viewerSequence;viewerSignal.abort();viewerSignal=new AbortController();viewerMoment=moment;closeMoreMenu();
  const savedTitle=typeof moment.mediaMetadata?.title==='string'?moment.mediaMetadata.title.trim():'';
  const namedTitle=!isAutoTitle(moment.title)&&typeof moment.title==='string'?moment.title.trim():'';
@@ -210,7 +213,7 @@ function openHomeViewer(moment,opener=null){
 }
 function stepHomeDetail(direction){
  const connections=momentConnections(viewerMoment,viewerConnectionMoments()),next=direction<0?connections.parent:connections.next;if(!next)return;
- paintHomeViewer(next);requestAnimationFrame(()=>{const target=vEl('mediaTreeChipHome').closest('.mediaShell').querySelector(`[data-connected-dir="${direction<0?'prev':'next'}"]`);(target||vEl('mediaCloseHome')).focus();});
+ paintHomeViewer(next);viewerFocusFrame=requestAnimationFrame(()=>{viewerFocusFrame=0;const target=vEl('mediaTreeChipHome').closest('.mediaShell').querySelector(`[data-connected-dir="${direction<0?'prev':'next'}"]`);(target||vEl('mediaCloseHome')).focus();});
 }
 vEl('mediaCloseHome').onclick=closeHomeViewer;
 vEl('mediaTreeChipHome').onclick=()=>{const moment=viewerMoment;if(!moment)return;closeHomeViewer();bridge.actions.openTree(moment.treeId,moment.id);};
