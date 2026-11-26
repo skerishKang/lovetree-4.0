@@ -90,13 +90,14 @@ async function withShelf(trees, { width, height, view }, fn) {
   const origin = `http://127.0.0.1:${server.address().port}`;
   const browser = await chromium.launch({ headless: true });
   const ctx = await browser.newContext({ viewport: { width, height }, colorScheme: 'dark', reducedMotion: 'reduce' });
+  let prefs = view ? { shelfView: view } : {}; let resolveSave; const saved = new Promise((r) => { resolveSave = r; });
   if (view) await ctx.addInitScript((v) => { try { localStorage.setItem('lt41.shelfView', v); } catch {} }, view);
   try {
     await ctx.route('**://i.ytimg.com/**', (route) => route.fulfill({ status: 200, contentType: 'image/png', body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64') }));
     await ctx.route('**/api/**', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
     await ctx.route('**/api/workspace**', (route) => {
-      if (route.request().method() === 'PUT') { route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"revision":2}' }); return; }
-      route.fulfill({ status: 200, contentType: 'application/json', body: WORKSPACE(trees, view) });
+      if (route.request().method() === 'PUT') { try { const body = route.request().postDataJSON(); const next = body?.state?.prefs || body?.prefs; if (next) prefs = { ...prefs, ...next }; } catch {} route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"revision":2}' }); resolveSave?.(); return; }
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ revision: 1, state: { version: 1, trees, prefs }, subject: '시험계정', writeSubjectBound: true, savedAt: '2026-11-20T09:00:00.000Z' }) });
     });
     const page = await ctx.newPage();
     const errors = [];
@@ -116,7 +117,7 @@ async function withShelf(trees, { width, height, view }, fn) {
     assert.ok(frame, '서재 화면이 열리지 않음');
     await frame.waitForSelector('#shelfRail [data-book-index]', { timeout: 20000 });
     await page.waitForTimeout(600); // 배치·ResizeObserver가 한 번 돌 시간
-    await fn({ page, frame, errors });
+    await fn({ page, frame, errors, saved });
   } finally {
     await browser.close();
     server.close();
@@ -288,7 +289,7 @@ test('서재 — 390·844·1440 × 선반·회전 × 책 1·4·20권에서 왼�
 test('서재 — 설정에서 고른 기본 보기가 저장되고 다시 열려도 남는다', async (t) => {
   if (skip) { if (REQUIRE) assert.fail(`화면 시험을 건너뛸 수 없습니다: ${skip}`); t.skip(skip); return; }
   for (const name of ['shelf', 'carousel']) {
-    await withShelf(books(2), { width: 1440, height: 900 }, async ({ page, errors }) => {
+    await withShelf(books(2), { width: 1440, height: 900 }, async ({ page, errors, saved }) => {
       await page.locator('#account-avatar').click();
       await page.locator('#account-open-settings').click();
       await page.waitForSelector('#account-settings[open]');
@@ -296,6 +297,7 @@ test('서재 — 설정에서 고른 기본 보기가 저장되고 다시 열려
       await page.locator(`[data-settings-shelf-view="${name}"]`).click();
       assert.equal(await page.evaluate(() => localStorage.getItem('lt41.shelfView')), name, '기기 값에 저장된다');
       assert.equal(await page.evaluate(() => window.LT41?.prefs?.shelfView), name, '계정 값에 저장된다');
+      await saved;
       await page.reload({ waitUntil: 'load' });
       await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
       await page.locator('#discover-ask-no').click().catch(() => {});
