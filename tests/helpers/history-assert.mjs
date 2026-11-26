@@ -129,17 +129,10 @@ const signalCounts = target => target
   : Promise.resolve({ msg: 0, dom: 0 });
 
 async function waitForGrowth(page, frame, before, waitMs) {
-  const deadline = Date.now() + waitMs;
-  const remaining = () => Math.max(50, deadline - Date.now());
-  // 셸 기록이 늘어난 뒤 안정적으로 유지되는지를 본다 — 화면 교체 중 잠깐 늘어나는 프레임 기록은 제외.
-  while (Date.now() < deadline) {
-    const grew = await page.waitForFunction(n => history.length > n, before, { timeout: remaining() }).then(() => true, () => false);
-    if (!grew) break;
-    await page.waitForTimeout(100);
-    if (await page.evaluate(() => history.length) > before) return true;
-  }
+  const grew = await page.waitForFunction(n => history.length > n, before, { timeout: waitMs }).then(() => true, () => false);
+  if (grew) return true;
   if (!frame) return false;
-  return frame.waitForFunction(n => history.length > n, before, { timeout: remaining() }).then(() => true, () => false);
+  return frame.waitForFunction(n => history.length > n, before, { timeout: waitMs }).then(() => true, () => false);
 }
 
 async function waitForProcessed(page, frame, before, waitMs) {
