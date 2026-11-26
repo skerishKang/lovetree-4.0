@@ -630,7 +630,7 @@ let advancing=0,unavailableTimer=0,unavailableId='';
    };
    const swipeTargets=[stage,toolbar];
   for(const target of swipeTargets)target.addEventListener('touchstart',event=>{
-    if(event.target?.closest?.('.moments-media')||videoTouch(event)){touchY=null;return;}
+    if(event.target?.closest?.('.moments-media')||(event.isTrusted&&videoTouch(event))){touchY=null;return;}
     const t=event.touches[0];touchY=t?{x:t.clientX,y:t.clientY}:null;
   },{passive:true});
  for(const target of swipeTargets)target.addEventListener('touchend',event=>{
