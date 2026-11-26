@@ -163,7 +163,9 @@ test('renderAccount: 이메일이 있으면 계정 메뉴에 전체 이메일을
   });
   try {
     await h.header.loadAccountEmail();
-    assert.equal(h.els['account-email'].textContent, email, '전체 이메일 표시, mask(•) 없음');
+    assert.equal(h.els['account-email'].textContent, 'kimb…', '이메일은 앞부분만 짧게 표시');
+    assert.equal(h.els['account-email'].title, email, '전체 주소는 제목에 있다');
+    assert.equal(h.els['account-email'].getAttribute('aria-label'), email, '화면 읽기에는 전체 주소');
     assert.ok(!h.els['account-email'].textContent.includes('•'), '마스킹 문자가 없다');
     assert.equal(h.els['account-avatar'].textContent, 'K', '동그라미 글자 = 이메일 첫 글자(대문자)');
     assert.equal(h.els['account-avatar'].getAttribute('aria-label'), `내 계정 메뉴, ${email}으로 로그인됨`);
@@ -194,7 +196,8 @@ test('updateAccountControls: 로그인 직후 계정 API를 불러 동그라미�
     h.header.updateAccountControls();
     await new Promise((resolve) => setTimeout(resolve, 0));
     assert.equal(calls, 1, '메뉴를 열기 전에 한 번 부른다');
-    assert.equal(h.els['account-email'].textContent, email, '메뉴를 열지 않아도 전체 이메일이 먼저 놓인다');
+    assert.equal(h.els['account-email'].textContent, 'fay…', '메뉴를 열지 않아도 짧은 이메일이 먼저 놓인다');
+    assert.equal(h.els['account-email'].title, email, '전체 주소는 제목에 있다');
     assert.equal(h.els['account-avatar'].textContent, 'F');
     h.header.openAccountMenu();
     await new Promise((resolve) => setTimeout(resolve, 0));
@@ -254,7 +257,8 @@ test('loadAccountEmail: 계정 API가 이메일을 주면 갱신하고, 아니�
   try {
     await loaded.header.loadAccountEmail();
     assert.equal(loaded.header.currentAccountEmail(), email);
-    assert.equal(loaded.els['account-email'].textContent, email);
+    assert.equal(loaded.els['account-email'].textContent, 'kate…');
+    assert.equal(loaded.els['account-email'].title, email);
   } finally {
     loaded.restore();
   }

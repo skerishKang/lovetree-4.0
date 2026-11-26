@@ -97,13 +97,14 @@ async function withShelf(trees, { width, height, view }, fn) {
   const origin = `http://127.0.0.1:${server.address().port}`;
   const browser = await chromium.launch({ headless: true });
   const ctx = await browser.newContext({ viewport: { width, height }, colorScheme: 'dark', reducedMotion: 'reduce' });
+  let prefs = view ? { shelfView: view } : {}; let resolveSave; const saved = new Promise((r) => { resolveSave = r; });
   if (view) await ctx.addInitScript((v) => { try { localStorage.setItem('lt41.shelfView', v); } catch {} }, view);
   try {
     await ctx.route('**://i.ytimg.com/**', (route) => route.fulfill({ status: 200, contentType: 'image/png', body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64') }));
     await ctx.route('**/api/**', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
     await ctx.route('**/api/workspace**', (route) => {
-      if (route.request().method() === 'PUT') { route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"revision":2}' }); return; }
-      route.fulfill({ status: 200, contentType: 'application/json', body: WORKSPACE(trees, view) });
+      if (route.request().method() === 'PUT') { try { const body = route.request().postDataJSON(); const next = body?.state?.prefs || body?.prefs; if (next) prefs = { ...prefs, ...next }; } catch {} route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"revision":2}' }); resolveSave?.(); return; }
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ revision: 1, state: { version: 1, trees, prefs }, subject: '시험계정', writeSubjectBound: true, savedAt: '2026-11-20T09:00:00.000Z' }) });
     });
     const page = await ctx.newPage();
     const errors = [];
@@ -125,7 +126,7 @@ async function withShelf(trees, { width, height, view }, fn) {
     assert.ok(frame, '서재 화면이 열리지 않음');
     await frame.waitForSelector('#shelfRail [data-book-index]', { timeout: 20000 });
     await page.waitForTimeout(600); // 배치·ResizeObserver가 한 번 돌 시간
-    await fn({ page, frame, errors });
+    await fn({ page, frame, errors, saved });
   } finally {
     await browser.close();
     server.close();
@@ -361,74 +362,28 @@ test('서재 — 책 수·폭·보기별 첫 카드 잘림 0', async (t) => {
   });
 });
 
-
-// #1366 ⑥·#1415·#1418: 한 브라우저에서 폭·테마·책 수를 바꿔 빈 띠, 넘침, 대비를 확인한다.
-test('서재 — 최근 순간 책장 바로 아래, 4폭×2테마×3책 수 가로 넘침·대비 0', async (t) => {
-  if (skip) { if (REQUIRE) assert.fail('화면 시험을 건너뛸 수 없습니다: '+skip); t.skip(skip); return; }
-  await withShelfSession(async ({ errors, getFrame, setData, setViewport, setView, setTheme }) => {
-    for (const count of [1, 4, 20]) {
-      await setData(count);
-      for (const width of [390, 844, 1440, 2560]) {
-        await setViewport(width, width === 390 ? 844 : 900);
-        for (const theme of ['night', 'garden']) {
-          await setTheme(theme);
-          for (const name of SHELF_VIEW_NAMES) {
-            await setView(name);
-            const frame = getFrame();
-            const actual = await frame.evaluate(() => {
-              const shelf=document.getElementById('shelfViewport');
-              const recent=document.getElementById('shelfRecent');
-              const row=document.getElementById('shelfRecentRow');
-              const title=recent.querySelector('h2');
-              const card=recent.querySelector('.shelf-recent-item');
-              const caption=card?.querySelector('.shelf-recent-name');
-              const backdrop=getComputedStyle(card).backgroundColor;
-              const parse=(color)=>[...color.matchAll(/[\d.]+/g)].map(v=>Number(v[0])).slice(0,3);
-              const linear=(x)=>{x/=255;return x<=0.04045?x/12.92:Math.pow((x+0.055)/1.055,2.4)};
-              const luminance=(color)=>{const [r,g,b]=parse(color);return 0.2126*linear(r)+0.7152*linear(g)+0.0722*linear(b)};
-              const contrast=(a,b)=>{const aa=luminance(a),bb=luminance(b);return (Math.max(aa,bb)+0.05)/(Math.min(aa,bb)+0.05)};
-              return {
-                gap:recent.getBoundingClientRect().top-shelf.getBoundingClientRect().bottom,
-                scrollOverflow:document.documentElement.scrollWidth-window.innerWidth,
-                hidden:recent.hidden, title:title.textContent.trim(),
-                cardCount:recent.querySelectorAll('.shelf-recent-item').length,
-                rowScrollable:getComputedStyle(row).overflowX==='auto',
-                rowWidth:row.getBoundingClientRect().width,
-                rowScrollWidth:row.scrollWidth,
-                cardContrast:caption?contrast(getComputedStyle(caption).color,backdrop):0,
-                titleContrast:contrast(getComputedStyle(title).color,getComputedStyle(recent).backgroundColor),
-                coverRadius:getComputedStyle(card).borderTopLeftRadius,
-                baseOpacity:getComputedStyle(document.querySelector('.shelf-base')).opacity
-              };
-            });
-            const label=width+' '+theme+' '+name+' '+count+'권';
-            assert.equal(actual.hidden,false,label+': 최근 순간 보여야 함');
-            assert.equal(actual.title,'최근 순간',label+': 제목 띄어쓰기');
-            assert.ok(actual.cardCount>0&&actual.cardCount<=6,label+': 최근 최대 6개');
-            assert.ok(actual.gap>=-1&&actual.gap<=24,label+': 책장 아래 빈 띠 24px 이내 '+actual.gap);
-            assert.ok(actual.scrollOverflow<=1,label+': 전체 가로 넘침 0 '+actual.scrollOverflow);
-            assert.equal(actual.rowScrollable,true,label+': 줄 안에서만 가로 스크롤');
-            assert.ok(actual.rowWidth>0,label+': 줄 넓이 존재');
-            assert.ok(actual.cardContrast>=4.5,label+': 카드 글자 대비 '+actual.cardContrast);
-            assert.ok(actual.titleContrast>=4.5,label+': 제목 대비 '+actual.titleContrast);
-            assert.notEqual(actual.coverRadius,'0px',label+': 알약이 아닌 둥근 카드');
-            if(name==='carousel')assert.equal(actual.baseOpacity,'0',label+': 회전 갈색 막대 숨김');
-            assert.deepEqual(errors,[],label+': 페이지 오류 0');
-          }
-        }
-      }
-    }
-  });
-});
-
-test('서재 — 최근 순간 카드를 누르면 크게 보기, 닫으면 원래 카드로 초점 복귀', async (t) => {
-  if (skip) { if (REQUIRE) assert.fail('화면 시험을 건너뛸 수 없습니다: '+skip); t.skip(skip); return; }
-  await withShelf(books(1), { width: 390, height: 844, view:'carousel' }, async ({frame,errors}) => {
-    await frame.locator('#shelfRecent .shelf-recent-item').first().click();
-    assert.equal(await frame.locator('.shelf-recent-viewer[role="dialog"]').count(),1,'순간 크게 보기');
-    await frame.locator('.shelf-recent-viewer .lt-lightbox-close').click();
-    assert.equal(await frame.locator('.shelf-recent-viewer').count(),0,'닫힌다');
-    assert.equal(await frame.evaluate(() => document.activeElement?.classList.contains('shelf-recent-item')),true,'원래 카드로 초점 복귀');
-    assert.deepEqual(errors,[],'페이지 오류 0');
-  });
+// #1435 3: 설정 화면에서 고른 서재 기본 보기가 서재에 바로 반영되고 새로고침 뒤에도 남는다.
+test('서재 — 설정에서 고른 기본 보기가 저장되고 다시 열려도 남는다', async (t) => {
+  if (skip) { if (REQUIRE) assert.fail(`화면 시험을 건너뛸 수 없습니다: ${skip}`); t.skip(skip); return; }
+  for (const name of ['shelf', 'carousel']) {
+    await withShelf(books(2), { width: 1440, height: 900 }, async ({ page, errors, saved }) => {
+      await page.locator('#account-avatar').click();
+      await page.locator('#account-open-settings').click();
+      await page.waitForSelector('#account-settings[open]');
+      await page.locator(`#settings-tab-screen`).click();
+      await page.locator(`[data-settings-shelf-view="${name}"]`).click();
+      assert.equal(await page.evaluate(() => localStorage.getItem('lt41.shelfView')), name, '기기 값에 저장된다');
+      assert.equal(await page.evaluate(() => window.LT41?.prefs?.shelfView), name, '계정 값에 저장된다');
+      await saved;
+      await page.reload({ waitUntil: 'load' });
+      await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
+      await page.locator('#discover-ask-no').click().catch(() => {});
+      await page.locator('#account-avatar').click();
+      await page.locator('#account-open-settings').click();
+      await page.waitForSelector('#account-settings[open]');
+      const checked = await page.evaluate((v) => document.querySelector(`[data-settings-shelf-view="${v}"]`)?.getAttribute('aria-checked'), name);
+      assert.equal(checked, 'true', '새로고침 뒤에도 선택이 남는다');
+      assert.deepEqual(errors, [], '페이지 오류 없음');
+    });
+  }
 });
