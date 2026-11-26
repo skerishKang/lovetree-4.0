@@ -654,6 +654,11 @@ test('#1367 4번: 트리 고르기 목록은 바깥 누름·안쪽 화면 누름
         assert.equal(await hidden(), true, `${width}/${theme}: 안쪽 화면 누름으로 닫힌다`);
 
         // Esc로 닫고 초점은 트리 고르기 단추로 돌아온다.
+        await open();
+        await page.keyboard.press('Escape');
+        assert.equal(await hidden(), true, `${width}/${theme}: Esc로 닫힌다`);
+        await page.waitForFunction(() => document.querySelector('iframe#view')?.contentDocument?.activeElement?.matches('button.lt-toolbar-tree-choice'), null, {timeout:5000});
+        assert.equal(await treeChoiceFocused(page), true, `${width}/${theme}: 닫힌 뒤 초점 복귀`);
         if (width === 1440) {
           await page.evaluate(() => {
             const button = document.createElement('button');
@@ -674,11 +679,6 @@ test('#1367 4번: 트리 고르기 목록은 바깥 누름·안쪽 화면 누름
           await page.locator('#share-panel').waitFor({state:'hidden',timeout:5000});
           await page.locator('#share-under-picker-test').evaluate(button => button.remove());
         }
-        await open();
-        await page.keyboard.press('Escape');
-        assert.equal(await hidden(), true, `${width}/${theme}: Esc로 닫힌다`);
-        await page.waitForFunction(() => document.querySelector('iframe#view')?.contentDocument?.activeElement?.matches('button.lt-toolbar-tree-choice'), null, {timeout:5000});
-        assert.equal(await treeChoiceFocused(page), true, `${width}/${theme}: 닫힌 뒤 초점 복귀`);
       } finally { await ctx.close(); }
     }
   } finally { await browser.close(); await new Promise((r) => server.close(r)); }
