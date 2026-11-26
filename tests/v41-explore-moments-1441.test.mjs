@@ -17,7 +17,7 @@ const B=item('다음 순간','b2222222222','2026-11-01','첫 순간');
 const C=item('마지막 순간','c3333333333','2026-11-02','다음 순간');
 const visible=[C,A,B];
 const reply=(route,data,status=200)=>route.fulfill({status,contentType:'application/json',body:JSON.stringify(data)});
-const embed='<html><script>window.__commands=[];window.addEventListener("message",e=>{let d;try{d=typeof e.data==="string"?JSON.parse(e.data):e.data}catch{return}if(d?.event!=="command")return;window.__commands.push(d.func);if(d.func==="mute"||d.func==="unMute")parent.postMessage(JSON.stringify({event:"infoDelivery",info:{muted:d.func==="mute",playerState:1}}),"*")});</script></html>';
+const embed='<html><style>html,body{height:100%;margin:0;background:radial-gradient(ellipse at 45% 38%,#775c89,#29283f 52%,#0e1221 90%)}body:after{content:"모의 영상";display:block;text-align:center;padding-top:45vh;color:#f1e7fc;font:16px sans-serif}</style><script>window.__commands=[];window.addEventListener("message",e=>{let d;try{d=typeof e.data==="string"?JSON.parse(e.data):e.data}catch{return}if(d?.event!=="command")return;window.__commands.push(d.func);if(d.func==="mute"||d.func==="unMute")parent.postMessage(JSON.stringify({event:"infoDelivery",info:{muted:d.func==="mute",playerState:1}}),"*")});</script></html>';
 
 function serve(){
  const root=existsSync(join(ROOT,'dist','v41','home.html'))?join(ROOT,'dist'):join(ROOT,'public');
