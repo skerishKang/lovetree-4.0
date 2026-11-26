@@ -705,7 +705,7 @@ nav .tree-frame{scroll-snap-align:center}
    글자만 또렷하게 살린다(배경은 없다). */
 .home-links{position:fixed;left:14px;bottom:max(10px,env(safe-area-inset-bottom));z-index:24;display:flex;gap:2px;align-items:center}
 /* #1284: 첫 화면 링크는 숫자판을 덮지 않고 화면 흐름에 참여한다. */
-body.home-screen .home-links{position:relative;left:auto;bottom:auto;flex:0 0 auto;align-self:center;margin:0 auto max(10px,env(safe-area-inset-bottom));z-index:3}
+@media(max-width:650px){body.home-screen .home-links{position:relative;left:auto;bottom:auto;flex:0 0 auto;align-self:center;margin:0 auto max(10px,env(safe-area-inset-bottom));z-index:3}}
 /* 안쪽 문서가 스크롤을 맡은 뒤에도 카드 아래 단추와 바닥 링크의 겹침 0을 유지한다. */
 @media(max-width:650px){body.home-screen .home-links{top:3px}}
 .home-links .feedback-link{opacity:1;color:var(--lt-pearl);text-shadow:0 1px 1px var(--lt-stage),0 -1px 1px var(--lt-stage),1px 0 1px var(--lt-stage),-1px 0 1px var(--lt-stage),0 0 4px var(--lt-stage),0 0 8px var(--lt-stage),0 0 14px var(--lt-stage),0 0 20px var(--lt-stage)}
