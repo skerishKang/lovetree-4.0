@@ -59,7 +59,7 @@ export async function settleObservation(page, predicate, arg = null, { freezeClo
     else await Promise.all(animations.map(animation => animation.finished.catch(() => {})));
     if (frame) {
       frame.style.willChange = 'transform';
-      frame.contentDocument?.querySelectorAll('.lt-screen-toolbar,button,select,.pill,.mini,.action,.close,.edge-tip,.recent-card')?.forEach(element => { element.style.willChange = 'transform'; });
+      frame.contentDocument?.querySelectorAll('.lt-screen-toolbar,button,select,.pill,.mini,.action,.close,.edge-tip,.recent-card')?.forEach(element => { element.style.willChange = 'transform'; if (element.matches('.recent-card')) element.style.transform = 'translateZ(0)'; });
     }
     if (!freeze) await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
   }, freezeClock);
