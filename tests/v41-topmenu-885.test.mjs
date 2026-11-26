@@ -269,7 +269,7 @@ test('상단 메뉴 261119: 트리 단추 폭·⌄ 자리·목록 규칙·메뉴
         const firstItem = pop.querySelector('.tree-list [data-tree-id]');
         const first = firstItem ? getComputedStyle(firstItem) : null;
         const checked = items.filter((b) => b.getAttribute('aria-checked') === 'true').map((b) => ({ bg: getComputedStyle(b).backgroundColor, shadow: getComputedStyle(b).boxShadow }));
-        const plain = items.filter((b) => !b.closest('.tree-foot') && b.getAttribute('aria-checked') !== 'true').map((b) => getComputedStyle(b).backgroundColor);
+        const plain = items.filter((b) => b.hasAttribute('data-tree-id') && b.getAttribute('aria-checked') !== 'true').map((b) => getComputedStyle(b).backgroundColor);
         return {
           openedBy: pop.dataset.ltOpenedBy,
           firstOutline: first ? (first.outlineStyle === 'none' || first.outlineColor === 'rgba(0, 0, 0, 0)' ? '0px' : first.outlineWidth) : null,
@@ -359,7 +359,7 @@ test('970 실행: 트리 드롭다운은 Esc·바깥 누르기로 닫히고, 키
       });
       await page.keyboard.press('Enter');
       await page.waitForFunction(() => document.getElementById('tree-popover')?.hidden, null, { timeout: 10000 });
-      assert.equal(treeChoiceExpanded(page), 'false', `${width}: 트리를 고르면 목록이 닫힌다`);
+      assert.equal(await treeChoiceExpanded(page), 'false', `${width}: 트리를 고르면 목록이 닫힌다`);
       await page.waitForFunction((id) => /tree=/.test(location.hash) && new URLSearchParams(location.hash.split('?')[1] || '').get('tree') === id, wantTree, { timeout: 15000 });
       assert.ok(page.url().includes(`tree=${wantTree}`), `${width}: Enter로 고른 트리가 열린다(${page.url().split('#')[1] || ''})`);
 
@@ -369,7 +369,7 @@ test('970 실행: 트리 드롭다운은 Esc·바깥 누르기로 닫히고, 키
       // 아이프레임 위 좌표는 부모 문서까지 클릭이 오지 않으므로 부모 머리줄 빈 곳을 누른다.
       await page.click(".app-header", { position: { x: 5, y: 5 } });
       await page.waitForFunction(() => document.getElementById('tree-popover')?.hidden, null, { timeout: 5000 });
-      assert.equal(treeChoiceExpanded(page), 'false', `${width}: 바깥을 누르면 닫히고 aria-expanded=false`);
+      assert.equal(await treeChoiceExpanded(page), 'false', `${width}: 바깥을 누르면 닫히고 aria-expanded=false`);
       assert.equal(await page.evaluate(() => document.getElementById('tree-popover')?.contains(document.activeElement)), false, `${width}: 닫힌 목록 안에 초점이 남지 않는다`);
       await ctx.close();
     }
