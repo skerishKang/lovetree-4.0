@@ -116,7 +116,7 @@ async function finishBookObservation(page) {
   await page.waitForFunction(() => [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length)?.contentDocument?.querySelector('.moment.focused'), null, { timeout: 30000 });
   await page.evaluate(() => {
     const frame = [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length);
-    frame.contentDocument.dispatchEvent(new Event('lt41-tagline-ready'));
+    frame.contentWindow.dispatchEvent(new Event('lt41-tagline-ready'));
   });
   await page.clock.fastForward(0);
 }
