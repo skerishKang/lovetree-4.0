@@ -69,7 +69,6 @@ test('#850 하단 링크와 지도·그래프 하단 요소 겹침 0(1440·390)'
       const page = await ctx.newPage();
       await page.goto(`${origin}/v41/?account=1`, { waitUntil: 'load' });
       await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
-      await page.locator('#discover-ask-no').click().catch(() => {});
 
       for (const [file, selector, name, view] of [['track56-network', '.left-rail .controls', 'map', 'network'], ['track60-graph', '.g-shelf', 'graph', 'graph']]) {
         await openScreen(page, view, file, selector);

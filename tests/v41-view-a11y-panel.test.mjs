@@ -50,7 +50,7 @@ function serve(root) {
 
 async function openScreen(browser, base, hash) {
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce', locale: 'ko-KR' });
-  await ctx.addInitScript(() => { try { localStorage.setItem('lt41.theme', 'night'); localStorage.setItem('lt41.tips.firstTree', '1'); localStorage.setItem('lt41.discoverAsked', JSON.stringify(['tree-1'])); } catch {} });
+  await ctx.addInitScript(() => { try { localStorage.setItem('lt41.theme', 'night'); localStorage.setItem('lt41.tips.firstTree', '1'); } catch {} });
   const page = await ctx.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push(String(e.message || e)));
@@ -86,7 +86,6 @@ test('보드 상세: 열린 겹은 탭 가능, 닫으면 겹은 탭 불가(inert
     const { ctx, page, errors } = await openScreen(browser, base, '?account=1#my/board?tree=tree-1&moment=m3');
     try {
       assert.ok(await waitFrame(page, 'track58-pinboard'), '보드 프레임이 열리지 않음');
-      if (await page.evaluate(() => !!document.getElementById('discover-ask')?.open)) await page.click('#discover-ask-no');
       // #891①: 주소(#my/board?tree=…&moment=m3)가 순간을 가리키면 그 순간의 상세 판이 저절로 열린다.
       await page.waitForFunction(`(() => { const f = [...document.querySelectorAll('#view,#view-next')].filter((x) => !x.hidden).pop(); const d = f.contentDocument.getElementById('detail'); return d && d.classList.contains('open'); })()`, null, { timeout: 15000 });
       const opened = await page.evaluate(`(() => {
@@ -159,7 +158,7 @@ test('390 보드: 닫힌 상세는 처음부터 탭이 들어가지 않는다', 
   try {
     browser = await chromium.launch({ headless: true });
     const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce', locale: 'ko-KR' });
-    await ctx.addInitScript(() => { try { localStorage.setItem('lt41.theme', 'night'); localStorage.setItem('lt41.tips.firstTree', '1'); localStorage.setItem('lt41.discoverAsked', JSON.stringify(['tree-1'])); } catch {} });
+    await ctx.addInitScript(() => { try { localStorage.setItem('lt41.theme', 'night'); localStorage.setItem('lt41.tips.firstTree', '1'); } catch {} });
     const page = await ctx.newPage();
     try {
       await page.goto(`${base}/v41/#board`, { waitUntil: 'load' });

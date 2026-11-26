@@ -55,7 +55,6 @@ test('#842·#841 v3 — 실제 셸의 꼬리표 정리 판 연결과 저장 뒤 
     page.on('pageerror', (e) => errors.push(String(e.message || e)));
     await page.goto(`${origin}/v41/?account=1`, { waitUntil: 'load' });
     await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
-    await page.locator('#discover-ask-no').click().catch(() => {});
 
     await page.locator('.tree-views [data-view="track56-network.html"]').click();
     await waitForShownScreen(page, {path: 'track56-network'}, 10000);
@@ -135,7 +134,6 @@ test('#1057 점에 초점을 두고 Enter·Space — 묶음·순간 상세가 �
     const page = await ctx.newPage();
     await page.goto(`${origin}/v41/?account=1#my/graph`, { waitUntil: 'load' });
     await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
-    await page.locator('#discover-ask-no').click().catch(() => {});
     let graph = null;
     for (let i = 0; i < 40 && !graph; i++) {
       graph = page.frames().find((f) => /track60-graph/.test(f.url()));

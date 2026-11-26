@@ -133,9 +133,12 @@ import { VIEWS } from './shelf-views.mjs';
           var metaParts=bookMeta(book).split(' · ');
           var metaLine1=book.name+' · '+metaParts[0];
           var metaLine2=metaParts.slice(1).join(' · ');
+          // #1495: 둘러보기에 소개된 트리만 아주 작게 '둘러보기에 보임' — 누르면 셸이 그 트리 공유 판을 연다. 소개 안 된 트리는 표시 없음.
+          var discovered=(function(){try{return !!(parent.LT41_DISCOVER&&parent.LT41_DISCOVER[book.id]===true)}catch(e){return false}})();
+          var discoverBadge=discovered?'<button type="button" class="book-discover" data-discover-share="'+esc(book.id)+'" aria-label="'+esc(book.name)+' 둘러보기에 보임, 공유 판 열기">둘러보기에 보임</button>':'';
           return '<article class="book-card" data-book-index="'+index+'"><button type="button" data-book-id="'+esc(book.id)+'" aria-label="'+esc(book.name)+' 책 열기">'+
             '<div class="book-cover'+coverClasses(book)+'"'+(book.design?' data-cover-design="'+esc(book.design)+'"':'')+'>'+(book.coverMedia?'<img class="book-cover-media" src="'+esc(book.coverMedia)+'"'+coverFallbackAttrs(book.coverCandidates||[book.coverMedia])+' alt="" loading="lazy" referrerpolicy="no-referrer">':'')+'<span class="cover-symbol"><span>'+esc(book.symbol)+'</span></span>'+(book.coverMedia?'<span class="cover-name-band">'+esc(book.name)+'</span>':'<strong class="cover-title">'+esc(book.name)+'</strong>')+'</div>'+
-            '<span class="book-card-meta"><span class="book-card-meta-title">'+esc(metaLine1)+'</span><span class="book-card-meta-date">'+esc(metaLine2)+'</span></span></button><button type="button" class="book-manage" data-manage-id="'+esc(book.id)+'" aria-label="'+esc(book.name)+' 고치기">⋯</button></article>';
+            '<span class="book-card-meta"><span class="book-card-meta-title">'+esc(metaLine1)+'</span><span class="book-card-meta-date">'+esc(metaLine2)+'</span></span></button><button type="button" class="book-manage" data-manage-id="'+esc(book.id)+'" aria-label="'+esc(book.name)+' 고치기">⋯</button>'+discoverBadge+'</article>';
         }).join(''):'<div class="empty"><strong>찾는 책이 없어요.</strong><span>트리 이름·좋아하는 대상·순간 제목으로 검색해 보세요.</span></div>');
         // #1285 빈 칸 자리와 배치는 보기 모듈이 맡는다(#1376 1단계).
         relayout();
@@ -300,7 +303,7 @@ import { VIEWS } from './shelf-views.mjs';
       function openManageTree(id){parent.postMessage({type:MSG.manageTree,treeId:id},location.origin);}
       // 261118 대표 지적 3: '+ 새 트리' 입구는 오른쪽 단추(#shelfNewTree) 하나다. 트리 고치기·만들기는 셸의 흐름으로 넘긴다.
       function bindTreeActions(){
-        $('#shelfRail').addEventListener('click',function(event){var railManage=event.target.closest('[data-manage-id]');if(railManage)openManageTree(railManage.dataset.manageId);});
+        $('#shelfRail').addEventListener('click',function(event){var railManage=event.target.closest('[data-manage-id]');if(railManage)openManageTree(railManage.dataset.manageId);var share=event.target.closest('[data-discover-share]');if(share){event.stopPropagation();try{parent.postMessage({type:MSG.openShare,treeId:share.dataset.discoverShare},location.origin);}catch{}}});
         $('#shelfNewTree').addEventListener('click',openNewTree);
       }
       // 보기 전환(회전·선반): 저장과 전환은 셸이 맡긴다.
@@ -356,7 +359,9 @@ if(typeof addEventListener==='function')addEventListener('message',e=>{
    renderShelf();
    return;
   }
-  if(e.data?.type===MSG.shelfFilter){
+  // #1495: 셸이 소개 상태를 새로 알면(서재가 뜬 뒤 확인·공유 판에서 바꿈) 카드 표시를 다시 그린다.
+ if(e.data?.type===MSG.discoverState){renderShelf();return;}
+ if(e.data?.type===MSG.shelfFilter){
    state.filter=e.data.value==='public'?'public':'all';
    paintShelfFilterInline();renderShelf();
    return;

@@ -22,7 +22,6 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { FALLBACK_SECONDS, playbackItemOf, buildPlaybackQueue, stepPlayable, firstPlayable, playbackChipText, segmentReached, playbackStatusOf, STATUS_PLAYING, STATUS_PAUSED, STATUS_BUFFERING, STATUS_SKIPPED } from '../public/v41/playback-core.mjs';
-import { dismissDiscoverAskIfOpen } from './helpers/discover-ask.mjs';
 
 const read = (p) => readFileSync(new URL('../' + p, import.meta.url), 'utf8');
 const MP = read('public/v41/media-preview.js');
@@ -568,7 +567,6 @@ test('26: 책을 열어 둔 채 트리를 바꾸면 책 제목·첫 카드·카�
         const page = await ctx.newPage();
         await page.goto(`${base}/v41/?account=1`,{waitUntil:'load'});
         await page.waitForFunction(()=>!!window.LT41?.trees?.length,null,{timeout:20000});
-        await page.locator('#discover-ask-no').click().catch(()=>{});
         if (width === 390) {
           await page.locator('#mobile-more').click();
           await page.waitForTimeout(150);
@@ -707,7 +705,6 @@ test('1001a 실행: 책 한마디 저장 — 답이 같은 문서에 도착·연
     page.on('framenavigated', f => { if (counting && /\/v41\/(views\/|home\.html)/.test(f.url())) navs.push({ url: f.url(), at: Date.now() }); });
     await page.goto(`${base}/v41/?account=1`, { waitUntil: 'load' });
     await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
-    await page.locator('#discover-ask-no').click().catch(() => {});
     await page.locator('.tree-views [data-view="track59-sketchbook.html"]').click();
     await waitShown(page, { path: 'track59-sketchbook' }, 8000);
     const frame = page.frames().find(f => /views\/track59-sketchbook/.test(f.url()));
@@ -784,7 +781,6 @@ test('1001b 실행: 책 순간 변경(고치기·연결·해제·이전 순간·
     page.on('dialog', d => d.accept());
     await page.goto(`${base}/v41/?account=1`, { waitUntil: 'load' });
     await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
-    await page.locator('#discover-ask-no').click().catch(() => {});
     await page.locator('.tree-views [data-view="track59-sketchbook.html"]').click();
     await waitShown(page, { path: 'track59-sketchbook' }, 8000);
     await page.waitForTimeout(900);
@@ -867,7 +863,6 @@ test('1001c 실행: 쓰기 판 날짜·감정·비공개 변경 — 재적재 0�
     page.on('dialog', d => d.accept());
     await page.goto(`${base}/v41/?account=1`, { waitUntil: 'load' });
     await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
-    await dismissDiscoverAskIfOpen(page);
     await page.locator('.tree-views [data-view="track59-sketchbook.html"]').click();
     await waitShown(page, { path: 'track59-sketchbook' }, 8000);
     await page.waitForTimeout(900);
@@ -930,7 +925,6 @@ test('1001d 실행: 자세한 추가·설정·영상 정보·서재 ⋯ 같은 �
   const openBook = async (page) => {
     await page.goto(`${base}/v41/?account=1`, { waitUntil: 'load' });
     await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
-    await dismissDiscoverAskIfOpen(page);
     await page.locator('.tree-views [data-view="track59-sketchbook.html"]').click();
     await waitShown(page, { path: 'track59-sketchbook' }, 8000);
     await page.waitForTimeout(1000);

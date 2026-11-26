@@ -47,7 +47,6 @@ async function open({width,height=width===390?844:900,theme,scene,member=true}){
  const url='http://127.0.0.1:'+globalThis._lt1284port+'/v41/'+(member?'?account=1':'');
  try{
   await page.goto(url,{waitUntil:'domcontentloaded'});
-  await page.locator('#discover-ask-no').click({timeout:3000}).catch(()=>{});
   if(member)await page.waitForFunction(()=>{const f=document.querySelector('#view');return !!f?.contentDocument?.querySelector('#orbit')?.shadowRoot?.querySelector('.recent-card');},null,{timeout:12000});
   else await page.frameLocator('#view').locator('.center .actions').waitFor({state:'visible',timeout:12000});
   const frame=page.frameLocator('#view');

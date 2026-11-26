@@ -55,14 +55,17 @@ const KNOWN = [
   { 화면: '지도', 항목: '가려짐', 찾을: 'p ← canvas#stage', 이슈: 'Track56 원본(b2567fe)' },
   // (261116, '둘러보기 소개 질문'·'공유 판·소개 스위치' 상태가 처음 잰 자리) 회원 계정의 궤도 첫 화면 —
   // 실제 기록이 있어야 그리는 레거시 카드라 지금까지 안 잰 곳. #548·#728과 같은 원본 모양이라 이 이슈에서 손대지 않는다.
-  { 화면: '둘러보기 소개 질문', 항목: '작은글자', 찾을: 'span.lt-fallback-action "제목 달기"', 이슈: '#548(12px 기준)·레거시 궤도 카드' },
-  { 화면: '둘러보기 소개 질문', 항목: '작은글자', 찾을: 'small "(마지막 순간|모아둔 순간)', 이슈: '#548(12px 기준)·레거시 궤도 카드' },
+  // #1495: 소개 물음 창이 없어져 같은 첫 화면을 '내 소식·둘러보기 소개 줄' 상태가 잰다(같은 레거시 카드 줄).
+  { 화면: '내 소식·둘러보기 소개 줄', 항목: '작은글자', 찾을: 'span.lt-fallback-action "제목 달기"', 이슈: '#548(12px 기준)·레거시 궤도 카드' },
+  { 화면: '내 소식·둘러보기 소개 줄', 항목: '작은글자', 찾을: 'small "(마지막 순간|모아둔 순간)', 이슈: '#548(12px 기준)·레거시 궤도 카드' },
   { 화면: '공유 판·소개 꺼짐', 항목: '작은글자', 찾을: 'span.lt-fallback-action "제목 달기"', 이슈: '#548(12px 기준)·레거시 궤도 카드' },
   { 화면: '공유 판·소개 꺼짐', 항목: '작은글자', 찾을: 'small "(마지막 순간|모아둔 순간)', 이슈: '#548(12px 기준)·레거시 궤도 카드' },
   { 화면: '공유 판·소개 켜짐', 항목: '작은글자', 찾을: 'span.lt-fallback-action "제목 달기"', 이슈: '#548(12px 기준)·레거시 궤도 카드' },
   { 화면: '공유 판·소개 켜짐', 항목: '작은글자', 찾을: 'small "(마지막 순간|모아둔 순간)', 이슈: '#548(12px 기준)·레거시 궤도 카드' },
   { 화면: '꼬리표 직접 붙이기', 항목: '작은글자', 찾을: 'span.lt-fallback-action "제목 달기"', 이슈: '#548(12px 기준)·레거시 궤도 카드' },
   { 화면: '꼬리표 직접 붙이기', 항목: '작은글자', 찾을: 'small "(마지막 순간|모아둔 순간)', 이슈: '#548(12px 기준)·레거시 궤도 카드' },
+  // #1495 '서재·둘러보기에 보임' 상태가 처음 잰 내 서재(회원) — 도구 줄 '전체 / 공개만' 칩 11px는 main 서재의 기존 모양(#1497 6번에서 고친다).
+  { 화면: '서재·둘러보기에 보임', 항목: '작은글자', 찾을: 'button "(전체|공개만)"', 이슈: '#1497 6번(칩 누름 크기·글자)' },
 ];
 
 // #638: '내 의견 목록' 상태 — 상태 말 네 가지·답변·새 소식 링크가 한 화면에 보이게 하는 가짜 게시물.
@@ -171,10 +174,6 @@ test('#942 첫 화면 추가 단추와 숫자 묶음', { skip: REQUIRE ? false :
         if(signedIn)await page.waitForFunction(()=>document.body.dataset.member==='in'&&!document.querySelector('#account-avatar')?.hidden);
         if(member){
           await page.waitForFunction(()=>window.LT41?.trees?.length===3);
-          const ask=page.locator('#discover-ask-no');
-          await ask.waitFor({state:'visible',timeout:4000}).catch(()=>{});
-          if(await ask.isVisible())await ask.click();
-          await ask.waitFor({state:'hidden'});
         }
         // 두 프레임의 이름은 화면을 넘길 때 바뀐다. 지금 보이는 문서에서 모든 치수를 한 번에 읽는다.
         const result = await page.waitForFunction(readHome, kind);
@@ -364,8 +363,6 @@ test('#987 공유 창 폭·단추·대비와 설정 정렬·동그라미·배치
         const page=await ctx.newPage();
         await page.goto(base+'/v41/?account=1#shelf');
         await page.waitForFunction(()=>window.LT41?.trees?.length===3&&!document.querySelector('#account-avatar')?.hidden);
-        const ask=page.locator('#discover-ask-no');
-        if(await ask.isVisible())await ask.click();
         // #1367: the tree picker now lives in the shelf; avoid reopening the same shelf frame.
         await clickToolbarTreeChoice(page);
         await page.locator('[data-tree-action="share"]').click();
@@ -1001,9 +998,11 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     assert.ok(!cardDate.meta.includes(utcCut), `카드 날짜가 UTC 절단(어제)으로 나온다: "${cardDate.meta}"`);
     await pageDate.screenshot({ path: screenAuditCapture('audit-community-date-' + width + '.png'), animations: 'disabled', timeout: 10000 }).catch(() => {});
     await ctxDate.close();
-    // 둘러보기 소개 질문(2026-11-16 대표 결정) — 새 계정의 쉬운 추가 3번째 저장에서 한 번 묻는다.
-    // [지금은 안 할래요] → discover false·다시 안 물음, [소개하기] → discover true, 공유 판 스위치가 같은 값,
-    // 백필(이미 3개·소개 켜짐) 계정은 묻지 않는다. 창 모양(겹침·잘림 0)은 take가 함께 잰다.
+    // #1495(2026-11-27 대표 결정): 둘러보기 소개 물음 창 대신 내 소식 한 줄·공유 판·서재 표시.
+    // 새 계정의 쉬운 추가 3번째 저장 뒤 창은 뜨지 않고 떠 있는 공개 안내(#538)도 없다. 대신 내 소식에
+    // "'<트리 이름>'에 순간이 3개 모였어요. 둘러보기에 소개할 수 있어요. [소개하기]"가 트리마다 한 줄 생긴다.
+    // [소개하기] → discover true·다시 누를 수 없음. 공유 판 맨 위 '둘러보기 소개' 줄과 설명(이름·아이디·이메일 안 보임),
+    // 서재 카드의 '둘러보기에 보임' → 그 트리 공유 판. 백필(이미 3개·소개 켜짐) 계정은 줄이 없다. 겹침·잘림 0은 take가 잰다.
     const oembed = (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ title: '검사기 시험 영상', author_name: '시험 채널', thumbnail_url: 'https://i.ytimg.com/vi/qaAsk001/hqdefault.jpg' }) });
     const openQuick = async (pageAsk) => {
       if (await pageAsk.evaluate(() => !!document.getElementById('write-panel')?.open)) return;
@@ -1018,10 +1017,32 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
       await pageAsk.click('#quick-submit');
       await pageAsk.waitForTimeout(800);
     };
-    const askFlow = async (answer) => {
+    const newsRoutes = async (ctxAsk) => {
+      await ctxAsk.route('**/api/community/my-news/unread-count*', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"unreadCount":0}' }));
+      await ctxAsk.route('**/api/community/my-news', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"lines":[]}' }));
+    };
+    // 떠 있는 알림(토스트)으로 지나간 문장을 모두 모은다 — 공개 안내(#538)가 다시 뜨지 않는지 본다.
+    const watchToasts = () => {
+      window.__ltToasts = [];
+      const start = () => { const t = document.getElementById('toast'); if (!t) return setTimeout(start, 50); new MutationObserver(() => { if (!t.hidden && t.textContent.trim()) window.__ltToasts.push(t.textContent.trim()); }).observe(t, { attributes: true, childList: true, subtree: true, characterData: true }); };
+      if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
+    };
+    const openNews = async (pageAsk) => {
+      await pageAsk.evaluate(() => { const w = document.getElementById('write-panel'); if (w?.open) w.close(); });
+      await pageAsk.evaluate(() => document.getElementById('account-avatar')?.click());
+      await pageAsk.waitForFunction(() => !document.getElementById('account-popover')?.hidden, null, { timeout: 5000 });
+      const count = await pageAsk.evaluate(() => { const c = document.getElementById('account-my-news-count'); return c && !c.hidden ? c.textContent.trim() : ''; });
+      await pageAsk.evaluate(() => document.getElementById('account-my-news')?.click());
+      await pageAsk.waitForFunction(() => !!document.getElementById('my-news-panel')?.open && !document.querySelector('#my-news-list .my-news-loading'), null, { timeout: 8000 });
+      return count;
+    };
+    const closeNews = (pageAsk) => pageAsk.evaluate(() => document.getElementById('my-news-panel')?.close());
+    const newsFlow = async (answer) => {
       const ctxAsk = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
       await ctxAsk.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); } catch {} }, theme);
+      await ctxAsk.addInitScript(watchToasts);
       await ctxAsk.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
+      await newsRoutes(ctxAsk);
       await ctxAsk.route('**://i.ytimg.com/**', THUMB);
       const discoverPuts = [];
       await ctxAsk.route('**/api/workspace*', (r) => {
@@ -1042,63 +1063,124 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
       await quickSave(pageAsk, 'https://www.youtube.com/watch?v=qaAsk01');
       await quickSave(pageAsk, 'https://www.youtube.com/watch?v=qaAsk02');
       await quickSave(pageAsk, 'https://www.youtube.com/watch?v=qaAsk03');
-      // 3번째 저장의 동기화 뒤 질문 창이 한 번 뜬다(2→3).
-      await pageAsk.waitForFunction(() => !!document.getElementById('discover-ask')?.open, null, { timeout: 15000 });
-      await pageAsk.waitForTimeout(400);
-      const buttons = await pageAsk.evaluate(() => [document.getElementById('discover-ask-yes')?.textContent, document.getElementById('discover-ask-no')?.textContent]);
-      assert.deepEqual(buttons, ['소개하기', '지금은 안 할래요'], '질문 창 단추는 소개하기·지금은 안 할래요다');
-      await take(pageAsk, '둘러보기 소개 질문'); // 겹침·잘림 0 검사에 창이 함께 든다(390·1440 × 밤·정원)
-      await pageAsk.screenshot({ path: screenAuditCapture('audit-discover-ask-' + width + '-' + theme + '.png'), animations: 'disabled', timeout: 10000 }).catch(() => {});
-      await pageAsk.evaluate((a) => document.getElementById(a === 'yes' ? 'discover-ask-yes' : 'discover-ask-no')?.click(), answer);
-      await pageAsk.waitForFunction(() => !document.getElementById('discover-ask')?.open, null, { timeout: 8000 });
-      assert.deepEqual(discoverPuts, [answer === 'yes'], '[소개하기]는 true, [지금은 안 할래요]는 false로 저장된다');
-      const asked = await pageAsk.evaluate(() => { try { return JSON.parse(localStorage.getItem('lt41.discoverAsked') || '[]'); } catch { return []; } });
-      assert.ok(asked.length >= 1, '고른 트리는 discoverAsked에 기억된다');
-      return { ctxAsk, pageAsk, discoverPuts };
+      // 3번째 저장의 동기화 뒤: 창 없음·떠 있는 공개 안내 없음, 대신 내 소식에 한 줄(점 숫자 1).
+      // 저장이 끝났는지는 머리줄 '저장 안 됨'이 아닌지로 본다(좁은 화면은 단추 글자가 '+'뿐이다).
+      await pageAsk.waitForFunction(() => window.LT41?.trees?.[0]?.moments?.length >= 3 && !/저장/.test(document.getElementById('write-menu')?.textContent || ''), null, { timeout: 15000 });
+      await pageAsk.waitForTimeout(1500);
+      assert.equal(await pageAsk.evaluate(() => document.getElementById('discover-ask')), null, '소개 물음 창은 더 없다');
+      // 쉬운 추가 창(write-panel)은 저장 뒤에도 이어 담도록 열려 있다 — 그 밖에 새로 뜬 창이 없어야 한다.
+      const openDialogs = await pageAsk.evaluate(() => [...document.querySelectorAll('dialog[open]')].map(d => d.id).filter(id => id !== 'write-panel'));
+      assert.deepEqual(openDialogs, [], '3번째 저장 뒤 화면을 막는 창이 없다');
+      const toasts = await pageAsk.evaluate(() => window.__ltToasts || []);
+      assert.ok(!toasts.some(t => t.includes('링크를 받은 사람만')), '떠 있는 공개 안내(#538)를 띄우지 않는다: ' + JSON.stringify(toasts));
+      const treeTitle = await pageAsk.evaluate(() => window.LT41.trees[0].title);
+      const count = await openNews(pageAsk);
+      assert.equal(count, '1', '계정 메뉴 내 소식에 새 줄 1개가 숫자로 보인다');
+      const line = pageAsk.locator('#my-news-list [data-discover-line]');
+      assert.equal(await line.count(), 1, '내 소식에 소개 줄이 한 줄');
+      assert.ok((await line.textContent()).includes("'" + treeTitle + "'에 순간이 3개 모였어요. 둘러보기에 소개할 수 있어요."), await line.textContent());
+      const action = line.locator('[data-discover-tree]');
+      assert.equal(await action.textContent(), '소개하기');
+      const actionBox = await action.boundingBox();
+      assert.ok(actionBox && actionBox.height >= 44, '[소개하기] 누름 높이 44px 이상: ' + JSON.stringify(actionBox));
+      await take(pageAsk, '내 소식·둘러보기 소개 줄');
+      await pageAsk.screenshot({ path: screenAuditCapture('audit-discover-news-' + width + '-' + theme + '.png'), animations: 'disabled', timeout: 10000 }).catch(() => {});
+      if (answer === 'yes') {
+        await action.click();
+        await pageAsk.waitForFunction(() => !document.querySelector('#my-news-list [data-discover-tree]'), null, { timeout: 8000 });
+        assert.deepEqual(discoverPuts, [true], '[소개하기]는 discover true로 저장한다(창의 소개하기와 같은 동작)');
+        assert.ok((await line.textContent()).includes('둘러보기에 소개했어요'), '소개한 뒤에는 다시 누를 수 없는 표시로 바뀐다');
+      } else assert.deepEqual(discoverPuts, [], '누르지 않으면 저장하지 않는다(기본은 링크를 받은 사람만)');
+      await closeNews(pageAsk);
+      return { ctxAsk, pageAsk, discoverPuts, treeTitle };
     };
     const addFourth = async (pageAsk) => {
       await quickSave(pageAsk, 'https://www.youtube.com/watch?v=qaAsk09');
       await pageAsk.waitForTimeout(1500);
-      assert.equal(await pageAsk.evaluate(() => !!document.getElementById('discover-ask')?.open), false, '고른 뒤 같은 트리에서 다시 묻지 않는다');
+      assert.deepEqual(await pageAsk.evaluate(() => [...document.querySelectorAll('dialog[open]')].map(d => d.id).filter(id => id !== 'write-panel')), [], '4번째 저장 뒤에도 창이 없다');
+      await openNews(pageAsk);
+      assert.equal(await pageAsk.locator('#my-news-list [data-discover-line]').count(), 1, '같은 트리에는 한 줄만(다시 남기지 않는다)');
+      await closeNews(pageAsk);
     };
-    const noAsk = await askFlow('no');
+    const shelfBadge = async (pageAsk) => {
+      await pageAsk.evaluate(() => document.querySelector('[data-view="track32-bookshelf.html"]')?.click());
+      await pageAsk.waitForFunction(() => { const f = document.getElementById('view'); try { return !f.hidden && f.contentWindow.location.pathname.endsWith('/track32-bookshelf.html') && !!f.contentDocument.querySelector('#shelfRail .book-card'); } catch { return false; } }, null, { timeout: 15000 });
+      await pageAsk.waitForTimeout(800);
+      return pageAsk.frameLocator('#view').locator('#shelfRail .book-card .book-discover');
+    };
+    const noAsk = await newsFlow('no');
     await addFourth(noAsk.pageAsk);
-    // 공유 판 두 칸 선택: 꺼짐 상태 문장·단추를 잰 뒤 켜기 → 켜짐 — 선택 뒤 상자 안 두 문장(순간 수 힌트·상태)이 같은 상태를 말한다.
     {
       const { ctxAsk, pageAsk, discoverPuts } = noAsk;
+      // 서재: 소개하지 않은 트리에는 아무 표시가 없다. 공유 판은 원래처럼 첫 화면 위에서 잰다.
+      assert.equal(await (await shelfBadge(pageAsk)).count(), 0, '소개 안 된 트리는 서재 카드에 표시가 없다');
+      await pageAsk.evaluate(() => document.querySelector('.app-header .brand')?.click());
+      await pageAsk.waitForFunction(() => { const f = document.getElementById('view'); try { return !f.hidden && /home/.test(f.contentWindow.location.pathname) && f.contentDocument.readyState === 'complete'; } catch { return false; } }, null, { timeout: 15000 });
+      await pageAsk.waitForTimeout(800);
+      // 공유 판: '둘러보기 소개' 줄이 공개 설정의 맨 위이고, 설명이 바로 아래(이름·아이디·이메일 안 보임).
       await pageAsk.evaluate(() => document.getElementById('share-menu')?.click());
       await pageAsk.waitForFunction(() => !!document.getElementById('share-panel')?.open, null, { timeout: 8000 }).catch(() => {});
       await pageAsk.waitForFunction(() => (document.getElementById('share-disc-off')?.getAttribute('aria-checked')||'')==='true', null, { timeout: 8000 });
       await pageAsk.waitForTimeout(400);
+      const layout = await pageAsk.evaluate(() => {
+        const rows = [...document.querySelectorAll('#share-panel .share-visibility .share-visibility-row-2')];
+        const note = document.getElementById('share-discover-note');
+        return { firstHasDiscover: !!rows[0]?.querySelector('#share-disc-on'), note: note?.textContent || '', noteAfterFirst: !!note && rows[0]?.compareDocumentPosition(note) === Node.DOCUMENT_POSITION_FOLLOWING && (!rows[1] || note.compareDocumentPosition(rows[1]) === Node.DOCUMENT_POSITION_FOLLOWING) };
+      });
+      assert.equal(layout.firstHasDiscover, true, "공유 판 공개 설정의 첫 줄이 '둘러보기 소개'다");
+      assert.ok(layout.noteAfterFirst, '설명은 둘러보기 소개 줄 바로 아래다');
+      assert.ok(layout.note.includes('이름·아이디·이메일은 어디에도 보이지 않아요'), '이름·아이디·이메일 안내는 공유 판 설명에 있다: ' + layout.note);
       const box = () => pageAsk.evaluate(() => ({ off: document.getElementById('share-disc-off')?.getAttribute('aria-checked')||'', on: document.getElementById('share-disc-on')?.getAttribute('aria-checked')||'' }));
       const before = await box();
-      assert.equal(before.off, 'true', '안 할래요를 고른 트리는 공유 판에서도 안 함이 선택'); assert.equal(before.on, 'false');
+      assert.equal(before.off, 'true', '소개하지 않은 트리는 공유 판에서 안 함이 선택'); assert.equal(before.on, 'false');
       // 261117 고객 의견: '공개되는 범위' 문구가 줄바꿈돼도 겹침 0 — 문구 자리로 스크롤한 뒤에도 잰다.
       await pageAsk.evaluate(() => document.querySelector('.share-warning')?.scrollIntoView({ block: 'center' }));
       await pageAsk.waitForTimeout(300);
       await take(pageAsk, '공유 판·소개 꺼짐');
+      await pageAsk.evaluate(() => document.querySelector('#share-panel .share-visibility')?.scrollIntoView({ block: 'center' }));
       await pageAsk.screenshot({ path: screenAuditCapture('audit-discover-panel-off-' + width + '-' + theme + '.png'), animations: 'disabled', timeout: 10000 }).catch(() => {});
       await pageAsk.evaluate(() => document.getElementById('share-disc-on')?.click());
       await pageAsk.waitForFunction(() => (document.getElementById('share-disc-on')?.getAttribute('aria-checked')||'')==='true', null, { timeout: 8000 });
-      assert.deepEqual(discoverPuts, [false, true], '공유 판 스위치(소개 켜기)도 discover PUT으로 저장한다');
+      assert.deepEqual(discoverPuts, [true], '공유 판 스위치(소개 켜기)도 discover PUT으로 저장한다');
       await pageAsk.waitForTimeout(400);
       const after = await box();
-      // 두 칸 선택 뒤 상자 안 문장들이 같은 상태를 말한다(261116 2차 지적 — 첫 줄이 옛 값에 머물던 것).
       assert.equal(after.on, 'true', '켜짐 뒤 소개가 선택'); assert.equal(after.off, 'false');
       await pageAsk.evaluate(() => document.querySelector('.share-warning')?.scrollIntoView({ block: 'center' }));
       await pageAsk.waitForTimeout(300);
       await take(pageAsk, '공유 판·소개 켜짐');
       await pageAsk.screenshot({ path: screenAuditCapture('audit-discover-panel-on-' + width + '-' + theme + '.png'), animations: 'disabled', timeout: 10000 }).catch(() => {});
+      await pageAsk.evaluate(() => document.getElementById('share-panel')?.close());
+      // 공유 판에서 켠 뒤 내 소식의 줄도 같은 상태(다시 누를 수 없음)를 말한다.
+      await openNews(pageAsk);
+      assert.equal(await pageAsk.locator('#my-news-list [data-discover-tree]').count(), 0, '공유 판에서 켠 트리의 소개 줄은 단추가 없다');
+      await closeNews(pageAsk);
+      // 서재: 소개된 트리만 '둘러보기에 보임' 표시 → 누르면 그 트리 공유 판.
+      const badge = await shelfBadge(pageAsk);
+      await badge.first().waitFor({ state: 'visible', timeout: 8000 });
+      assert.equal(await badge.count(), 1, '소개된 트리의 서재 카드에 표시가 하나');
+      assert.equal((await badge.first().textContent()).trim(), '둘러보기에 보임');
+      const badgeBox = await badge.first().boundingBox();
+      const hit = await badge.first().evaluate(e => { const r = e.getBoundingClientRect(), s = getComputedStyle(e, '::after'); return { font: parseFloat(getComputedStyle(e).fontSize), hitH: r.height + Math.max(0, -parseFloat(s.top || '0')) + Math.max(0, -parseFloat(s.bottom || '0')) }; });
+      assert.ok(badgeBox && badgeBox.height <= 28, '표시는 아주 작다(보이는 높이 28px 이하): ' + JSON.stringify(badgeBox));
+      assert.ok(hit.font >= 13, '단추 글자 13px 이상(#548 단추 기준): ' + hit.font);
+      assert.ok(hit.hitH >= 44, '누름 영역 44px 이상: ' + JSON.stringify(hit));
+      await take(pageAsk, '서재·둘러보기에 보임');
+      await pageAsk.screenshot({ path: screenAuditCapture('audit-discover-shelf-' + width + '-' + theme + '.png'), animations: 'disabled', timeout: 10000 }).catch(() => {});
+      await badge.first().click();
+      await pageAsk.waitForFunction(() => !!document.getElementById('share-panel')?.open, null, { timeout: 8000 });
+      assert.equal(await pageAsk.evaluate(() => document.getElementById('share-disc-on')?.getAttribute('aria-checked')), 'true', '표시를 누르면 그 트리 공유 판(소개 켜짐)이 열린다');
       await ctxAsk.close();
     }
-    const yesAsk = await askFlow('yes');
+    const yesAsk = await newsFlow('yes');
     await addFourth(yesAsk.pageAsk);
+    assert.equal(await (await shelfBadge(yesAsk.pageAsk)).count(), 1, '[소개하기]로 소개한 트리도 서재 카드에 표시가 생긴다');
     await yesAsk.ctxAsk.close();
-    // 백필 계정(이미 3개·소개 켜짐) — 질문 없이 건너뛴다.
+    // 백필 계정(이미 3개·소개 켜짐) — 소개 줄이 생기지 않는다.
     {
       const ctxBack = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
       await ctxBack.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); } catch {} }, theme);
       await ctxBack.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
+      await newsRoutes(ctxBack);
       await ctxBack.route('**://i.ytimg.com/**', THUMB);
       const now = '2026-11-16T09:00:00.000Z';
       const moments = [1, 2, 3].map((i) => ({ id: 'bm' + i, parentId: i === 1 ? null : 'bm' + (i - 1), links: [], createdAt: now, updatedAt: now, url: 'https://www.youtube.com/watch?v=qaBack00' + i, title: '백필 순간 ' + i, note: '', emotion: '', date: '2026-11-1' + (2 + i) }));
@@ -1113,7 +1195,9 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
       await pageBack.waitForTimeout(1200);
       await quickSave(pageBack, 'https://www.youtube.com/watch?v=qaBack09');
       await pageBack.waitForTimeout(1500);
-      assert.equal(await pageBack.evaluate(() => !!document.getElementById('discover-ask')?.open), false, '백필(이미 소개 켜진) 계정은 질문 없이 건너뛴다');
+      assert.deepEqual(await pageBack.evaluate(() => [...document.querySelectorAll('dialog[open]')].map(d => d.id).filter(id => id !== 'write-panel')), [], '백필(이미 소개 켜진) 계정은 창 없이 지나간다');
+      await openNews(pageBack);
+      assert.equal(await pageBack.locator('#my-news-list [data-discover-line]').count(), 0, '백필(이미 소개 켜진) 계정은 소개 줄이 없다');
       await ctxBack.close();
     }
     await ctxDate.close();
@@ -2815,8 +2899,6 @@ test('#987 보드 첫 줄과 모바일 셸 겹침·현재 표시', { skip: REQUI
       const page = await ctx.newPage();
       await page.goto(base + '/v41/?account=1#shelf');
       await page.waitForFunction(() => window.LT41?.trees?.length === 3 && !document.querySelector('#account-avatar')?.hidden);
-      const ask = page.locator('#discover-ask-no');
-      if (await ask.isVisible()) await ask.click();
       await clickToolbarTreeChoice(page);
       await page.locator('[data-tree-action="shelf"]').click();
       await page.frameLocator('#view').locator('#shelfRail [data-book-index]').first().waitFor();
@@ -3403,8 +3485,6 @@ test('#1084 세로 영상 첫 화면의 미디어 칸에는 회색 여백이 없
         const page = await ctx.newPage();
         await page.goto(base + '/v41/?account=1#home', {waitUntil: 'load'});
         await page.waitForFunction(() => window.LT41?.trees?.length === 1, null, {timeout: 15000});
-        const ask = page.locator('#discover-ask-no');
-        if (await ask.isVisible().catch(() => false)) await ask.click();
         const media = page.frameLocator('#view').locator('.recent-media.vertical');
         await media.locator('.recent-thumb').waitFor({state: 'visible', timeout: 15000});
         await page.waitForFunction(() => {
@@ -3545,7 +3625,7 @@ test('#1362 확장: 여섯 화면 선택 탭 채움·쉬는 테두리 역할 변
       const ctx = await browser.newContext({ viewport: { width, height: width === 390 ? 844 : 900 } });
       await ctx.addInitScript(({ theme, id }) => {
         localStorage.setItem('lt41.theme', theme);
-        try { localStorage.setItem('lt41.discoverAsked', JSON.stringify([id])); } catch {}
+        try { } catch {}
       }, { theme, id: data.id });
       await ctx.route('**/*', (route) => {
         const u = new URL(route.request().url());

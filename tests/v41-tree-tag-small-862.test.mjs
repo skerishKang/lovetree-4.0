@@ -44,7 +44,6 @@ async function openShell(browser, origin, tree, width, height) {
   page.on('response', (r) => { if (r.request().method() === 'PUT' && /api\/workspace/.test(r.url())) saved.push(new Date().toISOString()); });
   await page.goto(`${origin}/v41/?account=1`, { waitUntil: 'load' });
   await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
-  await page.locator('#discover-ask-no').click().catch(() => {});
   return { ctx, page, errors, saved };
 }
 

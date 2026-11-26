@@ -183,7 +183,7 @@ export async function observeFrameMatrix({ browser, base, outputDir, shard = '' 
     const ownShard = theme === 'night' ? (width === 1440 ? 'a' : 'b') : 'c';
     if (shard && shard !== ownShard) continue;
     const context = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
-    await context.addInitScript(({ theme, treeId }) => { localStorage.setItem('lt41.theme', theme); localStorage.setItem('lt41.tips.firstTree', '1'); localStorage.setItem('lt41.video-consent', '1'); localStorage.setItem('lt41.discoverAsked', JSON.stringify([treeId])); }, { theme, treeId: tree.id });
+    await context.addInitScript(({ theme, treeId }) => { localStorage.setItem('lt41.theme', theme); localStorage.setItem('lt41.tips.firstTree', '1'); localStorage.setItem('lt41.video-consent', '1'); }, { theme, treeId: tree.id });
     await context.route('**://i.ytimg.com/**', THUMB);
     await context.route('**/api/**', routeApi);
     const page = await context.newPage();
@@ -207,7 +207,7 @@ export async function observeFrameMatrix({ browser, base, outputDir, shard = '' 
     };
     try {
       await page.goto(base + '/v41/?account=1#home', { waitUntil: 'load' });
-      await settleObservation(page, () => window.LT41?.trees?.length === 1 && document.body.dataset.member === 'in' && !document.getElementById('discover-ask')?.open && [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length)?.contentDocument?.getElementById('orbit') && [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length)?.contentWindow?.__LT_ORBIT_TEST__?.canvasSettled());
+      await settleObservation(page, () => window.LT41?.trees?.length === 1 && document.body.dataset.member === 'in' && [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length)?.contentDocument?.getElementById('orbit') && [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length)?.contentWindow?.__LT_ORBIT_TEST__?.canvasSettled());
       await page.evaluate(() => {
         const frame = [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length);
         const orbit = frame.contentWindow.__LT_ORBIT_TEST__;
@@ -218,7 +218,7 @@ export async function observeFrameMatrix({ browser, base, outputDir, shard = '' 
       for (const screen of FRAME_SCREENS) { await openMemberScreen(page, screen); await capture(page, screen); if (screen.id === 'book' || screen.id === 'board') await page.clock.resume(); }
     } finally { await context.close().catch(() => {}); }
     const guest = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
-    await guest.addInitScript(({ theme, treeId }) => { localStorage.setItem('lt41.theme', theme); localStorage.setItem('lt41.tips.firstTree', '1'); localStorage.setItem('lt41.video-consent', '1'); localStorage.setItem('lt41.discoverAsked', JSON.stringify([treeId])); }, { theme, treeId: tree.id });
+    await guest.addInitScript(({ theme, treeId }) => { localStorage.setItem('lt41.theme', theme); localStorage.setItem('lt41.tips.firstTree', '1'); localStorage.setItem('lt41.video-consent', '1'); }, { theme, treeId: tree.id });
     await guest.route('**://i.ytimg.com/**', THUMB);
     await guest.route('**/api/**', routeApi);
     const guestPage = await guest.newPage();

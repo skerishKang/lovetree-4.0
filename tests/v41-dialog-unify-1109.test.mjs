@@ -50,7 +50,6 @@ async function withShell(tree, { width, height, theme, deferred = false, cached 
     page.on('pageerror', (error) => errors.push(String(error.message || error)));
     await page.goto(`${base}/v41/?account=1${hash}`, { waitUntil: 'load' });
     if (!deferred || cached) await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
-    if (!deferred) await page.locator('#discover-ask-no').click().catch(() => {});
     await fn({ page, errors, initial, release });
   } finally { release?.(initial); await browser.close(); server.close(); }
 }

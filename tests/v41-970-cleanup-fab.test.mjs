@@ -9,7 +9,6 @@ import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 import { serve } from './helpers/screen-audit.mjs';
 import { createTree, addMoment } from '../public/v41/domain.mjs';
-import { dismissDiscoverAskIfOpen } from './helpers/discover-ask.mjs';
 
 const REQUIRE = process.env.LT_970_REQUIRE === '1';
 let chromium, skip = false;
@@ -57,7 +56,6 @@ async function withShell(tree, { width = 1440, height = 900 } = {}, fn) {
     page.on('pageerror', (error) => errors.push(String(error.message || error)));
     await page.goto(`${origin}/v41/?account=1`, { waitUntil: 'load' });
     await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
-    await page.locator('#discover-ask-no').click().catch(() => {});
     await page.waitForTimeout(300);
     await fn({ page, errors, puts });
   } finally {
@@ -249,7 +247,6 @@ async function withGuardWorkspace(trees, { width = 1440, height = 900, quarantin
     page.on('console', (message) => { if (message.type() === 'warning') warnings.push(message.text()); });
     await page.goto(`${origin}/v41/?account=1`, { waitUntil: 'load' });
     await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
-    await dismissDiscoverAskIfOpen(page);
     await page.waitForTimeout(300);
     await fn({ page, errors, warnings, puts });
   } finally {
@@ -391,7 +388,7 @@ async function withLiveShell(state, { width = 1440, height = 900 } = {}, fn) {
     // 둘러보기 소개 물음(순간 3개 이상인 트리에 한 번)은 이 시험의 대상이 아니다 — 시험 트리는 이미 물은 것으로 두어
     // 물음 창이 되돌리기 안내를 가리지 않게 한다(불러오자마자 뜨는 때와 복사로 3개가 되는 때 모두).
     const asked = state.trees.map((tree) => tree.id);
-    await ctx.addInitScript((ids) => { try { localStorage.setItem('lt41.theme', 'night'); localStorage.setItem('lt41.discoverAsked', JSON.stringify(ids)); } catch {} }, asked);
+    await ctx.addInitScript((ids) => { try { localStorage.setItem('lt41.theme', 'night'); } catch {} }, asked);
     await ctx.route('**://i.ytimg.com/**', (route) => route.fulfill({ status: 200, contentType: 'image/png', body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64') }));
     await ctx.route('**/api/**', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
     await ctx.route('**/api/workspace**', async (route) => {
@@ -411,7 +408,6 @@ async function withLiveShell(state, { width = 1440, height = 900 } = {}, fn) {
     await page.goto(`${origin}/v41/?account=1`, { waitUntil: 'load' });
     await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
     // #1478: 위에서 모든 시험 트리를 이미 물은 것으로 두어 질문 창은 뜨지 않는다 — 보이지 않는 단추를 30초 기다리지 않는다.
-    await dismissDiscoverAskIfOpen(page);
     await page.waitForTimeout(300);
     await fn({ page, errors, live, origin });
   } finally {

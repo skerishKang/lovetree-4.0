@@ -263,7 +263,6 @@ test('1001b 실행: 지도 순간 변경(고치기·연결·삭제) — 재적�
     page.on('dialog', d => d.accept());
     await page.goto(`${base}/v41/?account=1`, { waitUntil: 'load' });
     await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
-    await page.locator('#discover-ask-no').click().catch(() => {});
     await page.locator('.tree-views [data-view="track56-network.html"]').click();
     await waitShown(page, { path: 'track56-network' }, 8000);
     await page.waitForTimeout(1200);

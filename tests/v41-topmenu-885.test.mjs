@@ -46,7 +46,6 @@ test('상단 메뉴: 같은 글자 크기·테두리 0·세로선 0·현재 탭 
         const page = await ctx.newPage();
         await page.goto(`${origin}/v41/?account=1`, { waitUntil: 'load', timeout: 60000 });
         await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
-        await page.locator('#discover-ask-no').click().catch(() => {});
         const perScreen = {};
         // 대표 11-23: 화면마다 머리줄 높이·단추 줄 높이가 달라 서재·책에서 단추와 아래 선이 내려와 보였다.
         const headerGeom = () => page.evaluate(() => {
@@ -179,7 +178,6 @@ test("서재에서 트리를 고르면 가운데 책이 그 트리로 이동", {
     const page = await ctx.newPage();
     await page.goto(`${origin}/v41/?account=1`, { waitUntil: "load", timeout: 60000 });
     await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
-    await page.locator('#discover-ask-no').click().catch(() => {});
     await page.evaluate(() => { location.hash = '#my/shelf'; });
     await page.waitForFunction(() => [...document.querySelectorAll('iframe')].some((f) => { try { return /track32-bookshelf/.test(f.contentWindow.location.href) && f.contentDocument.querySelector('.book-card.is-center'); } catch { return false; } }), null, { timeout: 15000 });
     await clickToolbarTreeChoice(page);
@@ -216,7 +214,6 @@ test('상단 메뉴 261119: 트리 단추 폭·⌄ 자리·목록 규칙·메뉴
       // 긴 이름 트리를 지금 트리로 연다 — 말줄임과 ⌄ 자리를 같은 자리에서 함께 잰다.
       await page.goto(`${origin}/v41/?account=1#my/board?tree=${longTree.id}&moment=${longTree.moments[0].id}`, { waitUntil: 'load', timeout: 60000 });
       await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
-      await page.locator('#discover-ask-no').click().catch(() => {});
       await page.waitForTimeout(700);
       const bar = await page.evaluate(() => {
         const record = document.querySelector('iframe#view')?.contentDocument?.querySelector('button.lt-toolbar-tree-choice');
@@ -320,7 +317,6 @@ test('970 실행: 트리 드롭다운은 Esc·바깥 누르기로 닫히고, 키
       const page = await ctx.newPage();
       await page.goto(`${origin}/v41/?account=1`, { waitUntil: 'load', timeout: 60000 });
       await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
-      await page.locator('#discover-ask-no').click().catch(() => {});
       await page.waitForTimeout(700);
 
       // 마우스로 열기 → Esc로 닫기: 초점이 단추로 돌아온다.
@@ -409,7 +405,6 @@ test('1028 실행: 트리 목록만 스크롤하고 동작 칸은 고정이며 �
     const current = trees.at(-1);
     await page.goto(`${origin}/v41/?account=1#my/board?tree=${current.id}&moment=${current.moments[0].id}`, { waitUntil: 'load', timeout: 60000 });
     await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
-    await page.locator('#discover-ask-no').click().catch(() => {});
     await page.waitForTimeout(600);
     await clickToolbarTreeChoice(page);
     await page.waitForFunction(() => !document.getElementById('tree-popover')?.hidden, null, { timeout: 10000 });
@@ -564,9 +559,6 @@ test('#1246 모든 화면의 순간 추가만 장미색·둘러보기 테두리'
         const page=await ctx.newPage();
         await page.goto(base+'/v41/?account=1#home');
         await page.waitForFunction(()=>window.LT41?.trees?.length===2&&document.body.dataset.member==='in');
-        const ask=page.locator('#discover-ask-no');
-        await ask.waitFor({state:'visible',timeout:4000}).catch(()=>{});
-        if(await ask.isVisible())await ask.click();
         const read=()=>page.evaluate(()=>{
           const sample=document.createElement('span');
           sample.style.backgroundColor='var(--lt-cta-rose)';sample.style.color='var(--lt-cta-white)';document.body.append(sample);
@@ -650,7 +642,6 @@ test('#1367 4번: 트리 고르기 목록은 바깥 누름·안쪽 화면 누름
       try {
         await page.goto(`${origin}/v41/?account=1`, { waitUntil: 'load', timeout: 60000 });
         await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
-        await page.locator('#discover-ask-no').click().catch(() => {});
         const hidden = () => page.evaluate(() => document.getElementById('tree-popover')?.hidden !== false);
         const open = async () => { assert.equal(await hidden(), true, '처음에는 닫혀 있다'); await clickToolbarTreeChoice(page); await page.waitForFunction(() => !document.getElementById('tree-popover')?.hidden, null, {timeout:5000}); assert.equal(await hidden(), false, '트리 고르기를 누르면 열린다'); };
 
