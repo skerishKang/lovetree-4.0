@@ -451,3 +451,81 @@ test('서재 — 설정에서 고른 기본 보기가 저장되고 다시 열려
     });
   }
 });
+
+// #1497 2·3·6번(서재 점검 #1454): 선반·회전 표지의 긴 제목은 표지 안에서 최대 3줄·잘린 글자 0, 이어 보기 띠에 같은 이름 두 번 0,
+// '전체/공개만' 칩 누름 영역 44px. 첫 책은 아주 긴 이름이고 첫 순간 제목이 트리 이름과 같다(가짜 기록).
+const LONG_NAME = '기억의 나무와 아주 길고 긴 서재 이름을 가진 테스트 트리 2026년 가을의 순간 모음';
+function longBooks() {
+  const list = books(20);
+  let first = createTree({ subject: LONG_NAME, title: LONG_NAME, note: '', emotion: '설렘', date: '2026-11-20', url: '' }, '2026-11-20T00:00:00Z');
+  first.moments[0].title = LONG_NAME;
+  first = addMoment(first, { title: '두 번째 순간', note: '', emotion: '설렘', date: '2026-11-20', url: '' }, first.moments[0].id, '2026-11-20T00:01:00Z');
+  list[0] = first;
+  return list;
+}
+test('#1497 서재: 표지 제목 3줄 안·잘림 0, 이어 보기 같은 이름 한 번, 전체/공개만 누름 44px', { timeout: 300000 }, async (t) => {
+  if (skip) { if (REQUIRE) assert.fail('화면 시험을 건너뛸 수 없습니다: ' + skip); t.skip(skip); return; }
+  const rows = [];
+  for (const [width, height] of [[390, 844], [844, 390], [1440, 900]]) for (const view of ['shelf', 'carousel']) {
+    await withShelf(longBooks(), { width, height, view }, async ({ page, frame, errors }) => {
+      for (const theme of ['night', 'garden']) {
+        await page.evaluate((n) => window.LT41_THEME_REGISTRY.apply(document.documentElement, n), theme);
+        await frame.evaluate((n) => window.LT41_THEME_REGISTRY.apply(document.documentElement, n), theme);
+        await frame.waitForTimeout(300);
+        const m = await frame.evaluate(() => {
+          const shown = (el) => !!el && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden' && el.checkVisibility?.({ checkOpacity: true, checkVisibilityCSS: true }) !== false;
+          const titles = [...document.querySelectorAll('#shelfRail .cover-title')].filter(shown).filter((el) => { const r = el.getBoundingClientRect(); return r.right > 0 && r.left < innerWidth; }).map((el) => {
+            const r = el.getBoundingClientRect();
+            const range = document.createRange(); range.selectNodeContents(el);
+            const lines = [];
+            for (const q of range.getClientRects()) { if (q.height < 1 || q.top >= r.bottom - 0.5) continue; if (!lines.some((l) => Math.abs(l.top - q.top) < 2)) lines.push({ top: q.top, bottom: q.bottom }); else { const l = lines.find((x) => Math.abs(x.top - q.top) < 2); l.bottom = Math.max(l.bottom, q.bottom); } }
+            const cover = el.closest('.book-cover')?.getBoundingClientRect();
+            return { text: el.textContent.trim().slice(0, 12), lines: lines.length, cut: Math.max(0, ...lines.map((l) => l.bottom - r.bottom)), inside: !cover || (r.left >= cover.left - 0.5 && r.right <= cover.right + 0.5 && r.bottom <= cover.bottom + 0.5 && r.top >= cover.top - 0.5) };
+          });
+          const tree = document.querySelector('#resumeTree'), moment = document.querySelector('#resumeMoment');
+          const chips = [...document.querySelectorAll('#shelf-filter-inline button')].filter(shown).map((b) => {
+            const r = b.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+            const at = (y) => { const e = document.elementFromPoint(cx, y); return !!e && (e === b || b.contains(e)); };
+            return { t: b.textContent.trim(), w: Math.round(r.width), h: Math.round(r.height), up: at(cy - 21), down: at(cy + 21) };
+          });
+          return { titles, tree: shown(tree) ? tree.textContent.trim() : '', moment: shown(moment) ? moment.textContent.trim() : '', chips };
+        });
+        rows.push({ width, view, theme, ...m, titles: m.titles.slice(0, 3) });
+        for (const ti of m.titles) {
+          assert.ok(ti.lines <= 3, `${width} ${view} ${theme} '${ti.text}': 표지 제목은 최대 3줄(${ti.lines})`);
+          assert.ok(ti.cut <= 0.5, `${width} ${view} ${theme} '${ti.text}': 마지막 줄 글자가 ${ti.cut.toFixed(1)}px 잘린다`);
+          assert.ok(ti.inside, `${width} ${view} ${theme} '${ti.text}': 제목 칸이 표지 안에 있다`);
+        }
+        assert.ok(m.tree, '이어 보기 띠가 보인다');
+        assert.notEqual(m.moment.replace(/\s+/g, ''), m.tree.replace(/\s+/g, ''), `${width} ${view} ${theme}: 이어 보기 띠에 같은 이름이 두 번 나오지 않는다`);
+        assert.equal(m.chips.length, 2, '전체·공개만 칩 둘');
+        for (const c of m.chips) assert.ok(c.w >= 44 && c.up && c.down, `${width} ${view} ${theme} '${c.t}' 칩 누름 영역 44px(폭 ${c.w}, 위 ${c.up}, 아래 ${c.down})`);
+      }
+      assert.deepEqual(errors, [], '페이지 오류 없음');
+    });
+  }
+  console.log('#1497 서재', JSON.stringify(rows));
+});
+
+// #1497 5번: 최근 순간 '크게 보기' 창이 열려 있는 동안 휴대폰 ＋ 단추·알림·새 소식 띠는 창 위에 뜨지 않는다(창이 맨 위).
+test('#1497 서재: 최근 순간 크게 보기 위에 ＋ 단추·알림이 뜨지 않는다(390)', { timeout: 180000 }, async (t) => {
+  if (skip) { if (REQUIRE) assert.fail('화면 시험을 건너뛸 수 없습니다: ' + skip); t.skip(skip); return; }
+  for (const theme of ['night', 'garden']) {
+    await withShelf(longBooks(), { width: 390, height: 844, view: 'carousel' }, async ({ page, frame, errors }) => {
+      await page.evaluate((n) => window.LT41_THEME_REGISTRY.apply(document.documentElement, n), theme);
+      const vis = (sel) => page.evaluate((s) => { const el = document.querySelector(s); return !!el && !el.hidden && el.getClientRects().length > 0 && getComputedStyle(el).display !== 'none' && getComputedStyle(el).visibility !== 'hidden'; }, sel);
+      assert.equal(await vis('#mobile-add'), true, theme + ': 창을 열기 전에는 ＋ 단추가 보인다');
+      await frame.locator('.shelf-recent-item').first().click();
+      await page.waitForFunction(() => document.body.classList.contains('lt-book-lightbox-open'), null, { timeout: 5000 });
+      // 알림이 떠 있는 순간을 만든다(문구는 시험용).
+      await page.evaluate(() => { const t = document.getElementById('toast'); t.textContent = '시험 알림'; t.hidden = false; const c = document.getElementById('updates-card'); if (c) c.hidden = false; });
+      await page.waitForTimeout(200);
+      const open = { fab: await vis('#mobile-add'), toast: await vis('#toast'), card: await vis('#updates-card') };
+      assert.deepEqual(open, { fab: false, toast: false, card: false }, theme + ': 크게 보기가 열린 동안 ＋ 단추·알림·새 소식 띠가 보이지 않는다');
+      await frame.locator('.lt-lightbox-close').first().click();
+      await page.waitForFunction(() => !document.body.classList.contains('lt-book-lightbox-open'), null, { timeout: 5000 });
+      assert.equal(await vis('#mobile-add'), true, theme + ': 창을 닫으면 ＋ 단추가 돌아온다');
+      assert.deepEqual(errors, [], '페이지 오류 없음');
+    });
+  }
+});
