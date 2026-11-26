@@ -2,6 +2,7 @@ import { MSG } from './frame-messages.mjs';
 import {displayTreeTitle} from './tree-name.mjs';
 import {normalizeDateStyle} from './domain.mjs';
 import {AUTO_TITLE} from './auto-title.mjs';
+import {normalizeTheme} from './header-state.mjs';
 // 기억책 사용성 규칙(2026-11-08 대표 피드백 1~9). 화면(iframe)과 셸이 같은 규칙을 쓰고,
 // 시험은 이 파일을 직접 불러 확인한다. 데이터는 읽기만 하고 바꾸지 않는다(표시 단계에서만 거른다).
 
@@ -225,7 +226,7 @@ export const BOOK_TITLE_FONT = Object.freeze({
 
 /** 밤/정원 이름만 받는다. 모르는 값은 밤(기본)이다. */
 export function bookTheme(theme) {
-  return String(theme ?? '').trim().toLowerCase() === 'garden' ? 'garden' : 'night';
+  return normalizeTheme(String(theme ?? '').trim().toLowerCase());
 }
 
 /** 기억책 큰 제목에 쓸 글꼴. 밤은 Pretendard, 정원은 마루부리. */
