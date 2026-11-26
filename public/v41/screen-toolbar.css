@@ -221,3 +221,9 @@ html[data-v41-screen=tree] .lt-toolbar-tools{flex:0 0 auto;overflow:visible}
  html[data-v41-screen=shelf] .lt-toolbar-left{flex:0 1 auto;min-width:0}
  html[data-v41-screen=tree] .lt-toolbar-tree-choice{max-width:calc(100vw - 238px)}
 }
+
+/* #1367: current tree remains legible in both themes. */
+button.lt-toolbar-tree-choice[aria-pressed=true]{background:var(--lt-role-accent-bg);color:var(--lt-role-accent-ink);border-color:var(--lt-role-accent-bg)}
+button.lt-toolbar-tree-choice[aria-pressed=true]:is(:hover,:focus-visible){background:var(--lt-role-accent-bg);color:var(--lt-role-accent-ink)}
+button.lt-toolbar-tree-choice[aria-pressed=true] .lt-toolbar-tree-name,
+button.lt-toolbar-tree-choice[aria-pressed=true] .lt-toolbar-tree-caret{color:inherit}

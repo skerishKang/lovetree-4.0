@@ -1,3 +1,4 @@
+import { normalizeTreeOpenView } from '../tree-open-view.mjs';
 import { MSG } from '../frame-messages.mjs';
 // createTreeMenu — shell.mjs에서 코드 위치만 옮긴 모듈(#886 PR 2). 동작은 그대로다.
 export function createTreeMenu(deps){
@@ -50,7 +51,8 @@ function renderTreeMenu(){
   const viewGroup = `${shelfEntry}${momentsEntry}`;
   const shareButtons = manage ? '<button type="button" role="menuitem" data-tree-action="manage">이 트리 관리 (이름·표지)</button><button type="button" role="menuitem" data-tree-action="share">이 트리 공유</button>' : '';
   const dangerRow = cleanupRow ? divider + cleanupRow.replace('tree-item tree-cleanup', 'tree-item tree-cleanup tree-danger') : '';
-  treePopover.innerHTML = list + `<div class="tree-foot" role="none"><button type="button" role="menuitem" data-tree-action="new">＋ 새 트리</button>${manage ? divider + shareButtons : ''}${tagsRow}${viewGroup ? divider + viewGroup : ''}${dangerRow}</div>`;
+  treePopover.innerHTML = '<div class="lt-tree-picker-heading"><strong>&#53944;&#47532;&#32;&#44256;&#47476;&#44592;</strong><button type="button" data-tree-close aria-label="&#53944;&#47532;&#32;&#47785;&#47197;&#32;&#45803;&#44592;">&times;</button></div>' + list + `<div class="tree-foot" role="none"><button type="button" role="menuitem" data-tree-action="new">＋ 새 트리</button>${manage ? divider + shareButtons : ''}${tagsRow}${viewGroup ? divider + viewGroup : ''}${dangerRow}</div>`;
+ treePopover.querySelector('[data-tree-close]')?.addEventListener('click',()=>closeTreeMenu(true));
  const search=treePopover.querySelector('[data-tree-search]');
  search?.addEventListener('input',()=>{
   const q=search.value.trim().toLowerCase();
@@ -59,18 +61,19 @@ function renderTreeMenu(){
   if(active&&!active.hidden)scrollTreeItemIntoView(active);
  });
   // 트리를 누르면 그 트리로 이동한다: 책·보드·지도를 보던 중이면 같은 보기로, 그 외(첫 화면·내 트리·둘러보기)에는 그 트리의 책으로. 주소도 따라오게 남긴다.
-  const TREE_VIEWS=new Set(['track32-bookshelf.html','track61-tree.html','track59-sketchbook.html','track58-pinboard.html','track56-network.html']);
+  const OPEN_FILES={tree:'track61-tree.html',board:'track58-pinboard.html',book:'track59-sketchbook.html',network:'track56-network.html'};
   treePopover.querySelectorAll('[data-tree-id]').forEach(b=>b.onclick=()=>{
-   const id=b.dataset.treeId;closeTreeMenu();if(!id)return;
-   // 서재는 프레임을 다시 띄우지 않고 가운데 책만 고른 트리로 옮긴다(2026-11-18 13:49 결정).
-   if(deps.current==='track32-bookshelf.html'){
+    const id=b.dataset.treeId;
+    if(!id || deps.source!=='server' || !deps.member?.snapshot().owned || !deps.member?.snapshot().writable)return;
+    const tree=deps.model?.trees?.find(t=>t.id===id);
+    if(!tree)return;
+    closeTreeMenu();
+    if(id===window.LT41?.tree?.id)return;
     choose(id,'',true);
-    renderAccount();
+    show(OPEN_FILES[normalizeTreeOpenView(tree.openView)],false,id);
     flowNavigation();
-    try{for(const f of document.querySelectorAll('iframe'))f.contentWindow?.postMessage({type:MSG.shelfSelectTree,treeId:id},location.origin);}catch{}
-    writeLocation();return;
-   }
-   const wasTreeView=TREE_VIEWS.has(deps.current);choose(id);if(!wasTreeView)show('track59-sketchbook.html',false);flowNavigation();writeLocation();
+    writeLocation();
+    focusChoiceOnReady();
   });
  treePopover.querySelector('[data-tree-action="new"]')?.addEventListener('click',()=>{closeTreeMenu();if(deps.member?.snapshot().writable)openEditor('new');else openLoginStart('new-tree');});
  treePopover.querySelector('[data-tree-action="cleanup"]')?.addEventListener('click',()=>{closeTreeMenu();deps.shellCleanup.open({});});
@@ -90,24 +93,109 @@ function scrollTreeItemIntoView(item){
  if(a.bottom>box.bottom)list.scrollTop+=a.bottom-box.bottom+4;
  else if(a.top<box.top)list.scrollTop-=box.top-a.top+4;
 }
-function openTreeMenu(via='keyboard'){if(!treePopover)return;renderTreeMenu();treePopover.dataset.ltOpenedBy=via;treePopover.hidden=false;treeTrigger.setAttribute('aria-expanded','true');const active=treePopover.querySelector('[data-tree-id][aria-checked="true"]');treePopover.querySelector('button')?.focus();if(active&&!active.hidden)scrollTreeItemIntoView(active);}
-function closeTreeMenu(){if(!treePopover)return;treePopover.hidden=true;treeTrigger.setAttribute('aria-expanded','false');}
-$('record-menu').addEventListener('click',event=>{event.stopPropagation();if(treePopover?.hidden)openTreeMenu(event.detail===0?'keyboard':'mouse');else closeTreeMenu();});
-if(treePopover)treePopover.addEventListener('keydown',event=>{const items=[...treePopover.querySelectorAll('button')].filter(b=>!b.hidden);const at=items.indexOf(document.activeElement);if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();const next=event.key==='ArrowDown'?(at+1)%items.length:(at-1+items.length)%items.length;items[next]?.focus();}else if(event.key==='Home'){event.preventDefault();items[0]?.focus();}else if(event.key==='End'){event.preventDefault();items.at(-1)?.focus();}});
-// #1367 4번: 바깥을 누르면 닫기만 하고 그 누름으로 다른 단추가 동작하지 않게 한다.
-function outsideClick(event){
- if(!treePopover||treePopover.hidden)return;
- if(event.target?.closest?.('.tree-slot'))return;
- event.preventDefault?.();event.stopPropagation?.();
- closeTreeMenu();
+let activeFrame=null;
+function activeViewFrame(){
+ return ['view','view-next'].map(id=>document.getElementById(id)).find(f=>f?.contentWindow && !f.hidden && f.getClientRects().length>0) || document.getElementById('view');
 }
-function escKey(event){if(event.key==='Escape'&&treePopover&&!treePopover.hidden){event.preventDefault?.();event.stopPropagation?.();closeTreeMenu();treeTrigger.focus();}}
+function tellFrame(open, focus=false){
+ const frame=activeFrame;
+ if(frame?.contentWindow)frame.contentWindow.postMessage({type:MSG.toolbarTreePickerState,open,focus},location.origin);
+}
+function focusChoiceOnReady(){
+ const frame=activeViewFrame();
+ frame?.addEventListener('load',()=>{frame.contentWindow?.postMessage({type:MSG.toolbarTreePickerState,open:false,focus:true},location.origin);},{once:true});
+}
+function openTreeMenu(via='keyboard',rect=null,frame=null){
+ if(!treePopover || deps.source!=='server' || !deps.member?.snapshot().owned || !deps.member?.snapshot().writable)return;
+ activeFrame=frame||activeViewFrame();
+ // Bind the currently visible frame after every swap, before a click can reach its controls.
+ bindFrame(activeFrame);
+ renderTreeMenu();
+ treePopover.dataset.ltOpenedBy=via;
+ treePopover.hidden=false;
+ treePopover.setAttribute('role','dialog');
+ treePopover.setAttribute('aria-label','\uD2B8\uB9AC \uACE0\uB974\uAE30');
+ treePopover.classList.add('lt-toolbar-picker');
+ treePopover.style.setProperty('--lt-picker-left',Math.round(rect?.left||24)+'px');
+ treePopover.style.setProperty('--lt-picker-top',Math.round((rect?.bottom||60)+6)+'px');
+ tellFrame(true);
+ const active=treePopover.querySelector('[data-tree-id][aria-checked="true"]');
+ (active||treePopover.querySelector('[data-tree-close]'))?.focus({preventScroll:true});
+ if(active)scrollTreeItemIntoView(active);
+}
+function closeTreeMenu(focus=false){
+ if(!treePopover || treePopover.hidden)return;
+ treePopover.hidden=true;
+ tellFrame(false,focus);
+ activeFrame=null;
+}
+window.addEventListener('message',event=>{
+ if(event.origin!==location.origin || event.data?.type!==MSG.toolbarTreePicker)return;
+ const frame=activeViewFrame();
+ if(!frame || event.source!==frame.contentWindow || deps.source!=='server' || !deps.member?.snapshot().owned || !deps.member?.snapshot().writable || !window.LT41?.tree)return;
+ if(!['track32-bookshelf.html','track59-sketchbook.html','track58-pinboard.html','track56-network.html','track61-tree.html'].includes(deps.current))return;
+ if(!treePopover.hidden){closeTreeMenu(true);return;}
+ const r=event.data.rect;
+ if(!r||![r.left,r.bottom].every(Number.isFinite))return;
+ const fr=frame.getBoundingClientRect();
+ openTreeMenu(event.data.via,{left:Math.max(0,Math.min(innerWidth-44,fr.left+r.left)),bottom:fr.top+r.bottom},frame);
+});
+if(treePopover)treePopover.addEventListener('keydown',event=>{
+ const items=[...treePopover.querySelectorAll('button')].filter(b=>!b.hidden && b.getClientRects().length);
+ const at=items.indexOf(document.activeElement);
+ if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();const next=event.key==='ArrowDown'?(at+1)%items.length:(at-1+items.length)%items.length;items[next]?.focus();}
+ else if(event.key==='Home'){event.preventDefault();items[0]?.focus();}
+ else if(event.key==='End'){event.preventDefault();items.at(-1)?.focus();}
+ else if(event.key==='Tab' && matchMedia('(max-width:900px)').matches){
+  if(event.shiftKey && at===0){event.preventDefault();items.at(-1)?.focus();}
+  else if(!event.shiftKey && at===items.length-1){event.preventDefault();items[0]?.focus();}
+ }
+});
+// The closing pointer press must not also activate a control underneath the picker.
+// Keep the paired click in its source document, including clicks inside the view iframe.
+let pendingOutsideClick=null;
+function shellPointerPosition(event){
+ const current=event.currentTarget;
+ const doc=current?.document||current;
+ const frame=doc===document?null:[...document.querySelectorAll('iframe')].find(f=>f.contentDocument===doc);
+ const rect=frame?.getBoundingClientRect();
+ return {x:event.clientX+(rect?.left||0),y:event.clientY+(rect?.top||0)};
+}
+function outsidePointerDown(event){
+ pendingOutsideClick=null;
+ if(!treePopover||treePopover.hidden||treePopover.contains(event.target))return;
+ pendingOutsideClick=shellPointerPosition(event);
+ event.preventDefault();event.stopImmediatePropagation();
+ closeTreeMenu(true);
+}
+function outsideClick(event){
+ const pending=pendingOutsideClick;
+ if(pending){
+  pendingOutsideClick=null;
+  const point=shellPointerPosition(event);
+  if(Math.abs(point.x-pending.x)<=8 && Math.abs(point.y-pending.y)<=8){
+   event.preventDefault();event.stopImmediatePropagation();return;
+  }
+ }
+ if(!treePopover||treePopover.hidden||treePopover.contains(event.target))return;
+ event.preventDefault();event.stopImmediatePropagation();closeTreeMenu(true);
+}
+function escKey(event){
+ if(event.key==='Escape'&&treePopover&&!treePopover.hidden){event.preventDefault();event.stopPropagation();closeTreeMenu(true);}
+}
+document.addEventListener('pointerdown',outsidePointerDown,true);
 document.addEventListener('click',outsideClick,true);
 document.addEventListener('keydown',escKey,true);
-// 안쪽 화면(iframe)을 눌러도 닫힌다 — 그 문서의 눌림도 여기서 먼저 본다.
+const boundFrameDocuments=new WeakSet();
 function bindFrame(frame){
  try{
-  const doc=frame.contentDocument;if(!doc)return;
+  const doc=frame.contentDocument,win=frame.contentWindow;
+  if(!doc||!win||boundFrameDocuments.has(doc))return;
+  boundFrameDocuments.add(doc);
+  // ?? ???? ?? iframe ?? ?? ???? ?? ??? ????.
+  win.addEventListener('pointerdown',outsidePointerDown,true);
+  win.addEventListener('click',outsideClick,true);
+  doc.addEventListener('pointerdown',outsidePointerDown,true);
   doc.addEventListener('click',outsideClick,true);
   doc.addEventListener('keydown',escKey,true);
  }catch{}

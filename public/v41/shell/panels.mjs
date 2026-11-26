@@ -388,6 +388,7 @@ export function createPanels(deps) {
     }
     const tree = window.LT41.tree, form = $('tree-form');
     form.elements.title.value = tree.title;
+    if(form.elements.openView)form.elements.openView.value = tree.openView || 'tree';
     form.elements.subject.value = tree.subject === '모아둔 순간' ? '' : tree.subject;
     fillTreeCoverOptions(tree);
     $('tree-cover').value = tree.coverMomentId || firstMomentId(tree);
