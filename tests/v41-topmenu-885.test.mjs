@@ -360,6 +360,7 @@ test('970 실행: 트리 드롭다운은 Esc·바깥 누르기로 닫히고, 키
       });
       await page.keyboard.press('Enter');
       await page.waitForFunction(() => document.getElementById('tree-popover')?.hidden, null, { timeout: 10000 });
+      await page.waitForFunction(() => document.querySelector('iframe#view')?.contentDocument?.querySelector('button.lt-toolbar-tree-choice')?.getAttribute('aria-expanded') === 'false', null, { timeout: 5000 });
       assert.equal(await treeChoiceExpanded(page), 'false', `${width}: 트리를 고르면 목록이 닫힌다`);
       await page.waitForFunction((id) => /tree=/.test(location.hash) && new URLSearchParams(location.hash.split('?')[1] || '').get('tree') === id, wantTree, { timeout: 15000 });
       assert.ok(page.url().includes(`tree=${wantTree}`), `${width}: Enter로 고른 트리가 열린다(${page.url().split('#')[1] || ''})`);
