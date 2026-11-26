@@ -33,6 +33,58 @@ function books(count) {
 
 const WORKSPACE = (trees, view) => JSON.stringify({ revision: 1, state: { version: 1, trees, prefs: view ? { shelfView: view } : {} }, subject: '시험계정', writeSubjectBound: true, savedAt: '2026-11-20T09:00:00.000Z' });
 
+
+// #1418: 36조합을 한 페이지에서 폭·보기·데이터만 바꿔 잰다(데이터 변경 때만 다시 연다).
+async function withShelfSession(fn) {
+  const server = await serve();
+  const origin = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch({ headless: true });
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, colorScheme: 'dark', reducedMotion: 'reduce' });
+  let trees = books(20), view = 'carousel', frame = null;
+  const errors = [];
+  try {
+    await ctx.addInitScript((v) => { try { localStorage.setItem('lt41.shelfView', v); } catch {} }, view);
+    await ctx.route('**://i.ytimg.com/**', (route) => route.fulfill({ status: 200, contentType: 'image/png', body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64') }));
+    await ctx.route('**/api/**', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
+    await ctx.route('**/api/workspace**', (route) => {
+      if (route.request().method() === 'PUT') { route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"revision":2}' }); return; }
+      route.fulfill({ status: 200, contentType: 'application/json', body: WORKSPACE(trees, view) });
+    });
+    const page = await ctx.newPage();
+    page.on('pageerror', (error) => errors.push(String(error.message || error)));
+    async function openShelf() {
+      await page.goto(`${origin}/v41/?account=1`, { waitUntil: 'load' });
+      await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
+      // 무대 준비가 끝나기 전의 클릭은 '불러오는 중' 덮개에 가로챼진다.
+      await page.waitForFunction(() => document.getElementById('stage-loading')?.hidden === true, null, { timeout: 20000 });
+      await page.locator('#discover-ask-no').click().catch(() => {});
+      await page.locator('#record-menu').click();
+      await page.locator('[data-tree-action="shelf"]').click();
+      frame = null;
+      for (let i = 0; i < 80 && !frame; i += 1) {
+        frame = page.frames().find((f) => /track32-bookshelf/.test(f.url()));
+        if (frame) break;
+        await page.waitForTimeout(250);
+      }
+      assert.ok(frame, '서재 화면이 열리지 않음');
+      await frame.waitForSelector('#shelfRail [data-book-index]', { timeout: 20000 });
+      await page.waitForTimeout(600);
+    }
+    await openShelf();
+    await fn({
+      errors,
+      getFrame: () => frame,
+      geometry: () => geometry(frame),
+      setData: async (count) => { trees = books(count); await openShelf(); },
+      setViewport: async (width, height) => { await page.setViewportSize({ width, height }); await page.waitForTimeout(600); },
+      setView: async (name) => { view = name; await frame.evaluate((n) => document.querySelector(`#shelf-view-inline [data-shelf-view="${n}"]`).click(), name); await frame.waitForTimeout(600); }
+    });
+  } finally {
+    await browser.close();
+    server.close();
+  }
+}
+
 async function withShelf(trees, { width, height, view }, fn) {
   const server = await serve();
   const origin = `http://127.0.0.1:${server.address().port}`;
@@ -211,17 +263,23 @@ test('서재 — 저장값 없으면 회전 보기가 기본이다', async (t) =
 // #1366: 기본 보기는 회전이고, 첫 책(회전은 가운데 책)의 왼쪽 끝이 화면 안에 있다.
 test('서재 — 390·844·1440 × 선반·회전 × 책 1·4·20권에서 왼쪽 잘림 0', async (t) => {
   if (skip) { if (REQUIRE) assert.fail(`화면 시험을 건너뛸 수 없습니다: ${skip}`); t.skip(skip); return; }
-  for (const width of [390, 844, 1440]) for (const name of SHELF_VIEW_NAMES) for (const count of [1, 4, 20]) {
-    await withShelf(books(count), { width, height: width === 390 ? 844 : 900 }, async ({ frame, errors }) => {
-      await frame.evaluate((n) => document.querySelector(`#shelf-view-inline [data-shelf-view="${n}"]`).click(), name);
-      await frame.waitForTimeout(600);
-      const applied = await frame.evaluate((n) => document.querySelector('#shelfViewport')?.dataset.shelfView === n, name);
-      assert.equal(applied, true, `${width} ${name}: 보기가 적용된다`);
-      const g = await geometry(frame);
-      const card = name === 'shelf' ? g.cards[0] : (g.cards.find((c) => c.center) || g.cards[0]);
-      assert.ok(card, `${width} ${name} ${count}권: 카드가 있다`);
-      assert.ok(card.left >= 0, `${width} ${name} ${count}권: 왼쪽 잘림 0 (왼쪽 끝 ${Math.round(card.left)}px)`);
-      assert.deepEqual(errors, [], `${width} ${name} ${count}권: 페이지 오류 없음`);
-    });
-  }
+  await withShelfSession(async ({ errors, getFrame, geometry, setData, setViewport, setView }) => {
+    for (const count of [1, 4, 20]) {
+      await setData(count);
+      for (const width of [390, 844, 1440]) {
+        await setViewport(width, width === 390 ? 844 : 900);
+        for (const name of SHELF_VIEW_NAMES) {
+          await setView(name);
+          const frame = getFrame();
+          const applied = await frame.evaluate((n) => document.querySelector('#shelfViewport')?.dataset.shelfView === n, name);
+          assert.equal(applied, true, `${width} ${name}: 보기가 적용된다`);
+          const g = await geometry();
+          const card = name === 'shelf' ? g.cards[0] : (g.cards.find((c) => c.center) || g.cards[0]);
+          assert.ok(card, `${width} ${name} ${count}권: 카드가 있다`);
+          assert.ok(card.left >= 0, `${width} ${name} ${count}권: 왼쪽 잘림 0 (왼쪽 끝 ${Math.round(card.left)}px)`);
+          assert.deepEqual(errors, [], `${width} ${name} ${count}권: 페이지 오류 없음`);
+        }
+      }
+    }
+  });
 });
