@@ -7,6 +7,7 @@
 // - #466 M2·2026-11-12 사고: 같은 날짜 표기를 몇 번 보내도 첫 화면은 한 번만 다시 뜬다.
 // - #379: 공개(인기) 카드를 누르면 #share/ 공유 화면으로 간다.
 // - #426·#635·#388: 추가·둘러보기 단추와 '어떻게 쓰나요' 안내 패널(이름·단추·처리방침/약관 링크·누름 영역 44px).
+// - #1487: 트리 0개 첫 화면의 덮개·추가 입구, 로그인 확인 중 서재 주소의 첫 그림.
 // LT_HOME_952_REQUIRE=1 일 때 실행(CI 화면 잡 — 건너뜀=실패).
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -1297,4 +1298,112 @@ test('#1442 title wait 400ms and slow 5s, owned empty has no example cards', {sk
    }finally{await ctx.close()}
   }
  }finally{await browser.close();await new Promise(ok=>server.close(ok));}
+});
+
+
+// #1487(2026-11-27): 트리 0개 계정의 첫 화면과, 로그인 확인 중 안쪽 화면 주소의 첫 그림.
+// - 트리 0개로 확정되면 '불러오는 중' 덮개가 걷히고, 가운데 '첫 순간 추가'·머리줄 추가(1440)·+ 단추(390)가 보인다.
+//   (덮개는 궤도 카드가 생길 때만 걷혀, 카드를 지우는 트리 0개 화면에서 영원히 남았다.)
+// - 로그인 확인 중에는 안쪽 화면 주소도 '불러오는 중'이고, 손님 안내(로그인하면 내 … 보여요)는 손님으로 확정된 뒤에만 보인다.
+async function boot1487(browser, { width, hash, workspace, hold = false }) {
+  const server = await serve({});
+  const base = 'http://127.0.0.1:' + server.address().port;
+  const ctx = await browser.newContext({ viewport: { width, height: width === 390 ? 844 : 900 }, reducedMotion: 'reduce' });
+  await ctx.addInitScript(() => {
+    try { localStorage.setItem('lt41.updatesSeen', '999.0.0'); localStorage.setItem('lt41.tips.firstTree', '1'); } catch {}
+    // 확인 중(data-lt-auth-phase=pending)에 손님 안내가 한 번이라도 보였는지 기록한다.
+    window.__lt1487 = { guestWhilePending: false };
+    setInterval(() => {
+      const empty = document.getElementById('empty');
+      if (document.documentElement.dataset.ltAuthPhase === 'pending' && empty && !empty.hidden && empty.dataset.emptyGuest === '1') window.__lt1487.guestWhilePending = true;
+    }, 25);
+  });
+  let release = () => {};
+  const held = hold ? new Promise(ok => { release = ok; }) : null;
+  await ctx.route('**/*', async (route) => {
+    const u = new URL(route.request().url());
+    if (u.origin !== base) return route.abort();
+    if (u.pathname === '/api/workspace' || u.pathname === '/api/account') {
+      if (held) await held;
+      if (!workspace) return route.fulfill({ status: 401, contentType: 'application/json', body: '{"ok":false}' }).catch(() => {});
+      if (u.pathname === '/api/account') return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, subject: workspace.subject }) }).catch(() => {});
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(workspace) }).catch(() => {});
+    }
+    if (u.pathname.startsWith('/api/')) return route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' });
+    return route.continue();
+  });
+  const page = await ctx.newPage();
+  await page.goto(base + '/v41/?account=1' + hash, { waitUntil: 'load' });
+  return { server, ctx, page, release: () => release() };
+}
+
+const visible1487 = (page, id) => page.evaluate((i) => { const e = document.getElementById(i); return !!e && !e.hidden && e.checkVisibility({ opacityProperty: true, visibilityProperty: true }); }, id);
+
+test('#1487 트리 0개 첫 화면: 불러오는 중이 걷히고 첫 순간 추가·머리줄 추가·+ 단추가 보인다(1440·390)', { skip: REQUIRE952 ? false : skip952, timeout: 180000 }, async () => {
+  if (skip952) assert.fail(skip952);
+  const browser = await chromium952.launch({ headless: true });
+  const workspace = { revision: 1, state: { version: 1, trees: [], prefs: {} }, subject: 'qa-empty-fake', writeSubjectBound: true, savedAt: '2026-11-27T00:00:00.000Z' };
+  try {
+    for (const width of [1440, 390]) {
+      // 실제 방문처럼 주소 꼬리 없이 연다(첫 화면 덮개가 이 길로 시작된다).
+      const h = await boot1487(browser, { width, hash: '', workspace });
+      try {
+        await h.page.waitForFunction(() => document.documentElement.dataset.ltAuthPhase === 'ready' && document.body.dataset.member === 'in', null, { timeout: 20000 });
+        // 가운데 트리 0개 안내가 그려질 때까지(덮개가 있어도 아래에는 그려진다).
+        const add = h.page.frameLocator('#view').locator('.center[data-lt-empty-owned] .actions [data-do="new"]');
+        await add.waitFor({ state: 'attached', timeout: 15000 });
+        // 덮개는 표시 지연(0.8초)이 지난 뒤에도 걷혀 있어야 한다(느림 안내는 10초) — 이전에는 끝까지 남아 '느리게 불러오고 있어요'가 떴다.
+        await h.page.waitForTimeout(1500);
+        const lifted = await h.page.waitForFunction(() => document.getElementById('stage-loading')?.hidden === true, null, { timeout: 6000 }).then(() => true, () => false);
+        assert.equal(lifted, true, width + ': 트리 0개로 확정된 뒤 불러오는 중 덮개가 걷힌다');
+        assert.equal(await visible1487(h.page, 'stage-loading-retry'), false, width + ': 느림 안내가 없다');
+        // 가운데 '첫 순간 추가'가 보이고, 그 자리를 셸에서 눌러도 덮개가 아니라 화면이 받는다.
+        assert.equal(await add.isVisible(), true, width + ': 가운데 첫 순간 추가 단추가 보인다');
+        const box = await add.boundingBox();
+        assert.ok(box, width + ': 첫 순간 추가 단추 위치');
+        const hit = await h.page.evaluate(({ x, y }) => { const e = document.elementFromPoint(x, y); return e ? (e.id || e.tagName) : ''; }, { x: box.x + box.width / 2, y: box.y + box.height / 2 });
+        assert.equal(hit, 'view', width + ': 첫 순간 추가 자리를 덮는 셸 요소가 없다 (' + hit + ')');
+        // 머리줄 추가(넓은 화면)·떠 있는 + 단추(휴대폰)가 첫 순간 입구로 보인다.
+        if (width === 1440) assert.equal(await visible1487(h.page, 'write-menu'), true, '1440: 머리줄 ＋ 순간 추가가 보인다');
+        else assert.equal(await visible1487(h.page, 'mobile-add'), true, '390: 떠 있는 ＋ 단추가 보인다');
+      } finally {
+        await h.ctx.close();
+        await new Promise(r => h.server.close(r));
+      }
+    }
+  } finally { await browser.close(); }
+});
+
+test('#1487 로그인 확인 중 서재 주소: 불러오는 중을 보이고, 손님 안내는 손님으로 확정된 뒤에만 보인다', { skip: REQUIRE952 ? false : skip952, timeout: 180000 }, async () => {
+  if (skip952) assert.fail(skip952);
+  const browser = await chromium952.launch({ headless: true });
+  const tree = tree952({ subject: '확인 중 시험', count: 2 });
+  const member = { revision: 1, state: { version: 1, trees: [tree], prefs: {} }, subject: 'qa-pending-fake', writeSubjectBound: true, savedAt: '2026-11-27T00:00:00.000Z' };
+  try {
+    for (const [label, workspace] of [['손님', null], ['회원', member]]) {
+      const h = await boot1487(browser, { width: 1440, hash: '#my/shelf', workspace, hold: true });
+      try {
+        // 계정 확인 응답을 붙잡은 채 1.5초(덮개 표시 지연 0.8초보다 길게) 본다.
+        await h.page.waitForTimeout(1500);
+        assert.equal(await h.page.evaluate(() => document.documentElement.dataset.ltAuthPhase), 'pending', label + ': 아직 확인 중');
+        assert.equal(await visible1487(h.page, 'stage-loading'), true, label + ': 확인 중에는 불러오는 중 덮개가 보인다');
+        assert.equal(await visible1487(h.page, 'empty'), false, label + ': 확인 중에는 빈 상태 안내를 보이지 않는다');
+        h.release();
+        await h.page.waitForFunction(() => document.documentElement.dataset.ltAuthPhase === 'ready', null, { timeout: 20000 });
+        if (!workspace) {
+          await h.page.waitForFunction(() => { const e = document.getElementById('empty'); return e && !e.hidden && e.dataset.emptyGuest === '1'; }, null, { timeout: 10000 });
+          await h.page.waitForFunction(() => document.getElementById('stage-loading')?.hidden === true, null, { timeout: 5000 });
+        } else {
+          await h.page.waitForFunction(() => { const f = document.getElementById('view'); try { return !f.hidden && f.contentWindow.location.pathname.endsWith('/track32-bookshelf.html'); } catch { return false; } }, null, { timeout: 20000 });
+          assert.equal(await visible1487(h.page, 'empty'), false, '회원: 서재가 열리면 빈 상태 안내가 없다');
+          const lifted = await h.page.waitForFunction(() => document.getElementById('stage-loading')?.hidden === true, null, { timeout: 5000 }).then(() => true, () => false);
+          assert.equal(lifted, true, '회원: 서재가 열리면 불러오는 중 덮개가 걷힌다');
+        }
+        assert.equal(await h.page.evaluate(() => window.__lt1487.guestWhilePending), false, label + ': 확인 중에 손님 안내가 한 번도 보이지 않았다');
+      } finally {
+        await h.ctx.close();
+        await new Promise(r => h.server.close(r));
+      }
+    }
+  } finally { await browser.close(); }
 });
