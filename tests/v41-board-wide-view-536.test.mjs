@@ -444,3 +444,65 @@ test('#1359 넓은 보드와 지도, 최근 순간 및 휴대폰 회귀', {skip:
     }
   } finally {await browser.close();server.close();}
 });
+
+test('#1430 wide garden summary panel is visible with readable text', {skip: REQUIRE ? false : skip, timeout: 180000}, async () => {
+  if (skip) assert.fail(String(skip));
+  const server = await serve();
+  const base = 'http://127.0.0.1:' + server.address().port;
+  const browser = await chromium.launch({headless:true});
+  const rgb = value => {
+    const match = String(value).match(/rgba?\(([^)]+)\)/);
+    return match ? match[1].split(/[,\s]+/).map(Number) : null;
+  };
+  const lum = values => values.slice(0,3).map(v => {
+    const x = v / 255;
+    return x <= .04045 ? x / 12.92 : ((x + .055) / 1.055) ** 2.4;
+  }).reduce((acc,v,i) => acc + v * [.2126,.7152,.0722][i],0);
+  const ratio = (a,b) => (Math.max(lum(a),lum(b)) + .05) / (Math.min(lum(a),lum(b)) + .05);
+  try {
+    for (const width of [1440,1920,2560]) for (const theme of ['night','garden']) {
+      const context = await browser.newContext({viewport:{width,height:1080},reducedMotion:'reduce'});
+      try {
+        await context.addInitScript(({tree,theme}) => {
+          localStorage.setItem('lt41.theme',theme);
+          globalThis.LT41={tree,source:'example',writable:false,momentId:tree.moments[0].id,prefs:{}};
+        },{tree:chainTree(5),theme});
+        const page = await context.newPage();
+        await page.goto(base + '/v41/views/track58-pinboard.html',{waitUntil:'load'});
+        await page.waitForSelector('.lt1359-info h2',{state:'visible'});
+        const m = await page.evaluate(() => {
+          const panel=document.querySelector('.lt1359-info');
+          const computed=element=>getComputedStyle(element);
+          const style=computed(panel);
+          const heading=panel.querySelector('h2');
+          const button=panel.querySelector('button');
+          const next=panel.querySelector('.lt1359-next');
+          const marker=document.createElement('div');
+          marker.style.background='var(--lt-role-bg)';
+          panel.append(marker);
+          const surrounding=computed(marker).backgroundColor;
+          marker.remove();
+          return {theme:document.documentElement.dataset.ltTheme,
+            count:document.querySelectorAll('.lt1359-info').length,
+            visible:style.visibility==='visible' && style.display!=='none',
+            panel:style.backgroundColor,border:style.borderColor,surrounding,
+            heading:computed(heading).color,body:computed(panel.querySelector('p')).color,
+            next:computed(next).color,button:computed(button).color,
+            buttonBg:computed(button).backgroundColor};
+        });
+        assert.equal(m.count,1);
+        assert.ok(m.visible,width+' '+theme+' visible summary');
+        const bg=rgb(m.panel),buttonBg=rgb(m.buttonBg);
+        for(const key of ['heading','body','next']) {
+          assert.ok(ratio(rgb(m[key]),bg)>=4.5,width+' '+theme+' '+key+' contrast '+ratio(rgb(m[key]),bg));
+        }
+        const btnBg=buttonBg[3]===0?bg:buttonBg;
+        assert.ok(ratio(rgb(m.button),btnBg)>=4.5,width+' '+theme+' button contrast '+ratio(rgb(m.button),btnBg));
+        if(theme==='garden') {
+          assert.ok(ratio(bg,rgb(m.surrounding))>=2,width+' garden panel distinct from board');
+          assert.ok(ratio(bg,rgb(m.border))>=2,width+' garden border distinct from panel');
+        }
+      }finally{await context.close();}
+    }
+  }finally{await browser.close();server.close();}
+});
