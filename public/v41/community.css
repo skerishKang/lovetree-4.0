@@ -444,3 +444,110 @@ html[data-lt-theme=garden] .moments-comments-dialog{background:var(--lt-paper);c
 /* #1356: 범위 칩 줄만큼 무대 높이에서 뺀다 — 기존 조작 단추가 화면 밖으로 밀리지 않게 한다. */
 #community-moments-panel .moments-stage{height:min(calc(100dvh - 230px),740px)}
 @media(max-width:780px){#community-moments-panel .moments-stage{height:calc(100dvh - 94px - env(safe-area-inset-bottom))}}
+
+
+/* #1441: 트리·순간 보기 전환은 두 보기에서 같은 행·같은 크기로 고정한다. */
+#community-panel .community-top-row,
+#community-panel .community-top-row.is-moments,
+#community-panel:has(#community-tab-moments[aria-selected="true"]) .community-top-row{
+ width:100%;max-width:1500px;min-width:0;margin:0 auto 12px;padding:0;justify-content:flex-start;
+}
+#community-panel .community-top-row .community-tabs,
+#community-panel .community-top-row.is-moments .community-tabs,
+#community-panel:has(#community-tab-moments[aria-selected="true"]) .community-top-row .community-tabs{
+ flex:0 0 auto;width:auto;height:48px;margin:0;position:static;
+}
+#community-panel .community-top-row.is-moments{pointer-events:auto}
+#community-panel .community-top-row.is-moments .moments-toolbar{margin-left:0}
+#community-panel .community-top-row .moments-scope-control{
+ position:relative;display:none;align-items:center;gap:5px;min-width:0;margin-left:auto;z-index:32;
+}
+#community-panel .community-top-row.is-moments .moments-scope-control{display:flex}
+#community-panel .moments-scope-trigger,
+#community-panel .moments-scope-reset{
+ min-height:44px;padding:0 12px;border:1px solid var(--lt-role-secondary-border);
+ border-radius:var(--lt-r-pill);background:var(--lt-role-secondary-bg);
+ color:var(--lt-role-secondary-ink);font:inherit;font-size:13px;cursor:pointer;white-space:nowrap;
+}
+#community-panel .moments-scope-reset{min-width:44px;padding:0;font-size:21px}
+#community-panel .moments-scope-summary{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--lt-role-text-strong);font-size:13px}
+#community-panel .moments-scope-menu{
+ position:absolute;top:calc(100% + 4px);right:0;z-index:50;
+ display:grid;gap:4px;min-width:174px;padding:6px;
+ border:1px solid var(--lt-role-input-border);border-radius:var(--lt-r-card);
+ background:var(--lt-role-input-bg);box-shadow:var(--lt-garden-shadow);
+}
+#community-panel .moments-scope-menu[hidden],#community-panel .moments-scope-summary[hidden],#community-panel .moments-scope-reset[hidden]{display:none}
+#community-panel .moments-scope-chip{
+ display:block;width:100%;min-height:44px;text-align:left;border-radius:var(--lt-r-card);
+ padding:8px 12px;color:var(--lt-role-input-ink);
+}
+#community-panel .moments-scope-chip[hidden]{display:none}
+#community-panel .moments-tree-picker{
+ position:absolute;z-index:52;inset:62px 12px auto auto;width:min(420px,calc(100vw - 24px));max-height:min(70dvh,620px);
+ overflow:auto;display:flex;flex-direction:column;gap:8px;padding:14px;
+ border:1px solid var(--lt-role-input-border);border-radius:var(--lt-r-card);
+ background:var(--lt-role-input-bg);box-shadow:var(--lt-garden-shadow);
+}
+#community-panel .moments-tree-picker[hidden],#community-panel .moments-owner-menu[hidden]{display:none}
+#community-panel .moments-tree-picker-close{align-self:flex-end;width:44px;min-height:44px;border:0;background:none;color:var(--lt-role-input-ink)}
+#community-panel .moments-tree-picker-search{width:100%;min-height:44px;border:1px solid var(--lt-role-input-border);border-radius:var(--lt-r-card);background:var(--lt-role-input-bg);color:var(--lt-role-input-ink);padding:8px}
+#community-panel .moments-tree-picker-options{display:grid;gap:5px}
+#community-panel .moments-tree-picker-option,
+#community-panel .moments-owner-only{min-height:44px;padding:8px 12px;text-align:left;border:1px solid var(--lt-role-secondary-border);border-radius:var(--lt-r-card);background:var(--lt-role-secondary-bg);color:var(--lt-role-secondary-ink)}
+#community-panel .moments-tree-owner{border:0;background:none;color:inherit;font:inherit;cursor:pointer}
+#community-panel .moments-owner-menu{position:relative;z-index:6;display:block;max-width:100%;padding:4px;border:1px solid var(--lt-role-input-border);border-radius:var(--lt-r-card);background:var(--lt-role-input-bg)}
+#community-moments-panel .moments-stage{grid-template-columns:minmax(180px,250px) minmax(260px,420px) 72px;max-width:1150px}
+#community-moments-panel .moments-rail{grid-column:3;grid-row:1;display:flex;align-self:center;gap:3px;align-items:center;justify-content:center}
+#community-moments-panel .moments-rail .moments-step{flex:none;display:grid;place-items:center;width:48px;height:44px;min-height:44px;border:1px solid var(--lt-role-secondary-border);background:var(--lt-role-secondary-bg);color:var(--lt-role-secondary-ink)}
+#community-moments-panel .moments-rail-button.is-sound{order:-1}
+#community-moments-panel .moments-stage.moments-info-open .moments-rail{display:flex}
+#community-panel .moments-toolbar .moments-info-button{display:none}
+#community-panel .moments-toolbar .moments-close-button{min-width:44px;width:44px}
+#community-moments-panel .moments-stage{height:min(calc(100dvh - 184px),740px)}
+@media(max-width:780px){
+ #community-panel:has(#community-tab-moments[aria-selected="true"]) .community-top-row{padding:0 6px}
+ #community-panel .community-top-row .community-tabs button{min-width:49px;padding:0 9px}
+ #community-panel .moments-scope-trigger{max-width:132px;overflow:hidden;text-overflow:ellipsis;padding:0 8px}
+ #community-panel .moments-scope-summary{max-width:86px;font-size:11px}
+ #community-panel .moments-toolbar .moments-close-button{width:44px}
+ #community-moments-panel .moments-stage{height:calc(100dvh - 48px - env(safe-area-inset-bottom));grid-template-columns:minmax(0,1fr) 70px}
+ #community-moments-panel .moments-rail,
+ #community-moments-panel .moments-stage.moments-info-open .moments-rail{
+  position:absolute;right:12px;top:50%;bottom:auto;transform:translateY(-50%);
+  z-index:8;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:2px;max-height:calc(100% - 40px);overflow-y:auto;padding:2px;
+  border:0;background:transparent;
+ }
+ #community-moments-panel .moments-rail-button{flex:0 0 46px;display:flex;align-items:center;justify-content:center;gap:1px;width:46px;min-width:46px;height:46px;min-height:46px;border-radius:var(--lt-r-pill);background:var(--lt-role-secondary-bg);color:var(--lt-role-secondary-ink)}
+ #community-moments-panel .moments-rail-label{display:none}
+ #community-moments-panel .moments-rail .moments-step{display:none}
+ #community-moments-panel .moments-stage.moments-info-open .moments-card{grid-area:1/1/2/3}
+}
+
+/* #1441: 휴대폰에서 정보 판을 닫아도 카드 위 트리 주인 입구를 보여 준다. */
+#community-moments-panel .moments-card-tree{display:none}
+#community-moments-panel .moments-owner-menu{
+ position:absolute;left:12px;top:56px;max-width:min(270px,calc(100% - 24px));z-index:20;
+ background:var(--lt-role-input-bg);color:var(--lt-role-input-ink);
+}
+@media(max-width:780px){
+ #community-moments-panel .moments-card-tree{
+  position:absolute;z-index:6;display:block;left:12px;top:12px;max-width:calc(100% - 82px);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-height:44px;padding:0 10px;
+  border:1px solid var(--lt-role-secondary-border);border-radius:var(--lt-r-pill);
+  background:var(--lt-role-secondary-bg);color:var(--lt-role-secondary-ink);font:inherit;font-size:12px;
+ }
+}
+
+#community-panel .moments-scope-chip.is-active{color:var(--lt-role-accent-ink)}
+
+@media(max-width:780px){
+ #community-panel .community-top-row.is-moments{transform:translateY(99px)}
+ #community-panel .community-top-row .community-tabs button{flex:0 0 52px;width:52px;min-width:52px;box-sizing:border-box}
+ #community-moments-panel{margin-top:99px}
+ #community-moments-panel .moments-stage{height:calc(100dvh - 147px - env(safe-area-inset-bottom))}
+}
+
+#community-panel .community-top-row.is-moments .moments-toolbar{order:3;margin-left:0}
+#community-panel .community-top-row.is-moments .moments-scope-control{order:2;margin-left:auto}
