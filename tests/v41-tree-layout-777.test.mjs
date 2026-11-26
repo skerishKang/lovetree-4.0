@@ -9,6 +9,7 @@ import {
   branchWidth, edgeWidths, branchPoints, branchRibbon
 } from '../public/v41/lab/tree-layout.mjs';
 import { DATASETS, EMOTIONS, dataset } from '../public/v41/lab/tree-sketch-data.mjs';
+import { createTreePathPlayer } from '../public/v41/lab/tree-path-play.mjs';
 import { EMOTIONS as APP_EMOTIONS } from '../public/v41/domain.mjs';
 
 const EPS = 1e-6;
@@ -438,4 +439,64 @@ test('#777 가지는 자기 띠 안에서만 휘고, 부모·자식이 아닌 �
     }
   });
   assert.ok(checked > 50000);
+});
+
+/* ── 경로 재생: 배치와 무관한 경로 추적·접근성 ─────────────────────────── */
+
+test('#777 경로 재생은 10·40·120개의 뿌리~선택 순간 연결을 정확히 그린다', () => {
+  // SVG가 필요한 부분만 대역으로 두고 실제 레이아웃 객체를 그대로 통과시킨다.
+  const oldDocument = globalThis.document;
+  const oldTimeout = globalThis.setTimeout;
+  try {
+    const paths = [];
+    const makeControl = () => ({
+      textContent: '', disabled: false, listeners: new Map(),
+      setAttribute() {},
+      addEventListener(name, fn) { this.listeners.set(name, fn); },
+      click() { this.listeners.get('click')(); }
+    });
+    globalThis.document = { createElementNS(_ns, tag) {
+      assert.equal(tag, 'path');
+      const p = { style: {}, attrs: {}, setAttribute(k, v) { this.attrs[k] = v; }, getTotalLength() { return 100; } };
+      paths.push(p);
+      return p;
+    } };
+    globalThis.setTimeout = () => 0;
+    const layer = { nodes: [], append(p) { this.nodes.push(p); }, replaceChildren(...nodes) { this.nodes = nodes; } };
+    const controls = { play: makeControl(), replay: makeControl(), speed: makeControl() };
+    const cards = { children: [] };
+    let last;
+    const player = createTreePathPlayer({
+      layer, cards, controls, isReduced: () => true, onState: (data) => { last = data; }
+    });
+    for (const count of COUNTS) {
+      const root = buildHierarchy(dataset(count));
+      const expanded = allFoldable(root);
+      const layout = layoutTree(root, { expanded, sizeOf: SIZES.wide, bandPad: 22 });
+      const target = layout.cards.filter((c) => c.kind === 'moment').at(-1);
+      const parents = new Map(layout.cards.map((c) => [c.id, c.parentId]));
+      let depth = 0;
+      for (let id = target.id; parents.get(id); id = parents.get(id)) depth++;
+      player.configure(layout, target.id, STYLES[1].curve);
+      assert.equal(last.count, depth, '뿌리부터 선택 순간까지의 가지 수');
+      controls.play.click();
+      assert.equal(last.status, 'done');
+      assert.equal(last.metrics.finished, true);
+      assert.equal(layer.nodes.length, depth);
+      assert.ok(layer.nodes.every((path) => path.attrs.d?.startsWith('M') && path.style.strokeWidth === '5.5px'));
+      controls.speed.click();
+      assert.equal(last.speed, 1.25);
+      controls.speed.click();
+      assert.equal(last.speed, 1.5);
+      controls.speed.click();
+      assert.equal(last.speed, 1);
+      controls.replay.click();
+      assert.equal(last.status, 'done');
+      assert.equal(layer.nodes.length, depth);
+    }
+    assert.ok(paths.length > 0);
+  } finally {
+    globalThis.document = oldDocument;
+    globalThis.setTimeout = oldTimeout;
+  }
 });
