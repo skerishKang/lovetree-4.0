@@ -1431,3 +1431,22 @@ body.lt-header-visitor #toast[data-visitor-intro]{display:none}
  .app-header .header-actions>#write-menu{flex:0 0 122px;width:122px}
 }
 @media(min-width:781px) and (max-width:1020px){.app-header{--lt-head-items:8px}}
+
+/* ?? #1350: ??? ??? ?? ?? ?? ??? 122px ?? ?? ??? CLS? ???. */
+@media(min-width:781px){
+ html[data-lt-auth-phase=pending][data-lt-auth-hint=in] .app-header .header-actions{
+  display:grid;grid-template-columns:44px 122px 80px;column-gap:var(--lt-head-items)
+ }
+}
+
+/* #1447: visitor small-screen nav shows the current view and the browse return. */
+@media(max-width:780px){
+ body.lt-header-visitor .app-header .main-nav{display:flex;flex:1 1 0;min-width:0;overflow:hidden}
+ body.lt-header-visitor .app-header .main-nav .tree-frame{display:flex;flex:0 0 auto;min-width:0;order:0}
+ body.lt-header-visitor .app-header .tree-frame .tree-views{display:flex;gap:0;min-height:44px}
+ body.lt-header-visitor .app-header .tree-frame .tree-views>button:not([aria-current=true]){display:none}
+ body.lt-header-visitor .app-header .tree-frame .tree-views>button[aria-current=true]{display:flex;align-items:center;justify-content:center;min-width:44px;padding:0 6px}
+ body.lt-header-visitor .app-header .main-nav>#community-menu{display:inline-flex;order:1;padding-inline:5px;min-width:0;margin-left:var(--lt-head-items)}
+ body.lt-header-visitor #community-menu .community-menu-label{font-size:11px}
+}
+.lt-toolbar-picker .tree-cover{width:36px;height:36px;flex-basis:36px;border-radius:var(--lt-r-card);box-shadow:none}

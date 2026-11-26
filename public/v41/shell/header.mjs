@@ -36,10 +36,8 @@ function renderHeaderLayout({publicReading, owned, parts, current, tree}) {
     b.hidden=hidden;
     b.inert=hidden;
     b.toggleAttribute('aria-hidden',hidden);
-    // ?? ????? ?? ?? ?? ????? ????.
     if(publicReading)b.setAttribute('aria-current',String(!hidden && b.dataset.view===viewing));
   }
-  // ?? ? ??? ? ?? ???? ?? ?? ?? ?? ????.
   let label=document.getElementById('lt-visitor-caption');
   if(!label) {
     label=document.createElement('div');
@@ -49,9 +47,9 @@ function renderHeaderLayout({publicReading, owned, parts, current, tree}) {
   }
   label.hidden=!publicReading;
   if(publicReading) {
-    const name=String(tree?.title||window.LT41?.tree?.title||'??').trim();
+    const name=String(tree?.title||window.LT41?.tree?.title||'트리').trim();
     const owner=String(tree?.ownerName||tree?.owner?.name||'').trim();
-    label.textContent=owner?`${owner}?? ?? '${name}' ?? ?`:`?? ?? '${name}' ?? ?`;
+    label.textContent=owner?`${owner}님의 트리 '${name}' 감상 중`:`공개 트리 '${name}' 감상 중`;
   }
 }
 

@@ -64,7 +64,7 @@ function prepareTreeChoice(bar, screen, title, titleFrom) {
   title.hidden = true;
   const refresh = () => {
     const current = source()?.tree;
-    const value = String((screen === 'shelf' ? current?.title : titleFrom?.textContent || current?.title) || '\uD2B8\uB9AC').trim() || '\uD2B8\uB9AC';
+    const value = String(current?.title || current?.subject || titleFrom?.textContent || '\uD2B8\uB9AC').trim() || '\uD2B8\uB9AC';
     name.textContent = value;
     if (!own) return;
     const initial = Array.from(value)[0] || '\uD2B8';
