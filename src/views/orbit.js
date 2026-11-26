@@ -83,7 +83,10 @@ extraCSS+=`.card.lt-under-link{opacity:0}\n.card .surface .lt-orbit-texture{posi
 
 // #1204: opacity/transform only; existing layout boxes are allocated before paint.
 extraCSS+=`@keyframes lt-home-rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+@keyframes lt-home-fade{from{opacity:0}to{opacity:1}}
 .center .lt-home-line{display:block}.center .lt-home-enter{animation:lt-home-rise 460ms cubic-bezier(.2,.7,.2,1) both;animation-delay:calc(var(--lt-home-order)*100ms)}
+/* 단추 묶음은 변형 없이 페이드해 44px 누름 높이가 애니메이션 중에도 유지된다. */
+.center .actions.lt-home-enter{animation-name:lt-home-fade}
 @media(prefers-reduced-motion:reduce){.center .lt-home-enter{animation:none;opacity:1;transform:none}}
 .card.lt-first-frame{visibility:hidden}
 .center[data-lt-home-wait] .lt-home-enter{animation-play-state:paused;opacity:0}
