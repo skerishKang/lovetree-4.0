@@ -49,9 +49,10 @@ test('#1069 화면 잡의 Playwright 버전은 잠금 파일에서 읽는다', (
   assert.ok(!/1\.49\.1/.test(workflow), '옛 하드코딩 버전이 남아 있지 않다');
   assert.ok(workflow.includes("hashFiles('package-lock.json')"), '캐시 키가 잠금 파일에서 유도된다');
   const installs = workflow.match(/playwright@\$\(node -p "require\('\.\/package-lock\.json'\)\.packages\['node_modules\/playwright'\]\.version"\)/g) || [];
-  // #1413: 셸 화면 잡을 둘로 나누고(3단계) 지도 대비 잡에서 서재·날짜 잡을 떼어 내(4단계) Playwright 설치 구간은 15곳이다.
+  // #1413: 셸 화면 잡을 둘로 나누고(3단계) 지도 대비 잡에서 서재·날짜 잡을 떼어 내(4단계) 보드 잡을 둘로 나눠(5단계)
+  // Playwright 설치 구간은 16곳이다.
   // 밤 측정 쪽도 같은 규칙을 지킨다.
-  assert.equal(installs.length, 15, `PR 화면 잡 15곳이 모두 잠금 파일 버전을 쓴다(실측 ${installs.length})`);
+  assert.equal(installs.length, 16, `PR 화면 잡 16곳이 모두 잠금 파일 버전을 쓴다(실측 ${installs.length})`);
   const nightly = readFileSync(new URL('../.github/workflows/nightly-screen-perf.yml', import.meta.url), 'utf8');
   assert.ok(!/playwright@\d/.test(nightly) && nightly.includes("hashFiles('package-lock.json')"), '밤 측정도 하드코딩 버전 없이 잠금 파일을 쓴다');
   const actual = execFileSync(process.execPath, ['-p', "require('./package-lock.json').packages['node_modules/playwright'].version"], { cwd: new URL('..', import.meta.url), encoding: 'utf8' }).trim();
@@ -100,7 +101,7 @@ test('화면 잡 고르기: 보드만 바뀌면 보드 잡, 공용 파일이 섞
   assert.equal(selectJobs(['public/v41/views/board/board.js', 'public/v41/views/track58-pinboard.html'], jobs, screen, helpers), 'screen-board');
   assert.equal(selectJobs(['tests/v41-board-pinboard-582.test.mjs', 'docs/a.md', 'server/x.js'], jobs, screen, helpers), 'screen-board', '화면 밖 파일은 고르기에 영향이 없다');
   assert.equal(selectJobs(['tests/v41-book-single-537.test.mjs'], jobs, screen, helpers), 'screen-book');
-  assert.equal(selectJobs(['tests/v41-explore-moments-1025.test.mjs'], jobs, screen, helpers), 'screen-home');
+  assert.equal(selectJobs(['tests/v41-explore-moments-1025.test.mjs'], jobs, screen, helpers), 'screen-reload', '#1413 5단계: 둘러보기 순간 보기 시험은 저장 재적재 잡이 돈다');
   assert.equal(selectJobs(['tests/v41-home-screen-952.test.mjs'], jobs, screen, helpers), 'screen-home');
   assert.equal(selectJobs(['tests/v41-account-settings.test.mjs'], jobs, screen, helpers), 'screen-shell-extra', '분리된 셸 설정 시험만 바뀌면 새 잡을 고른다');
   assert.equal(selectJobs(['tests/v41-970-cleanup-fab.test.mjs'], jobs, screen, helpers), 'screen-shell', '원래 셸 시험은 기존 잡을 고른다');
@@ -119,9 +120,10 @@ test('서재·날짜 잡 떼어 내기: 시험 위치·고르기·모음 잡', a
   const shelf = 'tests/v41-970-shelf-date.test.mjs';
   assert.ok(jobs['screen-shelf'].has(shelf), '서재·날짜 시험은 새 잡이 돌린다');
   assert.ok(!jobs['screen-map-a'].has(shelf), '지도 대비 잡에는 서재·날짜 시험이 없다');
-  assert.deepEqual([...jobs['screen-map-a']].sort(), ['tests/v41-map-contrast.test.mjs', 'tests/v41-map-fan-open.test.mjs'], '지도 대비 잡에는 지도 시험만 남는다');
+  assert.deepEqual([...jobs['screen-map-a']].sort(), ['tests/v41-community-chips-784.test.mjs', 'tests/v41-header-ia.test.mjs', 'tests/v41-map-contrast.test.mjs', 'tests/v41-map-fan-open.test.mjs'], '지도 대비 잡에는 지도 시험과 칩·머리줄 시험만 있다');
+  // #1413 5단계: 칩·머리줄 시험은 공통 검사기 a에서 지도 대비 잡으로 되돌렸다(지도 바뀜과 무관하게 돈다).
   for (const f of ['tests/v41-community-chips-784.test.mjs', 'tests/v41-header-ia.test.mjs']) {
-    assert.ok(jobs['screen-audit-a'].has(f), `${f}는 공통 검사기 a가 돌린다`);
+    assert.ok(jobs['screen-map-a'].has(f), `${f}는 지도 대비 잡이 돌린다`);
     assert.equal(Object.entries(jobs).filter(([, files]) => files.has(f)).length, 1, `${f}는 한 잡에서만 돈다`);
   }
   assert.ok(helpers.has('tests/helpers/screen-audit.mjs') && screen.has(shelf), '새 잡의 시험과 helpers가 화면 판정에 들어간다');
@@ -166,4 +168,73 @@ test('결과 모으기: 고르지 않은 화면 잡의 건너뜀만 통과', asy
   assert.equal(shelfPickedSkipped.ok, false, '서재·날짜 잡을 골랐는데 건너뛰면 실패');
   const shelfNotPicked = checkScreenResults({ 'screen-changes': gate('none'), 'screen-map-a': { result: 'success' }, 'screen-shelf': { result: 'skipped' }, deploy: { result: 'success' } });
   assert.equal(shelfNotPicked.ok, true, '고르지 않은 서재·날짜 잡의 건너뜀은 통과');
+});
+
+// #1413 5단계: 필수 검사의 가장 긴 길이던 보드·첫 화면·첫 화면 후속·책·감상·공통 검사기 c 잡의 시험 단계를 짧은 잡으로
+// 옮기고 보드 잡을 둘로 나눴다. 시험은 하나도 빼지 않았고, 옮긴 시험은 한 잡에서만 돈다.
+test('#1413 5단계: 옮긴 시험 위치·보드 둘째 잡 고르기·공통 검사기 나눔·겉모습 캡처 동시', async () => {
+  const { selectJobs, jobTestFiles, screenTestFiles, helperFiles, JOB_TOKEN, tokenOf } = await import('../tools/ci/screen-changes.mjs');
+  const { checkScreenResults } = await import('../tools/ci/screen-results.mjs');
+  const tests = screenTestFiles();
+  const screen = new Set(tests), helpers = new Set(helperFiles(tests)), jobs = jobTestFiles();
+  const moved = {
+    'screen-board-b': ['tests/v41-a11y-514-remaining.test.mjs', 'tests/v41-local-date-547.test.mjs', 'tests/v41-tree-layout-777.test.mjs',
+      'tests/v41-932-937-board-legend.test.mjs', 'tests/v41-bottom-links-850.test.mjs', 'tests/v41-a11y-views.test.mjs', 'tests/v41-orbit-535-float-overlap.test.mjs'],
+    'screen-reload': ['tests/v41-explore-moments-1025.test.mjs', 'tests/v41-1286-moments.test.mjs', 'tests/v41-explore-sort-search-1363.test.mjs'],
+    'screen-book-screen': ['tests/v41-share-guest-635.test.mjs', 'tests/v41-book-long-note.test.mjs'],
+  };
+  for (const [job, files] of Object.entries(moved)) for (const f of files) {
+    const owners = Object.entries(jobs).filter(([, set]) => set.has(f)).map(([name]) => name);
+    assert.deepEqual(owners, [job], `${f}는 ${job} 한 잡에서만 돈다(실제 ${owners.join(',')})`);
+  }
+  // 보드 둘째 잡은 보드 잡과 같은 고르기 이름을 쓴다 — 보드만 바뀐 PR에서도, 옮긴 시험만 바뀐 PR에서도 두 잡이 함께 돈다.
+  assert.equal(JOB_TOKEN['screen-board-b'], 'screen-board');
+  assert.equal(tokenOf('screen-board'), 'screen-board');
+  assert.equal(selectJobs(['public/v41/views/board/board.js'], jobs, screen, helpers), 'screen-board');
+  assert.equal(selectJobs(['tests/v41-orbit-535-float-overlap.test.mjs'], jobs, screen, helpers), 'screen-board', '#535 시험만 바뀌면 보드 둘째 잡이 골린다');
+  assert.equal(selectJobs(['tests/v41-share-guest-635.test.mjs'], jobs, screen, helpers), 'screen-book-screen');
+  assert.equal(selectJobs(['tests/v41-1284-home.test.mjs'], jobs, screen, helpers), 'screen-home', '첫 화면 휴대폰 시험만 바뀌면 그 잡(첫 화면 이름)이 골린다');
+  const workflow = readFileSync(new URL('../.github/workflows/preview-check.yml', import.meta.url), 'utf8');
+  const jobBody = (key) => { const s = workflow.indexOf(`\n  ${key}:\n`); const rest = workflow.slice(s + 1); const m = rest.slice(3).search(/\n  [a-z0-9-]+:\n/); return m < 0 ? rest : rest.slice(0, m + 3); };
+  const header = (body) => body.slice(0, body.indexOf('\n    steps:'));
+  const board = jobBody('screen-board'), boardB = jobBody('screen-board-b');
+  assert.equal(header(boardB).match(/runs-on: .*/)[0], header(board).match(/runs-on: .*/)[0], '보드 둘째 잡은 보드 잡과 같은 실행기 선택식을 쓴다');
+  assert.match(header(boardB), /contains\(format\(',\{0\},', needs\.screen-changes\.outputs\.jobs\), ',screen-board,'\)/, '보드 둘째 잡은 screen-board가 골릴 때 돈다');
+  for (const [job, token] of Object.entries(JOB_TOKEN)) {
+    assert.ok(header(jobBody(job)).includes(`',${token},'`), `${job}의 if는 고르기 이름 ${token}을 본다`);
+  }
+  const needs = workflow.slice(workflow.indexOf('  preview:')).match(/needs: \[([^\]]+)\]/)[1].split(',').map((s) => s.trim());
+  assert.ok(needs.includes('screen-board-b'), '보드 둘째 잡이 모음 잡 needs에 있다');
+  assert.ok(!needs.includes('visual'), '겉모습 비교(알림용)는 필수 검사가 기다리지 않는다');
+  // 모음 잡: 보드 둘째 잡도 실패·취소는 실패, 고른 이름에서 건너뛰면 실패, 고르지 않았을 때만 건너뜀 통과.
+  const gate = (j) => ({ result: 'success', outputs: { changed: 'true', jobs: j } });
+  assert.equal(checkScreenResults({ 'screen-changes': gate('all'), 'screen-board-b': { result: 'failure' }, deploy: { result: 'success' } }).ok, false);
+  assert.equal(checkScreenResults({ 'screen-changes': gate('screen-board'), 'screen-board-b': { result: 'skipped' }, deploy: { result: 'success' } }).ok, false, '보드를 골랐는데 보드 둘째가 건너뛰면 실패');
+  assert.equal(checkScreenResults({ 'screen-changes': gate('screen-home'), 'screen-board-b': { result: 'skipped' }, deploy: { result: 'success' } }).ok, true, '보드를 고르지 않았으면 건너뜀 통과');
+  // 공통 검사기: a는 이름 거르기 없이 파일 전부(새 시험도 여기서 돈다), b·c는 #657 두 시험만 각자 조합으로 돈다.
+  const audit = {};
+  for (const s of ['a', 'b', 'c']) {
+    const runs = jobBody(`screen-audit-${s}`).match(/LT_SCREEN_AUDIT_SHARD=\w .*tests\/v41-screen-audit\.test\.mjs/g) || [];
+    assert.equal(runs.length, 1, `공통 검사기 ${s}는 검사 파일을 한 번 돈다`);
+    assert.ok(runs[0].startsWith(`LT_SCREEN_AUDIT_SHARD=${s} `), `공통 검사기 ${s}는 자기 조합을 고른다`);
+    audit[s] = runs[0];
+  }
+  // a는 '#657 후속'만 빼고 전부(새 시험도 a), b는 #657 두 시험만, c는 #657 두 시험과 '#657 후속'. 셋을 합치면 파일 전부다.
+  assert.equal((audit.a.match(/--test-(name|skip)-pattern='[^']*'/g) || []).join(' '), "--test-skip-pattern='^#657 후속'", 'a는 #657 후속만 뺀다');
+  assert.equal((audit.b.match(/--test-(name|skip)-pattern='[^']*'/g) || []).join(' '), "--test-name-pattern='^#657 화면 공통 검사기'", 'b는 #657 두 시험만 돈다');
+  assert.equal((audit.c.match(/--test-(name|skip)-pattern='[^']*'/g) || []).join(' '), "--test-name-pattern='^#657 화면 공통 검사기' --test-name-pattern='^#657 후속'", 'c는 #657 두 시험과 #657 후속을 돈다');
+  const auditSrc = readFileSync(new URL('./v41-screen-audit.test.mjs', import.meta.url), 'utf8');
+  const auditNames = [...auditSrc.matchAll(/^test\('([^']+)'/gm)].map((m) => m[1]);
+  const shardTests = auditNames.filter((n) => /^#657 화면 공통 검사기/.test(n));
+  assert.equal(shardTests.length, 2, '#657 거르기에 걸리는 시험은 조합을 나눠 도는 두 시험뿐이다');
+  const followTests = auditNames.filter((n) => /^#657 후속/.test(n));
+  assert.ok(followTests.length >= 1 && followTests.every((n) => !/^#657 화면 공통 검사기/.test(n)), 'c로 넘긴 #657 후속 시험이 있고 두 거르기는 겹치지 않는다');
+  assert.ok(auditSrc.includes('process.env.LT_SCREEN_AUDIT_SHARD'), '두 시험은 shard 환경값으로 조합을 고른다');
+  // 겉모습 비교(알림용): deploy 하나만 기다리고, before·after 캡처를 한 단계에서 동시에 찍은 뒤 둘 다 기다린다.
+  const visual = jobBody('visual');
+  assert.match(header(visual), /\n    needs: deploy\n/, '알림용 잡은 deploy만 기다린다');
+  assert.match(visual, /shoot before "\$BEFORE_BASE" visual-before & p1=\$!\n\s+shoot after "\$AFTER_BASE" visual-after & p2=\$!\n\s+wait \$p1; wait \$p2/, 'before·after를 동시에 찍고 둘 다 기다린다');
+  assert.match(visual, /timeout -k 15 420 node tools\/visual-baseline\/visual-baseline\.mjs capture/, '캡처 명령 상한 7분은 그대로다');
+  assert.ok(!/capture-(before|after)/.test(visual), '옛 단계 출력 이름이 남지 않는다');
+  assert.match(visual, /steps\.capture\.outputs\.before_status[\s\S]*steps\.capture\.outputs\.after_status/, '요약 표가 두 캡처의 종료 코드를 읽는다');
 });

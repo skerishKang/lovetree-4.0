@@ -46,6 +46,8 @@ const embedSrc=(id,item={},{autoplay=true}={})=>{
  return `${EMBED}${encodeURIComponent(id)}?${params.join('&')}`;
 };
 
+import {orderTreeMoments} from './community-moments-order.mjs';
+
 export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin,api=null,when=null,historyLayers=null,isMember=()=>false,getShareContext=()=>'',onScopeChange=null}){
  const stage=el('div','moments-stage');
  const card=el('div','moments-card');
@@ -88,7 +90,8 @@ let soundButton=null;
  const up=el('button','moments-step','▲');up.type='button';up.setAttribute('aria-label','이전 순간');
  const down=el('button','moments-step','▼');down.type='button';down.setAttribute('aria-label','다음 순간');
  nav.append(up,down);
- stage.append(context,card,rail,nav);
+ rail.append(up,down);
+ stage.append(context,card,rail);
  let liked=false,heartButton=null,heartCount=null,commentsCount=null;
  // #1356: 순간 보기 범위. '이 트리만'은 공유 트리 문맥이 있을 때만, '내 순간'은 로그인했을 때만 보인다.
  let scope='all',scopeShareId='';
@@ -150,9 +153,26 @@ let soundButton=null;
   const soundStart=soundIcon(true);soundStart.setAttribute('class','moments-rail-svg');
   soundButton.append(soundStart,el('span','moments-rail-label','소리 켜기'));
   soundButton.setAttribute('aria-label','소리 켜기');soundButton.onclick=toggleSound;
-  toolbar.prepend(soundButton);
- const scopeChips=el('div','moments-scope-chips');scopeChips.setAttribute('role','group');scopeChips.setAttribute('aria-label','순간 보기 범위');
+  rail.prepend(soundButton);
+ rail.append(up,down);
+ const scopeChips=el('div','moments-scope-control');
+ const scopeTrigger=el('button','moments-scope-trigger','보는 범위: 전체 ▾');
+ scopeTrigger.type='button';scopeTrigger.setAttribute('aria-haspopup','true');scopeTrigger.setAttribute('aria-expanded','false');
+ const scopeMenu=el('div','moments-scope-menu');scopeMenu.hidden=true;
  const scopeButtons={};
+ const scopeSummary=el('span','moments-scope-summary');scopeSummary.hidden=true;
+ const scopeReset=el('button','moments-scope-reset','×');scopeReset.type='button';scopeReset.hidden=true;scopeReset.setAttribute('aria-label','전체 순간 보기');
+ scopeChips.append(scopeTrigger,scopeMenu,scopeSummary,scopeReset);
+ const treePicker=el('div','moments-tree-picker');treePicker.hidden=true;treePicker.setAttribute('role','dialog');treePicker.setAttribute('aria-label','공개 트리 고르기');
+ const treePickerSearch=el('input','moments-tree-picker-search');treePickerSearch.type='search';treePickerSearch.placeholder='공개 트리 검색';treePickerSearch.setAttribute('aria-label','공개 트리 검색');
+ const treePickerOptions=el('div','moments-tree-picker-options');
+ const treePickerClose=el('button','moments-tree-picker-close','×');treePickerClose.type='button';treePickerClose.setAttribute('aria-label','트리 고르기 닫기');treePickerClose.onclick=()=>treePicker.hidden=true;
+ treePicker.append(treePickerClose,treePickerSearch,treePickerOptions);
+ const cardTree=el('button','moments-card-tree');cardTree.type='button';cardTree.setAttribute('aria-label','트리 주인과 트리 이름');
+ card.append(cardTree);
+ const ownerMenu=el('div','moments-owner-menu');ownerMenu.hidden=true;
+ const ownerOnly=el('button','moments-owner-only','이 트리 순간만 보기');ownerOnly.type='button';
+ ownerMenu.append(ownerOnly);
  const emptyRetry=el('button','moments-empty-retry','다시 시도');emptyRetry.type='button';emptyRetry.hidden=true;
  emptyRetry.onclick=()=>{empty.hidden=true;emptyRetry.hidden=true;void load();};
  const chips=el('div','moments-chips');chips.setAttribute('role','group');chips.setAttribute('aria-label','가수 고르기');
@@ -160,7 +180,8 @@ let soundButton=null;
  empty.hidden=true;
  context.append(chips);
  panel.closest?.('dialog')?.querySelector('.community-top-row')?.append(toolbar);
- panel.append(scopeChips,stage,empty,emptyRetry);
+ panel.closest?.('dialog')?.querySelector('.community-top-row')?.append(scopeChips);
+ panel.append(treePicker,stage,empty,emptyRetry);stage.append(ownerMenu);
 
  // 담기 창 — 기존 트리 고르기 창이 따로 없어 이 보기 안에 작은 창을 둔다(트리 목록은 셸 모델을 쓴다).
  const addDialog=el('div','moments-add-dialog');addDialog.setAttribute('role','dialog');addDialog.setAttribute('aria-modal','true');addDialog.setAttribute('aria-label','어느 트리에 담을까요');addDialog.hidden=true;
@@ -291,32 +312,59 @@ let advancing=0,unavailableTimer=0,unavailableId='';
    soundButton.classList.toggle('is-muted',!unmuted);
    stage.dataset.ltMomentsMuted=String(!unmuted);
  }
- // #1356: 순간 보기 범위 칩. 문맥(공유 트리에서 들어옴)·로그인 여부에 따라 보이는 칸이 달라진다.
+ // #1441: 순간 범위는 칩 줄이 아닌 상단의 단일 선택 메뉴에 둔다.
+ let publicTreeChoices=[],treeMomentOrder=[],treeMomentTotal=0,treeTitle='';
+ const scopeNames={all:'전체',mine:'내 순간',tree:'트리 고르기'};
+ function closeScope(){scopeMenu.hidden=true;scopeTrigger.setAttribute('aria-expanded','false');}
  function renderScopeChips(){
-  const choices=[['all','전체',true],['tree','이 트리만',!!scopeShareId],['mine','내 순간',!!isMember()]];
-  if(!choices.some(([value,shown])=>value===scope&&shown))scope='all';
-  scopeChips.replaceChildren(...choices.filter(choice=>choice[2]).map(([value,label])=>{
+  scopeTrigger.textContent='보는 범위: '+(scope==='tree'?(treeTitle||'트리 하나'):scopeNames[scope])+' ▾';
+  scopeMenu.replaceChildren(...[['all','전체'],['mine','내 순간'],['tree','트리 고르기']].map(([value,label])=>{
    const button=el('button','moments-scope-chip',label);button.type='button';button.dataset.scope=value;
-   const active=scope===value;
-   button.classList.toggle('is-active',active);button.setAttribute('aria-pressed',String(active));
-   button.onclick=()=>chooseScope(value);
-   scopeButtons[value]=button;
-   return button;
+   button.setAttribute('aria-pressed',String(scope===value));
+   button.classList.toggle('is-active',scope===value);
+   if(value==='mine'&&!isMember())button.hidden=true;
+   button.onclick=()=>{closeScope();if(value==='tree'){void openTreePicker();return;}chooseScope(value);};
+   scopeButtons[value]=button;return button;
   }));
+  scopeSummary.hidden=scope!=='tree';scopeReset.hidden=scope!=='tree';
+  scopeSummary.textContent=scope==='tree'?((treeTitle||'선택한')+' 트리 · '+(items.length?index+1:0)+'/'+(treeMomentTotal||items.length)):'';
  }
+ scopeTrigger.onclick=()=>{const opening=scopeMenu.hidden;scopeMenu.hidden=!opening;scopeTrigger.setAttribute('aria-expanded',String(opening));};
+ scopeReset.onclick=()=>{treeTitle='';scopeShareId='';chooseScope('all');};
+ if(typeof document.addEventListener==='function')document.addEventListener('pointerdown',event=>{if(!scopeChips.contains(event.target))closeScope();if(!treePicker.hidden&&!treePicker.contains(event.target))treePicker.hidden=true;if(!ownerMenu.contains(event.target)&&!treeLine.contains(event.target))ownerMenu.hidden=true;});
+ scopeChips.addEventListener('keydown',event=>{if(event.key==='Escape'){closeScope();scopeTrigger.focus();}});
+ const safeTree=(item)=>item&&item.shareId&&(item.isPublic!==false&&item.visibility!=='private'&&item.public!==false);
+ async function openTreePicker(){
+  treePicker.hidden=false;treePickerOptions.replaceChildren(el('p','community-muted','공개 트리를 불러오는 중이에요.'));
+  treePickerSearch.value='';
+  const answer=await api.discover({limit:50,sort:'newest'});
+  if(treePicker.hidden)return;
+  publicTreeChoices=(answer.ok&&Array.isArray(answer.items)?answer.items:[]).filter(safeTree);
+  paintTreeChoices();
+  treePickerSearch.focus();
+ }
+ function paintTreeChoices(){
+  const q=treePickerSearch.value.toLocaleLowerCase('ko');
+  const choices=publicTreeChoices.filter(item=>String(item.title||item.subject||'').toLocaleLowerCase('ko').includes(q));
+  treePickerOptions.replaceChildren(...(choices.map(item=>{
+   const button=el('button','moments-tree-picker-option',(item.title||item.subject||'공개 트리')+(item.publicDisplayName?' · '+item.publicDisplayName:''));
+   button.type='button';button.dataset.shareId=item.shareId;
+   button.onclick=()=>{treeTitle=item.title||item.subject||'트리';treePicker.hidden=true;setScopeContext(item.shareId);chooseScope('tree');};return button;
+  }).concat(choices.length?[]:[el('p','community-muted','고를 공개 트리가 없어요.') ])));
+ }
+ treePickerSearch.oninput=paintTreeChoices;
  function setScopeContext(shareId){
   const next=String(shareId||'');
-  const changed=next!==scopeShareId;
-  scopeShareId=next;
-  renderScopeChips();
+  const changed=next!==scopeShareId;scopeShareId=next;
+  if(changed){treeMomentOrder=[];treeMomentTotal=0;}
   if(changed&&scope==='tree'&&!scopeShareId)scope='all';
+  renderScopeChips();
  }
  function chooseScope(value,{syncHash=true}={}){
-  if(value===scope)return;
+  if(value===scope&&value!=='tree')return;
   if(value==='tree'&&!scopeShareId)return;
   if(value==='mine'&&!isMember())return;
-  scope=value;
-  items=[];seen=new Set();index=0;
+  token+=1;loading=false;scope=value;items=[];seen=new Set();index=0;treeMomentOrder=[];treeMomentTotal=0;
   clearFrames();media.querySelectorAll('.moments-frame').forEach(node=>node.remove());
   currentFrame=null;stage.hidden=true;
   empty.hidden=true;emptyRetry.hidden=true;
@@ -326,9 +374,9 @@ let advancing=0,unavailableTimer=0,unavailableId='';
   if(syncHash)onScopeChange?.(scope,scopeShareId);
  }
  function applyScope(value,shareId=''){
-  setScopeContext(shareId||getShareContext?.()||'');
   const wanted=['all','tree','mine'].includes(value)?value:'all';
-  if(wanted!==scope)chooseScope(wanted,{syncHash:false});
+  setScopeContext(wanted==='tree'?shareId:'');
+  if(wanted!==scope||wanted==='tree'){chooseScope(wanted,{syncHash:false});}
  }
  // 칩 줄: 전체 + 서버가 센 공개 쇼츠 가수 꼬리표 상위 6개. 누르면 그 가수만 다시 섞는다.
  function renderChips(){
@@ -362,7 +410,7 @@ let advancing=0,unavailableTimer=0,unavailableId='';
    // 소리를 켠 채로는 휴대폰이 자동 재생을 막는다 — 2초 안에 시작하지 않으면 음소거로 시작한다.
    // 소리를 켜 둔 사람은 새 영상에서도 소리로 시작한다(주소의 mute=1을 풀어 준다).
    // 휴대폰이 소리 자동 재생을 막아 2초 안에 시작하지 않으면 음소거로 시작한다.
-   if(wantSound&&tries<=8){command(frame,'playVideo');command(frame,'unMute');}
+   if(wantSound){command(frame,'playVideo');command(frame,'unMute');command(frame,'setVolume',[100]);}
    else{command(frame,'mute');command(frame,'playVideo');}
    stage.dataset.ltAutoplay='1';
   };
@@ -411,11 +459,15 @@ let advancing=0,unavailableTimer=0,unavailableId='';
   const displayOwner=String(item.ownerName||item.publicDisplayName||item.authorLabel||item.ownerLabel||item.creatorName||item.authorName||'트리 주인').trim();
   owner.textContent=displayOwner.slice(0,1);
   ownerText.textContent=displayOwner;
-  treeLine.append(owner,ownerText);
+  const treeOwner=el('button','moments-tree-owner',displayOwner);treeOwner.type='button';treeOwner.setAttribute('aria-label','트리 주인과 이름');
+  treeLine.append(owner,treeOwner);
   if(item.aiTester)treeLine.append(el('span','moments-ai','✦ AI 명예회원'));
   const treeName=el('button','moments-tree-name',item.treeTitle||item.ownerName||'트리');treeName.type='button';
   treeName.title=item.treeTitle||'';
-  treeName.onclick=()=>{if(!item.shareId)return;setScopeContext(item.shareId);chooseScope('tree');};
+  const openOwnerMenu=()=>{ownerMenu.hidden=!ownerMenu.hidden;};
+  treeOwner.onclick=openOwnerMenu;treeName.onclick=openOwnerMenu;
+  cardTree.textContent=displayOwner+' · '+(item.treeTitle||'트리');cardTree.onclick=openOwnerMenu;
+  ownerOnly.onclick=()=>{if(!item.shareId)return;ownerMenu.hidden=true;treeTitle=item.treeTitle||'트리';setScopeContext(item.shareId);chooseScope('tree');};
   treeLine.append(treeName);
   titleLine.textContent=item.title||'';
   // 꼬리표는 '가수:아이유' 같은 머리말을 뺀 값만 — 기존 parseTag 한 벌을 그대로 쓴다.
@@ -423,6 +475,7 @@ let advancing=0,unavailableTimer=0,unavailableId='';
   noteLine.textContent=item.note||'';
   noteLine.setAttribute('aria-expanded','false');noteLine.setAttribute('aria-label','설명 펼치기');
   noteLine.hidden=!item.note;
+  renderScopeChips();
   // 지금 것 + 다음 것만 iframe — 다음 것은 autoplay=0, mute=1로 준비한다.
   clearFrames();
   const now=makeFrame(item),next=makeFrame(items[index+1],{preload:true});
@@ -464,15 +517,31 @@ let advancing=0,unavailableTimer=0,unavailableId='';
    const listed=(Array.isArray(data.items)?data.items:[]).filter(item=>scope!=='mine'||!activeTag||(Array.isArray(item?.keywords)&&item.keywords.includes(activeTag)));
    if(activeTag&&!items.length&&!listed.length){empty.hidden=false;empty.textContent=`${activeTag.slice('가수:'.length)} 쇼츠가 아직 없어요.`;stage.hidden=true;renderChips();return;}
    if(Array.isArray(data.groups)){groups=data.groups;renderChips();}
-   const fresh=listed.filter(item=>item&&item.videoId&&!seen.has(item.videoId));
+   let fresh=listed.filter(item=>item&&item.videoId&&!seen.has(item.videoId));
+   if(scope==='tree'){
+    // 공개 공유 응답만 사용한다. 비공개 트리와 순간은 서버에서 반환하지 않는다.
+    const shared=await api.publicShare(scopeShareId);
+    if(id!==token)return;
+    if(!shared?.ok||!shared.tree){fresh=[];treeMomentOrder=[];treeMomentTotal=0;}
+    else {
+     const path=orderTreeMoments(Array.isArray(shared.tree.moments)?shared.tree.moments:[]);
+     treeMomentOrder=path.map(moment=>String(moment.id));
+     treeMomentTotal=path.filter(moment=>moment.videoId||moment.type==='youtube'||moment.type==='video'||moment.url).length||path.length;
+     treeTitle=shared.tree.title||shared.tree.subject||treeTitle||'트리';
+     const byId=new Map(treeMomentOrder.map((key,pos)=>[key,pos]));
+     fresh=fresh.filter(item=>item.shareId===scopeShareId&&(!treeMomentOrder.length||byId.has(String(item.id))));
+     fresh.sort((a,b)=>(byId.get(String(a.id))??Number.MAX_SAFE_INTEGER)-(byId.get(String(b.id))??Number.MAX_SAFE_INTEGER));
+    }
+   }
    if(!fresh.length&&!items.length){items=[];render();return;}
    items=[...items,...fresh];
+   if(scope==='tree'&&treeMomentOrder.length){const byId=new Map(treeMomentOrder.map((key,pos)=>[key,pos]));items.sort((a,b)=>(byId.get(String(a.id))??Number.MAX_SAFE_INTEGER)-(byId.get(String(b.id))??Number.MAX_SAFE_INTEGER));}
    for(const item of fresh)seen.add(item.videoId);
    if(!current())index=0;
    render();
   }catch{
    if(id===token&&!items.length){empty.hidden=false;empty.textContent=scope==='mine'?'내 순간을 불러오지 못했어요.':scope==='tree'?'이 트리의 순간을 불러오지 못했어요.':'공개 세로 순간을 불러오지 못했어요.';emptyRetry.hidden=false;stage.hidden=true;}
-  }finally{loading=false;}
+  }finally{if(id===token)loading=false;}
  }
  // 재생이 끝난 뒤 한 번만 넘긴다(유튜브가 같은 상태를 여러 번 보낼 수 있다).
  function advanceAfterEnd(){
@@ -502,8 +571,11 @@ let advancing=0,unavailableTimer=0,unavailableId='';
     // 화면 표시는 유튜브가 알려 준 실제 상태를 따른다. 새 영상은 주소의 mute=1로 음소거 상태를 알려 오므로,
     // 소리를 켜 둔 사람의 선택(wantSound)이 있으면 몇 번 더 소리를 다시 켠다(브라우저가 막으면 알약이 다시 보인다).
     if(typeof info.muted==='boolean'){
-     unmuted=!info.muted;paintSound();
-     if(info.muted&&wantSound&&(currentFrame._ltSoundTries=(currentFrame._ltSoundTries||0)+1)<=8)command(currentFrame,'unMute');
+     unmuted=!info.muted;
+     if(info.muted&&wantSound&&(currentFrame._ltSoundTries=(currentFrame._ltSoundTries||0)+1)<=8){
+      command(currentFrame,'unMute');command(currentFrame,'setVolume',[100]);
+     }
+     paintSound();
     }
   }
   if(data?.event==='onError'){
@@ -549,9 +621,16 @@ let advancing=0,unavailableTimer=0,unavailableId='';
   if(event.key==='ArrowDown'){event.preventDefault();step(1);}
   if(event.key==='ArrowUp'){event.preventDefault();step(-1);}
  });
-  const swipeTargets=[stage,toolbar];
+  const videoTouch=event=>{
+    const touch=event.touches?.[0]||event.changedTouches?.[0];
+    const frame=media.querySelector('.moments-frame:not(.moments-next)');
+    if(!touch||!frame)return false;
+    const box=frame.getBoundingClientRect();
+    return touch.clientX>=box.left&&touch.clientX<box.right&&touch.clientY>=box.top&&touch.clientY<box.bottom;
+   };
+   const swipeTargets=[stage,toolbar];
   for(const target of swipeTargets)target.addEventListener('touchstart',event=>{
-    if(event.target?.closest?.('.moments-media')){touchY=null;return;}
+    if(event.target?.closest?.('.moments-media')||(event.isTrusted&&videoTouch(event))){touchY=null;return;}
     const t=event.touches[0];touchY=t?{x:t.clientX,y:t.clientY}:null;
   },{passive:true});
  for(const target of swipeTargets)target.addEventListener('touchend',event=>{
@@ -563,12 +642,14 @@ let advancing=0,unavailableTimer=0,unavailableId='';
   function toggleSound(event){
     event.stopPropagation();
     if(!currentFrame)return;
-    command(currentFrame,unmuted?'mute':'unMute');
-    unmuted=!unmuted;wantSound=unmuted;paintSound();
+    wantSound=!wantSound;unmuted=wantSound;
+    command(currentFrame,wantSound?'unMute':'mute');
+    if(wantSound){command(currentFrame,'setVolume',[100]);command(currentFrame,'playVideo');}
+    paintSound();
   };
  // 플레이어 위에는 어떤 클릭·제스처 층도 두지 않는다.
  // 재생·일시 정지는 유튜브 기본 컨트롤이 전담한다.
- function activate(){scopeShareId=getShareContext?.()||scopeShareId;renderScopeChips();if(!items.length&&!loading)void load();else render();}
+ function activate(){if(scope!=='tree')scopeShareId=getShareContext?.()||scopeShareId;renderScopeChips();if(!items.length&&!loading)void load();else render();}
  function deactivate(){clearFrames();media.querySelectorAll('.moments-frame').forEach(node=>node.remove());}
  return {activate,deactivate,load,step,setScopeContext,applyScope,state:()=>({count:frames.length,id:stage.dataset.ltMomentsId||'',index,loaded:items.length,scope,scopeShareId})};
 }

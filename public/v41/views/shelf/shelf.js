@@ -3,7 +3,7 @@ import { MSG, isShellMessage } from '../../frame-messages.mjs';
 // 계산(표지 색·이름·정보 줄·검색·카드 배치·페이지)은 shelf-model.mjs로 옮기고 여기서는 화면만 다룬다.
 // 조건·문구·id·순서 변경 0. #291(궤도)와 같이 모듈로 불러 쓴다.
 import {
-  COVER_PALETTE, allBooks as allBooksOf, bookMeta, buildShelf,
+  COVER_PALETTE, bookMeta, buildShelf,
   escapeShelf, filterShelf, findBook, lastMomentDate as lastMomentDateOf,
   recentChapters, resolveShelfIndex, resumeCard, resumeName, shelfBook, shelfRowLayout,
   treeTitleOf, youtubeId as youtubeIdOf
@@ -11,7 +11,6 @@ import {
 import { shelfOrder } from '../../inbox-model.mjs';
 import { titleView, titleDisplayOf, shouldReloadForTitleDisplay } from '../../book-usability.mjs';
 import { coverFallbackAttrs, mountThumbFallback } from '../../thumb-fallback.mjs';
-import { localDateOnly } from '../../local-date.mjs';
 import { createReader } from './shelf-reader.js';
 import { VIEWS } from './shelf-views.mjs';
 
@@ -30,7 +29,7 @@ import { VIEWS } from './shelf-views.mjs';
       var palette = COVER_PALETTE;
       var books = buildShelf(shelfOrder(LTDEMO.library), palette, namer);
       var initialFilter='all';try{var asked=localStorage.getItem('lt41.shelfFilter');if(asked==='public'||asked==='all')initialFilter=asked;localStorage.removeItem('lt41.shelfFilter');}catch{}
-      var state = { filter:initialFilter, query:'', selectedId:null, shelfIndex:0, shelfOffset:0, shelfList:[], chapterIndex:0, open:false, openProgress:0, customBooks:[], pageTurning:false };
+      var state = { filter:initialFilter, query:'', selectedId:null, shelfIndex:0, shelfOffset:0, shelfList:[], chapterIndex:0, open:false, openProgress:0, pageTurning:false };
       var storageKey = 'lovetree-people-book-shelf-v2-1-true-page-motion';
       var drag = { active:false, mode:'', startX:0, startY:0, moved:false, startProgress:0 };
       // #1366: 계정 설정(bookDisplay와 같은 길) → 기기 미러 → 기본 회전.
@@ -83,11 +82,9 @@ import { VIEWS } from './shelf-views.mjs';
         state.chapterIndex = Number.isInteger(saved.chapterIndex) ? saved.chapterIndex : 0;
         state.open = false;
         state.openProgress = 0;
-        state.customBooks = [];
       } catch (error) {}
       state.shelfIndex=Math.max(0,books.findIndex(book=>book.id===parent.LT41.tree.id));
-      function allBooks() { return allBooksOf(books, state.customBooks); }
-      function getBook(id) { return findBook(allBooks(), id); }
+      function getBook(id) { return findBook(books, id); }
       function save() {} // Selection belongs to the shell; never persist another account's library.
       // #1446: 공개 트리 여부는 셸 상태가 아니라 서버 shares로만 안다. 실패하면 아무 책도 공개로 표시하지 않는다.
       function readPublicFlags(){
@@ -95,7 +92,7 @@ import { VIEWS } from './shelf-views.mjs';
         fetch('/api/shares',{headers:{accept:'application/json'}}).then(function(r){return r.ok?r.json():null}).then(function(body){
          var ids={};(Array.isArray(body&&body.shares)?body.shares:[]).forEach(function(s){if(s&&s.status==='active'&&s.treeId)ids[s.treeId]=true;});
          var changed=false;
-         allBooks().forEach(function(book){var next=ids[book.id]===true;if(book.public!==next){book.public=next;changed=true;}});
+         books.forEach(function(book){var next=ids[book.id]===true;if(book.public!==next){book.public=next;changed=true;}});
          if(changed)renderShelf();
         }).catch(function(){});
        }catch(error){}
@@ -110,10 +107,8 @@ import { VIEWS } from './shelf-views.mjs';
         var tiltName = tilt === -2 ? 'tilt-m2' : tilt === -1 ? 'tilt-m1' : tilt === 0 ? 'tilt-0' : tilt === 1 ? 'tilt-p1' : 'tilt-p2';
         return (cIdx >= 0 ? ' cover-c' + (cIdx + 1) : '') + (aIdx >= 0 ? ' cover-a' + (aIdx + 1) : '') + ' ' + tiltName;
       }
-      function openModal(id) { $('#'+id).classList.remove('hidden'); }
-      function closeModal(id) { $('#'+id).classList.add('hidden'); }
        function renderShelf() {
-         var list=filterShelf(allBooks(), state.filter, state.query);
+         var list=filterShelf(books, state.filter, state.query);
 
          state.shelfList=list;
         state.shelfIndex=resolveShelfIndex(list, state.selectedId, state.shelfIndex);
@@ -129,7 +124,7 @@ import { VIEWS } from './shelf-views.mjs';
         // 261118 대표 지적 4: 트리가 있으면 소개 문 대신 이어 보기 띠 한 줄. 트리 0개일 때만 소개 문('…한 권의 책으로.'+'책 열기')이 보인다.
         var hero=document.querySelector('.hero');
         if(hero)hero.classList.toggle('strip-mode',list.length>0);
-        // #256-1: 목록이 바뀔 때마다 다시 그린다. 칸은 검색·필터와 무관하게 전체 책(allBooks) 기준이라 좁아져도 그대로다.
+        // #256-1: 목록이 바뀔 때마다 다시 그린다. 칸은 검색·필터와 무관하게 전체 책 기준이라 좁아져도 그대로다.
         renderResumeCard();
         renderRecent();
         $('#shelfRail').innerHTML=(list.length?list.map(function(book,index){
@@ -156,7 +151,7 @@ import { VIEWS } from './shelf-views.mjs';
           source:context?context.source:'server',
           treeId:context&&context.tree?context.tree.id:'',
           momentId:typeof LTDEMO.get==='function'?String(LTDEMO.get()||''):'',
-          books:allBooks()
+          books:books
         });
         var show=!!info.book;
         strip.hidden=!show;
@@ -300,16 +295,26 @@ import { VIEWS } from './shelf-views.mjs';
         animateOpenProgress = reader.animateOpenProgress, renderReader = reader.renderReader,
         openReader = reader.openReader, backToShelf = reader.backToShelf, openBook = reader.openBook,
         closeBook = reader.closeBook, turnPage = reader.turnPage, bindBookDrag = reader.bindBookDrag;
-      function bind() {
-        // 261118 대표 지적 3: '+ 새 트리' 입구는 오른쪽 단추(#shelfNewTree) 하나다.
-        var openNewTree=function(){parent.postMessage({type:MSG.newTree},location.origin);};
-        var openManageTree=function(id){parent.postMessage({type:MSG.manageTree,treeId:id},location.origin);};
+      // ── #1468: 배선을 쓰는 것끼리 작은 함수로 나눈다. 등록하는 귀와 처리기 내용은 이전 한 함수와 같다(동작 바뀜 0). ──
+      function openNewTree(){parent.postMessage({type:MSG.newTree},location.origin);}
+      function openManageTree(id){parent.postMessage({type:MSG.manageTree,treeId:id},location.origin);}
+      // 261118 대표 지적 3: '+ 새 트리' 입구는 오른쪽 단추(#shelfNewTree) 하나다. 트리 고치기·만들기는 셸의 흐름으로 넘긴다.
+      function bindTreeActions(){
         $('#shelfRail').addEventListener('click',function(event){var railManage=event.target.closest('[data-manage-id]');if(railManage)openManageTree(railManage.dataset.manageId);});
-       $$('#shelf-view-inline [data-shelf-view]').forEach(function(b){b.onclick=function(){try{parent.postMessage({type:MSG.setShelfView,value:b.dataset.shelfView},location.origin)}catch{}};});
         $('#shelfNewTree').addEventListener('click',openNewTree);
+      }
+      // 보기 전환(회전·선반): 저장과 전환은 셸이 맡긴다.
+      function bindViewSwitch(){
+       $$('#shelf-view-inline [data-shelf-view]').forEach(function(b){b.onclick=function(){try{parent.postMessage({type:MSG.setShelfView,value:b.dataset.shelfView},location.origin)}catch{}};});
+      }
+      // 찾기·걸러 보기·지금 책 바로 열기: 목록이 바뀌면 서재를 다시 그린다.
+      function bindSearchActions(){
         $('#shelfJump').addEventListener('click',function(){state.query='';state.filter='all';$('#searchInput').value='';paintShelfFilterInline();renderShelf();var book=getShelfCard(state.shelfIndex)?.querySelector('button[data-book-id]');if(book)openReader(book.dataset.bookId,book.closest('.book-card'));});
         $('#searchInput').addEventListener('input',function(event){state.query=event.target.value;renderShelf();});
         $$('#shelf-filter-inline [data-filter]').forEach(function(button){button.addEventListener('click',function(){state.filter=button.dataset.filter==='public'?'public':'all';paintShelfFilterInline();renderShelf();});});
+      }
+      // 화살표·휠: 회전 보기 넘김(휠 한 칸 이동은 #1438 그대로).
+      function bindCarouselMoves(){
         $('#shelfPrev').addEventListener('click',function(){view.move(-1);});
         $('#shelfNext').addEventListener('click',function(){view.move(1);});
         // #1366 ⑧: 세로 휠만 회전 넘김으로 쓴다. 레일 밖과 가로 트랙패드는 기본 스크롤에 맡긴다.
@@ -325,6 +330,9 @@ import { VIEWS } from './shelf-views.mjs';
           wheelAt=at;
           view.move(event.deltaY>0?1:-1);
         },{passive:false});
+      }
+      // 펼침 보기(책 읽기): 열기·닫기·장 넘김·끌기·키보드.
+      function bindReaderActions(){
         $('#backToShelf').addEventListener('click',backToShelf);
         $('#openBookButton').addEventListener('click',openBook);
         $('#closeBookButton').addEventListener('click',closeBook);
@@ -333,16 +341,9 @@ import { VIEWS } from './shelf-views.mjs';
         $('#rightPage').addEventListener('click',function(event){if(event.target.closest('[data-play-video]'))mountVideo();});
         bindBookDrag();
         document.addEventListener('keydown',function(event){if(!state.selectedId){if(event.key==='ArrowRight')view.move(1);if(event.key==='ArrowLeft')view.move(-1);return;}if(event.key==='Escape'&&state.open){closeBook();return;}if(state.open&&event.key==='ArrowRight')turnPage(1);if(state.open&&event.key==='ArrowLeft')turnPage(-1);});
-        $('#newBookButton').addEventListener('click',function(){openModal('newBookModal');});
-        $$('[data-close]').forEach(function(button){button.addEventListener('click',function(){closeModal(button.dataset.close);});});
-        $$('.modal-backdrop').forEach(function(backdrop){backdrop.addEventListener('click',function(event){if(event.target===backdrop)closeModal(backdrop.id);});});
-        $('#newBookForm').addEventListener('submit',function(event){
-          event.preventDefault();
-          var name=$('#newBookName').value.trim(),url=$('#newBookUrl').value.trim();
-          if(!name||!url)return;
-          state.customBooks.push({id:'custom-'+Date.now(),name:name,category:'all',color:palette[0],accent:palette[0],symbol:'♡',description:'새롭게 기록하기 시작한 트리.',tags:['새 책','첫 마음'],lastDate:localDateOnly(),chapters:[{title:$('#newBookChapter').value.trim()||'처음 마음이 움직인 장면',url:url,mood:'첫 마음',note:'이 사람을 처음 책으로 만들게 된 순간'}]});
-          save();closeModal('newBookModal');$('#newBookForm').reset();renderShelf();showToast(name+'의 책을 만들었어요.');
-        });
+      }
+      function bind(){
+        bindTreeActions();bindViewSwitch();bindSearchActions();bindCarouselMoves();bindReaderActions();
       }
 // #481: 제목 보기가 바뀌면 책장의 제목(이어 읽기·표지)도 다시 그려야 한다. 다만 날짜 표기와 같은 판정으로
 // '지금 그린 값과 다르고, 기기 미러가 이미 그 값일 때'만 다시 띄운다 — 받을 때마다 새로고침하면 고리가 된다.

@@ -123,7 +123,6 @@ test('#547 오늘을 UTC로 만드는 자리가 남아 있지 않다(보드 제�
   const files = [
     'public/v41/domain.mjs',
     'public/v41/shell/panels.mjs',
-    'public/v41/views/shelf/shelf.js',
     'src/domain.js',
     'src/main.js',
     'public/v41/views/board/board.js',
@@ -139,8 +138,7 @@ test('#547 오늘을 UTC로 만드는 자리가 남아 있지 않다(보드 제�
   assert.match(read('public/v41/shell/panels.mjs'), /import \{localDateOnly\} from '\.\.\/local-date\.mjs'/);
   assert.match(read('public/v41/shell/panels.mjs'), /form\.elements\.date\.value = localDateOnly\(\)/);
   assert.match(read('public/v41/shell/panels.mjs'), /name === 'date' \? localDateOnly\(\)/);
-  assert.match(read('public/v41/views/shelf/shelf.js'), /import \{ localDateOnly \} from '\.\.\/\.\.\/local-date\.mjs'/);
-  assert.match(read('public/v41/views/shelf/shelf.js'), /lastDate:localDateOnly\(\)/);
+  // #1468: 서재의 숨겨진 '새 책 만들기' 경로가 지워져 서재는 오늘 날짜를 더 만들지 않는다(서재 두 줄 글자 검사를 지웠다).
 });
 
 /* ── 4. 실제 브라우저에서 시간대를 고정해 확인 ──────────────────────── */
