@@ -201,15 +201,18 @@ export async function observeFrameMatrix({ browser, base, outputDir, shard = '' 
       if (screen.id === 'map') await activePage.evaluate(() => { const frame = [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length); frame.contentWindow.__lt?.resize(); });
       if (clockPaused) { await activePage.clock.runFor(32); await activePage.clock.fastForward(0); }
       else await activePage.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
-      await activePage.screenshot({ path: join(outputDir, name + '.png'), animations: 'disabled' });
+      const cdp = await activePage.context().newCDPSession(activePage);
+      const shoot = async (path, clip = null) => { const result = await cdp.send('Page.captureScreenshot', { format: 'png', fromSurface: false, ...(clip ? { clip: { ...clip, scale: 1 } } : {}) }); writeFileSync(path, Buffer.from(result.data, 'base64')); };
+      await shoot(join(outputDir, name + '.png'));
       const target = screen.panel ? activePage.locator(screen.panel) : activePage.locator('#stage');
       const box = await target.boundingBox();
       if (box) {
-        await activePage.screenshot({ path: join(outputDir, name + '-surface.png'), clip: box, animations: 'disabled' });
+        await shoot(join(outputDir, name + '-surface.png'), box);
         const edge = Math.min(24, box.width, box.height);
         const edges = { top: { x: box.x, y: box.y, width: box.width, height: edge }, bottom: { x: box.x, y: box.y + box.height - edge, width: box.width, height: edge }, left: { x: box.x, y: box.y, width: edge, height: box.height }, right: { x: box.x + box.width - edge, y: box.y, width: edge, height: box.height } };
-        for (const [side, clip] of Object.entries(edges)) await activePage.screenshot({ path: join(outputDir, name + '-roi-' + side + '.png'), clip, animations: 'disabled' });
+        for (const [side, clip] of Object.entries(edges)) await shoot(join(outputDir, name + '-roi-' + side + '.png'), clip);
       }
+      await cdp.detach();
       const measured = await measureFrame(activePage, screen, theme, width, height);
       rows.push(measured);
       writeFileSync(join(outputDir, name + '.json'), JSON.stringify(measured, null, 2));
