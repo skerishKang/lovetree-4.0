@@ -828,3 +828,107 @@ test('#1350 머리줄 오른쪽 간격: 390·844·1440 × 밤·정원 × 로그�
   } finally { await browser.close(); server.close(); }
   console.log('#1350 머리줄 측정 결과', JSON.stringify(measurements));
 });
+
+// #1488 3·4·5·7번(공통 틀 #1452 점검): 390 머리줄 오른쪽 세 단추(테마·계정·☰) 간격 8px로 같게, 보기 탭·로고 누름 44px,
+// '+ 순간 추가' 마우스 올림 변화(--lt-role-hover-* 토큰), 공개 감상 '둘러보기'는 로고 바로 뒤·390 글자 12px 이상·390 탭은 내 트리 390 규칙.
+test('#1488 머리줄: 390 오른쪽 간격 8px·누름 44px·순간 추가 올림 변화·공개 감상 둘러보기 자리', { skip: skip || !REQUIRE ? skip || 'LT_TOPMENU_REQUIRE=1 일 때 실행' : false, timeout: 420000 }, async () => {
+  const { openShellState, BOX_FN } = await import('./helpers/shell-states.mjs');
+  const server = await serve();
+  const origin = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch({ headless: true });
+  const rows = [];
+  const header = (page) => page.evaluate((boxSrc) => {
+    const box = new Function('return ' + boxSrc)();
+    const vis = (id) => box('#' + id);
+    const account = vis('account-avatar') || vis('account-entry');
+    const theme = vis('theme-toggle'), more = vis('mobile-more');
+    const tabs = [...document.querySelectorAll('#tree-views button[data-view]')].map((b) => ({ t: b.textContent.trim(), b: box(b) })).filter((x) => x.b);
+    const label = document.querySelector('#community-menu .community-menu-label');
+    return { theme, account, more, brand: box('.app-header .brand'), community: box('#community-menu'), labelSize: label && label.getClientRects().length ? parseFloat(getComputedStyle(label).fontSize) : null, tabs: tabs.map((x) => ({ t: x.t, w: x.b.w, h: x.b.h, x: x.b.x })) };
+  }, BOX_FN.toString());
+  try {
+    // 3번: 390 로그인(계정 동그라미)·로그아웃(로그인 단추) 모두 테마→계정→☰ 간격이 8px로 같다.
+    for (const theme of ['night', 'garden']) for (const kind of ['member', 'guest']) {
+      const { ctx, page } = await openShellState(browser, origin, { kind, screen: kind === 'member' ? 'book' : 'home', width: 390, height: 844, theme });
+      try {
+        const h = await header(page);
+        const g1 = Math.round((h.account.x - h.theme.r) * 10) / 10, g2 = Math.round((h.more.x - h.account.r) * 10) / 10;
+        rows.push({ case: '390-gap', theme, kind, g1, g2, account: h.account });
+        assert.ok(Math.abs(g1 - 8) <= 0.5 && Math.abs(g2 - 8) <= 0.5, `390 ${theme} ${kind}: 테마→계정 ${g1}px·계정→☰ ${g2}px — 둘 다 8px`);
+        assert.ok(h.account.w >= 44 && h.account.h >= 44, '계정 단추 누름 44px 이상');
+        assert.ok(h.brand.h >= 44, `390 로고 링크 높이 44px 이상(${h.brand.h})`);
+      } finally { await ctx.close(); }
+    }
+    // 4번: 보기 탭(책 포함)과 로고 링크의 누름 크기 44px 이상.
+    const memberHeaders = {};
+    for (const [width, height] of [[844, 390], [1440, 900], [2560, 1440]]) {
+      const { ctx, page } = await openShellState(browser, origin, { kind: 'member', screen: 'book', width, height });
+      try {
+        const h = await header(page);
+        memberHeaders[width] = h;
+        rows.push({ case: 'taps', width, brand: h.brand, tabs: h.tabs });
+        assert.equal(h.tabs.length, 5, width + ': 보기 탭 다섯');
+        for (const t of h.tabs) assert.ok(t.w >= 44 && t.h >= 44, `${width} '${t.t}' 탭 누름 ${t.w}×${t.h} — 44px 이상`);
+        assert.ok(h.brand.h >= 44, `${width} 로고 링크 높이 44px 이상(${h.brand.h})`);
+        if (width === 1440) {
+          // 5번: '+ 순간 추가'에 마우스를 올리면 바탕·테두리가 바뀐다(탭 올림과 같은 역할 토큰).
+          for (const theme of ['night', 'garden']) {
+            await page.evaluate((t) => { document.documentElement.dataset.ltTheme = t; }, theme);
+            await page.mouse.move(5, 300);
+            await page.waitForTimeout(200);
+            // 계산값 글자가 아니라 실제로 그려진 화소로 본다 — 단추와 둘레 6px의 화소가 올림 전후로 달라져야 한다(두 테마 모두).
+            const btn = await page.evaluate(BOX_FN, '#write-menu');
+            const clip = { x: btn.x - 6, y: btn.y - 6, width: btn.w + 12, height: btn.h + 12 };
+            const before = await page.screenshot({ clip });
+            await page.hover('#write-menu');
+            await page.waitForTimeout(300);
+            const after = await page.screenshot({ clip });
+            // 두 캡처를 브라우저 캔버스로 읽어 화소마다 RGB 차(합 24 초과)를 센다.
+            const changed = await page.evaluate(async ([a, b]) => {
+              const load = (src) => new Promise((ok, fail) => { const im = new Image(); im.onload = () => ok(im); im.onerror = fail; im.src = 'data:image/png;base64,' + src; });
+              const [ia, ib] = await Promise.all([load(a), load(b)]);
+              const read = (im) => { const c = document.createElement('canvas'); c.width = im.width; c.height = im.height; const g = c.getContext('2d'); g.drawImage(im, 0, 0); return g.getImageData(0, 0, im.width, im.height).data; };
+              const da = read(ia), db = read(ib);
+              let diff = 0;
+              for (let i = 0; i < da.length; i += 4) if (Math.abs(da[i] - db[i]) + Math.abs(da[i + 1] - db[i + 1]) + Math.abs(da[i + 2] - db[i + 2]) > 24) diff++;
+              return diff / (ia.width * ia.height);
+            }, [before.toString('base64'), after.toString('base64')]);
+            rows.push({ case: 'hover-add', theme, changed });
+            assert.ok(changed >= 0.05, `${theme}: '+ 순간 추가' 올림에 보이는 변화가 있다(바뀐 화소 ${Math.round(changed * 1000) / 10}%)`);
+          }
+        }
+      } finally { await ctx.close(); }
+    }
+    // 7번: 공개 감상 '둘러보기'는 로고 바로 뒤(내 트리와 같은 자리), 390 글자 12px 이상, 390 탭은 내 트리 390과 같은 규칙.
+    for (const [width, height] of [[844, 390], [1440, 900], [2560, 1440]]) {
+      const { ctx, page } = await openShellState(browser, origin, { kind: 'share', screen: 'book', width, height });
+      try {
+        const h = await header(page);
+        const own = memberHeaders[width];
+        rows.push({ case: 'public-order', width, brand: h.brand, community: h.community, tabs: h.tabs, ownCommunity: own.community });
+        assert.ok(h.community, width + ': 공개 감상 둘러보기가 보인다');
+        assert.ok(h.tabs.every((t) => t.x > h.community.r), `${width}: 둘러보기가 보기 탭보다 앞(로고 바로 뒤)`);
+        assert.ok(Math.abs((h.community.x - h.brand.r) - (own.community.x - own.brand.r)) <= 1, `${width}: 로고→둘러보기 간격이 내 트리와 같다(${h.community.x - h.brand.r} / ${own.community.x - own.brand.r})`);
+      } finally { await ctx.close(); }
+    }
+    {
+      const own = await openShellState(browser, origin, { kind: 'member', screen: 'book', width: 390, height: 844 });
+      const ownTabs = (await header(own.page)).tabs.map((t) => t.t);
+      await own.ctx.close();
+      for (const theme of ['night', 'garden']) {
+        const { ctx, page } = await openShellState(browser, origin, { kind: 'share', screen: 'book', width: 390, height: 844, theme });
+        try {
+          const h = await header(page);
+          rows.push({ case: 'public-390', theme, labelSize: h.labelSize, tabs: h.tabs.map((t) => t.t), ownTabs, community: h.community });
+          assert.ok(h.community, '390 공개 감상 둘러보기가 보인다');
+          assert.ok(h.labelSize >= 12, `390 ${theme} 둘러보기 글자 12px 이상(${h.labelSize})`);
+          assert.deepEqual(h.tabs.map((t) => t.t), ownTabs, '390 공개 감상 보기 탭은 내 트리 390과 같다');
+        } finally { await ctx.close(); }
+      }
+    }
+  } finally {
+    console.log('#1488 머리줄', JSON.stringify(rows));
+    await browser.close();
+    await new Promise((ok) => server.close(ok));
+  }
+});
