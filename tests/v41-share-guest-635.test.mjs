@@ -560,7 +560,8 @@ test('#635 PR C 화면: 메뉴 시작 입구·첫날 표기·크게 보기 대�
           assert.equal(problems.length, 0, `책 ${width}·${theme}: 화면 오류 ${problems.join(' | ')}`);
           const bookBox = await frame.locator(width === 390 ? '.mobile-page' : '.book-wrap').first().boundingBox();
           assert.ok(bookBox, `${width}·${theme}: 책 자리를 못 읽었다`);
-          if (width === 390) {
+          // #1488(CTO 결정 #1452): 안쪽 책 화면은 폭과 상관없이 아래 링크 줄이 없다(계정 메뉴·☰ 메뉴로 옮김) — 1440도 390과 같이 숨김을 본다.
+          if (width === 390 || width === 1440) {
             const hidden = await page.evaluate(() => {
               const el = document.querySelector('.home-links');
               if (!el) return true;

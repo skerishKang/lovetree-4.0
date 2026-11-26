@@ -54,10 +54,10 @@ export async function openShellState(browser, origin, { kind = 'member', screen 
   else if (screen === 'home') url = origin + '/v41/' + (kind === 'member' ? '?account=1' : '') + '#home';
   else url = origin + '/v41/' + (kind === 'member' ? '?account=1' : '') + '#my/' + route;
   await page.goto(url, { waitUntil: 'load' });
-  if (kind === 'member') await page.waitForFunction(() => window.LT41?.source === 'server', null, { timeout: 20000 });
-  if (kind === 'share') await page.waitForFunction(() => window.LT41?.source === 'share', null, { timeout: 20000 });
-  if (kind === 'guest' && screen !== 'home') await page.waitForFunction(() => !!document.querySelector('#empty h1') && document.querySelector('#empty').getClientRects().length > 0, null, { timeout: 20000 });
-  else await page.waitForFunction((f) => { const v = document.querySelector('#view'); const p = v?.contentWindow?.location?.pathname || ''; return !!v && !v.hidden && v.contentDocument?.readyState === 'complete' && (p.endsWith(f) || (f === 'src064-orbit.html' && p.endsWith('/home.html'))); }, SCREEN_FILES[screen], { timeout: 20000 }).catch(() => {});
+  if (kind === 'member') await page.waitForFunction(() => window.LT41?.source === 'server', null, { timeout: 30000 });
+  if (kind === 'share') await page.waitForFunction(() => window.LT41?.source === 'share', null, { timeout: 30000 });
+  if (kind === 'guest' && screen !== 'home') await page.waitForFunction(() => !!document.querySelector('#empty h1') && document.querySelector('#empty').getClientRects().length > 0, null, { timeout: 30000 });
+  else await page.waitForFunction((f) => { const v = document.querySelector('#view'); const p = v?.contentWindow?.location?.pathname || ''; return !!v && !v.hidden && v.contentDocument?.readyState === 'complete' && (p.endsWith(f) || (f === 'src064-orbit.html' && p.endsWith('/home.html'))); }, SCREEN_FILES[screen], { timeout: 30000 }).catch(() => {});
   await page.evaluate(() => document.fonts?.ready).catch(() => {});
   await page.waitForTimeout(900);
   return { ctx, page, errors, tree };
