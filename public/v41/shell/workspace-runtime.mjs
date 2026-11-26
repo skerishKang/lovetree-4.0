@@ -32,24 +32,30 @@ export function createWorkspaceRuntime(ctx){
     if(authPendingGuest()){waitAuthThenEmpty();return;}
     paintEmptyNow();}}
 
-  function authPendingGuest(){return document.documentElement.dataset.ltAuthPhase==='pending'&&!ctx.member?.snapshot().owned;}
+  // 확인 중: 아직 회원으로 확정되지 않았고, 회원 세션이 서버 확인 중(checking)이거나 세션 전이라 머리줄이 확인 중이다.
+  // 세션이 로그인 필요·연결 실패 등으로 끝났으면 확인이 끝난 것으로 본다(머리줄 표시는 그때 바뀌지 않을 수 있다 — #1109 읽기 실패).
+  function authPendingGuest(){
+    const snap=ctx.member?.snapshot();
+    if(snap?.owned)return false;
+    if(snap?.phase&&snap.phase!=='checking')return false;
+    return document.documentElement.dataset.ltAuthPhase==='pending';
+  }
   // 261118 대표 결정: 트리 0개 계정이 주소(#my/shelf 등)로 바로 들어와도 그 화면의 빈 상태(#817)를 보여 준다 —
   // 탭을 눌러 열 때와 같은 문구('아직 책장이 비어 있어요.' 등)로 시작한다. 빈 상태에서는 불러올 화면이 없으므로 덮개도 걷는다(#1487).
   function paintEmptyNow(){ctx.shellStageLoading.cancel();paintEmptyForScreen(ctx.current);(0,ctx.$)('empty').hidden=false;links();}
-  let authWait=null;
+  let authWait=0;
   function waitAuthThenEmpty(){
     (0,ctx.$)('empty').hidden=true;
     ctx.shellStageLoading.start('auth');
-    if(authWait)return;
-    const root=document.documentElement;
-    authWait=new MutationObserver(()=>{
-      if(root.dataset.ltAuthPhase==='pending')return;
-      authWait.disconnect();authWait=null;
-      // 회원이면 기록을 받은 쪽(choose·show)이 화면을 연다. 손님으로 확정됐고 열린 트리가 없을 때만 빈 상태를 그린다.
-      if(ctx.member?.snapshot().owned||window.LT41||ctx.current==='src064-orbit.html')return;
-      paintEmptyNow();
-    });
-    authWait.observe(root,{attributes:true,attributeFilter:['data-lt-auth-phase']});
+    // 회원 상태가 바뀔 때(member-runtime)는 settleAuthWait를 바로 부른다. 머리줄 확정처럼 다른 길로 끝날 때를 위해 짧게도 살펴본다.
+    if(!authWait)authWait=setInterval(settleAuthWait,100);
+  }
+  // 확인이 끝났으면 대기를 마친다. 회원이면 기록을 받은 쪽(choose·show)이 화면을 연다. 회원이 아니고 열린 트리가 없을 때만 빈 상태를 그린다.
+  function settleAuthWait(){
+    if(!authWait||authPendingGuest())return;
+    clearInterval(authWait);authWait=0;
+    if(ctx.member?.snapshot().owned||window.LT41||ctx.current==='src064-orbit.html'||!(0,ctx.$)('empty').hidden)return;
+    paintEmptyNow();
   }
 
   // #453 D2: 빈 화면 문구·단추는 계정 상태에 맞춘다. 로그인한 사람에게 '로그인한 계정의 기록을 불러오세요'는 어색하고,
@@ -179,6 +185,7 @@ export function createWorkspaceRuntime(ctx){
     syncTreeTips:{get:()=>syncTreeTips,set:value=>{syncTreeTips=value;}},
     choose:{value:choose},
     paintEmptyForScreen:{value:paintEmptyForScreen},
+    settleAuthWait:{value:settleAuthWait},
     paintEmptyCopy:{value:paintEmptyCopy},
     onExploreRoute:{get:()=>onExploreRoute,set:value=>{onExploreRoute=value;}},
     load:{value:load},
