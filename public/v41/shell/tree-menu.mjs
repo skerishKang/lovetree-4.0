@@ -151,14 +151,33 @@ if(treePopover)treePopover.addEventListener('keydown',event=>{
   else if(!event.shiftKey && at===items.length-1){event.preventDefault();items[0]?.focus();}
  }
 });
+// The closing pointer press must not also activate a control underneath the picker.
+// Keep the paired click in its source document, including clicks inside the view iframe.
+const pendingOutsideClicks=new WeakMap();
+function outsidePointerDown(event){
+ const doc=event.currentTarget;
+ pendingOutsideClicks.delete(doc);
+ if(!treePopover||treePopover.hidden||treePopover.contains(event.target))return;
+ pendingOutsideClicks.set(doc,{x:event.clientX,y:event.clientY});
+ event.preventDefault();event.stopImmediatePropagation();
+ closeTreeMenu(true);
+}
 function outsideClick(event){
- if(!treePopover||treePopover.hidden)return;
- if(treePopover.contains(event.target))return;
- event.preventDefault();event.stopPropagation();closeTreeMenu(true);
+ const doc=event.currentTarget;
+ const pending=pendingOutsideClicks.get(doc);
+ if(pending){
+  pendingOutsideClicks.delete(doc);
+  if(Math.abs(event.clientX-pending.x)<=8 && Math.abs(event.clientY-pending.y)<=8){
+   event.preventDefault();event.stopImmediatePropagation();return;
+  }
+ }
+ if(!treePopover||treePopover.hidden||treePopover.contains(event.target))return;
+ event.preventDefault();event.stopImmediatePropagation();closeTreeMenu(true);
 }
 function escKey(event){
  if(event.key==='Escape'&&treePopover&&!treePopover.hidden){event.preventDefault();event.stopPropagation();closeTreeMenu(true);}
 }
+document.addEventListener('pointerdown',outsidePointerDown,true);
 document.addEventListener('click',outsideClick,true);
 document.addEventListener('keydown',escKey,true);
 function bindFrame(frame){

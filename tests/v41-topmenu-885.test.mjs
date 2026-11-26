@@ -654,6 +654,26 @@ test('#1367 4번: 트리 고르기 목록은 바깥 누름·안쪽 화면 누름
         assert.equal(await hidden(), true, `${width}/${theme}: 안쪽 화면 누름으로 닫힌다`);
 
         // Esc로 닫고 초점은 트리 고르기 단추로 돌아온다.
+        if (width === 1440) {
+          await page.evaluate(() => {
+            const button = document.createElement('button');
+            button.id = 'share-under-picker-test';
+            button.textContent = '??';
+            Object.assign(button.style, { position: 'fixed', right: '30px', bottom: '120px', zIndex: '1' });
+            button.onclick = () => document.getElementById('share-menu').click();
+            document.body.append(button);
+          });
+          await open();
+          await page.locator('#share-under-picker-test').click();
+          assert.equal(await hidden(), true, `${width}/${theme}: ? ??? ??? ???`);
+          assert.equal(await page.locator('#share-panel').evaluate(dialog => dialog.open), false, `${width}/${theme}: ? ??? ?? ?? ??? ???`);
+          await page.locator('#share-under-picker-test').click();
+          await page.locator('#share-panel[open]').waitFor({state:'visible',timeout:5000});
+          assert.equal(await page.locator('#share-panel').evaluate(dialog => dialog.open), true, `${width}/${theme}: ? ?? ?? ??? ????`);
+          await page.locator('#share-panel [data-close="share-panel"]').click();
+          await page.locator('#share-panel').waitFor({state:'hidden',timeout:5000});
+          await page.locator('#share-under-picker-test').evaluate(button => button.remove());
+        }
         await open();
         await page.keyboard.press('Escape');
         assert.equal(await hidden(), true, `${width}/${theme}: Esc로 닫힌다`);
