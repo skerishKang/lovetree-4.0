@@ -881,6 +881,18 @@ jobs:
           fc-cache -f >/dev/null 2>&1 || true
           echo "한글 글꼴 $(fc-list :lang=ko | wc -l)개 · 대표 $(fc-match 'sans-serif:lang=ko' | head -1)"
           echo "한글 글꼴 준비 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+      # B-04: 그룹 칩·머리줄 시험 연결(건너뜀=실패).
+      # #1413 4단계: 지도 대비 잡에서 옮겨 왔다. 같은 브라우저·한글 글꼴 준비를 쓰고, 지도 대비 잡과 같이
+      # 빌드 결과(dist) 없이 돌도록 아래 공통 검사기(vite build) 앞에 둔다. 도는 조건(화면 바뀜이면 늘)도 같다.
+      - name: 둘러보기 칩·머리줄 시험(건너뜀=실패 — #784·#1025)
+        env:
+          LT_COMMUNITY_784_REQUIRE: '1'
+          LT_HEADER_IA_REQUIRE: '1'
+        if: needs.screen-changes.outputs.changed == 'true'
+        run: |
+          start=$(date +%s)
+          node --test --test-concurrency=1 tests/v41-community-chips-784.test.mjs tests/v41-header-ia.test.mjs
+          echo "둘러보기 칩·머리줄 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
       - name: 화면 공통 검사기 shard a(건너뜀=실패 — #657·#1080)
         timeout-minutes: 10
         if: needs.screen-changes.outputs.changed == 'true'
@@ -1257,7 +1269,9 @@ jobs:
           fc-cache -f >/dev/null 2>&1 || true
           echo "한글 글꼴 $(fc-list :lang=ko | wc -l)개 · 대표 $(fc-match 'sans-serif:lang=ko' | head -1)"
           echo "한글 글꼴 준비 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
-      # 지도는 추후 개발(11-22 대표 결정): 지도 파일이 안 바뀐 PR에서는 이 단계를 건너뛴다(같은 잡의 서재·순간 시험은 그대로 돈다).
+      # 지도는 추후 개발(11-22 대표 결정): 지도 파일이 안 바뀐 PR에서는 이 단계를 건너뛴다.
+      # #1413 4단계: 같은 잡에 있던 서재·날짜 시험은 '화면 시험 — 서재·날짜' 잡으로, 둘러보기 칩·머리줄 시험은
+      # '화면 공통 검사기 a/3' 잡으로 옮겼다. 이 잡에는 지도 대비·부채꼴 시험만 남는다.
       - name: 지도 실제 대비 시험(건너뜀=실패)
         env:
           LT_MAP_CONTRAST_REQUIRE: '1'
@@ -1283,6 +1297,110 @@ jobs:
           [ $r1 -eq 0 ] && [ $r2 -eq 0 ] || exit 1
           echo "지도 실제 대비·부채꼴 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
 
+      - name: 화면 변경 없으면 건너뜀을 남긴다
+        if: always()
+        run: |
+          if [ "${{ needs.screen-changes.outputs.changed }}" != "true" ]; then
+            echo "건너뜀(화면 변경 없음)" | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+  # #1413 4단계: 서재·날짜 시험(#970)이 지도 대비 잡을 23분으로 붙잡던 것을 떼어 낸다. 그 20분 중 대부분은 시험이
+  # 숨은 소개 질문 단추를 누르려고 30초씩 기다리던 헛대기였다(같은 PR에서 고침 — 로컬 실측 2분 남짓).
+  # 브라우저·한글 글꼴 준비는 지도 대비 잡과 같고(글자 폭을 재므로 같은 Noto CJK 글꼴), '바뀐 화면만' 판정과
+  # 초안 건너뛰기는 다른 화면 잡과 같은 규칙이다(서재 시험 파일만 바뀌면 이 잡만 고른다).
+  screen-shelf:
+    name: 화면 시험 — 서재·날짜
+    # 실행기 선택은 보드·첫 화면 잡과 같은 식이다 — 같은 저장소 PR이고 저장소 변수(USE_CGI_RUNNER)가 켜져 있으면
+    # CGI 자체 실행기, 포크 PR이나 변수가 꺼진 경우에는 호스트에서 돈다.
+    runs-on: ${{ fromJSON((github.event.pull_request.head.repo.full_name == github.repository && vars.USE_CGI_RUNNER == '1') && '["self-hosted","Linux","X64","cgi"]' || '["ubuntu-latest"]') }}
+    timeout-minutes: 12
+    needs: screen-changes
+    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || needs.screen-changes.outputs.jobs == '' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-shelf,'))
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          clean: true
+      # 같은 CGI 컴퓨터의 자체 실행기 여러 개가 홈의 npm 캐시를 함께 쓰면 동시에 받다가 깨진다(보드 잡과 같은 식).
+      - name: 실행기별 npm 캐시 폴더(자체 실행기)
+        if: runner.environment == 'self-hosted'
+        run: echo "npm_config_cache=$HOME/.npm-runner-$RUNNER_NAME" >> "$GITHUB_ENV"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      # 자체 실행기는 홈 폴더에 Chromium·글꼴이 그대로 남으므로 Actions 캐시를 쓰지 않는다(보드 잡과 같은 식).
+      - uses: actions/cache@v4
+        if: runner.environment != 'self-hosted'
+        with:
+          path: ~/.cache/ms-playwright
+          key: ms-playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - name: 브라우저 준비(Playwright Chromium, 캐시)
+        id: browser
+        if: needs.screen-changes.outputs.changed == 'true'
+        run: |
+          # 모듈은 항상 설치한다(캐시는 브라우저 바이너리에만 걸린다). 캐시가 있어도 모듈이 없으면 실행이 안 된다.
+          npm i --no-save --no-package-lock playwright@$(node -p "require('./package-lock.json').packages['node_modules/playwright'].version")
+          if [ "$RUNNER_ENVIRONMENT" = "self-hosted" ]; then
+            # 자체 실행기: 이 버전 Chromium이 있으면 받지 않고 끝난다(시스템 라이브러리는 미리 깔림, sudo 없음).
+            npx playwright install chromium
+          elif ls "$HOME/.cache/ms-playwright" 2>/dev/null | grep -q chromium; then
+            echo "캐시된 Chromium 사용"
+          else
+            npx playwright install --with-deps chromium
+          fi
+          node -e "import('playwright-core').then(()=>console.log('playwright-core 확인')).catch(e=>{console.error(e.message);process.exit(1)})"
+      - uses: actions/cache@v4
+        if: runner.environment != 'self-hosted'
+        with:
+          path: ~/.fonts
+          key: fonts-noto-cjk-${{ runner.os }}-1
+      # 이슈 947: apt-get이 가끔 10분 넘게 멈춘다(실측 — 지도 도구 줄 잡 10분 단계 초과). 매번 apt로 받지 않고
+      # 글꼴 파일(~/.fonts)을 캐시에 두고, 캐시가 있으면 fc-cache만 한다. 없을 때만 설치해 캐시에 쌓는다.
+      - name: 한글 글꼴 준비(캐시, 없으면 설치)
+        if: needs.screen-changes.outputs.changed == 'true'
+        timeout-minutes: 10
+        run: |
+          start=$(date +%s)
+          # 두 갈래만 둔다(실행기마다 글꼴 구성이 달라 fc-list로 판단하면 캐시를 채울 기회를 놓친다 — 실측).
+          # APT mirror delays must not prevent the same Noto CJK font from being installed.
+          # Pin the upstream font revision; the APT path below remains as fallback.
+          # Upstream pinned revision: SHA-256 checked for both cached and downloaded copies.
+          noto_font="$HOME/.fonts/NotoSansCJK-Regular.ttc"
+          noto_sha256="b76b0433203017ca80401b2ee0dd69350349871c4b19d504c34dbdd80541690a"
+          if [ -f "$noto_font" ] && ! echo "$noto_sha256  $noto_font" | sha256sum --check --status; then
+            rm -f "$noto_font"
+          fi
+          if [ ! -f "$noto_font" ]; then
+            mkdir -p "$HOME/.fonts"
+            if curl -fLsS --retry 2 --connect-timeout 10 --max-time 90 "https://raw.githubusercontent.com/notofonts/noto-cjk/f8d157532fbfaeda587e826d4cd5b21a49186f7c/Sans/OTC/NotoSansCJK-Regular.ttc" -o "$noto_font"; then
+              if ! echo "$noto_sha256  $noto_font" | sha256sum --check --status; then
+                echo "Noto CJK checksum mismatch; falling back to APT"
+                rm -f "$noto_font"
+              fi
+            else
+              rm -f "$noto_font"
+            fi
+          fi
+          if [ -f "$HOME/.fonts/NotoSansCJK-Regular.ttc" ]; then
+            echo "캐시된 한글 글꼴 사용($(ls "$HOME/.fonts" | wc -l)개 파일)"
+          else
+            echo "캐시된 한글 글꼴 없음 — fonts-noto-cjk 설치해 ~/.fonts에 쌓는다"
+            sudo apt-get update -qq || true
+            ok=0
+            for i in 1 2 3; do
+              if sudo timeout 150 apt-get install -y -qq --no-install-recommends fonts-noto-cjk; then ok=1; break; fi
+              echo "apt-get install $i번째 시도 실패/멈춤 — 다시 시도"
+              sleep 5
+            done
+            [ $ok -eq 1 ] || { echo "fonts-noto-cjk 설치 실패"; exit 1; }
+            mkdir -p "$HOME/.fonts"
+            sudo cp /usr/share/fonts/opentype/noto/*.tt* "$HOME/.fonts/" 2>/dev/null || sudo find /usr/share/fonts -name 'Noto*CJK*.ttc' -exec cp {} "$HOME/.fonts/" \; 2>/dev/null || true
+            echo "쌓은 글꼴 파일 $(ls "$HOME/.fonts" | wc -l)개"
+          fi
+          fc-cache -f >/dev/null 2>&1 || true
+          echo "한글 글꼴 $(fc-list :lang=ko | wc -l)개 · 대표 $(fc-match 'sans-serif:lang=ko' | head -1)"
+          echo "한글 글꼴 준비 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
       # 이슈 970: 서재(책이 왼쪽부터·책장 세로 가운데·넘칠 때만 화살표)와 날짜 표시(시계 고정)를
       # 실제 화면에서 잰다. 서재 여백 수치는 고정하지 않는다(#972 여백 수정과 겹치지 않게).
       # 건너뜀=실패(크롬이 준비된 이 잡에서 돈다).
@@ -1294,18 +1412,6 @@ jobs:
           start=$(date +%s)
           node --test --test-concurrency=1 tests/v41-970-shelf-date.test.mjs
           echo "서재·날짜 표시 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
-
-      # B-04: 그룹 칩·머리줄 시험 연결(건너뜀=실패).
-      - name: 둘러보기 칩·머리줄 시험(건너뜀=실패 — #784·#1025)
-        env:
-          LT_COMMUNITY_784_REQUIRE: '1'
-          LT_HEADER_IA_REQUIRE: '1'
-        if: needs.screen-changes.outputs.changed == 'true'
-        run: |
-          start=$(date +%s)
-          node --test --test-concurrency=1 tests/v41-community-chips-784.test.mjs tests/v41-header-ia.test.mjs
-          echo "둘러보기 칩·머리줄 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
-
       - name: 화면 변경 없으면 건너뜀을 남긴다
         if: always()
         run: |
@@ -1834,7 +1940,7 @@ jobs:
     name: 미리보기 postdeploy(로그아웃)
     runs-on: ubuntu-latest
     if: always()
-    needs: [screen-changes, screen-board, screen-home, screen-home-followup, screen-book, screen-reload, screen-shell, screen-shell-extra, screen-map-a, screen-map-b, screen-book-screen, screen-audit-a, screen-audit-b, screen-audit-c, deploy]
+    needs: [screen-changes, screen-board, screen-home, screen-home-followup, screen-book, screen-reload, screen-shell, screen-shell-extra, screen-map-a, screen-shelf, screen-map-b, screen-book-screen, screen-audit-a, screen-audit-b, screen-audit-c, deploy]
     steps:
       - uses: actions/checkout@v4
         with:
