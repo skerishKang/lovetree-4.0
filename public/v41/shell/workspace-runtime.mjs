@@ -27,9 +27,36 @@ export function createWorkspaceRuntime(ctx){
   function choose(id,momentId,skipShow=false){const tree=ctx.model.trees.find(t=>t.id===id);if(skipShow&&window.LT41?.tree?.id===tree?.id){window.LT41.momentId=tree.moments.find(m=>m.id===momentId)?.id||tree.moments.find(m=>m.parentId===null)?.id||tree.moments[0]?.id;window.LT41.prefs=(0,ctx.currentPrefs)();window.LT41.writable=ctx.source==='server'&&!!ctx.member?.snapshot().writable;return;}window.LT41=tree?{tree,trees:ctx.model.trees,source:ctx.source,momentId:tree.moments.find(m=>m.id===momentId)?.id||tree.moments.find(m=>m.parentId===null)?.id||tree.moments[0]?.id,prefs:(0,ctx.currentPrefs)(),writable:ctx.source==='server'&&!!ctx.member?.snapshot().writable,}:null;
     if(!skipShow&&(tree||ctx.current==='src064-orbit.html'))show(ctx.current,false,id||'');
    else if(!skipShow||!tree){(0,ctx.flowNavigation)();document.body.classList.remove('home-screen');hideFrames();
-    // 261118 대표 결정: 트리 0개 계정이 주소(#my/shelf 등)로 바로 들어와도 그 화면의 빈 상태(#817)를 보여 준다 —
-    // 탭을 눌러 열 때와 같은 문구('아직 책장이 비어 있어요.' 등)로 시작한다.
-    paintEmptyForScreen(ctx.current);(0,ctx.$)('empty').hidden=false;links();}}
+    // #1487: 로그인 확인 중에는 손님 안내('로그인하면 내 … 보여요')를 그리지 않고 첫 화면처럼 '불러오는 중'을 보인다.
+    // 확인 응답 전에 이미 로그인한 사람에게 다시 로그인하라고 하지 않는다. 손님으로 확정되면 그때 빈 상태를 그린다.
+    if(authPendingGuest()){waitAuthThenEmpty();return;}
+    paintEmptyNow();}}
+
+  // 확인 중: 아직 회원으로 확정되지 않았고, 회원 세션이 서버 확인 중(checking)이거나 세션 전이라 머리줄이 확인 중이다.
+  // 세션이 로그인 필요·연결 실패 등으로 끝났으면 확인이 끝난 것으로 본다(머리줄 표시는 그때 바뀌지 않을 수 있다 — #1109 읽기 실패).
+  function authPendingGuest(){
+    const snap=ctx.member?.snapshot();
+    if(snap?.owned)return false;
+    if(snap?.phase&&snap.phase!=='checking')return false;
+    return document.documentElement.dataset.ltAuthPhase==='pending';
+  }
+  // 261118 대표 결정: 트리 0개 계정이 주소(#my/shelf 등)로 바로 들어와도 그 화면의 빈 상태(#817)를 보여 준다 —
+  // 탭을 눌러 열 때와 같은 문구('아직 책장이 비어 있어요.' 등)로 시작한다. 빈 상태에서는 불러올 화면이 없으므로 덮개도 걷는다(#1487).
+  function paintEmptyNow(){ctx.shellStageLoading.cancel();paintEmptyForScreen(ctx.current);(0,ctx.$)('empty').hidden=false;links();}
+  let authWait=0;
+  function waitAuthThenEmpty(){
+    (0,ctx.$)('empty').hidden=true;
+    ctx.shellStageLoading.start('auth');
+    // 회원 상태가 바뀔 때(member-runtime)는 settleAuthWait를 바로 부른다. 머리줄 확정처럼 다른 길로 끝날 때를 위해 짧게도 살펴본다.
+    if(!authWait)authWait=setInterval(settleAuthWait,100);
+  }
+  // 확인이 끝났으면 대기를 마친다. 회원이면 기록을 받은 쪽(choose·show)이 화면을 연다. 회원이 아니고 열린 트리가 없을 때만 빈 상태를 그린다.
+  function settleAuthWait(){
+    if(!authWait||authPendingGuest())return;
+    clearInterval(authWait);authWait=0;
+    if(ctx.member?.snapshot().owned||window.LT41||ctx.current==='src064-orbit.html'||!(0,ctx.$)('empty').hidden)return;
+    paintEmptyNow();
+  }
 
   // #453 D2: 빈 화면 문구·단추는 계정 상태에 맞춘다. 로그인한 사람에게 '로그인한 계정의 기록을 불러오세요'는 어색하고,
   // 백업 파일 열기는 계정 없이 쓰는 입구라 로그인 상태에서는 숨긴다(로그아웃은 지금 그대로 둔다).
@@ -158,6 +185,9 @@ export function createWorkspaceRuntime(ctx){
     syncTreeTips:{get:()=>syncTreeTips,set:value=>{syncTreeTips=value;}},
     choose:{value:choose},
     paintEmptyForScreen:{value:paintEmptyForScreen},
+    settleAuthWait:{value:settleAuthWait},
+    authPendingGuest:{value:authPendingGuest},
+    waitAuthThenEmpty:{value:waitAuthThenEmpty},
     paintEmptyCopy:{value:paintEmptyCopy},
     onExploreRoute:{get:()=>onExploreRoute,set:value=>{onExploreRoute=value;}},
     load:{value:load},

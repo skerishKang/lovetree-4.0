@@ -91,7 +91,7 @@ const USAGE = `lovetree-postdeploy ${TOOL_VERSION}
   -h, --help          이 도움말
 
 로그인 세션:
-  수동: node postdeploy.mjs <주소> --login   (열린 창에서 로그인 후 터미널에서 Enter)
+  수동: node postdeploy.mjs <주소> --login --headed   (열린 창에서 로그인 후 터미널에서 Enter)
   자동: node postdeploy.mjs <주소> --auto-login --account 02 (--secrets 기본 %USERPROFILE%\\.secrets\\.env 의 PADIEM_TUTORIAL02_EMAIL/_PASSWORD 로 로그인)
   계정 선택: --account 인자 > LT_ACCOUNT 환경변수 > 둘 다 없으면 계정을 쓰는 실행(--auto-login·--auth-flows)은 시작 전에 멈춘다(#344, 레인별 전용 계정 #300).
   이후 실행은 같은 프로필을 재사용하므로 비밀번호 없이 읽기 검사를 돌린다.
@@ -125,7 +125,7 @@ function parseArgs(argv) {
     switch (a) {
       case '-h':
       case '--help': opts.help = true; break;
-      case '--login': opts.login = true; opts.headless = false; break;
+      case '--login': opts.login = true; break;
       case '--headed': opts.headless = false; break;
       case '--write': opts.write = true; break;
       case '--strict': opts.strict = true; break;
@@ -135,8 +135,8 @@ function parseArgs(argv) {
       case '--share': opts.share = argv[++i]; break;
       case '--youtube': opts.youtube = argv[++i]; break;
       case '--timeout': opts.timeout = Number(argv[++i]); break;
-      case '--cdp': opts.cdp = argv[++i]; opts.headless = false; break;
-      case '--auto-login': opts.autoLogin = true; opts.headless = false; break;
+      case '--cdp': opts.cdp = argv[++i]; break;
+      case '--auto-login': opts.autoLogin = true; break;
       case '--auth-flows': opts.authFlows = true; break;
       case '--frame-reload': opts.frameReload = true; break;
       case '--account': opts.account = argv[++i]; break;
@@ -2407,6 +2407,11 @@ async function main() {
   console.log(`프로필: ${opts.profile}`);
   console.log(`모드: ${opts.autoLogin ? 'auto-login' : opts.login ? 'login' : opts.write ? 'read+write' : 'read-only'} / headless=${opts.headless}`);
   console.log('');
+
+  if (opts.login && opts.headless) {
+    console.error('수동 로그인은 창에서 비밀번호를 입력해야 합니다. --login --headed 로 실행하세요.');
+    return 1;
+  }
 
   if (opts.login && opts.autoLogin) {
     console.error('--login 과 --auto-login 은 함께 쓸 수 없습니다.');

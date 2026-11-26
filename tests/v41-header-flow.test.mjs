@@ -69,8 +69,7 @@ test('상태 4 × 화면 5: 보이는 버튼·문구·접근성 이름이 표대
           aria: h.els['tree-views'].getAttribute('aria-label')
         };
         const want = { ...state.expect };
-        // #942: 처음 온 사람의 첫 화면에서만 머리줄 추가 단추를 숨긴다.
-        if (state.name==='로그인·트리 없음' && file==='src064-orbit.html') want.writeMenu=false;
+        // #1487 결정(2026-11-27): 트리 0개 첫 화면에서도 머리줄 추가 단추를 보인다(#942의 첫 화면 숨김을 바꿈).
         // 2026-11-18 13:49 대표 결정: 트리 선택은 서재를 포함한 모든 화면에서 같게 보인다.
         assert.deepEqual(got, want, `${state.name} × ${label}`);
         table.push(`${state.name} × ${label}: ${JSON.stringify(got)}`);
@@ -82,14 +81,19 @@ test('상태 4 × 화면 5: 보이는 버튼·문구·접근성 이름이 표대
   assert.equal(table.length, 20, '상태 4 × 화면 5 = 20칸을 모두 확인한다');
 });
 
-test('#942 트리가 있어도 순간이 없으면 첫 화면 추가 단추만 숨긴다', () => {
+test('#1487 순간이 없어도 내 기록이면 첫 화면을 포함한 다섯 화면에서 추가 단추를 보인다', () => {
   for (const [label,file] of SCREENS) {
-    const h=createHeaderHarness({owned:true,trees:1,moments:0,tree:{title:'빈 트리'},source:'server',current:file});
-    try {
-      h.header.flowNavigation();
-      assert.equal(h.els['write-menu'].hidden,file==='src064-orbit.html',label);
-    } finally {h.restore()}
+    for (const trees of [0, 1]) {
+      const h=createHeaderHarness({owned:true,trees,moments:0,tree:trees?{title:'빈 트리'}:null,source:'server',current:file});
+      try {
+        h.header.flowNavigation();
+        assert.equal(h.els['write-menu'].hidden,false,label+' 트리 '+trees);
+      } finally {h.restore()}
+    }
   }
+  // 로그인했어도 예시를 보는 중(내 기록이 아님)이면 첫 화면 추가 단추는 숨긴다(예시에는 저장하지 않는다).
+  const h=createHeaderHarness({owned:true,trees:0,moments:0,tree:null,source:'example',current:'src064-orbit.html'});
+  try { h.header.flowNavigation(); assert.equal(h.els['write-menu'].hidden,true,'예시 첫 화면'); } finally {h.restore()}
 });
 
 test('어느 상태·화면에서도 비활성(disabled)으로 남기지 않고 숨김으로 정리한다', () => {

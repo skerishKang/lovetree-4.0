@@ -486,3 +486,16 @@ test('#1026 마지막 순간 영상은 후보를 기다리고 같은 칸에서�
   assert.equal(applyThumbOutcome(bad.img,{error:true}).status,'fallback');
   assert.equal(bad.media.dataset.recentState,'failed');
 });
+
+test('#1480 작은 영상 썸네일 실패 시 대체 표지로 바뀌고 깨진 img를 지운다',()=>{
+ const candidates=['https://i.ytimg.com/vi/abc123DEF45/hqdefault.jpg'];
+ const attrs={'data-lt-candidates':JSON.stringify(candidates),'data-lt-cand-index':'0','data-lt-fallback-mode':'thumb-slot','data-lt-fallback-html':'<span class="lt-recent-fallback">첫</span>'};
+ const row={querySelector:()=>null};let html='',removed=false;
+ const slot={insertAdjacentHTML:(where,value)=>{html=value;}};
+ const img={dataset:{},src:candidates[0],getAttribute:k=>attrs[k],setAttribute:(k,v)=>attrs[k]=v,closest:sel=>sel==='[data-lt-moment-row]'?row:sel.includes('.cleanup-moment-thumb-slot')?slot:null,remove:()=>{removed=true;}};
+ assert.equal(applyThumbOutcome(img,{error:true})?.status,'fallback');
+ assert.equal(removed,true,'실패한 그림은 남지 않아야 합니다');
+ assert.match(html,/lt-recent-fallback/);
+ const computed=thumbFallbackAttrs({title:'첫 순간',type:'video',url:'https://youtu.be/abc123DEF45'},{candidates,mode:'thumb-slot'});
+ assert.match(computed,/lt-recent-fallback/,'기존 대체 표지를 사용해야 합니다');
+});
