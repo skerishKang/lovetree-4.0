@@ -9,6 +9,7 @@ import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 import { serve } from './helpers/screen-audit.mjs';
 import { createTree, addMoment } from '../public/v41/domain.mjs';
+import { dismissDiscoverAskIfOpen } from './helpers/discover-ask.mjs';
 
 const REQUIRE = process.env.LT_970_REQUIRE === '1';
 let chromium, skip = false;
@@ -248,7 +249,7 @@ async function withGuardWorkspace(trees, { width = 1440, height = 900, quarantin
     page.on('console', (message) => { if (message.type() === 'warning') warnings.push(message.text()); });
     await page.goto(`${origin}/v41/?account=1`, { waitUntil: 'load' });
     await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
-    await page.locator('#discover-ask-no').click().catch(() => {});
+    await dismissDiscoverAskIfOpen(page);
     await page.waitForTimeout(300);
     await fn({ page, errors, warnings, puts });
   } finally {
@@ -409,7 +410,8 @@ async function withLiveShell(state, { width = 1440, height = 900 } = {}, fn) {
     page.on('pageerror', (error) => errors.push(String(error.message || error)));
     await page.goto(`${origin}/v41/?account=1`, { waitUntil: 'load' });
     await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
-    await page.locator('#discover-ask-no').click().catch(() => {});
+    // #1478: 위에서 모든 시험 트리를 이미 물은 것으로 두어 질문 창은 뜨지 않는다 — 보이지 않는 단추를 30초 기다리지 않는다.
+    await dismissDiscoverAskIfOpen(page);
     await page.waitForTimeout(300);
     await fn({ page, errors, live, origin });
   } finally {
