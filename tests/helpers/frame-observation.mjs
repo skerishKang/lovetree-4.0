@@ -116,8 +116,9 @@ async function finishBookObservation(page) {
   await page.waitForFunction(() => [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length)?.contentDocument?.querySelector('.moment.focused'), null, { timeout: 30000 });
   await page.evaluate(() => {
     const frame = [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length);
-    frame.contentWindow.dispatchEvent(new Event('lt41-tagline-ready'));
+    frame.contentWindow.dispatchEvent(new frame.contentWindow.Event('lt41-tagline-ready'));
   });
+  await page.waitForFunction(() => { const frame = [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length); const doc = frame?.contentDocument; return !!doc?.querySelector('.moment') && !doc.querySelector('.moment.focused') && !doc.querySelector('.moment.landed'); }, null, { timeout: 30000 });
   await page.clock.fastForward(0);
 }
 
