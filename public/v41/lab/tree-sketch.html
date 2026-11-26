@@ -12,6 +12,7 @@
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="modulepreload" href="./tree-layout.mjs">
 <link rel="modulepreload" href="./tree-sketch-data.mjs">
+<link rel="modulepreload" href="./tree-path-play.mjs">
 <link rel="stylesheet" href="../identity.css">
 <style>
 :root{
@@ -77,6 +78,13 @@ body{background:var(--lt-stage);color:var(--lt-pearl);font-family:var(--lt-ui);o
 .ts-soil{fill:none;stroke:var(--ts-soil);stroke-linecap:round}
 .ts-root{fill:none;stroke:var(--ts-wood);stroke-linecap:round}
 .ts-lit{fill:var(--ts-path)}
+.ts-play-line{filter:drop-shadow(0 0 4px var(--ts-path));pointer-events:none}
+.ts-card.is-path-pulse{border-color:var(--lt-gold);box-shadow:0 0 0 2px var(--lt-gold-line),0 0 16px var(--lt-gold-glow)}
+.ts-play-controls{position:fixed;left:max(14px,env(safe-area-inset-left));bottom:max(70px,calc(env(safe-area-inset-bottom) + 56px));z-index:4;display:flex;gap:6px;align-items:center}
+.ts-play-controls button{min-height:44px;min-width:44px;padding:0 12px;border:1px solid var(--lt-line);border-radius:var(--lt-r-pill);background:var(--lt-glass-strong);color:var(--lt-pearl);font:600 13px var(--lt-ui);cursor:pointer}
+.ts-play-controls button:focus-visible{outline:2px solid var(--lt-gold);outline-offset:2px}
+.ts-play-controls button:disabled{opacity:.45;cursor:default}
+@media(prefers-reduced-motion:reduce){.ts-play-line{filter:none}}
 .ts-stage[data-style="1"] .ts-grain,.ts-stage[data-style="1"] .ts-leaf,.ts-stage[data-style="1"] .ts-root,.ts-stage[data-style="1"] .ts-stump{display:none}
 .ts-stump{fill:var(--ts-wood)}
 .ts-stage.has-pick .ts-limb{opacity:.38}
@@ -175,12 +183,17 @@ body{background:var(--lt-stage);color:var(--lt-pearl);font-family:var(--lt-ui);o
 
 <main class="ts-stage" id="stage" tabindex="0" aria-label="트리 보기 — 끌어서 옮기고, 휠이나 두 손가락으로 확대합니다">
   <div class="ts-world" id="world">
-    <svg class="ts-wood" id="wood" aria-hidden="true"><g id="ground"></g><g id="leaves"></g><g id="limbs"></g><g id="lit"></g></svg>
+    <svg class="ts-wood" id="wood" aria-hidden="true"><g id="ground"></g><g id="leaves"></g><g id="limbs"></g><g id="lit"></g><g id="playLit"></g></svg>
     <div class="ts-cards" id="cards"></div>
   </div>
 </main>
 
 <p class="ts-note" id="note" role="status"></p>
+<div class="ts-play-controls" role="group" aria-label="경로 재생">
+  <button type="button" id="pathPlay">재생</button>
+  <button type="button" id="pathReplay">다시 보기</button>
+  <button type="button" id="pathSpeed" aria-label="경로 속도 1배">1배</button>
+</div>
 <div class="ts-hud">
   <button type="button" class="ts-go" id="goRoot" title="첫 순간(뿌리)을 읽을 수 있는 크기로 보여 줍니다">뿌리로</button>
   <button type="button" id="goFit" title="나무 전체를 한 화면에 맞춥니다">전체</button>
@@ -191,12 +204,13 @@ body{background:var(--lt-stage);color:var(--lt-pearl);font-family:var(--lt-ui);o
 <script type="module">
 import { buildHierarchy, layoutTree, branchWidth, edgeWidths, branchRibbon, branchPoints } from './tree-layout.mjs';
 import { dataset, EMOTIONS } from './tree-sketch-data.mjs';
+import { createTreePathPlayer } from './tree-path-play.mjs';
 
 const scriptStart = performance.now();
 const SVG = 'http://www.w3.org/2000/svg';
 const $ = (id) => document.getElementById(id);
 const stage = $('stage'), world = $('world'), cardsEl = $('cards'), note = $('note');
-const layers = { ground: $('ground'), leaves: $('leaves'), limbs: $('limbs'), lit: $('lit') };
+const layers = { ground: $('ground'), leaves: $('leaves'), limbs: $('limbs'), lit: $('lit'), play: $('playLit') };
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
 // 시안 두 개: 자리 규칙은 같고 가지 그리는 법만 다르다(굵은 가지에 맞춰 가지 띠가 조금 넓고 높다).
@@ -229,6 +243,53 @@ const perf = { scriptStartMs: scriptStart, layoutMs: 0, drawMs: 0, firstBuildMs:
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 const svg = (tag, cls, attrs) => { const e = document.createElementNS(SVG, tag); if (cls) e.setAttribute('class', cls); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; };
 const shortDate = (d) => String(d || '').slice(2).replaceAll('-', '.');
+// 최근 순간은 접힌 카드도 포함한 원자료에서 찾는다. 경로 재생 직전에 필요한 갈림을 펼친다.
+function recentMoment(root) {
+  const stack = [root];
+  let latest = root;
+  while (stack.length) {
+    const item = stack.pop();
+    if (item.moment && (!latest.moment || String(item.moment.date || '') > String(latest.moment.date || ''))) latest = item;
+    stack.push(...item.children);
+  }
+  return latest.id;
+}
+function revealRoute(id) {
+  const stack = [state.root];
+  const parents = new Map();
+  while (stack.length) {
+    const node = stack.pop();
+    for (const child of node.children) { parents.set(child.id, node); stack.push(child); }
+  }
+  let changed = false;
+  for (let at = id; parents.has(at);) {
+    const parent = parents.get(at);
+    if (parent.children.length > 6 && !state.expanded.has(parent.id)) {
+      state.expanded.add(parent.id); changed = true;
+    }
+    at = parent.id;
+  }
+  return changed;
+}
+const player = createTreePathPlayer({
+  layer: layers.play, cards: cardsEl,
+  controls: { play: $('pathPlay'), replay: $('pathReplay'), speed: $('pathSpeed') },
+  isReduced: () => matchMedia('(prefers-reduced-motion: reduce)').matches,
+  onState: (snapshot) => { window.__TREE_PATH_STATE__ = snapshot; }
+});
+$('pathPlay').addEventListener('click', () => {
+  // 재생 시에는 현재 선택한 순간을 우선하며, 선택이 없으면 가장 최근 순간까지 이어진다.
+  if (player.status === 'idle' || player.status === 'done') {
+    const target = state.pick || recentMoment(state.root);
+    if (revealRoute(target)) { draw(); rehome(); }
+    player.configure(state.layout, target, STYLES[state.style].curve);
+  }
+}, { capture: true });
+$('pathReplay').addEventListener('click', () => {
+  const target = state.pick || recentMoment(state.root);
+  if (revealRoute(target)) { draw(); rehome(); }
+  player.configure(state.layout, target, STYLES[state.style].curve);
+}, { capture: true });
 
 function sizeOf(item) {
   const s = state.sizes;
@@ -249,6 +310,7 @@ function draw() {
   drawWood(layout, style);
   stage.dataset.style = String(state.style);
   setPick(state.pick && layout.cards.some((c) => c.id === state.pick) ? state.pick : null);
+  player.configure(layout, state.pick || recentMoment(state.root), style.curve);
   perf.drawMs = performance.now() - t0;
   tell();
 }
@@ -336,6 +398,7 @@ function drawWood(layout, style) {
 /* ── 고른 순간 강조 ─────────────────────────────────────────────────── */
 
 function setPick(id) {
+  if (state.pick !== id) player.stop();
   state.pick = id;
   const path = new Set();
   if (id) {
@@ -351,6 +414,7 @@ function setPick(id) {
   const lit = document.createDocumentFragment();
   for (const pid of path) { const d = state.ribbons.get(pid); if (d) lit.append(svg('path', 'ts-lit', { d })); }
   layers.lit.replaceChildren(lit);
+  player.configure(state.layout, id || recentMoment(state.root), STYLES[state.style].curve);
   tell();
 }
 
@@ -559,6 +623,7 @@ function mark() {
   history.replaceState(null, '', location.pathname + '?' + next);
 }
 function load(n) {
+  player.stop();
   state.n = n;
   state.root = buildHierarchy(dataset(n));
   state.expanded = new Set();
@@ -608,7 +673,7 @@ if (query.get('view') === 'root') toRoot(false); else fitAll(false);
 perf.firstBuildMs = perf.drawMs;
 perf.readyMs = performance.now();
 requestAnimationFrame((t1) => { perf.frameOneMs = performance.now(); requestAnimationFrame(() => { perf.firstPaintMs = performance.now(); tell(); }); });
-window.__TREE_SKETCH__ = { state, perf, fitAll, toRoot, zoomAt, setPick, load };
+window.__TREE_SKETCH__ = { state, perf, fitAll, toRoot, zoomAt, setPick, load, player };
 </script>
 </body>
 </html>
