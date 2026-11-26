@@ -1129,10 +1129,11 @@ test('#1356 scope menu contract: login, back, keyboard, contrast and retry', { s
     await show();
     assert.deepEqual(await options(),expected(member),key+' options preserved after tree');
     if(member){
+     const beforeMine=h.calls.mine;
      await h.page.locator('.moments-scope-chip[data-scope="mine"]').click();
      await h.page.waitForFunction(()=>document.querySelector('#community-moments-panel .moments-title')?.textContent==='내 순간 하나',null,{timeout:10000});
      assert.match(h.page.url(),/scope=mine/,key+' mine hash');
-     const before=h.calls.mine;assert.ok(before>0,key+' mine requested');
+     assert.equal(h.calls.mine,beforeMine+1,key+' exactly one mine request');
      assert.equal(await panel.evaluate(n=>n.scrollTop),0,key+' scroll reset');
      await h.page.goBack();
      await h.page.waitForFunction(()=>location.hash.includes('scope=tree'),null,{timeout:10000});
@@ -1151,7 +1152,7 @@ test('#1356 scope menu contract: login, back, keyboard, contrast and retry', { s
     if(focused==='tree')assert.equal(await panel.locator('.moments-tree-picker').isVisible(),true,key+' keyboard tree dialog');
     else assert.equal(await h.page.locator('.moments-scope-chip[data-scope="'+focused+'"]').getAttribute('aria-pressed'),'true',key+' keyboard scope');
     const audit=await auditPage(h.page,'둘러보기 범위 메뉴');
-    const structural=failuresOf(audit,String(width),theme).filter(row=>['겹침','잘림','넘침','가로넘침'].includes(row[0]));
+    const structural=failuresOf(audit,String(width),theme).filter(row=>['겹침','가려짐','잘림','넘침','가로넘침'].includes(row[0]));
     assert.deepEqual(structural,[],key+' layout '+JSON.stringify(structural));
     const colors=await h.page.evaluate(()=>{
       const probe=document.createElement('span');document.body.append(probe);
@@ -1181,6 +1182,19 @@ test('#1356 scope menu contract: login, back, keyboard, contrast and retry', { s
       await panel.locator('.moments-empty').waitFor({state:'visible',timeout:10000});
       assert.equal(await panel.locator('.moments-empty-retry').isVisible(),false,key+' empty not retry');
     }
+    if(member&&width===1440&&theme==='garden'){
+      await h.page.goto(h.base+'/v41/?account=1#share/'+items[0].shareId+'/book',{waitUntil:'load'});
+      await h.page.locator('#community-menu').click();
+      await h.page.locator('#community-tab-moments').click();
+      const sharedTrigger=h.page.locator('.moments-scope-trigger');
+      assert.equal(await sharedTrigger.isVisible(),true,key+' shared tree scope menu visible');
+      await sharedTrigger.click();
+      assert.equal(await h.page.locator('.moments-scope-chip[data-scope="tree"]').isVisible(),true,key+' shared tree picker entry visible');
+      await h.page.locator('.moments-scope-chip[data-scope="tree"]').click();
+      await h.page.waitForFunction(()=>document.querySelector('.moments-tree-picker')?.hidden===false,null,{timeout:10000});
+      assert.equal(await h.page.locator('.moments-tree-picker').isVisible(),true,key+' shared tree selector accessible');
+    }
+    console.log('#1356',key,JSON.stringify({options:await options(),public:h.calls.public,mine:h.calls.mine,structural:structural.length}));
     console.log('#1356',key,JSON.stringify({options:await options(),public:h.calls.public,mine:h.calls.mine,structural:structural.length}));
    }finally{await h.ctx.close();await new Promise(resolve=>h.server.close(resolve));}
   }
