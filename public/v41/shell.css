@@ -551,6 +551,16 @@ label.cleanup-moment{display:flex;align-items:center;gap:12px;min-height:48px;ma
 .cleanup-moment span{min-width:0;overflow-wrap:anywhere}
 .cleanup-moment .is-blank{color:var(--lt-muted)}
 .cleanup-moment-thumb{display:block;flex:0 0 auto;width:56px;height:56px;margin:0;border-radius:6px;object-fit:cover;background:rgba(255,255,255,.06);border:1px solid var(--line)}
+.cleanup-moment-thumb-slot{position:relative;display:grid;place-items:center;flex:0 0 56px;width:56px;height:56px;overflow:hidden;border-radius:6px}
+.cleanup-moment-thumb-slot .lt-recent-fallback{position:relative;inset:auto;width:100%;height:100%;box-sizing:border-box;display:grid;place-items:center;align-content:center;gap:2px;padding:4px;background:color-mix(in srgb,var(--lt-group-1) 35%,var(--lt-stage-2));color:var(--lt-pearl)}
+.cleanup-moment-thumb-slot .lt-recent-fallback[data-tone="2"]{background:color-mix(in srgb,var(--lt-group-2) 35%,var(--lt-stage-2))}
+.cleanup-moment-thumb-slot .lt-recent-fallback[data-tone="3"]{background:color-mix(in srgb,var(--lt-group-3) 35%,var(--lt-stage-2))}
+.cleanup-moment-thumb-slot .lt-recent-fallback[data-tone="4"]{background:color-mix(in srgb,var(--lt-group-4) 35%,var(--lt-stage-2))}
+.cleanup-moment-thumb-slot .lt-recent-fallback[data-tone="5"]{background:color-mix(in srgb,var(--lt-group-5) 35%,var(--lt-stage-2))}
+.cleanup-moment-thumb-slot .lt-recent-fallback[data-tone="6"]{background:color-mix(in srgb,var(--lt-group-6) 35%,var(--lt-stage-2))}
+.cleanup-moment-thumb-slot .lt-recent-fallback-letter{font-size:24px;font-weight:700;line-height:1}
+.cleanup-moment-thumb-slot .lt-recent-fallback-title{font-size:9px;line-height:1.2;max-width:100%;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+
 /* 순간 추가 폼 입력칸과 같은 규칙: 정원(밝은 바탕)에서는 정리 창의 입력칸도 정원 종이·선 토큰으로 흰 칸과 견준다. 밤은 기본값 그대로다. */
 html[data-lt-theme=garden] #cleanup-panel input:not([type=checkbox]),html[data-lt-theme=garden] #cleanup-panel select{background:var(--lt-paper);border-color:var(--lt-line-paper)}
 #cleanup-count{margin:10px 0 0}
