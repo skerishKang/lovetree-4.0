@@ -170,6 +170,10 @@ export async function testBackNavigation(page, { frame = null, recorded, action,
   await action();
 
   if (recorded) {
+    const hashAfter = await page.evaluate(() => location.hash);
+    if (hashAfter !== before.hash) {
+      await page.waitForFunction(({ n, hash }) => history.length > n && location.hash === hash, { n: beforeHistory, hash: hashAfter }, { timeout: waitMs }).catch(() => {});
+    }
     const grew = await waitForGrowth(page, frame, beforeHistory, waitMs);
     const afterAction = await backState(page, options);
     const afterHistory = Math.max(afterAction.historyLength, afterAction.frameHistoryLength);
