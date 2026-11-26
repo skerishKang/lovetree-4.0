@@ -166,7 +166,7 @@ function renderAccount(){
  else{const shown=view.initial==='나'?(lastLetter()||view.initial):view.initial;
  login.hidden=true;avatar.hidden=false;avatar.textContent=shown;avatar.setAttribute('aria-label',view.ariaLabel);avatar.title=deps.getAccountTip?.()||'내 계정';avatar.dataset.accent=accent;
  const init=$('account-initial');if(init){init.textContent=shown;init.dataset.accent=accent;}
- const mailEl=$('account-email');mailEl.textContent=view.label;mailEl.title=view.label;rememberLetter(shown);}
+ const mailEl=$('account-email');mailEl.textContent=view.label;mailEl.title=view.title;mailEl.setAttribute('aria-label',view.title);rememberLetter(shown);}
   // #368: 설정 "프로필" 묶음도 같은 이메일 값을 쓴다(셸이 넘긴 콜백).
   deps.onEmailChange?.(accountEmail);}
 function openAccountMenu(via='keyboard'){

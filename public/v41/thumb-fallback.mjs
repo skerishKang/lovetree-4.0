@@ -235,6 +235,14 @@ export function fallbackCardMarkup(moment, {
     `</div>`;
 }
 
+/** #1435: 첫 화면 영상 카드에서 썸네일이 전부 실패했을 때의 표지. 회색·흐림 없이 트리 색과 첫 글자만 쓴다. */
+export function recentVideoFallbackMarkup(moment) {
+  const title = userTitleText(moment) || trimText(moment?.mediaMetadata?.title) || trimText(moment?.mediaMetadata?.channel) || '순간';
+  const tone = emotionToneOf(trimText(moment?.emotion));
+  const letter = Array.from(title)[0] || '순';
+  return `<span class="lt-recent-fallback" data-tone="${tone}" aria-hidden="true"><span class="lt-recent-fallback-letter">${escapeHtml(letter)}</span><strong class="lt-recent-fallback-title">${escapeHtml(title)}</strong></span>`;
+}
+
 /** <img> 태그에 붙일 내려가기 속성 문자열. */
 export function thumbFallbackAttrs(moment, {
   candidates = null,
@@ -256,6 +264,8 @@ export function thumbFallbackAttrs(moment, {
   } else if (mode === 'thumb-slot') {
     const tone = emotionToneOf(moment?.emotion);
     fallbackHtml = `<span class="lt-thumb-tone" data-tone="${tone}" aria-hidden="true"></span>`;
+  } else if (mode === 'recent-video') {
+    fallbackHtml = recentVideoFallbackMarkup(moment);
   }
   return ` data-lt-candidates="${escapeHtml(JSON.stringify(list))}" data-lt-cand-index="0" data-lt-fallback-mode="${escapeHtml(mode)}"` +
     (fallbackHtml ? ` data-lt-fallback-html="${escapeHtml(fallbackHtml)}"` : '');
@@ -306,6 +316,11 @@ export function applyThumbOutcome(img, outcome = {}) {
   if (img.dataset) img.dataset.ltThumbSettled = '1';
   if (recent) {
     recent.dataset.recentState = 'failed';
+    // #1435: 실패한 영상은 빈 칸으로 두지 않고 표지와 제목을 같은 자리에 그린다.
+    const html = img.getAttribute?.('data-lt-fallback-html') || img.dataset?.ltFallbackHtml || '';
+    if (html && !recent.querySelector?.('.lt-recent-fallback')) recent.insertAdjacentHTML('beforeend', html);
+    const status = recent.querySelector?.('.recent-video-status');
+    if (status) status.hidden = true;
     return step;
   }
   const html = img.getAttribute?.('data-lt-fallback-html') || img.dataset?.ltFallbackHtml || '';

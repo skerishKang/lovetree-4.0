@@ -31,5 +31,5 @@ test('#898 ① 자세한 추가 창은 맨 위부터 연다(다듬기로 넘어�
 });
 
 test('#942 알림이 가운데 단추까지 덮지 않게 가운데 묶음에 표식을 건다', () => {
-  assert.match(orbit, /<div class="center" data-lt-keep-clear>/, '가운데 단추·숫자판 묶음 전체가 알림 피하기 기준');
+  assert.match(orbit, /<div class="center" data-lt-keep-clear(?:\$\{titlePending\?[^}]+\})?>/, '가운데 단추·숫자판 묶음 전체가 알림 피하기 기준');
 });
