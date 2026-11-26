@@ -130,10 +130,9 @@ export function mountScreenToolbar({ screen, titleFrom, tools = [], initialBar =
 
   // 상단 메뉴의 실제 높이를 기준으로 하고 도구 줄 높이는 CSS 변수 하나를 쓴다.
   const align = () => {
+    // #1448: five views use one measurable left edge, regardless of their inner header padding.
+    bar.style.setProperty('--lt-toolbar-pad', matchMedia('(max-width:600px)').matches ? '10px' : '20px');
     if (!header) return;
-    const headerPad = Number.parseFloat(getComputedStyle(header).paddingLeft) || 0;
-    const fallbackPad = matchMedia('(max-width:600px)').matches ? 10 : 24;
-    bar.style.setProperty('--lt-toolbar-pad', `${headerPad || fallbackPad}px`);
     const root = document.documentElement;
     // #886: the board's fixed header and first-paint positions are set in board.css.
     // Only its wrapping narrow header needs measurement; never overwrite desktop geometry.

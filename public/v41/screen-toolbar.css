@@ -239,3 +239,7 @@ button.lt-toolbar-tree-choice[aria-pressed=true] .lt-toolbar-tree-caret{color:in
 .lt-toolbar-tree-thumb[data-cover-design="texture-5"]{background:linear-gradient(135deg,var(--lt-stage-2),var(--lt-gold-line),var(--lt-stage-2))}
 .lt-toolbar-tree-thumb[data-cover-design="texture-6"]{background:linear-gradient(180deg,var(--lt-gold-line),var(--lt-stage-2) 38%,var(--lt-gold-line))}
 @media(max-width:600px){.lt-toolbar-tree-choice{max-width:min(240px,calc(100vw - 160px))}}
+
+/* #1448: selector starts at the same left x in the five views, including first paint. */
+html[data-v41-screen]:is([data-v41-screen=shelf],[data-v41-screen=tree],[data-v41-screen=board],[data-v41-screen=book],[data-v41-screen=network]){--lt-toolbar-pad:20px}
+@media(max-width:600px){html[data-v41-screen]:is([data-v41-screen=shelf],[data-v41-screen=tree],[data-v41-screen=board],[data-v41-screen=book],[data-v41-screen=network]){--lt-toolbar-pad:10px}}
