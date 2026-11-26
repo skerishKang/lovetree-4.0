@@ -65,7 +65,7 @@ function flowNavigation(){
   // 방문자에게는 트리 고르기와 서재를 숨기고 내 화면의 책·보드·지도 탭을 재사용한다.
   const treeSlot=document.querySelector?.('.tree-slot');
   if(treeSlot){treeSlot.inert=publicReading;if(publicReading)treeSlot.setAttribute('aria-hidden','true');else treeSlot.removeAttribute('aria-hidden');}
-  $('record-menu').hidden=!parts.treePicker||publicReading;
+  $('record-menu').hidden=true;
   // #1092: 둘러보기 단추는 community-panel.mjs가 표시한다. 여기서 다시 숨기면 로그인·로그아웃·방문자
   // 모두 둘러보기 탭을 잃는다 — 좁은 화면은 shell.css가 접기 메뉴로 접으므로 이곳에서는 건드리지 않는다.
   const pickerState={owned,treeTitle:displayTreeTitle(window.LT41?.tree.title||''),pendingDraft,treeCount:getModel()?.trees?.length||0};

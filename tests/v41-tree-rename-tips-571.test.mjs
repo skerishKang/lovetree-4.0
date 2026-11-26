@@ -1,3 +1,4 @@
+import {clickToolbarTreeChoice,treeChoiceExpanded,treeChoiceFocused} from './helpers/tree-picker-pr3.mjs';
 // #571(#549-2 대표 결정 '나'): '첫 트리를 만들었어요' 안내의 첫 항목을 '트리 이름은 지금 바꿀 수 있어요'로
 // 바꾸고 [이름 바꾸기] 단추를 둔다(그림 549-mock-na-390.png). 단추는 트리 관리 창의
 // 이름 칸을 바로 열고(openTreeManager가 이름 칸에 초점을 둔다), 이름을 바꾸면 머리줄 '트리: …'와
@@ -138,7 +139,7 @@ test('#571 바꾼 이름이 트리 목록에도 보이고, 알겠어요를 누�
     await page.click('#tree-form button[type="submit"]');
     await page.waitForFunction(() => document.getElementById('source-label')?.textContent.includes('우리의 첫 가을'), null, { timeout: 10000 });
     // 트리 목록(머리 트리 고르기 메뉴)에도 바뀐 이름이 보인다.
-    await page.click('#record-menu');
+    await clickToolbarTreeChoice(page);
     await page.waitForFunction(() => document.getElementById('tree-popover')?.hidden === false, null, { timeout: 10000 });
     const rows = await page.evaluate(() => [...document.querySelectorAll('#tree-popover .tree-item .tree-name')].map((b) => b.textContent));
     assert.ok(rows.some((t) => t.includes('우리의 첫 가을')), `트리 목록에 바뀐 이름이 있다: ${rows.join(' · ')}`);
@@ -246,7 +247,7 @@ test('970 실행: 표지 — 제목 보임·안 잘림(390·1440), 고르면 반
       assert.equal(savedTree?.coverDesign, 'texture-3', `${w}: 저장한 디자인은 texture-3`);
       // ③ 반영 — 머리줄 트리 목록의 표지는 고른 디자인으로 바로 보인다.
       if (w === 1440) {
-        await page.click('#record-menu');
+        await clickToolbarTreeChoice(page);
         await page.waitForFunction(() => document.getElementById('tree-popover')?.hidden === false, null, { timeout: 10000 });
         const listDesign = await page.evaluate(() => {
           const row = [...document.querySelectorAll('#tree-popover .tree-item')].find((r) => r.textContent.includes('리센느의 기록'));
@@ -382,7 +383,7 @@ test('984 실행: 표지 — 저장 직후 서재·열린 책 반영, 실패하�
         await frame.waitForSelector('#readerScreen.active', { timeout: 10000 });
         const readerBefore = await frame.evaluate(() => document.getElementById('bookCoverFace')?.getAttribute('data-cover-design') || '');
         assert.equal(readerBefore, 'texture-3', `${w}: 열린 책 표지는 저장된 디자인`);
-        await page.click('#record-menu');
+        await clickToolbarTreeChoice(page);
         await page.waitForFunction(() => document.getElementById('tree-popover')?.hidden === false, null, { timeout: 10000 });
         await page.click('#tree-popover [data-tree-action="manage"]');
         await pickDesign984(page, 'texture-5');
@@ -536,7 +537,7 @@ test('970/1001b-2 실행: 표지 사진 올리기 — 저장 뒤 재적재 1회(
     await page.waitForFunction(() => document.querySelector('[data-popover-target="quick-add"]') === null, null, { timeout: 10000 }).catch(() => {});
     await page.waitForTimeout(900);
     // 트리 관리 창 → 사진 표지 모드 → 올리기
-    await page.click('#record-menu');
+    await clickToolbarTreeChoice(page);
     await page.waitForFunction(() => document.getElementById('tree-popover')?.hidden === false, null, { timeout: 10000 });
     await page.click('[data-tree-action="manage"]');
     await page.waitForFunction(() => document.getElementById('tree-manager').open, null, { timeout: 10000 });
