@@ -1380,9 +1380,14 @@ test('#1487 로그인 확인 중 서재 주소: 불러오는 중을 보이고, �
   const tree = tree952({ subject: '확인 중 시험', count: 2 });
   const member = { revision: 1, state: { version: 1, trees: [tree], prefs: {} }, subject: 'qa-pending-fake', writeSubjectBound: true, savedAt: '2026-11-27T00:00:00.000Z' };
   try {
-    for (const [label, workspace] of [['손님', null], ['회원', member]]) {
-      const h = await boot1487(browser, { width: 1440, hash: '#my/shelf', workspace, hold: true });
+    // 주소로 들어온 경우와, 첫 화면에서 확인 중에 머리줄 탭으로 서재를 연 경우(#1487 후속).
+    for (const [label, workspace, via] of [['손님', null, 'address'], ['회원', member, 'address'], ['손님·탭', null, 'tab'], ['회원·탭', member, 'tab']]) {
+      const h = await boot1487(browser, { width: 1440, hash: via === 'tab' ? '' : '#my/shelf', workspace, hold: true });
       try {
+        if (via === 'tab') {
+          await h.page.waitForTimeout(500);
+          await h.page.locator('#tree-views button[data-view="track32-bookshelf.html"]').click();
+        }
         // 계정 확인 응답을 붙잡은 채 1.5초(덮개 표시 지연 0.8초보다 길게) 본다.
         await h.page.waitForTimeout(1500);
         assert.equal(await h.page.evaluate(() => document.documentElement.dataset.ltAuthPhase), 'pending', label + ': 아직 확인 중');

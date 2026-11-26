@@ -186,6 +186,8 @@ export function createWorkspaceRuntime(ctx){
     choose:{value:choose},
     paintEmptyForScreen:{value:paintEmptyForScreen},
     settleAuthWait:{value:settleAuthWait},
+    authPendingGuest:{value:authPendingGuest},
+    waitAuthThenEmpty:{value:waitAuthThenEmpty},
     paintEmptyCopy:{value:paintEmptyCopy},
     onExploreRoute:{get:()=>onExploreRoute,set:value=>{onExploreRoute=value;}},
     load:{value:load},
