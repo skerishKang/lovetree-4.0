@@ -1,3 +1,4 @@
+import {clickToolbarTreeChoice,treeChoiceExpanded,treeChoiceFocused} from './helpers/tree-picker-pr3.mjs';
 // #1109: 정리 창과 순간 목록 창의 닫기 단추·뒤 덮개·390 크기를 같게, 정리 창 아래 단추는 스크롤 끝에서 보이게.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -73,7 +74,7 @@ test('#1109 두 창의 닫기 단추·덮개·폭이 같고 정리 창 아래 �
   const tree = sampleTree();
   for (const [width, height] of [[1440, 900], [390, 844]]) for (const theme of ['night', 'garden']) {
     await withShell(tree, { width, height, theme }, async ({ page, errors }) => {
-      await page.locator('#record-menu').click();
+      await clickToolbarTreeChoice(page);
       await page.locator('[data-tree-action="cleanup"]').click();
       await page.waitForSelector('#cleanup-panel[open]');
       const cleanup = await closeFacts(page, '#cleanup-panel [data-close="cleanup-panel"]');
@@ -95,6 +96,11 @@ test('#1109 두 창의 닫기 단추·덮개·폭이 같고 정리 창 아래 �
         assert.ok(b.w > 0 && b.h >= 44 && b.top >= 0 && b.bottom <= height, `${width}·${theme}: ${b.id} 단추가 화면 안에 있다 — ${JSON.stringify(b)}`);
       }
       await page.evaluate(() => document.getElementById('cleanup-panel').close());
+       await clickToolbarTreeChoice(page);
+       await page.locator('[data-tree-action="moments"]').click();
+       await page.waitForFunction(() => [...document.querySelectorAll('iframe')].some(f =>
+         !f.hidden && f.getBoundingClientRect().width > 0 && f.contentDocument?.getElementById('orbit')?.shadowRoot?.querySelector('[data-do=moments],[data-do=index]')),
+         null, { timeout: 8000 });
 
       let frame = null;
       for (const f of page.frames()) {

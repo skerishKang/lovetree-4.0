@@ -1,3 +1,4 @@
+import {clickToolbarTreeChoice,treeChoiceExpanded,treeChoiceFocused} from './helpers/tree-picker-pr3.mjs';
 // #549: '첫 트리를 만들었어요' 안내와 모달 창의 관계. 원래 #566은 창이 열려 있는 동안 안내를 창 안
 // 맨 위로 옮겨 붙였지만, 안내 판이 창 내용 위에 포개지는 일이 반복됐다(#845·#846 사용 일지 — 순간 추가·
 // 내 의견 창, PR #851 캡처). 261118 대표 결정(#845 1단계): 창 안으로 옮기지 않고, 모달 창이 하나라도
@@ -305,7 +306,7 @@ test('#933 새 트리 만들기 화면에서는 첫 트리 안내 판이 뜨지 
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
     await openWithFirstTree(page);
     // 트리 고르기 → '+ 새 트리'
-    await page.locator('#record-menu').click();
+    await clickToolbarTreeChoice(page);
     await page.waitForFunction(() => !document.getElementById('tree-popover')?.hidden, null, { timeout: 15000 });
     // 단추가 실제로 보이는 것을 확인한 뒤 진짜 마우스로 누른다(창 항목은 pointer 이벤트로도 반응한다).
     const newTree = page.locator('[data-tree-action="new"]').first();

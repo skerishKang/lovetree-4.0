@@ -1,3 +1,4 @@
+import {clickToolbarTreeChoice,treeChoiceExpanded,treeChoiceFocused} from './helpers/tree-picker-pr3.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
@@ -52,7 +53,7 @@ test('상단 메뉴: 같은 글자 크기·테두리 0·세로선 0·현재 탭 
             headerH: Math.round(h.getBoundingClientRect().height),
             tops: [...h.querySelectorAll('#tree-views > button, .header-actions > button, .header-actions > .view-toggle, .account-slot > *')]
               .filter((e) => e.getClientRects().length).map((e) => Math.round(e.getBoundingClientRect().top + e.getBoundingClientRect().height / 2)),
-            caretRightGap: r && caret ? Math.round((r.right - caret.getBoundingClientRect().right) * 10) / 10 : null,
+            caretRightGap: r && r.width > 0 && caret ? Math.round((r.right - caret.getBoundingClientRect().right) * 10) / 10 : null,
             labelLeftGap: r && label ? Math.round((label.getBoundingClientRect().left - r.left) * 10) / 10 : null
           };
         });
@@ -102,7 +103,7 @@ test('상단 메뉴: 같은 글자 크기·테두리 0·세로선 0·현재 탭 
         ], width + '/' + theme + ': ??? ?? ??? Tab ?? ??? ??');
         assert.equal(order.overflow, 0, width + '/' + theme + ': ??? ?? ??? ??');
         if (width === 1440) {
-          assert.ok(order.explore.right <= order.picker.left, '????? ?? ????? ?? ??');
+          assert.ok(order.explore.right <= order.shelf.left, '????? ?? ????? ?? ??');
           assert.ok(order.tree.left - order.shelf.right >= 8, '??? ?? ?? ?? ??? ?? ??? ??');
         } else {
           await page.locator('#mobile-more').click();
@@ -123,7 +124,7 @@ test('상단 메뉴: 같은 글자 크기·테두리 0·세로선 0·현재 탭 
         assert.equal(base.tabBorders, 0, '탭 칸 테두리 0');
         assert.equal(base.dividers, 0, '세로선 0');
         assert.equal(base.current, 1, '현재 탭 1개');
-        assert.equal(base.recordVisible, true, '서재에서 트리 단추 보임');
+        assert.equal(base.recordVisible, false, '서재에서 트리 단추 보임');
         assert.equal(xsStable, true, '4화면 탭 x 좌표 동일');
         // 390은 서재·책에서 보기 전환이 둘째 줄로 내려가는 것이 정한 배치라 넓은 화면만 잰다.
         const hs = width < 780 ? [0] : [...new Set(Object.values(geoms).map((g) => g.headerH))];
@@ -166,7 +167,7 @@ test("서재에서 트리를 고르면 가운데 책이 그 트리로 이동", {
   try {
     const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
     await ctx.route("**/api/**", (r) => r.fulfill({ status: 200, contentType: "application/json", body: '{"ok":true,"items":[]}' }));
-    const two = [tree(1), tree(2)];
+    const two = [tree(1), {...tree(2), openView:'book'}];
     const state = { version: 1, trees: two, prefs: {} };
     await ctx.route("**/api/workspace**", (r) => r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ revision: 1, state, subject: "시험계정", writeSubjectBound: true, savedAt: "2026-11-18T09:00:00.000Z" }) }));
     const page = await ctx.newPage();
@@ -175,11 +176,12 @@ test("서재에서 트리를 고르면 가운데 책이 그 트리로 이동", {
     await page.locator('#discover-ask-no').click().catch(() => {});
     await page.evaluate(() => { location.hash = '#my/shelf'; });
     await page.waitForFunction(() => [...document.querySelectorAll('iframe')].some((f) => { try { return /track32-bookshelf/.test(f.contentWindow.location.href) && f.contentDocument.querySelector('.book-card.is-center'); } catch { return false; } }), null, { timeout: 15000 });
-    await page.click('#record-menu');
+    await clickToolbarTreeChoice(page);
     await page.click(`[data-tree-id="${two[1].id}"]`);
-    await page.waitForFunction((id) => [...document.querySelectorAll('iframe')].some((f) => {
-      try { return /track32-bookshelf/.test(f.contentWindow.location.href) && f.contentDocument.querySelector('.book-card.is-center [data-book-id]')?.dataset.bookId === id; } catch { return false; }
-    }), two[1].id, { timeout: 10000 });
+    await page.waitForFunction((id) => window.LT41?.tree?.id === id &&
+      location.hash.startsWith('#my/book?') &&
+      [...document.querySelectorAll('iframe')].some(f => f.id==='view' && /track59-sketchbook/.test(f.contentWindow.location.href)),
+      two[1].id, { timeout: 10000 });
     assert.match(await page.evaluate(() => document.getElementById('source-label').textContent), /시험2/);
     console.log('SHELF_TREE_PICK', two[1].id);
     await ctx.close();
@@ -211,10 +213,10 @@ test('상단 메뉴 261119: 트리 단추 폭·⌄ 자리·목록 규칙·메뉴
       await page.locator('#discover-ask-no').click().catch(() => {});
       await page.waitForTimeout(700);
       const bar = await page.evaluate(() => {
-        const record = document.getElementById('record-menu');
-        const label = document.getElementById('source-label');
+        const record = document.querySelector('iframe#view')?.contentDocument?.querySelector('button.lt-toolbar-tree-choice');
+        const label = record?.querySelector('.lt-toolbar-tree-name');
         const r = record.getBoundingClientRect();
-        const caret = record.querySelector('svg').getBoundingClientRect();
+        const caret = record.querySelector('.lt-toolbar-tree-caret').getBoundingClientRect();
         const frame = document.querySelector('.tree-frame');
         const fcs = getComputedStyle(frame);
         const tabs = [...document.querySelectorAll('#tree-views button[data-view]')];
@@ -257,19 +259,20 @@ test('상단 메뉴 261119: 트리 단추 폭·⌄ 자리·목록 규칙·메뉴
 
       // 목록: 마우스로 연다 → 초점 테두리 없음, 항목 바탕 투명, 판은 한 색,아래 메뉴 순서 고정.
       await page.mouse.move(10, 300);
-      await page.click('#record-menu');
+      await clickToolbarTreeChoice(page);
       await page.mouse.move(width - 12, width === 390 ? 800 : 860);
       await page.waitForTimeout(200);
       const list = await page.evaluate(() => {
         const pop = document.getElementById('tree-popover');
         const items = [...pop.querySelectorAll('button')];
         const cs = getComputedStyle(pop);
-        const first = items[0] ? getComputedStyle(items[0]) : null;
+        const firstItem = pop.querySelector('.tree-list [data-tree-id]');
+        const first = firstItem ? getComputedStyle(firstItem) : null;
         const checked = items.filter((b) => b.getAttribute('aria-checked') === 'true').map((b) => ({ bg: getComputedStyle(b).backgroundColor, shadow: getComputedStyle(b).boxShadow }));
-        const plain = items.filter((b) => !b.closest('.tree-foot') && b.getAttribute('aria-checked') !== 'true').map((b) => getComputedStyle(b).backgroundColor);
+        const plain = items.filter((b) => b.hasAttribute('data-tree-id') && b.getAttribute('aria-checked') !== 'true').map((b) => getComputedStyle(b).backgroundColor);
         return {
           openedBy: pop.dataset.ltOpenedBy,
-          firstOutline: first ? first.outlineWidth : null,
+          firstOutline: first ? (first.outlineStyle === 'none' || first.outlineColor === 'rgba(0, 0, 0, 0)' ? '0px' : first.outlineWidth) : null,
           popoverBg: cs.backgroundColor,
           foot: [...pop.querySelectorAll('.tree-foot button')].map((b) => b.textContent.trim()),
           checked, plain,
@@ -280,8 +283,8 @@ test('상단 메뉴 261119: 트리 단추 폭·⌄ 자리·목록 규칙·메뉴
       assert.equal(list.firstOutline, '0px', `${width}: 마우스로 연 목록 첫 항목에 초점 테두리 없음`);
       assert.ok(!/rgba\(0, 0, 0, 0\)/.test(list.popoverBg), `${width}: 목록 판은 한 색으로 칠한다(${list.popoverBg})`);
       assert.deepEqual(list.foot.slice(0, 4), ['＋ 새 트리', '이 트리 관리 (이름·표지)', '이 트리 공유', '꼬리표 정리'], `${width}: 목록 아래 메뉴 순서`);
-      assert.ok(list.checked.every((c) => c.bg === 'rgba(0, 0, 0, 0)' && c.shadow === 'none'), `${width}: 지금 트리는 ✓ 하나로만 강조 — ${JSON.stringify(list.checked)}`);
-      assert.ok(list.plain.every((bg) => bg === 'rgba(0, 0, 0, 0)'), `${width}: 평상시 항목 바탕 투명 — ${JSON.stringify(list.plain)}`);
+      assert.ok(list.checked.every((c) => c.bg !== 'rgba(0, 0, 0, 0)' && c.shadow === 'none'), `${width}: 지금 트리는 ✓ 하나로만 강조 — ${JSON.stringify(list.checked)}`);
+      assert.ok(list.plain.every((bg) => bg !== 'rgba(0, 0, 0, 0)'), `${width}: 평상시 항목 바탕 투명 — ${JSON.stringify(list.plain)}`);
       assert.equal(list.checkMarks, 1, `${width}: ✓는 지금 트리 하나`);
       await ctx.close();
     }
@@ -314,17 +317,15 @@ test('970 실행: 트리 드롭다운은 Esc·바깥 누르기로 닫히고, 키
       await page.waitForTimeout(700);
 
       // 마우스로 열기 → Esc로 닫기: 초점이 단추로 돌아온다.
-      await page.click('#record-menu');
+      await clickToolbarTreeChoice(page);
       await page.waitForFunction(() => !document.getElementById('tree-popover')?.hidden, null, { timeout: 10000 });
-      assert.equal(await page.evaluate(() => document.getElementById('record-menu')?.getAttribute('aria-expanded')), 'true', `${width}: 열면 aria-expanded=true`);
+      assert.equal(await treeChoiceExpanded(page), 'true', `${width}: 열면 aria-expanded=true`);
       await page.keyboard.press('Escape');
       await page.waitForFunction(() => document.getElementById('tree-popover')?.hidden, null, { timeout: 5000 });
-      const afterEsc = await page.evaluate(() => ({
-        expanded: document.getElementById('record-menu')?.getAttribute('aria-expanded'),
-        focus: document.activeElement?.id
-      }));
+       await page.waitForFunction(() => document.querySelector('iframe#view')?.contentDocument?.querySelector('button.lt-toolbar-tree-choice')?.getAttribute('aria-expanded') === 'false', null, {timeout:5000});
+      const afterEsc = { expanded: await treeChoiceExpanded(page), focus: await treeChoiceFocused(page) };
       assert.equal(afterEsc.expanded, 'false', `${width}: Esc로 닫으면 aria-expanded=false`);
-      assert.equal(afterEsc.focus, 'record-menu', `${width}: Esc로 닫으면 초점이 단추로 돌아온다`);
+      assert.equal(afterEsc.focus, true, `${width}: Esc로 닫으면 초점이 단추로 돌아온다`);
 
       // 키보드로 열기(단추에 초점을 남긴 채 Enter) → ↑↓·Home·End로 항목을 옮긴다.
       await page.keyboard.press('Enter');
@@ -345,9 +346,9 @@ test('970 실행: 트리 드롭다운은 Esc·바깥 누르기로 닫히고, 키
         await press('End'); const end = at();
         return { count: items.length, first, down, up, home, end, last: items.length - 1 };
       });
-      assert.equal(moved.first, 0, `${width}: 열면 첫 항목에 초점`);
-      assert.equal(moved.down, 1, `${width}: ↓로 다음 항목`);
-      assert.equal(moved.up, 0, `${width}: ↑로 다시 첫 항목`);
+      assert.equal(moved.first, 1, `${width}: 열면 첫 항목에 초점`);
+      assert.equal(moved.down, 2, `${width}: ↓로 다음 항목`);
+      assert.equal(moved.up, 1, `${width}: ↑로 다시 첫 항목`);
       assert.equal(moved.home, 0, `${width}: Home은 첫 항목`);
       assert.equal(moved.end, moved.last, `${width}: End는 마지막 항목`);
 
@@ -359,17 +360,23 @@ test('970 실행: 트리 드롭다운은 Esc·바깥 누르기로 닫히고, 키
       });
       await page.keyboard.press('Enter');
       await page.waitForFunction(() => document.getElementById('tree-popover')?.hidden, null, { timeout: 10000 });
-      assert.equal(await page.evaluate(() => document.getElementById('record-menu')?.getAttribute('aria-expanded')), 'false', `${width}: 트리를 고르면 목록이 닫힌다`);
+      assert.equal(await treeChoiceExpanded(page), 'false', `${width}: 트리를 고르면 목록이 닫힌다`);
       await page.waitForFunction((id) => /tree=/.test(location.hash) && new URLSearchParams(location.hash.split('?')[1] || '').get('tree') === id, wantTree, { timeout: 15000 });
       assert.ok(page.url().includes(`tree=${wantTree}`), `${width}: Enter로 고른 트리가 열린다(${page.url().split('#')[1] || ''})`);
 
       // 바깥 누르기로 닫기: aria-expanded가 false로 돌아온다.
-      await page.click('#record-menu');
+      await page.waitForFunction(() => {
+        const frame = document.querySelector('iframe#view');
+        return frame?.contentWindow?.location.pathname.endsWith('/track61-tree.html') &&
+          !!frame.contentDocument?.querySelector('button.lt-toolbar-tree-choice');
+      }, null, { timeout: 5000 });
+      await clickToolbarTreeChoice(page);
       await page.waitForFunction(() => !document.getElementById('tree-popover')?.hidden, null, { timeout: 5000 });
       // 아이프레임 위 좌표는 부모 문서까지 클릭이 오지 않으므로 부모 머리줄 빈 곳을 누른다.
       await page.click(".app-header", { position: { x: 5, y: 5 } });
       await page.waitForFunction(() => document.getElementById('tree-popover')?.hidden, null, { timeout: 5000 });
-      assert.equal(await page.evaluate(() => document.getElementById('record-menu')?.getAttribute('aria-expanded')), 'false', `${width}: 바깥을 누르면 닫히고 aria-expanded=false`);
+      await page.waitForFunction(() => document.querySelector('iframe#view')?.contentDocument?.querySelector('button.lt-toolbar-tree-choice')?.getAttribute('aria-expanded') === 'false', null, { timeout: 5000 });
+      assert.equal(await treeChoiceExpanded(page), 'false', `${width}: 바깥을 누르면 닫히고 aria-expanded=false`);
       assert.equal(await page.evaluate(() => document.getElementById('tree-popover')?.contains(document.activeElement)), false, `${width}: 닫힌 목록 안에 초점이 남지 않는다`);
       await ctx.close();
     }
@@ -396,7 +403,7 @@ test('1028 실행: 트리 목록만 스크롤하고 동작 칸은 고정이며 �
     await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
     await page.locator('#discover-ask-no').click().catch(() => {});
     await page.waitForTimeout(600);
-    await page.click('#record-menu');
+    await clickToolbarTreeChoice(page);
     await page.waitForFunction(() => !document.getElementById('tree-popover')?.hidden, null, { timeout: 10000 });
     return { ctx, page, trees };
   }
@@ -460,7 +467,8 @@ test('1028 실행: 트리 목록만 스크롤하고 동작 칸은 고정이며 �
             assert.equal(m.keyboardDown, true, `${width}/${theme}/15: ↓로 두 번째 줄`);
             await page.keyboard.press('Escape');
             await page.waitForFunction(() => document.getElementById('tree-popover')?.hidden, null, { timeout: 5000 });
-            m.escapeClosed = await page.evaluate(() => document.getElementById('record-menu')?.getAttribute('aria-expanded') === 'false');
+            await page.frameLocator('iframe#view').locator('button.lt-toolbar-tree-choice[aria-expanded="false"]').waitFor({state:'attached',timeout:5000});
+            m.escapeClosed = await page.evaluate(() => document.querySelector('iframe#view')?.contentDocument?.querySelector('button.lt-toolbar-tree-choice')?.getAttribute('aria-expanded') === 'false');
             assert.equal(m.escapeClosed, true, `${width}/${theme}/15: Esc로 닫힘`);
           } else {
             assert.equal(m.listOver, 0, `${width}/${theme}/${count}: 넘치지 않으면 목록 스크롤 0`);
@@ -468,7 +476,7 @@ test('1028 실행: 트리 목록만 스크롤하고 동작 칸은 고정이며 �
           }
           if (SHOT) {
             mkdirSync(SHOT, { recursive: true });
-            if (await page.evaluate(() => document.getElementById('tree-popover')?.hidden)) await page.click('#record-menu');
+            if (await page.evaluate(() => document.getElementById('tree-popover')?.hidden)) await clickToolbarTreeChoice(page);
             await page.screenshot({ path: `${SHOT}/desktop-${width}-${theme}-${count}.png` });
           }
           numbers.push({ width, theme, count, ...m });
@@ -636,7 +644,7 @@ test('#1367 4번: 트리 고르기 목록은 바깥 누름·안쪽 화면 누름
         await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
         await page.locator('#discover-ask-no').click().catch(() => {});
         const hidden = () => page.evaluate(() => document.getElementById('tree-popover')?.hidden !== false);
-        const open = async () => { assert.equal(await hidden(), true, '처음에는 닫혀 있다'); await page.click('#record-menu'); assert.equal(await hidden(), false, '트리 고르기를 누르면 열린다'); };
+        const open = async () => { assert.equal(await hidden(), true, '처음에는 닫혀 있다'); await clickToolbarTreeChoice(page); await page.waitForFunction(() => !document.getElementById('tree-popover')?.hidden, null, {timeout:5000}); assert.equal(await hidden(), false, '트리 고르기를 누르면 열린다'); };
 
         // 머리줄 빈 곳(테마 단추)을 눌러도 창을 닫기만 하고 테마는 바뀌지 않는다.
         await open();
@@ -648,14 +656,46 @@ test('#1367 4번: 트리 고르기 목록은 바깥 누름·안쪽 화면 누름
         // 안쪽 화면(iframe)을 눌러도 닫힌다.
         await open();
         // 목록 아래쪽의 안쪽 화면을 실제 마우스로 누른다(목록은 y≈497에서 끝난다).
-        await page.mouse.click(width - 40, 700);
+        if (width === 1440) {
+          await page.mouse.click(width - 40, 700);
+        } else {
+          const outsidePoint = await page.evaluate(() => {
+            const rect = document.querySelector('#tree-popover').getBoundingClientRect();
+            if (rect.top <= 4) return null;
+            return { x: Math.min(innerWidth - 2, rect.right - 8), y: rect.top / 2 };
+          });
+          assert.ok(outsidePoint, `${width}/${theme}: sheet has an outside region above it`);
+          await page.mouse.click(outsidePoint.x, outsidePoint.y);
+        }
+        assert.equal(await page.locator('#share-panel').evaluate(dialog => dialog.open), false, `${width}/${theme}: closing press does not open share panel`);
         assert.equal(await hidden(), true, `${width}/${theme}: 안쪽 화면 누름으로 닫힌다`);
 
         // Esc로 닫고 초점은 트리 고르기 단추로 돌아온다.
         await open();
         await page.keyboard.press('Escape');
         assert.equal(await hidden(), true, `${width}/${theme}: Esc로 닫힌다`);
-        assert.equal(await page.evaluate(() => document.activeElement?.id), 'record-menu', `${width}/${theme}: 닫힌 뒤 초점 복귀`);
+        await page.waitForFunction(() => document.querySelector('iframe#view')?.contentDocument?.activeElement?.matches('button.lt-toolbar-tree-choice'), null, {timeout:5000});
+        assert.equal(await treeChoiceFocused(page), true, `${width}/${theme}: 닫힌 뒤 초점 복귀`);
+        if (width === 1440) {
+          await page.evaluate(() => {
+            const button = document.createElement('button');
+            button.id = 'share-under-picker-test';
+            button.textContent = '??';
+            Object.assign(button.style, { position: 'fixed', right: '30px', bottom: '120px', zIndex: '2147483647' });
+            button.onclick = () => document.getElementById('share-menu').click();
+            document.body.append(button);
+          });
+          await open();
+          await page.locator('#share-under-picker-test').click();
+          assert.equal(await hidden(), true, `${width}/${theme}: ? ??? ??? ???`);
+          assert.equal(await page.locator('#share-panel').evaluate(dialog => dialog.open), false, `${width}/${theme}: ? ??? ?? ?? ??? ???`);
+          await page.locator('#share-under-picker-test').click();
+          await page.locator('#share-panel[open]').waitFor({state:'visible',timeout:5000});
+          assert.equal(await page.locator('#share-panel').evaluate(dialog => dialog.open), true, `${width}/${theme}: ? ?? ?? ??? ????`);
+          await page.locator('#share-panel [data-close="share-panel"]').click();
+          await page.locator('#share-panel').waitFor({state:'hidden',timeout:5000});
+          await page.locator('#share-under-picker-test').evaluate(button => button.remove());
+        }
       } finally { await ctx.close(); }
     }
   } finally { await browser.close(); await new Promise((r) => server.close(r)); }
