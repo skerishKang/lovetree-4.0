@@ -226,8 +226,11 @@ export function deriveScreens(report, old, label = '관측') {
       // 좌우 여백 차이 허용치는 기준선의 상수를 그대로 쓴다(관측값이 아니다).
       toast.centeringTolerance = old.screens['share-guest'].toast.centeringTolerance;
       for (const s of all) {
-        must(Number.isFinite(s.toastCenterDelta), '공유 방문자 책 안내 좌우 여백 차이를 재지 못했다');
-        seen.toastCenterDelta = Math.max(seen.toastCenterDelta, s.toastCenterDelta);
+        // 숨긴 예전 안내는 레이아웃이 없으므로 중심 정렬을 재지 않는다.
+        if (!s.toastHidden) {
+          must(Number.isFinite(s.toastCenterDelta), '공유 방문자 책 안내 좌우 여백 차이를 재지 못했다');
+          seen.toastCenterDelta = Math.max(seen.toastCenterDelta, s.toastCenterDelta);
+        }
         must(s.toastHorizontalOverflow === 0, `공유 방문자 책 안내 가로 넘침 ${s.toastHorizontalOverflow}`);
         must(s.toastWithinViewport === true, '공유 방문자 책 안내가 화면 밖으로 나갔다');
       }
