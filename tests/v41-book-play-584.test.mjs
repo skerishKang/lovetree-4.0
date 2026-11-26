@@ -1052,7 +1052,7 @@ test('책 도구 줄: 중복 제목 없음·이어 보기·두 칸 동일 치수
       const {ctx,frame,errors} = await openBook(browser,width,width===390?844:900);
       try {
         await frame.evaluate((t)=>{document.documentElement.setAttribute('data-lt-theme',t==='garden'?'garden':'');},theme);
-        await frame.waitForSelector('.lt-toolbar-title');
+        await frame.waitForSelector('.lt-toolbar-tree-name');
         const result = await frame.evaluate(()=>{
           const toolbar=document.querySelector('.lt-screen-toolbar');
           const toggle=document.getElementById('book-view-toggle');
@@ -1061,8 +1061,8 @@ test('책 도구 줄: 중복 제목 없음·이어 보기·두 칸 동일 치수
           const old=document.querySelector('.topbar');
           const play=document.getElementById('playAllBtn');
           return {
-            title:toolbar.querySelector('.lt-toolbar-title').textContent.trim(),
-            titleCount:[...document.querySelectorAll('.lt-toolbar-title')].filter(n=>n.textContent.trim()==='시험 트리'&&n.getClientRects().length).length,
+            title:toolbar.querySelector('.lt-toolbar-tree-name').textContent.trim(),
+            titleCount:[...document.querySelectorAll('.lt-toolbar-tree-name')].filter(n=>n.textContent.trim()==='시험 트리'&&n.getClientRects().length).length,
             oldVisible:!!old&&getComputedStyle(old).display!=='none',
             playText:play.textContent.trim(),
             playAria:play.getAttribute('aria-label'),

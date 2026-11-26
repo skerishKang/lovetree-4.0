@@ -23,6 +23,7 @@ test('판정 도구와 판정이 들어 있는 워크플로는 서버 바뀜이�
 });
 
 test('운영 설치 대상 파일 하나만 바뀌어도 서버 바뀜이다', () => {
+  assert.equal(changed(['public/v41/tree-open-view.mjs']), true);
   assert.equal(changed(['public/v41/youtube-id.mjs']), true);
   assert.equal(changed(['src/domain.js']), true);
   assert.equal(changed(['tools/export-ai-customer-db.mjs']), true);

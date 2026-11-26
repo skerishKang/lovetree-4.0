@@ -1,5 +1,5 @@
 import { MSG } from '../frame-messages.mjs';
-import { loginUrlWithTheme } from '../header-state.mjs';
+import { loginUrlWithTheme, themeTone } from '../header-state.mjs';
 // 설정·계정 창 — shell.mjs에서 코드 위치만 옮긴 모듈(#886). 동작·기준은 그대로다.
 // 상태는 deps의 getter로 받는다(모듈이 shell을 다시 import하지 않는다).
 // #1072 A-16: 의견 보내기의 '함께 보낼 정보'에 실릴 최근 오류 기록은 report.mjs 한 곳에서 가져온다.
@@ -407,7 +407,7 @@ const BOARD_THEME_KEY='lt41.boardTheme';
 // 'auto'면 앱 테마를 따른다(#853). 화면 단추·메뉴는 저장한 상태를 그대로 보여 주고, 프레임에는
 // 해결된 판(종이/밤)을 넘긴다.
 function storedBoardTheme(){try{const saved=localStorage.getItem(BOARD_THEME_KEY);return saved==='night'||saved==='paper'?saved:'auto'}catch{return 'auto'}}
-function resolveBoardTheme(){return storedBoardTheme()==='auto'?(readTheme(localStorage)==='garden'?'paper':'night'):storedBoardTheme()}
+function resolveBoardTheme(){return storedBoardTheme()==='auto'?(themeTone(readTheme(localStorage))==='light'?'paper':'night'):storedBoardTheme()}
 function currentBoardTheme(){return storedBoardTheme()}
 function paintBoardThemeControls(){const value=currentBoardTheme();for(const b of document.querySelectorAll('button[data-board-theme]'))b.setAttribute('aria-checked',String(b.dataset.boardTheme===value));}
 function applyBoardThemeToFrame(frame){

@@ -2,10 +2,24 @@
 // 2026-11-08 리팩터링: 동작·겉모습 변경 0. 계산은 header-state.mjs, 화면 반영은 여기서 한다.
 // 저장 키(lt41.theme)와 버튼 id·문구는 그대로다.
 import {memberLoginUrl} from '../member-entry.mjs';
-import {readTheme, writeTheme, nextTheme, themeButtonLabel, themeButtonAriaLabel, themeIconGlyph, themePressed, appliedTheme, applyThemeAttribute} from '../header-state.mjs';
+import {readTheme, writeTheme, nextTheme, themeButtonLabel, themeButtonAriaLabel, themeIconGlyph, themePressed, appliedTheme, applyThemeAttribute, THEMES, DEFAULT_THEME} from '../header-state.mjs';
 import {themedViewFor} from './navigation.mjs';
 
 const $ = id => document.getElementById(id);
+
+export function renderThemeChoices() {
+  const container = $('settings-theme-choices');
+  if (!container || container.childElementCount) return;
+  for (const theme of THEMES) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.setAttribute('role', 'radio');
+    button.setAttribute('aria-checked', String(theme.id === DEFAULT_THEME));
+    button.dataset.setTheme = theme.id;
+    button.textContent = theme.label;
+    container.append(button);
+  }
+}
 
 export function paintLoginLinks(theme = readTheme(localStorage)) {
   const href = memberLoginUrl(theme);

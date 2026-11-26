@@ -545,7 +545,7 @@ test('#1376 두 보기가 같은 mount·layout·move·destroy 약속을 지킨�
       assert.deepEqual(h.counts().reports, [0], `${name}: 마지막 본 트리 보고`);
 
       // 클릭은 열기 공용 동작만 부른다.
-      h.listeners.click[0]({ target: { closest: (sel) => (sel === '[data-manage-id]' ? null : h.cards[2]) }, detail: 0 });
+      h.listeners.click[0]({ target: { closest: (sel) => (sel === '[data-manage-id]' || sel === '.shelf-empty-slot' ? null : h.cards[2]) }, detail: 0 });
       assert.deepEqual(h.counts().opens, [2], `${name}: 카드는 공용 열기로 간다`);
 
       // 화살표 이동은 보기 규칙대로 가운데 또는 오프셋을 바꾼다.
@@ -554,7 +554,7 @@ test('#1376 두 보기가 같은 mount·layout·move·destroy 약속을 지킨�
 
       // 길게 누르기 타이머를 남긴 채 떠나면, 귀·타이머·관찰자가 모두 정리된다.
       const timerCount = timers.length;
-      h.listeners.pointerdown[0]({ target: { closest: (sel) => (sel === '[data-manage-id]' ? null : h.cards[1]) }, clientX: 0, clientY: 0, pointerId: 1 });
+      h.listeners.pointerdown[0]({ target: { closest: (sel) => (sel === '[data-manage-id]' || sel === '.shelf-empty-slot' ? null : h.cards[1]) }, clientX: 0, clientY: 0, pointerId: 1 });
       assert.equal(timers.length, timerCount + 1, `${name}: 길게 누르기 타이머가 생긴다`);
       h.view.destroy();
       assert.equal(timers[timers.length - 1].cleared, true, `${name}: 타이머 해제`);

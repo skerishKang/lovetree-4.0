@@ -215,7 +215,7 @@ html[data-v41-screen=shelf] .shelf-new-tree:hover { border-color: var(--lt-gold-
 html[data-v41-screen=shelf] .shelf-new-tree:focus-visible { outline: 3px solid var(--lt-gold); outline-offset: 2px; }
 html[data-v41-screen=shelf][data-lt-theme=garden] .shelf-new-tree {
   border-color: var(--lt-line-paper);
-  background: #fffaf5;
+  background: var(--paper-strong);
   color: #704b55;
 }
 html[data-v41-screen=shelf][data-lt-theme=garden] .shelf-new-tree:focus-visible { outline-color: var(--lt-gold-ink); }
@@ -314,4 +314,28 @@ html[data-v41-screen=shelf] .shelf-recent{
 /* #1366 ⑧: 움직임 줄이기에서는 회전 카드의 전환을 끈다. */
 @media(prefers-reduced-motion:reduce){
  .shelf-viewport[data-shelf-view=carousel] .book-card{transition:none}
+/* #1366 ③ 회전 보기: 카드(표지+이름표) 전체가 레일 안에 들어오도록 높이를 미리 예약한다. */
+html[data-v41-screen=shelf] .shelf-screen:has(.hero.strip-mode) .shelf-viewport[data-shelf-view=carousel] .shelf-rail{height:320px}
+@media(max-width:700px){
+  html[data-v41-screen=shelf] .shelf-screen:has(.hero.strip-mode) .shelf-viewport[data-shelf-view=carousel] .shelf-rail{height:270px}
+}
+/* #1366 ④ 회전 보기에는 갈색 막대를 두지 않는다. 선반 보기는 아래 한 줄만 고정하고 카드마다 붙던 막대는 없앤다. */
+html[data-v41-screen=shelf] .shelf-viewport[data-shelf-view=carousel] .shelf-base{opacity:0}
+html[data-v41-screen=shelf] .shelf-viewport[data-shelf-view=shelf] .book-card::after{display:none}
+/* #1366 ⑤ 사진 표지 위 이름 띠 — 역할 변수만 쓴다. */
+html[data-v41-screen=shelf] .cover-name-band{
+  position:absolute;left:0;right:0;bottom:0;z-index:4;display:block;padding:7px 8px;
+  background:var(--lt-role-bg);color:var(--lt-role-text-strong);
+  font:700 11px/1.3 var(--lt-ui);text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis
+}
+/* #1366 ⑦ 빈 자리는 하나만, 작고 덜 띄게. 누르면 새 트리를 만든다. */
+html[data-v41-screen=shelf] .shelf-empty-slot{
+  position:absolute;left:50%;top:50%;width:104px;height:156px;margin:-78px 0 0 -52px;
+  display:grid;place-items:center;border:1px dashed var(--lt-role-line);border-radius:var(--lt-r-card);
+  background:var(--lt-role-bg);color:var(--lt-role-text-muted);font-size:12px;
+  transform:translate3d(var(--x,0px),0,0);pointer-events:auto;cursor:pointer
+}
+html[data-v41-screen=shelf] .shelf-viewport[data-shelf-view=shelf] .shelf-empty-slot{
+  position:relative;left:auto;top:auto;width:104px;height:156px;min-height:0;margin:0 auto;
+  transform:none;aspect-ratio:auto;align-self:end
 }

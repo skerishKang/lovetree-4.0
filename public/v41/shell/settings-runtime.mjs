@@ -13,7 +13,7 @@ import {createFeedbackDialog} from "../feedback.mjs";
 import {createFeedbackBoard} from "../feedback-board.mjs";
 import {mountUpdates} from "../updates.mjs";
 import {createSettings} from "./settings.mjs";
-import {paintLoginLinks,paintThemeControls,applyTheme as applyThemeFor,toggleTheme as toggleThemeFor} from "./theme.mjs";
+import {paintLoginLinks,paintThemeControls,renderThemeChoices,applyTheme as applyThemeFor,toggleTheme as toggleThemeFor} from "./theme.mjs";
 import {normalizeTitleDisplay, normalizeAccentColor, normalizeDateStyle, normalizeStartPlace, normalizeShareView, normalizeHomeMoment, normalizeBookDisplay, normalizeShelfView, coverModeOf, normalizeCoverDesign} from "../domain.mjs";
 
 export function createSettingsRuntime(ctx){
@@ -48,6 +48,7 @@ export function createSettingsRuntime(ctx){
      if((0,ctx.$)('account-popover').hidden){(0,ctx.openAccountMenu)(e.detail===0?'keyboard':'mouse');void shellSettings.getFeedbackBoard().refreshReplyDot();void shellSettings.refreshMyNewsCount?.();}else (0,ctx.closeAccountMenu)();
     };
 
+    renderThemeChoices();
     shellSettings=createSettings({ $:ctx.$, memberViewsAvailable:ctx.memberViewsAvailable, notify:ctx.notify, setTitleDisplay:ctx.setTitleDisplay, openLoginStart:ctx.openLoginStart, links:ctx.links, screenForView, choose:ctx.choose, panel:ctx.panel, show:ctx.show, frames:ctx.frames, frameLoaded:ctx.frameLoaded, hideFrames:ctx.hideFrames, closeAccountMenu:ctx.closeAccountMenu, openAccountMenu:ctx.openAccountMenu, renderAccount:ctx.renderAccount, updateAccountControls:ctx.updateAccountControls, openAssets:ctx.openAssets, openEditor:ctx.openEditor, sample:ctx.sample, backup:ctx.backup, clear:ctx.clear, startMember:ctx.startMember, leaveMember:ctx.leaveMember, pauseMember:ctx.pauseMember, openFallbackShell:ctx.openFallbackShell, writeLocation:ctx.writeLocation, load:ctx.load, flowNavigation:ctx.flowNavigation, renderTreeMenu:ctx.renderTreeMenu, requestBoardOpen:ctx.requestBoardOpen, lastShelfTreeId, shellHeader:ctx.shellHeader, shellDialogs:ctx.shellDialogs,  shareApi:ctx.shareApi, accountApi:ctx.accountApi, onVisitorAccount:account=>{ctx.visitorAccount=account;ctx.shellHeader?.updateAccountControls();}, myNewsApi:ctx.myNewsApi, readTheme, writeTheme, normalizeAccentColor, normalizeDateStyle, normalizeStartPlace, normalizeShareView, normalizeHomeMoment,  readPageTurn, writePageTurn, frameMessage, displayTreeTitle, accountPresentation, createFeedbackDialog, createFeedbackBoard, mountUpdates, mountMyNews, readWriteTab, writeWriteTab, clearCachedWorkspace, forgetLoginSubject, createWorkspaceApi, paintThemeControls, applyTheme:ctx.applyTheme, toggleTheme:ctx.toggleTheme, paintBookDisplayControls:ctx.paintBookDisplayControls, get member(){return ctx.member}, get model(){return ctx.model}, get current(){return ctx.current}, get source(){return ctx.source}, get motionPaused(){return ctx.motionPaused}, get loadGeneration(){return ctx.loadGeneration}, get handledHash(){return ctx.handledHash}, get activeShareId(){return ctx.activeShareId}, set member(v){ctx.member=v}, set model(v){ctx.model=v}, set current(v){ctx.current=v}, set source(v){ctx.source=v}, set motionPaused(v){ctx.motionPaused=v}, set loadGeneration(v){ctx.loadGeneration=v}, set handledHash(v){ctx.handledHash=v}, set activeShareId(v){ctx.activeShareId=v}
      });
 

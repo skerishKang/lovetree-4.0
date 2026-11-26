@@ -663,6 +663,52 @@ jobs:
           node --test --test-concurrency=1 tests/v41-home-card-1077.test.mjs
           echo "로그아웃 첫 화면 카드 가림 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
 
+
+      - name: 화면 변경 없으면 건너뜀을 남긴다
+        if: always()
+        run: |
+          if [ "${{ needs.screen-changes.outputs.changed }}" != "true" ]; then
+            echo "건너뜀(화면 변경 없음)" | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+
+  # #1413: 화면 시험은 그대로 유지하고 직렬 셸 잡의 뒷부분을 별도 호스트에서 병렬 실행한다.
+  screen-shell-extra:
+    name: 화면 시험 — 셸·설정·나머지
+    # 2026-11-22: 호스트 실행기 대기(동시 3개 안팎)를 피해 같은 저장소 PR은 CGI 자체 실행기에서 돈다(보드 잡과 같은 식).
+    # 2026-11-23: CGI 실행기 4대가 줄이 되어 호스트 실행기로 돌린다(CGI에는 같은 기계에서 재야 하는 첫 화면·궤도·보드만).
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    needs: screen-changes
+    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || needs.screen-changes.outputs.jobs == '' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-shell-extra,'))
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          clean: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/cache@v4
+        if: runner.environment != 'self-hosted'
+        with:
+          path: ~/.cache/ms-playwright
+          key: ms-playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - name: 브라우저 준비(Playwright Chromium, 캐시)
+        id: browser
+        if: needs.screen-changes.outputs.changed == 'true'
+        run: |
+          npm i --no-save --no-package-lock playwright@$(node -p "require('./package-lock.json').packages['node_modules/playwright'].version")
+          if [ "$RUNNER_ENVIRONMENT" = "self-hosted" ]; then
+            # 자체 실행기: 이 버전 Chromium이 있으면 받지 않고 끝난다(시스템 라이브러리는 미리 깔림, sudo 없음).
+            npx playwright install chromium
+          elif ls "$HOME/.cache/ms-playwright" 2>/dev/null | grep -q chromium; then
+            echo "캐시된 Chromium 사용"
+          else
+            npx playwright install --with-deps chromium
+          fi
+          node -e "import('playwright-core').then(()=>console.log('playwright-core 확인')).catch(e=>{console.error(e.message);process.exit(1)})"
       # 이슈 952: 셸·설정·테마 — 설정 창 탭 전환·키보드·더러운 닫기 확인·정책 링크, 390 접기 메뉴,
       # 접근성 이름(axe 수정), 밤/정원 테마 적용과 외부 글꼴 요청 0건, 부팅 synced 안내를 실제 화면에서 잰다.
       # 소스 글자 검사를 동작 검사로 바꾼 자리다. 첫 화면은 vite 번들이라 먼저 build 한다. 건너뜀=실패.
@@ -1552,16 +1598,13 @@ jobs:
             echo "건너뜀(화면 변경 없음)" | tee -a "$GITHUB_STEP_SUMMARY"
           fi
   deploy:
-    name: 미리보기 배포 검사(postdeploy·겉모습 비교)
+    name: 미리보기 배포 검사(postdeploy)
     runs-on: ubuntu-latest
-    needs: [screen-changes, screen-home, screen-home-followup]
-    if: >-
-      always() && needs.screen-changes.result == 'success' &&
-      (needs.screen-changes.outputs.changed == 'false' ||
-       (needs.screen-home.result == 'success' && needs.screen-home-followup.result == 'success') ||
-       (needs.screen-changes.outputs.jobs != 'all' && needs.screen-changes.outputs.jobs != '' &&
-        !contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-home,')))
+    needs: [screen-changes]
+    if: always() && needs.screen-changes.result == 'success'
     timeout-minutes: 40
+    outputs:
+      previewUrl: ${{ steps.preview.outputs.url }}
     env:
       PR_SHA: ${{ github.event.pull_request.head.sha }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -1592,35 +1635,6 @@ jobs:
       - name: 미리보기 주소 찾기
         id: preview
         run: node tools/postdeploy/preview-url.mjs "$GITHUB_REPOSITORY" "$PR_SHA" --wait 600
-      # 겉모습 비교(알림용)는 화면 파일이 바뀐 PR에서만 돈다 — 문서·서버·시험만 바뀐 PR은 3~4분을 아낀다.
-      - name: 화면 파일 바뀜 확인
-        id: changes
-        run: |
-          BASE_SHA=$(git merge-base "$PR_SHA" origin/main)
-          if git diff --name-only "$BASE_SHA" "$PR_SHA" | grep -Eq '^(public/|src/|index\.html$|vite\.config|package\.json$)'; then
-            echo "ui=true" >> "$GITHUB_OUTPUT"; echo "화면 파일 바뀜 — 겉모습 비교를 돈다"
-          else
-            echo "ui=false" >> "$GITHUB_OUTPUT"; echo "화면 파일 안 바뀜 — 겉모습 비교 건너뜀"
-            echo "## 겉모습 비교 건너뜀 — 화면 파일(public/·src/ 등)이 바뀌지 않은 PR" >> "$GITHUB_STEP_SUMMARY"
-          fi
-      - name: 기준 커밋 찾기(merge-base 배포본)
-        if: steps.changes.outputs.ui == 'true'
-        id: base
-        run: |
-          BASE_SHA=$(git merge-base "$PR_SHA" origin/main)
-          echo "baseSha=$BASE_SHA" >> "$GITHUB_OUTPUT"
-          echo "기준 커밋(merge-base): $BASE_SHA"
-          node tools/postdeploy/preview-url.mjs "$GITHUB_REPOSITORY" "$BASE_SHA" --wait 240 --quiet > "$RUNNER_TEMP/base.log" 2>&1 || true
-          BASE_URL=$(sed -n 's/.*preview=\([^ ]*\).*/\1/p' "$RUNNER_TEMP/base.log" | head -1)
-          if [ -n "$BASE_URL" ] && [ "$BASE_URL" != "(없음)" ]; then
-            echo "baseUrl=$BASE_URL" >> "$GITHUB_OUTPUT"
-            echo "baseLabel=기준 커밋 배포본" >> "$GITHUB_OUTPUT"
-            echo "기준 주소: $BASE_URL"
-          else
-            echo "baseUrl=https://lovetree-4-0.pages.dev" >> "$GITHUB_OUTPUT"
-            echo "baseLabel=운영(대체)" >> "$GITHUB_OUTPUT"
-            echo "기준 커밋 배포 주소를 못 찾아 운영으로 대체: $(sed -n 's/.*reason=//p' "$RUNNER_TEMP/base.log" | head -1)"
-          fi
       - name: 미리보기 배포 없음 — 건너뜀
         if: steps.preview.outputs.url == ''
         run: |
@@ -1661,9 +1675,79 @@ jobs:
           node tools/postdeploy/preview-gate.mjs ./preview-out \
             --summary "$GITHUB_STEP_SUMMARY" \
             --readiness "${{ steps.preview.outputs.readiness || 'unknown' }}"
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.preview.outputs.url != ''
+        with:
+          name: preview-check-${{ github.event.pull_request.number }}
+          path: preview-out
+          retention-days: 14
+
+  visual:
+    name: 겉모습 비교(알림용)
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: needs.deploy.result == 'success'
+    timeout-minutes: 40
+    env:
+      PR_SHA: ${{ github.event.pull_request.head.sha }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ms-playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - name: 브라우저 준비(Playwright Chromium, 캐시)
+        id: browser
+        run: |
+          # 모듈은 항상 설치한다(캐시는 브라우저 바이너리에만 걸린다). 캐시가 있어도 모듈이 없으면 실행이 안 된다.
+          PLAYWRIGHT_VERSION=$(node -p "require('./package-lock.json').packages['node_modules/playwright'].version")
+          npm i --no-save --no-package-lock "playwright@$PLAYWRIGHT_VERSION"
+          if ls "$HOME/.cache/ms-playwright" 2>/dev/null | grep -q chromium; then
+            echo "캐시된 Chromium 사용"
+          else
+            npx playwright install --with-deps chromium
+          fi
+          node -e "import('playwright-core').then(()=>console.log('playwright-core 확인')).catch(e=>{console.error(e.message);process.exit(1)})"
+      # 겉모습 비교(알림용)는 화면 파일이 바뀐 PR에서만 돈다 — 문서·서버·시험만 바뀐 PR은 3~4분을 아낸다.
+      - name: 화면 파일 바뀜 확인
+        id: changes
+        run: |
+          BASE_SHA=$(git merge-base "$PR_SHA" origin/main)
+          if git diff --name-only "$BASE_SHA" "$PR_SHA" | grep -Eq '^(public/|src/|index\.html$|vite\.config|package\.json$)'; then
+            echo "ui=true" >> "$GITHUB_OUTPUT"; echo "화면 파일 바뀜 — 겉모습 비교를 돈다"
+          else
+            echo "ui=false" >> "$GITHUB_OUTPUT"; echo "화면 파일 안 바뀜 — 겉모습 비교 건너뜀"
+            echo "## 겉모습 비교 건너뜀 — 화면 파일(public/·src/ 등)이 바뀌지 않은 PR" >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: 기준 커밋 찾기(merge-base 배포본)
+        if: steps.changes.outputs.ui == 'true'
+        id: base
+        run: |
+          BASE_SHA=$(git merge-base "$PR_SHA" origin/main)
+          echo "baseSha=$BASE_SHA" >> "$GITHUB_OUTPUT"
+          echo "기준 커밋(merge-base): $BASE_SHA"
+          node tools/postdeploy/preview-url.mjs "$GITHUB_REPOSITORY" "$BASE_SHA" --wait 240 --quiet > "$RUNNER_TEMP/base.log" 2>&1 || true
+          BASE_URL=$(sed -n 's/.*preview=\([^ ]*\).*/\1/p' "$RUNNER_TEMP/base.log" | head -1)
+          if [ -n "$BASE_URL" ] && [ "$BASE_URL" != "(없음)" ]; then
+            echo "baseUrl=$BASE_URL" >> "$GITHUB_OUTPUT"
+            echo "baseLabel=기준 커밋 배포본" >> "$GITHUB_OUTPUT"
+            echo "기준 주소: $BASE_URL"
+          else
+            echo "baseUrl=https://lovetree-4-0.pages.dev" >> "$GITHUB_OUTPUT"
+            echo "baseLabel=운영(대체)" >> "$GITHUB_OUTPUT"
+            echo "기준 커밋 배포 주소를 못 찾아 운영으로 대체: $(sed -n 's/.*reason=//p' "$RUNNER_TEMP/base.log" | head -1)"
+          fi
       # ---- 겉모습 비교(visual-baseline, 2026-11-08): 알림만 하고 실패로 만들지 않는다 ----
       - name: 기준 커밋 화면 캡처 — before
-        if: steps.preview.outputs.url != '' && steps.changes.outputs.ui == 'true'
+        if: needs.deploy.outputs.previewUrl != '' && steps.changes.outputs.ui == 'true'
         id: capture-before
         continue-on-error: true
         env:
@@ -1680,7 +1764,7 @@ jobs:
           echo "seconds=$(( $(date +%s) - start ))" >> "$GITHUB_OUTPUT"
           tail -5 "$RUNNER_TEMP/before.log" || true
       - name: 미리보기 화면 캡처 — after
-        if: steps.preview.outputs.url != '' && steps.changes.outputs.ui == 'true'
+        if: needs.deploy.outputs.previewUrl != '' && steps.changes.outputs.ui == 'true'
         id: capture-after
         continue-on-error: true
         env:
@@ -1692,12 +1776,12 @@ jobs:
           # 2026-11-24: 단계 timeout-minutes로 끊으면 continue-on-error여도 잡 전체가 취소(빨강)된다.
           # 도구 안 상한(5분)에 더해 명령만 7분에서 끊어 단계는 종료 코드로 끝나게 한다(알림용 유지).
           timeout -k 15 420 node tools/visual-baseline/visual-baseline.mjs capture \
-            --base "${{ steps.preview.outputs.url }}/v41/" --out visual-after > "$RUNNER_TEMP/after.log" 2>&1
+            --base "${{ needs.deploy.outputs.previewUrl }}/v41/" --out visual-after > "$RUNNER_TEMP/after.log" 2>&1
           echo "status=$?" >> "$GITHUB_OUTPUT"
           echo "seconds=$(( $(date +%s) - start ))" >> "$GITHUB_OUTPUT"
           tail -5 "$RUNNER_TEMP/after.log" || true
       - name: 화면 비교(장별 차이 %)
-        if: steps.preview.outputs.url != '' && steps.changes.outputs.ui == 'true'
+        if: needs.deploy.outputs.previewUrl != '' && steps.changes.outputs.ui == 'true'
         id: compare
         continue-on-error: true
         run: |
@@ -1709,7 +1793,7 @@ jobs:
           echo "seconds=$(( $(date +%s) - start ))" >> "$GITHUB_OUTPUT"
           tail -12 "$RUNNER_TEMP/compare.log" || true
       - name: 겉모습 비교 요약 표
-        if: steps.preview.outputs.url != '' && steps.changes.outputs.ui == 'true'
+        if: needs.deploy.outputs.previewUrl != '' && steps.changes.outputs.ui == 'true'
         continue-on-error: true
         run: |
           if [ ! -f visual-diff.json ]; then
@@ -1729,18 +1813,17 @@ jobs:
           fi
           node tools/visual-baseline/visual-summary.mjs visual-diff.json \
             --before-url "${{ steps.base.outputs.baseUrl }}/v41/" \
-            --after-url "${{ steps.preview.outputs.url }}/v41/" \
+            --after-url "${{ needs.deploy.outputs.previewUrl }}/v41/" \
             --base-sha "${{ steps.base.outputs.baseSha }}" \
             --head-sha "$PR_SHA" \
             --base-label "${{ steps.base.outputs.baseLabel }}" \
             $LAG_ARG | head -40
           echo "- 소요: 캡처 before ${{ steps.capture-before.outputs.seconds }}초 · after ${{ steps.capture-after.outputs.seconds }}초 · 비교 ${{ steps.compare.outputs.seconds }}초" >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
-        if: always() && steps.preview.outputs.url != ''
+        if: always() && needs.deploy.outputs.previewUrl != '' && steps.changes.outputs.ui == 'true'
         with:
-          name: preview-check-${{ github.event.pull_request.number }}
+          name: preview-check-visual-${{ github.event.pull_request.number }}
           path: |
-            preview-out
             visual-before
             visual-after
             visual-diff
@@ -1751,7 +1834,7 @@ jobs:
     name: 미리보기 postdeploy(로그아웃)
     runs-on: ubuntu-latest
     if: always()
-    needs: [screen-changes, screen-board, screen-home, screen-home-followup, screen-book, screen-reload, screen-shell, screen-map-a, screen-map-b, screen-book-screen, screen-audit-a, screen-audit-b, screen-audit-c, deploy]
+    needs: [screen-changes, screen-board, screen-home, screen-home-followup, screen-book, screen-reload, screen-shell, screen-shell-extra, screen-map-a, screen-map-b, screen-book-screen, screen-audit-a, screen-audit-b, screen-audit-c, deploy]
     steps:
       - uses: actions/checkout@v4
         with:
