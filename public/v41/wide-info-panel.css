@@ -29,3 +29,19 @@
   .lt1359-info button:focus-visible{outline:2px solid var(--lt-role-hover-border);outline-offset:2px}
   .app:has(.detail.open) .lt1359-info{visibility:hidden}
 }
+
+@media (min-width:1200px) {
+  html[data-lt-theme=garden] .lt1359-info {
+    background:var(--lt-role-accent-bg);
+    color:var(--lt-role-accent-ink);
+    border-color:var(--lt-role-accent-ink);
+  }
+  html[data-lt-theme=garden] .lt1359-info button {
+    background:var(--lt-role-input-bg);
+    color:var(--lt-role-input-ink);
+    border-color:var(--lt-role-input-border);
+  }
+  html[data-lt-theme=garden] .lt1359-info .lt1359-next {
+    color:var(--lt-role-accent-ink);
+  }
+}
