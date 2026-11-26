@@ -54,16 +54,20 @@ async function withShelfSession(fn) {
     const page = await ctx.newPage();
     page.on('pageerror', (error) => errors.push(String(error.message || error)));
     async function openShelf() {
-      await page.goto(`${origin}/v41/?account=1`, { waitUntil: 'load' });
+      await page.goto(`${origin}/v41/?account=1#my/shelf`, { waitUntil: 'load' });
       await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
       // 무대 준비가 끝나기 전의 클릭은 '불러오는 중' 덮개에 가로챼진다.
       await page.waitForFunction(() => document.getElementById('stage-loading')?.hidden === true, null, { timeout: 20000 });
       await page.locator('#discover-ask-no').click().catch(() => {});
-      await clickToolbarTreeChoice(page);
-      await page.locator('[data-tree-action="shelf"]').click();
+      await page.waitForFunction(() => {
+        const f=document.querySelector('iframe#view');
+        return f && !f.hidden && f.contentWindow?.location.pathname.endsWith('/track32-bookshelf.html') &&
+          !!f.contentDocument?.querySelector('#shelfRail [data-book-index]');
+      }, null, {timeout:20000});
       frame = null;
       for (let i = 0; i < 80 && !frame; i += 1) {
-        frame = page.frames().find((f) => /track32-bookshelf/.test(f.url()));
+        frame = await (await page.locator('iframe#view').elementHandle()).contentFrame();
+        if (!/track32-bookshelf/.test(frame?.url() || '')) frame = null;
         if (frame) break;
         await page.waitForTimeout(250);
       }
