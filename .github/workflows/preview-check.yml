@@ -1922,12 +1922,18 @@ jobs:
       # 둘을 차례로 찍던 때는 이 잡이 약 11분 동안 실행기 한 자리를 잡았다(호스트 실행기는 동시에 20자리뿐이라 겹친 PR의
       # 화면 잡이 줄을 섰다). 필수 검사(미리보기 postdeploy)는 이 잡을 기다리지 않는다 — needs는 그대로 deploy 하나다.
       # 명령마다 7분 상한(timeout 420)·로그·종료 코드·초는 전과 같고, 단계는 둘 다 끝날 때까지 기다린다.
+      # 캡처 도구의 장 수 상한(기본 5분 — 그 시각이 지나면 남은 장은 시작하지 않는다)은 이 단계에 한해 5분 30초로 둔다.
+      # 순서대로 찍을 때는 19번째 장이 5분 직전에 시작돼 늘 19장이었는데, 동시에 찍으면 한쪽이 5% 남짓 느려져
+      # before가 18장에서 멈췄다(#1486 실측: before 306초 18장, after 328초 19장). 느려진 몫의 두 배를 더 줘
+      # 두 캡처 모두 전처럼 19장 이상 찍게 한다. 장마다 기다리는 25초·찍는 순서·비교 기준은 그대로다.
+      # 5분 30초 + 마지막 한 장(최대 25초) + 브라우저 준비는 명령 상한 7분 안에 든다.
       - name: 기준·미리보기 화면 캡처 — before·after 동시
         if: needs.deploy.outputs.previewUrl != '' && steps.changes.outputs.ui == 'true'
         id: capture
         continue-on-error: true
         env:
           LOVETREE_POSTDEPLOY_BROWSER: chromium
+          LT_VISUAL_BUDGET_MS: '330000'
           BEFORE_BASE: ${{ steps.base.outputs.baseUrl }}/v41/
           AFTER_BASE: ${{ needs.deploy.outputs.previewUrl }}/v41/
         run: |

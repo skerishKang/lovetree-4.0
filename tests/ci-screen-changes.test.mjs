@@ -235,6 +235,14 @@ test('#1413 5단계: 옮긴 시험 위치·보드 둘째 잡 고르기·공통 �
   assert.match(header(visual), /\n    needs: deploy\n/, '알림용 잡은 deploy만 기다린다');
   assert.match(visual, /shoot before "\$BEFORE_BASE" visual-before & p1=\$!\n\s+shoot after "\$AFTER_BASE" visual-after & p2=\$!\n\s+wait \$p1; wait \$p2/, 'before·after를 동시에 찍고 둘 다 기다린다');
   assert.match(visual, /timeout -k 15 420 node tools\/visual-baseline\/visual-baseline\.mjs capture/, '캡처 명령 상한 7분은 그대로다');
+  // 동시 캡처로 before가 5분 상한 안에 한 장 덜 찍던 것(19 → 18장)을 되돌린다: 이 단계에 한해 장 수 상한을 늘린다.
+  // 도구 기본값(5분)보다 짧아지지 않고, 상한 + 마지막 한 장(SHOT_BUDGET_MS) + 준비 30초가 명령 상한 420초 안에 든다.
+  const tool = readFileSync(new URL('../tools/visual-baseline/visual-baseline.mjs', import.meta.url), 'utf8');
+  const toolDefault = Number(tool.match(/process\.env\.LT_VISUAL_BUDGET_MS \|\| (\d+)/)[1]);
+  const shotBudget = Number(tool.match(/const SHOT_BUDGET_MS = (\d+);/)[1]);
+  const budget = Number((visual.match(/\n          LT_VISUAL_BUDGET_MS: '(\d+)'\n/) || [])[1]);
+  assert.ok(budget > toolDefault, `동시 캡처 단계의 장 수 상한(${budget})이 도구 기본값(${toolDefault})보다 길다`);
+  assert.ok(budget + shotBudget + 30000 <= 420000, `장 수 상한 ${budget} + 한 장 ${shotBudget} + 준비 30초가 명령 상한 420초 안에 든다`);
   assert.ok(!/capture-(before|after)/.test(visual), '옛 단계 출력 이름이 남지 않는다');
   assert.match(visual, /steps\.capture\.outputs\.before_status[\s\S]*steps\.capture\.outputs\.after_status/, '요약 표가 두 캡처의 종료 코드를 읽는다');
 });
