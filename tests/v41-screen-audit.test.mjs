@@ -346,8 +346,7 @@ test('#987 공유 창 폭·단추·대비와 설정 정렬·동그라미·배치
         await page.waitForFunction(()=>window.LT41?.trees?.length===3&&!document.querySelector('#account-avatar')?.hidden);
         const ask=page.locator('#discover-ask-no');
         if(await ask.isVisible())await ask.click();
-        await clickToolbarTreeChoice(page);
-        await page.locator('[data-tree-action="shelf"]').click();
+        // #1367: the tree picker now lives in the shelf; avoid reopening the same shelf frame.
         await clickToolbarTreeChoice(page);
         await page.locator('[data-tree-action="share"]').click();
         await page.locator('#share-panel[open] .share-item-actions button').first().waitFor();

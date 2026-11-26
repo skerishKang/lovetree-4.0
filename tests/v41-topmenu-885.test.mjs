@@ -272,7 +272,7 @@ test('상단 메뉴 261119: 트리 단추 폭·⌄ 자리·목록 규칙·메뉴
         const plain = items.filter((b) => !b.closest('.tree-foot') && b.getAttribute('aria-checked') !== 'true').map((b) => getComputedStyle(b).backgroundColor);
         return {
           openedBy: pop.dataset.ltOpenedBy,
-          firstOutline: first ? first.outlineWidth : null,
+          firstOutline: first ? (first.outlineStyle === 'none' || first.outlineColor === 'rgba(0, 0, 0, 0)' ? '0px' : first.outlineWidth) : null,
           popoverBg: cs.backgroundColor,
           foot: [...pop.querySelectorAll('.tree-foot button')].map((b) => b.textContent.trim()),
           checked, plain,
@@ -319,7 +319,7 @@ test('970 실행: 트리 드롭다운은 Esc·바깥 누르기로 닫히고, 키
       // 마우스로 열기 → Esc로 닫기: 초점이 단추로 돌아온다.
       await clickToolbarTreeChoice(page);
       await page.waitForFunction(() => !document.getElementById('tree-popover')?.hidden, null, { timeout: 10000 });
-      assert.equal(treeChoiceExpanded(page), 'true', `${width}: 열면 aria-expanded=true`);
+      assert.equal(await treeChoiceExpanded(page), 'true', `${width}: 열면 aria-expanded=true`);
       await page.keyboard.press('Escape');
       await page.waitForFunction(() => document.getElementById('tree-popover')?.hidden, null, { timeout: 5000 });
       const afterEsc = { expanded: await treeChoiceExpanded(page), focus: await treeChoiceFocused(page) };
@@ -460,6 +460,7 @@ test('1028 실행: 트리 목록만 스크롤하고 동작 칸은 고정이며 �
             assert.equal(m.keyboardDown, true, `${width}/${theme}/15: ↓로 두 번째 줄`);
             await page.keyboard.press('Escape');
             await page.waitForFunction(() => document.getElementById('tree-popover')?.hidden, null, { timeout: 5000 });
+            await page.frameLocator('iframe#view').locator('button.lt-toolbar-tree-choice[aria-expanded="false"]').waitFor({state:'attached',timeout:5000});
             m.escapeClosed = await page.evaluate(() => document.querySelector('iframe#view')?.contentDocument?.querySelector('button.lt-toolbar-tree-choice')?.getAttribute('aria-expanded') === 'false');
             assert.equal(m.escapeClosed, true, `${width}/${theme}/15: Esc로 닫힘`);
           } else {
@@ -636,7 +637,7 @@ test('#1367 4번: 트리 고르기 목록은 바깥 누름·안쪽 화면 누름
         await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
         await page.locator('#discover-ask-no').click().catch(() => {});
         const hidden = () => page.evaluate(() => document.getElementById('tree-popover')?.hidden !== false);
-        const open = async () => { assert.equal(await hidden(), true, '처음에는 닫혀 있다'); await clickToolbarTreeChoice(page); assert.equal(await hidden(), false, '트리 고르기를 누르면 열린다'); };
+        const open = async () => { assert.equal(await hidden(), true, '처음에는 닫혀 있다'); await clickToolbarTreeChoice(page); await page.waitForFunction(() => !document.getElementById('tree-popover')?.hidden, null, {timeout:5000}); assert.equal(await hidden(), false, '트리 고르기를 누르면 열린다'); };
 
         // 머리줄 빈 곳(테마 단추)을 눌러도 창을 닫기만 하고 테마는 바뀌지 않는다.
         await open();
