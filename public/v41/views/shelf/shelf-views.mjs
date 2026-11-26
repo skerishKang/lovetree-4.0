@@ -1,7 +1,7 @@
 // 서재 보기 틀 (#1376 1단계). 보기 이름별 배치·이동·정리만 여기서 맡는다.
 // 데이터·카드 마크업·저장·메시지·주소·읽기 화면은 shelf.js(공용)에 그대로 둔다.
 // 2026-11-25: 기존 분기를 값·조건·문구 변경 없이 옮긴다(겉모습 변화 0).
-import { shelfRowLayout, shelfRotationLayout } from './shelf-model.mjs';
+import { shelfRowLayout, shelfRotationLayout, shelfDragShift } from './shelf-model.mjs';
 import { MSG } from '../../frame-messages.mjs';
 
 // 셸의 값 목록을 그대로 쓴다(화면에서 새로 만들지 않는다). 시험이 이름만 바꿔 같은 검사를 돈다.
@@ -18,6 +18,24 @@ function setDragX(rail, px) {
   if (!rail || !rail.style) return;
   if (typeof rail.style.setProperty === 'function') rail.style.setProperty('--drag-x', px + 'px');
   else rail.style['--drag-x'] = px + 'px';
+}
+
+/* #1468: 끝 손가락 속도(px/ms). 마지막 표본과 창(기본 100ms) 안 첫 표본으로 잰다.
+   표본이 부족하거나 시간을 못 읽으면 0 — 튕기기 아님으로 본다(짧은 밀기는 판 폭 규칙을 따른다). */
+function releaseVelocity(samples, windowMs) {
+  var win = windowMs === undefined ? 100 : windowMs;
+  if (!Array.isArray(samples) || samples.length < 2) return 0;
+  // 창 안에 든 표본 가운데 가장 이른 것과 마지막 표본으로 잰다. 하나도 없으면(놓기 전에 손가락이 멈춘 경우) 0 — 튕기기가 아니다.
+  var last = samples[samples.length - 1], first = null;
+  for (var i = 0; i < samples.length - 1; i += 1) {
+    if (last.t - samples[i].t > win) continue;
+    first = samples[i];
+    break;
+  }
+  if (!first) return 0;
+  var dt = last.t - first.t;
+  if (!(dt > 0) || !isFinite(dt) || !isFinite(last.x - first.x)) return 0;
+  return (last.x - first.x) / dt;
 }
 
 // 빈 칸 자리: 원래 renderShelf가 카드 바로 뒤에 넣던 것을 보기가 맡는다.
@@ -43,7 +61,7 @@ function bindRail(ctx, policy) {
   var rail = ctx.rail();
   if (!rail) return function () {};
   var lpTimer = null, lpTarget = null, lpStart = null, lpFired = false;
-  var drag = { active: false, startX: 0, moved: false, downIndex: null, startIndex: 0, lastDx: 0 };
+  var drag = { active: false, startX: 0, moved: false, downIndex: null, startIndex: 0, lastDx: 0, samples: [] };
   var clearLp = function () { if (lpTimer) { clearTimeout(lpTimer); lpTimer = null; } lpStart = null; };
 
   function onClick(event) {
@@ -66,6 +84,7 @@ function bindRail(ctx, policy) {
     drag.active = true; drag.startX = event.clientX; drag.moved = false;
     drag.downIndex = card ? Number(card.dataset.bookIndex) : null;
     drag.startIndex = ctx.center();
+    drag.samples = [{ x: event.clientX, t: event.timeStamp }];
     rail.classList.add('dragging'); rail.setPointerCapture(event.pointerId);
   }
   function onMove(event) {
@@ -73,15 +92,20 @@ function bindRail(ctx, policy) {
     if (!drag.active) return;
     var dx = event.clientX - drag.startX;
     drag.lastDx = dx;
+    drag.samples.push({ x: event.clientX, t: event.timeStamp });
+    if (drag.samples.length > 8) drag.samples.shift();
     if (Math.abs(dx) > 7) drag.moved = true;
     if (drag.moved) policy.onMove(ctx, dx, rail);
   }
-  function onUp() {
+  function onUp(event) {
     clearLp();
     if (!drag.active) return;
+    // #1468: 놓은 순간도 표본에 넣는다 — 마지막 움직임 뒤 손가락이 멈춰 있었으면 놓기 속도는 0이어야 한다.
+    if (event && isFinite(event.timeStamp) && isFinite(event.clientX)) drag.samples.push({ x: event.clientX, t: event.timeStamp });
     var moved = drag.moved, downIndex = drag.downIndex, longFired = lpFired, dx = drag.lastDx || 0, startIndex = drag.startIndex;
+    var velocity = releaseVelocity(drag.samples);
     drag.active = false; rail.classList.remove('dragging');
-    if (moved) policy.onEnd(ctx, { dx: dx, startIndex: startIndex, rail: rail });
+    if (moved) policy.onEnd(ctx, { dx: dx, startIndex: startIndex, rail: rail, velocity: velocity });
     else if (longFired) { /* 길게 누르기: ⋯만 보이고 책은 열지 않는다 */ }
     else if (downIndex !== null) ctx.open(downIndex);
     drag.downIndex = null;
@@ -90,7 +114,7 @@ function bindRail(ctx, policy) {
   function onCancel() {
     clearLp(); lpFired = false; lpTarget = null;
     if (!drag.active) return;
-    drag.active = false; rail.classList.remove('dragging');
+    drag.active = false; drag.samples = []; rail.classList.remove('dragging');
     ctx.setCenter(drag.startIndex || 0); ctx.relayout();
   }
 
@@ -107,7 +131,7 @@ function bindRail(ctx, policy) {
   }
   return function destroy() {
     if (lpTimer) clearTimeout(lpTimer);
-    lpTimer = null; lpTarget = null; lpStart = null; lpFired = false; drag.active = false;
+    lpTimer = null; lpTarget = null; lpStart = null; lpFired = false; drag.active = false; drag.samples = [];
     rail.removeEventListener('click', onClick);
     rail.removeEventListener('pointerdown', onDown);
     rail.removeEventListener('pointermove', onMove);
@@ -185,7 +209,9 @@ var carousel = defineView('carousel', function (ctx) {
   onMove: function (ctx, dx, rail) { setDragX(rail, dx); },
   onEnd: function (ctx, e) {
     var list = ctx.books();
-    var shifted = Math.round(-(e.dx || 0) / 200);
+    // #1468: 판 폭 15%(최소 40px) 한 칸 + 빠른 튕기기 한 칸. 100px 이상은 옛 반올림 값(Math.round(-dx/200))과 같다
+    // — 왼쪽으로 밀면 다음 책(+1), 오른쪽으로 밀면 앞 책(-1)이다.
+    var shifted = shelfDragShift(e.dx || 0, { velocity: e.velocity || 0 });
     ctx.setCenter(Math.max(0, Math.min(list.length - 1, e.startIndex + shifted)));
     ctx.save(); ctx.relayout();
   }

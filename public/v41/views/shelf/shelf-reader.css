@@ -142,22 +142,10 @@
 
     .toast { position: fixed; left: 50%; bottom: 24px; z-index: 100; max-width: calc(100vw - 40px); padding: 12px 17px; border: 1px solid rgba(255,255,255,.62); border-radius: var(--lt-r-pill); color: var(--paper-strong); background: rgba(73,61,58,.92); box-shadow: 0 14px 34px rgba(66,46,40,.14); opacity: 0; pointer-events: none; transform: translate(-50%,12px); transition: .25s ease; font-size: 12px; }
     .toast.show { opacity: 1; transform: translate(-50%,0); }
-    .modal-backdrop { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; padding: 20px; background: rgba(37,30,31,.38); backdrop-filter: blur(8px); }
-    .modal-backdrop.hidden { display: none; }
     .chapter-node-1{--node:var(--lt-cover-1)}
     .chapter-node-2{--node:var(--lt-cover-2)}
     .chapter-node-3{--node:var(--lt-cover-3)}
     .chapter-node-4{--node:var(--lt-cover-4)}
-    .modal { position: relative; width: min(620px,100%); padding: 28px; border: 1px solid rgba(255,255,255,.7); border-radius: 25px; background: var(--paper-strong); box-shadow: var(--shadow-xl); }
-    .modal h2 { margin: 0 0 9px; font: 400 28px var(--display); letter-spacing: -.07em; }
-    .modal > p { color: var(--muted); font-size: 12px; line-height: 1.7; }
-    .modal-close { position: absolute; top: 13px; right: 14px; width: 33px; height: 33px; border: 0; border-radius: 50%; color: var(--muted); background: #f3e9df; font-size: 20px; }
-    .new-book-form { display: grid; gap: 12px; margin-top: 18px; }
-    .new-book-form label { display: grid; gap: 6px; color: #7d6c65; font-size: 11px; }
-    .new-book-form input { min-height: 42px; padding: 0 12px; border: 1px solid var(--line); border-radius: 11px; color: var(--ink); background: var(--lt-cta-white); font-size: 12px; }
-    .modal-actions { display: flex; justify-content: flex-end; gap: 7px; margin-top: 18px; }
-    .open-video { min-height: 40px; padding: 0 15px; border: 1px solid var(--rose); border-radius: var(--lt-r-pill); color: var(--lt-cta-white); background: var(--rose); font-size: 11px; text-decoration: none; }
-    .open-video:hover { background: var(--rose-deep); }
 
     @media (max-width: 1020px) {
       .hero { grid-template-columns: 1fr; }

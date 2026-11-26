@@ -4,7 +4,7 @@
 export const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]):not([type="hidden"]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
 export const DIALOGS = Object.freeze([
   ['#archivePanel', 'open'], ['#detail', 'open'], ['#viewer', 'open'],
-  ['#branchModal', 'open'], ['#overview', 'open'], ['#newBookModal', 'hidden'],
+  ['#branchModal', 'open'], ['#overview', 'open'],
   ['#viewerModal', 'open'], ['#addModal', 'open'], ['#editModal', 'open'], ['#whyModal', 'open'],
   ['#nextChooser', 'open'], ['#postAdd', 'show'], ['#branchChooser', 'open']
 ]);
