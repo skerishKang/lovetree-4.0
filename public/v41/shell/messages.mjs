@@ -131,6 +131,15 @@ export function createMessages(deps) {
     if (data?.type === MSG.shelfTree && getModel()?.trees?.some(t => t.id === data.treeId)) { shelfTreeId = data.treeId; return; }
     if (data?.type === MSG.navigate) {
       if (data.view === 'track32-bookshelf.html' && !getMember()?.snapshot().owned) { openLoginStart('shelf'); return; }
+      // 첫 화면 숫자판 오른쪽 둘 줄: 서재 전체 / 공개만(#1446). 화면이 읽기 전에 값을 먼저 둔다.
+      if (data.view === 'track32-bookshelf.html') {
+        const filter = data.filter === 'public' ? 'public' : 'all';
+        // LT41은 화면 이동마다 다시 만들어지므로 값은 기기 저장소에 한 번만 건네고 서재가 읽을 때 지운다.
+        try { localStorage.setItem('lt41.shelfFilter', filter); } catch {}
+        show(data.view);
+        try { $('view').contentWindow?.postMessage({type:MSG.shelfFilter,value:filter},location.origin); } catch {}
+        return;
+      }
       show(data.view);
     }
     if ((data?.type === MSG.selection || data?.type === MSG.select) && window.LT41?.tree.moments.some(m => m.id === data.id)) {
@@ -234,7 +243,14 @@ export function createMessages(deps) {
     if (data?.type === MSG.account) {
       if (getMember()?.snapshot().owned) openAccountMenu(); else $('account-entry').click();
     }
-    if (data?.type === MSG.community) $('community-menu').click();
+    if (data?.type === MSG.community) {
+      // 첫 화면 숫자판: 가운데 두 줄은 각각 둘러보기의 트리·순간 보기로 연다(#1446).
+      const tab = data.tab === 'moments' ? 'moments' : 'trees';
+      const want = tab === 'moments' ? '#explore/moments' : '#explore';
+      if (location.hash !== want) location.hash = want;
+      $('community-menu').click();
+      return;
+    }
     if (data?.type === MSG.example && exampleTree?.moments?.some(m => m.id === data.momentId) && ['track59-sketchbook.html', 'track58-pinboard.html'].includes(data.view)) {
       sample({treeId: exampleTree.id, momentId: data.momentId}, data.view);
     }

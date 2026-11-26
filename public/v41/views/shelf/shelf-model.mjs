@@ -66,6 +66,8 @@ export function shelfBook(tree, index, palette, namer) {
     name: treeTitleOf(tree.title, namer),
     subject: tree.subject || '',
     category: 'all',
+    // #1446: 서재 '공개만' 칩이 쓰는 값. 실제 공개 여부는 화면이 /api/shares로 채운다.
+    public: false,
     // #327 2부: 모아둔 순간 트리는 책장 카드에 표시를 붙이고 맨 앞에 고정한다(shelfOrder).
     inbox: tree.inbox === true,
     color: choice.color,
@@ -119,7 +121,7 @@ export const bookMeta = (book, now) => {
 export function filterShelf(books, filter, query) {
   const needle = String(query || '').trim().toLowerCase();
   return books.filter((book) => {
-    const filterOk = filter === 'all' || book.category === filter;
+    const filterOk = filter === 'all' || (filter === 'public' ? book.public === true : book.category === filter);
     const queryOk = !needle || [book.name, book.description].concat(book.tags).concat(book.chapters.map((chapter) => chapter.title)).join(' ').toLowerCase().indexOf(needle) >= 0;
     return filterOk && queryOk;
   });

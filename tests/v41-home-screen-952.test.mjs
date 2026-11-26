@@ -411,7 +411,13 @@ test('#1087 카드 바꾸기·숫자 두 줄·숫자 누르기', { skip: REQUIRE
       assert.equal(await groups.count(), 3);
       for (const group of await groups.all()) assert.equal(await group.locator('.home-count-line').count(), 2, '단추마다 두 줄');
       const texts = await groups.evaluateAll(es => es.map(e => [...e.querySelectorAll('.home-count-line')].map(row => row.textContent.trim())));
-      assert.deepEqual(texts, [['순간 4', '정리 전 2'], ['공개 트리 11', '공개 순간 42'], ['트리 2', '공개 트리 1']], JSON.stringify(texts));
+      assert.deepEqual(texts, [['순간 4', '정리 전 2'], ['모두의 트리 11', '모두의 순간 42'], ['내 트리 2', '내 공개 트리 1']], JSON.stringify(texts));
+      const spoken = await groups.evaluateAll(es => es.map(e => [...e.querySelectorAll('.home-count button')].map(b => b.getAttribute('aria-label'))));
+      assert.deepEqual(spoken, [
+        ['내 순간 4개 목록 열기', '정리 전 순간 2개 정리하기'],
+        ['모두의 트리 11개, 둘러보기 트리 보기로 이동', '모두의 순간 42개, 둘러보기 순간 보기로 이동'],
+        ['내 트리 2개, 서재 전체 보기로 이동', '내 공개 트리 1개, 서재 공개만 보기로 이동']
+      ], JSON.stringify(spoken));
 
       await frame.locator('.recent-change').click();
       await frame.locator('.recent-menu').waitFor({ state: 'visible', timeout: 5000 });
@@ -428,20 +434,24 @@ test('#1087 카드 바꾸기·숫자 두 줄·숫자 누르기', { skip: REQUIRE
       await h.page.keyboard.press('Escape');
       assert.equal(await frame.locator('.recent-menu').count(), 0, 'Esc로 닫힌다');
 
-      await h.page.evaluate(() => { window.__msgs1087 = []; addEventListener('message', e => { if (e.data?.type) window.__msgs1087.push(e.data.type); }); });
+      await h.page.evaluate(() => { window.__msgs1087 = []; window.__msgData1087 = []; addEventListener('message', e => { if (e.data?.type) { window.__msgs1087.push(e.data.type); window.__msgData1087.push({...e.data}); } }); });
       await groups.nth(0).locator('.home-count button', { hasText: '순간 4' }).evaluate(el => el.click());
       await frame.locator('.orbit-dialog .index-list').waitFor({ state: 'visible', timeout: 5000 });
       await h.page.keyboard.press('Escape');
       await frame.locator('.orbit-dialog[open]').waitFor({ state: 'detached', timeout: 5000 });
       await groups.nth(0).locator('.home-count button', { hasText: '정리 전 2' }).evaluate(el => el.click());
       await h.page.waitForFunction(() => window.__msgs1087.includes('lt41-cleanup'), null, { timeout: 5000 });
-      await groups.nth(1).locator('.home-count button', { hasText: '공개 트리 11' }).evaluate(el => el.click());
-      await groups.nth(1).locator('.home-count button', { hasText: '공개 순간 42' }).evaluate(el => el.click());
+      await groups.nth(1).locator('.home-count button', { hasText: '모두의 트리 11' }).evaluate(el => el.click());
+      await groups.nth(1).locator('.home-count button', { hasText: '모두의 순간 42' }).evaluate(el => el.click());
       await h.page.waitForFunction(() => window.__msgs1087.filter(type => type === 'lt41-community').length >= 2, null, { timeout: 5000 });
-      await groups.nth(2).locator('.home-count button', { hasText: '트리 2' }).evaluate(el => el.click());
-      await groups.nth(2).locator('.home-count button', { hasText: '공개 트리 1' }).evaluate(el => el.click());
+      const communityTabs = await h.page.evaluate(() => window.__msgData1087.filter(d => d.type === 'lt41-community').map(d => d.tab));
+      assert.ok(communityTabs.includes('trees') && communityTabs.includes('moments'), '가운데 두 줄 → 둘러보기 트리·순간 보기 ' + JSON.stringify(communityTabs));
+      await groups.nth(2).locator('.home-count button', { hasText: '내 트리 2' }).evaluate(el => el.click());
+      await groups.nth(2).locator('.home-count button', { hasText: '내 공개 트리 1' }).evaluate(el => el.click());
       const navs = await h.page.evaluate(() => window.__msgs1087.filter(t => t === 'lt41-navigate').length);
       assert.ok(navs >= 2, '트리 숫자 둘 → 서재 ' + navs);
+      const destinations = await h.page.evaluate(() => window.__msgData1087.filter(d => d.type === 'lt41-navigate' && d.view === 'track32-bookshelf.html').map(d => d.filter));
+      assert.ok(destinations.includes('all') && destinations.includes('public'), '오른쪽 두 줄 → 서재 전체·공개만 ' + JSON.stringify(destinations));
 
       await h.page.evaluate(() => document.querySelector('[data-home-moment="random"]').click());
       await h.page.waitForFunction(() => window.__msgs1087.includes('lt41-home-moment'), null, { timeout: 5000 });
