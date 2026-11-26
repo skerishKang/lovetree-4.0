@@ -184,7 +184,7 @@ export async function observeFrameMatrix({ browser, base, outputDir, shard = '' 
       await page.goto(base + '/v41/?account=1#home', { waitUntil: 'load' });
       await settleObservation(page, () => window.LT41?.trees?.length === 1 && document.body.dataset.member === 'in' && !document.getElementById('discover-ask')?.open && [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length)?.contentDocument?.getElementById('orbit'));
       for (const screen of FRAME_SCREENS) { await openMemberScreen(page, screen); await capture(page, screen); if (screen.id === 'board') await page.clock.resume(); }
-    } finally { await context.close(); }
+    } finally { await context.close().catch(() => {}); }
     const guest = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
     await guest.addInitScript(({ theme, treeId }) => { localStorage.setItem('lt41.theme', theme); localStorage.setItem('lt41.tips.firstTree', '1'); localStorage.setItem('lt41.video-consent', '1'); localStorage.setItem('lt41.discoverAsked', JSON.stringify([treeId])); }, { theme, treeId: tree.id });
     await guest.route('**://i.ytimg.com/**', THUMB);
@@ -196,7 +196,7 @@ export async function observeFrameMatrix({ browser, base, outputDir, shard = '' 
       await guestPage.goto(base + '/v41/#share/c000000000000000000000a/book', { waitUntil: 'load' });
       await settleObservation(guestPage, () => document.body.dataset.recordSource === 'share' && document.body.dataset.fabLift === 'book' && !document.getElementById('toast')?.hidden && document.getElementById('toast')?.hasAttribute('data-visitor-intro') && [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length)?.contentWindow?.location?.pathname?.endsWith('/track59-sketchbook.html') && [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length)?.contentDocument?.querySelector('.moment,.mobile-page,.book-wrap') && [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length)?.contentDocument?.querySelector('.lt-screen-toolbar[data-screen="book"]') && [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length)?.contentWindow?.LTTagLine, null, { freezeClock: true });
       await capture(guestPage, { id: 'share-guest', label: '공유 방문자 책', root: '.moment' });
-    } finally { await guest.close(); }
+    } finally { await guest.close().catch(() => {}); }
   }
   const report = { basis: '현재 제품 코드', fakeSession: true, errors, screens: rows };
   writeFileSync(join(outputDir, 'metrics.json'), JSON.stringify(report, null, 2));
@@ -208,7 +208,7 @@ export async function compareScreenshotBuffers(browser, before, after) {
   const page = await browser.newPage();
   try {
     return await page.evaluate(async ({ left, right }) => {
-      const decode = async bytes => { const blob = new Blob([Uint8Array.from(bytes)], { type: 'image/png' }); const bitmap = await createImageBitmap(blob); const canvas = new OffscreenCanvas(bitmap.width, bitmap.height); const ctx = canvas.getContext('2d'); ctx.drawImage(bitmap, 0, 0); const data = ctx.getImageData(0, 0, bitmap.width, bitmap.height).data; bitmap.close(); return { data, width: canvas.width, height: canvas.height }; };
+      const decode = async encoded => { const bytes = Uint8Array.from(atob(encoded), character => character.charCodeAt(0)); const blob = new Blob([bytes], { type: 'image/png' }); const bitmap = await createImageBitmap(blob); const canvas = new OffscreenCanvas(bitmap.width, bitmap.height); const ctx = canvas.getContext('2d'); ctx.drawImage(bitmap, 0, 0); const data = ctx.getImageData(0, 0, bitmap.width, bitmap.height).data; bitmap.close(); return { data, width: canvas.width, height: canvas.height }; };
       const a = await decode(left), b = await decode(right);
       if (a.width !== b.width || a.height !== b.height) return { changedPixels: -1, maxChannelDelta: -1, width: a.width, height: a.height, other: [b.width, b.height] };
       let changedPixels = 0, maxChannelDelta = 0;
@@ -219,6 +219,6 @@ export async function compareScreenshotBuffers(browser, before, after) {
         maxChannelDelta = Math.max(maxChannelDelta, pixel);
       }
       return { changedPixels, maxChannelDelta, width: a.width, height: a.height };
-    }, { left: [...before], right: [...after] });
+    }, { left: before.toString('base64'), right: after.toString('base64') });
   } finally { await page.close(); }
 }
