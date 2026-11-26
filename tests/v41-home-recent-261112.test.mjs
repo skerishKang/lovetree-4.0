@@ -19,18 +19,15 @@ test('#426 최근 순간 카드는 내 기록 최신 순간 한 장(로그아웃
   assert.match(orbit,/\$\{recentMoment\?recentMarkup\(recentMoment\):''\}/);
 });
 
-test('#426 카드 모양: 썸네일 크게 + 마지막 순간·지난 날 + 한 줄 제목 + 트리 이름·이어 보기',()=>{
+test('#426 카드 모양: 썸네일 크게 + 마지막 순간·지난 날 + 한 줄 제목 + 트리 이름·자세히 보기',()=>{
   // 261116 PR 2: 머리글은 눌러 카드 모드를 고르는 단추다 — 기본 문구('마지막 순간 · N일 전')는 그 안에 그대로 살아 있다.
   assert.match(orbit,/class="recent-head" data-recent-head/);
   assert.match(orbit,/마지막 순간\$\{days===null\?'':` · \$\{relativeDayLabel\(days\)\}`\}/,'기본 머리글 문구(#549: 오늘·어제·N일 전)');
   assert.match(orbit,/localDaysBetween\(undefined,raw\)/,'일수는 기기 지역 날짜(#547) 기준');
-  assert.match(orbit,/<strong>\$\{esc\(head\)\}<\/strong>/,'한 줄 제목');
-  assert.match(orbit,/· 이어 보기 →<\/small>/,'트리 이름·이어 보기');
   // 이슈 #466 M6: 카드 자체는 role="button"이 아니다(안의 ▶ 재생·제목 달기와 중첩되면 axe
   // nested-interactive). 뒤에 깔린 투명 단추(recent-open)가 열기를 맡고, 자기 이름은 aria-label로 준다.
   assert.match(orbit,/class="recent-card mine" data-do="recent">/,'카드 자체는 역할·초점 대상이 아니다(M6)');
   assert.doesNotMatch(orbit,/class="recent-card[^>]*role="button"/,'카드 div에 더는 role=button을 주지 않는다(M6)');
-  assert.match(orbit,/class="recent-open" data-do="recent" aria-label="\$\{esc\(head\)\} 이어 보기">/,'열기 전담 투명 단추가 따로 있다');
   assert.match(orbit,/aria-label="바로 재생"/,'▶ 재생 단추는 자기 이름을 유지한다(이슈 584: 바로 재생)');
   assert.match(orbit,/setAttribute\('aria-label','정지'\)/,'재생 중에는 정지 이름');
   // 금빛 내 카드와 같은 결 — .card.mine과 같은 진한 금 테두리(--lt-gold-deep)·이중선·번짐 토큰을 쓴다(#443).

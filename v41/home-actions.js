@@ -13,6 +13,8 @@ export function createHomeActions({getContext,send,gallery=false}) {
    cleanup:()=>send({type:MSG.cleanup}),
   navigate:(where,filter)=>send({type:MSG.navigate,view:where==='trees'?SHELF:'src064-orbit.html',filter:where==='trees'?(filter==='public'?'public':'all'):undefined}),
   openMine:(treeId,id)=>{const tree=ownTree(treeId,id);if(!tree)return;send({type:MSG.openBook,treeId:tree.id,id});},
+  openTree:(treeId,id)=>{const tree=ownTree(treeId,id);if(!tree)return;send({type:MSG.openTree,treeId:tree.id,id:id||''});},
+  shareMoment:(treeId,id)=>{const tree=ownTree(treeId,id);if(!tree)return;send({type:MSG.share,treeId:tree.id,id});},
   openBook:(treeId,id)=>{const tree=ownTree(treeId,id);if(gallery&&tree){send({type:MSG.openBook,treeId:tree.id,id});return;}if(gallery&&getContext()?.source!=='example'){send({type:MSG.example,view:BOOK,momentId:id});return;}if(select(id))send({type:MSG.navigate,view:BOOK});},
   openWorkspace:(_tree,id)=>{if(gallery&&getContext()?.source!=='example'){send({type:MSG.example,view:BOARD,momentId:id});return;}if(select(id))send({type:MSG.navigate,view:BOARD});},
   requestMoment:mode=>{if(['new','add','edit'].includes(mode))send({type:MSG.write,mode});},

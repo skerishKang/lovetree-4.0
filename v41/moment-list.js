@@ -26,10 +26,15 @@ export function momentListEntries({ trees = [], origin = globalThis.location?.or
       const id = text(moment?.id);
       if (!id) continue;
       // 카드 한 벌(cardOf)을 재사용해 썸네일·종류를 정한다. 마음 한마디는 제목으로 대체하지 않는다(#394 3번).
+      const nextReasons = tree.moments
+        .filter(next => next.parentId === id)
+        .map(next => text(next?.relation))
+        .filter(Boolean);
       entries.push({
         ...cardOf(treeId, moment, origin, youtube),
         note: text(moment?.note),
         relation: text(moment?.relation),
+        whyNext: nextReasons.join(' / ') || text(moment?.whyNext),
         treeLabel: label,
         inbox: isInboxTree(tree),
         subject: label
