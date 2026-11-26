@@ -322,6 +322,7 @@ test('970 실행: 트리 드롭다운은 Esc·바깥 누르기로 닫히고, 키
       assert.equal(await treeChoiceExpanded(page), 'true', `${width}: 열면 aria-expanded=true`);
       await page.keyboard.press('Escape');
       await page.waitForFunction(() => document.getElementById('tree-popover')?.hidden, null, { timeout: 5000 });
+       await page.waitForFunction(() => document.querySelector('iframe#view')?.contentDocument?.querySelector('button.lt-toolbar-tree-choice')?.getAttribute('aria-expanded') === 'false', null, {timeout:5000});
       const afterEsc = { expanded: await treeChoiceExpanded(page), focus: await treeChoiceFocused(page) };
       assert.equal(afterEsc.expanded, 'false', `${width}: Esc로 닫으면 aria-expanded=false`);
       assert.equal(afterEsc.focus, true, `${width}: Esc로 닫으면 초점이 단추로 돌아온다`);
@@ -656,6 +657,7 @@ test('#1367 4번: 트리 고르기 목록은 바깥 누름·안쪽 화면 누름
         await open();
         await page.keyboard.press('Escape');
         assert.equal(await hidden(), true, `${width}/${theme}: Esc로 닫힌다`);
+        await page.waitForFunction(() => document.querySelector('iframe#view')?.contentDocument?.activeElement?.matches('button.lt-toolbar-tree-choice'), null, {timeout:5000});
         assert.equal(await treeChoiceFocused(page), true, `${width}/${theme}: 닫힌 뒤 초점 복귀`);
       } finally { await ctx.close(); }
     }
