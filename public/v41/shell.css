@@ -1465,3 +1465,12 @@ body.lt-header-visitor #toast[data-visitor-intro]{display:none}
 
 /* #1447: keep the persistent visit label unobtrusive while video is expanded. */
 body.lt-book-lightbox-open #lt-visitor-caption{visibility:hidden}
+
+/* #1433: 넓은 머리줄의 글자 칸(로고·둘러보기·화면 탭)은 마지막 글꼴로 잰 폭을 처음부터 쓴다. #1447 뒤 글자 폭만큼 넓어지게 되어,
+   글꼴이 늦게 오는 느린 연결(리눅스 대체 글꼴)에서 첫 그림 뒤 화면 탭이 30px 넘게 밀렸다. 칸 사이 간격(--lt-head-*)과 보이는 모양은 그대로다. */
+@media(min-width:781px){
+ .app-header .brand{flex:0 0 101px;width:101px}
+ .app-header .main-nav>button#community-menu{flex:0 0 auto;width:calc(43px + 3.46em);padding-inline:0}
+ .app-header .tree-frame .tree-views>button[data-view]{width:45px;padding-inline:0}
+ .app-header .tree-frame .tree-views>button[data-view="track59-sketchbook.html"]{width:33px}
+}
