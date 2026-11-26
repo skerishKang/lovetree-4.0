@@ -8,6 +8,7 @@ import {HOME_ORBIT_LIMIT, ltDateStyle, dateStyleOf, shouldReloadForDateStyle} fr
 import {fetchPopularCards} from './home-popular.js';
 import {createHomeActions} from './home-actions.js';
 import {homePresentation} from './home-presentation.js';
+import {readHomeTitleHint} from '../public/v41/home-title-state.mjs';
 import {applyHomeCenter} from './home-center.js';
 import {readTheme,writeTheme,appliedTheme,applyThemeAttribute} from '../public/v41/header-state.mjs';
 import {readTitleDisplay, titleDisplayOf, shouldReloadForTitleDisplay} from '../public/v41/book-usability.mjs';
@@ -28,6 +29,8 @@ const bridge=createHomeActions({getContext:()=>parent.LT41,send:message=>parent.
 const presentation=homePresentation(context);
 const loggedIn=presentation.centerState.member==='in';
 const hasMoments=presentation.centerState.momentCount>0;
+const homeTitlePending=parent.document.documentElement.dataset.ltAuthPhase==='pending';
+const homeTitleHint=homeTitlePending&&(()=>{try{return readHomeTitleHint(parent.localStorage)}catch{return false}})();
 // 2026-11-08 카드 출처: 예시/인기/내 것만/섞어서. 저장값이 없으면 로그인=섞어서, 로그아웃=예시.
 const mode=readHomeCardsMode(localStorage,{loggedIn});
 const popular=mode==='popular'?await fetchPopularCards({limit:HOME_ORBIT_LIMIT}):[];
@@ -35,7 +38,10 @@ const popular=mode==='popular'?await fetchPopularCards({limit:HOME_ORBIT_LIMIT})
 // 썸네일 카드를 처음부터 만든다. 판정 입력은 media-preview의 currentContext(셸 기록 상태)와 같은 값이다.
 const mediaState=globalThis.LTMedia?.currentContext?.()||{source:'',owned:false};
 const youtube={describe:url=>globalThis.LTMedia?.describe?.(url)??null,auto:globalThis.LTMedia?.autoLoadMedia?.(mediaState.source,mediaState.owned)===true || (context.source==='server' && loggedIn && shellBody.dataset.member==='in')};
-const cardsPlan=homeCardsPlan({mode,loggedIn,context,popular,youtube});
+const confirmedTreeZero=loggedIn&&!homeTitlePending&&Number(presentation.centerState.treeCount)===0;
+const cardsPlan=confirmedTreeZero
+ ? {mode:'mine',kind:'mine-empty',cards:[],examples:0,note:null}
+ : homeCardsPlan({mode,loggedIn,context,popular,youtube});
 // 첫 화면이 셸의 기록을 다 받기 전에 그려지면 내 사진·영상 순간이 아직 없어 '예시만' 궤도로 시작한다(운영 11-24).
 // #1109 뒤로는 셸이 프레임을 다시 띄우지 않으므로, 기록이 도착했을 때 궤도 카드 구성이 달라지면 첫 화면만 다시 그린다.
 const cardsPlanKey=plan=>plan.kind+':'+plan.cards.map(c=>c?.id||c?.key||'').join(',');
@@ -70,7 +76,7 @@ const renderedTitleDisplay=titleDisplayOf(readTitleDisplay(parent.LT41));
  // 내 것만 0장은 예시로 대체하지 않고 빈 궤도와 첫 순간 안내를 남긴다.
  empty:cardsPlan.kind==='mine-empty',
  // #780: 큰 제목·부제목은 카드(mix-empty)가 비었는지보다 로그인 여부를 먼저 본다. 카드는 그대로 예시다.
- loggedIn,
+ loggedIn,homeTitlePending,homeTitleHint,
  momentList,
  prefs:parent.LT41?.prefs||null,
  titleDisplay:readTitleDisplay(parent.LT41),
@@ -209,6 +215,11 @@ shadow.append(cardUI);
 // 로그인 전이면 지금 두 줄 그대로, 로그인 후면 상태에 따라 큰 제목 아래 둘째 줄도 함께 갱신한다(아래 상태 블록).
 const centerButtons=[...shadow.querySelectorAll('.center .actions button')];
 const centerPlan=applyHomeCenter(centerButtons,presentation.centerState);
+if(confirmedTreeZero){
+ centerButtons[0].dataset.do='new';centerButtons[0].textContent='첫 순간 추가';centerButtons[0].classList.add('primary-cta');
+ centerButtons[1].dataset.do='example';centerButtons[1].textContent='예시 둘러보기';centerButtons[1].classList.remove('primary-cta');
+ centerButtons[2].hidden=true;
+}
 // #1246: the public-tree entrance has its own outline compass, not a filled action.
 const exploreButton=centerButtons.find(button=>button.dataset.do==='community');
 if(exploreButton){
@@ -267,7 +278,7 @@ guideDialog.addEventListener('click',e=>{
 // 로그아웃 첫 버튼은 로그인/가입으로.
 {
   const first=centerButtons[0];
-  if(!hasMoments)first.onclick=loggedIn?()=>bridge.actions.requestMoment('add'):bridge.actions.start;
+  if(!hasMoments)first.onclick=confirmedTreeZero?event=>{event.stopPropagation();bridge.actions.requestMoment('new');}:loggedIn?()=>bridge.actions.requestMoment('add'):bridge.actions.start;
 }
 // 예시 모드는 궤도의 기존 안내를 그대로 두고, 나머지는 계획의 문구를 쓴다(빈 문자열이면 숨김).
 // #1204: the bottom guidance row was removed; keep home actions initialization independent of it.
@@ -390,7 +401,7 @@ function refreshCountsFromParent(){
   inboxCount?{name:`정리 전`,count:inboxCount,label:`정리 전 순간 ${inboxCount}개 정리하기`,action:()=>bridge.actions.cleanup()}:null
  ]);
  const publicRow=countLines.get('trees')?.lastElementChild;
- const treeCount=showCount('trees',[{name:`트리`,count:fresh.length,label:`트리 ${fresh.length}개 서재 열기`,action:openTrees},null]);
+ const treeCount=showCount('trees',[{name:`내 트리`,count:fresh.length,label:`내 트리 ${fresh.length}개, 서재 전체 보기로 이동`,action:openTrees},null]);
  if(publicRow&&treeCount)treeCount.lastElementChild.replaceWith(publicRow);
   // 처음 그릴 때와 같은 길로 다시 고른다 — 머리글까지 넘겨야 같은 마크업·글자 크기로 그려진다.
   const media=globalThis.LTMedia?.currentContext?.();
@@ -405,16 +416,16 @@ const inboxTree=(Array.isArray(context.trees)?context.trees:[]).find(t=>t?.inbox
 const inboxCount=inboxTree?.moments?.length||0;
 const totalCount=momentList?.entries?.length||0;
 const openMoments=()=>orbit?.index?.('all');
-const openCommunity=()=>bridge.actions.community();
 const openTrees=()=>bridge.actions.navigate('trees');
+const openPublicTrees=()=>bridge.actions.navigate('trees','public');
 if(hasMoments){
  showCount('moments',[
   {name:`순간`,count:totalCount,label:`내 순간 ${totalCount}개 목록 열기`,action:openMoments},
   inboxCount?{name:`정리 전`,count:inboxCount,label:`정리 전 순간 ${inboxCount}개 정리하기`,action:()=>bridge.actions.cleanup()}:null
  ]);
  showCount('trees',[
-  {name:`트리`,count:momentList?.trees?.length||0,label:`트리 ${momentList?.trees?.length||0}개 서재 열기`,action:openTrees},
-  null
+  {name:`내 트리`,count:momentList?.trees?.length||0,label:`내 트리 ${momentList?.trees?.length||0}개, 서재 전체 보기로 이동`,action:openTrees},
+  {name:`내 공개 트리`,count:0,label:`내 공개 트리 0개, 서재 공개만 보기로 이동`,action:openPublicTrees}
  ]);
  (async()=>{try{
   const answer=await fetch('/api/shares',{headers:{accept:'application/json'}});
@@ -423,8 +434,8 @@ if(hasMoments){
   const ids=new Set((Array.isArray(body?.shares)?body.shares:[]).filter(s=>s?.status==='active').map(s=>s.treeId).filter(Boolean));
   const n=ids.size;
   showCount('trees',[
-   {name:`트리`,count:momentList?.trees?.length||0,label:`트리 ${momentList?.trees?.length||0}개 서재 열기`,action:openTrees},
-   {name:`공개 트리`,count:n,label:`공개 트리 ${n}개 서재에서 보기`,action:openTrees}
+   {name:`내 트리`,count:momentList?.trees?.length||0,label:`내 트리 ${momentList?.trees?.length||0}개, 서재 전체 보기로 이동`,action:openTrees},
+   {name:`내 공개 트리`,count:n,label:`내 공개 트리 ${n}개, 서재 공개만 보기로 이동`,action:openPublicTrees}
   ]);
  }catch{ /* 공개 트리 수를 못 받으면 둘째 줄은 빈 자리로 둔다. */ }})();
 }
@@ -436,11 +447,11 @@ if(hasMoments){
  if(!valid(stats?.trees)||(!hasMoments&&!valid(stats?.moments)))return;
  const prefix=loggedIn?'':'예시 ';
  showCount('community',hasMoments?[
-  {name:`공개 트리`,count:stats.trees,label:`공개 트리 ${stats.trees}개 둘러보기`,action:openCommunity},
-  {name:`공개 순간`,count:stats.moments,label:`공개 순간 ${stats.moments}개 둘러보기`,action:openCommunity}
+  {name:`모두의 트리`,count:stats.trees,label:`모두의 트리 ${stats.trees}개, 둘러보기 트리 보기로 이동`,action:()=>bridge.actions.community('trees')},
+  {name:`모두의 순간`,count:stats.moments,label:`모두의 순간 ${stats.moments}개, 둘러보기 순간 보기로 이동`,action:()=>bridge.actions.community('moments')}
  ]:[
-  {name:`${prefix}공개 트리`,count:stats.trees,label:`공개 트리 ${stats.trees}개 둘러보기`,action:openCommunity},
-  {name:`순간`,count:stats.moments,label:`공개 순간 ${stats.moments}개 둘러보기`,action:openCommunity}
+  {name:`${prefix}모두의 트리`,count:stats.trees,label:`${prefix}모두의 트리 ${stats.trees}개, 둘러보기 트리 보기로 이동`,action:()=>bridge.actions.community('trees')},
+  {name:`모두의 순간`,count:stats.moments,label:`모두의 순간 ${stats.moments}개, 둘러보기 순간 보기로 이동`,action:()=>bridge.actions.community('moments')}
  ]);
  }catch{ /* 집계를 받지 못하면 해당 줄만 숨긴다. */ }finally{clearTimeout(timer);}})();
 const infoStyle=document.createElement('style');
@@ -448,8 +459,10 @@ infoStyle.textContent=`.home-add-top{margin-top:12px;font-size:15px;pointer-even
 .center .actions{gap:18px;align-items:flex-start;flex-wrap:nowrap}
 .center .actions .home-action-group{flex:1 1 0%;max-width:176px;min-width:0;display:flex;flex-direction:column;align-items:stretch;gap:4px}
 .center .actions .home-action-group .subtleBtn{flex:none;width:100%;max-width:none;box-sizing:border-box;height:44px;white-space:nowrap;overflow-wrap:normal}
-.home-count{display:block;font-size:12px;line-height:15px;min-height:30px;white-space:nowrap;color:var(--lt-muted)}
+.home-count{display:block;font-size:12px;line-height:15px;min-height:32px;white-space:nowrap;color:var(--lt-muted)}
 .home-count-line{display:block;min-height:15px;line-height:15px}
+/* #1446: 두 줄이 붙어 보이지 않게 2px 띄운다. */
+.home-count-line + .home-count-line{margin-top:2px}
 .home-count[hidden]{display:none}
 .home-count[data-reserve][hidden]{display:block;visibility:hidden}
 .home-count-item{display:flex;align-items:baseline;justify-content:space-between;gap:4px;width:100%;min-width:0;white-space:nowrap}

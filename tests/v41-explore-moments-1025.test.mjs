@@ -727,6 +727,8 @@ test('#1322 트리 카드 표지는 한 겹 — 가로·세로·그림 없음 �
           });
           return {
             h: c.getBoundingClientRect().height, kind: c.dataset.mediaKind,
+            fit: c.querySelector('.community-cover-image') ? getComputedStyle(c.querySelector('.community-cover-image')).objectFit : null,
+            pos: c.querySelector('.community-cover-image') ? getComputedStyle(c.querySelector('.community-cover-image')).objectPosition : null,
             backdrop: !!c.querySelector('.community-cover-backdrop'),
             grad: getComputedStyle(c, '::after').backgroundImage,
             badges
@@ -735,6 +737,7 @@ test('#1322 트리 카드 표지는 한 겹 — 가로·세로·그림 없음 �
         assert.equal(facts.length, 3, `${width}/${theme}: 세 카드가 보인다`);
         const heights = facts.map((f) => f.h);
         assert.ok(Math.max(...heights) - Math.min(...heights) <= 1, `${width}/${theme}: 표지 높이 차 1px 이하 ${JSON.stringify(heights)}`);
+        assert.ok(facts.filter((f) => f.fit).every((f) => f.fit === 'cover' && f.pos === '50% 50%'), `${width}/${theme}: 그림은 가운데 기준으로 잘라 맞춘다 ${JSON.stringify(facts.map((f) => [f.fit, f.pos]))}`);
         assert.deepEqual(facts.map((f) => f.backdrop), [false, true, false], `${width}/${theme}: 흐린 배경은 세로 영상만`);
         for (const f of facts) {
           assert.match(f.grad, /linear-gradient/, `${width}/${theme}: 아래쪽 그라데이션 한 겹`);
