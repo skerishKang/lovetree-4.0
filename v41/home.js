@@ -108,6 +108,8 @@ shadow.append(viewer);
 const vEl=id=>shadow.querySelector('#'+id);
 let viewerOpener=null;
 let viewerMoment=null;
+let viewerFocusObserver=null;
+let viewerFocusTimer=0;
 let viewerSequence=0;
 let viewerSignal=new AbortController();
 const mediaKind=(videoId,moment)=>videoId?'동영상':moment.image?'사진':'기록';
@@ -161,7 +163,11 @@ function closeHomeViewer(){
  try{parent.postMessage({type:MSG.viewer,open:false},location.origin)}catch{}
  vEl('mediaImageHome').hidden=true;vEl('mediaMemoHome').hidden=true;
  const opener=viewerOpener;viewerOpener=null;
- (opener?.isConnected?opener:shadow.querySelector('.recent-open'))?.focus?.();
+ viewerFocusObserver?.disconnect();clearTimeout(viewerFocusTimer);
+ const restoreFocus=()=>{const active=shadow.activeElement;const movedElsewhere=active&&active!==shadow.host&&active!==document.body&&!viewer.contains(active)&&active!==opener&&!active.classList?.contains('recent-open');if(movedElsewhere){viewerFocusObserver?.disconnect();return;}const target=opener?.isConnected?opener:shadow.querySelector('.recent-open');target?.focus?.();};
+ restoreFocus();
+ viewerFocusObserver=new MutationObserver(restoreFocus);viewerFocusObserver.observe(shadow,{childList:true,subtree:true});
+ viewerFocusTimer=setTimeout(()=>{viewerFocusObserver?.disconnect();viewerFocusObserver=null;},3000);
 }
 function paintHomeViewer(moment){
  const videoId=youtubeIdFrom(moment.url||''),sequence=++viewerSequence;viewerSignal.abort();viewerSignal=new AbortController();viewerMoment=moment;closeMoreMenu();
@@ -195,7 +201,7 @@ function paintHomeViewer(moment){
 function openHomeViewer(moment,opener=null){
  if(!moment)return;
  const orbitDialog=shadow.querySelector('dialog');if(orbitDialog?.open)orbitDialog.close();
- const opening=!viewer.classList.contains('open');if(opening)viewerOpener=opener||shadow.querySelector('.recent-open')||shadow.querySelector('.recent-card')||document.activeElement;
+ const opening=!viewer.classList.contains('open');if(opening){viewerFocusObserver?.disconnect();clearTimeout(viewerFocusTimer);viewerOpener=opener||shadow.querySelector('.recent-open')||shadow.querySelector('.recent-card')||document.activeElement;}
  paintHomeViewer(moment);
  if(!opening)return;
  viewer.classList.add('open');viewer.setAttribute('aria-hidden','false');homeHistory.open('viewer',closeHomeViewer);
