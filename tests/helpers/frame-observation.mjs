@@ -129,10 +129,9 @@ async function openMemberScreen(page, screen) {
     return f?.contentWindow?.location?.pathname?.endsWith('/' + file) && f.contentDocument?.querySelector(root) &&
       !!f.contentDocument.querySelector('.lt-screen-toolbar[data-screen]') &&
       (file !== 'track59-sketchbook.html' || !!f.contentWindow.LTTagLine) &&
-      (file !== 'track58-pinboard.html' || (typeof f.contentWindow.bootDetailPanel === 'function' && !!f.contentWindow.__LT58V11));
+      (file !== 'track58-pinboard.html' || (typeof f.contentWindow.bootDetailPanel === 'function' && !!f.contentWindow.__LT58V12));
   }, { file: screen.file, root: screen.root });
   if (screen.id === 'board') {
-    await page.clock.runFor(100);
     await page.clock.fastForward(0);
     await page.evaluate(() => {
       const frame = [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length);
@@ -163,6 +162,10 @@ export async function observeFrameMatrix({ browser, base, outputDir, shard = '' 
     page.on('pageerror', e => errors.push(String(e)));
     const capture = async (activePage, screen) => {
       const name = `${width}-${theme}-${screen.id}`;
+      await activePage.evaluate(() => {
+        const frame = [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length);
+        if (frame) frame.style.willChange = 'transform';
+      });
       await activePage.screenshot({ path: join(outputDir, name + '.png'), animations: 'disabled' });
       const target = screen.panel ? activePage.locator(screen.panel) : activePage.locator('#stage');
       const box = await target.boundingBox();
