@@ -2728,6 +2728,13 @@ test('#987 보드 첫 줄과 모바일 셸 겹침·현재 표시', { skip: REQUI
       await clickToolbarTreeChoice(page);
       await page.locator('[data-tree-action="shelf"]').click();
       await page.frameLocator('#view').locator('#shelfRail [data-book-index]').first().waitFor();
+        await page.waitForFunction(() => {
+          const frame = document.querySelector('iframe#view');
+          return !frame?.hidden && /track32-bookshelf/.test(frame?.contentWindow?.location.pathname || '') &&
+            document.getElementById('view-next')?.hidden &&
+            document.getElementById('view-next')?.contentWindow?.location.href === 'about:blank' &&
+            !!window.LT41?.tree;
+        }, null, { timeout: 5000 });
       await page.locator('#toast').waitFor({ state: 'hidden', timeout: 6000 }).catch(() => {});
       const snap = async label => { if (dest) await page.screenshot({ path: join(dest, label + '-' + width + '-' + theme + '.png'), animations: 'disabled' }); };
       await run(page, snap, trees[0]);
@@ -2737,6 +2744,7 @@ test('#987 보드 첫 줄과 모바일 셸 겹침·현재 표시', { skip: REQUI
     for (const theme of ['night', 'garden']) {
       for (const width of [360, 375, 390]) await withPage(width, 844, theme, 8, async (page, snap) => {
         await clickToolbarTreeChoice(page);
+        await page.waitForFunction(() => !document.getElementById('tree-popover')?.hidden, null, { timeout: 5000 });
         const header = await page.evaluate(() => {
           const frame = document.querySelector('iframe#view');
           const doc = frame?.contentDocument;
