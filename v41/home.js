@@ -38,7 +38,10 @@ const popular=mode==='popular'?await fetchPopularCards({limit:HOME_ORBIT_LIMIT})
 // 썸네일 카드를 처음부터 만든다. 판정 입력은 media-preview의 currentContext(셸 기록 상태)와 같은 값이다.
 const mediaState=globalThis.LTMedia?.currentContext?.()||{source:'',owned:false};
 const youtube={describe:url=>globalThis.LTMedia?.describe?.(url)??null,auto:globalThis.LTMedia?.autoLoadMedia?.(mediaState.source,mediaState.owned)===true || (context.source==='server' && loggedIn && shellBody.dataset.member==='in')};
-const cardsPlan=homeCardsPlan({mode,loggedIn,context,popular,youtube});
+const confirmedTreeZero=loggedIn&&!homeTitlePending&&Number(presentation.centerState.treeCount)===0;
+const cardsPlan=confirmedTreeZero
+ ? {mode:'mine',kind:'mine-empty',cards:[],examples:0,note:null}
+ : homeCardsPlan({mode,loggedIn,context,popular,youtube});
 // 첫 화면이 셸의 기록을 다 받기 전에 그려지면 내 사진·영상 순간이 아직 없어 '예시만' 궤도로 시작한다(운영 11-24).
 // #1109 뒤로는 셸이 프레임을 다시 띄우지 않으므로, 기록이 도착했을 때 궤도 카드 구성이 달라지면 첫 화면만 다시 그린다.
 const cardsPlanKey=plan=>plan.kind+':'+plan.cards.map(c=>c?.id||c?.key||'').join(',');
@@ -212,6 +215,11 @@ shadow.append(cardUI);
 // 로그인 전이면 지금 두 줄 그대로, 로그인 후면 상태에 따라 큰 제목 아래 둘째 줄도 함께 갱신한다(아래 상태 블록).
 const centerButtons=[...shadow.querySelectorAll('.center .actions button')];
 const centerPlan=applyHomeCenter(centerButtons,presentation.centerState);
+if(confirmedTreeZero){
+ centerButtons[0].dataset.do='new';centerButtons[0].textContent='첫 순간 추가';centerButtons[0].classList.add('primary-cta');
+ centerButtons[1].dataset.do='example';centerButtons[1].textContent='예시 둘러보기';centerButtons[1].classList.remove('primary-cta');
+ centerButtons[2].hidden=true;
+}
 // #1246: the public-tree entrance has its own outline compass, not a filled action.
 const exploreButton=centerButtons.find(button=>button.dataset.do==='community');
 if(exploreButton){
@@ -270,7 +278,7 @@ guideDialog.addEventListener('click',e=>{
 // 로그아웃 첫 버튼은 로그인/가입으로.
 {
   const first=centerButtons[0];
-  if(!hasMoments)first.onclick=loggedIn?()=>bridge.actions.requestMoment('add'):bridge.actions.start;
+  if(!hasMoments)first.onclick=confirmedTreeZero?event=>{event.stopPropagation();bridge.actions.requestMoment('new');}:loggedIn?()=>bridge.actions.requestMoment('add'):bridge.actions.start;
 }
 // 예시 모드는 궤도의 기존 안내를 그대로 두고, 나머지는 계획의 문구를 쓴다(빈 문자열이면 숨김).
 // #1204: the bottom guidance row was removed; keep home actions initialization independent of it.

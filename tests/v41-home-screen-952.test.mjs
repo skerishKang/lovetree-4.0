@@ -1104,7 +1104,7 @@ test('#1437 delayed member response does not paint guest title, corrects stale h
  const testCases=[
   {key:'member',member:true,trees:[tree],hint:false,expected:'다시, 그 순간으로.',neverGuest:true},
   {key:'remembered',member:true,trees:[tree],hint:true,expected:'다시, 그 순간으로.',neverGuest:true},
-  {key:'empty',member:true,trees:[],hint:true,expected:'좋아하는 순간부터.'},
+  {key:'empty',member:true,trees:[],hint:true,expected:'내 첫 순간'},
   {key:'logout',member:false,trees:[],hint:true,expected:'좋아하는 순간부터.'}
  ];
  try{
@@ -1206,6 +1206,73 @@ test('#1437 pending center is text-free until confirmed response and reserves st
     assert.equal(after.pending,false);assert.equal(after.actionsHidden,false);assert.ok(after.actions.every(Boolean));
     assert.ok(Math.abs(after.height-before.height)<=1,`${width}: ${before.height} -> ${after.height}`);
     console.log('#1437 PENDING',width,asMember?'member':'guest',JSON.stringify({before,middle,after}));
+    await page.close();
+   }finally{await ctx.close()}
+  }
+ }finally{await browser.close();await new Promise(ok=>server.close(ok));}
+});
+
+
+test('#1442 title wait 400ms and slow 5s, owned empty has no example cards', {skip:REQUIRE952?false:skip952,timeout:180000}, async()=>{
+ if(skip952)assert.fail(skip952);
+ const {mkdirSync}=await import('node:fs');const {join}=await import('node:path');
+ const capture=process.env.LT_HOME_1442_CAPTURE_DIR;
+ const harness=(member,phase)=>`<!doctype html><html><head><script>document.documentElement.dataset.ltAuthPhase='${phase}';</script></head><body data-member='${member}' data-tree-count='0' style='margin:0'><iframe src='/v41/home.html' style='width:100vw;height:100vh;border:0'></iframe></body></html>`;
+ const server=await serve({'/1442-pending.html':harness('out','pending'),'/1442-empty.html':harness('in','ready'),'/1442-guest.html':harness('out','ready')},4147);
+ const browser=await chromium952.launch({headless:true,args:['--disable-gpu']});
+ const tree=tree952({subject:'시험 순간',count:3});
+ try{
+  for(const width of [1440,390])for(const theme of ['night','garden']){
+   const ctx=await browser.newContext({viewport:{width,height:width===390?844:900},reducedMotion:'reduce'});
+   try{
+    await ctx.addInitScript(themeName=>{try{localStorage.setItem('lt41.theme',themeName)}catch{}},theme);
+    await ctx.route('**/*',route=>{const u=new URL(route.request().url());if(u.origin!=='http://127.0.0.1:4147')return route.abort();if(u.pathname.startsWith('/api/'))return route.fulfill({status:200,json:{ok:true,items:[]}});return route.continue();});
+    const page=await ctx.newPage();
+    const snap=async state=>{if(capture){mkdirSync(capture,{recursive:true});await page.screenshot({path:join(capture,`home-${width}-${theme}-${state}.png`),animations:'disabled',timeout:20000});}};
+    const center=async frame=>frame.evaluate(()=>{const root=document.querySelector('#orbit')?.shadowRoot,c=root?.querySelector('.center'),indicator=c?.querySelector('.lt-home-pending-indicator');return {title:c?.querySelector('h1')?.textContent||'',height:c?.getBoundingClientRect().height||0,pending:!!c?.hasAttribute('data-lt-title-pending'),loading:!!indicator&&!indicator.hidden,slow:!!indicator&&!indicator.querySelector('.lt-home-pending-retry')?.hidden,exampleCards:[...(root?.querySelectorAll('.card')||[])].filter(e=>e.dataset.example==='1').length,allCards:root?.querySelectorAll('.card').length||0,buttons:[...(c?.querySelectorAll('.actions button')||[])].filter(b=>!b.hidden).map(b=>b.textContent),motion:indicator?getComputedStyle(indicator.querySelector('.lt-home-pending-orbit')).animationName:''};});
+    await page.goto('http://127.0.0.1:4147/1442-pending.html',{waitUntil:'domcontentloaded'});
+    let frame=await (await page.$('iframe')).contentFrame();
+    await frame.waitForFunction(()=>document.querySelector('#orbit')?.shadowRoot?.querySelector('.center[data-lt-title-pending]'),null,{timeout:15000});
+    const initial=await center(frame);assert.equal(initial.title,'');
+    await page.waitForTimeout(650);
+    const pending=await center(frame);assert.equal(pending.loading,true);assert.equal(pending.slow,false);assert.equal(pending.motion,'none');assert.equal(pending.title,'');await snap('pending');
+    await page.waitForTimeout(4700);
+    const slow=await center(frame);assert.equal(slow.slow,true);assert.equal(slow.title,'');await snap('slow');
+    await page.evaluate(t=>{window.LT41={trees:[t]};document.body.dataset.member='in';document.body.dataset.treeCount='1';document.documentElement.dataset.ltAuthPhase='ready';},tree);
+    await frame.waitForFunction(()=>document.querySelector('#orbit')?.shadowRoot?.querySelector('.center h1')?.textContent==='다시, 그 순간으로.',null,{timeout:5000});
+    const ready=await center(frame);assert.equal(ready.loading,false);assert.equal(ready.pending,false);assert.ok(Math.abs(ready.height-pending.height)<=1);await snap('ready');
+    console.log('#1442 WAIT',width,theme,JSON.stringify({initial,pending,slow,ready}));
+    await page.goto('http://127.0.0.1:4147/1442-empty.html',{waitUntil:'domcontentloaded'});
+    frame=await (await page.$('iframe')).contentFrame();
+    await frame.waitForFunction(()=>document.querySelector('#orbit')?.shadowRoot?.querySelector('.center h1')?.textContent==='내 첫 순간',null,{timeout:15000});
+    const zero=await center(frame);assert.equal(zero.allCards,0);assert.equal(zero.exampleCards,0);assert.equal(zero.buttons.length,2);assert.deepEqual(zero.buttons,['첫 순간 추가','예시 둘러보기']);await snap('tree0');
+    await page.goto('http://127.0.0.1:4147/1442-guest.html',{waitUntil:'domcontentloaded'});
+    frame=await (await page.$('iframe')).contentFrame();
+    await frame.waitForFunction(()=>document.querySelector('#orbit')?.shadowRoot?.querySelector('.center h1')?.textContent==='좋아하는 순간부터.',null,{timeout:15000});
+    const guest=await center(frame);assert.ok(guest.allCards>0);console.log('#1442 EMPTY',width,theme,JSON.stringify({zero,guest}));
+    await page.goto('http://127.0.0.1:4147/1442-pending.html',{waitUntil:'domcontentloaded'});
+    frame=await (await page.$('iframe')).contentFrame();
+    await frame.waitForFunction(()=>document.querySelector('#orbit')?.shadowRoot?.querySelector('.center[data-lt-title-pending]'));
+    const zeroBefore=await center(frame);
+    await page.evaluate(()=>{window.LT41={trees:[]};document.body.dataset.member='in';document.body.dataset.treeCount='0';document.documentElement.dataset.ltAuthPhase='ready';});
+    await frame.waitForFunction(()=>document.querySelector('#orbit')?.shadowRoot?.querySelector('.center h1')?.textContent==='내 첫 순간');
+    const zeroAfter=await center(frame);
+    console.log('#1442 ZERO_TRANSITION',width,theme,JSON.stringify({zeroBefore,zeroAfter}));
+    assert.equal(zeroAfter.allCards,0);
+    assert.ok(Math.abs(zeroAfter.height-zeroBefore.height)<=1,`${width} ${theme} tree0 CLS height: ${zeroBefore.height} vs ${zeroAfter.height}`);
+    await page.evaluate(()=>{window.__homeMessages=[];window.addEventListener('message',event=>window.__homeMessages.push(event.data));});
+    await frame.locator('.center .actions button').first().click();
+    await page.waitForFunction(()=>window.__homeMessages?.some(message=>message?.mode==='new'),null,{timeout:4000});
+    const firstMomentMessages=await page.evaluate(()=>window.__homeMessages.filter(message=>message?.mode==='new').length);
+    assert.equal(firstMomentMessages,1,`첫 순간 추가 동작은 한 번만 보내야 합니다: ${width} ${theme}`);
+    await page.evaluate(()=>localStorage.setItem('lt41.homeTitleHasMoments.v1','1'));
+    await page.goto('http://127.0.0.1:4147/1442-pending.html',{waitUntil:'domcontentloaded'});
+    frame=await (await page.$('iframe')).contentFrame();
+    await frame.waitForFunction(()=>document.querySelector('#orbit')?.shadowRoot?.querySelector('.center h1')?.textContent==='다시, 그 순간으로.',null,{timeout:15000});
+    const hint=await center(frame);
+    assert.equal(hint.loading,false);assert.equal(hint.pending,false);
+    await page.evaluate(()=>localStorage.removeItem('lt41.homeTitleHasMoments.v1'));
+
     await page.close();
    }finally{await ctx.close()}
   }
