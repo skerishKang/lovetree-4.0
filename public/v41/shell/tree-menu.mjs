@@ -153,21 +153,26 @@ if(treePopover)treePopover.addEventListener('keydown',event=>{
 });
 // The closing pointer press must not also activate a control underneath the picker.
 // Keep the paired click in its source document, including clicks inside the view iframe.
-const pendingOutsideClicks=new WeakMap();
-function outsidePointerDown(event){
+let pendingOutsideClick=null;
+function shellPointerPosition(event){
  const doc=event.currentTarget;
- pendingOutsideClicks.delete(doc);
+ const frame=doc===document?null:[...document.querySelectorAll('iframe')].find(f=>f.contentDocument===doc);
+ const rect=frame?.getBoundingClientRect();
+ return {x:event.clientX+(rect?.left||0),y:event.clientY+(rect?.top||0)};
+}
+function outsidePointerDown(event){
+ pendingOutsideClick=null;
  if(!treePopover||treePopover.hidden||treePopover.contains(event.target))return;
- pendingOutsideClicks.set(doc,{x:event.clientX,y:event.clientY});
+ pendingOutsideClick=shellPointerPosition(event);
  event.preventDefault();event.stopImmediatePropagation();
  closeTreeMenu(true);
 }
 function outsideClick(event){
- const doc=event.currentTarget;
- const pending=pendingOutsideClicks.get(doc);
+ const pending=pendingOutsideClick;
  if(pending){
-  pendingOutsideClicks.delete(doc);
-  if(Math.abs(event.clientX-pending.x)<=8 && Math.abs(event.clientY-pending.y)<=8){
+  pendingOutsideClick=null;
+  const point=shellPointerPosition(event);
+  if(Math.abs(point.x-pending.x)<=8 && Math.abs(point.y-pending.y)<=8){
    event.preventDefault();event.stopImmediatePropagation();return;
   }
  }
