@@ -51,7 +51,7 @@ function renderTreeMenu(){
   const viewGroup = `${shelfEntry}${momentsEntry}`;
   const shareButtons = manage ? '<button type="button" role="menuitem" data-tree-action="manage">이 트리 관리 (이름·표지)</button><button type="button" role="menuitem" data-tree-action="share">이 트리 공유</button>' : '';
   const dangerRow = cleanupRow ? divider + cleanupRow.replace('tree-item tree-cleanup', 'tree-item tree-cleanup tree-danger') : '';
-  treePopover.innerHTML = '<div class="lt-tree-picker-heading"><strong>?? ???</strong><button type="button" data-tree-close aria-label="?? ?? ??">?</button></div>' + list + `<div class="tree-foot" role="none"><button type="button" role="menuitem" data-tree-action="new">＋ 새 트리</button>${manage ? divider + shareButtons : ''}${tagsRow}${viewGroup ? divider + viewGroup : ''}${dangerRow}</div>`;
+  treePopover.innerHTML = '<div class="lt-tree-picker-heading"><strong>&#53944;&#47532;&#32;&#44256;&#47476;&#44592;</strong><button type="button" data-tree-close aria-label="&#53944;&#47532;&#32;&#47785;&#47197;&#32;&#45803;&#44592;">&times;</button></div>' + list + `<div class="tree-foot" role="none"><button type="button" role="menuitem" data-tree-action="new">＋ 새 트리</button>${manage ? divider + shareButtons : ''}${tagsRow}${viewGroup ? divider + viewGroup : ''}${dangerRow}</div>`;
  treePopover.querySelector('[data-tree-close]')?.addEventListener('click',()=>closeTreeMenu(true));
  const search=treePopover.querySelector('[data-tree-search]');
  search?.addEventListener('input',()=>{
@@ -112,7 +112,7 @@ function openTreeMenu(via='keyboard',rect=null,frame=null){
  treePopover.dataset.ltOpenedBy=via;
  treePopover.hidden=false;
  treePopover.setAttribute('role','dialog');
- treePopover.setAttribute('aria-label','?? ???');
+ treePopover.setAttribute('aria-label','\uD2B8\uB9AC \uACE0\uB974\uAE30');
  treePopover.classList.add('lt-toolbar-picker');
  treePopover.style.setProperty('--lt-picker-left',Math.round(rect?.left||24)+'px');
  treePopover.style.setProperty('--lt-picker-top',Math.round((rect?.bottom||60)+6)+'px');

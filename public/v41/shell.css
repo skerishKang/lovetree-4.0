@@ -1363,7 +1363,7 @@ body>.tree-popover.lt-toolbar-picker{position:fixed;top:var(--lt-picker-top);lef
 body>.tree-popover.lt-toolbar-picker[hidden]{display:none}
 .lt-toolbar-picker .lt-tree-picker-heading{display:flex;justify-content:space-between;align-items:center;padding:4px 8px}
 .lt-toolbar-picker .lt-tree-picker-heading button{min-width:44px;min-height:44px;background:var(--lt-role-idle-bg);color:var(--lt-role-idle-ink);border:1px solid var(--lt-role-idle-border);border-radius:var(--lt-r-pill)}
-.lt-toolbar-picker .tree-list{flex:1 1 auto;min-height:0;max-height:none;overflow:auto}
+.lt-toolbar-picker .tree-list{flex:1 1 auto;min-height:0;max-height:none;overflow:auto;align-content:start;grid-auto-rows:min-content}
 .lt-toolbar-picker .tree-foot{flex:0 0 auto;overflow:auto;max-height:32dvh}
 .lt-toolbar-picker .tree-item{color:var(--lt-role-text-strong);background:var(--lt-role-bg)}
 .lt-toolbar-picker .tree-item[aria-checked=true]{background:var(--lt-role-accent-bg);color:var(--lt-role-accent-ink)}
