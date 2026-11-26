@@ -1,3 +1,4 @@
+import { listenOnSafePort } from './helpers/safe-port.mjs';
 // #1098 3단계 — 내 소식 화면: 계정 단추 점(0이면 숨김)·계정 메뉴 입구·목록 창·읽음 뒤 점 지움·
 // 불러오기 실패 안내 한 줄·키보드 열기·Esc 닫기·접근성 이름·폭 360·768·1280 × 밤/정원에서 점 위치·창 겹침.
 // 크롬이 필요한 실행형 시험이라 LT_MY_NEWS_REQUIRE=1 에서만 실패로 셈한다(미리보기 검사 잡에 연결).
@@ -88,7 +89,7 @@ function serve() {
     }
     res.writeHead(404); res.end('not found');
   });
-  return new Promise((ok) => server.listen(0, '127.0.0.1', () => ok(server)));
+  return listenOnSafePort(server, '127.0.0.1').then(() => server);
 }
 const serverHost = server => `http://127.0.0.1:${server.address().port}`;
 

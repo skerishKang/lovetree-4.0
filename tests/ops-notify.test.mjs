@@ -1,3 +1,4 @@
+import { listenOnSafePort } from './helpers/safe-port.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
@@ -24,8 +25,7 @@ async function receiver({ failTimes = 0 } = {}) {
       res.end(status === 200 ? 'ok' : 'retry');
     });
   });
-  server.listen(0, '127.0.0.1');
-  await once(server, 'listening');
+  await listenOnSafePort(server, '127.0.0.1');
   return {
     url: `http://127.0.0.1:${server.address().port}/api/ops/notify-event`,
     seen,

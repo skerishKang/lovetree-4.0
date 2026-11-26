@@ -1,3 +1,4 @@
+import { listenOnSafePort } from './helpers/safe-port.mjs';
 // #553: 썸네일이 실린 긴 YouTube 카드가 treeSpread 줄 간격(세로 420px)을 넘어 같은 열 위아래
 // 카드와 겹치던 문제의 실행 계약.
 // - 모델: 줄 간격을 카드 종류별 최대 높이(예약 높이)에 맞춘다. 기본 카드(260px)뿐인 트리는
@@ -71,7 +72,7 @@ function serve(extra = {}) {
     }
     res.writeHead(404); res.end('not found');
   });
-  return new Promise((ok) => server.listen(0, '127.0.0.1', () => ok(server)));
+  return listenOnSafePort(server, '127.0.0.1').then(() => server);
 }
 
 // 내 기록(썸네일이 자동으로 실리는) 보드 호스트: 셸처럼 data-member="in"을 본문에 남긴다.

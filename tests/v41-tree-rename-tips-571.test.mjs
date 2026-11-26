@@ -1,3 +1,4 @@
+import { listenOnSafePort } from './helpers/safe-port.mjs';
 import {clickToolbarTreeChoice,treeChoiceExpanded,treeChoiceFocused} from './helpers/tree-picker-pr3.mjs';
 // #571(#549-2 대표 결정 '나'): '첫 트리를 만들었어요' 안내의 첫 항목을 '트리 이름은 지금 바꿀 수 있어요'로
 // 바꾸고 [이름 바꾸기] 단추를 둔다(그림 549-mock-na-390.png). 단추는 트리 관리 창의
@@ -36,7 +37,7 @@ function serve(root) {
     }
     res.writeHead(404); res.end('not found');
   });
-  return new Promise((ok) => server.listen(0, '127.0.0.1', () => ok(server)));
+  return listenOnSafePort(server, '127.0.0.1').then(() => server);
 }
 
 // 첫 트리 안내가 뜨는 상태 = 서버 기록에 트리 1개(순간 1개, 자동 이름 '모아둔 순간').

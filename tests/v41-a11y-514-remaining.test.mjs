@@ -1,3 +1,4 @@
+import { listenOnSafePort } from './helpers/safe-port.mjs';
 // #514: 2026-11-13 전 화면 재점검에서 남은 moderate 이하 항목을 실제 화면에서 잰다.
 // - meta-viewport: 안쪽 화면 문서가 확대를 막지 않는다(최대 배율·확대 금지 없음).
 // - region: 책·보드·지도 안쪽 문서에 main 랜드마크가 있어 내용이 지역 밖에 있지 않다.
@@ -45,7 +46,7 @@ function serve() {
     }
     res.writeHead(404); res.end('not found');
   });
-  return new Promise((ok) => server.listen(0, '127.0.0.1', () => ok(server)));
+  return listenOnSafePort(server, '127.0.0.1').then(() => server);
 }
 
 async function openScreen(browser, base, { width, theme, screen }) {

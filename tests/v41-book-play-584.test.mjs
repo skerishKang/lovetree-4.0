@@ -1,3 +1,4 @@
+import { listenOnSafePort } from './helpers/safe-port.mjs';
 import {clickToolbarTreeChoice,treeChoiceExpanded,treeChoiceFocused} from './helpers/tree-picker-pr3.mjs';
 // 이슈 584: 책의 YouTube 재생·크게 보기·두 장 모드 손보기.
 //  (1) 크게 보기 오류 153 — media-preview.js 의 두 iframe 이 referrerpolicy="no-referrer" 라
@@ -101,7 +102,7 @@ function serve(root) {
     }
     res.writeHead(404); res.end('not found');
   });
-  return new Promise((ok) => server.listen(0, '127.0.0.1', () => ok(server)));
+  return listenOnSafePort(server, '127.0.0.1').then(() => server);
 }
 
 function hostHtml() {

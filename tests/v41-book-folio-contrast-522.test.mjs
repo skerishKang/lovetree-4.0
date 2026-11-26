@@ -1,3 +1,4 @@
+import { listenOnSafePort } from './helpers/safe-port.mjs';
 // #522 4: 책 좌우 페이지 밑 번호(01·02)가 종이 위에서 2.63:1이었다 — 정보 글자로 보고 4.5:1 이상으로 올린다.
 // 실제 책 프레임에서 getComputedStyle 글자색과 그 자리에 칠해진 바탕 픽셀로 잰다(밤·정원 × 1440·1024).
 // 크롬이 없는 곳에서는 건너뛰고, LT_BOOK_FOLIO_REQUIRE=1(미리보기 검사)에서는 건너뜀을 실패로 본다.
@@ -30,7 +31,7 @@ function serve(root) {
     }
     res.writeHead(404); res.end('not found');
   });
-  return new Promise((ok) => server.listen(0, '127.0.0.1', () => ok(server)));
+  return listenOnSafePort(server, '127.0.0.1').then(() => server);
 }
 
 const parse = (s) => { const m = s.match(/rgba?\(([^)]+)\)/); if (!m) return null; const p = m[1].split(/[\s,/]+/).filter(Boolean).map(Number); return { r: p[0], g: p[1], b: p[2], a: p.length > 3 ? p[3] : 1 }; };

@@ -1,3 +1,4 @@
+import { listenOnSafePort } from './helpers/safe-port.mjs';
 // #582: 보드를 핀보드로 — 실행 계약.
 // 1) 배치: 관계(treeSpread) 대신 날짜 최신순 바둑판. 26순간 평평한 트리에서 겹침 0·빈 칸 비율,
 //    칸 수는 화면 폭이 정한다(1440 4칸, 390 1칸). 글자 기준선(#548)은 v41-font-floor-548가 검사한다.
@@ -61,7 +62,7 @@ function serve(extra = {}) {
     }
     res.writeHead(404); res.end('not found');
   });
-  return new Promise((ok) => server.listen(0, '127.0.0.1', () => ok(server)));
+  return listenOnSafePort(server, '127.0.0.1').then(() => server);
 }
 
 const hostHTML = (tree) => `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>보드 호스트</title><style>html,body{margin:0;overflow:hidden}iframe{display:block}</style></head><body data-member="in" data-record-source="server">

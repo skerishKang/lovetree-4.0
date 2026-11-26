@@ -363,3 +363,142 @@ test('#1089 정리 창은 순간 목록 창과 같은 가운데 카드 틀이다
     });
   }
 });
+
+
+// ── #1439: 정리 창의 복사하기·같은 순간 알림·되돌리기를 실제 셸에서 본다 ──
+// 가짜 /api/workspace는 마지막으로 저장(PUT)된 기록을 다음 읽기(GET)에 돌려준다 — 새로고침 뒤 유지까지 본다.
+const VIDEO = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
+function organizeWorkspace() {
+  const at = '2026-11-20T00:00:00Z';
+  const base = { note: '', emotion: '설렘', date: '2026-11-20' };
+  let inbox = createTree({ ...base, subject: '정리 시험', title: '정리 시험', url: '' }, at);
+  inbox.moments[0].title = '첫 순간';
+  const root = inbox.moments[0].id;
+  inbox = addMoment(inbox, { ...base, title: '영상 순간', note: '원본 메모', url: VIDEO, startSeconds: 30, relation: '계속 생각나서', mediaMetadata: { title: '영상 순간' } }, root, '2026-11-20T00:00:01Z');
+  inbox = addMoment(inbox, { ...base, title: '셋째 순간', url: '' }, root, '2026-11-20T00:00:02Z');
+  inbox.inbox = true;
+  const billy = createTree({ ...base, subject: '빌리 하루나', title: '빌리 하루나', url: 'https://youtu.be/dQw4w9WgXcQ', startSeconds: 30, mediaMetadata: { title: '같은 장면' } }, at);
+  const yoon = createTree({ ...base, subject: '윤슬', title: '윤슬', url: 'https://youtu.be/dQw4w9WgXcQ', startSeconds: 90, mediaMetadata: { title: '다른 장면' } }, at);
+  return { version: 1, trees: [inbox, billy, yoon], prefs: {} };
+}
+async function withLiveShell(state, { width = 1440, height = 900 } = {}, fn) {
+  const server = await serve();
+  const origin = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch({ headless: true });
+  const ctx = await browser.newContext({ viewport: { width, height }, colorScheme: 'dark' });
+  const live = { revision: 1, state: structuredClone(state), puts: [] };
+  try {
+    // 둘러보기 소개 물음(순간 3개 이상인 트리에 한 번)은 이 시험의 대상이 아니다 — 시험 트리는 이미 물은 것으로 두어
+    // 물음 창이 되돌리기 안내를 가리지 않게 한다(불러오자마자 뜨는 때와 복사로 3개가 되는 때 모두).
+    const asked = state.trees.map((tree) => tree.id);
+    await ctx.addInitScript((ids) => { try { localStorage.setItem('lt41.theme', 'night'); localStorage.setItem('lt41.discoverAsked', JSON.stringify(ids)); } catch {} }, asked);
+    await ctx.route('**://i.ytimg.com/**', (route) => route.fulfill({ status: 200, contentType: 'image/png', body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64') }));
+    await ctx.route('**/api/**', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
+    await ctx.route('**/api/workspace**', async (route) => {
+      if (route.request().method() === 'PUT') {
+        const body = route.request().postDataJSON();
+        live.puts.push(body);
+        live.state = body.state;
+        live.revision += 1;
+        route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, revision: live.revision }) });
+        return;
+      }
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ revision: live.revision, state: live.state, subject: '시험계정', writeSubjectBound: true, savedAt: '2026-11-20T09:00:00.000Z' }) });
+    });
+    const page = await ctx.newPage();
+    const errors = [];
+    page.on('pageerror', (error) => errors.push(String(error.message || error)));
+    await page.goto(`${origin}/v41/?account=1`, { waitUntil: 'load' });
+    await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
+    await page.locator('#discover-ask-no').click().catch(() => {});
+    await page.waitForTimeout(300);
+    await fn({ page, errors, live, origin });
+  } finally {
+    await browser.close();
+    server.close();
+  }
+}
+// 저장(PUT)이 n번째까지 나갈 때까지 잰다(저장 대기 900ms + 여유).
+async function waitPuts(live, n, ms = 12000) {
+  const deadline = Date.now() + ms;
+  while (live.puts.length < n && Date.now() < deadline) await new Promise((r) => setTimeout(r, 100));
+  assert.ok(live.puts.length >= n, `저장 ${n}번째가 나간다(지금 ${live.puts.length})`);
+}
+const shape = (state) => state.trees.map((t) => [t.id, t.moments.map((m) => [m.id, m.parentId, m.relation || '', m.copiedFrom || ''])]);
+const row = (page, host, text) => page.locator(`#${host} .cleanup-moment`, { hasText: text });
+
+test('#1439 정리 창: 이미 있음 → 건너뛰기로 두 트리에 복사 → 되돌리기, 옮기기 → 되돌리기, 저장·새로고침 뒤 유지', async (t) => {
+  if (skip) { t.skip(skip); return; }
+  if (REQUIRE && !existsSync(new URL('../dist/v41/home.html', import.meta.url))) { t.skip('빌드 결과가 없어 화면 시험을 건너뜀'); return; }
+  const start = organizeWorkspace();
+  await withLiveShell(start, {}, async ({ page, errors, live }) => {
+    const original = shape(live.state);
+    const [inbox, billy, yoon] = live.state.trees;
+    const videoId = inbox.moments.find((m) => m.title === '영상 순간').id;
+    const thirdId = inbox.moments.find((m) => m.title === '셋째 순간').id;
+
+    // 1) 두 순간을 골라 두 트리에 복사 — 빌리 하루나에는 같은 영상·같은 시작 초가 있어 '이미 있음 1개'.
+    await openCleanup(page);
+    await row(page, 'cleanup-moments', '영상 순간').locator('input').check();
+    await row(page, 'cleanup-moments', '셋째 순간').locator('input').check();
+    assert.equal((await row(page, 'cleanup-targets', '빌리 하루나').locator('.cleanup-dup').textContent()).trim(), '이미 있음 1개');
+    assert.equal(await row(page, 'cleanup-targets', '윤슬').locator('.cleanup-dup').isHidden(), true, '시작 초가 다른 같은 영상은 이미 있음이 아니다');
+    await row(page, 'cleanup-targets', '빌리 하루나').locator('input').check();
+    await row(page, 'cleanup-targets', '윤슬').locator('input').check();
+    assert.equal(await page.locator('#cleanup-move').isDisabled(), true, '두 트리면 옮기기는 막힌다');
+    assert.equal(await page.locator('#cleanup-copy').textContent(), '트리 2곳에 복사하기');
+    await page.locator('#cleanup-copy').click();
+    await page.waitForSelector('#video-dup-panel[open]', { timeout: 8000 });
+    assert.equal(await page.locator('#video-dup-title').textContent(), '이 트리에 같은 영상이 이미 있어요');
+    assert.match(await page.locator('#video-dup-text').textContent(), /'빌리 하루나' 트리 · 고른 2개 중 1개가 이미 있어요/);
+    assert.equal(await page.locator('#video-dup-view').isHidden(), true, '정리에서는 그 순간 보기가 없다');
+    await page.locator('#video-dup-skip').click();
+    await page.waitForFunction(() => { const bar = document.querySelector('#move-feedback'); return bar && !bar.hidden && /복사했어요/.test(bar.textContent || ''); }, null, { timeout: 8000 });
+    assert.equal(await page.locator('#move-message').textContent(), '트리 2곳에 2개 복사했어요. 이미 있는 1개는 건너뛰었어요.');
+    await waitPuts(live, 1);
+    const afterCopy = live.state.trees;
+    assert.deepEqual(afterCopy.find((tr) => tr.id === billy.id).moments.filter((m) => m.copiedFrom).map((m) => m.copiedFrom), [thirdId], '빌리 하루나: 이미 있는 영상은 건너뛰고 셋째만');
+    assert.deepEqual(afterCopy.find((tr) => tr.id === yoon.id).moments.filter((m) => m.copiedFrom).map((m) => m.copiedFrom), [videoId, thirdId], '윤슬: 둘 다');
+    const copy = afterCopy.find((tr) => tr.id === yoon.id).moments.find((m) => m.copiedFrom === videoId);
+    assert.equal(copy.note, '원본 메모');
+    assert.equal(copy.relation, '계속 생각나서', '다음으로 간 이유도 복사');
+    assert.equal(copy.parentId, yoon.moments[0].id, '대상 트리 시작 순간 아래');
+
+    // 2) 마우스를 올려 두면 8초가 지나도 안내가 남는다(공통 타이머). 되돌리기는 사본을 모두 거둔다.
+    await page.locator('#move-message').hover();
+    await page.waitForTimeout(9000);
+    assert.equal(await page.locator('#move-feedback').isVisible(), true, '올려 둔 동안은 사라지지 않는다');
+    await page.locator('#move-actions button', { hasText: '되돌리기' }).click();
+    await waitPuts(live, 2);
+    assert.deepEqual(shape(live.state), original, '복사 되돌리기 → 처음 모습');
+
+    // 3) 옮기기 → 되돌리기: 원래 트리·원래 자리로.
+    await openCleanup(page);
+    await row(page, 'cleanup-moments', '셋째 순간').locator('input').check();
+    await row(page, 'cleanup-targets', '윤슬').locator('input').check();
+    assert.equal(await page.locator('#cleanup-move').textContent(), '윤슬로 옮기기');
+    await page.locator('#cleanup-move').click();
+    await page.waitForFunction(() => /윤슬로 1개 옮겼어요/.test(document.querySelector('#move-message')?.textContent || ''), null, { timeout: 8000 });
+    await waitPuts(live, 3);
+    assert.equal(live.state.trees.find((tr) => tr.id === yoon.id).moments.some((m) => m.id === thirdId), true, '윤슬로 옮겨졌다');
+    await page.locator('#move-actions button', { hasText: '되돌리기' }).click();
+    await waitPuts(live, 4);
+    assert.deepEqual(shape(live.state), original, '옮기기 되돌리기 → 처음 모습');
+
+    // 4) 시작 초가 다른 같은 영상은 묻지 않고 복사 → 새로고침 뒤에도 사본·원본 표시가 남는다.
+    await page.waitForFunction(() => window.LT41?.tree?.inbox === true, null, { timeout: 10000 });
+    await openCleanup(page);
+    await row(page, 'cleanup-moments', '영상 순간').locator('input').check();
+    await row(page, 'cleanup-targets', '윤슬').locator('input').check();
+    await page.locator('#cleanup-copy').click();
+    await page.waitForFunction(() => /윤슬에 1개 복사했어요/.test(document.querySelector('#move-message')?.textContent || ''), null, { timeout: 8000 });
+    assert.equal(await page.evaluate(() => !!document.querySelector('#video-dup-panel')?.open), false, '묻지 않는다');
+    await waitPuts(live, 5);
+    await page.reload({ waitUntil: 'load' });
+    await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
+    const kept = await page.evaluate((id) => window.LT41.trees.find((tr) => tr.id === id)?.moments.filter((m) => m.copiedFrom).map((m) => [m.copiedFrom, m.note]), yoon.id);
+    assert.deepEqual(kept, [[videoId, '원본 메모']], '새로고침 뒤에도 사본이 남는다');
+    assert.deepEqual(await page.evaluate((id) => window.LT41.trees.find((tr) => tr.id === id)?.moments.length, inbox.id), 3, '원본 트리는 그대로');
+    assert.deepEqual(errors, [], '페이지 오류 없음');
+  });
+});

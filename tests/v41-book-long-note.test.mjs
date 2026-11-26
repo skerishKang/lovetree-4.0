@@ -1,3 +1,4 @@
+import { listenOnSafePort } from './helpers/safe-port.mjs';
 import {waitForShownScreen} from './helpers/visible-frame.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -40,7 +41,7 @@ function serve(root) {
     }
     res.writeHead(404); res.end('not found');
   });
-  return new Promise(ok => server.listen(0, '127.0.0.1', () => ok(server)));
+  return listenOnSafePort(server, '127.0.0.1').then(() => server);
 }
 // 시험 기록: 순간 둘(긴 노트·짧은 노트). 넘침 자체는 화면에서 내용을 키워 만든다(아래 시험).
 const PREFS = {};

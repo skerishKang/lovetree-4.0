@@ -1,3 +1,4 @@
+import { listenOnSafePort } from './helpers/safe-port.mjs';
 // #608: 보드 순간 수정 창에서도 날짜를 바꿀 수 있어야 한다 — 책의 '수정'과 같은 경로·같은 규칙.
 // - 보드 수정 창은 날짜를 고정 글씨('DATE · …')로 보여주지 않고 책처럼 <input type="date">로 바꿔 준다.
 // - 저장은 책의 editMoment가 쓰는 validateMomentInput 규칙(YYYY-MM-DD + 실제 날짜)과 같은 규칙으로 미리 걷고,
@@ -51,7 +52,7 @@ function serve(extra = {}) {
     }
     res.writeHead(404); res.end('not found');
   });
-  return new Promise((ok) => server.listen(0, '127.0.0.1', () => ok(server)));
+  return listenOnSafePort(server, '127.0.0.1').then(() => server);
 }
 
 // 내 기록 보드 호스트: 셸처럼 data-member="in"을 본문에 남기고, 보드가 보낸 lt41-board-sync를 통째로 기록한다.

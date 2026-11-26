@@ -1,3 +1,4 @@
+import { listenOnSafePort } from './helpers/safe-port.mjs';
 // 지도 판: 실제 셸 설정 → 프레임 수신 → 다시 그리기와 클릭 흐름을 로그아웃 예시로 시험한다.
 // 계정 입구는 열지 않는다. 설정 dialog만 showModal()로 드러낸 뒤 실제 선택 단추를 누른다.
 import test from 'node:test';
@@ -30,7 +31,7 @@ async function serve() {
     }
     res.writeHead(404); res.end('not found');
   });
-  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  await listenOnSafePort(server, '127.0.0.1');
   return server;
 }
 

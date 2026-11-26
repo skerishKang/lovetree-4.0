@@ -1,3 +1,4 @@
+import { listenOnSafePort } from './helpers/safe-port.mjs';
 // #583 부채꼴 나무·'이 순간 열기' — 지도 화면 실브라우저 시험.
 // 평평한 트리(첫 순간 하나에 25개가 이어진 모양, 대표 트리와 같다)에서 그물 보기가 묶음 칸으로
 // 쪼개지 않고 한 고리에 펼쳐 겹침 0인지, 주소 약속(?open=<순간> — 셸이 #my/network?moment=…로
@@ -36,7 +37,7 @@ async function serve() {
     }
     res.writeHead(404); res.end('not found');
   });
-  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  await listenOnSafePort(server, '127.0.0.1');
   return server;
 }
 // 지도 한 장을 셸 없이 직접 연다(셸이 LT41로 넘기는 문맥을 같은 모양으로 심는다).

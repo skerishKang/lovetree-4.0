@@ -41,7 +41,7 @@ test('3. 정리 목록은 주입된 화면 규칙으로 제목·썸네일을 그
     };
     return node;
   };
-  const ids = ['cleanup-moments','cleanup-desc','cleanup-error','cleanup-new-name','cleanup-target','cleanup-count','cleanup-create','cleanup-move','cleanup-move-box','cleanup-panel'];
+  const ids = ['cleanup-moments','cleanup-desc','cleanup-error','cleanup-new-name','cleanup-targets','cleanup-target-hint','cleanup-count','cleanup-create','cleanup-move','cleanup-copy','cleanup-move-box','cleanup-panel'];
   const els = Object.fromEntries(ids.map(id => [id, el()]));
   globalThis.document = { createElementNS: (ns, tag) => ({ tagName: String(tag), namespaceURI: String(ns), attrs: {}, children: [], setAttribute(n,v){this.attrs[n]=String(v)}, getAttribute(n){return this.attrs[n]??null}, append(...k){this.children.push(...k)}, querySelector(){return null}, querySelectorAll(){return []} }), createElement: tag => el(tag)};
   globalThis.window = {LT41: {tree: {id: 'inbox', inbox: true, moments: [
