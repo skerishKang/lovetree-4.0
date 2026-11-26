@@ -484,10 +484,14 @@ test('#1497 서재: 표지 제목 3줄 안·잘림 0, 이어 보기 같은 이�
             return { text: el.textContent.trim().slice(0, 12), lines: lines.length, cut: Math.max(0, ...lines.map((l) => l.bottom - r.bottom)), inside: !cover || (r.left >= cover.left - 0.5 && r.right <= cover.right + 0.5 && r.bottom <= cover.bottom + 0.5 && r.top >= cover.top - 0.5) };
           });
           const tree = document.querySelector('#resumeTree'), moment = document.querySelector('#resumeMoment');
+          // 누름 영역은 그 칩이 실제로 받는 점을 가로·세로 1px씩 짚어 잰다(보이는 크기가 아니라 누르는 범위).
           const chips = [...document.querySelectorAll('#shelf-filter-inline button')].filter(shown).map((b) => {
             const r = b.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
-            const at = (y) => { const e = document.elementFromPoint(cx, y); return !!e && (e === b || b.contains(e)); };
-            return { t: b.textContent.trim(), w: Math.round(r.width), h: Math.round(r.height), up: at(cy - 21), down: at(cy + 21) };
+            const hits = (x, y) => { const e = document.elementFromPoint(x, y); return !!e && (e === b || b.contains(e)); };
+            let w = 0, h = 0;
+            for (let x = Math.floor(r.left - 30); x <= r.right + 30; x++) if (hits(x, cy)) w++;
+            for (let y = Math.floor(r.top - 30); y <= r.bottom + 30; y++) if (hits(cx, y)) h++;
+            return { t: b.textContent.trim(), w, h, up: hits(cx, cy - 21), down: hits(cx, cy + 21) };
           });
           return { titles, tree: shown(tree) ? tree.textContent.trim() : '', moment: shown(moment) ? moment.textContent.trim() : '', chips };
         });
@@ -500,7 +504,7 @@ test('#1497 서재: 표지 제목 3줄 안·잘림 0, 이어 보기 같은 이�
         assert.ok(m.tree, '이어 보기 띠가 보인다');
         assert.notEqual(m.moment.replace(/\s+/g, ''), m.tree.replace(/\s+/g, ''), `${width} ${view} ${theme}: 이어 보기 띠에 같은 이름이 두 번 나오지 않는다`);
         assert.equal(m.chips.length, 2, '전체·공개만 칩 둘');
-        for (const c of m.chips) assert.ok(c.w >= 44 && c.up && c.down, `${width} ${view} ${theme} '${c.t}' 칩 누름 영역 44px(폭 ${c.w}, 위 ${c.up}, 아래 ${c.down})`);
+        for (const c of m.chips) assert.ok(c.w >= 44 && c.h >= 44, `${width} ${view} ${theme} '${c.t}' 칩 누름 영역 44px(가로 ${c.w}, 세로 ${c.h})`);
       }
       assert.deepEqual(errors, [], '페이지 오류 없음');
     });
