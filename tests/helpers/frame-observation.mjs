@@ -45,18 +45,24 @@ export function observationRoutes(tree) {
 
 const THUMB = route => route.fulfill({ status: 200, contentType: 'image/png', body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64') });
 
-export async function settleObservation(page, predicate, arg = null) {
+export async function settleObservation(page, predicate, arg = null, { freezeClock = false } = {}) {
   await page.waitForFunction(predicate, arg, { timeout: 30000 });
-  await page.evaluate(async () => {
+  if (freezeClock) await page.clock.fastForward(0);
+  await page.evaluate(async freeze => {
     const docs = [document];
     const frame = [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length);
     try { if (frame?.contentDocument) docs.push(frame.contentDocument); } catch {}
     await Promise.all(docs.map(doc => doc.fonts?.ready));
-    await Promise.all(docs.flatMap(doc => doc.getAnimations({ subtree: true })
-      .filter(animation => animation.effect?.getTiming().iterations !== Infinity)
-      .map(animation => animation.finished.catch(() => {}))));
-    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-  });
+    const animations = docs.flatMap(doc => doc.getAnimations({ subtree: true })
+      .filter(animation => animation.effect?.getTiming().iterations !== Infinity));
+    if (freeze) for (const animation of animations) { try { animation.finish(); } catch {} }
+    else await Promise.all(animations.map(animation => animation.finished.catch(() => {})));
+    if (!freeze) await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  }, freezeClock);
+  if (freezeClock) {
+    await page.clock.runFor(32);
+    await page.clock.fastForward(0);
+  }
 }
 
 export async function measureFrame(page, screen, theme, width, height) {
@@ -184,8 +190,7 @@ export async function observeFrameMatrix({ browser, base, outputDir, shard = '' 
     try {
       await guestPage.clock.install({ time: new Date('2026-11-20T00:00:00Z') });
       await guestPage.goto(base + '/v41/#share/c000000000000000000000a/book', { waitUntil: 'load' });
-      await settleObservation(guestPage, () => document.body.dataset.recordSource === 'share' && document.body.dataset.fabLift === 'book' && !document.getElementById('toast')?.hidden && document.getElementById('toast')?.hasAttribute('data-visitor-intro') && [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length)?.contentWindow?.location?.pathname?.endsWith('/track59-sketchbook.html') && [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length)?.contentDocument?.querySelector('.moment,.mobile-page,.book-wrap') && [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length)?.contentDocument?.querySelector('.lt-screen-toolbar[data-screen="book"]'));
-      await guestPage.clock.fastForward(0);
+      await settleObservation(guestPage, () => document.body.dataset.recordSource === 'share' && document.body.dataset.fabLift === 'book' && !document.getElementById('toast')?.hidden && document.getElementById('toast')?.hasAttribute('data-visitor-intro') && [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length)?.contentWindow?.location?.pathname?.endsWith('/track59-sketchbook.html') && [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length)?.contentDocument?.querySelector('.moment,.mobile-page,.book-wrap') && [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length)?.contentDocument?.querySelector('.lt-screen-toolbar[data-screen="book"]'), null, { freezeClock: true });
       await capture(guestPage, { id: 'share-guest', label: '공유 방문자 책', root: '.moment' });
     } finally { await guest.close(); }
   }
