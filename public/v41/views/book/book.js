@@ -29,6 +29,8 @@ const topBookDialog=()=>bookDialogs[bookDialogs.length-1]||null;
 const bookWrap=$('#bookWrap'),book=$('#book'),leftPage=$('#leftPage'),rightPage=$('#rightPage'),mobilePage=$('#mobilePage'),mobileContent=$('#mobileContent');
 let current=0,recent=[],lastMoment=null,selectedMomentId=null,lensOn=true,machineState='IDLE',turn=null,turnAnim=null,focusAfter=null;
 let customConnections=[];
+/* #1468: 넘기는 동안 들어온 '다시 그리기' 요청(셸 메시지·뒤로 가기·상세 닫기)과 넘김 입력은 각각 한 자리에 미둔다 — 여러 번이면 마지막 것만 남는다. */
+let spreadAfterTurn=null,queuedTurn=null;
 const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
 /* #368 2차: 페이지 넘김 — '종이처럼'(기본)은 #411 종이 넘김, '부드럽게'는 움직임 줄이기와 같은 0.35초 교차 페이드.
    설정은 이 기기에만 저장된다(lt41.pageTurn, 아래 한 장/두 장 보기(VIEW_KEY)와 같은 읽기). 시스템 움직임 줄이기가
@@ -154,9 +156,9 @@ function setViewChoice(v){
 }
 const allMoments=()=>SPREADS.flatMap((s,i)=>[{...s.left,spread:i,side:'left'},{...s.right,spread:i,side:'right'}]).filter(m=>!m.synthetic);
 const esc=globalThis.LTEscapeHtml; // A-15: 글자 막기 정본(html-escape.js) 한 벌
-function titleMainOf(m){try{const v=window.LTBookTitle?.view?.(m);return v?.main||m?.title||''}catch{return m?.title||''}}
-function titleSubOf(m){try{return window.LTBookTitle?.view?.(m)?.sub||''}catch{return ''}}
-function dateOf(v){try{return window.LTBookTitle?.date?.(v)||v||''}catch{return v||''}}
+function titleMainOf(m){try{const v=window.__BOOK_USABILITY__?.titleView?.(m);return v?.main||m?.title||''}catch{return m?.title||''}}
+function titleSubOf(m){try{return window.__BOOK_USABILITY__?.titleView?.(m)?.sub||''}catch{return ''}}
+function dateOf(v){try{return window.__BOOK_USABILITY__?.date?.(v)||v||''}catch{return v||''}}
 function momentContent(m,compact=false){const mark=m.first?'<span class="first-mark">첫 순간</span>':'';let v='';
  if(m.url){const media=LTMedia.markup(m.url,m.title,m.mediaMetadata,m.id);const vertical=window.LTMedia?.verticalVideo?.(m.url,m.mediaMetadata);v=`<div class="clipping moment" data-moment="${m.id}">${vertical?media+`<h2>${esc(titleMainOf(m))}</h2><p>${esc(m.note)}</p>`:`<h2>${esc(titleMainOf(m))}</h2>`+media+`<p>${esc(m.note)}</p>`}</div>`}
  else if(m.kind==='photo')v=`<div class="photo-piece moment" data-moment="${m.id}">${mark}<img src="${m.image}" alt=""><span class="photo-caption">${esc(m.emotion||"")}</span></div>`;
@@ -215,7 +217,14 @@ const pad2=v=>String(v).padStart(2,'0');
    오른쪽 페이지(#rightPage)에 그린다. book-extra.js가 이 함수를 감싸 제목·다음 순간 안내를 덧그린다. */
 function singlePageContent(m,pos,total){const kicker=`${pad2(pos+1)} · ${dateOf(m.date)}`;return `<div class="mobile-kicker"><span>${esc(kicker)}</span><span>${pad2(pos+1)} / ${pad2(total)}</span></div>${momentContent(m)}`}
 function singleFaceMarkup(m,pos,phone){if(phone)return `<div class="mobile-content">${singlePageContent(m,pos,pageCount())}</div>`;return `<div class="page-content">${momentContent(m)}</div><div class="folio folio-right">${pad2(pos+1)}</div>`}
+/* #1468: 넘기는 동안에는 펼침면을 다시 그리지 않는다. 넘김 중에 셸 메시지(날짜 표기·제목 보기)·뒤로 가기·상세 닫기가 여기를 부르면
+   넘김 면 아래 페이지가 바뀌고 상태가 IDLE 로 돌아가, 아직 살아 있는 넘김 고리 옆에 다음 넘김이 겹치게 된다
+   (먼저 끝난 고리가 turn을 비우고, 남은 고리가 비어 자리에 progress를 쓰다 예외). 넘김 중 요청은 한 자리에 미루고
+   settleTurn이 넘김이 끝난 뒤 처리한다. 넘김 중에는 false를 돌려준다 — book-extra.js의 덧그리기도 함께 건너뛴다. */
+/* #1468: '지금 쪽 다시 그리기' 요청인가 — 요청할 때의 쪽·선택이 그대로인 요청(날짜 표기·제목 보기 변경, 상세 닫기). */
+const samePageAsk=ask=>ask.idx===ask.page&&(ask.focusId==null||ask.focusId===ask.selected);
 function renderSpread(idx,focusId=null,land=true){
+ if(turn){const ask={idx,focusId,land,page:current,selected:LTDEMO.get()};/* 다른 쪽으로 가려던 요청이 이미 미뤄져 있으면 '지금 쪽 다시 그리기'는 그 자리를 덮지 않는다 — 그 그리기가 최신 쪽·설정으로 그린다. */if(!(spreadAfterTurn&&!samePageAsk(spreadAfterTurn)&&samePageAsk(ask)))spreadAfterTurn=ask;return false}
  const total=pageCount();if(!total)return;
  current=Math.max(0,Math.min(total-1,idx));
  const si=spreadOfPos(current),s=SPREADS[si],phone=narrow(),one=single()?momentAtPos(current):null;
@@ -235,14 +244,17 @@ function renderSpread(idx,focusId=null,land=true){
  setTimeout(()=>{if(focusId){document.querySelector(`[data-moment="${focusId}"]`)?.classList.add('focused')}if(land){(document.querySelector(`[data-moment="${focusId||(one?one.id:s.left.id)}"]`)||document.querySelector('.moment'))?.classList.add('landed')}},35);
  renderArchive();syncLensClone();markOverflowPages();machineState='IDLE';bookWrap.classList.remove('turning');
  if(phone&&(land||focusId))window.scrollTo({top:0,behavior:'auto'});
+ return true;
 }
 function toast(t){const e=$('#toast');e.textContent=t;e.classList.add('show');clearTimeout(toast._t);toast._t=setTimeout(()=>e.classList.remove('show'),1200)}
 function hideLens(){overBook=false;$('#lens').classList.remove('active');$('#lensHandle').classList.remove('active');$('#lensMeta').classList.remove('active');$('#mobileInspect').classList.remove('active');if(machineState==='INSPECTING')machineState='IDLE'}
 /* #393 3: 넘김 동안 매 프레임 하는 일은 transform·opacity뿐이다. 아래 페이지 그림·clip-path·drop-shadow는
    prepareTurn에서 한 번 끝내고, 그림자·어둠·광은 미리 만든 층의 opacity로만 움직인다(innerHTML·filter·clip-path 재계산 없음). */
 /* #635 PR B: 책장 넘기기 힌트 상자(.turn-why)는 쪽 가운데 글 위에 떠 있다(390 감상에서 특히). 감상 화면에서는 아예 내지 않는다 — 내 트리는 넘기는 동안의 힌트로 그대로 둔다. */
-function setTurnProgress(p){p=Math.max(0,Math.min(1,p));turn.progress=p;const sh=$('#flipSheet'),dir=turn.dir;$('#turnWhy').classList.toggle('show',p>.16&&!LTDEMO.readOnly);bookWrap.classList.toggle('turning',p>.04);if(smoothTurn()){sh.style.opacity=(1-p).toFixed(3);return}const {deg,bend}=LT59Model.turnAngle(p,dir);sh.style.transform=`rotateY(${deg}deg) rotateZ(${dir==='next'?-bend:bend}deg)`;sh.classList.toggle('curl',p>.05&&p<.95);if(turn.frontFace)turn.frontFace.style.opacity=(1-p*.92).toFixed(3);if(turn.backFace)turn.backFace.style.opacity=(.08+p*.92).toFixed(3);if(turn.shadowLayer)turn.shadowLayer.style.opacity=(.18+.5*Math.sin(Math.PI*p)).toFixed(3);if(turn.shadeLayer)turn.shadeLayer.style.opacity=p.toFixed(3);if(turn.sheenLayer)turn.sheenLayer.style.opacity=(1-p).toFixed(3)}
-function prepareTurn(dir,target=null,whyOverride=null){if(machineState==='PAGE_DRAGGING'||machineState==='PAGE_COMMITTING'||machineState==='LANDING')return false;hideLens();const total=pageCount();const t=target??(dir==='next'?(single()?current+1:(SPREADS[current].nextOverride??current+1)):(single()?current-1:(SPREADS[current].prevOverride??current-1)));if(t<0||t>=total)return false;machineState='PAGE_DRAGGING';turn={dir,target:t,progress:0,startX:0,lastX:0,moved:false};const sh=$('#flipSheet'),front=$('#flipFront'),back=$('#flipBack');sh.className=`flip-sheet active ${dir}${smoothTurn()?' reduced':''}`;sh.style.opacity='';const phone=narrow(),curPos=current,cur=SPREADS[spreadOfPos(curPos)],tar=SPREADS[spreadOfPos(t)],curM=single()?momentAtPos(curPos):null,tarM=single()?momentAtPos(t):null;
+function setTurnProgress(p){if(!turn)return;p=Math.max(0,Math.min(1,p));turn.progress=p;const sh=$('#flipSheet'),dir=turn.dir;$('#turnWhy').classList.toggle('show',p>.16&&!LTDEMO.readOnly);bookWrap.classList.toggle('turning',p>.04);if(smoothTurn()){sh.style.opacity=(1-p).toFixed(3);return}const {deg,bend}=LT59Model.turnAngle(p,dir);sh.style.transform=`rotateY(${deg}deg) rotateZ(${dir==='next'?-bend:bend}deg)`;sh.classList.toggle('curl',p>.05&&p<.95);if(turn.frontFace)turn.frontFace.style.opacity=(1-p*.92).toFixed(3);if(turn.backFace)turn.backFace.style.opacity=(.08+p*.92).toFixed(3);if(turn.shadowLayer)turn.shadowLayer.style.opacity=(.18+.5*Math.sin(Math.PI*p)).toFixed(3);if(turn.shadeLayer)turn.shadeLayer.style.opacity=p.toFixed(3);if(turn.sheenLayer)turn.sheenLayer.style.opacity=(1-p).toFixed(3)}
+/* #1468: 넘김 중(책 가장자리 끌기·넘기는 중·착지 그리기)인가 — prepareTurn이 막는 상태와 같다. */
+const midTurn=()=>machineState==='PAGE_DRAGGING'||machineState==='PAGE_COMMITTING'||machineState==='LANDING';
+function prepareTurn(dir,target=null,whyOverride=null){if(midTurn())return false;hideLens();const total=pageCount();const t=target??(dir==='next'?(single()?current+1:(SPREADS[current].nextOverride??current+1)):(single()?current-1:(SPREADS[current].prevOverride??current-1)));if(t<0||t>=total)return false;machineState='PAGE_DRAGGING';turn={dir,target:t,progress:0,startX:0,lastX:0,moved:false};const sh=$('#flipSheet'),front=$('#flipFront'),back=$('#flipBack');sh.className=`flip-sheet active ${dir}${smoothTurn()?' reduced':''}`;sh.style.opacity='';const phone=narrow(),curPos=current,cur=SPREADS[spreadOfPos(curPos)],tar=SPREADS[spreadOfPos(t)],curM=single()?momentAtPos(curPos):null,tarM=single()?momentAtPos(t):null;
 /* #393 3: 재생 중인 영상은 넘기는 동안 썸네일로 대체된다(넘김 면을 새로 그리므로) — 살아 있는 페이지의 video는 잠깐 멈춘다. */
 for(const v of book.querySelectorAll('video'))try{v.pause()}catch{}
 if(smoothTurn()){/* 부드럽게(움직임 줄이기와 같은 속도): 종이 넘김 대신 0.35초 교차 페이드 — 낡은 펼침 면을 얇게 덮고 서서히 걷는다. */
@@ -254,17 +266,41 @@ if(!single()){if(smoothTurn()){leftPage.innerHTML=momentContent({...tar.left,spr
 else if(phone){mobileContent.innerHTML=singlePageContent(tarM,t,total)}
 else{rightPage.innerHTML=momentContent({...tarM,spread:spreadOfPos(t)});$('#rightFolio').textContent=pad2(t+1)}
 markOverflowPages();turn.frontFace=front;turn.backFace=back;turn.shadowLayer=sh.querySelector('.flip-shadow');turn.shadeLayer=sh.querySelector('.flip-shade');turn.sheenLayer=sh.querySelector('.flip-sheen');$('#turnWhy').querySelector('span').textContent=whyOverride||'책의 순서대로 페이지를 넘깁니다.';setTurnProgress(0);return true}
-function finishTurn(commit){if(!turn)return;machineState=commit?'PAGE_COMMITTING':'PAGE_DRAGGING';/* #1231: 움직임 감소에서는 화면 넘김 효과를 유지하되, 현재 장과 단추의 상태만 클릭 즉시 확정한다. */
+function finishTurn(commit){if(!turn)return;turn.held=false;cancelAnimationFrame(turnAnim);machineState=commit?'PAGE_COMMITTING':'PAGE_DRAGGING';/* #1231: 움직임 감소에서는 화면 넘김 효과를 유지하되, 현재 장과 단추의 상태만 클릭 즉시 확정한다. */
 if(reduced&&commit){current=turn.target;$('#prevBtn').disabled=current<=0;$('#nextBtn').disabled=current>=pageCount()-1;}
-const from=turn.progress,to=commit?1:0,dur=smoothTurn()?350:Math.max(220,650*Math.abs(to-from));const start=performance.now();function step(now){const q=Math.min(1,(now-start)/dur);/* #393 3: 천천히 들리고 가운데 빠르고 천천히 내려앉는 ease-in-out */const ease=smoothTurn()?q:(q<.5?2*q*q:1-Math.pow(-2*q+2,2)/2);setTurnProgress(from+(to-from)*ease);if(q<1){turnAnim=requestAnimationFrame(step);return}const target=turn.target;$('#turnWhy').classList.remove('show');
+/* #1468: 고리는 자기가 시작한 넘김(mine)만 움직인다 — 그 사이 turn이 비워졌거나 다른 넘김으로 바뀌었으면 멈춘다. */
+const mine=turn,from=mine.progress,to=commit?1:0,dur=smoothTurn()?350:Math.max(220,650*Math.abs(to-from));const start=performance.now();function step(now){if(turn!==mine)return;const q=Math.min(1,(now-start)/dur);/* #393 3: 천천히 들리고 가운데 빠르고 천천히 내려앉는 ease-in-out */const ease=smoothTurn()?q:(q<.5?2*q*q:1-Math.pow(-2*q+2,2)/2);setTurnProgress(from+(to-from)*ease);if(q<1){turnAnim=requestAnimationFrame(step);return}const target=mine.target;$('#turnWhy').classList.remove('show');
 /* #393 3: 새 페이지를 먼저 완성하고 같은 프레임에 종이를 치운다 — 넘김 끝 빈 틈 0. (기존 80ms setTimeout 틈이 '뚝'이었다) */
-if(commit){machineState='LANDING';const landingFocus=focusAfter||(single()?momentAtPos(target)?.id:SPREADS[target].left.id)||'';focusAfter=null;renderSpread(target,landingFocus,true)}else{machineState='IDLE';renderSpread(current,LTDEMO.get(),false)}
-const sh=$('#flipSheet');sh.className='flip-sheet';sh.style.transform='';sh.style.opacity='';turn=null}turnAnim=requestAnimationFrame(step)}
-function autoTurn(dir,target=null,focus=null,whyOverride=null){if(!prepareTurn(dir,target,whyOverride))return;focusAfter=focus;machineState='PAGE_COMMITTING';finishTurn(true)}
-function startEdgeDrag(e,dir){if(e.button!==undefined&&e.button!==0)return;if(!prepareTurn(dir))return;turn.startX=e.clientX;turn.lastX=e.clientX;try{e.currentTarget.setPointerCapture(e.pointerId)}catch{};e.currentTarget.classList.add('hot');e.preventDefault()}
+/* #1468: 넘김 고리는 여기서 끝난다 — 아래 그리기는 넘김의 마무리라 renderSpread의 문을 열어 두고, 나머지 정리와 미뤄 둔 요청은 settleTurn이 한다. */
+ turn=null;
+ try{
+ if(commit){machineState='LANDING';const landingFocus=focusAfter||(single()?momentAtPos(target)?.id:SPREADS[target].left.id)||'';focusAfter=null;renderSpread(target,landingFocus,true)}else{machineState='IDLE';renderSpread(current,LTDEMO.get(),false)}
+ }finally{settleTurn()}
+}
+turnAnim=requestAnimationFrame(step)}
+/* #1468: 넘김 정리 — 종이·상태를 대기로 돌리고, 넘기는 동안 미뤄 둔 것을 처리한다. '지금 쪽 다시 그리기'(요청할 때의 쪽·선택이
+   그대로인 요청: 날짜 표기·제목 보기 변경, 상세 닫기)는 끝난 뒤의 쪽·선택으로 바꿔 그려 넘어간 쪽으로 되돌아가지 않게 하고,
+   다른 쪽으로 가려던 요청(뒤로 가기·건너뛰기)은 그대로 따른다. 그다음 미뤄 둔 넘김 입력 한 번을 이어 간다.
+   처리하는 동안 새로 미뤄질 수 있으므로 자리부터 비운다. */
+function settleTurn(){
+ turn=null;turnAnim=0;machineState='IDLE';bookWrap.classList.remove('turning');
+ const sh=$('#flipSheet');sh.className='flip-sheet';sh.style.transform='';sh.style.opacity='';$('#turnWhy').classList.remove('show');
+ const again=spreadAfterTurn;spreadAfterTurn=null;
+ if(again){const repaint=samePageAsk(again);renderSpread(repaint?current:again.idx,repaint?LTDEMO.get():again.focusId,again.land)}
+ const next=queuedTurn;queuedTurn=null;
+ if(next){if(next.target===current)renderSpread(current,next.focus,false);else autoTurn(next.dir,next.target,next.focus,next.why)}
+}
+/* #1468: 목차·갈림길·이어진 순간에서 쪽을 고르는 한 길. 같은 쪽이면 초점만 다시 그리고, 다른 쪽이면 넘긴다.
+   넘기는 중에 고르면 넘김 입력과 같은 자리에 미뤄, 넘김이 끝난 뒤 그때의 쪽 기준으로 처리한다. */
+function goTo(target,focus){if(midTurn()){queuedTurn={dir:target>current?'next':'prev',target,focus,why:null};return}if(target===current)renderSpread(target,focus,false);else autoTurn(target>current?'next':'prev',target,focus)}
+/* #1468: 넘기는 동안 온 넘김 입력(단추·키보드·목차)은 한 번 줄 세운다 — 한 자리라 여러 번이면 마지막 것만 남는다.
+   넘김이 끝나면 settleTurn이 바로 이어 간다. 책 가장자리 끌기·스와이프는 줄 세우지 않는다(손을 뗀 뒤의 끌기는 입력이 아니다). */
+function autoTurn(dir,target=null,focus=null,whyOverride=null){if(midTurn()){queuedTurn={dir,target,focus,why:whyOverride};return}if(!prepareTurn(dir,target,whyOverride))return;focusAfter=focus;machineState='PAGE_COMMITTING';finishTurn(true)}
+function startEdgeDrag(e,dir){if(e.button!==undefined&&e.button!==0)return;if(!prepareTurn(dir))return;turn.held=true;turn.startX=e.clientX;turn.lastX=e.clientX;try{e.currentTarget.setPointerCapture(e.pointerId)}catch{};e.currentTarget.classList.add('hot');e.preventDefault()}
 function moveEdgeDrag(e){if(!turn||machineState!=='PAGE_DRAGGING'||!turn.startX)return;const dx=e.clientX-turn.startX;turn.lastX=e.clientX;turn.moved=turn.moved||Math.abs(dx)>5;const denom=Math.max(220,bookWrap.getBoundingClientRect().width*.40);const p=turn.dir==='next'?-dx/denom:dx/denom;setTurnProgress(p)}
-function endEdgeDrag(e){if(!turn)return;e.currentTarget?.classList?.remove('hot');const click=!turn.moved;const commit=click||turn.progress>=.38;finishTurn(commit)}
-['prev','next'].forEach(dir=>{const el=$(`#${dir}Edge`);el.addEventListener('pointerdown',e=>startEdgeDrag(e,dir));el.addEventListener('pointermove',moveEdgeDrag);el.addEventListener('pointerup',endEdgeDrag);el.addEventListener('pointercancel',e=>{if(turn)finishTurn(false)})});
+/* #1468: 끌기 처리기는 자기가 잡은 넘김(turn.held)만 끝낸다 — 넘기는 중에 가장자리 위에서 손을 뗀 것이면 건너뛴다. */
+function endEdgeDrag(e){if(!turn?.held)return;e.currentTarget?.classList?.remove('hot');const click=!turn.moved;const commit=click||turn.progress>=.38;finishTurn(commit)}
+['prev','next'].forEach(dir=>{const el=$(`#${dir}Edge`);el.addEventListener('pointerdown',e=>startEdgeDrag(e,dir));el.addEventListener('pointermove',moveEdgeDrag);el.addEventListener('pointerup',endEdgeDrag);const cancelEdgeDrag=()=>{if(turn?.held)finishTurn(false)};el.addEventListener('pointercancel',cancelEdgeDrag);el.addEventListener('lostpointercapture',cancelEdgeDrag)});
 $('#prevBtn').onclick=()=>autoTurn('prev');$('#nextBtn').onclick=()=>autoTurn('next');document.addEventListener('keydown',e=>{if($('#archivePanel').classList.contains('open')||document.querySelector('.lt-lightbox')||e.target.closest('input,textarea,select,[contenteditable=true]'))return;if(e.key==='ArrowRight')autoTurn('next');if(e.key==='ArrowLeft')autoTurn('prev')});
 /* Desktop magnifier — exact DOM clone + 1.95x actual zoom */
 const lens=$('#lens'),lensStage=$('#lensStage'),lensHandle=$('#lensHandle'),lensMeta=$('#lensMeta');let tx=0,ty=0,lx=0,ly=0,overBook=false,hoverMoment=null;
@@ -280,9 +316,9 @@ document.addEventListener('pointermove',updateLensTarget);
 /* Mobile gesture arbitration: tap / long press / horizontal swipe / vertical scroll */
 let touch=null,pressTimer=null;const mobileLens=$('#mobileInspect'),mobileLensStage=$('#mobileLensStage');
 function positionMobileLens(x,y){const size=150,left=Math.max(8,Math.min(innerWidth-size-8,x-size/2)),top=Math.max(66,Math.min(innerHeight-size-12,y-size-178));mobileLens.style.left=left+'px';mobileLens.style.top=top+'px';const r=mobilePage.getBoundingClientRect(),px=Math.max(0,Math.min(r.width,x-r.left)),py=Math.max(0,Math.min(r.height,y-r.top)),scale=2.1;mobileLensStage.style.width=r.width+'px';mobileLensStage.style.height=r.height+'px';mobileLensStage.style.transform=`translate(${size/2-px*scale}px,${size/2-py*scale}px) scale(${scale})`}
-bookWrap.addEventListener('pointerdown',e=>{if(!narrow()||e.pointerType==='mouse')return;if(machineState!=='IDLE')return;const m=e.target.closest('[data-moment]');touch={id:e.pointerId,x:e.clientX,y:e.clientX,lastX:e.clientX,lastY:e.clientY,mode:'pending'};if(m){pressTimer=setTimeout(()=>{if(!touch||touch.mode!=='pending')return;touch.mode='inspect';machineState='INSPECTING';mobileLens.classList.add('active');positionMobileLens(touch.lastX,touch.lastY)},420)}/* 이슈 638: 고치기 손잡이 위 손끝은 가두지 않는다 — 가두면 탭 뒤 click이 bookWrap으로 가서 '✎ 고치기'의 수정 창이 열리지 않았다(마우스는 애초에 가두지 않아 열렸다). */;if(!(e.target.closest&&e.target.closest('[data-title-edit],[data-note-edit]'))){try{bookWrap.setPointerCapture(e.pointerId)}catch{}}});
-bookWrap.addEventListener('pointermove',e=>{if(!narrow()||!touch||e.pointerId!==touch.id)return;touch.lastX=e.clientX;touch.lastY=e.clientY;const dx=e.clientX-touch.x,dy=e.clientY-touch.y;if(touch.mode==='inspect'){positionMobileLens(e.clientX,e.clientY);return}if(touch.mode==='pending'){if(Math.abs(dx)>12||Math.abs(dy)>12)clearTimeout(pressTimer);if(Math.abs(dx)>32&&Math.abs(dx)>Math.abs(dy)*1.25){touch.mode='swipe';clearTimeout(pressTimer);const dir=dx<0?'next':'prev';if(prepareTurn(dir)){turn.startX=touch.x;turn.lastX=e.clientX;const denom=Math.max(180,bookWrap.clientWidth*.72);setTurnProgress(Math.abs(dx)/denom)}}else if(Math.abs(dy)>18&&Math.abs(dy)>Math.abs(dx)*1.1){touch.mode='vertical';clearTimeout(pressTimer)}}else if(touch.mode==='swipe'&&turn){const dx2=e.clientX-touch.x;const denom=Math.max(180,bookWrap.clientWidth*.72);setTurnProgress(Math.abs(dx2)/denom)}});
-function mobileEnd(e,cancel=false){if(!narrow()||!touch||e.pointerId!==touch.id)return;clearTimeout(pressTimer);const dx=e.clientX-touch.x,dy=e.clientY-touch.y,mode=touch.mode;touch=null;if(mode==='inspect'){mobileLens.classList.remove('active');machineState='IDLE';return}if(mode==='swipe'&&turn){finishTurn(!cancel&&turn.progress>=.34);return}if(mode==='pending'&&Math.abs(dx)>18&&Math.abs(dx)<32){toast('짧은 스와이프 · 페이지 유지')}machineState='IDLE'}bookWrap.addEventListener('pointerup',e=>mobileEnd(e,false));bookWrap.addEventListener('pointercancel',e=>mobileEnd(e,true));
+bookWrap.addEventListener('pointerdown',e=>{if(!narrow()||e.pointerType==='mouse')return;if(machineState!=='IDLE')return;const m=e.target.closest('[data-moment]');touch={id:e.pointerId,x:e.clientX,y:e.clientX,lastX:e.clientX,lastY:e.clientY,mode:'pending'};if(m){pressTimer=setTimeout(()=>{if(!touch||touch.mode!=='pending'||machineState!=='IDLE')return;touch.mode='inspect';machineState='INSPECTING';mobileLens.classList.add('active');positionMobileLens(touch.lastX,touch.lastY)},420)}/* 이슈 638: 고치기 손잡이 위 손끝은 가두지 않는다 — 가두면 탭 뒤 click이 bookWrap으로 가서 '✎ 고치기'의 수정 창이 열리지 않았다(마우스는 애초에 가두지 않아 열렸다). */;if(!(e.target.closest&&e.target.closest('[data-title-edit],[data-note-edit]'))){try{bookWrap.setPointerCapture(e.pointerId)}catch{}}});
+bookWrap.addEventListener('pointermove',e=>{if(!narrow()||!touch||e.pointerId!==touch.id)return;touch.lastX=e.clientX;touch.lastY=e.clientY;const dx=e.clientX-touch.x,dy=e.clientY-touch.y;if(touch.mode==='inspect'){positionMobileLens(e.clientX,e.clientY);return}if(touch.mode==='pending'){if(Math.abs(dx)>12||Math.abs(dy)>12)clearTimeout(pressTimer);if(Math.abs(dx)>32&&Math.abs(dx)>Math.abs(dy)*1.25){clearTimeout(pressTimer);const dir=dx<0?'next':'prev';if(prepareTurn(dir)){touch.mode='swipe';turn.startX=touch.x;turn.lastX=e.clientX;const denom=Math.max(180,bookWrap.clientWidth*.72);setTurnProgress(Math.abs(dx)/denom)}}else if(Math.abs(dy)>18&&Math.abs(dy)>Math.abs(dx)*1.1){touch.mode='vertical';clearTimeout(pressTimer)}}else if(touch.mode==='swipe'&&turn){const dx2=e.clientX-touch.x;const denom=Math.max(180,bookWrap.clientWidth*.72);setTurnProgress(Math.abs(dx2)/denom)}});
+function mobileEnd(e,cancel=false){if(!narrow()||!touch||e.pointerId!==touch.id)return;clearTimeout(pressTimer);const dx=e.clientX-touch.x,dy=e.clientY-touch.y,mode=touch.mode;touch=null;if(mode==='inspect'){mobileLens.classList.remove('active');if(!turn)machineState='IDLE';return}if(mode==='swipe'&&turn){finishTurn(!cancel&&turn.progress>=.34);return}if(mode==='pending'&&Math.abs(dx)>18&&Math.abs(dx)<32){toast('짧은 스와이프 · 페이지 유지')}if(!turn)machineState='IDLE'}bookWrap.addEventListener('pointerup',e=>mobileEnd(e,false));bookWrap.addEventListener('pointercancel',e=>mobileEnd(e,true));
 /* Detail + viewer */
 function showDetail(id){LTDEMO.select(id);recent=recent.filter(item=>item!==id);recent.push(id);recent=recent.slice(-5);updateConnectionSummary(id);const m=metadataFor(id);if(!m)return;lastMoment=m;selectedMomentId=id;$('#detailTag').textContent=`${LTLabels.type(m.kind)} · ${dateOf(m.date)} · ${m.emotion}`;$('#detailTitle').textContent=titleMainOf(m);$('#detailBody').textContent=`${m.note} · 출처: ${m.source}`;$('#detailChips').innerHTML=m.keywords.map(k=>`<span class="chip">#${esc(k)}</span>`).join('');$('#detailWhy').textContent='연결 이유 · '+metaWhy(m);const a=$('#detailOriginalLinkBtn');if(m.kind==='link'&&m.url){a.href=m.url;a.textContent=isYouTubeUrl(m.url)?'YouTube에서 열기 ↗':'원본 링크 열기 ↗';a.hidden=false}else{a.hidden=true;a.removeAttribute('href')}setBookOpen($('#detail'),true)}
 function openViewer(){if(!lastMoment)return;const m=lastMoment;$('#viewerTitle').textContent=titleMainOf(m);$('#viewerText').textContent=`${titleSubOf(m)?'▶ '+titleSubOf(m)+' · ':''}${m.note} · ${dateOf(m.date)} · ${m.emotion}`;const a=$('#viewerOriginalLinkBtn');a.hidden=true;a.removeAttribute('href');if(m.url)$('#viewerMedia').innerHTML=LTMedia.markup(m.url,m.title,m.mediaMetadata,m.id,null,{emotion:m.emotion,date:m.date,note:m.note});else if(m.kind==='video')$('#viewerMedia').innerHTML=`<img src="${m.image}" alt=""><p class="viewer-note">영상 예시 이미지 · 재생할 원본 영상은 없습니다.</p>`;else if(m.kind==='link'){const thumb=m.image?`<img src="${m.image}" ${m.fallbackImage?`onerror="this.onerror=null;this.src='${m.fallbackImage}'"`:''} alt="">`:'';$('#viewerMedia').innerHTML=thumb||`<div class="viewer-link-card">${esc(titleMainOf(m))}<br><small class="viewer-link-meta">${esc(m.domain||m.source)}<br>${esc(m.url||'')}</small></div>`;if(m.url){a.href=m.url;a.textContent=isYouTubeUrl(m.url)?'YouTube에서 열기 ↗':'원본 링크 열기 ↗';a.hidden=false}}else if(m.image)$('#viewerMedia').innerHTML=`<img src="${m.image}" alt="${esc(m.title)}">`;else $('#viewerMedia').innerHTML=`<div class="viewer-text-card">${esc(m.note)}</div>`;setBookOpen($('#viewer'),true)}
@@ -316,7 +352,7 @@ const panel=$('#archivePanel');if(panel.classList.contains('open'))closeBookHist
  paintInlineBookDisplay(choice);
  if(choice==='list'){archiveByDisplay=true;openArchive()}
  else if($('#archivePanel').classList.contains('open'))closeArchive();
-});$('#archiveClose').onclick=closeArchive;$('#archivePanel').addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();closeArchive()}});$('#archivePanel').addEventListener('click',e=>{const b=e.target.closest('[data-jump]');if(!b)return;const target=+b.dataset.jump,focus=b.dataset.focus||(momentAtPos(target)?.id||'');bookHistoryTransferring=true;try{closeArchive();completeBookJump(focus,target)}finally{bookHistoryTransferring=false}if(target===current){renderSpread(current,focus,false)}else autoTurn(target>current?'next':'prev',target,focus)});$('#detailIndexBtn').onclick=()=>{bookHistoryTransferring=true;try{setBookOpen($('#detail'),false);history.replaceState({...history.state,ltBookOverlay:'archivePanel'},'',location.href);openArchive()}finally{bookHistoryTransferring=false}};
+});$('#archiveClose').onclick=closeArchive;$('#archivePanel').addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();closeArchive()}});$('#archivePanel').addEventListener('click',e=>{const b=e.target.closest('[data-jump]');if(!b)return;const target=+b.dataset.jump,focus=b.dataset.focus||(momentAtPos(target)?.id||'');bookHistoryTransferring=true;try{closeArchive();completeBookJump(focus,target)}finally{bookHistoryTransferring=false}goTo(target,focus)});$('#detailIndexBtn').onclick=()=>{bookHistoryTransferring=true;try{setBookOpen($('#detail'),false);history.replaceState({...history.state,ltBookOverlay:'archivePanel'},'',location.href);openArchive()}finally{bookHistoryTransferring=false}};
 /* Branch chooser */
 /* 갈림길 고르는 창 — 맨 위 창 하나만 닫고, 초점은 연 책갈피로 돌려 준다. */
 let branchOpener=null,branchTargets=[],branchCurrentId='',branchExpanded=false,branchQuery='';
@@ -332,7 +368,7 @@ $('#branchClose').onclick=closeBranch;
 $('#branchModal').addEventListener('click',e=>{if(e.target===$('#branchModal'))closeBranch()});
 $('#branchSearch').addEventListener('input',e=>{branchQuery=e.target.value;renderBranchChoices()});
 $('#branchMore').onclick=()=>{branchExpanded=true;renderBranchChoices();$('#branchChoices').scrollTop=0};
-$('#branchChoices').onclick=e=>{if(e.target.closest('#branchMore'))return;const b=e.target.closest('[data-branch-target]');if(!b)return;const t=+b.dataset.branchTarget;bookHistoryTransferring=true;try{closeBranch();completeBookJump(b.dataset.focus,t)}finally{bookHistoryTransferring=false}t===current?renderSpread(t,b.dataset.focus,false):autoTurn(t>current?'next':'prev',t,b.dataset.focus)};
+$('#branchChoices').onclick=e=>{if(e.target.closest('#branchMore'))return;const b=e.target.closest('[data-branch-target]');if(!b)return;const t=+b.dataset.branchTarget;bookHistoryTransferring=true;try{closeBranch();completeBookJump(b.dataset.focus,t)}finally{bookHistoryTransferring=false}goTo(t,b.dataset.focus)};
 document.addEventListener('keydown',e=>{if(e.key!=='Escape'||topBookDialog()!==$('#branchModal'))return;e.preventDefault();e.stopPropagation();closeBranch()},true);
 $('#lensBtn').onclick=()=>{lensOn=!lensOn;$('#lensBtn').classList.toggle('active',lensOn);if(!lensOn)hideLens()};
 /* #642: 전체 화면 단추로도 resize 가 일어난다. 그때 renderSpread 가 장을 처음부터 다시 그려
@@ -352,7 +388,7 @@ $('#doubleViewBtn').onclick=()=>setViewChoice('double');
 renderSpread(posOfMoment(LTDEMO.get()),LTDEMO.get(),true);setTimeout(syncLensClone,120);
 // #627: 꼬리표 칩 규칙(tag-line.mjs)이 클래식 스크립트 뒤에 도착한다 — 페이지를 한 번 다시 그려 칩을 붙인다.
 addEventListener('lt41-tagline-ready',()=>{if(machineState==='IDLE'&&!document.fullscreenElement)renderSpread(current,null,false)});
-window.__TRACK59__={playbackMoments:()=>allMoments(),getState:()=>({current,machineState,lensOn,recent:[...recent],detail:$('#detail').classList.contains('open'),viewer:$('#viewer').classList.contains('open'),archive:$('#archivePanel').classList.contains('open'),branch:$('#branchModal').classList.contains('open'),page:current,total:pageCount(),pageIds:pageSteps().map(x=>x.id),shape:narrow()?'phone':'wide',mobile:single(),view:single()?'single':'double'}),turnNext:()=>autoTurn('next'),turnPrev:()=>autoTurn('prev'),jump:(i,id)=>renderSpread(i,id,false),jumpToMoment:id=>renderSpread(posOfMoment(id),id,false),pageSteps,pageCount,posOfMoment,momentAtPos,currentSpread,spreadOfPos,setView:setViewChoice,showDetail,openArchive,openBranch,closeBranch,meta:metadataFor,normalizeHttpUrl,youtubeId,rejudgeOverflow:()=>markOverflowPages()};
+window.__TRACK59__={playbackMoments:()=>allMoments(),getState:()=>({current,machineState,lensOn,recent:[...recent],detail:$('#detail').classList.contains('open'),viewer:$('#viewer').classList.contains('open'),archive:$('#archivePanel').classList.contains('open'),branch:$('#branchModal').classList.contains('open'),page:current,total:pageCount(),pageIds:pageSteps().map(x=>x.id),shape:narrow()?'phone':'wide',mobile:single(),view:single()?'single':'double',queued:!!queuedTurn}),turnNext:()=>autoTurn('next'),turnPrev:()=>autoTurn('prev'),jump:(i,id)=>renderSpread(i,id,false),jumpToMoment:id=>renderSpread(posOfMoment(id),id,false),pageSteps,pageCount,posOfMoment,momentAtPos,currentSpread,spreadOfPos,setView:setViewChoice,showDetail,openArchive,openBranch,closeBranch,meta:metadataFor,normalizeHttpUrl,youtubeId,rejudgeOverflow:()=>markOverflowPages()};
 /* #1001 (3): 같은 트리 안 순간 변경(고치기·삭제·이전 순간 바꾸기·연결·해제)은 셸이 모델만 갱신하고
    lt41-moments-saved로 알린다 — 화면을 다시 띄우지 않고 지금 펼침면·고른 순간·열린 상세·스크롤을 그대로 다시 그린다.
    boardSync·editTree(#997)와 같은 방식: 알림을 받아 화면이 자기 상태를 다시 그린다. 재적재 0. */

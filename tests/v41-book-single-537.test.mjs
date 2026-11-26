@@ -706,3 +706,104 @@ test('#1358 책 첫 그리기에서 쪽 표시가 바뀌지 않는다(저장값 
     }
   } finally { await browser.close(); await new Promise((r) => server.close(r)); }
 });
+
+/* ── #1468: 넘김 도중 연속 입력(단추→키보드 0.5초 간격)과 넘김 중에 오는 셸 메시지(#1429 책 점검) ── */
+// 매 프레임 쪽 번호를 적어 둔다 — 쪽이 건너뛰는지(두 칸 이상)는 이 기록으로 본다.
+const startPageLog = (frame) => frame.evaluate(() => {
+  const log = window.__lt1468Pages = { pages: [window.__TRACK59__.getState().page], raf: 0 };
+  let last = log.pages[0];
+  const tick = () => {
+    const page = window.__TRACK59__.getState().page;
+    if (page !== last) { log.pages.push(page); last = page; }
+    log.raf = requestAnimationFrame(tick);
+  };
+  tick();
+});
+const stopPageLog = (frame) => frame.evaluate(() => { const log = window.__lt1468Pages; cancelAnimationFrame(log.raf); return log.pages; });
+// 쪽 번호는 한 칸씩만 움직여야 한다(앞·뒤 한 칸은 허용, 두 칸 이상은 건너뜀이다).
+const oneStepEach = (pages, label) => {
+  for (let i = 1; i < pages.length; i += 1) {
+    assert.equal(Math.abs(pages[i] - pages[i - 1]), 1, `${label}: 쪽 번호가 두 칸 이상 움직인다(${pages.join('→')})`);
+  }
+};
+const turnSettled = (frame) => frame.waitForFunction(() => {
+  const state = window.__TRACK59__.getState();
+  return state.machineState === 'IDLE' && !state.queued;
+}, null, { timeout: 10000 });
+
+test('#1468 책 넘김 중 연속 입력(단추→키보드 0.5초 간격 50회): 예외 0·쪽 번호 건너뜀 0(1440·390)', { skip: REQUIRE ? false : skip, timeout: 240000 }, async () => {
+  if (skip) assert.fail(skip);
+  const server = await serve(ROOT);
+  const base = `http://127.0.0.1:${server.address().port}`;
+  let browser;
+  try {
+    browser = await chromium.launch({ headless: true });
+    for (const [width, height, view] of [[1440, 900, 'double'], [390, 844, 'single']]) {
+      const { ctx, page, frame, errors } = await openBook(browser, base, width, height, view);
+      try {
+        await startPageLog(frame);
+        await frame.evaluate(() => document.getElementById('nextBtn').focus());
+        for (let i = 0; i < 50; i += 1) {
+          const forward = Math.floor(i / 12) % 2 === 0; // 12번마다 방향을 바꿔 책 끝에 닿지 않게 한다
+          if (i % 2 === 0) await frame.evaluate((f) => document.getElementById(f ? 'nextBtn' : 'prevBtn').click(), forward);
+          else await page.keyboard.press(forward ? 'ArrowRight' : 'ArrowLeft');
+          await frame.waitForTimeout(500); // 점검과 같은 간격 — 넘김(약 0.65초)이 끝나기 전에 다음 입력이 든다
+        }
+        await turnSettled(frame);
+        const pages = await stopPageLog(frame);
+        assert.deepEqual(errors, [], `${width}: 페이지 예외 0`);
+        oneStepEach(pages, `${width}`);
+        assert.ok(pages.length >= 8, `${width}: 입력이 쪽 넘김으로 이어진다(관찰 ${pages.length}쪽: ${pages.join('→')})`);
+      } finally {
+        await ctx.close();
+      }
+    }
+  } finally {
+    if (browser) await browser.close().catch(() => {});
+    server.close();
+  }
+});
+
+test('#1468 책 넘김 중 날짜 표기 메시지가 와도 다음 넘김은 안전하다: 예외 0, 표기는 넘김 뒤 바뀐다(1440·390)', { skip: REQUIRE ? false : skip, timeout: 240000 }, async () => {
+  if (skip) assert.fail(skip);
+  const server = await serve(ROOT);
+  const base = `http://127.0.0.1:${server.address().port}`;
+  let browser;
+  try {
+    browser = await chromium.launch({ headless: true });
+    for (const [width, height, view] of [[1440, 900, 'double'], [390, 844, 'single']]) {
+      const { ctx, page, frame, errors } = await openBook(browser, base, width, height, view);
+      try {
+        await startPageLog(frame);
+        await frame.evaluate(() => document.getElementById('nextBtn').focus());
+        for (let i = 0; i < 12; i += 1) {
+          const value = i % 2 ? 'dash' : 'dot';
+          await frame.evaluate(() => document.getElementById('nextBtn').click());
+          await frame.waitForTimeout(200); // 넘김 한가운데
+          // 셸이 화면이 뜬 뒤 1.6초 뒤 한 번 더 보내는 날짜 표기 메시지(frame-wiring frameReadyMessages의 repeats)가 넘김 중에 닿는 모양.
+          await frame.evaluate((value) => window.dispatchEvent(new MessageEvent('message', { data: { type: 'lt41-date-style', value }, origin: location.origin, source: window.parent })), value);
+          await frame.waitForTimeout(300);
+          await page.keyboard.press('ArrowRight');
+          await frame.waitForTimeout(300);
+        }
+        await turnSettled(frame);
+        const pages = await stopPageLog(frame);
+        const after = await frame.evaluate(() => ({
+          style: document.documentElement.getAttribute('data-lt-date-style'),
+          text: [...document.querySelectorAll('.page-content, .mobile-content')].map((node) => node.textContent).join(' ')
+        }));
+        assert.deepEqual(errors, [], `${width}: 페이지 예외 0`);
+        oneStepEach(pages, `${width}`);
+        assert.ok(pages.length >= 6, `${width}: 입력이 쪽 넘김으로 이어진다(관찰 ${pages.length}쪽: ${pages.join('→')})`);
+        assert.equal(after.style, 'dash', `${width}: 마지막에 받은 표기 값`);
+        assert.match(after.text, /\d{4}-\d{2}-\d{2}/, `${width}: 넘김 뒤 날짜 표기(2026-11-10 모양)가 쪽에 그려진다`);
+        assert.doesNotMatch(after.text, /\d{4}\. \d{2}\. \d{2}/, `${width}: 옛 표기(2026. 11. 10 모양)가 남아 있지 않다`);
+      } finally {
+        await ctx.close();
+      }
+    }
+  } finally {
+    if (browser) await browser.close().catch(() => {});
+    server.close();
+  }
+});
