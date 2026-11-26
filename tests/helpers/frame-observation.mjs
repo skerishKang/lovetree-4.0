@@ -125,6 +125,8 @@ async function openMemberScreen(page, screen) {
       (file !== 'track58-pinboard.html' || (typeof f.contentWindow.bootDetailPanel === 'function' && !!f.contentWindow.__LT58V11));
   }, { file: screen.file, root: screen.root });
   if (screen.id === 'board') {
+    await page.clock.runFor(100);
+    await page.clock.fastForward(0);
     await page.evaluate(() => {
       const frame = [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length);
       frame.contentWindow.bootDetailPanel();
@@ -150,6 +152,7 @@ export async function observeFrameMatrix({ browser, base, outputDir, shard = '' 
     await context.route('**://i.ytimg.com/**', THUMB);
     await context.route('**/api/**', routeApi);
     const page = await context.newPage();
+    await page.clock.install({ time: new Date('2026-11-20T00:00:00Z') });
     page.on('pageerror', e => errors.push(String(e)));
     const capture = async (activePage, screen) => {
       const name = `${width}-${theme}-${screen.id}`;
@@ -170,7 +173,7 @@ export async function observeFrameMatrix({ browser, base, outputDir, shard = '' 
     try {
       await page.goto(base + '/v41/?account=1#home', { waitUntil: 'load' });
       await settleObservation(page, () => window.LT41?.trees?.length === 1 && document.body.dataset.member === 'in' && !document.getElementById('discover-ask')?.open && [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length)?.contentDocument?.getElementById('orbit'));
-      for (const screen of FRAME_SCREENS) { await openMemberScreen(page, screen); await capture(page, screen); }
+      for (const screen of FRAME_SCREENS) { await openMemberScreen(page, screen); await capture(page, screen); if (screen.id === 'board') await page.clock.resume(); }
     } finally { await context.close(); }
     const guest = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
     await guest.addInitScript(({ theme, treeId }) => { localStorage.setItem('lt41.theme', theme); localStorage.setItem('lt41.tips.firstTree', '1'); localStorage.setItem('lt41.video-consent', '1'); localStorage.setItem('lt41.discoverAsked', JSON.stringify([treeId])); }, { theme, treeId: tree.id });
