@@ -56,7 +56,7 @@ jobs:
   # 필수 검사 이름 '미리보기 postdeploy(로그아웃)'은 맨 아래 모음 잡이 그대로 쓴다 — 아래 잡이 하나라도
   # 실패·취소되면 모음 잡도 실패한다. 새 화면 시험은 가장 짧은 잡에 단계로 붙인다(각 잡 소요는 요약에 적힌다).
   screen-board:
-    name: 화면 시험 — 보드·접근성·날짜
+    name: 화면 시험 — 보드
     # 2026-11-22: 호스트 실행기 대기를 줄이려 같은 저장소 PR이고 저장소 변수가 켜져 있으면 CGI 자체 실행기에서 돈다.
     # 포크 PR이나 변수가 꺼진 경우에는 호스트에서 그대로 돈다(ci.yml check 잡과 같은 식).
     runs-on: ${{ fromJSON((github.event.pull_request.head.repo.full_name == github.repository && vars.USE_CGI_RUNNER == '1') && '["self-hosted","Linux","X64","cgi"]' || '["ubuntu-latest"]') }}
@@ -172,6 +172,94 @@ jobs:
           start=$(date +%s)
           node --test --test-concurrency=1 tests/v41-board-order-619.test.mjs
           echo "보드 순서 끼워 넣기 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+      # 11-14 점검: 핀보드(#582)·상세 다음/이전 단추(#583) 화면 시험이 CI 어디에도 연결되지 않아 조용히 건너뛰어졌다.
+      - name: 핀보드·상세 단추 시험(건너뜀=실패 — #582·#583)
+        env:
+          LT_BOARD_582_REQUIRE: '1'
+          LT_BOARD_583_REQUIRE: '1'
+        if: needs.screen-changes.outputs.changed == 'true'
+        run: |
+          start=$(date +%s)
+          node --test --test-concurrency=1 --test-skip-pattern='그림 지연 도착에도' tests/v41-board-pinboard-582.test.mjs tests/v41-board-cursor-detail.test.mjs
+          echo "핀보드·상세 단추 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+      # #952: 보드 머리 트리 제목(#417)·판 테마 드롭(#467) 화면 시험도 이 잡에서 돈다 — 건너뜀=실패.
+      - name: 보드 트리 제목·판 테마 시험(건너뜀=실패 — #417·#467)
+        env:
+          LT_BOARD_417_REQUIRE: '1'
+          LT_BOARD_467_REQUIRE: '1'
+        if: needs.screen-changes.outputs.changed == 'true'
+        run: |
+          start=$(date +%s)
+          node --test --test-concurrency=1 tests/v41-board-map-tree-title.test.mjs tests/v41-board-theme-flow.test.mjs
+          echo "보드 트리 제목·판 테마 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+      # #608: 보드 순간 수정 창에서 날짜를 바꾸는 시험 — 책과 같은 규칙·경로, 날짜순 재배치·내 배치 유지.
+      # 크롬이 필요한 실행형 시험이라 이 잡에서 돈다. 건너뜀=실패.
+      - name: 보드 날짜 수정 시험(건너뜀=실패 — #608)
+        env:
+          LT_BOARD_608_REQUIRE: '1'
+        if: needs.screen-changes.outputs.changed == 'true'
+        run: |
+          start=$(date +%s)
+          node --test --test-concurrency=1 tests/v41-board-date-edit-608.test.mjs
+          echo "보드 날짜 수정 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+
+
+      - name: 화면 변경 없으면 건너뜀을 남긴다
+        if: always()
+        run: |
+          if [ "${{ needs.screen-changes.outputs.changed }}" != "true" ]; then
+            echo "건너뜀(화면 변경 없음)" | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+  screen-board-b:
+    name: 화면 시험 — 보드 둘째·접근성·첫 화면 떠 있음
+    # #1413 5단계: 보드 잡(6.5~8분)과 첫 화면 잡(약 6.8분)이 필수 검사의 가장 긴 길이었다. 보드 잡의 접근성·날짜·
+    # 트리 보기·범례 시험과 첫 화면 잡의 #535 떠 있음 시험을 이 잡으로 옮겨 나란히 돈다. 고르기 이름은 'screen-board'
+    # 그대로라(tools/ci/screen-changes.mjs JOB_TOKEN) 보드만 바뀐 PR에서도 두 보드 잡이 함께 돈다. 실행기 선택식·준비 단계는
+    # 보드 잡과 같다(#535는 같은 기계에서 재는 궤도 시험이라 CGI 선택식이 있는 잡에 둔다). 빌드 없이 돌던 시험을 빌드 앞에 둔다.
+    # 2026-11-22: 호스트 실행기 대기를 줄이려 같은 저장소 PR이고 저장소 변수가 켜져 있으면 CGI 자체 실행기에서 돈다.
+    # 포크 PR이나 변수가 꺼진 경우에는 호스트에서 그대로 돈다(ci.yml check 잡과 같은 식).
+    runs-on: ${{ fromJSON((github.event.pull_request.head.repo.full_name == github.repository && vars.USE_CGI_RUNNER == '1') && '["self-hosted","Linux","X64","cgi"]' || '["ubuntu-latest"]') }}
+    timeout-minutes: 25
+    needs: screen-changes
+    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || needs.screen-changes.outputs.jobs == '' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-board,'))
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          clean: true
+      # 같은 CGI 컴퓨터의 자체 실행기 여러 개가 홈의 npm 캐시를 함께 쓰면 동시에 받다가 깨진다
+      # (2026-11-24: EINTEGRITY·ENOENT로 시험 전에 실패). 자체 실행기에서는 실행기마다 캐시 폴더를 따로 둔다.
+      - name: 실행기별 npm 캐시 폴더(자체 실행기)
+        if: runner.environment == 'self-hosted'
+        run: echo "npm_config_cache=$HOME/.npm-runner-$RUNNER_NAME" >> "$GITHUB_ENV"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      # 자체 실행기는 홈 폴더에 Chromium이 그대로 남으므로 Actions 캐시를 쓰지 않는다.
+      # (2026-11-22: 시험 5분 뒤 591MB 캐시 올리기에 CGI 회선으로 9분이 더 걸렸다.)
+      - uses: actions/cache@v4
+        if: runner.environment != 'self-hosted'
+        with:
+          path: ~/.cache/ms-playwright
+          key: ms-playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - name: 브라우저 준비(Playwright Chromium, 캐시)
+        id: browser
+        if: needs.screen-changes.outputs.changed == 'true'
+        run: |
+          # 모듈은 항상 설치한다(캐시는 브라우저 바이너리에만 걸린다). 캐시가 있어도 모듈이 없으면 실행이 안 된다.
+          npm i --no-save --no-package-lock playwright@$(node -p "require('./package-lock.json').packages['node_modules/playwright'].version")
+          if [ "$RUNNER_ENVIRONMENT" = "self-hosted" ]; then
+            # 자체 실행기는 홈 캐시에 다른 버전의 Chromium이 있을 수 있어 폴더 유무로 판단하지 않는다.
+            # install은 이 버전 Chromium이 이미 있으면 받지 않고 끝난다. 시스템 라이브러리는 미리 깔아 두었다(sudo 없음).
+            npx playwright install chromium
+          elif ls "$HOME/.cache/ms-playwright" 2>/dev/null | grep -q chromium; then
+            echo "캐시된 Chromium 사용"
+          else
+            npx playwright install --with-deps chromium
+          fi
+          node -e "import('playwright-core').then(()=>console.log('playwright-core 확인')).catch(e=>{console.error(e.message);process.exit(1)})"
       # #514: 남은 접근성 항목(moderate 이하)을 실제 화면에서 잰다 — 확대 막기·랜드마크·제목 단계·
       # 모바일 선택 줄 top. axe-core·Chromium이 필요한 실행형 시험이라 크롬이 준비된 이 잡에서 돈다.
       - name: 남은 접근성 항목 시험(#514, 건너뜀=실패)
@@ -193,26 +281,6 @@ jobs:
           start=$(date +%s)
           node --test --test-concurrency=1 tests/v41-local-date-547.test.mjs
           echo "지역 날짜 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
-      # 11-14 점검: 핀보드(#582)·상세 다음/이전 단추(#583) 화면 시험이 CI 어디에도 연결되지 않아 조용히 건너뛰어졌다.
-      - name: 핀보드·상세 단추 시험(건너뜀=실패 — #582·#583)
-        env:
-          LT_BOARD_582_REQUIRE: '1'
-          LT_BOARD_583_REQUIRE: '1'
-        if: needs.screen-changes.outputs.changed == 'true'
-        run: |
-          start=$(date +%s)
-          node --test --test-concurrency=1 --test-skip-pattern='그림 지연 도착에도' tests/v41-board-pinboard-582.test.mjs tests/v41-board-cursor-detail.test.mjs
-          echo "핀보드·상세 단추 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
-      # #952: 보드 머리 트리 제목(#417)·판 테마 드롭(#467) 화면 시험도 이 잡에서 돈다 — 건너뜀=실패.
-      - name: 보드 트리 제목·판 테마 시험(건너뜀=실패 — #417·#467)
-        env:
-          LT_BOARD_417_REQUIRE: '1'
-          LT_BOARD_467_REQUIRE: '1'
-        if: needs.screen-changes.outputs.changed == 'true'
-        run: |
-          start=$(date +%s)
-          node --test --test-concurrency=1 tests/v41-board-map-tree-title.test.mjs tests/v41-board-theme-flow.test.mjs
-          echo "보드 트리 제목·판 테마 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
       # #1295: 트리 보기 뒤로 가기 시험(건너뜀=실패) — 화면 시험은 이 잡에서만 돌아야 한다.
       - name: 트리 보기 뒤로 가기 시험(건너뜀=실패 — #1295)
         env:
@@ -222,16 +290,6 @@ jobs:
           start=$(date +%s)
           node --test --test-concurrency=1 tests/v41-tree-layout-777.test.mjs
           echo "트리 보기 뒤로 가기 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
-      # #608: 보드 순간 수정 창에서 날짜를 바꾸는 시험 — 책과 같은 규칙·경로, 날짜순 재배치·내 배치 유지.
-      # 크롬이 필요한 실행형 시험이라 이 잡에서 돈다. 건너뜀=실패.
-      - name: 보드 날짜 수정 시험(건너뜀=실패 — #608)
-        env:
-          LT_BOARD_608_REQUIRE: '1'
-        if: needs.screen-changes.outputs.changed == 'true'
-        run: |
-          start=$(date +%s)
-          node --test --test-concurrency=1 tests/v41-board-date-edit-608.test.mjs
-          echo "보드 날짜 수정 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
 
       # B-04: CI에서 한 번도 돌지 않던 시험 연결(건너뜀=실패).
       - name: 보드 범례·바닥 링크 시험(건너뜀=실패 — #932·#937·#850)
@@ -255,6 +313,24 @@ jobs:
           test -f dist/v41/home.html || npx vite build > /dev/null
           node --test --test-concurrency=1 tests/v41-a11y-views.test.mjs
           echo "접근성 이름 세 규칙 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+      # #1413 5단계: 첫 화면 잡에서 옮겼다(맨 뒤 — 앞의 빌드 없이 도는 시험들의 조건을 바꾸지 않는다).
+      - name: 첫 화면 떠 있음·겹침 시험(#535, 건너뜀=실패)
+        env:
+          LT_ORBIT535_REQUIRE: '1'
+          LT_ORBIT535_DIAG_DIR: ./test-results/orbit535-diag
+        if: needs.screen-changes.outputs.changed == 'true'
+        run: |
+          start=$(date +%s)
+          npx vite build > /dev/null
+          node --test tests/v41-orbit-535-float-overlap.test.mjs
+          echo "첫 화면 떠 있음·겹침 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+      - name: 첫 화면 침범 진단 스크린샷(390 로그아웃)
+        if: failure() && needs.screen-changes.outputs.changed == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: orbit535-intrusion-390-out
+          path: test-results/orbit535-diag/*.png
+          if-no-files-found: ignore
 
       - name: 화면 변경 없으면 건너뜀을 남긴다
         if: always()
@@ -307,23 +383,6 @@ jobs:
             npx playwright install --with-deps chromium
           fi
           node -e "import('playwright-core').then(()=>console.log('playwright-core 확인')).catch(e=>{console.error(e.message);process.exit(1)})"
-      - name: 첫 화면 떠 있음·겹침 시험(#535, 건너뜀=실패)
-        env:
-          LT_ORBIT535_REQUIRE: '1'
-          LT_ORBIT535_DIAG_DIR: ./test-results/orbit535-diag
-        if: needs.screen-changes.outputs.changed == 'true'
-        run: |
-          start=$(date +%s)
-          npx vite build > /dev/null
-          node --test tests/v41-orbit-535-float-overlap.test.mjs
-          echo "첫 화면 떠 있음·겹침 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
-      - name: 첫 화면 침범 진단 스크린샷(390 로그아웃)
-        if: failure() && needs.screen-changes.outputs.changed == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: orbit535-intrusion-390-out
-          path: test-results/orbit535-diag/*.png
-          if-no-files-found: ignore
       # #537: 책의 한 장 보기가 순간 하나씩 넘어가는지, 넓은 화면에서 두 장 책의 한 쪽 크기·같은 높이로
       # 나오는지, 390 휴대폰 모양이 그대로인지를 실제 화면에서 잰다. 건너뜀=실패(크롬이 준비된 이 잡에서 돈다).
       - name: 첫 화면 화면 시험(건너뜀=실패 — 이슈 952)
@@ -353,7 +412,7 @@ jobs:
           fi
 
   screen-home-followup:
-    name: 화면 시험 — 첫 화면 후속·둘러보기
+    name: 화면 시험 — 첫 화면 후속
     # 2026-11-22: 호스트 실행기 대기(동시 3개 안팎)를 피해 같은 저장소 PR은 CGI 자체 실행기에서 돈다(보드 잡과 같은 식).
     runs-on: ${{ fromJSON((github.event.pull_request.head.repo.full_name == github.repository && vars.USE_CGI_RUNNER == '1') && '["self-hosted","Linux","X64","cgi"]' || '["ubuntu-latest"]') }}
     timeout-minutes: 12
@@ -421,15 +480,6 @@ jobs:
       # 이슈 970: 트리 드롭다운(닫힘 길·초점 복귀·키보드)과 인증 화면 시안(전환·빈 칸 안내·오류 자리)을
       # 실제 화면에서 본다. 드롭다운은 첫 화면 번들이 필요해 먼저 build하고, 인증 시안은 정적 파일(요청 0)이다.
       # 건너뜀=실패(크롬이 준비된 이 잡에서 돈다).
-      - name: 둘러보기 순간 보기 시험(건너뜀=실패 — #1025)
-        env:
-          LT_MOMENTS_1025_REQUIRE: '1'
-        if: needs.screen-changes.outputs.changed == 'true'
-        run: |
-          start=$(date +%s)
-          npx vite build > /dev/null
-          node --test --test-concurrency=1 tests/v41-explore-moments-1025.test.mjs tests/v41-1286-moments.test.mjs tests/v41-explore-sort-search-1363.test.mjs
-          echo "둘러보기 순간 보기 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
 
       # #631: 의견 보내기 창 — 1440×900 에서 스크롤 없이 들어오고, 체크 상자와 글자가 같은 줄이며,
       # 보낸 뒤 제목·주 단추·안내가 바뀌는지 수치로 잰다. 건너뜀=실패(크롬이 준비된 이 잡에서 돈다).
@@ -546,19 +596,6 @@ jobs:
           LT_BOOK_584_REQUIRE=1 node --test --test-concurrency=1 tests/v41-book-youtube-lazy-1365.test.mjs
           echo "책 YouTube API 늦게 받기 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: 감상 화면 흔적 값·어떻게 쓰나요 안내 시험(건너뜀=실패 — #635)
-        env:
-          LT_635A_REQUIRE: '1'
-          LT_BOOK_LONG_NOTE_REQUIRE: '1'
-        if: needs.screen-changes.outputs.changed == 'true'
-        run: |
-          start=$(date +%s)
-          npx vite build > /dev/null
-          node --test --test-concurrency=1 tests/v41-share-guest-635.test.mjs
-          echo "감상 화면 흔적 값·어떻게 쓰나요 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
-          # #952: 책의 넘침 판정·넘친 페이지 스크롤을 실제 화면에서 잰다(같은 빌드 결과를 쓴다).
-          node --test --test-concurrency=1 tests/v41-book-long-note.test.mjs
-          echo "책 넘침 화면 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
 
       # #1025 1단계: 둘러보기 [순간] 보기 — 공개 세로 순간만, iframe ≤2, 10회 넘기기 중복 0, 세 폭 겹침·잘림 0.
       # vite 번들이라 먼저 build 한다. 건너뜀=실패(크롬이 준비된 이 잡에서 돈다).
@@ -571,9 +608,6 @@ jobs:
           node --test --test-concurrency=1 tests/updates-card-611-followup.test.mjs
           echo "새 소식 카드 겹침 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
 
-      # #635: 감상 화면(공유 링크·예시)의 책에서 undefined·null·NaN 흔적이 없는지 첫 장~마지막 장 전부 넘기며 검사하고,
-      # 첫 화면 '어떻게 쓰나요'가 안내 패널을 여는지(둘러보기가 같이 열리지 않는지) 실제 화면에서 본다.
-      # 첫 화면은 vite 번들이라 먼저 build 한다. 건너뜀=실패(크롬이 준비된 이 잡에서 돈다).
       - name: 화면 변경 없으면 건너뜀을 남긴다
         if: always()
         run: |
@@ -881,25 +915,16 @@ jobs:
           fc-cache -f >/dev/null 2>&1 || true
           echo "한글 글꼴 $(fc-list :lang=ko | wc -l)개 · 대표 $(fc-match 'sans-serif:lang=ko' | head -1)"
           echo "한글 글꼴 준비 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
-      # B-04: 그룹 칩·머리줄 시험 연결(건너뜀=실패).
-      # #1413 4단계: 지도 대비 잡에서 옮겨 왔다. 같은 브라우저·한글 글꼴 준비를 쓰고, 지도 대비 잡과 같이
-      # 빌드 결과(dist) 없이 돌도록 아래 공통 검사기(vite build) 앞에 둔다. 도는 조건(화면 바뀜이면 늘)도 같다.
-      - name: 둘러보기 칩·머리줄 시험(건너뜀=실패 — #784·#1025)
-        env:
-          LT_COMMUNITY_784_REQUIRE: '1'
-          LT_HEADER_IA_REQUIRE: '1'
-        if: needs.screen-changes.outputs.changed == 'true'
-        run: |
-          start=$(date +%s)
-          node --test --test-concurrency=1 tests/v41-community-chips-784.test.mjs tests/v41-header-ia.test.mjs
-          echo "둘러보기 칩·머리줄 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+      # #1413 5단계: 공통 검사기 파일의 #657 두 시험 밖 나머지(첫 화면 단추·공유 창·탭 글자·CLS 등 20여 개)는
+      # 이제 이 shard가 돈다(이름 거르기 없음 — 파일에 새로 더한 시험도 여기서 돈다). b·c는 #657 두 시험만 각자 조합으로 돈다.
+      # 전에는 c가 정원 두 폭과 나머지를 혼자 돌아 6.5분으로 가장 긴 잡이었다. 칩·머리줄 시험은 지도 대비 잡으로 옮겼다.
       - name: 화면 공통 검사기 shard a(건너뜀=실패 — #657·#1080)
         timeout-minutes: 10
         if: needs.screen-changes.outputs.changed == 'true'
         run: |
           start=$(date +%s)
           npx vite build > /dev/null
-          LT_SCREEN_AUDIT_SHARD=a LT_SCREEN_AUDIT_REQUIRE=1 node --test --test-name-pattern='^#657 화면 공통 검사기' tests/v41-screen-audit.test.mjs > /tmp/screen-audit.log 2>&1 & pid=$!
+          LT_SCREEN_AUDIT_SHARD=a LT_SCREEN_AUDIT_REQUIRE=1 node --test tests/v41-screen-audit.test.mjs > /tmp/screen-audit.log 2>&1 & pid=$!
           r=0
           while kill -0 $pid 2>/dev/null; do
             sleep 30
@@ -1107,13 +1132,14 @@ jobs:
           fc-cache -f >/dev/null 2>&1 || true
           echo "한글 글꼴 $(fc-list :lang=ko | wc -l)개 · 대표 $(fc-match 'sans-serif:lang=ko' | head -1)"
           echo "한글 글꼴 준비 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+      # #1413 5단계: c는 b처럼 #657 두 시험(정원 1440·390 조합)만 돈다. 나머지 시험은 a가 돈다.
       - name: 화면 공통 검사기 shard c(건너뜀=실패 — #657·#1080)
         timeout-minutes: 10
         if: needs.screen-changes.outputs.changed == 'true'
         run: |
           start=$(date +%s)
           npx vite build > /dev/null
-          LT_SCREEN_AUDIT_SHARD=c LT_SCREEN_AUDIT_REQUIRE=1 node --test tests/v41-screen-audit.test.mjs > /tmp/screen-audit.log 2>&1 & pid=$!
+          LT_SCREEN_AUDIT_SHARD=c LT_SCREEN_AUDIT_REQUIRE=1 node --test --test-name-pattern='^#657 화면 공통 검사기' tests/v41-screen-audit.test.mjs > /tmp/screen-audit.log 2>&1 & pid=$!
           r=0
           while kill -0 $pid 2>/dev/null; do
             sleep 30
@@ -1137,7 +1163,7 @@ jobs:
             echo "건너뜀(화면 변경 없음)" | tee -a "$GITHUB_STEP_SUMMARY"
           fi
   screen-reload:
-    name: 화면 시험 — 저장 재적재
+    name: 화면 시험 — 저장 재적재·둘러보기 순간
     # 2026-11-22: 호스트 실행기 대기(동시 3개 안팎)를 피해 같은 저장소 PR은 CGI 자체 실행기에서 돈다(보드 잡과 같은 식).
     # 2026-11-23: CGI 실행기 4대가 줄이 되어 호스트 실행기로 돌린다(CGI에는 같은 기계에서 재야 하는 첫 화면·궤도·보드만).
     runs-on: ubuntu-latest
@@ -1181,6 +1207,16 @@ jobs:
           start=$(date +%s)
           node --test --test-concurrency=1 --test-name-pattern='1001' tests/v41-book-play-584.test.mjs
           echo "저장 재적재 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+      # #1413 5단계: 첫 화면 후속 잡(6~8분)에서 옮겼다. 앞의 저장 재적재 시험은 지금처럼 빌드 없이 먼저 돈다.
+      - name: 둘러보기 순간 보기 시험(건너뜀=실패 — #1025)
+        env:
+          LT_MOMENTS_1025_REQUIRE: '1'
+        if: needs.screen-changes.outputs.changed == 'true'
+        run: |
+          start=$(date +%s)
+          npx vite build > /dev/null
+          node --test --test-concurrency=1 tests/v41-explore-moments-1025.test.mjs tests/v41-1286-moments.test.mjs tests/v41-explore-sort-search-1363.test.mjs
+          echo "둘러보기 순간 보기 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
       - name: 화면 변경 없으면 건너뜀을 남긴다
         if: always()
         run: |
@@ -1189,7 +1225,7 @@ jobs:
           fi
 
   screen-map-a:
-    name: 화면 시험 — 지도 대비
+    name: 화면 시험 — 지도 대비·둘러보기 칩
     runs-on: ubuntu-latest
     timeout-minutes: 25
     needs: screen-changes
@@ -1269,9 +1305,22 @@ jobs:
           fc-cache -f >/dev/null 2>&1 || true
           echo "한글 글꼴 $(fc-list :lang=ko | wc -l)개 · 대표 $(fc-match 'sans-serif:lang=ko' | head -1)"
           echo "한글 글꼴 준비 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+      # B-04: 그룹 칩·머리줄 시험 연결(건너뜀=실패).
+      # #1413 5단계: 공통 검사기 a/3에서 이 잡으로 되돌렸다(4단계 전 자리). 지도 파일이 안 바뀐 PR에서 이 잡은 준비만 하고
+      # 20초 만에 끝나 자리가 남는다. a/3에는 c/3이 혼자 돌던 나머지 공통 검사 시험이 간다. 한글 글꼴 준비 뒤, 빌드 결과(dist)
+      # 없이 도는 조건은 그대로이고, 지도 바뀜과 무관하게 화면이 바뀌면 늘 돈다.
+      - name: 둘러보기 칩·머리줄 시험(건너뜀=실패 — #784·#1025)
+        env:
+          LT_COMMUNITY_784_REQUIRE: '1'
+          LT_HEADER_IA_REQUIRE: '1'
+        if: needs.screen-changes.outputs.changed == 'true'
+        run: |
+          start=$(date +%s)
+          node --test --test-concurrency=1 tests/v41-community-chips-784.test.mjs tests/v41-header-ia.test.mjs
+          echo "둘러보기 칩·머리줄 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
       # 지도는 추후 개발(11-22 대표 결정): 지도 파일이 안 바뀐 PR에서는 이 단계를 건너뛴다.
-      # #1413 4단계: 같은 잡에 있던 서재·날짜 시험은 '화면 시험 — 서재·날짜' 잡으로, 둘러보기 칩·머리줄 시험은
-      # '화면 공통 검사기 a/3' 잡으로 옮겼다. 이 잡에는 지도 대비·부채꼴 시험만 남는다.
+      # #1413 4단계: 같은 잡에 있던 서재·날짜 시험은 '화면 시험 — 서재·날짜' 잡으로 옮겼다. 5단계: 둘러보기 칩·머리줄
+      # 시험은 위 단계로 되돌아왔다(지도 바뀜과 무관하게 돈다). 이 단계에는 지도 대비·부채꼴 시험만 있다.
       - name: 지도 실제 대비 시험(건너뜀=실패)
         env:
           LT_MAP_CONTRAST_REQUIRE: '1'
@@ -1588,7 +1637,7 @@ jobs:
             echo "건너뜀(화면 변경 없음)" | tee -a "$GITHUB_STEP_SUMMARY"
           fi
   screen-book-screen:
-    name: 화면 시험 — 책 대비·초점
+    name: 화면 시험 — 책 대비·초점·감상
     # 책 화면 잡은 글자 줄바꿈·페이지 넘침을 재므로 글꼴이 다른 CGI가 아니라 호스트에서 돈다(2026-11-22 CGI에서 넘침 실측이 달라 실패).
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -1696,6 +1745,23 @@ jobs:
           npx vite build > /dev/null
           node --test --test-concurrency=1 tests/v41-book-fullscreen-833.test.mjs tests/v41-tree-tag-small-862.test.mjs
           echo "책 전체화면·작은 꼬리표 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+      # #1413 5단계: 책·감상 잡(약 6.7분)에서 옮겼다(맨 뒤 — 이 잡의 앞 단계 조건은 그대로).
+      # #635: 감상 화면(공유 링크·예시)의 책에서 undefined·null·NaN 흔적이 없는지 첫 장~마지막 장 전부 넘기며 검사하고,
+      # 첫 화면 '어떻게 쓰나요'가 안내 패널을 여는지(둘러보기가 같이 열리지 않는지) 실제 화면에서 본다.
+      # 첫 화면은 vite 번들이라 먼저 build 한다. 건너뜀=실패(크롬이 준비된 이 잡에서 돈다).
+      - name: 감상 화면 흔적 값·어떻게 쓰나요 안내 시험(건너뜀=실패 — #635)
+        env:
+          LT_635A_REQUIRE: '1'
+          LT_BOOK_LONG_NOTE_REQUIRE: '1'
+        if: needs.screen-changes.outputs.changed == 'true'
+        run: |
+          start=$(date +%s)
+          npx vite build > /dev/null
+          node --test --test-concurrency=1 tests/v41-share-guest-635.test.mjs
+          echo "감상 화면 흔적 값·어떻게 쓰나요 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+          # #952: 책의 넘침 판정·넘친 페이지 스크롤을 실제 화면에서 잰다(같은 빌드 결과를 쓴다).
+          node --test --test-concurrency=1 tests/v41-book-long-note.test.mjs
+          echo "책 넘침 화면 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
 
       - name: 화면 변경 없으면 건너뜀을 남긴다
         if: always()
@@ -1940,7 +2006,7 @@ jobs:
     name: 미리보기 postdeploy(로그아웃)
     runs-on: ubuntu-latest
     if: always()
-    needs: [screen-changes, screen-board, screen-home, screen-home-followup, screen-book, screen-reload, screen-shell, screen-shell-extra, screen-map-a, screen-shelf, screen-map-b, screen-book-screen, screen-audit-a, screen-audit-b, screen-audit-c, deploy]
+    needs: [screen-changes, screen-board, screen-board-b, screen-home, screen-home-followup, screen-book, screen-reload, screen-shell, screen-shell-extra, screen-map-a, screen-shelf, screen-map-b, screen-book-screen, screen-audit-a, screen-audit-b, screen-audit-c, deploy]
     steps:
       - uses: actions/checkout@v4
         with:
