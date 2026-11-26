@@ -377,6 +377,8 @@ function titleRest(t) {
 
 // 제목에서 가수 후보를 모은다.
 function findArtists(t) {
+  // A lone uppercase word is ambiguous: it may be a song title, not an artist.
+  if (/^[A-Z][A-Z0-9&'??]+$/.test(t.trim())) return [];
   const rest = titleRest(t);
   const out = [];
   const seen = new Set();
@@ -492,7 +494,9 @@ export function suggestTagsFromTitle(title, options = {}) {
   }
 
   // 2) 제목 규칙: 가수 → 멤버(확실한 모양만) → 노래 → 무대(방송·시상식·공연 이름 — 날짜 숫자는 값에 섞지 않는다).
-  const artists = findArtists(t);
+  const song = findSong(t);
+  const songKey = tagKey(song);
+  const artists = findArtists(t).filter((name) => tagKey(name) !== songKey);
   // 멤버 제안의 '가수 확신' 재료 — 제목 규칙이 고른 가수에 재사용으로 정해진 가수를 더한다.
   const artistKeys = new Set([
     ...artists.map((name) => tagKey(name)),
@@ -500,7 +504,6 @@ export function suggestTagsFromTitle(title, options = {}) {
   ]);
   for (const name of artists) push('artist', name, 'title');
   for (const name of findMembers(t, artistKeys)) push('member', name, 'title');
-  const song = findSong(t);
   if (song) push('song', song, 'title');
   const stage = findStage(t);
   if (stage) push('stage', stage, 'title'); // 261111·240524 같은 날짜는 무대 꼬리표에 붙이지 않는다
@@ -514,6 +517,7 @@ export function suggestTagsFromTitle(title, options = {}) {
     const vk = tagKey(p.value);
     const key = (p.kindId || 'plain') + '|' + vk;
     if (seen.has(key)) continue;
+    if (p.kindId === 'artist' && vk === songKey) continue;
     if (p.how === 'title' && reuseKeys.has(vk)) continue;
     seen.add(key);
     out.push(p);
