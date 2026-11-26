@@ -5,7 +5,7 @@ import { MSG, isShellMessage } from '../../frame-messages.mjs';
 import {
   COVER_PALETTE, allBooks as allBooksOf, bookMeta, buildShelf,
   escapeShelf, filterShelf, findBook, lastMomentDate as lastMomentDateOf,
-  resolveShelfIndex, resumeCard, resumeName, shelfBook, shelfRowLayout,
+  recentChapters, resolveShelfIndex, resumeCard, resumeName, shelfBook, shelfRowLayout,
   treeTitleOf, youtubeId as youtubeIdOf
 } from './shelf-model.mjs';
 import { shelfOrder } from '../../inbox-model.mjs';
@@ -115,6 +115,7 @@ import { VIEWS } from './shelf-views.mjs';
         if(hero)hero.classList.toggle('strip-mode',list.length>0);
         // #256-1: 목록이 바뀔 때마다 다시 그린다. 칸은 검색·필터와 무관하게 전체 책(allBooks) 기준이라 좁아져도 그대로다.
         renderResumeCard();
+        renderRecent();
         $('#shelfRail').innerHTML=(list.length?list.map(function(book,index){
           // #212: 표지에 이름 한 번만. 사진 표지에는 제목을 올리지 않고(표지 사진만), 표지 아래는 두 줄로 — '제목 · N개 순간' / 'N일 전 추가'(한 줄 넘으면 말줄임).
           // #256-3: 디자인 표지는 shelf-model coverChoice 판정(book.design)을 그대로 쓴다. 없으면 속성도 없다(기존 화면 변화 0).
@@ -171,6 +172,83 @@ import { VIEWS } from './shelf-views.mjs';
           else LTDEMO.openBook(info.book.chapters[0]&&info.book.chapters[0].id,info.book.id);
         };
       }
+      // 다른 화면의 크게 보기와 같은 영상 플레이어·사진 확대 형식을 사용한다.
+      function openRecentMoment(book,chapter) {
+        var media=window.LTMedia&&window.LTMedia.describe?window.LTMedia.describe(chapter.url||''):null;
+        if(media&&(media.kind==='youtube'||media.kind==='video')&&typeof window.LTMedia.openLightbox==='function'){
+          window.LTMedia.openLightbox(chapter.url,chapter.title||'순간');
+          return;
+        }
+        var previous=document.activeElement;
+        var old=document.querySelector('.shelf-recent-viewer');
+        if(old)old.remove();
+        var overlay=document.createElement('div');
+        overlay.className='lt-lightbox shelf-recent-viewer';
+        overlay.setAttribute('role','dialog');
+        overlay.setAttribute('aria-modal','true');
+        overlay.setAttribute('aria-label','순간 크게 보기');
+        var stage=document.createElement('div');
+        stage.className='lt-lightbox-stage';
+        var src=chapter.image||(chapter.thumbCandidates&&chapter.thumbCandidates[0])||'';
+        if(src){
+          var image=document.createElement('img');
+          image.className='shelf-recent-viewer-image';
+          image.src=src;
+          image.alt=chapter.title||'순간';
+          image.referrerPolicy='no-referrer';
+          stage.appendChild(image);
+        }else{
+          var note=document.createElement('p');
+          note.className='shelf-recent-viewer-text';
+          note.textContent=chapter.title||'순간';
+          stage.appendChild(note);
+        }
+        var close=document.createElement('button');
+        close.type='button';
+        close.className='lt-lightbox-close';
+        close.setAttribute('aria-label','크게 보기 닫기');
+        close.textContent='×';
+        var caption=document.createElement('p');
+        caption.className='lt-lightbox-title';
+        caption.textContent=(chapter.title||'순간')+(chapter.date?' · '+chapter.date:'');
+        function finish(){
+          document.removeEventListener('keydown',onKey,true);
+          overlay.remove();
+          if(previous&&previous.isConnected)previous.focus({preventScroll:true});
+        }
+        function onKey(event){if(event.key==='Escape'){event.preventDefault();event.stopPropagation();finish();}}
+        document.addEventListener('keydown',onKey,true);
+        close.addEventListener('click',finish);
+        overlay.addEventListener('click',function(event){if(event.target===overlay)finish();});
+        overlay.append(stage,close,caption);
+        document.body.appendChild(overlay);
+        close.focus();
+      }
+      // #1366 ⑥: 고른 트리의 최근 순간 여섯 개와 숫자를 책장 아래에 둔다.
+      function renderRecent() {
+        var sec=$('#shelfRecent'),row=$('#shelfRecentRow'),stats=$('#shelfRecentStats');
+        if(!sec||!row||!stats)return;
+        var book=state.shelfList[state.shelfIndex];
+        if(!book||!book.chapters.length){sec.hidden=true;row.innerHTML='';stats.textContent='';return;}
+        var list=recentChapters(book.chapters);
+        stats.textContent=bookMeta(book);
+        row.innerHTML=list.map(function(chapter){
+          var src=chapter.image||(chapter.thumbCandidates&&chapter.thumbCandidates[0])||'';
+          var candidates=chapter.thumbCandidates&&chapter.thumbCandidates.length?chapter.thumbCandidates:[src];
+          var image=src?'<img src="'+esc(src)+'"'+coverFallbackAttrs(candidates)+' alt="" loading="lazy" referrerpolicy="no-referrer">':'<span class="shelf-recent-letter" aria-hidden="true">'+esc(String(book.name||'책').slice(0,1))+'</span>';
+          return '<button type="button" class="shelf-recent-item" data-moment-id="'+esc(chapter.id)+'" aria-label="'+esc(chapter.title||'순간')+' 크게 보기">'+
+            '<span class="shelf-recent-visual'+(src?'':' shelf-recent-visual--empty')+'" aria-hidden="true">'+image+'</span>'+
+            '<span class="shelf-recent-name">'+esc(chapter.title||'순간')+'</span></button>';
+        }).join('');
+        sec.style.setProperty('--shelf-recent-cover',book.color);
+        Array.prototype.forEach.call(row.querySelectorAll('[data-moment-id]'),function(button){
+          button.onclick=function(){
+            var chapter=list.find(function(item){return String(item.id)===button.dataset.momentId;});
+            if(chapter)openRecentMoment(book,chapter);
+          };
+        });
+        sec.hidden=false;
+      }
       function setShelfAtmosphere(book) {
         var viewport=$('#shelfViewport');
         if(!viewport||!book)return;
@@ -186,6 +264,7 @@ import { VIEWS } from './shelf-views.mjs';
         if(nextArrow)nextArrow.hidden=!show;
       }
       function reportShelfTree(center){
+        renderRecent();
         // 261118 대표 지적 2차 5: 서재에서 마지막에 본 트리(가운데 책의 트리)를 셸에 알린다 —
         // 서재 화면에서 콕·보드·지도 탭을 누르면 그 트리로 열린다.
         var centered=state.shelfList[center];
@@ -217,6 +296,19 @@ import { VIEWS } from './shelf-views.mjs';
         $$('.filter').forEach(function(button){button.addEventListener('click',function(){state.filter=button.dataset.filter;$$('.filter').forEach(function(item){item.classList.toggle('active',item===button);});renderShelf();});});
         $('#shelfPrev').addEventListener('click',function(){view.move(-1);});
         $('#shelfNext').addEventListener('click',function(){view.move(1);});
+        // #1366 ⑧: 세로 휠만 회전 넘김으로 쓴다. 레일 밖과 가로 트랙패드는 기본 스크롤에 맡긴다.
+        // 한 묶음당 한 칸, 연속 휠은 잠깐 무시해 건너뛰기를 막는다.
+        var wheelAt=0;
+        $('#shelfRail').addEventListener('wheel',function(event){
+          if(shelfView()!=='carousel'||event.ctrlKey)return;
+          if(Math.abs(event.deltaX)>Math.abs(event.deltaY))return;
+          if(Math.abs(event.deltaY)<2)return;
+          event.preventDefault();
+          var at=Date.now();
+          if(at-wheelAt<320)return;
+          wheelAt=at;
+          view.move(event.deltaY>0?1:-1);
+        },{passive:false});
         $('#backToShelf').addEventListener('click',backToShelf);
         $('#openBookButton').addEventListener('click',openBook);
         $('#closeBookButton').addEventListener('click',closeBook);
