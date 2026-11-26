@@ -21,6 +21,12 @@ function tree(n) {
   return t;
 }
 
+// 닫힘 신호는 목록 숨김과 단추 aria-expanded=false 두 가지다. Esc·Enter가 같은 도우미를 쓴다.
+async function waitTreeChoiceClosed(page, timeout) {
+  await page.waitForFunction(() => document.getElementById('tree-popover')?.hidden, null, { timeout });
+  await page.waitForFunction(() => document.querySelector('iframe#view')?.contentDocument?.querySelector('button.lt-toolbar-tree-choice')?.getAttribute('aria-expanded') === 'false', null, { timeout });
+}
+
 const SCREENS = [['shelf', '#my/shelf'], ['book', '#my/book'], ['board', '#my/board'], ['map', '#my/network']];
 
 test('상단 메뉴: 같은 글자 크기·테두리 0·세로선 0·현재 탭 1·탭 x 고정', { skip: skip || !REQUIRE ? skip || 'LT_TOPMENU_REQUIRE=1 일 때 실행' : false }, async () => {
@@ -321,8 +327,7 @@ test('970 실행: 트리 드롭다운은 Esc·바깥 누르기로 닫히고, 키
       await page.waitForFunction(() => !document.getElementById('tree-popover')?.hidden, null, { timeout: 10000 });
       assert.equal(await treeChoiceExpanded(page), 'true', `${width}: 열면 aria-expanded=true`);
       await page.keyboard.press('Escape');
-      await page.waitForFunction(() => document.getElementById('tree-popover')?.hidden, null, { timeout: 5000 });
-       await page.waitForFunction(() => document.querySelector('iframe#view')?.contentDocument?.querySelector('button.lt-toolbar-tree-choice')?.getAttribute('aria-expanded') === 'false', null, {timeout:5000});
+      await waitTreeChoiceClosed(page, 5000);
       const afterEsc = { expanded: await treeChoiceExpanded(page), focus: await treeChoiceFocused(page) };
       assert.equal(afterEsc.expanded, 'false', `${width}: Esc로 닫으면 aria-expanded=false`);
       assert.equal(afterEsc.focus, true, `${width}: Esc로 닫으면 초점이 단추로 돌아온다`);
@@ -359,7 +364,7 @@ test('970 실행: 트리 드롭다운은 Esc·바깥 누르기로 닫히고, 키
         return row.dataset.treeId;
       });
       await page.keyboard.press('Enter');
-      await page.waitForFunction(() => document.getElementById('tree-popover')?.hidden, null, { timeout: 10000 });
+      await waitTreeChoiceClosed(page, 10000);
       assert.equal(await treeChoiceExpanded(page), 'false', `${width}: 트리를 고르면 목록이 닫힌다`);
       await page.waitForFunction((id) => /tree=/.test(location.hash) && new URLSearchParams(location.hash.split('?')[1] || '').get('tree') === id, wantTree, { timeout: 15000 });
       assert.ok(page.url().includes(`tree=${wantTree}`), `${width}: Enter로 고른 트리가 열린다(${page.url().split('#')[1] || ''})`);
