@@ -1,3 +1,4 @@
+import {clickToolbarTreeChoice} from './helpers/tree-picker-pr3.mjs';
 import {clickToolbarTreeChoice,treeChoiceExpanded,treeChoiceFocused} from './helpers/tree-picker-pr3.mjs';
 // #970 동작 시험 — 서재·책장(#938 대표 결정)과 날짜 표시.
 // 1) 서재: 책이 왼쪽부터 놓이고(첫 책이 책장 왼쪽 안쪽), 책장이 화면 세로 가운데에 있으며,
@@ -59,7 +60,7 @@ async function withShelfSession(fn) {
       // 무대 준비가 끝나기 전의 클릭은 '불러오는 중' 덮개에 가로챼진다.
       await page.waitForFunction(() => document.getElementById('stage-loading')?.hidden === true, null, { timeout: 20000 });
       await page.locator('#discover-ask-no').click().catch(() => {});
-      await page.locator('#record-menu').click();
+      await clickToolbarTreeChoice(page);
       await page.locator('[data-tree-action="shelf"]').click();
       frame = null;
       for (let i = 0; i < 80 && !frame; i += 1) {
