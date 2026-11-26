@@ -21,6 +21,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { FALLBACK_SECONDS, playbackItemOf, buildPlaybackQueue, stepPlayable, firstPlayable, playbackChipText, segmentReached, playbackStatusOf, STATUS_PLAYING, STATUS_PAUSED, STATUS_BUFFERING, STATUS_SKIPPED } from '../public/v41/playback-core.mjs';
+import { dismissDiscoverAskIfOpen } from './helpers/discover-ask.mjs';
 
 const read = (p) => readFileSync(new URL('../' + p, import.meta.url), 'utf8');
 const MP = read('public/v41/media-preview.js');
@@ -865,7 +866,7 @@ test('1001c 실행: 쓰기 판 날짜·감정·비공개 변경 — 재적재 0�
     page.on('dialog', d => d.accept());
     await page.goto(`${base}/v41/?account=1`, { waitUntil: 'load' });
     await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
-    await page.locator('#discover-ask-no').click().catch(() => {});
+    await dismissDiscoverAskIfOpen(page);
     await page.locator('.tree-views [data-view="track59-sketchbook.html"]').click();
     await waitShown(page, { path: 'track59-sketchbook' }, 8000);
     await page.waitForTimeout(900);
@@ -928,7 +929,7 @@ test('1001d 실행: 자세한 추가·설정·영상 정보·서재 ⋯ 같은 �
   const openBook = async (page) => {
     await page.goto(`${base}/v41/?account=1`, { waitUntil: 'load' });
     await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
-    await page.locator('#discover-ask-no').click().catch(() => {});
+    await dismissDiscoverAskIfOpen(page);
     await page.locator('.tree-views [data-view="track59-sketchbook.html"]').click();
     await waitShown(page, { path: 'track59-sketchbook' }, 8000);
     await page.waitForTimeout(1000);

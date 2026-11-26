@@ -7,6 +7,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {chromium} from 'playwright';
 import {createTree} from '../public/v41/domain.mjs';
+import { dismissDiscoverAskIfOpen } from './helpers/discover-ask.mjs';
 
 const ROOT=path.resolve(process.env.LT_1284_DIST||fileURLToPath(new URL('../dist/',import.meta.url)));
 const BASELINE=process.env.LT_1284_BASELINE==='1';
@@ -46,7 +47,7 @@ async function open({width,height=width===390?844:900,theme,scene,member=true}){
  const url='http://127.0.0.1:'+globalThis._lt1284port+'/v41/'+(member?'?account=1':'');
  try{
   await page.goto(url,{waitUntil:'domcontentloaded'});
-  await page.locator('#discover-ask-no').click({timeout:3000}).catch(()=>{});
+  await dismissDiscoverAskIfOpen(page);
   if(member)await page.waitForFunction(()=>{const f=document.querySelector('#view');return !!f?.contentDocument?.querySelector('#orbit')?.shadowRoot?.querySelector('.recent-card');},null,{timeout:12000});
   else await page.frameLocator('#view').locator('.center .actions').waitFor({state:'visible',timeout:12000});
   const frame=page.frameLocator('#view');

@@ -6,6 +6,7 @@ import {createServer} from 'node:http';
 import {stat} from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
+import { dismissDiscoverAskIfOpen } from './helpers/discover-ask.mjs';
 
 // #295: 기억책에서 긴 노트가 페이지 밖으로 넘치면 잘려 보이는 문제.
 // 안1(넘친 페이지만 안에서 스크롤)을 채택했다 — 안2(페이지 분할)는 펼침 두 쪽·넘기기 구조를 바꾸므로 쓰지 않는다.
@@ -80,7 +81,7 @@ test('#295 화면: 넘친 페이지만 그 안에서 세로로 넘겨 보고, �
     await page.goto(`${base}/v41/?account=1`, { waitUntil: 'load' });
     // 기록이 실려 온 뒤(트리 목록이 생긴 뒤) 책 화면으로 옮긴다 — 순서를 지키지 않으면 책이 빈 채로 남는다.
     await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
-    await page.locator('#discover-ask-no').click().catch(() => {});
+    await dismissDiscoverAskIfOpen(page);
     await page.locator('.tree-views [data-view="track59-sketchbook.html"]').click();
     await waitForShownScreen(page, {path: 'track59-sketchbook'}, 15000);
     const frame = page.frames().find(f => /track59-sketchbook/.test(f.url()));

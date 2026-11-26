@@ -13,6 +13,7 @@ import { fileURLToPath } from 'node:url';
 import { flat26, lt41Stub } from './helpers/map-shapes.mjs';
 import { testBackNavigation } from './helpers/history-assert.mjs';
 import { createTree } from '../public/v41/domain.mjs';
+import { dismissDiscoverAskIfOpen } from './helpers/discover-ask.mjs';
 
 const ROOT = path.resolve(process.env.LT_MAP_FAN_ROOT || fileURLToPath(new URL('../public', import.meta.url)));
 const REQUIRE = process.env.LT_MAP_FAN_REQUIRE === '1';
@@ -373,7 +374,7 @@ test('#1298 지도 영상 크게 보기 뒤로 가기: 창 닫힘·iframe 0·상
         const page = await ctx.newPage();
         await page.goto(base + '/v41/?account=1#home', { waitUntil: 'domcontentloaded' });
         await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 30000 });
-        await page.locator('#discover-ask-no').click().catch(() => {});
+        await dismissDiscoverAskIfOpen(page);
         await page.evaluate(() => document.querySelector('[data-view="track56-network.html"]').click());
         await page.waitForFunction(() => { const f = document.querySelector('#view:not([hidden])'); try { return !!f && /track56-network/.test(f.contentWindow.location.href); } catch { return false; } }, null, { timeout: 20000 });
         const frame = await (await page.$('#view:not([hidden])')).contentFrame();

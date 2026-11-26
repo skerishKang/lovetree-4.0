@@ -9,6 +9,7 @@ import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 import { serve } from './helpers/screen-audit.mjs';
 import { createTree, addMoment } from '../public/v41/domain.mjs';
+import { dismissDiscoverAskIfOpen } from './helpers/discover-ask.mjs';
 
 const REQUIRE = process.env.LT_970_REQUIRE === '1';
 let chromium, skip = false;
@@ -248,7 +249,7 @@ async function withGuardWorkspace(trees, { width = 1440, height = 900, quarantin
     page.on('console', (message) => { if (message.type() === 'warning') warnings.push(message.text()); });
     await page.goto(`${origin}/v41/?account=1`, { waitUntil: 'load' });
     await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
-    await page.locator('#discover-ask-no').click().catch(() => {});
+    await dismissDiscoverAskIfOpen(page);
     await page.waitForTimeout(300);
     await fn({ page, errors, warnings, puts });
   } finally {
