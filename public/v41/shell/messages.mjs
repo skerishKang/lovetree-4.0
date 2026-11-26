@@ -546,6 +546,8 @@ export function createMessages(deps) {
     memberLogin: () => openSettingsData('new-tree'),
     // 이슈 457 5번: 공유할 내 트리가 있어야 "내 트리 공유하기" — 로그아웃·트리 0개는 "첫 트리 만들기"로 바뀐다.
     hasOwnTree: () => getSource() === 'server' && !!getMember()?.snapshot().owned && (getModel()?.trees?.length || 0) > 0,
+    // #1356: '내 순간' 칩은 로그인 상태에서만 보인다 — 서버Source의 소유 계정이 기준.
+    isMember: () => getMember()?.snapshot().phase === 'synced' && !!getMember()?.snapshot().writable,
     onShareOwn: () => {
       $('community-panel').close();
       if (getSource() === 'server' && getMember()?.snapshot().owned && window.LT41) openSharePanel();
