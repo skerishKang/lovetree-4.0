@@ -59,7 +59,7 @@ async function withShelfSession(fn) {
       // 무대 준비가 끝나기 전의 클릭은 '불러오는 중' 덮개에 가로챼진다.
       await page.waitForFunction(() => document.getElementById('stage-loading')?.hidden === true, null, { timeout: 20000 });
       await page.locator('#discover-ask-no').click().catch(() => {});
-      await page.evaluate(() => { location.hash = '#my/shelf'; });
+      await page.locator('[data-view="track32-bookshelf.html"]').first().evaluate(button => button.click());
       frame = null;
       for (let i = 0; i < 80 && !frame; i += 1) {
         frame = page.frames().find((f) => /track32-bookshelf/.test(f.url()));
@@ -77,6 +77,10 @@ async function withShelfSession(fn) {
       geometry: () => geometry(frame),
       setData: async (count) => { trees = books(count); await openShelf(); },
       setViewport: async (width, height) => { await page.setViewportSize({ width, height }); await page.waitForTimeout(600); },
+      setTheme: async (name) => {
+        await page.evaluate((theme) => window.LT41_THEME_REGISTRY.apply(document.documentElement, theme), name);
+        await frame.evaluate((theme) => window.LT41_THEME_REGISTRY.apply(document.documentElement, theme), name);
+      },
       setView: async (name) => { view = name; await frame.evaluate((n) => document.querySelector(`#shelf-view-inline [data-shelf-view="${n}"]`).click(), name); await frame.waitForTimeout(600); }
     });
   } finally {
@@ -264,6 +268,74 @@ test('서재 — 저장값 없으면 회전 보기가 기본이다', async (t) =
 // #1366: 기본 보기는 회전이고, 첫 책(회전은 가운데 책)의 왼쪽 끝이 화면 안에 있다.
 test('서재 — 390·844·1440 × 선반·회전 × 책 1·4·20권에서 왼쪽 잘림 0', async (t) => {
   if (skip) { if (REQUIRE) assert.fail(`화면 시험을 건너뛸 수 없습니다: ${skip}`); t.skip(skip); return; }
+  for (const width of [390, 844, 1440]) for (const name of SHELF_VIEW_NAMES) for (const count of [1, 4, 20]) {
+    await withShelf(books(count), { width, height: width === 390 ? 844 : 900 }, async ({ frame, errors }) => {
+      await frame.evaluate((n) => document.querySelector(`#shelf-view-inline [data-shelf-view="${n}"]`).click(), name);
+      await frame.waitForTimeout(600);
+      const applied = await frame.evaluate((n) => document.querySelector('#shelfViewport')?.dataset.shelfView === n, name);
+      assert.equal(applied, true, `${width} ${name}: 보기가 적용된다`);
+      const g = await geometry(frame);
+      const card = name === 'shelf' ? g.cards[0] : (g.cards.find((c) => c.center) || g.cards[0]);
+      assert.ok(card, `${width} ${name} ${count}권: 카드가 있다`);
+      assert.ok(card.left >= 0, `${width} ${name} ${count}권: 왼쪽 잘림 0 (왼쪽 끝 ${Math.round(card.left)}px)`);
+      assert.deepEqual(errors, [], `${width} ${name} ${count}권: 페이지 오류 없음`);
+    });
+  }
+});
+
+// #1366 ⑧: 세로 휠은 레일에서만 한 칸, 가로 트랙패드와 레일 밖은 기본 스크롤에 맡긴다.
+test('서재 — 회전 보기 휠은 레일에서만 한 칸, 연속 휠은 건너뛰지 않는다', async (t) => {
+  if (skip) { if (REQUIRE) assert.fail(`화면 시험을 건너뛸 수 없습니다: ${skip}`); t.skip(skip); return; }
+  await withShelf(books(4), { width: 1440, height: 900, view: 'carousel' }, async ({ frame, errors }) => {
+    const fire = (dy, dx, outside) => frame.evaluate(([dy, dx, outside]) => {
+      const el = outside ? document.querySelector('.shelf-screen') : document.querySelector('#shelfRail');
+      return !el.dispatchEvent(new WheelEvent('wheel', { deltaY: dy, deltaX: dx, bubbles: true, cancelable: true }));
+    }, [dy, dx, outside]);
+    const center = () => frame.evaluate(() => [...document.querySelectorAll('.book-card')].findIndex((c) => c.classList.contains('is-center')));
+    const before = await center();
+    assert.equal(await fire(120, 0, false), true, '세로 휠은 레일에서 넘김으로 소비된다');
+    assert.equal(await center(), before + 1, '휠 한 번에 한 칸');
+    for (let i = 0; i < 5; i += 1) await fire(120, 0, false);
+    assert.equal(await center(), before + 1, '빠른 연속 휠은 건너뛰지 않는다');
+    await frame.waitForTimeout(400);
+    assert.equal(await fire(120, 0, false), true, '잠금 뒤에는 다시 한 칸');
+    assert.equal(await center(), before + 2, '두 번째 휠도 한 칸');
+    assert.equal(await fire(0, 120, false), false, '가로 트랙패드는 소비하지 않는다');
+    assert.equal(await center(), before + 2, '가로 트랙패드는 넘기지 않는다');
+    assert.equal(await fire(120, 0, true), false, '레일 밖 세로 휠은 소비하지 않는다');
+    assert.equal(await center(), before + 2, '레일 밖 휠은 넘기지 않는다');
+    assert.deepEqual(errors, [], '페이지 오류 없음');
+  });
+});
+
+// #1366 ⑧: 움직임 줄이기에서 회전 카드 전환이 없다.
+test('서재 — reduced-motion에서 회전 카드 전환이 없다', async (t) => {
+  if (skip) { if (REQUIRE) assert.fail(`화면 시험을 건너뛸 수 없습니다: ${skip}`); t.skip(skip); return; }
+  await withShelf(books(4), { width: 1440, height: 900, view: 'carousel' }, async ({ frame, errors }) => {
+    const duration = await frame.evaluate(() => getComputedStyle(document.querySelector('.book-card')).transitionDuration);
+    assert.equal(duration, '0s', '회전 카드 전환 없음');
+    assert.deepEqual(errors, [], '페이지 오류 없음');
+  });
+});
+
+// #1366 ⑥: 최근 순간 줄이 고른 트리를 따라가고, 순간이 없으면 숨는다.
+test('서재 — 최근 순간 줄과 숫자, 순간 0개에서는 숨김', async (t) => {
+  if (skip) { if (REQUIRE) assert.fail(`화면 시험을 건너뛸 수 없습니다: ${skip}`); t.skip(skip); return; }
+  await withShelf(books(1), { width: 1440, height: 900 }, async ({ frame, errors }) => {
+    const shown = await frame.evaluate(() => {
+      const sec = document.querySelector('#shelfRecent');
+      return { hidden: sec.hidden, count: sec.querySelectorAll('.shelf-recent-item').length, stats: document.querySelector('#shelfRecentStats').textContent.trim() };
+    });
+    assert.equal(shown.hidden, false, '최근 순간 영역이 보인다');
+    assert.ok(shown.count > 0 && shown.count <= 6, '최근 순간은 최대 여섯 개');
+    assert.match(shown.stats, /순간/, '순간 수와 마지막 추가가 적힌다');
+    assert.deepEqual(errors, [], '페이지 오류 없음');
+  });
+});
+
+// #1418: 병합된 선반·회전 화면을 한 세션에서 시험한다. 기준값과 기다림은 그대로다.
+test('서재 — 책 수·폭·보기별 첫 카드 잘림 0', async (t) => {
+  if (skip) { if (REQUIRE) assert.fail('화면 시험을 건너뛸 수 없습니다: '+skip); t.skip(skip); return; }
   await withShelfSession(async ({ errors, getFrame, geometry, setData, setViewport, setView }) => {
     for (const count of [1, 4, 20]) {
       await setData(count);

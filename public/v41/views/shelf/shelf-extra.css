@@ -55,7 +55,7 @@ html[data-v41-screen=shelf] .app{display:flex;flex-direction:column;padding-bott
 html[data-v41-screen=shelf] .page{display:flex;flex-direction:column;flex:1 1 auto;width:100%;margin-top:0;padding-top:0}
 /* 261118 대표 지적 2차: 이어 보기 띠는 위쪽에 붙이고(위 여백 24px 이내), 남은 세로 공간은 책장이 쓴다. */
 html[data-v41-screen=shelf] .shelf-screen{display:flex;flex-direction:column;justify-content:flex-start;flex:1 1 auto;min-height:0}
-html[data-v41-screen=shelf] .shelf-viewport{margin-top:12px;margin-bottom:auto}
+html[data-v41-screen=shelf] .shelf-viewport{margin-top:12px;margin-bottom:0}
 
 /* ── 261118 대표 지적 3차: 보이는 갈색 막대는 .shelf-base(wood gradient)다. 카드 높이를 내용에 맞춰
    표지 바로 아래 설명이 오고 카드 아랫단(설명 글자 아래)이 막대 윗면에 닿게 한다 — 카드 안 빈 칸이 빔으로 보였던 원인. */
@@ -280,7 +280,7 @@ html[data-v41-screen=shelf][data-lt-theme=garden] .book-card > .book-manage {
 
 /* #972: 펼쳐 보기·검색·책장의 간격을 유지하며 세 요소를 함께 세로 가운데에 둔다. */
 html[data-v41-screen=shelf] .shelf-screen:has(.hero.strip-mode) .hero.strip-mode { margin-top: 0; }
-html[data-v41-screen=shelf] .shelf-screen:has(.hero.strip-mode) .shelf-viewport { margin-top: 0; margin-bottom: auto; }
+html[data-v41-screen=shelf] .shelf-screen:has(.hero.strip-mode) .shelf-viewport { margin-top: 0; margin-bottom: 0; }
 /* 책은 선반 위에 두고 표지·두 줄 이름표와 그림자에 필요한 높이만 남긴다. */
 html[data-v41-screen=shelf] .shelf-screen:has(.hero.strip-mode) .shelf-rail { height: 280px; }
 @media (max-width: 700px) {
@@ -296,6 +296,61 @@ html[data-v41-screen=shelf] .shelf-viewport[data-shelf-view=shelf]{overflow:visi
 /* 회전은 책장 높이가 고정이라 여유가 위로 몰린다 — 띠를 선반과 같은 자리에 둔다. */
 html[data-v41-screen=shelf] .shelf-screen:has(.shelf-viewport[data-shelf-view=carousel]) .hero.strip-mode{margin-top:0}
 
+/* #1366 ⑥: 책장 바로 아래의 순간 카드 한 줄. 페이지 남는 공간은 아래에 둔다. */
+html[data-v41-screen=shelf] .shelf-recent{
+  box-sizing:border-box;flex:0 0 auto;min-width:0;max-width:100%;
+  margin:10px 0 0;padding:12px 14px;border:1px solid var(--lt-role-border);
+  border-radius:var(--lt-r-card);background:var(--lt-role-bg);
+}
+html[data-v41-screen=shelf] .shelf-recent[hidden]{display:none}
+.shelf-recent-head{display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:6px 12px;margin:0 0 10px}
+.shelf-recent-head h2{margin:0;font-size:15px;line-height:1.5;font-weight:700;color:var(--lt-role-text-strong)}
+.shelf-recent-head span{font-size:12px;line-height:1.5;color:var(--lt-role-text-strong)}
+.shelf-recent-row{
+  display:flex;flex-wrap:nowrap;gap:10px;box-sizing:border-box;width:100%;max-width:100%;min-width:0;
+  overflow-x:auto;overflow-y:hidden;overscroll-behavior-inline:contain;padding:0 0 6px;
+}
+.shelf-recent-item{
+  flex:0 0 126px;min-width:0;min-height:112px;padding:0;
+  border:1px solid var(--lt-role-border);border-radius:var(--lt-r-card);
+  background:var(--lt-role-bg);color:var(--lt-role-text-strong);
+  font:inherit;cursor:pointer;overflow:hidden;text-align:left;
+}
+.shelf-recent-item:focus-visible{outline:3px solid var(--lt-role-accent-bg);outline-offset:2px}
+.shelf-recent-visual{
+  display:grid;place-items:center;width:100%;height:84px;overflow:hidden;
+  background:var(--lt-role-bg);
+}
+.shelf-recent-visual img{display:block;width:100%;height:100%;object-fit:cover}
+.shelf-recent-visual--empty{background:var(--shelf-recent-cover,var(--lt-role-bg))}
+.shelf-recent-letter{
+  display:grid;place-items:center;min-width:40px;min-height:40px;padding:4px 8px;
+  border-radius:var(--lt-r-card);background:var(--lt-role-bg);color:var(--lt-role-text-strong);
+  font-size:22px;font-weight:700;line-height:1.2;
+}
+.shelf-recent-name{
+  display:block;box-sizing:border-box;max-width:100%;padding:8px 9px;
+  color:var(--lt-role-text-strong);font-size:12px;font-weight:700;line-height:1.45;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+html[data-v41-screen=shelf] .shelf-recent-viewer .shelf-recent-viewer-image{
+  display:block;max-width:min(94vw,1200px);max-height:calc(100dvh - 130px);width:auto;height:auto;
+  object-fit:contain;border-radius:var(--lt-r-card);
+}
+html[data-v41-screen=shelf] .shelf-recent-viewer .shelf-recent-viewer-text{
+  max-width:min(88vw,640px);padding:24px;border-radius:var(--lt-r-card);
+  background:var(--lt-role-bg);color:var(--lt-role-text-strong);
+  font-size:18px;font-weight:700;line-height:1.5;text-align:center;
+}
+@media(max-width:520px){
+  .shelf-recent-item{flex-basis:116px;min-height:108px}
+  .shelf-recent-visual{height:76px}
+  html[data-v41-screen=shelf] .shelf-recent{padding:10px 12px}
+}
+/* #1366 ⑧: 움직임 줄이기에서는 회전 카드의 전환을 끈다. */
+@media(prefers-reduced-motion:reduce){
+ .shelf-viewport[data-shelf-view=carousel] .book-card{transition:none}
+}
 /* #1366 ③ 회전 보기: 카드(표지+이름표) 전체가 레일 안에 들어오도록 높이를 미리 예약한다. */
 html[data-v41-screen=shelf] .shelf-screen:has(.hero.strip-mode) .shelf-viewport[data-shelf-view=carousel] .shelf-rail{height:320px}
 @media(max-width:700px){

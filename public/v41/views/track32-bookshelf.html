@@ -52,6 +52,11 @@
           <button class="shelf-arrow right" id="shelfNext" type="button" aria-label="다음 책">›</button>
           <div class="shelf-base" aria-hidden="true"></div>
         </section>
+        <!-- #1366 ⑥: 책장 아래 빈 절반에 고른 트리의 최근 순간과 숫자를 둔다. -->
+        <section class="shelf-recent" id="shelfRecent" aria-label="최근 순간" hidden>
+          <div class="shelf-recent-head"><h2>최근 순간</h2><span id="shelfRecentStats"></span></div>
+          <div class="shelf-recent-row" id="shelfRecentRow"></div>
+        </section>
       </section>
 
       <section class="reader-screen" id="readerScreen">
