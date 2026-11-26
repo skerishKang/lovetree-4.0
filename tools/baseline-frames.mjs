@@ -227,7 +227,7 @@ export function deriveScreens(report, old, label = '관측') {
       toast.centeringTolerance = old.screens['share-guest'].toast.centeringTolerance;
       for (const s of all) {
         // 숨긴 예전 안내는 레이아웃이 없으므로 중심 정렬을 재지 않는다.
-        if (!s.toastHidden) {
+        if (!s.toastHidden && s.toast.display !== 'none') {
           must(Number.isFinite(s.toastCenterDelta), '공유 방문자 책 안내 좌우 여백 차이를 재지 못했다');
           seen.toastCenterDelta = Math.max(seen.toastCenterDelta, s.toastCenterDelta);
         }

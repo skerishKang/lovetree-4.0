@@ -99,6 +99,13 @@ test('#1469 숨긴 방문자 알림은 중심 정렬 검사에서 제외하고 �
     row.shell.toastCenterDelta = row.viewport.width;
   }
   assert.doesNotThrow(() => deriveScreens(hidden, old));
+  const cssHidden = fakeReport(old);
+  for (const row of cssHidden.screens.filter(row => row.screen === 'share-guest')) {
+    row.shell.toastHidden = false;
+    row.shell.toast.display = 'none';
+    row.shell.toastCenterDelta = row.viewport.width;
+  }
+  assert.doesNotThrow(() => deriveScreens(cssHidden, old));
   const visible = fakeReport(old);
   for (const row of visible.screens.filter(row => row.screen === 'share-guest')) {
     row.shell.toastHidden = false;
