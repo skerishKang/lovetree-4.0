@@ -176,7 +176,7 @@ export async function observeFrameMatrix({ browser, base, outputDir, shard = '' 
         const frame = [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length);
         if (!frame) return;
         frame.style.willChange = 'transform';
-        frame.contentDocument?.querySelectorAll('.lt-screen-toolbar,button,select,.pill,.mini,.action,.close,.edge-tip,.recent-card')?.forEach(element => { element.style.willChange = 'transform'; if (element.matches('.recent-card')) element.style.transform = 'translateZ(0)'; });
+        frame.contentDocument?.querySelectorAll('.lt-screen-toolbar,button,select,.pill,.mini,.action,.close,.edge-tip,.recent-card,.note-piece,.mobile-page,.mobile-content,.page-content,.photo-piece,.clipping,.letter,.film-piece')?.forEach(element => { element.style.willChange = 'transform'; if (element.matches('.recent-card')) element.style.transform = 'translateZ(0)'; });
       });
       if (clockPaused) { await activePage.clock.runFor(32); await activePage.clock.fastForward(0); }
       else await activePage.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
