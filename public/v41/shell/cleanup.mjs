@@ -1,6 +1,9 @@
 // #327 2부: 모아둔 순간 정리 창. 계산은 inbox-model.mjs 한 벌을 쓰고, 여기서는 읽기·그리기·적용만 한다.
-// 저장은 기존 member.apply('treeFromMoments'/'moveMoment') 그대로다(새 저장 경로 없음).
-import { cleanupState, cleanupTargets, cleanupAvailable, moveAvailable, isInboxTree, pickerLabel, movedNotice } from '../inbox-model.mjs';
+// 저장은 기존 member.apply 한 길이다 — 새 트리는 'treeFromMoments', 옮기기·복사하기는 'organizeMoments'(#1439),
+// 그 되돌리기는 'undoOrganize'. 같은 순간 판정은 quick-intake 한 벌(#876·#1439), 안내 시간은 공통 타이머(#1273).
+import { cleanupState, cleanupTargets, cleanupAvailable, moveAvailable, isInboxTree, pickerLabel, movedNotice, organizedNotice } from '../inbox-model.mjs';
+import { duplicatesByTree, sameMomentNoun } from '../quick-intake.mjs';
+import '../toast-timer.js';
 
 export function createCleanup(deps) {
   const $ = deps.$;
@@ -19,7 +22,16 @@ export function createCleanup(deps) {
   const addTitleLabel = deps.addTitleLabel || '제목 달기';
   const unavailableLabel = deps.unavailableLabel || '영상을 볼 수 없어요';
   let fromTreeId = '';
-  let noticeTimer = null;
+  // #1439: '이미 있음'을 물어볼 창(#876 같은 영상 안내 창을 같이 쓴다). 없으면 묻지 않고 넣는다(막지 않는다).
+  const sameMoment = deps.sameMoment || null;
+  // #1273 9번 공통 타이머: 단추 있는 안내는 8초, 마우스·초점이 안내 안에 있으면 멈춘다.
+  // 셸 안내 줄의 단추 없는 안내도 예전부터 8초였으므로 같은 시간을 쓴다.
+  const toastApi = globalThis.LTToastTimer || globalThis.window?.LTToastTimer || null;
+  const noticeTimer = toastApi ? toastApi.createToastTimer() : null;
+  const NOTICE_MS = toastApi?.ACTION_TOAST_MS || 8000;
+  let fallbackTimer = null;
+  let targetRows = [];
+  let busy = false;
   function writable() {
     const snap = getMember()?.snapshot();
     return !!snap?.owned && !!snap?.writable;
@@ -125,28 +137,47 @@ export function createCleanup(deps) {
       host.append(label);
     }
   }
+  // #1439: 대상 트리는 고르기 칸 목록이다(예전 드롭다운). 옮기기는 하나만, 복사하기는 여러 개를 고른다.
+  // 고른 순간이 이미 들어 있는 트리에는 '이미 있음'을 미리 붙인다(sync가 고를 때마다 다시 센다).
   function renderTargets(tree) {
-    const select = $('cleanup-target');
+    const host = $('cleanup-targets');
     const targets = cleanupTargets(getTrees(), tree.id);
-    select.replaceChildren();
-    if (!targets.length) {
-      const option = document.createElement('option');
-      option.value = '';
-      option.textContent = '옮길 트리가 아직 없어요';
-      select.append(option);
-    }
+    host.replaceChildren();
+    targetRows = [];
     for (const target of targets) {
-      const option = document.createElement('option');
-      option.value = target.id;
-      option.textContent = target.label;
-      select.append(option);
+      const label = document.createElement('label');
+      label.className = 'cleanup-moment cleanup-target';
+      const box = document.createElement('input');
+      box.type = 'checkbox';
+      box.value = target.id;
+      box.checked = false;
+      box.addEventListener('change', sync);
+      const text = document.createElement('span');
+      text.textContent = target.label;
+      const badge = document.createElement('small');
+      badge.className = 'cleanup-dup';
+      badge.setAttribute('data-lt-dup', '');
+      badge.hidden = true;
+      badge.textContent = '이미 있음';
+      label.append(box, text, badge);
+      host.append(label);
+      targetRows.push({ id: target.id, label: target.label, box, badge });
     }
     $('cleanup-move-box').hidden = !targets.length;
-    // 아래 고정 줄에 옮기기 단추를 두었으므로 대상이 없으면 단추도 함께 숨긴다.
+    // 아래 고정 줄에 옮기기·복사하기 단추를 두었으므로 대상이 없으면 단추도 함께 숨긴다.
     $('cleanup-move').hidden = !targets.length;
+    $('cleanup-copy').hidden = !targets.length;
   }
   function pickedIds() {
     return [...$('cleanup-moments').querySelectorAll('input:checked')].map(box => box.value);
+  }
+  function pickedTargets() {
+    return targetRows.filter(row => row.box.checked);
+  }
+  function pickedMoments() {
+    const tree = getTrees().find(t => t.id === fromTreeId) || window.LT41?.tree;
+    const ids = new Set(pickedIds());
+    return (tree?.moments || []).filter(m => ids.has(m.id));
   }
   // #480 M8: 쓰다 만 입력 = 창을 열 때와 달라진 것. 새 트리 이름을 적었거나, 순간 고름이 바뀌었거나,
   // 옮길 트리를 바꿨을 때다. 이름 칸만 보면 미리 골라진 순간을 놓치고, 고름만 보면 이름을 놓친다.
@@ -154,7 +185,7 @@ export function createCleanup(deps) {
     return {
       picked: pickedIds().slice().sort().join(','),
       name: $('cleanup-new-name').value.trim(),
-      target: $('cleanup-target')?.value || ''
+      target: pickedTargets().map(row => row.id).sort().join(',')
     };
   }
   function dirty() {
@@ -162,20 +193,32 @@ export function createCleanup(deps) {
     return now.picked !== baseState.picked || now.name !== baseState.name || now.target !== baseState.target;
   }
   function sync() {
-    const target = $('cleanup-target');
+    const targets = pickedTargets();
     const state = cleanupState({
       selectedIds: pickedIds(),
       newTreeName: $('cleanup-new-name').value,
-      targetId: target.value,
-      targetLabel: target.selectedOptions[0]?.textContent || ''
+      targetIds: targets.map(row => row.id),
+      targetLabels: targets.map(row => row.label)
     });
     $('cleanup-count').textContent = state.count ? `${state.count}개를 골랐어요.` : '아직 고르지 않았어요.';
     const create = $('cleanup-create');
     create.textContent = state.createLabel;
-    create.disabled = !state.canCreate;
+    create.disabled = busy || !state.canCreate;
     const move = $('cleanup-move');
     move.textContent = state.moveLabel;
-    move.disabled = !state.canMove;
+    move.disabled = busy || !state.canMove;
+    const copy = $('cleanup-copy');
+    copy.textContent = state.copyLabel;
+    copy.disabled = busy || !state.canCopy;
+    $('cleanup-target-hint').textContent = state.targetHint || '옮기기는 트리 하나, 복사하기는 여러 트리를 고를 수 있어요.';
+    // '이미 있음': 고른 순간 중 같은 순간이 그 트리에 이미 있으면 붙인다(여러 개 중 일부면 그 수).
+    const moments = pickedMoments();
+    const dup = new Map(duplicatesByTree(getTrees(), moments, targetRows.map(row => row.id)).map(item => [item.treeId, item.momentIds.length]));
+    for (const row of targetRows) {
+      const n = dup.get(row.id) || 0;
+      row.badge.hidden = !n;
+      row.badge.textContent = n && moments.length > 1 && n < moments.length ? `이미 있음 ${n}개` : '이미 있음';
+    }
   }
   function fail(error) {
     $('cleanup-error').textContent = error?.message || '정리하지 못했어요. 다시 시도해 주세요.';
@@ -189,17 +232,102 @@ export function createCleanup(deps) {
       finish({ treeId: made.treeId, targetLabel: name, isNew: true });
     } catch (error) { fail(error); }
   }
-  function onMove() {
-    const target = $('cleanup-target');
-    const targetId = target.value;
-    const state = cleanupState({ selectedIds: pickedIds(), targetId, targetLabel: target.selectedOptions[0]?.textContent || '' });
-    if (!state.canMove) return;
+  // #1439: 같은 순간이 이미 있는 트리마다 한 번 묻는다 — 그래도 넣기 / 건너뛰기(그 트리에 이미 있는 순간만 뺀다).
+  // ×·Esc로 닫으면 이번 옮기기·복사하기를 하지 않는다(고른 것은 창에 그대로 남는다).
+  function askSame({ treeLabel, momentIds, moments }) {
+    if (!sameMoment) return Promise.resolve('put');
+    const dupMoments = moments.filter(m => momentIds.includes(m.id));
+    const nouns = new Set(dupMoments.map(sameMomentNoun));
+    const noun = nouns.size === 1 ? [...nouns][0] : '순간';
+    const detail = moments.length > 1 ? `'${treeLabel}' 트리 · 고른 ${moments.length}개 중 ${momentIds.length}개가 이미 있어요.` : `'${treeLabel}' 트리에 이미 있어요.`;
+    return new Promise(resolve => {
+      let settled = false;
+      const answer = value => { if (!settled) { settled = true; resolve(value); } };
+      Promise.resolve().then(() => sameMoment.open({
+        eyebrow: '순간 정리', noun, detail, showView: false,
+        onContinue: () => answer('put'), onSkip: () => answer('skip'), onCancel: () => answer('cancel')
+      })).catch(() => answer('put'));
+    });
+  }
+  async function onOrganize(mode) {
+    if (busy) return;
+    const targets = pickedTargets();
+    const ids = pickedIds();
+    const state = cleanupState({ selectedIds: ids, targetIds: targets.map(row => row.id), targetLabels: targets.map(row => row.label) });
+    if (mode === 'move' ? !state.canMove : !state.canCopy) return;
+    $('cleanup-error').textContent = '';
+    const moments = pickedMoments();
+    const plan = duplicatesByTree(getTrees(), moments, targets.map(row => row.id));
+    const skip = {};
+    if (plan.length) {
+      busy = true; sync();
+      try {
+        for (const item of plan) {
+          const row = targets.find(r => r.id === item.treeId);
+          const answer = await askSame({ treeLabel: row?.label || '', momentIds: item.momentIds, moments });
+          if (answer === 'cancel') return;
+          if (answer === 'skip') skip[item.treeId] = item.momentIds;
+        }
+      } finally { busy = false; sync(); }
+    }
+    const placed = targets.reduce((n, row) => n + ids.filter(id => !(skip[row.id] || []).includes(id)).length, 0);
+    if (!placed) { $('cleanup-error').textContent = '모두 이미 있는 순간이라 건너뛰었어요. 바뀐 것이 없어요.'; return; }
+    // 정리 결과를 셸이 다시 그리는 동안 이 창을 '쓰다 만 입력'으로 붙잡지 않는다(실패하면 되돌린다).
+    const savedBase = baseState;
+    baseState = readState();
+    const toTreeIds = targets.map(row => row.id);
+    // 지금 보고 있는 트리가 바뀌지 않으면(복사는 원래 트리를 고치지 않는다) 화면을 다시 띄우지 않고 모델만 고친다.
+    const meta = mode === 'copy' && !toTreeIds.includes(window.LT41?.tree?.id) ? { tree: true } : undefined;
+    let result;
     try {
-      for (const momentId of pickedIds()) {
-        getMember().apply('moveMoment', { toTreeId: targetId }, { treeId: fromTreeId, momentId });
-      }
-      finish({ treeId: targetId, targetLabel: target.selectedOptions[0]?.textContent || '', isNew: false });
-    } catch (error) { fail(error); }
+      result = getMember().apply('organizeMoments', { mode, momentIds: ids, toTreeIds, skip }, { treeId: fromTreeId }, meta);
+    } catch (error) { baseState = savedBase; fail(error); return; }
+    finishOrganize({ mode, result, labels: targets.map(row => row.label) });
+  }
+  function finishOrganize({ mode, result, labels }) {
+    baseState = readState();
+    $('cleanup-panel').close();
+    const stillThere = getTrees().some(t => t.id === fromTreeId);
+    if (stillThere && window.LT41?.tree?.id !== fromTreeId) choose(fromTreeId);
+    const summary = result?.summary || {};
+    organizeUndo = result?.record ? { record: result.record, mode } : null;
+    const notice = organizedNotice({ mode, targetLabels: labels, count: summary.moments || 0, skipped: summary.skipped || 0, action: organizeUndo ? '되돌리기' : '' });
+    showNotice(notice.text, notice.action ? [{ label: notice.action, onClick: onUndoOrganize }] : []);
+  }
+  let organizeUndo = null;
+  function onUndoOrganize() {
+    const undo = organizeUndo;
+    if (!undo) { hideMoveNotice(); return; }
+    const record = undo.record;
+    const touched = undo.mode === 'copy' ? record.toTreeIds : [record.fromTreeId, ...record.toTreeIds];
+    const meta = undo.mode === 'copy' && !touched.includes(window.LT41?.tree?.id) ? { tree: true } : undefined;
+    try {
+      getMember().apply('undoOrganize', { record }, { treeId: record.fromTreeId }, meta);
+    } catch (error) {
+      notify(error?.message || '되돌리지 못했어요. 다시 시도해 주세요.');
+      return;
+    }
+    organizeUndo = null;
+    hideMoveNotice();
+    notify(undo.mode === 'copy' ? '복사한 순간을 거뒀어요.' : '옮긴 순간을 원래 자리로 돌렸어요.');
+  }
+  // 셸 위쪽 안내 줄(#move-feedback) 한 벌 — 글과 단추를 그리고 공통 타이머로 거둔다.
+  function showNotice(text, actions = []) {
+    $('move-message').textContent = text;
+    const host = $('move-actions');
+    host.replaceChildren();
+    for (const action of actions) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = action.label;
+      button.onclick = action.onClick;
+      host.append(button);
+    }
+    const bar = $('move-feedback');
+    bar.hidden = false;
+    if (noticeTimer) noticeTimer.arm(bar, NOTICE_MS, hideMoveNotice);
+    else { clearTimeout(fallbackTimer); fallbackTimer = setTimeout(hideMoveNotice, NOTICE_MS); }
+    notify(text);
   }
   // 적용 뒤 셸은 결과 트리로 옮겨 간다(member-session 규칙). 정리 흐름에서는 원래 트리에 머문다(트리가 남아 있을 때).
   function finish({ treeId, targetLabel, isNew }) {
@@ -209,18 +337,7 @@ export function createCleanup(deps) {
     const stillThere = getTrees().some(t => t.id === fromTreeId);
     if (stillThere && window.LT41?.tree?.id !== fromTreeId) choose(fromTreeId);
     const notice = movedNotice({ targetLabel, isNew });
-    $('move-message').textContent = notice.text;
-    const actions = $('move-actions');
-    actions.replaceChildren();
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.textContent = notice.action;
-    button.onclick = () => { hideMoveNotice(); choose(treeId); };
-    actions.append(button);
-    $('move-feedback').hidden = false;
-    clearTimeout(noticeTimer);
-    noticeTimer = setTimeout(hideMoveNotice, 8000);
-    notify(notice.text);
+    showNotice(notice.text, [{ label: notice.action, onClick: () => { hideMoveNotice(); choose(treeId); } }]);
   }
   // #644 1: 순간 상세의 '다른 트리로 옮기기' — 트리 목록에서 고르면 바로 옮긴다.
   // 트리가 하나뿐이면(옮길 대상이 없으면) 목록 대신 기존 정리 창('새 트리 만들어 옮기기', treeFromMoments)을 연다.
@@ -271,20 +388,7 @@ export function createCleanup(deps) {
     // 원래 트리가 사라졌으면(옮긴 뒤 비어 지워진 트리) 되돌릴 길이 없다 — 안내만 보인다.
     const canUndo = getTrees().some(t => t.id === undo.fromTreeId);
     const notice = movedNotice({ targetLabel: undo.targetLabel, action: canUndo ? '되돌리기' : '' });
-    $('move-message').textContent = notice.text;
-    const actions = $('move-actions');
-    actions.replaceChildren();
-    if (notice.action) {
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.textContent = notice.action;
-      button.onclick = onUndoMove;
-      actions.append(button);
-    }
-    $('move-feedback').hidden = false;
-    clearTimeout(noticeTimer);
-    noticeTimer = setTimeout(hideMoveNotice, 8000);
-    notify(notice.text);
+    showNotice(notice.text, notice.action ? [{ label: notice.action, onClick: onUndoMove }] : []);
   }
   function onUndoMove() {
     const undo = moveUndo;
@@ -302,12 +406,13 @@ export function createCleanup(deps) {
     hideMoveNotice();
   }
   function hideMoveNotice() {
-    clearTimeout(noticeTimer);
+    noticeTimer?.cancel();
+    clearTimeout(fallbackTimer);
     $('move-feedback').hidden = true;
   }
   $('cleanup-new-name').addEventListener('input', sync);
-  $('cleanup-target').addEventListener('change', sync);
   $('cleanup-create').addEventListener('click', onCreate);
-  $('cleanup-move').addEventListener('click', onMove);
+  $('cleanup-move').addEventListener('click', () => onOrganize('move'));
+  $('cleanup-copy').addEventListener('click', () => onOrganize('copy'));
   return { open, openMove, sync, dirty, headerAvailable, hideMoveNotice, pickerLabel };
 }

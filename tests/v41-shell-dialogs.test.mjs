@@ -1,3 +1,4 @@
+import { listenOnSafePort } from './helpers/safe-port.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
@@ -587,7 +588,7 @@ test('의견 창 수치: 1440·390 밤·정원에서 창이 화면 안에 들어
     res.writeHead(200, {'content-type': TYPES[path.extname(file)] || 'application/octet-stream'});
     createReadStream(file).pipe(res);
   });
-  await new Promise(resolve => server.listen(0, resolve));
+  await listenOnSafePort(server);
   const base = `http://127.0.0.1:${server.address().port}`;
   const browser = await chromium631.launch();
   const seen = [];

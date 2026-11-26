@@ -1,3 +1,4 @@
+import { listenOnSafePort } from './helpers/safe-port.mjs';
 // #536: 넓은 화면에서 판이 오른쪽에만 차는 문제 + 머리줄 [종이|밤] 단추의 실행형 시험.
 // - 넓은 화면(2560) × 순간 1~3개: 판(.surface)이 화면 폭을 채운다(좌우 빈 공간이 한쪽으로 쏠리지 않는다).
 // - 모아둔 순간 같은 별 모양(한 뿌리 + 자식 N) 트리: 카드가 판 폭을 고르게 쓴다(한 기둥이 아니다).
@@ -62,7 +63,7 @@ function serve(extra = {}) {
     }
     res.writeHead(404); res.end('not found');
   });
-  return new Promise((ok) => server.listen(0, '127.0.0.1', () => ok(server)));
+  return listenOnSafePort(server, '127.0.0.1').then(() => server);
 }
 
 async function openHost(browser, url, { width, height, savedView } = {}) {

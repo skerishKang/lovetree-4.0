@@ -631,6 +631,145 @@ export function treeFromMoments(state, fromTreeId, momentIds, options = {}, cloc
   return { state: { version: 1, trees: [...state.trees.map(t => t.id === fromTreeId ? fromNext : t), tree], prefs: normalizePrefs(state.prefs) }, treeId: tree.id };
 }
 
+// #1439: 순간 정리 — 고른 순간을 다른 트리 하나로 옮기거나(move), 여러 트리에 복사한다(copy).
+// 옮기기는 기존 moveMoment를 한 번씩 그대로 쓴다(자식·링크·표지·빈 트리 규칙 같음).
+// 복사는 따로 노는 사본이다: 새 id를 만들고 제목·메모·감정·다음으로 간 이유(relation)·주소·구간·꼬리표는
+// 그대로 둔다. 길 연결(parentId·links)은 원래 트리의 순간을 가리키므로 비우고, 대상 트리의 시작 순간
+// 아래에 둔다 — 옮기기(moveMoment)가 붙이는 자리와 같고, 대상 트리의 이어진 길 중간에 끼워 넣지 않는다.
+// 사본에는 원본 id(copiedFrom)를 남긴다. 사본을 다시 복사해도 처음 원본을 가리킨다(같은 순간 묶음 유지).
+// skip = {트리 id: [순간 id…]} — '이미 있음'에서 건너뛰기를 고른 순간은 그 트리에만 넣지 않는다.
+// record는 undoOrganize가 이 한 번을 통째로 되돌리는 데 쓴다(관련 트리의 전·후 모습).
+export function organizeMoments(state, { mode = '', fromTreeId = '', momentIds = [], toTreeIds = [], skip = {} } = {}, clock = new Date().toISOString(), makeId = newId) {
+  if (mode !== 'move' && mode !== 'copy') throw new Error('지원하지 않는 작업이에요.');
+  const from = state.trees.find(tree => tree.id === fromTreeId);
+  if (!from) throw new Error('트리를 찾을 수 없어요.');
+  const wanted = [...new Set(Array.isArray(momentIds) ? momentIds : [])];
+  if (!wanted.length) throw new Error('옮길 순간을 먼저 골라 주세요.');
+  const sources = wanted.map(id => {
+    const moment = from.moments.find(m => m.id === id);
+    if (!moment) throw new Error('이 순간을 찾을 수 없어요.');
+    return moment;
+  });
+  const targets = [...new Set(Array.isArray(toTreeIds) ? toTreeIds : [])];
+  if (!targets.length) throw new Error('넣을 트리를 골라 주세요.');
+  if (mode === 'move' && targets.length !== 1) throw new Error('옮기기는 트리 하나만 고를 수 있어요.');
+  if (targets.includes(fromTreeId)) throw new Error('같은 트리 안에서는 옮길 수 없어요. 이전 순간 바꾸기를 사용해 주세요.');
+  for (const id of targets) if (!state.trees.some(tree => tree.id === id)) throw new Error('트리를 찾을 수 없어요.');
+  const skipped = treeId => new Set(Array.isArray(skip?.[treeId]) ? skip[treeId] : []);
+  const involved = [fromTreeId, ...targets];
+  const before = involved.map(id => {
+    const index = state.trees.findIndex(tree => tree.id === id);
+    return { id, index, tree: structuredClone(state.trees[index]) };
+  });
+  const done = [];
+  let skippedCount = 0;
+  let next = state;
+  if (mode === 'move') {
+    const toTreeId = targets[0];
+    const skipSet = skipped(toTreeId);
+    for (const moment of sources) {
+      if (skipSet.has(moment.id)) { skippedCount += 1; continue; }
+      next = moveMoment(next, fromTreeId, moment.id, toTreeId, undefined, clock).state;
+      done.push({ treeId: toTreeId, momentId: moment.id, sourceId: moment.id });
+    }
+  } else {
+    let trees = state.trees;
+    for (const toTreeId of targets) {
+      const skipSet = skipped(toTreeId);
+      const target = trees.find(tree => tree.id === toTreeId);
+      const root = target.moments.find(m => m.parentId === null)?.id || null;
+      if (!root) throw new Error('넣을 트리의 시작 순간을 찾을 수 없어요.');
+      const copies = [];
+      for (const source of sources) {
+        if (skipSet.has(source.id)) { skippedCount += 1; continue; }
+        const copy = { ...source, id: makeId(), parentId: root, links: [], createdAt: clock, copiedFrom: source.copiedFrom || source.id };
+        copies.push(copy);
+        done.push({ treeId: toTreeId, momentId: copy.id, sourceId: source.id });
+      }
+      if (!copies.length) continue;
+      if (target.moments.length + copies.length > MAX_MOMENTS) throw new Error(`한 트리에는 ${MAX_MOMENTS}개의 순간까지 담을 수 있어요.`);
+      trees = trees.map(tree => tree.id === toTreeId ? { ...tree, updatedAt: clock, moments: [...tree.moments, ...copies] } : tree);
+    }
+    next = { version: 1, trees, prefs: normalizePrefs(state.prefs) };
+  }
+  if (!done.length) throw new Error('넣을 순간이 없어요. 모두 건너뛰었어요.');
+  const validated = validateState(next);
+  const after = involved.map(id => {
+    const tree = validated.trees.find(t => t.id === id);
+    return { id, print: tree ? organizePrint(tree) : null };
+  });
+  const fromKept = validated.trees.some(tree => tree.id === fromTreeId);
+  const record = { mode, fromTreeId, toTreeIds: targets, before, after, done, at: clock };
+  return {
+    state: validated,
+    treeId: fromKept ? fromTreeId : targets[0],
+    record,
+    summary: { moments: new Set(done.map(item => item.sourceId)).size, trees: new Set(done.map(item => item.treeId)).size, placed: done.length, skipped: skippedCount }
+  };
+}
+
+// 되돌리기 판정용 모양 문자열(키 순서와 무관). 저장 직후와 같은 모양이면 그사이 아무것도 바뀌지 않은 것이다.
+function organizePrint(value) {
+  if (Array.isArray(value)) return `[${value.map(organizePrint).join(',')}]`;
+  if (value && typeof value === 'object') return `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${organizePrint(value[key])}`).join(',')}}`;
+  return JSON.stringify(value ?? null);
+}
+
+// #1439: 옮기기·복사하기 한 번을 통째로 되돌린다.
+// 그 뒤로 관련 트리가 그대로면(보통) 관련 트리를 그 전 모습으로 돌린다 — 옮긴 순간은 원래 트리의 원래 자리
+// (원래 부모·연결·다음으로 간 이유·표지)로, 옮겨서 비어 지워졌던 트리는 원래 순서 자리에 다시 생긴다.
+// 그사이 다른 저장으로 관련 트리가 바뀌었으면 그 바뀜은 지키고 이 작업으로 생긴 것만 거둔다
+// (복사는 사본만 지우고, 옮기기는 원래 트리의 원래 부모 아래로 다시 옮긴다).
+export function undoOrganize(state, record, clock = new Date().toISOString()) {
+  if (!record || (record.mode !== 'move' && record.mode !== 'copy') || !Array.isArray(record.before) || !Array.isArray(record.after) || !Array.isArray(record.done)) throw new Error('되돌릴 작업을 찾을 수 없어요.');
+  const untouched = record.after.every(({ id, print }) => {
+    const now = state.trees.find(tree => tree.id === id);
+    return print === null ? !now : !!now && organizePrint(now) === print;
+  });
+  let trees = state.trees.slice();
+  if (untouched) {
+    for (const { id, index, tree } of [...record.before].sort((a, b) => a.index - b.index)) {
+      const at = trees.findIndex(t => t.id === id);
+      if (at >= 0) trees[at] = structuredClone(tree);
+      else trees.splice(Math.min(Math.max(index, 0), trees.length), 0, structuredClone(tree));
+    }
+  } else if (record.mode === 'copy') {
+    for (const { treeId, momentId } of record.done) {
+      const tree = trees.find(t => t.id === treeId);
+      if (!tree || !tree.moments.some(m => m.id === momentId) || tree.moments.length < 2) continue;
+      const shrunk = removeMoment(tree, momentId, clock);
+      trees = trees.map(t => t.id === treeId ? shrunk : t);
+    }
+  } else {
+    const fromBefore = record.before.find(item => item.id === record.fromTreeId);
+    if (!trees.some(t => t.id === record.fromTreeId) && fromBefore) {
+      // 옮겨서 비어 지워진 트리: 원래 모습으로 다시 세우고, 대상 트리에 남은 그 순간들은 거둔다.
+      const moved = new Set(record.done.map(item => item.momentId));
+      trees = trees.map(t => {
+        if (!record.toTreeIds.includes(t.id)) return t;
+        const remaining = t.moments.filter(m => !moved.has(m.id));
+        return remaining.length && remaining.length !== t.moments.length ? { ...t, updatedAt: clock, moments: detachMoments(t, moved) } : t;
+      });
+      trees.splice(Math.min(Math.max(fromBefore.index, 0), trees.length), 0, structuredClone(fromBefore.tree));
+    } else {
+      let working = { version: 1, trees, prefs: normalizePrefs(state.prefs) };
+      for (const { treeId, momentId } of record.done) {
+        const holder = working.trees.find(t => t.id === treeId);
+        const home = working.trees.find(t => t.id === record.fromTreeId);
+        if (!holder || !home || !holder.moments.some(m => m.id === momentId)) continue;
+        const originalParent = fromBefore?.tree.moments.find(m => m.id === momentId)?.parentId || undefined;
+        const parentId = originalParent && home.moments.some(m => m.id === originalParent) ? originalParent : undefined;
+        working = moveMoment(working, treeId, momentId, record.fromTreeId, parentId, clock).state;
+      }
+      trees = working.trees;
+    }
+  }
+  const validated = validateState({ version: 1, trees, prefs: state.prefs });
+  const backTo = record.mode === 'move' && validated.trees.some(tree => tree.id === record.fromTreeId) ? record.fromTreeId
+    : validated.trees.some(tree => tree.id === record.fromTreeId) ? record.fromTreeId : (validated.trees[0]?.id || null);
+  return { state: validated, treeId: backTo, exact: untouched };
+}
+
 export function linksOf(moment) {
   return Array.isArray(moment?.links) ? moment.links : [];
 }
@@ -686,7 +825,9 @@ export function validateState(value) {
       // 틀린 구간 값은 그 필드만 버린다(순간 전체를 거부하지 않는다).
       const clean = { ...m };
       delete clean.startSeconds; delete clean.endSeconds;
-      return { ...validateMomentInput(clean), ...rangeFields(m, m.url), id: m.id, parentId: m.parentId, links: [...new Set(rawLinks)], createdAt: m.createdAt, ...boardLayoutOf(m) };
+      // #1439: 복사한 순간은 원본 순간 id(copiedFrom)를 남긴다. 원본은 다른 트리에 있거나 지워졌을 수 있어 모양만 본다.
+      const copiedFrom = idValid(m.copiedFrom) && m.copiedFrom !== m.id ? { copiedFrom: m.copiedFrom } : {};
+      return { ...validateMomentInput(clean), ...rangeFields(m, m.url), id: m.id, parentId: m.parentId, links: [...new Set(rawLinks)], createdAt: m.createdAt, ...boardLayoutOf(m), ...copiedFrom };
     });
     if (moments.filter(m => m.parentId === null).length !== 1) throw new Error('트리의 시작 순간은 하나여야 해요.');
     const byId = new Map(moments.map(m => [m.id, m]));

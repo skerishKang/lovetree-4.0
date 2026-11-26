@@ -38,7 +38,10 @@ export function projectSharedTreeFromScan(scan, treeId) {
     moments: source.moments.map(moment => {
       const url = privateMedia(moment.url) ? '' : moment.url;
       if (url !== moment.url) omittedPrivateMedia += 1;
-      return { ...moment, url, links: [...moment.links] };
+      const shared = { ...moment, url, links: [...moment.links] };
+      // #1439: 복사 원본 id(copiedFrom)는 내 다른 트리의 순간을 가리키는 안쪽 값이라 공개 사본에는 싣지 않는다.
+      delete shared.copiedFrom;
+      return shared;
     })
   };
   // #425 2번: 올린 사진 표지(coverMode=photo)는 공개 응답에서만 디자인 표지로,

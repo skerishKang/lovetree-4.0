@@ -1,3 +1,4 @@
+import { listenOnSafePort } from './helpers/safe-port.mjs';
 // #417: 보드·지도 머리의 트리 제목 ▾ — 책(#416)과 같은 내용·키보드 동작.
 // #952: 화면 배선을 글자로 고정하던 33개 단정을 걷어내고, 보드 화면을 띄워 결과로 잰다 —
 // 제목 글자·▾ 열기·행 순서(정리 전 먼저)·지금 트리 표시·행을 눌러 lt41-open-view·← 서재는
@@ -35,7 +36,7 @@ function serve(extra = {}) {
     }
     res.writeHead(404); res.end('not found');
   });
-  return new Promise((ok) => server.listen(0, '127.0.0.1', () => ok(server)));
+  return listenOnSafePort(server, '127.0.0.1').then(() => server);
 }
 
 const moment = (id, title) => ({ id, title, date: '2026-01-01', emotion: '설렘', note: '메모', parentId: null, url: '', x: 120, y: 120, rot: 0, color: 'rose', keywords: [] });

@@ -7,7 +7,7 @@ import {
 import {
   INTAKE_LOGIN_RETRY_TEXT, INTAKE_STEP_LOGIN, INTAKE_STEP_NOTICE, INTAKE_STEP_SKIP, INTAKE_STEP_WAIT,
   classifyIntake, createLoginAttemptSlot, createPendingSlot, findSameVideoInTree, intakeStep, loginAttempted,
-  readIntakeParams, resolveIntakeCandidate, resolveMediaMetadata, treesWithSameVideo,
+  readIntakeParams, resolveIntakeCandidate, resolveMediaMetadata, sameMomentNoun, treesWithSameVideo,
 } from '../quick-intake.mjs';
 import {formatDisplayDate} from '../book-usability.mjs';
 import {displayTreeTitle} from '../tree-name.mjs';
@@ -80,6 +80,7 @@ export function createQuickIntake(deps) {
           momentId: String(dup.id || ''),
           treeName: displayTreeTitle(String(inboxTree?.title || inboxTree?.subject || '') || '모아둔 순간'),
           dateText: formatDisplayDate(dup.date, 'long'),
+          noun: sameMomentNoun({ url }),
           onContinue: () => { intakeSave(url, via, { force: true }); },
         });
         return;

@@ -7,7 +7,7 @@ import {suggestMomentTitle} from '../domain.mjs';
 import {displayTreeTitle} from '../tree-name.mjs';
 import {extractDropUrl, hasDropPayload, firstImageFile, parseQuickUrl, dropRoute, previewState, previewTag, savedNoticeText, quickTreeLineText, quickTreeAfterText, quickSubmitText, quickSavedTreeText, QUICK_INBOX_LABEL, QUICK_EMPTY_ERROR, QUICK_INVALID_ERROR, DROP_LOGIN_NOTICE, DROP_READONLY_NOTICE, QUICK_PASTE_LABEL, QUICK_CLEAR_LABEL, QUICK_EMPTY_PREVIEW, QUICK_INVALID_PREVIEW, QUICK_PASTE_EMPTY, QUICK_PASTE_ERROR} from '../quick-add.mjs';
 // #876: 같은 영상 판정(quick-intake 한 벌)과 안내 창 날짜 표기(book-usability 한 벌) — 새 규칙을 만들지 않는다.
-import {findSameVideoInTree, treesWithSameVideo} from '../quick-intake.mjs';
+import {findSameVideoInTree, treesWithSameVideo, sameMomentNoun} from '../quick-intake.mjs';
 import {formatDisplayDate} from '../book-usability.mjs';
 // #627 PR B: 담은 직후 안내에 붙는 꼬리표 줄 — 그리기·누르기는 tag-line.mjs 한 벌, 규칙은 tag-model.mjs 한 벌.
 // 저장은 deps.saveTags(셸 tag-save.mjs)가 기존 경로로 keywords만 바꾼다. 쓰기 창 자체 흐름은 바꾸지 않는다.
@@ -412,6 +412,7 @@ export function createQuickAdd(deps) {
           momentId: dup.id,
           treeName: selectedTreeName(),
           dateText: formatDisplayDate(dup.date, 'long'),
+          noun: sameMomentNoun({ url }),
           onContinue: () => { saveUrl(url, { force: true }); },
         });
         return false;

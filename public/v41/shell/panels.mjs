@@ -4,7 +4,7 @@
 // 셸은 자기 상태(member·source·window.LT41·업로드)를 읽기 함수로 넘기고, 이 파일은 패널만 만진다.
 import {parentCandidates, coverModeOf, latestMomentId, validateRange, startFromUrl, fillStartFromUrl, formatTimecode} from '../domain.mjs';
 // #876: 같은 영상 판정(quick-intake 한 벌)과 안내 창 날짜 표기(book-usability 한 벌) — 새 규칙을 만들지 않는다.
-import {findSameVideoInTree, treesWithSameVideo} from '../quick-intake.mjs';
+import {findSameVideoInTree, treesWithSameVideo, sameMomentNoun} from '../quick-intake.mjs';
 import {formatDisplayDate} from '../book-usability.mjs';
 import {localDateOnly} from '../local-date.mjs';
 import {displayTreeTitle} from '../tree-name.mjs';
@@ -710,6 +710,7 @@ export function createPanels(deps) {
         momentId: dupInfo.dup.id,
         treeName: dupInfo.treeName,
         dateText: formatDisplayDate(dupInfo.dup.date, 'long'),
+        noun: sameMomentNoun(dupInfo.dup),
         onContinue: () => { editorDupBypass = true; try { $('moment-form').requestSubmit(); } finally { editorDupBypass = false; } },
       });
       return;

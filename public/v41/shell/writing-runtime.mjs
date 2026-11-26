@@ -218,6 +218,8 @@ export function createWritingRuntime(ctx){
       addTitleLabel:ADD_TITLE_LABEL,
       unavailableLabel:VIDEO_UNAVAILABLE_TEXT,
       momentTitle:moment=>{const main=titleView(moment,(0,ctx.titleDisplayValue)()).main;return main||withoutAutoTitle(moment).title;},
+      // #1439: '이미 있음'을 그래도 넣을지 묻는 창 — 쉬운 추가의 같은 영상 안내 창(#876)을 같이 쓴다.
+      sameMoment:shellVideoDup,
     })));
 
     mountThumbFallback(document,{

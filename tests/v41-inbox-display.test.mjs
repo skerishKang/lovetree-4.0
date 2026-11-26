@@ -2,7 +2,7 @@ import test from 'node:test';import assert from 'node:assert/strict';import {rea
 import {serve} from './helpers/screen-audit.mjs';
 import {createTree, addMoment} from '../public/v41/domain.mjs';
 // #327 2부: 모아둔 순간 표시·정리 화면. 계산은 inbox-model.mjs 한 벌이고, 화면은 그 결과를 그린다.
-import {INBOX_LABEL, isInboxTree, shelfOrder, pickerLabel, headerBadge, josaRo, cleanupTargets, cleanupState, movedNotice, cleanupAvailable, moveAvailable} from '../public/v41/inbox-model.mjs';
+import {INBOX_LABEL, isInboxTree, shelfOrder, pickerLabel, headerBadge, josaRo, cleanupTargets, cleanupState, movedNotice, organizedNotice, cleanupAvailable, moveAvailable} from '../public/v41/inbox-model.mjs';
 const read=p=>readFileSync(new URL(p,import.meta.url),'utf8');
 
 const inbox={id:'t1',title:'모아둔 순간',inbox:true,moments:[{id:'m1',title:'첫 순간',parentId:null},{id:'m2',title:'바다',parentId:'m1'}]};
@@ -77,6 +77,31 @@ test('movedNotice: 옮겼어요 안내와 가 보기 단추 문구',()=>{
  assert.deepEqual(movedNotice({targetLabel:'우리의 이야기'}),{text:'우리의 이야기로 옮겼어요.',action:'가 보기'});
  assert.deepEqual(movedNotice({targetLabel:'정리 시험',isNew:true}),{text:'정리 시험으로 새 트리를 만들었어요.',action:'가 보기'});
  assert.equal(movedNotice({}).text,'로 옮겼어요.');
+});
+
+// #1439: 대상 트리를 여러 개 고를 수 있다 — 옮기기는 하나일 때만, 복사하기는 하나 이상.
+test('#1439 cleanupState: 대상 여러 개 — 옮기기는 하나만, 복사하기는 여러 곳',()=>{
+ const rows=[
+  // [대상 id, 대상 이름, 옮기기 가능, 복사 가능, 옮기기 문구, 복사 문구, 안내]
+  [[],[],false,false,'옮기기','복사하기',''],
+  [['t2'],['빌리 하루나'],true,true,'빌리 하루나로 옮기기','빌리 하루나에 복사하기',''],
+  [['t2','t3'],['빌리 하루나','윤슬'],false,true,'옮기기','트리 2곳에 복사하기','옮기기는 트리 하나만 고를 수 있어요. 여러 트리에는 복사할 수 있어요.'],
+ ];
+ for(const [ids,labels,move,copy,moveLabel,copyLabel,hint] of rows){
+  const s=cleanupState({selectedIds:['m1','m2'],targetIds:ids,targetLabels:labels});
+  assert.equal(s.canMove,move,ids.join()+' 옮기기');assert.equal(s.canCopy,copy,ids.join()+' 복사');
+  assert.equal(s.moveLabel,moveLabel);assert.equal(s.copyLabel,copyLabel);assert.equal(s.targetHint,hint);
+ }
+ const none=cleanupState({targetIds:['t2'],targetLabels:['빌리 하루나']});
+ assert.equal(none.canCopy,false,'순간을 고르지 않으면 복사도 막힌다');assert.equal(none.copyLabel,'복사하기');
+});
+
+test('#1439 organizedNotice: 옮기기·복사하기 한 번 뒤 안내 한 줄과 되돌리기 단추',()=>{
+ assert.deepEqual(organizedNotice({mode:'move',targetLabels:['빌리 하루나'],count:2,action:'되돌리기'}),{text:'빌리 하루나로 2개 옮겼어요.',action:'되돌리기'});
+ assert.equal(organizedNotice({mode:'move',targetLabels:['우리의 밤'],count:1}).text,'우리의 밤으로 1개 옮겼어요.');
+ assert.equal(organizedNotice({mode:'copy',targetLabels:['빌리 하루나'],count:2}).text,'빌리 하루나에 2개 복사했어요.');
+ assert.equal(organizedNotice({mode:'copy',targetLabels:['빌리 하루나','윤슬','바다'],count:1}).text,'트리 3곳에 1개 복사했어요.');
+ assert.equal(organizedNotice({mode:'copy',targetLabels:['빌리 하루나'],count:1,skipped:1}).text,'빌리 하루나에 1개 복사했어요. 이미 있는 1개는 건너뛰었어요.');
 });
 
 test('cleanupAvailable: 내 기록(서버·소유자)의 inbox 트리에서만 정리 화면을 연다',()=>{
