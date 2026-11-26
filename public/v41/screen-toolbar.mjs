@@ -88,6 +88,13 @@ function prepareTreeChoice(bar, screen, title, titleFrom) {
     }
   };
   refresh();
+  // Keep the visible label synchronized even when book title is changed outside the toolbar.
+  // The auxiliary hidden book header is still the source for legacy readers.
+  if (!own && titleFrom && typeof MutationObserver === 'function') {
+    new MutationObserver(() => {
+      name.textContent = String(titleFrom.textContent || source()?.tree?.title || '').trim();
+    }).observe(titleFrom, {childList:true,characterData:true,subtree:true});
+  }
   return refresh;
 }
 export function mountScreenToolbar({ screen, titleFrom, tools = [], initialBar = null, backEl = null, meta = false }) {
