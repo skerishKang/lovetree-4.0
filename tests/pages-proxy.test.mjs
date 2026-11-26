@@ -86,6 +86,21 @@ test('순간 하나의 ♡·댓글 경로는 서버로 넘기고 메서드 밖�
     assert.equal(fetcher.calls.length,0);
   }
 });
+
+test('#1356 내 순간 경로는 GET만 넘기고 나머지 메서드는 막는다(CTO 허락으로 프록시 한 줄 추가)', async () => {
+  const base = 'https://lovetree.example', path = '/api/community/me/moments';
+  const fetcher = recorder(new Response('{}', { headers: { 'content-type': 'application/json' } }));
+  const result = await onRequest(createProxy({ fetcher }), base + path, { method: 'GET' });
+  assert.equal(fetcher.calls.length, 1);
+  assert.equal(fetcher.calls[0].url, UPSTREAM + path);
+  assert.equal(fetcher.calls[0].method, 'GET');
+  assert.equal(result.status, 200);
+  for (const method of ['POST', 'PUT', 'DELETE']) {
+    const blocked = recorder(new Response());
+    assert.equal((await onRequest(createProxy({ blocked }), base + path, { method })).status, 405, path + ' ' + method);
+    assert.equal(blocked.calls.length, 0);
+  }
+});
 const onRequest = (proxy, url, init, extraEnv = {}) => proxy({ request: new Request(url, init), env: { LOVETREE_API_ORIGIN: UPSTREAM, ...extraEnv } });
 
 function recorder(reply) {

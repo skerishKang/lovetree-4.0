@@ -1,6 +1,7 @@
 // #547: '오늘' 날짜는 기기의 지역 날짜로 만든다(UTC 날짜였을 때 새벽 순간이 하루 전으로 찍혔다).
 import { localDateOnly } from './local-date.mjs';
 import { isAutoTitle, autoTitleFor } from './auto-title.mjs';
+import { DEFAULT_TREE_OPEN_VIEW, normalizeTreeOpenView } from './tree-open-view.mjs';
 
 // #792: 순간 구간의 순수 계산(서버 사본 src/moment-range.js와 같은 규칙 — tests/moment-range-792.test.mjs가 대조).
 export const MAX_RANGE_SECONDS = 12 * 60 * 60;
@@ -11,6 +12,12 @@ export function parseTimecode(value) {
   let seconds;
   if (/^\d+$/.test(raw)) {
     seconds = Number(raw);
+  } else if (/^\d+m(?:\d+s?)?$/.test(raw)) {
+    // #1316: 주소의 t=1m35s처럼 분·초를 붙여 쓴 값도 같은 해석 함수에서 초로 바꾼다.
+    const parts = raw.match(/^(\d+)m(?:(\d+)s?)?$/);
+    const minute = Number(parts[1]), second = Number(parts[2] || 0);
+    if (second >= 60) return null;
+    seconds = minute * 60 + second;
   } else {
     const parts = raw.split(':');
     if (parts.length < 2 || parts.length > 3 || parts.some(part => !/^\d{1,2}$/.test(part))) return null;
@@ -407,7 +414,7 @@ export function createTree(input, clock = new Date().toISOString()) {
   const subject = requireText(input.subject, '좋아하는 대상', 60);
   const moment = { ...validateMomentInput(input), id: newId(), parentId: null, relation: '', links: [], createdAt: clock };
   // #212: 자동 접미사(", 나의 순간들")는 더 붙이지 않는다. 표시 단계 규칙은 tree-name.mjs.
-  return { id: newId(), subject, title: subject, coverMomentId: '', coverDesign: '', inbox: false, createdAt: clock, updatedAt: clock, moments: [moment] };
+  return { id: newId(), subject, title: subject, openView: normalizeTreeOpenView(input.openView), coverMomentId: '', coverDesign: '', inbox: false, createdAt: clock, updatedAt: clock, moments: [moment] };
 }
 export function editTree(tree, input, clock = new Date().toISOString()) {
   const title = requireText(input.title, '트리 이름', 100);
@@ -418,8 +425,11 @@ export function editTree(tree, input, clock = new Date().toISOString()) {
   // #380 5번: 표지 방법(basic·moment·design·photo)은 따로 저장한다. 고른 방법 하나만 표지가 되고,
   // 고르지 않은 곳의 저장값은 지우지 않는다(되돌리면 그대로 다시 보인다).
   const coverMode = normalizeCoverMode(input.coverMode);
-  if (tree.title === title && tree.subject === subject && (tree.coverMomentId || '') === coverMomentId && (tree.coverDesign || '') === coverDesign && (tree.coverMode || '') === coverMode) return tree;
-  const next = { ...tree, title, subject, coverMomentId, coverDesign, updatedAt: clock };
+  const openView = normalizeTreeOpenView(input.openView === undefined ? tree.openView : input.openView);
+  if (tree.openView === openView && tree.title === title && tree.subject === subject &&
+      (tree.coverMomentId || '') === coverMomentId && (tree.coverDesign || '') === coverDesign &&
+      (tree.coverMode || '') === coverMode) return tree;
+  const next = { ...tree, title, subject, openView, coverMomentId, coverDesign, updatedAt: clock };
   // 방법을 고르지 않은 옛 저장본에는 빈 값을 새로 심지 않는다(모양을 그대로 둔다).
   if (coverMode) next.coverMode = coverMode; else delete next.coverMode;
   return next;
@@ -542,7 +552,11 @@ export function latestMomentId(tree) {
 
 export function quickAdd(state, input, clock = new Date().toISOString()) {
   // #344: 빠른 추가도 미리보기 때 받은 영상 제목(mediaMetadata)을 저장에 함께 넘긴다.
-  const moment = { ...validateMomentInput({ url: input?.url || '', mediaMetadata: input?.mediaMetadata }), id: newId(), parentId: null, relation: '', links: [], createdAt: clock };
+  // #1316: 주소의 시작 초는 기존 자동 채움 함수로 읽어 일반 추가와 같은 규칙으로 저장한다.
+  const url = input?.url || '';
+  const fromUrl = fillStartFromUrl(url, '');
+  const source = { url, mediaMetadata: input?.mediaMetadata, ...(fromUrl === null ? {} : { startSeconds: fromUrl }) };
+  const moment = { ...validateMomentInput(source), id: newId(), parentId: null, relation: '', links: [], createdAt: clock };
   const trees = state.trees;
   // #638(고른 트리 우선, CTO 결정 2026-11-15): 지금 고른 트리(input.treeId)에 담는다. 예전(#327)에는
   // 빠른 추가를 일부러 '모아둔 순간'(inbox)에 담았지만, 트리를 고른 채 담으면 엉뚱한 첫 트리에 들어가는
@@ -553,17 +567,17 @@ export function quickAdd(state, input, clock = new Date().toISOString()) {
     // 이슈 671: '그 순간 다음에 담기'(input.parentId)가 이 트리의 순간이면 그 순간 바로 다음에 잇는다.
     // 목적지가 없거나 못 찾으면(오래된 화면·지워진 순간) 기존 규칙대로 가장 최근 순간 다음에 담는다.
     const after = chosen.moments.some(m => m.id === input?.parentId) ? input.parentId : (latestMomentId(chosen) || chosen.moments.find(m => m.parentId === null).id);
-    const grown = addMoment(chosen, { url: input?.url || '', mediaMetadata: input?.mediaMetadata }, after, clock);
+    const grown = addMoment(chosen, source, after, clock);
     return { state: { version: 1, trees: trees.map(tree => tree.id === chosen.id ? grown : tree), prefs: normalizePrefs(state.prefs) }, treeId: chosen.id, momentId: grown.moments.at(-1).id };
   }
   const inbox = trees.find(tree => tree.inbox === true);
   if (!inbox) {
     if (trees.length >= MAX_TREES) throw new Error(`트리는 ${MAX_TREES}개까지 만들 수 있어요.`);
-    const tree = { id: newId(), subject: INBOX_SUBJECT, title: INBOX_SUBJECT, coverMomentId: '', coverDesign: '', inbox: true, createdAt: clock, updatedAt: clock, moments: [moment] };
+    const tree = { id: newId(), subject: INBOX_SUBJECT, title: INBOX_SUBJECT, openView: DEFAULT_TREE_OPEN_VIEW, coverMomentId: '', coverDesign: '', inbox: true, createdAt: clock, updatedAt: clock, moments: [moment] };
     return { state: { version: 1, trees: [...trees, tree], prefs: normalizePrefs(state.prefs) }, treeId: tree.id, momentId: moment.id };
   }
   // '가' 결정: 빠른 추가는 이전 순간을 고를 길이 없으므로 가장 최근 순간 다음에 잇는다(첫 순간 하나뿐이면 첫 순간).
-  const grown = addMoment(inbox, { url: input?.url || '', mediaMetadata: input?.mediaMetadata }, latestMomentId(inbox) || inbox.moments.find(m => m.parentId === null).id, clock);
+  const grown = addMoment(inbox, source, latestMomentId(inbox) || inbox.moments.find(m => m.parentId === null).id, clock);
   return { state: { version: 1, trees: trees.map(tree => tree.id === inbox.id ? grown : tree), prefs: normalizePrefs(state.prefs) }, treeId: inbox.id, momentId: grown.moments.at(-1).id };
 }
 
@@ -610,7 +624,7 @@ export function treeFromMoments(state, fromTreeId, momentIds, options = {}, cloc
   });
   if (state.trees.length >= MAX_TREES) throw new Error(`트리는 ${MAX_TREES}개까지 만들 수 있어요.`);
   const root = { ...moving[0], parentId: null, relation: '', links: [] };
-  const tree = { id: newId(), subject, title: `${subject}, 나의 순간들`, coverMomentId: '', coverDesign: '', inbox: false, createdAt: clock, updatedAt: clock, moments: [root, ...moving.slice(1).map(m => ({ ...m, parentId: root.id, relation: '', links: [] }))] };
+  const tree = { id: newId(), subject, title: `${subject}, 나의 순간들`, openView: DEFAULT_TREE_OPEN_VIEW, coverMomentId: '', coverDesign: '', inbox: false, createdAt: clock, updatedAt: clock, moments: [root, ...moving.slice(1).map(m => ({ ...m, parentId: root.id, relation: '', links: [] }))] };
   const moments = detachMoments(from, movedIds);
   if (!moments.length) return { state: { version: 1, trees: [...state.trees.filter(t => t.id !== fromTreeId), tree], prefs: normalizePrefs(state.prefs) }, treeId: tree.id };
   const fromNext = { ...from, coverMomentId: movedIds.has(from.coverMomentId) ? '' : from.coverMomentId || '', updatedAt: clock, moments };
@@ -693,7 +707,7 @@ export function validateState(value) {
     const coverMode = normalizeCoverMode(tree.coverMode);
     const inbox = tree.inbox === true && !inboxSeen;
     if (inbox) inboxSeen = true;
-    const out = { id: tree.id, subject: requireText(tree.subject, '대상', 60), title: requireText(tree.title, '트리 제목', 100), coverMomentId, coverDesign, inbox, createdAt: tree.createdAt, updatedAt: tree.updatedAt, moments };
+    const out = { id: tree.id, subject: requireText(tree.subject, '대상', 60), title: requireText(tree.title, '트리 제목', 100), openView: normalizeTreeOpenView(tree.openView), coverMomentId, coverDesign, inbox, createdAt: tree.createdAt, updatedAt: tree.updatedAt, moments };
     if (coverMode) out.coverMode = coverMode;
     return out;
   });

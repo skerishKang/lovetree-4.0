@@ -3,8 +3,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createWorkspaceService } from '../server/workspace-service.js';
 import { createMemoryWorkspaceRepo } from '../server/testing/memory-workspace-repo.js';
-import { createTree, addMoment, validateState, validateMomentInput as serverValidate } from '../src/domain.js';
-import { validateMomentInput as browserValidate } from '../public/v41/domain.mjs';
+import { createTree, addMoment, validateState, validateMomentInput as serverValidate, quickAdd as serverQuickAdd } from '../src/domain.js';
+import { validateMomentInput as browserValidate, quickAdd as browserQuickAdd } from '../public/v41/domain.mjs';
 import * as server from '../src/moment-range.js';
 import * as browser from '../public/v41/domain.mjs';
 import {CAPTURE_DEFAULT_SECONDS, capturedRange, endForDuration, endTextForDuration, loopBoundaryReached, createSegmentCapture} from '../public/v41/segment-capture.mjs';
@@ -19,8 +19,9 @@ for (const [name, lib] of [['서버', server], ['화면', browser]]) {
     assert.equal(lib.parseTimecode('1:02:30'), 3750);
     assert.equal(lib.parseTimecode('90'), 90);
     assert.equal(lib.parseTimecode('0'), 0);
+    assert.equal(lib.parseTimecode('1m35s'), 95);
     assert.equal(lib.parseTimecode('12:00:00'), 43200);
-    for (const bad of ['1:60', '1:02:60', '12:00:01', '-1', '43201', '1:2:3:4', 'abc', '1:30s', '', null]) {
+    for (const bad of ['1:60', '1:02:60', '12:00:01', '-1', '43201', '1:2:3:4', 'abc', '1:30s', '1m60s', '', null]) {
       assert.equal(lib.parseTimecode(bad), null, `${JSON.stringify(bad)}는 틀린 값`);
     }
   });
@@ -201,4 +202,26 @@ test('#792 2단계: 재생기에서 담기·길이 단추·반복이 칸 값을 
   assert.equal(seeks.at(-1), 90, '끝에 닿으면 시작으로 돌아간다');
   assert.ok(plays >= 2, '반복 재생한다');
   controller.destroy();
+});
+
+test('#1316 쉬운 추가는 주소의 시작 초를 일반 추가와 같은 해석으로 저장한다', () => {
+  const clock = '2026-11-26T00:00:00.000Z';
+  const cases = [
+    ['https://youtu.be/abcdefghijk?t=95', 95],
+    ['https://youtu.be/abcdefghijk?t=95s', 95],
+    ['https://www.youtube.com/watch?v=abcdefghijk&t=1m35s', 95],
+    ['https://www.youtube.com/watch?v=abcdefghijk&start=95', 95],
+    ['https://youtu.be/abcdefghijk', 0],
+    ['https://youtu.be/abcdefghijk?t=abc', 0],
+  ];
+  for (const [name, quickAdd] of [['서버', serverQuickAdd], ['화면', browserQuickAdd]]) {
+    for (const [url, expected] of cases) {
+      const saved = quickAdd({ version: 1, trees: [], prefs: {} }, { url }, clock).state.trees[0].moments[0];
+      assert.equal(saved.startSeconds ?? 0, expected, `${name} ${url}`);
+      assert.equal(saved.url, url, `${name} 주소는 그대로`);
+    }
+  }
+  const tree = createTree({ ...BASE, subject: '시험' }, clock);
+  const normal = addMoment(tree, { ...BASE, title: '둘째', startSeconds: '01:35' }, tree.moments[0].id, clock);
+  assert.equal(normal.moments.at(-1).startSeconds, 95, '일반 추가는 명시한 시작 초를 지킨다');
 });
