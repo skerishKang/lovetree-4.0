@@ -1,3 +1,4 @@
+import { listenOnSafePort } from './helpers/safe-port.mjs';
 // 보드·책 겹(패널)의 키보드 초점 계약 — 실제 화면에서 잰다(브라우저 없는 곳은 건너뜀, CI 미리보기 잡은 REQUIRE=1).
 // 계약:
 //  1) 닫힌 겹은 탭이 들어가지 못한다(inert) — 이 화면의 겹 몇몇은 display:none 대신 transform·opacity로
@@ -44,7 +45,7 @@ function serve(root) {
     }
     res.writeHead(404); res.end('not found');
   });
-  return new Promise((ok) => server.listen(0, '127.0.0.1', () => ok(server)));
+  return listenOnSafePort(server, '127.0.0.1').then(() => server);
 }
 
 async function openScreen(browser, base, hash) {

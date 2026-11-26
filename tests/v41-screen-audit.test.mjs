@@ -17,6 +17,8 @@ import { fileURLToPath } from 'node:url';
 import { serve, auditPage, failuresOf, roleStyleFn, assertRolePair } from './helpers/screen-audit.mjs';
 import { createTree, addMoment } from '../public/v41/domain.mjs';
 import { observeFrameMatrix } from './helpers/frame-observation.mjs';
+import { EventEmitter } from 'node:events';
+import { listenOnSafePort } from './helpers/safe-port.mjs';
 
 const REQUIRE = process.env.LT_SCREEN_AUDIT_REQUIRE === '1';
 const SCREEN_AUDIT_CAPTURE_DIR = fileURLToPath(new URL('../test-results/v41-screen-audit/', import.meta.url));
@@ -3579,4 +3581,35 @@ test('#1362 확장: 여섯 화면 선택 탭 채움·쉬는 테두리 역할 변
     }
   } finally { await browser.close(); server.close(); }
   assert.ok(pairs.length >= 24, `역할 색 검사 24쌓 — 실제 ${pairs.length}`);
+});
+
+// #1420: Chromium이 막는 포트를 받으면 닫고 다시 받는지, 상한을 넘으면 분명히 실패하는지.
+function fakeServer(ports) {
+  const server = new EventEmitter();
+  let current = null;
+  let listens = 0;
+  let closes = 0;
+  server.listen = (_port, ...args) => {
+    listens += 1;
+    const done = args.find(arg => typeof arg === 'function');
+    current = ports.shift();
+    setImmediate(() => done?.());
+    return server;
+  };
+  server.address = () => ({ port: current });
+  server.close = done => { closes += 1; setImmediate(() => done?.()); return server; };
+  return { server, stats: () => ({ listens, closes }) };
+}
+
+test('#1420 막힌 포트를 받으면 닫고 다시 받아 안전한 포트를 쓴다', async () => {
+  const { server, stats } = fakeServer([5061, 6668, 4102]);
+  const port = await listenOnSafePort(server, '127.0.0.1');
+  assert.equal(port, 4102);
+  assert.deepEqual(stats(), { listens: 3, closes: 2 });
+});
+
+test('#1420 다시 받는 횟수가 상한을 넘으면 분명한 오류로 끝난다', async () => {
+  const { server, stats } = fakeServer([6669, 6669, 6669]);
+  await assert.rejects(listenOnSafePort(server, '127.0.0.1', { maxTries: 3 }), /다시 받았지만/);
+  assert.deepEqual(stats(), { listens: 3, closes: 3 });
 });

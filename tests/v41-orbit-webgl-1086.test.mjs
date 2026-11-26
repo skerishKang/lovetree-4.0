@@ -1,3 +1,4 @@
+import { listenOnSafePort } from './helpers/safe-port.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {cardPose,hitProjective,sortPaintOrder} from '../src/views/orbit-canvas.js';
@@ -54,7 +55,7 @@ test('#1086 실제 기존 DOM과 새 그림판의 카드 28장 쌓임 순서와 
   if((await stat(file)).isDirectory())file=path.join(file,'index.html');
   res.writeHead(200,{'Content-Type':mime[path.extname(file)]||'application/octet-stream'});res.end(await readFile(file));
  }catch{res.writeHead(404);res.end();}});
- await new Promise(r=>server.listen(0,'127.0.0.1',r));const base='http://127.0.0.1:'+server.address().port;
+ await listenOnSafePort(server, '127.0.0.1');const base='http://127.0.0.1:'+server.address().port;
  let browser;const results={};
  try{
   browser=await chromium.launch({headless:true});

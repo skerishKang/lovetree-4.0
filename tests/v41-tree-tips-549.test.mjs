@@ -1,3 +1,4 @@
+import { listenOnSafePort } from './helpers/safe-port.mjs';
 import {clickToolbarTreeChoice,treeChoiceExpanded,treeChoiceFocused} from './helpers/tree-picker-pr3.mjs';
 // #549: '첫 트리를 만들었어요' 안내와 모달 창의 관계. 원래 #566은 창이 열려 있는 동안 안내를 창 안
 // 맨 위로 옮겨 붙였지만, 안내 판이 창 내용 위에 포개지는 일이 반복됐다(#845·#846 사용 일지 — 순간 추가·
@@ -37,7 +38,7 @@ function serve(root) {
     }
     res.writeHead(404); res.end('not found');
   });
-  return new Promise((ok) => server.listen(0, '127.0.0.1', () => ok(server)));
+  return listenOnSafePort(server, '127.0.0.1').then(() => server);
 }
 
 // 첫 트리 안내가 뜨는 상태 = 서버 기록에 트리 1개(순간 1개). 도메인 검증(validateState)을 통과하는 최소 모양.

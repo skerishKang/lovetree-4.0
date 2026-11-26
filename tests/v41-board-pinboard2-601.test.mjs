@@ -1,3 +1,4 @@
+import { listenOnSafePort } from './helpers/safe-port.mjs';
 // #601: 핀보드 2차 — 실행 계약.
 // 1) 배치 모드: '날짜순 | 내 배치' 전환(기본 날짜순). 카드를 끌면 '내 배치'로 자동 전환·저장.
 //    전환은 저장 자리를 지우지 않는다('정렬 되돌리기' 대체). 근본 수리: 옛 관계 배치의 x·y는
@@ -64,7 +65,7 @@ function serve(extra = {}) {
     }
     res.writeHead(404); res.end('not found');
   });
-  return new Promise((ok) => server.listen(0, '127.0.0.1', () => ok(server)));
+  return listenOnSafePort(server, '127.0.0.1').then(() => server);
 }
 
 const hostHTML = (tree) => `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>보드 호스트</title></head><body data-member="in" data-record-source="server">

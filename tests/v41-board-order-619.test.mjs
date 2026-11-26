@@ -1,3 +1,4 @@
+import { listenOnSafePort } from './helpers/safe-port.mjs';
 // #619-6 '내 배치' = 끌어서 끼워 넣고 순서로 저장한다.
 // 저장 경로는 서버 문서 PUT 그대로 — 좌표 y 값에 순위(-10000+rank)를 실어 보내고, 서버 검증(boardLayoutOf)은 그대로 통과시킨다(서버·DB 변경 없음).
 // 크롬 화면 시험은 LT_BOARD_ORDER_619_REQUIRE=1.
@@ -100,7 +101,7 @@ function serve(extra = {}) {
     res.writeHead(200, { 'content-type': MIME[path.extname(file)] || 'application/octet-stream' });
     res.end(body);
   });
-  return new Promise((ok) => server.listen(0, '127.0.0.1', () => ok(server)));
+  return listenOnSafePort(server, '127.0.0.1').then(() => server);
 }
 
 const starTree = (n, { old = false, mixed = false } = {}) => {

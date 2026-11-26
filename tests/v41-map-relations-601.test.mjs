@@ -1,3 +1,4 @@
+import { listenOnSafePort } from './helpers/safe-port.mjs';
 // #601 관계 지도 다듬기 — 실행형 시험.
 // ① 새 순간 기본 연결(가 결정): 이전 순간을 고르지 않으면 첫 순간이 아니라 가장 최근 순간 다음에 잇는다.
 // ② 점 이름표: 자동 제목('youtube.com에서 간직한 순간')이 제목 자리를 차지하지 않고, 썸네일이 붙는다.
@@ -39,7 +40,7 @@ async function serve() {
     }
     res.writeHead(404); res.end('not found');
   });
-  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  await listenOnSafePort(server, '127.0.0.1');
   return server;
 }
 // 지도 한 장을 셸 없이 직접 연다(셸이 LT41로 넘기는 문맥을 같은 모양으로 심는다).

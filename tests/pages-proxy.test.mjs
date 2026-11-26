@@ -1,3 +1,4 @@
+import { listenOnSafePort } from './helpers/safe-port.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
@@ -350,7 +351,7 @@ test('실제 fetch로 PUT 본문을 넘기면 업스트림이 끝까지 받는�
       res.end(JSON.stringify({ revision: 1, savedAt: '2026-10-28T00:00:00.000Z' }));
     });
   });
-  await new Promise((resolve) => upstream.listen(0, '127.0.0.1', resolve));
+  await listenOnSafePort(upstream, '127.0.0.1');
   try {
     const payload = JSON.stringify({ state: { version: 1, trees: [] }, expectedRevision: 0, clientKey: 'ck-1' });
     const response = await createProxy()({

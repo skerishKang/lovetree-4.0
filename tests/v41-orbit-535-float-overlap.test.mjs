@@ -1,3 +1,4 @@
+import { listenOnSafePort } from './helpers/safe-port.mjs';
 // #535: 첫 화면 카드가 "떠 있는" 느낌 + 카드끼리 겹침 줄이기 + 끄는 동안 무거움을 실제 화면에서 잰다.
 // - 떠 있음: 카드 하나의 24초 이동 폭·이동 거리. 동작 줄이기(prefers-reduced-motion)면 거의 멈춘다.
 // - 유휴 그리기: 5초 동안 requestAnimationFrame 요청 수가 크게 늘지 않는다.
@@ -136,7 +137,7 @@ function serve() {
     }
     res.writeHead(404); res.end('not found');
   });
-  return new Promise((ok) => server.listen(0, '127.0.0.1', () => ok(server)));
+  return listenOnSafePort(server, '127.0.0.1').then(() => server);
 }
 
 // 첫 화면 안쪽(orbit) 문서를 찾는다.
