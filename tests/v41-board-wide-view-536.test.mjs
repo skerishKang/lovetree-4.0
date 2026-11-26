@@ -307,3 +307,202 @@ test('#972 cinema button stays outside cards and mobile selection is opaque', { 
     }
   } finally { await browser.close(); server.close(); }
 });
+
+test('#1359 넓은 보드와 지도, 최근 순간 및 휴대폰 회귀', {skip: REQUIRE ? false : skip, timeout: 300000}, async () => {
+  if (skip) assert.fail(String(skip));
+  const server = await serve();
+  const base = 'http://127.0.0.1:' + server.address().port;
+  const browser = await chromium.launch({headless:true});
+  async function open(screen, width, height, theme, n, baseline = false) {
+    const page = await browser.newPage({viewport:{width,height},reducedMotion:'reduce',deviceScaleFactor:1});
+    await page.route('**/*', route => {
+      const url = route.request().url();
+      if (!url.startsWith(base)) return route.abort();
+      if (baseline && /wide-info-panel\.(js|css)$/.test(url)) return route.fulfill({status:200,contentType:url.endsWith('.js')?'text/javascript':'text/css',body:''});
+      return route.continue();
+    });
+    // 같은 데이터의 모바일 전후를 같은 애니메이션 시각에서 비교한다.
+    if (width === 390) await page.addInitScript(() => {
+      Object.defineProperty(performance, 'now', { configurable: true, value: () => 1000 });
+    });
+    await page.addInitScript(({tree,theme}) => {
+      localStorage.setItem('lt41.theme',theme);
+      window.LT41={tree,source:'example',writable:false,momentId:tree.moments[0].id,prefs:{titleDisplay:'both'}};
+    },{tree:chainTree(n),theme});
+    await page.goto(base + '/v41/views/track' + (screen==='board'?'58-pinboard':'56-network') + '.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(screen => screen==='board' ? document.querySelectorAll('#cardLayer .card').length>0 : !!window.__lt, screen);
+    // 지도 도구 줄은 모듈에서 장착되므로 초기 화면 이동 중에 전후를 비교하지 않는다.
+    if (screen === 'network') await page.waitForSelector('.lt-screen-toolbar', { state: 'attached' });
+    await page.evaluate(() => document.fonts.ready);
+    return page;
+  }
+  try {
+    for(const screen of ['board','network']) for(const [width,height] of [[1280,800],[1440,900],[1920,1080]]) for(const theme of ['night','garden']) for(const n of [5,40,54]) {
+      const page = await open(screen,width,height,theme,n);
+      try {
+        const g = await page.evaluate(n => {
+          const app=document.querySelector('.app'), surface=document.querySelector('.surface');
+          const style=el=>getComputedStyle(el);
+          return {overflow:document.documentElement.scrollWidth-innerWidth, panel:!!document.querySelector('.lt1359-info'),cols:window.LT58Model?.gridColumns(innerWidth,n),
+            appBg:style(app).backgroundColor, surfaceBg:surface?style(surface).backgroundColor:null,
+            appImage:style(app).backgroundImage,surfaceImage:surface?style(surface).backgroundImage:null};
+        },n);
+        assert.equal(g.overflow,0);
+        assert.equal(g.panel,n===5);
+        if(screen==='board') {
+          const geometry=await page.evaluate(() => {
+            const rects=[...document.querySelectorAll('#cardLayer .card')].map(c=>c.getBoundingClientRect());
+            return {count:rects.length,min:Math.min(...rects.map(r=>r.left)),max:Math.max(...rects.map(r=>r.right))};
+          });
+          assert.equal(geometry.count,n);
+          assert.ok(geometry.min>=0,screen+' '+width+' '+theme+' '+n+' 왼쪽 카드 잘림: '+JSON.stringify(geometry));
+          assert.ok(geometry.max<=width,screen+' '+width+' '+theme+' '+n+' 오른쪽 카드 잘림: '+JSON.stringify(geometry));
+          if(n===54) assert.ok(Math.abs(geometry.min-(width-geometry.max))<=60,'좌우 여백 대칭: '+JSON.stringify(geometry));
+        }
+        if(screen==='board' && n===54){
+          assert.equal(g.cols,width===1280?4:width===1440?5:7);
+          assert.equal(g.appBg,g.surfaceBg);
+          assert.equal(g.appImage,'none');assert.equal(g.surfaceImage,'none');
+        }
+        if(n===5){
+          const button=page.locator('.lt1359-info button').first();
+          assert.equal(await page.locator('.lt1359-info button').count(),3);
+          const box=await button.boundingBox();assert.ok(box.width>=44&&box.height>=44);
+          const id=await button.getAttribute('data-moment-id');
+          if(theme==='garden'){await button.focus();await button.press('Enter');}else await button.click();
+          // 상세 제목에는 메모 유형을 표시할 수 있으므로 선택된 순간 ID와 열린 상태를 함께 검사한다.
+          await page.waitForFunction(({screen,id}) =>
+            document.querySelector('#detail')?.classList.contains('open') &&
+            (screen==='board'
+              ? document.querySelector('#cardLayer .card.selected')?.dataset.id===id
+              : window.__lt?.state?.selected?.id===id),
+            {screen,id}
+          );
+        }
+      } finally {await page.close();}
+    }
+    for(const screen of ['board','network']) {
+      const page=await open(screen,1440,900,'night',54);
+      try {
+        const measure=()=>page.evaluate(screen => {
+          if(screen==='board') {
+            const cards=[...document.querySelectorAll('#cardLayer .card')].map(c=>c.getBoundingClientRect());
+            return {cols:LT58Model.gridColumns(innerWidth,54),min:Math.min(...cards.map(c=>c.left)),max:Math.max(...cards.map(c=>c.right))};
+          }
+          return {width:innerWidth,box:window.__lt?.box()};
+        },screen);
+        const first=await measure();
+        await page.setViewportSize({width:1920,height:1080});
+        await page.waitForFunction(() => innerWidth===1920);
+        await page.evaluate(() => new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+        const second=await measure();
+        if(screen==='board') {
+          assert.equal(first.cols,5);
+          assert.equal(second.cols,7);
+          assert.ok(second.min>=0&&second.max<=1920,'크기 변경 뒤 카드 가로 잘림 없음');
+        } else {
+          assert.ok(second.box.w>first.box.w,'지도 1920 배치 영역 확대');
+        }
+      } finally {await page.close();}
+    }
+    const settleMobile = async page => {
+      await page.evaluate(() => {
+        // 기존 시간 변화 장식은 비교 캡처에서만 멈춘다. 제품 CSS는 변경하지 않는다.
+        for (const animation of document.getAnimations()) {
+          animation.pause();
+          try { animation.currentTime = 0; } catch {}
+        }
+        const glow = document.querySelector('.spaceGlow');
+        if (glow) glow.style.visibility = 'hidden';
+        if (window.__lt?.state) window.__lt.state.revealStart = 0;
+        window.__lt?.resize?.();
+      });
+      await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    };
+    const mobileAppearance = async page => page.evaluate(() => [...document.querySelectorAll('body, .app, .boardFrame, #viewport, #world, .surface, #cardLayer, .card, #stage, .topbar, .lt-screen-toolbar, .hero, .detail, button')].map(el => {
+      const r=el.getBoundingClientRect(),s=getComputedStyle(el);
+      return [el.tagName,el.id,el.className?.baseVal || el.className,
+        r.x,r.y,r.width,r.height,s.display,s.visibility,s.color,s.backgroundColor,s.backgroundImage,
+        s.fontFamily,s.fontSize,s.borderColor,s.padding,s.margin,s.transform];
+    }));
+    for(const screen of ['board','network']) for(const theme of ['night','garden']) for(const n of [5,54]){
+      const page=await open(screen,390,844,theme,n,true);
+      try{
+        await settleMobile(page);
+        const appearanceBefore=await mobileAppearance(page);
+        const a=await page.screenshot({animations:'disabled'});
+        await page.unroute('**/*');
+        await page.route('**/*', route => route.request().url().startsWith(base) ? route.continue() : route.abort());
+        // 같은 화면에 신규 CSS·JS만 주입해 390 배치·스타일 변경 0을 판정한다.
+        await page.addStyleTag({ url: base + '/v41/wide-info-panel.css' });
+        await page.addScriptTag({ url: base + '/v41/wide-info-panel.js' });
+        assert.equal(await page.locator('.lt1359-info').count(),0);
+        await settleMobile(page);
+        const appearanceAfter=await mobileAppearance(page);
+        assert.deepEqual(appearanceAfter, appearanceBefore, screen+' '+theme+' '+n+' 휴대폰 화면 구성·스타일 변경');
+      }finally{await page.close();}
+    }
+  } finally {await browser.close();server.close();}
+});
+
+test('#1430 wide garden summary panel is visible with readable text', {skip: REQUIRE ? false : skip, timeout: 180000}, async () => {
+  if (skip) assert.fail(String(skip));
+  const server = await serve();
+  const base = 'http://127.0.0.1:' + server.address().port;
+  const browser = await chromium.launch({headless:true});
+  const rgb = value => {
+    const match = String(value).match(/rgba?\(([^)]+)\)/);
+    return match ? match[1].split(/[,\s]+/).map(Number) : null;
+  };
+  const lum = values => values.slice(0,3).map(v => {
+    const x = v / 255;
+    return x <= .04045 ? x / 12.92 : ((x + .055) / 1.055) ** 2.4;
+  }).reduce((acc,v,i) => acc + v * [.2126,.7152,.0722][i],0);
+  const ratio = (a,b) => (Math.max(lum(a),lum(b)) + .05) / (Math.min(lum(a),lum(b)) + .05);
+  try {
+    for (const width of [1440,1920,2560]) for (const theme of ['night','garden']) {
+      const context = await browser.newContext({viewport:{width,height:1080},reducedMotion:'reduce'});
+      try {
+        await context.addInitScript(({tree,theme}) => {
+          localStorage.setItem('lt41.theme',theme);
+          globalThis.LT41={tree,source:'example',writable:false,momentId:tree.moments[0].id,prefs:{}};
+        },{tree:chainTree(5),theme});
+        const page = await context.newPage();
+        await page.goto(base + '/v41/views/track58-pinboard.html',{waitUntil:'load'});
+        await page.waitForSelector('.lt1359-info h2',{state:'visible'});
+        const m = await page.evaluate(() => {
+          const panel=document.querySelector('.lt1359-info');
+          const computed=element=>getComputedStyle(element);
+          const style=computed(panel);
+          const heading=panel.querySelector('h2');
+          const button=panel.querySelector('button');
+          const next=panel.querySelector('.lt1359-next');
+          const marker=document.createElement('div');
+          marker.style.background='var(--lt-role-bg)';
+          panel.append(marker);
+          const surrounding=computed(marker).backgroundColor;
+          marker.remove();
+          return {theme:document.documentElement.dataset.ltTheme,
+            count:document.querySelectorAll('.lt1359-info').length,
+            visible:style.visibility==='visible' && style.display!=='none',
+            panel:style.backgroundColor,border:style.borderColor,surrounding,
+            heading:computed(heading).color,body:computed(panel.querySelector('p')).color,
+            next:computed(next).color,button:computed(button).color,
+            buttonBg:computed(button).backgroundColor};
+        });
+        assert.equal(m.count,1);
+        assert.ok(m.visible,width+' '+theme+' visible summary');
+        const bg=rgb(m.panel),buttonBg=rgb(m.buttonBg);
+        for(const key of ['heading','body','next']) {
+          assert.ok(ratio(rgb(m[key]),bg)>=4.5,width+' '+theme+' '+key+' contrast '+ratio(rgb(m[key]),bg));
+        }
+        const btnBg=buttonBg[3]===0?bg:buttonBg;
+        assert.ok(ratio(rgb(m.button),btnBg)>=4.5,width+' '+theme+' button contrast '+ratio(rgb(m.button),btnBg));
+        if(theme==='garden') {
+          assert.ok(ratio(bg,rgb(m.surrounding))>=2,width+' garden panel distinct from board');
+          assert.ok(ratio(bg,rgb(m.border))>=2,width+' garden border distinct from panel');
+        }
+      }finally{await context.close();}
+    }
+  }finally{await browser.close();server.close();}
+});

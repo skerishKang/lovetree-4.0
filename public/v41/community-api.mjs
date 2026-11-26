@@ -20,6 +20,21 @@ export function createCommunityApi({fetchImpl=(...args)=>fetch(...args)}={}){
   comment:(id,body)=>call('/api/community/shares/'+encodeURIComponent(id)+'/comments',{method:'POST',headers:{'idempotency-key':key('comment')},body:JSON.stringify({body})}),
   removeComment:id=>call('/api/community/comments/'+encodeURIComponent(id),{method:'DELETE'}),
   // #1098 2단계: 순간 단위 ♡·댓글(서버 #1136의 순간 경로) — 통계 읽기·♡ 켜기/끄기·댓글 읽기/쓰기.
+  // #1356: 순간 보기 세 가지 범위. '이 트리만'은 공개 조건에 shareId만 더하고, '내 순간'은 로그인 전용이다.
+  publicMoments:({shareId='',exclude='',tag='',limit=12}={})=>{
+   const query=new URLSearchParams();
+   query.set('limit',String(limit));
+   if(shareId)query.set('shareId',String(shareId));
+   if(exclude)query.set('exclude',String(exclude));
+   if(tag)query.set('tag',String(tag));
+   return call('/api/public/moments?'+query.toString());
+  },
+  myMoments:({exclude='',limit=12}={})=>{
+   const query=new URLSearchParams();
+   query.set('limit',String(limit));
+   if(exclude)query.set('exclude',String(exclude));
+   return call('/api/community/me/moments?'+query.toString());
+  },
   publicShare:shareId=>call('/api/public/shares/'+encodeURIComponent(shareId)),
   momentStats:(shareId,momentId)=>call('/api/community/shares/'+encodeURIComponent(shareId)+'/moments/'+encodeURIComponent(momentId)),
   momentReact:(shareId,momentId,enabled)=>call('/api/community/shares/'+encodeURIComponent(shareId)+'/moments/'+encodeURIComponent(momentId)+'/reaction',{method:enabled?'PUT':'DELETE',body:enabled?JSON.stringify({kind:'heart'}):undefined}),

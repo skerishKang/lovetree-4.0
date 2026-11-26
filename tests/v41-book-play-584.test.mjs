@@ -1,3 +1,4 @@
+import {clickToolbarTreeChoice,treeChoiceExpanded,treeChoiceFocused} from './helpers/tree-picker-pr3.mjs';
 // 이슈 584: 책의 YouTube 재생·크게 보기·두 장 모드 손보기.
 //  (1) 크게 보기 오류 153 — media-preview.js 의 두 iframe 이 referrerpolicy="no-referrer" 라
 //      YouTube 가 플레이어 구성 오류(오류 153)를 냈다(2026-11-14 실측: 같은 영상을 no-referrer 로는
@@ -551,6 +552,7 @@ test('26: 책을 열어 둔 채 트리를 바꾸면 책 제목·첫 카드·카�
   let b = makeTree({subject:'B',title:'B',note:'',emotion:'설렘',date:'2026-11-03',url:''},'2026-11-03T00:00:00Z');
   b = growTree(b,{title:'B 첫 순간',note:'',emotion:'설렘',date:'2026-11-03',url:''},b.moments[0].id,'2026-11-03T00:00:00Z');
   b = growTree(b,{title:'B 둘 순간',note:'',emotion:'설렘',date:'2026-11-04',url:''},b.moments[0].id,'2026-11-04T00:00:00Z');
+  b.openView='book';
   const server = await serveApp();
   const base = `http://127.0.0.1:${server.address().port}`;
   const browser = await chromium.launch({ headless:true, ...(process.env.LT_BOOK_BROWSER_EXE ? { executablePath: process.env.LT_BOOK_BROWSER_EXE } : {}) });
@@ -591,7 +593,7 @@ test('26: 책을 열어 둔 채 트리를 바꾸면 책 제목·첫 카드·카�
         assert.ok(before.title==='A', '전환 전 책 제목 A');
 
         // 공통 줄로 옮긴 뒤에는 머리줄 트리 선택(기록 메뉴)에서 바꾼다.
-        await page.locator('#record-menu').click();
+        await clickToolbarTreeChoice(page);
         await page.waitForTimeout(150);
         await page.locator(`#tree-popover [data-tree-id="${b.id}"]`).click();
         await page.waitForFunction((id) => {
@@ -1052,7 +1054,7 @@ test('책 도구 줄: 중복 제목 없음·이어 보기·두 칸 동일 치수
       const {ctx,frame,errors} = await openBook(browser,width,width===390?844:900);
       try {
         await frame.evaluate((t)=>{document.documentElement.setAttribute('data-lt-theme',t==='garden'?'garden':'');},theme);
-        await frame.waitForSelector('.lt-toolbar-title');
+        await frame.waitForSelector('.lt-toolbar-tree-name');
         const result = await frame.evaluate(()=>{
           const toolbar=document.querySelector('.lt-screen-toolbar');
           const toggle=document.getElementById('book-view-toggle');
@@ -1061,8 +1063,8 @@ test('책 도구 줄: 중복 제목 없음·이어 보기·두 칸 동일 치수
           const old=document.querySelector('.topbar');
           const play=document.getElementById('playAllBtn');
           return {
-            title:toolbar.querySelector('.lt-toolbar-title').textContent.trim(),
-            titleCount:[...document.querySelectorAll('.lt-toolbar-title')].filter(n=>n.textContent.trim()==='시험 트리'&&n.getClientRects().length).length,
+            title:toolbar.querySelector('.lt-toolbar-tree-name').textContent.trim(),
+            titleCount:[...document.querySelectorAll('.lt-toolbar-tree-name')].filter(n=>n.textContent.trim()==='시험 트리'&&n.getClientRects().length).length,
             oldVisible:!!old&&getComputedStyle(old).display!=='none',
             playText:play.textContent.trim(),
             playAria:play.getAttribute('aria-label'),

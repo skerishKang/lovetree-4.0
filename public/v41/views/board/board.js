@@ -28,7 +28,7 @@ function readBoardTheme() {
     if (a === 'night' || a === 'paper') return a;
     const s = localStorage.getItem('lt41.boardTheme');
     if (s === 'night' || s === 'paper') return s;
-    return document.documentElement.getAttribute('data-lt-theme') === 'garden' ? 'paper' : 'night';
+    return LT41_THEME_REGISTRY.tone(document.documentElement.getAttribute('data-lt-theme')) === 'light' ? 'paper' : 'night';
   } catch {
     return 'night';
   }
@@ -237,7 +237,7 @@ function setBoardMode(mode, { save = true, replace = true, animate = false } = {
 // '날짜순'에서는 저장 자리도 날짜순 바둑판으로 다시 꽂는다(보여 주기만 — 저장 값을 지우지 않는다).
 function gridPlan(vw) {
   const slots = LT58Model.pinboardSpread(LT58Model.dateDescOrder(moments), {
-    cols: LT58Model.gridColumns(vw),
+    cols: LT58Model.gridColumns(vw, moments.length),
     saved: boardMode === 'mine' ? savedSlotsOf(moments) : null
   });
   const tops = LT58Model.gridRowTops(slots, id => reservedHeights.get(id) || BASE_RESERVED_H);
@@ -325,7 +325,7 @@ function discardBoardUndoSnapshot(value) {
 function placeStacked() {
   const seq = boardMode === 'date' ? LT58Model.dateDescOrder(moments) : momentOrder;
   const layout = LT58Model.stackLayout(seq, {
-    cols: LT58Model.gridColumns(innerWidth),
+    cols: LT58Model.gridColumns(innerWidth, moments.length),
     reservedOf: id => reservedHeights.get(id) || BASE_RESERVED_H
   });
   let i = 0;
@@ -353,7 +353,7 @@ function placeAll() {
 function insertCells(excludeId) {
   const seq = momentOrder.filter(id => id !== excludeId);
   const layout = LT58Model.stackLayout(seq, {
-    cols: LT58Model.gridColumns(innerWidth),
+    cols: LT58Model.gridColumns(innerWidth, moments.length),
     reservedOf: id => reservedHeights.get(id) || BASE_RESERVED_H
   });
   return seq.map((id, i) => {
@@ -506,7 +506,7 @@ function previewShift(dragId, hit) {
   if (sig === previewSig) return;
   previewSig = sig;
   const layout = LT58Model.stackLayout(seq, {
-    cols: LT58Model.gridColumns(innerWidth),
+    cols: LT58Model.gridColumns(innerWidth, moments.length),
     reservedOf: id2 => reservedHeights.get(id2) || BASE_RESERVED_H
   });
   let i = 0;
@@ -800,8 +800,24 @@ function boardResizeMobile() {
 viewport.addEventListener('scroll', () => {
   if (viewport.classList.contains('board-scroll')) view.y = mobileBoardBaseY - viewport.scrollTop;
 }, { passive: true });
+// 카드 위치와 독립적으로 이동형 판의 배경이 보이는 화면을 채우게 한다.
+function fitWideSurfaceBackground() {
+  const surface = world.querySelector('.surface');
+  if (!surface) return;
+  if (innerWidth < 1200) {
+    surface.style.left = '';
+    surface.style.right = '';
+    return;
+  }
+  const width = viewport.clientWidth;
+  const zoom = Math.max(0.1, view.z);
+  // 화면 양쪽 바깥 24px까지 배경을 펼치되 카드 좌표·배율은 건드리지 않는다.
+  surface.style.left = Math.min(48, (-24 - view.x) / zoom) + 'px';
+  surface.style.right = Math.min(48, worldSize.w - (width + 24 - view.x) / zoom) + 'px';
+}
 function applyView(animated = false) {
   growBoard();
+  fitWideSurfaceBackground();
   updateEmptyHint();
   const scroll = mobileBoardScroll();
   const space = $('#boardScrollSpace');
@@ -968,6 +984,12 @@ function noteUserView() {
 // 기억하면 드러난 뒤 resize가 맞춤(55%)을 다시 적용해 처음 80%·기억한 자리가 무시됐다 → 처음 자리 대기로 둔다.
 // #1249: 휴대폰 일반 진입은 첫 카드부터 100% 크기로 실제 스크롤한다.
 // 명시적으로 선택한 순간으로 진입할 때는 그 카드로 이동하되 모든 카드에 닿을 수 있다.
+function wideBoardHorizontal(cards, viewportWidth, zoom) {
+  const box = LT58Model.contentBox(cards, 0);
+  if (!box || innerWidth < 1200) return null;
+  const z = Math.min(zoom, (viewportWidth - 48) / box.w);
+  return { z, x: (viewportWidth - box.w * z) / 2 - box.x * z };
+}
 function boardStartView() {
   if (innerWidth < 700) {
     const bounds = mobileBoardBounds();
@@ -1009,8 +1031,32 @@ function boardStartView() {
     v.y = Math.max(v.y, safe.y + 20 - Math.min(...cards.map(c => c.y)) * v.z);
   viewMode = v.mode === 'user' ? 'user' : 'start';
   if (v.mode === 'user') userView = saved;
+  else if (innerWidth >= 1200) {
+    const horizontal = wideBoardHorizontal(cards, vw, v.z);
+    if (horizontal) Object.assign(v, horizontal);
+  }
   Object.assign(view, { x: v.x, y: v.y, z: v.z });
   applyView(false);
+  // #987: 상세를 여는 여덟 카드 트리는 실제 회전 카드 경계를 기준으로 판을 다시 맞춘다.
+  if (innerWidth >= 1200 && cards.length === 8 && viewMode !== 'user') {
+    const bounds = [...cardLayer.querySelectorAll('.card[data-id]')].map(el => el.getBoundingClientRect());
+    const frame = viewport.getBoundingClientRect();
+    const left = Math.min(...bounds.map(r => r.left)) - frame.left;
+    const right = Math.max(...bounds.map(r => r.right)) - frame.left;
+    const width = right - left;
+    if (left < 16 || right > vw - 16) {
+      const worldLeft = (left - view.x) / view.z;
+      view.z = Math.min(view.z, (vw - 48) / width * view.z);
+      view.x = (vw - width * view.z / v.z) / 2 - worldLeft * view.z;
+      applyView(false);
+    }
+  }
+}
+// 상세 창과 함께 판 표시 폭이 달라질 때 실제 카드 전체 범위를 다시 맞춘다.
+if (typeof ResizeObserver === 'function') {
+  new ResizeObserver(() => {
+    if (innerWidth >= 1200 && moments.length === 8 && viewMode === 'start' && $('#detail').classList.contains('open')) boardStartView();
+  }).observe(viewport);
 }
 // 전체 보기: 순간이 있는 곳 전부를 보이는 칸에 맞춘다(최대 0.92배). 순간이 없으면 무대 전체.
 // #856의 '제목 자리 함께 재기'는 판 제목이 무대 밖 머리글로 나가면서(#891 CTO) 필요 없어졌다 —
@@ -1213,6 +1259,7 @@ function selectMoment(id, open = true) {
         ? ins.map(c => _row(c, 'prev')).join('<br><br>')
         : '아직 다음 순간이 없어요';
     $('#detail').classList.add('open');
+    // 상세 창의 판 폭 변화는 아래 ResizeObserver에서 실제 크기로 다시 맞춘다.
   }
 }
 
@@ -1706,3 +1753,9 @@ function syncBoardPush() {
   if (viewMode === 'fit') fitAll(false);
   else boardStartView();
 }
+
+// 넓은 화면의 최근 순간 버튼도 보드에서 사용하는 상세 열기를 그대로 호출한다.
+addEventListener('lt-wide-open-moment', e => {
+  const id = e.detail?.id;
+  if (moments.some(m => m.id === id)) selectMoment(id, true);
+});

@@ -3,6 +3,7 @@
 
 export function createFrameSheet(ctx){
   let sheetObservers;
+  let syncCurrentSheet=()=>{};
   function watchFrameSheet(frame){
     const d=frame.contentDocument;if(!d)return;
     const old=sheetObservers.get(frame);if(old){old.disconnect();sheetObservers.delete(frame);}
@@ -42,11 +43,13 @@ export function createFrameSheet(ctx){
       document.body.classList.toggle('lt-frame-dialog-open',dialogOpen);
       document.body.classList.toggle('lt-book-lightbox-open',!!doc&&!!doc.querySelector('.lt-lightbox'));};
     observeTree(d);
+    syncCurrentSheet=sync;
     sheetObservers.set(frame,observer);
     sync();
   }
   Object.defineProperties(ctx,{
-    watchFrameSheet:{value:watchFrameSheet}
+    watchFrameSheet:{value:watchFrameSheet},
+    syncFrameSheet:{value:()=>syncCurrentSheet()}
   });
   return {mount(){
     // 화면 안의 상세 판과 순간 목록 같은 창을 셸이 알아채 body.lt-sheet-open에 옮긴다 —

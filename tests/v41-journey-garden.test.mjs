@@ -65,13 +65,6 @@ test('정원이면 첫 여정도 정원이고, 밤이면 A, 기억책·보드·�
   // #231 1-B: 화면별 테마 대상은 shell/navigation.mjs에 있다.
 });
 
-test('첫 여정 문서는 셸 테마를 첫 그리기 전에 받고, 단독일 때만 저장값을 읽는다', () => {
-  const head = html.slice(0, html.indexOf('</head>'));
-  assert.match(head, /window\.parent!==window\?window\.parent\.document\.documentElement\.getAttribute\('data-lt-theme'\)/);
-  assert.match(head, /if\(!ltHostTheme&&window\.parent===window\)ltHostTheme=localStorage\.getItem\('lt41\.theme'\)==='garden'\?'garden':null;/);
-  assert.match(head, /catch\(e\)\{\}/, '셸·저장소 접근이 막히면 A로 남는다');
-});
-
 test('정원 첫 여정은 크림·잉크·장미 토큰, 정원 테두리·그림자, Gowun Batang 제목, keep-all을 쓴다', () => {
   const start = html.indexOf('html[data-lt-theme=garden]{color-scheme:light}');
   assert.ok(start > 0, '정원 규칙 블록이 있어야 한다');

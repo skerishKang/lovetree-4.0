@@ -1,3 +1,4 @@
+import {clickToolbarTreeChoice,treeChoiceExpanded,treeChoiceFocused} from './helpers/tree-picker-pr3.mjs';
 // 검사 함수는 tests/helpers/screen-audit.mjs에 있다(①겹침·가려짐 #635 규칙 ②가로 넘침·잘림 ③흔적 값 넷 #635 ④글자 기준선 #548 ⑤알림 줄이 아래 링크 줄·＋ 단추·새 소식 카드를 덮지 않음 #666).
 // 화면 목록: 첫 화면(예시)·책(공유 링크, 마지막 장 포함)·보드·지도·둘러보기·의견 보내기 창(보내기 전·후)·어떻게 쓰나요 안내.
 // #666이 더한 상태: 알림 줄(토스트)이 떠 있는 셸 첫 화면·보드 — ＋ 단추(body.lt-fab-ok)와 새 소식 카드가 함께 뜬 자리에서 잰다.
@@ -345,9 +346,8 @@ test('#987 공유 창 폭·단추·대비와 설정 정렬·동그라미·배치
         await page.waitForFunction(()=>window.LT41?.trees?.length===3&&!document.querySelector('#account-avatar')?.hidden);
         const ask=page.locator('#discover-ask-no');
         if(await ask.isVisible())await ask.click();
-        await page.locator('#record-menu').click();
-        await page.locator('[data-tree-action="shelf"]').click();
-        await page.locator('#record-menu').click();
+        // #1367: the tree picker now lives in the shelf; avoid reopening the same shelf frame.
+        await clickToolbarTreeChoice(page);
         await page.locator('[data-tree-action="share"]').click();
         await page.locator('#share-panel[open] .share-item-actions button').first().waitFor();
         const snap=async(label,id)=>{
@@ -1419,7 +1419,7 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     await page5b.waitForFunction(() => { const c = document.getElementById('updates-card'); return c && !c.hidden; }, null, { timeout: 10000 }).catch(() => {});
     if (!await page5b.evaluate(() => document.getElementById('updates-card')?.hidden)) await page5b.click('#updates-dismiss');
     await page5b.waitForFunction(() => { const c = document.getElementById('updates-card'); return c && c.hidden; }, null, { timeout: 8000 }).catch(() => {});
-    await page5b.click('#record-menu');
+    await clickToolbarTreeChoice(page5b);
     await page5b.waitForFunction(() => !document.getElementById('tree-popover')?.hidden, null, { timeout: 8000 });
     await page5b.click('#tree-popover [data-tree-action="moments"]');
     const orbitFrameOf = async () => {
@@ -1659,7 +1659,7 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     }
     await take(page6, '꼬리표 줄이 열린 상세');
     // #627 PR B: 꼬리표 정리 화면 — 목록·개수와 '제목에서 꼬리표 한 번에 제안받기'가 그려진 자리를 잰다.
-    await page6.evaluate(() => document.getElementById('record-menu')?.click());
+    await clickToolbarTreeChoice(page6);
     await page6.waitForTimeout(400);
     await page6.evaluate(() => document.querySelector('[data-tree-action="tags"]')?.click());
     await page6.waitForFunction(() => !!document.getElementById('tag-panel')?.open, null, { timeout: 8000 });
@@ -2582,6 +2582,8 @@ test('#972 서재·책 상세·둘러보기·새 소식 화면 치수', { skip: 
       const ctx = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
       try {
         await ctx.addInitScript((value) => localStorage.setItem('lt41.theme', value), theme);
+        // #1366: 이 시험은 선반 그리드의 치수를 지킨다. 회전 기본 변경과 무관하게 선반으로 고정한다.
+        await ctx.addInitScript(() => localStorage.setItem('lt41.shelfView', 'shelf'));
         const groups = ['BTS', 'Hearts2Hearts', 'RIIZE'].map(value => ({ value, count: 2 }));
         await ctx.route('**/api/community/**', route => {
           const body = route.request().url().includes('/shares')
@@ -2725,9 +2727,16 @@ test('#987 보드 첫 줄과 모바일 셸 겹침·현재 표시', { skip: REQUI
       await page.waitForFunction(() => window.LT41?.trees?.length === 3 && !document.querySelector('#account-avatar')?.hidden);
       const ask = page.locator('#discover-ask-no');
       if (await ask.isVisible()) await ask.click();
-      await page.locator('#record-menu').click();
+      await clickToolbarTreeChoice(page);
       await page.locator('[data-tree-action="shelf"]').click();
       await page.frameLocator('#view').locator('#shelfRail [data-book-index]').first().waitFor();
+        await page.waitForFunction(() => {
+          const frame = document.querySelector('iframe#view');
+          return !frame?.hidden && /track32-bookshelf/.test(frame?.contentWindow?.location.pathname || '') &&
+            document.getElementById('view-next')?.hidden &&
+            document.getElementById('view-next')?.contentWindow?.location.href === 'about:blank' &&
+            !!window.LT41?.tree;
+        }, null, { timeout: 5000 });
       await page.locator('#toast').waitFor({ state: 'hidden', timeout: 6000 }).catch(() => {});
       const snap = async label => { if (dest) await page.screenshot({ path: join(dest, label + '-' + width + '-' + theme + '.png'), animations: 'disabled' }); };
       await run(page, snap, trees[0]);
@@ -2736,17 +2745,23 @@ test('#987 보드 첫 줄과 모바일 셸 겹침·현재 표시', { skip: REQUI
   try {
     for (const theme of ['night', 'garden']) {
       for (const width of [360, 375, 390]) await withPage(width, 844, theme, 8, async (page, snap) => {
-        await page.locator('#record-menu').click();
+        await clickToolbarTreeChoice(page);
+        await page.waitForFunction(() => !document.getElementById('tree-popover')?.hidden, null, { timeout: 5000 });
         const header = await page.evaluate(() => {
-          const t = document.querySelector('#record-menu'), s = document.querySelector('#theme-toggle'), a = t.querySelector('svg');
-          const b = t.getBoundingClientRect(), c = s.getBoundingClientRect(), d = a.getBoundingClientRect();
-          const hit = document.elementFromPoint(d.x + d.width/2, d.y + d.height/2);
-          return { overlap: Math.max(0, Math.min(b.right,c.right)-Math.max(b.left,c.left))*Math.max(0,Math.min(b.bottom,c.bottom)-Math.max(b.top,c.top)), arrowVisible: a.contains(hit) || t.contains(hit), arrowGap: b.right-d.right, arrowWidth: d.width, overflow: document.documentElement.scrollWidth-innerWidth };
+          const frame = document.querySelector('iframe#view');
+          const doc = frame?.contentDocument;
+          const t = doc?.querySelector('button.lt-toolbar-tree-choice');
+          const s = document.querySelector('#theme-toggle'), a = t?.querySelector('.lt-toolbar-tree-caret');
+          const b = t.getBoundingClientRect(), c = s.getBoundingClientRect(), d = a.getBoundingClientRect(), fr = frame.getBoundingClientRect();
+          const hit = doc.elementFromPoint(d.x + d.width/2, d.y + d.height/2);
+          const overlap = Math.max(0, Math.min(b.right+fr.left,c.right)-Math.max(b.left+fr.left,c.left))*
+            Math.max(0,Math.min(b.bottom+fr.top,c.bottom)-Math.max(b.top+fr.top,c.top));
+          return { overlap, arrowVisible: a.contains(hit) || t.contains(hit), arrowGap: b.right-d.right, arrowWidth: d.width, overflow: document.documentElement.scrollWidth-innerWidth };
         });
         console.log('#987 header', width, theme, JSON.stringify(header));
         await snap('tree-menu');
         check(header.overlap === 0 && header.arrowVisible && header.arrowWidth > 0 && header.arrowGap >= 0 && header.arrowGap <= 16 && header.overflow === 0, '트리 ' + width + ' ' + theme + ' ' + JSON.stringify(header));
-        await page.locator('#record-menu').click();
+        await page.locator('#tree-popover [data-tree-close]').click();
         if (width !== 390) return;
         await page.locator('#mobile-more').click();
         const menu = await page.locator('#header-overflow [aria-current=true]').evaluate(el => {

@@ -58,7 +58,7 @@ export function mapChanged(changedFiles) {
 // 고를 수 있는 잡은 아래 여섯이다. 공통 검사기와 지도 잡은 지금처럼 늘 판정대로 돈다.
 // 화면 시험 파일이 바뀌면 그 파일을 실행하는 잡을, 보드 전용 소스가 바뀌면 보드 잡을 고른다.
 // 그 밖의 화면 파일(공용 모듈·셸·CSS·빌드 설정·helpers 등)이 하나라도 있으면 전부(all)다 — 애매하면 다 돈다.
-export const SELECTABLE_JOBS = ['screen-board', 'screen-home', 'screen-book', 'screen-reload', 'screen-shell', 'screen-book-screen'];
+export const SELECTABLE_JOBS = ['screen-board', 'screen-home', 'screen-book', 'screen-reload', 'screen-shell', 'screen-shell-extra', 'screen-book-screen'];
 const AREA_SOURCES = [
   [/^public\/v41\/views\/board\//, 'screen-board'],
   [/^public\/v41\/views\/track58-pinboard\.html$/, 'screen-board']

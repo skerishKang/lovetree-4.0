@@ -5,7 +5,7 @@ import { MSG, isShellMessage } from '../../frame-messages.mjs';
 import {
   COVER_PALETTE, allBooks as allBooksOf, bookMeta, buildShelf,
   escapeShelf, filterShelf, findBook, lastMomentDate as lastMomentDateOf,
-  resolveShelfIndex, resumeCard, resumeName, shelfBook, shelfRowLayout,
+  recentChapters, resolveShelfIndex, resumeCard, resumeName, shelfBook, shelfRowLayout,
   treeTitleOf, youtubeId as youtubeIdOf
 } from './shelf-model.mjs';
 import { shelfOrder } from '../../inbox-model.mjs';
@@ -32,11 +32,11 @@ import { VIEWS } from './shelf-views.mjs';
       var state = { filter:'all', query:'', selectedId:null, shelfIndex:0, shelfOffset:0, shelfList:[], chapterIndex:0, open:false, openProgress:0, customBooks:[], pageTurning:false };
       var storageKey = 'lovetree-people-book-shelf-v2-1-true-page-motion';
       var drag = { active:false, mode:'', startX:0, startY:0, moved:false, startProgress:0 };
-      // #1093: 계정 설정(bookDisplay와 같은 길) → 기기 미러 → 기본 선반.
+      // #1366: 계정 설정(bookDisplay와 같은 길) → 기기 미러 → 기본 회전.
       function shelfView() {
         try { var v=parent.LT41?.prefs?.shelfView; if(v==='shelf'||v==='carousel')return v; } catch {}
         try { var m=localStorage.getItem('lt41.shelfView'); if(m==='shelf'||m==='carousel')return m; } catch {}
-        return 'shelf';
+        return 'carousel';
       }
       function paintShelfViewInline(){
         var view=shelfView();
@@ -106,7 +106,8 @@ import { VIEWS } from './shelf-views.mjs';
          paintShelfViewInline();
         var railWidth=($('#shelfRail')&&$('#shelfRail').clientWidth)||0;
         // #944: 시작은 첫 책 왼쪽 끝이 책장 안쪽 여백. 고른 책이 뒤쪽이면 보이게만 최소로 민다.
-        state.shelfOffset=shelfRowLayout(list.length, railWidth).offsetFor(state.shelfIndex, state.shelfOffset||0);
+        // #1366: 선반은 그리드가 모든 책을 보여 주므로 캐러셀 넘김 값을 쓰지 않는다.
+        state.shelfOffset=shelfView()==='shelf'?0:shelfRowLayout(list.length, railWidth).offsetFor(state.shelfIndex, state.shelfOffset||0);
         // #889 원래 결정: 화살표는 책이 한 줄에 다 안 들어갈 때(넘김 배치일 때)만 둔다.
         applyShelfArrows(list.length,railWidth);
         // 261118 대표 지적 4: 트리가 있으면 소개 문 대신 이어 보기 띠 한 줄. 트리 0개일 때만 소개 문('…한 권의 책으로.'+'책 열기')이 보인다.
@@ -114,6 +115,7 @@ import { VIEWS } from './shelf-views.mjs';
         if(hero)hero.classList.toggle('strip-mode',list.length>0);
         // #256-1: 목록이 바뀔 때마다 다시 그린다. 칸은 검색·필터와 무관하게 전체 책(allBooks) 기준이라 좁아져도 그대로다.
         renderResumeCard();
+        renderRecent();
         $('#shelfRail').innerHTML=(list.length?list.map(function(book,index){
           // #212: 표지에 이름 한 번만. 사진 표지에는 제목을 올리지 않고(표지 사진만), 표지 아래는 두 줄로 — '제목 · N개 순간' / 'N일 전 추가'(한 줄 넘으면 말줄임).
           // #256-3: 디자인 표지는 shelf-model coverChoice 판정(book.design)을 그대로 쓴다. 없으면 속성도 없다(기존 화면 변화 0).
@@ -121,7 +123,7 @@ import { VIEWS } from './shelf-views.mjs';
           var metaLine1=book.name+' · '+metaParts[0];
           var metaLine2=metaParts.slice(1).join(' · ');
           return '<article class="book-card" data-book-index="'+index+'"><button type="button" data-book-id="'+esc(book.id)+'" aria-label="'+esc(book.name)+' 책 열기">'+
-            '<div class="book-cover'+coverClasses(book)+'"'+(book.design?' data-cover-design="'+esc(book.design)+'"':'')+'>'+(book.coverMedia?'<img class="book-cover-media" src="'+esc(book.coverMedia)+'"'+coverFallbackAttrs(book.coverCandidates||[book.coverMedia])+' alt="" loading="lazy" referrerpolicy="no-referrer">':'')+'<span class="cover-symbol"><span>'+esc(book.symbol)+'</span></span>'+(book.coverMedia?'':'<strong class="cover-title">'+esc(book.name)+'</strong>')+'</div>'+
+            '<div class="book-cover'+coverClasses(book)+'"'+(book.design?' data-cover-design="'+esc(book.design)+'"':'')+'>'+(book.coverMedia?'<img class="book-cover-media" src="'+esc(book.coverMedia)+'"'+coverFallbackAttrs(book.coverCandidates||[book.coverMedia])+' alt="" loading="lazy" referrerpolicy="no-referrer">':'')+'<span class="cover-symbol"><span>'+esc(book.symbol)+'</span></span>'+(book.coverMedia?'<span class="cover-name-band">'+esc(book.name)+'</span>':'<strong class="cover-title">'+esc(book.name)+'</strong>')+'</div>'+
             '<span class="book-card-meta"><span class="book-card-meta-title">'+esc(metaLine1)+'</span><span class="book-card-meta-date">'+esc(metaLine2)+'</span></span></button><button type="button" class="book-manage" data-manage-id="'+esc(book.id)+'" aria-label="'+esc(book.name)+' 고치기">⋯</button></article>';
         }).join(''):'<div class="empty"><strong>찾는 책이 없어요.</strong><span>트리 이름·좋아하는 대상·순간 제목으로 검색해 보세요.</span></div>');
         // #1285 빈 칸 자리와 배치는 보기 모듈이 맡는다(#1376 1단계).
@@ -145,10 +147,11 @@ import { VIEWS } from './shelf-views.mjs';
         if(!show){strip.onclick=null;return;}
         var thumb=$('#resumeThumb');
         if(thumb){
-          // 가로 썸네일: 마지막 순간의 사진을 먼저 쓰고, 없으면 책 표지 사진·표지 색 칸으로 채운다. 글자는 썸네일 안에 넣지 않는다.
+          // #1366 ⑤ 가로 썸네일도 책 표지와 같은 규칙: 그 트리의 표지 사진(첫 순간/바꾼 표지)을 먼저 쓰고,
+          // 없으면 순간 사진, 그래도 없으면 표지 색 칸으로 남긴다. 글자는 썸네일 밖에 둔다.
           var fallbackChapter=info.book.chapters.find(function(c){return c.image});
-          var src=info.moment&&info.moment.thumb?info.moment.thumb:(info.book.coverMedia||(fallbackChapter&&fallbackChapter.image)||'');
-          var candidates=info.moment&&info.moment.thumbCandidates?info.moment.thumbCandidates:(info.book.coverCandidates&&info.book.coverCandidates.length?info.book.coverCandidates:(fallbackChapter&&fallbackChapter.thumbCandidates?fallbackChapter.thumbCandidates:[src]));
+          var src=info.book.coverMedia || (info.moment&&info.moment.thumb?info.moment.thumb:'') || (fallbackChapter&&fallbackChapter.image) || '';
+          var candidates=(info.book.coverCandidates&&info.book.coverCandidates.length)?info.book.coverCandidates:(info.moment&&info.moment.thumbCandidates?info.moment.thumbCandidates:(fallbackChapter&&fallbackChapter.thumbCandidates?fallbackChapter.thumbCandidates:[src]));
           // #1273 8번: 그림이 없으면 빈 색 칸으로 남지 않게 트리 이름 첫 글자로 표지를 채운다(사진 위에는 글자를 얹지 않는다).
           thumb.innerHTML=src?'<img src="'+esc(src)+'"'+coverFallbackAttrs(candidates||[src])+' alt="" loading="lazy" referrerpolicy="no-referrer">':'<span class="resume-thumb-mark" aria-hidden="true">'+esc(String(info.treeName||info.book.name||'책').slice(0,1))+'</span>';
           thumb.style.setProperty('--cover',info.book.color);
@@ -169,6 +172,83 @@ import { VIEWS } from './shelf-views.mjs';
           else LTDEMO.openBook(info.book.chapters[0]&&info.book.chapters[0].id,info.book.id);
         };
       }
+      // 다른 화면의 크게 보기와 같은 영상 플레이어·사진 확대 형식을 사용한다.
+      function openRecentMoment(book,chapter) {
+        var media=window.LTMedia&&window.LTMedia.describe?window.LTMedia.describe(chapter.url||''):null;
+        if(media&&(media.kind==='youtube'||media.kind==='video')&&typeof window.LTMedia.openLightbox==='function'){
+          window.LTMedia.openLightbox(chapter.url,chapter.title||'순간');
+          return;
+        }
+        var previous=document.activeElement;
+        var old=document.querySelector('.shelf-recent-viewer');
+        if(old)old.remove();
+        var overlay=document.createElement('div');
+        overlay.className='lt-lightbox shelf-recent-viewer';
+        overlay.setAttribute('role','dialog');
+        overlay.setAttribute('aria-modal','true');
+        overlay.setAttribute('aria-label','순간 크게 보기');
+        var stage=document.createElement('div');
+        stage.className='lt-lightbox-stage';
+        var src=chapter.image||(chapter.thumbCandidates&&chapter.thumbCandidates[0])||'';
+        if(src){
+          var image=document.createElement('img');
+          image.className='shelf-recent-viewer-image';
+          image.src=src;
+          image.alt=chapter.title||'순간';
+          image.referrerPolicy='no-referrer';
+          stage.appendChild(image);
+        }else{
+          var note=document.createElement('p');
+          note.className='shelf-recent-viewer-text';
+          note.textContent=chapter.title||'순간';
+          stage.appendChild(note);
+        }
+        var close=document.createElement('button');
+        close.type='button';
+        close.className='lt-lightbox-close';
+        close.setAttribute('aria-label','크게 보기 닫기');
+        close.textContent='×';
+        var caption=document.createElement('p');
+        caption.className='lt-lightbox-title';
+        caption.textContent=(chapter.title||'순간')+(chapter.date?' · '+chapter.date:'');
+        function finish(){
+          document.removeEventListener('keydown',onKey,true);
+          overlay.remove();
+          if(previous&&previous.isConnected)previous.focus({preventScroll:true});
+        }
+        function onKey(event){if(event.key==='Escape'){event.preventDefault();event.stopPropagation();finish();}}
+        document.addEventListener('keydown',onKey,true);
+        close.addEventListener('click',finish);
+        overlay.addEventListener('click',function(event){if(event.target===overlay)finish();});
+        overlay.append(stage,close,caption);
+        document.body.appendChild(overlay);
+        close.focus();
+      }
+      // #1366 ⑥: 고른 트리의 최근 순간 여섯 개와 숫자를 책장 아래에 둔다.
+      function renderRecent() {
+        var sec=$('#shelfRecent'),row=$('#shelfRecentRow'),stats=$('#shelfRecentStats');
+        if(!sec||!row||!stats)return;
+        var book=state.shelfList[state.shelfIndex];
+        if(!book||!book.chapters.length){sec.hidden=true;row.innerHTML='';stats.textContent='';return;}
+        var list=recentChapters(book.chapters);
+        stats.textContent=bookMeta(book);
+        row.innerHTML=list.map(function(chapter){
+          var src=chapter.image||(chapter.thumbCandidates&&chapter.thumbCandidates[0])||'';
+          var candidates=chapter.thumbCandidates&&chapter.thumbCandidates.length?chapter.thumbCandidates:[src];
+          var image=src?'<img src="'+esc(src)+'"'+coverFallbackAttrs(candidates)+' alt="" loading="lazy" referrerpolicy="no-referrer">':'<span class="shelf-recent-letter" aria-hidden="true">'+esc(String(book.name||'책').slice(0,1))+'</span>';
+          return '<button type="button" class="shelf-recent-item" data-moment-id="'+esc(chapter.id)+'" aria-label="'+esc(chapter.title||'순간')+' 크게 보기">'+
+            '<span class="shelf-recent-visual'+(src?'':' shelf-recent-visual--empty')+'" aria-hidden="true">'+image+'</span>'+
+            '<span class="shelf-recent-name">'+esc(chapter.title||'순간')+'</span></button>';
+        }).join('');
+        sec.style.setProperty('--shelf-recent-cover',book.color);
+        Array.prototype.forEach.call(row.querySelectorAll('[data-moment-id]'),function(button){
+          button.onclick=function(){
+            var chapter=list.find(function(item){return String(item.id)===button.dataset.momentId;});
+            if(chapter)openRecentMoment(book,chapter);
+          };
+        });
+        sec.hidden=false;
+      }
       function setShelfAtmosphere(book) {
         var viewport=$('#shelfViewport');
         if(!viewport||!book)return;
@@ -177,13 +257,14 @@ import { VIEWS } from './shelf-views.mjs';
       }
       // 화살표 0개(다 들어감) / 2개(넘침). 레일 폭이 정해지기 전에는 잠시 숨기고, ResizeObserver가 다시 맞춘다.
       function applyShelfArrows(count, railWidth) {
-        // 화살표는 보기 방식과 무관하게 옛날과 같은 넘침 조건에서만 뜬다(도구 줄 토글은 계산에 넣지 않는다).
-        var show=railWidth>0&&shelfRowLayout(count, railWidth).mode==='carousel'&&count>0;
+        // #1366: 선반은 여러 줄 그리드라 넘김이 없다. 화살표는 회전 보기에서만 둔다.
+        var show=shelfView()!=='shelf'&&railWidth>0&&shelfRowLayout(count, railWidth).mode==='carousel'&&count>0;
         var prevArrow=$('#shelfPrev'),nextArrow=$('#shelfNext');
         if(prevArrow)prevArrow.hidden=!show;
         if(nextArrow)nextArrow.hidden=!show;
       }
       function reportShelfTree(center){
+        renderRecent();
         // 261118 대표 지적 2차 5: 서재에서 마지막에 본 트리(가운데 책의 트리)를 셸에 알린다 —
         // 서재 화면에서 콕·보드·지도 탭을 누르면 그 트리로 열린다.
         var centered=state.shelfList[center];
@@ -215,6 +296,19 @@ import { VIEWS } from './shelf-views.mjs';
         $$('.filter').forEach(function(button){button.addEventListener('click',function(){state.filter=button.dataset.filter;$$('.filter').forEach(function(item){item.classList.toggle('active',item===button);});renderShelf();});});
         $('#shelfPrev').addEventListener('click',function(){view.move(-1);});
         $('#shelfNext').addEventListener('click',function(){view.move(1);});
+        // #1366 ⑧: 세로 휠만 회전 넘김으로 쓴다. 레일 밖과 가로 트랙패드는 기본 스크롤에 맡긴다.
+        // 한 묶음당 한 칸, 연속 휠은 잠깐 무시해 건너뛰기를 막는다.
+        var wheelAt=0;
+        $('#shelfRail').addEventListener('wheel',function(event){
+          if(shelfView()!=='carousel'||event.ctrlKey)return;
+          if(Math.abs(event.deltaX)>Math.abs(event.deltaY))return;
+          if(Math.abs(event.deltaY)<2)return;
+          event.preventDefault();
+          var at=Date.now();
+          if(at-wheelAt<320)return;
+          wheelAt=at;
+          view.move(event.deltaY>0?1:-1);
+        },{passive:false});
         $('#backToShelf').addEventListener('click',backToShelf);
         $('#openBookButton').addEventListener('click',openBook);
         $('#closeBookButton').addEventListener('click',closeBook);

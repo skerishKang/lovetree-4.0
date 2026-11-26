@@ -1,3 +1,5 @@
+import { MSG } from './frame-messages.mjs';
+import { thumbnailCandidates } from './thumb-fallback.mjs';
 // #1091: 상단 메뉴 아래 화면 도구 줄 한 벌. 책·보드가 각자 그리던 줄 대신 이 부품을 호출한다.
 // 서재는 #1154가 상단을 바꾸는 중이라 아직 붙이지 않는다.
 // 책·보드·지도 같은 트리 줄 — 왼쪽에 '← 서재'·트리 이름(크게)·작은 메타(순간 N개 · 마지막 M.D),
@@ -16,6 +18,67 @@ function treeMetaText() {
     }
     return '순간 ' + list.length + '개';
   } catch { return ''; }
+}
+// #1367 PR 2: A common, non-navigating tree selector; the shell hookup belongs to PR 3.
+function prepareTreeChoice(bar, screen, title, titleFrom) {
+  const left = bar.querySelector('.lt-toolbar-left');
+  if (!left) return () => {};
+  const source = () => { try { return window.parent.LT41; } catch { return null; } };
+  const context = source();
+  const own = context?.source === 'server' && context?.writable === true && !!context?.tree && !context?.tree?.demoData;
+  const choice = document.createElement(own ? 'button' : 'span');
+  choice.className = 'lt-toolbar-tree-choice' + (own ? '' : ' lt-toolbar-tree-label');
+  if (own) {
+    choice.type = 'button';
+    choice.setAttribute('aria-label', '\uD2B8\uB9AC \uACE0\uB974\uAE30');
+    choice.title = '\uD2B8\uB9AC \uACE0\uB974\uAE30';
+    choice.setAttribute('aria-haspopup', 'dialog');
+    choice.setAttribute('aria-expanded', 'false');
+    choice.setAttribute('aria-pressed', 'true');
+    choice.addEventListener('click', event => {
+      event.stopPropagation();
+      const box = choice.getBoundingClientRect();
+      window.parent.postMessage({type:MSG.toolbarTreePicker, rect:{left:box.left,top:box.top,right:box.right,bottom:box.bottom}, via:event.detail===0?'keyboard':'mouse'}, location.origin);
+    });
+    window.addEventListener('message', event => {
+      if(event.source!==window.parent || event.origin!==location.origin || event.data?.type!==MSG.toolbarTreePickerState)return;
+      choice.setAttribute('aria-expanded',String(!!event.data.open));
+      if(event.data.focus) choice.focus();
+    });
+  }
+  const thumb = document.createElement('span');
+  thumb.className = 'lt-toolbar-tree-thumb';
+  thumb.setAttribute('aria-hidden', 'true');
+  const name = document.createElement('span');
+  name.className = 'lt-toolbar-tree-name';
+  if (own) {
+    const caret = document.createElement('span');
+    caret.className = 'lt-toolbar-tree-caret';
+    caret.setAttribute('aria-hidden', 'true');
+    caret.textContent = '\u25BE';
+    choice.append(thumb, name, caret);
+  } else choice.append(name);
+  left.prepend(choice);
+  if (screen !== 'shelf') title.hidden = true;
+  const refresh = () => {
+    const current = source()?.tree;
+    const value = String((screen === 'shelf' ? current?.title : titleFrom?.textContent || current?.title) || '\uD2B8\uB9AC').trim() || '\uD2B8\uB9AC';
+    name.textContent = value;
+    if (!own) return;
+    const initial = Array.from(value)[0] || '\uD2B8';
+    thumb.replaceChildren(document.createTextNode(initial));
+    const moments = Array.isArray(current?.moments) ? current.moments : [];
+    const cover = moments.find(m => m.id === current?.coverMomentId) || moments.find(m => thumbnailCandidates(m, {autoLoad:true}).length);
+    const url = cover ? thumbnailCandidates(cover, {autoLoad:true})[0] || '' : '';
+    if (typeof url === 'string' && /^https?:\/\//.test(url)) {
+      const image = document.createElement('img');
+      image.alt = '';
+      image.addEventListener('load', () => thumb.replaceChildren(image), {once:true});
+      image.src = url;
+    }
+  };
+  refresh();
+  return refresh;
 }
 export function mountScreenToolbar({ screen, titleFrom, tools = [], initialBar = null, backEl = null, meta = false }) {
   // Adopt a pre-rendered toolbar when supplied, so the first paint already has its final layout.
@@ -77,9 +140,11 @@ export function mountScreenToolbar({ screen, titleFrom, tools = [], initialBar =
   };
   align();
 
+  const refreshTreeChoice = prepareTreeChoice(bar, screen, title, titleFrom);
   let reflow = () => {};
   const sync = () => {
     title.textContent = (titleFrom?.textContent || '').trim();
+    refreshTreeChoice();
     const metaEl = bar.querySelector('.lt-toolbar-meta');
     if (metaEl && meta) metaEl.textContent = treeMetaText();
     if (typeof reflow === 'function') reflow();
@@ -147,7 +212,7 @@ export function mountScreenToolbar({ screen, titleFrom, tools = [], initialBar =
     menu.replaceChildren();
     menu.hidden = true;
     more.hidden = true;
-    if (fits()) return;
+    if (screen === 'tree' || fits()) return;
     const items = [...group.children];
     const order = new Map(items.map((el, i) => [el, i]));
     const plays = items.filter((el) => isPlay(el));

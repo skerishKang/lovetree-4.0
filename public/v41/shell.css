@@ -705,7 +705,7 @@ nav .tree-frame{scroll-snap-align:center}
    글자만 또렷하게 살린다(배경은 없다). */
 .home-links{position:fixed;left:14px;bottom:max(10px,env(safe-area-inset-bottom));z-index:24;display:flex;gap:2px;align-items:center}
 /* #1284: 첫 화면 링크는 숫자판을 덮지 않고 화면 흐름에 참여한다. */
-body.home-screen .home-links{position:relative;left:auto;bottom:auto;flex:0 0 auto;align-self:center;margin:0 auto max(10px,env(safe-area-inset-bottom));z-index:3}
+@media(max-width:650px), (max-width:900px) and (max-height:520px){body.home-screen .home-links{position:relative;left:auto;bottom:auto;flex:0 0 auto;align-self:center;margin:0 auto max(10px,env(safe-area-inset-bottom));z-index:3}}
 /* 안쪽 문서가 스크롤을 맡은 뒤에도 카드 아래 단추와 바닥 링크의 겹침 0을 유지한다. */
 @media(max-width:650px){body.home-screen .home-links{top:3px}}
 .home-links .feedback-link{opacity:1;color:var(--lt-pearl);text-shadow:0 1px 1px var(--lt-stage),0 -1px 1px var(--lt-stage),1px 0 1px var(--lt-stage),-1px 0 1px var(--lt-stage),0 0 4px var(--lt-stage),0 0 8px var(--lt-stage),0 0 14px var(--lt-stage),0 0 20px var(--lt-stage)}
@@ -1316,10 +1316,18 @@ html .main-nav>button#community-menu[aria-current=true]{font-weight:600}
 html[data-lt-auth-phase=pending] .app-header .tree-prefix{visibility:hidden}
 @media(min-width:781px){
  .app-header .brand{flex:0 0 112px;width:112px}
- .app-header .header-actions{display:grid;grid-template-columns:44px 122px 80px;align-items:center}
+ /* #1350: 로그아웃 확정 시 숨겨진 순간 추가 칸을 접어 테마와 계정 사이 간격을 복원합니다. */
+ .app-header .header-actions{display:grid;grid-template-columns:44px 80px;align-items:center}
  .app-header .header-actions>#theme-toggle{grid-column:1;grid-row:1}
  .app-header .header-actions>#write-menu{grid-column:2;grid-row:1;width:122px}
- .app-header .header-actions>.account-slot{grid-column:3;grid-row:1;width:80px;justify-content:flex-end}
+ .app-header .header-actions>.account-slot{grid-column:2;grid-row:1;width:80px;justify-content:flex-end}
+ /* 로그인 흔적이 있는 확인 중에는 122px를 예약하며, 확정 로그인에서도 유지합니다. */
+ html[data-lt-auth-phase=pending][data-lt-auth-hint=in] .app-header .header-actions,
+ html[data-lt-auth-phase=ready][data-lt-auth-hint=in] .app-header .header-actions,
+ html:not([data-lt-auth-phase=pending]) .app-header .header-actions:has(>#write-menu:not([hidden])){grid-template-columns:44px 122px 80px}
+ html[data-lt-auth-phase=pending][data-lt-auth-hint=in] .app-header .header-actions>.account-slot,
+ html[data-lt-auth-phase=ready][data-lt-auth-hint=in] .app-header .header-actions>.account-slot,
+ html:not([data-lt-auth-phase=pending]) .app-header .header-actions:has(>#write-menu:not([hidden]))>.account-slot{grid-column:3}
  .app-header .tree-slot{flex:0 0 208px;width:208px}
  .app-header .tree-prefix{flex:0 0 21px;width:21px;margin-right:8px}
  .app-header .tree-frame .tree-views{display:grid;grid-template-columns:56px 68px 56px 44px 56px;gap:2px}
@@ -1348,3 +1356,24 @@ body[data-record-source=share][data-fab-lift=book].lt-book-lightbox-open #toast[
 
 /* #1362: 휴대폰에서만 선택 탭을 채운다(넓은 화면의 기존 모양은 그대로). */
 @media(max-width:780px){nav button[aria-current=true],.tree-frame .tree-views>button[aria-current=true]{background:var(--lt-role-accent-bg);color:var(--lt-role-accent-ink)}}
+
+/* #1367: shared picker is anchored to the active screen, not the top navigation. */
+.app-header .tree-slot:has(>#record-menu[hidden]){display:none}
+body>.tree-popover.lt-toolbar-picker{position:fixed;top:var(--lt-picker-top);left:clamp(8px,var(--lt-picker-left),calc(100vw - 370px));right:auto;width:min(354px,calc(100vw - 16px));min-width:0;max-height:min(85dvh,750px);overflow:hidden;z-index:220;display:flex;flex-direction:column;gap:4px;background:var(--lt-role-bg);color:var(--lt-role-text-strong);border:1px solid var(--lt-role-border);border-radius:var(--lt-r-card)}
+body>.tree-popover.lt-toolbar-picker[hidden]{display:none}
+.lt-toolbar-picker .lt-tree-picker-heading{display:flex;justify-content:space-between;align-items:center;padding:4px 8px}
+.lt-toolbar-picker .lt-tree-picker-heading button{min-width:44px;min-height:44px;background:var(--lt-role-idle-bg);color:var(--lt-role-idle-ink);border:1px solid var(--lt-role-idle-border);border-radius:var(--lt-r-pill)}
+.lt-toolbar-picker .tree-list{flex:1 1 auto;min-height:0;max-height:none;overflow:auto;align-content:start;grid-auto-rows:min-content}
+.lt-toolbar-picker .tree-foot{flex:0 0 auto;overflow:auto;max-height:32dvh}
+.lt-toolbar-picker .tree-item{color:var(--lt-role-text-strong);background:var(--lt-role-bg)}
+.lt-toolbar-picker .tree-item[aria-checked=true]{background:var(--lt-role-accent-bg);color:var(--lt-role-accent-ink)}
+.lt-toolbar-picker .tree-item[aria-checked=true] .tree-name,.lt-toolbar-picker .tree-item[aria-checked=true] .tree-count{color:inherit}
+.lt-toolbar-picker .tree-item:is(:hover,:focus-visible),.lt-toolbar-picker .tree-foot button:is(:hover,:focus-visible){background:var(--lt-role-hover-bg);color:var(--lt-role-hover-ink)}
+.lt-toolbar-picker .tree-foot button{color:var(--lt-role-text-strong)}
+.lt-toolbar-picker .tree-search input{color:var(--lt-role-text-strong);background:var(--lt-role-bg);border-color:var(--lt-role-border)}
+@media(max-width:900px){
+ body>.tree-popover.lt-toolbar-picker{top:8dvh;left:0;right:0;bottom:0;width:100%;max-height:92dvh;border-radius:var(--lt-r-card) var(--lt-r-card) 0 0}
+ .lt-toolbar-picker .tree-foot{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));max-height:28dvh}
+ .lt-toolbar-picker .tree-group-divider{grid-column:1/-1}
+}
+@media(min-width:601px) and (max-width:900px){.lt-toolbar-picker .tree-foot{grid-template-columns:repeat(3,minmax(0,1fr))}}

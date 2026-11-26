@@ -22,7 +22,8 @@ export function createScreens(deps) {
     closePanels,
     syncTips,
     takeBoardOpen,
-    onFrameReady
+    onFrameReady,
+    onFrameReveal
   } = deps;
 
   // 2026-11-08 #211 화면 전환 깜빡임: 새 화면은 보이지 않는 두 번째 iframe에서 먼저 다 그린다.
@@ -78,6 +79,7 @@ export function createScreens(deps) {
     next.style.zIndex = '2';
     active.style.zIndex = '1';
     setFrameFocusGuard(active, true);
+    onFrameReveal?.();
     // #428: 보여 주는 순간에만 초점 이동을 허용한다 — 숨은 장에서 온 초점 청구가
     // reveal 직후에 자리 잡아 .app(overflow:hidden)을 밀 수 있다. 그 밀림은 보여 준
     // 딱 그 순간 한 번만 되돌린다(숨은 장의 스크롤 리스너 가드(#420) 대신, 뷰 코드는 건드리지 않는다).

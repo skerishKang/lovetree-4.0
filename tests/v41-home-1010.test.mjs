@@ -1,3 +1,4 @@
+import {clickToolbarTreeChoice,treeChoiceExpanded,treeChoiceFocused} from './helpers/tree-picker-pr3.mjs';
 // 이슈 1010(2026-11-20): 첫 화면 기존 사용자 — 예시 안내 줄·예시 카드 누름·숫자 줄 띄어쓰기·390 바닥 링크를
 // 그려진 첫 화면에서 잰다(소스 글자 검사 없음 — 동작 검사만).
 // - 안내 줄: 떠다니는 예시 카드가 보일 때만 보인다(390처럼 카드가 숨으면 숨김). 기존 사용자 문구에서 '금테'를 뺀다.
@@ -362,12 +363,12 @@ test('지연 창 모듈 — 정리·꼬리표 첫 클릭으로 창이 열린다'
       const h = await boot1010(browser, { member: true, mix: true, width: 1440 });
       try {
         if (pickInbox) {
-          await h.page.click('#record-menu');
+          await clickToolbarTreeChoice(h.page);
           await h.page.waitForFunction(() => !document.getElementById('tree-popover')?.hidden, null, { timeout: 10000 });
           await h.page.locator('#tree-popover [data-tree-id]').first().click();
           await h.page.waitForTimeout(700);
         }
-        await h.page.click('#record-menu');
+        await clickToolbarTreeChoice(h.page);
         await h.page.waitForFunction(() => !document.getElementById('tree-popover')?.hidden, null, { timeout: 10000 });
         const btn = h.page.locator(`#tree-popover [data-tree-action="${action}"]`);
         await btn.waitFor({ state: 'visible', timeout: 10000 });

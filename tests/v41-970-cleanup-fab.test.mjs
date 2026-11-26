@@ -1,3 +1,4 @@
+import {clickToolbarTreeChoice,treeChoiceExpanded,treeChoiceFocused} from './helpers/tree-picker-pr3.mjs';
 // #970 동작 시험 — 정리 창(cleanup.mjs)과 모바일 아래 ＋ 단추(#mobile-add).
 // 1) 정리 창: 트리 ▾에서 '정리 전 N개 정리하기'로 열고, 순간 고를 → 이름 적기 → 취소하면 그대로,
 //    확인하면 저장(PUT /api/workspace)되고 안내가 뜬다. 쓰다 만 입력이 있으면 닫을 때 한 번 묻는다.
@@ -65,7 +66,7 @@ async function withShell(tree, { width = 1440, height = 900 } = {}, fn) {
 }
 
 async function openCleanup(page) {
-  await page.locator('#record-menu').click();
+  await clickToolbarTreeChoice(page);
   await page.locator('[data-tree-action="cleanup"]').click();
   await page.waitForSelector('#cleanup-panel[open]', { timeout: 10000 });
 }
@@ -276,7 +277,7 @@ test('어긋난 트리 1개 + 정상 2개: 셸이 열리고 정상 트리 2개�
       assert.equal(warnings.filter((text) => /열 수 없는 트리/.test(text)).length, 1, `${width}: 콘솔 경고 한 줄`);
       assert.deepEqual(errors, [], `${width}: 페이지 오류 없음`);
       if (width === 1440) {
-        await page.locator('#record-menu').click();
+        await clickToolbarTreeChoice(page);
         await page.waitForSelector('#tree-popover [data-tree-id]', { timeout: 5000 }).catch(() => {});
         assert.equal(await page.locator('#tree-popover [data-tree-id]').count(), 2, '트리 메뉴에도 정상 트리 2개만 보인다');
       }

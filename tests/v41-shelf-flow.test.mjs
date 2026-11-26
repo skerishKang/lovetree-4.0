@@ -10,6 +10,7 @@ import {
 import { youtubeIdFrom } from '../public/v41/youtube-id.mjs';
 import { createReader } from '../public/v41/views/shelf/shelf-reader.js';
 import { VIEWS, SHELF_VIEW_NAMES } from '../public/v41/views/shelf/shelf-views.mjs';
+import { recentChapters } from '../public/v41/views/shelf/shelf-model.mjs';
 import { nextMomentMessage } from '../public/v41/book-usability.mjs';
 import { MSG } from '../public/v41/frame-messages.mjs';
 import { fakeEl } from './helpers/fake-dom.mjs';
@@ -544,7 +545,7 @@ test('#1376 두 보기가 같은 mount·layout·move·destroy 약속을 지킨�
       assert.deepEqual(h.counts().reports, [0], `${name}: 마지막 본 트리 보고`);
 
       // 클릭은 열기 공용 동작만 부른다.
-      h.listeners.click[0]({ target: { closest: (sel) => (sel === '[data-manage-id]' ? null : h.cards[2]) }, detail: 0 });
+      h.listeners.click[0]({ target: { closest: (sel) => (sel === '[data-manage-id]' || sel === '.shelf-empty-slot' ? null : h.cards[2]) }, detail: 0 });
       assert.deepEqual(h.counts().opens, [2], `${name}: 카드는 공용 열기로 간다`);
 
       // 화살표 이동은 보기 규칙대로 가운데 또는 오프셋을 바꾼다.
@@ -553,7 +554,7 @@ test('#1376 두 보기가 같은 mount·layout·move·destroy 약속을 지킨�
 
       // 길게 누르기 타이머를 남긴 채 떠나면, 귀·타이머·관찰자가 모두 정리된다.
       const timerCount = timers.length;
-      h.listeners.pointerdown[0]({ target: { closest: (sel) => (sel === '[data-manage-id]' ? null : h.cards[1]) }, clientX: 0, clientY: 0, pointerId: 1 });
+      h.listeners.pointerdown[0]({ target: { closest: (sel) => (sel === '[data-manage-id]' || sel === '.shelf-empty-slot' ? null : h.cards[1]) }, clientX: 0, clientY: 0, pointerId: 1 });
       assert.equal(timers.length, timerCount + 1, `${name}: 길게 누르기 타이머가 생긴다`);
       h.view.destroy();
       assert.equal(timers[timers.length - 1].cleared, true, `${name}: 타이머 해제`);
@@ -612,4 +613,13 @@ test('#1376 뒤로 가기는 보기와 무관하게 서재 선택을 되돌린�
   } finally {
     if (savedWindow === undefined) delete globalThis.window; else globalThis.window = savedWindow;
   }
+});
+
+// #1366 ⑥: 순간이 없는 트리는 최근 순간 줄을 만들지 않는다(가짜 작업 공간은 빈 트리를 거부한다).
+test('최근 순간 줄은 순간이 없으면 비어 있고 최대 여섯 개다', () => {
+  assert.deepEqual(recentChapters([]), []);
+  const many = Array.from({ length: 9 }, (_, i) => ({ id: 'm' + i, title: '순간 ' + i, date: '2026-11-' + String(i + 1).padStart(2, '0') }));
+  const list = recentChapters(many);
+  assert.equal(list.length, 6);
+  assert.deepEqual(list.map((m) => m.id), ['m8', 'm7', 'm6', 'm5', 'm4', 'm3']);
 });
