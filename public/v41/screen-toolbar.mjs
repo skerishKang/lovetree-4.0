@@ -27,10 +27,13 @@ function prepareTreeChoice(bar, screen, title, titleFrom) {
   const source = () => { try { return window.parent.LT41; } catch { return null; } };
   const context = source();
   const own = context?.source === 'server' && context?.writable === true && !!context?.tree && !context?.tree?.demoData;
-  const choice = document.createElement(own ? 'button' : 'span');
+  // #1433: 도구 줄을 HTML로 먼저 그리는 화면(보드·트리)은 첫 그림의 뼈대(높이 44·최소 폭)를 그대로 이어받고 이름·표지만 채운다.
+  const early = left.querySelector(':scope > .lt-toolbar-tree-choice');
+  const choice = early && early.tagName === (own ? 'BUTTON' : 'SPAN') ? early : document.createElement(own ? 'button' : 'span');
   choice.className = 'lt-toolbar-tree-choice' + (own ? '' : ' lt-toolbar-tree-label');
   if (own) {
     choice.type = 'button';
+    choice.disabled = false;
     choice.setAttribute('aria-label', '\uD2B8\uB9AC \uACE0\uB974\uAE30');
     choice.title = '\uD2B8\uB9AC \uACE0\uB974\uAE30';
     choice.setAttribute('aria-haspopup', 'dialog');
@@ -57,9 +60,10 @@ function prepareTreeChoice(bar, screen, title, titleFrom) {
     caret.className = 'lt-toolbar-tree-caret';
     caret.setAttribute('aria-hidden', 'true');
     caret.textContent = '\u25BE';
-    choice.append(thumb, name, caret);
-  } else choice.append(name);
-  left.prepend(choice);
+    choice.replaceChildren(thumb, name, caret);
+  } else choice.replaceChildren(name);
+  if (early && early !== choice) early.replaceWith(choice);
+  else if (!early) left.prepend(choice);
   // #1448: 서재의 중복 제목을 숨기고 트리 선택기만 표시한다.
   title.hidden = true;
   const refresh = () => {

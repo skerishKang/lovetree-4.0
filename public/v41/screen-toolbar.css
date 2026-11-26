@@ -246,3 +246,18 @@ html[data-v41-screen]:is([data-v41-screen=shelf],[data-v41-screen=tree],[data-v4
 
 /* #1448: identical typography gives identical intrinsic picker width in every view. */
 .lt-toolbar-tree-choice{font-family:'Pretendard Variable','Noto Sans KR',system-ui,sans-serif}
+
+/* #1433: 트리 고르기는 첫 그림부터 자리(높이 44·최소 폭)를 잡는다. 이름·표지를 나중에 채워도 도구 줄이 밀리지 않는다.
+   왼쪽 이름 폭이 바뀌어도 오른쪽 도구 묶음은 오른쪽 끝에 붙어 있다(서재는 검색 칸이 남은 폭을 쓰므로 그대로 둔다). */
+.lt-toolbar-tree-choice{min-width:120px}
+@media(max-width:600px){.lt-toolbar-tree-choice{min-width:112px}}
+/* 좁은 화면은 넘치는 도구를 '…'로 접으며 묶음 폭이 줄어든다 — 그때 묶음이 오른쪽으로 밀리지 않게 넓은 화면에만 둔다. */
+@media(min-width:761px){html:is([data-v41-screen=board],[data-v41-screen=book],[data-v41-screen=network]) .lt-screen-toolbar .lt-toolbar-tools{flex-grow:0;margin-left:auto}}
+/* 좁은 보드는 도구 줄을 HTML로 먼저 그린 뒤 넘치는 도구를 '…'로 접는다 — 접기 전에 트리 고르기가 눌렸다가 펴지며 도구 묶음을 밀지 않게 왼쪽은 줄이지 않는다. */
+@media(max-width:760px){html[data-v41-screen=board] .lt-screen-toolbar .lt-toolbar-left{flex-shrink:0}}
+/* #1433: 보드의 배치 묶음·배경 단추는 첫 그림부터 마지막 폭으로 그린다 — 글꼴이 늦게 와도 폭이 같아 옆 단추가 밀리지 않는다. */
+@media(min-width:761px){
+  html[data-v41-screen=board] .lt-toolbar-tools .boardModeSwitch{width:128px}
+  html[data-v41-screen=board] .lt-toolbar-tools .boardModeSwitch:has(>#boardResetOrderBtn){width:216px}
+}
+html[data-v41-screen=board] .lt-screen-toolbar .lt-toolbar-tools #boardBgBtn{width:66px;padding:0}
