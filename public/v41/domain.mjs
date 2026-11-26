@@ -179,7 +179,7 @@ export const BOOK_DISPLAYS = ['book', 'list'];
 export const DEFAULT_BOOK_DISPLAY = 'book';
 // #1093: 서재 진열 방식 — shelf(선반, 기본)·carousel(회전). 상태(state.prefs)에 저장한다.
 export const SHELF_VIEWS = ['shelf', 'carousel'];
-export const DEFAULT_SHELF_VIEW = 'shelf';
+export const DEFAULT_SHELF_VIEW = 'carousel';
 // #368 2차: 프로필(표시 이름·동그라미 색). 계정 기록의 설정 칸(state.prefs)에 함께 저장한다(#371).
 // 표시 이름은 공백을 한 칸으로 모으고 20자(문자 단위)까지만 남긴다. 값이 없으면 ''라 이전 저장본도 그대로 읽힌다.
 // src/domain.js(서버가 쓰는 같은 규칙)와 값이 같은지 tests/v41-title-prefs.test.mjs가 확인한다.
