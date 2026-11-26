@@ -1,3 +1,4 @@
+import {clickToolbarTreeChoice,treeChoiceExpanded,treeChoiceFocused} from './helpers/tree-picker-pr3.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
@@ -175,7 +176,7 @@ test("서재에서 트리를 고르면 가운데 책이 그 트리로 이동", {
     await page.locator('#discover-ask-no').click().catch(() => {});
     await page.evaluate(() => { location.hash = '#my/shelf'; });
     await page.waitForFunction(() => [...document.querySelectorAll('iframe')].some((f) => { try { return /track32-bookshelf/.test(f.contentWindow.location.href) && f.contentDocument.querySelector('.book-card.is-center'); } catch { return false; } }), null, { timeout: 15000 });
-    await page.click('#record-menu');
+    await clickToolbarTreeChoice(page);
     await page.click(`[data-tree-id="${two[1].id}"]`);
     await page.waitForFunction((id) => [...document.querySelectorAll('iframe')].some((f) => {
       try { return /track32-bookshelf/.test(f.contentWindow.location.href) && f.contentDocument.querySelector('.book-card.is-center [data-book-id]')?.dataset.bookId === id; } catch { return false; }
@@ -257,7 +258,7 @@ test('상단 메뉴 261119: 트리 단추 폭·⌄ 자리·목록 규칙·메뉴
 
       // 목록: 마우스로 연다 → 초점 테두리 없음, 항목 바탕 투명, 판은 한 색,아래 메뉴 순서 고정.
       await page.mouse.move(10, 300);
-      await page.click('#record-menu');
+      await clickToolbarTreeChoice(page);
       await page.mouse.move(width - 12, width === 390 ? 800 : 860);
       await page.waitForTimeout(200);
       const list = await page.evaluate(() => {
@@ -314,7 +315,7 @@ test('970 실행: 트리 드롭다운은 Esc·바깥 누르기로 닫히고, 키
       await page.waitForTimeout(700);
 
       // 마우스로 열기 → Esc로 닫기: 초점이 단추로 돌아온다.
-      await page.click('#record-menu');
+      await clickToolbarTreeChoice(page);
       await page.waitForFunction(() => !document.getElementById('tree-popover')?.hidden, null, { timeout: 10000 });
       assert.equal(await page.evaluate(() => document.getElementById('record-menu')?.getAttribute('aria-expanded')), 'true', `${width}: 열면 aria-expanded=true`);
       await page.keyboard.press('Escape');
@@ -364,7 +365,7 @@ test('970 실행: 트리 드롭다운은 Esc·바깥 누르기로 닫히고, 키
       assert.ok(page.url().includes(`tree=${wantTree}`), `${width}: Enter로 고른 트리가 열린다(${page.url().split('#')[1] || ''})`);
 
       // 바깥 누르기로 닫기: aria-expanded가 false로 돌아온다.
-      await page.click('#record-menu');
+      await clickToolbarTreeChoice(page);
       await page.waitForFunction(() => !document.getElementById('tree-popover')?.hidden, null, { timeout: 5000 });
       // 아이프레임 위 좌표는 부모 문서까지 클릭이 오지 않으므로 부모 머리줄 빈 곳을 누른다.
       await page.click(".app-header", { position: { x: 5, y: 5 } });
@@ -396,7 +397,7 @@ test('1028 실행: 트리 목록만 스크롤하고 동작 칸은 고정이며 �
     await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
     await page.locator('#discover-ask-no').click().catch(() => {});
     await page.waitForTimeout(600);
-    await page.click('#record-menu');
+    await clickToolbarTreeChoice(page);
     await page.waitForFunction(() => !document.getElementById('tree-popover')?.hidden, null, { timeout: 10000 });
     return { ctx, page, trees };
   }
@@ -468,7 +469,7 @@ test('1028 실행: 트리 목록만 스크롤하고 동작 칸은 고정이며 �
           }
           if (SHOT) {
             mkdirSync(SHOT, { recursive: true });
-            if (await page.evaluate(() => document.getElementById('tree-popover')?.hidden)) await page.click('#record-menu');
+            if (await page.evaluate(() => document.getElementById('tree-popover')?.hidden)) await clickToolbarTreeChoice(page);
             await page.screenshot({ path: `${SHOT}/desktop-${width}-${theme}-${count}.png` });
           }
           numbers.push({ width, theme, count, ...m });
@@ -636,7 +637,7 @@ test('#1367 4번: 트리 고르기 목록은 바깥 누름·안쪽 화면 누름
         await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
         await page.locator('#discover-ask-no').click().catch(() => {});
         const hidden = () => page.evaluate(() => document.getElementById('tree-popover')?.hidden !== false);
-        const open = async () => { assert.equal(await hidden(), true, '처음에는 닫혀 있다'); await page.click('#record-menu'); assert.equal(await hidden(), false, '트리 고르기를 누르면 열린다'); };
+        const open = async () => { assert.equal(await hidden(), true, '처음에는 닫혀 있다'); await clickToolbarTreeChoice(page); assert.equal(await hidden(), false, '트리 고르기를 누르면 열린다'); };
 
         // 머리줄 빈 곳(테마 단추)을 눌러도 창을 닫기만 하고 테마는 바뀌지 않는다.
         await open();
