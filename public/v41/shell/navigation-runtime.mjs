@@ -208,6 +208,7 @@ export function createNavigationRuntime(ctx){
       applyTheme:ctx.applyTheme,
       writeLocation,
       links:(...args)=>(0,ctx.links)(...args),
+      onFrameReveal:()=>ctx.syncFrameSheet?.(),
       onFrameReady:frame=>{
         const d=frame.contentDocument;if(!d)return;
         (0,ctx.mountConnectionTool)(d);applyViewAccessibility(d);ctx.shellQuick.mountFrame(d);(0,ctx.watchFrameSheet)(frame);

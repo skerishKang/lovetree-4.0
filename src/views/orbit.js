@@ -239,7 +239,7 @@ export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSel
   const treeZero=owned&&treeCount===0;
   if(treeZero){centerTitle.dataset.ltEmptyOwned='1';world.querySelectorAll('.card').forEach(card=>card.remove());}
   const guest=!isMember;
-  centerTitle.querySelector('.eyebrow').textContent=guest?'나의 첫 순간':'다시 만나 반가워요';
+  centerTitle.querySelector('.eyebrow').textContent=treeZero?'처음 시작해요':guest?'나의 첫 순간':'다시 만나 반가워요';
   centerTitle.querySelector('h1').textContent=treeZero?'내 첫 순간':guest?'좋아하는 순간부터.':'다시, 그 순간으로.';
   const p=centerTitle.querySelector('p.lt-home-enter, p:not(.center-note)');
   if(p){const copy=treeZero?['첫 순간을 남겨 보세요.']:guest?['간직하고 싶은 장면에 마음을 남겨 보세요.','지금 떠오르는 순간 하나면 충분해요.']:['기억은 아직 여기에서 이어지고 있어요.'];p.classList.remove('lt-home-enter');p.innerHTML=copy.map((line,i)=>`<span class="lt-home-line lt-home-enter" style="--lt-home-order:${2+i}">${line}</span>`).join('');}

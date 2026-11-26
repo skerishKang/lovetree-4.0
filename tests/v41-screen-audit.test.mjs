@@ -1,3 +1,4 @@
+import {clickToolbarTreeChoice,treeChoiceExpanded,treeChoiceFocused} from './helpers/tree-picker-pr3.mjs';
 // 검사 함수는 tests/helpers/screen-audit.mjs에 있다(①겹침·가려짐 #635 규칙 ②가로 넘침·잘림 ③흔적 값 넷 #635 ④글자 기준선 #548 ⑤알림 줄이 아래 링크 줄·＋ 단추·새 소식 카드를 덮지 않음 #666).
 // 화면 목록: 첫 화면(예시)·책(공유 링크, 마지막 장 포함)·보드·지도·둘러보기·의견 보내기 창(보내기 전·후)·어떻게 쓰나요 안내.
 // #666이 더한 상태: 알림 줄(토스트)이 떠 있는 셸 첫 화면·보드 — ＋ 단추(body.lt-fab-ok)와 새 소식 카드가 함께 뜬 자리에서 잰다.
@@ -10,11 +11,12 @@
 // 크롬(Playwright chromium)이 없는 곳에서는 건너뛴다 — CI(LT_SCREEN_AUDIT_REQUIRE=1)에서는 건너뜀을 실패로 본다.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { serve, auditPage, failuresOf, roleStyleFn, assertRolePair } from './helpers/screen-audit.mjs';
 import { createTree, addMoment } from '../public/v41/domain.mjs';
+import { observeFrameMatrix } from './helpers/frame-observation.mjs';
 
 const REQUIRE = process.env.LT_SCREEN_AUDIT_REQUIRE === '1';
 const SCREEN_AUDIT_CAPTURE_DIR = fileURLToPath(new URL('../test-results/v41-screen-audit/', import.meta.url));
@@ -361,9 +363,8 @@ test('#987 공유 창 폭·단추·대비와 설정 정렬·동그라미·배치
         await page.waitForFunction(()=>window.LT41?.trees?.length===3&&!document.querySelector('#account-avatar')?.hidden);
         const ask=page.locator('#discover-ask-no');
         if(await ask.isVisible())await ask.click();
-        await page.locator('#record-menu').click();
-        await page.locator('[data-tree-action="shelf"]').click();
-        await page.locator('#record-menu').click();
+        // #1367: the tree picker now lives in the shelf; avoid reopening the same shelf frame.
+        await clickToolbarTreeChoice(page);
         await page.locator('[data-tree-action="share"]').click();
         await page.locator('#share-panel[open] .share-item-actions button').first().waitFor();
         const snap=async(label,id)=>{
@@ -598,6 +599,75 @@ const readyFrame = async (page, test_, { root = null, view = null, timeout = 450
   }
   assert.fail(`${why} 실패 — ${detail} (최대 ${timeout / 1000}초). 현재 프레임 URL: [${frameUrls(page).join(' | ')}]`);
 };
+
+test('#657 화면 공통 검사기: 아홉 화면 둘레·스크롤 주인 관측 기반선(390·1440 × 밤·정원)', { skip: REQUIRE ? false : skip, timeout: 300000 }, async () => {
+  if (skip) assert.fail(`미리보기 검사에서는 건너뜀이 실패다 — ${skip}`);
+  const baseline = JSON.parse(readFileSync(new URL('./fixtures/frame-observation-baseline.json', import.meta.url), 'utf8'));
+  const shard = process.env.LT_SCREEN_AUDIT_SHARD || '';
+  const outputDir = fileURLToPath(new URL('../test-results/v41-frame-observation/' + (shard || 'all') + '/', import.meta.url));
+  const server = await serve({}, { port: 4401 });
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch({ headless: true });
+  const started = Date.now();
+  try {
+    const report = await observeFrameMatrix({ browser, base, outputDir, shard });
+    assert.deepEqual(report.errors, [], '관측 중 화면 오류가 없다');
+    assert.equal(report.screens.length, !shard ? 36 : shard === 'c' ? 18 : 9, '선택한 shard의 아홉 화면을 모두 관측했다');
+    const assertObservedStyle = (actual, expected, width, theme, label) => {
+      assert.ok(actual, `${label} 요소가 있다`);
+      assert.deepEqual(actual.padding, expected.padding[width], `${label} padding`);
+      assert.deepEqual(actual.borderWidth, expected.borderWidth, `${label} 테두리 두께`);
+      assert.deepEqual(actual.borderStyle, expected.borderStyle, `${label} 테두리 선`);
+      assert.deepEqual(actual.borderColor, Array(4).fill(expected.borderColor[theme]), `${label} 테두리 색`);
+      assert.deepEqual(actual.borderRadius, expected.borderRadius[width], `${label} 모서리 반경`);
+      assert.equal(actual.boxShadow, expected.boxShadow, `${label} 그림자`);
+      assert.deepEqual([actual.background, actual.backgroundImage], [expected.background[theme].background, expected.background[theme].backgroundImage], `${label} 배경`);
+    };
+    for (const row of report.screens) {
+      const width = String(row.viewport.width), id = row.screen, label = `${width}/${row.theme}/${id}`;
+      const expected = baseline.screens[baseline.screenGroups[id]];
+      const stage = row.shell.stage, frame = row.shell.frame, panel = row.shell.panel;
+      assert.ok(expected, `${label} 기준선이 있다`);
+      assertObservedStyle(stage, expected.stage, width, row.theme, `${label} stage`);
+      assert.ok(Math.abs(stage.rect.height - expected.stage.height[width]) <= 0.002, `${label} stage 높이 ${stage.rect.height}`);
+      assert.equal(row.scroll.shellDocumentScrollable, false, `${label} 셸 문서는 스크롤 주인이 아니다`);
+      const owner = row.scroll.owner, scroll = expected.scroll[id];
+      assert.ok(scroll, `${label} 스크롤 기준선이 있다`);
+      assert.equal(row.scroll.frameDocumentScrollable, scroll.frameDocumentScrollable[width], `${label} iframe 문서 스크롤 여부`);
+      assert.equal(`${owner?.owner}:${owner?.id}`, scroll.owner, `${label} 주 스크롤 주인`);
+      assert.equal(owner?.overflowY, scroll.overflowY[width], `${label} 주 스크롤 주인 overflowY`);
+      if (expected.frame) assertObservedStyle(frame, expected.frame, width, row.theme, `${label} iframe`);
+      else assert.equal(frame, null, `${label} iframe을 쓰지 않는다`);
+      if (expected.panel) {
+        assertObservedStyle(panel, expected.panel, width, row.theme, `${label} panel`);
+        assert.equal(panel.open, expected.panel.open, `${label} panel 열림 상태`);
+        assert.deepEqual(row.shell.backdrop, expected.panel.backdrop[row.theme], `${label} panel 배경 덮개`);
+      } else assert.equal(panel, null, `${label} 셸 패널을 쓰지 않는다`);
+      for (const suffix of ['.png', '-surface.png', '-roi-top.png', '-roi-bottom.png', '-roi-left.png', '-roi-right.png', '.json']) assert.ok(existsSync(join(outputDir, `${width}-${row.theme}-${id}${suffix}`)), `${label} 관측 파일 ${suffix}`);
+      if (id === 'share-guest') {
+        const toast = expected.toast;
+        assert.equal(row.shell.toastHidden, toast.hidden, `${label} 안내가 보인다`);
+        assert.equal(row.shell.visitorIntro, toast.visitorIntro, `${label} 방문자 안내다`);
+        assert.equal(row.shell.toast.position, toast.position, `${label} 안내는 문서 흐름 칸이다`);
+        assert.equal(row.shell.toast.flex, toast.flex, `${label} 안내는 flex 고정 칸이다`);
+        assert.ok(Math.abs(row.shell.toast.rect.height - toast.height[width]) <= 0.002, `${label} 안내 높이`);
+        assert.deepEqual([row.shell.toast.margin[0], row.shell.toast.margin[2]], [toast.margin[width].top, toast.margin[width].bottom], `${label} 안내 세로 여백`);
+        assert.ok(row.shell.toastCenterDelta <= toast.centeringTolerance, `${label} 안내 좌우 여백 차이 ${row.shell.toastCenterDelta}px`);
+        assert.equal(row.shell.toastHorizontalOverflow, toast.horizontalOverflow, `${label} 안내 가로 넘침`);
+        assert.equal(row.shell.toastWithinViewport, toast.withinViewport, `${label} 안내가 화면 안에 있다`);
+        const shortfall = baseline.screens.iframe.stage.height[width] - stage.rect.height;
+        assert.ok(Math.abs(shortfall - expected.stageShortfall[width]) <= 0.002, `${label} 안내가 줄인 stage 높이 ${shortfall}`);
+      }
+    }
+    const result = { basis: baseline.basis, shard: shard || 'all', screens: report.screens.length, elapsedMs: Date.now() - started };
+    mkdirSync(outputDir, { recursive: true });
+    writeFileSync(join(outputDir, 'result.json'), JSON.stringify(result, null, 2));
+    console.log('#1365 둘레 관측', JSON.stringify(result));
+  } finally {
+    await browser.close();
+    await new Promise(resolve => server.close(resolve));
+  }
+});
 
 test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤·정원에서 겹침·잘림·흔적 값·작은 글자가 0이다', { skip: REQUIRE ? false : skip, timeout: 900000 }, async () => {
   if (skip) assert.fail(`미리보기 검사에서는 건너뜀이 실패다 — ${skip}`);
@@ -1435,7 +1505,7 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     await page5b.waitForFunction(() => { const c = document.getElementById('updates-card'); return c && !c.hidden; }, null, { timeout: 10000 }).catch(() => {});
     if (!await page5b.evaluate(() => document.getElementById('updates-card')?.hidden)) await page5b.click('#updates-dismiss');
     await page5b.waitForFunction(() => { const c = document.getElementById('updates-card'); return c && c.hidden; }, null, { timeout: 8000 }).catch(() => {});
-    await page5b.click('#record-menu');
+    await clickToolbarTreeChoice(page5b);
     await page5b.waitForFunction(() => !document.getElementById('tree-popover')?.hidden, null, { timeout: 8000 });
     await page5b.click('#tree-popover [data-tree-action="moments"]');
     const orbitFrameOf = async () => {
@@ -1675,7 +1745,7 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     }
     await take(page6, '꼬리표 줄이 열린 상세');
     // #627 PR B: 꼬리표 정리 화면 — 목록·개수와 '제목에서 꼬리표 한 번에 제안받기'가 그려진 자리를 잰다.
-    await page6.evaluate(() => document.getElementById('record-menu')?.click());
+    await clickToolbarTreeChoice(page6);
     await page6.waitForTimeout(400);
     await page6.evaluate(() => document.querySelector('[data-tree-action="tags"]')?.click());
     await page6.waitForFunction(() => !!document.getElementById('tag-panel')?.open, null, { timeout: 8000 });
@@ -2743,9 +2813,16 @@ test('#987 보드 첫 줄과 모바일 셸 겹침·현재 표시', { skip: REQUI
       await page.waitForFunction(() => window.LT41?.trees?.length === 3 && !document.querySelector('#account-avatar')?.hidden);
       const ask = page.locator('#discover-ask-no');
       if (await ask.isVisible()) await ask.click();
-      await page.locator('#record-menu').click();
+      await clickToolbarTreeChoice(page);
       await page.locator('[data-tree-action="shelf"]').click();
       await page.frameLocator('#view').locator('#shelfRail [data-book-index]').first().waitFor();
+        await page.waitForFunction(() => {
+          const frame = document.querySelector('iframe#view');
+          return !frame?.hidden && /track32-bookshelf/.test(frame?.contentWindow?.location.pathname || '') &&
+            document.getElementById('view-next')?.hidden &&
+            document.getElementById('view-next')?.contentWindow?.location.href === 'about:blank' &&
+            !!window.LT41?.tree;
+        }, null, { timeout: 5000 });
       await page.locator('#toast').waitFor({ state: 'hidden', timeout: 6000 }).catch(() => {});
       const snap = async label => { if (dest) await page.screenshot({ path: join(dest, label + '-' + width + '-' + theme + '.png'), animations: 'disabled' }); };
       await run(page, snap, trees[0]);
@@ -2754,17 +2831,23 @@ test('#987 보드 첫 줄과 모바일 셸 겹침·현재 표시', { skip: REQUI
   try {
     for (const theme of ['night', 'garden']) {
       for (const width of [360, 375, 390]) await withPage(width, 844, theme, 8, async (page, snap) => {
-        await page.locator('#record-menu').click();
+        await clickToolbarTreeChoice(page);
+        await page.waitForFunction(() => !document.getElementById('tree-popover')?.hidden, null, { timeout: 5000 });
         const header = await page.evaluate(() => {
-          const t = document.querySelector('#record-menu'), s = document.querySelector('#theme-toggle'), a = t.querySelector('svg');
-          const b = t.getBoundingClientRect(), c = s.getBoundingClientRect(), d = a.getBoundingClientRect();
-          const hit = document.elementFromPoint(d.x + d.width/2, d.y + d.height/2);
-          return { overlap: Math.max(0, Math.min(b.right,c.right)-Math.max(b.left,c.left))*Math.max(0,Math.min(b.bottom,c.bottom)-Math.max(b.top,c.top)), arrowVisible: a.contains(hit) || t.contains(hit), arrowGap: b.right-d.right, arrowWidth: d.width, overflow: document.documentElement.scrollWidth-innerWidth };
+          const frame = document.querySelector('iframe#view');
+          const doc = frame?.contentDocument;
+          const t = doc?.querySelector('button.lt-toolbar-tree-choice');
+          const s = document.querySelector('#theme-toggle'), a = t?.querySelector('.lt-toolbar-tree-caret');
+          const b = t.getBoundingClientRect(), c = s.getBoundingClientRect(), d = a.getBoundingClientRect(), fr = frame.getBoundingClientRect();
+          const hit = doc.elementFromPoint(d.x + d.width/2, d.y + d.height/2);
+          const overlap = Math.max(0, Math.min(b.right+fr.left,c.right)-Math.max(b.left+fr.left,c.left))*
+            Math.max(0,Math.min(b.bottom+fr.top,c.bottom)-Math.max(b.top+fr.top,c.top));
+          return { overlap, arrowVisible: a.contains(hit) || t.contains(hit), arrowGap: b.right-d.right, arrowWidth: d.width, overflow: document.documentElement.scrollWidth-innerWidth };
         });
         console.log('#987 header', width, theme, JSON.stringify(header));
         await snap('tree-menu');
         check(header.overlap === 0 && header.arrowVisible && header.arrowWidth > 0 && header.arrowGap >= 0 && header.arrowGap <= 16 && header.overflow === 0, '트리 ' + width + ' ' + theme + ' ' + JSON.stringify(header));
-        await page.locator('#record-menu').click();
+        await page.locator('#tree-popover [data-tree-close]').click();
         if (width !== 390) return;
         await page.locator('#mobile-more').click();
         const menu = await page.locator('#header-overflow [aria-current=true]').evaluate(el => {

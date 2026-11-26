@@ -48,6 +48,7 @@ export function createNavigationMenu(ctx){
     moreButton=(0,ctx.$)('mobile-more'),moreMenu=(0,ctx.$)('header-overflow');
 
     treePopover=(0,ctx.$)('tree-popover'),treeTrigger=(0,ctx.$)('record-menu');
+    if(treePopover?.parentElement!==document.body)document.body.append(treePopover);
 
     shellTreeMenu=createTreeMenu({$:ctx.$, document, window, location, get model(){return ctx.model}, get member(){return ctx.member}, get current(){return ctx.current}, get source(){return ctx.source}, treePopover, treeTrigger, thumbnailCandidates, coverFallbackAttrs, coverModeOf, normalizeCoverDesign, displayTreeTitle, cleanupAvailable, writeLocation:ctx.writeLocation, renderAccount:ctx.renderAccount, flowNavigation:ctx.flowNavigation, choose:ctx.choose, show:ctx.show, openEditor:ctx.openEditor, openLoginStart:ctx.openLoginStart, get shellCleanup(){return ctx.shellCleanup}, get shellTagManager(){return ctx.shellTagManager}, get shellPanels(){return ctx.shellPanels}
      });

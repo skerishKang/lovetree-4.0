@@ -10,6 +10,7 @@ import {
 import { youtubeIdFrom } from '../public/v41/youtube-id.mjs';
 import { createReader } from '../public/v41/views/shelf/shelf-reader.js';
 import { VIEWS, SHELF_VIEW_NAMES } from '../public/v41/views/shelf/shelf-views.mjs';
+import { recentChapters } from '../public/v41/views/shelf/shelf-model.mjs';
 import { nextMomentMessage } from '../public/v41/book-usability.mjs';
 import { MSG } from '../public/v41/frame-messages.mjs';
 import { fakeEl } from './helpers/fake-dom.mjs';
@@ -612,4 +613,13 @@ test('#1376 뒤로 가기는 보기와 무관하게 서재 선택을 되돌린�
   } finally {
     if (savedWindow === undefined) delete globalThis.window; else globalThis.window = savedWindow;
   }
+});
+
+// #1366 ⑥: 순간이 없는 트리는 최근 순간 줄을 만들지 않는다(가짜 작업 공간은 빈 트리를 거부한다).
+test('최근 순간 줄은 순간이 없으면 비어 있고 최대 여섯 개다', () => {
+  assert.deepEqual(recentChapters([]), []);
+  const many = Array.from({ length: 9 }, (_, i) => ({ id: 'm' + i, title: '순간 ' + i, date: '2026-11-' + String(i + 1).padStart(2, '0') }));
+  const list = recentChapters(many);
+  assert.equal(list.length, 6);
+  assert.deepEqual(list.map((m) => m.id), ['m8', 'm7', 'm6', 'm5', 'm4', 'm3']);
 });

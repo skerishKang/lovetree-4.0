@@ -30,7 +30,7 @@ const STATES = [
     make: () => ({ owned: true, trees: 0, tree: null, source: 'server' }),
     expect: {
       // 2026-11-17 대표 결정: 로그인 상태면 트리 수와 관계없이 트리 고르기·네 탭을 늘 보인다.
-      treeViews: true, recordMenu: true, writeMenu: true, shareMenu: false,
+      treeViews: true, recordMenu: false, writeMenu: true, shareMenu: false,
       picker: '트리 없음', write: '＋ 순간 추가', aria: '이 트리 보기'
     }
   },
@@ -38,7 +38,7 @@ const STATES = [
     name: '로그인·트리 있음',
     make: () => ({ owned: true, trees: 2, tree: { title: '리센느, 나의 순간들' }, source: 'server' }),
     expect: {
-      treeViews: true, recordMenu: true, writeMenu: true, shareMenu: true,
+      treeViews: true, recordMenu: false, writeMenu: true, shareMenu: true,
       picker: '리센느', write: '＋ 순간 추가', aria: '이 트리 보기'
     }
   },

@@ -24,7 +24,7 @@ export function distOrPublic() {
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.woff2': 'font/woff2' };
 
 // extraRoutes: { '/share-host.html': html } 처럼 시험용 호스트 페이지를 얹는다(#635 방식).
-export function serve(extraRoutes = {}, port = 0) {
+export function serve(extraRoutes = {}, { port = 0 } = {}) {
   const ROOT = distOrPublic();
   const server = createServer(async (req, res) => {
     const clean = decodeURIComponent((req.url || '/').split('?')[0]);

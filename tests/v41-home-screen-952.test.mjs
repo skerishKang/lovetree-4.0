@@ -1099,7 +1099,7 @@ test('#1437 delayed member response does not paint guest title, corrects stale h
  const {mkdirSync}=await import('node:fs');
  const {join}=await import('node:path');
  const browser=await chromium952.launch({headless:true});
- const server=await serve({},4143),base='http://127.0.0.1:4143';
+ const server=await serve({},{ port: 4143 }),base='http://127.0.0.1:4143';
  const tree=tree952({subject:'시험 순간',count:3});
  const testCases=[
   {key:'member',member:true,trees:[tree],hint:false,expected:'다시, 그 순간으로.',neverGuest:true},
@@ -1169,7 +1169,7 @@ test('#1437 delayed member response does not paint guest title, corrects stale h
 test('#1437 pending center is text-free until confirmed response and reserves stable height', {skip:REQUIRE952?false:skip952,timeout:90000},async()=>{
  if(skip952)assert.fail(skip952);
  const browser=await chromium952.launch({headless:true,args:['--disable-gpu']});
- const server=await serve({'/1437-harness.html':'<!doctype html><html><head><script>document.documentElement.dataset.ltAuthPhase="pending";</script></head><body data-member="out" style="margin:0"><iframe src="/v41/home.html" style="border:0;width:100vw;height:100vh"></iframe></body></html>'},4144),base='http://127.0.0.1:4144';
+ const server=await serve({'/1437-harness.html':'<!doctype html><html><head><script>document.documentElement.dataset.ltAuthPhase="pending";</script></head><body data-member="out" style="margin:0"><iframe src="/v41/home.html" style="border:0;width:100vw;height:100vh"></iframe></body></html>'},{ port: 4144 }),base='http://127.0.0.1:4144';
  const {mkdirSync}=await import('node:fs');const {join}=await import('node:path');
  const tree=tree952({subject:'시험 순간',count:3});
  try{
@@ -1218,7 +1218,7 @@ test('#1442 title wait 400ms and slow 5s, owned empty has no example cards', {sk
  const {mkdirSync}=await import('node:fs');const {join}=await import('node:path');
  const capture=process.env.LT_HOME_1442_CAPTURE_DIR;
  const harness=(member,phase)=>`<!doctype html><html><head><script>document.documentElement.dataset.ltAuthPhase='${phase}';</script></head><body data-member='${member}' data-tree-count='0' style='margin:0'><iframe src='/v41/home.html' style='width:100vw;height:100vh;border:0'></iframe></body></html>`;
- const server=await serve({'/1442-pending.html':harness('out','pending'),'/1442-empty.html':harness('in','ready'),'/1442-guest.html':harness('out','ready')},4147);
+ const server=await serve({'/1442-pending.html':harness('out','pending'),'/1442-empty.html':harness('in','ready'),'/1442-guest.html':harness('out','ready')},{ port: 4147 });
  const browser=await chromium952.launch({headless:true,args:['--disable-gpu']});
  const tree=tree952({subject:'시험 순간',count:3});
  try{
@@ -1245,7 +1245,16 @@ test('#1442 title wait 400ms and slow 5s, owned empty has no example cards', {sk
     await page.goto('http://127.0.0.1:4147/1442-empty.html',{waitUntil:'domcontentloaded'});
     frame=await (await page.$('iframe')).contentFrame();
     await frame.waitForFunction(()=>document.querySelector('#orbit')?.shadowRoot?.querySelector('.center h1')?.textContent==='내 첫 순간',null,{timeout:15000});
-    const zero=await center(frame);assert.equal(zero.allCards,0);assert.equal(zero.exampleCards,0);assert.equal(zero.buttons.length,2);assert.deepEqual(zero.buttons,['첫 순간 추가','예시 둘러보기']);await snap('tree0');
+    await frame.evaluate(async()=>{
+      await document.fonts.ready;
+      const root=document.querySelector('#orbit')?.shadowRoot;
+      await Promise.all([...root.querySelectorAll('.center .lt-home-enter')].flatMap(el=>el.getAnimations()).map(anim=>anim.finished.catch(()=>{})));
+     });
+     const ink=await frame.evaluate(()=>{const root=document.querySelector('#orbit')?.shadowRoot,eyebrow=root?.querySelector('.center .eyebrow'),line=root?.querySelector('.center .lt-home-line');return {eyebrow:eyebrow?.textContent,description:line?.textContent,color:line?getComputedStyle(line).color:null,animation:line?.getAnimations().map(a=>a.playState)||[]};});
+     assert.equal(ink.eyebrow,'처음 시작해요');assert.equal(ink.description,'첫 순간을 남겨 보세요.');
+     assert.ok(ink.color);assert.ok(ink.animation.every(state=>state==='finished'||state==='idle'));
+     console.log('#1442 TREE0_TEXT',width,theme,JSON.stringify(ink));
+     const zero=await center(frame);assert.equal(zero.allCards,0);assert.equal(zero.exampleCards,0);assert.equal(zero.buttons.length,2);assert.deepEqual(zero.buttons,['첫 순간 추가','예시 둘러보기']);await snap('tree0');
     await page.goto('http://127.0.0.1:4147/1442-guest.html',{waitUntil:'domcontentloaded'});
     frame=await (await page.$('iframe')).contentFrame();
     await frame.waitForFunction(()=>document.querySelector('#orbit')?.shadowRoot?.querySelector('.center h1')?.textContent==='좋아하는 순간부터.',null,{timeout:15000});

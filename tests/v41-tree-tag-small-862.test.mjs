@@ -1,3 +1,4 @@
+import {clickToolbarTreeChoice} from './helpers/tree-picker-pr3.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync } from 'node:fs';
@@ -48,7 +49,7 @@ async function openShell(browser, origin, tree, width, height) {
 }
 
 async function openManager(page) {
-  await page.evaluate(() => document.getElementById('record-menu').click());
+  await clickToolbarTreeChoice(page);
   await page.click('[data-tree-action="manage"]');
   await page.waitForFunction(() => document.getElementById('tree-manager')?.open === true, null, { timeout: 10000 });
 }
@@ -118,7 +119,7 @@ test('#862 표지 이름 즉시 갱신·주제 빈 칸·정리 판 960px', { ski
     await openManager(wide);
     await wide.click('[data-close="tree-manager"]');
     await wide.waitForFunction(() => document.getElementById('tree-manager')?.open === false, null, { timeout: 10000 });
-    await wide.evaluate(() => document.getElementById('record-menu').click());
+    await clickToolbarTreeChoice(wide);
     await wide.click('[data-tree-action="tags"]');
     await wide.waitForFunction(() => document.getElementById('tag-panel')?.open === true, null, { timeout: 10000 });
     const panel = await wide.evaluate(() => {
