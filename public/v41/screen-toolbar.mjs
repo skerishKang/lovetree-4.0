@@ -76,7 +76,7 @@ function prepareTreeChoice(bar, screen, title, titleFrom) {
     // ??? ?? ??: ??? ??? ??, ?? ??? ?? ??? ??.
     const moments = Array.isArray(current?.moments) ? [...current.moments].sort((a, b) =>
       String(a.createdAt || '').localeCompare(String(b.createdAt || ''))) : [];
-    const selected = mode === 'moment' ? moments.find(m => m.id === current?.coverMomentId) : null;
+    const selected = mode !== 'design' ? moments.find(m => m.id === current?.coverMomentId) : null;
     const cover = selected || moments[0];
     const url = !design && cover ? thumbnailCandidates(cover, {autoLoad:true})[0] || '' : '';
     if (typeof url === 'string' && /^https?:\/\//.test(url)) {
