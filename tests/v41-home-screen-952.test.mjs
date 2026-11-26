@@ -1092,3 +1092,198 @@ test('#1378 첫 화면 YouTube 재생 불가 시 iframe 제거·원본 링크', 
     }
   }finally{await browser.close();}
 });
+
+
+test('#1437 delayed member response does not paint guest title, corrects stale hint without CLS', {skip:REQUIRE952?false:skip952,timeout:180000}, async()=>{
+ if(skip952)assert.fail(skip952);
+ const {mkdirSync}=await import('node:fs');
+ const {join}=await import('node:path');
+ const browser=await chromium952.launch({headless:true});
+ const server=await serve({},{ port: 4143 }),base='http://127.0.0.1:4143';
+ const tree=tree952({subject:'시험 순간',count:3});
+ const testCases=[
+  {key:'member',member:true,trees:[tree],hint:false,expected:'다시, 그 순간으로.',neverGuest:true},
+  {key:'remembered',member:true,trees:[tree],hint:true,expected:'다시, 그 순간으로.',neverGuest:true},
+  {key:'empty',member:true,trees:[],hint:true,expected:'내 첫 순간'},
+  {key:'logout',member:false,trees:[],hint:true,expected:'좋아하는 순간부터.'}
+ ];
+ try{
+  for(const width of [1440,390])for(const scenario of testCases){
+   const ctx=await browser.newContext({viewport:{width,height:width===390?844:900},reducedMotion:'reduce'});
+   try{
+    await ctx.addInitScript(hint=>{
+     if(hint){try{localStorage.setItem('lt41.homeTitleHasMoments.v1','1')}catch{}}
+     globalThis.__1437Titles=[];
+     if(location.pathname.endsWith('/home.html')){
+      const probe=()=>{
+       const root=document.querySelector('#orbit')?.shadowRoot,center=root?.querySelector('.center');
+       if(center){const title=center.querySelector('h1')?.textContent||'',r=center.getBoundingClientRect();
+        const last=globalThis.__1437Titles.at(-1);
+        if(!last||last.title!==title||last.pending!==center.hasAttribute('data-lt-title-pending'))globalThis.__1437Titles.push({title,pending:center.hasAttribute('data-lt-title-pending'),height:r.height});}
+       requestAnimationFrame(probe);
+      };requestAnimationFrame(probe);
+     }
+    },scenario.hint);
+    const workspace={revision:1,state:{version:1,trees:scenario.trees,prefs:{}},subject:'home-title-test',writeSubjectBound:true,savedAt:'2026-11-26T00:00:00Z'};
+    await ctx.route('**/*',async route=>{
+     const u=new URL(route.request().url());
+     if(u.origin!==base)return route.abort();
+     if(u.pathname==='/api/workspace'){
+      await new Promise(resolve=>setTimeout(resolve,1500));
+      return scenario.member?route.fulfill({status:200,json:workspace}):route.fulfill({status:401,json:{error:'unauthorized'}});
+     }
+     if(u.pathname.startsWith('/api/'))return route.fulfill({status:200,json:{ok:true,items:[]}});
+     return route.continue();
+    });
+    const page=await ctx.newPage();
+    const capture=process.env.LT_HOME_1437_CAPTURE_DIR;
+    await page.goto(base+'/v41/'+(scenario.member?'?account=1':'')+'#home',{waitUntil:'domcontentloaded'});
+    if(capture&&scenario.key==='member'){
+     mkdirSync(capture,{recursive:true});
+     await page.screenshot({path:join(capture,`home-${width}-before.png`)});
+     await page.waitForTimeout(700);
+     await page.screenshot({path:join(capture,`home-${width}-during.png`)});
+    }
+    await page.waitForFunction(expect=>{
+     const frame=document.querySelector('#view');
+     return frame?.contentDocument?.querySelector('#orbit')?.shadowRoot?.querySelector('.center h1')?.textContent===expect;
+    },scenario.expected,{timeout:20000});
+    if(capture&&scenario.key==='member')await page.screenshot({path:join(capture,`home-${width}-after.png`)});
+    const result=await page.evaluate(()=>{
+     const f=document.querySelector('#view'),doc=f.contentDocument;
+     return {titles:doc.defaultView.__1437Titles||[],phase:document.documentElement.dataset.ltAuthPhase,headline:doc.querySelector('#orbit')?.shadowRoot?.querySelector('.center h1')?.textContent};
+    });
+    if(scenario.neverGuest)assert.ok(result.titles.every(row=>row.title!=='좋아하는 순간부터.'),JSON.stringify({width,scenario:scenario.key,result}));
+    assert.equal(result.headline,scenario.expected);
+    assert.equal(result.phase,'ready');
+    const h=result.titles.filter(t=>t.height>0).map(t=>t.height);
+    if(h.length>1)assert.ok(Math.max(...h)-Math.min(...h)<=1,`${width} ${scenario.key}: center shift ${h.join(',')}`);
+    console.log('#1437',width,scenario.key,JSON.stringify(result));
+    await page.close();
+   }finally{await ctx.close()}
+  }
+ }finally{await browser.close();await new Promise(ok=>server.close(ok));}
+});
+
+
+test('#1437 pending center is text-free until confirmed response and reserves stable height', {skip:REQUIRE952?false:skip952,timeout:90000},async()=>{
+ if(skip952)assert.fail(skip952);
+ const browser=await chromium952.launch({headless:true,args:['--disable-gpu']});
+ const server=await serve({'/1437-harness.html':'<!doctype html><html><head><script>document.documentElement.dataset.ltAuthPhase="pending";</script></head><body data-member="out" style="margin:0"><iframe src="/v41/home.html" style="border:0;width:100vw;height:100vh"></iframe></body></html>'},{ port: 4144 }),base='http://127.0.0.1:4144';
+ const {mkdirSync}=await import('node:fs');const {join}=await import('node:path');
+ const tree=tree952({subject:'시험 순간',count:3});
+ try{
+  for(const width of [1440,390])for(const asMember of [true,false]){
+   const ctx=await browser.newContext({viewport:{width,height:width===390?844:900},reducedMotion:'reduce'});
+   try{
+    await ctx.route('**/*',route=>{
+     const u=new URL(route.request().url());if(u.origin!==base)return route.abort();
+     if(u.pathname.startsWith('/api/'))return route.fulfill({status:200,json:{ok:true,items:[]}});
+     return route.continue();
+    });
+    const page=await ctx.newPage();
+    await page.goto(base+'/1437-harness.html',{waitUntil:'domcontentloaded'});
+    const frame=await (await page.$('iframe')).contentFrame();
+    await frame.waitForFunction(()=>document.querySelector('#orbit')?.shadowRoot?.querySelector('.center[data-lt-title-pending]'),null,{timeout:15000});
+    const measure=()=>frame.evaluate(()=>{
+     const center=document.querySelector('#orbit').shadowRoot.querySelector('.center');
+     return {title:center.querySelector('h1')?.textContent||'',eyebrow:center.querySelector('.eyebrow')?.textContent||'',p:center.querySelector('p')?.textContent||'',actions:[...center.querySelectorAll('.actions button')].map(b=>b.textContent),pending:center.hasAttribute('data-lt-title-pending'),actionsHidden:getComputedStyle(center.querySelector('.actions')).visibility==='hidden',height:center.getBoundingClientRect().height};
+    });
+    const before=await measure();
+    assert.ok(before.pending&&!before.title&&!before.eyebrow&&!before.p&&before.actionsHidden,JSON.stringify(before));
+    const capture=process.env.LT_HOME_1437_PENDING_CAPTURE_DIR;
+    if(capture&&asMember){mkdirSync(capture,{recursive:true});await page.screenshot({path:join(capture,`pending-${width}-before.png`),animations:'disabled',timeout:15000});}
+    await page.waitForTimeout(750);
+    const middle=await measure();assert.equal(middle.title,'');assert.equal(middle.pending,true);
+    if(capture&&asMember)await page.screenshot({path:join(capture,`pending-${width}-during.png`),animations:'disabled',timeout:15000});
+    await page.waitForTimeout(750);
+    await page.evaluate(({tree,asMember})=>{
+     window.LT41={trees:asMember?[tree]:[]};document.body.dataset.member=asMember?'in':'out';document.documentElement.dataset.ltAuthPhase='ready';
+    },{tree,asMember});
+    await frame.waitForFunction(expected=>document.querySelector('#orbit')?.shadowRoot?.querySelector('.center h1')?.textContent===expected,asMember?'다시, 그 순간으로.':'좋아하는 순간부터.',{timeout:5000});
+    const after=await measure();
+    if(capture&&asMember)await page.screenshot({path:join(capture,`pending-${width}-after.png`),animations:'disabled',timeout:15000});
+    assert.equal(after.pending,false);assert.equal(after.actionsHidden,false);assert.ok(after.actions.every(Boolean));
+    assert.ok(Math.abs(after.height-before.height)<=1,`${width}: ${before.height} -> ${after.height}`);
+    console.log('#1437 PENDING',width,asMember?'member':'guest',JSON.stringify({before,middle,after}));
+    await page.close();
+   }finally{await ctx.close()}
+  }
+ }finally{await browser.close();await new Promise(ok=>server.close(ok));}
+});
+
+
+test('#1442 title wait 400ms and slow 5s, owned empty has no example cards', {skip:REQUIRE952?false:skip952,timeout:180000}, async()=>{
+ if(skip952)assert.fail(skip952);
+ const {mkdirSync}=await import('node:fs');const {join}=await import('node:path');
+ const capture=process.env.LT_HOME_1442_CAPTURE_DIR;
+ const harness=(member,phase)=>`<!doctype html><html><head><script>document.documentElement.dataset.ltAuthPhase='${phase}';</script></head><body data-member='${member}' data-tree-count='0' style='margin:0'><iframe src='/v41/home.html' style='width:100vw;height:100vh;border:0'></iframe></body></html>`;
+ const server=await serve({'/1442-pending.html':harness('out','pending'),'/1442-empty.html':harness('in','ready'),'/1442-guest.html':harness('out','ready')},{ port: 4147 });
+ const browser=await chromium952.launch({headless:true,args:['--disable-gpu']});
+ const tree=tree952({subject:'시험 순간',count:3});
+ try{
+  for(const width of [1440,390])for(const theme of ['night','garden']){
+   const ctx=await browser.newContext({viewport:{width,height:width===390?844:900},reducedMotion:'reduce'});
+   try{
+    await ctx.addInitScript(themeName=>{try{localStorage.setItem('lt41.theme',themeName)}catch{}},theme);
+    await ctx.route('**/*',route=>{const u=new URL(route.request().url());if(u.origin!=='http://127.0.0.1:4147')return route.abort();if(u.pathname.startsWith('/api/'))return route.fulfill({status:200,json:{ok:true,items:[]}});return route.continue();});
+    const page=await ctx.newPage();
+    const snap=async state=>{if(capture){mkdirSync(capture,{recursive:true});await page.screenshot({path:join(capture,`home-${width}-${theme}-${state}.png`),animations:'disabled',timeout:20000});}};
+    const center=async frame=>frame.evaluate(()=>{const root=document.querySelector('#orbit')?.shadowRoot,c=root?.querySelector('.center'),indicator=c?.querySelector('.lt-home-pending-indicator');return {title:c?.querySelector('h1')?.textContent||'',height:c?.getBoundingClientRect().height||0,pending:!!c?.hasAttribute('data-lt-title-pending'),loading:!!indicator&&!indicator.hidden,slow:!!indicator&&!indicator.querySelector('.lt-home-pending-retry')?.hidden,exampleCards:[...(root?.querySelectorAll('.card')||[])].filter(e=>e.dataset.example==='1').length,allCards:root?.querySelectorAll('.card').length||0,buttons:[...(c?.querySelectorAll('.actions button')||[])].filter(b=>!b.hidden).map(b=>b.textContent),motion:indicator?getComputedStyle(indicator.querySelector('.lt-home-pending-orbit')).animationName:''};});
+    await page.goto('http://127.0.0.1:4147/1442-pending.html',{waitUntil:'domcontentloaded'});
+    let frame=await (await page.$('iframe')).contentFrame();
+    await frame.waitForFunction(()=>document.querySelector('#orbit')?.shadowRoot?.querySelector('.center[data-lt-title-pending]'),null,{timeout:15000});
+    const initial=await center(frame);assert.equal(initial.title,'');
+    await page.waitForTimeout(650);
+    const pending=await center(frame);assert.equal(pending.loading,true);assert.equal(pending.slow,false);assert.equal(pending.motion,'none');assert.equal(pending.title,'');await snap('pending');
+    await page.waitForTimeout(4700);
+    const slow=await center(frame);assert.equal(slow.slow,true);assert.equal(slow.title,'');await snap('slow');
+    await page.evaluate(t=>{window.LT41={trees:[t]};document.body.dataset.member='in';document.body.dataset.treeCount='1';document.documentElement.dataset.ltAuthPhase='ready';},tree);
+    await frame.waitForFunction(()=>document.querySelector('#orbit')?.shadowRoot?.querySelector('.center h1')?.textContent==='다시, 그 순간으로.',null,{timeout:5000});
+    const ready=await center(frame);assert.equal(ready.loading,false);assert.equal(ready.pending,false);assert.ok(Math.abs(ready.height-pending.height)<=1);await snap('ready');
+    console.log('#1442 WAIT',width,theme,JSON.stringify({initial,pending,slow,ready}));
+    await page.goto('http://127.0.0.1:4147/1442-empty.html',{waitUntil:'domcontentloaded'});
+    frame=await (await page.$('iframe')).contentFrame();
+    await frame.waitForFunction(()=>document.querySelector('#orbit')?.shadowRoot?.querySelector('.center h1')?.textContent==='내 첫 순간',null,{timeout:15000});
+    await frame.evaluate(async()=>{
+      await document.fonts.ready;
+      const root=document.querySelector('#orbit')?.shadowRoot;
+      await Promise.all([...root.querySelectorAll('.center .lt-home-enter')].flatMap(el=>el.getAnimations()).map(anim=>anim.finished.catch(()=>{})));
+     });
+     const ink=await frame.evaluate(()=>{const root=document.querySelector('#orbit')?.shadowRoot,eyebrow=root?.querySelector('.center .eyebrow'),line=root?.querySelector('.center .lt-home-line');return {eyebrow:eyebrow?.textContent,description:line?.textContent,color:line?getComputedStyle(line).color:null,animation:line?.getAnimations().map(a=>a.playState)||[]};});
+     assert.equal(ink.eyebrow,'처음 시작해요');assert.equal(ink.description,'첫 순간을 남겨 보세요.');
+     assert.ok(ink.color);assert.ok(ink.animation.every(state=>state==='finished'||state==='idle'));
+     console.log('#1442 TREE0_TEXT',width,theme,JSON.stringify(ink));
+     const zero=await center(frame);assert.equal(zero.allCards,0);assert.equal(zero.exampleCards,0);assert.equal(zero.buttons.length,2);assert.deepEqual(zero.buttons,['첫 순간 추가','예시 둘러보기']);await snap('tree0');
+    await page.goto('http://127.0.0.1:4147/1442-guest.html',{waitUntil:'domcontentloaded'});
+    frame=await (await page.$('iframe')).contentFrame();
+    await frame.waitForFunction(()=>document.querySelector('#orbit')?.shadowRoot?.querySelector('.center h1')?.textContent==='좋아하는 순간부터.',null,{timeout:15000});
+    const guest=await center(frame);assert.ok(guest.allCards>0);console.log('#1442 EMPTY',width,theme,JSON.stringify({zero,guest}));
+    await page.goto('http://127.0.0.1:4147/1442-pending.html',{waitUntil:'domcontentloaded'});
+    frame=await (await page.$('iframe')).contentFrame();
+    await frame.waitForFunction(()=>document.querySelector('#orbit')?.shadowRoot?.querySelector('.center[data-lt-title-pending]'));
+    const zeroBefore=await center(frame);
+    await page.evaluate(()=>{window.LT41={trees:[]};document.body.dataset.member='in';document.body.dataset.treeCount='0';document.documentElement.dataset.ltAuthPhase='ready';});
+    await frame.waitForFunction(()=>document.querySelector('#orbit')?.shadowRoot?.querySelector('.center h1')?.textContent==='내 첫 순간');
+    const zeroAfter=await center(frame);
+    console.log('#1442 ZERO_TRANSITION',width,theme,JSON.stringify({zeroBefore,zeroAfter}));
+    assert.equal(zeroAfter.allCards,0);
+    assert.ok(Math.abs(zeroAfter.height-zeroBefore.height)<=1,`${width} ${theme} tree0 CLS height: ${zeroBefore.height} vs ${zeroAfter.height}`);
+    await page.evaluate(()=>{window.__homeMessages=[];window.addEventListener('message',event=>window.__homeMessages.push(event.data));});
+    await frame.locator('.center .actions button').first().click();
+    await page.waitForFunction(()=>window.__homeMessages?.some(message=>message?.mode==='new'),null,{timeout:4000});
+    const firstMomentMessages=await page.evaluate(()=>window.__homeMessages.filter(message=>message?.mode==='new').length);
+    assert.equal(firstMomentMessages,1,`첫 순간 추가 동작은 한 번만 보내야 합니다: ${width} ${theme}`);
+    await page.evaluate(()=>localStorage.setItem('lt41.homeTitleHasMoments.v1','1'));
+    await page.goto('http://127.0.0.1:4147/1442-pending.html',{waitUntil:'domcontentloaded'});
+    frame=await (await page.$('iframe')).contentFrame();
+    await frame.waitForFunction(()=>document.querySelector('#orbit')?.shadowRoot?.querySelector('.center h1')?.textContent==='다시, 그 순간으로.',null,{timeout:15000});
+    const hint=await center(frame);
+    assert.equal(hint.loading,false);assert.equal(hint.pending,false);
+    await page.evaluate(()=>localStorage.removeItem('lt41.homeTitleHasMoments.v1'));
+
+    await page.close();
+   }finally{await ctx.close()}
+  }
+ }finally{await browser.close();await new Promise(ok=>server.close(ok));}
+});
