@@ -54,14 +54,15 @@ async function withShelfSession(fn) {
     const page = await ctx.newPage();
     page.on('pageerror', (error) => errors.push(String(error.message || error)));
     async function openShelf() {
-      await page.goto(`${origin}/v41/?account=1#my/shelf`, { waitUntil: 'load' });
+      await page.goto(`${origin}/v41/?account=1`, { waitUntil: 'load' });
       await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
       // 무대 준비가 끝나기 전의 클릭은 '불러오는 중' 덮개에 가로챼진다.
       await page.waitForFunction(() => document.getElementById('stage-loading')?.hidden === true, null, { timeout: 20000 });
       // #1413: 둘러보기 소개 질문 창은 순간 2→3개 저장 직후에만 뜬다. 떠 있을 때만 '아니요'를 누른다(보이지 않는
       // 단추를 누르려고 Playwright 기본 제한 30초를 기다리던 헛대기를 없앤다 — isVisible은 기다리지 않는다).
       if (await page.locator('#discover-ask-no').isVisible().catch(() => false)) await page.locator('#discover-ask-no').click().catch(() => {});
-      // 서재 탭을 누른 뒤, 보이는 서재 프레임(iframe#view)이 책을 그릴 때까지 기다린다.
+      // 서재 탭을 누른 뒤, 보이는 서재 프레임(iframe#view)이 책을 그릴 때까지 기다린다. 주소로 서재를 먼저 열고
+      // 탭을 또 누르면 서재가 두 번 불려, 곧 비워질 이전 프레임을 붙잡는다(셸은 새 화면을 숨은 프레임에 불러 맞바꾼다).
       await page.locator('[data-view="track32-bookshelf.html"]').first().evaluate(button => button.click());
       await page.waitForFunction(() => {
         const f = document.querySelector('iframe#view');

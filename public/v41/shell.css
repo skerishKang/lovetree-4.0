@@ -1381,7 +1381,7 @@ body>.tree-popover.lt-toolbar-picker[hidden]{display:none}
 }
 @media(min-width:601px) and (max-width:900px){.lt-toolbar-picker .tree-foot{grid-template-columns:repeat(3,minmax(0,1fr))}}
 
-/* #1447: ???????? ??? ??? ????. */
+/* #1447: 머리줄 간격 세 가지(바깥 여백·묶음 사이·항목 사이)를 변수 하나씩으로 맞춘다. */
 .app-header{--lt-head-outer:16px;--lt-head-groups:12px;--lt-head-items:6px;padding-inline:var(--lt-head-outer);gap:var(--lt-head-groups)}
 .app-header .main-nav{gap:var(--lt-head-items);min-width:0}
 .app-header .tree-frame{margin-left:0;min-width:0}
@@ -1408,7 +1408,7 @@ body>.tree-popover.lt-toolbar-picker[hidden]{display:none}
  .app-header .main-nav>#community-menu{display:none}
  .app-header .header-actions{gap:var(--lt-head-items)}
 }
-/* 11-23 ???? ?? ? ??? ????? ??. */
+/* #1447: 공개 감상 머리줄은 넓은 화면에서 보기 탭 묶음 뒤에 둘러보기를 둔다. */
 @media(min-width:781px){
  body.lt-header-visitor .app-header .main-nav .tree-frame{order:0}
  body.lt-header-visitor .app-header .main-nav>#community-menu{order:1}
@@ -1417,15 +1417,15 @@ body>.tree-popover.lt-toolbar-picker[hidden]{display:none}
 #lt-visitor-caption[hidden]{display:none}
 @media(max-width:780px){#lt-visitor-caption{--lt-visitor-pad:8px}}
 body.lt-header-visitor #toast[data-visitor-intro]{display:none}
-/* ?? ??? ???? ??? ???? ? ??? ????. */
+/* #1448: 트리 고르기 목록의 표지 칸은 그림이 없거나 늦게 와도 첫 글자 표지가 아래에 보인다. */
 .lt-toolbar-picker .tree-cover{position:relative;background:var(--lt-cover-1)}
 .lt-toolbar-picker .tree-cover-letter{position:absolute;inset:0;display:grid;place-items:center;color:var(--lt-role-text-strong);font-weight:700}
 .lt-toolbar-picker .tree-cover img{position:relative;z-index:1;background:var(--lt-cover-1)}
 
-/* #1350: ??? ?? ??? ?? ?? ?? ????. */
+/* #1350: 휴대폰 머리줄의 계정 칸 너비를 미리 잡아 둔다. */
 @media(max-width:780px){.app-header .header-actions>.account-slot{flex:0 0 66px;width:66px}}
 
-/* #1447: ?? ?? ?? ?? ??? ? ?? ??? ??? ??? ?? ???. */
+/* #1447: 넓은 화면에서 머리줄 오른쪽 세 단추(테마·순간 추가·계정) 사이 간격을 로그인 상태와 상관없이 같게 맞춘다. */
 @media(min-width:781px){
  .app-header{--lt-head-items:12px}
  html[data-lt-auth-phase] .app-header .header-actions,
@@ -1435,7 +1435,7 @@ body.lt-header-visitor #toast[data-visitor-intro]{display:none}
 }
 @media(min-width:781px) and (max-width:1020px){.app-header{--lt-head-items:8px}}
 
-/* ?? #1350: ??? ??? ?? ?? ?? ??? 122px ?? ?? ??? CLS? ???. */
+/* #1350: 로그인 확인 중에도 테마 44px·순간 추가 122px·계정 80px 칸을 미리 잡아 자리 밀림(CLS)을 막는다. */
 @media(min-width:781px){
  html[data-lt-auth-phase=pending][data-lt-auth-hint=in] .app-header .header-actions{
   display:grid;grid-template-columns:44px 122px 80px;column-gap:var(--lt-head-items)

@@ -228,7 +228,7 @@ button.lt-toolbar-tree-choice[aria-pressed=true]:is(:hover,:focus-visible){backg
 button.lt-toolbar-tree-choice[aria-pressed=true] .lt-toolbar-tree-name,
 button.lt-toolbar-tree-choice[aria-pressed=true] .lt-toolbar-tree-caret{color:inherit}
 
-/* #1448: ?? ??? ??? ??? ??? ?? ?? ??? ??? ?? ?? ???. */
+/* #1448: 도구 줄 트리 고르기 단추는 이름 길이만큼 넓어지고 화면 폭 안에서 줄어든다. 표지 칸은 고른 디자인 표지를 따른다. */
 .lt-toolbar-tree-choice{width:max-content;max-width:min(560px,calc(100vw - 200px));min-width:0;flex:0 1 auto}
 .lt-toolbar-tree-name{flex:0 1 auto;max-width:100%}
 .lt-toolbar-tree-thumb{border-radius:var(--lt-r-card);background:var(--lt-cover-1);flex-basis:30px}

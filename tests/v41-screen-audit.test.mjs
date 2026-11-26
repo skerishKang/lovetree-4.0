@@ -2504,8 +2504,8 @@ test('#657 후속 261117: 상단 탭 글자 통일과 고른 탭 칸 높이(390�
             });
             assert.equal(box.frameBg, 'rgba(0, 0, 0, 0)', `${width}/${theme}/${view}: 탭을 감싸는 판 배경 없음`);
             assert.equal(box.frameBorder, 0, `${width}/${theme}/${view}: 탭을 감싸는 판 테두리 없음`);
-            assert.notEqual(box.bg, 'rgba(0, 0, 0, 0)', `${width}/${theme}/${view}: 고른 탭 칸을 칠하지 않는다`);
-            assert.ok(pairContrast(box.color,box.bg)>=4.5, `${width}/${theme}/${view}: ?? ? ?? ?? 4.5:1 ??`);
+            assert.notEqual(box.bg, 'rgba(0, 0, 0, 0)', `${width}/${theme}/${view}: 고른 탭 칸을 칠한다`);
+            assert.ok(pairContrast(box.color,box.bg)>=4.5, `${width}/${theme}/${view}: 고른 탭 글자 대비 4.5:1 이상`);
             assert.equal(box.deco, 'underline', `${width}/${theme}/${view}: 고른 탭은 밑줄로 표시한다`);
             assert.equal(box.thickness, '2px', `${width}/${theme}/${view}: 밑줄 두께 2px`);
             assert.ok(box.height >= 44, `${width}/${theme}/${view}: 탭 누름 영역 ${box.height}px ≥ 44`);

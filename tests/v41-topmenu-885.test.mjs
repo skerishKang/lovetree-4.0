@@ -253,7 +253,7 @@ test('상단 메뉴 261119: 트리 단추 폭·⌄ 자리·목록 규칙·메뉴
         assert.equal(bar.tabsHidden, false, '1440: 탭 보임');
         assert.equal(bar.currentDeco, 'underline', '고른 탭은 밑줄');
         assert.equal(bar.currentThickness, '2px', '밑줄 두께 2px');
-        assert.notEqual(bar.currentBg, 'rgba(0, 0, 0, 0)', '고른 탭을 채우지 않는다');
+        assert.notEqual(bar.currentBg, 'rgba(0, 0, 0, 0)', '고른 탭을 채운다');
         assert.ok(bar.tabHeights.every((h) => h >= 44), `탭 누름 영역 44px 이상 — ${JSON.stringify(bar.tabHeights)}`);
         assert.equal(bar.currentCount, 1, '현재 화면 표시 1개');
       }

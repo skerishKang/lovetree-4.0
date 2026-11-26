@@ -88,7 +88,7 @@ function flowNavigation(){
   if(bookToggle)bookToggle.hidden=!bookDisplayVisible({current:getCurrent()})||onCommunity;bookToggle?.removeAttribute?.('data-lt-pending');
   const shelfToggle=$('shelf-view-toggle');
   if(shelfToggle)shelfToggle.hidden=!shelfViewVisible({current:getCurrent()})||onCommunity||inlineShelfToggle;shelfToggle?.removeAttribute?.('data-lt-pending');
-  // #1447: ???? ? ??? ? ??? ????. ??? ??? ??? ???.
+  // #1447: 머리줄 상태별 표시는 renderHeaderLayout 한 곳에서 그린다. 감춘 항목은 자리를 남기지 않는다.
   renderHeaderLayout({publicReading, owned, parts, current:getCurrent(), tree:getModel()?.trees?.find(t=>t.id===window.LT41?.tree?.id)});
   // 트리 선택은 뒤쪽 탭 묶음 바로 앞에 있고, 로그인 상태에서만 "트리: <이름> ▾"로 보여 준다.
   // 2026-11-18 13:49 대표 결정: 트리 선택은 모든 페이지에서 똑같이 보인다(서재 포함).
