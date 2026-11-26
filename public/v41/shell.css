@@ -1453,3 +1453,6 @@ body.lt-header-visitor #toast[data-visitor-intro]{display:none}
 
 /* #1447: logged-in theme, write, and account button boxes share one exact gap. */
 @media(min-width:781px){.app-header .account-slot>#account-avatar{box-sizing:border-box;width:80px;min-width:80px;border-radius:var(--lt-r-pill)}}
+
+/* #1447: keep the persistent visit label unobtrusive while video is expanded. */
+body.lt-book-lightbox-open #lt-visitor-caption{visibility:hidden}
