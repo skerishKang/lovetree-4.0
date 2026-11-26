@@ -381,7 +381,7 @@ test('#1026 마지막 순간 영상은 확인 전 실패를 보이지 않고 높
         const after=await card.boundingBox();
         assert.equal(after.height,before.height);
         if(failed){
-          const notice=await media.locator('.recent-video-status').boundingBox(),title=await card.locator('.recent-meta strong').boundingBox();
+          const notice=await media.locator('.lt-recent-fallback').boundingBox(),title=await card.locator('.recent-meta strong').boundingBox();
           assert.ok(notice.y+notice.height<=title.y,'안내와 제목 겹침 없음');
         }
       }finally{release();await close952(h)}
