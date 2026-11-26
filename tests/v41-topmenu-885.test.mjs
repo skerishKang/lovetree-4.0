@@ -650,7 +650,18 @@ test('#1367 4번: 트리 고르기 목록은 바깥 누름·안쪽 화면 누름
         // 안쪽 화면(iframe)을 눌러도 닫힌다.
         await open();
         // 목록 아래쪽의 안쪽 화면을 실제 마우스로 누른다(목록은 y≈497에서 끝난다).
-        await page.mouse.click(width - 40, 700);
+        if (width === 1440) {
+          await page.mouse.click(width - 40, 700);
+        } else {
+          const outsidePoint = await page.evaluate(() => {
+            const rect = document.querySelector('#tree-popover').getBoundingClientRect();
+            if (rect.top <= 4) return null;
+            return { x: Math.min(innerWidth - 2, rect.right - 8), y: rect.top / 2 };
+          });
+          assert.ok(outsidePoint, `${width}/${theme}: sheet has an outside region above it`);
+          await page.mouse.click(outsidePoint.x, outsidePoint.y);
+        }
+        assert.equal(await page.locator('#share-panel').evaluate(dialog => dialog.open), false, `${width}/${theme}: closing press does not open share panel`);
         assert.equal(await hidden(), true, `${width}/${theme}: 안쪽 화면 누름으로 닫힌다`);
 
         // Esc로 닫고 초점은 트리 고르기 단추로 돌아온다.
