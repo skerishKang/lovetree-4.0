@@ -698,9 +698,19 @@ async function measure(page) {
         const de = document.scrollingElement || document.documentElement;
         const vw = window.innerWidth;
         const overflow = [];
+        // iframe 안에서도 최상위 문서와 동일하게, 실제 가로 스크롤 칸 안의 항목은 페이지 넘침이 아니다.
+        const scrollableAncestor = (el) => {
+          for (let n = el.parentElement; n && n !== document.body; n = n.parentElement) {
+            const ox = getComputedStyle(n).overflowX;
+            if ((ox === 'auto' || ox === 'scroll') && n.scrollWidth > n.clientWidth + 1) return n;
+          }
+          return null;
+        };
         for (const el of document.querySelectorAll('body *')) {
           const r = el.getBoundingClientRect();
-          if (r.width > 2 && r.height > 2 && r.right > vw + 1) overflow.push(Math.round(r.right));
+          if (r.width > 2 && r.height > 2 && r.right > vw + 1 && !scrollableAncestor(el)) {
+            overflow.push(Math.round(r.right));
+          }
         }
         const nodes = [...document.querySelectorAll('button,a,[role="button"],input,select,textarea')]
           .map((el) => ({ r: el.getBoundingClientRect(), s: getComputedStyle(el) }))
