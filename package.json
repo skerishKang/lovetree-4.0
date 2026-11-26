@@ -14,6 +14,7 @@
     "test:all": "node --test tests/*.test.mjs",
     "reference": "node scripts/serve-reference.mjs",
     "a11y": "node tools/a11y/a11y-run.mjs",
+    "baseline:frames": "node tools/baseline-frames.mjs",
     "check": "npm test && npm run build"
   },
   "devDependencies": {
