@@ -107,6 +107,21 @@ function sameState(a, b) {
   try { assert.deepEqual(comparable(a), comparable(b)); return true; } catch { return false; }
 }
 
+// #1298: 화면을 연 뒤 주소에 ?tree=…&moment=…를 덧붙이는 일이 끝날 때까지 기다린다.
+// 고정 시간 대기가 아니라, 주소와 셸 기록이 연속 두 프레임 같은지를 본다.
+async function settleShell(page, waitMs) {
+  await page.evaluate(() => { delete window.__ltSettleKey; delete window.__ltSettleAt; });
+  await page.waitForFunction(() => {
+    const key = location.hash + '|' + history.length;
+    if (key !== window.__ltSettleKey) {
+      window.__ltSettleKey = key;
+      window.__ltSettleAt = performance.now();
+      return false;
+    }
+    return performance.now() - (window.__ltSettleAt || 0) >= 32;
+  }, null, { timeout: waitMs, polling: 'raf' }).catch(() => {});
+}
+
 // 셸이 안쪽 메시지를 받은 뒤 기록을 늘린다 — 메시지 도착을 실제 신호로 본다(#1412 측정).
 async function installObserver(target, { messages = false } = {}) {
   if (!target) return;
@@ -146,6 +161,7 @@ async function waitForProcessed(page, frame, before, waitMs) {
 }
 
 async function waitForPrevious(page, expected, options) {
+  await settleShell(page, Math.min(options.timeoutMs || HISTORY_WAIT_MS, HISTORY_WAIT_MS));
   const deadline = Date.now() + (options.timeoutMs || 5000);
   let current = null;
   while (Date.now() < deadline) {
@@ -175,6 +191,7 @@ export async function testBackNavigation(page, { frame = null, recorded, action,
       await page.waitForFunction(({ n, hash }) => history.length > n && location.hash === hash, { n: beforeHistory, hash: hashAfter }, { timeout: waitMs }).catch(() => {});
     }
     const grew = await waitForGrowth(page, frame, beforeHistory, waitMs);
+    await settleShell(page, waitMs);
     const afterAction = await backState(page, options);
     const afterHistory = Math.max(afterAction.historyLength, afterAction.frameHistoryLength);
     assert.equal(grew, true, `기록하는 동작 후 기록이 늘어나야 한다 / ${JSON.stringify({ before: beforeHistory, after: afterHistory, messageSeen: (await signalCounts(page)).msg - signalsBefore.shell.msg })}`);
@@ -186,6 +203,7 @@ export async function testBackNavigation(page, { frame = null, recorded, action,
   }
 
   await waitForProcessed(page, frame, signalsBefore, waitMs);
+  await settleShell(page, waitMs);
   await page.waitForTimeout(OBSERVE_MS);
   const afterAction = await backState(page, options);
   const afterHistory = Math.max(afterAction.historyLength, afterAction.frameHistoryLength);
