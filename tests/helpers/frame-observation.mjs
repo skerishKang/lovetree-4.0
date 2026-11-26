@@ -189,30 +189,17 @@ export async function observeFrameMatrix({ browser, base, outputDir, shard = '' 
     const page = await context.newPage();
     await page.clock.install({ time: new Date('2026-11-20T00:00:00Z') });
     page.on('pageerror', e => errors.push(String(e)));
-    const capture = async (activePage, screen, { clockPaused = false } = {}) => {
+    const capture = async (activePage, screen) => {
       const name = `${width}-${theme}-${screen.id}`;
-      await activePage.evaluate(() => {
-        const frame = [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length);
-        if (!frame) return;
-        frame.style.willChange = 'transform';
-        frame.style.transform = 'translateZ(0)';
-        frame.contentDocument?.querySelectorAll('.lt-screen-toolbar,button,select,.pill,.mini,.action,.close,.edge-tip,.recent-card,.leftPanel,.rightPanel,.detail-panel,.note-piece,.mobile-page,.mobile-content,.page-content,.photo-piece,.clipping,.letter,.film-piece')?.forEach(element => { element.style.willChange = 'transform'; const transform = getComputedStyle(element).transform; element.style.transform = transform === 'none' ? 'translateZ(0)' : transform + ' translateZ(0)'; });
-      });
-      if (screen.id === 'map') await activePage.evaluate(() => { const frame = [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length); frame.contentWindow.__lt?.resize(); });
-      if (clockPaused) { await activePage.clock.runFor(32); await activePage.clock.fastForward(0); }
-      else await activePage.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
-      const cdp = await activePage.context().newCDPSession(activePage);
-      const shoot = async (path, clip = null) => { const result = await cdp.send('Page.captureScreenshot', { format: 'png', fromSurface: false, ...(clip ? { clip: { ...clip, scale: 1 } } : {}) }); writeFileSync(path, Buffer.from(result.data, 'base64')); };
-      await shoot(join(outputDir, name + '.png'));
+      await activePage.screenshot({ path: join(outputDir, name + '.png'), animations: 'disabled' });
       const target = screen.panel ? activePage.locator(screen.panel) : activePage.locator('#stage');
       const box = await target.boundingBox();
       if (box) {
-        await shoot(join(outputDir, name + '-surface.png'), box);
+        await activePage.screenshot({ path: join(outputDir, name + '-surface.png'), clip: box, animations: 'disabled' });
         const edge = Math.min(24, box.width, box.height);
         const edges = { top: { x: box.x, y: box.y, width: box.width, height: edge }, bottom: { x: box.x, y: box.y + box.height - edge, width: box.width, height: edge }, left: { x: box.x, y: box.y, width: edge, height: box.height }, right: { x: box.x + box.width - edge, y: box.y, width: edge, height: box.height } };
-        for (const [side, clip] of Object.entries(edges)) await shoot(join(outputDir, name + '-roi-' + side + '.png'), clip);
+        for (const [side, clip] of Object.entries(edges)) await activePage.screenshot({ path: join(outputDir, name + '-roi-' + side + '.png'), clip, animations: 'disabled' });
       }
-      await cdp.detach();
       const measured = await measureFrame(activePage, screen, theme, width, height);
       rows.push(measured);
       writeFileSync(join(outputDir, name + '.json'), JSON.stringify(measured, null, 2));
@@ -228,7 +215,7 @@ export async function observeFrameMatrix({ browser, base, outputDir, shard = '' 
         orbit.pauseFloat();
         orbit.seek(0);
       });
-      for (const screen of FRAME_SCREENS) { await openMemberScreen(page, screen); const clockPaused = screen.id === 'book' || screen.id === 'board'; await capture(page, screen, { clockPaused }); if (clockPaused) await page.clock.resume(); }
+      for (const screen of FRAME_SCREENS) { await openMemberScreen(page, screen); await capture(page, screen); if (screen.id === 'book' || screen.id === 'board') await page.clock.resume(); }
     } finally { await context.close().catch(() => {}); }
     const guest = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
     await guest.addInitScript(({ theme, treeId }) => { localStorage.setItem('lt41.theme', theme); localStorage.setItem('lt41.tips.firstTree', '1'); localStorage.setItem('lt41.video-consent', '1'); localStorage.setItem('lt41.discoverAsked', JSON.stringify([treeId])); }, { theme, treeId: tree.id });
@@ -243,7 +230,7 @@ export async function observeFrameMatrix({ browser, base, outputDir, shard = '' 
       await guestPage.clock.fastForward(0);
       await settleObservation(guestPage, () => { const frame = [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length); return !!frame?.contentDocument?.querySelector('.lt-screen-toolbar[data-screen="book"]') && !!frame?.contentWindow?.LTTagLine; }, null, { freezeClock: true });
       await finishBookObservation(guestPage);
-      await capture(guestPage, { id: 'share-guest', label: '공유 방문자 책', root: '.moment' }, { clockPaused: true });
+      await capture(guestPage, { id: 'share-guest', label: '공유 방문자 책', root: '.moment' });
     } finally { await guest.close().catch(() => {}); }
   }
   const report = { basis: '현재 제품 코드', fakeSession: true, errors, screens: rows };

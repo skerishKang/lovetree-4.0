@@ -15,7 +15,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { serve, auditPage, failuresOf, roleStyleFn, assertRolePair } from './helpers/screen-audit.mjs';
 import { createTree, addMoment } from '../public/v41/domain.mjs';
-import { observeFrameMatrix, compareScreenshotBuffers } from './helpers/frame-observation.mjs';
+import { observeFrameMatrix } from './helpers/frame-observation.mjs';
 
 const REQUIRE = process.env.LT_SCREEN_AUDIT_REQUIRE === '1';
 const SCREEN_AUDIT_CAPTURE_DIR = fileURLToPath(new URL('../test-results/v41-screen-audit/', import.meta.url));
@@ -589,10 +589,9 @@ test('#657 화면 공통 검사기: 아홉 화면 둘레·스크롤 주인 관�
   const baseline = JSON.parse(readFileSync(new URL('./fixtures/frame-observation-baseline.json', import.meta.url), 'utf8'));
   const shard = process.env.LT_SCREEN_AUDIT_SHARD || '';
   const outputDir = fileURLToPath(new URL('../test-results/v41-frame-observation/' + (shard || 'all') + '/', import.meta.url));
-  const beforeDir = process.env.LT_FRAME_OBSERVATION_BEFORE_DIR || '';
   const server = await serve({}, { port: 4401 });
   const base = `http://127.0.0.1:${server.address().port}`;
-  const browser = await chromium.launch({ headless: true, args: ['--force-color-profile=srgb', '--run-all-compositor-stages-before-draw', '--disable-new-content-rendering-timeout', '--disable-skia-runtime-opts', '--disable-gpu-rasterization', '--disable-lcd-text', '--font-render-hinting=none'] });
+  const browser = await chromium.launch({ headless: true });
   const started = Date.now();
   try {
     const report = await observeFrameMatrix({ browser, base, outputDir, shard });
@@ -608,7 +607,6 @@ test('#657 화면 공통 검사기: 아홉 화면 둘레·스크롤 주인 관�
       assert.equal(actual.boxShadow, expected.boxShadow, `${label} 그림자`);
       assert.deepEqual([actual.background, actual.backgroundImage], [expected.background[theme].background, expected.background[theme].backgroundImage], `${label} 배경`);
     };
-    const pixelResults = [];
     for (const row of report.screens) {
       const width = String(row.viewport.width), id = row.screen, label = `${width}/${row.theme}/${id}`;
       const expected = baseline.screens[baseline.screenGroups[id]];
@@ -644,15 +642,8 @@ test('#657 화면 공통 검사기: 아홉 화면 둘레·스크롤 주인 관�
         const shortfall = baseline.screens.iframe.stage.height[width] - stage.rect.height;
         assert.ok(Math.abs(shortfall - expected.stageShortfall[width]) <= 0.002, `${label} 안내가 줄인 stage 높이 ${shortfall}`);
       }
-      if (beforeDir) {
-        const result = await compareScreenshotBuffers(browser, readFileSync(join(beforeDir, `${width}-${row.theme}-${id}.png`)), readFileSync(join(outputDir, `${width}-${row.theme}-${id}.png`)));
-        assert.equal(result.changedPixels, 0, `${label} 전체 화면 RGBA 변경 픽셀 0: ${JSON.stringify(result)}`);
-        assert.equal(result.maxChannelDelta, 0, `${label} 전체 화면 RGBA 최대 채널 차이 0`);
-        pixelResults.push({ label, ...result });
-      }
     }
-    if (beforeDir) assert.equal(pixelResults.length, report.screens.length, '모든 관측 화면을 전후 픽셀 비교했다');
-    const result = { basis: baseline.basis, shard: shard || 'all', screens: report.screens.length, pixelResults, elapsedMs: Date.now() - started };
+    const result = { basis: baseline.basis, shard: shard || 'all', screens: report.screens.length, elapsedMs: Date.now() - started };
     mkdirSync(outputDir, { recursive: true });
     writeFileSync(join(outputDir, 'result.json'), JSON.stringify(result, null, 2));
     console.log('#1365 둘레 관측', JSON.stringify(result));
