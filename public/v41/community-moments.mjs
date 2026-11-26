@@ -331,7 +331,7 @@ let advancing=0,unavailableTimer=0,unavailableId='';
  }
  scopeTrigger.onclick=()=>{const opening=scopeMenu.hidden;scopeMenu.hidden=!opening;scopeTrigger.setAttribute('aria-expanded',String(opening));};
  scopeReset.onclick=()=>{treeTitle='';scopeShareId='';chooseScope('all');};
- document.addEventListener('pointerdown',event=>{if(!scopeChips.contains(event.target))closeScope();if(!treePicker.hidden&&!treePicker.contains(event.target))treePicker.hidden=true;if(!ownerMenu.contains(event.target)&&!treeLine.contains(event.target))ownerMenu.hidden=true;});
+ if(typeof document.addEventListener==='function')document.addEventListener('pointerdown',event=>{if(!scopeChips.contains(event.target))closeScope();if(!treePicker.hidden&&!treePicker.contains(event.target))treePicker.hidden=true;if(!ownerMenu.contains(event.target)&&!treeLine.contains(event.target))ownerMenu.hidden=true;});
  scopeChips.addEventListener('keydown',event=>{if(event.key==='Escape'){closeScope();scopeTrigger.focus();}});
  const safeTree=(item)=>item&&item.shareId&&(item.isPublic!==false&&item.visibility!=='private'&&item.public!==false);
  async function openTreePicker(){
