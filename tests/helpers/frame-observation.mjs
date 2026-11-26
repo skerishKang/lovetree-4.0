@@ -107,6 +107,15 @@ export async function measureFrame(page, screen, theme, width, height) {
   }, { screen, theme, width, height });
 }
 
+async function finishBookObservation(page) {
+  await page.clock.runFor(50);
+  await page.evaluate(() => {
+    const frame = [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length);
+    frame.contentDocument.dispatchEvent(new Event('lt41-tagline-ready'));
+  });
+  await page.clock.fastForward(0);
+}
+
 async function openMemberScreen(page, screen) {
   if (screen.id === 'home') return;
   if (screen.id === 'explore') {
@@ -131,6 +140,7 @@ async function openMemberScreen(page, screen) {
       (file !== 'track59-sketchbook.html' || !!f.contentWindow.LTTagLine) &&
       (file !== 'track58-pinboard.html' || (typeof f.contentWindow.bootDetailPanel === 'function' && !!f.contentWindow.__LT58V12));
   }, { file: screen.file, root: screen.root });
+  if (screen.id === 'book') await finishBookObservation(page);
   if (screen.id === 'board') {
     await page.clock.fastForward(0);
     await page.evaluate(() => {
@@ -183,7 +193,7 @@ export async function observeFrameMatrix({ browser, base, outputDir, shard = '' 
     try {
       await page.goto(base + '/v41/?account=1#home', { waitUntil: 'load' });
       await settleObservation(page, () => window.LT41?.trees?.length === 1 && document.body.dataset.member === 'in' && !document.getElementById('discover-ask')?.open && [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length)?.contentDocument?.getElementById('orbit'));
-      for (const screen of FRAME_SCREENS) { await openMemberScreen(page, screen); await capture(page, screen); if (screen.id === 'board') await page.clock.resume(); }
+      for (const screen of FRAME_SCREENS) { await openMemberScreen(page, screen); await capture(page, screen); if (screen.id === 'book' || screen.id === 'board') await page.clock.resume(); }
     } finally { await context.close().catch(() => {}); }
     const guest = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
     await guest.addInitScript(({ theme, treeId }) => { localStorage.setItem('lt41.theme', theme); localStorage.setItem('lt41.tips.firstTree', '1'); localStorage.setItem('lt41.video-consent', '1'); localStorage.setItem('lt41.discoverAsked', JSON.stringify([treeId])); }, { theme, treeId: tree.id });
@@ -195,6 +205,7 @@ export async function observeFrameMatrix({ browser, base, outputDir, shard = '' 
       await guestPage.clock.install({ time: new Date('2026-11-20T00:00:00Z') });
       await guestPage.goto(base + '/v41/#share/c000000000000000000000a/book', { waitUntil: 'load' });
       await settleObservation(guestPage, () => document.body.dataset.recordSource === 'share' && document.body.dataset.fabLift === 'book' && !document.getElementById('toast')?.hidden && document.getElementById('toast')?.hasAttribute('data-visitor-intro') && [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length)?.contentWindow?.location?.pathname?.endsWith('/track59-sketchbook.html') && [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length)?.contentDocument?.querySelector('.moment,.mobile-page,.book-wrap') && [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length)?.contentDocument?.querySelector('.lt-screen-toolbar[data-screen="book"]') && [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length)?.contentWindow?.LTTagLine, null, { freezeClock: true });
+      await finishBookObservation(guestPage);
       await capture(guestPage, { id: 'share-guest', label: '공유 방문자 책', root: '.moment' });
     } finally { await guest.close().catch(() => {}); }
   }
