@@ -755,7 +755,9 @@ test('#1350 머리줄 오른쪽 간격: 390·844·1440 × 밤·정원 × 로그�
             assert.equal(result.gap, expected, label + ': 테마와 계정 사이 간격');
             assert.equal(result.slotWidth, 80, label + ': 계정 칸 폭');
           } else {
-            assert.equal(result.slotWidth, 66, label + ': 휴대폰 계정 칸 66px 유지');
+            // #1488 3번: 휴대폰 계정 칸은 56px(로그인 단추·계정 알약이 칸을 채운다) — 세 단추 간격 8px.
+            assert.equal(result.slotWidth, 56, label + ': 휴대폰 계정 칸 56px');
+            assert.equal(result.gap, 8, label + ': 휴대폰 테마와 계정 사이 8px');
             if (auth === '로그아웃') assert.equal(result.entryWidth, 56,
               label + ': 휴대폰 로그아웃 단추 56px 유지');
           }
@@ -795,7 +797,7 @@ test('#1350 머리줄 오른쪽 간격: 390·844·1440 × 밤·정원 × 로그�
           observer.disconnect();
           return { before, after: gap(), cls };
         });
-        const compactGap = width === 1440 ? 12 : width === 844 ? 8 : 4;
+        const compactGap = width === 1440 ? 12 : 8; // #1488 3번: 390도 8px(전에는 4px)
         assert.equal(noHint.before, compactGap,
           width + '/' + theme + ': 로그인 흔적이 없으면 확인 중에도 예약 칸을 두지 않는다');
         assert.equal(noHint.after, compactGap,

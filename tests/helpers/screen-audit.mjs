@@ -275,7 +275,12 @@ export const AUDIT_FN = function audit(opts) {
   if (shown(cardEl)) {
     const openDialog = !!document.querySelector('dialog[open]');
     const openSheet = document.body.classList.contains('lt-sheet-open');
-    const linksExpected = !openDialog && !openSheet && document.body.dataset.fabLift !== 'shelf' && !(innerWidth <= 520 && ['book', 'network'].includes(document.body.dataset.fabLift));
+    // #1488(CTO 결정 #1452): 바닥 링크는 첫 화면·공개 감상에만 있다 — 안쪽 다섯 화면(서재·트리·보드·책·지도)의 내 기록에서는 계정 메뉴·☰ 메뉴로 옮겼다.
+    // 공개 감상은 트리 보기와 390 책·지도에서만 숨긴다. 링크가 있는 곳에서는 지금처럼 새 소식 카드와의 겹침을 반드시 잰다.
+    const lift = document.body.dataset.fabLift || '';
+    const visitor = document.body.classList.contains('share-visitor');
+    const linksOnScreen = !lift || (visitor && lift !== 'tree' && !(innerWidth <= 520 && ['book', 'network'].includes(lift)));
+    const linksExpected = !openDialog && !openSheet && linksOnScreen;
     for (const s of ['.home-links', '#mobile-add', '#toolCinema', '[data-cinema]', '.cinema-btn']) {
       const targets = [...document.querySelectorAll(s)].filter(shown);
       const required = (s === '.home-links' && linksExpected)
