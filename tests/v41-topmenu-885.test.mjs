@@ -659,7 +659,7 @@ test('#1367 4번: 트리 고르기 목록은 바깥 누름·안쪽 화면 누름
             const button = document.createElement('button');
             button.id = 'share-under-picker-test';
             button.textContent = '??';
-            Object.assign(button.style, { position: 'fixed', right: '30px', bottom: '120px', zIndex: '1' });
+            Object.assign(button.style, { position: 'fixed', right: '30px', bottom: '120px', zIndex: '2147483647' });
             button.onclick = () => document.getElementById('share-menu').click();
             document.body.append(button);
           });
