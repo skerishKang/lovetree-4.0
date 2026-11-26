@@ -377,7 +377,7 @@ test('서재 — 설정에서 고른 기본 보기가 저장되고 다시 열려
       await saved;
       await page.reload({ waitUntil: 'load' });
       await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
-      await page.locator('#discover-ask-no').click().catch(() => {});
+      await dismissDiscoverAskIfOpen(page);
       await page.locator('#account-avatar').click();
       await page.locator('#account-open-settings').click();
       await page.waitForSelector('#account-settings[open]');
