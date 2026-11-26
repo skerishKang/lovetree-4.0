@@ -29,7 +29,8 @@ import { VIEWS } from './shelf-views.mjs';
       // 실제 색값은 identity.css의 --lt-cover-N에만 있다(테마를 바꿔도 다시 그릴 필요가 없다).
       var palette = COVER_PALETTE;
       var books = buildShelf(shelfOrder(LTDEMO.library), palette, namer);
-      var state = { filter:'all', query:'', selectedId:null, shelfIndex:0, shelfOffset:0, shelfList:[], chapterIndex:0, open:false, openProgress:0, customBooks:[], pageTurning:false };
+      var initialFilter='all';try{var asked=localStorage.getItem('lt41.shelfFilter');if(asked==='public'||asked==='all')initialFilter=asked;localStorage.removeItem('lt41.shelfFilter');}catch{}
+      var state = { filter:initialFilter, query:'', selectedId:null, shelfIndex:0, shelfOffset:0, shelfList:[], chapterIndex:0, open:false, openProgress:0, customBooks:[], pageTurning:false };
       var storageKey = 'lovetree-people-book-shelf-v2-1-true-page-motion';
       var drag = { active:false, mode:'', startX:0, startY:0, moved:false, startProgress:0 };
       // #1366: 계정 설정(bookDisplay와 같은 길) → 기기 미러 → 기본 회전.
@@ -41,6 +42,10 @@ import { VIEWS } from './shelf-views.mjs';
       function paintShelfViewInline(){
         var view=shelfView();
         $$('#shelf-view-inline [data-shelf-view]').forEach(function(b){b.setAttribute('aria-checked',String(b.dataset.shelfView===view));});
+      }
+      // #1446: 첫 화면 '내 공개 트리'가 서재를 공개만 걸러 열 때 칸 표시도 같이 맞춘다.
+      function paintShelfFilterInline(){
+        $$('#shelf-filter-inline [data-filter]').forEach(function(b){b.setAttribute('aria-checked',String(b.dataset.filter===state.filter));});
       }
       // #1376 1단계: 값 읽기는 공용에 두고, 보기 모듈에는 이름과 공용 동작만 넘긴다.
       // 저장(prefs.shelfView + lt41.shelfView)과 전환 메시지는 아래 공용 경로를 그대로 쓴다.
@@ -84,6 +89,17 @@ import { VIEWS } from './shelf-views.mjs';
       function allBooks() { return allBooksOf(books, state.customBooks); }
       function getBook(id) { return findBook(allBooks(), id); }
       function save() {} // Selection belongs to the shell; never persist another account's library.
+      // #1446: 공개 트리 여부는 셸 상태가 아니라 서버 shares로만 안다. 실패하면 아무 책도 공개로 표시하지 않는다.
+      function readPublicFlags(){
+       try{
+        fetch('/api/shares',{headers:{accept:'application/json'}}).then(function(r){return r.ok?r.json():null}).then(function(body){
+         var ids={};(Array.isArray(body&&body.shares)?body.shares:[]).forEach(function(s){if(s&&s.status==='active'&&s.treeId)ids[s.treeId]=true;});
+         var changed=false;
+         allBooks().forEach(function(book){var next=ids[book.id]===true;if(book.public!==next){book.public=next;changed=true;}});
+         if(changed)renderShelf();
+        }).catch(function(){});
+       }catch(error){}
+      }
       var esc = escapeShelf;
       var youtubeId = function (url) { return youtubeIdOf(url, window.LTMedia && window.LTMedia.describe); };
       function showToast(message) { var toast=$('#toast'); toast.textContent=message; toast.classList.add('show'); clearTimeout(showToast.timer); showToast.timer=setTimeout(function(){toast.classList.remove('show');},2400); }
@@ -103,7 +119,7 @@ import { VIEWS } from './shelf-views.mjs';
         state.shelfIndex=resolveShelfIndex(list, state.selectedId, state.shelfIndex);
         $('#resultCount').textContent='트리 '+list.length+'개';
          var viewport=$('#shelfViewport');if(viewport)viewport.dataset.shelfView=shelfView();
-         paintShelfViewInline();
+         paintShelfViewInline();paintShelfFilterInline();
         var railWidth=($('#shelfRail')&&$('#shelfRail').clientWidth)||0;
         // #944: 시작은 첫 책 왼쪽 끝이 책장 안쪽 여백. 고른 책이 뒤쪽이면 보이게만 최소로 민다.
         // #1366: 선반은 그리드가 모든 책을 보여 주므로 캐러셀 넘김 값을 쓰지 않는다.
@@ -291,9 +307,9 @@ import { VIEWS } from './shelf-views.mjs';
         $('#shelfRail').addEventListener('click',function(event){var railManage=event.target.closest('[data-manage-id]');if(railManage)openManageTree(railManage.dataset.manageId);});
        $$('#shelf-view-inline [data-shelf-view]').forEach(function(b){b.onclick=function(){try{parent.postMessage({type:MSG.setShelfView,value:b.dataset.shelfView},location.origin)}catch{}};});
         $('#shelfNewTree').addEventListener('click',openNewTree);
-        $('#shelfJump').addEventListener('click',function(){state.query='';state.filter='all';$('#searchInput').value='';$$('.filter').forEach(function(item){item.classList.toggle('active',item.dataset.filter==='all');});renderShelf();var book=getShelfCard(state.shelfIndex)?.querySelector('button[data-book-id]');if(book)openReader(book.dataset.bookId,book.closest('.book-card'));});
+        $('#shelfJump').addEventListener('click',function(){state.query='';state.filter='all';$('#searchInput').value='';paintShelfFilterInline();renderShelf();var book=getShelfCard(state.shelfIndex)?.querySelector('button[data-book-id]');if(book)openReader(book.dataset.bookId,book.closest('.book-card'));});
         $('#searchInput').addEventListener('input',function(event){state.query=event.target.value;renderShelf();});
-        $$('.filter').forEach(function(button){button.addEventListener('click',function(){state.filter=button.dataset.filter;$$('.filter').forEach(function(item){item.classList.toggle('active',item===button);});renderShelf();});});
+        $$('#shelf-filter-inline [data-filter]').forEach(function(button){button.addEventListener('click',function(){state.filter=button.dataset.filter==='public'?'public':'all';paintShelfFilterInline();renderShelf();});});
         $('#shelfPrev').addEventListener('click',function(){view.move(-1);});
         $('#shelfNext').addEventListener('click',function(){view.move(1);});
         // #1366 ⑧: 세로 휠만 회전 넘김으로 쓴다. 레일 밖과 가로 트랙패드는 기본 스크롤에 맡긴다.
@@ -337,6 +353,11 @@ if(typeof addEventListener==='function')addEventListener('message',e=>{
  if(e.data?.type===MSG.shelfView){
    ensureView();view.mount(viewCtx());
    renderShelf();
+   return;
+  }
+  if(e.data?.type===MSG.shelfFilter){
+   state.filter=e.data.value==='public'?'public':'all';
+   paintShelfFilterInline();renderShelf();
    return;
   }
   if(e.data?.type===MSG.shelfSelectTree){
@@ -401,6 +422,6 @@ if(typeof addEventListener==='function')addEventListener('message',e=>{
 
       mountThumbFallback(document);
       ensureView();view.mount(viewCtx());
-      renderShelf();renderResumeCard();bind();
+      renderShelf();renderResumeCard();bind();readPublicFlags();
   }
 }

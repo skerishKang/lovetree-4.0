@@ -75,6 +75,10 @@ html[data-v41-screen=shelf] .book-card .book-cover-media{object-position:50% 50%
 .shelf-view-inline{display:inline-flex;align-items:center;padding:3px;border:1px solid var(--lt-line);border-radius:var(--lt-r-pill)}
 .shelf-view-inline button{min-height:36px;padding:0 11px;border:0;border-radius:var(--lt-r-pill);background:transparent;color:var(--muted);font-size:12px;white-space:nowrap}
 .shelf-view-inline button[aria-checked=true]{background:var(--lt-primary);color:var(--lt-primary-ink)}
+/* #1446: 걸러 보기 칩도 같은 모양. 도구 줄에서는 보기 토글보다 먼저 접힌다. */
+.shelf-filter-inline{display:inline-flex;align-items:center;padding:2px;border:1px solid var(--lt-line);border-radius:var(--lt-r-pill)}
+.shelf-filter-inline button{min-height:28px;padding:0 7px;border:0;border-radius:var(--lt-r-pill);background:transparent;color:var(--muted);font-size:11px;white-space:nowrap}
+.shelf-filter-inline button[aria-checked=true]{background:var(--lt-primary);color:var(--lt-primary-ink)}
 /* 390에서는 책 아래 설명을 한 줄로 적고 남는 글자는 말줄임으로 표시한다. */
 @media(max-width:520px){html[data-v41-screen=shelf] .book-card-meta span{display:block;max-height:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;-webkit-line-clamp:1}}
 

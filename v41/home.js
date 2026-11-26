@@ -401,7 +401,7 @@ function refreshCountsFromParent(){
   inboxCount?{name:`정리 전`,count:inboxCount,label:`정리 전 순간 ${inboxCount}개 정리하기`,action:()=>bridge.actions.cleanup()}:null
  ]);
  const publicRow=countLines.get('trees')?.lastElementChild;
- const treeCount=showCount('trees',[{name:`트리`,count:fresh.length,label:`트리 ${fresh.length}개 서재 열기`,action:openTrees},null]);
+ const treeCount=showCount('trees',[{name:`내 트리`,count:fresh.length,label:`내 트리 ${fresh.length}개, 서재 전체 보기로 이동`,action:openTrees},null]);
  if(publicRow&&treeCount)treeCount.lastElementChild.replaceWith(publicRow);
   // 처음 그릴 때와 같은 길로 다시 고른다 — 머리글까지 넘겨야 같은 마크업·글자 크기로 그려진다.
   const media=globalThis.LTMedia?.currentContext?.();
@@ -416,16 +416,16 @@ const inboxTree=(Array.isArray(context.trees)?context.trees:[]).find(t=>t?.inbox
 const inboxCount=inboxTree?.moments?.length||0;
 const totalCount=momentList?.entries?.length||0;
 const openMoments=()=>orbit?.index?.('all');
-const openCommunity=()=>bridge.actions.community();
 const openTrees=()=>bridge.actions.navigate('trees');
+const openPublicTrees=()=>bridge.actions.navigate('trees','public');
 if(hasMoments){
  showCount('moments',[
   {name:`순간`,count:totalCount,label:`내 순간 ${totalCount}개 목록 열기`,action:openMoments},
   inboxCount?{name:`정리 전`,count:inboxCount,label:`정리 전 순간 ${inboxCount}개 정리하기`,action:()=>bridge.actions.cleanup()}:null
  ]);
  showCount('trees',[
-  {name:`트리`,count:momentList?.trees?.length||0,label:`트리 ${momentList?.trees?.length||0}개 서재 열기`,action:openTrees},
-  null
+  {name:`내 트리`,count:momentList?.trees?.length||0,label:`내 트리 ${momentList?.trees?.length||0}개, 서재 전체 보기로 이동`,action:openTrees},
+  {name:`내 공개 트리`,count:0,label:`내 공개 트리 0개, 서재 공개만 보기로 이동`,action:openPublicTrees}
  ]);
  (async()=>{try{
   const answer=await fetch('/api/shares',{headers:{accept:'application/json'}});
@@ -434,8 +434,8 @@ if(hasMoments){
   const ids=new Set((Array.isArray(body?.shares)?body.shares:[]).filter(s=>s?.status==='active').map(s=>s.treeId).filter(Boolean));
   const n=ids.size;
   showCount('trees',[
-   {name:`트리`,count:momentList?.trees?.length||0,label:`트리 ${momentList?.trees?.length||0}개 서재 열기`,action:openTrees},
-   {name:`공개 트리`,count:n,label:`공개 트리 ${n}개 서재에서 보기`,action:openTrees}
+   {name:`내 트리`,count:momentList?.trees?.length||0,label:`내 트리 ${momentList?.trees?.length||0}개, 서재 전체 보기로 이동`,action:openTrees},
+   {name:`내 공개 트리`,count:n,label:`내 공개 트리 ${n}개, 서재 공개만 보기로 이동`,action:openPublicTrees}
   ]);
  }catch{ /* 공개 트리 수를 못 받으면 둘째 줄은 빈 자리로 둔다. */ }})();
 }
@@ -447,11 +447,11 @@ if(hasMoments){
  if(!valid(stats?.trees)||(!hasMoments&&!valid(stats?.moments)))return;
  const prefix=loggedIn?'':'예시 ';
  showCount('community',hasMoments?[
-  {name:`공개 트리`,count:stats.trees,label:`공개 트리 ${stats.trees}개 둘러보기`,action:openCommunity},
-  {name:`공개 순간`,count:stats.moments,label:`공개 순간 ${stats.moments}개 둘러보기`,action:openCommunity}
+  {name:`모두의 트리`,count:stats.trees,label:`모두의 트리 ${stats.trees}개, 둘러보기 트리 보기로 이동`,action:()=>bridge.actions.community('trees')},
+  {name:`모두의 순간`,count:stats.moments,label:`모두의 순간 ${stats.moments}개, 둘러보기 순간 보기로 이동`,action:()=>bridge.actions.community('moments')}
  ]:[
-  {name:`${prefix}공개 트리`,count:stats.trees,label:`공개 트리 ${stats.trees}개 둘러보기`,action:openCommunity},
-  {name:`순간`,count:stats.moments,label:`공개 순간 ${stats.moments}개 둘러보기`,action:openCommunity}
+  {name:`${prefix}모두의 트리`,count:stats.trees,label:`${prefix}모두의 트리 ${stats.trees}개, 둘러보기 트리 보기로 이동`,action:()=>bridge.actions.community('trees')},
+  {name:`모두의 순간`,count:stats.moments,label:`모두의 순간 ${stats.moments}개, 둘러보기 순간 보기로 이동`,action:()=>bridge.actions.community('moments')}
  ]);
  }catch{ /* 집계를 받지 못하면 해당 줄만 숨긴다. */ }finally{clearTimeout(timer);}})();
 const infoStyle=document.createElement('style');
@@ -459,8 +459,10 @@ infoStyle.textContent=`.home-add-top{margin-top:12px;font-size:15px;pointer-even
 .center .actions{gap:18px;align-items:flex-start;flex-wrap:nowrap}
 .center .actions .home-action-group{flex:1 1 0%;max-width:176px;min-width:0;display:flex;flex-direction:column;align-items:stretch;gap:4px}
 .center .actions .home-action-group .subtleBtn{flex:none;width:100%;max-width:none;box-sizing:border-box;height:44px;white-space:nowrap;overflow-wrap:normal}
-.home-count{display:block;font-size:12px;line-height:15px;min-height:30px;white-space:nowrap;color:var(--lt-muted)}
+.home-count{display:block;font-size:12px;line-height:15px;min-height:32px;white-space:nowrap;color:var(--lt-muted)}
 .home-count-line{display:block;min-height:15px;line-height:15px}
+/* #1446: 두 줄이 붙어 보이지 않게 2px 띄운다. */
+.home-count-line + .home-count-line{margin-top:2px}
 .home-count[hidden]{display:none}
 .home-count[data-reserve][hidden]{display:block;visibility:hidden}
 .home-count-item{display:flex;align-items:baseline;justify-content:space-between;gap:4px;width:100%;min-width:0;white-space:nowrap}
