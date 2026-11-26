@@ -3,6 +3,7 @@
 import {formatRange} from '/v41/domain.mjs';
 import {loadYouTubeIframeApi} from '/v41/segment-capture.mjs';
 import {buildPlaybackQueue, stepPlayable, firstPlayable, playbackChipText, segmentReached, playbackStatusOf, STATUS_PLAYING, STATUS_BUFFERING, STATUS_SKIPPED} from '/v41/playback-core.mjs';
+import {escapeHtml, fallbackCardMarkup, thumbFallbackAttrs, thumbnailCandidates} from '/v41/thumb-fallback.mjs';
 
 const $ = (selector) => document.querySelector(selector);
 const overlay = $('#playback');
@@ -19,10 +20,10 @@ let tickTimer = 0;
 let statusTimer = 0;
 
 const titleOf = (moment) => {
-  try { return window.LTBookTitle?.view?.(moment)?.main || moment?.title || '순간'; } catch { return moment?.title || '순간'; }
+  try { return window.__BOOK_USABILITY__?.titleView?.(moment)?.main || moment?.title || '순간'; } catch { return moment?.title || '순간'; }
 };
 const dateOf = (moment) => {
-  try { return window.LTBookTitle?.date?.(moment?.date) || moment?.date || ''; } catch { return moment?.date || ''; }
+  try { return window.__BOOK_USABILITY__?.date?.(moment?.date) || moment?.date || ''; } catch { return moment?.date || ''; }
 };
 const itemsForBook = () => {
   const moments = (typeof window.__TRACK59__?.playbackMoments === 'function' ? window.__TRACK59__.playbackMoments() : []) || [];
@@ -115,10 +116,35 @@ function resetPlayerHost() {
   }
 }
 
+/* #1468: 재생 줄 항목 → 그 순간 기록. 표지·글 카드는 순간 기록으로 그린다. */
+function momentFor(item) {
+  const moments = typeof window.__TRACK59__?.playbackMoments === 'function' ? window.__TRACK59__.playbackMoments() : [];
+  return (Array.isArray(moments) ? moments : []).find((moment) => String(moment?.id) === String(item?.id)) || null;
+}
+/* #1468: 재생기 없이 순간을 보일 때 무대에 그 순간의 표지를 그린다 — 책 쪽과 같은 규칙(#1435).
+   내 기록은 썸네일을 먼저 보이고 공유·예시는 외부 요청을 하지 않는다(#327). 썸네일이 없거나 깨지면
+   제목 글 카드와 '영상을 볼 수 없어요'로 내려간다(mountThumbFallback의 길 그대로). */
+function paintStageCover(item) {
+  const host = $('#pbPlayer');
+  if (!host || host.tagName === 'IFRAME' || !item) return;
+  const moment = momentFor(item);
+  const media = window.LTMedia || null;
+  const context = typeof media?.currentContext === 'function' ? media.currentContext() : { source: '', owned: false };
+  const autoLoad = typeof media?.autoLoadMedia === 'function' && !!media.autoLoadMedia(context.source, context.owned);
+  const vertical = moment && media ? media.verticalVideo?.(moment.url, moment.mediaMetadata) : null;
+  const candidates = moment && autoLoad ? thumbnailCandidates(moment, { vertical, autoLoad }) : [];
+  const options = { writable: false, videoUnavailable: true, variant: 'playback', momentId: item.id };
+  const card = fallbackCardMarkup(moment || { id: item.id, title: item.title, date: item.date }, options);
+  host.innerHTML = candidates.length
+    ? `<div class="playback-cover" data-lt-thumb-host>${card}<img src="${escapeHtml(candidates[0])}" alt="" referrerpolicy="no-referrer" decoding="async"${thumbFallbackAttrs(moment, { candidates, ...options })}></div>`
+    : `<div class="playback-cover">${card}</div>`;
+}
 function loadItem(item) {
-  if (!item || !player || !open) return;
-  const myToken = token;
+  if (!item || !open) return;
   hideDone();
+  // #1468: 재생기를 받지 못했어도 이전·다음은 멈추지 않는다 — 순간마다 그 표지로 바꾼다(빈 검은 틀 그대로 두지 않는다).
+  if (!player) { paintStageCover(item); return; }
+  const myToken = token;
   setStatus('이어 보는 중이에요.');
   try {
     player.loadVideoById({videoId: item.videoId, startSeconds: item.start, endSeconds: item.end});
@@ -149,7 +175,8 @@ function markUnavailable(at) {
 function advance(delta) {
   if (!open || advancing) return;
   const next = stepPlayable(items, index, delta);
-  if (next < 0) { showDone(); return; }
+  // #1468: 재생기 없이는 아무것도 보지 못했다 — '다 봤어요' 대신 마지막 순간임만 알린다.
+  if (next < 0) { if (player) showDone(); else setStatus('마지막 순간이에요.'); return; }
   advancing = true;
   index = next;
   renderCurrent();
@@ -166,6 +193,7 @@ function goTo(next) {
 }
 
 function finishAll() {
+  if (!player) { setStatus('마지막 순간이에요.'); return; }
   try { player?.pauseVideo?.(); } catch {}
   showDone();
 }
@@ -240,6 +268,9 @@ async function openPlayback() {
   resetPlayerHost();
   const host = $('#pbPlayer');
   host.replaceChildren();
+  // #1468: 재생기를 기다리는 동안도 무대는 비어 있지 않다 — 먼저 그 순간의 표지를 그리고, 재생기를 받으면 그 자리를 플레이어가 대신한다.
+  paintStageCover(currentItem());
+  $('#pbToggle').disabled = false;
   try {
     const YT = await loadYouTubeIframeApi();
     if (!open || myToken !== token) return;
@@ -270,6 +301,11 @@ async function openPlayback() {
   } catch {
     if (open && myToken === token) {
       // 재생기 자체를 못 받은 실패는 '그 순간만 못 봄'이 아니다 — 건너뛰면 안내가 덮이고 다음 순간도 같은 실패라 그냥 안내만 남긴다.
+      // #1468: 대신 무대는 그 순간의 표지로 채우고 이전·다음은 그대로 움직인다. 멈춤 단추는 할 일이 없어 꺼 둔다.
+      player = null;
+      $('#pbToggle').disabled = true;
+      $('#pbToggle').textContent = '재생';
+      paintStageCover(currentItem());
       setStatus('YouTube 재생기를 불러오지 못했어요. 원본 링크에서 확인해 주세요.');
     }
   }
@@ -347,7 +383,7 @@ function wire() {
   $('#pbPrev').addEventListener('click', () => {
     const previous = stepPlayable(items, index, -1);
     if (previous >= 0) goTo(previous);
-    else if (currentItem()) {
+    else if (currentItem() && player) {
       try { player?.seekTo?.(currentItem().start, true); player?.playVideo?.(); } catch {}
       setStatus('이 순간의 처음으로 돌아갔어요.');
     }

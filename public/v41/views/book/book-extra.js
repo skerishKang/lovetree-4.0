@@ -23,7 +23,8 @@ const ltDateStyle=()=>{
   const cached=localStorage.getItem('lt41.dateStyle');if(cached)return cached;}catch{}
  return 'dot';};
 const styledDate=v=>formatDisplayDate(v,ltDateStyle());
-try{window.LTBookTitle={view:titleViewFor,date:styledDate}}catch{}
+/* #1468: 제목·날짜 도우미는 별도 전역(window.LTBookTitle)에 통째로 두지 않는다 — 책 화면 이름 공간 __BOOK_USABILITY__(아래쪽에서 한 번 만든다)에 넣어
+   book.js(클래식 스크립트)와 book-playback.mjs가 같은 곳에서 읽는다. */
 const t=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 /* 5. 돋보기: 기본 꺼짐. 선택값은 localStorage(실패하면 꺼짐). */
 let lensPref=readLens(window.localStorage);
@@ -351,7 +352,8 @@ momentContent=function(m,compact=false){
 /* 8. 가운데 머리 표시는 CSS로 지우고, 4. 오른쪽 빈 페이지 문구·버튼을 여기서 만든다. */
 const originalRenderSpread=renderSpread;
 renderSpread=function(idx,focusId=null,land=true){
- originalRenderSpread(idx,focusId,land);
+ /* #1468: 넘기는 동안에는 book.js가 다시 그리지 않고 false를 돌려준다 — 덧그리기도 하지 않는다(미뤄 둔 요청은 넘김이 끝난 뒤 다시 온다). */
+ if(originalRenderSpread(idx,focusId,land)===false)return;
  // #584: 주소·정보만으로 세로를 못 정한 YouTube 칸을 썸네일 실측으로 올려 고친다.
  //   공유·예시 화면은 누르기 전 외부 요청 0 규칙(#327)을 유지하기 위해 내 기록일 때만 본다.
  if(window.LTMedia?.upgradeVerticals){const ctx=(typeof LTMedia.currentContext==='function')?LTMedia.currentContext():{source:'',owned:false};if(LTMedia.autoLoadMedia(ctx.source,ctx.owned))LTMedia.upgradeVerticals(document);}
@@ -548,8 +550,7 @@ $b('#overviewFlow').addEventListener('click',e=>{
  bookHistoryTransferring=true;try{closeJourney();completeBookJump(focus,posOfMoment(focus))}finally{bookHistoryTransferring=false}
  // #537: 가는 자리는 보기 모드가 정한다(한 장은 그 순간, 두 장은 그 순간이 든 펼침면).
  const target=posOfMoment(focus);
- if(target===current)renderSpread(target,focus,false);
- else autoTurn(target>current?'next':'prev',target,focus);
+ goTo(target,focus);
 });
 window.__TRACK59__.openOverview=openJourney;
 /* 5. 돋보기는 도구 줄에서 켜고 끈다. */
@@ -614,9 +615,10 @@ mountTips();
    book.js(클래식)는 createOverflowRejudge를 못 불러 오므로 여기서 연결하고, 이미지 load·창 크기 변경·
    페이지 크기 변화(ResizeObserver) 뒤에 rAF로 묶어 다시 판정하게 한다. 아래 재그리기 때 관찰이 시작된다. */
 window.__TRACK59__.overflowRejudge=createOverflowRejudge({judge:()=>window.__TRACK59__.rejudgeOverflow(),raf:f=>requestAnimationFrame(f),cancelRaf:id=>cancelAnimationFrame(id),addDocListener:(t,f,o)=>document.addEventListener(t,f,o),addWinListener:(t,f)=>addEventListener(t,f),ResizeObserver:typeof ResizeObserver==='undefined'?null:ResizeObserver,isPageImage:n=>n instanceof HTMLImageElement&&!!n.closest('.page-content,.mobile-content')});
+/* #1468: 제목·날짜 도우미(titleView·date)는 이 이름 공간 하나에 둔다 — 바로 아래 첫 다시 그리기보다 먼저 만들어 그 그리기부터 한 벌 규칙을 쓴다. */
+window.__BOOK_USABILITY__={titleParts,closeDetail,closeJourney,placeDetail,nextMomentOf,paintTitle,openJourney,titleView:titleViewFor,date:styledDate,get lensPref(){return lensPref}};
 renderSpread(current,LTDEMO.get(),false);
 syncLensClone();
-window.__BOOK_USABILITY__={titleParts,closeDetail,closeJourney,placeDetail,nextMomentOf,paintTitle,openJourney,get lensPref(){return lensPref}};
 
 // #347 후속: 계정 제목 보기 설정이 바뀌면 지금 펼침면·상세를 다시 그린다.
 addEventListener('message',e=>{if(e.data?.type!==MSG.titleDisplay||!isShellMessage(e))return;try{LTDEMO.prefs={...(LTDEMO.prefs||{}),titleDisplay:e.data.value}}catch{}try{renderSpread(current,LTDEMO.get(),false)}catch{}if($b('#detail')?.classList.contains('open')&&selectedMomentId)showDetail(selectedMomentId);});
