@@ -92,6 +92,28 @@ test('#1469 기준선에서 거꾸로 만든 가짜 관측은 다시 기준선�
   assert.deepEqual(deriveScreens(fakeReport(old), old).screens, old.screens);
 });
 
+test('#1469 숨긴 방문자 알림은 중심 정렬 검사에서 제외하고 보이는 알림은 기존 한도를 지킨다', () => {
+  const hidden = fakeReport(old);
+  for (const row of hidden.screens.filter(row => row.screen === 'share-guest')) {
+    row.shell.toastHidden = true;
+    row.shell.toastCenterDelta = row.viewport.width;
+  }
+  assert.doesNotThrow(() => deriveScreens(hidden, old));
+  const cssHidden = fakeReport(old);
+  for (const row of cssHidden.screens.filter(row => row.screen === 'share-guest')) {
+    row.shell.toastHidden = false;
+    row.shell.toast.display = 'none';
+    row.shell.toastCenterDelta = row.viewport.width;
+  }
+  assert.doesNotThrow(() => deriveScreens(cssHidden, old));
+  const visible = fakeReport(old);
+  for (const row of visible.screens.filter(row => row.screen === 'share-guest')) {
+    row.shell.toastHidden = false;
+    row.shell.toastCenterDelta = 2;
+  }
+  assert.throws(() => deriveScreens(visible, old));
+});
+
 test('#1469 두 관측이 같고 바뀐 값이 없으면 쓰지 않는다 — 텍스트·기준 커밋 그대로', () => {
   const result = plan({
     oldText,

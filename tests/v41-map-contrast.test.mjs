@@ -1,3 +1,4 @@
+import { listenOnSafePort } from './helpers/safe-port.mjs';
 // #504: real rendered pixels/styles, and a required browser in the preview job.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -38,7 +39,7 @@ function serve(root) {
     }
     res.writeHead(404); res.end('not found');
   });
-  return new Promise(resolve => server.listen(0, '127.0.0.1', () => resolve(server)));
+  return listenOnSafePort(server, '127.0.0.1').then(() => server);
 }
 
 test('지도 실제 대비: 앱 2 × 판 2 × 1440·390, 두 보기·선택 상태의 글자 4.5와 점·선 3 이상', { skip: REQUIRE ? false : skip, timeout: 300000 }, async () => {

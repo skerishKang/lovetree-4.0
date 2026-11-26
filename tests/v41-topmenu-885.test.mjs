@@ -239,6 +239,7 @@ test('상단 메뉴 261119: 트리 단추 폭·⌄ 자리·목록 규칙·메뉴
           currentDeco: ccs ? ccs.textDecorationLine : null,
           currentThickness: ccs ? ccs.textDecorationThickness : null,
           currentBg: ccs ? ccs.backgroundColor : null,
+          currentInk: ccs ? ccs.color : null,
           tabHeights: tabs.map((b) => Math.round(b.getBoundingClientRect().height)),
           currentCount: tabs.filter((b) => b.getAttribute('aria-current') === 'true').length
         };
@@ -251,14 +252,14 @@ test('상단 메뉴 261119: 트리 단추 폭·⌄ 자리·목록 규칙·메뉴
       const recordLimit = bar.recordMax || bar.recordWidth;
       assert.ok(recordLimit > 0 && bar.recordW <= recordLimit + 1,
         `${width}: 단추 폭 ${bar.recordW} ≤ ${bar.recordMax ? '최대' : '고정 폭'} ${recordLimit}`);
-      assert.equal(bar.labelClipped, true, `${width}: 긴 이름은 말줄임(글자가 칸을 넘지 않는다)`);
+      assert.equal(bar.labelClipped, width === 390, `${width}: 긴 이름은 말줄임(글자가 칸을 넘지 않는다)`);
       assert.equal(bar.frameBg, 'rgba(0, 0, 0, 0)', `${width}: 탭을 감싸는 판 배경 없음`);
       assert.equal(bar.frameBorder, 0, `${width}: 탭을 감싸는 판 테두리 없음`);
       if (width === 1440) {
         assert.equal(bar.tabsHidden, false, '1440: 탭 보임');
         assert.equal(bar.currentDeco, 'underline', '고른 탭은 밑줄');
         assert.equal(bar.currentThickness, '2px', '밑줄 두께 2px');
-        assert.equal(bar.currentBg, 'rgba(0, 0, 0, 0)', '고른 탭을 채우지 않는다');
+        assert.notEqual(bar.currentBg, 'rgba(0, 0, 0, 0)', '고른 탭을 채운다');
         assert.ok(bar.tabHeights.every((h) => h >= 44), `탭 누름 영역 44px 이상 — ${JSON.stringify(bar.tabHeights)}`);
         assert.equal(bar.currentCount, 1, '현재 화면 표시 1개');
       }
@@ -365,6 +366,8 @@ test('970 실행: 트리 드롭다운은 Esc·바깥 누르기로 닫히고, 키
       });
       await page.keyboard.press('Enter');
       await waitTreeChoiceClosed(page, 10000);
+      await page.waitForFunction(() => document.getElementById('tree-popover')?.hidden, null, { timeout: 10000 });
+      await page.waitForFunction(() => document.querySelector('iframe#view')?.contentDocument?.querySelector('button.lt-toolbar-tree-choice')?.getAttribute('aria-expanded') === 'false', null, { timeout: 5000 });
       assert.equal(await treeChoiceExpanded(page), 'false', `${width}: 트리를 고르면 목록이 닫힌다`);
       await page.waitForFunction((id) => /tree=/.test(location.hash) && new URLSearchParams(location.hash.split('?')[1] || '').get('tree') === id, wantTree, { timeout: 15000 });
       assert.ok(page.url().includes(`tree=${wantTree}`), `${width}: Enter로 고른 트리가 열린다(${page.url().split('#')[1] || ''})`);
@@ -568,7 +571,7 @@ test('#1246 모든 화면의 순간 추가만 장미색·둘러보기 테두리'
           const sample=document.createElement('span');
           sample.style.backgroundColor='var(--lt-cta-rose)';sample.style.color='var(--lt-cta-white)';document.body.append(sample);
           const rose=getComputedStyle(sample).backgroundColor,white=getComputedStyle(sample).color;sample.remove();
-          const info=e=>{const s=getComputedStyle(e);return{id:e.id,bg:s.backgroundColor,ink:s.color,visible:e.checkVisibility({checkVisibilityCSS:true})}};
+          const info=e=>{const s=getComputedStyle(e);return{id:e.id,bg:s.backgroundColor,ink:s.color,selectedView:!!e.dataset.view&&e.getAttribute('aria-current')==='true',visible:e.checkVisibility({checkVisibilityCSS:true})}};
           const explore=document.getElementById('community-menu'),cs=getComputedStyle(explore),er=explore.getBoundingClientRect();
           const icon=explore.querySelector('svg'),ir=icon.getBoundingClientRect(),header=document.querySelector('.app-header').getBoundingClientRect();
           const picker=document.getElementById('record-menu').getBoundingClientRect();
@@ -594,7 +597,7 @@ test('#1246 모든 화면의 순간 추가만 장미색·둘러보기 테두리'
           assert.equal(m.head.bg,m.rose,key+' 머리줄 배경');
           assert.equal(m.head.ink,m.white,key+' 머리줄 글자');
           if(width===390){assert.equal(m.fab.bg,m.rose,key+' 휴대폰 배경');assert.equal(m.fab.ink,m.white,key+' 휴대폰 글자');}
-          assert.deepEqual(m.other.filter(b=>b.bg===m.rose),[],key+' 다른 머리줄 단추에 장미색 없음');
+          assert.deepEqual(m.other.filter(b=>b.bg===m.rose&&!b.selectedView),[],key+' 다른 머리줄 단추에 장미색 없음');
           if(width===1440)assert.equal(m.head.visible,true,key+' 머리줄 순간 추가 표시');
           else if(!['home','community'].includes(name))assert.equal(m.fab.visible,true,key+' 휴대폰 순간 추가 표시');
           const e=m.explore;

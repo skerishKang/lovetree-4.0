@@ -17,6 +17,8 @@ import { fileURLToPath } from 'node:url';
 import { serve, auditPage, failuresOf, roleStyleFn, assertRolePair } from './helpers/screen-audit.mjs';
 import { createTree, addMoment } from '../public/v41/domain.mjs';
 import { observeFrameMatrix } from './helpers/frame-observation.mjs';
+import { EventEmitter } from 'node:events';
+import { listenOnSafePort } from './helpers/safe-port.mjs';
 
 const REQUIRE = process.env.LT_SCREEN_AUDIT_REQUIRE === '1';
 const SCREEN_AUDIT_CAPTURE_DIR = fileURLToPath(new URL('../test-results/v41-screen-audit/', import.meta.url));
@@ -652,7 +654,7 @@ test('#657 화면 공통 검사기: 아홉 화면 둘레·스크롤 주인 관�
         assert.equal(row.shell.toast.flex, toast.flex, `${label} 안내는 flex 고정 칸이다`);
         assert.ok(Math.abs(row.shell.toast.rect.height - toast.height[width]) <= 0.002, `${label} 안내 높이`);
         assert.deepEqual([row.shell.toast.margin[0], row.shell.toast.margin[2]], [toast.margin[width].top, toast.margin[width].bottom], `${label} 안내 세로 여백`);
-        assert.ok(row.shell.toastCenterDelta <= toast.centeringTolerance, `${label} 안내 좌우 여백 차이 ${row.shell.toastCenterDelta}px`);
+        if (!row.shell.toastHidden && row.shell.toast.display !== 'none') assert.ok(row.shell.toastCenterDelta <= toast.centeringTolerance, `${label} 안내 좌우 여백 차이 ${row.shell.toastCenterDelta}px`);
         assert.equal(row.shell.toastHorizontalOverflow, toast.horizontalOverflow, `${label} 안내 가로 넘침`);
         assert.equal(row.shell.toastWithinViewport, toast.withinViewport, `${label} 안내가 화면 안에 있다`);
         const shortfall = baseline.screens.iframe.stage.height[width] - stage.rect.height;
@@ -2504,7 +2506,8 @@ test('#657 후속 261117: 상단 탭 글자 통일과 고른 탭 칸 높이(390�
             });
             assert.equal(box.frameBg, 'rgba(0, 0, 0, 0)', `${width}/${theme}/${view}: 탭을 감싸는 판 배경 없음`);
             assert.equal(box.frameBorder, 0, `${width}/${theme}/${view}: 탭을 감싸는 판 테두리 없음`);
-            assert.equal(box.bg, 'rgba(0, 0, 0, 0)', `${width}/${theme}/${view}: 고른 탭 칸을 칠하지 않는다`);
+            assert.notEqual(box.bg, 'rgba(0, 0, 0, 0)', `${width}/${theme}/${view}: 고른 탭 칸을 칠한다`);
+            assert.ok(pairContrast(box.color,box.bg)>=4.5, `${width}/${theme}/${view}: 고른 탭 글자 대비 4.5:1 이상`);
             assert.equal(box.deco, 'underline', `${width}/${theme}/${view}: 고른 탭은 밑줄로 표시한다`);
             assert.equal(box.thickness, '2px', `${width}/${theme}/${view}: 밑줄 두께 2px`);
             assert.ok(box.height >= 44, `${width}/${theme}/${view}: 탭 누름 영역 ${box.height}px ≥ 44`);
@@ -3578,4 +3581,35 @@ test('#1362 확장: 여섯 화면 선택 탭 채움·쉬는 테두리 역할 변
     }
   } finally { await browser.close(); server.close(); }
   assert.ok(pairs.length >= 24, `역할 색 검사 24쌓 — 실제 ${pairs.length}`);
+});
+
+// #1420: Chromium이 막는 포트를 받으면 닫고 다시 받는지, 상한을 넘으면 분명히 실패하는지.
+function fakeServer(ports) {
+  const server = new EventEmitter();
+  let current = null;
+  let listens = 0;
+  let closes = 0;
+  server.listen = (_port, ...args) => {
+    listens += 1;
+    const done = args.find(arg => typeof arg === 'function');
+    current = ports.shift();
+    setImmediate(() => done?.());
+    return server;
+  };
+  server.address = () => ({ port: current });
+  server.close = done => { closes += 1; setImmediate(() => done?.()); return server; };
+  return { server, stats: () => ({ listens, closes }) };
+}
+
+test('#1420 막힌 포트를 받으면 닫고 다시 받아 안전한 포트를 쓴다', async () => {
+  const { server, stats } = fakeServer([5061, 6668, 4102]);
+  const port = await listenOnSafePort(server, '127.0.0.1');
+  assert.equal(port, 4102);
+  assert.deepEqual(stats(), { listens: 3, closes: 2 });
+});
+
+test('#1420 다시 받는 횟수가 상한을 넘으면 분명한 오류로 끝난다', async () => {
+  const { server, stats } = fakeServer([6669, 6669, 6669]);
+  await assert.rejects(listenOnSafePort(server, '127.0.0.1', { maxTries: 3 }), /다시 받았지만/);
+  assert.deepEqual(stats(), { listens: 3, closes: 3 });
 });

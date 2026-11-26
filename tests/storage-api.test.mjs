@@ -1,3 +1,4 @@
+import { listenOnSafePort } from './helpers/safe-port.mjs';
 import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
@@ -288,7 +289,7 @@ test('oversized and malformed requests are refused', async () => {
 test('GET and PUT work over a real socket', async () => {
   const { handle } = buildHandle();
   const server = createServer(createNodeHandler(handle));
-  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  await listenOnSafePort(server, '127.0.0.1');
   try {
     const origin = `http://127.0.0.1:${server.address().port}`;
     const empty = await fetch(`${origin}/api/workspace`);
@@ -331,7 +332,7 @@ test('격리 테스트 DB 가드는 loopback과 테스트 DB 이름을 모두 �
 test('큰 본문은 413으로 응답하고 끊긴 요청은 서버를 쓰러뜨리지 않는다', async () => {
   const { handle } = buildHandle({ maxBodyBytes: 64 });
   const server = createServer(createNodeHandler(handle, { maxBodyBytes: 64 }));
-  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  await listenOnSafePort(server, '127.0.0.1');
   const port = server.address().port;
   try {
     const padded = { ...sampleState(), note: '길게'.repeat(200) };

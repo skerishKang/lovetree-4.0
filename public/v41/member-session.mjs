@@ -1,5 +1,5 @@
 import {createSyncController} from './sync-controller.mjs';
-import {EMPTY_STATE,validateState,createTree,editTree,addMoment,editMoment,reparentMoment,removeMoment,linkMoments,unlinkMoments,cacheMomentMediaMetadata,quickAdd,moveMoment,treeFromMoments,MAX_TREES,newId,updatePrefs} from './domain.mjs';
+import {EMPTY_STATE,validateState,createTree,editTree,addMoment,editMoment,reparentMoment,removeMoment,linkMoments,unlinkMoments,cacheMomentMediaMetadata,quickAdd,moveMoment,treeFromMoments,organizeMoments,undoOrganize,MAX_TREES,newId,updatePrefs} from './domain.mjs';
 // Reuses 4.0 persistence, retries and revision conflicts; demo/file records cannot enter this session.
 function sessionDraftStorage(){try{return globalThis.sessionStorage||null;}catch{return null;}}
 function sessionCacheStorage(){try{return globalThis.localStorage||null;}catch{return null;}}
@@ -73,14 +73,21 @@ export function createMemberSession({api,onState=()=>{},onStatus=()=>{},onGuard=
       return {treeId,momentId};
     }
     // #327(① 데이터 규칙): 빠른 추가·옮기기·새 트리로 정리는 상태 전체를 도메인 함수가 바꾼다.
-   if(action==='quickAdd'||action==='moveMoment'||action==='treeFromMoments'){
+   // #1439: 순간 정리의 옮기기·복사하기 한 번(organizeMoments)과 그 되돌리기(undoOrganize)도 같은 길이다.
+   // 되돌리기에 쓸 기록(record)과 결과 숫자(summary)를 함께 돌려준다.
+   if(action==='quickAdd'||action==='moveMoment'||action==='treeFromMoments'||action==='organizeMoments'||action==='undoOrganize'){
      const result=action==='quickAdd'?quickAdd(document,input)
        :action==='moveMoment'?moveMoment(document,selection.treeId,selection.momentId,input.toTreeId,input.parentId)
+       :action==='organizeMoments'?organizeMoments(document,{mode:input.mode,fromTreeId:selection.treeId,momentIds:input.momentIds,toTreeIds:input.toTreeIds,skip:input.skip})
+       :action==='undoOrganize'?undoOrganize(document,input.record)
        :treeFromMoments(document,selection.treeId,input.momentIds,{subject:input.subject});
      document=validateState(result.state);
      treeId=result.treeId;
      momentId=result.momentId??document.trees.find(t=>t.id===result.treeId)?.moments.find(m=>m.parentId===null)?.id??null;
-     onState(structuredClone(document),{treeId,momentId},metaHint);sync.markLocalSave();return {treeId,momentId};
+     onState(structuredClone(document),{treeId,momentId},metaHint);sync.markLocalSave();
+     if(action==='organizeMoments')return {treeId,momentId,record:result.record,summary:result.summary};
+     if(action==='undoOrganize')return {treeId,momentId,exact:result.exact};
+     return {treeId,momentId};
    }
    if(action==='new'){if(trees.length>=MAX_TREES)throw Error('트리는 50개까지 만들 수 있어요.');tree=createTree(input);trees.push(tree);treeId=tree.id;momentId=tree.moments[0].id;}
    else {if(!tree)throw Error('트리를 선택해 주세요.');let next;

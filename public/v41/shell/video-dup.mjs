@@ -5,8 +5,10 @@
 //
 // 창 규칙(#845 규칙표): 잠깐 판 — 열려 있는 창(순간 추가) 위에 겹쳐 열리고(#845 3단계 STACK_ALLOWED),
 // ×·Esc·뒤로가기로 닫으면 아무것도 담지 않고 창만 닫힌다(적어 둔 값은 순간 추가 창에 그대로 남는다).
-// [그래도 담기]는 원래 하려던 담기를 그대로 하고, [그 순간 보기]는 이미 담은 순간을 편집기로 연다
-// ('지금 다듬기'와 같은 길 — 닫기·이동·초점 규칙을 그대로 쓴다).
+// [그래도 넣기]는 원래 하려던 담기를 그대로 하고, [건너뛰기]는 담지 않고 닫고, [그 순간 보기]는 이미 담은
+// 순간을 편집기로 연다('지금 다듬기'와 같은 길 — 닫기·이동·초점 규칙을 그대로 쓴다).
+// #1439: 순간 정리의 옮기기·복사하기도 이 창으로 묻는다(문구 "이 트리에 같은 영상이 이미 있어요 · 그래도 넣기 / 건너뛰기").
+// 정리에서는 [그 순간 보기]를 숨기고, ×·Esc·뒤로가기로 닫으면 onCancel(이번 작업 그만)을 알린다.
 export function createVideoDup(deps) {
   const $ = deps.$;
   const doc = deps.document || globalThis.document;
@@ -26,6 +28,11 @@ export function createVideoDup(deps) {
     dialog.close();
     action?.onContinue?.();
   };
+  $('video-dup-skip').onclick = () => {
+    const action = finish();
+    dialog.close();
+    action?.onSkip?.();
+  };
   $('video-dup-view').onclick = () => {
     const action = finish();
     const { treeId = '', momentId = '' } = action || {};
@@ -36,16 +43,22 @@ export function createVideoDup(deps) {
     deps.choose?.(treeId, momentId);
     deps.openEditor?.('edit');
   };
-  // ×·Esc·뒤로가기·바깥 누르기로 닫히면 아무것도 하지 않는다 — pending만 버린다.
-  dialog.addEventListener('close', () => { pending = null; });
+  // ×·Esc·뒤로가기·바깥 누르기로 닫히면 아무것도 담지 않는다 — pending을 버리고, 물은 쪽에 그만둠을 알린다.
+  dialog.addEventListener('close', () => { const action = finish(); action?.onCancel?.(); });
 
-  // info: { treeName, dateText, onContinue } — 문구는 이슈 #876 규칙 1의 한 줄이다.
+  // info: { treeName, dateText, onContinue, onSkip?, onCancel?, eyebrow?, noun?, detail?, showView? }
+  // 제목은 #1439 문구 "이 트리에 같은 영상이 이미 있어요"(영상·사진·순간), 아래 줄은 어느 트리·언제 담았는지.
   function open(info = {}) {
+    if (pending) { const previous = finish(); previous?.onCancel?.(); }
     pending = info;
-    const text = $('video-dup-text');
+    const noun = info.noun || '영상';
+    const eyebrow = $('video-dup-eyebrow');
+    if (eyebrow) eyebrow.textContent = info.eyebrow || '순간 추가';
+    $('video-dup-title').textContent = `이 트리에 같은 ${noun}이 이미 있어요`;
     const date = info.dateText ? ` (${info.dateText})` : '';
     const where = info.treeName ? `'${info.treeName}' 트리에 ` : '이 트리에 ';
-    text.textContent = `${where}이미 담은 영상이에요${date}. 다시 담을까요?`;
+    $('video-dup-text').textContent = info.detail || `${where}이미 담은 ${noun}이에요${date}. 그래도 넣을까요?`;
+    $('video-dup-view').hidden = info.showView === false || !info.treeId || !info.momentId;
     dialog.showModal();
     deps.onModalShown?.();
   }

@@ -1,3 +1,4 @@
+import { listenOnSafePort } from './safe-port.mjs';
 // #657 — 화면 공통 검사기의 검사 함수. 화면 시험 파일은 tests/v41-screen-audit.test.mjs 하나다.
 // 네 가지를 한 번에 잰다(기준은 각 이슈에서 정한 값을 그대로 쓴다 — 여기서 기준을 바꾸지 않는다):
 //   ① 보이는 글자·단추끼리 겹침 0 + 다른 요소에 가려진 글자 0(#635 PR B의 scanOverlap 규칙 —
@@ -39,7 +40,7 @@ export function serve(extraRoutes = {}, { port = 0 } = {}) {
     }
     res.writeHead(404); res.end('not found');
   });
-  return new Promise((ok) => server.listen(port, '127.0.0.1', () => ok(server)));
+  return listenOnSafePort(server, '127.0.0.1', { port }).then(() => server);
 }
 
 // 한 문서(프레임) 안의 네 가지 검사. 페이지·프레임마다 이 함수를 evaluate로 돌린다.

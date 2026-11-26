@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import {
   INTAKE_URL_PARAM, INTAKE_TEXT_PARAM, INTAKE_TITLE_PARAM, INTAKE_MAX_URL_LENGTH,
   readIntakeParams, classifyIntake, firstHttpUrl, resolveIntakeCandidate, canonicalUrl, isSameVideoMoment,
-  findSameVideoInTree, treesWithSameVideo, createPendingSlot,
+  findSameVideoInTree, treesWithSameVideo, createPendingSlot, isSameMoment, duplicatesByTree, sameMomentNoun, momentOrigin,
   resolveMediaMetadata, INTAKE_TITLE_WAIT_MS,
 } from '../public/v41/quick-intake.mjs';
 
@@ -204,4 +204,50 @@ test('resolveMediaMetadata: YouTube가 아니면 oEmbed를 부르지 않는다',
   assert.deepEqual(await resolveMediaMetadata('https://example.com/a', { describe: describeYouTube, fetchImpl }), {});
   assert.deepEqual(await resolveMediaMetadata('그냥 글자', { describe: describeYouTube, fetchImpl }), {});
   assert.equal(called, 0);
+});
+
+// #1439: 순간끼리 같은 순간 판정(순간 정리의 '이미 있음'). #876 규칙에 복사 원본(copiedFrom)을 더한다.
+test('#1439 isSameMoment: 같은 영상+같은 시작 초, 같은 사진 파일, 같은 원본이면 같고 시작 초가 다르면 다르다', () => {
+  const yt = (id, extra = {}) => ({ id, url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', ...extra });
+  const photo = 'https://lovetree-4-0.pages.dev/api/media/0f0e0d0c-0b0a-4999-8999-000000000001.png';
+  const rows = [
+    [yt('a', { startSeconds: 30 }), { id: 'b', url: 'https://youtu.be/dQw4w9WgXcQ', startSeconds: 30 }, true, '같은 영상·같은 시작 초(주소 모양 달라도)'],
+    [yt('a', { startSeconds: 30 }), { id: 'b', url: 'https://youtu.be/dQw4w9WgXcQ', startSeconds: 45 }, false, '시작 초가 다르면 다른 순간'],
+    [yt('a'), { id: 'b', url: 'https://youtu.be/dQw4w9WgXcQ?t=30' }, false, '없음과 30초는 다르다'],
+    [yt('a'), yt('b'), true, '둘 다 시작 초 없음'],
+    [{ id: 'p', url: photo }, { id: 'q', url: photo }, true, '같은 사진 파일'],
+    [{ id: 'p', url: photo }, { id: 'q', url: photo.replace('001.png', '002.png') }, false, '다른 사진 파일'],
+    [{ id: 'o', title: '원본' }, { id: 'c', copiedFrom: 'o', title: '고친 사본' }, true, '원본과 사본'],
+    [{ id: 'c1', copiedFrom: 'o', url: photo }, { id: 'c2', copiedFrom: 'o' }, true, '같은 원본의 두 사본'],
+    [{ id: 'x', title: '글만' }, { id: 'y', title: '글만' }, false, '주소 없는 글 순간은 원본으로만'],
+    [null, yt('b'), false, '빈 값'],
+  ];
+  for (const [a, b, want, label] of rows) {
+    assert.equal(isSameMoment(a, b), want, label);
+    assert.equal(isSameMoment(b, a), want, label + '(반대로)');
+  }
+  assert.equal(momentOrigin({ id: 'c', copiedFrom: 'o' }), 'o');
+  assert.equal(momentOrigin({ id: 'o' }), 'o');
+});
+
+test('#1439 duplicatesByTree: 대상 트리마다 이미 있는 고른 순간만 모은다', () => {
+  const trees = [
+    { id: 't2', moments: [{ id: 'x', url: 'https://youtu.be/dQw4w9WgXcQ', startSeconds: 30 }] },
+    { id: 't3', moments: [{ id: 'y', url: 'https://youtu.be/dQw4w9WgXcQ', startSeconds: 90 }] },
+    { id: 't4', moments: [{ id: 'z', copiedFrom: 'm2' }] },
+  ];
+  const picked = [{ id: 'm1', url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', startSeconds: 30 }, { id: 'm2', title: '글' }];
+  assert.deepEqual(duplicatesByTree(trees, picked, ['t2', 't3', 't4', 'nope']), [
+    { treeId: 't2', momentIds: ['m1'] },
+    { treeId: 't4', momentIds: ['m2'] },
+  ], '시작 초가 다른 t3은 없음, 없는 트리는 무시');
+  assert.deepEqual(duplicatesByTree(trees, [], ['t2']), []);
+});
+
+test('#1439 sameMomentNoun: 알림 문구 이름(영상·사진·순간)', () => {
+  assert.equal(sameMomentNoun({ url: 'https://youtu.be/dQw4w9WgXcQ' }), '영상');
+  assert.equal(sameMomentNoun({ url: '/api/media/0f0e0d0c-0b0a-4999-8999-000000000001.mp4' }), '영상');
+  assert.equal(sameMomentNoun({ url: '/api/media/0f0e0d0c-0b0a-4999-8999-000000000001.webp' }), '사진');
+  assert.equal(sameMomentNoun({ url: 'https://example.com/article' }), '순간');
+  assert.equal(sameMomentNoun({}), '순간');
 });

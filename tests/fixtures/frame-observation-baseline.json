@@ -1,5 +1,5 @@
 {
-  "basis": "77072bf2a7c2d5f6bd89dbfa3a1dcb37f85185b8",
+  "basis": "0eec067e5de3e5f23d5767c8df0b364e01fae0a2",
   "viewports": {
     "390": { "width": 390, "height": 844 },
     "1440": { "width": 1440, "height": 900 }
@@ -309,7 +309,7 @@
           "390": ["6px", "6px", "8px", "6px"],
           "1440": ["10px", "14px", "14px", "14px"]
         },
-        "height": { "390": 750.813, "1440": 736 },
+        "height": { "390": 764, "1440": 812 },
         "borderWidth": ["0px", "0px", "0px", "0px"],
         "borderStyle": ["none", "none", "none", "none"],
         "borderColor": {
@@ -363,7 +363,7 @@
         "visitorIntro": true,
         "position": "relative",
         "flex": "0 0 auto",
-        "height": { "390": 32.188, "1440": 41 },
+        "height": { "390": 0, "1440": 0 },
         "margin": {
           "390": { "top": "2px", "bottom": "2px" },
           "1440": { "top": "4px", "bottom": "54px" }
@@ -372,7 +372,7 @@
         "horizontalOverflow": 0,
         "withinViewport": true
       },
-      "stageShortfall": { "390": 36.187, "1440": 99 }
+      "stageShortfall": { "390": 23, "1440": 23 }
     }
   }
 }

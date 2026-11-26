@@ -1,3 +1,4 @@
+import { listenOnSafePort } from './helpers/safe-port.mjs';
 // #625: 390 에서 새 소식 알림 카드가 책 화면 '순간 목차' 단추를 가리지 않는다.
 // 카드는 첫 화면(빈 주소·#home) 전용이다 — 안쪽 화면(책·보드·지도·내 트리)은 상단 도구 줄과
 // 아래 컨트롤이 화면을 채워 어떤 고정 위치도 단추를 가린다(390 실측: 카드 76~132 vs 책 단추 64~110).
@@ -65,7 +66,7 @@ function serve() {
     }
     res.writeHead(404); res.end('not found');
   });
-  return new Promise((ok) => server.listen(0, '127.0.0.1', () => ok(server)));
+  return listenOnSafePort(server, '127.0.0.1').then(() => server);
 }
 
 let server, base;

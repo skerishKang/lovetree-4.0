@@ -1,3 +1,4 @@
+import { listenOnSafePort } from './helpers/safe-port.mjs';
 // #518: 지도 상세의 '책에서 보기'(#openMoment)가 지도에서 고른 그 순간의 책으로 가는지,
 // 그리고 안내 문구 자리에 영어 프로토타입 스텁('Prototype: …')이 돌아오지 않는지 시험한다.
 // 셸(shell.mjs)이 문서 캡처 단계에서 #openMoment 클릭을 잡아 track59 책으로 옮긴다 —
@@ -31,7 +32,7 @@ async function serve() {
     }
     res.writeHead(404); res.end('not found');
   });
-  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  await listenOnSafePort(server, '127.0.0.1');
   return server;
 }
 
