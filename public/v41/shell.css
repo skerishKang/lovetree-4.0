@@ -782,8 +782,9 @@ html[data-lt-shell-entry] body:not(.share-visitor) .home-links,
 body.share-visitor[data-fab-lift=tree] .home-links{display:none}
 @media(max-width:520px){body.share-visitor:is([data-fab-lift=book],[data-fab-lift=network]) .home-links{display:none}}
 /* #1488 1번: 공개 감상에서 바닥 링크가 보이는 화면은 화면 틀(iframe) 아래 끝을 링크 줄(44px) 위에 두어 내용과 겹치지 않게 한다. */
-@media(min-width:521px){body.share-visitor:not(.home-screen):is([data-fab-lift=board],[data-fab-lift=book],[data-fab-lift=network]) #stage>iframe{bottom:calc(max(10px,env(safe-area-inset-bottom)) + 44px);height:auto}}
-@media(max-width:520px){body.share-visitor:not(.home-screen)[data-fab-lift=board] #stage>iframe{bottom:calc(max(10px,env(safe-area-inset-bottom)) + 44px);height:auto}}
+/* iframe는 위·아래를 정해도 저절로 늘어나지 않으므로(기본 150px) 높이를 직접 준다. */
+@media(min-width:521px){body.share-visitor:not(.home-screen):is([data-fab-lift=board],[data-fab-lift=book],[data-fab-lift=network]) #stage>iframe{bottom:auto;height:calc(100% - max(10px,env(safe-area-inset-bottom)) - 44px)}}
+@media(max-width:520px){body.share-visitor:not(.home-screen)[data-fab-lift=board] #stage>iframe{bottom:auto;height:calc(100% - max(10px,env(safe-area-inset-bottom)) - 44px)}}
 /* 이슈 611: 계정 단추 점 — 새 소식이나 새 답글이 있을 때. */
 .account-avatar{position:relative}
 .account-avatar.has-dot::after{content:'';position:absolute;top:2px;right:2px;width:9px;height:9px;border-radius:50%;background:var(--lt-rose);border:1px solid var(--lt-stage)}

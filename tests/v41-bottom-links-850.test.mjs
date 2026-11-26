@@ -173,6 +173,7 @@ test('#1488 바닥 링크: 안쪽 다섯 화면에서 빠지고 계정 메뉴·�
         assert.deepEqual(first, [], `공개 감상 ${screen} ${width}: 바닥 링크와 화면 내용 겹침 0`);
         assert.deepEqual(bottom, [], `공개 감상 ${screen} ${width}: 맨 아래까지 굴려도 겹침 0`);
         assert.ok(frame.b <= links.y + 0.5, `공개 감상 ${screen} ${width}: 화면 틀(아래 ${frame.b})이 링크 줄(위 ${links.y}) 위에서 끝난다`);
+        assert.ok(frame.b >= links.y - 2, `공개 감상 ${screen} ${width}: 화면 틀이 링크 줄 바로 위까지 내려온다(아래 ${frame.b}, 링크 위 ${links.y}) — 화면이 줄어 빈 자리가 생기지 않는다`);
         assert.ok(links.h >= 44, '링크 줄 높이 44px 이상(' + links.h + ')');
       } finally { await ctx.close(); }
     }
