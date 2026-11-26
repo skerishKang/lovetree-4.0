@@ -103,6 +103,46 @@ export function findSameVideoInTree(tree, url) {
   return tree.moments.find(moment => isSameVideoMoment(moment, url)) || null;
 }
 
+// #1439: 같은 순간 판정(순간 정리의 '이미 있음'·쉬운 추가 한 벌). 위 #876 규칙(같은 영상 id + 같은 구간,
+// 영상이 아니면 같은 주소 — 올린 사진은 파일 주소가 같으면 같은 사진)을 순간끼리 비교하도록 넓히고,
+// 복사 원본(copiedFrom)이 같으면 내용을 고쳤어도 같은 순간으로 본다. 시작 초가 다르면 다른 순간이다.
+export function momentOrigin(moment) {
+  return String(moment?.copiedFrom || moment?.id || '');
+}
+export function isSameMoment(a, b) {
+  if (!a || !b) return false;
+  const originA = momentOrigin(a);
+  if (originA && originA === momentOrigin(b)) return true;
+  if (!a.url || !b.url) return false;
+  const keyA = videoKey(a.url);
+  const keyB = videoKey(b.url);
+  if (keyA && keyB) return keyA === keyB && rangeKeyOf(a.url, a) === rangeKeyOf(b.url, b);
+  return canonicalUrl(a.url) === canonicalUrl(b.url);
+}
+
+// 고른 순간들이 대상 트리마다 이미 있는지: [{ treeId, momentIds: [이미 있는 고른 순간 id…] }] (없는 트리는 뺀다).
+export function duplicatesByTree(trees, moments, targetIds) {
+  const list = Array.isArray(trees) ? trees : [];
+  const picked = Array.isArray(moments) ? moments.filter(Boolean) : [];
+  const out = [];
+  for (const treeId of Array.isArray(targetIds) ? targetIds : []) {
+    const tree = list.find(t => t && t.id === treeId);
+    if (!tree || !Array.isArray(tree.moments)) continue;
+    const momentIds = picked.filter(moment => tree.moments.some(existing => isSameMoment(existing, moment))).map(moment => moment.id);
+    if (momentIds.length) out.push({ treeId, momentIds });
+  }
+  return out;
+}
+
+// 알림 문구의 이름: 영상·사진·순간. 판정은 위 규칙과 같은 주소 모양만 본다.
+export function sameMomentNoun(moment) {
+  const url = String(moment?.url || '');
+  if (!url) return '순간';
+  if (videoKey(url) || /vimeo\.com\//i.test(url) || /\.(?:mp4|webm)(?:[?#]|$)/i.test(url)) return '영상';
+  if (/\.(?:png|jpe?g|gif|webp)(?:[?#]|$)/i.test(url)) return '사진';
+  return '순간';
+}
+
 // 규칙 3: 다른 트리에 같은 영상이 있는 트리들 — 막지 않고 담은 뒤 한 줄 알린다. 구간은 보지 않는다.
 export function treesWithSameVideo(trees, { excludeTreeId = '', url = '' } = {}) {
   const target = String(url || '');
