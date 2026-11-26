@@ -17,6 +17,7 @@ import { createTree } from '../public/v41/domain.mjs';
 import { stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { dismissDiscoverAskIfOpen } from './helpers/discover-ask.mjs';
 
 globalThis.window = globalThis;
 import '../public/v41/html-escape.mjs'; // A-15: 글자 막기 정본을 먼저 등록한다.
@@ -539,7 +540,7 @@ test('#1298 보드 영상 크게 보기 뒤로 가기: 창 닫힘·iframe 0·스
         const page = await context.newPage();
         await page.goto(base + '/v41/?account=1#home', { waitUntil: 'domcontentloaded' });
         await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 30000 });
-        await page.locator('#discover-ask-no').click().catch(() => {});
+        await dismissDiscoverAskIfOpen(page);
         await page.evaluate(() => document.querySelector('[data-view="track58-pinboard.html"]').click());
         await page.waitForFunction(() => { const f = document.querySelector('#view:not([hidden])'); try { return !!f && /track58-pinboard/.test(f.contentWindow.location.href); } catch { return false; } }, null, { timeout: 20000 });
         const frame = await (await page.$('#view:not([hidden])')).contentFrame();

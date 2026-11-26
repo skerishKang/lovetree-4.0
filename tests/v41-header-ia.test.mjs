@@ -12,6 +12,7 @@ import {hasPendingDraft} from '../public/v41/sync-controller.mjs';
 import {applyHomeCenter} from '../v41/home-center.js';
 import {homePresentation} from '../v41/home-presentation.js';
 import {createHomeActions} from '../v41/home-actions.js';
+import { dismissDiscoverAskIfOpen } from './helpers/discover-ask.mjs';
 
 const readSource = path => readFileSync(new URL('../' + path, import.meta.url), 'utf8');
 
@@ -912,7 +913,7 @@ test('저장 실패 안내: 400·413은 서버 문구와 백업, 연결 끊김�
         const page = await context.newPage();
         await page.goto(`${origin}/v41/?account=1#home`, { waitUntil: 'load' });
         await waitSynced644(page);
-        await page.locator('#discover-ask-no').click().catch(() => {});
+        await dismissDiscoverAskIfOpen(page);
         ctrl.putMode = mode;
         await quickAdd644(page, `https://example.com/1056-${mode}.jpg`);
         await wait644(800);
@@ -937,7 +938,7 @@ test('저장 실패 안내: 400·413은 서버 문구와 백업, 연결 끊김�
       const page = await context.newPage();
       await page.goto(`${origin}/v41/?account=1#home`, { waitUntil: 'load' });
       await waitSynced644(page);
-      await page.locator('#discover-ask-no').click().catch(() => {});
+      await dismissDiscoverAskIfOpen(page);
       ctrl.failPut = true;
       await quickAdd644(page, 'https://example.com/1056-offline.jpg');
       await page.waitForFunction(() => !document.getElementById('save-feedback')?.hidden, null, { timeout: 20000 });

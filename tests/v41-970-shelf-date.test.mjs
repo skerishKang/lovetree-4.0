@@ -13,6 +13,7 @@ import { SHELF_VIEW_NAMES } from '../public/v41/views/shelf/shelf-views.mjs';
 import { createTree, addMoment } from '../public/v41/domain.mjs';
 import { localDateOnly, localDaysBetween, relativeDayLabel } from '../public/v41/local-date.mjs';
 import { formatDisplayDate } from '../public/v41/book-usability.mjs';
+import { dismissDiscoverAskIfOpen } from './helpers/discover-ask.mjs';
 
 const REQUIRE = process.env.LT_970_REQUIRE === '1';
 let chromium, skip = false;
@@ -60,7 +61,7 @@ async function withShelfSession(fn) {
       await page.waitForFunction(() => document.getElementById('stage-loading')?.hidden === true, null, { timeout: 20000 });
       // #1413: 둘러보기 소개 질문 창은 순간 2→3개 저장 직후에만 뜬다. 떠 있을 때만 '아니요'를 누른다(보이지 않는
       // 단추를 누르려고 Playwright 기본 제한 30초를 기다리던 헛대기를 없앤다 — isVisible은 기다리지 않는다).
-      if (await page.locator('#discover-ask-no').isVisible().catch(() => false)) await page.locator('#discover-ask-no').click().catch(() => {});
+      await dismissDiscoverAskIfOpen(page);
       // 서재 탭을 누른 뒤, 보이는 서재 프레임(iframe#view)이 책을 그릴 때까지 기다린다. 주소로 서재를 먼저 열고
       // 탭을 또 누르면 서재가 두 번 불려, 곧 비워질 이전 프레임을 붙잡는다(셸은 새 화면을 숨은 프레임에 불러 맞바꾼다).
       await page.locator('[data-view="track32-bookshelf.html"]').first().evaluate(button => button.click());
@@ -120,7 +121,7 @@ async function withShelf(trees, { width, height, view }, fn) {
     await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
     // #1413: 둘러보기 소개 질문 창은 순간 2→3개 저장 직후에만 뜬다. 떠 있을 때만 '아니요'를 누른다(보이지 않는
     // 단추를 누르려고 Playwright 기본 제한 30초를 기다리던 헛대기를 없앤다 — isVisible은 기다리지 않는다).
-    if (await page.locator('#discover-ask-no').isVisible().catch(() => false)) await page.locator('#discover-ask-no').click().catch(() => {});
+    await dismissDiscoverAskIfOpen(page);
     // 서재는 트리 ▾의 '서재 전체 보기'로 연다(실제 입구).
     // #1367: the shelf tab itself is the entry; the header tree menu no longer exists.
     await page.locator('[data-view="track32-bookshelf.html"]').first().evaluate(button => button.click());
@@ -384,7 +385,7 @@ test('서재 — 설정에서 고른 기본 보기가 저장되고 다시 열려
       await saved;
       await page.reload({ waitUntil: 'load' });
       await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
-      await page.locator('#discover-ask-no').click().catch(() => {});
+      await dismissDiscoverAskIfOpen(page);
       await page.locator('#account-avatar').click();
       await page.locator('#account-open-settings').click();
       await page.waitForSelector('#account-settings[open]');

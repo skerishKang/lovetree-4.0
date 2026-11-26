@@ -15,6 +15,7 @@ import { createReadStream, existsSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { dismissDiscoverAskIfOpen } from './helpers/discover-ask.mjs';
 
 const REQUIRE = process.env.LT_TREE_RENAME_571_REQUIRE === '1';
 let chromium = null;
@@ -533,7 +534,7 @@ test('970/1001b-2 실행: 표지 사진 올리기 — 저장 뒤 재적재 1회(
     page.on('framenavigated', f => { if (counting && /\/v41\/(views\/|home\.html)/.test(f.url())) navs.push({ url: f.url(), at: Date.now() }); });
     await page.goto(`${base}/v41/?account=1`, { waitUntil: 'load' });
     await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
-    await page.locator('#discover-ask-no').click().catch(() => {});
+    await dismissDiscoverAskIfOpen(page);
     await page.locator('.tree-views [data-view="track59-sketchbook.html"]').click();
     await page.waitForFunction(() => document.querySelector('[data-popover-target="quick-add"]') === null, null, { timeout: 10000 }).catch(() => {});
     await page.waitForTimeout(900);
