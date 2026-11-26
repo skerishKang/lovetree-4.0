@@ -54,6 +54,7 @@ export function createQuickAdd(deps) {
     deps.resetEditorBaseline?.();
     const parent = validTargetParent(target);
     if (parent) {
+      deps.prepareAddParent?.(parent.id);
       // open()은 설정된 '먼저 보일 탭'으로 열고 그 탭을 돌려준다.
       const opened = deps.writePanel.open();
       if (opened === 'detailed') { quickTarget = null; deps.openEditor?.('add', parent.id); return; }

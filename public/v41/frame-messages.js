@@ -26,6 +26,7 @@
     cleanup: fromView('lt41-cleanup', '없음'),
     community: fromView('lt41-community', 'tab? (trees|moments)'),
     dateStyle: fromShell('lt41-date-style', 'value'),
+    deleteMoment: fromView('lt41-delete-moment', 'treeId?, momentId'),
     example: fromView('lt41-example', 'view, momentId'),
     homeCards: fromShell('lt41-home-cards', 'mode'),
     homeMoment: fromView('lt41-home-moment', 'value'),

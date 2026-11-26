@@ -9,7 +9,7 @@ import { createMemberSession } from '../public/v41/member-session.mjs';
 import { addMoment, createTree, linkMoments, validateState } from '../src/domain.js';
 import { ApiError } from '../server/errors.js';
 import { createApiHandler, createNodeHandler } from '../server/http.js';
-import { createWorkspaceService } from '../server/workspace-service.js';
+import { createWorkspaceService, readStoredDocument } from '../server/workspace-service.js';
 import { createMemoryWorkspaceRepo } from '../server/testing/memory-workspace-repo.js';
 import { assertIsolatedTestDatabase } from '../server/testing/isolated-test-database.js';
 
@@ -424,6 +424,29 @@ test('a stored tree with broken timestamps and names is repaired on read, not qu
   assert.equal(got.body.quarantined, undefined, '고쳐 읽은 트리는 빠진 트리가 아니다');
   assert.equal(got.body.state.trees[0].updatedAt, tree.createdAt);
   assert.equal(got.body.state.trees[0].subject, '윤슬, 나의 순간들', '빈 대상 이름은 제목으로 채운다');
+});
+
+test('#1434 stored empty trees and broken parent references are repaired on read without rewriting storage', () => {
+  const root = createTree({ ...base, title: '정상 트리' }, CLOCK);
+  const grown = addMoment(root, { ...base, title: '끊어진 순간', relation: '남은 이유' }, root.moments[0].id, CLOCK);
+  const broken = structuredClone(grown);
+  broken.id = 't-broken';
+  broken.moments[1].parentId = 'missing-parent';
+  broken.moments.push({ ...broken.moments[1], id: 'valid-child', parentId: broken.moments[0].id, relation: '남길 이유' });
+  const empty = { ...structuredClone(root), id: 't-empty', title: '빈 트리', moments: [] };
+  const malformed = { ...structuredClone(root), id: 't-malformed', moments: [structuredClone(root.moments[0]), { ...structuredClone(root.moments[0]), id: 'bad-parent', parentId: 42 }] };
+  const doc = { version: 1, prefs: {}, trees: [empty, broken, malformed, root] };
+  const original = structuredClone(doc);
+  const read = readStoredDocument(doc, CLOCK);
+  assert.deepEqual(read.quarantined.map(tree => tree.id), ['t-malformed'], '형식이 잘못된 parentId만 격리한다');
+  assert.deepEqual(read.state.trees.map(tree => tree.id), ['t-empty', 't-broken', root.id]);
+  assert.deepEqual(read.state.trees[0].moments, []);
+  assert.equal(read.state.trees[1].moments[1].parentId, root.moments[0].id);
+  assert.equal(read.state.trees[1].moments[1].relation, '');
+  assert.equal(read.state.trees[1].moments.find(moment => moment.id === 'valid-child').parentId, root.moments[0].id, '정상 부모 참조는 그대로 읽는다');
+  assert.equal(read.state.trees[1].moments.find(moment => moment.id === 'valid-child').relation, '남길 이유');
+  assert.equal(read.state.trees[2].moments[0].parentId, null, '정상 부모는 추측해 바꾸지 않는다');
+  assert.deepEqual(doc, original, '저장 문서 원본은 읽기 보정으로 바뀌지 않는다');
 });
 
 test('onCommit receives the validated state only — quarantined originals stay out', async () => {

@@ -70,7 +70,7 @@ export function createPanels(deps) {
   }
   // #1097: 머리 한 줄 — 트리 이름 · 담은 날(순간의 날짜). add 모드는 기존 문구를 그대로 둔다.
   function editorContextLine(mode, m) {
-    if (mode !== 'edit') return `새 순간 추가 · ${m.title}에서 이어집니다.`;
+    if (mode !== 'edit') return m ? `새 순간 추가 · ${m.title}에서 이어집니다.` : '';
     const treeTitle = displayTreeTitle(String(window.LT41?.tree?.title || window.LT41?.tree?.subject || '') || '트리');
     let dateText = '';
     try { dateText = formatDisplayDate(m.date, getMember()?.state?.()?.prefs?.dateStyle) || ''; } catch { dateText = ''; }
@@ -157,6 +157,7 @@ export function createPanels(deps) {
   function startQuickSession() {
     // #462: ＋ 순간 추가는 늘 새 순간이다. 직전에 '이 순간 수정'으로 연 상태(제목 '순간 수정'·그 순간의 값·
     // 수정 전용 묶음)가 남아, 자세한 추가에서 저장하면 그 순간을 고쳐 버리던 것을 여기서 비운다.
+    parentChoice = '';
     if (editorMode === 'edit') resetToAdd();
     formBaseline = '';
     parentBaseline = parentValue();
@@ -235,6 +236,10 @@ export function createPanels(deps) {
     if (parentChoice && c?.tree?.moments.some(moment => moment.id === parentChoice)) return parentChoice;
     return (c?.tree && latestMomentId(c.tree)) || c?.momentId || '';
   }
+  function prepareAddParent(parentId = '') {
+    const c = window.LT41;
+    parentChoice = parentId && c?.tree?.moments.some(moment => moment.id === parentId) ? parentId : '';
+  }
   function setEditorMode(mode, parentId = '') {
     const uploads = getUploads();
     if (uploads.busy) {
@@ -244,11 +249,11 @@ export function createPanels(deps) {
     if (formDirty() && !confirm('현재 입력을 비우고 작업을 바꿀까요?')) return;
     uploads.reset();
     const c = window.LT41;
-    parentChoice = mode === 'add' && parentId && c?.tree.moments.some(moment => moment.id === parentId) ? parentId : '';
+    prepareAddParent(mode === 'add' ? parentId : '');
     const m = mode === 'add'
       ? c?.tree.moments.find(moment => moment.id === addParentMomentId())
       : c?.tree.moments.find(moment => moment.id === c.momentId);
-    if (!m) {
+    if (!m && !(mode === 'add' && c?.tree?.moments.length === 0)) {
       notify('먼저 순간을 선택해 주세요.');
       return;
     }
@@ -784,12 +789,33 @@ export function createPanels(deps) {
       renderContinueSummary();
     }
   };
-  $('delete-moment').onclick = () => {
+  function deleteMoment({ treeId = '', momentId = '' } = {}) {
+    const tree = getMember()?.state?.().trees.find(item => item.id === treeId);
+    if (!tree?.moments.some(moment => moment.id === momentId)) {
+      notify('이 순간을 찾을 수 없어요.');
+      return;
+    }
     if (!confirm('이 순간을 삭제할까요? 자식 순간은 이전 순간으로 이어지고 관련 연결은 해제됩니다.')) return;
+    const before = structuredClone(tree);
     try {
-      getMember().apply('delete', {}, selection());
+      getMember().apply('delete', {}, { treeId: tree.id, momentId });
+      const after = getMember().state().trees.find(item => item.id === tree.id);
       $('write-panel').close();
-    } catch (e) { $('form-error').textContent = e.message; }
+      notify('지웠어요.', {
+        hold: true,
+        action: {
+          label: '되돌리기',
+          run: () => {
+            try {
+              getMember().apply('undoDelete', { treeId: tree.id, momentId, record: { treeId: tree.id, before, after } }, { treeId: tree.id, momentId }, { moment: true });
+            } catch (error) { notify(error.message, { hold: true }); }
+          }
+        }
+      });
+    } catch (error) { notify(error.message); }
+  }
+  $('delete-moment').onclick = () => {
+    deleteMoment(selection());
   };
 
   // 업로드 모듈이 파일을 바꾼 뒤 미리보기·자동 제목 안내를 다시 그린다.
@@ -809,6 +835,7 @@ export function createPanels(deps) {
   return {
     setEditorMode,
     openEditor,
+    deleteMoment,
     focusTitleInput,
     openTreeManager,
     updateTreeCoverHint,
@@ -817,6 +844,7 @@ export function createPanels(deps) {
     formDirty,
     detailedDirty,
     startQuickSession,
+    prepareAddParent,
     onWriteTab,
     treeDirty,
     editorMode: () => editorMode

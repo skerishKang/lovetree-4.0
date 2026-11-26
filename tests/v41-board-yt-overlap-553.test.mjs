@@ -12,7 +12,6 @@ import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { createReadStream, readFileSync, mkdirSync } from 'node:fs';
 import { inspectYoutubeIframe, countYoutubeAutoplay } from './helpers/youtube-embed-audit.mjs';
-import { testBackNavigation } from './helpers/history-assert.mjs';
 import { createTree } from '../public/v41/domain.mjs';
 import { stat } from 'node:fs/promises';
 import path from 'node:path';
@@ -25,6 +24,7 @@ await import('../public/v41/views/board/board-model.js');
 const LT58Model = globalThis.LT58Model;
 
 const REQUIRE = process.env.LT_BOARD_YT_REQUIRE === '1';
+const TEST_PORT = Number(process.env.LT_BOARD_YT_PORT || 0);
 const ROOT = path.resolve(process.env.LT_BOARD_YT_ROOT || fileURLToPath(new URL('../public', import.meta.url)));
 let chromium, skip = false;
 try {
@@ -72,7 +72,7 @@ function serve(extra = {}) {
     }
     res.writeHead(404); res.end('not found');
   });
-  return listenOnSafePort(server, '127.0.0.1').then(() => server);
+  return listenOnSafePort(server, '127.0.0.1', { port: TEST_PORT }).then(() => server);
 }
 
 // 내 기록(썸네일이 자동으로 실리는) 보드 호스트: 셸처럼 data-member="in"을 본문에 남긴다.
@@ -133,7 +133,7 @@ const geometry = (frame) => frame.evaluate(() => {
     list.sort((a, b) => a.y - b.y);
     for (let i = 1; i < list.length; i++) minColumnGap = Math.min(minColumnGap, list[i].y - list[i - 1].y);
   }
-  return { pairs, area: Math.round(area), minColumnGap: Math.round(minColumnGap), zoom: document.getElementById('zoomLabel').textContent, ys: [...new Set(cards.map((c) => c.y))].sort((a, b) => a - b), maxH: Math.max(...cards.map((c) => c.h)), thumbs: [...document.querySelectorAll('#cardLayer .lt-yt-preview img,#cardLayer .ytThumbWrap img[data-stage]')].filter((i) => i.complete && i.naturalWidth > 0).length };
+  return { pairs, area: Math.round(area), cols: new Set(cards.map(card => card.x)).size, minColumnGap: Math.round(minColumnGap), zoom: document.getElementById('zoomLabel').textContent, ys: [...new Set(cards.map((c) => c.y))].sort((a, b) => a - b), maxH: Math.max(...cards.map((c) => c.h)), thumbs: [...document.querySelectorAll('#cardLayer .lt-yt-preview img,#cardLayer .ytThumbWrap img[data-stage]')].filter((i) => i.complete && i.naturalWidth > 0).length };
 });
 
 test('#553 모델 → #582 바둑판: 줄 간격이 카드 종류별 최대 높이를 따른다 — YouTube 카드 줄은 위아래 간격이 예약 높이 이상', () => {
@@ -206,6 +206,63 @@ test('#553 화면: 썸네일이 실린 모아둔 순간 26 — 인접 겹침 0�
       await context.close();
     }
   } finally { await browser.close(); server.close(); }
+});
+
+test('#1434 화면: 390 보드는 첫 카드와 두 열 카드로 세 장 이상을 보여 주고 기존 간격을 지킨다', { skip: REQUIRE ? false : skip, timeout: 180000 }, async () => {
+  if (skip) assert.fail(skip);
+  const tree = starTree(6);
+  tree.moments.forEach((moment, index) => { moment.date = `2026-01-0${index + 1}`; });
+  const server = await serve({ '/__host-1434.html': hostHTML(tree) });
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const { context, page, frame } = await openHost(browser, `${base}/__host-1434.html`, { width: 390, height: 844 });
+    const g = await geometry(frame);
+    const visible = await frame.evaluate(() => {
+      const viewport = document.getElementById('viewport').getBoundingClientRect();
+      return [...document.querySelectorAll('#cardLayer .card')].filter(card => {
+        const r = card.getBoundingClientRect();
+        const w = Math.max(0, Math.min(r.right, viewport.right) - Math.max(r.left, viewport.left));
+        const h = Math.max(0, Math.min(r.bottom, viewport.bottom) - Math.max(r.top, viewport.top));
+        return w * h >= r.width * r.height * 0.5;
+      }).length;
+    });
+    const widest = await frame.evaluate(() => {
+      const viewport = document.getElementById('viewport').getBoundingClientRect();
+      return Math.max(...[...document.querySelectorAll('#cardLayer .card')].map(card => {
+        const r = card.getBoundingClientRect();
+        return Math.min(r.right, viewport.right) - Math.max(r.left, viewport.left);
+      }));
+    });
+    const rootWidth = await frame.$eval('.card[data-id="s0"]', card => card.getBoundingClientRect().width);
+    assert.equal(Math.round(rootWidth), 160, '최신 순간이 아닌 시작 카드는 일반 폭을 유지한다');
+    assert.ok(g.cols >= 2, `390 보드는 두 열 이상이다(${g.cols}열)`);
+    assert.ok(visible >= 3, `390 보드에서 절반 이상 보이는 카드가 ${visible}장이다`);
+    assert.ok(widest >= 200, `보이는 카드의 가장 넓은 폭은 ${widest}px로 기존 200px 기준을 지킨다`);
+    assert.equal(g.pairs, 0, '좁은 보드 카드 겹침 0');
+    assert.ok(g.minColumnGap >= YT_RESERVED_H, `같은 열 위아래 간격 ${g.minColumnGap}px ≥ ${YT_RESERVED_H}px`);
+    assert.ok(g.maxH >= 260 && g.maxH <= 460, `카드 높이 ${g.maxH}px는 기존 상한을 지킨다`);
+    const featuredId = await frame.locator('.card.isFeatured').getAttribute('data-id');
+    const featured = frame.locator(`.card[data-id="${featuredId}"]`);
+    const featuredBox = await featured.boundingBox();
+    await page.mouse.move(featuredBox.x + featuredBox.width / 2, featuredBox.y + featuredBox.height - 24);
+    await page.mouse.down();
+    await page.mouse.move(featuredBox.x + featuredBox.width / 2 + 120, featuredBox.y + featuredBox.height - 24, { steps: 8 });
+    await page.mouse.up();
+    await page.waitForTimeout(500);
+    const draggedRight = await featured.evaluate(card => card.getBoundingClientRect().right);
+    assert.ok(draggedRight <= 391, `넓은 카드를 오른쪽으로 끌어도 화면 밖으로 나가지 않는다(${draggedRight}px)`);
+    await frame.evaluate(() => {
+      momentOrder = ['s0', 's1', 's2', 's3', 's4', 's5'];
+      setBoardMode('mine');
+    });
+    await page.waitForTimeout(500);
+    const mine = await geometry(frame);
+    assert.equal(mine.pairs, 0, '저장 순서와 날짜순서가 달라도 카드가 겹치지 않는다');
+    assert.equal(await frame.locator('.card.isFeatured').getAttribute('data-id'), 's0', 'featured 카드는 현재 배치의 첫 순간과 일치한다');
+    assert.equal(Math.round(await frame.$eval('.card[data-id="s0"]', card => card.getBoundingClientRect().width)), 264, 'featured로 바뀐 시작 카드는 넓은 카드가 된다');
+    await context.close();
+  } finally { await browser.close(); await new Promise(resolve => server.close(resolve)); }
 });
 
 test('#553 화면: 예시 40순간(사슬) 처음 보기는 그대로다 — 0.8배·카드 줄 위치·겹침 0', { skip: REQUIRE ? false : skip, timeout: 180000 }, async () => {
@@ -342,30 +399,23 @@ test('970 실행: 썸네일 — 영상·사진이 화면 안에 보인다(가짜
       assert.equal(p1Load.inScreen, true, `${w}: 불러온 사진이 화면 안에 있다`);
       assert.equal(p1Load.status, false, `${w}: 카드는 상태 글자 없이 그림만 실린다(compact 유지)`);
       assert.deepEqual(problems.slice(beforeLoadErrors), [], `${w}: 사진 불러오기에서 새 콘솔 오류 0 (${problems.join(' | ') || '없음'})`);
-      // 상세 창의 같은 단추는 비-compact 마크업 — 상태 글자와 함께 계속 동작한다.
+      // 공용 크게 보기는 사진을 바로 불러온다.
       await frame.evaluate(() => window.openViewer('p1'));
-      await frame.waitForSelector('#viewerModal.open', { timeout: 5000 });
-      const detailBefore = await frame.evaluate(() => {
-        const root = document.querySelector('#viewerMedia .lt-media');
-        return { button: !!root?.querySelector('[data-lt-load]'), status: root?.querySelector('.lt-media-status')?.textContent || '' };
-      });
-      assert.equal(detailBefore.button, true, `${w}: 상세 창에 사진 불러오기 단추가 있다`);
-      assert.ok(detailBefore.status.length > 0, `${w}: 상세 창에는 기존 상태 글이 있다`);
+      await frame.waitForSelector('.lt-lightbox', { timeout: 5000 });
       const beforeDetailErrors = problems.length;
-      await frame.locator('#viewerMedia [data-lt-load]').click();
-      await frame.waitForFunction(() => document.querySelector('#viewerMedia .lt-media-status')?.textContent === '사진을 불러왔어요.', null, { timeout: 20000 });
+      await frame.waitForSelector('.lt-lightbox img.lt-lightbox-photo', { timeout: 20000 });
       await frame.waitForFunction(() => {
-        const img = document.querySelector('#viewerMedia .lt-media-body img');
+        const img = document.querySelector('.lt-lightbox img.lt-lightbox-photo');
         return !!img && img.complete && img.naturalWidth > 0;
       }, null, { timeout: 20000 });
       const detailAfter = await frame.evaluate(() => ({
-        nw: document.querySelector('#viewerMedia .lt-media-body img')?.naturalWidth || 0,
-        status: document.querySelector('#viewerMedia .lt-media-status')?.textContent || '',
+        nw: document.querySelector('.lt-lightbox img.lt-lightbox-photo')?.naturalWidth || 0,
+        status: document.querySelector('.lt-lightbox .lt-media-status')?.textContent || '',
       }));
-      assert.ok(detailAfter.nw > 0, `${w}: 상세 창에서도 사진이 실린다`);
-      assert.equal(detailAfter.status, '사진을 불러왔어요.', `${w}: 상세 창은 기존 상태 글자를 유지한다`);
-      assert.deepEqual(problems.slice(beforeDetailErrors), [], `${w}: 상세 창 불러오기에서도 새 콘솔 오류 0`);
-      await frame.evaluate(() => document.getElementById('viewerModal').classList.remove('open'));
+      assert.ok(detailAfter.nw > 0, `${w}: 공용 크게 보기에서도 사진이 실린다`);
+      assert.equal(detailAfter.status, '', `${w}: 큰 사진에는 불러오기 상태 글자를 덧붙이지 않는다`);
+      assert.deepEqual(problems.slice(beforeDetailErrors), [], `${w}: 공용 크게 보기 불러오기에서도 새 콘솔 오류 0`);
+      await frame.evaluate(() => LTMedia.closeLightbox());
       await context.close();
     }
   } finally { await browser.close(); server.close(); }
@@ -390,8 +440,8 @@ test('#1273 2번 화면: 크게 보기에 영어 라벨과 빈 한마디 줄이 
   try {
     const { context, frame } = await openHost(browser, `${base}/__host-viewer.html`, { width: 1440, height: 900 });
     await frame.evaluate(() => window.openViewer('m1'));
-    await frame.waitForSelector('#viewerModal.open', { timeout: 5000 });
-    const text = await frame.locator('#viewerModal').innerText();
+    await frame.waitForSelector('.lt-lightbox', { timeout: 5000 });
+    const text = await frame.locator('.lt-lightbox').innerText();
     assert.match(text, /순간 크게 보기/);
     assert.match(text, /꼬리표: #가수:BTS/);
     assert.doesNotMatch(text, /PROVENANCE|VIEWER|Keywords:|URL:|Source:|Note:/, `영어 라벨 없음: ${text}`);
@@ -410,6 +460,10 @@ test('970 실행: 썸네일 — 불러오기 실패면 대체 표시, 깨진 그
       const { context, page, frame } = await openMediaHost(browser, `${base}/__host-media-fail.html`, { width: w, height: h, fail: true });
       await frame.evaluate(() => { if (typeof fitAll === 'function') fitAll(false); });
       await page.waitForTimeout(600);
+      for (const id of ['v1', 'v2', 'v3']) {
+        await frame.locator(`.card[data-id="${id}"]`).scrollIntoViewIfNeeded();
+        await page.waitForTimeout(300);
+      }
       // 영상 후보가 모두 실패하면 글 카드(대체 표시)로 내려간다.
       await frame.waitForFunction(() => document.querySelectorAll('#cardLayer .lt-fallback-card').length >= 3, null, { timeout: 25000 });
       const fb = await frame.evaluate(() => {
@@ -471,11 +525,10 @@ test('#1378 보드: 카드 썸네일에서 크게 보기 재생·닫기(390·144
         if(capture){mkdirSync(capture,{recursive:true});await page.screenshot({path:path.join(capture,'before-'+w+'-'+theme+'.png')});}
         await open.focus();
         await open.press('Enter');
-        await frame.waitForSelector('#viewerModal.open',{timeout:10000});
+        await frame.waitForSelector('.lt-lightbox',{timeout:10000});
         assert.equal(await card.locator('iframe').count(),0,'크게 보기 뒤 카드 iframe 0');
-        await frame.locator('#viewerMedia [data-lt-play]').click({force:true});
-        await frame.waitForSelector('#viewerMedia iframe.lt-yt-frame',{timeout:10000});
-        const player=frame.locator('#viewerMedia iframe.lt-yt-frame');
+        await frame.waitForSelector('.lt-lightbox iframe.lt-lightbox-media',{timeout:10000});
+        const player=frame.locator('.lt-lightbox iframe.lt-lightbox-media');
         await player.scrollIntoViewIfNeeded();
         const measure=await inspectYoutubeIframe(player);
         assert.equal(measure.minimum200,true,w+'/'+theme+': 최소 200×200 '+measure.width+'×'+measure.height);
@@ -483,10 +536,10 @@ test('#1378 보드: 카드 썸네일에서 크게 보기 재생·닫기(390·144
         assert.ok(await countYoutubeAutoplay(frame)<=1,w+'/'+theme+': 자동 재생 1개 이하');
         assert.equal(await card.locator('iframe').count(),0,'재생 중에도 카드 iframe 0');
         if(capture)await page.screenshot({path:path.join(capture,'after-'+w+'-'+theme+'.png')});
-        if(w===390)await frame.locator('#closeViewer').click();
-        else await frame.locator('#closeViewer').press('Escape');
-        assert.equal(await frame.locator('#viewerModal.open').count(),0,'닫힘');
-        assert.equal(await frame.locator('#viewerMedia iframe').count(),0,'닫은 뒤 iframe 0');
+        if(w===390)await frame.locator('.lt-lightbox-close').click();
+        else await frame.locator('.lt-lightbox-close').press('Escape');
+        assert.equal(await frame.locator('.lt-lightbox').count(),0,'닫힘');
+        assert.equal(await frame.locator('.lt-lightbox iframe').count(),0,'닫은 뒤 iframe 0');
         const geometryAfter=await card.evaluate(el=>{const r=el.getBoundingClientRect();return {width:r.width,height:r.height};});
         assert.deepEqual(geometryAfter,geometryBefore,'카드 크기 유지');
       } finally {await context.close();}
@@ -509,12 +562,12 @@ test('#1378 보드: 재생 불가면 크게 보기 iframe 제거·원본 링크'
         status:200,contentType:'text/html',body:'<title>YouTube video</title>'
       }));
       await frame.locator('.card[data-id="s1"] [data-lt-play]').click({force:true});
-      await frame.locator('#viewerMedia [data-lt-play]').click({force:true});
-      await frame.waitForSelector('#viewerMedia .lt-media-noembed-link',{timeout:10000});
-      assert.equal(await frame.locator('#viewerMedia iframe').count(),0,'재생 불가 플레이어 제거');
-      assert.equal(await frame.locator('#viewerMedia a.lt-media-noembed-link[href*="youtube.com"]').count(),1,'원본 링크 제공');
-      await frame.locator('#closeViewer').press('Escape');
-      assert.equal(await frame.locator('#viewerMedia iframe').count(),0,'닫은 뒤 iframe 0');
+      await frame.waitForSelector('.lt-lightbox',{timeout:10000});
+      await frame.waitForSelector('.lt-lightbox .lt-lightbox-note',{timeout:10000});
+      assert.equal(await frame.locator('.lt-lightbox iframe').count(),0,'재생 불가 플레이어 제거');
+      assert.equal(await frame.locator('.lt-lightbox a[href*="youtube.com"]').count(),1,'원본 링크 제공');
+      await frame.locator('.lt-lightbox-close').press('Escape');
+      assert.equal(await frame.locator('.lt-lightbox iframe').count(),0,'닫은 뒤 iframe 0');
     }finally{await context.close();}
   }finally{await browser.close();await new Promise(r=>server.close(r));}
 });
@@ -549,11 +602,17 @@ test('#1298 보드 영상 크게 보기 뒤로 가기: 창 닫힘·iframe 0·스
         await frame.evaluate(() => { const v = document.getElementById('viewport'); v.scrollTop = 120; v.scrollLeft = 40; });
         const scroll = () => frame.evaluate(() => { const v = document.getElementById('viewport'); return { top: v.scrollTop, left: v.scrollLeft }; });
         const before = await scroll();
-        await testBackNavigation(page, { frame, recorded: true, panels: ['#viewerModal.open'], settleMs: 400, timeoutMs: 10000, action: async () => {
-          await frame.evaluate(() => document.querySelector('#cardLayer .card [data-lt-play]').click());
-          await frame.waitForSelector('#viewerModal.open', { timeout: 8000 });
-        } });
-        const after = await frame.evaluate(() => ({ open: document.getElementById('viewerModal').classList.contains('open'), iframes: document.querySelectorAll('#viewerMedia iframe').length }));
+        const historyBefore = await page.evaluate(() => history.length);
+        await frame.evaluate(() => document.querySelector('#cardLayer .card [data-lt-play]').click());
+        await frame.waitForSelector('.lt-lightbox', { timeout: 8000 });
+        assert.ok(await page.evaluate(() => history.length) > historyBefore, '크게 보기가 뒤로 가기 기록을 하나 추가한다');
+        await page.goBack();
+        await page.waitForFunction(() => !document.querySelector('#view')?.contentDocument?.querySelector('.lt-lightbox'), null, { timeout: 10000 });
+        await page.waitForFunction(({ top, left }) => {
+          const viewport = document.querySelector('#view')?.contentDocument?.getElementById('viewport');
+          return !!viewport && viewport.scrollTop === top && viewport.scrollLeft === left;
+        }, before, { timeout: 10000 });
+        const after = await frame.evaluate(() => ({ open: !!document.querySelector('.lt-lightbox'), iframes: document.querySelectorAll('.lt-lightbox iframe').length }));
         assert.equal(after.open, false, '뒤로 가기로 크게 보기가 닫힌다');
         assert.equal(after.iframes, 0, '뒤로 가기 뒤 iframe 0');
         assert.deepEqual(await scroll(), before, '보드 스크롤 위치 유지');

@@ -14,7 +14,7 @@ const timeValid = value => typeof value === 'string' && value.length <= 40 && !N
 const line = (value, fallback, max) => typeof value === 'string' && value.trim() && value.length <= max ? value.trim() : fallback;
 
 // 기본값으로 고쳐도 되는 값만 고친다. 순간 목록처럼 내용이 걸린 값은 고치지 않는다(그 트리는 뺀다).
-function repairTree(tree, now) {
+export function repairTreeForRead(tree, now) {
   if (!isObject(tree)) return { tree, fields: [] };
   const fields = [];
   const out = { ...tree };
@@ -39,6 +39,17 @@ function repairTree(tree, now) {
     out.coverMomentId = '';
     fields.push('coverMomentId');
   }
+  const ids = new Set(moments.map(moment => moment?.id).filter(Boolean));
+  const roots = moments.filter(moment => moment?.parentId === null);
+  if (roots.length === 1) {
+    let fixed = false;
+    out.moments = moments.map(moment => {
+      if (!isObject(moment) || typeof moment.parentId !== 'string' || ids.has(moment.parentId)) return moment;
+      fixed = true;
+      return { ...moment, parentId: roots[0].id, relation: '' };
+    });
+    if (fixed) fields.push('parentId');
+  }
   return { tree: out, fields };
 }
 
@@ -52,7 +63,7 @@ export function guardWorkspaceState(value, { now = new Date().toISOString() } = 
     ? '지원하지 않는 러브트리 파일이에요.' : null;
   let state = { version: 1, trees: [], prefs: isObject(value) ? value.prefs : undefined };
   for (const raw of (unreadable ? [] : value.trees)) {
-    const { tree, fields } = repairTree(raw, now);
+    const { tree, fields } = repairTreeForRead(raw, now);
     let next;
     try {
       // 트리 하나씩만 검증한다 — 한 트리의 문제가 다른 트리까지 막지 않게.
