@@ -192,7 +192,14 @@ export async function observeFrameMatrix({ browser, base, outputDir, shard = '' 
     };
     try {
       await page.goto(base + '/v41/?account=1#home', { waitUntil: 'load' });
-      await settleObservation(page, () => window.LT41?.trees?.length === 1 && document.body.dataset.member === 'in' && !document.getElementById('discover-ask')?.open && [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length)?.contentDocument?.getElementById('orbit'));
+      await settleObservation(page, () => window.LT41?.trees?.length === 1 && document.body.dataset.member === 'in' && !document.getElementById('discover-ask')?.open && [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length)?.contentDocument?.getElementById('orbit') && [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length)?.contentWindow?.__LT_ORBIT_TEST__?.canvasSettled());
+      await page.evaluate(() => {
+        const frame = [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length);
+        const orbit = frame.contentWindow.__LT_ORBIT_TEST__;
+        orbit.hold(true);
+        orbit.pauseFloat();
+        orbit.seek(0);
+      });
       for (const screen of FRAME_SCREENS) { await openMemberScreen(page, screen); await capture(page, screen); if (screen.id === 'book' || screen.id === 'board') await page.clock.resume(); }
     } finally { await context.close().catch(() => {}); }
     const guest = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
