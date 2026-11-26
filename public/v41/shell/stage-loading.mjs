@@ -17,7 +17,8 @@ export function createStageLoading(deps) {
       try {
         const frame = $('view');
         const orbit = frame?.contentDocument?.querySelector('#orbit');
-        return !!(orbit?.shadowRoot?.querySelector('.card'));
+        // #1487: 트리 0개 첫 화면은 카드 없이 가운데 첫 순간 안내만 그린다 — 그 안내가 그려지면 준비된 것이다.
+        return !!(orbit?.shadowRoot?.querySelector('.card, .center[data-lt-empty-owned]'));
       } catch { return false; }
     }
     if (kind === 'explore') {

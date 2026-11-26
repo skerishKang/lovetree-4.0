@@ -27,9 +27,30 @@ export function createWorkspaceRuntime(ctx){
   function choose(id,momentId,skipShow=false){const tree=ctx.model.trees.find(t=>t.id===id);if(skipShow&&window.LT41?.tree?.id===tree?.id){window.LT41.momentId=tree.moments.find(m=>m.id===momentId)?.id||tree.moments.find(m=>m.parentId===null)?.id||tree.moments[0]?.id;window.LT41.prefs=(0,ctx.currentPrefs)();window.LT41.writable=ctx.source==='server'&&!!ctx.member?.snapshot().writable;return;}window.LT41=tree?{tree,trees:ctx.model.trees,source:ctx.source,momentId:tree.moments.find(m=>m.id===momentId)?.id||tree.moments.find(m=>m.parentId===null)?.id||tree.moments[0]?.id,prefs:(0,ctx.currentPrefs)(),writable:ctx.source==='server'&&!!ctx.member?.snapshot().writable,}:null;
     if(!skipShow&&(tree||ctx.current==='src064-orbit.html'))show(ctx.current,false,id||'');
    else if(!skipShow||!tree){(0,ctx.flowNavigation)();document.body.classList.remove('home-screen');hideFrames();
-    // 261118 대표 결정: 트리 0개 계정이 주소(#my/shelf 등)로 바로 들어와도 그 화면의 빈 상태(#817)를 보여 준다 —
-    // 탭을 눌러 열 때와 같은 문구('아직 책장이 비어 있어요.' 등)로 시작한다.
-    paintEmptyForScreen(ctx.current);(0,ctx.$)('empty').hidden=false;links();}}
+    // #1487: 로그인 확인 중에는 손님 안내('로그인하면 내 … 보여요')를 그리지 않고 첫 화면처럼 '불러오는 중'을 보인다.
+    // 확인 응답 전에 이미 로그인한 사람에게 다시 로그인하라고 하지 않는다. 손님으로 확정되면 그때 빈 상태를 그린다.
+    if(authPendingGuest()){waitAuthThenEmpty();return;}
+    paintEmptyNow();}}
+
+  function authPendingGuest(){return document.documentElement.dataset.ltAuthPhase==='pending'&&!ctx.member?.snapshot().owned;}
+  // 261118 대표 결정: 트리 0개 계정이 주소(#my/shelf 등)로 바로 들어와도 그 화면의 빈 상태(#817)를 보여 준다 —
+  // 탭을 눌러 열 때와 같은 문구('아직 책장이 비어 있어요.' 등)로 시작한다. 빈 상태에서는 불러올 화면이 없으므로 덮개도 걷는다(#1487).
+  function paintEmptyNow(){ctx.shellStageLoading.cancel();paintEmptyForScreen(ctx.current);(0,ctx.$)('empty').hidden=false;links();}
+  let authWait=null;
+  function waitAuthThenEmpty(){
+    (0,ctx.$)('empty').hidden=true;
+    ctx.shellStageLoading.start('auth');
+    if(authWait)return;
+    const root=document.documentElement;
+    authWait=new MutationObserver(()=>{
+      if(root.dataset.ltAuthPhase==='pending')return;
+      authWait.disconnect();authWait=null;
+      // 회원이면 기록을 받은 쪽(choose·show)이 화면을 연다. 손님으로 확정됐고 열린 트리가 없을 때만 빈 상태를 그린다.
+      if(ctx.member?.snapshot().owned||window.LT41||ctx.current==='src064-orbit.html')return;
+      paintEmptyNow();
+    });
+    authWait.observe(root,{attributes:true,attributeFilter:['data-lt-auth-phase']});
+  }
 
   // #453 D2: 빈 화면 문구·단추는 계정 상태에 맞춘다. 로그인한 사람에게 '로그인한 계정의 기록을 불러오세요'는 어색하고,
   // 백업 파일 열기는 계정 없이 쓰는 입구라 로그인 상태에서는 숨긴다(로그아웃은 지금 그대로 둔다).
