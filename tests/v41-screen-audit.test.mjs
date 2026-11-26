@@ -592,7 +592,7 @@ test('#657 화면 공통 검사기: 아홉 화면 둘레·스크롤 주인 관�
   const beforeDir = process.env.LT_FRAME_OBSERVATION_BEFORE_DIR || '';
   const server = await serve({}, { port: 4401 });
   const base = `http://127.0.0.1:${server.address().port}`;
-  const browser = await chromium.launch({ headless: true, args: ['--force-color-profile=srgb', '--run-all-compositor-stages-before-draw', '--disable-new-content-rendering-timeout', '--disable-skia-runtime-opts'] });
+  const browser = await chromium.launch({ headless: true, args: ['--force-color-profile=srgb', '--run-all-compositor-stages-before-draw', '--disable-new-content-rendering-timeout', '--disable-skia-runtime-opts', '--disable-gpu-rasterization'] });
   const started = Date.now();
   try {
     const report = await observeFrameMatrix({ browser, base, outputDir, shard });
