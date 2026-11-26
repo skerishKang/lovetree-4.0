@@ -478,7 +478,8 @@ test('#1497 서재: 표지 제목 3줄 안·잘림 0, 이어 보기 같은 이�
             const r = el.getBoundingClientRect();
             const range = document.createRange(); range.selectNodeContents(el);
             const lines = [];
-            for (const q of range.getClientRects()) { if (q.height < 1 || q.top >= r.bottom - 0.5) continue; if (!lines.some((l) => Math.abs(l.top - q.top) < 2)) lines.push({ top: q.top, bottom: q.bottom }); else { const l = lines.find((x) => Math.abs(x.top - q.top) < 2); l.bottom = Math.max(l.bottom, q.bottom); } }
+            // 보이는 줄 = 줄 가운데가 제목 칸 안에 있는 줄(가려진 다음 줄은 글자 상자 위끝만 칸에 걸칠 수 있다).
+            for (const q of range.getClientRects()) { if (q.height < 1 || (q.top + q.bottom) / 2 >= r.bottom) continue; if (!lines.some((l) => Math.abs(l.top - q.top) < 2)) lines.push({ top: q.top, bottom: q.bottom }); else { const l = lines.find((x) => Math.abs(x.top - q.top) < 2); l.bottom = Math.max(l.bottom, q.bottom); } }
             const cover = el.closest('.book-cover')?.getBoundingClientRect();
             return { text: el.textContent.trim().slice(0, 12), lines: lines.length, cut: Math.max(0, ...lines.map((l) => l.bottom - r.bottom)), inside: !cover || (r.left >= cover.left - 0.5 && r.right <= cover.right + 0.5 && r.bottom <= cover.bottom + 0.5 && r.top >= cover.top - 0.5) };
           });
