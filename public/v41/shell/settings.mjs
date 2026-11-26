@@ -252,13 +252,13 @@ function paintPageTurnControls(){const value=currentPageTurn();for(const b of do
 // #368 3차: 날짜 표기·처음 보여 줄 곳·공유 기본값은 계정(state.prefs), 관계 지도 기본 보기는 이 기기(lt41.network.view — network.js와 같은 키).
 // 날짜 표기는 책·보드·지도·첫 화면이 같은 한 벌(formatDisplayDate)로 따르고, 셸은 프레임 속성+lt41-date-style 메시지로 알린다.
 // #1435: 서재 기본 보기는 #1418의 저장 값을 그대로 쓴다(새 키 없음).
-function paintShelfViewControls(){const value=readShelfView(localStorage)||'carousel';for(const b of document.querySelectorAll('[data-settings-shelf-view]'))b.setAttribute('aria-checked',String(b.dataset.settingsShelfView===value));}
+function paintSettingsShelfView(){const value=readShelfView(localStorage)||'carousel';for(const b of document.querySelectorAll('[data-settings-shelf-view]'))b.setAttribute('aria-checked',String(b.dataset.settingsShelfView===value));}
 for(const b of document.querySelectorAll('[data-settings-shelf-view]'))b.onclick=()=>{
  if(!deps.member?.snapshot().owned){notify('로그인한 뒤 서재 보기를 바꿀 수 있어요.');return;}
- setShelfView(b.dataset.settingsShelfView);paintShelfViewControls();
+ setShelfView(b.dataset.settingsShelfView);paintSettingsShelfView();
  notify(b.dataset.settingsShelfView==='shelf'?'서재를 선반으로 보여요.':'서재를 회전으로 보여요.');
 };
-paintShelfViewControls();
+paintSettingsShelfView();
 function currentDateStyle(){try{return normalizeDateStyle(deps.member?.state?.().prefs?.dateStyle)}catch{return 'dot'}}
 function sendToFrame(frame,message){
  try{frame.contentWindow?.postMessage(message,location.origin);}catch{}
@@ -477,7 +477,7 @@ async function openAccountSettings({section=''}={}){
  if(!deps.member?.snapshot().owned){notify('로그인한 뒤 설정을 열 수 있어요.');return;}
  paintSettingsProfile();
  fillProfileForm();
- paintDateStyleControls();paintBookDisplayControls();paintShelfViewControls();paintStartPlaceControls();paintNetworkViewControls();paintShareControls();paintQuickTargetControls();
+ paintDateStyleControls();paintBookDisplayControls();paintSettingsShelfView();paintStartPlaceControls();paintNetworkViewControls();paintShareControls();paintQuickTargetControls();
  void paintSettingsUsage();void loadTreeVisibility();
  panel('account-settings');
  focusSettingsSection(section);
@@ -568,7 +568,7 @@ document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{
 for(const f of frames())f.addEventListener('load',()=>{frameLoaded(f);
  // #894: 새로 뜬 안쪽 화면에도 움직임 끄기 상태를 알린다(메모리 상태 — 화면을 다시 열면 처음 상태).
  try{f.contentWindow.postMessage({type:MSG.motion,paused:deps.motionPaused},location.origin)}catch{}});
-return { updatesReady, showPublicRoute, getFeedbackDialog:()=>feedbackDialog, getFeedbackBoard:()=>feedbackBoard, refreshMyNewsCount:()=>myNewsMount.refreshCount(), openMyNews:()=>myNewsMount.open(), getAccountTip:()=>accountTip, applyAdvanced, applyDateStyleToFrame, applyPageTurnToFrame, applyNetworkViewToFrame, applyBoardThemeToFrame, syncBoardThemeToApp, quickTargetPreference, profileDirty, paintSettingsProfile, accountConfirmMatches, openAccountData, openAccountSettings, paintDateStyleControls, paintStartPlaceControls, paintShareControls, paintQuickTargetControls, paintNetworkViewControls, paintPageTurnControls, paintBoardThemeControls, paintTreeVisibilityList, paintSettingsUsage, loadTreeVisibility, paintTreeManagerVisibility, paintSettingsTab, focusSettingsSection, fillProfileForm, paintScreenControls, readAdvanced, advancedKey, currentDateStyle, currentPageTurn, sendToFrame, currentStartPlace, currentShareView, currentBoardTheme };
+return { updatesReady, showPublicRoute, getFeedbackDialog:()=>feedbackDialog, getFeedbackBoard:()=>feedbackBoard, refreshMyNewsCount:()=>myNewsMount.refreshCount(), openMyNews:()=>myNewsMount.open(), getAccountTip:()=>accountTip, applyAdvanced, applyDateStyleToFrame, applyPageTurnToFrame, applyNetworkViewToFrame, applyBoardThemeToFrame, syncBoardThemeToApp, quickTargetPreference, profileDirty, paintSettingsProfile, accountConfirmMatches, openAccountData, openAccountSettings, paintDateStyleControls, paintSettingsShelfView, paintStartPlaceControls, paintShareControls, paintQuickTargetControls, paintNetworkViewControls, paintPageTurnControls, paintBoardThemeControls, paintTreeVisibilityList, paintSettingsUsage, loadTreeVisibility, paintTreeManagerVisibility, paintSettingsTab, focusSettingsSection, fillProfileForm, paintScreenControls, readAdvanced, advancedKey, currentDateStyle, currentPageTurn, sendToFrame, currentStartPlace, currentShareView, currentBoardTheme };
 }
 
 
