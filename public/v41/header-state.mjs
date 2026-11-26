@@ -2,6 +2,14 @@
 // DOM·인증·저장을 건드리지 않는다. 셸(shell.mjs)과 첫 화면(v41/home.js)이 같은 규칙을 쓰고,
 // 시험은 이 함수들만 호출한다.
 
+import './theme-registry.js';
+
+const themeRegistry = () => globalThis.LT41_THEME_REGISTRY;
+export const THEMES = themeRegistry().themes;
+export const DEFAULT_THEME = themeRegistry().defaultTheme.id;
+export function themeDefinition(value) { return themeRegistry().find(value); }
+export function themeTone(value) { return themeRegistry().tone(value); }
+
 const clean = value => (typeof value === 'string' ? value.trim() : '');
 
 // '으로/로' 조사 선택. 한글은 받침, 라틴 문자는 흔한 발음(모음 끝)만 구분한다.
@@ -174,8 +182,6 @@ export const HOME_LOGIN_NEXT = '/v41/';
 // 4.1 첫 화면 테마 A/B(대표 지시 2026-11-07). A=밤(지금 운영), B=정원.
 // 셸과 첫 화면이 같은 키·같은 규칙을 쓰고, 시험은 이 함수들만 호출한다. 저장소는 인자로 받는다.
 export const THEME_KEY = 'lt41.theme';
-export const THEME_NIGHT = 'night';
-export const THEME_GARDEN = 'garden';
 
 // #368 2차: 페이지 넘김 — '종이처럼'은 기억책 종이 넘김(#411), '부드럽게'는 움직임 줄이기와 같은 0.35초 교차 페이드.
 // 기기에 저장한다(localStorage). 기본은 종이처럼이고, 시스템 움직임 줄이기가 켜져 있으면 기억책이 고른 값과
@@ -205,7 +211,7 @@ export function writePageTurn(storage, value) {
 }
 
 export function normalizeTheme(value) {
-  return value === THEME_GARDEN ? THEME_GARDEN : THEME_NIGHT;
+  return themeRegistry().normalize(value);
 }
 
 // 저장값을 읽는다. 저장소가 없거나 접근이 막히면 A로 본다.
@@ -213,7 +219,7 @@ export function readTheme(storage) {
   try {
     return normalizeTheme(storage?.getItem(THEME_KEY));
   } catch {
-    return THEME_NIGHT;
+    return DEFAULT_THEME;
   }
 }
 
@@ -223,31 +229,37 @@ export function writeTheme(storage, theme) {
   try {
     storage?.setItem(THEME_KEY, next);
   } catch {
-    return THEME_NIGHT;
+    return DEFAULT_THEME;
   }
   return next;
 }
 
+function followingTheme(theme) {
+  const current = normalizeTheme(theme);
+  const index = THEMES.findIndex(entry => entry.id === current);
+  return THEMES[(index + 1) % THEMES.length];
+}
+
 export function nextTheme(theme) {
-  return normalizeTheme(theme) === THEME_GARDEN ? THEME_NIGHT : THEME_GARDEN;
+  return followingTheme(theme).id;
 }
 
 // 버튼 글자는 지금이 아니라 '누르면 갈 곳'을 쓴다.
 export function themeButtonLabel(theme) {
-  return normalizeTheme(theme) === THEME_GARDEN ? '밤' : '정원';
+  return followingTheme(theme).label;
 }
 
 export function themeButtonAriaLabel(theme) {
-  return normalizeTheme(theme) === THEME_GARDEN ? '밤 테마로 바꾸기' : '정원 테마로 바꾸기';
+  return `${followingTheme(theme).label} 테마로 바꾸기`;
 }
 
 // 머리줄 원형 단추는 '누르면 갈 곳'을 그림으로 보여 준다(밤이면 ☀, 정원이면 ☾).
 export function themeIconGlyph(theme) {
-  return normalizeTheme(theme) === THEME_GARDEN ? '☾' : '☀';
+  return followingTheme(theme).icon;
 }
 
 export function themePressed(theme) {
-  return normalizeTheme(theme) === THEME_GARDEN;
+  return normalizeTheme(theme) !== DEFAULT_THEME;
 }
 
 // #1094: 책/목록 보기 선택. 머리줄 전환 묶음(.view-toggle)과 설정 창이 같은 값·같은 키를 쓴다.
@@ -306,7 +318,7 @@ export const SHELF_VIEW_KEY = 'lt41.shelfView';
 export const SHELF_VIEW_SHELF = 'shelf';
 export const SHELF_VIEW_CAROUSEL = 'carousel';
 export const SHELF_VIEWS = [SHELF_VIEW_SHELF, SHELF_VIEW_CAROUSEL];
-export const DEFAULT_SHELF_VIEW = SHELF_VIEW_SHELF;
+export const DEFAULT_SHELF_VIEW = SHELF_VIEW_CAROUSEL;
 
 export function normalizeShelfView(value) {
   return SHELF_VIEWS.includes(value) ? value : DEFAULT_SHELF_VIEW;
@@ -336,15 +348,13 @@ export function shelfViewPressed(value) {
 // 2단계 범위: 공통 헤더·첫 화면·첫 여정은 B를 쓴다. 내 트리는 #212, 책은 2026-11-08 대표 확인으로 B를 받는다.
 // 기억 보드·관계 지도는 계속 A다(대표 결정: 책만 테마를 따라간다).
 export function appliedTheme(theme, view) {
-  return view === 'home' || view === 'journey' || view === 'shelf' || view === 'tree' || view === 'book' || view === 'board' || view === 'network' || view === 'graph' ? normalizeTheme(theme) : THEME_NIGHT;
+  return view === 'home' || view === 'journey' || view === 'shelf' || view === 'tree' || view === 'book' || view === 'board' || view === 'network' || view === 'graph' ? normalizeTheme(theme) : DEFAULT_THEME;
 }
 
 // 속성 없음 = A. B일 때만 data-lt-theme=garden 을 붙인다.
 export function applyThemeAttribute(root, theme) {
-  if (!root) return THEME_NIGHT;
-  if (normalizeTheme(theme) === THEME_GARDEN) root.setAttribute('data-lt-theme', THEME_GARDEN);
-  else root.removeAttribute('data-lt-theme');
-  return normalizeTheme(theme);
+  if (!root) return DEFAULT_THEME;
+  return themeRegistry().apply(root, normalizeTheme(theme));
 }
 export const LOGIN_INTENTS = Object.freeze(['new-tree', 'shelf']);
 export function readLoginIntent(search = '') {
@@ -360,7 +370,7 @@ export function loginUrlWithTheme(url, theme, intent = '') {
     else target.searchParams.delete('intent');
     parsed.searchParams.set('next', `${target.pathname}${target.search}${target.hash}`);
   }
-  if (theme === THEME_NIGHT || theme === THEME_GARDEN) parsed.searchParams.set('lt_theme', theme);
+  if (themeDefinition(theme)) parsed.searchParams.set('lt_theme', theme);
   else parsed.searchParams.delete('lt_theme');
   return `${parsed.pathname}${parsed.search}${parsed.hash}`;
 }

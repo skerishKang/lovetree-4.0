@@ -49,8 +49,8 @@ test('#1069 화면 잡의 Playwright 버전은 잠금 파일에서 읽는다', (
   assert.ok(!/1\.49\.1/.test(workflow), '옛 하드코딩 버전이 남아 있지 않다');
   assert.ok(workflow.includes("hashFiles('package-lock.json')"), '캐시 키가 잠금 파일에서 유도된다');
   const installs = workflow.match(/playwright@\$\(node -p "require\('\.\/package-lock\.json'\)\.packages\['node_modules\/playwright'\]\.version"\)/g) || [];
-  // 2026-11-24: #1086 궤도 잡은 매일 밤 측정으로 옮겨 PR 화면 잡은 13곳이다. 밤 측정 쪽도 같은 규칙을 지킨다.
-  assert.equal(installs.length, 13, `PR 화면 잡 13곳이 모두 잠금 파일 버전을 쓴다(실측 ${installs.length})`);
+  // #1413: 셸 화면 잡을 둘로 나눠 Playwright 설치 구간은 14곳이다. 밤 측정 쪽도 같은 규칙을 지킨다.
+  assert.equal(installs.length, 14, `PR 화면 잡 14곳이 모두 잠금 파일 버전을 쓴다(실측 ${installs.length})`);
   const nightly = readFileSync(new URL('../.github/workflows/nightly-screen-perf.yml', import.meta.url), 'utf8');
   assert.ok(!/playwright@\d/.test(nightly) && nightly.includes("hashFiles('package-lock.json')"), '밤 측정도 하드코딩 버전 없이 잠금 파일을 쓴다');
   const actual = execFileSync(process.execPath, ['-p', "require('./package-lock.json').packages['node_modules/playwright'].version"], { cwd: new URL('..', import.meta.url), encoding: 'utf8' }).trim();
@@ -101,6 +101,8 @@ test('화면 잡 고르기: 보드만 바뀌면 보드 잡, 공용 파일이 섞
   assert.equal(selectJobs(['tests/v41-book-single-537.test.mjs'], jobs, screen, helpers), 'screen-book');
   assert.equal(selectJobs(['tests/v41-explore-moments-1025.test.mjs'], jobs, screen, helpers), 'screen-home');
   assert.equal(selectJobs(['tests/v41-home-screen-952.test.mjs'], jobs, screen, helpers), 'screen-home');
+  assert.equal(selectJobs(['tests/v41-account-settings.test.mjs'], jobs, screen, helpers), 'screen-shell-extra', '분리된 셸 설정 시험만 바뀌면 새 잡을 고른다');
+  assert.equal(selectJobs(['tests/v41-970-cleanup-fab.test.mjs'], jobs, screen, helpers), 'screen-shell', '원래 셸 시험은 기존 잡을 고른다');
   assert.equal(selectJobs(['public/v41/views/board/board.js', 'public/v41/shell.css'], jobs, screen, helpers), 'all', '공용 CSS가 섞이면 전부');
   assert.equal(selectJobs(['tests/helpers/screen-audit.mjs'], jobs, screen, helpers), 'all', 'helpers는 전부');
   assert.equal(selectJobs(['src/views/orbit.js'], jobs, screen, helpers), 'all');
@@ -125,4 +127,8 @@ test('결과 모으기: 고르지 않은 화면 잡의 건너뜀만 통과', asy
   assert.equal(old.ok, false, 'jobs가 빈 값(옛 가지 판정 도구)이면 건너뜀은 실패');
   const none = checkScreenResults({ 'screen-changes': gate('none'), 'screen-book': { result: 'skipped' }, deploy: { result: 'success' } });
   assert.equal(none.ok, true, "'none'이면 고른 잡이 없어 건너뜀 통과");
+  const extraFails = checkScreenResults({ 'screen-changes': gate('all'), 'screen-shell': { result: 'success' }, 'screen-shell-extra': { result: 'failure' }, deploy: { result: 'success' } });
+  assert.equal(extraFails.ok, false, '새 셸 잡 실패는 필수 집계 실패');
+  const extraSkipped = checkScreenResults({ 'screen-changes': gate('screen-shell'), 'screen-shell': { result: 'success' }, 'screen-shell-extra': { result: 'skipped' }, deploy: { result: 'success' } });
+  assert.equal(extraSkipped.ok, true, '새 셸 잡이 선택되지 않았을 때만 건너뜀을 통과시킨다');
 });

@@ -59,14 +59,16 @@ export function createViewPreferences(ctx){
   }
 
   // #1093: 서재 진열 방식(선반/회전)도 같은 길로 저장하고, 서재 화면에 바로 알린다.
-  function currentShelfView(){try{return normalizeShelfView(ctx.member?.state?.().prefs?.shelfView)}catch{return readShelfView(localStorage)}}
+  // #1366: 값이 없거나 잘못된 값이면 회전이 기본이다. 저장된 'shelf'는 그대로 유지한다.
+  const shelfViewOf=value=>value==='shelf'?'shelf':'carousel';
+  function currentShelfView(){try{return shelfViewOf(ctx.member?.state?.().prefs?.shelfView)}catch{return shelfViewOf(readShelfView(localStorage))}}
 
   function rememberShelfView(value){writeShelfView(localStorage,value)}
 
   function paintShelfViewControls(){const value=currentShelfView();for(const b of document.querySelectorAll('[data-shelf-view]'))b.setAttribute('aria-checked',String(b.dataset.shelfView===value));}
 
   function setShelfView(value){
-   const next=normalizeShelfView(value);
+   const next=shelfViewOf(value);
    if(!ctx.member?.snapshot().owned){(0,ctx.notify)('로그인한 뒤 진열 방식을 바꿀 수 있어요.');return;}
    try{ctx.member.apply('setPrefs',{shelfView:next});}catch(e){(0,ctx.notify)('진열 방식을 저장하지 못했어요. 잠시 뒤 다시 시도해 주세요.');return;}
    if(window.LT41)window.LT41.prefs=ctx.member.state().prefs;

@@ -9,6 +9,12 @@ export function parseTimecode(value) {
   let seconds;
   if (/^\d+$/.test(raw)) {
     seconds = Number(raw);
+  } else if (/^\d+m(?:\d+s?)?$/.test(raw)) {
+    // #1316: 주소의 t=1m35s처럼 분·초를 붙여 쓴 값도 같은 해석 함수에서 초로 바꾼다.
+    const parts = raw.match(/^(\d+)m(?:(\d+)s?)?$/);
+    const minute = Number(parts[1]), second = Number(parts[2] || 0);
+    if (second >= 60) return null;
+    seconds = minute * 60 + second;
   } else {
     const parts = raw.split(':');
     if (parts.length < 2 || parts.length > 3 || parts.some(part => !/^\d{1,2}$/.test(part))) return null;

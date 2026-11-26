@@ -2652,6 +2652,8 @@ test('#972 서재·책 상세·둘러보기·새 소식 화면 치수', { skip: 
       const ctx = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
       try {
         await ctx.addInitScript((value) => localStorage.setItem('lt41.theme', value), theme);
+        // #1366: 이 시험은 선반 그리드의 치수를 지킨다. 회전 기본 변경과 무관하게 선반으로 고정한다.
+        await ctx.addInitScript(() => localStorage.setItem('lt41.shelfView', 'shelf'));
         const groups = ['BTS', 'Hearts2Hearts', 'RIIZE'].map(value => ({ value, count: 2 }));
         await ctx.route('**/api/community/**', route => {
           const body = route.request().url().includes('/shares')

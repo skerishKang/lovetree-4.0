@@ -4,9 +4,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { existsSync } from 'node:fs';
+import { createTree, addMoment } from '../public/v41/domain.mjs';
 import {
-  readTheme, writeTheme, nextTheme, themeButtonLabel, themeButtonAriaLabel, themePressed,
-  appliedTheme, applyThemeAttribute, THEME_KEY,
+  readTheme, writeTheme, nextTheme, themeButtonLabel, themeButtonAriaLabel, themeIconGlyph, themePressed,
+  appliedTheme, applyThemeAttribute, normalizeTheme, THEMES, DEFAULT_THEME, THEME_KEY,
   normalizeBookDisplay, readBookDisplay, writeBookDisplay, bookDisplayVisible,
   bookDisplayLabel, bookDisplayAriaLabel, bookDisplayPressed, BOOK_DISPLAY_KEY,
   normalizeShelfView, readShelfView, writeShelfView, shelfViewVisible,
@@ -59,6 +60,31 @@ test('정원 대상: 책장·기억책·기억 보드·관계 지도(#212, 2026-
   assert.equal(themedViewFor('track56-network.html'), 'network');
   assert.equal(themedViewFor('track32-bookshelf.html'), 'shelf');
   assert.equal(themedViewFor('없는-화면.html'), 'inner');
+});
+
+test('테마 레지스트리는 밤·정원 두 항목과 저장 기본 규칙을 한 곳에 둔다', () => {
+  assert.deepEqual(THEMES.map(theme => ({id:theme.id,label:theme.label,order:theme.order,icon:theme.icon,tone:theme.tone,attribute:theme.attribute})), [
+    {id:'night',label:'밤',order:1,icon:'☾',tone:'dark',attribute:null},
+    {id:'garden',label:'정원',order:2,icon:'☀',tone:'light',attribute:'garden'}
+  ]);
+  assert.equal(DEFAULT_THEME, 'night');
+  assert.equal(THEME_KEY, 'lt41.theme');
+  assert.equal(themeIconGlyph('night'), '☀');
+  assert.equal(themeIconGlyph('garden'), '☾');
+  for (const value of [undefined, null, '', 'memory-paper', 'GARDEN']) assert.equal(normalizeTheme(value), 'night');
+  assert.equal(normalizeTheme('garden'), 'garden');
+  const storage = memoryStorage({});
+  assert.equal(readTheme(storage), 'night');
+  assert.equal(writeTheme(storage, 'garden'), 'garden');
+  assert.equal(storage.data[THEME_KEY], 'garden');
+  assert.equal(readTheme(storage), 'garden');
+  assert.equal(readTheme(brokenStorage()), 'night');
+  assert.equal(writeTheme(brokenStorage(), 'garden'), 'night');
+  const root = fakeRoot();
+  assert.equal(applyThemeAttribute(root, 'garden'), 'garden');
+  assert.equal(root.getAttribute('data-lt-theme'), 'garden');
+  assert.equal(applyThemeAttribute(root, 'unknown'), 'night');
+  assert.equal(root.getAttribute('data-lt-theme'), null);
 });
 
 test('화면 테마는 설정 창의 "화면" 묶음에 있고 밤/정원 두 칸으로 aria-checked를 쓴다', () => {
@@ -192,6 +218,7 @@ test('952 실행: 밤이 기본이고 정원 저장은 다음 부팅에 유지�
 
 test('#1026 안쪽 네 문서는 첫 그림 전에 기기 테마와 판 선택을 적용한다', async()=>{
   const {runInNewContext}=await import('node:vm');
+  const registry=fs.readFileSync(new URL('../public/v41/theme-registry.js',import.meta.url),'utf8');
   for(const [screen,file] of [['book','track59-sketchbook'],['network','track56-network'],['board','track58-pinboard'],['shelf','track32-bookshelf']]){
     const html=fs.readFileSync(new URL('../public/v41/views/'+file+'.html',import.meta.url),'utf8');
     if(screen==='board') assert.ok(html.indexOf('href="/v41/views/board/board-extra.css"')>0&&html.indexOf('href="/v41/views/board/board-extra.css"')<html.indexOf('</head>'),'보드 정원 색은 첫 그림 전에 함께 읽는다');
@@ -199,11 +226,105 @@ test('#1026 안쪽 네 문서는 첫 그림 전에 기기 테마와 판 선택�
     for(const [theme,plate,want,wantPlate] of [['garden',null,'garden','paper'],['night',null,null,'night'],['garden','night','garden','night'],['night','paper',null,'paper']]){
       const attrs=new Map(),root={dataset:{v41Screen:screen},setAttribute:(k,v)=>attrs.set(k,v),removeAttribute:k=>attrs.delete(k)};
       const window={};window.parent=window;
-      runInNewContext(script,{document:{documentElement:root},window,localStorage:{getItem:k=>k==='lt41.theme'?theme:plate}});
+      const context={document:{documentElement:root},window,localStorage:{getItem:k=>k==='lt41.theme'?theme:plate}};
+      runInNewContext(registry,context);
+      runInNewContext(script,context);
       assert.equal(attrs.get('data-lt-theme')||null,want,screen);
       assert.equal(attrs.get('data-lt-board-theme')||null,['network','board'].includes(screen)?wantPlate:null,screen);
     }
   }
+});
+
+test('트리·그래프·첫 여정의 첫 그리기도 레지스트리와 기존 폴백 규칙을 쓴다', async()=>{
+  const {runInNewContext}=await import('node:vm');
+  const registry=fs.readFileSync(new URL('../public/v41/theme-registry.js',import.meta.url),'utf8');
+  const run=(file,{stored='',parentTheme=null,standalone=true})=>{
+    const html=fs.readFileSync(new URL('../public/v41/'+file,import.meta.url),'utf8');
+    const script=html.match(/<script>([\s\S]*?)<\/script>/)?.[1];
+    const attrs=new Map(),root={setAttribute:(k,v)=>attrs.set(k,v),removeAttribute:k=>attrs.delete(k)};
+    const window={};
+    window.parent=standalone?window:{document:{documentElement:{getAttribute:()=>parentTheme}}};
+    const context={document:{documentElement:root},window,parent:window.parent,localStorage:{getItem:key=>key==='lt41.theme'?stored:null}};
+    runInNewContext(registry,context);
+    runInNewContext(script,context);
+    return attrs.get('data-lt-theme')||null;
+  };
+  assert.equal(run('views/track61-tree.html',{parentTheme:'garden',standalone:false}),'garden');
+  assert.equal(run('views/track61-tree.html',{stored:'night',parentTheme:'garden',standalone:false}),null);
+  assert.equal(run('views/track61-tree.html',{stored:'unknown',parentTheme:'garden',standalone:false}),null);
+  assert.equal(run('views/graph/track60-graph.html',{stored:'garden'}),'garden');
+  assert.equal(run('views/graph/track60-graph.html',{stored:'night'}),null);
+  assert.equal(run('views/first-journey.html',{stored:'night',parentTheme:'garden',standalone:false}),'garden');
+  assert.equal(run('views/first-journey.html',{stored:'garden'}),'garden');
+});
+
+test('셸과 각 화면 iframe의 테마가 같고 테마 전환은 프레임을 다시 불러오지 않는다', { skip: skip952t || undefined }, async()=>{
+  const { serve } = await import('./helpers/screen-audit.mjs');
+  const server = await serve({});
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium952t.launch();
+  let tree = createTree({subject:'시험',title:'테마 일치 트리',note:'',emotion:'설렘',date:'2026-11-18',url:''},'2026-11-18T00:00:00Z');
+  tree = addMoment(tree,{title:'첫 순간',note:'고정 기록',emotion:'설렘',date:'2026-11-18',url:''},tree.moments[0].id,'2026-11-18T00:01:00Z');
+  try {
+    for (const initial of ['night','garden']) {
+      const ctx = await browser.newContext({viewport:{width:1440,height:900},reducedMotion:'reduce'});
+      await ctx.addInitScript((value)=>{
+        try { localStorage.setItem('lt41.theme',value); } catch {}
+        window.__themeFrameLoads={};
+        document.addEventListener('load',event=>{
+          const id=event.target?.id;
+          if(id==='view'||id==='view-next')window.__themeFrameLoads[id]=(window.__themeFrameLoads[id]||0)+1;
+        },true);
+      },initial);
+      await ctx.route('**/api/**',route=>route.fulfill({status:200,contentType:'application/json',body:'{"ok":true,"items":[]}'}));
+      await ctx.route('**/api/workspace*',route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({revision:1,state:{version:1,trees:[tree]},subject:'시험계정',writeSubjectBound:true,savedAt:'2026-11-20T00:00:00.000Z'})}));
+      const page = await ctx.newPage();
+      await page.goto(base+'/v41/?account=1#home');
+      await page.waitForFunction(()=>!!window.LT41?.trees?.length,null,{timeout:20000});
+      const screens=[
+        ['', 'home.html'], ['#shelf','track32-bookshelf.html'], ['#tree','track61-tree.html'],
+        ['#book','track59-sketchbook.html'], ['#board','track58-pinboard.html'],
+        ['#network','track56-network.html'], ['#journey/00','first-journey.html']
+      ];
+      const state=()=>page.evaluate(()=>{
+        const frame=document.getElementById('view');
+        return {shell:document.documentElement.getAttribute('data-lt-theme')||'night',frame:frame?.contentDocument?.documentElement.getAttribute('data-lt-theme')||'night',href:frame?.contentWindow?.location?.href||'',loads:{...window.__themeFrameLoads}};
+      });
+      const open=async(hash,file)=>{
+        if(hash)await page.evaluate(value=>{location.hash=value},hash);
+        await page.waitForFunction(expected=>document.getElementById('view')?.contentWindow?.location?.href.includes(expected),file,{timeout:20000});
+        await page.waitForFunction(()=>document.getElementById('view')?.contentDocument?.readyState==='complete',null,{timeout:10000});
+      };
+      for(const [hash,file] of screens){
+        await open(hash,file);
+        const got=await state();
+        assert.equal(got.shell,initial,`${file}: 셸 테마`);
+        assert.equal(got.frame,initial,`${file}: iframe 테마`);
+      }
+      // 직전 화면 교대의 숨은 프레임 비우기(600ms)가 테마 전환과 겹치지 않게 둔다.
+      await page.waitForTimeout(700);
+      await page.evaluate(()=>document.getElementById('theme-toggle').click());
+      const switched=initial==='night'?'garden':'night';
+      await page.waitForFunction(expected=>document.documentElement.getAttribute('data-lt-theme')===expected,switched==='garden'?'garden':null,{timeout:5000});
+      const afterToggle=await state();
+      assert.equal(afterToggle.frame,switched,'머리줄 전환 후 iframe 테마');
+      const loadsAfterToggle=afterToggle.loads;
+      await page.evaluate(()=>{
+        document.getElementById('account-avatar').click();
+        document.getElementById('account-open-settings').click();
+      });
+      await page.waitForFunction(()=>document.getElementById('account-settings')?.open,null,{timeout:5000});
+      const choices=await page.evaluate(()=>[...document.querySelectorAll('#account-settings [data-set-theme]')].map(button=>({id:button.dataset.setTheme,checked:button.getAttribute('aria-checked')})));
+      assert.deepEqual(choices,[{id:'night',checked:String(switched==='night')},{id:'garden',checked:String(switched==='garden')}]);
+      await page.evaluate(value=>document.querySelector(`#account-settings [data-set-theme="${value}"]`).click(),initial);
+      await page.waitForFunction(expected=>document.documentElement.getAttribute('data-lt-theme')===expected,initial==='garden'?'garden':null,{timeout:5000});
+      await page.waitForTimeout(500);
+      const afterSettings=await state();
+      assert.equal(afterSettings.frame,initial,'설정 전환 후 iframe 테마');
+      assert.deepEqual(afterSettings.loads,loadsAfterToggle,'테마 전환으로 iframe이 다시 불러와지 않는다');
+      await ctx.close();
+    }
+  } finally {await browser.close();server.close();}
 });
 
 // #1094: 책/목록 보기 전환(테마와 같은 두 칸고르기). 기본은 책, 기기 미러는 날짜 표기·제목 보기와 같은 길이다.
@@ -228,14 +349,14 @@ test('책/목록 보기는 기본 책, 미러 저장·반환, 서재·책에서�
   assert.equal(bookDisplayAriaLabel('list'), '목록으로 보기');
   assert.equal(bookDisplayPressed('book'), false);
   assert.equal(bookDisplayPressed('list'), true);
-  // #1093: 서재 진열 방식도 같은 계약 — 기본 선반, 서재에서만 보인다.
-  assert.equal(readShelfView(memoryStorage({})), 'shelf', '저장 없으면 선반이다');
+  // #1366: 서재 진열 방식도 같은 계약 — 기본 회전, 서재에서만 보인다.
+  assert.equal(readShelfView(memoryStorage({})), 'carousel', '저장 없으면 회전이다');
   assert.equal(writeShelfView(storage, 'carousel'), 'carousel');
   assert.equal(storage.data[SHELF_VIEW_KEY], 'carousel');
   assert.equal(readShelfView(storage), 'carousel', '다시 들어와도 기억된다');
-  assert.equal(readShelfView(brokenStorage()), 'shelf', '저장소가 막히면 선반이다');
-  assert.equal(writeShelfView(brokenStorage(), 'carousel'), 'shelf', '저장 실패는 기본을 돌려준다');
-  assert.equal(normalizeShelfView('엉뚱한값'), 'shelf');
+  assert.equal(readShelfView(brokenStorage()), 'carousel', '저장소가 막히면 회전이다');
+  assert.equal(writeShelfView(brokenStorage(), 'carousel'), 'carousel', '저장 실패는 기본을 돌려준다');
+  assert.equal(normalizeShelfView('엉뚱한값'), 'carousel');
   assert.equal(shelfViewVisible({ current: 'track32-bookshelf.html' }), true);
   for (const file of ['track59-sketchbook.html', 'track58-pinboard.html', 'track56-network.html', 'src064-orbit.html', '']) assert.equal(shelfViewVisible({ current: file }), false, file);
   assert.equal(shelfViewLabel('shelf'), '선반');

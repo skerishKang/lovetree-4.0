@@ -1049,3 +1049,138 @@ test('둘러보기 윗줄·역할별 색·마우스 올림·칩 크기 — 390·
  }
  }finally{await browser.close();}
 });
+
+
+// #1356: 순간 보기 범위 칩(전체·이 트리만·내 순간). 390·1440 × 밤·정원 × 로그인·로그아웃.
+const REL_LUM = (value) => {
+  const parts = String(value || '').match(/[\d.]+/g)?.map(Number) || [];
+  const f = (v) => { v /= 255; return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+  return 0.2126 * f(parts[0] || 0) + 0.7152 * f(parts[1] || 0) + 0.0722 * f(parts[2] || 0);
+};
+const REL_CONTRAST = (a, b) => (Math.max(REL_LUM(a), REL_LUM(b)) + 0.05) / (Math.min(REL_LUM(a), REL_LUM(b)) + 0.05);
+
+async function bootScope(browser, { width, height, theme, member, controls = {} }) {
+  const server = await serve();
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const ctx = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
+  await ctx.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); } catch {} }, theme);
+  const calls = { public: 0, mine: 0, lastShare: '' };
+  const mineItems = [{ ...items[0], id: 'mine-1', videoId: 'mine11111111', title: '내 순간 하나', keywords: [] }];
+  const workspace = { revision: 1, state: { version: 1, trees: [{ id: 'tree1', subject: '주인', title: '내 트리', moments: [], edges: [] }], prefs: {} }, subject: '시험계정', writeSubjectBound: true, savedAt: '2026-11-25T00:00:00.000Z' };
+  await ctx.route('**/*', (route) => {
+    const u = new URL(route.request().url());
+    if (u.origin !== base) return u.hostname === 'i.ytimg.com' ? THUMB(route) : route.abort();
+    if (u.pathname === '/api/public/moments') {
+      calls.public += 1;
+      calls.lastShare = u.searchParams.get('shareId') || '';
+      const shareId = calls.lastShare;
+      const listed = shareId ? items.filter((item) => item.shareId === shareId) : items;
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ items: listed, total: listed.length, groups: GROUPS }) });
+    }
+    if (u.pathname === '/api/community/me/moments') {
+      calls.mine += 1;
+      if (controls.mineStatus === 500) return route.fulfill({ status: 500, contentType: 'application/json', body: '{}' });
+      const listed = controls.mineEmpty ? [] : mineItems;
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ items: listed, total: listed.length, groups: [] }) });
+    }
+    if (u.pathname.startsWith('/api/workspace')) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(workspace) });
+    if (u.pathname.startsWith('/api/')) return route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' });
+    return route.continue();
+  });
+  const page = await ctx.newPage();
+  try {
+    await page.goto(`${base}/v41/${member ? '?account=1' : ''}#explore/moments`, { waitUntil: 'load' });
+    await page.locator('#community-panel[open] #community-moments-panel:not([hidden])').waitFor({ state: 'visible', timeout: 20000 });
+    await page.waitForFunction(() => !!document.querySelector('#community-moments-panel .moments-stage')?.dataset.ltMomentsId, null, { timeout: 30000 });
+    return { server, ctx, page, calls, controls, base };
+  } catch (error) { await ctx.close(); await new Promise((r) => server.close(r)); throw error; }
+}
+
+test('#1356 순간 보기 범위 칩: 표시·호출 조건·뒤로 가기·키보드·대비(390·1440 × 밤·정원 × 로그인·로그아웃)', { skip: REQUIRE ? false : skip, timeout: 600000 }, async () => {
+  if (skip) assert.fail(skip);
+  const browser = await chromium.launch({ headless: true });
+  const labelOf = (page) => page.locator('.moments-scope-chip').allTextContents();
+  try {
+    for (const width of [390, 1440]) for (const theme of ['night', 'garden']) for (const member of [false, true]) {
+      const key = `${width}·${theme}·${member ? '로그인' : '로그아웃'}`;
+      const h = await bootScope(browser, { width, height: width === 390 ? 844 : 900, theme, member });
+      try {
+        const panel = h.page.locator('#community-moments-panel');
+        assert.deepEqual(await labelOf(h.page), member ? ['전체', '내 순간'] : ['전체'], `${key}: 기본 칸`);
+        assert.equal(h.calls.mine, 0, `${key}: 첫 열기에서 내 순간 요청 0`);
+        // 순간의 트리 이름을 누르면 '이 트리만'이 나타나고 그 트리만 요청한다.
+        if (width === 390) await h.page.locator('.moments-info-button').click();
+        await panel.locator('.moments-tree-name').first().click();
+        await h.page.waitForTimeout(250);
+        const afterTree = await labelOf(h.page);
+        assert.deepEqual(afterTree, member ? ['전체', '이 트리만', '내 순간'] : ['전체', '이 트리만'], `${key}: 트리 이름 누름 뒤 칸`);
+        assert.match(h.page.url(), /scope=tree/, `${key}: 트리 칩이 주소에 남는다`);
+        assert.ok(h.calls.lastShare, `${key}: shareId를 붙여 요청`);
+        if (member) {
+          const beforeMine = h.calls.mine;
+          await panel.locator('.moments-scope-chip[data-scope="mine"]').click();
+          await h.page.waitForFunction(() => document.querySelector('#community-moments-panel .moments-title')?.textContent === '내 순간 하나', null, { timeout: 10000 });
+          assert.equal(h.calls.mine, beforeMine + 1, `${key}: 내 순간은 한 번만 요청`);
+          assert.match(h.page.url(), /scope=mine/, `${key}: 내 순간 칩이 주소에 남는다`);
+          const scroll = await panel.evaluate((node) => node.scrollTop);
+          assert.equal(scroll, 0, `${key}: 칩을 바꾸면 목록 맨 위`);
+          await h.page.goBack();
+          await h.page.waitForTimeout(200);
+          assert.match(h.page.url(), /scope=tree/, `${key}: 뒤로 가기로 이 트리만 복원`);
+          assert.equal(await panel.locator('.moments-scope-chip[data-scope="tree"]').getAttribute('aria-pressed'), 'true', `${key}: 복원된 칩 표시`);
+        } else {
+          assert.equal(await panel.locator('.moments-scope-chip[data-scope="mine"]').count(), 0, `${key}: 로그아웃에는 내 순간 칸 없음`);
+          assert.equal(h.calls.mine, 0, `${key}: 로그아웃에서 내 순간 요청 0`);
+        }
+        // 키보드: Tab으로 다음 칩에 가고 Enter로 고른다.
+        const firstChip = panel.locator('.moments-scope-chip').first();
+        await firstChip.focus();
+        await h.page.keyboard.press('Tab');
+        const focused = await h.page.evaluate(() => document.activeElement?.dataset?.scope || '');
+        assert.ok(focused, `${key}: Tab으로 범위 칩에 도달`);
+        await h.page.keyboard.press('Enter');
+        await h.page.waitForTimeout(200);
+        assert.equal(await panel.locator(`.moments-scope-chip[data-scope="${focused}"]`).getAttribute('aria-pressed'), 'true', `${key}: Enter로 선택`);
+        // 겹침·가로 넘침 0, 선택·쉬는 칩 대비 4.5:1.
+        const audit = await auditPage(h.page, '둘러보기 순간 범위');
+        const structural = failuresOf(audit, String(width), theme).filter((row) => ['겹침', '가려짐', '잘림', '가로넘침'].includes(row[0]));
+        assert.deepEqual(structural, [], `${key}: ${JSON.stringify(structural)}`);
+        const colors = await panel.evaluate(() => {
+          const probe = document.createElement('span'); probe.style.display = 'none'; document.body.append(probe);
+          probe.style.color = 'var(--lt-role-bg)'; const base = getComputedStyle(probe).color; probe.remove();
+          const read = (chip) => { const cs = getComputedStyle(chip); return { fg: cs.color, bg: cs.backgroundColor }; };
+          return { base, active: read(document.querySelector('.moments-scope-chip.is-active')), idle: read(document.querySelector('.moments-scope-chip:not(.is-active)')) };
+        });
+        const over = (top, bottom) => {
+          const a = String(top).match(/[\d.]+/g)?.map(Number) || [0, 0, 0, 1];
+          const b = String(bottom).match(/[\d.]+/g)?.map(Number) || [0, 0, 0, 1];
+          const alpha = a[3] ?? 1;
+          return `rgb(${a[0] * alpha + b[0] * (1 - alpha)},${a[1] * alpha + b[1] * (1 - alpha)},${a[2] * alpha + b[2] * (1 - alpha)})`;
+        };
+        assert.ok(REL_CONTRAST(colors.active.fg, over(colors.active.bg, colors.base)) >= 4.5, `${key}: 선택 칩 대비`);
+        assert.ok(REL_CONTRAST(colors.idle.fg, over(colors.idle.bg, colors.base)) >= 4.5, `${key}: 쉬는 칩 대비`);
+        if (member && width === 1440 && theme === 'night') {
+          h.controls.mineStatus = 500;
+          await panel.locator('.moments-scope-chip[data-scope="mine"]').click();
+          await panel.locator('.moments-empty-retry').waitFor({ state: 'visible', timeout: 10000 });
+          assert.match(await panel.locator('.moments-empty').textContent(), /불러오지 못했어요/, `${key}: 오류 안내`);
+          h.controls.mineStatus = 200;
+          await panel.locator('.moments-empty-retry').click();
+          await h.page.waitForFunction(() => document.querySelector('#community-moments-panel .moments-title')?.textContent === '내 순간 하나', null, { timeout: 10000 });
+          h.controls.mineEmpty = true;
+          await panel.locator('.moments-scope-chip[data-scope="all"]').click();
+          await panel.locator('.moments-scope-chip[data-scope="mine"]').click();
+          await panel.locator('.moments-empty').waitFor({ state: 'visible', timeout: 10000 });
+          assert.equal(await panel.locator('.moments-empty-retry').isVisible(), false, `${key}: 빈 목록에는 다시 시도 없음`);
+        }
+        if (member && width === 1440 && theme === 'garden') {
+          await h.page.goto(`${h.base}/v41/?account=1#share/${items[0].shareId}/book`, { waitUntil: 'load' });
+          await h.page.locator('#community-menu').click();
+          await h.page.waitForTimeout(400);
+          assert.ok((await labelOf(h.page)).includes('이 트리만'), `${key}: 공유 트리 화면에서 들어오면 이 트리만`);
+        }
+        console.log('#1356', key, JSON.stringify({ chips: afterTree, public: h.calls.public, mine: h.calls.mine, structural: structural.length }));
+      } finally { await h.ctx.close(); await new Promise((r) => h.server.close(r)); }
+    }
+  } finally { await browser.close(); }
+});
