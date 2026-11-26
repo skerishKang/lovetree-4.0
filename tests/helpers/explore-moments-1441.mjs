@@ -4,7 +4,8 @@ import {createServer} from 'node:http';
 import {createReadStream,existsSync,mkdirSync,statSync} from 'node:fs';
 import {join,resolve,extname} from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {chromium} from 'playwright';
+let chromium, browserUnavailable=false;
+try { ({chromium}=await import('playwright')); if(!existsSync(chromium.executablePath()))browserUnavailable='Playwright Chromium이 없어 건너뜀'; } catch { browserUnavailable='Playwright 패키지가 없어 건너뜀'; }
 
 const ROOT=resolve(fileURLToPath(new URL('../..',import.meta.url)));
 const PORT=4614;
@@ -56,7 +57,7 @@ async function open(browser,width,theme){
 }
 async function rect(locator){return locator.evaluate(el=>{const a=el.getBoundingClientRect();return {x:a.x,y:a.y,width:a.width,height:a.height};});}
 function aligned(a,b,key){for(const k of ['x','y','width','height'])assert.ok(Math.abs(a[k]-b[k])<=1,key+' '+k+': '+a[k]+' vs '+b[k]);}
-test('#1441 두 보기 자리·범위·길·주소·공개 제한·세로 줄·소리 유지', {timeout:240000},async()=>{
+test('#1441 두 보기 자리·범위·길·주소·공개 제한·세로 줄·소리 유지', {skip:browserUnavailable,timeout:240000},async()=>{
  const server=await serve(); const browser=await chromium.launch({headless:true});
  try{
   for(const width of [1440,390])for(const theme of ['night','garden']){
