@@ -1450,3 +1450,6 @@ body.lt-header-visitor #toast[data-visitor-intro]{display:none}
  body.lt-header-visitor #community-menu .community-menu-label{font-size:11px}
 }
 .lt-toolbar-picker .tree-cover{width:36px;height:36px;flex-basis:36px;border-radius:var(--lt-r-card);box-shadow:none}
+
+/* #1447: logged-in theme, write, and account button boxes share one exact gap. */
+@media(min-width:781px){.app-header .account-slot>#account-avatar{box-sizing:border-box;width:80px;min-width:80px;border-radius:var(--lt-r-pill)}}
