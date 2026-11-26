@@ -108,7 +108,12 @@ export async function measureFrame(page, screen, theme, width, height) {
 }
 
 async function finishBookObservation(page) {
-  await page.clock.runFor(50);
+  await page.evaluate(() => {
+    const frame = [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length);
+    const api = frame.contentWindow.__TRACK59__, state = api.getState();
+    api.jump(state.page, api.momentAtPos(state.page)?.id);
+  });
+  await page.waitForFunction(() => [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length)?.contentDocument?.querySelector('.moment.focused'), null, { timeout: 30000 });
   await page.evaluate(() => {
     const frame = [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length);
     frame.contentDocument.dispatchEvent(new Event('lt41-tagline-ready'));
