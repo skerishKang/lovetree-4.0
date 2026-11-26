@@ -108,6 +108,8 @@ function focusChoiceOnReady(){
 function openTreeMenu(via='keyboard',rect=null,frame=null){
  if(!treePopover || deps.source!=='server' || !deps.member?.snapshot().owned || !deps.member?.snapshot().writable)return;
  activeFrame=frame||activeViewFrame();
+ // Bind the currently visible frame after every swap, before a click can reach its controls.
+ bindFrame(activeFrame);
  renderTreeMenu();
  treePopover.dataset.ltOpenedBy=via;
  treePopover.hidden=false;
