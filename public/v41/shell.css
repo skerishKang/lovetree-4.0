@@ -1467,4 +1467,3 @@ body.lt-header-visitor #toast[data-visitor-intro]{display:none}
 
 /* #1447: keep the persistent visit label unobtrusive while video is expanded. */
 body.lt-book-lightbox-open #lt-visitor-caption{visibility:hidden}
-/* #1413 5단계 임시 줄: 겉모습 비교 동시 캡처를 CI에서 한 번 돌려 보려는 줄 — 다음 커밋에서 지운다 */
