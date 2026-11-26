@@ -23,6 +23,38 @@ export function createHeader(deps) {
    const lastLetter = () => { try { return localStorage.getItem('lt41.avatarLetter') || ''; } catch { return ''; } };
   const rememberLetter = (letter) => { try { if (letter && letter !== '나') localStorage.setItem('lt41.avatarLetter', letter); else localStorage.removeItem('lt41.avatarLetter'); } catch { /* 저장소 접근 불가 */ } };
 
+function renderHeaderLayout({publicReading, owned, parts, current, tree}) {
+  const root=document.body;
+  root.classList.toggle('lt-header-visitor',publicReading);
+  const browse=$('community-menu');
+  browse.hidden=false;
+  browse.removeAttribute('aria-hidden');
+  const views=$('tree-views');
+  const viewing=publicReading && current==='track32-bookshelf.html' ? 'track59-sketchbook.html' : current;
+  for(const b of views.querySelectorAll('button[data-view]')) {
+    const hidden=publicReading&&b.dataset.view==='track32-bookshelf.html';
+    b.hidden=hidden;
+    b.inert=hidden;
+    b.toggleAttribute('aria-hidden',hidden);
+    // ?? ????? ?? ?? ?? ????? ????.
+    if(publicReading)b.setAttribute('aria-current',String(!hidden && b.dataset.view===viewing));
+  }
+  // ?? ? ??? ? ?? ???? ?? ?? ?? ?? ????.
+  let label=document.getElementById('lt-visitor-caption');
+  if(!label) {
+    label=document.createElement('div');
+    label.id='lt-visitor-caption';
+    label.setAttribute('role','status');
+    document.querySelector('.app-header')?.after(label);
+  }
+  label.hidden=!publicReading;
+  if(publicReading) {
+    const name=String(tree?.title||window.LT41?.tree?.title||'??').trim();
+    const owner=String(tree?.ownerName||tree?.owner?.name||'').trim();
+    label.textContent=owner?`${owner}?? ?? '${name}' ?? ?`:`?? ?? '${name}' ?? ?`;
+  }
+}
+
 function flowNavigation(){
   const owned=!!getMember()?.snapshot().owned;
   const reading=!!window.LT41&&['track61-tree.html','track59-sketchbook.html','track58-pinboard.html','track56-network.html'].includes(getCurrent());
@@ -37,6 +69,7 @@ function flowNavigation(){
   for(const b of $('tree-views').querySelectorAll('button[data-view]')){
     const visitorHidden=publicReading&&b.dataset.view==='track32-bookshelf.html';
     b.classList.toggle('visitor-hidden',visitorHidden);
+    b.hidden=visitorHidden;
     b.inert=visitorHidden;
     if(visitorHidden)b.setAttribute('aria-hidden','true');else b.removeAttribute('aria-hidden');
     b.disabled=false;b.title='';
@@ -57,7 +90,8 @@ function flowNavigation(){
   if(bookToggle)bookToggle.hidden=!bookDisplayVisible({current:getCurrent()})||onCommunity;bookToggle?.removeAttribute?.('data-lt-pending');
   const shelfToggle=$('shelf-view-toggle');
   if(shelfToggle)shelfToggle.hidden=!shelfViewVisible({current:getCurrent()})||onCommunity||inlineShelfToggle;shelfToggle?.removeAttribute?.('data-lt-pending');
-  for(const b of document.querySelectorAll('nav>button'))b.hidden=publicReading;
+  // #1447: ???? ? ??? ? ??? ????. ??? ??? ??? ???.
+  renderHeaderLayout({publicReading, owned, parts, current:getCurrent(), tree:getModel()?.trees?.find(t=>t.id===window.LT41?.tree?.id)});
   // 트리 선택은 뒤쪽 탭 묶음 바로 앞에 있고, 로그인 상태에서만 "트리: <이름> ▾"로 보여 준다.
   // 2026-11-18 13:49 대표 결정: 트리 선택은 모든 페이지에서 똑같이 보인다(서재 포함).
   // 로그아웃이면 "트리 고르기", 브라우저에만 남은 미저장 기록이 있으면 "저장 안 된 기록"이다.

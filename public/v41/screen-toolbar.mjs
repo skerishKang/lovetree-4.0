@@ -1,5 +1,6 @@
 import { MSG } from './frame-messages.mjs';
 import { thumbnailCandidates } from './thumb-fallback.mjs';
+import { coverModeOf, normalizeCoverDesign } from './domain.mjs';
 // #1091: 상단 메뉴 아래 화면 도구 줄 한 벌. 책·보드가 각자 그리던 줄 대신 이 부품을 호출한다.
 // 서재는 #1154가 상단을 바꾸는 중이라 아직 붙이지 않는다.
 // 책·보드·지도 같은 트리 줄 — 왼쪽에 '← 서재'·트리 이름(크게)·작은 메타(순간 N개 · 마지막 M.D),
@@ -59,7 +60,8 @@ function prepareTreeChoice(bar, screen, title, titleFrom) {
     choice.append(thumb, name, caret);
   } else choice.append(name);
   left.prepend(choice);
-  if (screen !== 'shelf') title.hidden = true;
+  // #1448: ????? ??? ??? ?? ??? ????? ?? ??? ??.
+  title.hidden = true;
   const refresh = () => {
     const current = source()?.tree;
     const value = String((screen === 'shelf' ? current?.title : titleFrom?.textContent || current?.title) || '\uD2B8\uB9AC').trim() || '\uD2B8\uB9AC';
@@ -67,13 +69,21 @@ function prepareTreeChoice(bar, screen, title, titleFrom) {
     if (!own) return;
     const initial = Array.from(value)[0] || '\uD2B8';
     thumb.replaceChildren(document.createTextNode(initial));
-    const moments = Array.isArray(current?.moments) ? current.moments : [];
-    const cover = moments.find(m => m.id === current?.coverMomentId) || moments.find(m => thumbnailCandidates(m, {autoLoad:true}).length);
-    const url = cover ? thumbnailCandidates(cover, {autoLoad:true})[0] || '' : '';
+    const mode = coverModeOf(current);
+    const design = mode === 'design' ? normalizeCoverDesign(current?.coverDesign) : '';
+    if (design) thumb.dataset.coverDesign = design;
+    else delete thumb.dataset.coverDesign;
+    // ??? ?? ??: ??? ??? ??, ?? ??? ?? ??? ??.
+    const moments = Array.isArray(current?.moments) ? [...current.moments].sort((a, b) =>
+      String(a.createdAt || '').localeCompare(String(b.createdAt || ''))) : [];
+    const selected = mode === 'moment' ? moments.find(m => m.id === current?.coverMomentId) : null;
+    const cover = selected || moments[0];
+    const url = !design && cover ? thumbnailCandidates(cover, {autoLoad:true})[0] || '' : '';
     if (typeof url === 'string' && /^https?:\/\//.test(url)) {
       const image = document.createElement('img');
       image.alt = '';
-      image.addEventListener('load', () => thumb.replaceChildren(image), {once:true});
+      image.referrerPolicy = 'no-referrer';
+      image.addEventListener('load', () => { if (source()?.tree?.id === current?.id) thumb.replaceChildren(image); }, {once:true});
       image.src = url;
     }
   };

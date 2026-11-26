@@ -16,8 +16,9 @@ function treeCoverMarkup(tree){
  const cover=mode!=='design'&&tree?.coverMomentId?moments.find(m=>m.id===tree.coverMomentId):null;
  const chosen=(cover&&treeMomentThumb(cover)?cover:null)||moments.find(m=>Boolean(treeMomentThumb(m)))||null;
  const thumb=chosen?treeMomentThumb(chosen):'';
+ const initial=escHTML(Array.from(displayTreeTitle(tree?.title||tree?.subject||'??'))[0]||'?');
  const fallback=chosen?coverFallbackAttrs(chosen):'';
- return `<span class="tree-cover" aria-hidden="true">${thumb?`<img src="${escHTML(thumb)}"${fallback} alt="" loading="lazy" referrerpolicy="no-referrer">`:''}</span>`;
+ return `<span class="tree-cover" aria-hidden="true">${thumb?`<img src="${escHTML(thumb)}"${fallback} alt="" loading="lazy" referrerpolicy="no-referrer">`:''}<span class="tree-cover-letter">${initial}</span></span>`;
 }
 function renderTreeMenu(){
  if(!treePopover)return;
