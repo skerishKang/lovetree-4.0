@@ -97,7 +97,7 @@ const THUMB = (route) => route.fulfill({ status: 200, contentType: 'image/png', 
 // #942: 초심자·기존 사용자의 추가 단추와 단추별 숫자 묶음을 실제 화면에서 잰다.
 test('#942 첫 화면 추가 단추와 숫자 묶음', { skip: REQUIRE ? false : skip, timeout: 180000 }, async () => {
   if (skip) assert.fail(skip);
-  const server=await serve(),base='http://127.0.0.1:'+server.address().port;
+  const server=await serve({}, {port:Number(process.env.LT_TEST_PORT)||0}),base='http://127.0.0.1:'+server.address().port;
   const browser=await chromium.launch({headless:true});
   const dest=process.env.LT_HOME_CTA_CAPTURE;
   if(dest)mkdirSync(dest,{recursive:true});
