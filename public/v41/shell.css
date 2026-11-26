@@ -1359,7 +1359,7 @@ body[data-record-source=share][data-fab-lift=book].lt-book-lightbox-open #toast[
 
 /* #1367: shared picker is anchored to the active screen, not the top navigation. */
 .app-header .tree-slot:has(>#record-menu[hidden]){display:none}
-body>.tree-popover.lt-toolbar-picker{position:fixed;top:var(--lt-picker-top);left:clamp(8px,var(--lt-picker-left),calc(100vw - 370px));right:auto;width:min(354px,calc(100vw - 16px));min-width:0;max-height:min(75dvh,650px);overflow:hidden;z-index:220;display:flex;flex-direction:column;gap:4px;background:var(--lt-role-bg);color:var(--lt-role-text-strong);border:1px solid var(--lt-role-border);border-radius:var(--lt-r-card)}
+body>.tree-popover.lt-toolbar-picker{position:fixed;top:var(--lt-picker-top);left:clamp(8px,var(--lt-picker-left),calc(100vw - 370px));right:auto;width:min(354px,calc(100vw - 16px));min-width:0;max-height:min(85dvh,750px);overflow:hidden;z-index:220;display:flex;flex-direction:column;gap:4px;background:var(--lt-role-bg);color:var(--lt-role-text-strong);border:1px solid var(--lt-role-border);border-radius:var(--lt-r-card)}
 body>.tree-popover.lt-toolbar-picker[hidden]{display:none}
 .lt-toolbar-picker .lt-tree-picker-heading{display:flex;justify-content:space-between;align-items:center;padding:4px 8px}
 .lt-toolbar-picker .lt-tree-picker-heading button{min-width:44px;min-height:44px;background:var(--lt-role-idle-bg);color:var(--lt-role-idle-ink);border:1px solid var(--lt-role-idle-border);border-radius:var(--lt-r-pill)}

@@ -53,8 +53,8 @@ async function withShelf(trees, { width, height }, fn) {
     await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
     await page.locator('#discover-ask-no').click().catch(() => {});
     // 서재는 트리 ▾의 '서재 전체 보기'로 연다(실제 입구).
-    await clickToolbarTreeChoice(page);
-    await page.locator('[data-tree-action="shelf"]').click();
+    // #1367: the shelf tab itself is the entry; the header tree menu no longer exists.
+    await page.locator('[data-view="track32-bookshelf.html"]').first().evaluate(button => button.click());
     let frame = null;
     for (let i = 0; i < 80 && !frame; i += 1) {
       frame = page.frames().find((f) => /track32-bookshelf/.test(f.url()));

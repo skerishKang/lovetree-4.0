@@ -2739,15 +2739,20 @@ test('#987 보드 첫 줄과 모바일 셸 겹침·현재 표시', { skip: REQUI
       for (const width of [360, 375, 390]) await withPage(width, 844, theme, 8, async (page, snap) => {
         await clickToolbarTreeChoice(page);
         const header = await page.evaluate(() => {
-          const t = document.querySelector('#record-menu'), s = document.querySelector('#theme-toggle'), a = t.querySelector('svg');
-          const b = t.getBoundingClientRect(), c = s.getBoundingClientRect(), d = a.getBoundingClientRect();
-          const hit = document.elementFromPoint(d.x + d.width/2, d.y + d.height/2);
-          return { overlap: Math.max(0, Math.min(b.right,c.right)-Math.max(b.left,c.left))*Math.max(0,Math.min(b.bottom,c.bottom)-Math.max(b.top,c.top)), arrowVisible: a.contains(hit) || t.contains(hit), arrowGap: b.right-d.right, arrowWidth: d.width, overflow: document.documentElement.scrollWidth-innerWidth };
+          const frame = document.querySelector('iframe#view');
+          const doc = frame?.contentDocument;
+          const t = doc?.querySelector('button.lt-toolbar-tree-choice');
+          const s = document.querySelector('#theme-toggle'), a = t?.querySelector('.lt-toolbar-tree-caret');
+          const b = t.getBoundingClientRect(), c = s.getBoundingClientRect(), d = a.getBoundingClientRect(), fr = frame.getBoundingClientRect();
+          const hit = doc.elementFromPoint(d.x + d.width/2, d.y + d.height/2);
+          const overlap = Math.max(0, Math.min(b.right+fr.left,c.right)-Math.max(b.left+fr.left,c.left))*
+            Math.max(0,Math.min(b.bottom+fr.top,c.bottom)-Math.max(b.top+fr.top,c.top));
+          return { overlap, arrowVisible: a.contains(hit) || t.contains(hit), arrowGap: b.right-d.right, arrowWidth: d.width, overflow: document.documentElement.scrollWidth-innerWidth };
         });
         console.log('#987 header', width, theme, JSON.stringify(header));
         await snap('tree-menu');
         check(header.overlap === 0 && header.arrowVisible && header.arrowWidth > 0 && header.arrowGap >= 0 && header.arrowGap <= 16 && header.overflow === 0, '트리 ' + width + ' ' + theme + ' ' + JSON.stringify(header));
-        await clickToolbarTreeChoice(page);
+        await page.locator('#tree-popover [data-tree-close]').click();
         if (width !== 390) return;
         await page.locator('#mobile-more').click();
         const menu = await page.locator('#header-overflow [aria-current=true]').evaluate(el => {

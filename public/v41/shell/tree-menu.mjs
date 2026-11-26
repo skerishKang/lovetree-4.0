@@ -157,12 +157,12 @@ function outsideClick(event){
 function escKey(event){
  if(event.key==='Escape'&&treePopover&&!treePopover.hidden){event.preventDefault();event.stopPropagation();closeTreeMenu(true);}
 }
-document.addEventListener('pointerdown',outsideClick,true);
+document.addEventListener('click',outsideClick,true);
 document.addEventListener('keydown',escKey,true);
 function bindFrame(frame){
  try{
   const doc=frame.contentDocument;if(!doc)return;
-  doc.addEventListener('pointerdown',outsideClick,true);
+  doc.addEventListener('click',outsideClick,true);
   doc.addEventListener('keydown',escKey,true);
  }catch{}
 }

@@ -552,6 +552,7 @@ test('26: 책을 열어 둔 채 트리를 바꾸면 책 제목·첫 카드·카�
   let b = makeTree({subject:'B',title:'B',note:'',emotion:'설렘',date:'2026-11-03',url:''},'2026-11-03T00:00:00Z');
   b = growTree(b,{title:'B 첫 순간',note:'',emotion:'설렘',date:'2026-11-03',url:''},b.moments[0].id,'2026-11-03T00:00:00Z');
   b = growTree(b,{title:'B 둘 순간',note:'',emotion:'설렘',date:'2026-11-04',url:''},b.moments[0].id,'2026-11-04T00:00:00Z');
+  b.openView='book';
   const server = await serveApp();
   const base = `http://127.0.0.1:${server.address().port}`;
   const browser = await chromium.launch({ headless:true, ...(process.env.LT_BOOK_BROWSER_EXE ? { executablePath: process.env.LT_BOOK_BROWSER_EXE } : {}) });
