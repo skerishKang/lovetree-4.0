@@ -1,5 +1,5 @@
 {
-  "basis": "b41636d4dbe54ae551eec1576467429cf9392cd9",
+  "basis": "77072bf2a7c2d5f6bd89dbfa3a1dcb37f85185b8",
   "viewports": {
     "390": { "width": 390, "height": 844 },
     "1440": { "width": 1440, "height": 900 }
@@ -22,7 +22,7 @@
           "390": ["0px", "0px", "0px", "0px"],
           "1440": ["0px", "0px", "0px", "0px"]
         },
-        "height": { "390": 733, "1440": 781 },
+        "height": { "390": 733, "1440": 835 },
         "borderWidth": ["0px", "0px", "0px", "0px"],
         "borderStyle": ["none", "none", "none", "none"],
         "borderColor": {
