@@ -8,9 +8,9 @@ import {localDateOnly} from '../local-date.mjs';
 // 소개 켜짐/꺼짐 값 자체는 저장하지 않는다(서버 discover 값이 기준이다).
 export const DISCOVER_NEWS_KEY = 'lt41.discoverNews';
 
-export function createDiscoverRuntime(ctx){
+export function createDiscoverRuntime(ctx,{storage:given=null}={}){
   let countTreeMoments, discoverState;
-  const storage = () => { try { return ctx.storage || globalThis.localStorage || null; } catch { return null; } };
+  const storage = () => { try { return given || globalThis.localStorage || null; } catch { return null; } };
   function readNews(){
    try{const raw=JSON.parse(storage()?.getItem(DISCOVER_NEWS_KEY)||'[]');return Array.isArray(raw)?raw.filter(row=>row&&typeof row.treeId==='string'):[];}catch{return[];}
   }

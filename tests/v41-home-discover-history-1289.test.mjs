@@ -16,13 +16,13 @@ function setup({answer = {ok:true,discover:false}, defer = false, storage = memo
  const opened = [];
  const ctx = {
   $: id => (id === 'discover-ask' ? {showModal(){opened.push(id);}} : null),
-  source:'server', model:{trees}, storage,
+  source:'server', model:{trees},
   shareApi:{
    getTreeDiscover: () => defer ? new Promise(resolve => { resolveResponse = resolve; }) : Promise.resolve(answer),
    setTreeDiscover: async (treeId, discover) => { puts.push([treeId, discover]); return {ok:true, discover}; }
   }
  };
- createDiscoverRuntime(ctx).mount();
+ createDiscoverRuntime(ctx, {storage}).mount();
  return {ctx, puts, opened, storage, reply: (value = {ok:true,discover:false}) => resolveResponse(value)};
 }
 
