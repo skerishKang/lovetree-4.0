@@ -16,7 +16,7 @@ import {momentListEntries, momentListTrees} from './moment-list.js';
 import {youtubeIdFrom,isVerticalMoment} from '../public/v41/youtube-id.mjs';
 import {isAutoTitle} from '../public/v41/auto-title.mjs';
 import {fetchVideoMetadata} from '../public/v41/video-title.mjs';
-import {fetchVideoStatus} from '../public/v41/video-status.mjs';
+import {fetchVideoStatus,readVideoStatusCache} from '../public/v41/video-status.mjs';
 // 261116 PR 2: 카드 모드(마지막·고정·그날·무작위·트리)·숫자 줄이기 — 순수 계산 한 벌.
 import {HOME_MOMENT_KEY, readHomeMoment, normalizeHomeMoment, homeMomentPick, homeDayMoment, homeMomentMenu, formatCount} from './home-card-mode.js';
 const themeHost=document.getElementById('orbit');
@@ -38,10 +38,13 @@ const popular=mode==='popular'?await fetchPopularCards({limit:HOME_ORBIT_LIMIT})
 // 썸네일 카드를 처음부터 만든다. 판정 입력은 media-preview의 currentContext(셸 기록 상태)와 같은 값이다.
 const mediaState=globalThis.LTMedia?.currentContext?.()||{source:'',owned:false};
 const youtube={describe:url=>globalThis.LTMedia?.describe?.(url)??null,auto:globalThis.LTMedia?.autoLoadMedia?.(mediaState.source,mediaState.owned)===true || (context.source==='server' && loggedIn && shellBody.dataset.member==='in')};
+// #1435: 이 기기에 '없음'으로 기록된 영상은 첫 화면 카드(가운데·둘레)에서 빼고, 기록 화면에는 남긴다.
+const available=item=>{const id=youtubeIdFrom(item?.url||item?.externalUrl||'');return !(id&&readVideoStatusCache(localStorage,id)==='gone')};
 const confirmedTreeZero=loggedIn&&!homeTitlePending&&Number(presentation.centerState.treeCount)===0;
 const cardsPlan=confirmedTreeZero
  ? {mode:'mine',kind:'mine-empty',cards:[],examples:0,note:null}
  : homeCardsPlan({mode,loggedIn,context,popular,youtube});
+cardsPlan.cards=cardsPlan.cards.filter(available);
 // 첫 화면이 셸의 기록을 다 받기 전에 그려지면 내 사진·영상 순간이 아직 없어 '예시만' 궤도로 시작한다(운영 11-24).
 // #1109 뒤로는 셸이 프레임을 다시 띄우지 않으므로, 기록이 도착했을 때 궤도 카드 구성이 달라지면 첫 화면만 다시 그린다.
 const cardsPlanKey=plan=>plan.kind+':'+plan.cards.map(c=>c?.id||c?.key||'').join(',');
@@ -61,6 +64,7 @@ const momentList=loggedIn?{
  initialPicking:momentsRequest?.picking===true,
  initialNotice:momentsRequest?.notice||null
 }:null;
+if(momentList)momentList.entries=momentList.entries.filter(available);
 const homeMomentChoice=homeMomentPick(momentList?.entries,homeMomentValue,{day:homeMomentDay,trees:momentList?.trees||[]});
 if(momentList){momentList.recent=homeMomentChoice.moment;momentList.recentHeader=homeMomentChoice.header;}
 const setHomePortrait=moment=>{const vertical=!!(moment&&isVerticalMoment(moment));document.getElementById('orbit')?.toggleAttribute('data-lt-home-portrait',vertical);};
