@@ -283,3 +283,28 @@ test('서재 — 390·844·1440 × 선반·회전 × 책 1·4·20권에서 왼�
     }
   });
 });
+
+// #1435 3: 설정 화면에서 고른 서재 기본 보기가 서재에 바로 반영되고 새로고침 뒤에도 남는다.
+test('서재 — 설정에서 고른 기본 보기가 저장되고 다시 열려도 남는다', async (t) => {
+  if (skip) { if (REQUIRE) assert.fail(`화면 시험을 건너뛸 수 없습니다: ${skip}`); t.skip(skip); return; }
+  for (const name of ['shelf', 'carousel']) {
+    await withShelf(books(2), { width: 1440, height: 900 }, async ({ page, errors }) => {
+      await page.locator('#account-avatar').click();
+      await page.locator('#account-open-settings').click();
+      await page.waitForSelector('#account-settings[open]');
+      await page.locator(`#settings-tab-screen`).click();
+      await page.locator(`[data-settings-shelf-view="${name}"]`).click();
+      assert.equal(await page.evaluate(() => localStorage.getItem('lt41.shelfView')), name, '기기 값에 저장된다');
+      assert.equal(await page.evaluate(() => window.LT41?.prefs?.shelfView), name, '계정 값에 저장된다');
+      await page.reload({ waitUntil: 'load' });
+      await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
+      await page.locator('#discover-ask-no').click().catch(() => {});
+      await page.locator('#account-avatar').click();
+      await page.locator('#account-open-settings').click();
+      await page.waitForSelector('#account-settings[open]');
+      const checked = await page.evaluate((v) => document.querySelector(`[data-settings-shelf-view="${v}"]`)?.getAttribute('aria-checked'), name);
+      assert.equal(checked, 'true', '새로고침 뒤에도 선택이 남는다');
+      assert.deepEqual(errors, [], '페이지 오류 없음');
+    });
+  }
+});

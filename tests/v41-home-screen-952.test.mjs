@@ -376,7 +376,8 @@ test('#1026 마지막 순간 영상은 확인 전 실패를 보이지 않고 높
         release();
         await media.locator('.recent-thumb').evaluate(img=>new Promise(r=>{if(img.complete&&img.naturalWidth)r();else img.addEventListener('load',r,{once:true});setTimeout(r,5000)}));
         await h.frame.waitForFunction(v=>document.querySelector('#orbit').shadowRoot.querySelector('.recent-media').dataset.recentState===v,failed?'failed':'ready');
-        assert.equal(await media.locator('.recent-video-status').isVisible(),failed);
+        assert.equal(await media.locator('.recent-video-status').isVisible(),false, '실패 안내 대신 표지가 보인다');
+        assert.equal(await media.locator('.lt-recent-fallback').isVisible(),failed, '썸네일 실패 시 표지와 제목');
         const after=await card.boundingBox();
         assert.equal(after.height,before.height);
         if(failed){

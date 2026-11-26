@@ -23,9 +23,14 @@ function roParticle(value) {
 
 // 로그인 상태의 계정 표시: 글자 알약 대신 첫 글자 동그라미.
 // 동그라미 글자는 표시 이름 → 이메일 첫 글자 순서로 고르고(#368), subject(usr_…) 첫 글자는 쓰지 않는다.
-// 이메일 표시 규칙: 자기 계정 메뉴는 본인만 보는 곳이라 전체를 보여 주고, 가리기(maskEmail)는
-// 공유 화면 등 남이 보는 곳에서만 쓴다 — 지금 이메일을 남이 보는 화면에 쓰는 곳은 없다(2026-11-11 확인).
+// 이메일 표시 규칙(#1435): 계정 메뉴에는 앞부분만 짧게 보여 주고, 전체 주소는 이름표·제목과
+// 화면 읽기 프로그램에만 전달한다. 긴 아이디가 한 줄을 넘지 않게 하는 것이 목적이다.
 // 로그아웃 상태는 기존 "로그인" 알약을 그대로 쓴다(모양이 확실히 달라야 한다).
+function shortAccountLabel(address) {
+  if (!address || address === '내 계정') return '내 계정';
+  const id = address.split('@')[0] || address;
+  return id.slice(0, 4) + '…';
+}
 export function accountPresentation({ owned = false, email = '', name = '' } = {}) {
   if (!owned) return { mode: 'login', label: '로그인', initial: '', ariaLabel: null, title: '로그인' };
   const address = clean(email);
@@ -35,7 +40,7 @@ export function accountPresentation({ owned = false, email = '', name = '' } = {
   const who = address || '내 계정';
   return {
     mode: 'avatar',
-    label: who,
+    label: shortAccountLabel(who),
     initial,
     ariaLabel: `내 계정 메뉴, ${who}${roParticle(who)} 로그인됨`,
     title: who

@@ -243,6 +243,8 @@ html[data-lt-theme=garden] .view-toggle button[aria-checked="true"]{background:v
 @media(max-width:780px){.header-actions{flex-wrap:wrap;row-gap:4px}.view-toggle button{min-height:36px;padding:0 9px;font-size:12px}}
 .account-popover{position:absolute;right:0;top:calc(100% + 8px);z-index:30;width:232px;padding:8px;border:1px solid var(--lt-line);border-radius:var(--lt-r-card);background:var(--lt-glass-strong);backdrop-filter:blur(24px);box-shadow:0 12px 30px #0008;display:grid;grid-template-columns:minmax(0,1fr);gap:4px}
 .account-popover[hidden]{display:none}
+/* #1435: 계정 정보·설정 묶음과 로그아웃을 구분한다. 색은 역할 변수만 쓴다. */
+#account-logout{border-top:1px solid var(--lt-role-border);margin-top:4px;padding-top:4px}
 .account-email{margin:0;padding:8px 10px 10px;border-bottom:1px solid var(--lt-line);font-size:12px;line-height:1.6;color:var(--lt-muted);overflow-wrap:anywhere}
 /* 판 안 단추는 스스로 flex 칸이다 — 상단 칩 규칙이 더는 내려오지 않으므로 정렬·줄바꿈 금지를 여기서 정한다. */
 .account-popover button{display:flex;align-items:center;gap:6px;justify-content:flex-start;white-space:nowrap;width:100%;min-height:44px;padding:0 10px;border:0;border-radius:10px;background:transparent;font-size:13px;letter-spacing:.02em;color:var(--lt-pearl)}
