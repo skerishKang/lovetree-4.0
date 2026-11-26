@@ -60,6 +60,17 @@ export function mapChanged(changedFiles) {
 // 화면 시험 파일이 바뀌면 그 파일을 실행하는 잡을, 보드 전용 소스가 바뀌면 보드 잡을 고른다.
 // 그 밖의 화면 파일(공용 모듈·셸·CSS·빌드 설정·helpers 등)이 하나라도 있으면 전부(all)다 — 애매하면 다 돈다.
 export const SELECTABLE_JOBS = ['screen-board', 'screen-home', 'screen-book', 'screen-reload', 'screen-shell', 'screen-shell-extra', 'screen-book-screen', 'screen-shelf'];
+// 한 고르기 이름을 함께 쓰는 잡: 그 이름이 골리면 같이 돈다(워크플로 if도 같은 이름을 본다). 결과 모으기도 이 표를 쓴다.
+// #1413 5단계: 보드 둘째 잡(screen-board-b)은 보드 잡에서 나눈 잡이라 'screen-board'를 쓴다. 첫 화면 휴대폰 잡도
+// 'screen-home'으로 돈다 — 전에는 표에 없어 그 시험 파일만 바뀐 PR에서 잡이 골리지 않았다.
+export const JOB_TOKEN = {
+  'screen-home-followup': 'screen-home',
+  'screen-home-1284': 'screen-home',
+  'screen-board-b': 'screen-board'
+};
+export function tokenOf(job) {
+  return JOB_TOKEN[job] || job;
+}
 const AREA_SOURCES = [
   [/^public\/v41\/views\/board\//, 'screen-board'],
   [/^public\/v41\/views\/track58-pinboard\.html$/, 'screen-board']
@@ -85,7 +96,7 @@ export function selectJobs(changedFiles, jobTests, screenTests, screenHelpers) {
     const one = classify([f], screenTests, screenHelpers);
     if (!one.changed) continue;
     if (screenTests.has(f)) {
-      for (const [job, files] of Object.entries(jobTests)) if (files.has(f) && SELECTABLE_JOBS.includes(job === 'screen-home-followup' ? 'screen-home' : job)) picked.add(job === 'screen-home-followup' ? 'screen-home' : job);
+      for (const [job, files] of Object.entries(jobTests)) if (files.has(f) && SELECTABLE_JOBS.includes(tokenOf(job))) picked.add(tokenOf(job));
       continue;
     }
     const area = AREA_SOURCES.find(([re]) => re.test(f));
