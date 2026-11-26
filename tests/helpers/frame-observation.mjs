@@ -57,6 +57,10 @@ export async function settleObservation(page, predicate, arg = null, { freezeClo
       .filter(animation => animation.effect?.getTiming().iterations !== Infinity));
     if (freeze) for (const animation of animations) { try { animation.finish(); } catch {} }
     else await Promise.all(animations.map(animation => animation.finished.catch(() => {})));
+    if (frame) {
+      frame.style.willChange = 'transform';
+      frame.contentDocument?.querySelectorAll('.lt-screen-toolbar,button,select,.pill,.mini,.action,.close,.edge-tip')?.forEach(element => { element.style.willChange = 'transform'; });
+    }
     if (!freeze) await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
   }, freezeClock);
   if (freezeClock) {
@@ -172,10 +176,6 @@ export async function observeFrameMatrix({ browser, base, outputDir, shard = '' 
     page.on('pageerror', e => errors.push(String(e)));
     const capture = async (activePage, screen) => {
       const name = `${width}-${theme}-${screen.id}`;
-      await activePage.evaluate(() => {
-        const frame = [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length);
-        if (frame) frame.style.willChange = 'transform';
-      });
       await activePage.screenshot({ path: join(outputDir, name + '.png'), animations: 'disabled' });
       const target = screen.panel ? activePage.locator(screen.panel) : activePage.locator('#stage');
       const box = await target.boundingBox();
