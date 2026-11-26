@@ -155,8 +155,13 @@ async function openMemberScreen(page, screen) {
     await settleObservation(page, () => {
       const frame = [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length);
       const doc = frame?.contentDocument;
-      return !!doc && !doc.getElementById('detail')?.classList.contains('open') && !!doc.querySelector('#cardLayer .card.selected');
+      return !!doc && !doc.getElementById('detail')?.classList.contains('open') && !!doc.querySelector('#cardLayer .card.selected') && [...doc.images].every(image => image.complete);
     });
+    await page.evaluate(() => {
+      const frame = [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length);
+      frame.contentWindow.boardStartView();
+    });
+    await page.clock.fastForward(0);
   }
 }
 
@@ -181,6 +186,7 @@ export async function observeFrameMatrix({ browser, base, outputDir, shard = '' 
         const frame = [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length);
         if (!frame) return;
         frame.style.willChange = 'transform';
+        frame.style.transform = 'translateZ(0)';
         frame.contentDocument?.querySelectorAll('.lt-screen-toolbar,button,select,.pill,.mini,.action,.close,.edge-tip,.recent-card,.note-piece,.mobile-page,.mobile-content,.page-content,.photo-piece,.clipping,.letter,.film-piece')?.forEach(element => { element.style.willChange = 'transform'; if (element.matches('.recent-card')) element.style.transform = 'translateZ(0)'; });
       });
       if (screen.id === 'map') await activePage.evaluate(() => { const frame = [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length); frame.contentWindow.__lt?.resize(); });
