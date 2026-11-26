@@ -128,6 +128,7 @@ async function openMemberScreen(page, screen) {
     const f = [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length);
     return f?.contentWindow?.location?.pathname?.endsWith('/' + file) && f.contentDocument?.querySelector(root) &&
       !!f.contentDocument.querySelector('.lt-screen-toolbar[data-screen]') &&
+      (file !== 'track59-sketchbook.html' || !!f.contentWindow.LTTagLine) &&
       (file !== 'track58-pinboard.html' || (typeof f.contentWindow.bootDetailPanel === 'function' && !!f.contentWindow.__LT58V11));
   }, { file: screen.file, root: screen.root });
   if (screen.id === 'board') {
@@ -190,7 +191,7 @@ export async function observeFrameMatrix({ browser, base, outputDir, shard = '' 
     try {
       await guestPage.clock.install({ time: new Date('2026-11-20T00:00:00Z') });
       await guestPage.goto(base + '/v41/#share/c000000000000000000000a/book', { waitUntil: 'load' });
-      await settleObservation(guestPage, () => document.body.dataset.recordSource === 'share' && document.body.dataset.fabLift === 'book' && !document.getElementById('toast')?.hidden && document.getElementById('toast')?.hasAttribute('data-visitor-intro') && [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length)?.contentWindow?.location?.pathname?.endsWith('/track59-sketchbook.html') && [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length)?.contentDocument?.querySelector('.moment,.mobile-page,.book-wrap') && [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length)?.contentDocument?.querySelector('.lt-screen-toolbar[data-screen="book"]'), null, { freezeClock: true });
+      await settleObservation(guestPage, () => document.body.dataset.recordSource === 'share' && document.body.dataset.fabLift === 'book' && !document.getElementById('toast')?.hidden && document.getElementById('toast')?.hasAttribute('data-visitor-intro') && [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length)?.contentWindow?.location?.pathname?.endsWith('/track59-sketchbook.html') && [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length)?.contentDocument?.querySelector('.moment,.mobile-page,.book-wrap') && [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length)?.contentDocument?.querySelector('.lt-screen-toolbar[data-screen="book"]') && [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length)?.contentWindow?.LTTagLine, null, { freezeClock: true });
       await capture(guestPage, { id: 'share-guest', label: '공유 방문자 책', root: '.moment' });
     } finally { await guest.close(); }
   }
