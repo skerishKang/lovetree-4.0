@@ -87,7 +87,7 @@ extraCSS+=`@keyframes lt-home-rise{from{opacity:0;transform:translateY(12px)}to{
 @media(prefers-reduced-motion:reduce){.center .lt-home-enter{animation:none;opacity:1;transform:none}}
 .card.lt-first-frame{visibility:hidden}
 .center[data-lt-home-wait] .lt-home-enter{animation-play-state:paused;opacity:0}
-.center .eyebrow{min-height:1.3em}.center h1{min-height:1em}.center>p:not(.center-note){min-height:1.9em}.center .actions{min-height:44px}
+.center .eyebrow{min-height:1.3em}.center h1{min-height:1em}.center>p:not(.center-note){min-height:3.6em}.center:has(.recent-card)>p:not(.center-note){min-height:1.9em}.center .actions{min-height:44px}
 .center[data-lt-title-pending] .lt-home-enter{animation:none;opacity:0;pointer-events:none}
 .center[data-lt-title-pending] .actions{visibility:hidden}
 @media(max-width:650px){.center:has(.recent-media.vertical) .actions{position:relative;top:-4px}}

@@ -1173,7 +1173,7 @@ test('#1437 pending center is text-free until confirmed response and reserves st
  const {mkdirSync}=await import('node:fs');const {join}=await import('node:path');
  const tree=tree952({subject:'시험 순간',count:3});
  try{
-  for(const width of [1440,390]){
+  for(const width of [1440,390])for(const asMember of [true,false]){
    const ctx=await browser.newContext({viewport:{width,height:width===390?844:900},reducedMotion:'reduce'});
    try{
     await ctx.route('**/*',route=>{
@@ -1192,20 +1192,20 @@ test('#1437 pending center is text-free until confirmed response and reserves st
     const before=await measure();
     assert.ok(before.pending&&!before.title&&!before.eyebrow&&!before.p&&before.actionsHidden,JSON.stringify(before));
     const capture=process.env.LT_HOME_1437_PENDING_CAPTURE_DIR;
-    if(capture){mkdirSync(capture,{recursive:true});await page.screenshot({path:join(capture,`pending-${width}-before.png`),animations:'disabled',timeout:15000});}
+    if(capture&&asMember){mkdirSync(capture,{recursive:true});await page.screenshot({path:join(capture,`pending-${width}-before.png`),animations:'disabled',timeout:15000});}
     await page.waitForTimeout(750);
     const middle=await measure();assert.equal(middle.title,'');assert.equal(middle.pending,true);
-    if(capture)await page.screenshot({path:join(capture,`pending-${width}-during.png`),animations:'disabled',timeout:15000});
+    if(capture&&asMember)await page.screenshot({path:join(capture,`pending-${width}-during.png`),animations:'disabled',timeout:15000});
     await page.waitForTimeout(750);
-    await page.evaluate(t=>{
-     window.LT41={trees:[t]};document.body.dataset.member='in';document.documentElement.dataset.ltAuthPhase='ready';
-    },tree);
-    await frame.waitForFunction(()=>document.querySelector('#orbit')?.shadowRoot?.querySelector('.center h1')?.textContent==='다시, 그 순간으로.',null,{timeout:5000});
+    await page.evaluate(({tree,asMember})=>{
+     window.LT41={trees:asMember?[tree]:[]};document.body.dataset.member=asMember?'in':'out';document.documentElement.dataset.ltAuthPhase='ready';
+    },{tree,asMember});
+    await frame.waitForFunction(expected=>document.querySelector('#orbit')?.shadowRoot?.querySelector('.center h1')?.textContent===expected,asMember?'다시, 그 순간으로.':'좋아하는 순간부터.',{timeout:5000});
     const after=await measure();
-    if(capture)await page.screenshot({path:join(capture,`pending-${width}-after.png`),animations:'disabled',timeout:15000});
+    if(capture&&asMember)await page.screenshot({path:join(capture,`pending-${width}-after.png`),animations:'disabled',timeout:15000});
     assert.equal(after.pending,false);assert.equal(after.actionsHidden,false);assert.ok(after.actions.every(Boolean));
     assert.ok(Math.abs(after.height-before.height)<=1,`${width}: ${before.height} -> ${after.height}`);
-    console.log('#1437 PENDING',width,JSON.stringify({before,middle,after}));
+    console.log('#1437 PENDING',width,asMember?'member':'guest',JSON.stringify({before,middle,after}));
     await page.close();
    }finally{await ctx.close()}
   }
