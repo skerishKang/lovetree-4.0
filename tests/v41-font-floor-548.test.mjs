@@ -1,3 +1,4 @@
+import { listenOnSafePort } from './helpers/safe-port.mjs';
 // #548 — 화면마다 기준선(부수 글자 12px, 본문·안내·단추 13px)에 못 미치는 글자가 0개인지
 // 실제 크롬으로 잰다. 홈·책·보드·지도는 화면 공통 검사기(#657, tests/v41-screen-audit.test.mjs)가
 // 같은 규칙으로 밤·정원까지 함께 재므로, 여기서는 설정 창·순간 추가 창만 잰다.
@@ -35,7 +36,7 @@ async function serve() {
     }
     res.writeHead(404); res.end('not found');
   });
-  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  await listenOnSafePort(server, '127.0.0.1');
   return server;
 }
 

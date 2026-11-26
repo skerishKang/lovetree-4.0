@@ -1,3 +1,4 @@
+import { listenOnSafePort } from './helpers/safe-port.mjs';
 // #520·#521: 읽기 전용(예시·공유) 보드에서는 390에서도 '＋ 순간 꽂기'가 숨는지(#520),
 // '진주빛 보드 · 읽기 전용' 표시가 모바일 순간 선택 패널에 가려지지 않는지(#521),
 // 쓰기 가능한 내 보드에서는 390에서도 단추가 보이고 눌리는지(실행형) 시험한다.
@@ -45,7 +46,7 @@ function serve() {
     }
     res.writeHead(404); res.end('not found');
   });
-  return new Promise((ok) => server.listen(0, '127.0.0.1', () => ok(server)));
+  return listenOnSafePort(server, '127.0.0.1').then(() => server);
 }
 
 async function openSampleBoard(browser, base, { width, theme, plate }) {

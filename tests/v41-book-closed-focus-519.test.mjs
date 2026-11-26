@@ -1,3 +1,4 @@
+import { listenOnSafePort } from './helpers/safe-port.mjs';
 // #519: 읽기 전용(예시) 책에서 닫힌 창(opacity 0)의 입력칸이 Tab 초점을 받던 문제.
 // 실제 책 프레임에서 닫힌 창이 inert인지, Tab 18번 동안 그 안으로 초점이 들어가지 않는지,
 // 링크 창을 열면 다시 초점이 들어가고 닫으면 inert로 돌아오는지 확인한다.
@@ -31,7 +32,7 @@ function serve(root) {
     }
     res.writeHead(404); res.end('not found');
   });
-  return new Promise((ok) => server.listen(0, '127.0.0.1', () => ok(server)));
+  return listenOnSafePort(server, '127.0.0.1').then(() => server);
 }
 
 // #722: 책의 '링크 순간 추가' 창(#linkModal)은 지웠다 — 닫힌 채 시작하는 창은 다섯이다.

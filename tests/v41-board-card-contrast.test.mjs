@@ -1,3 +1,4 @@
+import { listenOnSafePort } from './helpers/safe-port.mjs';
 // #467: 보드 카드 글자 대비를 "실제 그려진 화면"에서 잰다(PR #499 CTO 검토).
 // 예전 시험은 변수 값(#fdfbf7 등)끼리 계산해, 밤 판에서 카드가 어두워지고 제목이 1.0:1이 된 것을 놓쳤다.
 // 여기서는 보드 화면을 헤드리스 크롬으로 열어, 카드 종류(보통·첫 순간·마음 한마디 × 포스트잇·메모지·둥근·필름·티켓…)마다
@@ -38,7 +39,7 @@ function serve(root) {
     }
     res.writeHead(404); res.end('not found');
   });
-  return new Promise((ok) => server.listen(0, '127.0.0.1', () => ok(server)));
+  return listenOnSafePort(server, '127.0.0.1').then(() => server);
 }
 
 // 보드는 셸이 넘겨주는 예시 트리(parent.LT41)로 그린다 — 로그아웃 셸(/v41/#board)째 열고 보드 프레임 안에서 잰다.

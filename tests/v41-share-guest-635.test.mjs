@@ -1,3 +1,4 @@
+import { listenOnSafePort } from './helpers/safe-port.mjs';
 // #635 PR A: 감상 화면(공유 링크·예시)의 고장 2개 + 문구 정리 — 데이터·규칙은 그대로, 화면만.
 // #635 PR B(2026-11-15, 대표 캡처 지적 3가지)를 같은 잡에서 검사한다:
 //   5. 안내 패널 다듬기 — 패널 여백이 네 방향 같게(#guidePanel id 누락 수리), 열자마자 닫기 포커스 테두리 없음(초점은 제목),
@@ -51,7 +52,7 @@ function serve() {
     }
     res.writeHead(404); res.end('not found');
   });
-  return new Promise((ok) => server.listen(0, '127.0.0.1', () => ok(server)));
+  return listenOnSafePort(server, '127.0.0.1').then(() => server);
 }
 
 // 시험 트리: 순간 3개 사슬. 첫 순간은 유튜브(사용자 제목이 영상 제목과 대소문자만 다르다),

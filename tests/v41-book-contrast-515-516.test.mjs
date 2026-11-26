@@ -1,3 +1,4 @@
+import { listenOnSafePort } from './helpers/safe-port.mjs';
 // #515·#516: 정원 책의 '다음 순간으로 이어진 이유'·보기 알약·페이지 수를 실제 그려진 화면에서 잰다.
 // getComputedStyle의 글자색(+opacity)과 그 자리에 실제로 칠해진 바탕 픽셀(스크린샷의 가장 많은 색)으로 대비를 낸다.
 // 밤 테마는 손대지 않았음을 색·opacity 값으로 함께 고정한다.
@@ -31,7 +32,7 @@ function serve(root) {
     }
     res.writeHead(404); res.end('not found');
   });
-  return new Promise((ok) => server.listen(0, '127.0.0.1', () => ok(server)));
+  return listenOnSafePort(server, '127.0.0.1').then(() => server);
 }
 
 const parse = (s) => { const m = s.match(/rgba?\(([^)]+)\)/); if (!m) return null; const p = m[1].split(/[\s,/]+/).filter(Boolean).map(Number); return { r: p[0], g: p[1], b: p[2], a: p.length > 3 ? p[3] : 1 }; };

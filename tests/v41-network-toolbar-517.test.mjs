@@ -1,3 +1,4 @@
+import { listenOnSafePort } from './helpers/safe-port.mjs';
 // #517: 390·360 지도 머리 도구 줄이 화면 밖으로 넘치지 않는지(전: 사용법 339~399 9px 잘림,
 // 이어진 선 n개 404~504 화면 밖), 모든 단추가 44px 누름 높이를 유지하는지,
 // 내려온 도구 줄과 순간 선택 패널·안내 문구가 겹치지 않는지 시험한다.
@@ -85,7 +86,7 @@ async function serve() {
     }
     res.writeHead(404); res.end('not found');
   });
-  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  await listenOnSafePort(server, '127.0.0.1');
   return server;
 }
 

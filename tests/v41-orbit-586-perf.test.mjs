@@ -1,3 +1,4 @@
+import { listenOnSafePort } from './helpers/safe-port.mjs';
 // #586: 첫 화면(궤도) 끌기 성능 — 원인을 줄인 자리를 실제 화면에서 잠근다.
 // - z-index를 매 프레임 다시 쓰지 않는다(64 단계 밴드). 매 프레임 z-index 쓰기는 스타일 재계산을
 //   몇 배로 무겁게 만드는 상태를 이어갔다(실측 기록은 지정한 캡처 폴더에 남는다).
@@ -38,7 +39,7 @@ function serve() {
     }
     res.writeHead(404); res.end('not found');
   });
-  return new Promise((ok) => server.listen(0, '127.0.0.1', () => ok(server)));
+  return listenOnSafePort(server, '127.0.0.1').then(() => server);
 }
 const frameOf = async (page) => {
   let frame = null;
