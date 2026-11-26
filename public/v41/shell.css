@@ -1421,3 +1421,13 @@ body.lt-header-visitor #toast[data-visitor-intro]{display:none}
 
 /* #1350: ??? ?? ??? ?? ?? ?? ????. */
 @media(max-width:780px){.app-header .header-actions>.account-slot{flex:0 0 66px;width:66px}}
+
+/* #1447: ?? ?? ?? ?? ??? ? ?? ??? ??? ??? ?? ???. */
+@media(min-width:781px){
+ .app-header{--lt-head-items:12px}
+ html[data-lt-auth-phase] .app-header .header-actions,
+ html:not([data-lt-auth-phase]) .app-header .header-actions{display:flex;gap:var(--lt-head-items)}
+ .app-header .header-actions>.account-slot{flex:0 0 80px;width:80px}
+ .app-header .header-actions>#write-menu{flex:0 0 122px;width:122px}
+}
+@media(min-width:781px) and (max-width:1020px){.app-header{--lt-head-items:8px}}
