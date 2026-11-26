@@ -27,24 +27,24 @@ function renderHeaderLayout({publicReading, owned, parts, current, tree}) {
   const root=document.body;
   root.classList.toggle('lt-header-visitor',publicReading);
   const browse=$('community-menu');
-  browse.hidden=false;
-  browse.removeAttribute('aria-hidden');
+  if(browse) { browse.hidden=false; browse.removeAttribute?.('aria-hidden'); }
   const views=$('tree-views');
   const viewing=publicReading && current==='track32-bookshelf.html' ? 'track59-sketchbook.html' : current;
-  for(const b of views.querySelectorAll('button[data-view]')) {
+  for(const b of views?.querySelectorAll?.('button[data-view]')||[]) {
     const hidden=publicReading&&b.dataset.view==='track32-bookshelf.html';
     b.hidden=hidden;
     b.inert=hidden;
-    b.toggleAttribute('aria-hidden',hidden);
+    b.toggleAttribute?.('aria-hidden',hidden);
     if(publicReading)b.setAttribute('aria-current',String(!hidden && b.dataset.view===viewing));
   }
-  let label=document.getElementById('lt-visitor-caption');
-  if(!label) {
+  let label=document.getElementById?.('lt-visitor-caption');
+  if(!label && typeof document.createElement==='function' && document.querySelector?.('.app-header')) {
     label=document.createElement('div');
     label.id='lt-visitor-caption';
     label.setAttribute('role','status');
     document.querySelector('.app-header')?.after(label);
   }
+  if(!label)return;
   label.hidden=!publicReading;
   if(publicReading) {
     const name=String(tree?.title||window.LT41?.tree?.title||'트리').trim();
