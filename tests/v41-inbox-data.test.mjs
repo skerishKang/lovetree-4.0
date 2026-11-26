@@ -259,3 +259,134 @@ test('treeFromMoments: 원래 트리가 비면 지우고, 남은 자식은 가�
     assert.throws(() => d.treeFromMoments(many, 't0', ['m0'], { subject: '새 책' }, CLOCK), /트리는 50개까지 만들 수 있어요/);
   }
 });
+
+
+// ── #1439: 순간 정리 — 복사하기(copiedFrom)·옮기기 여러 개·되돌리기 ──
+// 복사 원본 표시는 두 벌(서버·클라이언트) 검증이 모두 지켜야 서버 왕복에서 남는다.
+test('#1439 copiedFrom은 두 벌 검증을 지나 남고, 모양이 틀리거나 자기 자신이면 버린다', () => {
+  for (const d of [serverDomain, webDomain]) {
+    const state = chainState();
+    state.trees[1].moments.push({ ...moment('my', 'mx', '사본', { seq: 2 }), copiedFrom: 'mb' });
+    state.trees[1].moments.push({ ...moment('mz', 'mx', '이상한 사본', { seq: 3 }), copiedFrom: '../x' });
+    state.trees[1].moments.push({ ...moment('mw', 'mx', '자기 자신', { seq: 4 }), copiedFrom: 'mw' });
+    const kept = validate(d)(state).trees[1].moments;
+    assert.equal(kept.find(m => m.id === 'my').copiedFrom, 'mb', '원본 id 유지');
+    assert.equal('copiedFrom' in kept.find(m => m.id === 'mz'), false, '틀린 모양은 버린다');
+    assert.equal('copiedFrom' in kept.find(m => m.id === 'mw'), false, '자기 자신은 버린다');
+    assert.equal('copiedFrom' in kept.find(m => m.id === 'mx'), false, '없으면 키도 없다');
+  }
+});
+
+const OUT = '2026-11-26T10:00:00.000Z';
+const counter = prefix => { let n = 0; return () => `${prefix}${++n}`; };
+function threeTrees() {
+  const state = chainState();
+  state.trees.push(tree('t3', [moment('my', null, '셋째 트리 시작', { seq: 1 })], { subject: '빌리' }));
+  state.trees[0].moments = state.trees[0].moments.map(m => m.id === 'mb' ? { ...m, relation: '표정이 생각나서', note: '원본 메모', url: 'https://youtu.be/dQw4w9WgXcQ', startSeconds: 30 } : m);
+  return webDomain.validateState(state);
+}
+
+test('#1439 복사: 여러 순간을 여러 트리에 한 번에 — 새 id·내용은 그대로·길 연결은 비우고 시작 순간 아래', () => {
+  const state = threeTrees();
+  const done = webDomain.organizeMoments(state, { mode: 'copy', fromTreeId: 't1', momentIds: ['mb', 'mc'], toTreeIds: ['t2', 't3'] }, OUT, counter('cp'));
+  assert.deepEqual(done.summary, { moments: 2, trees: 2, placed: 4, skipped: 0 });
+  assert.equal(done.treeId, 't1', '복사 뒤에도 원래 트리에 머문다');
+  assert.deepEqual(done.state.trees.find(t => t.id === 't1'), state.trees.find(t => t.id === 't1'), '원래 트리는 그대로');
+  for (const [treeId, root] of [['t2', 'mx'], ['t3', 'my']]) {
+    const copies = done.state.trees.find(t => t.id === treeId).moments.filter(m => m.copiedFrom);
+    assert.equal(copies.length, 2, treeId + ': 두 사본');
+    const b = copies.find(m => m.copiedFrom === 'mb');
+    assert.notEqual(b.id, 'mb', '새 id');
+    assert.equal(b.parentId, root, '대상 트리 시작 순간 아래(길에 끼워 넣지 않음)');
+    assert.deepEqual(b.links, [], '연결은 비운다');
+    assert.equal(b.relation, '표정이 생각나서', '다음으로 간 이유는 복사');
+    assert.equal(b.note, '원본 메모', '메모 복사');
+    assert.equal(b.emotion, '설렘', '감정 복사');
+    assert.equal(b.startSeconds, 30, '시작 초 복사');
+  }
+  assert.doesNotThrow(() => serverDomain.validateState(done.state), '서버 검증도 통과');
+});
+
+test('#1439 복사 뒤 원본과 사본은 따로 고친다', () => {
+  const state = threeTrees();
+  const done = webDomain.organizeMoments(state, { mode: 'copy', fromTreeId: 't1', momentIds: ['mb'], toTreeIds: ['t2'] }, OUT, counter('cp'));
+  const edit = { title: '고친 원본', note: '원본만 고침', emotion: '잔상', date: '2026-11-09', relation: '다른 이유', url: 'https://youtu.be/dQw4w9WgXcQ' };
+  const t1 = webDomain.editMoment(done.state.trees.find(t => t.id === 't1'), 'mb', edit, OUT);
+  const copy = done.state.trees.find(t => t.id === 't2').moments.find(m => m.copiedFrom === 'mb');
+  assert.equal(copy.note, '원본 메모', '원본을 고쳐도 사본은 그대로');
+  const t2 = webDomain.editMoment(done.state.trees.find(t => t.id === 't2'), copy.id, { ...edit, title: '고친 사본', note: '사본만 고침' }, OUT);
+  assert.equal(t1.moments.find(m => m.id === 'mb').note, '원본만 고침');
+  assert.equal(t2.moments.find(m => m.id === copy.id).note, '사본만 고침');
+  assert.equal(t2.moments.find(m => m.id === copy.id).copiedFrom, 'mb', '고쳐도 원본 표시는 남는다');
+});
+
+test('#1439 사본을 다시 복사해도 처음 원본을 가리킨다', () => {
+  const first = webDomain.organizeMoments(threeTrees(), { mode: 'copy', fromTreeId: 't1', momentIds: ['mb'], toTreeIds: ['t2'] }, OUT, () => 'cp1');
+  const second = webDomain.organizeMoments(first.state, { mode: 'copy', fromTreeId: 't2', momentIds: ['cp1'], toTreeIds: ['t3'] }, OUT, () => 'cp2');
+  assert.equal(second.state.trees.find(t => t.id === 't3').moments.find(m => m.id === 'cp2').copiedFrom, 'mb');
+});
+
+test('#1439 건너뛰기: 고른 트리에서 그 순간만 빼고, 모두 빠지면 막는다', () => {
+  const done = webDomain.organizeMoments(threeTrees(), { mode: 'copy', fromTreeId: 't1', momentIds: ['mb', 'mc'], toTreeIds: ['t2', 't3'], skip: { t2: ['mb'] } }, OUT, counter('cp'));
+  assert.deepEqual(done.summary, { moments: 2, trees: 2, placed: 3, skipped: 1 });
+  assert.deepEqual(done.state.trees.find(t => t.id === 't2').moments.filter(m => m.copiedFrom).map(m => m.copiedFrom), ['mc']);
+  assert.throws(() => webDomain.organizeMoments(threeTrees(), { mode: 'move', fromTreeId: 't1', momentIds: ['mb'], toTreeIds: ['t2'], skip: { t2: ['mb'] } }, OUT), /모두 건너뛰었어요/);
+});
+
+test('#1439 옮기기는 트리 하나만, 같은 트리·없는 트리·없는 순간은 막는다', () => {
+  const state = threeTrees();
+  assert.throws(() => webDomain.organizeMoments(state, { mode: 'move', fromTreeId: 't1', momentIds: ['mb'], toTreeIds: ['t2', 't3'] }, OUT), /트리 하나만/);
+  assert.throws(() => webDomain.organizeMoments(state, { mode: 'copy', fromTreeId: 't1', momentIds: ['mb'], toTreeIds: ['t1'] }, OUT), /같은 트리/);
+  assert.throws(() => webDomain.organizeMoments(state, { mode: 'copy', fromTreeId: 't1', momentIds: ['mb'], toTreeIds: ['nope'] }, OUT), /트리를 찾을 수 없어요/);
+  assert.throws(() => webDomain.organizeMoments(state, { mode: 'copy', fromTreeId: 't1', momentIds: ['nope'], toTreeIds: ['t2'] }, OUT), /이 순간을 찾을 수 없어요/);
+  assert.throws(() => webDomain.organizeMoments(state, { mode: 'copy', fromTreeId: 't1', momentIds: [], toTreeIds: ['t2'] }, OUT), /먼저 골라/);
+});
+
+test('#1439 되돌리기(복사): 사본을 모두 거두고 처음 모습 그대로', () => {
+  const state = threeTrees();
+  const done = webDomain.organizeMoments(state, { mode: 'copy', fromTreeId: 't1', momentIds: ['mb', 'mc'], toTreeIds: ['t2', 't3'] }, OUT, counter('cp'));
+  const back = webDomain.undoOrganize(done.state, done.record, OUT);
+  assert.equal(back.exact, true);
+  assert.deepEqual(back.state, state, '처음 상태와 같다');
+});
+
+test('#1439 되돌리기(옮기기): 원래 트리의 원래 자리 — 부모·자식·연결·다음으로 간 이유·표지까지', () => {
+  const state = threeTrees();
+  const done = webDomain.organizeMoments(state, { mode: 'move', fromTreeId: 't1', momentIds: ['mb'], toTreeIds: ['t2'] }, OUT);
+  const t1 = done.state.trees.find(t => t.id === 't1');
+  assert.equal(t1.moments.find(m => m.id === 'mc').parentId, 'ma', '옮기면 자식은 원래 부모에게 붙는다(기존 규칙)');
+  assert.equal(t1.coverMomentId, '', '표지가 풀린다(기존 규칙)');
+  const back = webDomain.undoOrganize(done.state, done.record, OUT);
+  assert.equal(back.exact, true);
+  assert.equal(back.treeId, 't1');
+  assert.deepEqual(back.state, state, '자식 연결·링크·표지까지 처음 모습');
+});
+
+test('#1439 되돌리기(옮기기): 옮겨서 비어 지워진 트리도 원래 순서 자리에 다시 생긴다', () => {
+  const state = threeTrees();
+  const done = webDomain.organizeMoments(state, { mode: 'move', fromTreeId: 't1', momentIds: ['ma', 'mb', 'mc'], toTreeIds: ['t3'] }, OUT);
+  assert.equal(done.state.trees.some(t => t.id === 't1'), false, '빈 트리는 지워진다(기존 규칙)');
+  assert.equal(done.treeId, 't3', '원래 트리가 없으면 대상 트리로 간다');
+  const back = webDomain.undoOrganize(done.state, done.record, OUT);
+  assert.deepEqual(back.state, state);
+  assert.deepEqual(back.state.trees.map(t => t.id), ['t1', 't2', 't3'], '원래 순서');
+});
+
+test('#1439 되돌리기: 그사이 다른 것을 고쳤으면 그 고침은 지키고 이 작업으로 생긴 것만 거둔다', () => {
+  const state = threeTrees();
+  const copied = webDomain.organizeMoments(state, { mode: 'copy', fromTreeId: 't1', momentIds: ['mb'], toTreeIds: ['t2'] }, OUT, () => 'cp1');
+  const edited = { ...copied.state, trees: copied.state.trees.map(t => t.id === 't2' ? webDomain.editMoment(t, 'mx', { title: '그사이 고침', note: '', emotion: '설렘', date: '2026-11-09', relation: '', url: '' }, OUT) : t) };
+  const back = webDomain.undoOrganize(webDomain.validateState(edited), copied.record, OUT);
+  assert.equal(back.exact, false);
+  const t2 = back.state.trees.find(t => t.id === 't2');
+  assert.deepEqual(t2.moments.map(m => m.id), ['mx'], '사본만 거둔다');
+  assert.equal(t2.moments[0].title, '그사이 고침', '그사이 고침은 남는다');
+
+  const moved = webDomain.organizeMoments(state, { mode: 'move', fromTreeId: 't1', momentIds: ['mc'], toTreeIds: ['t2'] }, OUT);
+  const touched = { ...moved.state, trees: moved.state.trees.map(t => t.id === 't2' ? webDomain.editMoment(t, 'mx', { title: '또 고침', note: '', emotion: '설렘', date: '2026-11-09', relation: '', url: '' }, OUT) : t) };
+  const undone = webDomain.undoOrganize(webDomain.validateState(touched), moved.record, OUT);
+  assert.equal(undone.exact, false);
+  assert.equal(undone.state.trees.find(t => t.id === 't1').moments.find(m => m.id === 'mc').parentId, 'mb', '원래 부모 아래로 돌아온다');
+  assert.equal(undone.state.trees.find(t => t.id === 't2').moments.some(m => m.id === 'mc'), false);
+  assert.equal(undone.state.trees.find(t => t.id === 't2').moments[0].title, '또 고침');
+});

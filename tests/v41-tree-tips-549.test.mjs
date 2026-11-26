@@ -654,3 +654,44 @@ test('#37 꼬리표 칩: 확정 뒤 안내가 도드라지고, 다시 눌러 빼
     assert.deepEqual(errors, [], '페이지 오류 없음');
   } finally { await browser.close(); }
 });
+
+// #1439: 쉬운 추가도 순간 정리와 같은 '같은 순간' 확인을 쓴다 — 제목 "이 트리에 같은 영상이 이미 있어요",
+// [그래도 넣기]·[건너뛰기]. 건너뛰기는 아무것도 담지 않고 창만 닫는다(적어 둔 주소는 순간 추가 창에 남는다).
+test('#1439 쉬운 추가 같은 순간 확인: 제목과 [건너뛰기]는 담지 않고 닫는다', { skip: REQUIRE ? false : skip }, async () => {
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    const errors = [];
+    page.on('pageerror', (e) => errors.push(String(e.message || e)));
+    await openWith(page, WORKSPACE_DUP);
+    await openQuickAndFill(page, `https://youtu.be/${YT_ID}`);
+    await page.waitForFunction(() => document.getElementById('video-dup-panel').open, null, { timeout: 10000 });
+    const view = await page.evaluate(() => ({
+      title: document.getElementById('video-dup-title').textContent,
+      skip: document.getElementById('video-dup-skip').textContent,
+      put: document.getElementById('video-dup-continue').textContent,
+      seeHidden: document.getElementById('video-dup-view').hidden,
+    }));
+    assert.deepEqual(view, { title: '이 트리에 같은 영상이 이미 있어요', skip: '건너뛰기', put: '그래도 넣기', seeHidden: false });
+    await page.click('#video-dup-skip');
+    await page.waitForFunction(() => !document.getElementById('video-dup-panel').open, null, { timeout: 10000 });
+    assert.equal(await momentCount(page), 1, '건너뛰면 담지 않는다');
+    assert.equal(await page.evaluate(() => document.getElementById('write-panel').open), true, '순간 추가 창은 그대로');
+    assert.equal(await page.inputValue('#quick-url'), `https://youtu.be/${YT_ID}`, '적어 둔 주소도 그대로');
+    assert.deepEqual(errors, [], '페이지 오류 없음');
+  } finally { await browser.close(); }
+});
+
+test('#1439 쉬운 추가: 같은 영상이라도 시작 초가 다르면 묻지 않고 담는다', { skip: REQUIRE ? false : skip }, async () => {
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    const errors = [];
+    page.on('pageerror', (e) => errors.push(String(e.message || e)));
+    await openWith(page, WORKSPACE_DUP);
+    await openQuickAndFill(page, `https://youtu.be/${YT_ID}?t=95`);
+    await page.waitForFunction(() => window.LT41.trees[0].moments.length === 2, null, { timeout: 10000 });
+    assert.equal(await page.evaluate(() => document.getElementById('video-dup-panel').open), false, '알림 창을 열지 않는다');
+    assert.deepEqual(errors, [], '페이지 오류 없음');
+  } finally { await browser.close(); }
+});
