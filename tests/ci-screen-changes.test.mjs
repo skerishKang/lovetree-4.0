@@ -219,12 +219,16 @@ test('#1413 5단계: 옮긴 시험 위치·보드 둘째 잡 고르기·공통 �
     assert.ok(runs[0].startsWith(`LT_SCREEN_AUDIT_SHARD=${s} `), `공통 검사기 ${s}는 자기 조합을 고른다`);
     audit[s] = runs[0];
   }
-  assert.ok(!/--test-(name|skip)-pattern/.test(audit.a), 'a는 이름 거르기 없이 파일의 시험을 모두 돈다');
-  for (const s of ['b', 'c']) assert.match(audit[s], /--test-name-pattern='\^#657 화면 공통 검사기' /, `${s}는 #657 두 시험만 돈다`);
+  // a는 '#657 후속'만 빼고 전부(새 시험도 a), b는 #657 두 시험만, c는 #657 두 시험과 '#657 후속'. 셋을 합치면 파일 전부다.
+  assert.equal((audit.a.match(/--test-(name|skip)-pattern='[^']*'/g) || []).join(' '), "--test-skip-pattern='^#657 후속'", 'a는 #657 후속만 뺀다');
+  assert.equal((audit.b.match(/--test-(name|skip)-pattern='[^']*'/g) || []).join(' '), "--test-name-pattern='^#657 화면 공통 검사기'", 'b는 #657 두 시험만 돈다');
+  assert.equal((audit.c.match(/--test-(name|skip)-pattern='[^']*'/g) || []).join(' '), "--test-name-pattern='^#657 화면 공통 검사기' --test-name-pattern='^#657 후속'", 'c는 #657 두 시험과 #657 후속을 돈다');
   const auditSrc = readFileSync(new URL('./v41-screen-audit.test.mjs', import.meta.url), 'utf8');
   const auditNames = [...auditSrc.matchAll(/^test\('([^']+)'/gm)].map((m) => m[1]);
   const shardTests = auditNames.filter((n) => /^#657 화면 공통 검사기/.test(n));
   assert.equal(shardTests.length, 2, '#657 거르기에 걸리는 시험은 조합을 나눠 도는 두 시험뿐이다');
+  const followTests = auditNames.filter((n) => /^#657 후속/.test(n));
+  assert.ok(followTests.length >= 1 && followTests.every((n) => !/^#657 화면 공통 검사기/.test(n)), 'c로 넘긴 #657 후속 시험이 있고 두 거르기는 겹치지 않는다');
   assert.ok(auditSrc.includes('process.env.LT_SCREEN_AUDIT_SHARD'), '두 시험은 shard 환경값으로 조합을 고른다');
   // 겉모습 비교(알림용): deploy 하나만 기다리고, before·after 캡처를 한 단계에서 동시에 찍은 뒤 둘 다 기다린다.
   const visual = jobBody('visual');
