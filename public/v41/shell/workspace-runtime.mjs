@@ -189,6 +189,6 @@ export function createWorkspaceRuntime(ctx){
 
     narrowNav=()=>matchMedia('(max-width:780px)').matches;
 
-    onExploreRoute=()=>/^#explore(?:\/moments)?$/.test(location.hash);
+    onExploreRoute=()=>/^#explore(?:\/moments)?(?:\?|$)/.test(location.hash);
   }};
 }

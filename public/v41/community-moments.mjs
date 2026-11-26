@@ -154,6 +154,7 @@ let soundButton=null;
   soundButton.append(soundStart,el('span','moments-rail-label','소리 켜기'));
   soundButton.setAttribute('aria-label','소리 켜기');soundButton.onclick=toggleSound;
   rail.prepend(soundButton);
+ rail.append(up,down);
  const scopeChips=el('div','moments-scope-control');
  const scopeTrigger=el('button','moments-scope-trigger','보는 범위: 전체 ▾');
  scopeTrigger.type='button';scopeTrigger.setAttribute('aria-haspopup','true');scopeTrigger.setAttribute('aria-expanded','false');
@@ -363,7 +364,7 @@ let advancing=0,unavailableTimer=0,unavailableId='';
   if(value===scope&&value!=='tree')return;
   if(value==='tree'&&!scopeShareId)return;
   if(value==='mine'&&!isMember())return;
-  scope=value;items=[];seen=new Set();index=0;treeMomentOrder=[];treeMomentTotal=0;
+  token+=1;loading=false;scope=value;items=[];seen=new Set();index=0;treeMomentOrder=[];treeMomentTotal=0;
   clearFrames();media.querySelectorAll('.moments-frame').forEach(node=>node.remove());
   currentFrame=null;stage.hidden=true;
   empty.hidden=true;emptyRetry.hidden=true;
@@ -409,7 +410,7 @@ let advancing=0,unavailableTimer=0,unavailableId='';
    // 소리를 켠 채로는 휴대폰이 자동 재생을 막는다 — 2초 안에 시작하지 않으면 음소거로 시작한다.
    // 소리를 켜 둔 사람은 새 영상에서도 소리로 시작한다(주소의 mute=1을 풀어 준다).
    // 휴대폰이 소리 자동 재생을 막아 2초 안에 시작하지 않으면 음소거로 시작한다.
-   if(wantSound&&tries<=8){command(frame,'playVideo');command(frame,'unMute');command(frame,'setVolume',[100]);}
+   if(wantSound){command(frame,'playVideo');command(frame,'unMute');command(frame,'setVolume',[100]);}
    else{command(frame,'mute');command(frame,'playVideo');}
    stage.dataset.ltAutoplay='1';
   };
@@ -540,7 +541,7 @@ let advancing=0,unavailableTimer=0,unavailableId='';
    render();
   }catch{
    if(id===token&&!items.length){empty.hidden=false;empty.textContent=scope==='mine'?'내 순간을 불러오지 못했어요.':scope==='tree'?'이 트리의 순간을 불러오지 못했어요.':'공개 세로 순간을 불러오지 못했어요.';emptyRetry.hidden=false;stage.hidden=true;}
-  }finally{loading=false;}
+  }finally{if(id===token)loading=false;}
  }
  // 재생이 끝난 뒤 한 번만 넘긴다(유튜브가 같은 상태를 여러 번 보낼 수 있다).
  function advanceAfterEnd(){
