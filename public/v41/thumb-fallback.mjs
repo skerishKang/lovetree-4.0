@@ -263,7 +263,9 @@ export function thumbFallbackAttrs(moment, {
     fallbackHtml = fallbackCardMarkup(moment, { writable, videoUnavailable, variant, momentId, treeId, dateStyle });
   } else if (mode === 'thumb-slot') {
     const tone = emotionToneOf(moment?.emotion);
-    fallbackHtml = `<span class="lt-thumb-tone" data-tone="${tone}" aria-hidden="true"></span>`;
+    fallbackHtml = isVideoMoment(moment)
+      ? recentVideoFallbackMarkup(moment)
+      : `<span class="lt-thumb-tone" data-tone="${tone}" aria-hidden="true"></span>`;
   } else if (mode === 'recent-video') {
     fallbackHtml = recentVideoFallbackMarkup(moment);
   }
@@ -340,7 +342,14 @@ export function applyThumbOutcome(img, outcome = {}) {
     if (badge) badge.hidden = false;
     // 261117 대표 검수: 섬네일이 없으면(불러오기 실패) 빈 자리도 남기지 않는다 — 슬롯째로 지워
     // 줄 왼쪽을 맞춘다(섬네일이 있으면 지금처럼 자리를 유지한다).
-    img.closest?.('.index-row-thumb')?.remove();
+    const indexSlot = img.closest?.('.index-row-thumb');
+    if (indexSlot) indexSlot.remove();
+    else {
+      // 작은 썸네일 칸은 그림이 실패하면 기존 대체 표지로 교체한다.
+      const slot = img.closest?.('.cleanup-moment-thumb-slot, .journey-thumb, .branch-thumb');
+      if (slot && html) slot.insertAdjacentHTML('beforeend', html);
+      img.remove?.();
+    }
     return step;
   }
   const host = img.closest?.('[data-lt-thumb-host]') || img.parentElement;

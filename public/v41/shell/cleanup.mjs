@@ -3,6 +3,7 @@
 // 그 되돌리기는 'undoOrganize'. 같은 순간 판정은 quick-intake 한 벌(#876·#1439), 안내 시간은 공통 타이머(#1273).
 import { cleanupState, cleanupTargets, cleanupAvailable, moveAvailable, isInboxTree, pickerLabel, movedNotice, organizedNotice } from '../inbox-model.mjs';
 import { duplicatesByTree, sameMomentNoun } from '../quick-intake.mjs';
+import { thumbFallbackAttrs } from '../thumb-fallback.mjs';
 import '../toast-timer.js';
 
 export function createCleanup(deps) {
@@ -81,19 +82,20 @@ export function createCleanup(deps) {
       const thumb = candidates[0] || treeMomentThumb(moment);
       let thumbNode = null;
       if (thumb) {
+        const slot = document.createElement('span');
+        slot.className = 'cleanup-moment-thumb-slot';
         thumbNode = document.createElement('img');
         thumbNode.className = 'cleanup-moment-thumb';
         thumbNode.alt = '';
         thumbNode.loading = 'lazy';
         thumbNode.referrerPolicy = 'no-referrer';
+        const attrs = thumbFallbackAttrs(moment, { candidates: candidates.length ? candidates : [thumb], mode: 'thumb-slot' });
+        const template = document.createElement('template');
+        template.innerHTML = `<img${attrs}>`;
+        for (const attr of template.content.firstElementChild.attributes) thumbNode.setAttribute(attr.name, attr.value);
         thumbNode.src = thumb;
-        if (candidates.length) {
-          const tone = emotionToneOf(moment.emotion);
-          thumbNode.setAttribute('data-lt-candidates', JSON.stringify(candidates));
-          thumbNode.setAttribute('data-lt-cand-index', '0');
-          thumbNode.setAttribute('data-lt-fallback-mode', 'thumb-slot');
-          thumbNode.setAttribute('data-lt-fallback-html', `<span class="lt-thumb-tone" data-tone="${tone}" aria-hidden="true"></span>`);
-        }
+        slot.append(thumbNode);
+        thumbNode = slot;
       }
       // 썸네일이 없으면 그 자리를 비운다(#798 목록 규칙 — 빈 네모를 따로 두지 않는다).
       label.setAttribute('data-lt-moment-row', '');

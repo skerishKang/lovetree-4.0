@@ -1,3 +1,4 @@
+import { serve } from './helpers/screen-audit.mjs';
 // #429 1부: 공용 썸네일 내려가기 모듈(thumb-fallback.mjs)과 전 화면 연결 시험.
 // 동작은 함수 직접 호출로, 마크업·공용 모듈 배선은 구조 검사로 고정한다(docs/TESTING.md).
 import test from 'node:test';
@@ -485,4 +486,76 @@ test('#1026 마지막 순간 영상은 후보를 기다리고 같은 칸에서�
   applyThumbOutcome(bad.img,{error:true});
   assert.equal(applyThumbOutcome(bad.img,{error:true}).status,'fallback');
   assert.equal(bad.media.dataset.recentState,'failed');
+});
+
+test('#1480 작은 영상 썸네일 실패 시 대체 표지로 바뀌고 깨진 img를 지운다',()=>{
+ const candidates=['https://i.ytimg.com/vi/abc123DEF45/hqdefault.jpg'];
+ const attrs={'data-lt-candidates':JSON.stringify(candidates),'data-lt-cand-index':'0','data-lt-fallback-mode':'thumb-slot','data-lt-fallback-html':'<span class="lt-recent-fallback">첫</span>'};
+ const row={querySelector:()=>null};let html='',removed=false;
+ const slot={insertAdjacentHTML:(where,value)=>{html=value;}};
+ const img={dataset:{},src:candidates[0],getAttribute:k=>attrs[k],setAttribute:(k,v)=>attrs[k]=v,closest:sel=>sel==='[data-lt-moment-row]'?row:sel.includes('.cleanup-moment-thumb-slot')?slot:null,remove:()=>{removed=true;}};
+ assert.equal(applyThumbOutcome(img,{error:true})?.status,'fallback');
+ assert.equal(removed,true,'실패한 그림은 남지 않아야 합니다');
+ assert.match(html,/lt-recent-fallback/);
+ const computed=thumbFallbackAttrs({title:'첫 순간',type:'video',url:'https://youtu.be/abc123DEF45'},{candidates,mode:'thumb-slot'});
+ assert.match(computed,/lt-recent-fallback/,'기존 대체 표지를 사용해야 합니다');
+});
+
+
+let chromium;
+try { ({ chromium } = await import('playwright')); } catch {}
+const executable = chromium?.executablePath?.();
+const REQUIRE_1480 = process.env.LT_1480_REQUIRE === '1';
+const harness = `<!doctype html><html lang="ko"><head><meta charset="utf-8"><link rel="stylesheet" href="/v41/identity.css"><link rel="stylesheet" href="/v41/shell.css"><style>body{padding:30px;background:#161921;color:white}#cleanup-panel{display:block;position:static;max-width:560px} .journey-thumb{display:grid;place-items:center;width:64px;height:64px;overflow:hidden;border-radius:10px}</style></head><body>
+<dialog id="cleanup-panel" open><div id="cleanup-desc"></div><div id="cleanup-moments" class="cleanup-moments"></div><div id="cleanup-targets"></div><div id="cleanup-move-box"></div><input id="cleanup-new-name"><div id="cleanup-error"></div><div id="cleanup-count"></div><div id="cleanup-target-hint"></div><button id="cleanup-create"></button><button id="cleanup-move"></button><button id="cleanup-copy"></button></dialog><div class="journey-thumb" id="journey"></div><div class="branch-thumb" id="branch"></div>
+<script type="module">
+import {createCleanup} from '/v41/shell/cleanup.mjs';
+import {thumbnailCandidates,thumbFallbackAttrs,mountThumbFallback} from '/v41/thumb-fallback.mjs';
+const broken={id:'bad',title:'실패하는 영상',type:'video',emotion:'그리움',url:'https://youtu.be/abc123DEF45'};
+const good={id:'good',title:'정상 영상',type:'video',emotion:'설렘',url:'https://youtu.be/good123DEF4'};
+const tree={id:'t1',moments:[broken,good]};const other={id:'t2',moments:[]};
+window.LT41={tree,trees:[tree,other],source:'server'};
+mountThumbFallback(document);
+const cleanup=createCleanup({$:id=>document.getElementById(id),getMember:()=>({snapshot:()=>({owned:true,writable:true})}),getSource:()=> 'server',getTrees:()=>[tree,other],choose:()=>{},notify:()=>{},panel:()=>{},thumbCandidatesOf:m=>thumbnailCandidates(m,{autoLoad:true}),treeMomentThumb:()=>'',momentTitle:m=>m.title});
+cleanup.open();
+const list=thumbnailCandidates(broken,{autoLoad:true});
+document.getElementById('journey').innerHTML='<img alt="" src="'+list[0]+'"'+thumbFallbackAttrs(broken,{candidates:list,mode:'thumb-slot'})+'>';
+ document.getElementById('branch').innerHTML='<img alt="" src="'+list[0]+'"'+thumbFallbackAttrs(broken,{candidates:list,mode:'thumb-slot'})+'>';
+window.__ready1480=true;
+</script></body></html>`;
+
+test('#1480 실패한 작은 영상 썸네일을 보이는 대체 표지로 교체하고 성공한 그림을 보존한다',{skip:!REQUIRE_1480 || !chromium || !fs.existsSync(executable)?'필요할 때만 헤드리스 실행':false,timeout:60000},async()=>{
+ const server=await serve({'/1480.html':harness},{port:4148});
+ const browser=await chromium.launch({headless:true});
+ try{
+  for(const width of [390,1440]){
+   const context=await browser.newContext({viewport:{width,height:844}});
+   await context.route('**/i.ytimg.com/**',route=>{
+    if(route.request().url().includes('good123DEF4'))return route.fulfill({status:200,contentType:'image/png',body:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=','base64')});
+    return route.fulfill({status:404,body:'이미지 없음'});
+   });
+   const page=await context.newPage();
+   const errors=[];page.on('pageerror',e=>errors.push(e.message));
+   await page.goto('http://127.0.0.1:4148/1480.html',{waitUntil:'load'});
+   await page.waitForFunction(()=>window.__ready1480===true);
+   await page.waitForFunction(()=>document.querySelectorAll('.cleanup-moment-thumb-slot .lt-recent-fallback').length===1 && document.querySelectorAll('.journey-thumb .lt-recent-fallback').length===1 && document.querySelectorAll('.branch-thumb .lt-recent-fallback').length===1,{timeout:10000});
+   const result=await page.evaluate(()=>{
+    const slots=[...document.querySelectorAll('.cleanup-moment-thumb-slot')];
+    const broken=slots[0],good=slots[1],journey=document.querySelector('.journey-thumb');
+    return {brokenImg:broken.querySelector('img')?.naturalWidth??null,brokenLetter:broken.querySelector('.lt-recent-fallback-letter')?.textContent,goodImg:good.querySelector('img')?.naturalWidth??null,goodFallback:!!good.querySelector('.lt-recent-fallback'),journeyImg:journey.querySelector('img')?.naturalWidth??null,journeyLetter:journey.querySelector('.lt-recent-fallback-letter')?.textContent,branchImg:document.querySelector('.branch-thumb img')?.naturalWidth??null,branchLetter:document.querySelector('.branch-thumb .lt-recent-fallback-letter')?.textContent,zeroImgs:[...document.querySelectorAll('img')].filter(i=>i.complete&&i.naturalWidth===0).length};
+   });
+   assert.equal(result.brokenImg,null);
+   assert.equal(result.brokenLetter,'실');
+   assert.ok(result.goodImg>0);
+   assert.equal(result.goodFallback,false);
+   assert.equal(result.journeyImg,null);
+   assert.equal(result.journeyLetter,'실');
+   assert.equal(result.branchImg,null);
+   assert.equal(result.branchLetter,'실');
+   assert.equal(result.zeroImgs,0);
+   assert.deepEqual(errors,[]);
+   console.log('#1480',width,JSON.stringify(result));
+   await context.close();
+  }
+ }finally{await browser.close();await new Promise(done=>server.close(done));}
 });
