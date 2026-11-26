@@ -23,6 +23,36 @@ export function createHeader(deps) {
    const lastLetter = () => { try { return localStorage.getItem('lt41.avatarLetter') || ''; } catch { return ''; } };
   const rememberLetter = (letter) => { try { if (letter && letter !== '나') localStorage.setItem('lt41.avatarLetter', letter); else localStorage.removeItem('lt41.avatarLetter'); } catch { /* 저장소 접근 불가 */ } };
 
+function renderHeaderLayout({publicReading, owned, parts, current, tree}) {
+  const root=document.body;
+  root.classList.toggle('lt-header-visitor',publicReading);
+  const browse=$('community-menu');
+  if(browse) { browse.hidden=false; browse.removeAttribute?.('aria-hidden'); }
+  const views=$('tree-views');
+  const viewing=publicReading && current==='track32-bookshelf.html' ? 'track59-sketchbook.html' : current;
+  for(const b of views?.querySelectorAll?.('button[data-view]')||[]) {
+    const hidden=publicReading&&b.dataset.view==='track32-bookshelf.html';
+    b.hidden=hidden;
+    b.inert=hidden;
+    b.toggleAttribute?.('aria-hidden',hidden);
+    if(publicReading)b.setAttribute('aria-current',String(!hidden && b.dataset.view===viewing));
+  }
+  let label=document.getElementById?.('lt-visitor-caption');
+  if(!label && typeof document.createElement==='function' && document.querySelector?.('.app-header')) {
+    label=document.createElement('div');
+    label.id='lt-visitor-caption';
+    label.setAttribute('role','status');
+    document.querySelector('.app-header')?.after(label);
+  }
+  if(!label)return;
+  label.hidden=!publicReading;
+  if(publicReading) {
+    const name=String(tree?.title||window.LT41?.tree?.title||'트리').trim();
+    const owner=String(tree?.ownerName||tree?.owner?.name||'').trim();
+    label.textContent=owner?`${owner}님의 트리 '${name}' 감상 중`:`공개 트리 '${name}' 감상 중`;
+  }
+}
+
 function flowNavigation(){
   const owned=!!getMember()?.snapshot().owned;
   const reading=!!window.LT41&&['track61-tree.html','track59-sketchbook.html','track58-pinboard.html','track56-network.html'].includes(getCurrent());
@@ -37,6 +67,7 @@ function flowNavigation(){
   for(const b of $('tree-views').querySelectorAll('button[data-view]')){
     const visitorHidden=publicReading&&b.dataset.view==='track32-bookshelf.html';
     b.classList.toggle('visitor-hidden',visitorHidden);
+    b.hidden=visitorHidden;
     b.inert=visitorHidden;
     if(visitorHidden)b.setAttribute('aria-hidden','true');else b.removeAttribute('aria-hidden');
     b.disabled=false;b.title='';
@@ -57,7 +88,8 @@ function flowNavigation(){
   if(bookToggle)bookToggle.hidden=!bookDisplayVisible({current:getCurrent()})||onCommunity;bookToggle?.removeAttribute?.('data-lt-pending');
   const shelfToggle=$('shelf-view-toggle');
   if(shelfToggle)shelfToggle.hidden=!shelfViewVisible({current:getCurrent()})||onCommunity||inlineShelfToggle;shelfToggle?.removeAttribute?.('data-lt-pending');
-  for(const b of document.querySelectorAll('nav>button'))b.hidden=publicReading;
+  // #1447: 머리줄 상태별 표시는 renderHeaderLayout 한 곳에서 그린다. 감춘 항목은 자리를 남기지 않는다.
+  renderHeaderLayout({publicReading, owned, parts, current:getCurrent(), tree:getModel()?.trees?.find(t=>t.id===window.LT41?.tree?.id)});
   // 트리 선택은 뒤쪽 탭 묶음 바로 앞에 있고, 로그인 상태에서만 "트리: <이름> ▾"로 보여 준다.
   // 2026-11-18 13:49 대표 결정: 트리 선택은 모든 페이지에서 똑같이 보인다(서재 포함).
   // 로그아웃이면 "트리 고르기", 브라우저에만 남은 미저장 기록이 있으면 "저장 안 된 기록"이다.
@@ -134,7 +166,7 @@ function renderAccount(){
  else{const shown=view.initial==='나'?(lastLetter()||view.initial):view.initial;
  login.hidden=true;avatar.hidden=false;avatar.textContent=shown;avatar.setAttribute('aria-label',view.ariaLabel);avatar.title=deps.getAccountTip?.()||'내 계정';avatar.dataset.accent=accent;
  const init=$('account-initial');if(init){init.textContent=shown;init.dataset.accent=accent;}
- const mailEl=$('account-email');mailEl.textContent=view.label;mailEl.title=view.label;rememberLetter(shown);}
+ const mailEl=$('account-email');mailEl.textContent=view.label;mailEl.title=view.title;mailEl.setAttribute('aria-label',view.title);rememberLetter(shown);}
   // #368: 설정 "프로필" 묶음도 같은 이메일 값을 쓴다(셸이 넘긴 콜백).
   deps.onEmailChange?.(accountEmail);}
 function openAccountMenu(via='keyboard'){

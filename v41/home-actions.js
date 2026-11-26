@@ -8,10 +8,10 @@ export function createHomeActions({getContext,send,gallery=false}) {
  return {select,actions:{
   start:()=>send({type:MSG.start}),
    account:()=>send({type:MSG.account}),
-   community:()=>send({type:MSG.community}),
+   community:tab=>send({type:MSG.community,tab:tab==='moments'?'moments':'trees'}),
    // 261117 고객 의견: 첫 화면 둘째 줄 '모아둔 순간 N개 정리하기' — 모아둔 순간 정리 창을 연다(순간 옮기기 picker와 별개).
    cleanup:()=>send({type:MSG.cleanup}),
-  navigate:where=>send({type:MSG.navigate,view:where==='trees'?SHELF:'src064-orbit.html'}),
+  navigate:(where,filter)=>send({type:MSG.navigate,view:where==='trees'?SHELF:'src064-orbit.html',filter:where==='trees'?(filter==='public'?'public':'all'):undefined}),
   openMine:(treeId,id)=>{const tree=ownTree(treeId,id);if(!tree)return;send({type:MSG.openBook,treeId:tree.id,id});},
   openBook:(treeId,id)=>{const tree=ownTree(treeId,id);if(gallery&&tree){send({type:MSG.openBook,treeId:tree.id,id});return;}if(gallery&&getContext()?.source!=='example'){send({type:MSG.example,view:BOOK,momentId:id});return;}if(select(id))send({type:MSG.navigate,view:BOOK});},
   openWorkspace:(_tree,id)=>{if(gallery&&getContext()?.source!=='example'){send({type:MSG.example,view:BOARD,momentId:id});return;}if(select(id))send({type:MSG.navigate,view:BOARD});},

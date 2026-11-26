@@ -1,3 +1,4 @@
+import { listenOnSafePort } from './helpers/safe-port.mjs';
 // #611 새 소식 화면: 알림 카드(한 번만) · 계정 단추 점 · 로그아웃 입구 · 출처 문구.
 // 크롬이 필요한 실행형 시험이라 LT_UPDATES_611_REQUIRE=1 에서만 돈다(미리보기 검사 잡에 연결).
 import test from 'node:test';
@@ -68,7 +69,7 @@ function serve() {
     }
     res.writeHead(404); res.end('not found');
   });
-  return new Promise((ok) => server.listen(0, '127.0.0.1', () => ok(server)));
+  return listenOnSafePort(server, '127.0.0.1').then(() => server);
 }
 
 /** 실제 그려진 색을 겹쳐 대비를 잰다(밤·정원 모두 같은 규칙). */

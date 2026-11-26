@@ -1,3 +1,4 @@
+import { listenOnSafePort } from './helpers/safe-port.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createServer} from 'node:http';
@@ -29,7 +30,7 @@ async function serve(){
    createReadStream(file).pipe(res);
   }catch{res.writeHead(404).end('missing');}
  });
- await new Promise(ok=>server.listen(0,'127.0.0.1',ok));
+ await listenOnSafePort(server, '127.0.0.1');
  return server;
 }
 async function open({width,height=width===390?844:900,theme,scene,member=true}){

@@ -1,6 +1,7 @@
 // 첫 화면 시작과 로그인·종료 안내.
 import {memberLoginUrl,shouldLoadMemberRecords} from "../member-entry.mjs";
 import {settleHeaderAuth} from './header-initial.mjs';
+import {settleHomeTitleHint} from '../home-title-state.mjs';
 import {createNotifier, syncedNoticeText, newlyPublishedTrees, NOTICE_HIDE_MS} from "./notice.mjs";
 import {LOGIN_NOTICE_PARAM, LOGIN_NOTICE_TEXT, LOGIN_NOTICE_BUTTON, loginNoticeFrom} from "./login-notice.mjs";
 
@@ -35,7 +36,7 @@ export function createBootRuntime(ctx){
      // 로그아웃·신규 사용자는 예시가 실제 내용이므로 필요한 이 순간에만 동적으로 받는다.
      ctx.shellStageLoading.start('home');
      ctx.exampleInitializing=true;
-     void (0,ctx.loadExampleTree)().then(tree=>{if(ctx.source!=='server'&&ctx.source!=='share')(0,ctx.load)(null,'example',{}, {},tree);ctx.exampleInitializing=false;settleHeaderAuth(false);}).catch(()=>{ctx.exampleInitializing=false;settleHeaderAuth(false);});
+     void (0,ctx.loadExampleTree)().then(tree=>{if(ctx.source!=='server'&&ctx.source!=='share')(0,ctx.load)(null,'example',{}, {},tree);ctx.exampleInitializing=false;settleHomeTitleHint(false,0,localStorage);settleHeaderAuth(false);}).catch(()=>{ctx.exampleInitializing=false;settleHomeTitleHint(false,0,localStorage);settleHeaderAuth(false);});
     }
 
     addEventListener('beforeunload',e=>{

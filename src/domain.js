@@ -533,7 +533,9 @@ export function validateState(value) {
       // 틀린 구간 값은 그 필드만 버린다(순간 전체를 거부하지 않는다).
       const clean = { ...m };
       delete clean.startSeconds; delete clean.endSeconds;
-      return { ...validateMomentInput(clean), ...rangeFields(m, m.url), id: m.id, parentId: m.parentId, links: [...new Set(rawLinks)], createdAt: m.createdAt, ...boardLayoutOf(m) };
+      // #1439: 복사한 순간은 원본 순간 id(copiedFrom)를 남긴다. 원본은 다른 트리에 있거나 지워졌을 수 있어 모양만 본다.
+      const copiedFrom = idValid(m.copiedFrom) && m.copiedFrom !== m.id ? { copiedFrom: m.copiedFrom } : {};
+      return { ...validateMomentInput(clean), ...rangeFields(m, m.url), id: m.id, parentId: m.parentId, links: [...new Set(rawLinks)], createdAt: m.createdAt, ...boardLayoutOf(m), ...copiedFrom };
     });
     if (moments.filter(m => m.parentId === null).length !== 1) throw new Error('트리의 시작 순간은 하나여야 해요.');
     const byId = new Map(moments.map(m => [m.id, m]));

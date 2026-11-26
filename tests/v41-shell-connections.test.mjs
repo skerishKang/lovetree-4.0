@@ -37,5 +37,5 @@ test('셸이 연결하던 요소는 지금도 셸·shell/ 안에서 연결을 �
   const missing = SHELL_CONNECTIONS.filter(id => !new RegExp(String.raw`(?:\$\s*|\(\s*0\s*,\s*ctx\.\$\s*\)\s*)\(\s*'${id}'\s*\)\s*\??\s*\.\s*(onclick|onchange|onsubmit|oninput|addEventListener)\b`).test(source));
   assert.deepEqual(missing, [], '연결이 사라진 요소: ' + missing.join(', '));
   assert.equal(SHELL_CONNECTIONS.length, 39);
-  assert.ok(source.includes('MSG.toolbarTreePicker'), '?? ?? ??? ??? ??? ????');
+  assert.ok(source.includes('MSG.toolbarTreePicker'), '도구 줄 트리 고르기 연결 메시지가 있어야 한다');
 });

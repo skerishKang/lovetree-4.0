@@ -1,3 +1,4 @@
+import {settleHomeTitleHint} from '../home-title-state.mjs';
 import { MSG } from '../frame-messages.mjs';
 import { loginUrlWithTheme, themeTone } from '../header-state.mjs';
 // 설정·계정 창 — shell.mjs에서 코드 위치만 옮긴 모듈(#886). 동작·기준은 그대로다.
@@ -5,7 +6,7 @@ import { loginUrlWithTheme, themeTone } from '../header-state.mjs';
 // #1072 A-16: 의견 보내기의 '함께 보낼 정보'에 실릴 최근 오류 기록은 report.mjs 한 곳에서 가져온다.
 import {reportEntries} from '../report.mjs';
 export function createSettings(deps){
-const { $, notify, setTitleDisplay, openLoginStart, links, screenForView, choose, panel, show, frames, frameLoaded, hideFrames, closeAccountMenu, openAccountMenu, renderAccount, updateAccountControls, openAssets, openEditor, sample, backup, clear, startMember, leaveMember, pauseMember, openFallbackShell, writeLocation, load, flowNavigation, closePanels, renderTreeMenu, requestBoardOpen, lastShelfTreeId, shellHeader, shellDialogs,  shareApi, accountApi, myNewsApi, readTheme, writeTheme, normalizeAccentColor, normalizeDateStyle, normalizeStartPlace, normalizeShareView, normalizeHomeMoment,  readPageTurn, writePageTurn, frameMessage, displayTreeTitle, accountPresentation, createFeedbackDialog, createFeedbackBoard, mountUpdates, mountMyNews, readWriteTab, writeWriteTab, clearCachedWorkspace, forgetLoginSubject, createWorkspaceApi, paintThemeControls, applyTheme, toggleTheme, paintBookDisplayControls } = deps;
+const { $, notify, setTitleDisplay, openLoginStart, links, screenForView, choose, panel, show, frames, frameLoaded, hideFrames, closeAccountMenu, openAccountMenu, renderAccount, updateAccountControls, openAssets, openEditor, sample, backup, clear, startMember, leaveMember, pauseMember, openFallbackShell, writeLocation, load, flowNavigation, closePanels, renderTreeMenu, requestBoardOpen, lastShelfTreeId, shellHeader, shellDialogs,  shareApi, accountApi, myNewsApi, readTheme, writeTheme, normalizeAccentColor, normalizeDateStyle, normalizeStartPlace, normalizeShareView, normalizeHomeMoment,  readPageTurn, writePageTurn, readShelfView, frameMessage, displayTreeTitle, accountPresentation, createFeedbackDialog, createFeedbackBoard, mountUpdates, mountMyNews, readWriteTab, writeWriteTab, clearCachedWorkspace, forgetLoginSubject, createWorkspaceApi, paintThemeControls, applyTheme, toggleTheme, paintBookDisplayControls, setShelfView } = deps;
 const $on=(id,fn)=>{const el=$(id);if(el)el.onclick=fn;};
 function advancedKey(){try{return 'lt41.advanced.'+(deps.member?.snapshot().subject||'')}catch{return 'lt41.advanced.'}}
 function readAdvanced(){try{return localStorage.getItem(advancedKey())==='1'}catch{return false}}
@@ -251,6 +252,14 @@ function applyPageTurnToFrame(frame){
 function paintPageTurnControls(){const value=currentPageTurn();for(const b of document.querySelectorAll('[data-page-turn]'))b.setAttribute('aria-checked',String(b.dataset.pageTurn===value));}
 // #368 3차: 날짜 표기·처음 보여 줄 곳·공유 기본값은 계정(state.prefs), 관계 지도 기본 보기는 이 기기(lt41.network.view — network.js와 같은 키).
 // 날짜 표기는 책·보드·지도·첫 화면이 같은 한 벌(formatDisplayDate)로 따르고, 셸은 프레임 속성+lt41-date-style 메시지로 알린다.
+// #1435: 서재 기본 보기는 #1418의 저장 값을 그대로 쓴다(새 키 없음).
+function paintSettingsShelfView(){const value=readShelfView(localStorage)||'carousel';for(const b of document.querySelectorAll('[data-settings-shelf-view]'))b.setAttribute('aria-checked',String(b.dataset.settingsShelfView===value));}
+for(const b of document.querySelectorAll('[data-settings-shelf-view]'))b.onclick=()=>{
+ if(!deps.member?.snapshot().owned){notify('로그인한 뒤 서재 보기를 바꿀 수 있어요.');return;}
+ setShelfView(b.dataset.settingsShelfView);paintSettingsShelfView();
+ notify(b.dataset.settingsShelfView==='shelf'?'서재를 선반으로 보여요.':'서재를 회전으로 보여요.');
+};
+paintSettingsShelfView();
 function currentDateStyle(){try{return normalizeDateStyle(deps.member?.state?.().prefs?.dateStyle)}catch{return 'dot'}}
 function sendToFrame(frame,message){
  try{frame.contentWindow?.postMessage(message,location.origin);}catch{}
@@ -469,7 +478,7 @@ async function openAccountSettings({section=''}={}){
  if(!deps.member?.snapshot().owned){notify('로그인한 뒤 설정을 열 수 있어요.');return;}
  paintSettingsProfile();
  fillProfileForm();
- paintDateStyleControls();paintBookDisplayControls();paintStartPlaceControls();paintNetworkViewControls();paintShareControls();paintQuickTargetControls();
+ paintDateStyleControls();paintBookDisplayControls();paintSettingsShelfView();paintStartPlaceControls();paintNetworkViewControls();paintShareControls();paintQuickTargetControls();
  void paintSettingsUsage();void loadTreeVisibility();
  panel('account-settings');
  focusSettingsSection(section);
@@ -504,7 +513,7 @@ $('account-form').onsubmit=async event=>{
  notify(answer.commonAccountDeleted
   ? '러브트리 탈퇴와 함께 공통 로그인 계정과 인증 세션을 폐기했습니다.'
   : '러브트리에서 탈퇴했습니다. 다른 서비스 연결이 남아 있어 공통 계정은 유지됩니다.');
-};$('logout').onclick=async()=>{if(deps.member){await deps.member.act('logout');if(deps.member.snapshot().dirty){notify('미저장 기록이 있어 로그아웃하지 않았어요. 다시 저장하거나 백업해 주세요.');return;}/* 로그아웃 뒤 머리글만 바뀌고 첫 화면 본문·카드·숫자 줄이 회원 상태로 남았다 — 새 문서로 다시 열어 셸 전체를 비로그인 상태로 그린다(account=1·#my/... 같은 기록 주소도 함께 사라진다). */try{sessionStorage.setItem('lt41.logoutNotice','1');}catch{}location.replace(location.pathname);return;}const answer=await createWorkspaceApi().logout();if(answer.ok){clearCachedWorkspace(localStorage);forgetLoginSubject(localStorage);}notify(answer.ok?'로그아웃했습니다.':'로그아웃하지 못했어요. 다시 시도해 주세요.');};
+};$('logout').onclick=async()=>{if(deps.member){await deps.member.act('logout');if(deps.member.snapshot().dirty){notify('미저장 기록이 있어 로그아웃하지 않았어요. 다시 저장하거나 백업해 주세요.');return;}/* 로그아웃 뒤 머리글만 바뀌고 첫 화면 본문·카드·숫자 줄이 회원 상태로 남았다 — 새 문서로 다시 열어 셸 전체를 비로그인 상태로 그린다(account=1·#my/... 같은 기록 주소도 함께 사라진다). */settleHomeTitleHint(false,0,localStorage);try{sessionStorage.setItem('lt41.logoutNotice','1');}catch{}location.replace(location.pathname);return;}const answer=await createWorkspaceApi().logout();if(answer.ok){clearCachedWorkspace(localStorage);forgetLoginSubject(localStorage);settleHomeTitleHint(false,0,localStorage);}notify(answer.ok?'로그아웃했습니다.':'로그아웃하지 못했어요. 다시 시도해 주세요.');};
 $('file').onchange=async()=>{
  const f=$('file').files[0];
  if(!f)return;
@@ -560,7 +569,7 @@ document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{
 for(const f of frames())f.addEventListener('load',()=>{frameLoaded(f);
  // #894: 새로 뜬 안쪽 화면에도 움직임 끄기 상태를 알린다(메모리 상태 — 화면을 다시 열면 처음 상태).
  try{f.contentWindow.postMessage({type:MSG.motion,paused:deps.motionPaused},location.origin)}catch{}});
-return { updatesReady, showPublicRoute, getFeedbackDialog:()=>feedbackDialog, getFeedbackBoard:()=>feedbackBoard, refreshMyNewsCount:()=>myNewsMount.refreshCount(), openMyNews:()=>myNewsMount.open(), getAccountTip:()=>accountTip, applyAdvanced, applyDateStyleToFrame, applyPageTurnToFrame, applyNetworkViewToFrame, applyBoardThemeToFrame, syncBoardThemeToApp, quickTargetPreference, profileDirty, paintSettingsProfile, accountConfirmMatches, openAccountData, openAccountSettings, paintDateStyleControls, paintStartPlaceControls, paintShareControls, paintQuickTargetControls, paintNetworkViewControls, paintPageTurnControls, paintBoardThemeControls, paintTreeVisibilityList, paintSettingsUsage, loadTreeVisibility, paintTreeManagerVisibility, paintSettingsTab, focusSettingsSection, fillProfileForm, paintScreenControls, readAdvanced, advancedKey, currentDateStyle, currentPageTurn, sendToFrame, currentStartPlace, currentShareView, currentBoardTheme };
+return { updatesReady, showPublicRoute, getFeedbackDialog:()=>feedbackDialog, getFeedbackBoard:()=>feedbackBoard, refreshMyNewsCount:()=>myNewsMount.refreshCount(), openMyNews:()=>myNewsMount.open(), getAccountTip:()=>accountTip, applyAdvanced, applyDateStyleToFrame, applyPageTurnToFrame, applyNetworkViewToFrame, applyBoardThemeToFrame, syncBoardThemeToApp, quickTargetPreference, profileDirty, paintSettingsProfile, accountConfirmMatches, openAccountData, openAccountSettings, paintDateStyleControls, paintSettingsShelfView, paintStartPlaceControls, paintShareControls, paintQuickTargetControls, paintNetworkViewControls, paintPageTurnControls, paintBoardThemeControls, paintTreeVisibilityList, paintSettingsUsage, loadTreeVisibility, paintTreeManagerVisibility, paintSettingsTab, focusSettingsSection, fillProfileForm, paintScreenControls, readAdvanced, advancedKey, currentDateStyle, currentPageTurn, sendToFrame, currentStartPlace, currentShareView, currentBoardTheme };
 }
 
 

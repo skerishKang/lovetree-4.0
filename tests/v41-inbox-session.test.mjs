@@ -101,3 +101,38 @@ test('서버 저장 경계: inbox 트리 2개는 첫 번째만 true로 정리되
   assert.equal(read.state.trees[0].inbox, false, '필드가 없으면 false(옛 클라이언트 호환)');
   assert.equal(read.state.trees[1].inbox, false);
 });
+
+// ── #1439: 순간 정리의 옮기기·복사하기·되돌리기도 같은 저장 경로(PUT)로 간다 ──
+test('#1439 member.apply organizeMoments(복사) → undoOrganize가 저장 경로로 저장되고 원래대로 돌아온다', async () => {
+  const one = createTree({ ...base, title: '윤슬의 책', url: 'https://youtu.be/dQw4w9WgXcQ' }, CLOCK);
+  const two = createTree({ ...base, subject: '빌리', title: '빌리 하루나' }, CLOCK);
+  const three = createTree({ ...base, subject: '바다', title: '바다' }, CLOCK);
+  const { session, writes } = fakeSession({ version: 1, trees: [one, two, three] });
+  await session.start();
+  const before = session.state();
+  const done = session.apply('organizeMoments', { mode: 'copy', momentIds: [one.moments[0].id], toTreeIds: [two.id, three.id] }, { treeId: one.id }, { tree: true });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(done.treeId, one.id, '원래 트리에 머문다');
+  assert.deepEqual(done.summary, { moments: 1, trees: 2, placed: 2, skipped: 0 });
+  const putCopies = writes.at(-1).state.trees.flatMap(t => t.moments).filter(m => m.copiedFrom === one.moments[0].id);
+  assert.equal(putCopies.length, 2, '사본 두 개와 원본 표시가 PUT 본문에 있다');
+  session.apply('undoOrganize', { record: done.record }, { treeId: one.id }, { tree: true });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(session.state(), before, '되돌리면 처음 모습');
+  assert.equal(writes.at(-1).state.trees.flatMap(t => t.moments).some(m => m.copiedFrom), false, '되돌린 것도 PUT으로 저장된다');
+  session.dispose();
+});
+
+test('#1439 서버 저장 경계: copiedFrom을 PUT→GET 왕복에 유지하고, 공개 사본에는 싣지 않는다', async () => {
+  const { service, principal } = build();
+  const source = createTree({ ...base, title: '윤슬의 책' }, CLOCK);
+  const target = createTree({ ...base, subject: '빌리', title: '빌리 하루나' }, CLOCK);
+  const copy = { ...source.moments[0], id: 'copy-0001', parentId: target.moments[0].id, copiedFrom: source.moments[0].id };
+  const state = validateState({ version: 1, trees: [source, { ...target, moments: [...target.moments, copy] }] });
+  await service.write(principal, { state, expectedRevision: 0, clientKey: 'copy-1439-1' });
+  const read = await service.read(principal);
+  assert.equal(read.state.trees[1].moments.find(m => m.id === 'copy-0001').copiedFrom, source.moments[0].id, '원본 표시가 서버 왕복에 남는다');
+  const { projectSharedTree } = await import('../server/share-service.js');
+  const shared = projectSharedTree(read.state, target.id).tree;
+  assert.equal(shared.moments.some(m => 'copiedFrom' in m), false, '공개 사본에는 원본 표시를 싣지 않는다');
+});

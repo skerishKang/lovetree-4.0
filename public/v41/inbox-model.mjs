@@ -46,19 +46,28 @@ export function cleanupTargets(trees, fromTreeId) {
 }
 
 /**
- * 정리 화면 상태: 고른 순간·이름·대상으로 두 동작의 가능 여부와 단추 문구를 계산한다.
- * 새 트리 만들기는 이름만, 옮기기는 대상만 필요하다(둘 다 순간 1개 이상).
+ * 정리 화면 상태: 고른 순간·이름·대상으로 세 동작의 가능 여부와 단추 문구를 계산한다.
+ * 새 트리 만들기는 이름만, 옮기기는 대상 트리 하나만, 복사하기는 대상 트리 하나 이상이 필요하다(모두 순간 1개 이상).
+ * #1439: 대상은 targetIds·targetLabels(여러 개)로 받는다. 예전 한 개 값(targetId·targetLabel)도 그대로 받는다.
  */
-export function cleanupState({ selectedIds = [], newTreeName = '', targetId = '', targetLabel = '' } = {}) {
+export function cleanupState({ selectedIds = [], newTreeName = '', targetId = '', targetLabel = '', targetIds = null, targetLabels = null } = {}) {
   const ids = [...new Set(selectedIds)];
   const name = String(newTreeName ?? '').trim();
+  const targets = Array.isArray(targetIds) ? [...new Set(targetIds.filter(Boolean))] : (targetId ? [targetId] : []);
+  const labels = (Array.isArray(targetLabels) ? targetLabels : (targetLabel ? [targetLabel] : [])).map(label => String(label ?? '').trim());
+  const one = targets.length === 1;
+  const firstLabel = labels[0] || '';
   return {
     count: ids.length,
     hasSelection: ids.length > 0,
+    targetCount: targets.length,
     canCreate: ids.length > 0 && name.length > 0,
-    canMove: ids.length > 0 && !!targetId,
+    canMove: ids.length > 0 && one,
+    canCopy: ids.length > 0 && targets.length > 0,
     createLabel: ids.length ? `${ids.length}개의 순간으로 새 트리 만들기` : '새 트리 만들기',
-    moveLabel: ids.length && targetLabel ? `${targetLabel}${josaRo(targetLabel)} 옮기기` : '옮기기',
+    moveLabel: ids.length && one && firstLabel ? `${firstLabel}${josaRo(firstLabel)} 옮기기` : '옮기기',
+    copyLabel: ids.length && targets.length ? (one && firstLabel ? `${firstLabel}에 복사하기` : `트리 ${targets.length}곳에 복사하기`) : '복사하기',
+    targetHint: targets.length > 1 ? '옮기기는 트리 하나만 고를 수 있어요. 여러 트리에는 복사할 수 있어요.' : '',
     createHint: ids.length ? '' : '옮길 순간을 먼저 골라 주세요.',
     moveHint: ids.length ? '' : '옮길 순간을 먼저 골라 주세요.'
   };
@@ -71,6 +80,21 @@ export function movedNotice({ targetLabel = '', isNew = false, action = '가 보
     text: isNew ? `${label}${josaRo(label)} 새 트리를 만들었어요.` : `${label}${josaRo(label)} 옮겼어요.`,
     action
   };
+}
+
+/**
+ * #1439: 옮기기·복사하기 한 번 뒤의 안내 한 줄. "빌리 하루나로 2개 옮겼어요." / "빌리 하루나에 2개 복사했어요." /
+ * "트리 3곳에 2개 복사했어요." 건너뛴 것이 있으면 그 수를 덧붙인다. action은 단추 이름(되돌리기)이다.
+ */
+export function organizedNotice({ mode = 'move', targetLabels = [], count = 0, skipped = 0, action = '' } = {}) {
+  const labels = (Array.isArray(targetLabels) ? targetLabels : []).map(label => String(label ?? '').trim()).filter(Boolean);
+  const first = labels[0] || '';
+  const counted = count > 0 ? ` ${count}개` : '';
+  let text = mode === 'copy'
+    ? (labels.length > 1 ? `트리 ${labels.length}곳에${counted} 복사했어요.` : `${first}에${counted} 복사했어요.`)
+    : `${first}${josaRo(first)}${counted} 옮겼어요.`;
+  if (skipped > 0) text += ` 이미 있는 ${skipped}개는 건너뛰었어요.`;
+  return { text, action };
 }
 
 /** 정리 화면을 열 수 있는가: 내 기록(서버·로그인 소유자)의 inbox 트리일 때만. */

@@ -1,3 +1,4 @@
+import { listenOnSafePort } from './helpers/safe-port.mjs';
 // 이슈 #1365: 책을 열 때 YouTube IFrame API를 받지 않는다. '이어 보기'를 누를 때 처음 받고, 다시 눌러도 다시 받지 않는다.
 // 실행 시험: 가짜 데이터·가짜 API 응답만 쓴다. 크롬이 없으면 건너뛴다.
 import test from 'node:test';
@@ -71,7 +72,7 @@ function serve() {
     res.writeHead(404);
     res.end('not found');
   });
-  return new Promise((ok) => server.listen(0, '127.0.0.1', () => ok(server)));
+  return listenOnSafePort(server, '127.0.0.1').then(() => server);
 }
 
 // 책을 열고 첫 쪽이 그려질 때까지 기다린다. API 요청은 apiState 에 센다.

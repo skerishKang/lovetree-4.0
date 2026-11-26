@@ -1,3 +1,4 @@
+import { listenOnSafePort } from './helpers/safe-port.mjs';
 // #619-5 쌓기 배치: 줄 맞춤이 아니라 열마다 위에서부터 쌓는다.
 // 핀터레스트식 — 다음 카드는 가장 짧은 열에 들어가고, 가로 카드는 짧게·세로 카드는 길게 그대로다.
 // 화면 폭이 바뀌면 칸 수만 바뀌고 순서는 같다. 크롬 화면 시험은 LT_BOARD_STACK_619_REQUIRE=1.
@@ -79,7 +80,7 @@ function serve(extra = {}) {
     res.writeHead(200, { 'content-type': MIME[path.extname(file)] || 'application/octet-stream' });
     res.end(await readFile(file));
   });
-  return new Promise((ok) => server.listen(0, '127.0.0.1', () => ok(server)));
+  return listenOnSafePort(server, '127.0.0.1').then(() => server);
 }
 
 const starTree = (n) => {

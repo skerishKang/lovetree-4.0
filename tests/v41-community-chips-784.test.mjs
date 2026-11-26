@@ -1,3 +1,4 @@
+import { listenOnSafePort } from './helpers/safe-port.mjs';
 // #784 그룹 찾기 창·검색 자동완성 — 설계(issuecomment-6985967913)의 시험 목록.
 // 순수: 'ㅂㅌㅅㄴㄷ'→'방탄소년단' 먼저, 'riize'→'RIIZE', '방 탄'→'방탄소년단'(공백 무시), 섹션 순서 ㄱ이 첫.
 // (설계 댓글의 'ㅂㅅㅅㄴㄷ' 예는 두 번째 초성(탄=ㅌ)이 잘못 적힌 것 — 실제 초성은 'ㅂㅌㅅㄴㄷ'이다.)
@@ -217,7 +218,7 @@ testOrSkip('#784 화면: 창 열림 때 항목 높이 ≥44px / 고른 그룹 �
       createReadStream(file).pipe(res);
     } catch { res.writeHead(404); res.end(); }
   });
-  await new Promise((r) => server.listen(0, r));
+  await listenOnSafePort(server);
   const port = server.address().port;
   const browser = await chromium.launch();
   const page = await browser.newPage();
@@ -319,7 +320,7 @@ testOrSkip('#792 ⑤ 화면: 인기 무대 줄(3표 미만 제외)과 미리보�
       createReadStream(file).pipe(res);
     } catch { res.writeHead(404); res.end(); }
   });
-  await new Promise((r) => server.listen(0, r));
+  await listenOnSafePort(server);
   const port = server.address().port;
   const browser = await chromium.launch();
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
@@ -448,7 +449,7 @@ testOrSkip('#1098 1단계: 판 아래에 최근 댓글 3개·댓글 모두 보�
       createReadStream(file).pipe(res);
     } catch { res.writeHead(404); res.end(); }
   });
-  await new Promise((r) => server.listen(0, r));
+  await listenOnSafePort(server);
   const port = server.address().port;
   const browser = await chromium.launch();
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
@@ -515,7 +516,7 @@ testOrSkip('#1098 1단계: ♡는 크게 하나 — 빠르게 누르면 공감 �
       createReadStream(file).pipe(res);
     } catch { res.writeHead(404); res.end(); }
   });
-  await new Promise((r) => server.listen(0, r));
+  await listenOnSafePort(server);
   const port = server.address().port;
   const browser = await chromium.launch();
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
@@ -594,7 +595,7 @@ testOrSkip('#1098 2단계: 판의 순간 목록 — 순간 카드에 그 순간�
       createReadStream(file).pipe(res);
     } catch { res.writeHead(404); res.end(); }
   });
-  await new Promise((r) => server.listen(0, r));
+  await listenOnSafePort(server);
   const port = server.address().port;
   const browser = await chromium.launch();
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });

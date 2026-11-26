@@ -1,3 +1,4 @@
+import { listenOnSafePort } from './helpers/safe-port.mjs';
 // 이슈 833 / PR 836 2차: 쇼츠 재생 칸의 '크게 보기'는 영상 위에 겹치지 않는다(#836 1차 반려).
 //  ① 단추 줄은 영상 칸 아래 한 줄 — 왼쪽 'YouTube ↗', 오른쪽 '크게 보기'(44px 이상). 재생 전(책
 //     .media-links 줄)과 재생 중에 같은 자리다.
@@ -41,7 +42,7 @@ function serve(root) {
     }
     res.writeHead(404); res.end('not found');
   });
-  return new Promise((ok) => server.listen(0, '127.0.0.1', () => ok(server)));
+  return listenOnSafePort(server, '127.0.0.1').then(() => server);
 }
 
 test('833-1: 단추 줄은 영상 칸 아래 한 줄이고 영상과 겹치지 않는다(44px 이상)', { skip: skip || undefined }, async () => {

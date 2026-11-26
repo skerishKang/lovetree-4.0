@@ -1,3 +1,4 @@
+import { listenOnSafePort } from './helpers/safe-port.mjs';
 // #467: 보드·지도 판 테마(종이/밤) 배선 및 대비(contrast) 검증 시험
 // #952: 마크업·카피·셸 정규식 단정 31개를 걷어냈다. 화면 배선에서 남길 것은 하나다 —
 // 배경 드롭이 실제로 열리고, 고른 값이 셸로 가며, 열린 판이 그 자리에서 바뀌는가.
@@ -39,7 +40,7 @@ function serve(extra = {}) {
     }
     res.writeHead(404); res.end('not found');
   });
-  return new Promise((ok) => server.listen(0, '127.0.0.1', () => ok(server)));
+  return listenOnSafePort(server, '127.0.0.1').then(() => server);
 }
 
 const moment = (id, title) => ({ id, title, date: '2026-01-01', emotion: '설렘', note: '메모', parentId: null, url: '', x: 120, y: 120, rot: 0, color: 'rose', keywords: [] });

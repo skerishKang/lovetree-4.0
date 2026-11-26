@@ -1,3 +1,4 @@
+import { listenOnSafePort } from './helpers/safe-port.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
@@ -26,7 +27,8 @@ test('로그아웃 상태는 기존 로그인 알약, 로그인 상태는 첫 �
   const inState = accountPresentation({owned: true, email: 'kate@example.test'});
   assert.equal(inState.mode, 'avatar');
   assert.equal(inState.initial, 'K');
-  assert.equal(inState.label, 'kate@example.test');
+  assert.equal(inState.label, 'kate…');
+  assert.equal(inState.title, 'kate@example.test', '전체 주소는 제목으로 읽는다');
   assert.equal(inState.ariaLabel, '내 계정 메뉴, kate@example.test으로 로그인됨');
   assert.equal(accountPresentation({owned: true, email: 'kate@example.test'}).ariaLabel, '내 계정 메뉴, kate@example.test으로 로그인됨');
 });
@@ -295,7 +297,7 @@ async function serve644() {
     }
     res.writeHead(404); res.end('none');
   });
-  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  await listenOnSafePort(server, '127.0.0.1');
   return { server, state, puts, ctrl };
 }
 const wait644 = ms => new Promise(r => setTimeout(r, ms));

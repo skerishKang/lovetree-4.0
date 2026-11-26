@@ -17,6 +17,8 @@ import { fileURLToPath } from 'node:url';
 import { serve, auditPage, failuresOf, roleStyleFn, assertRolePair } from './helpers/screen-audit.mjs';
 import { createTree, addMoment } from '../public/v41/domain.mjs';
 import { observeFrameMatrix } from './helpers/frame-observation.mjs';
+import { EventEmitter } from 'node:events';
+import { listenOnSafePort } from './helpers/safe-port.mjs';
 
 const REQUIRE = process.env.LT_SCREEN_AUDIT_REQUIRE === '1';
 const SCREEN_AUDIT_CAPTURE_DIR = fileURLToPath(new URL('../test-results/v41-screen-audit/', import.meta.url));
@@ -108,16 +110,17 @@ test('#942 첫 화면 추가 단추와 숫자 묶음', { skip: REQUIRE ? false :
   const trees=[make('좋아하는 순간들',8),make('여름',3),{...make('함께 부른 노래',3),inbox:true}];
   const workspace={revision:1,state:{version:1,trees,prefs:{displayName:'화면검사 시험계정'}},subject:'visual-audit-fake',writeSubjectBound:true,savedAt:'2026-11-20T00:00:00.000Z'};
   const share={id:'audit-share-000000000001',treeId:trees[0].id,view:'book',status:'active',origin:'manual',createdAt:'2026-11-20T00:00:00.000Z'};
-  const readHome = member => {
+  const readHome = kind => {
+     const member=kind==='member';
     const frame = document.getElementById('view');
     if (!frame?.checkVisibility()) return false;
     const doc = frame.contentDocument;
     const root = doc?.getElementById('orbit')?.shadowRoot;
-    const first = root?.querySelector(member ? '.actions [data-do=moments]' : '.actions [data-do=start]');
+    const first = root?.querySelector(member ? '.actions [data-do=moments]' : kind==='empty' ? '.actions [data-do=new]' : '.actions [data-do=start]');
     if (!first?.checkVisibility() || doc.fonts.status !== 'loaded') return false;
     // 공개 집계와 공유 목록은 따로 도착한다. 숫자의 값과 치수는 아래에서 그대로 판정한다.
     const countFor = action => root.querySelector('.actions [data-do='+action+']')?.parentElement.querySelector('.home-count');
-    if (!countFor('community')?.checkVisibility()) return false;
+    if (kind!=='empty' && !countFor('community')?.checkVisibility()) return false;
     if (member && !countFor('trees')?.querySelector('.home-count-line:nth-child(2) > *')) return false;
 
     const measure = e => {
@@ -126,7 +129,7 @@ test('#942 첫 화면 추가 단추와 숫자 묶음', { skip: REQUIRE ? false :
       const a=L(s.backgroundColor),b=L(s.color);
       return {text:e.textContent.trim(),bg:s.backgroundColor,ink:s.color,border:s.borderTopWidth,borderColor:s.borderTopColor,font:parseFloat(s.fontSize),radius:parseFloat(s.borderTopLeftRadius),contrast:(Math.max(a,b)+.05)/(Math.min(a,b)+.05),visible:!!e.getClientRects().length,x:r.x,y:r.y,w:r.width,h:r.height};
     };
-    const buttons = [...root.querySelectorAll('.center .actions > .subtleBtn,.center .actions > .home-action-group > .subtleBtn')].map(e => {
+    const buttons = [...root.querySelectorAll('.center .actions > .subtleBtn,.center .actions > .home-action-group > .subtleBtn')].filter(e=>e.checkVisibility()).map(e => {
       const s = doc.defaultView.getComputedStyle(e);
       const icon=e.querySelector('svg.home-compass'), ir=icon?.getBoundingClientRect();
       return { text:e.textContent.trim(),bg:s.backgroundColor,border:s.borderTopWidth,borderColor:s.borderTopColor,borderStyle:s.borderTopStyle,radius:parseFloat(s.borderTopLeftRadius),ink:s.color,icon:!!icon&&ir.width>0&&ir.height>0&&icon.getAttribute('aria-hidden')==='true'&&icon.getAttribute('fill')==='none'&&icon.getAttribute('stroke')==='currentColor' };
@@ -174,12 +177,26 @@ test('#942 첫 화면 추가 단추와 숫자 묶음', { skip: REQUIRE ? false :
           await ask.waitFor({state:'hidden'});
         }
         // 두 프레임의 이름은 화면을 넘길 때 바뀐다. 지금 보이는 문서에서 모든 치수를 한 번에 읽는다.
-        const result = await page.waitForFunction(readHome, member);
+        const result = await page.waitForFunction(readHome, kind);
         const values = await result.jsonValue();
         await result.dispose();
         const { buttons, head, fab, top, groups, stageBg } = values;
         const key=width+'-'+theme+'-'+kind;
         console.log('#942',key,JSON.stringify(values));
+         if(kind==='empty'){
+          check(JSON.stringify(buttons.map(b=>b.text))===JSON.stringify(['첫 순간 추가','예시 둘러보기']),key+' 빈 기록 단추 순서 '+JSON.stringify(buttons));
+          check(buttons.length===2&&groups.length===2,key+' 빈 기록 단추/집계 묶음 개수 '+JSON.stringify(groups));
+          check(groups.every(g=>g.btnH>=44),key+' 빈 기록 단추 높이 44px 이상 '+JSON.stringify(groups));
+          check(buttons[0]?.radius>=22&&buttons[1]?.radius>=22,key+' 빈 기록 둥근 단추 모양 '+JSON.stringify(buttons));
+          check(!head.visible&&!fab.visible&&!top?.visible,key+' 빈 기록에서 쓰기 단추는 가운데 한 곳만 표시');
+          check(buttons.every(b=>b.border==='1px'&&b.radius>=22&&pairContrast(b.ink,b.bg)>=4.5),key+' 빈 기록 단추 글자 대비 4.5:1 이상 및 테두리 '+JSON.stringify(buttons));
+          if(groups.length===2){const a=groups[0],b=groups[1],gap=Math.abs(a.y-b.y)<2?b.x-a.x-a.w:b.y-a.y-a.h;check(gap>=Math.max(width===1440?16:14,15),key+' 빈 기록 단추 간격 '+gap);}
+
+          const emptyView=await page.evaluate(()=>{const root=document.getElementById('view')?.contentDocument?.getElementById('orbit')?.shadowRoot;return {cards:root?.querySelectorAll('.card').length,headline:root?.querySelector('.center h1')?.textContent}});
+          check(emptyView.cards===0&&emptyView.headline==='내 첫 순간',key+' 빈 기록 예시 카드 0개/제목 '+JSON.stringify(emptyView));
+          continue;
+         }
+
         if(dest){
           if(width===1440)await page.frameLocator('#view').locator('.card:not(.off):not(.clash)').first().waitFor({state:'visible',timeout:8000});
           // Capture the fully revealed center, not a transient animation frame.
@@ -228,7 +245,7 @@ test('#942 첫 화면 추가 단추와 숫자 묶음', { skip: REQUIRE ? false :
         check(groups.length===3,key+' 묶음 3개');
         // #1350: 단추 줄의 세 단추는 44px 이상 눌린다.
         check(groups.every(g=>g.btnH>=44),key+' 단추 누름 높이 44px 이상 '+JSON.stringify(groups.map(g=>[g.label,g.btnH])));
-         check(JSON.stringify(groups.map(g=>g.count))===JSON.stringify(member?['순간 14|정리 전 3','공개 트리 17|공개 순간 1.2k','트리 3|공개 트리 1']:['',(signedIn?'':'예시 ')+'공개 트리 17|순간 1.2k','']),key+' 숫자 귀속');
+         check(JSON.stringify(groups.map(g=>g.count))===JSON.stringify(member?['순간 14|정리 전 3','모두의 트리 17|모두의 순간 1.2k','내 트리 3|내 공개 트리 1']:['',(signedIn?'':'예시 ')+'모두의 트리 17|모두의 순간 1.2k','']),key+' 숫자 귀속');
         for(const g of groups.filter(g=>g.count)){
           check(g.inner>=4&&g.inner<=6&&g.font>=12&&g.widthDiff<=1,key+' 숫자 표 폭·간격 '+JSON.stringify(g));
           for(const row of g.rows){
@@ -268,7 +285,7 @@ test('#1246 첫 화면 단추 첫 표시 뒤 배치 고정', { skip: REQUIRE ? f
             try{
               const f=document.getElementById('view'),root=f?.contentDocument?.getElementById('orbit')?.shadowRoot;
               const a=root?.querySelector('.center .actions'),c=root?.querySelector('.center'),bs=[...a?.querySelectorAll('.home-action-group > button')||[]];
-              if(f?.checkVisibility()&&a&&bs.length===3){
+              if(f?.checkVisibility()&&a&&bs.length===(document.body.dataset.member==='in'&&document.body.dataset.treeCount==='0'?2:3)){
                 const w=f.contentWindow,style=w.getComputedStyle(a),r=a.getBoundingClientRect(),cr=c.getBoundingClientRect();
                 if(Number(style.opacity)>0&&r.width&&r.height){
                   const translate=style.transform==='none'?0:new DOMMatrixReadOnly(style.transform).m42;
@@ -295,14 +312,15 @@ test('#1246 첫 화면 단추 첫 표시 뒤 배치 고정', { skip: REQUIRE ? f
         // Do not wait for fonts or counts before measuring the first visible group.
         await page.waitForFunction(()=>window.__homeActionFrames.length>0,null,{timeout:15000});
         await page.waitForTimeout(3000);releaseFonts();releaseStats();
-        await page.waitForFunction(()=>window.__homeActionFrames.some(r=>r.filled),null,{timeout:10000});
+        if(kind==='empty')await page.evaluate(()=>document.fonts.ready);
+         else await page.waitForFunction(()=>window.__homeActionFrames.some(r=>r.filled),null,{timeout:10000});
         await page.waitForTimeout(700);
         const rows=await page.evaluate(()=>window.__homeActionFrames);
-        const first=rows[0],last=rows.at(-1),expected=width===390&&!member?3:1;
+        const first=rows[0],last=rows.at(-1),expected=width===390?(kind==='guest'?3:kind==='empty'?2:1):1;
         const delta=k=>Math.max(...rows.map(r=>r[k]))-Math.min(...rows.map(r=>r[k]));
         const result={key,samples:rows.length,first,last,heightDelta:delta('height'),topDelta:delta('top'),centerDelta:delta('centerTop'),lines:[...new Set(rows.map(r=>r.lines))],labels:[...new Set(rows.map(r=>r.labels))]};
         console.log('#1246 FIRST',JSON.stringify(result));
-        if(first.filled||!last.filled||result.lines.length!==1||result.lines[0]!==expected||result.labels.length!==1||result.heightDelta>8||result.topDelta>8||result.centerDelta>8)failures.push(result);
+        if(first.filled||(kind!=='empty'&&!last.filled)||result.lines.length!==1||result.lines[0]!==expected||result.labels.length!==1||result.heightDelta>8||result.topDelta>8||result.centerDelta>8)failures.push(result);
       }finally{releaseFonts();releaseStats();await ctx.close();}
     }
   }finally{await browser.close();await new Promise(r=>server.close(r));}
@@ -636,7 +654,7 @@ test('#657 화면 공통 검사기: 아홉 화면 둘레·스크롤 주인 관�
         assert.equal(row.shell.toast.flex, toast.flex, `${label} 안내는 flex 고정 칸이다`);
         assert.ok(Math.abs(row.shell.toast.rect.height - toast.height[width]) <= 0.002, `${label} 안내 높이`);
         assert.deepEqual([row.shell.toast.margin[0], row.shell.toast.margin[2]], [toast.margin[width].top, toast.margin[width].bottom], `${label} 안내 세로 여백`);
-        assert.ok(row.shell.toastCenterDelta <= toast.centeringTolerance, `${label} 안내 좌우 여백 차이 ${row.shell.toastCenterDelta}px`);
+        if (!row.shell.toastHidden && row.shell.toast.display !== 'none') assert.ok(row.shell.toastCenterDelta <= toast.centeringTolerance, `${label} 안내 좌우 여백 차이 ${row.shell.toastCenterDelta}px`);
         assert.equal(row.shell.toastHorizontalOverflow, toast.horizontalOverflow, `${label} 안내 가로 넘침`);
         assert.equal(row.shell.toastWithinViewport, toast.withinViewport, `${label} 안내가 화면 안에 있다`);
         const shortfall = baseline.screens.iframe.stage.height[width] - stage.rect.height;
@@ -2488,7 +2506,8 @@ test('#657 후속 261117: 상단 탭 글자 통일과 고른 탭 칸 높이(390�
             });
             assert.equal(box.frameBg, 'rgba(0, 0, 0, 0)', `${width}/${theme}/${view}: 탭을 감싸는 판 배경 없음`);
             assert.equal(box.frameBorder, 0, `${width}/${theme}/${view}: 탭을 감싸는 판 테두리 없음`);
-            assert.equal(box.bg, 'rgba(0, 0, 0, 0)', `${width}/${theme}/${view}: 고른 탭 칸을 칠하지 않는다`);
+            assert.notEqual(box.bg, 'rgba(0, 0, 0, 0)', `${width}/${theme}/${view}: 고른 탭 칸을 칠한다`);
+            assert.ok(pairContrast(box.color,box.bg)>=4.5, `${width}/${theme}/${view}: 고른 탭 글자 대비 4.5:1 이상`);
             assert.equal(box.deco, 'underline', `${width}/${theme}/${view}: 고른 탭은 밑줄로 표시한다`);
             assert.equal(box.thickness, '2px', `${width}/${theme}/${view}: 밑줄 두께 2px`);
             assert.ok(box.height >= 44, `${width}/${theme}/${view}: 탭 누름 영역 ${box.height}px ≥ 44`);
@@ -3562,4 +3581,35 @@ test('#1362 확장: 여섯 화면 선택 탭 채움·쉬는 테두리 역할 변
     }
   } finally { await browser.close(); server.close(); }
   assert.ok(pairs.length >= 24, `역할 색 검사 24쌓 — 실제 ${pairs.length}`);
+});
+
+// #1420: Chromium이 막는 포트를 받으면 닫고 다시 받는지, 상한을 넘으면 분명히 실패하는지.
+function fakeServer(ports) {
+  const server = new EventEmitter();
+  let current = null;
+  let listens = 0;
+  let closes = 0;
+  server.listen = (_port, ...args) => {
+    listens += 1;
+    const done = args.find(arg => typeof arg === 'function');
+    current = ports.shift();
+    setImmediate(() => done?.());
+    return server;
+  };
+  server.address = () => ({ port: current });
+  server.close = done => { closes += 1; setImmediate(() => done?.()); return server; };
+  return { server, stats: () => ({ listens, closes }) };
+}
+
+test('#1420 막힌 포트를 받으면 닫고 다시 받아 안전한 포트를 쓴다', async () => {
+  const { server, stats } = fakeServer([5061, 6668, 4102]);
+  const port = await listenOnSafePort(server, '127.0.0.1');
+  assert.equal(port, 4102);
+  assert.deepEqual(stats(), { listens: 3, closes: 2 });
+});
+
+test('#1420 다시 받는 횟수가 상한을 넘으면 분명한 오류로 끝난다', async () => {
+  const { server, stats } = fakeServer([6669, 6669, 6669]);
+  await assert.rejects(listenOnSafePort(server, '127.0.0.1', { maxTries: 3 }), /다시 받았지만/);
+  assert.deepEqual(stats(), { listens: 3, closes: 3 });
 });

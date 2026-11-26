@@ -1,3 +1,4 @@
+import { listenOnSafePort } from './helpers/safe-port.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdtemp,rm,readFile,readdir,writeFile} from 'node:fs/promises';
@@ -91,7 +92,7 @@ test('HTTP boundary authenticates, binds subject and origin; unknown route/metho
 });
 test('real Node binary adapter + Pages proxy preserve upload/get/delete and cookie identity',async t=>{
  const {store}=await setup(t),handle=createMediaHandler({authenticate:async r=>r.headers.cookie==='test=A'?A:r.headers.cookie==='test=B'?B:null,productId:A.productId,store,publicOrigin:'https://front.test'});
- const server=createServer(createNodeHandler(handle));server.listen(0,'127.0.0.1');await once(server,'listening');t.after(()=>new Promise(r=>server.close(r)));
+ const server=createServer(createNodeHandler(handle));await listenOnSafePort(server, '127.0.0.1');t.after(()=>new Promise(r=>server.close(r)));
  const env={LOVETREE_API_ORIGIN:'http://127.0.0.1:'+server.address().port},proxy=createProxy();
  const request=(path,init={})=>proxy({request:new Request('https://front.test'+path,{...init,headers:{cookie:'test=A',origin:'https://front.test',...init.headers}}),env});
  const id=randomUUID(),uploaded=await request('/api/media',{method:'POST',headers:{'content-type':'image/png','x-lovetree-subject':A.subjectId,'x-lovetree-upload-id':id},body:png});

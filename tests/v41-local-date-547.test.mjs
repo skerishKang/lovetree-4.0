@@ -1,3 +1,4 @@
+import { listenOnSafePort } from './helpers/safe-port.mjs';
 // #547: 새벽에 남긴 순간이 하루 전 날짜로 찍히던 문제.
 // '오늘'을 new Date().toISOString()(UTC)으로 만들면 한국 시간 0시~9시에는 하루 전이 된다.
 // 여기서는 (1) 지역 날짜 함수를 시간대 경계에서 실제로 돌려 보고, (2) 순간 입력 기본값이 그 함수를 쓰는지,
@@ -221,7 +222,7 @@ function servePublic() {
     res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' });
     res.end('not found');
   });
-  return new Promise((ok) => server.listen(0, '127.0.0.1', () => ok(server)));
+  return listenOnSafePort(server, '127.0.0.1').then(() => server);
 }
 // 지금 이 순간 지역 날짜와 UTC 날짜가 다른 시간대를 하나 고른다(없으면 UTC와 늘 같은 시간대).
 function pickZoneDifferingFromUtc() {
