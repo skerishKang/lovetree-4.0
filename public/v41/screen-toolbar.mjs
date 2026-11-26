@@ -60,11 +60,11 @@ function prepareTreeChoice(bar, screen, title, titleFrom) {
     choice.append(thumb, name, caret);
   } else choice.append(name);
   left.prepend(choice);
-  // #1448: ????? ??? ??? ?? ??? ????? ?? ??? ??.
+  // #1448: 서재의 중복 제목을 숨기고 트리 선택기만 표시한다.
   title.hidden = true;
   const refresh = () => {
     const current = source()?.tree;
-    const value = String(current?.title || current?.subject || titleFrom?.textContent || '\uD2B8\uB9AC').trim() || '\uD2B8\uB9AC';
+    const value = String((screen === 'shelf' ? current?.title : titleFrom?.textContent || current?.title) || current?.subject || '\uD2B8\uB9AC').trim() || '\uD2B8\uB9AC';
     name.textContent = value;
     if (!own) return;
     const initial = Array.from(value)[0] || '\uD2B8';
@@ -73,7 +73,7 @@ function prepareTreeChoice(bar, screen, title, titleFrom) {
     const design = mode === 'design' ? normalizeCoverDesign(current?.coverDesign) : '';
     if (design) thumb.dataset.coverDesign = design;
     else delete thumb.dataset.coverDesign;
-    // ??? ?? ??: ??? ??? ??, ?? ??? ?? ??? ??.
+    // 표지는 선택한 순간이 우선이고, 그외에는 가장 오래된 순간을 쓴다.
     const moments = Array.isArray(current?.moments) ? [...current.moments].sort((a, b) =>
       String(a.createdAt || '').localeCompare(String(b.createdAt || ''))) : [];
     const selected = mode !== 'design' ? moments.find(m => m.id === current?.coverMomentId) : null;
