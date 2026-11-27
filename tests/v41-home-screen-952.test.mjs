@@ -1748,3 +1748,15 @@ test('#1521 머리줄과 가운데 단추 일치',{skip: REQUIRE952 ? false : sk
  }
  }finally{await browser.close()}
 });
+
+test('#1530 cold thumbnail states',{skip: REQUIRE952 ? false : skip952,timeout:120000},async()=>{
+ if(skip952)assert.fail(skip952);
+ const browser=await chromium952.launch({headless:true});
+ try{for(const [kind,url] of [['vertical','https://www.youtube.com/shorts/abc123DEF45'],['horizontal','https://youtu.be/abc123DEF45'],['missing','https://youtu.be/abc123DEF45']]){
+ const tree=createTree({subject:'Test',title:'Test video',date:'2026-11-20',emotion:'test',url},'2026-11-20T00:00:00.000Z');
+ const workspace={revision:1,state:{version:1,trees:[tree],prefs:{}},subject:'visual-audit-fake',writeSubjectBound:true};
+ let release;const gate=new Promise(r=>release=r);const events=[];
+ const h=await boot952(browser,{member:true,width:1440,waitUntil:'domcontentloaded',routes:{'/api/workspace':r=>r.fulfill({json:workspace}),'/api/youtube/oembed':r=>r.fulfill({status:kind==='missing'?404:403,json:{}})},thumb:async(r,u)=>{events.push(['request',u.pathname,Date.now()]);await gate; if(kind==='missing'||u.pathname.includes('oardefault')){events.push(['abort',u.pathname,Date.now()]);return r.abort()}events.push(['success',u.pathname,Date.now()]);return THUMB(r)}});
+ try{const m=h.frame.locator('.recent-media');const snap=()=>m.evaluate(e=>{const i=e.querySelector('img');return {state:e.dataset.recentState,src:i?.src,width:i?.naturalWidth,opacity:i&&getComputedStyle(i).opacity,cover:!!e.querySelector('.lt-recent-fallback'),h:e.getBoundingClientRect().height}});const before=await snap();assert.equal(before.state,'loading');assert.equal(before.cover,false);assert.equal(before.opacity,'0');release();await h.frame.waitForFunction(()=>{const e=document.querySelector('#orbit')?.shadowRoot?.querySelector('.recent-media');const i=e?.querySelector('img');return e?.querySelector('.lt-recent-fallback')||i?.naturalWidth>0});const after=await snap();assert.equal(after.state,kind==='missing'?'failed':'ready');assert.equal(after.cover,kind==='missing');assert.equal(after.opacity,kind==='missing'?'0':'1');assert.equal(after.h,before.h);assert.equal(after.width>0,kind!=='missing');if(kind==='vertical')assert.match(after.src,/hqdefault/);assert.equal(await m.locator('.recent-play').isVisible(),false);}finally{release();await close952(h)}
+ }}finally{await browser.close()}
+});
