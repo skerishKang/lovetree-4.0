@@ -579,7 +579,7 @@ test('#1287 모바일 책 보기 제어와 가로 복귀', { skip: REQUIRE ? fal
 });
 import {expectNoHistoryGrowth,testBackNavigation} from './helpers/history-assert.mjs';
 
-test('#1291 책 판 열기와 옵션 전환의 뒤로 가기', {skip: REQUIRE ? false : skip,timeout:100000}, async()=>{
+async function runBookHistory(width,height){
  if(skip) assert.fail('실제 화면 시험을 건너뛸 수 없습니다: '+skip);
  const server=await serve(ROOT);
  let browser;
@@ -587,7 +587,6 @@ test('#1291 책 판 열기와 옵션 전환의 뒤로 가기', {skip: REQUIRE ? 
   browser=await chromium.launch({headless:true,args:['--disable-gpu']});
   const shots=process.env.LT_BOOK_HISTORY_SHOTS||'';
  if(shots)mkdirSync(shots,{recursive:true});
- for(const [width,height] of [[390,844],[844,390],[1440,900]]){
    const env=await openBook(browser,'http://127.0.0.1:'+server.address().port,width,height,'single');
    const {frame,page}=env;
    const snapshot=()=>frame.evaluate(()=>({
@@ -595,6 +594,10 @@ test('#1291 책 판 열기와 옵션 전환의 뒤로 가기', {skip: REQUIRE ? 
     archive:window.__TRACK59__.getState().archive,detail:window.__TRACK59__.getState().detail,
     viewer:window.__TRACK59__.getState().viewer,scrollY:window.scrollY
    }));
+   const waitForBookPage=expected=>frame.waitForFunction(page=>{
+    const state=window.__TRACK59__.getState();
+    return state.page===page&&state.machineState==='IDLE'&&!state.queued;
+   },expected,{timeout:10000});
    await testBackNavigation(page,{frame,recorded:false,action:()=>frame.evaluate(()=>window.__TRACK59__.setView('single'))});
    if(shots)await page.screenshot({path:path.join(shots, `book-${width}-before.png`)});
    const original=await snapshot();
@@ -613,15 +616,16 @@ test('#1291 책 판 열기와 옵션 전환의 뒤로 가기', {skip: REQUIRE ? 
    await frame.evaluate(()=>history.back());
    await frame.waitForFunction(()=>!document.querySelector('#detailSide:not([hidden]),.page-detail'));
    assert.equal((await snapshot()).page,beforeDetail.page,'순간 자세히 뒤로 가기 책 복귀');
+   const beforeTurn=await snapshot();
    await expectNoHistoryGrowth(frame,()=>frame.evaluate(()=>window.__TRACK59__.turnNext()),'일반 책장 넘김은 기록을 쌓지 않음');
-   await frame.waitForTimeout(600);
+   await waitForBookPage(beforeTurn.page+1);
    const beforeJump=await snapshot();
    await frame.evaluate(()=>window.__TRACK59__.openArchive());
    await frame.locator('#archiveList [data-jump="3"]').first().click();
-   await frame.waitForTimeout(750);
+   await waitForBookPage(3);
    assert.equal((await snapshot()).page,3,'목록에서 다른 쪽으로 이동');
    await frame.evaluate(()=>history.back());
-   await frame.waitForTimeout(750);
+   await waitForBookPage(beforeJump.page);
    assert.equal((await snapshot()).page,beforeJump.page,'목록 점프 뒤로 가기 이전 쪽');
 
    await env.ctx.close();
@@ -658,12 +662,14 @@ test('#1291 책 판 열기와 옵션 전환의 뒤로 가기', {skip: REQUIRE ? 
    await testBackNavigation(viewer.page,{frame:viewer.frame,recorded:true,panels:['#detailSide:not([hidden])','.page-detail','#viewer.open'],action:async()=>viewer.frame.locator('[data-detail-viewer]:visible').first().click()});
    await viewer.ctx.close();
 
-  }
  }finally{
   await browser?.close();
   await new Promise(r=>server.close(r));
  }
-});
+}
+for(const [width,height] of [[390,844],[844,390],[1440,900]]){
+ test(`#1291 책 판 열기와 옵션 전환의 뒤로 가기(${width}×${height})`, {skip: REQUIRE ? false : skip,timeout:100000}, ()=>runBookHistory(width,height));
+}
 
 
 test('#1358 책 첫 그리기에서 쪽 표시가 바뀌지 않는다(저장값 없음)', { skip: REQUIRE ? false : skip, timeout: 240000 }, async () => {

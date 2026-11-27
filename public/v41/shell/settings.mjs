@@ -92,6 +92,9 @@ const themeToggleTop=$('theme-toggle');if(themeToggleTop)themeToggleTop.onclick=
  const myNewsMount=mountMyNews({$,showPanel:id=>panel(id),fetchNews:()=>myNewsApi.myNews(),fetchCount:()=>myNewsApi.myNewsUnread(),getTrees:()=>deps.model?.trees||[],onCount:count=>{dotState.news=Number(count)>0;paintAccountDots();}});
  $('account-my-news').onclick=()=>{closeAccountMenu();void myNewsMount.open();};
  $('updates-link').onclick=()=>{void updatesMount.openUpdates();};
+ // #1488: 안쪽 화면에서 뺀 바닥 링크의 '의견 보내기'·처리방침·약관도 계정 메뉴에 둔다 — 같은 창·같은 주소다.
+ $('account-feedback').onclick=()=>{closeAccountMenu();feedbackDialog.open();};
+ for(const link of document.querySelectorAll('#account-popover a[role=menuitem]'))link.addEventListener('click',()=>closeAccountMenu());
  $('settings-updates-open').onclick=()=>{$('account-settings').close();void updatesMount.openUpdates();};
  // #952: 첫 접속 안내는 새 소식 여부를 확인한 뒤 차례로 올린다.
  const updatesReady=updatesMount.start();

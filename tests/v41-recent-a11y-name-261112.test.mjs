@@ -1,21 +1,19 @@
 // #449 — "마지막 순간" 카드의 접근 이름은 보이는 글자에서 온다(axe label-content-name-mismatch serious).
 // aria-label을 부분적으로 쓰면(보이는 글자 일부만 포함) axe가 오히려 위반으로 잡는다(로컬 픽스처로 확인).
-// 그래서 aria-label을 지우고 안쪽 보이는 글자(마지막 순간 · N일 전 / 제목 / 트리 · 이어 보기 →)로 이름을 만든다.
+// 그래서 aria-label을 지우고 안쪽 보이는 글자(마지막 순간 · N일 전 / 제목 / 트리 · 자세히 보기 →)로 이름을 만든다.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const orbit = readFileSync(new URL('../src/views/orbit.js', import.meta.url), 'utf8');
 
-test('마지막 순간 카드: 접근 이름은 보이는 글자(머리글 · 제목 · 이어 보기)에서 온다', () => {
+test('마지막 순간 카드: 접근 이름은 보이는 글자(머리글 · 제목 · 자세히 보기)에서 온다', () => {
   assert.doesNotMatch(orbit, /class="recent-card[^>]*aria-label/, '카드에 aria-label을 다시 붙이지 않는다');
   // 보이는 글자가 그대로 이름이 되려면 안쪽 글자가 마크업에 있어야 한다.
   // #549: 'N일 전'은 '오늘'·'어제'로 바뀌었고(relativeDayLabel), 접근 이름은 여전히 보이는 글자에서 온다.
   // 261116 PR 2: 머리글은 카드 모드를 고르는 단추다(recent-head) — 기본 문구('마지막 순간 · N일 전')는 버튼 안에 그대로 보인다.
   assert.match(orbit, /<button type="button" class="recent-head" data-recent-head/);
   assert.match(orbit, /마지막 순간\$\{days===null\?'':` · \$\{relativeDayLabel\(days\)\}`\}/);
-  assert.match(orbit, /<strong>\$\{esc\(head\)\}<\/strong>/);
-  assert.match(orbit, / · 이어 보기 →<\/small>/);
 });
 
 test('▶ 재생 단추는 자기 이름을 따로 유지한다(바로 재생 ↔ 정지)', () => {

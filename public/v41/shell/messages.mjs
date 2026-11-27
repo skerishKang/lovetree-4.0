@@ -3,6 +3,7 @@ import { MSG } from '../frame-messages.mjs';
 // 2026-11-08 리팩터링: 동작·문구·주소 형식 변경 0. shell.mjs에서 조건·조회 방식·인자 형태를 바꾸지 않고 그대로 옮겼다.
 // #1026 E 2단계(A-06): 둘러보기 창 모듈은 이 연결 지점에서만 받는다(첫 클릭 리스너는 곧바로 단다).
 import {displayTreeTitle} from '../tree-name.mjs';
+import {normalizeTreeOpenView} from '../tree-open-view.mjs';
 import {parseTag,tagKey,isChannelLikeArtist} from '../tags.mjs';
 // #480 L13: 날짜는 책·보드·지도·첫 화면과 같은 한 벌(formatDisplayDate)로만 적는다.
 import {formatDisplayDate} from '../book-usability.mjs';
@@ -226,6 +227,24 @@ export function createMessages(deps) {
     if (data?.type === MSG.cleanup && getSource() === 'server') { openCleanup({}); return; }
     if (data?.type === MSG.openBook && getModel()?.trees.some(t => t.id === data.treeId && t.moments.some(m => m.id === data.id))) {
       setCurrent('track59-sketchbook.html'); choose(data.treeId, data.id); writeLocation();
+    }
+    if (data?.type === MSG.openTree && getSource() === 'server') {
+      const tree = getModel()?.trees.find(t => t.id === data.treeId);
+      const validMoment = !data.id || tree?.moments.some(m => m.id === data.id);
+      if (tree && validMoment) {
+        const files = {tree:'track61-tree.html',board:'track58-pinboard.html',book:'track59-sketchbook.html',network:'track56-network.html'};
+        setCurrent(files[normalizeTreeOpenView(tree.openView)]);
+        choose(tree.id, data.id || '');
+        writeLocation();
+      }
+    }
+    if (data?.type === MSG.share && getSource() === 'server' && getMember()?.snapshot().owned) {
+      const tree = getModel()?.trees.find(t => t.id === data.treeId && t.moments.some(m => m.id === data.id));
+      if (tree) {
+        if (window.LT41?.tree?.id !== tree.id) choose(tree.id, data.id);
+        else window.LT41.momentId = data.id;
+        void openSharePanel();
+      }
     }
     // #810: 서재 ⋯ — 그 트리로 고른 뒤 기존 트리 관리 창을 연다(새 창 만들지 않음). 없는 트리는 무시한다.
     if (data?.type === MSG.manageTree && getSource() === 'server' && getModel()?.trees.some(t => t.id === data.treeId)) {
