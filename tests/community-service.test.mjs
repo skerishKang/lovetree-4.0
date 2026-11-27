@@ -129,14 +129,17 @@ test('browse cover sends an address only for moment mode — photo/design/basic 
  assert.equal((await call(photoBasic.handle,'GET','/api/community/shares')).body.items[0].cover.url,'','사진 표지 + 디자인 없음은 기본 색 표지');
 });
 
-test('비YouTube 링크 표지는 공개 HTTPS 썸네일만 쓰고 일반·위험 링크 주소는 대체하지 않는다',async()=>{
+test('비유튜브 링크 표지는 외부 이미지 호스트를 거르고 기본 그림을 사용한다',async()=>{
  const external='https://images.example.com/articles/og.jpg';
  const linked=await setup({url:'https://example.com/article',coverMode:'moment',mediaMetadata:{title:'기사 제목',channel:'기사 채널',thumbnail:external}});
  const card=(await call(linked.handle,'GET','/api/community/shares')).body.items[0];
- assert.equal(card.cover.thumbnailUrl,external);
+ assert.equal(card.cover.thumbnailUrl,'','유튜브 밖 썸네일은 공개하지 않는다');
+ assert.equal((await linked.workspaceRepo.load(principal('alice'))).doc.trees[0].moments[0].mediaMetadata.thumbnail,external,'저장 원본에 썸네일은 유지된다');
  const blocked=await setup({url:'https://example.com/article',coverMode:'moment',mediaMetadata:{title:'기사 제목',thumbnail:'javascript:alert(1)'}});
  const blockedCard=(await call(blocked.handle,'GET','/api/community/shares')).body.items[0];
  assert.equal(blockedCard.cover.thumbnailUrl,'');
+ const imageLink=await setup({url:'https://images.example.com/cover.jpg',coverMode:'moment'});
+ assert.equal((await call(imageLink.handle,'GET','/api/community/shares')).body.items[0].cover.thumbnailUrl,'','그림 확장자 링크라도 허용 목록 밖 주소는 거른다');
  const plain=await setup({url:'http://example.com/article',coverMode:'moment'});
  assert.equal((await call(plain.handle,'GET','/api/community/shares')).body.items[0].cover.thumbnailUrl,'','평문 링크 주소는 썸네일로 쓰지 않는다');
 });
@@ -587,12 +590,12 @@ test('tag-moments: 소개가 꺼진 트리의 순간은 나오지 않는다(2026
  assert.deepEqual(after.body.items.map(item=>item.title),['켠 트리 순간','끈 트리 순간'],'켜면 다른 팬 보기에 나온다');
 });
 
-test('tag-moments: 비YouTube 링크의 공개 HTTPS 썸네일을 유지한다',async()=>{
+test('tag-moments: 비유튜브 링크의 외부 썸네일은 공개하지 않는다',async()=>{
  const external='https://images.example.com/articles/og.jpg';
  const data=await tagSetup({accounts:[{subject:'link-owner',trees:[{title:'기사 트리',moments:[{title:'기사 순간',date:'2026-11-05',url:'https://example.com/article',keywords:['무대:링크'],mediaMetadata:{thumbnail:external}}]}]}]});
  const response=await tagCall(data.handle,'무대:링크');
  assert.equal(response.status,200);
- assert.equal(response.body.items[0].thumbnail,external);
+ assert.equal(response.body.items[0].thumbnail,'');
 });
 
 test('tag-moments: 응답은 제목·영상 주소·썸네일·무대 날짜·트리 이름·공유 링크·aiTester뿐 — 개인정보 필드가 없다',async()=>{

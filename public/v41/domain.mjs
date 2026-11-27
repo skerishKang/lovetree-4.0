@@ -302,6 +302,18 @@ function normalizeVerticalMedia(value) {
   }
   return out;
 }
+// 저장 원본의 공개 여부는 판단하지 않고 허용된 모양만 유지한다.
+function normalizeStoredMediaMetadata(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('미디어 정보는 객체여야 해요.');
+  const out = {};
+  for (const [key, max] of [['title', 240], ['channel', 160], ['source', 2048], ['thumbnail', 2048], ['thumbnailUrl', 2048], ['poster', 2048], ['image', 2048], ['authorName', 2048]]) {
+    const item = value[key];
+    if (item === undefined || item === null) continue;
+    if (typeof item !== 'string' || item.length > max) throw new Error('미디어 정보의 글자 수와 형식을 확인해 주세요.');
+    out[key] = item;
+  }
+  return {...out, ...normalizeVerticalMedia(value)};
+}
 function normalizeMediaMetadata(value, url) {
   if (value === undefined || value === null) return null;
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('미디어 정보를 확인해 주세요.');
@@ -885,10 +897,10 @@ export function validateState(value) {
       // #1439: 복사한 순간은 원본 순간 id(copiedFrom)를 남긴다. 원본은 다른 트리에 있거나 지워졌을 수 있어 모양만 본다.
       const copiedFrom = idValid(m.copiedFrom) && m.copiedFrom !== m.id ? { copiedFrom: m.copiedFrom } : {};
       // 이미 저장된 미디어 정보는 새 입력의 정리 결과로 덮어쓰지 않는다.
-      // 형식 검사는 유지하고, 공개 여부와 미래 필드는 공개 응답에서만 판단한다.
+      // 허용된 미디어 필드만 검사해 저장하고, 주소의 공개 여부는 공개 응답에서 판단한다.
       const validated = validateMomentInput(clean);
       if (m.mediaMetadata !== undefined && m.mediaMetadata !== null) {
-        validated.mediaMetadata = structuredClone(m.mediaMetadata);
+        validated.mediaMetadata = normalizeStoredMediaMetadata(m.mediaMetadata);
       }
       return { ...validated, ...rangeFields(m, m.url), id: m.id, parentId: m.parentId, links: [...new Set(rawLinks)], createdAt: m.createdAt, ...boardLayoutOf(m), ...copiedFrom };
     });

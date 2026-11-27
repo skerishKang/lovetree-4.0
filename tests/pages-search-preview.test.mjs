@@ -94,10 +94,10 @@ test('직접 올린 사진(/api/media/)은 카드 그릴로 나가지 않는다(
   assert.doesNotMatch(html, /api\/media\//);
 });
 
-test('저장한 공개 HTTPS 썸네일을 쓰고 비공개·위험 주소는 버린다', () => {
+test('유튜브 허용 그림만 쓰고 다른 외부·비공개·위험 주소는 버린다', () => {
   const image = cardImageFor({ url: '', mediaMetadata: { thumbnail: 'https://i.ytimg.com/vi/abc12345678/hqdefault.jpg' } });
   assert.equal(image, 'https://i.ytimg.com/vi/abc12345678/hqdefault.jpg');
-  assert.equal(cardImageFor({ url: '', mediaMetadata: { thumbnail: 'https://images.example.com/articles/og.jpg' } }), 'https://images.example.com/articles/og.jpg', '공개 HTTPS 외부 썸네일은 유지한다');
+  assert.equal(cardImageFor({ url: '', mediaMetadata: { thumbnail: 'https://images.example.com/articles/og.jpg' } }), '', '유튜브 밖 그림은 공개하지 않는다');
   for(const value of ['/api/media/private.png','http://images.example.com/og.jpg','data:image/png;base64,AAAA','javascript:alert(1)'])assert.equal(cardImageFor({url:'',mediaMetadata:{thumbnail:value}}),'',value);
   assert.equal(cardImageFor(null), '');
 });
