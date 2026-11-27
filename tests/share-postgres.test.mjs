@@ -1,6 +1,7 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {applySchema,createPool,createWorkspaceRepo} from '../server/db/postgres.js';
 import {createShareRepo} from '../server/db/shares-postgres.js';
+import {createShareService,createShareHandler} from '../server/share-service.js';
 import {assertIsolatedTestDatabase} from '../server/testing/isolated-test-database.js';
 import {ApiError} from '../server/errors.js';
 const DATABASE_URL=process.env.LOVETREE_TEST_DATABASE_URL??'';
