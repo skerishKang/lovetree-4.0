@@ -63,6 +63,7 @@ export function createWorkspaceRuntime(ctx){
   // 백업 파일 열기는 계정 없이 쓰는 입구라 로그인 상태에서는 숨긴다(로그아웃은 지금 그대로 둔다).
   // 2026-11-17 대표 결정: 트리 0개 계정이 서재·책·보드·지도탭을 열면 그 화면의 빈 상태를 보여 준다.
   function paintEmptyForScreen(file){
+    const shareHome=(0,ctx.$)('empty-share-home');if(shareHome)shareHome.hidden=true;
     const empty=(0,ctx.$)('empty');
     const owned=!!ctx.member?.snapshot().owned;
     const shelf=file==='track32-bookshelf.html';
@@ -87,6 +88,7 @@ export function createWorkspaceRuntime(ctx){
   }
 
   function paintEmptyCopy(){
+    const shareHome=(0,ctx.$)('empty-share-home');if(shareHome)shareHome.hidden=true;
     const owned=!!ctx.member?.snapshot().owned;
     delete (0,ctx.$)('empty').dataset.emptyView;
     delete (0,ctx.$)('empty').dataset.emptyGuest;
