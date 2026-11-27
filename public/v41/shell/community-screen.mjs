@@ -15,6 +15,19 @@ export function createCommunityScreen(deps) {
   if (!dialog || !button) return {isOpen: () => false, openRoute: () => {}, close: () => {}};
   // 화면 상태 — iframe·빈 화면은 화면 뒤에 남지 않게 숨긴다(shell.css의 body.community-screen 규칙).
   const paintPage = on => document.body.classList.toggle('community-screen', on);
+  // #1499: 기존 정렬 선택값과 단추 이름을 맞춘다.
+  const paintSortName = () => {
+    const select = dialog.querySelector('#community-sort');
+    const trigger = dialog.querySelector('.community-sort-trigger');
+    const name = select?.selectedOptions[0]?.textContent;
+    if (!trigger || !name) return;
+    const label = name + ' ▾';
+    if (trigger.textContent !== label) trigger.textContent = label;
+    if (trigger.getAttribute('aria-label') !== name) trigger.setAttribute('aria-label', name);
+  };
+  const sortObserver = new MutationObserver(paintSortName);
+  sortObserver.observe(dialog, {subtree:true,childList:true,attributes:true,attributeFilter:['aria-selected']});
+  paintSortName();
   const viewTabs = () => document.querySelectorAll('nav [data-view]');
   const exploreHash = () => (/^#explore(?:\/moments)?(?:\?|$)/.test(location.hash) ? location.hash : '');
 

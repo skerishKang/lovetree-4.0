@@ -894,7 +894,10 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
   if(next==='ribbon'){
    stopOrbitLoop();world.classList.remove('lt-canvas');world.classList.add('lt-ribbon');const duration=96000;if(!hintDismissed)selectCardHint(0);
    elements.slice(0,8).forEach((el,i)=>{
-    el.classList.remove('off');const y=48+(i%2)*8,tilt=-5+(i%4)*3,baseH=el.offsetHeight||172,scale=Math.max(.32,Math.min(i===0?.68:.56+(i%3)*.04,((safeZone?.t||150)-12-y-8)/baseH)),baseW=el.offsetWidth||132,from=-baseW*scale-20,to=w+20,slot=(i===0?4:i<=4?i+4:i-4)/8;
+    el.classList.remove('off');const tilt=-5+(i%4)*3,baseH=el.offsetHeight||172,baseW=el.offsetWidth||132;
+    const preferredY=48+(i%2)*8,limit=(safeZone?.t??150)+20,angle=tilt*Math.PI/180,extent=baseH*Math.cos(angle)+Math.max(0,baseW*Math.sin(angle));
+    const preferredScale=Math.max(.32,Math.min(i===0?.68:.56+(i%3)*.04,((safeZone?.t??150)-12-preferredY-8)/baseH));
+    const y=Math.max(8,Math.min(preferredY,limit-extent*preferredScale)),scale=Math.min(preferredScale,Math.max(.01,(limit-y)/extent)),from=-baseW*scale-20,to=w+20,slot=(i===0?4:i<=4?i+4:i-4)/8;
     const anim=el.animate([{transform:`translate3d(${from}px,${y}px,0) scale(${scale}) rotate(${tilt}deg)`},{transform:`translate3d(${to}px,${y}px,0) scale(${scale}) rotate(${tilt}deg)`}],{duration,iterations:Infinity,easing:'linear',delay:-slot*duration});
     el.__ribbonDuration=duration;el.style.zIndex=String(20-i);ribbonAnims[i]=anim;
    });

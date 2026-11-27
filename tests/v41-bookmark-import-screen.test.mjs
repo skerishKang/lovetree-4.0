@@ -49,7 +49,7 @@ function fixtureTrees() {
 async function openContext(browser, { width, height, theme, trees, titleDelayMs = 0 }) {
   const ctx = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce', hasTouch: width < 600, isMobile: width < 600 });
   const seen = { requests: [], puts: [] };
-  await ctx.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); localStorage.setItem('lt41.publicNoticeShown', '1'); } catch {} }, theme);
+  await ctx.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); } catch {} }, theme);
   await ctx.route('**://i.ytimg.com/**', (r) => r.fulfill({ status: 200, contentType: 'image/svg+xml', body: IMG }));
   await ctx.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
   await ctx.route('**/api/youtube/oembed**', async (r) => {
@@ -257,7 +257,6 @@ test('#822 북마크에서 가져오기 화면: 입구 → 미리보기 → 담�
       await page.waitForFunction(viewShown('done'), null, { timeout: 30000 });
       await page.waitForTimeout(300);
       // 저장 뒤 뜨는 둘러보기 소개 질문은 이 창 위에 겹쳐 뜬다 — 답해도 결과 화면은 남아 있다.
-      if (await page.evaluate(() => document.getElementById('discover-ask')?.open === true)) await page.click('#discover-ask-no');
       const done = await page.evaluate(() => ({
         open: document.getElementById('bookmark-import-panel').open,
         title: document.querySelector('#bookmark-import-panel .bmi-done-title').textContent,
@@ -327,7 +326,6 @@ test('#822 한 번에 200개까지: 넘으면 200개만 골라 두고 안내하�
       // 담기 → 남은 30개 이어서.
       await page.click('#bookmark-import-panel .bmi-save');
       await page.waitForFunction(viewShown('done'), null, { timeout: 120000 });
-      if (await page.evaluate(() => document.getElementById('discover-ask')?.open === true)) await page.click('#discover-ask-no');
       const done = await page.evaluate(() => ({ title: document.querySelector('#bookmark-import-panel .bmi-done-title').textContent, more: [...document.querySelectorAll('#bookmark-import-panel .bmi-done-actions button')].filter((b) => !b.hidden).map((b) => b.textContent), moments: window.LT41.trees[0].moments.length }));
       assert.equal(done.title, '✓ 200개를 ‘시험 트리’에 담았어요', `${label}: 200개 담음`);
       assert.deepEqual(done.more, ['트리 보러 가기', '남은 30개 이어서 고르기', '닫기'], `${label}: 남은 것 이어서 고르기`);
@@ -389,7 +387,6 @@ test('#822 처음 온 팬 안내: 트리가 없는 내 계정의 빈 서재·첫
         await page.fill('#bookmark-import-new-name', '가짜 첫 트리');
         await page.click('#bookmark-import-panel .bmi-save');
         await page.waitForFunction(viewShown('done'), null, { timeout: 30000 });
-        if (await page.evaluate(() => document.getElementById('discover-ask')?.open === true)) await page.click('#discover-ask-no');
         const made = await page.evaluate(() => ({ trees: (window.LT41?.trees || []).map((tree) => [tree.title, tree.moments.length]), emptyHidden: document.getElementById('empty').hidden, title: document.querySelector('#bookmark-import-panel .bmi-done-title').textContent }));
         assert.deepEqual(made.trees, [['가짜 첫 트리', 4]], `${label}: 저장 뒤 새 트리 순간 수`);
         assert.equal(made.title, '✓ 4개를 ‘가짜 첫 트리’에 담았어요');

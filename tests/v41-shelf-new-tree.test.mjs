@@ -28,7 +28,6 @@ async function openShelf(browser, origin, width = 1440, count = 1) {
   const page = await ctx.newPage();
   await page.goto(`${origin}/v41/?account=1`, { waitUntil: 'load', timeout: 60000 });
   await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
-  await page.locator('#discover-ask-no').click().catch(() => {});
   await page.evaluate(() => { location.hash = '#my/shelf'; });
   await page.waitForFunction(() => [...document.querySelectorAll('iframe')].some((f) => {
     try { return /track32-bookshelf/.test(f.contentWindow.location.href) && f.contentDocument.querySelector('.book-card'); } catch { return false; }

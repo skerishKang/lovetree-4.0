@@ -273,8 +273,9 @@ export function createWritingRuntime(ctx){
       // #480 L13: 공유 목록·공유 미리보기의 날짜도 계정 설정 한 벌을 따른다(책·보드·지도·첫 화면과 같음).
       getDateStyle:()=>(0,ctx.currentDateStyle)(),
       shareApi:ctx.shareApi,
-      discoverOf:treeId=>ctx.discoverState.has(treeId)?ctx.discoverState.get(treeId):null,
-      rememberDiscover:(treeId,discover)=>ctx.discoverState.set(treeId,discover===true),
+      discoverOf:treeId=>ctx.discoverOf?.(treeId)??null,
+      // #1495: 공유 판에서 바꾼 값은 서재 표시·내 소식 줄이 같이 본다.
+      rememberDiscover:(treeId,discover)=>ctx.rememberDiscover?.(treeId,discover),
       notify:text=>(0,ctx.notify)(text),
       panel:id=>(0,ctx.panel)(id),
       openSettingsData:intent=>(0,ctx.openAccountData)(intent),

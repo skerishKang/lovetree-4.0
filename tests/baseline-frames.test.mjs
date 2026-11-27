@@ -6,7 +6,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { diffLeaves, deriveScreens, plan, replaceValues } from '../tools/baseline-frames.mjs';
+import { diffLeaves, deriveScreens, parseOptions, plan, replaceValues } from '../tools/baseline-frames.mjs';
 
 const oldText = readFileSync(new URL('./fixtures/frame-observation-baseline.json', import.meta.url), 'utf8');
 const old = JSON.parse(oldText);
@@ -79,6 +79,14 @@ function fakeReport(baseline) {
     }
   }
   return { basis: '가짜 관측', fakeSession: true, errors: [], screens };
+}
+
+function filteredReport(baseline, { screen = null, width = null } = {}) {
+  const report = fakeReport(baseline);
+  return {
+    ...report,
+    screens: report.screens.filter(row => (!screen || row.screen === screen) && (!width || String(row.viewport.width) === width))
+  };
 }
 
 test('#1469 기준선에서 거꾸로 만든 가짜 관측은 다시 기준선과 같다 — 테두리 색·배경은 테마마다 달라도 된다', () => {
@@ -266,4 +274,59 @@ test('#1469 기준선 구조가 달라지면 바꿔 끼우지 않고, 구조 차
   const structure = diffLeaves({ a: [1] }, { a: { b: 1 } });
   assert.equal(structure.length, 1);
   assert.match(structure[0].a, /^\(구조\)/);
+});
+
+test('#1469 화면·폭·결과 위치·비교 모드 선택을 검증한다', () => {
+  const defaults = parseOptions([], old);
+  assert.equal(defaults.screen, null);
+  assert.equal(defaults.width, null);
+  assert.equal(defaults.port, 4520);
+  assert.equal(defaults.check, false);
+  const selected = parseOptions(['--screen', 'home', '--width', '1440', '--out', 'test-results/custom', '--port', '4529', '--check'], old);
+  assert.deepEqual(selected.screens, ['home']);
+  assert.deepEqual(selected.widths, ['1440']);
+  assert.equal(selected.port, 4529);
+  assert.equal(selected.check, true);
+  assert.notEqual(selected.outDir, defaults.outDir);
+  assert.throws(() => parseOptions(['--screen', 'missing'], old), /알 수 없는 화면/);
+  assert.throws(() => parseOptions(['--width', '844'], old), /알 수 없는 폭/);
+  assert.throws(() => parseOptions(['--port', '4401'], old), /포트는 4520~4529/);
+  assert.throws(() => parseOptions(['--out', '../outside'], old), /결과 위치는 저장소 안/);
+});
+
+test('#1469 부분 관측은 선택한 조건만 검사하고 나머지 기준선 값은 유지한다', () => {
+  const home = deriveScreens(filteredReport(old, { screen: 'home' }), old, '부분', { screen: 'home' }).screens;
+  assert.deepEqual(Object.keys(home), ['home']);
+  assert.deepEqual(home.home, old.screens.home);
+
+  const narrow = deriveScreens(filteredReport(old, { width: '390' }), old, '부분', { width: '390' }).screens;
+  assert.deepEqual(narrow, old.screens);
+
+  const one = deriveScreens(filteredReport(old, { screen: 'book', width: '1440' }), old, '부분', { screen: 'book', width: '1440' }).screens;
+  assert.deepEqual(one.iframe, old.screens.iframe);
+});
+
+test('#1469 화면 하나·폭 하나를 다시 뽑으면 선택한 항목만 바뀐다', () => {
+  const selection = { screen: 'home', width: '1440' };
+  const first = filteredReport(old, selection);
+  const second = filteredReport(old, selection);
+  for (const theme of THEMES) rowOf(first, 'home', 1440, theme).shell.stage.rect.height = 836;
+  for (const theme of THEMES) rowOf(second, 'home', 1440, theme).shell.stage.rect.height = 836;
+  const result = plan({ oldText, metricsA: first, metricsB: second, runsEqual: true, basis: HEAD, selection });
+  assert.equal(result.status, 'changed');
+  assert.deepEqual(result.changed, [{ path: 'screens/home/stage/height/1440', a: 835, b: 836 }]);
+  const next = JSON.parse(result.text);
+  assert.deepEqual(next.screens.iframe, old.screens.iframe);
+  assert.deepEqual(next.screens.book, old.screens.book);
+});
+
+test('#1469 부분 관측에서도 두 결과가 다르면 기준선 텍스트를 내지 않는다', () => {
+  const selection = { screen: 'home', width: '1440' };
+  const first = filteredReport(old, selection);
+  const second = filteredReport(old, selection);
+  for (const theme of THEMES) rowOf(first, 'home', 1440, theme).shell.stage.rect.height = 836;
+  const result = plan({ oldText, metricsA: first, metricsB: second, runsEqual: false, basis: HEAD, selection });
+  assert.equal(result.status, 'runs-differ');
+  assert.equal(result.text, null);
+  assert.ok(result.runsDiff.some(row => row.path === 'home/stage/height/1440'));
 });

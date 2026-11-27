@@ -27,6 +27,8 @@
     community: fromView('lt41-community', 'tab? (trees|moments)'),
     dateStyle: fromShell('lt41-date-style', 'value'),
     deleteMoment: fromView('lt41-delete-moment', 'treeId?, momentId'),
+    // #1495: 둘러보기에 소개된 내 트리 목록(소개된 트리 id → true). 서재 카드 표시가 읽는다.
+    discoverState: fromShell('lt41-discover-state', 'trees'),
     example: fromView('lt41-example', 'view, momentId'),
     homeCards: fromShell('lt41-home-cards', 'mode'),
     homeMoment: fromView('lt41-home-moment', 'value'),
@@ -52,6 +54,8 @@
     openBook: fromView('lt41-open-book', 'treeId, id'),
     openGuide: fromShell('lt41-open-guide', '없음'),
     openNetwork: fromView('lt41-open-network', 'momentId, treeId?'),
+    // #1495: 서재 카드의 '둘러보기에 보임' — 그 트리 공유 판을 연다.
+    openShare: fromView('lt41-open-share', 'treeId'),
     openTags: fromView('lt41-open-tags', 'suggest'),
     openTree: fromView('lt41-open-tree', 'treeId, id?'),
     openView: fromView('lt41-open-view', 'treeId, view'),

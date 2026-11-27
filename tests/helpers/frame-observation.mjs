@@ -174,21 +174,19 @@ async function openMemberScreen(page, screen) {
   }
 }
 
-export async function observeFrameMatrix({ browser, base, outputDir, shard = '' }) {
+export async function observeFrameMatrix({ browser, base, outputDir, shard = '', screens = null, widths = null }) {
   mkdirSync(outputDir, { recursive: true });
   const tree = observationTree();
   const routeApi = observationRoutes(tree);
+  const chosenScreens = Array.isArray(screens) && screens.length ? new Set(screens.map(String)) : null;
+  const chosenWidths = Array.isArray(widths) && widths.length ? new Set(widths.map(String)) : null;
+  const memberScreens = FRAME_SCREENS.filter(screen => (!chosenScreens || chosenScreens.has(screen.id)));
+  const includeGuest = !chosenScreens || chosenScreens.has('share-guest');
+  const sizes = [[390, 844], [1440, 900]].filter(([width]) => !chosenWidths || chosenWidths.has(String(width)));
   const rows = [], errors = [];
-  for (const [width, height] of [[390, 844], [1440, 900]]) for (const theme of ['night', 'garden']) {
+  for (const [width, height] of sizes) for (const theme of ['night', 'garden']) {
     const ownShard = theme === 'night' ? (width === 1440 ? 'a' : 'b') : 'c';
     if (shard && shard !== ownShard) continue;
-    const context = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
-    await context.addInitScript(({ theme, treeId }) => { localStorage.setItem('lt41.theme', theme); localStorage.setItem('lt41.tips.firstTree', '1'); localStorage.setItem('lt41.video-consent', '1'); localStorage.setItem('lt41.discoverAsked', JSON.stringify([treeId])); }, { theme, treeId: tree.id });
-    await context.route('**://i.ytimg.com/**', THUMB);
-    await context.route('**/api/**', routeApi);
-    const page = await context.newPage();
-    await page.clock.install({ time: new Date('2026-11-20T00:00:00Z') });
-    page.on('pageerror', e => errors.push(String(e)));
     const capture = async (activePage, screen) => {
       const name = `${width}-${theme}-${screen.id}`;
       await activePage.screenshot({ path: join(outputDir, name + '.png'), animations: 'disabled' });
@@ -205,33 +203,44 @@ export async function observeFrameMatrix({ browser, base, outputDir, shard = '' 
       writeFileSync(join(outputDir, name + '.json'), JSON.stringify(measured, null, 2));
       console.log('관측', name);
     };
-    try {
-      await page.goto(base + '/v41/?account=1#home', { waitUntil: 'load' });
-      await settleObservation(page, () => window.LT41?.trees?.length === 1 && document.body.dataset.member === 'in' && !document.getElementById('discover-ask')?.open && [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length)?.contentDocument?.getElementById('orbit') && [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length)?.contentWindow?.__LT_ORBIT_TEST__?.canvasSettled());
-      await page.evaluate(() => {
-        const frame = [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length);
-        const orbit = frame.contentWindow.__LT_ORBIT_TEST__;
-        orbit.hold(true);
-        orbit.pauseFloat();
-        orbit.seek(0);
-      });
-      for (const screen of FRAME_SCREENS) { await openMemberScreen(page, screen); await capture(page, screen); if (screen.id === 'book' || screen.id === 'board') await page.clock.resume(); }
-    } finally { await context.close().catch(() => {}); }
-    const guest = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
-    await guest.addInitScript(({ theme, treeId }) => { localStorage.setItem('lt41.theme', theme); localStorage.setItem('lt41.tips.firstTree', '1'); localStorage.setItem('lt41.video-consent', '1'); localStorage.setItem('lt41.discoverAsked', JSON.stringify([treeId])); }, { theme, treeId: tree.id });
-    await guest.route('**://i.ytimg.com/**', THUMB);
-    await guest.route('**/api/**', routeApi);
-    const guestPage = await guest.newPage();
-    guestPage.on('pageerror', e => errors.push(String(e)));
-    try {
-      await guestPage.clock.install({ time: new Date('2026-11-20T00:00:00Z') });
-      await guestPage.goto(base + '/v41/#share/c000000000000000000000a/book', { waitUntil: 'load' });
-      await guestPage.waitForFunction(() => document.body.dataset.recordSource === 'share' && document.body.dataset.fabLift === 'book' && !document.getElementById('toast')?.hidden && document.getElementById('toast')?.hasAttribute('data-visitor-intro') && [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length)?.contentWindow?.location?.pathname?.endsWith('/track59-sketchbook.html') && [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length)?.contentDocument?.querySelector('.moment,.mobile-page,.book-wrap'), null, { timeout: 30000 });
-      await guestPage.clock.fastForward(0);
-      await settleObservation(guestPage, () => { const frame = [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length); return !!frame?.contentDocument?.querySelector('.lt-screen-toolbar[data-screen="book"]') && !!frame?.contentWindow?.LTTagLine; }, null, { freezeClock: true });
-      await finishBookObservation(guestPage);
-      await capture(guestPage, { id: 'share-guest', label: '공유 방문자 책', root: '.moment' });
-    } finally { await guest.close().catch(() => {}); }
+    if (memberScreens.length) {
+      const context = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
+      await context.addInitScript(({ theme, treeId }) => { localStorage.setItem('lt41.theme', theme); localStorage.setItem('lt41.tips.firstTree', '1'); localStorage.setItem('lt41.video-consent', '1'); }, { theme, treeId: tree.id });
+      await context.route('**://i.ytimg.com/**', THUMB);
+      await context.route('**/api/**', routeApi);
+      const page = await context.newPage();
+      await page.clock.install({ time: new Date('2026-11-20T00:00:00Z') });
+      page.on('pageerror', e => errors.push(String(e)));
+      try {
+        await page.goto(base + '/v41/?account=1#home', { waitUntil: 'load' });
+        await settleObservation(page, () => window.LT41?.trees?.length === 1 && document.body.dataset.member === 'in' && [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length)?.contentDocument?.getElementById('orbit') && [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length)?.contentWindow?.__LT_ORBIT_TEST__?.canvasSettled());
+        await page.evaluate(() => {
+          const frame = [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length);
+          const orbit = frame.contentWindow.__LT_ORBIT_TEST__;
+          orbit.hold(true);
+          orbit.pauseFloat();
+          orbit.seek(0);
+        });
+        for (const screen of memberScreens) { await openMemberScreen(page, screen); await capture(page, screen); if (screen.id === 'book' || screen.id === 'board') await page.clock.resume(); }
+      } finally { await context.close().catch(() => {}); }
+    }
+    if (includeGuest) {
+      const guest = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
+      await guest.addInitScript(({ theme, treeId }) => { localStorage.setItem('lt41.theme', theme); localStorage.setItem('lt41.tips.firstTree', '1'); localStorage.setItem('lt41.video-consent', '1'); }, { theme, treeId: tree.id });
+      await guest.route('**://i.ytimg.com/**', THUMB);
+      await guest.route('**/api/**', routeApi);
+      const guestPage = await guest.newPage();
+      guestPage.on('pageerror', e => errors.push(String(e)));
+      try {
+        await guestPage.clock.install({ time: new Date('2026-11-20T00:00:00Z') });
+        await guestPage.goto(base + '/v41/#share/c000000000000000000000a/book', { waitUntil: 'load' });
+        await guestPage.waitForFunction(() => document.body.dataset.recordSource === 'share' && document.body.dataset.fabLift === 'book' && !document.getElementById('toast')?.hidden && document.getElementById('toast')?.hasAttribute('data-visitor-intro') && [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length)?.contentWindow?.location?.pathname?.endsWith('/track59-sketchbook.html') && [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length)?.contentDocument?.querySelector('.moment,.mobile-page,.book-wrap'), null, { timeout: 30000 });
+        await guestPage.clock.fastForward(0);
+        await settleObservation(guestPage, () => { const frame = [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length); return !!frame?.contentDocument?.querySelector('.lt-screen-toolbar[data-screen="book"]') && !!frame?.contentWindow?.LTTagLine; }, null, { freezeClock: true });
+        await finishBookObservation(guestPage);
+        await capture(guestPage, { id: 'share-guest', label: '공유 방문자 책', root: '.moment' });
+      } finally { await guest.close().catch(() => {}); }
+    }
   }
   const report = { basis: '현재 제품 코드', fakeSession: true, errors, screens: rows };
   writeFileSync(join(outputDir, 'metrics.json'), JSON.stringify(report, null, 2));
