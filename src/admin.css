@@ -342,3 +342,6 @@ html[data-lt-theme=garden] .lt-field textarea,
 html[data-lt-theme=garden] .lt-field select { background: rgba(255,253,248,.9); color: var(--lt-ink); border-color: rgba(119,91,82,.3); }
 
 .lt-cat-row { margin-bottom: 6px; }
+
+/* #1571: 운영센터 머리줄의 양쪽 여백을 첫 화면(390px)과 맞춘다. */
+@media(max-width:390px){.app-header{padding-inline:16px}}
