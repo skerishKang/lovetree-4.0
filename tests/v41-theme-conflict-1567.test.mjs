@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createMemberSession } from '../public/v41/member-session.mjs';
+import { createTree } from '../public/v41/domain.mjs';
 
 const fields = {subject:'기록',title:'새 기록',note:'내용',date:'2026-11-28',emotion:'설렘',url:''};
 function memoryStorage() {
@@ -154,4 +155,42 @@ test('#1567 다른 기기가 연속 갱신해 테마 재시도도 충돌하면 �
   assertNoRecordConflict(b);
   assert.equal(database.read().state.prefs.theme,'night');
   assert.equal(database.read().state.trees.length,1);
+});
+
+test('#1570 회귀: 손상 트리가 섞인 첫 조회는 기존 보호 계층에서 정상 트리만 열고 쓰지 않는다',async()=>{
+  const valid=createTree({subject:'정상',title:'정상 기록',note:'내용',date:'2026-11-28',emotion:'설렘',url:''});
+  const bad={id:'bad',title:'손상',moments:[{id:'bad-moment'}]};
+  let reads=0,writes=0;
+  const guards=[],states=[];
+  const session=createMemberSession({
+    api:{
+      get:async()=>{reads+=1;return {ok:true,revision:1,state:{version:1,trees:[valid,bad],prefs:{}},subject:'member-A',writeSubjectBound:true};},
+      put:async()=>{writes+=1;return {ok:true,revision:2};},logout:async()=>({ok:true})
+    },
+    onGuard:r=>guards.push(r),onState:s=>states.push(s),delay:()=>new Promise(()=>{}),
+    draftStorage:null,cacheStorage:null,themeStorage:null
+  });
+  await session.start();
+  assert.equal(session.snapshot().phase,'synced');
+  assert.equal(session.snapshot().writable,true);
+  assert.deepEqual(session.state().trees.map(t=>t.id),[valid.id]);
+  assert.equal(guards.length,1);
+  assert.equal(guards[0].skipped.length,1);
+  assert.equal(reads,1,'첫 조회는 추가 요청하지 않는다');
+  assert.equal(writes,0,'테마가 없는 일반 조회만으로 PUT하지 않는다');
+  session.dispose();
+});
+
+test('#1570 회귀: 순간 목록이 비어 규칙을 어긴 조회여도 로그인 소유권을 잃지 않는다',async()=>{
+  const session=createMemberSession({
+    api:{get:async()=>({ok:true,revision:1,state:{version:1,trees:[{id:'tree1',subject:'메뉴',title:'메뉴',moments:[],edges:[]}],prefs:{}},subject:'member-A',writeSubjectBound:true}),
+      put:async()=>{throw Error('쓰기 호출 금지');},logout:async()=>({ok:true})},
+    draftStorage:null,cacheStorage:null,themeStorage:null,delay:()=>new Promise(()=>{})
+  });
+  await session.start();
+  assert.equal(session.snapshot().phase,'synced');
+  assert.equal(session.snapshot().owned,true);
+  assert.equal(session.snapshot().writable,true);
+  assert.equal(session.state().trees.length,1,'기존 보호 계층이 허용한 빈 순간 목록을 그대로 유지한다');
+  session.dispose();
 });

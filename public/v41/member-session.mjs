@@ -1,4 +1,5 @@
 import {createSyncController} from './sync-controller.mjs';
+import {guardWorkspaceState} from './workspace-guard.mjs';
 import {readTheme,THEME_KEY} from './header-state.mjs';
 import {EMPTY_STATE,validateState,createTree,editTree,addMoment,editMoment,reparentMoment,removeMoment,undoMomentDelete,linkMoments,unlinkMoments,cacheMomentMediaMetadata,quickAdd,moveMoment,treeFromMoments,organizeMoments,undoOrganize,MAX_TREES,newId,updatePrefs} from './domain.mjs';
 // Reuses 4.0 persistence, retries and revision conflicts; demo/file records cannot enter this session.
@@ -16,7 +17,8 @@ export function createMemberSession({api,onState=()=>{},onStatus=()=>{},onGuard=
    if(result.ok){if(subject&&subject!==result.subject){mismatch=true;bound=false;return {ok:false,status:401,code:'account_changed'};}
      subject=result.subject;bound=result.writeSubjectBound===true&&typeof subject==='string'&&!!subject;
      themeMissing=result.themeMissing===true||!Object.hasOwn(result.state?.prefs||{},'theme');
-     accountState=validateState(result.state);accountThemeMissing=themeMissing;migrateTheme=false;
+     // 원본을 그대로 보관한다. 일반 읽기는 기존 동기화의 트리별 보호 검사를 거쳐야 한다.
+     accountState=result.state;accountThemeMissing=themeMissing;migrateTheme=false;
      if(themeMissing&&bound){
        try{migrateTheme=result.themeMissing===true&&themeStorage?.getItem(THEME_KEY)!=null;}catch{}
        result.state={...result.state,prefs:{...result.state.prefs,theme:readTheme(themeStorage)}};
@@ -33,11 +35,11 @@ export function createMemberSession({api,onState=()=>{},onStatus=()=>{},onGuard=
  // 테마 차이일 때만 계정 상태를 기준으로 안전하게 다시 쓴다.
  async function resolveThemeConflict({state}){
    if(!active||!bound||mismatch||!accountState)return null;
-   const before=accountState,missingBefore=accountThemeMissing;
+   const before=validateState(guardWorkspaceState(accountState).state),missingBefore=accountThemeMissing;
    const result=await api.get();
    if(!active||!result.ok||result.subject!==subject||result.writeSubjectBound!==true||
       !Number.isSafeInteger(result.revision)||result.revision<0)return null;
-   const latest=validateState(result.state);
+   const latest=validateState(guardWorkspaceState(result.state).state);
    const latestMissing=result.themeMissing===true||!Object.hasOwn(result.state?.prefs||{},'theme');
    const localRecordsChanged=!sameWithoutTheme(state,before);
    const serverRecordsChanged=!sameWithoutTheme(latest,before);
