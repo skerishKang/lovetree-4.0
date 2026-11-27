@@ -327,6 +327,11 @@ export function createDialogs(deps) {
         else dialogGuard = false;
         return;
       }
+      if (top?.id === 'cleanup-panel' && top.hasAttribute('data-target-page')) {
+        top.dispatchEvent(new Event('cleanup-back'));
+        view.history.pushState({ lt41Dialog: true }, ''); dialogGuard = true;
+        return;
+      }
       if (top) {
         const closed = requestPanelClose(top.id);
         // 닫기가 막혔거나(더러움 확인 취소) 창이 남았으면 기록을 다시 쌓는다 — 뒤로가기를 계속 '닫기'로 쓰게.

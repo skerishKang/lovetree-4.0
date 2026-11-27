@@ -33,6 +33,72 @@ export function createCleanup(deps) {
   let fallbackTimer = null;
   let targetRows = [];
   let busy = false;
+  let cards = false, cardMode = 'move', targetPage = false, newTarget = false;
+  const narrow = () => matchMedia('(max-width: 700px), (pointer: coarse)').matches;
+  const dialog = () => $('cleanup-panel');
+  let backButton, newButton, copyFinish, localNotice, localMessage, localActions;
+  function initCards() {
+    if (backButton) return;
+    const button = (id, text, action) => {
+      const b = document.createElement('button'); b.type = 'button'; b.id = id; b.textContent = text; b.onclick = action; return b;
+    };
+    backButton = button('cleanup-back', '← 순간 목록', () => showTargets(false));
+    $('cleanup-move-box').prepend(backButton);
+    newButton = button('cleanup-new-card', '+ 새 트리', () => {
+      newTarget = true; $('cleanup-create-box').hidden = false; $('cleanup-new-name').focus();
+    });
+    copyFinish = button('cleanup-copy-finish', '복사하기', () => onOrganize('copy', newTarget ? $('cleanup-new-name').value.trim() : ''));
+    copyFinish.className = 'primary'; dialog().querySelector('.panel-foot').append(copyFinish);
+    localNotice = document.createElement('div'); localNotice.className = 'cleanup-local-notice'; localNotice.hidden = true;
+    localNotice.setAttribute('role','status');
+    localMessage = document.createElement('span'); localActions = document.createElement('div');
+    localNotice.append(localMessage, localActions); dialog().append(localNotice);
+    dialog().addEventListener('cleanup-back', () => showTargets(false));
+    dialog().addEventListener('close', () => { targetPage = false; dialog().removeAttribute('data-target-page'); });
+    dialog().addEventListener('cancel', e => { if (cards && targetPage) { e.preventDefault(); e.stopImmediatePropagation(); showTargets(false); } }, true);
+  }
+  function showTargets(on) {
+    targetPage = on;
+    dialog().toggleAttribute('data-target-page', on);
+    if (!on) { newTarget = false; $('cleanup-new-name').value = ''; for (const row of targetRows) row.box.checked = false; }
+    sync();
+    if (on) backButton.focus(); else $('cleanup-move').focus();
+  }
+  function selectCard(mode) {
+    if (!pickedIds().length) return;
+    cardMode = mode; newTarget = false; $('cleanup-new-name').value = '';
+    for (const row of targetRows) row.box.checked = false;
+    if (narrow()) showTargets(true); else sync();
+  }
+  function cardMove(id) {
+    if (!cards || busy || !pickedIds().length) return;
+    cardMode = 'move'; newTarget = false;
+    for (const row of targetRows) row.box.checked = row.id === id;
+    onOrganize('move');
+  }
+  function syncCards() {
+    if (!backButton) return;
+    backButton.hidden = !cards || !targetPage;
+    copyFinish.hidden = !cards || cardMode !== 'copy' || (narrow() && !targetPage);
+    newButton.hidden = !cards;
+    if (!cards) return;
+    const count = pickedIds().length;
+    $('cleanup-count').textContent = count + '개 고름';
+    $('cleanup-create-box').hidden = !newTarget;
+    $('cleanup-create').hidden = !newTarget;
+    $('cleanup-create').disabled = busy || !count || !$('cleanup-new-name').value.trim();
+    $('cleanup-move-box').hidden = narrow() && !targetPage;
+    $('cleanup-pick').hidden = targetPage;
+    $('cleanup-desc').hidden = targetPage;
+    $('cleanup-move').hidden = targetPage;
+    $('cleanup-copy').hidden = targetPage;
+    $('cleanup-move').textContent = '옮기기'; $('cleanup-copy').textContent = '복사하기';
+    $('cleanup-move').disabled = $('cleanup-copy').disabled = busy || !count;
+    copyFinish.disabled = busy || !count || (!pickedTargets().length && !(newTarget && $('cleanup-new-name').value.trim()));
+    newButton.disabled = busy || !count;
+    $('cleanup-target-hint').textContent = targetPage ? '순간 '+count+'개를 어디로 '+(cardMode==='copy'?'복사할까요?':'옮길까요?') : cardMode==='copy'?'복사할 트리를 골라 주세요.':'순간을 고른 뒤 트리 카드로 끌거나 눌러 주세요.';
+    for (const row of targetRows) { row.box.hidden = cardMode !== 'copy'; row.box.disabled = busy || !count; row.card.disabled = busy || !count; row.card.hidden = cardMode === 'copy'; }
+  }
   function writable() {
     const snap = getMember()?.snapshot();
     return !!snap?.owned && !!snap?.writable;
@@ -52,6 +118,15 @@ export function createCleanup(deps) {
     const tree = window.LT41?.tree;
     if (!tree) { notify('트리를 먼저 불러와 주세요.'); return false; }
     fromTreeId = tree.id;
+    cards = globalThis.LT41_THEME_REGISTRY?.readCleanupView() === 'cards';
+    if (cards) initCards();
+    if (backButton) {
+      cardMode = 'move'; targetPage = false; newTarget = false;
+      dialog().toggleAttribute('data-cleanup-cards', cards);
+      dialog().removeAttribute('data-target-page');
+      $('cleanup-pick').hidden = $('cleanup-desc').hidden = $('cleanup-create-box').hidden = $('cleanup-create').hidden = false;
+      localNotice.hidden = true;
+    }
     $('cleanup-desc').textContent = isInboxTree(tree)
       ? '모아둔 순간을 다른 트리로 옮기거나, 고른 순간만 골라 새 트리로 만들어요.'
       : '이 트리의 순간을 다른 트리로 옮겨요. 원하는 순간을 더 골라 함께 옮길 수도 있어요.';
@@ -140,6 +215,14 @@ export function createCleanup(deps) {
         editBtn.textContent = addTitleLabel;
         label.append(editBtn);
       }
+      if (cards && !narrow()) {
+        label.draggable = true;
+        label.addEventListener('dragstart', e => {
+          if (busy || narrow()) { e.preventDefault(); return; }
+          if (!box.checked) { for (const b of host.querySelectorAll('input')) b.checked = b === box; }
+          sync(); e.dataTransfer.setData('text/plain','cleanup'); e.dataTransfer.effectAllowed = 'move';
+        });
+      }
       host.append(label);
     }
   }
@@ -150,6 +233,7 @@ export function createCleanup(deps) {
     const targets = cleanupTargets(getTrees(), tree.id);
     host.replaceChildren();
     targetRows = [];
+    if (cards) host.append(newButton);
     for (const target of targets) {
       const label = document.createElement('label');
       label.className = 'cleanup-moment cleanup-target';
@@ -167,7 +251,26 @@ export function createCleanup(deps) {
       badge.textContent = '이미 있음';
       label.append(box, text, badge);
       host.append(label);
-      targetRows.push({ id: target.id, label: target.label, box, badge });
+      let card;
+      if (cards) {
+        card = document.createElement('button'); card.type = 'button'; card.className = 'cleanup-card-action';
+        const tree = getTrees().find(t => t.id === target.id);
+        const cover = document.createElement('span'); cover.className = 'cleanup-tree-cover'; cover.setAttribute('aria-hidden','true');
+        const moment = tree?.moments.find(m => m.id === tree.coverMomentId) || tree?.moments[0];
+        const thumb = moment && treeMomentThumb(moment);
+        if (thumb) { const img = document.createElement('img'); img.src = thumb; img.alt = ''; img.referrerPolicy = 'no-referrer'; cover.append(img); }
+        else cover.textContent = '❧';
+        const info = document.createElement('span'); info.textContent = (tree?.subject || target.label) + ' · 순간 ' + (tree?.moments.length || 0) + '개';
+        text.replaceChildren(cover,info);
+        card.textContent = '옮기기'; card.setAttribute('aria-label', target.label+'에 옮기기');
+        card.onclick = () => cardMove(target.id);
+        label.append(card);
+        label.addEventListener('click', e => { if (cardMode === 'move' && e.target !== card) { e.preventDefault(); cardMove(target.id); } });
+        label.addEventListener('dragover', e => { if (!narrow() && pickedIds().length && e.dataTransfer.types.includes('text/plain')) { e.preventDefault(); label.classList.add('cleanup-drop-hot'); } });
+        label.addEventListener('dragleave', () => label.classList.remove('cleanup-drop-hot'));
+        label.addEventListener('drop', e => { e.preventDefault(); label.classList.remove('cleanup-drop-hot'); if (!narrow() && e.dataTransfer.getData('text/plain') === 'cleanup') cardMove(target.id); });
+      }
+      targetRows.push({ id: target.id, label: target.label, box, badge, card });
     }
     $('cleanup-move-box').hidden = !targets.length;
     // 아래 고정 줄에 옮기기·복사하기 단추를 두었으므로 대상이 없으면 단추도 함께 숨긴다.
@@ -225,6 +328,7 @@ export function createCleanup(deps) {
       row.badge.hidden = !n;
       row.badge.textContent = n && moments.length > 1 && n < moments.length ? `이미 있음 ${n}개` : '이미 있음';
     }
+    syncCards();
   }
   function fail(error) {
     $('cleanup-error').textContent = error?.message || '정리하지 못했어요. 다시 시도해 주세요.';
@@ -233,6 +337,7 @@ export function createCleanup(deps) {
     const name = $('cleanup-new-name').value.trim();
     const state = cleanupState({ selectedIds: pickedIds(), newTreeName: name });
     if (!state.canCreate) return;
+    if (cards) { onOrganize(cardMode, name); return; }
     try {
       const made = getMember().apply('treeFromMoments', { momentIds: pickedIds(), subject: name }, { treeId: fromTreeId });
       finish({ treeId: made.treeId, targetLabel: name, isNew: true });
@@ -255,12 +360,12 @@ export function createCleanup(deps) {
       })).catch(() => answer('put'));
     });
   }
-  async function onOrganize(mode) {
+  async function onOrganize(mode, newTreeName = '') {
     if (busy) return;
-    const targets = pickedTargets();
+    const targets = newTreeName && mode === 'move' ? [] : pickedTargets();
     const ids = pickedIds();
     const state = cleanupState({ selectedIds: ids, targetIds: targets.map(row => row.id), targetLabels: targets.map(row => row.label) });
-    if (mode === 'move' ? !state.canMove : !state.canCopy) return;
+    if (!newTreeName && (mode === 'move' ? !state.canMove : !state.canCopy)) return;
     $('cleanup-error').textContent = '';
     const moments = pickedMoments();
     const plan = duplicatesByTree(getTrees(), moments, targets.map(row => row.id));
@@ -277,7 +382,7 @@ export function createCleanup(deps) {
       } finally { busy = false; sync(); }
     }
     const placed = targets.reduce((n, row) => n + ids.filter(id => !(skip[row.id] || []).includes(id)).length, 0);
-    if (!placed) { $('cleanup-error').textContent = '모두 이미 있는 순간이라 건너뛰었어요. 바뀐 것이 없어요.'; return; }
+    if (!placed && !newTreeName) { $('cleanup-error').textContent = '모두 이미 있는 순간이라 건너뛰었어요. 바뀐 것이 없어요.'; return; }
     // 정리 결과를 셸이 다시 그리는 동안 이 창을 '쓰다 만 입력'으로 붙잡지 않는다(실패하면 되돌린다).
     const savedBase = baseState;
     baseState = readState();
@@ -286,15 +391,20 @@ export function createCleanup(deps) {
     const meta = mode === 'copy' && !toTreeIds.includes(window.LT41?.tree?.id) ? { tree: true } : undefined;
     let result;
     try {
-      result = getMember().apply('organizeMoments', { mode, momentIds: ids, toTreeIds, skip }, { treeId: fromTreeId }, meta);
-    } catch (error) { baseState = savedBase; fail(error); return; }
-    finishOrganize({ mode, result, labels: targets.map(row => row.label) });
+      if (cards) deps.holdPanel?.('cleanup-panel', true);
+      result = getMember().apply('organizeMoments', { mode, momentIds: ids, toTreeIds, skip, ...(newTreeName ? { newTreeName } : {}) }, { treeId: fromTreeId }, meta);
+    } catch (error) { baseState = savedBase; fail(error); return; } finally { if (cards) deps.holdPanel?.('cleanup-panel', false); }
+    finishOrganize({ mode, result, labels: [...targets.map(row => row.label), ...(newTreeName ? [newTreeName] : [])] });
   }
   function finishOrganize({ mode, result, labels }) {
     baseState = readState();
-    $('cleanup-panel').close();
+    if (!cards) $('cleanup-panel').close();
     const stillThere = getTrees().some(t => t.id === fromTreeId);
     if (stillThere && window.LT41?.tree?.id !== fromTreeId) choose(fromTreeId);
+    if (cards) {
+      const source = getTrees().find(t => t.id === fromTreeId) || { id: fromTreeId, moments: [] };
+      cardMode = 'move'; showTargets(false); renderMoments(source); renderTargets(source); sync(); baseState = readState();
+    }
     const summary = result?.summary || {};
     organizeUndo = result?.record ? { record: result.record, mode } : null;
     const notice = organizedNotice({ mode, targetLabels: labels, count: summary.moments || 0, skipped: summary.skipped || 0, action: organizeUndo ? '되돌리기' : '' });
@@ -308,10 +418,15 @@ export function createCleanup(deps) {
     const touched = undo.mode === 'copy' ? record.toTreeIds : [record.fromTreeId, ...record.toTreeIds];
     const meta = undo.mode === 'copy' && !touched.includes(window.LT41?.tree?.id) ? { tree: true } : undefined;
     try {
+      if (cards) deps.holdPanel?.('cleanup-panel', true);
       getMember().apply('undoOrganize', { record }, { treeId: record.fromTreeId }, meta);
     } catch (error) {
       notify(error?.message || '되돌리지 못했어요. 다시 시도해 주세요.');
       return;
+    } finally { if (cards) deps.holdPanel?.('cleanup-panel', false); }
+    if (cards && dialog().open) {
+      const source = getTrees().find(t => t.id === record.fromTreeId);
+      if (source) { renderMoments(source); renderTargets(source); sync(); baseState = readState(); }
     }
     organizeUndo = null;
     hideMoveNotice();
@@ -320,7 +435,9 @@ export function createCleanup(deps) {
   // 셸 위쪽 안내 줄(#move-feedback) 한 벌 — 글과 단추를 그리고 공통 타이머로 거둔다.
   function showNotice(text, actions = []) {
     $('move-message').textContent = text;
-    const host = $('move-actions');
+    const inside = cards && dialog().open;
+    if (inside) localMessage.textContent = text;
+    const host = inside ? localActions : $('move-actions');
     host.replaceChildren();
     for (const action of actions) {
       const button = document.createElement('button');
@@ -329,7 +446,7 @@ export function createCleanup(deps) {
       button.onclick = action.onClick;
       host.append(button);
     }
-    const bar = $('move-feedback');
+    const bar = inside ? localNotice : $('move-feedback');
     bar.hidden = false;
     if (noticeTimer) noticeTimer.arm(bar, NOTICE_MS, hideMoveNotice);
     else { clearTimeout(fallbackTimer); fallbackTimer = setTimeout(hideMoveNotice, NOTICE_MS); }
@@ -415,10 +532,11 @@ export function createCleanup(deps) {
     noticeTimer?.cancel();
     clearTimeout(fallbackTimer);
     $('move-feedback').hidden = true;
+    if (localNotice) localNotice.hidden = true;
   }
   $('cleanup-new-name').addEventListener('input', sync);
   $('cleanup-create').addEventListener('click', onCreate);
-  $('cleanup-move').addEventListener('click', () => onOrganize('move'));
-  $('cleanup-copy').addEventListener('click', () => onOrganize('copy'));
+  $('cleanup-move').addEventListener('click', () => cards ? selectCard('move') : onOrganize('move'));
+  $('cleanup-copy').addEventListener('click', () => cards ? selectCard('copy') : onOrganize('copy'));
   return { open, openMove, sync, dirty, headerAvailable, hideMoveNotice, pickerLabel };
 }
