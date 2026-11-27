@@ -7,6 +7,7 @@ import { createWorkspaceService } from '../server/workspace-service.js';
 import { createMemoryWorkspaceRepo } from '../server/testing/memory-workspace-repo.js';
 import { createMemoryShareRepo } from '../server/testing/memory-share-repo.js';
 import { createShareHandler, createShareService } from '../server/share-service.js';
+import { shareUrlFor, SHARE_COPY_FAILURE } from '../public/v41/share-link.mjs';
 
 function fakeElement(extra = {}) {
   const node = {
@@ -30,7 +31,7 @@ function fakeElement(extra = {}) {
 }
 
 function listHarness({ shares = [], confirmAnswer = true, clipboard = null } = {}) {
-  const saved = {window: globalThis.window, document: globalThis.document, location: globalThis.location, addEventListener: globalThis.addEventListener, confirm: globalThis.confirm};
+  const saved = {window: globalThis.window, document: globalThis.document, location: globalThis.location, addEventListener: globalThis.addEventListener, confirm: globalThis.confirm, LT41Confirm: globalThis.LT41Confirm};
   for (const key of ['window', 'document', 'location', 'addEventListener', 'confirm']) delete globalThis[key];
   const els = {};
   const events = {};
@@ -39,6 +40,7 @@ function listHarness({ shares = [], confirmAnswer = true, clipboard = null } = {
   globalThis.location = {origin: 'https://lovetree-4-0.pages.dev', hostname: 'lovetree-4-0.pages.dev', hash: ''};
   globalThis.document = {createElement: () => fakeElement(), createElementNS: (ns, tag) => fakeElement({tagName: String(tag), namespaceURI: String(ns)}), querySelectorAll: () => []};
   globalThis.confirm = () => confirmAnswer;
+  globalThis.LT41Confirm = {ask: async () => confirmAnswer};
   if (clipboard) Object.defineProperty(globalThis, 'navigator', {value: {clipboard}, configurable: true});
   globalThis.window = {LT41: {tree: {id: 'tree1', title: '윤슬', moments: [{id: 'm1', title: '첫 순간'}]}, momentId: 'm1', trees: [{id: 'tree1', moments: [{id: 'm1'}]}]}};
   els['community-panel'] = fakeElement();
@@ -147,6 +149,30 @@ test('복사는 그 주소의 공유 주소를 클립보드에 넣는다', async
     assert.deepEqual(written, ['https://lovetree-4-0.pages.dev/t/live-1']);
     assert.match(h.els['share-feedback'].textContent, /복사했어요/);
   } finally { h.restore(); }
+});
+
+test('복사가 막히면 공유 판의 실패 안내 문구를 그대로 보여 준다', async () => {
+  const h = listHarness({shares: [share('live-1', 'active', 'book')], clipboard: {writeText: async () => { throw Error('denied'); }}});
+  try {
+    await h.messages.openSharePanel();
+    const copy = h.els['share-list'].children[0].children[1].children[0];
+    await copy.onclick();
+    assert.equal(h.els['share-feedback'].textContent, SHARE_COPY_FAILURE);
+  } finally { h.restore(); }
+});
+
+test('#1540 공유 주소는 보기와 화면에 관계없이 같은 주소를 만든다', () => {
+  const saved = globalThis.location;
+  globalThis.location = {origin: 'https://lovetree-4-0.pages.dev'};
+  try {
+    const book = shareUrlFor('share-same-00000001', 'book');
+    assert.equal(book, 'https://lovetree-4-0.pages.dev/t/share-same-00000001');
+    assert.equal(shareUrlFor('share-same-00000001', 'board'), book, '보기가 달라도 주소는 같다');
+    assert.equal(shareUrlFor('share-same-00000001', 'network'), book, '지도도 같은 주소다');
+    assert.match(SHARE_COPY_FAILURE, /복사하지 못했어요/);
+  } finally {
+    if (saved) globalThis.location = saved; else delete globalThis.location;
+  }
 });
 
 test('만든 공유가 없으면 안내 한 줄만 남는다', async () => {

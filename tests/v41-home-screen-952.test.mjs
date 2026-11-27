@@ -14,6 +14,7 @@ import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 import { serve } from './helpers/screen-audit.mjs';
 import { createTree, addMoment } from '../public/v41/domain.mjs';
+import { SHARE_COPY_FAILURE } from '../public/v41/share-link.mjs';
 
 const REQUIRE952 = process.env.LT_HOME_952_REQUIRE === '1';
 let chromium952 = null;
@@ -252,6 +253,27 @@ test('#379 인기 카드를 누르면 #share/ 공유 화면으로 간다', { ski
       await card.locator('.surface').evaluate(e => e.click());
       await h.page.waitForFunction(() => location.hash.startsWith('#share/'), null, { timeout: 5000 });
       assert.equal(await h.page.evaluate(() => location.hash), '#share/share-pop-00000001/book', '공개 카드는 공유 화면으로 이동한다');
+    } finally { await close952(h); }
+  } finally { await browser.close(); }
+});
+
+test('#1540 첫 화면 ⋯ 공유는 실패 안내로 공유 판과 같은 문구를 띄운다', { skip: REQUIRE952 ? false : skip952, timeout: 180000 }, async () => {
+  if (skip952) assert.fail(skip952);
+  const browser = await chromium952.launch({ headless: true });
+  try {
+    const h = await boot952(browser, { member: false, initStorage: { 'lt41.homeCards': 'example' } });
+    try {
+      const card = h.frame.locator('#orbit .card').first();
+      await card.waitFor({ state: 'visible', timeout: 15000 });
+      await card.locator('.surface').evaluate(e => e.click());
+      await h.frame.locator('#mediaViewerHome.open').waitFor({ state: 'visible', timeout: 5000 });
+      await h.frame.evaluate(() => {
+        Object.defineProperty(navigator, 'share', { value: undefined, configurable: true });
+        Object.defineProperty(navigator, 'clipboard', { value: { writeText: async () => { throw Error('denied'); } }, configurable: true });
+      });
+      await h.frame.locator('#mediaMoreHome').click();
+      await h.frame.locator('#mediaMoreMenuHome button').filter({ hasText: '공유' }).click();
+      await h.frame.getByText(SHARE_COPY_FAILURE).waitFor({ state: 'visible', timeout: 5000 });
     } finally { await close952(h); }
   } finally { await browser.close(); }
 });

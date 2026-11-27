@@ -117,6 +117,18 @@ test('썸네일은 저장된 같은 출처·data 값만 쓰고 외부 이미지�
   assert.deepEqual(memos.map(c => c.id), ['external']);
 });
 
+test('원본 SVG 썸네일은 유지하지만 첫 화면 카드 그림에는 표시하지 않는다', () => {
+ const thumbnail='data:image/svg+xml;base64,'+Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>').toString('base64');
+ const original=moment('legacy-svg',{mediaMetadata:{title:'원본 기록',thumbnail}});
+ const {photos,memos}=homeMomentCards(member([original]));
+ assert.deepEqual(photos,[]);
+ assert.deepEqual(memos.map(c=>c.id),['legacy-svg']);
+ assert.deepEqual(homeMomentCards(member([original]),40,undefined,{auto:true,describe:()=>({})}).photos,[]);
+ assert.equal(original.mediaMetadata.thumbnail,thumbnail);
+ const png=moment('inline-png',{mediaMetadata:{thumbnail:'data:image/png;base64,AAAA'}});
+ assert.deepEqual(homeMomentCards(member([png])).photos.map(c=>c.id),['inline-png']);
+});
+
 const PRIVATE_ORIGIN = 'https://lovetree-4-0.pages.dev';
 const privateUpload = (id, n, ext = 'png') => moment(id, {
   url: `${PRIVATE_ORIGIN}/api/media/0000000${n}-0000-4000-8000-00000000000${n}.${ext}`,

@@ -2,6 +2,7 @@ import {createWorkspaceApi} from './api.mjs';
 // #480 L13: 보관 파일의 날짜도 책·보드·지도와 같은 한 벌로 적는다.
 import {formatDisplayDate} from './book-usability.mjs';
 import {mediaAssetUrl} from './youtube-id.mjs'; // A-11: 올린 사진 주소도 정본 한 벌에서 만든다.
+import {askAppConfirm} from './confirm.mjs';
 const TYPES=new Set(['image/png','image/jpeg','image/gif','image/webp','video/mp4','video/webm']);
 const SIZE_PROBLEM='PNG·JPEG·GIF·WebP(약 4.2MB), MP4·WebM(약 8.4MB)만 올릴 수 있어요.';
 // 2026-11-08 순간 추가·수정 패널: 링크와 사진을 한 묶음으로 두고, 파일은 선택하면 바로 올린다.
@@ -86,7 +87,7 @@ export function mountPrivateUpload({form,assets,getSubject,getState,onChange,onU
   const row=document.createElement('div');row.className='button-row';
   const use=document.createElement('button');use.type='button';use.textContent='이 파일 첨부';use.onclick=()=>{if(busy||getSubject()!==subject)return;const url=mediaAssetUrl(asset.name,location.origin);assets.close();const accepted=onUseAsset?onUseAsset(url):true;if(accepted===false)return;form.elements.url.value=url;onChange();form.elements.url.focus?.();status.textContent='첨부할 파일을 골랐어요. 순간을 저장해 주세요.';};
   const remove=document.createElement('button');remove.type='button';remove.textContent='파일 삭제';remove.className='danger';
-  remove.onclick=async()=>{if(busy||getSubject()!==subject||!confirm('이 파일을 지우면 이 파일을 쓴 순간에서도 볼 수 없게 돼요. 지울까요?'))return;remove.disabled=true;const result=await api.removeMedia(asset.name,subject);if(getSubject()!==subject)return;if(result.ok){if(assetName(form.elements.url.value)===asset.name){form.elements.url.value='';onChange();}host.replaceChildren();await refresh();}else{status.textContent=result.message||'삭제하지 못했어요. 다시 시도해 주세요.';remove.disabled=false;}};
+  remove.onclick=async()=>{if(busy||getSubject()!==subject||!(await askAppConfirm('이 파일을 지우면 이 파일을 쓴 순간에서도 볼 수 없게 돼요. 지울까요?')))return;remove.disabled=true;const result=await api.removeMedia(asset.name,subject);if(getSubject()!==subject)return;if(result.ok){if(assetName(form.elements.url.value)===asset.name){form.elements.url.value='';onChange();}host.replaceChildren();await refresh();}else{status.textContent=result.message||'삭제하지 못했어요. 다시 시도해 주세요.';remove.disabled=false;}};
   row.append(use,remove);host.append(row);
  }
  function renderAssets(data,subject){

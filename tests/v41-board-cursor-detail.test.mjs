@@ -613,6 +613,8 @@ test('23. 화면: 보드 삭제는 공용 저장과 되돌리기로 원래 순�
   await frame.click('.card[data-id="m2"]');
   await frame.waitForSelector('#detail.open');
   await frame.evaluate(() => { document.getElementById('detailMoreBtn').click(); document.getElementById('deleteMomentBtn').click(); });
+  await page.waitForSelector('#lt-confirm[open]', { timeout: 10000 });
+  await page.click('#lt-confirm-ok');
   let deadline = Date.now() + 10000;
   while (Date.now() < deadline && puts.length < 1) await page.waitForTimeout(100);
   assert.equal(puts.length, 1, '공용 삭제가 저장 요청을 한 번 보낸다');
@@ -662,6 +664,8 @@ test('25. 화면: 삭제 뒤 기록이 바뀌면 되돌리기 실패를 보여 �
   t.after(async () => { await context.close(); await browser.close(); server.close(); });
   await frame.click('.card[data-id="m2"]');
   await frame.evaluate(() => { document.getElementById('detailMoreBtn').click(); document.getElementById('deleteMomentBtn').click(); });
+  await page.waitForSelector('#lt-confirm[open]', { timeout: 10000 });
+  await page.click('#lt-confirm-ok');
   await page.waitForSelector('#toast .toast-action');
   await page.waitForFunction(() => document.getElementById('write-menu')?.textContent !== '저장 안 됨', null, { timeout: 10000 });
   await page.click('#write-menu');

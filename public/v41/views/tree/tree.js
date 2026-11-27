@@ -357,7 +357,6 @@ stage.addEventListener('keydown', (e) => {
   else if (e.key === 'ArrowUp') state.ty += step; else if (e.key === 'ArrowDown') state.ty -= step;
   else if (e.key === '+' || e.key === '=') return zoomAt(1.25, cx, cy);
   else if (e.key === '-') return zoomAt(0.8, cx, cy);
-  else if (e.key === '0') return fitAll(true);
   else if (e.key === 'Home') return toRoot(true);
   else if (e.key === 'Escape') return setPick(null);
   else return;
@@ -394,7 +393,7 @@ function openDetail(id){
 }
 $('treeDetailClose').addEventListener('click',()=>detail.close());
 // 닫기로 기록을 더 쌓지 않는다 — 현재 칸의 상태만 '상세 닫힘'으로 갱신한다(뒤로 가기는 그 칸을 소비한다).
-detail.addEventListener('close',()=>{if(!restoringTree)try{history.replaceState(treeSnapshot(null),'');}catch{}});
+detail.addEventListener('close',()=>{if(!restoringTree){try{history.replaceState(treeSnapshot(null),'');}catch{}if(state.pick&&typeof data?.select==='function')data.select(state.pick,{noHistory:true});}});
 $('openMoment').addEventListener('click',()=>{if(state.pick)parent.postMessage({type:MSG.openBook,treeId:data.treeId,id:state.pick},location.origin);});
 function rehome(){if(!state.layout)return;if(state.mode==='fit')fitAll(false);else if(state.mode==='root')toRoot(false);else applyNow();rememberTree();}
 function load(){
@@ -403,9 +402,13 @@ function load(){
  $('treeEmpty').hidden=!!state.root;stage.hidden=!state.root;
  for(const id of ['goRoot','goFit','zoomOut','zoomIn'])$(id).disabled=!state.root;
  if(!state.root){state.layout=null;note.textContent='순간 0개';return;}
- measure();draw();fitAll(false);
+ measure();draw();
+ // #1525: 순간이 많을 때는 카드를 누를 수 있는 1배로 열고, 전체 맞춤은 '전체' 단추에서만 한다.
+ if(state.root.size>50)toRoot(false);else fitAll(false);
  // 기본 칸도 트리 상태로 적어 둔다 — 뒤로 가기로 돌아올 때 닫힌 상세와 펼침 상태를 복원한다.
  rememberTree();
+ const initialOpen=new URLSearchParams(location.search).get('open')||(history.state?.lt41TreePanel==='detail'?history.state.lt41TreePick:null);
+ if(initialOpen&&data.moments.some(m=>m.id===initialOpen)){setPick(initialOpen);openDetail(initialOpen);pushTree('detail');}
 }
 new ResizeObserver(()=>{const before={...view};measure();if(!state.root||(before.w===view.w&&before.h===view.h))return;if((before.w<700)!==(view.w<700))draw();rehome();}).observe(stage);
 addEventListener('message',e=>{

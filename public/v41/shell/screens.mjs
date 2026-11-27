@@ -82,6 +82,7 @@ export function createScreens(deps) {
     active.style.zIndex = '1';
     setFrameFocusGuard(active, true);
     onFrameReveal?.();
+    window.dispatchEvent(new Event('lt41-frame-revealed'));
     // #428: 보여 주는 순간에만 초점 이동을 허용한다 — 숨은 장에서 온 초점 청구가
     // reveal 직후에 자리 잡아 .app(overflow:hidden)을 밀 수 있다. 그 밀림은 보여 준
     // 딱 그 순간 한 번만 되돌린다(숨은 장의 스크롤 리스너 가드(#420) 대신, 뷰 코드는 건드리지 않는다).
@@ -258,6 +259,8 @@ export function createScreens(deps) {
     if (file === 'track56-network.html' && openMoment) url.searchParams.set('open', openMoment);
     // #891: 보드는 주소가 특정 순간을 가리켰을 때만 ?open=을 붙인다 — 판 자동 열림의 한 벌 판정.
     if (file === 'track58-pinboard.html' && openBoardMoment) url.searchParams.set('open', openBoardMoment);
+    // #1525: 보드의 ?open= 방식으로 트리 상세 열림을 새 프레임에 전달한다.
+    if (file === 'track61-tree.html' && globalThis.history?.state?.lt41TreeDetail && window.LT41?.momentId) url.searchParams.set('open', window.LT41.momentId);
     showInFrame(url.href, '러브트리 · ' + screenTitle(file));
     if (write) writeLocation();
     links();

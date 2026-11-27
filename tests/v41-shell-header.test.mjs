@@ -355,7 +355,7 @@ test('#1134 후속: 두 번 다 401 → 로그아웃 상태·안내 1번', async
     assert.deepEqual(h.calls, [
       ['check', false], ['check', false],
       ['paintAuthExpired'], ['close'],
-      ['notify', '로그인 확인이 필요해요. 다시 로그인해 주세요.']
+      ['notify', '로그인이 풀렸어요. 다시 로그인해 주세요.']
     ], '두 번째 확인도 401일 때만 로그아웃 상태로 바꾸고 안내를 한 번 띄운다');
   } finally { h.restore(); }
 });

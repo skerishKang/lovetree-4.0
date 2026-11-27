@@ -96,7 +96,45 @@ test('#1175 ③ 창이 열려 있어도 알림은 머리글 아래에 둔다 —
 
 test('#1175 ③ 로그아웃 상태 시작의 저장 연결 확인(401)은 진입 알림을 띄우지 않는다', () => {
   // 로그인한 상태에서 세션이 만료된 뒤에만('in' 표시가 있을 때) 알림을 띄운다.
-  assert.match(memberRuntime, /status\.phase\s*===\s*'login'\s*&&\s*!\s*status\.dirty\s*&&\s*document\.body\.dataset\.member\s*===\s*'in'\s*\)\s*\(\s*0\s*,\s*ctx\.notify\s*\)\s*\(\s*'로그인이 필요해요\.'/);
+  assert.match(memberRuntime, /status\.phase\s*===\s*'login'\s*&&\s*!\s*status\.dirty\s*&&\s*document\.body\.dataset\.member\s*===\s*'in'\s*\)\s*\(\s*0\s*,\s*ctx\.notify\s*\)\s*\(\s*'로그인이 풀렸어요\. 다시 로그인해 주세요\.'/);
+});
+
+test('#1541 저장 충돌의 덮어쓰기·불러오기는 앱 확인 창의 취소·확인을 따른다', async () => {
+  const saved = {document: globalThis.document, window: globalThis.window, LT41Confirm: globalThis.LT41Confirm};
+  const element = extra => ({
+    hidden: false, textContent: '', children: [], dataset: {}, attrs: {},
+    classList: {toggle() {}}, replaceChildren(...nodes) { this.children = nodes; },
+    append(...nodes) { this.children.push(...nodes); }, setAttribute(name, value) { this.attrs[name] = String(value); },
+    ...extra
+  });
+  const find = (node, text) => node.textContent === text ? node : (node.children || []).map(child => find(child, text)).find(Boolean);
+  try {
+    for (const answer of [false, true]) {
+      const actions = [], elements = new Map();
+      const member = {snapshot: () => ({owned: true, dirty: true}), act: name => actions.push(name)};
+      const ctx = {
+        member, model: {trees: []}, current: 'src064-orbit.html', source: 'server', previousDirty: false,
+        shellIntake: {flush() {}}, backup() {}, renderAccount() {}, flowNavigation() {}, applyAdvanced() {},
+        $: id => { if (!elements.has(id)) elements.set(id, element({id})); return elements.get(id); }
+      };
+      globalThis.document = {body: element({dataset: {}}), createElement: () => element()};
+      globalThis.window = {LT41: null};
+      const runtime = createMemberRuntime(ctx);
+      for (const [phase, action, label] of [['conflict', 'force', '이 화면 것으로 덮어쓰기'], ['offline', 'pull', '서버 기록 불러오기']]) {
+        globalThis.LT41Confirm = {ask: async () => answer};
+        const before = actions.length;
+        runtime.memberStatus({dirty: true, phase, detail: '', actions: [{name: action, label}]});
+        const button = find(ctx.$('save-actions'), label);
+        assert.ok(button);
+        await button.onclick();
+        assert.equal(actions.length - before, answer ? 1 : 0);
+      }
+    }
+  } finally {
+    globalThis.document = saved.document;
+    globalThis.window = saved.window;
+    globalThis.LT41Confirm = saved.LT41Confirm;
+  }
 });
 
 test('#1175 ① 공유에서 첫 화면으로 나갈 때 감상 알림을 지우고 방문자 기록으로 돌아간다', async () => {

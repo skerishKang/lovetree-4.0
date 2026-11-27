@@ -13,6 +13,7 @@ import {screens,screenForView,viewForFile,themedViewFor} from "./navigation.mjs"
 import {report} from "../report.mjs";
 import {createNotifier, syncedNoticeText, newlyPublishedTrees, NOTICE_HIDE_MS} from "./notice.mjs";
 import {normalizeTitleDisplay, normalizeAccentColor, normalizeDateStyle, normalizeStartPlace, normalizeShareView, normalizeHomeMoment, normalizeBookDisplay, normalizeShelfView, coverModeOf, normalizeCoverDesign} from "../domain.mjs";
+import {askAppConfirm} from "../confirm.mjs";
 
 export function createMemberRuntime(ctx){
   let memberCheckTimer = 0, checkingStill = false; // #1320: 확인이 5초를 넘겼을 때만 조용한 표시를 켠다.
@@ -50,7 +51,7 @@ export function createMemberRuntime(ctx){
       const overwrite=document.createElement('button');
       overwrite.textContent=force.label||'이 화면 것으로 덮어쓰기';
       overwrite.onclick=async()=>{
-       if(!confirm('이 화면의 기록을 서버에 저장하고, 다른 곳에서 바뀐 기록은 지워질 수 있어요. 계속할까요?'))return;
+       if(!(await askAppConfirm('이 화면의 기록을 서버에 저장하고, 다른 곳에서 바뀐 기록은 지워질 수 있어요. 계속할까요?')))return;
        extra.hidden=true;
        await ctx.member?.act('force');
       };
@@ -69,9 +70,9 @@ export function createMemberRuntime(ctx){
      b.onclick=async()=>{
       if(a.name==='backup'){(0,ctx.backup)();return;}
       if(a.name==='login'){forgetLoginSubject(localStorage);/* A-18: 새 로그인은 확인된 계정이 없어지는 일 — 표식을 비우고 새 창으로 보낸다 */window.open(memberLoginUrl(readTheme(localStorage)),'_blank','noopener,noreferrer');return;}
-      if(['pull','force'].includes(a.name)&&!confirm(a.name==='pull'
+      if(['pull','force'].includes(a.name)&&!(await askAppConfirm(a.name==='pull'
        ?'미저장 변경을 버리고 서버 기록을 불러올까요?'
-       :'서버의 최신 기록으로 현재 입력을 덮어쓸까요? 다른 창의 변경이 사라질 수 있습니다.'))return;
+       :'서버의 최신 기록으로 현재 입력을 덮어쓸까요? 다른 창의 변경이 사라질 수 있습니다.')))return;
       await ctx.member?.act(a.name);
      };
      (0,ctx.$)('save-actions').append(b);
@@ -122,7 +123,7 @@ export function createMemberRuntime(ctx){
     // 아직 소개 안 함). 화면을 막지 않고 트리마다 한 번만 남긴다. 떠 있던 첫 공개 안내(#538)는 공유 판 설명으로 옮겨 띄우지 않는다.
     if(status.writable)void ctx.offerDiscover?.(newlyPublishedTrees(null,(0,ctx.countTreeMoments)()).map(row=>row.treeId));
    }
-   else if(status.phase==='login'&&!status.dirty&&document.body.dataset.member==='in')(0,ctx.notify)('로그인이 필요해요.');/* #1175: 로그아웃 상태로 시작할 때(저장 연결 확인 401)는 진입만으로 알림을 띄우지 않는다 — 머리글의 로그인 단추가 이미 길을 알린다. */
+   else if(status.phase==='login'&&!status.dirty&&document.body.dataset.member==='in')(0,ctx.notify)('로그인이 풀렸어요. 다시 로그인해 주세요.');/* #1175: 로그아웃 상태로 시작할 때(저장 연결 확인 401)는 진입만으로 알림을 띄우지 않는다 — 머리글의 로그인 단추가 이미 길을 알린다. */
    else if(!status.dirty&&status.phase==='offline')(0,ctx.notify)(status.detail||'내 기록을 불러오지 못했어요.');
    (0,ctx.$)('write-menu').textContent=status.dirty?'저장 안 됨' :'＋ 순간 추가';
    // #1487: 로그인 확인을 기다리던 안쪽 화면은 확인이 끝난 이 순간에 빈 상태를 그린다(손님·읽기 실패).
@@ -133,12 +134,13 @@ export function createMemberRuntime(ctx){
    ctx.previousDirty=status.dirty;(0,ctx.renderAccount)();(0,ctx.flowNavigation)();document.body.dataset.member=ctx.member?.snapshot().owned?'in':'out';document.body.dataset.treeCount=String(ctx.model?.trees?.length||0);(0,ctx.applyAdvanced)();
   }
 
-  async function startMember(){setMemberRefreshStarted(true);if(!(0,ctx.leaveMember)())return;ctx.backfillStarted=false;ctx.backfillAttempted.clear();const startup=parseSelectionRoute(location.hash);if(startup.scope==='owner')stashPendingOwnerRoute(sessionStorage,location.hash);++ctx.loadGeneration;const generation=ctx.loadGeneration;(0,ctx.clear)(true);
+  async function startMember(){setMemberRefreshStarted(true);if(!(await (0,ctx.leaveMember)()))return;ctx.backfillStarted=false;ctx.backfillAttempted.clear();const startup=parseSelectionRoute(location.hash);if(startup.scope==='owner')stashPendingOwnerRoute(sessionStorage,location.hash);++ctx.loadGeneration;const generation=ctx.loadGeneration;(0,ctx.clear)(true);
    const api=createWorkspaceApi({fetchImpl:(url,init)=>fetch(init?.method==='GET'&&url==='/api/workspace'?'/api/workspace?features=bound-writes':url,init)});
    let initialized=false,startupNotice='',session;
    session=createMemberSession({api,onGuard:read=>(0,ctx.workspaceGuardNotice)(read),onState:(state,selection,meta)=>{if(generation!==ctx.loadGeneration)return;try{
     // 4.1 기억 보드 저장·트리 편집(#984)·한마디 저장/자동 제목 보정(#1001): 화면이 이미 자기 상태를 들고 있으므로 셸은 모델만 갱신하고 iframe을 다시 그리지 않는다.
     if(meta?.board||meta?.tree||meta?.moment){const projected=workspaceModel({revision:0,state});ctx.model=projected;if(window.LT41){const tree=projected.trees.find(t=>t.id===window.LT41.tree.id);if(tree){window.LT41.tree=tree;window.LT41.trees=projected.trees;window.LT41.writable=meta.board?true:(ctx.source==='server'&&!!ctx.member?.snapshot().writable);if(meta.moment&&!meta.story){if(selection?.momentId&&tree.moments.some(m=>m.id===selection.momentId))window.LT41.momentId=selection.momentId;try{for(const f of (0,ctx.frames)())f.contentWindow?.postMessage({type:MSG.momentsSaved,treeId:tree.id,momentId:window.LT41.momentId},location.origin);}catch{}}}}return;}const snapshot=session.snapshot(),saved=accountPosition(localStorage,snapshot.subject)||{},active=parseSelectionRoute(location.hash),pending=!initialized&&active.scope!=='owner'?pendingOwnerRoute(sessionStorage):null,route=active.scope==='owner'?active:pending;let requested=selection||(0,ctx.stateSelection)();
+     if(snapshot.owned)(0,ctx.reflectTheme)(state.prefs?.theme);
      if(!initialized){if(route)requested=route;else if(!selection)requested=saved;
       // #583 '이 순간 열기': 맨 처음 주소(#my/network?tree=…&moment=…)로 열 때도 지도가 그 순간을 가운데 두게 한다 —
       // 뒤의 주소 이동(applyBrowserLocation)과 같은 규칙. 이후 동기화 때는 다시 정하지 않는다(initialized 뒤).
@@ -204,7 +206,7 @@ export function createMemberRuntime(ctx){
    if(generation===ctx.loadGeneration){const startupJourney=parseJourneyRoute(location.hash);if(startupJourney){if(session.snapshot().owned&&session.snapshot().writable)(0,ctx.openFirstJourney)({step:startupJourney.step,route:true});else{history.replaceState(null,'','#home');ctx.handledHash='#home';}}}
   }
 
-  async function sample(selection={},view){if(!(0,ctx.pauseMember)())return;const tree=await (0,ctx.loadExampleTree)();++ctx.loadGeneration;if(view)ctx.current=view;(0,ctx.load)(null,'example',selection,{},tree);if(view)(0,ctx.writeLocation)();(0,ctx.$)('save-feedback').hidden=true;if((0,ctx.$)('account-settings').open)(0,ctx.$)('account-settings').close();}
+  async function sample(selection={},view){if(!(await (0,ctx.pauseMember)()))return;const tree=await (0,ctx.loadExampleTree)();++ctx.loadGeneration;if(view)ctx.current=view;(0,ctx.load)(null,'example',selection,{},tree);if(view)(0,ctx.writeLocation)();(0,ctx.$)('save-feedback').hidden=true;if((0,ctx.$)('account-settings').open)(0,ctx.$)('account-settings').close();}
 
   // #1175: 공유 화면 밖으로 나가는 길 한 벌 — share 잔여를 치우고 예시 첫 화면으로 돌아가며, 화면에 남은 '감상' 안내를 거둔다.
   function leaveShare(view){
@@ -220,5 +222,5 @@ export function createMemberRuntime(ctx){
   });
   return {mount(){
 
-  }};
+  }, memberStatus};
 }

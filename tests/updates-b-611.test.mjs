@@ -36,15 +36,16 @@ function mount(fetchImpl, posts, opts = {}) {
     onReplyCount: n => counts.push(n), onOpenUpdates: v => opened.push(v), storage,
     isLoggedIn: opts.isLoggedIn, memberPhase: opts.memberPhase
   });
-  const realFetch = globalThis.fetch;
-  globalThis.fetch = async (path) => {
-    if (typeof fetchImpl === 'function') return fetchImpl(path);
+  const realFetch = globalThis.fetch, realConfirm = globalThis.LT41Confirm;
+  globalThis.LT41Confirm = {ask: async () => opts.confirmAnswer ?? true};
+  globalThis.fetch = async (path, init) => {
+    if (typeof fetchImpl === 'function') return fetchImpl(path, init);
     return {
       ok: true, status: 200,
       json: async () => (path === '/v41/updates.json' ? JSON.parse(UPDATES) : {posts})
     };
   };
-  return { board, els, counts, opened, restore: () => { globalThis.fetch = realFetch; } };
+  return { board, els, counts, opened, restore: () => { globalThis.fetch = realFetch; globalThis.LT41Confirm = realConfirm; } };
 }
 
 test('611 4번: 안 본 운영센터 답글만 센다(내 덧붙임은 빼고)', () => {
@@ -84,6 +85,27 @@ test('611 4번: 열어 보면 사라진다 — 내 의견 목록의 숫자는 0�
     assert.equal(await board.refreshReplyDot(), 0);
     // 저장소가 새 것이면 다시 보이는 것도 자연스럽다(새 기기).
   } finally { restore(); }
+});
+
+test('#1541 내 덧붙임 삭제는 앱 확인 창의 취소·확인을 따른다', async () => {
+  for (const answer of [false, true]) {
+    const posts = [{id: 5, kind: 'opinion', status: 'fixed', body: '의견', replies: [{id: 21, authorType: 'customer', mine: true, canDelete: true, body: '내 덧붙임'}]}];
+    const deletes = [];
+    const {board, els, restore} = mount((path, init) => {
+      if (init?.method === 'DELETE') { deletes.push(path); return {ok: true, status: 200, json: async () => ({ok: true})}; }
+      return {ok: true, status: 200, json: async () => ({posts})};
+    }, posts, {confirmAnswer: answer});
+    try {
+      const reply = fakeEl('reply'); reply.dataset.replyId = '21';
+      const post = fakeEl('post'); post.dataset.followup = '5';
+      const button = fakeEl('delete');
+      button.closest = selector => selector === '.myposts-reply' ? reply : post;
+      els['myposts-list'].querySelectorAll = selector => selector === '[data-reply-delete]' ? [button] : [];
+      await board.openMyPosts();
+      await button.listeners.click();
+      assert.equal(deletes.length, answer ? 1 : 0);
+    } finally { restore(); }
+  }
 });
 
 test('A-20: 의견 답글 시각도 날짜 표기 설정을 따른다', async () => {

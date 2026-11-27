@@ -61,6 +61,7 @@ export function createWorkspaceApi({ fetchImpl = (...args) => globalThis.fetch(.
         currentRevision: payload?.error?.currentRevision ?? undefined,
         revision: Number.isSafeInteger(payload?.revision) ? payload.revision : undefined,
         writeSubjectBound: payload?.writeSubjectBound === true,
+        themeMissing: payload?.themeMissing === true,
         subject: typeof payload?.subject === 'string' && payload.subject ? payload.subject : null,
         confirmKind: typeof payload?.confirmKind === 'string' ? payload.confirmKind : null,
         email: typeof payload?.email === 'string' ? payload.email : null,
