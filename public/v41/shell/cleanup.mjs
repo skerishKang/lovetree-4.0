@@ -87,7 +87,7 @@ export function createCleanup(deps) {
     $('cleanup-create-box').hidden = !newTarget;
     $('cleanup-create').hidden = !newTarget;
     $('cleanup-create').disabled = busy || !count || !$('cleanup-new-name').value.trim();
-    $('cleanup-move-box').hidden = narrow() && !targetPage;
+    $('cleanup-move-box').hidden = narrow() && !targetPage && targetRows.length > 0;
     $('cleanup-pick').hidden = targetPage;
     $('cleanup-desc').hidden = targetPage;
     $('cleanup-move').hidden = targetPage;
@@ -272,7 +272,9 @@ export function createCleanup(deps) {
       }
       targetRows.push({ id: target.id, label: target.label, box, badge, card });
     }
-    $('cleanup-move-box').hidden = !targets.length;
+    $('cleanup-move-box').hidden = false;
+    const empty = $('cleanup-target-empty');
+    if (empty) empty.hidden = targets.length > 0;
     // 아래 고정 줄에 옮기기·복사하기 단추를 두었으므로 대상이 없으면 단추도 함께 숨긴다.
     $('cleanup-move').hidden = !targets.length;
     $('cleanup-copy').hidden = !targets.length;
@@ -312,12 +314,15 @@ export function createCleanup(deps) {
     $('cleanup-count').textContent = state.count ? `${state.count}개를 골랐어요.` : '아직 고르지 않았어요.';
     const create = $('cleanup-create');
     create.textContent = state.createLabel;
+    create.setAttribute?.('aria-label', '고른 순간으로 새 트리 만들기');
     create.disabled = busy || !state.canCreate;
     const move = $('cleanup-move');
     move.textContent = state.moveLabel;
+    move.setAttribute?.('aria-label', state.canMove ? state.moveLabel : '옮길 순간과 대상 트리를 골라 주세요');
     move.disabled = busy || !state.canMove;
     const copy = $('cleanup-copy');
     copy.textContent = state.copyLabel;
+    copy.setAttribute?.('aria-label', state.canCopy ? state.copyLabel : '복사할 순간과 대상 트리를 골라 주세요');
     copy.disabled = busy || !state.canCopy;
     $('cleanup-target-hint').textContent = state.targetHint || '옮기기는 트리 하나, 복사하기는 여러 트리를 고를 수 있어요.';
     // '이미 있음': 고른 순간 중 같은 순간이 그 트리에 이미 있으면 붙인다(여러 개 중 일부면 그 수).
