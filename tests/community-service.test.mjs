@@ -1062,3 +1062,15 @@ test('#1549 공개 순간 목록: 잘못된 limit·exclude·shareId는 500 없�
   assert.equal(response.body.error,undefined,query);
  }
 });
+
+test('#1552 공유 신고 이유 500자는 저장하고 501자는 빈 이유와 같은 400이다', async () => {
+ const {handle,communityRepo} = await setup(), shareId = 's'.repeat(24), path = '/api/community/shares/' + shareId + '/report';
+ const ok = await call(handle, 'POST', path, {account: 'bob', body: {reason: '가'.repeat(500)}, key: 'report-key-1552-ok'});
+ assert.equal(ok.status, 201);
+ assert.equal(communityRepo.inspect().reports.find(r => r.id === ok.body.report.id).reason.length, 500);
+ const empty = await call(handle, 'POST', path, {account: 'bob', body: {reason: ''}, key: 'report-key-1552-empty'});
+ const tooLong = await call(handle, 'POST', path, {account: 'bob', body: {reason: '가'.repeat(501)}, key: 'report-key-1552-long'});
+ assert.equal(empty.status, 400);
+ assert.equal(tooLong.status, 400);
+ assert.deepEqual(tooLong.body, empty.body);
+});
