@@ -303,6 +303,7 @@ html[data-lt-theme=garden] body,html[data-lt-theme=garden] .app-header{transitio
 :host([data-lt-theme=garden]) .center .actions .subtleBtn[data-do=community]:active{
  background:var(--lt-role-hover-bg);border-color:var(--lt-role-hover-border);filter:none
 }
+:host .center .actions .subtleBtn[data-do=guide],:host([data-lt-theme=garden]) .center .actions .subtleBtn[data-do=guide]{background:transparent;border-color:transparent;color:var(--lt-muted);text-decoration:underline;text-underline-offset:3px}
 :host .center .actions .home-compass{width:15px;height:15px;flex:none}
 :host([data-lt-theme=garden]) .hint,:host([data-lt-theme=garden]) .caption{color:var(--lt-muted);text-shadow:none}
 :host([data-lt-theme=garden]) .firstMark{border-color:var(--lt-rose);background:rgba(255,253,248,.86);color:var(--lt-ink);box-shadow:none}

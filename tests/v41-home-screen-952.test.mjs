@@ -1624,3 +1624,47 @@ test('#1487 로그인 확인 중 서재 주소: 불러오는 중을 보이고, �
     }
   } finally { await browser.close(); }
 });
+
+test('#1473 첫 화면 배치', {skip: REQUIRE952 ? false : skip952, timeout:240000}, async()=>{
+ if(skip952) assert.fail(skip952);
+ const {mkdirSync}=await import('node:fs');
+ const dir=process.env.LT_1473_CAPTURE;
+ if(dir)mkdirSync(dir,{recursive:true});
+ const browser=await chromium952.launch({headless:true});
+ try{
+ for(const [width,height] of [[390,844],[844,390],[1440,900]])for(const theme of ['night','garden'])for(const member of [false,true]){
+ const h=await boot952(browser,{width,height,member,initStorage:{'lt41.theme':theme}});
+ try{
+ await h.frame.waitForFunction(()=>globalThis.__LT_ORBIT_TEST__?.canvasSettled());
+ await h.frame.waitForFunction(()=>document.querySelector('#orbit')?.shadowRoot?.querySelector('.center .eyebrow')?.textContent?.trim());
+ if(dir)await h.page.screenshot({path:dir+'/'+width+'-'+theme+'-'+member+'.png',animations:'disabled'});
+ const m=await h.frame.evaluate(()=>{
+ const root=document.querySelector('#orbit').shadowRoot, app=root.querySelector('.app').getBoundingClientRect(), hook=globalThis.__LT_ORBIT_TEST__;
+ const rect=e=>{const r=e.getBoundingClientRect();return {l:r.left,t:r.top,r:r.right,b:r.bottom,w:r.width,h:r.height}};
+ const title=[...root.querySelectorAll('.center .eyebrow,.center h1')].map(rect);
+ const nodes=[...root.querySelectorAll('.card')];
+ const cards=hook.poses().filter((p,i)=>p&&!p.hidden&&!nodes[i]?.classList.contains('off')&&!nodes[i]?.classList.contains('clash')).map(p=>({l:Math.max(0,app.left+p.box.l),t:Math.max(0,app.top+p.box.t),r:Math.min(innerWidth,app.left+p.box.r),b:Math.min(innerHeight,app.top+p.box.b)})).filter(c=>c.r>c.l&&c.b>c.t);
+ const overlap=(a,b)=>Math.max(0,Math.min(a.r,b.r)-Math.max(a.l,b.l))*Math.max(0,Math.min(a.b,b.b)-Math.max(a.t,b.t));
+ const buttons=[...root.querySelectorAll('.center .actions button')].filter(e=>!e.hidden).map(e=>{const s=getComputedStyle(e);return {action:e.dataset.do,...rect(e),bg:s.backgroundColor,border:s.borderTopColor,primary:e.classList.contains('primary-cta')}});
+ const shell=parent.document, brand=shell.querySelector('.brand>span'), f=frameElement.getBoundingClientRect();
+ const links=[...shell.querySelectorAll('.home-links a,.home-links button')].filter(e=>e.getBoundingClientRect().width>0).map(e=>rect(e));
+ return {title,cardBottom:Math.max(...cards.map(c=>c.b)),titleOverlap:Math.max(0,...title.flatMap(t=>cards.map(c=>overlap(t,c)))),buttons,font:getComputedStyle(brand).fontFamily,weight:getComputedStyle(brand).fontWeight,links,linkOverlap:Math.max(0,...links.flatMap(l=>cards.map(c=>overlap(l,{l:c.l+f.left,r:c.r+f.left,t:c.t+f.top,b:c.b+f.top}))))};
+ });
+ const tag=width+' '+theme+' '+member;
+ assert.equal(m.titleOverlap,0,tag+' 제목 겹침');
+ if(width<1440) assert.equal(m.linkOverlap,0,tag+' 바닥 겹침'); // 넓은 화면의 바닥 링크는 기존 고정 위치를 유지한다.
+ assert.equal(m.links.length,4,tag);
+ assert.ok(m.links.every(l=>l.h>=44),tag);
+ assert.ok(m.buttons.filter(b=>b.action).every(b=>b.h>=44&&b.w>=44),tag);
+ assert.equal(m.font.includes('Gowun Batang'),theme==='garden',tag);
+ assert.equal(m.weight,'700',tag);
+ if(!member){
+  assert.equal(m.buttons.filter(b=>b.primary).length,1,tag);
+  assert.equal(m.buttons.filter(b=>b.bg!=='rgba(0, 0, 0, 0)').length,1,tag);
+  assert.equal(m.buttons.find(b=>b.action==='guide').border,'rgba(0, 0, 0, 0)',tag);
+ }
+ console.log('MEASURE',JSON.stringify({width,height,theme,member,...m}));
+ }finally{await close952(h)}
+ }
+ }finally{await browser.close()}
+});
