@@ -1565,3 +1565,43 @@ body.home-screen .app-header .main-nav>button#community-menu[aria-current=true]{
 #cleanup-panel[data-cleanup-cards] .cleanup-moments{max-height:none}
 #cleanup-panel[data-cleanup-cards][data-target-page]>.panel-heading{display:none}
 }
+
+/* #1571: 첫 화면 아래 조작줄은 궤도 위에 겹치지 않고 자체 공간을 쓴다. */
+body.home-screen .home-links{
+ position:relative;left:auto;bottom:auto;flex:0 0 auto;align-self:flex-start;
+ z-index:24;gap:10px;margin:0 0 max(10px,env(safe-area-inset-bottom)) 14px;
+}
+body.home-screen .updates-card:not([hidden]){
+ position:relative;inset:auto;flex:0 0 auto;align-self:flex-end;
+ width:max-content;max-width:min(420px,calc(100% - 32px));margin:0 16px 8px;
+}
+@media(max-width:900px) and (max-height:520px){
+ body.home-screen .home-links{align-self:center;margin-left:auto;margin-right:auto}
+}
+@media(max-width:780px){
+ body.home-screen .updates-card:not([hidden]){
+  align-self:center;width:calc(100% - 32px);max-width:420px;margin:0 auto 8px;
+ }
+}
+@media(max-width:520px){
+ body.home-screen .home-links{gap:5px}
+ body.home-screen .home-links .feedback-link{padding-inline:3px}
+}
+/* 전체 로고를 머리줄 안에 복원하고 양쪽 가장자리 여백을 16px로 맞춘다. */
+@media(max-width:390px){
+ body.home-screen .app-header{--lt-head-outer:16px;padding-inline:16px}
+ body.home-screen .app-header .brand{flex:0 0 auto;width:auto;min-width:0}
+ body.home-screen .app-header .brand-word{display:inline-flex;align-items:center}
+ body.home-screen .app-header .brand::before{content:''}
+}
+
+/* #1571: 회원의 오래된 바닥 132px 규칙이 새 상대 배치를 끌어올리지 않게 한다. */
+@media(max-width:520px){
+ body.home-screen.lt-fab-ok[data-member="in"] .updates-card:not([hidden]){bottom:auto}
+}
+
+/* #1571: 알림 단추의 겉 테두리는 유지하고 실제 클릭 상자는 44px 이상이다. */
+@media(max-width:520px){
+ body.home-screen .updates-card-actions button{min-height:44px;margin-block:-3px}
+ body.home-screen .updates-card-actions button:last-child{min-width:44px;margin-inline:-3px}
+}

@@ -535,6 +535,28 @@ infoStyle.textContent=`.home-add-top{margin-top:12px;font-size:15px;pointer-even
 .recent-menu{position:fixed;z-index:4000;inset:auto;margin:0;min-width:220px;max-width:min(300px,86vw);max-height:calc(100dvh - 16px);overflow:hidden;padding:6px;border:1px solid var(--lt-line,rgba(255,255,255,.14));border-radius:14px;background:#07070c;box-shadow:0 18px 44px rgba(0,0,0,.5)}.recent-menu::backdrop{background:transparent}.recent-menu-list{display:grid;gap:1px;max-height:min(60dvh,420px);overflow-y:auto;overscroll-behavior:contain}.recent-menu button{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;min-height:44px;padding:0 12px;border:0;border-radius:8px;background:none;cursor:pointer;font:inherit;font-size:13px;color:#e6ddef;text-align:left}.recent-menu button[aria-checked="true"]{color:var(--lt-gold,#ffe6a6)}.recent-menu button[disabled]{color:var(--lt-muted,#9b98a6);cursor:default}.recent-menu button:focus-visible{outline:2px solid #e8b8c9;outline-offset:-2px}.recent-menu .recent-menu-sub{padding-left:22px;font-size:12px;color:#cfc6dd}:host([data-lt-theme=garden]) .recent-menu{background:var(--lt-paper,#f7f0e8);border-color:var(--lt-line-paper)}:host([data-lt-theme=garden]) .recent-menu button{color:var(--lt-ink)}:host([data-lt-theme=garden]) .recent-menu button[aria-checked="true"]{color:var(--lt-gold-ink)}:host([data-lt-theme=garden]) .recent-menu button[disabled],:host([data-lt-theme=garden]) .recent-menu .recent-menu-sub{color:var(--lt-muted)}`;
 shadow.append(infoStyle);
 const mobileFit=document.createElement('style');mobileFit.textContent='@media(max-width:768px){.topbar{gap:12px;flex-wrap:wrap;align-items:center;padding:8px 12px}.top-actions{gap:6px;flex-shrink:0;flex-wrap:wrap;margin-left:auto}.topbar .menuBtn{white-space:nowrap;padding:10px 9px;font-size:14px}.actions .subtleBtn{font-size:14px}.center .center-note{font-size:14px}.hint{font-size:14px}}';shadow.append(mobileFit);
+// #1571: 세 단추와 숫자를 같은 격자에 두고, 문자 모양은 유지한 채 누름 영역을 44px로 확보한다.
+const homeDesign1571=document.createElement('style');
+homeDesign1571.textContent=`
+.center .actions[data-inline]{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));column-gap:clamp(8px,2vw,18px);row-gap:4px;align-items:start}
+.center .actions[data-inline] .home-action-group{display:contents}
+.center .actions[data-inline] .home-action-group>.subtleBtn{grid-row:1;width:100%;height:44px}
+.center .actions[data-inline] .home-action-group>.home-count{grid-row:2}
+.center .actions[data-inline] .home-action-group:nth-child(1)>*{grid-column:1}
+.center .actions[data-inline] .home-action-group:nth-child(2)>*{grid-column:2}
+.center .actions[data-inline] .home-action-group:nth-child(3)>*{grid-column:3}
+.home-count{min-height:0;font-size:12px;line-height:1.25}
+.home-count-line{display:flex;align-items:center;min-height:44px;line-height:1.25}
+.home-count-line:empty{display:none}
+.home-count-item{min-height:44px;align-items:center}
+.home-count button{box-sizing:border-box;min-height:44px;font-size:13px}
+:host([data-lt-theme=garden]) .home-count-name{color:var(--lt-ink)}
+.recent-change{box-sizing:border-box;min-width:44px;min-height:44px;margin:-10px -5px;padding:10px 5px}
+.recent-head{box-sizing:border-box;min-height:44px;margin-block:-14px;padding-block:10px}
+.recent-head::after,.recent-change::after{inset:0 -8px}
+.topbar .menuBtn{box-sizing:border-box;min-height:44px}
+`;
+shadow.append(homeDesign1571);
 // #380 5번: 첫 화면 오른쪽 위 "보기 ▾" 메뉴(테마·움직임·카드 출처)는 없앴다.
 // 로그인 상태의 같은 항목은 설정 창(셸)의 '화면' 묶음에 있고, 셸이 아래 두 메시지로 알려 준다.
 // 로그아웃에는 설정 입구가 없으므로 테마만 오른쪽 위 작은 ◐ 단추로 남긴다(저장 키 lt41.theme 그대로).
