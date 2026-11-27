@@ -3498,7 +3498,7 @@ test('#1026 서재·책·보드 390 첫 진입 CLS 0.01 이하', { skip: REQUIRE
 // 고른 트리 고르기의 올림 테두리. 서재·트리·보드·책·지도 × 390·1440 × 밤·정원, 가짜 기록·응답 대체만 쓴다.
 test('#1489 도구 줄: 다섯 화면 위끝 차 0px·누름 44px 이상·긴 이름 칸 안·고른 상태 올림 테두리', { skip: REQUIRE ? false : skip, timeout: 300000 }, async () => {
   if (skip) assert.fail(skip);
-  const server = await serve();
+  const server = await serve({}, {port:Number(process.env.LT_SESSION_PORT || 0)});
   const browser = await chromium.launch({ headless: true });
   const base = 'http://127.0.0.1:' + server.address().port;
   const LONG = '아주아주아주 길어서 도구 줄 칸과 목록 칸에 다 들어가지 않는 러브트리 이름 시험 열두 글자 더 더 더';
@@ -3509,7 +3509,7 @@ test('#1489 도구 줄: 다섯 화면 위끝 차 0px·누름 44px 이상·긴 �
   };
   const workspace = { revision: 1, state: { version: 1, trees: [make(LONG), make('봄날의 기억'), make('짧은 이름')], prefs: {} }, subject: 'qa-fake', writeSubjectBound: true, savedAt: '2026-11-23T00:00:00.000Z' };
   try {
-    for (const width of [1440, 390]) for (const theme of ['night', 'garden']) {
+    for (const width of [1440, 844, 390]) for (const theme of ['night', 'garden']) {
       const ctx = await browser.newContext({ viewport: { width, height: width === 390 ? 844 : 900 }, reducedMotion: 'reduce' });
       await ctx.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); localStorage.setItem('lt41.discoverAsked', JSON.stringify(['x'])); } catch {} }, theme);
       await ctx.route('**/api/**', async (route) => {
@@ -3527,7 +3527,10 @@ test('#1489 도구 줄: 다섯 화면 위끝 차 0px·누름 44px 이상·긴 �
         await page.goto(base + '/v41/?account=1#my/' + screen, { waitUntil: 'load' });
         await page.waitForSelector('iframe#view', { timeout: 15000 });
         await page.waitForTimeout(2500);
-        const frame = page.frames().find((f) => f !== page.mainFrame() && f.url().includes('track'));
+        const views={shelf:'track32-bookshelf',tree:'track61-tree',board:'track58-pinboard',book:'track59-sketchbook',network:'track56-network'};
+        await page.waitForFunction(v=>document.querySelector('#view')?.contentWindow?.location.href.includes(v),views[screen],{timeout:15000});
+        const frame = await (await page.$('#view')).contentFrame();
+        await frame.waitForSelector('.lt-toolbar-tree-choice',{state:'visible',timeout:15000});
         const offset = (await page.locator('iframe#view').boundingBox()).y;
         const value = await frame.evaluate(() => {
           const bar = document.querySelector('.lt-screen-toolbar');
@@ -3547,6 +3550,49 @@ test('#1489 도구 줄: 다섯 화면 위끝 차 0px·누름 44px 이상·긴 �
           return { top: barRect.top, hit, choiceRight: cr && cr.right, barRight: barRect.right, nameText: name ? name.textContent : '',
             pressed: choice && choice.getAttribute('aria-pressed'), overflowX: document.documentElement.scrollWidth - document.documentElement.clientWidth };
         });
+        // #1526: 공통 선택 표시와 실제 간격을 검증한다.
+        const styles = await frame.evaluate(() => {
+          const bar = document.querySelector('.lt-screen-toolbar');
+          const more = bar.querySelector('.lt-toolbar-more');
+          if (more && !more.hidden) more.click();
+          const groupSelector = '.view-toggle,.shelf-view-inline,.boardModeSwitch,.view-switch';
+          const visible = e => e.getClientRects().length > 0 && getComputedStyle(e).visibility !== 'hidden';
+          const read = e => {
+            const c = getComputedStyle(e), r = e.getBoundingClientRect();
+            let bg = e;
+            while (bg && getComputedStyle(bg).backgroundColor === 'rgba(0, 0, 0, 0)') bg = bg.parentElement;
+            const background = bg ? getComputedStyle(bg).backgroundColor : getComputedStyle(document.documentElement).backgroundColor;
+            return { color:c.color, background:c.backgroundColor, effectiveBg:background, border:c.borderTopColor, borderWidth:c.borderTopWidth, height:r.height, x:r.x, right:r.right, group:e.matches(groupSelector) };
+          };
+          const selected = [...bar.querySelectorAll(groupSelector)].filter(visible).flatMap(g=>[...g.querySelectorAll('button:is([aria-pressed=true],[aria-checked=true])')].filter(visible).map(read));
+          const chip = bar.querySelector('button.lt-toolbar-tree-choice[aria-pressed=true]');
+          const items = [...bar.querySelector('.lt-toolbar-tools').children].filter(visible).map(read).sort((a,b)=>a.x-b.x);
+          const reset = bar.querySelector('#boardResetOrderBtn');
+          return {selected,chip:chip && read(chip),items,reset:reset && !reset.hidden ? {group:reset.parentElement.matches('.boardModeSwitch'),border:getComputedStyle(reset).borderLeftColor} : null};
+        });
+        const accent = theme === 'garden' ? 'rgb(152, 80, 94)' : 'rgb(255, 230, 166)';
+        for (const selected of styles.selected) {
+          assert.equal(selected.background,'rgba(0, 0, 0, 0)',tag+' 선택 채움');
+          assert.equal(selected.color,accent,tag+' 선택 글자');
+          assert.equal(selected.border,accent,tag+' 선택 테두리');
+          assert.equal(selected.borderWidth,'1px',tag+' 테두리 두께');
+          assert.equal(selected.height,36,tag+' 선택 높이');
+          assert.ok(pairContrast(selected.color,selected.effectiveBg)>=4.5,tag+' 글자 대비');
+          assert.ok(pairContrast(selected.border,selected.effectiveBg)>=3,tag+' 테두리 대비');
+        }
+        if (styles.chip && theme === 'night') {
+          assert.equal(styles.chip.color,accent,tag+' 밤 트리 글자');
+          assert.equal(styles.chip.border,accent,tag+' 밤 트리 테두리');
+          assert.ok(pairContrast(styles.chip.color,styles.chip.background)>=4.5,tag+' 트리 글자 대비');
+          assert.ok(pairContrast(styles.chip.border,styles.chip.background)>=3,tag+' 트리 테두리 대비');
+        }
+        if (styles.chip && theme === 'garden') assert.equal(styles.chip.background,accent,tag+' 정원 트리 채움');
+        for (let i=1;i<styles.items.length;i++) {
+          const a=styles.items[i-1], b=styles.items[i];
+          assert.ok(Math.abs(b.x-a.right-(a.group||b.group?16:8))<=0.6,tag+' 도구 간격 '+(b.x-a.right));
+        }
+        if(styles.reset) assert.ok(styles.reset.group,tag+' 처음대로 묶음');
+        await frame.evaluate(()=>{const menu=document.querySelector('.lt-toolbar-menu');if(menu&&!menu.hidden) document.querySelector('.lt-toolbar-more').click()});
         tops[screen] = value.top + offset;
         assert.ok(value.hit.length > 0, tag + ': 도구 줄 단추가 없다');
         for (const h of value.hit) assert.ok(h.px >= 44, tag + ' 누름 영역 ' + h.px + 'px < 44px: ' + h.name);
@@ -3564,6 +3610,11 @@ test('#1489 도구 줄: 다섯 화면 위끝 차 0px·누름 44px 이상·긴 �
           const over = await pick.evaluate((b) => { const s = getComputedStyle(b); const probe = document.createElement('i'); probe.style.borderColor = 'var(--lt-role-hover-border)'; probe.style.borderStyle = 'solid'; document.body.append(probe); const want = getComputedStyle(probe).borderColor; probe.remove(); return { border: s.borderColor, shadow: s.boxShadow, want }; });
           assert.equal(idle, 'none', tag + ' 올리지 않았는데 고리가 있다: ' + idle);
           assert.ok(over.shadow !== 'none' && over.shadow.includes(over.want), tag + ' 고른 트리 고르기에 마우스를 올려도 올림 테두리(고리)가 안 보인다: ' + over.shadow);
+          await page.mouse.move(2,400);
+          await page.keyboard.press('Tab');
+          await pick.focus();
+          const focus=await pick.evaluate(async b=>{await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));const c=getComputedStyle(b);return {visible:b.matches(':focus-visible'),width:c.outlineWidth,style:c.outlineStyle,color:c.outlineColor,border:c.borderColor}});
+          assert.ok(focus.visible && parseFloat(focus.width)>=2 && focus.style!=='none' && focus.color!==focus.border,tag+' 키보드 초점 구분 '+JSON.stringify(focus));
           pressedSeen++;
         }
       }

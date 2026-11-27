@@ -722,7 +722,8 @@ nav .tree-frame{scroll-snap-align:center}
     오른쪽을 비켜 설 필요가 없다(자리는 셸이 --lt-toast-bottom으로 잰다). */
 }
 /* #987: 접힌 메뉴에서도 현재 화면의 글자에만 밑줄을 표시한다. */
-#header-overflow button[aria-current="true"]{box-shadow:none;border:0;background:var(--lt-role-accent-bg);color:var(--lt-role-accent-ink);font-weight:600;text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:6px}
+#header-overflow button[data-view][aria-current="true"]{box-shadow:none;border:1px solid var(--lt-gold);background:transparent;color:var(--lt-gold);font-weight:600;text-decoration:none}
+#header-overflow button[data-view]:focus-visible{outline:2px solid var(--lt-pearl);outline-offset:2px}
 
 /* 고객 의견 창구 (이슈 540) — 로그아웃 상태 첫 화면 아래 작은 글씨 링크. */
 .feedback-link{padding:6px 10px;border:0;background:none;color:var(--muted);font-size:13px;letter-spacing:.04em;text-decoration:underline;text-underline-offset:3px;opacity:.75;cursor:pointer}
@@ -1455,8 +1456,10 @@ body>.tree-popover.lt-toolbar-picker[hidden]{display:none}
 .app-header .brand{flex:0 0 auto;width:auto}
 .app-header .tree-slot:has(>#record-menu[hidden]){display:none}
 .app-header .tree-frame .tree-views>button[hidden]{display:none}
-.app-header .tree-frame .tree-views>button[aria-current="true"]{background:var(--lt-role-accent-bg);color:var(--lt-role-accent-ink);font-weight:700;text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:5px}
-.app-header .tree-frame .tree-views>button[aria-current="true"]:hover{color:var(--lt-role-accent-ink);background:var(--lt-role-accent-bg)}
+.app-header .tree-frame .tree-views>button[data-view]{border:1px solid transparent}
+.app-header .tree-frame .tree-views>button[aria-current="true"]{background:transparent;color:var(--lt-gold);border-color:var(--lt-gold);font-weight:700;text-decoration:none}
+.app-header .tree-frame .tree-views>button[aria-current="true"]:hover{color:var(--lt-gold);background:transparent}
+.app-header .tree-frame .tree-views>button:focus-visible{outline:2px solid var(--lt-pearl);outline-offset:2px}
 .app-header .main-nav>button#community-menu{margin:0;padding-inline:10px;width:auto}
 @media(min-width:781px){
  .app-header .header-actions{display:flex;flex:0 0 auto;gap:var(--lt-head-items);align-items:center;margin-left:auto}

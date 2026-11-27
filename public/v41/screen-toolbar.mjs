@@ -201,9 +201,7 @@ export function mountScreenToolbar({ screen, titleFrom, tools = [], initialBar =
   const placeBoardReset = () => {
     const reset = document.getElementById('boardResetOrderBtn');
     if (!boardMode || !reset) return;
-    const narrow = matchMedia('(max-width:760px)').matches;
-    if (narrow && reset.parentElement !== group) group.insertBefore(reset, boardMode.nextSibling);
-    else if (!narrow && reset.parentElement !== boardMode) boardMode.append(reset);
+    if (reset.parentElement !== boardMode) boardMode.append(reset);
   };
   let stashed = [];
   const isPlay = (el) => /^(playAllBtn|cinemaBtn|mapPlayBtn)$/.test(el.id || '');
@@ -218,7 +216,7 @@ export function mountScreenToolbar({ screen, titleFrom, tools = [], initialBar =
       const itemStyle = getComputedStyle(el);
       const border = (Number.parseFloat(itemStyle.borderLeftWidth) || 0) + (Number.parseFloat(itemStyle.borderRightWidth) || 0);
       const contentWidth = el.scrollWidth + border;
-      return sum + Math.max(rect.width, contentWidth);
+      return sum + Math.max(rect.width, contentWidth) + (Number.parseFloat(itemStyle.marginLeft) || 0) + (Number.parseFloat(itemStyle.marginRight) || 0);
     }, 0) + gap * Math.max(0, items.length - 1);
     return used <= group.clientWidth + 1;
   };
