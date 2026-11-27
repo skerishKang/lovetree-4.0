@@ -142,6 +142,25 @@ test('#611 3번: AI 테스터 기록은 둘러보기 카드에 aiTester 한 비�
  assert.equal(JSON.stringify(tester.body).includes('@'),false);
 });
 
+test('둘러보기 카드와 반응 응답은 통계 허용 목록만 내린다',async()=>{
+ const {handle,communityRepo}=await setup(),shareId='s'.repeat(24);
+ const summaries=communityRepo.listDiscoverableSummaries.bind(communityRepo);
+ communityRepo.listDiscoverableSummaries=async input=>{
+  const rows=await summaries(input);
+  for(const row of rows){row.stats.futureStat='future-stat-value';row.stats.reactions.future='future-reaction';row.stats.mine.push('future');}
+  return rows;
+ };
+ communityRepo.stats=async()=>({favorites:1,hearts:2,comments:3,favored:false,hearted:true,reactions:{heart:2,like:1,future:9},mine:['heart','future'],futureStat:'future-stat-value'});
+ const list=await call(handle,'GET','/api/community/shares');
+ const stats=list.body.items[0].stats;
+ assert.deepEqual(Object.keys(stats).sort(),['comments','favored','favorites','hearted','hearts','mine','reactions','weeklyFavorites']);
+ assert.deepEqual(Object.keys(stats.reactions).sort(),['angry','heart','laugh','love','sad','wow','like'].sort());
+ assert.deepEqual(stats.mine,[]);
+ const reaction=await call(handle,'PUT',`/api/community/shares/${shareId}/reaction`,{account:'bob',body:{kind:'like'}});
+ assert.deepEqual(Object.keys(reaction.body.stats).sort(),['comments','favored','favorites','hearted','hearts','mine','reactions','voted','weeklyFavorites']);
+ assert.equal(JSON.stringify(reaction.body).includes('future'),false);
+});
+
 test('favorites and reactions are authenticated, idempotent and remain outside workspace JSON',async()=>{
  const {handle,workspaceRepo}=await setup(),shareId='s'.repeat(24);
  assert.equal((await call(handle,'PUT',`/api/community/shares/${shareId}/favorite`)).status,401);

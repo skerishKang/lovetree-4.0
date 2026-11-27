@@ -369,9 +369,17 @@ test('실제 fetch로 PUT 본문을 넘기면 업스트림이 끝까지 받는�
 });
 
 test('명시적 공유 경로만 메서드별로 프록시하고 하위 확장은 막는다',async()=>{
- const cases=[['/api/shares','GET'],['/api/shares','POST'],['/api/shares/preview','POST'],['/api/shares/token_123','DELETE'],['/api/shares/token_123/discovery','PUT'],['/api/public/shares/token_123','GET']];
+ const cases=[['/api/shares','GET'],['/api/shares','POST'],['/api/shares/preview','POST'],['/api/shares/token_123','DELETE'],['/api/shares/token_123/discovery','PUT'],['/api/public/shares/token_123','GET'],['/api/public/visits/token_123','GET']];
  for(const [path,method] of cases){const fetcher=recorder(new Response('{}',{headers:{'content-type':'application/json'}}));const response=await onRequest(createProxy({fetcher}),`https://lovetree.example${path}`,{method});assert.equal(response.status,200,`${method} ${path}`);assert.equal(fetcher.calls[0].url,`${UPSTREAM}${path}`);}
- for(const path of ['/api/shares/token/extra','/api/public/shares/token/extra','/api/public/shares/token.json']){const fetcher=recorder(new Response('{}'));const response=await onRequest(createProxy({fetcher}),`https://lovetree.example${path}`);assert.equal(response.status,404,path);assert.equal(fetcher.calls.length,0);}
+ for(const path of ['/api/shares/token/extra','/api/public/shares/token/extra','/api/public/shares/token.json','/api/public/visits/token/extra','/api/public/visits/token.json']){const fetcher=recorder(new Response('{}'));const response=await onRequest(createProxy({fetcher}),`https://lovetree.example${path}`);assert.equal(response.status,404,path);assert.equal(fetcher.calls.length,0);}
+ const blocked=recorder(new Response('{}'));assert.equal((await onRequest(createProxy({fetcher:blocked}),'https://lovetree.example/api/public/visits/token_123',{method:'POST'})).status,405);assert.equal(blocked.calls.length,0);
+});
+
+test('방문 읽기 ETag와 조건부 요청 헤더를 그대로 전달한다',async()=>{
+ const etag='"visit-fixture-etag"';
+ const fetcher=recorder(new Response('{"visit":{}}',{headers:{'content-type':'application/json','cache-control':'private, no-cache',etag}}));
+ const response=await onRequest(createProxy({fetcher}),'https://lovetree.example/api/public/visits/token_123',{method:'GET',headers:{'if-none-match':etag}});
+ assert.equal(response.status,200);assert.equal(response.headers.get('etag'),etag);assert.equal(fetcher.calls[0].headers['if-none-match'],etag);
 });
 
 test('#678 후속: 덧붙임 고치기·지우기 경로는 PATCH·DELETE만 서버로 넘긴다', async () => {

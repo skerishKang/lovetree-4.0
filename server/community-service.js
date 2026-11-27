@@ -4,6 +4,7 @@ import {ApiError} from './errors.js';
 import {parsePrincipal} from './principal.js';
 import {createRateLimiter} from './rate-limit.js';
 import {projectSharedTree,projectSharedTreeFromScan} from './share-service.js';
+import {projectPublicStats,PUBLIC_REACTION_KINDS} from './public-projection.js';
 import {readStoredDocument} from './workspace-service.js';
 import {refreshStageIndex} from './stage-index-refresh.js';
 import {ROLE_TESTER,ROLE_UNKNOWN,isAiTesterRole,aiTesterFor} from './admin-roles.js';
@@ -12,7 +13,7 @@ import {coverModeOf} from '../src/domain.js';
 import {parseTag, tagKey, isChannelLikeArtist} from '../public/v41/tags.mjs';
 import {isVerticalMoment,safeYoutubeThumb,youtubeIdFrom,youtubeStageThumbUrl} from '../public/v41/youtube-id.mjs';
 
-export const REACTION_KINDS=Object.freeze(['heart','like','love','laugh','wow','sad','angry']);
+export const REACTION_KINDS=PUBLIC_REACTION_KINDS;
 const isReactionKind=value=>typeof value==='string'&&REACTION_KINDS.includes(value);
 
 const SHARE_ID=/^[A-Za-z0-9_-]{20,64}$/;
@@ -33,7 +34,7 @@ function feedMomentItem(moment,tree,shareId,aiTester,videoId){
   treeTitle:tree.title,
   title:moment.title,
   url:moment.url||'',
-  thumbnail:safeYoutubeThumb(moment.mediaMetadata?.thumbnail||'')||(videoId?youtubeStageThumbUrl(videoId,'oardefault'):'')||moment.mediaMetadata?.thumbnail||'',
+  thumbnail:safeYoutubeThumb(moment.mediaMetadata?.thumbnail||'')||(videoId?youtubeStageThumbUrl(videoId,'oardefault'):'')||'',
   note:moment.note||'',
   emotion:moment.emotion||'',
   date:moment.date||'',
@@ -165,7 +166,7 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
   }
   const emotions=[...new Set(tree.moments.map(moment=>moment.emotion).filter(Boolean))];
   const stats=statsOverride||await communityRepo.stats({productId,shareId:share.shareId,viewerSubjectId});
-  const card={shareId:share.shareId,title:tree.title,subject:tree.subject,summary:clean(cover?.note,160),emotions,momentCount:tree.moments.length,entryMomentId:share.entryMomentId,view:share.view,cover:{momentId:cover.id,title:cover?.title||tree.title,url:coverUrl,thumbnailUrl,type:cardCoverType,vertical:cardVertical,emotion:cover?.emotion||''},createdAt:share.createdAt,lastActivityAt:lastActivityAt||share.createdAt,stats};
+  const card={shareId:share.shareId,title:tree.title,subject:tree.subject,summary:clean(cover?.note,160),emotions,momentCount:tree.moments.length,entryMomentId:share.entryMomentId,view:share.view,cover:{momentId:cover.id,title:cover?.title||tree.title,url:coverUrl,thumbnailUrl,type:cardCoverType,vertical:cardVertical,emotion:cover?.emotion||''},createdAt:share.createdAt,lastActivityAt:lastActivityAt||share.createdAt,stats:projectPublicStats(stats)};
   // #611 3번: AI 명예회원 기록은 남에게 보이는 카드에 'AI 명예회원' 배지 한 비트만 내린다
   // (계정·이메일·subject는 공개 응답에 넣지 않는다).
   if(aiTesterLookup&&await aiTesterLookup(share.subjectId))card.aiTester=true;
@@ -336,7 +337,7 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
       treeTitle:tree.title,
       title:moment.title,
       url:moment.url||'',
-      thumbnail:moment.mediaMetadata?.thumbnail||'',
+      thumbnail:safeYoutubeThumb(moment.mediaMetadata?.thumbnail||'')||'',
       date:moment.date||'',
       aiTester
      });
@@ -431,7 +432,7 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
    const stats=await communityRepo.stats({productId,shareId,viewerSubjectId:subjectId});
    const voted=await communityRepo.hasVoted({productId,targetKind:'tree',targetId:shareId,subjectId});
    const weeklyFavorites=(await communityRepo.weeklyVoteCounts({productId,targetKind:'tree',...votingWeek()}))[shareId]||0;
-   return {...stats,voted,weeklyFavorites};
+   return {...projectPublicStats(stats),voted,weeklyFavorites};
   },
   async favorites(subjectId){return communityRepo.listFavorites({productId,subjectId});},
   async react(subjectId,shareId,enabled,kind='heart'){
@@ -446,7 +447,7 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
    const stats=await communityRepo.stats({productId,shareId,viewerSubjectId:subjectId});
    const voted=await communityRepo.hasVoted({productId,targetKind:'tree',targetId:shareId,subjectId});
    const weeklyFavorites=(await communityRepo.weeklyVoteCounts({productId,targetKind:'tree',...votingWeek()}))[shareId]||0;
-   return {...stats,voted,weeklyFavorites};},
+   return {...projectPublicStats(stats),voted,weeklyFavorites};},
   async comments(shareId,viewerSubjectId){await activeShare(shareId);const isAdmin=!!viewerSubjectId&&!!admin&&await admin.roleFor({productId,subjectId:viewerSubjectId})==='admin';return (await communityRepo.listComments({productId,shareId,limit:50})).map(row=>publicComment(row,viewerSubjectId,isAdmin));},
   async comment(subjectId,shareId,body,key){const share=await activeShare(shareId);rate(subjectId,'comment',12);if(communityRepo?.isBlocked){const blocked=await communityRepo.isBlocked({productId,blockerSubjectId:subjectId,blockedSubjectId:share.subjectId});if(blocked)throw new ApiError(403,'comment_blocked','차단한 기록에는 댓글을 남길 수 없어요.');}const text=clean(body,1000);if(!text)throw new ApiError(400,'comment_empty','댓글을 입력해 주세요.');const row=await communityRepo.createComment({productId,commentId:makeId(),shareId,subjectId,body:text,clientKey:key});return publicComment(row,subjectId);},
   async updateComment(subjectId,commentId,body){if(!ITEM_ID.test(commentId))throw new ApiError(404,'comment_not_found','댓글을 찾을 수 없어요.');rate(subjectId,'comment',12);const text=clean(body,1000);if(!text)throw new ApiError(400,'comment_empty','댓글을 입력해 주세요.');const current=await communityRepo.getComment?.({productId,commentId});if(!current||current.status!=='visible')throw new ApiError(404,'comment_not_found','댓글을 찾을 수 없어요.');if(current.subjectId!==subjectId)throw new ApiError(403,'comment_forbidden','이 댓글을 수정할 수 없어요.');const share=await shareRepo.load({productId,shareId:current.shareId});if(!share||share.status!=='active')throw new ApiError(404,'share_not_found','공개 트리를 찾을 수 없어요.');if(communityRepo?.isBlocked){const blocked=await communityRepo.isBlocked({productId,blockerSubjectId:subjectId,blockedSubjectId:share.subjectId});if(blocked)throw new ApiError(403,'comment_blocked','차단한 기록에는 댓글을 남길 수 없어요.');}const row=await communityRepo.updateComment({productId,commentId,subjectId,body:text});if(!row)throw new ApiError(403,'comment_forbidden','이 댓글을 수정할 수 없어요.');return publicComment(row,subjectId);},

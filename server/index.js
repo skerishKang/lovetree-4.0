@@ -84,9 +84,12 @@ const admin = createAdminRoleService({ store: createAdminRoleRepo(pool, { stageI
 // #655 2차 운영센터 전체 숫자. 집계는 저장소 안에서 한 번에 끝내고(전체 행을 읽어 오지 않는다)
 // 서비스는 숫자만 다듬는다. 이 자리는 운영센터 화면만 부르며 권한은 storageHandler 가 판정한다.
 const adminStats = createAdminStatsService({ repo: createStatsRepo(pool), productId: LOVETREE_PRODUCT_ID });
+const rankingPolicy = { hasRealCustomers: hasRealCustomersFromEnv(process.env) };
+const communityRepo = createMyNewsRepo(createMomentCommunityRepo(createCommunityRepo(pool, rankingPolicy), pool), pool);
 const shareShowPending = createShareShowPendingRepo(pool);
 const shareService = createShareService({
   shareRepo,
+  communityRepo,
   stageIndex,
   workspaceRepo: repo,
   visibilityRepo,
@@ -150,11 +153,9 @@ const shareHandler = createShareHandler({
  service: shareService,
  productId: LOVETREE_PRODUCT_ID
 });
-const rankingPolicy = { hasRealCustomers: hasRealCustomersFromEnv(process.env) };
 // #1098 2·3단계 — 순간 단위 ♡·댓글과 내 소식. 반응·댓글·신고 저장소에 순간 메서드·내 소식 메서드를 덧붙인 한 벌을
 // 세 서비스가 같이 쓰고, 내 소식 경로는 새 핸들러가, 순간 경로는 moment 핸들러가, 나머지 커뮤니티 경로는 기존
 // 핸들러가 그대로 맡는다(fallback — 분기는 각 핸들러 안에서).
-const communityRepo = createMyNewsRepo(createMomentCommunityRepo(createCommunityRepo(pool, rankingPolicy), pool), pool);
 const communityHandler = createMyNewsHandler({
  authenticate: guardedAuthenticate,
  service: createMyNewsService({communityRepo, productId: LOVETREE_PRODUCT_ID}),

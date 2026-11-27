@@ -22,6 +22,7 @@ const TREE_VISIBILITY = /^\/api\/trees\/[A-Za-z0-9_-]{1,80}\/visibility$/;
 // #739 이후: 공유 판의 '둘러보기 소개' 스위치(GET·PUT) — 서버·사이트는 있었고 프록시만 막혀 404였다.
 const TREE_DISCOVER = /^\/api\/trees\/[A-Za-z0-9_-]{1,80}\/discover$/;
 const PUBLIC_SHARE_ITEM = /^\/api\/public\/shares\/[A-Za-z0-9_-]{1,128}$/;
+const PUBLIC_VISIT_ITEM = /^\/api\/public\/visits\/[A-Za-z0-9_-]{1,128}$/;
 const COMMUNITY_SHARE_ACTION = /^\/api\/community\/shares\/[A-Za-z0-9_-]{1,128}\/(comments|favorite|reaction|report|block)$/;
 const COMMUNITY_COMMENT_ITEM = /^\/api\/community\/comments\/[A-Za-z0-9_-]{1,128}$/;
 const COMMUNITY_REPORT_ITEM = /^\/api\/community\/admin\/reports\/[A-Za-z0-9_-]{1,128}$/;
@@ -94,8 +95,8 @@ const ALLOWED = new Map([
   ['/auth/logout', new Set(['POST'])]
 ]);
 const LOOPBACK = new Set(['127.0.0.1', 'localhost', '::1', '[::1]']);
-const REQUEST_HEADERS = ['cookie', 'content-type', 'accept', 'accept-language', 'authorization', 'origin', 'idempotency-key', 'x-lovetree-subject', 'x-lovetree-upload-id'];
-const RESPONSE_HEADERS = ['content-type', 'location', 'cache-control', 'x-content-type-options', 'www-authenticate', 'content-security-policy'];
+const REQUEST_HEADERS = ['cookie', 'content-type', 'accept', 'accept-language', 'authorization', 'origin', 'idempotency-key', 'x-lovetree-subject', 'x-lovetree-upload-id', 'if-none-match'];
+const RESPONSE_HEADERS = ['content-type', 'location', 'cache-control', 'x-content-type-options', 'www-authenticate', 'content-security-policy', 'etag'];
 
 // 응답 본문 상한. 서버가 받아들이는 문서 상한(`server/http.js` DEFAULT_MAX_BODY_BYTES = 4MiB,
 // `LOVETREE_MAX_BODY_BYTES`로 조정)보다 넉넉해야 정상 기록이 프록시에서 잘리지 않는다.
@@ -221,6 +222,7 @@ export function createProxy({ fetcher = (...args) => fetch(...args), timeoutMs =
       || (TREE_VISIBILITY.test(incoming.pathname) ? new Set(['GET','PUT']) : null)
       || (TREE_DISCOVER.test(incoming.pathname) ? new Set(['GET','PUT']) : null)
       || (PUBLIC_SHARE_ITEM.test(incoming.pathname) ? new Set(['GET']) : null)
+      || (PUBLIC_VISIT_ITEM.test(incoming.pathname) ? new Set(['GET']) : null)
       || (ADMIN_FEEDBACK_ITEM.test(incoming.pathname) ? new Set(['GET','PATCH']) : null)
       || (ADMIN_FEEDBACK_REPLY.test(incoming.pathname) ? new Set(['POST']) : null)
       || (MY_POST_FOLLOWUP.test(incoming.pathname) ? new Set(['POST']) : null)

@@ -33,6 +33,7 @@ test('프록시 허용 경로 전체가 기대한 핸들러로 간다(빠진 경
   console.log('ROUTE_TABLE', JSON.stringify(rows));
   assert.deepEqual(bad, [], '핸들러가 없거나 어긋난 경로: ' + JSON.stringify(bad));
   assert.equal(handlerForPath('/api/public/moments'), 'community', '공개 순간 조회는 커뮤니티 핸들러로');
+ assert.equal(handlerForPath('/api/public/visits/' + 'v'.repeat(24)), 'share', '방문 공개 조회는 공유 핸들러로');
 });
 
 test('로그아웃 GET /api/public/moments?limit=1 → 200과 items 배열', async () => {
