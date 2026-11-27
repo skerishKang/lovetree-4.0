@@ -112,7 +112,7 @@ export function createNavigationRuntime(ctx){
     // capture로 등록해 다른 Esc 처리보다 먼저 본다 — 아래 창(공유 목록)이 먼저 닫힌 뒤 '열린 창 없음'으로 오판하지 않게.
     // #1092: 둘러보기는 창이 아니라 화면이라 Esc를 맡지 않는다 — 맨 위 창 판정에서 뺀다(화면 위의 창도 Esc로 닫히게).
     document.addEventListener('keydown', event => {
-      if (event.key !== 'Escape') return;
+      if (event.key !== 'Escape' || (0,ctx.$)('lt-confirm')?.open) return;
       const updates = (0,ctx.$)('updates-panel');
       if (!updates?.open || updates.matches(':modal')) return;
       if ([...document.querySelectorAll('dialog[open]')].some(d => d !== updates && !(d.id === 'community-panel' && document.body.classList.contains('community-screen')))) return; // 다른 창이 남아 있으면(맨 위 모달 포함) 그 창이 맡는다

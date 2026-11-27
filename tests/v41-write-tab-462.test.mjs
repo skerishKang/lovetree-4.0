@@ -60,7 +60,7 @@ function shell({storage = fakeStorage(), finePointer = true, viewport = null} = 
   els['tree-form'] = fakeEl({elements: {title: fakeEl({value: ''}), subject: fakeEl({value: ''}), coverMode: fakeRadioGroup(['basic', 'moment', 'design', 'photo']), coverDesign: fakeRadioGroup(['', 'texture-1'])}});
   els['tree-form'].querySelector = sel => (sel === '[data-media-slot]' ? coverSlot : null);
 
-  const saved = {window: globalThis.window, LT41: globalThis.LT41, LTMedia: globalThis.LTMedia, FormData: globalThis.FormData, confirm: globalThis.confirm, document: globalThis.document, queueMicrotask: globalThis.queueMicrotask};
+  const saved = {window: globalThis.window, LT41: globalThis.LT41, LTMedia: globalThis.LTMedia, FormData: globalThis.FormData, confirm: globalThis.confirm, LT41Confirm: globalThis.LT41Confirm, document: globalThis.document, queueMicrotask: globalThis.queueMicrotask};
   globalThis.window = globalThis;
   globalThis.LT41 = {tree: TREE, momentId: 'm1'};
   globalThis.LTMedia = {
@@ -74,6 +74,7 @@ function shell({storage = fakeStorage(), finePointer = true, viewport = null} = 
   };
   globalThis.FormData = FakeFormData;
   globalThis.confirm = () => true;
+  globalThis.LT41Confirm = {ask: async () => true};
   globalThis.queueMicrotask = fn => fn();
   globalThis.document = { createElementNS: (ns, tag) => ({ tagName: String(tag), namespaceURI: String(ns), attrs: {}, children: [], setAttribute(n,v){this.attrs[n]=String(v)}, getAttribute(n){return this.attrs[n]??null}, append(...k){this.children.push(...k)}, querySelector(){return null}, querySelectorAll(){return []} }), querySelectorAll: () => [], addEventListener() {}, createElement: tag => fakeEl({tagName: tag, value: '', children: [], append(...kids) { this.children.push(...kids); }})};
 

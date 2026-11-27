@@ -9,6 +9,7 @@ const REPLY_SEEN_KEY = 'lt41.replySeen';
 // A-15·A-20: 글자 막기·날짜 표기는 화면 정본 한 벌을 쓴다.
 import { escapeHtml as esc } from './html-escape.mjs';
 import { formatDisplayDate } from './book-usability.mjs';
+import {askAppConfirm} from './confirm.mjs';
 
 const dateStyle = () => {
   try { const value = globalThis.localStorage?.getItem?.('lt41.dateStyle'); return value === 'dash' || value === 'long' ? value : 'dot'; }
@@ -259,7 +260,7 @@ export function createFeedbackBoard({$, notify, show, showFull, onReplyCount, on
       button.addEventListener('click', async () => {
         const replyId = button.closest('.myposts-reply')?.dataset.replyId || '';
         const postId = button.closest('.myposts-item')?.querySelector('[data-followup]')?.dataset.followup || '';
-        if (!globalThis.confirm('이 덧붙임을 지울까요? 지우면 내 의견 목록에서 사라져요.')) return;
+        if (!(await askAppConfirm('이 덧붙임을 지울까요? 지우면 내 의견 목록에서 사라져요.'))) return;
         const res = await api.call(`/api/board/mine/${encodeURIComponent(postId)}/followup/${encodeURIComponent(replyId)}`, {method: 'DELETE'});
         if (!res.ok) { if (typeof notify === 'function') notify(res.message || '지우지 못했어요.'); return; }
         if (typeof notify === 'function') notify('지웠어요.');

@@ -528,8 +528,12 @@ test('#876 같은 트리 같은 영상: [그 순간 보기]는 담지 않고 이
     await openQuickAndFill(page, `https://youtu.be/${YT_ID}`);
     await page.waitForFunction(() => document.getElementById('video-dup-panel').open, null, { timeout: 10000 });
     // 그 순간 보기: 순간 추가 창을 닫는다 — 적어 둔 값이 있으면 기존 규칙대로 한 번 묻는다(받아들인다).
-    page.once('dialog', (d) => d.accept());
     await page.click('#video-dup-view');
+    // 두 확인 창은 별도 역할이다. 먼저 저장하지 않고 닫기를 승인한 뒤 작업 전환을 확인한다.
+    await page.waitForSelector('#lt-close-confirm[open]', { timeout: 10000 });
+    await page.click('#lt-close-confirm-yes');
+    await page.waitForSelector('#lt-confirm[open]', { timeout: 10000 });
+    await page.click('#lt-confirm-ok');
     await page.waitForFunction(() => !document.getElementById('video-dup-panel').open, null, { timeout: 10000 });
     await page.waitForFunction(() => document.getElementById('write-panel').open, null, { timeout: 10000 });
     assert.equal(await momentCount(page), 1, '아무것도 담지 않는다');

@@ -116,6 +116,41 @@ test('설정 창 실행: 고친 내용이 있으면 Esc로 닫을 때 한 번 �
   } finally { await browser.close(); server.close(); }
 });
 
+test('#1541 계정 탈퇴는 앱 확인 창의 Esc 취소·Enter 확인을 따른다', { skip: skip952 || undefined }, async () => {
+  const browser = await chromium952.launch({headless: true});
+  const { server, ctx, page } = await boot952(browser);
+  try {
+    let deletes = 0;
+    await page.route('**/api/account/delete', async route => {
+      if (route.request().method() !== 'POST') return route.fallback();
+      deletes += 1;
+      await route.fulfill({status: 200, contentType: 'application/json', body: JSON.stringify({ok: true, commonAccountDeleted: false})});
+    });
+    await openSettings952(page);
+    await page.click('#settings-tab-account');
+    await page.click('#account-settings-more > summary');
+    await page.click('#account-settings-delete > summary');
+    await page.fill('#account-confirm', '탈퇴합니다');
+    await page.waitForFunction(() => !document.getElementById('account-delete')?.disabled);
+    const nativeDialogs = [];
+    page.on('dialog', dialog => { nativeDialogs.push(dialog.message()); void dialog.dismiss().catch(() => {}); });
+    await page.evaluate(() => { document.getElementById('account-form').requestSubmit(); });
+    await page.waitForSelector('#lt-confirm[open]');
+    assert.equal(await page.evaluate(() => document.getElementById('account-settings').open), true, '확인 창이 떠도 설정 창은 열려 있다');
+    assert.equal(await page.evaluate(() => document.activeElement.id), 'lt-confirm-cancel');
+    await page.keyboard.press('Escape');
+    await page.waitForFunction(() => !document.getElementById('lt-confirm')?.open);
+    assert.equal(deletes, 0);
+    assert.equal(await page.evaluate(() => document.getElementById('account-settings').open), true);
+    await page.evaluate(() => document.getElementById('account-form').requestSubmit());
+    await page.waitForSelector('#lt-confirm[open]');
+    await page.keyboard.press('Enter');
+    await page.waitForFunction(() => !document.getElementById('account-settings').open);
+    assert.equal(deletes, 1);
+    assert.deepEqual(nativeDialogs, []);
+  } finally { await ctx.close().catch(() => {}); await browser.close(); await new Promise(resolve => server.close(resolve)); }
+});
+
 test('설정 창 실행: 개인정보 묶음의 정책 링크는 새 창이고 로그아웃 단추가 있다', { skip: skip952 || undefined }, async () => {
   const browser = await chromium952.launch();
   const { server, ctx, page } = await boot952(browser);

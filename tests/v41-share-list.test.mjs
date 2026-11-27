@@ -30,7 +30,7 @@ function fakeElement(extra = {}) {
 }
 
 function listHarness({ shares = [], confirmAnswer = true, clipboard = null } = {}) {
-  const saved = {window: globalThis.window, document: globalThis.document, location: globalThis.location, addEventListener: globalThis.addEventListener, confirm: globalThis.confirm};
+  const saved = {window: globalThis.window, document: globalThis.document, location: globalThis.location, addEventListener: globalThis.addEventListener, confirm: globalThis.confirm, LT41Confirm: globalThis.LT41Confirm};
   for (const key of ['window', 'document', 'location', 'addEventListener', 'confirm']) delete globalThis[key];
   const els = {};
   const events = {};
@@ -39,6 +39,7 @@ function listHarness({ shares = [], confirmAnswer = true, clipboard = null } = {
   globalThis.location = {origin: 'https://lovetree-4-0.pages.dev', hostname: 'lovetree-4-0.pages.dev', hash: ''};
   globalThis.document = {createElement: () => fakeElement(), createElementNS: (ns, tag) => fakeElement({tagName: String(tag), namespaceURI: String(ns)}), querySelectorAll: () => []};
   globalThis.confirm = () => confirmAnswer;
+  globalThis.LT41Confirm = {ask: async () => confirmAnswer};
   if (clipboard) Object.defineProperty(globalThis, 'navigator', {value: {clipboard}, configurable: true});
   globalThis.window = {LT41: {tree: {id: 'tree1', title: '윤슬', moments: [{id: 'm1', title: '첫 순간'}]}, momentId: 'm1', trees: [{id: 'tree1', moments: [{id: 'm1'}]}]}};
   els['community-panel'] = fakeElement();

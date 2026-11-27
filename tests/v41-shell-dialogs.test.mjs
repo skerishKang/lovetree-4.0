@@ -3,6 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {createDialogs} from '../public/v41/shell/dialogs.mjs';
+import {createWorkspaceRuntime} from '../public/v41/shell/workspace-runtime.mjs';
 
 // #231 1-B 후속: shell/dialogs.mjs를 직접 호출해 Tab 순환·Esc 복귀·포커스 되돌림을 고정한다.
 
@@ -142,6 +143,25 @@ function confirmFrame() {
   assert.ok(el?.open, '앱 안 확인 틀이 열린다');
   return {el, yes: el.byId['lt-close-confirm-yes'], no: el.byId['lt-close-confirm-no']};
 }
+
+test('#1541 기록 이탈은 앱 확인 창의 취소·확인을 따른다', async () => {
+  const saved = globalThis.LT41Confirm;
+  try {
+    for (const answer of [false, true]) {
+      let disposed = 0;
+      const member = {snapshot: () => ({owned: true, dirty: true}), dispose: () => { disposed += 1; }};
+      const ctx = {member, shellPanels: {formDirty: () => false, treeDirty: () => false}};
+      createWorkspaceRuntime(ctx);
+      globalThis.LT41Confirm = {ask: async () => answer};
+      assert.equal(await ctx.leaveMember(), answer);
+      assert.equal(disposed, answer ? 1 : 0);
+      assert.equal(ctx.member === null, answer);
+    }
+  } finally {
+    if (saved === undefined) delete globalThis.LT41Confirm;
+    else globalThis.LT41Confirm = saved;
+  }
+});
 
 // #380 4: 공통 틀의 Esc 규칙 — 쓰던 내용이 있으면 한 번 묻고, 아니오를 고르면 닫지 않는다.
 // #978: 물음은 앱 안 확인 틀(#lt-close-confirm)이다 — 아니오 단추를 누르면 창이 남고, 예 단추를 누르면 닫힌다.
