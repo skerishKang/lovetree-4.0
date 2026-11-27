@@ -6,6 +6,7 @@
 export const screens = [
   ['home', 'src064-orbit.html', '첫 화면'],
   ['shelf', 'track32-bookshelf.html', '서재'],
+  ['exhibit', 'exhibit.html', '전시'],
   ['tree', 'track61-tree.html', '트리'],
   ['book', 'track59-sketchbook.html', '책'],
   ['board', 'track58-pinboard.html', '보드'],
@@ -24,6 +25,7 @@ export function themedViewFor(file) {
   if (file === 'src064-orbit.html') return 'home';
   if (file === 'first-journey.html') return 'journey';
   if (file === 'track32-bookshelf.html') return 'shelf';
+  if (file === 'exhibit.html') return 'tree';
   if (file === 'track61-tree.html') return 'tree';
   if (file === 'track59-sketchbook.html') return 'book';
   if (file === 'track58-pinboard.html') return 'board';
@@ -36,8 +38,8 @@ export function themedViewFor(file) {
 // 두 벌을 한 벌로 합쳤으므로 source에 따라 경로를 가르지 않는다.
 // 그래프 화면만 views/graph/ 아래에 있다(#713). 파일 이름(시험·postdeploy 판정 키)은 'track60-graph.html' 그대로 두고
 // 주소를 만들 때만 하위 폴더를 붙인다 — 빠뜨리면 없는 주소를 배포가 4.0 첫 화면으로 되돌려 준다(2026-11-16 보고).
-const VIEW_SUBDIRS = { 'track60-graph.html': 'views/graph/' };
+const VIEW_SUBDIRS = { 'track60-graph.html': 'views/graph/', 'exhibit.html': 'views/exhibit/' };
 export function screenUrl(file, source, origin) {
-  const path = file === 'src064-orbit.html' ? 'home.html' : (VIEW_SUBDIRS[file] || 'views/') + file;
+  const path = file === 'exhibit.html' ? 'views/exhibit/exhibit.html' : file === 'src064-orbit.html' ? 'home.html' : (VIEW_SUBDIRS[file] || 'views/') + file;
   return new URL('/v41/' + path, origin).href;
 }

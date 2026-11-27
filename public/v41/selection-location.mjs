@@ -1,4 +1,4 @@
-const VIEWS = new Set(['home','shelf','tree','book','board','network','graph']); // graph: 그래프 보기(#627 3단계) — 지금은 주소(#my/graph)로만 연다
+const VIEWS = new Set(['home','shelf','tree','book','board','network','graph','exhibit']); // graph: 그래프 보기(#627 3단계) — 지금은 주소(#my/graph)로만 연다
 // #map 도 지도다 — 'network' 의 별칭(#book·#board·#graph 처럼 주소로 지도를 열게)
 const VIEW_ALIASES = new Map([['map','network']]);
 const POSITION_KEY = 'lovetree.v41.account-positions.v1';

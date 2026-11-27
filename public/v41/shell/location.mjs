@@ -89,7 +89,7 @@ export function createLocation(deps) {
     // #1175: 공유 주소는 공유에서 보는 화면(책·보드·지도)에서만 남긴다. 첫 화면·서재 같은 다른 화면으로
     // 나가는 길이 share 주소(#share/<아이디>/home 같은 없는 경로)로 덮이면 그 주소로 다시 들어올 때마다
     // 공유 기록을 새로 읽어 '감상' 안내가 되풀이되고, 로그아웃 상태에서는 공유 상태에서 빠져나오지 못한다.
-    const shareView = ['book', 'board', 'network'].includes(viewForFile(getCurrent()));
+    const shareView = ['tree', 'book', 'board', 'network', 'exhibit'].includes(viewForFile(getCurrent()));
     const hash = getSource() === 'share' && shareId && shareView ? `#share/${shareId}/${viewForFile(getCurrent())}` : owned ? ownerSelectionRoute(routePosition) : '#' + viewForFile(getCurrent());
     const state = locationState();
     const detailChanged = !!state?.lt41BoardDetail !== handledBoardDetail;
