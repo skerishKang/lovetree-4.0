@@ -184,3 +184,6 @@ body.lt-bloom-glow .threadGlow{opacity:.82}
 html[data-v41-screen=board]:not([data-lt-board-view]) .boardWorld{visibility:hidden}
 /* #1433: 읽기 전용 테마 표시는 글자가 늦게 바뀌어도 자리(오른쪽 끝 기준)가 같도록 최소 폭을 둔다. */
 .themeBadge{min-width:14em;text-align:right}
+
+/* #932: 움직임 줄이기를 선택하면 상세 판 진입/퇴장 이동을 즉시 끝낸다. */
+@media(prefers-reduced-motion:reduce){html[data-v41-screen=board] .detail{transition:none}}
