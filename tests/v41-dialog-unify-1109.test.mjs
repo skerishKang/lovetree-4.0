@@ -50,6 +50,8 @@ async function withShell(tree, { width, height, theme, deferred = false, cached 
     page.on('pageerror', (error) => errors.push(String(error.message || error)));
     await page.goto(`${base}/v41/?account=1${hash}`, { waitUntil: 'load' });
     if (!deferred || cached) await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
+    // #1495: 예전에는 소개 창 '안 함' 누르기가 첫 화면이 다 뜰 때까지 기다려 줬다 — 그 몫을 첫 화면 순간 목록 단추가 보일 때까지 기다리기로 바꾼다.
+    if (!deferred && !hash) await page.waitForFunction(() => [...document.querySelectorAll('iframe')].some(f => !f.hidden && f.getBoundingClientRect().width > 0 && f.contentDocument?.getElementById('orbit')?.shadowRoot?.querySelector('[data-do=moments],[data-do=index]')), null, { timeout: 20000 });
     await fn({ page, errors, initial, release });
   } finally { release?.(initial); await browser.close(); server.close(); }
 }
