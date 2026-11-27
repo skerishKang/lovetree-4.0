@@ -37,7 +37,16 @@ export function themedViewFor(file) {
 // 그래프 화면만 views/graph/ 아래에 있다(#713). 파일 이름(시험·postdeploy 판정 키)은 'track60-graph.html' 그대로 두고
 // 주소를 만들 때만 하위 폴더를 붙인다 — 빠뜨리면 없는 주소를 배포가 4.0 첫 화면으로 되돌려 준다(2026-11-16 보고).
 const VIEW_SUBDIRS = { 'track60-graph.html': 'views/graph/' };
+// #1425 시제품: 개발용 주소(?view=exhibit)에서만 트리 화면 자리에 전시 보기를 띄운다.
+// 화면 목록·메뉴·저장값(openView)은 그대로다 — 셸은 계속 '트리' 화면으로 다룬다(탭·주소·테마·트리 고르기 그대로).
+const DEV_VIEW_PATHS = { exhibit: { file: 'track61-tree.html', path: 'views/exhibit/exhibit.html' } };
+export function devViewPath(file, search = globalThis.location?.search || '') {
+  let name = '';
+  try { name = new URLSearchParams(search).get('view') || ''; } catch { return ''; }
+  const dev = Object.hasOwn(DEV_VIEW_PATHS, name) ? DEV_VIEW_PATHS[name] : null;
+  return dev && dev.file === file ? dev.path : '';
+}
 export function screenUrl(file, source, origin) {
-  const path = file === 'src064-orbit.html' ? 'home.html' : (VIEW_SUBDIRS[file] || 'views/') + file;
+  const path = devViewPath(file) || (file === 'src064-orbit.html' ? 'home.html' : (VIEW_SUBDIRS[file] || 'views/') + file);
   return new URL('/v41/' + path, origin).href;
 }
