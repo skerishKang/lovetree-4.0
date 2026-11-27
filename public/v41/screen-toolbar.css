@@ -224,7 +224,8 @@ html[data-v41-screen=tree] .lt-toolbar-tools{flex:0 0 auto;overflow:visible}
 
 /* #1367: current tree remains legible in both themes. */
 button.lt-toolbar-tree-choice[aria-pressed=true]{background:var(--lt-role-accent-bg);color:var(--lt-role-accent-ink);border-color:var(--lt-role-accent-bg)}
-button.lt-toolbar-tree-choice[aria-pressed=true]:is(:hover,:focus-visible){background:var(--lt-role-accent-bg);color:var(--lt-role-accent-ink)}
+/* #1489: 고른 상태에서도 마우스를 올리거나 초점이 오면 올림 테두리(--lt-role-hover-border)가 보인다(전에는 기본 색과 같아 변화가 없었다). 정원은 채움색과 올림 테두리 토큰이 같은 색이라, #1488 5번(순간 추가)처럼 무대색 2px 틈 바깥 고리로 그려 두 테마 모두 보이게 한다. */
+button.lt-toolbar-tree-choice[aria-pressed=true]:is(:hover,:focus-visible){background:var(--lt-role-accent-bg);color:var(--lt-role-accent-ink);border-color:var(--lt-role-hover-border);box-shadow:0 0 0 2px var(--lt-stage),0 0 0 3px var(--lt-role-hover-border)}
 button.lt-toolbar-tree-choice[aria-pressed=true] .lt-toolbar-tree-name,
 button.lt-toolbar-tree-choice[aria-pressed=true] .lt-toolbar-tree-caret{color:inherit}
 
@@ -259,3 +260,16 @@ html[data-v41-screen]:is([data-v41-screen=shelf],[data-v41-screen=tree],[data-v4
   html[data-v41-screen=board] .lt-toolbar-tools .boardModeSwitch:has(>#boardResetOrderBtn){width:216px}
 }
 html[data-v41-screen=board] .lt-screen-toolbar .lt-toolbar-tools #boardBgBtn{width:66px;padding:0}
+
+/* #1489: 도구 줄 단추는 보이는 높이(36px)를 두고 누름 영역만 위로 넓혀 44px 이상으로 만든다. 아래로 넓히면 단추 안 스크롤 높이가 늘어 글자 줄 수 검사(#951)가 틀어지므로 위쪽만 넓힌다. 옆 단추와는 가로로 겹치지 않는다. */
+.lt-screen-toolbar :is(.lt-toolbar-tools,.lt-toolbar-left)>button:not(.lt-toolbar-tree-choice),
+.lt-screen-toolbar .lt-toolbar-tools :is(.view-toggle,.shelf-view-inline,.boardModeSwitch,.view-switch,.bgDrop)>button,
+.lt-screen-toolbar .lt-toolbar-more{position:relative}
+.lt-screen-toolbar :is(.lt-toolbar-tools,.lt-toolbar-left)>button:not(.lt-toolbar-tree-choice)::before,
+.lt-screen-toolbar .lt-toolbar-tools :is(.view-toggle,.shelf-view-inline,.boardModeSwitch,.view-switch,.bgDrop)>button::before,
+.lt-screen-toolbar .lt-toolbar-more::before{content:'';position:absolute;left:0;right:0;top:-9px;bottom:0}
+/* 묶음·도구 줄의 가장자리가 늘어난 누름 영역을 자르지 않게 위쪽 9px 여유를 둔다(보이는 모양은 그대로). */
+.lt-screen-toolbar .lt-toolbar-tools{padding-top:9px;margin-top:-9px}
+.lt-screen-toolbar .lt-toolbar-tools :is(.view-toggle,.shelf-view-inline,.boardModeSwitch,.view-switch){overflow:clip;overflow-clip-margin:9px}
+/* #1489(#1497 1번): 넓은 화면에서도 도구 줄 트리 고르기 칸에 최대 폭을 두고 긴 이름은 줄임표로 끝낸다. */
+@media(min-width:601px){.lt-toolbar-tree-choice{max-width:min(360px,calc(100vw - 200px))}}

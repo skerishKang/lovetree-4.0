@@ -3390,6 +3390,110 @@ test('#1026 서재·책·보드 390 첫 진입 CLS 0.01 이하', { skip: REQUIRE
   }
 });
 
+// #1489(#1452·#1497 1번): 도구 줄 — 다섯 화면 위끝 같음(트리만 4px 위였다), 단추 누름 영역 44px 이상, 긴 트리 이름이 칸 밖으로 넘치지 않음,
+// 고른 트리 고르기의 올림 테두리. 서재·트리·보드·책·지도 × 390·1440 × 밤·정원, 가짜 기록·응답 대체만 쓴다.
+test('#1489 도구 줄: 다섯 화면 위끝 차 0px·누름 44px 이상·긴 이름 칸 안·고른 상태 올림 테두리', { skip: REQUIRE ? false : skip, timeout: 300000 }, async () => {
+  if (skip) assert.fail(skip);
+  const server = await serve();
+  const browser = await chromium.launch({ headless: true });
+  const base = 'http://127.0.0.1:' + server.address().port;
+  const LONG = '아주아주아주 길어서 도구 줄 칸과 목록 칸에 다 들어가지 않는 러브트리 이름 시험 열두 글자 더 더 더';
+  const make = (title) => {
+    let tree = createTree({ subject: title, title, date: '2026-11-01', emotion: '설렘', note: '시험 기록', url: 'https://youtu.be/dQw4w9WgXcQ' }, '2026-11-01T00:00:00.000Z');
+    for (let i = 1; i < 4; i++) tree = addMoment(tree, { title: '순간 ' + i, note: '메모', emotion: '기쁨', date: '2026-11-0' + (i + 1), url: 'https://youtu.be/dQw4w9WgXcQ' }, tree.moments[0].id, '2026-11-0' + (i + 1) + 'T00:00:00.000Z');
+    return tree;
+  };
+  const workspace = { revision: 1, state: { version: 1, trees: [make(LONG), make('봄날의 기억'), make('짧은 이름')], prefs: {} }, subject: 'qa-fake', writeSubjectBound: true, savedAt: '2026-11-23T00:00:00.000Z' };
+  try {
+    for (const width of [1440, 390]) for (const theme of ['night', 'garden']) {
+      const ctx = await browser.newContext({ viewport: { width, height: width === 390 ? 844 : 900 }, reducedMotion: 'reduce' });
+      await ctx.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); localStorage.setItem('lt41.discoverAsked', JSON.stringify(['x'])); } catch {} }, theme);
+      await ctx.route('**/api/**', async (route) => {
+        const p = new URL(route.request().url()).pathname;
+        if (p === '/api/workspace') return route.fulfill({ status: 200, json: route.request().method() === 'PUT' ? { ok: true, revision: 2 } : workspace });
+        if (p === '/api/account') return route.fulfill({ status: 200, json: { ok: true, email: 'qa@example.invalid', subject: workspace.subject } });
+        if (/\/discover$/.test(p)) return route.fulfill({ status: 200, json: { ok: true, discover: true } });
+        return route.fulfill({ status: 200, json: { ok: true, items: [] } });
+      });
+      const page = await ctx.newPage();
+      const tops = {};
+      let pressedSeen = 0;
+      for (const screen of ['shelf', 'tree', 'board', 'book', 'network']) {
+        const tag = width + '·' + theme + '·' + screen;
+        await page.goto(base + '/v41/?account=1#my/' + screen, { waitUntil: 'load' });
+        await page.waitForSelector('iframe#view', { timeout: 15000 });
+        await page.waitForTimeout(2500);
+        const frame = page.frames().find((f) => f !== page.mainFrame() && f.url().includes('track'));
+        const offset = (await page.locator('iframe#view').boundingBox()).y;
+        const value = await frame.evaluate(() => {
+          const bar = document.querySelector('.lt-screen-toolbar');
+          const barRect = bar.getBoundingClientRect();
+          const buttons = [...bar.querySelectorAll('button')].filter((b) => { const r = b.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(b).visibility !== 'hidden'; });
+          const hit = buttons.map((b) => {
+            const r = b.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+            const on = (y) => { const e = document.elementFromPoint(cx, y); return !!e && (e === b || b.contains(e)); };
+            let up = 0, down = 0;
+            for (let d = 1; d <= 30 && on(cy - d); d++) up = d;
+            for (let d = 1; d <= 30 && on(cy + d); d++) down = d;
+            return { name: (b.id || b.className || b.tagName) + ':' + (b.textContent || '').trim().slice(0, 6), px: up + down + 1 };
+          });
+          const choice = bar.querySelector('.lt-toolbar-tree-choice');
+          const name = bar.querySelector('.lt-toolbar-tree-name');
+          const cr = choice && choice.getBoundingClientRect();
+          return { top: barRect.top, hit, choiceRight: cr && cr.right, barRight: barRect.right, nameText: name ? name.textContent : '',
+            pressed: choice && choice.getAttribute('aria-pressed'), overflowX: document.documentElement.scrollWidth - document.documentElement.clientWidth };
+        });
+        tops[screen] = value.top + offset;
+        assert.ok(value.hit.length > 0, tag + ': 도구 줄 단추가 없다');
+        for (const h of value.hit) assert.ok(h.px >= 44, tag + ' 누름 영역 ' + h.px + 'px < 44px: ' + h.name);
+        assert.ok(value.choiceRight <= value.barRight + 0.5, tag + ' 트리 고르기가 도구 줄 밖으로 넘친다');
+        assert.ok(value.choiceRight - 0 <= (width === 390 ? 260 : 390), tag + ' 긴 이름이 트리 고르기 칸을 넓힌다: 오른쪽 끝 ' + value.choiceRight);
+        assert.equal(value.overflowX, 0, tag + ' 가로 넘침');
+        // 고른 상태(aria-pressed=true)의 올림 테두리 — 마우스를 올리면 테두리 색이 바뀐다.
+        if (value.pressed === 'true' && await frame.locator('button.lt-toolbar-tree-choice').isEnabled()) {
+          const pick = frame.locator('button.lt-toolbar-tree-choice');
+          await page.mouse.move(2, 400);
+          await page.waitForTimeout(300);
+          const idle = await pick.evaluate((b) => getComputedStyle(b).boxShadow);
+          await pick.hover();
+          await page.waitForTimeout(300);
+          const over = await pick.evaluate((b) => { const s = getComputedStyle(b); const probe = document.createElement('i'); probe.style.borderColor = 'var(--lt-role-hover-border)'; probe.style.borderStyle = 'solid'; document.body.append(probe); const want = getComputedStyle(probe).borderColor; probe.remove(); return { border: s.borderColor, shadow: s.boxShadow, want }; });
+          assert.equal(idle, 'none', tag + ' 올리지 않았는데 고리가 있다: ' + idle);
+          assert.ok(over.shadow !== 'none' && over.shadow.includes(over.want), tag + ' 고른 트리 고르기에 마우스를 올려도 올림 테두리(고리)가 안 보인다: ' + over.shadow);
+          pressedSeen++;
+        }
+      }
+      const list = Object.values(tops);
+      assert.equal(Math.max(...list) - Math.min(...list), 0, width + '·' + theme + ' 다섯 화면 도구 줄 위끝이 다르다: ' + JSON.stringify(tops));
+      assert.ok(pressedSeen > 0, width + '·' + theme + ' 고른 상태 트리 고르기를 한 번도 못 봤다');
+      // 서재: 트리 고르기 목록 — 긴 이름은 줄임표, 순간 수·✓는 목록 칸 안에 보인다.
+      await page.goto(base + '/v41/?account=1#my/shelf', { waitUntil: 'load' });
+      await page.waitForSelector('iframe#view', { timeout: 15000 });
+      await page.waitForTimeout(2500);
+      await clickToolbarTreeChoice(page);
+      await page.waitForSelector('.tree-popover.lt-toolbar-picker:not([hidden]) .tree-item[data-tree-id]', { timeout: 10000 });
+      const picker = await page.evaluate(() => {
+        const pop = document.querySelector('.tree-popover.lt-toolbar-picker'); const pr = pop.getBoundingClientRect();
+        return [...pop.querySelectorAll('.tree-item[data-tree-id]')].map((item) => {
+          const ir = item.getBoundingClientRect(); const count = item.querySelector('.tree-count').getBoundingClientRect(); const check = item.querySelector('.tree-check');
+          const cr = check && check.getBoundingClientRect();
+          return { itemOut: ir.right - pr.right, countIn: count.width > 0 && count.left >= pr.left && count.right <= pr.right + 0.5, checkIn: !cr || (cr.right <= pr.right + 0.5), ellipsis: getComputedStyle(item.querySelector('.tree-name')).textOverflow };
+        });
+      });
+      assert.ok(picker.length >= 3, width + '·' + theme + ' 목록에 트리가 ' + picker.length + '개뿐');
+      for (const row of picker) {
+        assert.ok(row.itemOut <= 0.5, width + '·' + theme + ' 목록 줄이 칸 밖으로 ' + row.itemOut + 'px 넘친다');
+        assert.ok(row.countIn && row.checkIn, width + '·' + theme + ' 순간 수·✓가 목록 칸 안에 안 보인다');
+        assert.equal(row.ellipsis, 'ellipsis');
+      }
+      await ctx.close();
+    }
+  } finally {
+    await browser.close();
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
 // #1084: 로그인 첫 화면의 세로 쇼츠는 미디어 칸 양쪽에 원본 썸네일의 회색 여백을 남기면 안 된다.
 // 화면 전체 PNG의 실제 픽셀도 검사한다. 화면 크기와 대기 시간은 공통 시험 기준을 그대로 쓴다.
 test('#1084 세로 영상 첫 화면의 미디어 칸에는 회색 여백이 없다(정원·밤, 390·1440, 재생 전후)', {skip: REQUIRE ? false : skip, timeout: 90000}, async () => {

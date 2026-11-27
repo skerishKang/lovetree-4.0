@@ -1408,7 +1408,10 @@ body>.tree-popover.lt-toolbar-picker{position:fixed;top:var(--lt-picker-top);lef
 body>.tree-popover.lt-toolbar-picker[hidden]{display:none}
 .lt-toolbar-picker .lt-tree-picker-heading{display:flex;justify-content:space-between;align-items:center;padding:4px 8px}
 .lt-toolbar-picker .lt-tree-picker-heading button{min-width:44px;min-height:44px;background:var(--lt-role-idle-bg);color:var(--lt-role-idle-ink);border:1px solid var(--lt-role-idle-border);border-radius:var(--lt-r-pill)}
-.lt-toolbar-picker .tree-list{flex:1 1 auto;min-height:0;max-height:none;overflow:auto;align-content:start;grid-auto-rows:min-content}
+/* #1489(#1497 1번): 긴 이름이 칸을 넓히지 않게 한 칸을 칸 폭으로 고정하고, 이름만 줄여 순간 수·✓가 항상 보이게 한다. */
+.lt-toolbar-picker .tree-list{flex:1 1 auto;min-height:0;max-height:none;overflow:auto;align-content:start;grid-auto-rows:min-content;grid-template-columns:minmax(0,1fr)}
+.lt-toolbar-picker .tree-item{min-width:0}
+.lt-toolbar-picker .tree-item .tree-count,.lt-toolbar-picker .tree-item .tree-check{flex:none}
 .lt-toolbar-picker .tree-foot{flex:0 0 auto;overflow:auto;max-height:32dvh}
 .lt-toolbar-picker .tree-item{color:var(--lt-role-text-strong);background:var(--lt-role-bg)}
 .lt-toolbar-picker .tree-item[aria-checked=true]{background:var(--lt-role-accent-bg);color:var(--lt-role-accent-ink)}
