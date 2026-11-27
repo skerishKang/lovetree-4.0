@@ -10,7 +10,7 @@ import {createHomeActions} from './home-actions.js';
 import {homePresentation} from './home-presentation.js';
 import {readHomeTitleHint} from '../public/v41/home-title-state.mjs';
 import {applyHomeCenter} from './home-center.js';
-import {readTheme,writeTheme,appliedTheme,applyThemeAttribute} from '../public/v41/header-state.mjs';
+import {readTheme,writeTheme,appliedTheme,applyThemeAttribute,paintPolicyLinks} from '../public/v41/header-state.mjs';
 import {readTitleDisplay, titleDisplayOf, shouldReloadForTitleDisplay, formatDisplayDate, titleView} from '../public/v41/book-usability.mjs';
 import {localDateOnly} from '../public/v41/local-date.mjs';
 import {momentListEntries, momentListTrees, momentHeadTitle} from './moment-list.js';
@@ -22,7 +22,7 @@ import {shareUrlFor,SHARE_COPY_FAILURE} from '../public/v41/share-link.mjs';
 // 261116 PR 2: 카드 모드(마지막·고정·그날·무작위·트리)·숫자 줄이기 — 순수 계산 한 벌.
 import {HOME_MOMENT_KEY, readHomeMoment, normalizeHomeMoment, homeMomentPick, homeDayMoment, homeMomentMenu, formatCount} from './home-card-mode.js';
 const themeHost=document.getElementById('orbit');
-function syncTheme(theme){applyThemeAttribute(themeHost,appliedTheme(theme,'home'));}
+function syncTheme(theme){applyThemeAttribute(themeHost,appliedTheme(theme,'home'));paintPolicyLinks(themeHost?.shadowRoot,theme);}
 function applyTheme(theme){applyThemeAttribute(document.documentElement,appliedTheme(theme,'home'));syncTheme(theme);}
 applyTheme(readTheme(localStorage));
 const shellBody=parent.document.body;
@@ -311,6 +311,7 @@ guideDialog.id='guidePanel';
 guideDialog.setAttribute('aria-label','어떻게 쓰나요');
 /* 단추는 오른쪽 아래로 모으고(justify-content:flex-end), 주 단추('첫 순간 추가')를 오른쪽 끝에 둔다 — 탭 순서도 보이는 순서와 같게 DOM 순서를 바꾼다. */
 guideDialog.innerHTML=`<button class="close" data-do="guide-close" aria-label="안내 닫기">닫기 ×</button><div class="guide-body"><h2 tabindex="-1">어떻게 쓰나요</h2><ol class="guide-list"><li>좋아하는 영상 링크를 붙여 넣으면 순간이 바로 담겨요</li><li>순간들은 트리로 묶여요(그룹·주제별로 여러 개)</li><li>책·보드·지도로 내 기록을 다시 봐요</li><li>순간이 3개 이상이면 둘러보기에서 다른 팬도 볼 수 있어요(이름·아이디는 보이지 않아요)</li></ol><div class="detail-buttons"><button data-do="guide-community">둘러보기</button><button class="primary-cta" data-do="guide-new">첫 순간 추가</button></div><div class="guide-policy"><a href="https://auth.padiem.net/privacy#lovetree" target="_blank" rel="noopener">개인정보 처리방침</a><a href="https://auth.padiem.net/terms" target="_blank" rel="noopener">이용약관</a></div></div></div>`;
+paintPolicyLinks(guideDialog,readTheme(localStorage));
 shadow.append(guideDialog);
 const guideStyle=document.createElement('style');
 guideStyle.textContent=`#guidePanel{word-break:keep-all}#guidePanel .guide-body{padding:42px;max-width:620px;margin:0 auto}#guidePanel h2{margin:0 0 18px;font-size:26px;outline:none;width:fit-content;max-width:100%}/* #662: 제목 상자가 창 폭을 통째로 차지해 닫기 단추 영역과 포개졌다 — 글자 폭만큼만. */.guide-list{margin:0;padding:0;list-style:none;counter-reset:guide;display:grid;gap:12px}.guide-list li{counter-increment:guide;display:flex;gap:12px;align-items:baseline;font-size:15px;line-height:1.7;color:#d9d2e2}.guide-list li::before{content:counter(guide);flex:0 0 auto;min-width:26px;min-height:26px;display:inline-grid;place-items:center;border:1px solid #615364;border-radius:50%;color:#e8b8c9;font-size:12px}#guidePanel .detail-buttons{margin-top:24px;justify-content:flex-end}/* 처리방침·약관 링크(2026-11-16): 단추 줄 아래 작은 글씨, 새 창. 누름 영역 44px. */#guidePanel .guide-policy{margin-top:18px;display:flex;gap:16px;justify-content:center}#guidePanel .guide-policy a{min-height:44px;display:inline-flex;align-items:center;font-size:14px;letter-spacing:.04em;color:#a99fb5;text-decoration:underline;text-underline-offset:3px}:host([data-lt-theme=garden]) #guidePanel .guide-policy a{color:var(--lt-muted)}:host([data-lt-theme=garden]) #guidePanel{background:var(--lt-paper);color:var(--lt-ink);border-color:var(--lt-line)}:host([data-lt-theme=garden]) #guidePanel h2{color:var(--lt-ink)}:host([data-lt-theme=garden]) .guide-list li{color:var(--lt-muted)}:host([data-lt-theme=garden]) .guide-list li::before{border-color:var(--lt-gold-line);color:var(--lt-gold-ink)}:host([data-lt-theme=garden]) #guidePanel .detail-buttons button{background:var(--lt-paper);color:var(--lt-ink);border-color:var(--lt-line)}:host([data-lt-theme=garden]) #guidePanel .primary-cta{background:var(--lt-primary);color:var(--lt-primary-ink);border-color:var(--lt-primary)}:host([data-lt-theme=garden]) #guidePanel .close{background:var(--lt-paper);color:var(--lt-ink);border-color:var(--lt-line)}`;
