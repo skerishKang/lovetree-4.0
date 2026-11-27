@@ -86,9 +86,9 @@ function touchHost(path,tree){
 
 async function hitMeasurement(frame,selector,expectedHeight){
  return frame.locator(selector).evaluate((el,{selector,expectedHeight})=>{
-  const r=el.getBoundingClientRect(),after=getComputedStyle(el,'::after');
+  const r=el.getBoundingClientRect(),before=getComputedStyle(el,'::before'),after=getComputedStyle(el,'::after');
   const px=v=>v&&v!=='auto'?parseFloat(v):0;
-  const top=px(after.top),right=px(after.right),bottom=px(after.bottom),left=px(after.left);
+  const top=Math.min(px(before.top),px(after.top)),right=Math.min(px(before.right),px(after.right)),bottom=Math.min(px(before.bottom),px(after.bottom)),left=Math.min(px(before.left),px(after.left));
   const hit={left:r.left+left,right:r.right-right,top:r.top+top,bottom:r.bottom-bottom};
   const own=(x,y)=>{const node=el.getRootNode().elementFromPoint(x,y);return node===el||el.contains(node)};
   const cx=(hit.left+hit.right)/2,cy=(hit.top+hit.bottom)/2;
