@@ -302,7 +302,10 @@ export function applyThumbOutcome(img, outcome = {}) {
   const recent = mode === 'recent-video' ? img.closest?.('.recent-media') : null;
   if (step.status === 'ok') {
     if (img.dataset) img.dataset.ltThumbState = 'ok';
-    if (recent && recent.dataset.recentState !== 'failed') recent.dataset.recentState = 'ready';
+    if (recent) {
+      recent.dataset.recentState = 'ready';
+      if (recent.classList?.contains('vertical')) recent.style.setProperty('--lt-recent-bg', `url(${JSON.stringify(step.src)})`);
+    }
     return step;
   }
   if (step.status === 'retry') {
