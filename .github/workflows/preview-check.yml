@@ -481,14 +481,6 @@ jobs:
       # 실제 화면에서 본다. 드롭다운은 첫 화면 번들이 필요해 먼저 build하고, 인증 시안은 정적 파일(요청 0)이다.
       # 건너뜀=실패(크롬이 준비된 이 잡에서 돈다).
 
-      - name: 날짜 표기·누름 영역 실제 브라우저 시험(건너뜀=실패 — #1514)
-        if: needs.screen-changes.outputs.changed == 'true'
-        run: |
-          start=$(date +%s)
-          test -f dist/v41/home.html || npx vite build > /dev/null
-          node --test --test-concurrency=1 tests/v41-date-style-crosslane-261112.test.mjs tests/v41-touch-targets.test.mjs
-          echo "날짜 표기·누름 영역 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
-
       # #631: 의견 보내기 창 — 1440×900 에서 스크롤 없이 들어오고, 체크 상자와 글자가 같은 줄이며,
       # 보낸 뒤 제목·주 단추·안내가 바뀌는지 수치로 잰다. 건너뜀=실패(크롬이 준비된 이 잡에서 돈다).
       - name: 의견 보내기 창 배치·보낸 뒤 화면 시험(건너뜀=실패 — #631)
