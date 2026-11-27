@@ -34,7 +34,7 @@ if [[ ${LOVETREE_DEPLOY_LOCK_HELD:-0} != 1 ]]; then
   flock -w 300 9 || fail DEPLOY_LOCKED
 fi
 [[ ${EUID} -eq 0 ]] || fail ROOT_REQUIRED
-[[ -f "$source_root/server/index.js" && -f "$source_root/src/domain.js" && -f "$source_root/public/v41/tags.mjs" && -f "$source_root/public/v41/youtube-id.mjs" && -f "$source_root/package-lock.json" ]] || fail SOURCE_MISSING
+[[ -f "$source_root/server/index.js" && -f "$source_root/src/domain.js" && -f "$source_root/public/v41/tags.mjs" && -f "$source_root/public/v41/public-thumbnail.mjs" && -f "$source_root/public/v41/youtube-id.mjs" && -f "$source_root/package-lock.json" ]] || fail SOURCE_MISSING
 [[ -x "$node_bin" ]] || fail NODE_MISSING
 "$node_bin" -e 'const[m,i]=process.versions.node.split(".").map(Number);process.exit(m>22||(m===22&&i>=13)?0:1)' || fail NODE_TOO_OLD
 command -v npm >/dev/null || fail NPM_MISSING
@@ -63,6 +63,7 @@ fi
 # 새 소스에서 .js가 빠지면 install-preflight의 import 그래프 시험이 잡는다.
 install -d -m 0755 "$app/public/v41"
 install -m 0644 "$source_root/public/v41/tags.mjs" "$app/public/v41/tags.mjs"
+install -m 0644 "$source_root/public/v41/public-thumbnail.mjs" "$app/public/v41/public-thumbnail.mjs"
 # 트리별 열 화면을 읽는 src/domain.js와 함께 설치한다. 이전 소스로 되돌릴 때는 이 모듈이 없다.
 if [[ -f "$source_root/public/v41/tree-open-view.mjs" ]]; then
   install -m 0644 "$source_root/public/v41/tree-open-view.mjs" "$app/public/v41/tree-open-view.mjs"
