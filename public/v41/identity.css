@@ -582,3 +582,7 @@ html[data-lt-theme=garden] select{color-scheme:light}
 .lt-bg-item[aria-checked="true"]::before{content:"✓";font-size:11px}
 html[data-lt-theme=garden] .lt-bg-item:hover,html[data-lt-theme=garden] .lt-bg-item:focus-visible{background:rgba(75,51,42,.08)}
 .bgDrop{position:relative;display:inline-flex}
+
+/* #1535: visible even when the entry module cannot mount. */
+#lt-deploy-recovery{position:fixed;inset:0;z-index:9999;display:grid;place-items:center;background:var(--lt-bg,#000)}
+#lt-deploy-recovery button{min-height:44px;padding:12px 20px;font:inherit;color:inherit;background:var(--lt-panel,transparent);border:1px solid currentColor;border-radius:8px;cursor:pointer}
