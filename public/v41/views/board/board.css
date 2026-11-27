@@ -12,7 +12,8 @@ html[data-v41-screen=board]{
   html[data-v41-screen=board] .detail,
   html[data-v41-screen=board] .leftPanel{top:calc(var(--lt-toolbar-top) + var(--lt-toolbar-height) + 8px)}
 }
-html[data-v41-screen=board] .boardEmptyGuide{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:5;color:var(--muted);font-size:13px;white-space:nowrap;pointer-events:none}
+html[data-v41-screen=board] .boardEmptyGuide{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:5;display:flex;flex-direction:column;align-items:center;gap:14px;max-width:calc(100% - 32px);color:var(--muted);font-size:13px;line-height:1.6;text-align:center;pointer-events:none}
+html[data-v41-screen=board] .boardEmptyAdd{min-height:44px;padding:0 18px;border:1px solid var(--lt-gold-line);border-radius:999px;background:var(--lt-glass-strong);color:var(--lt-pearl);font:600 14px/1.2 var(--lt-ui);cursor:pointer;pointer-events:auto}
 html[data-v41-screen=board][data-lt-theme=garden] .boardEmptyGuide{color:var(--lt-muted)}
 html[data-v41-screen=board] .boardTitle{top:calc(var(--lt-toolbar-top) + var(--lt-toolbar-height) + 8px)}
 @media(max-width:700px){
@@ -104,7 +105,7 @@ body[data-theme="night"] .boardTitle,body[data-theme="night"] .card{color:#e9ecf
 .detail{width:350px}.detail .keywordRow{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px}.chip{display:inline-flex;align-items:center;gap:4px;padding:5px 8px;border-radius:99px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.09);font-size:9px;color:#d9cadf}.chip.on{background:rgba(255,92,158,.15);border-color:rgba(255,116,179,.35)}
 #addModal .modal{width:min(900px,calc(100vw - 30px));display:grid;grid-template-columns:minmax(0,1.15fr) minmax(260px,.85fr);column-gap:18px;align-items:start}#addModal .modal>*{grid-column:1}#addModal .modal>#composerPreviewWrap{grid-column:2}#composerPreviewWrap{grid-row:1/20;padding:16px;border-radius:19px;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.09);position:sticky;top:0}.previewCard{min-height:310px;border-radius:18px;background:linear-gradient(145deg,#fff,#f6edf4);color:#2b2131;padding:13px;box-shadow:0 20px 45px rgba(0,0,0,.22);position:relative}.previewMedia{height:150px;border-radius:13px;overflow:hidden;background:#191322;display:grid;place-items:center;color:#c9b8d0;font-size:11px}.previewMedia img,.previewMedia video{width:100%;height:100%;object-fit:cover}.previewPin{position:absolute;left:50%;top:-12px;width:28px;height:28px;border-radius:50%;transform:translateX(-50%);background:radial-gradient(circle at 36% 30%,#fff 0 14%,#ffe6f1 17%,#ff71a8 55%,#8d5680 78%);box-shadow:0 0 22px rgba(255,88,154,.4)}
 .extraFields{display:grid;grid-template-columns:1fr 1fr;gap:8px}.keywordPicker{margin-top:10px;display:flex;flex-wrap:wrap;gap:5px}.keywordBtn{border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);color:#d7c6de;border-radius:99px;padding:5px 8px;font-size:9px}.keywordBtn.on{background:rgba(255,96,158,.18);border-color:rgba(255,110,170,.45)}
-#editModal .modal{width:min(920px,calc(100vw - 28px));display:grid;grid-template-columns:minmax(0,1.25fr) minmax(280px,.75fr);gap:18px}#editFields{grid-column:1}#editPreview{grid-column:2;grid-row:1/4}.editorTop{grid-column:1/3}.editActions{grid-column:1/3;display:flex;justify-content:flex-end;gap:8px}.selectField{appearance:auto}
+.selectField{appearance:auto}
 .postAdd{position:absolute;z-index:78;left:50%;bottom:88px;transform:translate(-50%,20px);opacity:0;pointer-events:none;min-width:520px;max-width:calc(100vw - 30px);padding:14px;border-radius:18px;background:rgba(22,12,31,.94);border:1px solid rgba(255,255,255,.12);backdrop-filter:blur(20px);box-shadow:0 22px 50px rgba(0,0,0,.38);transition:.3s}.postAdd.show{opacity:1;transform:translate(-50%,0);pointer-events:auto}.postAdd strong{font-size:13px}.postAdd .ctaRow{margin-top:10px}
 .nextChooser{position:absolute;z-index:85;right:382px;top:130px;width:290px;padding:14px;border-radius:18px;background:rgba(21,12,29,.96);border:1px solid rgba(255,255,255,.12);box-shadow:0 22px 50px rgba(0,0,0,.35);display:none}.nextChooser.open{display:block}.routeChoice{width:100%;text-align:left;padding:10px;margin-top:7px;border-radius:11px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.05);color:#eee}.routeChoice small{display:block;color:#a997b0;margin-top:5px;line-height:1.35}
 /* #553 뒤: 따라오는 금색 커서 동그라미를 없애고 원래 마우스 커서를 쓴다. 끌기·연결 같은 상태는
@@ -159,13 +160,17 @@ body.lt-bloom-glow .threadGlow{opacity:.82}
 .labelSpaced{margin-top:12px}
 #removePhoto{margin-top:7px}
 #formArea .mediaFieldNote{font-size:10px;color:#9b89a5;margin-top:6px}
-#editFields .editMediaNote{font-size:10px;color:#a995b1;margin:5px 0}
-#editFields .editMetaNote{font-size:10px;color:#94829e;margin-top:10px}
 #styleSection .ctaRow{margin-top:8px}/* #504: 눌린 판은 aria-pressed로 알리고 같은 모양을 유지한다 */
 
 /* #1249: 한 열로 배치하는 휴대폰에서는 카드 경계를 곧게 유지한다. */
 @media(max-width:699px){
   html[data-v41-screen=board] .card:not(.dragLift):not(.dropSettle):not(.landing){transform:none}
+  html[data-v41-screen=board] .surface{left:0;right:0}
+  html[data-v41-screen=board] .card{width:160px;min-height:180px}
+  html[data-v41-screen=board] .card.first{width:160px;min-height:180px}
+  html[data-v41-screen=board] .card.isFeatured{width:264px;min-height:260px}
+  html[data-v41-screen=board] .card:not(.first) .cardBody{padding:0 10px 10px}
+  html[data-v41-screen=board] .card:not(.first) .noteText{padding:34px 12px 14px;font-size:15px;line-height:1.5;max-height:110px;overflow:hidden}
 }
 
 /* #1249: 휴대폰 판은 실제 세로 스크롤 범위 안에 모든 카드를 둔다. */

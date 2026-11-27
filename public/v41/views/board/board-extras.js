@@ -315,7 +315,9 @@ function bindCardV11(el) {
     }
     let p = screenToWorld(e.clientX, e.clientY),
       m = moments.find(x => x.id === id);
-    m.x = Math.max(70, Math.min(1320, p.x - drag.dx));
+    const minX = innerWidth < 700 ? 8 : 70;
+    const maxX = innerWidth < 700 ? Math.max(minX, innerWidth - (el.offsetWidth || 160)) : 1320;
+    m.x = Math.max(minX, Math.min(maxX, p.x - drag.dx));
     m.y = Math.max(120, Math.min(760, p.y - drag.dy));
     el.style.left = m.x + 'px';
     el.style.top = m.y + 'px';
@@ -586,11 +588,7 @@ function restoreBoardState(state) {
   if (!state?.lt58Board) return;
   restoringBoardPanel = true;
   if (cinemaV11.active) endCinemaV11(false);
-  $('#viewerModal').classList.remove('open');
-  $('#viewerMedia video')?.pause();
-  // #1298: 뒤로 가기로 닫을 때도 숨은 미디어를 지운다 — 소리와 스크롤 자취가 남지 않게.
-  $('#viewerMedia').replaceChildren();
-  $('#editModal').classList.remove('open');
+  LTMedia.closeLightbox();
   $('#addModal').classList.remove('open');
   $('#nextChooser').classList.remove('open');
   $('#leftPanel').classList.remove('mobileOpen');
@@ -663,6 +661,8 @@ if (editBtn) editBtn.id = 'editMomentBtn';
 /* #315: 공유 감상은 쓰기·편집 도구(순간 추가·되돌리기·수정)를 렌더하지 않는다. */
 if (LTDEMO.readOnly) {
   if (editBtn) editBtn.hidden = true;
+  const deleteBtn = document.getElementById('deleteMomentBtn');
+  if (deleteBtn) deleteBtn.hidden = true;
   for (const id of ['addBtn', 'undoBtn']) {
     const b = document.getElementById(id);
     if (b) b.hidden = true;
@@ -1043,143 +1043,6 @@ function addMomentV11(m, parent) {
   toast(parent ? '순간이 추가되었어요. 방금 선택한 순간과 이어졌어요.' : '순간이 추가되었어요.');
 }
 
-function editMediaFields(m) {
-  if (m.type === 'photo')
-    return `<div class="label">PHOTO</div><div class="editMediaNote">기존 이미지 미리보기 · 교체하거나 기본 상태로 복귀할 수 있어요.</div><input class="field" id="editMediaFile" type="file" accept="image/*" aria-label="바꿀 그림 파일 고르기"><button type="button" class="miniBtn" id="removePhoto">이미지 제거</button>`;
-  if (m.type === 'video')
-    return `<div class="label">VIDEO</div><input class="field" id="editMediaFile" type="file" accept="video/*" aria-label="바꿀 영상 파일 고르기">`;
-  if (m.type === 'link' || m.type === 'youtube')
-    return `<div class="label">${m.type === 'youtube' ? 'VIDEO LINK / YOUTUBE' : 'LINK'}</div><input class="field" id="editUrl" value="${esc(m.url || '')}" aria-label="바꿀 링크 주소">`;
-  return `<div class="label">마음 한마디</div><textarea class="field" id="editNoteBody" rows="4" aria-label="마음 한마디">${esc(m.memo)}</textarea>`;
-}
-let editBase = null,
-  editTempAsset = null,
-  removePhotoFlag = false;
-function openEdit() {
-  if (LTDEMO.readOnly) return;
-  /* #315: 공유 감상은 편집하지 않는다 */ let m = moments.find(x => x.id === selected);
-  if (!m) return;
-  editBase = JSON.parse(JSON.stringify(m));
-  removePhotoFlag = false;
-  let f = $('#editFields');
-  f.innerHTML = `${editMediaFields(m)}<input class="field" id="editTitle" value="${esc(m.title)}" aria-label="순간 제목"><textarea class="field" id="editMemo" rows="3" aria-label="마음 한마디">${esc(m.memo)}</textarea>${styleFieldsHTML('edit', m)}<div class="editMetaNote">날짜 · ${esc(m.date)} &nbsp; 공개 범위 · ${esc(m.privacy || '비공개')}</div>`;
-  bindKeywordPicker('edit', updateEditPreview);
-  f.querySelectorAll('input,textarea,select').forEach(x =>
-    x.addEventListener('input', updateEditPreview)
-  );
-  $('#editMediaFile')?.addEventListener('change', updateEditPreview);
-  $('#editUrl')?.addEventListener('input', updateEditPreview);
-  $('#removePhoto')?.addEventListener('click', () => {
-    removePhotoFlag = true;
-    updateEditPreview();
-  });
-  $('#editModal').classList.add('open');
-  updateEditPreview();
-}
-function editPreviewState() {
-  let m = moments.find(x => x.id === selected),
-    type = m.type,
-    asset = m.asset,
-    video = m.video,
-    url = $('#editUrl')?.value ?? m.url;
-  let file = $('#editMediaFile')?.files?.[0];
-  if (file) {
-    editTempAsset = URL.createObjectURL(file);
-    asset = editTempAsset;
-    if (type === 'video') video = editTempAsset;
-  }
-  if (removePhotoFlag && type === 'photo') asset = ASSET.note;
-  if (type === 'youtube') asset = youtubeThumb(url || '');
-  return {
-    ...m,
-    title: $('#editTitle')?.value || m.title,
-    memo: $('#editNoteBody')?.value || $('#editMemo')?.value || m.memo,
-    emotion: $('#editEmotion')?.value || m.emotion,
-    source: $('#editSource')?.value || m.source,
-    pinStyle: $('#editPinStyle')?.value || m.pinStyle,
-    cardStyle: $('#editCardStyle')?.value || m.cardStyle,
-    keywords: selectedKeywords('edit'),
-    asset,
-    video,
-    url,
-    thumbnailUrl: type === 'youtube' ? youtubeThumbUrl(url || '') : m.thumbnailUrl || ''
-  };
-}
-function updateEditPreview() {
-  let m = editPreviewState(),
-    media =
-      m.type === 'note'
-        ? `<div class="previewMedia previewNote">“${esc(m.memo)}”</div>`
-        : m.type === 'video'
-          ? `<div class="previewMedia"><video src="${m.video || ''}" poster="${m.asset}" muted playsinline controls></video></div>`
-          : `<div class="previewMedia"><img src="${m.asset}" alt="${esc(m.title)} 바꿀 그림 미리보기" data-fallback="${ASSET.link}" ${thumbRetryAttrs(m)}></div>`;
-  $('#editPreview').innerHTML =
-    `<div class="label">LIVE PREVIEW</div><div class="previewCard"><span class="previewPin"></span>${media}<div class="previewTypeRow">${esc(LTLabels.type(m.originalType || m.type))} · ${esc(m.emotion)}</div><h3 class="previewTitle">${esc(m.title)}</h3><div class="previewMemo">${esc(m.memo)}</div></div>`;
-}
-function saveEdit() {
-  if (LTDEMO.readOnly) return;
-  /* #315: 공유 감상은 저장하지 않는다 */ let m = moments.find(x => x.id === selected),
-    n = editPreviewState();
-  snapshot();
-  Object.assign(m, n);
-  if (m.type === 'video' && editTempAsset) m.video = editTempAsset;
-  if (m.type === 'link' || m.type === 'youtube') m.url = n.url;
-  $('#editModal').classList.remove('open');
-  renderCards();
-  renderThreads();
-  updateKeywordFilter();
-  selectMoment(m.id, true);
-  persistBoard();
-  toast('순간 편집을 저장했어요. Connection과 provenance는 유지됩니다.');
-}
-$('#editMomentBtn').onclick = openEdit;
-$('#editCancel').onclick = () => $('#editModal').classList.remove('open');
-$('#editRevert').onclick = () => {
-  if (!editBase) return;
-  let m = moments.find(x => x.id === selected);
-  Object.assign(m, JSON.parse(JSON.stringify(editBase)));
-  openEdit();
-  toast('편집 입력을 원래 값으로 되돌렸어요.');
-};
-$('#editSave').onclick = saveEdit;
-openViewer = function (id) {
-  let m = moments.find(x => x.id === id);
-  if (!m) return;
-  const _vi = titleInfo(m);
-  $('#vTitle').textContent = _vi.main;
-  let box = $('#viewerMedia');
-  if (m.url) box.innerHTML = LTMedia.markup(m.url, m.title, m.mediaMetadata, m.id);
-  else if (m.type === 'video')
-    box.innerHTML = `<video src="${m.video}" poster="${m.asset}" controls autoplay muted playsinline class="viewerFitVideo"></video>`;
-  else if (m.type === 'note') box.innerHTML = `<div class="viewerNoteQuote">“${esc(m.memo)}”</div>`;
-  else
-    box.innerHTML = `<img src="${m.type === 'youtube' ? youtubeThumb(m.url || '') : m.asset}" alt="${esc(_vi.main)}" data-fallback="${ASSET.link}" ${thumbRetryAttrs(m)} class="viewerFitImg">`;
-  $('#vMeta').innerHTML = window.viewerMetaHTML({
-    head: `${esc(LTLabels.type(m.originalType || m.type))} · ${esc(dateText(m.date))} · ${esc(m.emotion)}`,
-    source: esc(m.source),
-    url: m.url ? esc(m.url) : '',
-    keywords: (m.keywords || []).map((keyword) => esc(keyword)),
-    memo: esc(m.memo || ''),
-    mediaTitle: _vi.sub ? esc(_vi.sub) : ''
-  });
-  // #327 2부: 내 기록(서버)의 순간 보기에서 다른 트리로 옮기기. 공유·예시는 숨긴다.
-  if (
-    window.parent !== window &&
-    window.parent.LT41 &&
-    window.parent.LT41.source === 'server' &&
-    !LTDEMO.readOnly
-  ) {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'lt-move-btn';
-    button.textContent = '다른 트리로 옮기기';
-    button.addEventListener('click', () =>
-      parent.postMessage({ type: globalThis.LT41_MSG.move, momentId: m.id }, location.origin)
-    );
-    $('#vMeta').append(button);
-  }
-  $('#viewerModal').classList.add('open');
-};
 headerFade = function (on) {
   document.body.classList.toggle('lt-cinema-fade', on);
   if (on) $('#detail').classList.remove('open');
@@ -1197,6 +1060,7 @@ const cinemaV11 = {
   fromMoment: null
 };
 function makeCinemaBeats(startId = null) {
+  if (!moments.length) return [];
   let path = startId
     ? collectPathFrom(startId).ids
     : replayPath.filter(id => moments.some(m => m.id === id));
@@ -1275,6 +1139,7 @@ function cinemaOverall() {
   return n <= 1 ? 0 : ((cinemaV11.index + cinemaV11.progress) / (n - 1)) * 100;
 }
 function setCinemaPosition(index, progress = 0) {
+  if (!cinemaV11.beats.length) return;
   cinemaV11.index = Math.max(0, Math.min(cinemaV11.beats.length - 1, index));
   cinemaV11.progress = Math.max(0, Math.min(0.999, progress));
   let beat = cinemaV11.beats[cinemaV11.index];
@@ -1301,6 +1166,7 @@ function cinemaTick(now) {
   cinemaV11.raf = requestAnimationFrame(cinemaTick);
 }
 function startCinemaV11(fromIndex = 0, fromMoment = null, record = true) {
+  if (!moments.length) return;
   if (record) pushBoardPanel('cinema');
   if (cinemaV11.active) {
     endCinemaV11(false);
@@ -1408,6 +1274,10 @@ if ($('#addBtn'))
     if (LTDEMO.readOnly) return;
     openAdd();
   };
+$('#boardFirstMoment').onclick = () => {
+  if (LTDEMO.readOnly) return;
+  parent.postMessage({ type: globalThis.LT41_MSG.write, mode: 'add', treeId: LTDEMO.treeId }, location.origin);
+};
 $('#confirmAdd').onclick = () => {
   if (LTDEMO.readOnly) return;
   confirmAdd();
@@ -1425,8 +1295,6 @@ window.__LT58V11 = {
   youtubeId,
   youtubeThumb,
   youtubeThumbUrl,
-  openEdit,
-  saveEdit,
   chooseNext,
   highlightPath,
   startCinema: startCinemaV11,
@@ -1463,10 +1331,11 @@ window.__LT58V11 = {
 
 // #1109: 서버 기록이 다시 도착해도 지금 판과 도구 창은 그대로 두고 카드 자료만 반영한다.
 addEventListener('message', e => {
+  const type = e.data?.type;
   if (
     !globalThis.LT41_isShellMessage?.(e) ||
-    e.data?.type !== globalThis.LT41_MSG.treesSaved ||
-    !e.data.background
+    (type !== globalThis.LT41_MSG.treesSaved && type !== globalThis.LT41_MSG.momentsSaved) ||
+    (type === globalThis.LT41_MSG.treesSaved && !e.data.background)
   )
     return;
   if (!LTDEMO.refresh?.()) return;

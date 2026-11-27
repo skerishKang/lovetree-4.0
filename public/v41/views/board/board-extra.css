@@ -14,24 +14,18 @@
 .videoSourceChoice label:has(input:checked){border-color:rgba(255,102,159,.52);background:rgba(255,102,159,.08);color:#fff}
 .videoSourcePanel{margin-top:8px}
 .netNote{font-size:9px;color:#9987a4;line-height:1.5;margin-top:6px}
-#viewerModal .modal{max-width:760px}
-#viewerMedia{margin:14px 0;border-radius:18px;overflow:hidden;background:#0f0a14;min-height:180px;display:grid;place-items:center;max-width:100%}
-#vMeta{color:#bcaac3;font-size:12px;line-height:1.6}
 #keywordFilter{margin-top:6px}
-#editModal h2{margin:5px 0}
 @media(max-width:760px){
 
-  #viewerModal .modal{width:calc(100vw - 16px);max-width:none;max-height:92vh;overflow:auto;padding:16px}
-  .viewerYouTube{padding:0;gap:8px}.viewerYouTube iframe{min-height:0;width:100%;aspect-ratio:16/9;max-height:46vh}
   .viewerFallback{font-size:12px;padding:4px 0}.viewerFallback .miniBtn{width:100%;margin:0}
   .videoSourceChoice{grid-template-columns:1fr}.typeGrid{grid-template-columns:repeat(2,1fr)}
-  #addModal .modal,#editModal .modal{padding:15px;width:calc(100vw - 12px);max-height:94vh}
-  #composerPreviewWrap,#editPreview{position:static;max-width:100%;overflow:hidden}
+  #addModal .modal{padding:15px;width:calc(100vw - 12px);max-height:94vh}
+  #composerPreviewWrap{position:static;max-width:100%;overflow:hidden}
   .previewCard{min-height:250px}.previewMedia{height:min(180px,31vh)}
   .modalActions,.editActions{position:sticky;bottom:-1px;background:linear-gradient(180deg,rgba(24,15,30,0),rgba(24,15,30,.98) 26%);padding-top:20px;padding-bottom:2px;z-index:8}
   .cinemaControls{max-width:calc(100vw - 12px);left:6px;right:6px;width:auto;gap:4px;transform:none}.cinCtl{min-width:0;padding:0 5px;font-size:9px}.enterBeat{font-size:9px}
 }
-@media(max-width:380px){#addModal .modal,#editModal .modal,#viewerModal .modal{width:calc(100vw - 8px);padding:12px}.typeBtn{font-size:9px;padding:8px 4px}.field{font-size:12px}.cinemaControls{left:4px;right:4px;transform:none}}
+@media(max-width:380px){#addModal .modal{width:calc(100vw - 8px);padding:12px}.typeBtn{font-size:9px;padding:8px 4px}.field{font-size:12px}.cinemaControls{left:4px;right:4px;transform:none}}
 
 /* === 정원 테마 (2026-11-08): 무대를 종이로, 새 색은 만들지 않고 identity.css의 --lt-* 토큰만 쓴다. === */
 html[data-lt-theme=garden],html[data-lt-theme=garden] body{background:var(--lt-stage);color:var(--lt-ink)}
@@ -251,6 +245,8 @@ html[data-lt-theme=garden] .boardModeSwitch .boardResetOrderBtn{color:var(--lt-m
 
 /* 2. 카드: 큰 썸네일 + 제목 2줄 + 감정·날짜 한 줄. 높이 상한(썸네일 200px·세로 영상 9:16 300px). */
 .card .cardTitle{margin:5px 0 4px;font-size:16px;line-height:1.35;font-weight:700;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;min-height:2.7em}
+.card.hasTags .cardBody{height:auto;min-height:104px}
+.card.hasTags .cardTags{margin-top:6px}
 .card .cardMeta{font-size:12px;color:#61526a;display:flex;align-items:center;white-space:nowrap;overflow:hidden;margin-top:6px}/* #662: 제목 상자(-webkit-line-clamp)가 아래로 8px 더 늘어나 감정·날짜 줄과 포개진다 — 사이를 벌린다. */
 .card .cardMeta .emotionDot{flex:0 0 auto}
 .card .cardMeta{gap:0}
@@ -373,10 +369,3 @@ body.board-hint-drag .board-empty-hint{border-color:var(--lt-gold-line);color:va
 @media (hover: none){.card .cardOrder{opacity:1;pointer-events:auto}}
 .card .orderBtn{appearance:none;border:1px solid rgba(90,65,103,.35);background:rgba(16,10,25,.72);color:#f7edf8;font-size:11px;line-height:1;padding:7px 10px;border-radius:7px;cursor:pointer;backdrop-filter:blur(8px)}
 .card .orderBtn:hover,.card .orderBtn:focus-visible{background:rgba(16,10,25,.92)}
-
-/* === #886: 크게 보기 창의 영상·그림·기록 널모양 — JS 고정 인라인을 클래스로 옮겼다. === */
-.viewerFitVideo{width:100%;max-height:420px;object-fit:contain}
-.viewerFitImg{width:100%;max-height:420px;object-fit:cover}
-#viewerMedia .viewerNoteQuote{padding:40px;color:#f7edf8;font-size:22px;line-height:1.6}
-
-#viewerMedia iframe.lt-yt-frame{display:block;width:100%;min-height:200px}
