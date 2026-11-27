@@ -412,6 +412,11 @@ test('#1529 844x390: 세로 스크롤로 마지막 카드 접근·끌기 두 방
   const { context, page, frame, problems } = await openHost(browser,
     'http://127.0.0.1:' + server.address().port + '/__host-1529.html', { width: 844, height: 390 });
   t.after(async () => context.close());
+  await frame.evaluate(() => document.body.classList.add('lt-advanced'));
+  const touch = await frame.evaluate(() => [...document.querySelectorAll('#leftPanel .filterSelect,#leftPanel .wideTool,#leftPanel .themeBtn,#leftPanel .styleMini,#leftPanel .collapseBtn')]
+    .filter(e => e.getClientRects().length).map(e => ({ id: e.id, height: e.getBoundingClientRect().height, width: e.getBoundingClientRect().width })));
+  assert.ok(touch.length >= 8, '844 고급 도구의 선택·테마 단추 존재');
+  for (const hit of touch) assert.ok(hit.height >= 44 && hit.width >= 44, '844 고급 도구 누름 영역 44px: ' + JSON.stringify(hit));
   const before = await frame.evaluate(() => {
     const viewport = document.querySelector('#viewport');
     return { scrollable: viewport.scrollHeight > viewport.clientHeight,
@@ -470,5 +475,28 @@ test('#1529 390: 접힌 도구 줄을 통해 두 종류의 거르기 사용', { 
   await frame.locator('#keywordFilter').selectOption('all');
   await frame.locator('#mediaFilter').selectOption('video');
   assert.equal(await frame.locator('.card:not(.filteredOut)').count(), 7, '영상 조건 결과 7장');
+  assert.deepEqual(problems, [], '브라우저 오류 없음');
+});
+
+test('#1529 1440: 카드 40장 상세 판을 열어도 읽을 수 있는 크기 유지', { skip: REQUIRE ? false : skip, timeout: 120000 }, async (t) => {
+  const tree = starTree(40);
+  const server = await serve({ '/__host-1529-many.html': hostHTML(tree) });
+  const browser = await chromium.launch({ headless: true });
+  t.after(async () => { await browser.close(); server.close(); });
+  const { context, frame, problems } = await openHost(browser,
+    'http://127.0.0.1:' + server.address().port + '/__host-1529-many.html', { width: 1440, height: 900 });
+  t.after(async () => context.close());
+  await frame.evaluate(() => selectMoment('s1', true));
+  await frame.waitForFunction(() => document.querySelector('#detail')?.classList.contains('open'));
+  const result = await frame.evaluate(() => {
+    const detail = document.querySelector('#detail').getBoundingClientRect();
+    const area = document.querySelector('#viewport').getBoundingClientRect();
+    const cards = [...document.querySelectorAll('.card')].map(c => c.getBoundingClientRect());
+    const visible = cards.filter(r => r.right > area.left && r.left < area.right && r.bottom > area.top && r.top < area.bottom);
+    return { maxWidth: Math.max(0, ...visible.map(r => r.width)), panel: detail.right,
+      overlap: visible.filter(r => r.left < detail.right && r.right > detail.left && r.top < detail.bottom && r.bottom > detail.top).length };
+  });
+  assert.ok(result.maxWidth >= 180, '1440 40장 상세 판의 보이는 카드 너비는 180px 이상: ' + JSON.stringify(result));
+  assert.equal(result.overlap, 0, '상세 판과 보이는 카드 겹침 0');
   assert.deepEqual(problems, [], '브라우저 오류 없음');
 });

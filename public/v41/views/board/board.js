@@ -1071,7 +1071,7 @@ function boardStartViewInner() {
     v.y = Math.max(v.y, safe.y + 20 - Math.min(...cards.map(c => c.y)) * v.z);
   viewMode = v.mode === 'user' ? 'user' : 'start';
   if (v.mode === 'user') userView = saved;
-  else if (innerWidth >= 1200) {
+  else if (innerWidth >= 1200 && !(moments.length > 8 && $('#detail').classList.contains('open'))) {
     const horizontal = wideBoardHorizontal(cards, vw, v.z);
     if (horizontal) Object.assign(v, horizontal);
   }
@@ -1777,8 +1777,9 @@ function syncBoardPush() {
   viewport.style.marginRight = margin;
   $('#boardControls').style.marginRight = margin;
   placeAll();
-  if (open && innerWidth >= 760) fitAll(false);
-  else if (viewMode === 'fit') fitAll(false);
+  // 8장 이하는 판과 모든 카드를 한눈에 맞추고, 많은 카드에서는 읽을 수 있는
+  // 기본 배율을 지킨다. 40장 전체 맞춤은 카드가 49px로 줄어드는 회귀를 만든다.
+  if (viewMode === 'fit' || (open && innerWidth >= 760 && moments.length <= 8 && viewMode !== 'user')) fitAll(false);
   else boardStartView();
 }
 
