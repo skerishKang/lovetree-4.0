@@ -63,6 +63,7 @@ fi
 # 새 소스에서 .js가 빠지면 install-preflight의 import 그래프 시험이 잡는다.
 install -d -m 0755 "$app/public/v41"
 install -m 0644 "$source_root/public/v41/tags.mjs" "$app/public/v41/tags.mjs"
+install -m 0644 "$source_root/public/v41/theme-registry.js" "$app/public/v41/theme-registry.js"
 if [[ -f "$source_root/public/v41/public-thumbnail.mjs" ]]; then
   install -m 0644 "$source_root/public/v41/public-thumbnail.mjs" "$app/public/v41/public-thumbnail.mjs"
 fi
