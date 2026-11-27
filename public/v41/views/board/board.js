@@ -794,7 +794,8 @@ function settlePlacedCards() {
 }
 
 let mobileBoardBaseY = 0;
-function mobileBoardScroll() { return innerWidth < 700 && !cinema; }
+function shortBoard() { return innerWidth >= 700 && innerWidth < 1200 && innerHeight <= 500; }
+function mobileBoardScroll() { return (innerWidth < 700 || shortBoard()) && !cinema; }
 function mobileBoardBounds() {
   const cards = boardCards();
   if (!cards.length) return null;
@@ -932,7 +933,7 @@ function boardSafeArea(expectDetail = false) {
       let r = lp.getBoundingClientRect();
       if (r.width && r.right - vr.left < vw / 2) left = Math.max(16, r.right - vr.left + 12);
     }
-    if (dt && (expectDetail || dt.classList.contains('open'))) right = dt.offsetWidth + 32;
+    if (dt && (expectDetail || dt.classList.contains('open')) && !parseFloat(viewport.style.marginRight)) right = dt.offsetWidth + 32;
   } else {
     /* #267: 좁은 판에서는 위에 순간 탐색 판(선택·책 열기)이, 오른쪽 아래에 시네마 단추가 카드 위에 뜬다 —
   처음 맞춤이 카드를 그 밑에 두도록 위·아래 자리를 비켜 둔다(판이 없으면 지금처럼 12px만 남긴다). */
@@ -1032,6 +1033,17 @@ function boardStartViewInner() {
     } else fitAll(false);
     return;
   }
+  if (shortBoard()) {
+    const bounds = mobileBoardBounds(), safe = boardSafeArea();
+    if (bounds) {
+      viewMode = 'start';
+      view.z = Math.min(0.8, safe.w / Math.max(1, bounds.right - bounds.left));
+      view.x = safe.x + (safe.w - (bounds.right - bounds.left) * view.z) / 2 - bounds.left * view.z;
+      view.y = safe.y - bounds.top * view.z;
+      applyView(false);
+      return;
+    }
+  }
   let vw = viewport.clientWidth,
     vh = viewport.clientHeight,
     cards = boardCards(),
@@ -1039,7 +1051,7 @@ function boardStartViewInner() {
   // #536: 기억한 자리의 적용·버림 판정까지 모델(LT58Model.startView)이 맡는다 — 처음 자리와 같은
   // 판 규칙(덮거나 가운데)을 함께 거치게 해 넓은 화면에서 판이 한쪽으로 쏠리지 않게 한다.
   growBoard();
-  const safe = boardSafeArea(true);
+  const safe = boardSafeArea();
   let v = LT58Model.startView({
     viewport: { w: vw, h: vh },
     safe,
@@ -1093,7 +1105,7 @@ function fitAll(animated = true) {
   let vw = viewport.clientWidth,
     vh = viewport.clientHeight,
     cards = boardCards();
-  if (innerWidth < 700 && cards.length) {
+  if ((innerWidth < 700 || shortBoard()) && cards.length) {
     boardStartView();
     viewMode = 'fit';
     applyView(animated);
@@ -1757,14 +1769,16 @@ function bootDetailPanel() {
 // #891: 상세 판이 열리면 보드를 덮지 않고 민다(넓은 화면 ≥760). 판 너비만큼 무대 오른쪽 여백을 벌려
 // 카드가 줄어든 영역에 다시 쌓이게 한다. 좁은 화면은 아래 시트 그대로(덮음) — 예전 규칙을 유지한다.
 function syncBoardPush() {
-  if (innerWidth < 760) return;
   const dt = $('#detail');
   if (!dt) return;
   const open = dt.classList.contains('open');
-  viewport.style.marginRight = open ? dt.offsetWidth + 32 + 'px' : '0px';
-  $('#boardControls').style.marginRight = viewport.style.marginRight;
+  const margin = open && innerWidth >= 760 ? dt.offsetWidth + 32 + 'px' : '0px';
+  if ((viewport.style.marginRight || '0px') === margin) return;
+  viewport.style.marginRight = margin;
+  $('#boardControls').style.marginRight = margin;
   placeAll();
-  if (viewMode === 'fit') fitAll(false);
+  if (open && innerWidth >= 760) fitAll(false);
+  else if (viewMode === 'fit') fitAll(false);
   else boardStartView();
 }
 

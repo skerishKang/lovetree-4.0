@@ -357,7 +357,7 @@ body.board-hint-drag .board-empty-hint{border-color:var(--lt-gold-line);color:va
    덮어 쓰면 ×가 "순간 상세" 글자 위에 앉는다. absolute여도 ::after 터치 영역은 그대로 동작한다. */
 #minusBtn::after{content:"";position:absolute;inset:-3px -5px}
 #plusBtn::after{content:"";position:absolute;inset:-3px -2px}
-#resetBtn::after,#openMoment::after,#detailYtLink::after,#cinemaFromMoment::after,#dHeartSave::after,#toolCinema::after,#toolFit::after,#cinemaBtn::after{content:"";position:absolute;inset:-5px 0}
+#resetBtn::after,#openMoment::after,#cinemaFromMoment::after,#dHeartSave::after,#toolCinema::after,#toolFit::after,#cinemaBtn::after{content:"";position:absolute;inset:-5px 0}
 #detailClose::after{content:"";position:absolute;inset:-11px}
 
 /* #1072 A-17: 카드 순서 단추 — 키보드(탭)로도 '내 배치' 순서를 바꾼다.
@@ -369,3 +369,34 @@ body.board-hint-drag .board-empty-hint{border-color:var(--lt-gold-line);color:va
 @media (hover: none){.card .cardOrder{opacity:1;pointer-events:auto}}
 .card .orderBtn{appearance:none;border:1px solid rgba(90,65,103,.35);background:rgba(16,10,25,.72);color:#f7edf8;font-size:11px;line-height:1;padding:7px 10px;border-radius:7px;cursor:pointer;backdrop-filter:blur(8px)}
 .card .orderBtn:hover,.card .orderBtn:focus-visible{background:rgba(16,10,25,.92)}
+
+/* #1529: 링크의 표시 높이는 그대로 두고 실제 누름 영역을 확보한다. */
+#detailYtLink::after{content:"";position:absolute;inset:-10px 0}
+.ytLinkRow{padding-bottom:10px}
+/* 긴 내용은 판 안에서 읽고 스크롤한다. */
+.detail{max-height:calc(100% - var(--lt-board-frame-top) - 20px)}
+.detailScroll{min-width:0;overflow-wrap:anywhere;overscroll-behavior:contain}
+.detailScroll .keywordRow,.detailScroll .chip{min-width:0;max-width:100%;overflow-wrap:anywhere;white-space:normal}
+#detailActions{flex-wrap:wrap}
+#detailActions .miniBtn.accent{flex:1 1 auto;white-space:normal}
+@media(min-width:761px){.detail{width:clamp(350px,30vw,440px)}.leftPanel{max-height:calc(100% - var(--lt-board-frame-top) - 16px)}}
+@media(max-width:760px){.detail{max-width:none;max-height:calc(100% - var(--lt-board-frame-top) - 84px)}}
+@media(min-width:761px) and (max-height:500px){.leftPanel{bottom:12px;max-height:none}.detail{bottom:12px;max-height:none}}
+/* 보드 크게 보기만: 정보와 영상은 서로 다른 줄에 둔다. */
+.lt-lightbox{grid-template-rows:auto minmax(0,1fr) auto auto;gap:8px;padding:12px 64px}
+.lt-lightbox-stage{grid-row:2;min-width:0;min-height:0;width:100%;height:100%;container-type:size}
+.lt-lightbox-kicker,.lt-lightbox-title,.lt-lightbox-meta{position:static;transform:none;min-width:0;max-width:100%}
+.lt-lightbox-kicker{grid-row:1}
+.lt-lightbox-title{grid-row:3}
+.lt-lightbox-meta{grid-row:4;pointer-events:auto;overflow-wrap:anywhere;overscroll-behavior:contain}
+.lt-lightbox-stage .lt-lightbox-media{width:min(100cqw,177.777cqh);max-height:100cqh}
+.lt-lightbox-vertical .lt-lightbox-stage .lt-lightbox-media{height:min(100cqh,177.777cqw);width:auto;max-width:100cqw;max-height:100cqh}
+.lt-lightbox-stage .lt-lightbox-photo{width:auto;height:auto;max-width:100cqw;max-height:100cqh}
+.lt-lightbox-stage .lt-lightbox-note{max-height:100%;overflow:auto;overflow-wrap:anywhere}
+@media(max-width:760px){.lt-lightbox{padding:12px 16px;grid-template-rows:minmax(44px,auto) minmax(0,1fr) auto auto}.lt-lightbox-kicker{padding-inline:44px}}
+
+/* #1529: 판을 비키는 폭과 카드 맞춤 계산은 같은 프레임에서 끝낸다. */
+#viewport,#boardControls{transition:none}
+
+/* #1529: 낮은 가로 화면도 카드 끝까지 세로로 이동한다. */
+@media(min-width:700px) and (max-width:1199px) and (max-height:500px){html[data-v41-screen=board] .boardFrame{bottom:12px}}

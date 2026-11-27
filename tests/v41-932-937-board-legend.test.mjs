@@ -108,6 +108,13 @@ test('#932 보드 — 1440·2560·390에서 가로 넘침 0, 상세 판이 화�
         const r = d.getBoundingClientRect();
         return r.width > 100 && r.height > 80;
       }, null, { timeout: 15000 });
+      if (w === 1440) {
+        await frame.locator('#detailClose').click();
+        await frame.locator('.card[data-id]').first().click({ position: { x: 30, y: 35 } });
+        await frame.waitForFunction(() => document.querySelector('#detail').classList.contains('open'));
+        const immediate = await frame.locator('#detail').evaluate(el => el.getBoundingClientRect().right);
+        assert.ok(immediate <= 1438, '1440: 상세 판을 다시 열자마자 화면 안');
+      }
       await page.waitForTimeout(450); // 판이 밀려 들어오는 전환(0.35s)이 끝난 뒤에 잰다.
       const rect = await frame.locator('#detail').evaluate((el) => {
         const r = el.getBoundingClientRect();
