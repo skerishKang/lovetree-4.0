@@ -32,8 +32,7 @@ async function createHarness(browser,base,width){
   const page=await ctx.newPage();
   await page.addInitScript(({theme,treeId})=>{
    localStorage.setItem('lt41.theme',theme);
-   localStorage.setItem('lt41.discoverAsked',JSON.stringify([treeId]));
-  },{theme,treeId:testTree.id});
+   },{theme,treeId:testTree.id});
   try{
    await page.goto(base+'/v41/?account=1#home',{waitUntil:'domcontentloaded'});
    await page.waitForFunction(()=>!!window.LT41?.trees?.length,{timeout:20000});

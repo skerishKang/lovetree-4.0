@@ -75,9 +75,6 @@ async function boot1010(browser, { width = 1440, member = true, mix = false, the
   await page.goto(`${base}/v41/${member ? '?account=1' : ''}#home`, { waitUntil: 'load' });
   if (member) {
     await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
-    const ask = page.locator('#discover-ask-no');
-    await ask.waitFor({ state: 'visible', timeout: 4000 }).catch(() => {});
-    if (await ask.isVisible()) await ask.click();
   }
   await page.frameLocator('#view').locator('.center .actions').waitFor({ state: 'visible', timeout: 15000 });
   // 셸은 두 장(#view·#view-next)을 교대한다(#428) — 숨은 장이 about:blank로 비워질 때까지 기다린 뒤 보이는 장을 고른다.

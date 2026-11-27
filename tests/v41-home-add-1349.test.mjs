@@ -54,12 +54,6 @@ test('#1349 가운데 순간 추가: 390·1440 × 밤·정원 × 로그인·방�
             await page.goto(base+'/v41/'+(member?'?account=1':'')+'#home');
             if(member) {
               await page.waitForFunction(()=>!!window.LT41?.trees?.length);
-              const intro=page.locator('#discover-ask');
-              await intro.waitFor({state:'visible',timeout:6000}).catch(()=>{});
-              if(await intro.isVisible()){
-                await page.locator('#discover-ask-no').click();
-                await intro.waitFor({state:'hidden',timeout:5000});
-              }
             }
             // 누르기 전에 셸이 로그인 기록·쓰기 권한을 다 받고 무대 준비 가리개가 내려가기를 기다린다.
             // 이 신호가 없으면 단추가 보인 뒤 셸 상태가 바뀌며 프레임이 다시 그려질 수 있어 누름이 사라진다.

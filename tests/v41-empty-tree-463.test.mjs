@@ -8,7 +8,6 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
 import { serve } from './helpers/screen-audit.mjs';
-import { dismissDiscoverAskIfOpen } from './helpers/discover-ask.mjs';
 
 const read = (p) => readFileSync(new URL('../' + p, import.meta.url), 'utf8');
 const workspaceRuntime = read('public/v41/shell/workspace-runtime.mjs');
@@ -125,7 +124,6 @@ test('970 실행: 빈 화면(순간 0개) — 안내·단추가 화면 안에, �
       // 빈 안내는 기록 화면에서 보인다(홈은 예시 궤도를 보여 준다 — 261118 결정). 책 화면으로 들어간다.
       await page.goto(`${origin}/v41/?account=1#my/book`, { waitUntil: 'load', timeout: 60000 });
       await page.waitForFunction(() => document.body.dataset.treeCount === '0' && !document.getElementById('empty')?.hidden, null, { timeout: 20000 });
-      await dismissDiscoverAskIfOpen(page);
       const m = await page.evaluate(() => {
         const rect = (el) => { const b = el.getBoundingClientRect(); return { l: Math.round(b.left), t: Math.round(b.top), r: Math.round(b.right), b: Math.round(b.bottom) }; };
         const empty = document.getElementById('empty');

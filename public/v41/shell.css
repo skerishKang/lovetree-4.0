@@ -862,6 +862,12 @@ body.lt-frame-dialog-open #toast{top:calc(68px + env(safe-area-inset-top));botto
 .my-news-day{min-height:24px;padding:10px 2px 0;font-size:12px;font-weight:700;letter-spacing:var(--lt-track);color:var(--lt-rose)}
 .my-news-line{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 12px;min-height:44px;padding:9px 12px;border:1px solid var(--lt-line);border-radius:var(--lt-r-card);background:#ffffff05}
 .my-news-label{font-size:14px;font-weight:700;color:var(--lt-pearl);white-space:nowrap}
+/* #1495: 둘러보기 소개 줄 — 문장과 [소개하기](44px). 소개한 뒤에는 단추 대신 조용한 표시. */
+.my-news-discover{align-items:center}
+.my-news-text{flex:1 1 220px;font-size:14px;line-height:1.5;color:var(--lt-pearl)}
+.my-news-action{min-height:44px;padding:0 16px;border:1px solid var(--lt-role-accent-bg);border-radius:var(--lt-r-pill);background:var(--lt-role-accent-bg);color:var(--lt-role-accent-ink);font-size:14px;font-weight:700}
+.my-news-action:disabled{opacity:.6}
+.my-news-done{font-size:13px;color:var(--lt-muted)}
 .my-news-last{min-width:0;font-size:13px;line-height:1.7;color:var(--lt-pearl);overflow-wrap:anywhere}
 .my-news-target{font-size:12px;color:var(--muted);overflow-wrap:anywhere}
 .my-news-ai{font-size:12px;color:var(--lt-gold);white-space:nowrap}
@@ -930,6 +936,9 @@ body.lt-frame-dialog-open #toast{top:calc(68px + env(safe-area-inset-top));botto
 .share-visibility-row-2{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:6px 0;border-top:1px solid var(--lt-line)}
 .share-visibility-row-2:first-of-type{border-top:0}
 .share-visibility-row-2>span{flex:0 0 auto;min-width:72px;font-size:13px;color:var(--lt-muted)}
+/* #1495: 둘러보기 소개는 공유 판 공개 설정의 첫 줄 — 이름을 본문색으로 세우고, 바로 아래 설명(이름·아이디·이메일 안 보임)을 둔다. */
+.share-discover-row>span{color:var(--lt-pearl);font-weight:700}
+.share-discover-note{margin:0 0 8px;font-size:13px;line-height:1.6;color:var(--lt-muted)}
 #share-discover-toggle,#share-visibility-toggle{min-height:44px;padding:10px 16px;border-radius:var(--lt-r-pill);border:1px solid var(--lt-role-line);background:transparent;color:var(--lt-role-secondary-ink);font-size:14px}
 #share-discover-toggle[data-state="on"],#share-visibility-toggle[data-state="private"]{background:var(--lt-role-accent-bg);color:var(--lt-role-accent-ink);border-color:var(--lt-role-accent-bg)}
 #share-panel p{word-break:keep-all}
@@ -1416,6 +1425,8 @@ body>.tree-popover.lt-toolbar-picker[hidden]{display:none}
 .lt-toolbar-picker .tree-item{color:var(--lt-role-text-strong);background:var(--lt-role-bg)}
 .lt-toolbar-picker .tree-item[aria-checked=true]{background:var(--lt-role-accent-bg);color:var(--lt-role-accent-ink)}
 .lt-toolbar-picker .tree-item[aria-checked=true] .tree-name,.lt-toolbar-picker .tree-item[aria-checked=true] .tree-count{color:inherit}
+/* #1495: 마우스로 연 목록의 초점 바탕 없애기(.tree-popover[data-lt-opened-by=mouse])가 지금 트리 강조까지 없애지 않게 한다 — 셸을 아직 누르지 않은 채 안쪽 화면에서 열면 첫 초점이 focus-visible이 된다. */
+.lt-toolbar-picker[data-lt-opened-by=mouse] .tree-item[aria-checked=true]:focus-visible:not(:hover){background:var(--lt-role-accent-bg);color:var(--lt-role-accent-ink)}
 .lt-toolbar-picker .tree-item:is(:hover,:focus-visible),.lt-toolbar-picker .tree-foot button:is(:hover,:focus-visible){background:var(--lt-role-hover-bg);color:var(--lt-role-hover-ink)}
 .lt-toolbar-picker .tree-foot button{color:var(--lt-role-text-strong)}
 .lt-toolbar-picker .tree-search input{color:var(--lt-role-text-strong);background:var(--lt-role-bg);border-color:var(--lt-role-border)}

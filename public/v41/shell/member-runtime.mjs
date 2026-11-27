@@ -118,21 +118,9 @@ export function createMemberRuntime(ctx){
       }).catch(error=>report(error,'새 소식 확인'));
      }
     }
-    // 소개 질문(2026-11-16 대표 결정): 아직 안 물은 트리 중 순간 3개 이상인 것이 있으면 묻는다 —
-    // 2→3 저장 직후가 대표 경로다. 직전 관측 스냅샷(상태마다 재촬영)은 두지 않는다(#718 원인): 재촬영하면
-    // syncing에서 before==after가 되어 전이를 놓친다. 질문은 트리당 1회(discoverAsked), 백필(이미 켜진)은 건너뛴다.
-    const treeCounts=(0,ctx.countTreeMoments)();
-    const askCandidates=status.writable
-     ?newlyPublishedTrees(null,treeCounts).filter(row=>!(0,ctx.discoverAskedList)().includes(row.treeId))
-     :[];
-    const askTree=askCandidates[0]||null;
-    if(askTree)(0,ctx.askDiscover)(askTree.treeId);
-    // #538: 첫 순간을 담은 뒤 한 번, 공개 방식(링크 공유·둘러보기 소개 기본 꺼짐)과 익명성을 알린다. 기기당 1회.
-    // 질문 창이 뜨는 저장에서는 같은 사실(공개 방식·익명성)이라 여기는 건너뛴다.
-    else if(ctx.previousDirty&&status.writable&&(ctx.model?.trees||[]).some(tree=>tree.moments.length>0)){
-     let shown=false;try{shown=localStorage.getItem('lt41.publicNoticeShown')==='1';}catch{}
-     if(!shown)(0,ctx.notifyPublicBanner)((ctx.model?.trees||[])[0]?.id);
-    }
+    // #1495(2026-11-27 대표 결정): 소개 물음 창 대신 내 소식에 한 줄 — 조건은 창과 같다(쓰기 가능한 계정, 순간 3개 이상,
+    // 아직 소개 안 함). 화면을 막지 않고 트리마다 한 번만 남긴다. 떠 있던 첫 공개 안내(#538)는 공유 판 설명으로 옮겨 띄우지 않는다.
+    if(status.writable)void ctx.offerDiscover?.(newlyPublishedTrees(null,(0,ctx.countTreeMoments)()).map(row=>row.treeId));
    }
    else if(status.phase==='login'&&!status.dirty&&document.body.dataset.member==='in')(0,ctx.notify)('로그인이 필요해요.');/* #1175: 로그아웃 상태로 시작할 때(저장 연결 확인 401)는 진입만으로 알림을 띄우지 않는다 — 머리글의 로그인 단추가 이미 길을 알린다. */
    else if(!status.dirty&&status.phase==='offline')(0,ctx.notify)(status.detail||'내 기록을 불러오지 못했어요.');
