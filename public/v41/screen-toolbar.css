@@ -178,7 +178,7 @@ html[data-v41-screen] body .lt-continue:is(#playAllBtn,#cinemaBtn,#mapPlayBtn):i
 }
 
 /* #1249: 배치 초기화도 공통 줄 높이와 묶음 안에 유지한다. */
-html[data-v41-screen=board] .lt-toolbar-tools .boardModeSwitch:has(>#boardResetOrderBtn){
+html[data-v41-screen=board] .lt-toolbar-tools .boardModeSwitch:has(>#boardResetOrderBtn:not([hidden])){
   grid-template-columns:repeat(3,minmax(0,1fr));min-width:210px
 }
 html[data-v41-screen=board] .lt-screen-toolbar #boardResetOrderBtn{
@@ -257,7 +257,7 @@ html[data-v41-screen]:is([data-v41-screen=shelf],[data-v41-screen=tree],[data-v4
 /* #1433: 보드의 배치 묶음·배경 단추는 첫 그림부터 마지막 폭으로 그린다 — 글꼴이 늦게 와도 폭이 같아 옆 단추가 밀리지 않는다. */
 @media(min-width:761px){
   html[data-v41-screen=board] .lt-toolbar-tools .boardModeSwitch{width:128px}
-  html[data-v41-screen=board] .lt-toolbar-tools .boardModeSwitch:has(>#boardResetOrderBtn){width:216px}
+  html[data-v41-screen=board] .lt-toolbar-tools .boardModeSwitch:has(>#boardResetOrderBtn:not([hidden])){width:216px}
 }
 html[data-v41-screen=board] .lt-screen-toolbar .lt-toolbar-tools #boardBgBtn{width:66px;padding:0}
 
@@ -294,12 +294,21 @@ html:not([data-lt-theme=garden]) button.lt-toolbar-tree-choice[aria-pressed=true
 html[data-v41-screen] body .lt-screen-toolbar[data-screen] button:focus-visible{outline:2px solid var(--lt-pearl);outline-offset:2px}
 html[data-v41-screen] body .lt-screen-toolbar[data-screen] :is(.view-toggle,.shelf-view-inline,.boardModeSwitch,.view-switch)>button:focus-visible{outline-offset:-4px}
 html[data-v41-screen] .lt-screen-toolbar .lt-toolbar-tools>button:not(.desktop-only),html[data-v41-screen] .lt-screen-toolbar .lt-toolbar-tools .bgDrop>button{height:36px;min-height:36px}
-html[data-v41-screen=board] .lt-screen-toolbar :is(.lt-toolbar-tools,.lt-toolbar-menu) .boardModeSwitch:has(>#boardResetOrderBtn){display:grid;grid-template-columns:repeat(3,minmax(0,1fr));min-width:210px}
+html[data-v41-screen=board] .lt-screen-toolbar :is(.lt-toolbar-tools,.lt-toolbar-menu) .boardModeSwitch:has(>#boardResetOrderBtn:not([hidden])){display:grid;grid-template-columns:repeat(3,minmax(0,1fr));min-width:210px}
 
-html[data-v41-screen] body .lt-screen-toolbar[data-screen] :is(.lt-toolbar-tools,.lt-toolbar-menu) :is(#book-display-inline,#book-view-toggle,.view-switch)>button:not([aria-pressed=true]):not([aria-checked=true]){
+html[data-v41-screen] body .lt-screen-toolbar[data-screen] :is(.lt-toolbar-tools,.lt-toolbar-menu) :is(#book-display-inline,#book-view-toggle,.view-switch)>button:not([aria-pressed=true]):not([aria-checked=true]):not(:hover):not(:focus-visible){
  background:transparent;border-color:transparent;color:var(--lt-pearl);box-shadow:none
 }
 .lt-toolbar-menu :is(.view-toggle,.shelf-view-inline,.boardModeSwitch,.view-switch){display:flex;align-items:center}
 .lt-toolbar-menu :is(.view-toggle,.shelf-view-inline,.boardModeSwitch,.view-switch)>button{flex:1 1 0;min-width:0}
 .lt-toolbar-menu{gap:8px}
 .lt-toolbar-menu>button{min-height:44px;height:44px}
+
+/* #1526: 책 전환의 보이는 높이는 유지하고 위아래 누름 영역을 확보한다. */
+html[data-v41-screen=book] .lt-screen-toolbar .lt-toolbar-tools #book-display-inline>button::before{top:-9px;bottom:-5px}
+html[data-v41-screen=book] .lt-screen-toolbar .lt-toolbar-tools{padding-bottom:5px;margin-bottom:-5px}
+
+/* #1526: 좁은 보드에서도 세 배치 단추를 접지 않고 표시한다. */
+@media(max-width:600px){
+ html[data-v41-screen=board] .lt-screen-toolbar .lt-toolbar-tools .boardModeSwitch:has(>#boardResetOrderBtn:not([hidden])){min-width:180px}
+}

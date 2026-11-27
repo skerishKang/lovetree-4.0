@@ -247,13 +247,14 @@ export function mountScreenToolbar({ screen, titleFrom, tools = [], initialBar =
       }
     };
     stash(items.filter((el) => !isPlay(el) && !essential(el)));
-    if (!fits()) stash(items.filter((el) => !isPlay(el) && essential(el)));
+    if (screen !== 'board' && !fits()) stash(items.filter((el) => !isPlay(el) && essential(el)));
     for (let i = plays.length - 1; i >= 0 && !fits(); i -= 1) {
       const el = plays[i];
       menu.prepend(el);
       // 이어 보기는 맨 오른쪽으로 돌아와야 한다 — 앞에 넣으면 되돌릴 때 제일 왼쪽으로 간다.
       stashed.push(el);
     }
+    if (screen === 'board' && !fits()) stash(items.filter((el) => !isPlay(el) && essential(el)));
     // 되돌릴 때 원래 순서를 지킨다.
     stashed.sort((a, b) => (order.get(a) ?? 0) - (order.get(b) ?? 0));
     more.hidden = stashed.length === 0;

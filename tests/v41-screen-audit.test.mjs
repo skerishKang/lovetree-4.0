@@ -14,7 +14,7 @@ import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { serve, auditPage, failuresOf, roleStyleFn, assertRolePair } from './helpers/screen-audit.mjs';
+import { serve, auditPage, failuresOf, roleStyleFn, assertRolePair, assertOutlinePair } from './helpers/screen-audit.mjs';
 import { createTree, addMoment } from '../public/v41/domain.mjs';
 import { observeFrameMatrix } from './helpers/frame-observation.mjs';
 import { EventEmitter } from 'node:events';
@@ -2607,7 +2607,7 @@ test('#657 후속 261117: 상단 탭 글자 통일과 고른 탭 칸 높이(390�
               return {
                 frameBg: fcs.backgroundColor, frameBorder: parseFloat(fcs.borderTopWidth) || 0,
                 bg: cs.backgroundColor, deco: cs.textDecorationLine, thickness: cs.textDecorationThickness, color: cs.color,
-                height: Math.round(r.height),
+                height: Math.round(r.height), border:cs.borderTopWidth, borderColor:cs.borderTopColor, surface:getComputedStyle(document.body).backgroundColor,
                 otherBg: others.map((b) => getComputedStyle(b).backgroundColor),
                 otherDeco: others.map((b) => getComputedStyle(b).textDecorationLine),
                 current: document.querySelectorAll('#tree-views button[aria-current="true"]').length
@@ -2615,10 +2615,10 @@ test('#657 후속 261117: 상단 탭 글자 통일과 고른 탭 칸 높이(390�
             });
             assert.equal(box.frameBg, 'rgba(0, 0, 0, 0)', `${width}/${theme}/${view}: 탭을 감싸는 판 배경 없음`);
             assert.equal(box.frameBorder, 0, `${width}/${theme}/${view}: 탭을 감싸는 판 테두리 없음`);
-            assert.notEqual(box.bg, 'rgba(0, 0, 0, 0)', `${width}/${theme}/${view}: 고른 탭 칸을 칠한다`);
-            assert.ok(pairContrast(box.color,box.bg)>=4.5, `${width}/${theme}/${view}: 고른 탭 글자 대비 4.5:1 이상`);
-            assert.equal(box.deco, 'underline', `${width}/${theme}/${view}: 고른 탭은 밑줄로 표시한다`);
-            assert.equal(box.thickness, '2px', `${width}/${theme}/${view}: 밑줄 두께 2px`);
+            assert.equal(box.bg, 'rgba(0, 0, 0, 0)', `${width}/${theme}/${view}: 고른 탭 배경 투명`);
+            assert.ok(pairContrast(box.color,box.surface)>=4.5, `${width}/${theme}/${view}: 고른 탭 글자 대비 4.5:1 이상`);
+            assert.equal(box.deco, 'none', `${width}/${theme}/${view}: 고른 탭은 밑줄 대신 테두리로 표시한다`);
+            assert.equal(box.border, '1px'); assert.equal(box.borderColor,box.color); assert.ok(pairContrast(box.borderColor,box.surface)>=3);
             assert.ok(box.height >= 44, `${width}/${theme}/${view}: 탭 누름 영역 ${box.height}px ≥ 44`);
             assert.equal(box.current, 1, `${width}/${theme}/${view}: 현재 화면 표시는 1개`);
             assert.notEqual(box.color, unselected[0].color, `${width}/${theme}/${view}: 고른 탭 글자가 더 진하다`);
@@ -2962,11 +2962,11 @@ test('#987 보드 첫 줄과 모바일 셸 겹침·현재 표시', { skip: REQUI
         await page.locator('#mobile-more').click();
         const menu = await page.locator('#header-overflow [aria-current=true]').evaluate(el => {
           const cs = getComputedStyle(el);
-          return { underline: cs.textDecorationLine, shadow: cs.boxShadow, border: cs.borderTopWidth, others: [...el.parentElement.querySelectorAll('button:not([aria-current=true])')].map(b => getComputedStyle(b).textDecorationLine) };
+          return { underline: cs.textDecorationLine, shadow: cs.boxShadow, border: cs.borderTopWidth, ink:cs.color, borderColor:cs.borderTopColor, others: [...el.parentElement.querySelectorAll('button:not([aria-current=true])')].map(b => getComputedStyle(b).textDecorationLine) };
         });
         console.log('#987 menu', width, theme, JSON.stringify(menu));
         await snap('nav-menu');
-        check(menu.underline.includes('underline') && menu.shadow === 'none' && menu.border === '0px' && menu.others.every(x => !x.includes('underline')), '접힌 메뉴 ' + theme + ' ' + JSON.stringify(menu));
+        check(menu.underline === 'none' && menu.shadow === 'none' && menu.border === '1px' && menu.ink === menu.borderColor && menu.others.every(x => !x.includes('underline')), '접힌 메뉴 ' + theme + ' ' + JSON.stringify(menu));
         await page.locator('#header-overflow').getByRole('menuitem', { name: '책', exact: true }).click();
         await page.frameLocator('#view').locator('.moment[data-moment]').first().waitFor();
         // #1078: 한마디 줄 오른쪽 끝이 ＋ 단추에 덮이지 않는다(상세 창을 열기 전, 단추가 보이는 자리에서 잰다).
@@ -3839,14 +3839,14 @@ test('#1362 확장: 여섯 화면 선택 탭 채움·쉬는 테두리 역할 변
         const label = `${width}·${theme}`;
         if (width === 390) {
           const shellLook = await page.evaluate(new Function('selectors', 'return (' + roleFn + ')(selectors);'), ['.tree-frame .tree-views>button[aria-current="true"]', '.tree-frame .tree-views>button[aria-current="false"]']);
-          assertRolePair(assert, pairs, label + '·머리줄 탭', shellLook.vars, shellLook.looks['.tree-frame .tree-views>button[aria-current="true"]'], shellLook.looks['.tree-frame .tree-views>button[aria-current="false"]'], '--lt-role-line');
+          assertOutlinePair(assert, pairs, label + '·머리줄 탭', shellLook.vars, shellLook.looks['.tree-frame .tree-views>button[aria-current="true"]'], shellLook.looks['.tree-frame .tree-views>button[aria-current="false"]'], '--lt-role-line');
         }
         for (const [name, hash, file, selected, idle] of screens) {
           await page.evaluate((h) => { location.hash = h; }, hash);
           await page.waitForFunction((f) => [...document.querySelectorAll('#stage iframe')].some((el) => !el.hidden && el.contentWindow?.location?.href.includes(f)), file, { timeout: 20000 });
           const frame = await (await page.$('#view:not([hidden])')).contentFrame();
           const look = await frame.evaluate(new Function('selectors', 'return (' + roleFn + ')(selectors);'), [selected, idle]);
-          assertRolePair(assert, pairs, label + '·' + name, look.vars, look.looks[selected], look.looks[idle], '--lt-role-line');
+          assertOutlinePair(assert, pairs, label + '·' + name, look.vars, look.looks[selected], look.looks[idle], '--lt-role-line');
         }
         await page.evaluate(() => document.getElementById('share-panel').showModal());
         const share = await page.evaluate(new Function('selectors', 'return (' + roleFn + ')(selectors);'), ['#share-steps li[data-state="current"]', '#share-steps li[data-state="todo"]']);

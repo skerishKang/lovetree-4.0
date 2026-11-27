@@ -442,7 +442,7 @@ export const roleStyleFn = function roleStyle(selectors) {
   probe.style.display = 'none';
   document.body.append(probe);
   const read = (name) => { probe.style.color = 'var(' + name + ')'; return getComputedStyle(probe).color; };
-  const names = ['--lt-role-line', '--lt-role-idle-border', '--lt-role-idle-ink', '--lt-role-bg', '--lt-role-accent-bg', '--lt-role-accent-ink', '--lt-role-secondary-ink'];
+  const names = ['--lt-role-line', '--lt-role-idle-border', '--lt-role-idle-ink', '--lt-role-bg', '--lt-role-accent-bg', '--lt-role-accent-ink', '--lt-role-secondary-ink', '--lt-gold'];
   const vars = Object.fromEntries(names.map((name) => [name, read(name)]));
   probe.remove();
   const look = (sel) => {
@@ -453,7 +453,7 @@ export const roleStyleFn = function roleStyle(selectors) {
     const fg = rgb(cs.color) || [0, 0, 0, 1];
     const base = rgb(vars['--lt-role-bg']) || [0, 0, 0, 1];
     const line = parseFloat(cs.borderTopWidth) > 0 ? cs.borderTopColor : cs.boxShadow;
-    return { bg: cs.backgroundColor, color: cs.color, border: cs.borderTopColor, line, ratio: Math.round(ratio(over(fg, bg), over(bg, base)) * 100) / 100 };
+    return { bg: cs.backgroundColor, color: cs.color, border: cs.borderTopColor, borderWidth:cs.borderTopWidth, borderRatio: ratio(over(rgb(cs.borderTopColor) || [0,0,0,0],over(bg,base)),over(bg,base)), line, ratio: Math.round(ratio(over(fg, bg), over(bg, base)) * 100) / 100 };
   };
   return { vars, looks: Object.fromEntries(selectors.map((sel) => [sel, look(sel)])) };
 };
@@ -467,4 +467,17 @@ export function assertRolePair(assert, report, label, vars, selected, idle, idle
   assert.ok(String(idle.line).includes(vars['--lt-role-line']), label + ': 쉬는 테두리는 ' + idleBorderName + ' — ' + idle.line);
   assert.ok(idle.ratio >= 4.5, label + ': 쉬는 글자 대비 ' + idle.ratio + ':1');
   report.push({ label, selected: selected.ratio, idle: idle.ratio });
+}
+
+// #1526: only the common navigation and view toggles use the outline contract.
+export function assertOutlinePair(assert,report,label,vars,selected,idle){
+ if(!selected || !idle)return;
+ assert.equal(selected.bg,"rgba(0, 0, 0, 0)",label+": transparent selection");
+ assert.equal(selected.color,vars["--lt-gold"]);
+ assert.equal(selected.border,vars["--lt-gold"]);
+ assert.equal(selected.borderWidth,"1px");
+ assert.ok(selected.ratio>=4.5,label+": selected text contrast "+selected.ratio);
+ assert.ok(selected.borderRatio>=3,label+": selected border contrast "+selected.borderRatio);
+ assert.ok(idle.ratio>=4.5,label+": idle text contrast "+idle.ratio);
+ report.push({label,selected:selected.ratio,idle:idle.ratio});
 }

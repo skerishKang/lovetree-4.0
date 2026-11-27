@@ -71,12 +71,12 @@ test('상단 메뉴: 같은 글자 크기·테두리 0·세로선 0·현재 탭 
             const record = document.getElementById('record-menu');
             const tabs = [...document.querySelectorAll('#tree-views > button')];
             const plain = tabs.filter((b) => b.id !== 'community-menu');
-            const borders = (el) => { const cs = getComputedStyle(el); return ['Top', 'Right', 'Bottom', 'Left'].filter((side) => parseFloat(cs['border' + side + 'Width']) > 0).length; };
+            const borders = (el) => { const cs = getComputedStyle(el); return ['Top', 'Right', 'Bottom', 'Left'].filter((side) => parseFloat(cs['border' + side + 'Width']) > 0 && cs['border' + side + 'Color'] !== 'rgba(0, 0, 0, 0)').length; };
             return {
               recordFont: parseFloat(getComputedStyle(record).fontSize),
               tabFonts: tabs.map((b) => parseFloat(getComputedStyle(b).fontSize)),
-              tabBorders: plain.reduce((n, b) => n + borders(b), 0),
-              dividers: [record, ...plain].reduce((n, el) => n + (parseFloat(getComputedStyle(el).borderLeftWidth) > 0 ? 1 : 0), 0),
+              tabBorders: plain.reduce((n, b) => n + borders(b), 0), selectedBorders: plain.filter(b=>b.getAttribute('aria-current')==='true').reduce((n,b)=>n+borders(b),0),
+              dividers: [record, ...plain].reduce((n, el) => n + (parseFloat(getComputedStyle(el).borderLeftWidth) > 0 && getComputedStyle(el).borderLeftColor !== 'rgba(0, 0, 0, 0)' && el.getAttribute('aria-current') !== 'true' ? 1 : 0), 0),
               current: tabs.filter((b) => b.getAttribute('aria-current') === 'true').length,
               xs: tabs.map((b) => Math.round(b.getBoundingClientRect().x)),
               recordVisible: !!record && record.getClientRects().length > 0
@@ -126,7 +126,7 @@ test('상단 메뉴: 같은 글자 크기·테두리 0·세로선 0·현재 탭 
         const base = perScreen.shelf;
         const xsStable = SCREENS.every(([name]) => JSON.stringify(perScreen[name].xs) === JSON.stringify(base.xs));
         assert.deepEqual([...new Set([base.recordFont, ...base.tabFonts])].length, 1, '트리 단추·탭 글자 크기 같음');
-        assert.equal(base.tabBorders, 0, '탭 칸 테두리 0');
+        assert.equal(base.tabBorders, 4, '고른 탭만 네 변 테두리'); assert.equal(base.selectedBorders,4);
         assert.equal(base.dividers, 0, '세로선 0');
         assert.equal(base.current, 1, '현재 탭 1개');
         assert.equal(base.recordVisible, false, '서재에서 트리 단추 보임');
@@ -236,7 +236,7 @@ test('상단 메뉴 261119: 트리 단추 폭·⌄ 자리·목록 규칙·메뉴
           currentDeco: ccs ? ccs.textDecorationLine : null,
           currentThickness: ccs ? ccs.textDecorationThickness : null,
           currentBg: ccs ? ccs.backgroundColor : null,
-          currentInk: ccs ? ccs.color : null,
+          currentInk: ccs ? ccs.color : null, currentBorder:ccs?.borderTopWidth,currentBorderColor:ccs?.borderTopColor,
           tabHeights: tabs.map((b) => Math.round(b.getBoundingClientRect().height)),
           currentCount: tabs.filter((b) => b.getAttribute('aria-current') === 'true').length
         };
@@ -254,9 +254,9 @@ test('상단 메뉴 261119: 트리 단추 폭·⌄ 자리·목록 규칙·메뉴
       assert.equal(bar.frameBorder, 0, `${width}: 탭을 감싸는 판 테두리 없음`);
       if (width === 1440) {
         assert.equal(bar.tabsHidden, false, '1440: 탭 보임');
-        assert.equal(bar.currentDeco, 'underline', '고른 탭은 밑줄');
-        assert.equal(bar.currentThickness, '2px', '밑줄 두께 2px');
-        assert.notEqual(bar.currentBg, 'rgba(0, 0, 0, 0)', '고른 탭을 채운다');
+        assert.equal(bar.currentDeco, 'none', '고른 탭 밑줄 없음');
+        assert.equal(bar.currentBorder,'1px');assert.equal(bar.currentBorderColor,bar.currentInk);
+        assert.equal(bar.currentBg, 'rgba(0, 0, 0, 0)', '고른 탭은 투명');
         assert.ok(bar.tabHeights.every((h) => h >= 44), `탭 누름 영역 44px 이상 — ${JSON.stringify(bar.tabHeights)}`);
         assert.equal(bar.currentCount, 1, '현재 화면 표시 1개');
       }
@@ -571,7 +571,7 @@ test('#1246 모든 화면의 순간 추가만 장미색·둘러보기 테두리'
           return {rose,white,head:info(document.getElementById('write-menu')),fab:info(document.getElementById('mobile-add')),
             explore:{...info(explore),current:explore.getAttribute('aria-current')==='true',border:cs.borderTopWidth,borderColor:cs.borderTopColor,borderStyle:cs.borderTopStyle,radius:parseFloat(cs.borderTopLeftRadius),deco:cs.textDecorationLine,weight:cs.fontWeight,icon:ir.width>0&&ir.height>0&&icon.getAttribute('stroke')==='currentColor'&&icon.getAttribute('fill')==='none'&&icon.getAttribute('aria-hidden')==='true',labelVisible:explore.querySelector('.community-menu-label').checkVisibility(),width:er.width,height:er.height,inside:er.left>=header.left&&er.right<=header.right&&er.top>=header.top&&er.bottom<=header.bottom,hit:hit===explore||explore.contains(hit),pickerOverlap:Math.max(0,Math.min(er.right,picker.right)-Math.max(er.left,picker.left))},
             headerHeight:Math.round(header.height),overflow:document.documentElement.scrollWidth-innerWidth,
-            tabs:[...document.querySelectorAll('#tree-views button[data-view]')].map(e=>({border:getComputedStyle(e).borderTopWidth,deco:getComputedStyle(e).textDecorationLine,current:e.getAttribute('aria-current')==='true'})),
+            tabs:[...document.querySelectorAll('#tree-views button[data-view]')].map(e=>({border:getComputedStyle(e).borderTopWidth,borderColor:getComputedStyle(e).borderTopColor,ink:getComputedStyle(e).color,deco:getComputedStyle(e).textDecorationLine,current:e.getAttribute('aria-current')==='true'})),
             other:[...document.querySelectorAll('.app-header button,.app-header a')].filter(e=>!['write-menu','mobile-add'].includes(e.id)&&e.checkVisibility({checkVisibilityCSS:true})).map(info)};
         });
         let idleExplore;
@@ -609,7 +609,7 @@ test('#1246 모든 화면의 순간 추가만 장미색·둘러보기 테두리'
           assert.equal(e.labelVisible,width===1440,key+' 넓은 화면만 글자 표시');
           }
           assert.equal(e.current,name==='community',key+' 현재 둘러보기 표시');
-          assert.ok(m.tabs.every(t=>t.border==='0px'),key+' 내 트리 탭은 테두리 없음');
+          assert.ok(m.tabs.every(t=>t.current?t.border==='1px'&&t.borderColor===t.ink:t.border==='0px'||t.borderColor==='rgba(0, 0, 0, 0)'),key+' 선택 탭만 테두리');
           assert.equal(m.overflow,0,key+' 가로 넘침 0');
           if(width===390)assert.equal(m.headerHeight,57,key+' 머리줄 57px');
           if(name==='home')idleExplore=e;
