@@ -12,6 +12,7 @@ import {thumbnailCandidates} from '../thumb-fallback.mjs';
 // #1072 A-16: 화면 공용 오류 기록 — 저장·보드·미디어 경로에서 조용히 넘기던 빈 catch를 여기서 기록한다.
 import {report} from '../report.mjs';
 import {askAppConfirm} from '../confirm.mjs';
+import {shareUrlFor,SHARE_COPY_FAILURE} from '../share-link.mjs';
 
 // 261118 대표 지적 2차 5: 서재 화면이 알려 준 '마지막에 본 트리'(가운데 책의 트리).
 // 서재 화면에서 콕·보드·지도 탭을 누르면 이 트리로 열린다(shell.mjs의 data-view 눌림에서 쓴다).
@@ -315,11 +316,6 @@ export function createMessages(deps) {
     // '링크 만들기'가 눌리지 않는 이유를 버튼 옆에 보여 준다.
     $('share-create-reason').hidden = !$('share-create').disabled;
   }
-  function shareUrlFor(id, view) {
-    // #541: 복사할 주소는 미리보기 카드가 붙는 /t/<id>. view 는 서버가 주소에서 정하고,
-    // 기존 #share/<id>/<view> 주소도 계속 열린다(앱 안 이동은 그 형식을 그대로 쓴다).
-    return new URL(`/t/${encodeURIComponent(id)}`, location.origin).href;
-  }
   function renderShareList(shares = []) {
     const host = $('share-list'), treeId = window.LT41?.tree.id;
     host.replaceChildren();
@@ -369,7 +365,7 @@ export function createMessages(deps) {
             await navigator.clipboard.writeText(shareUrlFor(item.id, item.view));
             $('share-feedback').textContent = '공유 주소를 복사했어요.';
           } catch {
-            $('share-feedback').textContent = '복사하지 못했어요. 열어 보기로 주소를 확인해 주세요.';
+            $('share-feedback').textContent = SHARE_COPY_FAILURE;
           }
         };
         const revoke = document.createElement('button');

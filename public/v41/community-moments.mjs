@@ -5,6 +5,7 @@ import {parseTag,tagKey} from './tags.mjs';
 // #1060: 썸네일 주소 글자는 정본(youtube-id.mjs) 한 벌에서만 만든다.
 import {youtubeStageThumbUrl} from './youtube-id.mjs';
 import {isGrayThumbnail,fallbackCardMarkup} from './thumb-fallback.mjs';
+import {shareUrlFor,SHARE_COPY_FAILURE} from './share-link.mjs';
 const el=(tag,className,text)=>{const node=document.createElement(tag);if(className)node.className=className;if(text!=null)node.textContent=text;return node;};
 const SVG_NS='http://www.w3.org/2000/svg';
 // 나무 모양 선 아이콘 — 다른 단추와 같은 currentColor·같은 선 굵기(#1025 2단계).
@@ -269,13 +270,13 @@ let soundButton=null;
  };
  // 공유: 공개 공유가 있는 순간은 /t/<shareId> 주소가 늘 있다 — 복사할 주소가 없으면 원본 영상 주소로 돌린다.
  async function copyShare(item){
-  const url=item.shareId?new URL('/t/'+encodeURIComponent(item.shareId),location.origin).href:(item.url||'');
+  const url=item.shareId?shareUrlFor(item.shareId,item.view||'book'):(item.url||'');
   if(!url){notify?.('복사할 주소가 없어요.');return;}
   try{
    if(globalThis.navigator?.clipboard?.writeText)await navigator.clipboard.writeText(url);
    else{const box=el('textarea');box.value=url;document.body.append(box);box.select();document.execCommand?.('copy');box.remove();}
    notify?.('주소를 복사했어요');
-  }catch{notify?.('주소를 복사하지 못했어요.');}
+  }catch{notify?.(SHARE_COPY_FAILURE);}
  }
 
  let items=[],index=0,loading=false,token=0,frames=[],seen=new Set(),unmuted=false,wantSound=false,touchY=null,activeTag='',groups=[];
