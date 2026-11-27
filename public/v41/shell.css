@@ -1565,3 +1565,95 @@ body.home-screen .app-header .main-nav>button#community-menu[aria-current=true]{
 #cleanup-panel[data-cleanup-cards] .cleanup-moments{max-height:none}
 #cleanup-panel[data-cleanup-cards][data-target-page]>.panel-heading{display:none}
 }
+
+/* #1580: 순간 추가·수정 창의 본문만 넘긴다. 공통 center 창의 크기·다른 창의 단추는 변경하지 않는다. */
+#write-panel[open]{
+ display:flex;flex-direction:column;
+ height:min(980px,calc(100dvh - 88px));max-height:calc(100dvh - 88px);
+ overflow:hidden;padding-bottom:0;
+}
+#write-panel>.panel-heading,#write-panel>.write-tabs{flex:0 0 auto}
+#write-panel .write-tab-panel:not([hidden]){flex:1 1 auto;min-height:0;overflow:hidden;padding:0;margin-top:8px;border-top:0}
+#write-panel #write-easy:not([hidden]){display:block;overflow:auto;padding-bottom:18px}
+#write-panel #write-detailed:not([hidden]){display:flex;flex-direction:column}
+#write-panel #moment-form{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;overflow:hidden;margin-top:0}
+#write-panel #moment-form>.editor-fields{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:0 4px 14px}
+#write-panel #moment-form>.editor-bottom{position:relative;bottom:auto;z-index:2;flex:0 0 auto;
+ margin:0;padding:10px 0 calc(10px + env(safe-area-inset-bottom));min-height:64px;
+ border-top:1px solid var(--lt-line);background:var(--lt-glass-strong)}
+#write-panel #moment-form>#form-error:empty{display:none}
+#write-panel #moment-form>#form-error:not(:empty){display:block;flex:0 0 auto;min-height:28px;max-height:92px;overflow:auto;
+ margin:0;padding:6px 8px;border-top:1px solid var(--lt-line);border-radius:6px;
+ background:var(--lt-stage-2);color:var(--lt-rose);font-size:13px;line-height:1.5}
+html[data-lt-theme=garden] #write-panel #moment-form>#form-error:not(:empty){color:var(--lt-rose-ink);background:var(--lt-paper);border-color:var(--lt-line-paper)}
+#write-panel #moment-form .editor-fields>#range-fields{margin:14px 0 0}
+#write-panel #moment-form .editor-fields>#segment-capture{margin:12px 0 0}
+#write-panel #moment-form .editor-fields>.edit-continue{display:block;margin:16px 0 0;padding:0 14px 10px;
+ border:1px solid var(--lt-line);border-radius:var(--lt-r-card);background:var(--lt-stage-2)}
+#write-panel #moment-form .editor-fields>.edit-continue>summary{min-height:44px;align-content:center;font-size:14px;font-weight:600;color:var(--lt-pearl)}
+#write-panel #editor-context{margin:6px 0 2px}
+#write-panel #moment-form .moment-video{margin:6px 0 0}
+#editor-parent-summary{display:flex;align-items:center;gap:10px;min-height:44px;margin:6px 0 8px;padding:6px 8px;
+ border:1px solid var(--lt-line);border-radius:var(--lt-r-card);background:var(--lt-stage-2)}
+#editor-parent-summary[hidden]{display:none}
+#editor-parent-summary img,#editor-parent-fallback{display:grid;place-items:center;flex:0 0 40px;width:40px;height:40px;
+ border-radius:7px;object-fit:cover;background:var(--lt-glass-strong);border:1px solid var(--lt-line);font-size:17px}
+#editor-parent-summary img[hidden],#editor-parent-fallback[hidden]{display:none}
+#editor-parent-title{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;color:var(--lt-pearl)}
+@media(max-height:500px) and (min-width:781px){
+ #write-panel[open]{height:calc(100dvh - 16px);max-height:calc(100dvh - 16px)}
+}
+@media(max-width:780px){
+ #write-panel[open]{inset:var(--lt-vv-top,0px) 0 auto 0;width:100vw;max-width:none;height:var(--lt-vv-h,100dvh);
+ max-height:var(--lt-vv-h,100dvh);margin:0;border:0;border-radius:0}
+ #write-panel #moment-form>.editor-bottom{margin:0;padding-bottom:calc(10px + env(safe-area-inset-bottom))}
+}
+/* #1580 3·7: 정원에서 삭제 행동과 입력 경계에 기존의 진한 토큰을 사용한다. */
+html[data-lt-theme=garden] #moment-form #delete-moment{color:var(--lt-rose-ink);border-color:var(--lt-line-paper)}
+html[data-lt-theme=garden] #tree-form input:not([type=radio]),html[data-lt-theme=garden] #tree-form select{
+ background:var(--lt-paper);border-color:color-mix(in srgb,var(--lt-ink) 34%,var(--lt-paper));color:var(--lt-ink)
+}
+html[data-lt-theme=garden] #tree-form #tree-delete{color:var(--lt-rose-ink);border:1px solid var(--lt-rose-ink);
+ border-radius:var(--lt-r-pill);padding:10px 14px;min-height:44px;background:var(--lt-paper)}
+/* #1580 5·6: fieldset의 기본 테두리를 없애고 이름표와 칩·표지 사이에 빈 줄을 확보한다. */
+#tree-cover-method,#tree-design{display:block;min-width:0;margin:20px 0 0;padding:0;border:0}
+#tree-cover-method legend,#tree-design legend{font-size:13px;color:var(--lt-muted);padding:0;margin:0;line-height:1.7}
+#tree-cover-method .cover-method-options{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:12px}
+#tree-cover-method .cover-method-option{flex:none;min-width:0;min-height:44px}
+#tree-design .cover-design-options{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px;margin-top:12px}
+#tree-design .cover-design-option{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;min-width:0}
+#tree-design .cover-design-name{display:block;max-width:100%;margin-top:7px;min-height:34px;text-align:center;
+ font-size:12px;line-height:1.45;white-space:normal;word-break:keep-all;overflow-wrap:anywhere;color:var(--lt-muted)}
+#tree-form .tree-visibility{margin:20px 0 0;padding:12px 14px 12px;border:1px solid var(--lt-line);
+ border-radius:var(--lt-r-card);background:var(--lt-stage-2)}
+#tree-form .tree-visibility legend{padding:0 6px;color:var(--lt-muted);font-size:13px}
+#tree-form .tree-visibility .settings-choice{margin:6px 0}
+#tree-form .tree-visibility .panel-note{margin:6px 0 0}
+html[data-lt-theme=garden] #tree-form .tree-visibility{border-color:var(--lt-line-paper);background:var(--lt-paper)}
+/* #1580 8·9: 하단 행동은 모두 같은 알약형 누름 영역이다. 비활성 때도 선이 사라지지 않는다. */
+#cleanup-panel .panel-foot button:not(.primary){min-width:90px;border-color:var(--lt-gold-line);
+ background:var(--lt-stage-2);color:var(--lt-pearl);font-weight:600}
+#cleanup-panel .panel-foot button:disabled{opacity:.75}
+html[data-lt-theme=garden] #cleanup-panel .panel-foot button:not(.primary){
+ border-color:var(--lt-line-paper);background:var(--lt-paper);color:var(--lt-ink)}
+#cleanup-target-empty:not([hidden]){display:block;margin:10px 0 0;padding:12px 14px;border:1px solid var(--lt-line);
+ border-radius:var(--lt-r-card);background:var(--lt-stage-2);font-size:13px;line-height:1.6}
+html[data-lt-theme=garden] #cleanup-target-empty{border-color:var(--lt-line-paper);background:var(--lt-paper)}
+
+/* #1580: 감정 칩도 44px 누름 영역을 유지한다(기존 색·모양은 그대로). */
+#write-panel #emotion-chips button{min-height:44px;padding:8px 12px}
+
+/* #1580: 같은 가운데 창이라도 트리 관리만 자체 본문을 스크롤해 저장·삭제 줄을 첫 화면에 남긴다. */
+#tree-manager[open]{display:flex;flex-direction:column;height:min(850px,calc(100dvh - 88px));
+ max-height:calc(100dvh - 88px);overflow:hidden;padding-bottom:0}
+#tree-manager>.panel-heading,#tree-manager>.panel-note{flex:0 0 auto}
+#tree-manager #tree-form{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;margin-top:12px;overflow:hidden}
+#tree-manager #tree-form>.tree-fields{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:0 4px 14px}
+#tree-manager #tree-form>.button-row{flex:0 0 auto;display:flex;gap:8px;margin:0;padding:10px 0 calc(10px + env(safe-area-inset-bottom));
+ border-top:1px solid var(--lt-line);background:var(--lt-glass-strong)}
+#tree-manager #tree-form>#tree-form-error:empty{display:none}
+#tree-manager #tree-form>#tree-form-error:not(:empty){flex:0 0 auto;max-height:92px;overflow:auto;margin:0;padding:6px 8px;font-size:13px}
+#write-panel .write-tabs [role=tab]{min-height:44px}
+@media(max-height:500px){
+ #tree-manager[open]{height:calc(100dvh - 16px);max-height:calc(100dvh - 16px)}
+}

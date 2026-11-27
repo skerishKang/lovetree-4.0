@@ -181,6 +181,7 @@ export function createPanels(deps) {
     setMediaChangeOpen(false);
     intendedLinks = new Set(); baselineLinks = []; baselineParentId = '';
     $('editor-context').textContent = '';
+    paintEditorParentSummary(null);
     $('form-error').textContent = '';
     updateMediaPreview();
   }
@@ -217,6 +218,7 @@ export function createPanels(deps) {
     // '가' 결정: 쉬운 추가 탭에서 자세한 추가로 바꾸면 어디에 이어지는지 보여 준다(빈 줄만 채운다).
     const parent = window.LT41?.tree?.moments.find(moment => moment.id === addParentMomentId());
     if (parent && !$('editor-context').textContent) $('editor-context').textContent = `새 순간 추가 · ${parent.title}에서 이어집니다.`;
+    paintEditorParentSummary(parent);
   }
   function detailedDirty() {
     return $('write-panel').open && $('write-easy').hidden
@@ -295,6 +297,7 @@ export function createPanels(deps) {
     $('stage-date-hint').hidden = mode !== 'add';
     // #1097: 제목은 접지 않는다 — 제목·감정·무대 날짜가 항상 보인다(#638의 접힘 불편을 그대로 없앤다).
     $('editor-context').textContent = editorContextLine(mode, m);
+    paintEditorParentSummary(mode === 'add' ? m : null);
     $('form-error').textContent = '';
     $('moment-management').hidden = mode !== 'edit';
     // #1097: 이어짐은 390에서는 접힌 칸으로, 그보다 큰 화면에서는 열린 상태로 연다.
@@ -499,6 +502,20 @@ export function createPanels(deps) {
     if (frame) void attachSegmentPlayer(frame);
   });
   // #1097: '영상 바꾸기'는 눌렀을 때만 링크·올리기·보관 파일 선택을 펼친다(닫힌 상태가 기본).
+  // #1580: 입력 위에서 이어지는 순간의 작은 영상 표지·제목을 한 줄로 보여 준다.
+  function paintEditorParentSummary(parent) {
+    const box = $('editor-parent-summary');
+    if (!box) return;
+    box.hidden = !parent;
+    if (!parent) return;
+    const title = $('editor-parent-title');
+    if (title) title.textContent = `이전 순간 · ${parent.title || '이전 순간'}`;
+    let image = '';
+    try { image = parent.url ? LTMedia.describe(parent.url)?.loadUrl || '' : ''; } catch {}
+    const thumb = $('editor-parent-thumb'), fallback = $('editor-parent-fallback');
+    if (thumb) { thumb.hidden = !image; thumb.src = image; }
+    if (fallback) { fallback.hidden = !!image; fallback.textContent = (parent.title || '순간').slice(0, 1); }
+  }
   function setMediaChangeOpen(open) {
     const box = $('media-change-box'), toggle = $('media-change-toggle');
     if (box) box.hidden = !open;
