@@ -1,0 +1,174 @@
+/* 전시 보기(#1425 시제품) — 트리 화면의 새 모드. 배치·움직임만 여기 두고 색·모서리는 identity.css 의 --lt-* 토큰만 쓴다(새 색 없음).
+   밤: 검은 무대·진주색 글자·금색 포인트 / 정원: 크림 무대·갈색 잉크·장미색 포인트(#1362 역할 색). 시안 62의 색 조합은 정원에 가깝다. */
+html[data-lt-view=exhibit]{
+  --lt-toolbar-top:4px;
+  --ex-bg:var(--lt-role-bg);
+  --ex-ink:var(--lt-role-text-strong);
+  --ex-muted:var(--lt-role-text-muted);
+  --ex-point:var(--lt-role-accent-bg);
+  --ex-hair:color-mix(in srgb,var(--lt-role-text-strong) 24%,transparent);
+  --ex-ghost:color-mix(in srgb,var(--lt-role-text-strong) 6%,transparent);
+  --ex-wash:color-mix(in srgb,var(--lt-role-text-strong) 7%,var(--lt-role-bg));
+  --ex-stage-h:720px;--ex-rail-h:140px;--ex-foot-h:52px;--ex-chrome:84px;
+  --ex-art-h:min(calc(var(--ex-stage-h) - var(--ex-rail-h) - var(--ex-foot-h) - var(--ex-chrome)),600px);
+  --ex-art-w:min(50vw,820px);
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--lt-stage);color:var(--ex-ink);font-family:var(--lt-ui);overflow:hidden;-webkit-text-size-adjust:100%}
+
+/* 도구 줄(공통 틀) 오른쪽: 앞·쪽 번호·다음 */
+.lt-toolbar-tools>button.ex-step{min-width:44px;padding:0 10px;font-size:16px;cursor:pointer}
+.lt-toolbar-tools>button.ex-step:disabled{opacity:.38;cursor:default}
+.ex-count{flex:none;min-width:66px;text-align:center;font-size:13px;font-weight:700;letter-spacing:.08em;font-variant-numeric:tabular-nums;color:var(--lt-role-text-strong);white-space:nowrap}
+
+/* 무대 */
+.ex-stage{position:absolute;inset:calc(var(--lt-toolbar-top) + var(--lt-toolbar-height)) 0 0 0;overflow:hidden;background:var(--ex-bg);touch-action:none;cursor:grab;outline:0;user-select:none;-webkit-user-select:none;isolation:isolate}
+.ex-stage[data-dragging=true]{cursor:grabbing}
+.ex-stage:focus-visible{outline:2px solid var(--ex-point);outline-offset:-3px}
+.ex-stage[hidden]{display:none}
+
+/* 위쪽 원형 레일: 큰 원의 아랫부분만 보인다. 점 자리는 exhibit-model 이 정한다. */
+.ex-rail{position:absolute;inset:0;z-index:3;overflow:hidden;pointer-events:none}
+.ex-ring{position:absolute;left:var(--ex-ring-x,0px);top:var(--ex-ring-y,0px);width:var(--ex-ring-d,0px);height:var(--ex-ring-d,0px);border:1px solid var(--ex-hair);border-radius:50%}
+.ex-station{position:absolute;left:50%;top:var(--ex-station-y,90px);width:22px;height:22px;margin:-11px 0 0 -11px;border:1px solid var(--ex-point);border-radius:50%}
+.ex-node{position:absolute;left:0;top:0;display:flex;flex-direction:column;align-items:center;gap:5px;min-width:44px;min-height:44px;margin:0;padding:16px 6px 6px;border:0;background:transparent;color:var(--ex-muted);font-family:var(--lt-ui);white-space:nowrap;cursor:pointer;pointer-events:auto;transform:translate3d(var(--x,0px),var(--y,0px),0) translate(-50%,-19px)}
+.ex-node[hidden]{display:none}
+.ex-node-dot{flex:none;width:6px;height:6px;border-radius:50%;background:var(--ex-ink);opacity:var(--fade,1);transition:transform .16s ease,background-color .16s ease}
+.ex-node-label{max-width:var(--ex-label-w,150px);overflow:hidden;text-overflow:ellipsis;font-size:12px;line-height:1.35;font-weight:600;letter-spacing:.02em;visibility:hidden}
+.ex-node.is-labelled .ex-node-label{visibility:visible}
+.ex-node.is-active{color:var(--ex-ink)}
+.ex-node.is-active .ex-node-dot{background:var(--ex-point);opacity:1;transform:scale(1.5)}
+.ex-node.is-active .ex-node-label{font-size:13px;font-weight:700}
+.ex-node:hover{color:var(--ex-ink)}
+.ex-node:focus-visible{outline:2px solid var(--ex-point);outline-offset:-2px;border-radius:var(--lt-r-card)}
+
+/* 장면: 한 번에 주인공 하나. 쉬고 있을 때 이웃 장면은 화면 밖이다. */
+.ex-world{position:absolute;left:0;right:0;top:var(--ex-rail-h);bottom:var(--ex-foot-h);z-index:2}
+.ex-scene{position:absolute;inset:0;display:grid;grid-template-columns:auto minmax(220px,340px);column-gap:clamp(28px,4.5vw,84px);align-items:center;justify-content:center;padding:0 clamp(20px,4vw,72px);transform:translate3d(var(--x,0px),0,0) scale(var(--s,1));opacity:var(--o,1)}
+.ex-stage[data-moving=true] .ex-scene{will-change:transform,opacity}
+.ex-scene:not(.is-active){pointer-events:none}
+
+/* 작품: 썸네일은 손대지 않고(흑백·흐림·덮어 그리기 없음) 바깥 틀·받침만 꾸민다. */
+.ex-piece{position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;justify-self:end;min-width:0}
+.ex-frame{padding:10px;border:1px solid var(--ex-hair)}
+.ex-art{display:block;position:relative;width:min(var(--ex-cap-w,9999px),var(--ex-art-w),calc(var(--ex-art-h) * var(--ex-ar,1.7778)));aspect-ratio:var(--ex-ar,1.7778);margin:0;padding:0;border:0;background:var(--ex-wash);overflow:hidden;cursor:pointer;box-shadow:var(--lt-garden-shadow,0 0 0 0 transparent)}
+.ex-art img{display:block;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .3s ease;pointer-events:none;-webkit-user-drag:none}
+.ex-art.is-ready img{opacity:1}
+/* 흑백은 사용자가 올린 사진(같은 출처 그림)에만. 유튜브 썸네일에는 걸지 않는다. */
+html:not([data-ex-mono=off]) .ex-scene.is-photo .ex-art img{filter:grayscale(1) contrast(1.05)}
+.ex-art:focus-visible,.ex-placard:focus-visible{outline:2px solid var(--ex-point);outline-offset:4px}
+.ex-floor{width:76%;height:16px;margin-top:12px;background:radial-gradient(closest-side,color-mix(in srgb,var(--ex-ink) 20%,transparent),transparent);pointer-events:none}
+/* 그림이 없는 순간 = 종이 한 장(글 전시물) */
+.ex-placard{display:flex;flex-direction:column;justify-content:space-between;gap:12px;width:min(var(--ex-art-w),calc(var(--ex-art-h) * .8),420px);aspect-ratio:4/5;margin:0;padding:clamp(16px,2.2vw,32px);border:0;background:var(--lt-paper);color:var(--lt-ink);font-family:var(--lt-ui);text-align:left;cursor:pointer;box-shadow:0 0 0 1px var(--lt-line-paper),var(--lt-garden-shadow,0 0 0 0 transparent)}
+.ex-placard-kind,.ex-placard-foot{font-size:12px;line-height:1.4;font-weight:700;letter-spacing:.1em;color:color-mix(in srgb,var(--lt-ink) 80%,transparent)}
+.ex-placard-text{font-family:var(--lt-reading);font-size:clamp(17px,1.6vw,26px);line-height:1.55;overflow-wrap:anywhere;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:6;overflow:hidden}
+
+/* 글자 위계: (뒤 큰 글자) → 번호·날짜 → 제목 → 영상 제목 → 마음 한마디 → 보기 단추 */
+.ex-note{position:relative;z-index:1;display:grid;grid-template-columns:auto minmax(0,1fr);column-gap:16px;align-items:start;justify-self:start;width:100%;max-width:340px;text-align:left}
+/* 뒤 큰 낱말(감정): 작품이 네모라 가운데에 두면 다 가려진다 — 글 뒤에 두고 첫 글자만 작품 틀 뒤로 살짝 숨긴다. */
+.ex-ghost{position:absolute;z-index:-1;font-family:var(--lt-font-display);font-size:clamp(110px,15vw,300px);line-height:1;font-weight:800;letter-spacing:-.04em;white-space:nowrap;color:var(--ex-ghost);pointer-events:none}
+.ex-ghost::before{content:attr(data-word)}
+.ex-ghost.is-side{left:-.36em;top:50%;transform:translateY(-52%)}
+.ex-ghost.is-top{display:none;left:-.05em;bottom:calc(100% - .3em)}
+.ex-dot{width:42px;height:42px;margin-top:2px;border-radius:50%;background:var(--ex-tone,var(--ex-point))}
+.ex-dot[data-tone="1"]{--ex-tone:var(--lt-group-1)}.ex-dot[data-tone="2"]{--ex-tone:var(--lt-group-2)}.ex-dot[data-tone="3"]{--ex-tone:var(--lt-group-3)}
+.ex-dot[data-tone="4"]{--ex-tone:var(--lt-group-4)}.ex-dot[data-tone="5"]{--ex-tone:var(--lt-group-5)}.ex-dot[data-tone="6"]{--ex-tone:var(--lt-group-6)}
+.ex-copy{display:flex;flex-direction:column;align-items:flex-start;gap:8px;min-width:0}
+.ex-eyebrow{margin:0;font-size:12px;line-height:1.35;font-weight:700;letter-spacing:.12em;color:var(--ex-muted);font-variant-numeric:tabular-nums}
+.ex-title{margin:0;font-family:var(--lt-font-display);font-size:clamp(20px,1.75vw,30px);line-height:1.32;font-weight:700;letter-spacing:-.01em;overflow-wrap:anywhere;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden}
+.ex-sub{margin:0;font-size:13px;line-height:1.45;color:var(--ex-muted);overflow-wrap:anywhere;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:1;overflow:hidden}
+.ex-sub[hidden],.ex-memo[hidden]{display:none}
+.ex-memo{margin:0;font-size:14px;line-height:1.6;color:var(--ex-muted);overflow-wrap:anywhere;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+.ex-open{min-height:44px;margin:0;padding:0 2px;border:0;border-bottom:1px solid var(--ex-hair);background:transparent;color:var(--ex-ink);font-family:var(--lt-ui);font-size:13px;font-weight:700;letter-spacing:.08em;cursor:pointer}
+.ex-open:hover,.ex-open:focus-visible{color:var(--lt-role-hover-ink);border-bottom-color:var(--lt-role-hover-border)}
+.ex-open:focus-visible{outline:2px solid var(--ex-point);outline-offset:2px}
+
+/* 아래 안내와 진행 선 */
+.ex-guide{position:absolute;left:clamp(20px,3vw,56px);bottom:16px;z-index:3;display:flex;align-items:center;gap:12px;margin:0;font-size:12px;line-height:1.4;letter-spacing:.08em;color:var(--ex-muted);pointer-events:none}
+.ex-guide-line{width:34px;height:1px;background:var(--ex-hair)}
+.ex-progress{position:absolute;right:clamp(20px,3vw,56px);bottom:24px;z-index:3;width:clamp(72px,8vw,140px);height:1px;background:var(--ex-hair);pointer-events:none}
+.ex-progress-fill{display:block;height:1px;background:var(--ex-ink);transform-origin:left center;transform:scaleX(var(--p,0))}
+.ex-live{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.ex-empty{position:absolute;inset:calc(var(--lt-toolbar-top) + var(--lt-toolbar-height)) 0 0 0;display:grid;place-items:center;color:var(--ex-muted);font-size:14px}
+.ex-empty[hidden]{display:none}
+
+/* 순간 상세(시안의 미디어 뷰어 자리): 왼쪽 그림·오른쪽 글. 재생은 공용 크게 보기가 맡는다 — 이 판 안에는 플레이어를 넣지 않는다. */
+.ex-detail{width:min(1000px,calc(100% - 32px));max-width:none;max-height:calc(100% - 32px);padding:0;border:1px solid var(--ex-hair);border-radius:var(--lt-r-panel);background:var(--lt-stage-2);color:var(--ex-ink);overflow:hidden}
+.ex-detail::backdrop{background:color-mix(in srgb,var(--lt-stage) 78%,transparent)}
+.ex-detail-grid{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(280px,.7fr);min-height:min(520px,calc(100vh - 34px));max-height:calc(100vh - 34px)}
+.ex-detail-grid.is-plain{grid-template-columns:minmax(0,1fr);min-height:0}
+.ex-detail-media{display:grid;place-items:center;min-width:0;min-height:0;padding:clamp(16px,3vw,40px);background:var(--ex-wash);border-right:1px solid var(--ex-hair)}
+.ex-detail-media[hidden]{display:none}
+.ex-still{width:min(100%,calc(min(60vh,540px) * var(--ex-ar,1.7778)));aspect-ratio:var(--ex-ar,1.7778);overflow:hidden;background:var(--lt-stage-2)}
+.ex-still img{display:block;width:100%;height:100%;object-fit:cover}
+html:not([data-ex-mono=off]) .ex-still.is-photo img{filter:grayscale(.35)}
+.ex-quote{margin:0;max-width:26em;font-family:var(--lt-reading);font-size:clamp(18px,1.9vw,28px);line-height:1.6;color:var(--ex-ink);white-space:pre-wrap;overflow-wrap:anywhere}
+.ex-detail-info{display:flex;flex-direction:column;gap:14px;min-width:0;padding:clamp(22px,3vw,44px) clamp(20px,2.6vw,40px);overflow:auto}
+.ex-kicker{margin:0 48px 0 0;font-size:12px;line-height:1.5;font-weight:700;letter-spacing:.12em;color:var(--ex-muted);font-variant-numeric:tabular-nums}
+.ex-detail h2{margin:0;font-family:var(--lt-font-display);font-size:clamp(22px,2.2vw,36px);line-height:1.24;letter-spacing:-.02em;overflow-wrap:anywhere}
+.ex-detail-sub{margin:0;font-size:13px;line-height:1.5;color:var(--ex-muted);overflow-wrap:anywhere}
+.ex-detail-sub[hidden],.ex-detail-block[hidden]{display:none}
+.ex-label{margin:0 0 6px;font-size:12px;line-height:1.4;font-weight:700;letter-spacing:.12em;color:var(--ex-ink)}
+.ex-detail-text{margin:0;font-size:14px;line-height:1.7;color:var(--ex-muted);white-space:pre-wrap;overflow-wrap:anywhere}
+.ex-detail-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:auto;padding-top:8px}
+.ex-btn{display:inline-flex;align-items:center;min-height:44px;padding:0 18px;border:1px solid var(--lt-role-secondary-border);border-radius:var(--lt-r-pill);background:var(--lt-role-secondary-bg);color:var(--lt-role-secondary-ink);font-family:var(--lt-ui);font-size:13px;font-weight:700;letter-spacing:.04em;text-decoration:none;cursor:pointer}
+.ex-btn[hidden]{display:none}
+.ex-btn.is-primary{border-color:var(--lt-role-accent-bg);background:var(--lt-role-accent-bg);color:var(--lt-role-accent-ink)}
+.ex-btn:not(.is-primary):hover{background:var(--lt-role-hover-bg);border-color:var(--lt-role-hover-border);color:var(--lt-role-hover-ink)}
+.ex-btn:focus-visible,.ex-detail-close:focus-visible{outline:2px solid var(--ex-point);outline-offset:2px}
+.ex-detail-close{position:absolute;right:14px;top:12px;z-index:2;width:44px;height:44px;padding:0;border:1px solid var(--ex-hair);border-radius:50%;background:var(--lt-stage-2);color:var(--ex-ink);font-size:20px;line-height:1;cursor:pointer}
+
+/* 휴대폰 세로: 작품 위·글 아래로 쌓는다(시안은 390에서 글이 조각상 받침과 겹쳤다). */
+html[data-ex-layout=narrow]{--ex-rail-h:96px;--ex-foot-h:20px;--ex-chrome:262px;--ex-art-w:80vw;--ex-art-h:min(calc(var(--ex-stage-h) - var(--ex-rail-h) - var(--ex-foot-h) - var(--ex-chrome)),380px)}
+html[data-ex-layout=narrow] .ex-scene{grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto;row-gap:12px;align-content:center;justify-items:center;padding:0 20px}
+html[data-ex-layout=narrow] .ex-piece{justify-self:center}
+html[data-ex-layout=narrow] .ex-frame{padding:8px}
+html[data-ex-layout=narrow] .ex-note{justify-self:center;column-gap:12px;padding-right:56px}
+html[data-ex-layout=narrow] .ex-dot{width:28px;height:28px}
+html[data-ex-layout=narrow] .ex-ghost{font-size:clamp(84px,30vw,150px)}
+html[data-ex-layout=narrow] .ex-ghost.is-side{display:none}
+html[data-ex-layout=narrow] .ex-ghost.is-top{display:block}
+html[data-ex-layout=narrow] .ex-scene:is(.is-tall,.is-text) .ex-ghost.is-top{display:none}
+html[data-ex-layout=narrow] .ex-title{font-size:20px;-webkit-line-clamp:2}
+html[data-ex-layout=narrow] .ex-copy{gap:6px}
+html[data-ex-layout=narrow] .ex-guide{display:none}
+html[data-ex-layout=narrow] .ex-progress{left:20px;right:20px;bottom:9px;width:auto}
+html[data-ex-layout=narrow] .ex-placard{width:min(var(--ex-art-w),calc(var(--ex-art-h) * .8),300px)}
+html[data-ex-layout=narrow] .ex-detail-grid{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr);min-height:0}
+html[data-ex-layout=narrow] .ex-detail-media{padding:16px 16px 14px;border-right:0;border-bottom:1px solid var(--ex-hair)}
+html[data-ex-layout=narrow] .ex-still{width:min(100%,calc(34vh * var(--ex-ar,1.7778)))}
+
+/* 낮은 창(휴대폰 가로): 레일을 눕히고 글은 번호·제목·단추만 남긴다. */
+html[data-ex-layout=short]{--ex-rail-h:52px;--ex-foot-h:8px;--ex-chrome:26px;--ex-art-w:42vw;--ex-art-h:calc(var(--ex-stage-h) - var(--ex-rail-h) - var(--ex-foot-h) - var(--ex-chrome))}
+html[data-ex-layout=short] .ex-scene{column-gap:clamp(20px,4vw,48px)}
+html[data-ex-layout=short] .ex-frame{padding:5px}
+html[data-ex-layout=short] .ex-floor,html[data-ex-layout=short] .ex-memo,html[data-ex-layout=short] .ex-sub,html[data-ex-layout=short] .ex-guide{display:none}
+html[data-ex-layout=short] .ex-ghost{font-size:clamp(72px,14vw,120px)}
+html[data-ex-layout=short] .ex-dot{width:24px;height:24px}
+html[data-ex-layout=short] .ex-title{font-size:18px;-webkit-line-clamp:2}
+html[data-ex-layout=short] .ex-copy{gap:4px}
+html[data-ex-layout=short] .ex-progress{bottom:4px}
+html[data-ex-layout=short] .ex-node{padding-top:12px;transform:translate3d(var(--x,0px),var(--y,0px),0) translate(-50%,-15px)}
+html[data-ex-layout=short] .ex-placard{aspect-ratio:5/4;width:min(var(--ex-art-w),calc(var(--ex-art-h) * 1.25))}
+html[data-ex-layout=short] .ex-placard-text{-webkit-line-clamp:3;font-size:15px}
+html[data-ex-layout=short] .ex-detail-grid{min-height:0}
+html[data-ex-layout=short] .ex-still{width:min(100%,calc(56vh * var(--ex-ar,1.7778)))}
+
+/* 아주 넓은 화면(2000px 이상): 구도는 가운데에 모으고 글자만 한 단계 키운다. */
+html[data-ex-layout=huge]{--ex-rail-h:190px;--ex-foot-h:64px;--ex-chrome:110px;--ex-art-w:min(44vw,1180px);--ex-art-h:min(calc(var(--ex-stage-h) - var(--ex-rail-h) - var(--ex-foot-h) - var(--ex-chrome)),860px)}
+html[data-ex-layout=huge] .ex-scene{grid-template-columns:auto minmax(280px,460px);column-gap:112px}
+html[data-ex-layout=huge] .ex-note{max-width:460px;column-gap:22px}
+html[data-ex-layout=huge] .ex-dot{width:56px;height:56px}
+html[data-ex-layout=huge] .ex-eyebrow,html[data-ex-layout=huge] .ex-node-label,html[data-ex-layout=huge] .ex-guide{font-size:14px}
+html[data-ex-layout=huge] .ex-node.is-active .ex-node-label{font-size:16px}
+html[data-ex-layout=huge] .ex-title{font-size:40px}
+html[data-ex-layout=huge] .ex-sub{font-size:16px}
+html[data-ex-layout=huge] .ex-memo{font-size:18px}
+html[data-ex-layout=huge] .ex-open{font-size:15px}
+html[data-ex-layout=huge] .ex-frame{padding:14px}
+html[data-ex-layout=huge] .ex-placard{width:min(var(--ex-art-w),calc(var(--ex-art-h) * .8),560px)}
+
+/* 움직임 줄이기: 기기 설정과 러브트리 설정(움직임 멈춤) 둘 다 따른다. 넘김은 곧바로 바뀌고 서서히 바뀌는 효과를 끈다. */
+@media(prefers-reduced-motion:reduce){.ex-art img,.ex-node-dot{transition:none}}
+html[data-ex-motion=reduce] .ex-art img,html[data-ex-motion=reduce] .ex-node-dot{transition:none}
