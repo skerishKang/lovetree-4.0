@@ -1760,3 +1760,62 @@ test('#1530 cold thumbnail states',{skip: REQUIRE952 ? false : skip952,timeout:1
  try{const m=h.frame.locator('.recent-media');const snap=()=>m.evaluate(e=>{const i=e.querySelector('img');return {state:e.dataset.recentState,src:i?.src,width:i?.naturalWidth,opacity:i&&getComputedStyle(i).opacity,cover:!!e.querySelector('.lt-recent-fallback'),h:e.getBoundingClientRect().height}});const before=await snap();assert.equal(before.state,'loading');assert.equal(before.cover,false);assert.equal(before.opacity,'0');release();await h.frame.waitForFunction(()=>{const e=document.querySelector('#orbit')?.shadowRoot?.querySelector('.recent-media');const i=e?.querySelector('img');return e?.querySelector('.lt-recent-fallback')||i?.naturalWidth>0});const after=await snap();assert.equal(after.state,kind==='missing'?'failed':'ready');assert.equal(after.cover,kind==='missing');assert.equal(after.opacity,kind==='missing'?'0':'1');assert.equal(after.h,before.h);assert.equal(after.width>0,kind!=='missing');if(kind==='vertical')assert.match(after.src,/hqdefault/);assert.equal(await m.locator('.recent-play').isVisible(),false);}finally{release();await close952(h)}
  }}finally{await browser.close()}
 });
+
+// #1535: a document from the previous deployment must not leave an empty shell.
+test('#1535 deployment chunk recovery is bounded and shared by the home frame', {skip:skip952 && !REQUIRE952 ? skip952 : false}, async () => {
+  assert.ok(!skip952, String(skip952));
+  const server = await serve({}, {port:Number(process.env.LT_TEST_PORT)||0});
+  const browser = await chromium952.launch({headless:true});
+  const base = `http://127.0.0.1:${server.address().port}`;
+  try {
+    for (const mode of ['once','always','frame','late']) {
+      const ctx = await browser.newContext();
+      let docs=0, bad=0;
+      try {
+        await ctx.route('**/*', async r => {
+          const u=new URL(r.request().url());
+          if(u.origin!==base)return r.abort();
+          if(u.pathname.startsWith('/api/'))return r.fulfill({contentType:'application/json',body:'{"ok":true,"items":[]}'});
+          if(u.pathname==='/v41/'){
+            docs++;
+            if(mode==='frame'||mode==='late'||mode==='once'&&docs>1)return r.continue();
+            const res=await r.fetch();
+            return r.fulfill({response:res,body:(await res.text()).replace(/\/assets\/v41shell-[\w-]+\.js/g,'/assets/v41shell-oldchunk.js')});
+          }
+          if(mode==='frame'&&docs===1&&u.pathname==='/v41/home.html'){
+            const res=await r.fetch();
+            return r.fulfill({response:res,body:(await res.text()).replace(/\/assets\/v41home-[\w-]+\.js/g,'/assets/v41home-oldchunk.js')});
+          }
+          if(u.pathname.includes('oldchunk')){
+            bad++;
+            return r.fulfill({status:mode==='frame'?404:200,contentType:'text/html',body:'<html>missing chunk</html>'});
+          }
+          return r.continue();
+        });
+        const page=await ctx.newPage();
+        await page.goto(base+'/v41/#home').catch(error=>{if(!/ERR_ABORTED/.test(String(error)))throw error;});
+        const home=page.frameLocator('#view').locator('.center .actions');
+        if(mode==='late'){
+          await home.waitFor({state:'visible',timeout:15000});
+          await page.evaluate(()=>{import('/assets/late-oldchunk.js').catch(()=>{});});
+          // Vite emits this event on a failed dynamic dependency even when the caller catches it.
+          await page.evaluate(()=>dispatchEvent(new Event('vite:preloadError',{cancelable:true})));
+        }
+        if(mode==='always'){
+          const notice=page.locator('#lt-deploy-recovery button');
+          await notice.waitFor({state:'visible',timeout:15000});
+          assert.equal(await notice.textContent(),'\uc0c8 \ubc84\uc804\uc774 \uc788\uc5b4\uc694 \u2014 \ub2e4\uc2dc \ubd88\ub7ec\uc624\uae30');
+          assert.equal(await page.evaluate(()=>sessionStorage.getItem('lt41.deployRecovery.v1')),'1');
+        }else{
+          await page.waitForFunction(()=>performance.getEntriesByType('navigation')[0]?.type==='reload',null,{timeout:15000});
+          await home.waitFor({state:'visible',timeout:15000});
+          assert.equal(await page.locator('#lt-deploy-recovery').count(),0);
+          assert.equal(await page.evaluate(()=>sessionStorage.getItem('lt41.deployRecovery.v1')),null);
+        }
+        await page.waitForTimeout(1000);
+        assert.equal(docs,2,mode+' reload count');
+        assert.equal(bad,mode==='always'?2:1,mode+' missing chunk requests');
+      }finally{await ctx.close();}
+    }
+  }finally{await browser.close();await new Promise(r=>server.close(r));}
+});
