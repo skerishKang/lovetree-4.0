@@ -11,6 +11,7 @@
 import { mkdirSync, writeFileSync, existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import { installVisualPublicApiStubs } from './public-api-stub.mjs';
 
 // 화면별 기준치(%). 기억 보드는 실·핀 선을 매 로드마다 미세하게 다시 그려 0.1%를 넘는 장이 나온다
 // (정리는 리팩터링 3단계 예정, #231).
@@ -288,6 +289,9 @@ async function capture(argv) {
             try { localStorage.setItem('lt41.theme', value); } catch {}
           }, theme);
           await context.addInitScript(FREEZE_INNER);
+          // #1585: 두 배포 주소 모두 촬영 브라우저 안에서만 같은 공개 값을 받는다.
+          const apiStubs = new Set();
+          await installVisualPublicApiStubs(context, options.base, (requestPath) => apiStubs.add(requestPath));
           const page = await context.newPage();
           const name = scene.openAccount ? `account-${viewport.tag}-${theme}.png` : shotName(scene.name, viewport, theme);
           try {
@@ -324,7 +328,7 @@ async function capture(argv) {
               unstable += 1;
               continue;
             }
-            manifest.push({ shot: name, scene: scene.name, opened: true, shown: href, stable });
+            manifest.push({ shot: name, scene: scene.name, opened: true, shown: href, stable, apiStubs: [...apiStubs].sort() });
             if (!stable) unstable += 1;
             count += 1;
           } finally {
