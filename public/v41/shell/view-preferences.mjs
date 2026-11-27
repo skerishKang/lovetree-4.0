@@ -86,7 +86,9 @@ export function createViewPreferences(ctx){
 
   function applyTheme(theme=readTheme(localStorage)){return applyThemeFor(ctx.current,theme);}
 
-  function toggleTheme(){const theme=toggleThemeFor(ctx.current);(0,ctx.syncBoardThemeToApp)(theme);return theme;}
+  function reflectTheme(value){const theme=writeTheme(localStorage,value);applyTheme(theme);paintThemeControls(theme);(0,ctx.syncBoardThemeToApp)(theme);return theme;}
+  function setTheme(value){const theme=reflectTheme(value);if(ctx.member?.snapshot().owned){try{ctx.member.apply('setPrefs',{theme});if(window.LT41)window.LT41.prefs=ctx.member.state().prefs;}catch(error){(0,ctx.notify)('테마를 계정에 저장하지 못했어요. 다시 시도해 주세요.');}}return theme;}
+  function toggleTheme(){return setTheme(nextTheme(readTheme(localStorage)));}
   Object.defineProperties(ctx,{
     openFallbackShell:{value:openFallbackShell},
     currentPrefs:{value:currentPrefs},
@@ -104,6 +106,8 @@ export function createViewPreferences(ctx){
     backfillAttempted:{get:()=>backfillAttempted,set:value=>{backfillAttempted=value;}},
     runTitleBackfill:{value:runTitleBackfill},
     applyTheme:{value:applyTheme},
+    reflectTheme:{value:reflectTheme},
+    setTheme:{value:setTheme},
     toggleTheme:{value:toggleTheme}
   });
   return {mount(){

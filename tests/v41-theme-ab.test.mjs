@@ -162,7 +162,7 @@ test('#1026 첫 화면은 문서와 카드 영역 모두 처음부터 기기 테
         requestAnimationFrame(sample);
       }, theme);
       await ctx.route('**/api/**',route=>route.fulfill({status:200,contentType:'application/json',body:'{"ok":true,"items":[]}'}));
-      await ctx.route('**/api/workspace*',route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({revision:1,state:{version:1,trees:[]},subject:'시험계정',writeSubjectBound:true,savedAt:'2026-11-20T00:00:00.000Z'})}));
+      await ctx.route('**/api/workspace*',route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({revision:1,state:{version:1,trees:[],prefs:{theme}},subject:'시험계정',writeSubjectBound:true,savedAt:'2026-11-20T00:00:00.000Z'})}));
       await ctx.route('**/assets/v41home-*.js',async route=>{await new Promise(resolve=>setTimeout(resolve,600));await route.continue();});
       const page=await ctx.newPage();
       await page.goto(base+'/v41/?account=1#home');
@@ -195,7 +195,7 @@ test('952 실행: 밤이 기본이고 정원 저장은 다음 부팅에 유지�
       const urls = [];
       if (c.stored) await ctx.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); } catch {} }, c.stored);
       await ctx.route('**/api/**', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
-      await ctx.route('**/api/workspace*', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ revision: 1, state: { version: 1, trees: [] }, subject: '검사기계정', writeSubjectBound: true, savedAt: '2026-11-16T09:00:00.000Z' }) }));
+      await ctx.route('**/api/workspace*', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ revision: 1, state: { version: 1, trees: [], prefs: {theme:c.want} }, subject: '검사기계정', writeSubjectBound: true, savedAt: '2026-11-16T09:00:00.000Z' }) }));
       const page = await ctx.newPage();
       page.on('request', (r) => urls.push(r.url()));
       await page.goto(`${base}/v41/?account=1`, { waitUntil: 'load' });
@@ -277,7 +277,7 @@ test('셸과 각 화면 iframe의 테마가 같고 테마 전환은 프레임을
         },true);
       },initial);
       await ctx.route('**/api/**',route=>route.fulfill({status:200,contentType:'application/json',body:'{"ok":true,"items":[]}'}));
-      await ctx.route('**/api/workspace*',route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({revision:1,state:{version:1,trees:[tree]},subject:'시험계정',writeSubjectBound:true,savedAt:'2026-11-20T00:00:00.000Z'})}));
+      await ctx.route('**/api/workspace*',route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({revision:1,state:{version:1,trees:[tree],prefs:{theme:initial}},subject:'시험계정',writeSubjectBound:true,savedAt:'2026-11-20T00:00:00.000Z'})}));
       const page = await ctx.newPage();
       await page.goto(base+'/v41/?account=1#home');
       await page.waitForFunction(()=>!!window.LT41?.trees?.length,null,{timeout:20000});
@@ -365,4 +365,30 @@ test('책/목록 보기는 기본 책, 미러 저장·반환, 서재·책에서�
   assert.equal(shelfViewAriaLabel('carousel'), '회전 책장 보기');
   assert.equal(shelfViewPressed('shelf'), false);
   assert.equal(shelfViewPressed('carousel'), true);
+});
+
+
+test('#1558 guest theme stays local without workspace writes', {skip:skip952t||undefined}, async()=>{
+  const {serve}=await import('./helpers/screen-audit.mjs');
+  const server=await serve({});
+  const browser=await chromium952t.launch({headless:true});
+  try {
+    const ctx=await browser.newContext({viewport:{width:1440,height:900},reducedMotion:'reduce'});
+    let puts=0;
+    await ctx.route('**/api/**',r=>r.fulfill({status:200,contentType:'application/json',body:'{"ok":true,"items":[]}'}));
+    await ctx.route('**/api/workspace*',r=>{
+      if(r.request().method()==='PUT')puts++;
+      return r.fulfill({status:401,contentType:'application/json',body:'{"error":{"code":"unauthenticated"}}'});
+    });
+    const page=await ctx.newPage();
+    await page.goto('http://127.0.0.1:'+server.address().port+'/v41/#home');
+    await page.waitForFunction(()=>document.getElementById('theme-toggle')?.onclick);
+    await page.evaluate(()=>document.getElementById('theme-toggle').click());
+    await page.waitForFunction(()=>localStorage.getItem('lt41.theme')==='garden'&&document.documentElement.dataset.ltTheme==='garden');
+    await page.reload();
+    await page.waitForFunction(()=>document.getElementById('theme-toggle')?.onclick);
+    assert.equal(await page.evaluate(()=>document.documentElement.dataset.ltTheme),'garden');
+    assert.equal(puts,0);
+    await ctx.close();
+  } finally {await browser.close();await new Promise(resolve=>server.close(resolve));}
 });

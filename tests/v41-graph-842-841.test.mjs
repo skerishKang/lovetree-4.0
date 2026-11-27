@@ -143,6 +143,9 @@ test('#1057 점에 초점을 두고 Enter·Space — 묶음·순간 상세가 �
     await graph.locator('#gBadge').waitFor({ timeout: 10000 });
     const detail = () => graph.locator('#detailCard').innerText();
     const dots = graph.locator('#gsvg g[role="button"][tabindex="0"]');
+    // #1057: 배지의 표시와 SVG 점 생성은 같은 준비 조건이 아니다.
+    // 두 번째 점이 붙을 때까지 기존 10초 상한 안에서 기다린 뒤 개수를 검사한다.
+    await dots.nth(1).waitFor({ state: 'attached', timeout: 10000 });
     const count = await dots.count();
     assert.ok(count >= 2, `누를 수 있는 점이 있다(실제 ${count}개)`);
     // 순간 점에 초점을 두고 Enter — 순간 상세가 열린다.

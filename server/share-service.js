@@ -3,7 +3,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { coverModeOf, normalizeCoverDesign } from '../src/domain.js';
 import { normalizeTreeOpenView } from '../public/v41/tree-open-view.mjs';
 import { safePublicThumbnail } from '../public/v41/public-thumbnail.mjs';
-import { isPrivateMediaUrl, projectPublicStats, projectPublicTree } from './public-projection.js';
+import { isPrivateMediaUrl, projectPublicStats, projectPublicTree, projectPublicVisitPrefs } from './public-projection.js';
 import { youtubeIdFrom, youtubeStageThumbUrl } from '../public/v41/youtube-id.mjs';
 import { ApiError } from './errors.js';
 import { readStoredDocument } from './workspace-service.js';
@@ -84,7 +84,7 @@ function shelfItem(tree, shareId) {
   };
 }
 
-export function createShareService({ shareRepo, workspaceRepo, visibilityRepo = null, discoverRepo = null, communityRepo = null, admin = null, stageIndex = null, pendingShowSync = null, productId, makeId = () => randomBytes(18).toString('base64url') }) {
+export function createShareService({ shareRepo, workspaceRepo, visibilityRepo = null, discoverRepo = null, communityRepo = null, admin = null, stageIndex = null, pendingShowSync = null, visitCounts = null, productId, makeId = () => randomBytes(18).toString('base64url') }) {
   const refreshStages = subjectId => refreshStageIndex(stageIndex, { productId, subjectId });
   // #1163(#1068 2단계): 응답 뒤에 시작되는 보임 동기화의 진행 중 Promise — 시험·종료 정리가 기다린다.
   const showTasks = new Set();
@@ -269,7 +269,7 @@ export function createShareService({ shareRepo, workspaceRepo, visibilityRepo = 
       if (aiTester) shared.aiTester = true;
       return shared;
     },
-    async readVisit(shareId) {
+    async readVisit(shareId, visitor = {}) {
       if (!SHARE_ID.test(shareId)) throw new ApiError(404, 'share_invalid', '공유 주소 형식이 올바르지 않아요.');
       const row = await shareRepo.load({ productId, shareId });
       if (!row) throw new ApiError(404, 'share_not_found', '공유 주소를 찾을 수 없어요.');
@@ -277,6 +277,7 @@ export function createShareService({ shareRepo, workspaceRepo, visibilityRepo = 
       if (await isHiddenShare(communityRepo, { ...row, productId })) throw new ApiError(404, 'share_not_found', '공유 주소를 찾을 수 없어요.');
       const { tree, omittedPrivateMedia, aiTester, stored } = await sharedTree(row);
       const shelf = [shelfItem(tree, row.shareId)];
+      const shelfShareIds = new Map([[row.treeId, row.shareId]]);
       if ((await treeDiscover(row.subjectId, row.treeId)).discover) {
         const summaries = communityRepo?.listDiscoverableSummaries
           ? await communityRepo.listDiscoverableSummaries({ productId, viewerSubjectId: null, limit: 240 })
@@ -296,6 +297,7 @@ export function createShareService({ shareRepo, workspaceRepo, visibilityRepo = 
           catch { continue; }
           if (!projected.tree.moments.length) continue;
           shelf.push(shelfItem(projected.tree, candidate.shareId));
+          shelfShareIds.set(candidate.treeId, candidate.shareId);
         }
       }
       const stats = communityRepo?.stats
@@ -310,11 +312,12 @@ export function createShareService({ shareRepo, workspaceRepo, visibilityRepo = 
           updatedAt: tree.updatedAt,
           aiTester,
           ownerLabel: '',
+          prefs: projectPublicVisitPrefs(stored.doc.prefs, shelfShareIds),
           omittedPrivateMedia
         },
         tree,
         shelf,
-        stats: projectPublicStats(stats)
+        stats: { ...projectPublicStats(stats), visits: visitCounts ? await visitCounts.record(shareId, visitor) : 0 }
       };
     },
     // === 저장 성공 뒤 공유 동기화(#538, B-12 2단계 #1163) ===
@@ -367,7 +370,7 @@ export function createShareService({ shareRepo, workspaceRepo, visibilityRepo = 
   };
 }
 
-export function createShareHandler({ authenticate, service, productId }) {
+export function createShareHandler({ authenticate, service, productId, visitProxyTrusted = () => false }) {
   async function owner(request) {
     let verified;
     try { verified = await authenticate(request); }
@@ -384,7 +387,16 @@ export function createShareHandler({ authenticate, service, productId }) {
     const visitMatch = path.match(/^\/api\/public\/visits\/([^/]+)$/);
     if (visitMatch) {
       if (method !== 'GET') throw new ApiError(405, 'method_not_allowed', '이 요청은 지원하지 않아요.');
-      return visitResponse(request, await service.readVisit(visitMatch[1]));
+      let visitor = {};
+      if (visitProxyTrusted(request)) {
+        const cookie = String(request.headers?.cookie || '');
+        const hasCredential = /(?:^|;\s*)__Host-lovetree-access=/.test(cookie) || !!request.headers?.authorization;
+        visitor = { trusted: true, clientIp: request.headers?.['x-lovetree-client-ip'], authKnown: !hasCredential };
+        if (hasCredential) {
+          try { visitor.subjectId = await owner(request); visitor.authKnown = true; } catch { /* 확인되지 않은 로그인은 세지 않는다. */ }
+        }
+      }
+      return visitResponse(request, await service.readVisit(visitMatch[1], visitor));
     }
     const subjectId = await owner(request);
     if (path === '/api/shares/preview') {

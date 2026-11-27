@@ -122,10 +122,10 @@ export function createWorkspaceService({ repo, productId, onCommit = null, onAcc
       const stored = await repo.load({ productId: principal.productId, subjectId: principal.subjectId });
       // subject는 검증된 주체 식별자만 되돌린다. 이 기기에 남은 미전송 기록이
       // 어느 계정의 것인지 다음 로그인에 가려 읽기 위한 최소 정보다.
-      if (!stored) return { revision: 0, savedAt: null, state: EMPTY_STATE(), subject: principal.subjectId };
+      if (!stored) return { revision: 0, savedAt: null, state: EMPTY_STATE(), subject: principal.subjectId, themeMissing: true };
       const scan = readStoredDocument(stored.doc);
       if (!scan) throw new ApiError(500, 'stored_document_invalid', '보관된 기록을 읽을 수 없어요.');
-      const body = { revision: stored.revision, savedAt: stored.savedAt, state: scan.state, subject: principal.subjectId };
+      const body = { revision: stored.revision, savedAt: stored.savedAt, state: scan.state, subject: principal.subjectId, ...(!Object.hasOwn(stored.doc.prefs || {}, 'theme') ? { themeMissing: true } : {}) };
       // 빠진(격리된) 트리는 개수만 알린다 — 원본 내용은 응답에 보내지 않는다.
       if (scan.quarantined.length) body.quarantined = scan.quarantined.length;
       return body;

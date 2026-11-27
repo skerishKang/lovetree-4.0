@@ -1,12 +1,13 @@
 import {createSyncController} from './sync-controller.mjs';
+import {readTheme,THEME_KEY} from './header-state.mjs';
 import {EMPTY_STATE,validateState,createTree,editTree,addMoment,editMoment,reparentMoment,removeMoment,undoMomentDelete,linkMoments,unlinkMoments,cacheMomentMediaMetadata,quickAdd,moveMoment,treeFromMoments,organizeMoments,undoOrganize,MAX_TREES,newId,updatePrefs} from './domain.mjs';
 // Reuses 4.0 persistence, retries and revision conflicts; demo/file records cannot enter this session.
 function sessionDraftStorage(){try{return globalThis.sessionStorage||null;}catch{return null;}}
 function sessionCacheStorage(){try{return globalThis.localStorage||null;}catch{return null;}}
-export function createMemberSession({api,onState=()=>{},onStatus=()=>{},onGuard=()=>{},navigate=()=>{},delay,makeClientKey=()=>`v41-${newId()}`,draftStorage=sessionDraftStorage(),cacheStorage=sessionCacheStorage()}){
- let document=EMPTY_STATE(),subject=null,bound=false,active=true,mismatch=false;
+export function createMemberSession({api,onState=()=>{},onStatus=()=>{},onGuard=()=>{},navigate=()=>{},delay,makeClientKey=()=>`v41-${newId()}`,draftStorage=sessionDraftStorage(),cacheStorage=sessionCacheStorage(),themeStorage=cacheStorage}){
+ let document=EMPTY_STATE(),subject=null,bound=false,active=true,mismatch=false,themeMissing=false,migrateTheme=false;
  const wrapped={get:async()=>{const result=await api.get();if(!active)return {ok:false,status:401};
-   if(result.ok){if(subject&&subject!==result.subject){mismatch=true;bound=false;return {ok:false,status:401,code:'account_changed'};}subject=result.subject;bound=result.writeSubjectBound===true&&typeof subject==='string'&&!!subject;}return result;},
+   if(result.ok){if(subject&&subject!==result.subject){mismatch=true;bound=false;return {ok:false,status:401,code:'account_changed'};}subject=result.subject;bound=result.writeSubjectBound===true&&typeof subject==='string'&&!!subject;themeMissing=result.themeMissing===true||!Object.hasOwn(result.state?.prefs||{},'theme');migrateTheme=false;if(themeMissing&&bound){try{migrateTheme=result.themeMissing===true&&themeStorage?.getItem(THEME_KEY)!=null;}catch{}result.state={...result.state,prefs:{...result.state.prefs,theme:readTheme(themeStorage)}};}}return result;},
  put:(body,options)=>{if(!active||!bound||mismatch||!subject)return Promise.resolve({ok:false,status:401});return api.put({...body,expectedSubject:subject},options);},logout:()=>api.logout()};
  const sync=createSyncController({getState:()=>document,replaceState:s=>{if(!active)return;document=validateState(s);onState(structuredClone(document));},onGuard,api:wrapped,draftStorage,cacheStorage,delay,makeClientKey,navigate:url=>navigate(url.startsWith('/auth/login')?'/auth/login?next=/v41/':url),onChange:s=>{if(active)onStatus({...s,writable:sync.snapshot().owned&&bound&&!mismatch,dirty:sync.snapshot().dirty});}});
  // 이슈 644 3번: 탭을 다시 보거나 창으로 돌아오면 최신 기록을 확인한다. 이 화면에서 고친 게 없을 때만
@@ -113,5 +114,6 @@ export function createMemberSession({api,onState=()=>{},onStatus=()=>{},onGuard=
    const modelOnly=metaHint??(action==='editTree'?{tree:true}:(action==='edit'||action==='delete'||action==='reparent'||action==='link'||action==='unlink'||action==='cacheMediaMetadata'?{moment:true}:undefined));
    onState(structuredClone(document),{treeId,momentId},modelOnly);sync.markLocalSave();return {treeId,momentId};
  }
- return {start:()=>sync.start(),apply,act:name=>sync.act(name),flushOnHide:()=>sync.flushOnHide(),snapshot:()=>({...sync.snapshot(),subject,writable:sync.snapshot().owned&&bound&&!mismatch,phase:sync.status().phase}),state:()=>structuredClone(document),dispose:()=>{active=false;bound=false;globalThis.document?.removeEventListener?.('visibilitychange',onVisible);globalThis.removeEventListener?.('pagehide',onHide);globalThis.removeEventListener?.('focus',quietCheck);},status:()=>sync.status()};
+ async function start(){await sync.start();if(active&&migrateTheme&&bound&&sync.status().phase==='synced'&&!sync.snapshot().dirty){migrateTheme=false;apply('setPrefs',{theme:document.prefs.theme});}return sync.status();}
+ return {start,apply,act:name=>sync.act(name),flushOnHide:()=>sync.flushOnHide(),snapshot:()=>({...sync.snapshot(),subject,writable:sync.snapshot().owned&&bound&&!mismatch,phase:sync.status().phase}),state:()=>structuredClone(document),dispose:()=>{active=false;bound=false;globalThis.document?.removeEventListener?.('visibilitychange',onVisible);globalThis.removeEventListener?.('pagehide',onHide);globalThis.removeEventListener?.('focus',quietCheck);},status:()=>sync.status()};
 }

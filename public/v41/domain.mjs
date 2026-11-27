@@ -2,6 +2,7 @@
 import { localDateOnly } from './local-date.mjs';
 import { isAutoTitle, autoTitleFor } from './auto-title.mjs';
 import { DEFAULT_TREE_OPEN_VIEW, normalizeTreeOpenView } from './tree-open-view.mjs';
+import './theme-registry.js';
 
 // #792: 순간 구간의 순수 계산(서버 사본 src/moment-range.js와 같은 규칙 — tests/moment-range-792.test.mjs가 대조).
 export const MAX_RANGE_SECONDS = 12 * 60 * 60;
@@ -251,6 +252,7 @@ export function normalizeTreeChipOrder(value) {
 }
 export function normalizePrefs(value) {
   return {
+    theme: globalThis.LT41_THEME_REGISTRY.normalize(value?.theme),
     titleDisplay: normalizeTitleDisplay(value?.titleDisplay),
     displayName: normalizeDisplayName(value?.displayName),
     accentColor: normalizeAccentColor(value?.accentColor),
