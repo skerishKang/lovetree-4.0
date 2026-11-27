@@ -151,7 +151,7 @@ test('#619-5 화면: 열마다 차곡차곡 쌓이고, 폭이 바뀌면 칸 수�
       // 순서(spec): 첫 장은 날짜 최신순 첫 장이다(모든 폭에서 같다).
       assert.equal(g.topLeft, expected[0], '맨 위 왼쪽 카드는 날짜순 첫 장');
     }
-    // 390: 1칸으로 쌓이고, 위에서 아래 순서가 날짜순이다.
+    // 390: featured 한 장과 아래 두 열로 쌓이고, 맨 위는 날짜순 첫 장이다.
     await context.close();
     const narrow = await openHost(browser, `${base}/__host-stack.html`, { width: 390, height: 844 });
     const one = await narrow.frame.evaluate(() => {
@@ -159,7 +159,7 @@ test('#619-5 화면: 열마다 차곡차곡 쌓이고, 폭이 바뀌면 칸 수�
       cards.sort((a, b) => a.y - b.y);
       return { cols: [...new Set(cards.map((c) => c.x))].length, top: cards[0]?.id };
     });
-    assert.equal(one.cols, 1, '390은 1칸');
+    assert.equal(one.cols, 3, '390은 featured 한 장과 두 열이다');
     assert.equal(one.top, expected[0], '390에서도 맨 위는 날짜순 첫 장(순서는 같다)');
     await narrow.context.close();
     // 1980: 6칸, 그래도 맨 위는 같다.

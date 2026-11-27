@@ -12,6 +12,7 @@ await import('../public/v41/toast-timer.js');
 await import('../public/v41/views/board/board-model.js');
 const M = globalThis.LT58Model;
 const REQUIRE = process.env.LT_BOARD_ORDER_619_REQUIRE === '1';
+const TEST_PORT = Number(process.env.LT_BOARD_ORDER_619_PORT || 0);
 
 test('#619-6 모델: 순서 값(y)은 -10000+순위이며, 순서로 읽는 조건이 맞는다', () => {
   assert.equal(M.ORDER_Y_BASE, -10000);
@@ -101,7 +102,7 @@ function serve(extra = {}) {
     res.writeHead(200, { 'content-type': MIME[path.extname(file)] || 'application/octet-stream' });
     res.end(body);
   });
-  return listenOnSafePort(server, '127.0.0.1').then(() => server);
+  return listenOnSafePort(server, '127.0.0.1', { port: TEST_PORT }).then(() => server);
 }
 
 const starTree = (n, { old = false, mixed = false } = {}) => {

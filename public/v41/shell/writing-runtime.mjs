@@ -79,7 +79,7 @@ export function createWritingRuntime(ctx){
       getMember:()=>ctx.member,
       getSource:()=>ctx.source,
       getUploads:()=>uploads,
-      notify:text=>(0,ctx.notify)(text),
+      notify:(text,options)=>(0,ctx.notify)(text,options),
       panel:id=>(0,ctx.panel)(id),
       // #368: 읽기 전용 안내는 내 기록 창 대신 설정 "내 데이터" 묶음으로 연다.
       openSettingsData:intent=>(0,ctx.openAccountData)(intent),
@@ -132,6 +132,7 @@ export function createWritingRuntime(ctx){
       openSettingsData:intent=>(0,ctx.openAccountData)(intent),
       choose:(id,momentId)=>(0,ctx.choose)(id,momentId),
       openEditor:(mode,parentId)=>openEditor(mode,parentId),
+      prepareAddParent:parentId=>shellPanels.prepareAddParent(parentId),
       resumeMember:intent=>(0,ctx.resumeMember)(intent),
       resetEditorBaseline:()=>shellPanels.startQuickSession(),
       openLoginStart:intent=>(0,ctx.openLoginStart)(intent),
@@ -183,7 +184,7 @@ export function createWritingRuntime(ctx){
     // 보일지 말지는 빈 화면을 그리는 곳(workspace-runtime paintEmptyForScreen)이 정한다.
     bookmarkEmptyEntry=mountEmptyBookmarkEntry({$:ctx.$,onOpen:()=>shellBookmarkImport.open()});
 
-    (0,ctx.$)('write-menu').onclick=()=>{if(ctx.source!=='server'&&ctx.member?.snapshot().owned){void (0,ctx.resumeMember)('write');return;}if(ctx.member?.snapshot().dirty){(0,ctx.explainSaveState)();return;}shellQuick.openWrite();};
+    (0,ctx.$)('write-menu').onclick=()=>{if(ctx.source!=='server'&&ctx.member?.snapshot().owned){void (0,ctx.resumeMember)('write');return;}if(ctx.member?.snapshot().dirty){(0,ctx.explainSaveState)();return;}const tree=window.LT41?.tree;const target=ctx.current==='track58-pinboard.html'&&tree&&window.LT41.momentId?{treeId:tree.id,parentId:window.LT41.momentId}:{};shellQuick.openWrite(target);};
 
     // #458: 모바일 떠 있는 ＋ 단추 — 헤더의 ＋ 순간 추가와 같은 길(같은 창)을 연다. 단추는 body.lt-fab-ok일 때만 보인다.
     (0,ctx.$)('mobile-add').addEventListener('click',()=>(0,ctx.$)('write-menu').click());
@@ -285,6 +286,7 @@ export function createWritingRuntime(ctx){
       openTreeManager:()=>shellPanels.openTreeManager(),
       openTagManager:opts=>shellTagManager.open(opts),
       openEditor:(mode,parentId)=>openEditor(mode,parentId),
+      deleteMoment:options=>shellPanels.deleteMoment(options),
       openNewTree:()=>openEditor('new'),
       // 이슈 671: lt41-write의 새로 추가(new·add)는 쓰기 창 한 길로 — 목적지(트리·이어질 순간)를 함께 넘긴다.
       openWriteEntry:target=>shellQuick.openWrite(target),

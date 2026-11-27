@@ -107,7 +107,7 @@ test('실행: 접근성 세 규칙(image-alt·button-name·label) 위반은 0이
     await scanPage(pageOut, '로그아웃·의견 보내기');
     await out.close();
 
-    // 2) 모의 로그인 — 보드(크게 보기·추가 창·수정 창) + 설정 프로필(표시 이름 칸)
+    // 2) 모의 로그인 — 보드(크게 보기·추가 창·공용 편집 창) + 설정 프로필(표시 이름 칸)
     const inw = await browser.newContext({viewport: {width: 1440, height: 900}, reducedMotion: 'reduce'});
     const tree = treeA17();
     await inw.route('**/api/**', (route) => route.fulfill({status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}'}));
@@ -124,15 +124,16 @@ test('실행: 접근성 세 규칙(image-alt·button-name·label) 위반은 0이
         await frameB.evaluate((id) => openViewer(id), firstId).catch(() => {});
         await pageIn.waitForTimeout(700);
         await scanPage(pageIn, '모의로그인·보드 크게 보기');
-        await frameB.evaluate(() => document.getElementById('viewerModal')?.classList.remove('open')).catch(() => {});
+        await frameB.evaluate(() => LTMedia.closeLightbox()).catch(() => {});
         await frameB.evaluate(() => openAdd()).catch(() => {});
         await pageIn.waitForTimeout(700);
         await scanPage(pageIn, '모의로그인·보드 추가 창');
         await frameB.evaluate(() => document.getElementById('addModal')?.classList.remove('open')).catch(() => {});
         await frameB.evaluate((id) => { selectMoment(id, true); openEdit(); }, firstId).catch(() => {});
+        await pageIn.waitForSelector('#write-panel[open]', {timeout: 8000});
         await pageIn.waitForTimeout(700);
-        await scanPage(pageIn, '모의로그인·보드 수정 창');
-        await frameB.evaluate(() => document.getElementById('editModal')?.classList.remove('open')).catch(() => {});
+        await scanPage(pageIn, '모의로그인·보드 공용 편집 창');
+        await pageIn.evaluate(() => document.getElementById('write-panel')?.close()).catch(() => {});
       }
     }
     await pageIn.evaluate(() => document.getElementById('account-avatar')?.click()).catch(() => {});

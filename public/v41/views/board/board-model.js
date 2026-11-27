@@ -10,6 +10,7 @@ window.LT58Model = (() => {
   // 칸 수는 화면 폭이 정한다: 1440에서 4칸, 390에서 1칸, 2560에서 8칸. 카드 폭 242px + 사이 여백.
   function gridColumns(vw, count = 0) {
     const width = Number(vw) || 0;
+    if (width > 0 && width < 700) return width >= 336 ? 2 : 1;
     const baseline = Math.max(1, Math.floor((width - 32) / COL_PITCH));
     // 40개 이하 기존 판 배치는 유지하고 48개 이상에서만 넓은 화면 열을 확장한다.
     return width >= 1200 && count >= 48
@@ -26,9 +27,9 @@ window.LT58Model = (() => {
   }
   // 각 열의 다음 카드가 놓일 y. 열마다 따로 쌓으므로 짧은 카드만 있는 열은
   // 긴 카드가 다른 열에 있어도 그 높이까지 아래 카드가 내려가지 않는다(줄 맞춤이 아니다).
-  function stackLayout(ids, { cols = 4, reservedOf = null } = {}) {
+  function stackLayout(ids, { cols = 4, reservedOf = null, startY = GRID_MARGIN } = {}) {
     const n = Math.max(1, Math.floor(Number(cols)) || 1);
-    const tops = new Array(n).fill(GRID_MARGIN);
+    const tops = new Array(n).fill(Number.isFinite(Number(startY)) ? Number(startY) : GRID_MARGIN);
     const out = new Map();
     for (const id of ids) {
       let col = 0;
@@ -107,8 +108,8 @@ window.LT58Model = (() => {
     return tops;
   }
   // 슬롯 → 픽셀 자리. 줄의 y는 gridRowTops가 정한 값을 그대로 쓴다.
-  function gridPosition(col, rowY, i) {
-    return { x: GRID_MARGIN + col * COL_PITCH, y: rowY, rot: ((Number(i) || 0) % 3 - 1) * 2 };
+  function gridPosition(col, rowY, i, { margin = GRID_MARGIN, pitch = COL_PITCH } = {}) {
+    return { x: margin + col * pitch, y: rowY, rot: ((Number(i) || 0) % 3 - 1) * 2 };
   }
   // #601: 이 x가 핀보드가 저장한 칸 자리인가 — 카드 x는 칸 위치(GRID_MARGIN+col*300)에 스냅되어 저장된다.
   // 옛 관계 배치의 x·y는 아무 값이나 있으므로(±2px 안에 칸 위치가 거의 없다),

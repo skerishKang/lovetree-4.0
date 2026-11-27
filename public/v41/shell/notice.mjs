@@ -80,6 +80,9 @@ function paintToast(toast, text, action) {
   btn.type = 'button';
   btn.className = 'toast-action';
   btn.textContent = action.label;
-  btn.addEventListener('click', () => action.run());
+  btn.addEventListener('click', () => {
+    action.run();
+    if (btn.isConnected && toast.contains(btn)) { toast.replaceChildren(); toast.hidden = true; }
+  });
   toast.replaceChildren(span, btn);
 }

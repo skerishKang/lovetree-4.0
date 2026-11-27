@@ -243,6 +243,33 @@ function gridPlan(vw) {
   const tops = LT58Model.gridRowTops(slots, id => reservedHeights.get(id) || BASE_RESERVED_H);
   return { slots, tops };
 }
+function featuredMomentId() {
+  if (innerWidth >= 700) return '';
+  return boardMode === 'date' ? (LT58Model.dateDescOrder(moments)[0] || '') : (momentOrder[0] || '');
+}
+function boardStackPositions(seq) {
+  const ids = Array.isArray(seq) ? seq : [];
+  const narrow = innerWidth < 700;
+  const cols = LT58Model.gridColumns(innerWidth, ids.length);
+  const featured = narrow && cols === 2 ? ids[0] : null;
+  const rest = featured ? ids.slice(1) : ids;
+  const startY = featured ? GRID_MARGIN + (reservedHeights.get(featured) || BASE_RESERVED_H) + 36 : GRID_MARGIN;
+  const layout = LT58Model.stackLayout(rest, {
+    cols,
+    reservedOf: id => reservedHeights.get(id) || BASE_RESERVED_H,
+    startY
+  });
+  const margin = narrow ? Math.max(8, (innerWidth - 336) / 2) : GRID_MARGIN;
+  const pitch = narrow ? 176 : GRID_COL_PITCH;
+  const out = new Map();
+  if (featured) out.set(featured, { x: (innerWidth - 264) / 2, y: GRID_MARGIN, rot: -2, featured: true });
+  let i = 0;
+  for (const id of rest) {
+    const slot = layout.get(id);
+    if (slot) out.set(id, LT58Model.gridPosition(slot.col, slot.y, i++, { margin, pitch }));
+  }
+  return out;
+}
 function projectBoardMoments() {
   return LTDEMO.moments.map((m, i) => {
     const saved = Number.isFinite(m.x) && Number.isFinite(m.y) && LT58Model.isPinboardSlot(m.x);
@@ -324,15 +351,10 @@ function discardBoardUndoSnapshot(value) {
 // 세로(쇼츠) 카드가 섞인 열 아래가 비지 않는다. #619-6: '내 배치'는 좌표가 아니라 순서로 쌓는다.
 function placeStacked() {
   const seq = boardMode === 'date' ? LT58Model.dateDescOrder(moments) : momentOrder;
-  const layout = LT58Model.stackLayout(seq, {
-    cols: LT58Model.gridColumns(innerWidth, moments.length),
-    reservedOf: id => reservedHeights.get(id) || BASE_RESERVED_H
-  });
-  let i = 0;
+  const positions = boardStackPositions(seq);
   for (const m of moments) {
-    const s = layout.get(m.id);
-    if (!s) continue;
-    const pos = LT58Model.gridPosition(s.col, s.y, i++);
+    const pos = positions.get(m.id);
+    if (!pos) continue;
     m.x = pos.x;
     m.y = pos.y;
     m.rot = pos.rot;
@@ -341,6 +363,7 @@ function placeStacked() {
       el.style.left = pos.x + 'px';
       el.style.top = pos.y + 'px';
       el.style.setProperty('--rot', pos.rot + 'deg');
+      el.classList.toggle('isFeatured', !!pos.featured);
     }
   }
 }
@@ -352,19 +375,15 @@ function placeAll() {
 // #619-6: 끼워 넣기 — 끄는 동안 자리를 보이기 위해 끌고 있는 카드를 뺀 나머지 카드를 현재 순서로 다시 쌓은 자리다.
 function insertCells(excludeId) {
   const seq = momentOrder.filter(id => id !== excludeId);
-  const layout = LT58Model.stackLayout(seq, {
-    cols: LT58Model.gridColumns(innerWidth, moments.length),
-    reservedOf: id => reservedHeights.get(id) || BASE_RESERVED_H
-  });
+  const positions = boardStackPositions(seq);
   return seq.map((id, i) => {
-    const s = layout.get(id);
-    const m = moments.find(x => x.id === id);
+    const pos = positions.get(id);
     const el = cardLayer.querySelector(`[data-id="${id}"]`);
     return {
       id,
       index: i,
-      x: GRID_MARGIN + s.col * 300,
-      y: s.y,
+      x: pos.x,
+      y: pos.y,
       w: el ? el.offsetWidth || 242 : 242,
       h: el
         ? el.offsetHeight || reservedHeights.get(id) || BASE_RESERVED_H
@@ -505,15 +524,10 @@ function previewShift(dragId, hit) {
   const sig = at + '|' + seq.join(',');
   if (sig === previewSig) return;
   previewSig = sig;
-  const layout = LT58Model.stackLayout(seq, {
-    cols: LT58Model.gridColumns(innerWidth, moments.length),
-    reservedOf: id2 => reservedHeights.get(id2) || BASE_RESERVED_H
-  });
-  let i = 0;
+  const positions = boardStackPositions(seq);
   for (const id2 of seq) {
-    const s = layout.get(id2);
-    if (!s) continue;
-    const pos = LT58Model.gridPosition(s.col, s.y, i++);
+    const pos = positions.get(id2);
+    if (!pos) continue;
     if (id2 === dragId) {
       if (typeof placeDropPlaceholder === 'function') placeDropPlaceholder(dragId, pos);
       continue;
@@ -1079,6 +1093,12 @@ function fitAll(animated = true) {
   let vw = viewport.clientWidth,
     vh = viewport.clientHeight,
     cards = boardCards();
+  if (innerWidth < 700 && cards.length) {
+    boardStartView();
+    viewMode = 'fit';
+    applyView(animated);
+    return;
+  }
   if (!cards.length) {
     let z = LT58Model.fitZoom(vw, vh);
     view.z = z;
@@ -1440,28 +1460,6 @@ function confirmAdd() {
   addMoment(n, selected);
 }
 
-function openViewer(id) {
-  let m = moments.find(x => x.id === id);
-  if (!m) return;
-  const _vi = titleInfo(m);
-  $('#vTitle').textContent = _vi.main;
-  let box = $('#viewerMedia');
-  if (m.url) box.innerHTML = LTMedia.markup(m.url, m.title, m.mediaMetadata, m.id);
-  else if (m.type === 'video')
-    box.innerHTML = `<video src="${m.video}" poster="${m.asset}" controls autoplay muted playsinline class="viewerFitVideo"></video>`;
-  else if (m.type === 'note') box.innerHTML = `<div class="viewerNoteQuote">“${esc(m.memo)}”</div>`;
-  else box.innerHTML = `<img src="${m.asset}" alt="${esc(m.title)}" class="viewerFitImg">`;
-  $('#vMeta').innerHTML = window.viewerMetaHTML({
-    head: `${esc(LTLabels.type(m.originalType || m.type))} · ${esc(dateText(m.date))} · ${esc(m.emotion)}`,
-    source: esc(m.source),
-    url: m.url ? esc(m.url) : '',
-    keywords: (m.keywords || []).map((keyword) => esc(keyword)),
-    memo: esc(m.memo || ''),
-    mediaTitle: _vi.sub ? esc(_vi.sub) : ''
-  });
-  $('#viewerModal').classList.add('open');
-}
-
 function focusMoment(id, caption) {
   let m = moments.find(x => x.id === id),
     el = cardLayer.querySelector(`[data-id="${id}"]`),
@@ -1683,11 +1681,6 @@ $('#detailClose').onclick = () => {
   if (window.parent !== window) parent.postMessage({ type: globalThis.LT41_MSG.boardDetail, open: false }, location.origin);
 };
 $('#openMoment').onclick = () => openViewer(selected);
-$('#closeViewer').onclick = () => {
-  let v = $('#viewerMedia video');
-  if (v) v.pause();
-  $('#viewerModal').classList.remove('open');
-};
 // #601: '다음 순간 보기'·'이전 순간 보기' 단추는 상세의 이어진 순간 카드로 대체됐다.
 // 전체 보기는 '처음으로' 돌아가는 단추이기도 하다: 기억한 자리를 지운다(다음에 열면 읽을 수 있는 처음 자리).
 function fitAllByUser() {

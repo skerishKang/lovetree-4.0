@@ -145,11 +145,10 @@ export function writeTipsSeen(storage) {
 // #457 2번: 예시 둘러보기·공유(읽기 전용)는 source가 'server'가 아니다 — pauseMember()가 로그인한
 // member 참조를 그대로 두고 dispose만 해서(owned가 예시 모드에서도 true로 남는다), model.trees가
 // 예시 트리로 바뀌어도 "내 첫 트리"로 잘못 보지 않게 source로 한 번 더 막는다.
-// #619-5: 계정의 트리가 1개 이상이고 그 트리의 순간이 2개 이상이면 "첫 트리를 만들었어요"가 아님 —
-// 트리 26개짜리 계정에서도 보드 전환 시마다 안 뜨도록, 트리 1개 & 그 트리의 순간 1개 이하일 때만
-// 띄운다.
+// #619-5: '첫 트리를 막 만든 직후'만 — 트리 1개 & 순간 1개일 때 띄운다.
+// 순간 0개 트리도 정식 기록이므로 첫 트리 안내를 덧씌우지 않는다.
 export function tipsWanted({ owned = false, treeCount = 0, seen = false, source = 'server', momentCount = 0 } = {}) {
-  return source === 'server' && !!owned && Number(treeCount) === 1 && Number(momentCount) <= 1 && !seen;
+  return source === 'server' && !!owned && Number(treeCount) === 1 && Number(momentCount) === 1 && !seen;
 }
 
 // 이슈 644 3번: 머리줄의 '저장 안 됨' 표시를 누르면 같은 설명을 연다. 저장 실패 떠는 이미 떠 있으므로

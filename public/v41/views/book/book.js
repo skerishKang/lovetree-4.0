@@ -224,6 +224,7 @@ function singleFaceMarkup(m,pos,phone){if(phone)return `<div class="mobile-conte
 /* #1468: '지금 쪽 다시 그리기' 요청인가 — 요청할 때의 쪽·선택이 그대로인 요청(날짜 표기·제목 보기 변경, 상세 닫기). */
 const samePageAsk=ask=>ask.idx===ask.page&&(ask.focusId==null||ask.focusId===ask.selected);
 function renderSpread(idx,focusId=null,land=true){
+ if(!LTDEMO.moments.length||!SPREADS.length)return false;
  if(turn){const ask={idx,focusId,land,page:current,selected:LTDEMO.get()};/* 다른 쪽으로 가려던 요청이 이미 미뤄져 있으면 '지금 쪽 다시 그리기'는 그 자리를 덮지 않는다 — 그 그리기가 최신 쪽·설정으로 그린다. */if(!(spreadAfterTurn&&!samePageAsk(spreadAfterTurn)&&samePageAsk(ask)))spreadAfterTurn=ask;return false}
  const total=pageCount();if(!total)return;
  current=Math.max(0,Math.min(total-1,idx));

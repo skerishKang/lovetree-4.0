@@ -16,9 +16,11 @@ test('0. 보드 한 벌: 화면이 부르는 함수가 전부 있다', () => {
   for (const fn of Object.keys(M)) assert.ok(typeof M[fn] === 'function' || fn === 'ORDER_Y_BASE', fn); // #619-6: ORDER_Y_BASE는 순서 상수(함수가 아니다)
 });
 
-test('1. 바둑판 칸 수: 화면 폭이 정한다(#582) — 1440은 4칸, 390은 1칸, 1920은 6칸(상한)', () => {
+test('1. 바둑판 칸 수: 화면 폭이 정한다(#582·#1434) — 1440은 4칸, 390은 2칸, 1920은 6칸(상한)', () => {
   assert.equal(M.gridColumns(1440), 4);
-  assert.equal(M.gridColumns(390), 1);
+  assert.equal(M.gridColumns(390), 2);
+  assert.equal(M.gridColumns(360), 2);
+  assert.equal(M.gridColumns(320), 1);
   assert.equal(M.gridColumns(1920), 6);
   assert.equal(M.gridColumns(0), 1);
 });
