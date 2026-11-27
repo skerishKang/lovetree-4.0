@@ -1666,7 +1666,7 @@ test('#1473 첫 화면 배치', {skip: REQUIRE952 ? false : skip952, timeout:240
  }finally{await browser.close()}
 });
 
-test('#1473 ?? ?? ??? ?? 0', {skip: REQUIRE952 ? false : skip952, timeout:240000}, async()=>{
+test('#1473 알림 띠와 숫자판 겹침 0', {skip: REQUIRE952 ? false : skip952, timeout:240000}, async()=>{
  const browser=await chromium952.launch({headless:true});
  try{
  for(const [width,height] of [[390,844],[844,390],[1440,900]])
