@@ -1045,12 +1045,16 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
       await newsRoutes(ctxAsk);
       await ctxAsk.route('**://i.ytimg.com/**', THUMB);
       const discoverPuts = [];
+      // 서버처럼 마지막으로 저장한 기록을 돌려준다 — 공유 판을 열 때 셸이 서버 기록을 다시 확인한다.
+      let savedState = { version: 1, trees: [] }, savedRevision = 1;
       await ctxAsk.route('**/api/workspace*', (r) => {
         if (r.request().method() === 'PUT') {
           const body = r.request().postDataJSON() || {};
-          return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, revision: Number(body.expectedRevision || 0) + 1, subject: '검사기계정' }) });
+          if (body.state) savedState = body.state;
+          savedRevision = Number(body.expectedRevision || 0) + 1;
+          return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, revision: savedRevision, subject: '검사기계정' }) });
         }
-        return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ revision: 1, state: { version: 1, trees: [] }, subject: '검사기계정', writeSubjectBound: true, savedAt: '2026-11-16T09:00:00.000Z' }) });
+        return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ revision: savedRevision, state: savedState, subject: '검사기계정', writeSubjectBound: true, savedAt: '2026-11-16T09:00:00.000Z' }) });
       });
       await ctxAsk.route('**/api/youtube/oembed*', oembed);
       await ctxAsk.route('**/api/trees/*/discover', (r) => {
@@ -1158,15 +1162,30 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
       const badge = await shelfBadge(pageAsk);
       await badge.first().waitFor({ state: 'visible', timeout: 8000 });
       assert.equal(await badge.count(), 1, '소개된 트리의 서재 카드에 표시가 하나');
-      assert.equal((await badge.first().textContent()).trim(), '둘러보기에 보임');
-      const badgeBox = await badge.first().boundingBox();
-      const hit = await badge.first().evaluate(e => { const r = e.getBoundingClientRect(), s = getComputedStyle(e, '::after'); return { font: parseFloat(getComputedStyle(e).fontSize), hitH: r.height + Math.max(0, -parseFloat(s.top || '0')) + Math.max(0, -parseFloat(s.bottom || '0')) }; });
-      assert.ok(badgeBox && badgeBox.height <= 28, '표시는 아주 작다(보이는 높이 28px 이하): ' + JSON.stringify(badgeBox));
-      assert.ok(hit.font >= 13, '단추 글자 13px 이상(#548 단추 기준): ' + hit.font);
-      assert.ok(hit.hitH >= 44, '누름 영역 44px 이상: ' + JSON.stringify(hit));
+      const mark = pageAsk.frameLocator('#view').locator('#shelfRail .book-card .book-cover .book-discover-mark');
+      assert.equal(await mark.count(), 1, '보이는 표시는 표지 안에 하나');
+      assert.equal((await mark.first().textContent()).trim(), '둘러보기에 보임');
+      assert.equal(await badge.first().getAttribute('aria-label'), (await badge.first().evaluate(e => e.closest('.book-card').querySelector('.book-cover .cover-title, .book-cover .cover-name-band')?.textContent || '')).trim() + ' 둘러보기에 보임, 공유 판 열기', '단추 읽기 이름');
+      const geo = await mark.first().evaluate(e => { const r = e.getBoundingClientRect(), c = e.closest('.book-cover').getBoundingClientRect(), b = e.closest('.book-card').querySelector('.book-discover').getBoundingClientRect(), s = getComputedStyle(e, '::after'); return { font: parseFloat(getComputedStyle(e).fontSize), lineH: parseFloat(getComputedStyle(e).lineHeight), h: e.offsetHeight, inL: r.left - c.left, inT: r.top - c.top, inR: c.right - r.right, inB: c.bottom - r.bottom, hitH: e.offsetHeight + Math.max(0, -parseFloat(s.top || '0')) + Math.max(0, -parseFloat(s.bottom || '0')), topHit: document.elementFromPoint((r.left + r.right) / 2, (r.top + r.bottom) / 2) === e, covers: b.left <= r.left + 1 && b.right >= r.right - 1 && b.top <= r.top + 16 && b.bottom >= r.bottom - 1 }; });
+      assert.ok(geo.h <= geo.lineH * 2 + 8, '표시는 아주 작다(두 줄 이하): ' + JSON.stringify(geo));
+      assert.ok(geo.font >= 13, '표시 글자 13px 이상(#548 단추 기준): ' + geo.font);
+      assert.ok(geo.inL >= 7 && geo.inL <= 10 && geo.inT >= 7 && geo.inT <= 10, '표시는 표지 테두리 안 왼쪽 위(안쪽 8px): ' + JSON.stringify(geo));
+      assert.ok(geo.inR >= 7 && geo.inB >= 7, '표시는 표지 밖으로 걸치지 않는다(오른쪽·아래도 안쪽 8px 이상): ' + JSON.stringify(geo));
+      assert.ok(geo.hitH >= 44, '누름 영역 44px 이상: ' + JSON.stringify(geo));
+      assert.ok(geo.topHit, '표시 가운데를 누르면 표시가 받는다(책 열기 단추가 아니다): ' + JSON.stringify(geo));
+      assert.ok(geo.covers, '키보드 단추의 자리가 보이는 표시와 같다(초점 위치): ' + JSON.stringify(geo));
       await take(pageAsk, '서재·둘러보기에 보임');
       await pageAsk.screenshot({ path: screenAuditCapture('audit-discover-shelf-' + width + '-' + theme + '.png'), animations: 'disabled', timeout: 10000 }).catch(() => {});
-      await badge.first().click();
+      // 키보드: 단추에 초점을 두고 Enter → 공유 판. 닫은 뒤 마우스로 표시를 눌러도 같은 공유 판.
+      await badge.first().focus();
+      await pageAsk.keyboard.press('Enter');
+      await pageAsk.waitForFunction(() => !!document.getElementById('share-panel')?.open, null, { timeout: 8000 });
+      await pageAsk.evaluate(() => document.getElementById('share-panel')?.close());
+      await pageAsk.waitForFunction(() => !document.getElementById('share-panel')?.open, null, { timeout: 8000 });
+      // 공유 판을 열 때 셸이 그 트리로 바꾸면 서재가 다른 판(#view-next)에 다시 뜬다 — 지금 보이는 판에서 표시를 찾는다.
+      const markNow = pageAsk.frameLocator('#view:not([hidden]), #view-next:not([hidden])').locator('#shelfRail .book-card .book-cover .book-discover-mark').first();
+      await markNow.waitFor({ state: 'visible', timeout: 15000 });
+      await markNow.click();
       await pageAsk.waitForFunction(() => !!document.getElementById('share-panel')?.open, null, { timeout: 8000 });
       assert.equal(await pageAsk.evaluate(() => document.getElementById('share-disc-on')?.getAttribute('aria-checked')), 'true', '표시를 누르면 그 트리 공유 판(소개 켜짐)이 열린다');
       await ctxAsk.close();

@@ -135,15 +135,29 @@ import { VIEWS } from './shelf-views.mjs';
           var metaLine2=metaParts.slice(1).join(' · ');
           // #1495: 둘러보기에 소개된 트리만 아주 작게 '둘러보기에 보임' — 누르면 셸이 그 트리 공유 판을 연다. 소개 안 된 트리는 표시 없음.
           var discovered=(function(){try{return !!(parent.LT41_DISCOVER&&parent.LT41_DISCOVER[book.id]===true)}catch(e){return false}})();
-          var discoverBadge=discovered?'<button type="button" class="book-discover" data-discover-share="'+esc(book.id)+'" aria-label="'+esc(book.name)+' 둘러보기에 보임, 공유 판 열기">둘러보기에 보임</button>':'';
+          // 보이는 글자는 표지 안(테두리 안쪽 8px)에 두어 표지의 기울기·떠오름을 그대로 따르고, 마우스·손가락 누름도 이 글자가 받는다.
+          // 단추 안에 단추를 둘 수 없어, 키보드·화면 읽기용 단추는 그 자리에 투명하게 겹치고 누름은 통과시킨다.
+          var discoverMark=discovered?'<span class="book-discover-mark" data-discover-share="'+esc(book.id)+'" aria-hidden="true">둘러보기에 보임</span>':'';
+          var discoverBadge=discovered?'<button type="button" class="book-discover" data-discover-share="'+esc(book.id)+'" aria-label="'+esc(book.name)+' 둘러보기에 보임, 공유 판 열기"></button>':'';
           return '<article class="book-card" data-book-index="'+index+'"><button type="button" data-book-id="'+esc(book.id)+'" aria-label="'+esc(book.name)+' 책 열기">'+
-            '<div class="book-cover'+coverClasses(book)+'"'+(book.design?' data-cover-design="'+esc(book.design)+'"':'')+'>'+(book.coverMedia?'<img class="book-cover-media" src="'+esc(book.coverMedia)+'"'+coverFallbackAttrs(book.coverCandidates||[book.coverMedia])+' alt="" loading="lazy" referrerpolicy="no-referrer">':'')+'<span class="cover-symbol"><span>'+esc(book.symbol)+'</span></span>'+(book.coverMedia?'<span class="cover-name-band">'+esc(book.name)+'</span>':'<strong class="cover-title">'+esc(book.name)+'</strong>')+'</div>'+
+            '<div class="book-cover'+coverClasses(book)+'"'+(book.design?' data-cover-design="'+esc(book.design)+'"':'')+'>'+(book.coverMedia?'<img class="book-cover-media" src="'+esc(book.coverMedia)+'"'+coverFallbackAttrs(book.coverCandidates||[book.coverMedia])+' alt="" loading="lazy" referrerpolicy="no-referrer">':'')+'<span class="cover-symbol"><span>'+esc(book.symbol)+'</span></span>'+(book.coverMedia?'<span class="cover-name-band">'+esc(book.name)+'</span>':'<strong class="cover-title">'+esc(book.name)+'</strong>')+discoverMark+'</div>'+
             '<span class="book-card-meta"><span class="book-card-meta-title">'+esc(metaLine1)+'</span><span class="book-card-meta-date">'+esc(metaLine2)+'</span></span></button><button type="button" class="book-manage" data-manage-id="'+esc(book.id)+'" aria-label="'+esc(book.name)+' 고치기">⋯</button>'+discoverBadge+'</article>';
         }).join(''):'<div class="empty"><strong>찾는 책이 없어요.</strong><span>트리 이름·좋아하는 대상·순간 제목으로 검색해 보세요.</span></div>');
         // #1285 빈 칸 자리와 배치는 보기 모듈이 맡는다(#1376 1단계).
         relayout();
+        placeDiscoverButtons();
       }
-      // #256-1 → 261118 대표 지적 4: 이어 보기 띠 한 줄 — [가로 썸네일] 트리 이름 · 순간 제목 · '이어 보기 ▶'.
+      // #1495: 투명 단추를 표지 안 '둘러보기에 보임' 자리에 맞춘다. 위치는 변형 전 배치값(offset)이라 책 기울기·이동과 무관하고, 보기·폭이 바뀔 때만 다시 잰다.
+      function placeDiscoverButtons(){
+        $$('#shelfRail .book-card').forEach(function(card){
+          var button=card.querySelector('.book-discover'),mark=card.querySelector('.book-discover-mark'),cover=card.querySelector('.book-cover');
+          if(!button||!mark||!cover)return;
+          var x=0,y=0,node=mark;
+          while(node&&node!==card){x+=node.offsetLeft;y+=node.offsetTop;node=node.offsetParent;}
+          card.style.setProperty('--discover-x',x+'px');card.style.setProperty('--discover-y',y+'px');
+          card.style.setProperty('--discover-w',mark.offsetWidth+'px');card.style.setProperty('--discover-h',mark.offsetHeight+'px');
+        });
+      }      // #256-1 → 261118 대표 지적 4: 이어 보기 띠 한 줄 — [가로 썸네일] 트리 이름 · 순간 제목 · '이어 보기 ▶'.
       // 마지막 위치는 새로 저장하지 않고, 셸이 이미 저장·복원하는 계정 위치를 읽어 보여 준다.
       // 글자는 썸네일 밖에 놓고(사진 위 겹침 금지), 주소 문구(동영상 사이트 이름)는 넣지 않는다.
       function renderResumeCard() {
@@ -346,6 +360,8 @@ import { VIEWS } from './shelf-views.mjs';
         document.addEventListener('keydown',function(event){if(!state.selectedId){if(event.key==='ArrowRight')view.move(1);if(event.key==='ArrowLeft')view.move(-1);return;}if(event.key==='Escape'&&state.open){closeBook();return;}if(state.open&&event.key==='ArrowRight')turnPage(1);if(state.open&&event.key==='ArrowLeft')turnPage(-1);});
       }
       function bind(){
+        // #1495: 폭이 바뀌면 표지 크기가 달라지니 투명 단추 자리를 다시 잰다.
+        if(typeof addEventListener==='function')addEventListener('resize',function(){requestAnimationFrame(placeDiscoverButtons);});
         bindTreeActions();bindViewSwitch();bindSearchActions();bindCarouselMoves();bindReaderActions();
       }
 // #481: 제목 보기가 바뀌면 책장의 제목(이어 읽기·표지)도 다시 그려야 한다. 다만 날짜 표기와 같은 판정으로
