@@ -243,6 +243,12 @@ export function createMessages(deps) {
       if (window.LT41?.tree?.id !== data.treeId) choose(data.treeId);
       openTreeManager?.();
     }
+    // #1495: 서재 카드의 '둘러보기에 보임' — 그 트리로 고른 뒤(화면은 다시 띄우지 않는다) 공유 판을 연다.
+    if (data?.type === MSG.openShare && getSource() === 'server' && getModel()?.trees.some(t => t.id === data.treeId)) {
+      if (window.LT41?.tree?.id !== data.treeId) choose(data.treeId, '', true);
+      void openSharePanel();
+      return;
+    }
     // #582: 보드 상세의 '지도에서 관계 보기' — 지도→책 이동과 같은 셸 방식(LT41.momentId로 그 순간을 연다).
     // 지도 파일은 건드리지 않는다. 지도는 뜰 때 LTDEMO.get()(=LT41.momentId)의 순간을 선택한다.
     if (data?.type === MSG.openNetwork) {

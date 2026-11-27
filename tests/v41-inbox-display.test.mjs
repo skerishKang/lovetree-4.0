@@ -200,7 +200,6 @@ test('970 실행: 모아둔 순간 — 목록·누르면 맞는 상세·닫으�
       }
       await page.goto(`${origin}/v41/?account=1#my/board?tree=${box.id}`, {waitUntil: 'load', timeout: 60000});
       await page.waitForFunction(() => !!window.LT41?.trees?.length, null, {timeout: 20000});
-      await page.locator('#discover-ask-no').click().catch(() => {});
       // 보드 카드와 모바일 고르기 목록은 따로 그려지므로 둘 다 준비될 때까지 기다린다.
       await page.waitForFunction(({n, mobile}) => [...document.querySelectorAll('iframe')].some((f) => {
         try {

@@ -10,7 +10,6 @@ import * as writePanelModule from '../public/v41/shell/write-panel.mjs';
 import {createPanels} from '../public/v41/shell/panels.mjs';
 import {createQuickAdd} from '../public/v41/shell/quick-add.mjs';
 import {fakeEl, fakeRadioGroup} from './helpers/fake-dom.mjs';
-import { dismissDiscoverAskIfOpen } from './helpers/discover-ask.mjs';
 
 const TREE = {id: 'tree-1', title: '리센느', moments: [
   {id: 'm1', title: '첫 순간', note: '', emotion: '설렘', date: '2026-11-01', url: '', relation: '', parentId: null},
@@ -281,7 +280,6 @@ test('970 실행: 쓰기 창 탭 — 입력 유지·방향키 이동·aria-selec
       const page = await ctx.newPage();
       await page.goto(`${origin}/v41/?account=1`, {waitUntil: 'load', timeout: 60000});
       await page.waitForFunction(() => !!window.LT41?.trees?.length, null, {timeout: 20000});
-      await dismissDiscoverAskIfOpen(page);
       // 첫 화면에서는 ＋가 가운데만 남으므로(#1084) 쓰기 창은 다른 화면 입구로 연다.
       await page.evaluate(() => { location.hash = '#shelf'; });
       const entry = await page.evaluate(() => {

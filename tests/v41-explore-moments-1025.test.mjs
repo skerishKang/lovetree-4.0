@@ -407,7 +407,6 @@ async function bootExploreTab(browser, { width, height, theme }) {
     await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
     // 기록 동기화가 서재 화면을 실제로 다 그릴 때까지 기다린다 — 시작 직후 전체 재그리기(choose→show)가 뒤따르므로 그 뒤에 움직인다.
     await waitForShownScreen(page, { hash: '^#my/shelf', path: 'track32-bookshelf\\.html' }, 20000);
-    await page.locator('#discover-ask-no').click().catch(() => {});
     return { server, ctx, page };
   } catch (error) {
     await ctx.close();

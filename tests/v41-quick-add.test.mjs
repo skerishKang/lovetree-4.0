@@ -19,7 +19,6 @@ import { fakeEl } from './helpers/fake-dom.mjs';
 import { createQuickAdd } from '../public/v41/shell/quick-add.mjs';
 import { quickAdd, cacheMomentMediaMetadata, validateState } from '../public/v41/domain.mjs';
 import { quickTreeLineText, quickTreeAfterText, quickSubmitText, quickSavedTreeText } from '../public/v41/quick-add.mjs';
-import { dismissDiscoverAskIfOpen } from './helpers/discover-ask.mjs';
 import '../public/v41/youtube-id.mjs'; // #1060: 정본 등록을 vm 시험에도 적용한다.
 import '../public/v41/html-escape.mjs'; // A-15: 글자 막기 정본을 vm 에도 넣는다.
 
@@ -649,7 +648,6 @@ test('952/1001 최종 실행: 쉬운 추가 뒤 자동 제목 보정 — 같은 
     page.on('framenavigated', f => { if (counting && /\/v41\/(views\/|home\.html)/.test(f.url())) navs.push({ url: f.url(), at: Date.now() }); });
     await page.goto(`${base}/v41/?account=1`, { waitUntil: 'load' });
     await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
-    await dismissDiscoverAskIfOpen(page);
     await page.locator('.tree-views [data-view="track59-sketchbook.html"]').click();
     await page.waitForFunction(() => [...document.querySelectorAll('iframe')].some(f => /track59-sketchbook/.test(f.contentWindow?.location?.href || '')), null, { timeout: 10000 });
     await page.waitForTimeout(2000);

@@ -89,7 +89,8 @@ const themeToggleTop=$('theme-toggle');if(themeToggleTop)themeToggleTop.onclick=
  $('account-updates').onclick=()=>{closeAccountMenu();void updatesMount.openUpdates();};
  // #1098 3단계: 내 소식 — 계정 메뉴 입구·목록 창·점. 서버 길은 #1159의 두 경로(myNewsApi)만 쓴다.
  // 로그아웃·빈 계정이면 이 입구 자체가 열리지 않는다(계정 메뉴는 로그인한 사람만 연다). 점 숫자가 0이면 점도 숨는다.
- const myNewsMount=mountMyNews({$,showPanel:id=>panel(id),fetchNews:()=>myNewsApi.myNews(),fetchCount:()=>myNewsApi.myNewsUnread(),getTrees:()=>deps.model?.trees||[],onCount:count=>{dotState.news=Number(count)>0;paintAccountDots();}});
+ // #1495: 둘러보기 소개 줄(화면 쪽)도 같은 창·같은 점 숫자로 보인다.
+ const myNewsMount=mountMyNews({$,showPanel:id=>panel(id),fetchNews:()=>myNewsApi.myNews(),fetchCount:()=>myNewsApi.myNewsUnread(),getTrees:()=>deps.model?.trees||[],onCount:count=>{dotState.news=Number(count)>0;paintAccountDots();},getLocalLines:()=>deps.discoverNewsLines?.()||[],localUnread:()=>deps.unseenDiscoverCount?.()||0,onLocalSeen:()=>deps.markDiscoverNewsSeen?.(),onDiscover:treeId=>deps.introduceTree?.(treeId)});
  $('account-my-news').onclick=()=>{closeAccountMenu();void myNewsMount.open();};
  $('updates-link').onclick=()=>{void updatesMount.openUpdates();};
  // #1488: 안쪽 화면에서 뺀 바닥 링크의 '의견 보내기'·처리방침·약관도 계정 메뉴에 둔다 — 같은 창·같은 주소다.
