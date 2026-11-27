@@ -355,7 +355,6 @@ renderSpread=function(idx,focusId=null,land=true){
  /* #1468: 넘기는 동안에는 book.js가 다시 그리지 않고 false를 돌려준다 — 덧그리기도 하지 않는다(미뤄 둔 요청은 넘김이 끝난 뒤 다시 온다). */
  if(!LTDEMO.moments.length)return false;
  if(originalRenderSpread(idx,focusId,land)===false)return;
- if(!SPREADS[current])return;
  // #584: 주소·정보만으로 세로를 못 정한 YouTube 칸을 썸네일 실측으로 올려 고친다.
  //   공유·예시 화면은 누르기 전 외부 요청 0 규칙(#327)을 유지하기 위해 내 기록일 때만 본다.
  if(window.LTMedia?.upgradeVerticals){const ctx=(typeof LTMedia.currentContext==='function')?LTMedia.currentContext():{source:'',owned:false};if(LTMedia.autoLoadMedia(ctx.source,ctx.owned))LTMedia.upgradeVerticals(document);}
