@@ -88,6 +88,7 @@ test('board: opinion/journal, reply counts, replies, persona, today journal',{sk
  assertIsolatedTestDatabase(DATABASE_URL);const pool=await createPool(DATABASE_URL,{max:3});
  try{
   await applySchema(pool);const repo=createFeedbackRepo(pool),tag=suffix(),productId='lt-'+tag;
+  const service=createFeedbackService({feedbackRepo:repo,productId,admin:{roleFor:async()=> 'ai_customer'}});
   const opinion=await repo.create({productId,subjectId:'sub_'+tag,kind:'opinion',category:'bug',title:'버그',body:'넘김 멈춤',context:{screen:'책'}});
   assert.equal(opinion.kind,'opinion');
   const journal=await repo.create({productId,subjectId:'sub_'+tag,kind:'journal',category:'other',title:'오늘',body:'기록',score:4,journalDate:(new Date(Date.now()+9*3600e3)).toISOString().slice(0,10)});
@@ -108,6 +109,8 @@ test('board: opinion/journal, reply counts, replies, persona, today journal',{sk
   // 오늘 일지
   const today=await repo.todayJournal({productId,subjectId:'sub_'+tag});
   assert.equal(today.id,journal.id);
+  assert.equal((await service.myJournal({principal:{productId,subjectId:'sub_'+tag}})).id,journal.id);
+  assert.equal((await service.myPosts({principal:{productId,subjectId:'sub_'+tag}})).length,2);
   // 페르소나
   assert.equal(await repo.getPersona({productId,subjectId:'sub_'+tag}),null);
   const persona=await repo.upsertPersona({productId,subjectId:'sub_'+tag,name:'시험 사용자',intro:{who:'팬'}});

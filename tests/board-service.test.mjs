@@ -209,3 +209,33 @@ test('관리자 일지 탭 읽기 API(#596): 일지만 날짜 내림차순, 관�
   assert.equal(got.body.journals[0].authorName, '시험 사용자');
   assert.equal(got.body.journals[0].displayTitle, '오늘 일지');
 });
+
+test('#1548 GET /api/board/journal/today: 오늘 일지를 주고 미로그인은 401이다', async () => {
+  const {call} = setup();
+  const anon = await call('GET', '/api/board/journal/today');
+  assert.equal(anon.status, 401);
+  assert.equal(anon.body.error.code, 'unauthenticated');
+  const empty = await call('GET', '/api/board/journal/today', {account: AI});
+  assert.equal(empty.status, 200);
+  assert.equal(empty.body.journal, null);
+  assert.match(empty.headers['cache-control'], /no-store/);
+  await call('POST', '/api/board', {account: AI, body: {title: '오늘 일지', body: '기록', score: 4}});
+  const got = await call('GET', '/api/board/journal/today', {account: AI});
+  assert.equal(got.status, 200);
+  assert.equal(got.body.journal.title, '오늘 일지');
+  assert.equal(got.body.journal.score, 4);
+});
+
+test('#1548 GET /api/board/mine: 미로그인은 401이고 남의 의견은 섞이지 않는다', async () => {
+  const {call} = setup();
+  const anon = await call('GET', '/api/board/mine');
+  assert.equal(anon.status, 401);
+  assert.equal(anon.body.error.code, 'unauthenticated');
+  await call('POST', '/api/feedback', {account: USER, body: {category: 'bug', body: '내 의견'}});
+  await call('POST', '/api/feedback', {account: 'other', body: {category: 'bug', body: '남의 의견'}});
+  const mine = await call('GET', '/api/board/mine', {account: USER});
+  assert.equal(mine.status, 200);
+  assert.deepEqual(mine.body.posts.map(p => p.body), ['내 의견']);
+  const other = await call('GET', '/api/board/mine', {account: 'other'});
+  assert.deepEqual(other.body.posts.map(p => p.body), ['남의 의견']);
+});

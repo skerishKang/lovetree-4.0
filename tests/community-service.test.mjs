@@ -1069,3 +1069,25 @@ test('#1356 내 순간 API: 로그인 필수·subjectId 인자 무시·공개 �
   assert.equal(ex.body.total,2);
   assert.ok(!ex.body.items.some(i=>i.videoId==='aaaa1111111'));
 });
+
+test('#1548 POST /api/community/shares/:id/report: 미로그인 401, 빈 이유 400', async () => {
+ const {handle} = await setup(), shareId = 's'.repeat(24), path = '/api/community/shares/' + shareId + '/report';
+ const anon = await call(handle, 'POST', path, {body: {reason: '확인이 필요해요'}, key: 'report-key-1548-01'});
+ assert.equal(anon.status, 401);
+ assert.equal(anon.body.error.code, 'unauthenticated');
+ const empty = await call(handle, 'POST', path, {account: 'bob', body: {reason: ''}, key: 'report-key-1548-02'});
+ assert.equal(empty.status, 400);
+ assert.equal(empty.body.error.code, 'report_reason_required');
+});
+
+test('#1548 GET /api/public/tag-moments: 빈 태그와 긴 태그에서 응답 모양이 유지된다', async () => {
+ const {handle} = await setup();
+ const empty = await tagCall(handle, '', undefined);
+ assert.equal(empty.status, 400);
+ assert.equal(empty.body.error.code, 'tag_invalid');
+ const long = await tagCall(handle, '노래:' + 'a'.repeat(100), undefined);
+ assert.equal(long.status, 200);
+ assert.equal(typeof long.body.tag, 'string');
+ assert.ok(long.body.tag.length <= 28);
+ assert.ok(Array.isArray(long.body.items));
+});
