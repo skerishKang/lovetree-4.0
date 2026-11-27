@@ -129,14 +129,16 @@ test('browse cover sends an address only for moment mode — photo/design/basic 
  assert.equal((await call(photoBasic.handle,'GET','/api/community/shares')).body.items[0].cover.url,'','사진 표지 + 디자인 없음은 기본 색 표지');
 });
 
-test('비YouTube 링크 표지는 공개 HTTPS 썸네일을 쓰고 위험 썸네일은 링크 주소로 대체한다',async()=>{
+test('비YouTube 링크 표지는 공개 HTTPS 썸네일만 쓰고 일반·위험 링크 주소는 대체하지 않는다',async()=>{
  const external='https://images.example.com/articles/og.jpg';
  const linked=await setup({url:'https://example.com/article',coverMode:'moment',mediaMetadata:{title:'기사 제목',channel:'기사 채널',thumbnail:external}});
  const card=(await call(linked.handle,'GET','/api/community/shares')).body.items[0];
  assert.equal(card.cover.thumbnailUrl,external);
  const blocked=await setup({url:'https://example.com/article',coverMode:'moment',mediaMetadata:{title:'기사 제목',thumbnail:'javascript:alert(1)'}});
  const blockedCard=(await call(blocked.handle,'GET','/api/community/shares')).body.items[0];
- assert.equal(blockedCard.cover.thumbnailUrl,'https://example.com/article');
+ assert.equal(blockedCard.cover.thumbnailUrl,'');
+ const plain=await setup({url:'http://example.com/article',coverMode:'moment'});
+ assert.equal((await call(plain.handle,'GET','/api/community/shares')).body.items[0].cover.thumbnailUrl,'','평문 링크 주소는 썸네일로 쓰지 않는다');
 });
 
 test('#611 3번: AI 테스터 기록은 둘러보기 카드에 aiTester 한 비트만 내린다',async()=>{

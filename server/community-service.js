@@ -156,8 +156,9 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
   // 기본·디자인 표지 트리도 썸네일을 비워 보내면 카드가 글자 칸만 남는다(운영 7카드 전부 해당 — 261118 확인).
   // 사진 주소는 #425 규칙 그대로 모드가 'moment'일 때만 내보내고, 공개 HTTPS 썸네일이 있으면 비YouTube 링크도 그 그림을 쓴다.
   // 비공개 업로드·위험 주소는 safePublicThumbnail이 거른다.
+  const coverImageUrl=/\.(?:png|jpe?g|gif|webp|avif)(?:$|[?#])/i.test(coverUrl)?safePublicThumbnail(coverUrl):'';
   let thumbnailUrl=coverIsMoment
-   ? coverType==='youtube'?youtubeThumbnail:(safeCoverThumbnail||coverUrl)
+   ? coverType==='youtube'?youtubeThumbnail:(safeCoverThumbnail||coverImageUrl)
    : '';
   let cardCoverType=coverType,cardVertical=vertical;
   if(!thumbnailUrl){
