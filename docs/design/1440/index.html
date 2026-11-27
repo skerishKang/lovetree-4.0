@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="ko">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>순간 정리 방식 시안</title>
+<link rel="stylesheet" href="../../../public/v41/identity.css"><link rel="stylesheet" href="sketch.css">
+<script src="../../../public/v41/theme-registry.js" defer></script><script src="sketch.js" defer></script></head>
+<body>
+<header class="preview"><span class="brand">러브트리 <small>순간 정리 화면안</small></span><div class="preview-controls"><label>테마 <select id="theme"><option value="night">밤</option><option value="garden">정원</option></select></label><label>시험 상태 <select id="fixture"><option value="normal">보통</option><option value="one">트리 하나</option><option value="empty">순간 없음</option></select></label><button id="settings-open">방식 고르기</button></div></header>
+<main class="panel" aria-labelledby="heading">
+<div id="source-page" class="source-page">
+<header class="heading"><div><span class="eyebrow">모아둔 순간 정리</span><h1 id="heading">순간을 정리해요</h1><p>모아둔 순간을 다른 트리에 옮기거나 복사해요.</p></div><button class="round" id="reset" aria-label="시안 처음부터">↺</button></header>
+<div class="origin"><span class="origin-dot"></span><strong>모아둔 순간</strong><span id="source-count"></span><span class="mode-label" id="mode-label"></span></div>
+<div class="workarea" id="workarea">
+<div class="source-column"><div class="column-head"><h2>옮길 순간 고르기</h2><button class="plain" id="all">모두 고르기</button></div><div id="moments" class="moment-list"></div></div>
+<div class="destination-column" id="desktop-dest"><div class="column-head"><h2 id="desktop-title">어느 트리에 넣을까요?</h2></div><p class="hint" id="desktop-hint">순간을 고른 뒤 트리 카드로 끌거나 눌러 주세요.</p><div id="drag-state" class="drag-state" role="status" hidden></div><div id="desktop-trees" class="tree-grid"></div></div>
+</div>
+<footer class="actionbar"><span id="selection" role="status" aria-live="polite">0개 고름</span><div class="actions"><button id="move" class="primary">옮기기</button><button id="copy">복사하기</button><button id="finish" class="primary" hidden>복사하기</button></div></footer>
+</div>
+<section id="target-page" class="target-page" hidden aria-labelledby="target-heading">
+<header class="heading target-heading"><button id="back" class="round" aria-label="순간 목록으로 돌아가기">←</button><div><span class="eyebrow">대상 트리 고르기</span><h1 id="target-heading" tabindex="-1"></h1></div><div class="stack" id="stack" aria-hidden="true"></div></header>
+<p class="hint" id="mobile-hint"></p><div id="mobile-trees" class="tree-grid"></div><footer class="actionbar" id="target-footer" hidden><span id="target-count" role="status"></span><button id="mobile-finish" class="primary">복사하기</button></footer>
+</section>
+<div id="notice" class="notice" hidden><span id="message" role="status" aria-live="polite"></span><button id="undo">되돌리기</button><button id="dismiss" class="round" aria-label="알림 닫기">×</button></div>
+</main>
+<dialog id="settings"><div class="dialog-head"><h2>순간 정리 방식</h2><button data-close="settings" class="round" aria-label="닫기">×</button></div><p>이 기기에서 사용할 보기를 고르세요. 색 테마와는 따로 기억해요.</p><fieldset><legend>보기 선택</legend><label class="choice"><input type="radio" name="view" value="classic">지금 방식 <small>목록과 대상 고르기</small></label><label class="choice"><input type="radio" name="view" value="cards">새 방식 <small>좌우 배치와 트리 페이지</small></label></fieldset><button data-close="settings" class="primary">마침</button></dialog>
+<dialog id="duplicate"><div class="dialog-head"><h2>같은 순간이 이미 있어요</h2><button id="cancel-dup" class="round" aria-label="이번 작업 취소">×</button></div><p id="duplicate-text"></p><div class="actions"><button id="skip">건너뛰기</button><button id="put" class="primary">그래도 넣기</button></div></dialog>
+<dialog id="new-tree"><div class="dialog-head"><h2>새 트리 만들기</h2><button data-close="new-tree" class="round" aria-label="닫기">×</button></div><form id="new-form"><label>트리 이름<input id="new-name" maxlength="60" required placeholder="예: 다시 보고 싶은 무대"></label><div class="actions"><button type="button" data-close="new-tree">취소</button><button class="primary" type="submit">새 트리 만들기</button></div></form></dialog>
+</body></html>
