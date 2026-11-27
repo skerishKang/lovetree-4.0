@@ -124,7 +124,7 @@
 
   /* Wire overwritten handlers and render actual YouTube source. */
   $('#editMomentBtn').onclick=openEdit;$('#deleteMomentBtn').onclick=()=>{const m=moments.find(x=>x.id===selected);if(!m||LTDEMO.readOnly)return;parent.postMessage({type:globalThis.LT41_MSG.deleteMoment,treeId:LTDEMO.treeId,momentId:m.id},location.origin);};$('#confirmAdd').onclick=()=>confirmAdd();
-  renderCards();renderThreads();updateKeywordFilter();formFor(addType);boardStartView();applyPathHighlight();setTimeout(()=>{/* #891: 탭으로 들어오면 닫힘, ?open= 주소만 자동 열림(board.js bootDetailPanel) */bootDetailPanel()},100);
+  renderCards();renderThreads();updateKeywordFilter();formFor(addType);boardStartView();applyPathHighlight();addEventListener('DOMContentLoaded',bootDetailPanel,{once:true});
   // #627: 꼬리표 줄 모듈(tag-line.mjs)이 늦게 붙는다 — 카드 칩은 규칙이 도착하면 한 번 다시 그린다.
   addEventListener('lt41-tagline-ready',()=>{if(moments.some(m=>(m.keywords||[]).length))renderCards()});
   // #627: 꼬리표 저장은 iframe을 다시 그리지 않는 길(boardSync)이라 답으로 카드 사본의 keywords만 바꾼다.
