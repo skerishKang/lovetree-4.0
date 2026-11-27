@@ -259,10 +259,10 @@ test('격리 트리가 섞인 기록에서도 본인 트리의 공개 상태 스
 
 
 test('다른 트리 저장과 제목 수정에도 미디어 원본을 보존하고 공개 응답에서만 거른다',async()=>{
- const original={title:'영상 제목',channel:'채널',source:'example.com',thumbnail:'http://images.example.com/old.jpg',thumbnailUrl:'https://images.example.com/alias.jpg',poster:'/api/media/private.jpg',image:'data:image/png;base64,AAAA',authorName:'옛 채널',vertical:true,width:1080,height:1920};
+ const original={title:'영상 제목',channel:'채널',source:'example.com',thumbnail:'http://images.example.com/old.jpg',thumbnailUrl:'https://images.example.com/alias.jpg',poster:'/api/media/private.jpg',image:'data:image/png;base64,AAAA',authorName:'옛 채널',vertical:true,width:1080,height:1920,futureMediaField:{memo:'저장하지 않을 정보'}};
  let a=createTree({subject:'기록',note:'첫 순간',emotion:'설렘',date:'2026-11-01',url:'https://example.com/video'},CLOCK);
  a.moments[0].mediaMetadata=structuredClone(original);
- const expectedOriginal=structuredClone(original);
+ const expectedOriginal=structuredClone(original);delete expectedOriginal.futureMediaField;
  a=addMoment(a,{title:'주소 없는 순간',note:'기록',emotion:'설렘',date:'2026-11-01',url:''},a.moments[0].id,CLOCK);
  const linkless={title:'보관 제목',channel:'채널',source:'INTERNAL_SOURCE_MARKER',thumbnail:'/api/media/private.jpg',poster:'https://example.com/alias.jpg'};
  a.moments[1].mediaMetadata=structuredClone(linkless);

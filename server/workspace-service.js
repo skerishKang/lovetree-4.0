@@ -141,7 +141,19 @@ export function createWorkspaceService({ repo, productId, onCommit = null, onAcc
       const scan = stored ? readStoredDocument(stored.doc) : null;
       const changedTreeIds = changedTreeIdsOf(scan?.state, validated);
       const changed = new Set(changedTreeIds);
-      const trees = validated.trees.map(tree => changed.has(tree.id) ? tree : (scan?.originals.get(tree.id) ?? tree));
+      // 변경하지 않은 트리의 다른 원본 필드는 유지하되, 미디어 정보는 검증된 허용 키만 다시 저장한다.
+      const trees = validated.trees.map(tree => {
+        if (changed.has(tree.id)) return tree;
+        const original = scan?.originals.get(tree.id);
+        if (!original) return tree;
+        const validatedMoments = new Map(tree.moments.map(moment => [moment.id, moment]));
+        return {...original, moments: original.moments.map(moment => {
+          const checked = validatedMoments.get(moment.id);
+          if (!checked) return moment;
+          const {mediaMetadata: _discarded, ...preserved} = moment;
+          return checked.mediaMetadata === undefined ? preserved : {...preserved, mediaMetadata: checked.mediaMetadata};
+        })};
+      });
       const doc = withQuarantinedTrees({ ...validated, trees }, scan?.quarantined ?? []);
       const outcome = await repo.commit({
         productId: principal.productId,
