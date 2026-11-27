@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 import { momentListTrees, momentListEntries, filterMomentEntries, momentHeadTitle, orderedTrees } from '../v41/moment-list.js';
+import { momentExternalView, momentConnections, treeChipView } from '../public/v41/moment-detail.mjs';
 
 const read = file => fs.readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
 
@@ -51,6 +52,16 @@ test('순간 목록: 마음 한마디는 제목으로 대체하지 않는다(자
   assert.equal(entries[0].title, 'youtube.com에서 간직한 순간', '저장 값은 그대로 둔다(표시 단계에서만 거른다)');
 });
 
+test('순간 목록: 다음으로 간 이유는 실제 자식 연결의 이유에서 모은다', () => {
+  const entries=momentListEntries({trees:[tree('t1',[
+    moment('root',{parentId:null}),
+    moment('next',{parentId:'root',relation:'첫 번째 이유'}),
+    moment('branch',{parentId:'root',relation:'다른 길 이유'})
+  ])]});
+  assert.equal(entries.find(entry=>entry.id==='root').whyNext,'첫 번째 이유 / 다른 길 이유');
+  assert.equal(entries.find(entry=>entry.id==='next').whyNext,'');
+});
+
 test('트리별로 걸기: 전체(all)와 트리 하나, 모르는 id는 빈 목록', () => {
   const entries = momentListEntries({
     trees: [tree('t1', [moment('a1')]), tree('t2', [moment('b1')])]
@@ -75,6 +86,21 @@ test('상세 창·목록 제목 규칙(#394 3번): 자동 기본 문구는 표�
   assert.equal(momentHeadTitle({ title: auto, note: '', mediaMetadata: { title: '영상 제목' } }).main, '영상 제목');
   // 자동 문구가 아닌 값은 걸러지지 않는다.
   assert.equal(momentHeadTitle({ title: '직접 쓴 제목', note: '메모' }).memoAsMain, false);
+});
+
+test('상세 창 공용 모델: 출처별 이름·앞뒤 연결·트리 표지를 정한다', () => {
+  assert.equal(momentExternalView({url:'https://youtu.be/a1111111111'}).label,'YouTube에서 보기');
+  assert.equal(momentExternalView({url:'https://www.instagram.com/p/test/'}).label,'Instagram에서 보기');
+  assert.equal(momentExternalView({url:'https://www.tiktok.com/@test/video/1'}).label,'TikTok에서 보기');
+  assert.equal(momentExternalView({url:'https://example.com/moment'}).label,'사이트에서 보기');
+  assert.equal(momentExternalView({url:''}),null);
+  const list=[{id:'root',parentId:null},{id:'next',parentId:'root'},{id:'branch',parentId:'root'}];
+  const connections=momentConnections(list[1],list);
+  assert.equal(connections.parent.id,'root');
+  assert.equal(connections.next,null);
+  assert.equal(momentConnections(list[0],list).branchCount,2);
+  const cover=treeChipView({title:'시험 트리',coverMode:'design',coverDesign:'texture-6',moments:[]});
+  assert.deepEqual({title:cover.title,initial:cover.initial,design:cover.design,image:cover.image},{title:'시험 트리',initial:'시',design:'texture-6',image:''});
 });
 
 test('세로 영상 판정은 #393 한 버(LTMedia.verticalVideo)을 쓴다 — 이 레인에서 새로 만들지 않는다', () => {

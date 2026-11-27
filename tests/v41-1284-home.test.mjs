@@ -30,7 +30,7 @@ async function serve(){
    createReadStream(file).pipe(res);
   }catch{res.writeHead(404).end('missing');}
  });
- await listenOnSafePort(server, '127.0.0.1');
+ await listenOnSafePort(server, '127.0.0.1', {port:Number(process.env.LT_TEST_PORT)||0});
  return server;
 }
 async function open({width,height=width===390?844:900,theme,scene,member=true}){
@@ -92,8 +92,8 @@ test('#1284 home layout and playback (1440/390, two themes, three media types)',
     assert.ok(!detail.kind.includes('VIDEO'),'한국어 영상 종류');
     assert.equal(detail.frame,false,'설명 창 즉시 외부 재생 금지');
     if(OUT)await snap(page,scene.type+'-'+theme+'-'+width+'-detail.png');
-    if(scene.blocked)await frame.locator('#mediaExternalHome').evaluate(el=>{if(el.textContent!=='YouTube에서 보기')throw Error('blocked 안내 누락');});
-    if(!scene.blocked&&width===390&&theme==='night'){await frame.locator('#mediaPlayHome').click();await frame.locator('#mediaViewerHome iframe').waitFor();const code=scene.type==='landscape'?101:150;await frame.locator('#orbit').evaluate((el,code)=>{dispatchEvent(new MessageEvent('message',{origin:'https://www.youtube-nocookie.com',data:JSON.stringify({event:'onError',info:code})}));},code);await frame.locator('#mediaExternalHome').evaluate(el=>{if(el.textContent!=='YouTube에서 보기')throw Error('오류 신호 안내 누락');});assert.equal(await frame.locator('#mediaViewerHome iframe').count(),0,'101/150 오류 즉시 임베드 제거');}
+    if(scene.blocked)await frame.locator('#mediaExternalHome').evaluate(el=>{if(el.textContent!=='YouTube에서 보기 ↗')throw Error('blocked 안내 누락');});
+    if(!scene.blocked&&width===390&&theme==='night'){await frame.locator('#mediaPlayHome').click();await frame.locator('#mediaViewerHome iframe').waitFor();const code=scene.type==='landscape'?101:150;await frame.locator('#orbit').evaluate((el,code)=>{dispatchEvent(new MessageEvent('message',{origin:'https://www.youtube-nocookie.com',data:JSON.stringify({event:'onError',info:code})}));},code);await frame.locator('#mediaExternalHome').evaluate(el=>{if(el.textContent!=='YouTube에서 보기 ↗')throw Error('오류 신호 안내 누락');});assert.equal(await frame.locator('#mediaViewerHome iframe').count(),0,'101/150 오류 즉시 임베드 제거');}
     await frame.locator('#mediaCloseHome').click();
     await frame.locator('[data-recent-play]').click({timeout:5000});
     const play=await measure(page,frame,scene);
