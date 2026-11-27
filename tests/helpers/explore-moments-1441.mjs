@@ -1,4 +1,4 @@
-﻿import test from 'node:test';
+import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createServer} from 'node:http';
 import {createReadStream,existsSync,mkdirSync,statSync} from 'node:fs';
@@ -8,7 +8,7 @@ let chromium, browserUnavailable=false;
 try { ({chromium}=await import('playwright')); if(!existsSync(chromium.executablePath()))browserUnavailable='Playwright Chromium이 없어 건너뜀'; } catch { browserUnavailable='Playwright 패키지가 없어 건너뜀'; }
 
 const ROOT=resolve(fileURLToPath(new URL('../..',import.meta.url)));
-const PORT=4614;
+const PORT=Number(process.env.LT1499_PORT||4614);
 const SHOTS=process.env.LT_1441_SHOT_DIR||'';
 const ONLY=process.env.LT_1441_CAPTURE_ONLY==='1';
 const format={'.html':'text/html; charset=utf-8','.js':'text/javascript','.mjs':'text/javascript','.css':'text/css','.json':'application/json','.svg':'image/svg+xml','.png':'image/png','.woff2':'font/woff2'};
@@ -34,7 +34,7 @@ function serve(){
  return new Promise((ok,fail)=>{server.once('error',fail);server.listen(PORT,'127.0.0.1',()=>ok(server));});
 }
 async function open(browser,width,theme){
- const context=await browser.newContext({viewport:{width,height:width===390?844:900},reducedMotion:'reduce',hasTouch:width===390,isMobile:width===390});
+ const context=await browser.newContext({viewport:{width,height:width===390?844:width===844?390:900},reducedMotion:'reduce',hasTouch:width===390,isMobile:width===390});
  await context.addInitScript(t=>{try{localStorage.setItem('lt41.theme',t)}catch{}},theme);
  await context.route('**/*',route=>{
   const u=new URL(route.request().url());
@@ -47,7 +47,7 @@ async function open(browser,width,theme){
    const data=(share&&share!=='public-tree-1441'?[]:visible).filter(x=>!exclude.has(x.videoId));
    return reply(route,{items:data,total:data.length,groups:[]});
   }
-  if(u.pathname==='/api/community/shares')return reply(route,{items:[{shareId:'public-tree-1441',title:'바람',isPublic:true},{shareId:'private-tree-1441',title:'비공개',isPublic:false}]});
+  if(u.pathname==='/api/community/shares')return reply(route,{items:[{shareId:'public-tree-1441',title:'바람',isPublic:true,momentCount:3},{shareId:'private-tree-1441',title:'비공개',isPublic:false,momentCount:3}]});
   if(u.pathname==='/api/public/shares/public-tree-1441')return reply(route,{tree:{title:'바람',moments:visible}});
   if(u.pathname==='/api/public/shares/private-tree-1441')return reply(route,{error:'not_found'},404);
   if(u.pathname.startsWith('/api/'))return reply(route,{items:[],ok:true});
@@ -60,7 +60,7 @@ function aligned(a,b,key){for(const k of ['x','y','width','height'])assert.ok(Ma
 test('#1441 두 보기 자리·범위·길·주소·공개 제한·세로 줄·소리 유지', {skip:browserUnavailable,timeout:240000},async()=>{
  const server=await serve(); const browser=await chromium.launch({headless:true});
  try{
-  for(const width of [1440,390])for(const theme of ['night','garden']){
+  for(const width of (ONLY?[390,844,1440,2560]:[1440,390]))for(const theme of ['night','garden']){
    const key=width+'/'+theme;const {context,page}=await open(browser,width,theme);
    try{
     await page.goto('http://127.0.0.1:'+PORT+'/v41/#explore',{waitUntil:'load'});
@@ -71,7 +71,12 @@ test('#1441 두 보기 자리·범위·길·주소·공개 제한·세로 줄·�
     await page.waitForFunction(()=>!!document.querySelector('.moments-stage')?.dataset.ltMomentsId,null,{timeout:15000});
     if(SHOTS)await page.screenshot({path:join(SHOTS,width+'-'+theme+'-moments.png'),animations:'disabled'});
     if(ONLY)continue;
-    aligned(treeRect,await rect(page.locator('.community-tabs')),key+' tabs');
+    const momentTabs=await rect(page.locator('.community-tabs'));
+    if(width===390){
+     assert.equal((await rect(page.locator('.community-top-row'))).y,0,key+' #1499 위 빈 띠 0');
+     assert.equal((await rect(page.locator('.moments-stage'))).y,48,key+' #1499 영상 시작');
+     aligned({...treeRect,y:momentTabs.y},momentTabs,key+' tabs');
+    }else aligned(treeRect,momentTabs,key+' tabs');
     const trigger=page.locator('.moments-scope-trigger');
     assert.equal(await trigger.isVisible(),true,key+' 범위 메뉴');
     const scopeRect=await rect(trigger),closeRect=await rect(page.locator('.moments-toolbar .moments-close-button'));
