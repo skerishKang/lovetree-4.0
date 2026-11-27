@@ -1,5 +1,5 @@
 import { MSG, isShellMessage } from '../../frame-messages.mjs';
-import {formatDisplayDate} from '../../book-usability.mjs';
+import {formatDisplayDate,titleView,readTitleDisplay,normalizeTitleDisplay} from '../../book-usability.mjs';
 import {localDateOnly} from '../../local-date.mjs';
 // 그래프 보기(#627 2단계 PR3) — 실제 트리(셸이 iframe에 넘기는 LT41.tree)를 graph-model.mjs 한 벌로
 // 묶음 원형(결정론)으로 그린다. 설계: docs/GRAPH_VIEW_20261115.md §2·§4(시안 v2를 실제 데이터로 옮긴 것).
@@ -30,12 +30,22 @@ const svg = document.getElementById('gsvg');
 applyThemeAttribute(document.documentElement, readTheme(localStorage));
 let dateStyle='dot';
 try{const value=document.documentElement.getAttribute('data-lt-date-style')||localStorage.getItem('lt41.dateStyle');dateStyle=value==='dash'||value==='long'?value:'dot'}catch{}
+const readTitleSetting=()=>{try{return readTitleDisplay(parent.LT41?.prefs?parent.LT41:{titleDisplay:localStorage.getItem('lt41.titleDisplay')})}catch{return 'both'}};
+let titleDisplay=readTitleSetting();
 
 addEventListener('message',e=>{
- if(!isShellMessage(e)||e.data.type!==MSG.dateStyle)return;
- dateStyle=e.data.value==='dash'||e.data.value==='long'?e.data.value:'dot';
- try{document.documentElement.setAttribute('data-lt-date-style',dateStyle)}catch{}
- refresh();
+ if(!isShellMessage(e))return;
+ if(e.data.type===MSG.dateStyle){
+  dateStyle=e.data.value==='dash'||e.data.value==='long'?e.data.value:'dot';
+  try{document.documentElement.setAttribute('data-lt-date-style',dateStyle)}catch{}
+  refresh();
+  return;
+ }
+ if(e.data.type===MSG.titleDisplay){
+  titleDisplay=normalizeTitleDisplay(e.data.value);
+  try{localStorage.setItem('lt41.titleDisplay',titleDisplay)}catch{}
+  refresh();
+ }
 });
 
 const ctx = parent.LT41 || {};
@@ -63,7 +73,7 @@ const dayOf = (m) => formatDisplayDate(rawDateOf(m),dateStyle);
 const byTime = (a, b) => rawDateOf(b).localeCompare(rawDateOf(a)) || String(b.id).localeCompare(String(a.id));
 const momentById = (id) => GRAPH.moments.find((m) => m.id === id) || null;
 const hubById = (key) => GRAPH.hubs.find((h) => h.id === key) || null;
-const titleOf = (m) => String(MOMENT_OF.get(m?.id)?.title || MOMENT_OF.get(m?.id)?.subject || m?.id || '');
+const titleOf = (m) => titleView(MOMENT_OF.get(m?.id) || m || {}, titleDisplay).main || String(MOMENT_OF.get(m?.id)?.subject || m?.id || '');
 const memoOf = (m) => String(MOMENT_OF.get(m?.id)?.note ?? MOMENT_OF.get(m?.id)?.whyNext ?? '') || '메모 없음';
 const emotionOf = (m) => String(MOMENT_OF.get(m?.id)?.emotion || '');
 const hash01 = (str) => { let h = 2166136261; for (const c of String(str)) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return ((h >>> 0) % 1000) / 1000; };
