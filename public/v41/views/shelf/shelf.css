@@ -160,7 +160,8 @@
     .cover-number { position: absolute; left: 19px; top: 18px; font: 700 9px var(--latin); letter-spacing: .12em; opacity: .78; }
     .cover-symbol { position: absolute; left: 50%; top: 43%; display: grid; place-items: center; width: 54px; height: 54px; border: 1px solid rgba(255,255,255,.62); border-radius: 50% 0; transform: translate(-50%,-50%) rotate(45deg); }
     .cover-symbol span { font-size: 23px; transform: rotate(-45deg); }
-    .cover-title { position: absolute; left: 19px; right: 12px; bottom: 31px; z-index: 1; display: -webkit-box; max-height: 3.45em; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 3; font: 700 16px/1.15 var(--display); text-align: center; letter-spacing: -.06em; }
+    .cover-title { position: absolute; left: 19px; right: 12px; bottom: 31px; z-index: 1; display: -webkit-box; max-height: 3.9em; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 3; font: 700 16px/1.3 var(--display); text-align: center; letter-spacing: -.06em; }
+    /* #1497 2번: 줄 높이 1.15에서는 한글 글자 위아래가 줄 상자를 넘어 셋째 줄 아래가 잘렸다 — 1.3으로 두고 세 줄(3.9em) 안에서 줄임표. */
     .cover-subtitle { position: absolute; left: 15px; right: 15px; bottom: 14px; z-index: 1; overflow: hidden; font: 700 8px var(--latin); letter-spacing: .06em; text-align: center; text-overflow: ellipsis; white-space: nowrap; opacity: .76; }
     .book-card-meta { display: grid; gap: 3px; margin-top: 11px; text-align: center; }
     .book-card-meta strong { display: -webkit-box; max-height: 3.45em; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 3; font: 700 16px/1.15 var(--display); }

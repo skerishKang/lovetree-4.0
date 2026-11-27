@@ -173,6 +173,10 @@ import { VIEWS } from './shelf-views.mjs';
         $('#resumeTree').textContent=info.treeName||info.book.name;
         var momentMain=info.moment&&titleView(info.moment,setting).main?titleView(info.moment,setting).main.replace(/[.。!?！？]+$/u,''):'';
         $('#resumeMoment').textContent=momentMain||(info.book.chapters[0]?resumeName(info.book.chapters[0].title):'');
+        // #1497 3번: 순간 제목이 트리 이름과 같으면(첫 순간 이름 = 트리 이름) 같은 이름을 두 번 보이지 않게 점과 함께 숨긴다.
+        var sameName=resumeName($('#resumeMoment').textContent).replace(/\s+/g,'')===resumeName($('#resumeTree').textContent).replace(/\s+/g,'');
+        $('#resumeMoment').hidden=sameName;
+        var resumeDot=strip.querySelector('.resume-dot');if(resumeDot)resumeDot.hidden=sameName;
         $('#resumeGo').textContent=info.action+' ▶';
         strip.dataset.resumeKind=info.kind;
         strip.onclick=function(){
