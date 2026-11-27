@@ -31,10 +31,10 @@ function seedAll(repo) {
   }
 }
 
-function build({ verified = { productId: PRODUCT, subjectId: USER }, repo = createMemoryAccountRepo(), workspaceRepo = createMemoryWorkspaceRepo(), admin = null, mediaStore = null, accountDeleteWorkflow = null, accountDeleteAuthenticate = null, allowedOrigins = [ORIGIN] } = {}) {
+function build({ verified = { productId: PRODUCT, subjectId: USER }, repo = createMemoryAccountRepo(), workspaceRepo = createMemoryWorkspaceRepo(), admin = null, mediaStore = null, accountDeleteWorkflow = null, accountDeleteAuthenticate = null, allowedOrigins = [ORIGIN], authenticate: authenticateOverride = null } = {}) {
   const service = createWorkspaceService({ repo: workspaceRepo, productId: PRODUCT });
   const account = createAccountService({ repo, productId: PRODUCT, admin, mediaStore, now: () => new Date(CLOCK) });
-  const authenticate = async () => verified;
+  const authenticate = authenticateOverride || (async () => verified);
   const handle = createApiHandler({ authenticate, accountDeleteAuthenticate, accountDeleteWorkflow, service, productId: PRODUCT, admin, account, allowedOrigins });
   return { handle, account, repo, workspaceRepo, service };
 }
@@ -225,6 +225,25 @@ test('GET /api/account는 확인 방식만 알려 주고 사용자 식별자를 
   assert.equal('subject' in described.body, false);
   assert.equal('email' in described.body, false);
   assert.equal(JSON.stringify(described.body).includes(USER), false, '응답에 subject 값이 실렸다');
+});
+
+test('#1548 GET /api/account: 미로그인과 세션이 끊긴 뒤에는 401이다', async () => {
+  const denied = async () => { throw new ApiError(401, 'unauthenticated', '로그인이 필요해요.'); };
+  const anon = await getAccount(build({ authenticate: denied }).handle);
+  assert.equal(anon.status, 401);
+  assert.equal(anon.body.error.code, 'unauthenticated');
+  let live = true;
+  const authenticate = async () => {
+    if (!live) throw new ApiError(401, 'unauthenticated', '로그인이 필요해요.');
+    return { productId: PRODUCT, subjectId: USER };
+  };
+  const { handle } = build({ authenticate });
+  const ok = await getAccount(handle);
+  assert.equal(ok.status, 200);
+  live = false;
+  const expired = await getAccount(handle);
+  assert.equal(expired.status, 401);
+  assert.equal(expired.body.error.code, 'unauthenticated');
 });
 
 test('사용자 키가 있는 표를 빠짐없이 지운다 (스키마 누락 검사)', () => {
