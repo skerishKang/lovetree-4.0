@@ -390,3 +390,31 @@ test('#1439 되돌리기: 그사이 다른 것을 고쳤으면 그 고침은 지
   assert.equal(undone.state.trees.find(t => t.id === 't2').moments.some(m => m.id === 'mc'), false);
   assert.equal(undone.state.trees.find(t => t.id === 't2').moments[0].title, '또 고침');
 });
+
+
+test('#1440 새 트리 생성과 담기는 한 번의 정리와 되돌리기로 처리한다', () => {
+  for (const mode of ['move', 'copy']) {
+    const state = threeTrees();
+    const result = webDomain.organizeMoments(state, { mode, fromTreeId: 't1', momentIds: ['ma', 'mb', 'mc'], newTreeName: '새 기억' }, OUT, counter('newcopy'));
+    const target = result.state.trees.find(t => t.subject === '새 기억');
+    assert.equal(target.moments.length, 3);
+    assert.equal(result.summary.moments, 3);
+    assert.equal(result.state.trees.some(t => t.id === 't1'), mode === 'copy');
+    if (mode === 'copy') {
+      assert.deepEqual(result.state.trees.find(t => t.id === 't1'), state.trees[0]);
+      assert.deepEqual(target.moments.map(m => m.copiedFrom), ['ma', 'mb', 'mc']);
+    }
+    assert.doesNotThrow(() => serverDomain.validateState(result.state));
+    assert.deepEqual(webDomain.undoOrganize(result.state, result.record, OUT).state, state);
+  }
+});
+
+test('#1440 새 트리와 기존 트리에 함께 복사하고 한 번에 복원한다', () => {
+  const state = threeTrees();
+  const result = webDomain.organizeMoments(state, { mode: 'copy', fromTreeId: 't1', momentIds: ['mb'], toTreeIds: ['t2'], newTreeName: '새 기억' }, OUT, counter('newcopy'));
+  assert.equal(result.summary.placed, 2);
+  assert.deepEqual(webDomain.undoOrganize(result.state, result.record, OUT).state, state);
+  const changed = structuredClone(result.state);
+  changed.trees.find(t => t.subject === '새 기억').title = '고친 이름';
+  assert.throws(() => webDomain.undoOrganize(changed, result.record, OUT), /트리가 바뀌었어요/);
+});

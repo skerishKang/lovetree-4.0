@@ -8,6 +8,20 @@ import {themedViewFor} from './navigation.mjs';
 const $ = id => document.getElementById(id);
 
 export function renderThemeChoices() {
+  const views = $('settings-cleanup-choices');
+  const registry = globalThis.LT41_THEME_REGISTRY;
+  if (views && registry && !views.childElementCount) {
+    for (const item of registry.cleanupViews) {
+      const button = document.createElement('button');
+      button.type = 'button'; button.role = 'radio'; button.textContent = item.label;
+      button.setAttribute('aria-checked', String(registry.readCleanupView() === item.id));
+      button.onclick = () => {
+        registry.writeCleanupView(item.id);
+        for (const sibling of views.children) sibling.setAttribute('aria-checked', String(sibling === button));
+      };
+      views.append(button);
+    }
+  }
   const container = $('settings-theme-choices');
   if (!container || container.childElementCount) return;
   for (const theme of THEMES) {

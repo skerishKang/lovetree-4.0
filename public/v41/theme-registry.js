@@ -7,6 +7,9 @@
   const defaultTheme = themes[0];
   const find = value => themes.find(theme => theme.id === value) || null;
   globalThis.LT41_THEME_REGISTRY = Object.freeze({
+    cleanupViews: Object.freeze([{id:'classic',label:'지금 방식'},{id:'cards',label:'새 방식'}].map(Object.freeze)),
+    readCleanupView(){try{return localStorage.getItem('lt41.cleanupView')==='cards'?'cards':'classic'}catch{return 'classic'}},
+    writeCleanupView(value){try{localStorage.setItem('lt41.cleanupView',value==='cards'?'cards':'classic')}catch{}},
     themes,
     defaultTheme,
     find,
