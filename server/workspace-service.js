@@ -2,7 +2,6 @@ import { createHash } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import { EMPTY_STATE, MAX_TREES, validateState } from '../src/domain.js';
 import { DEFAULT_TREE_OPEN_VIEW } from '../public/v41/tree-open-view.mjs';
-import { repairTreeForRead } from '../public/v41/workspace-guard.mjs';
 import { ApiError } from './errors.js';
 
 const CLIENT_KEY = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
@@ -14,6 +13,27 @@ function documentMessage(error) {
   if (error instanceof TypeError || error instanceof RangeError) return GENERIC_DOCUMENT_MESSAGE;
   const message = error?.message;
   return typeof message === 'string' && message.length <= 200 && !/[\u0000-\u001f]/.test(message) ? message : GENERIC_DOCUMENT_MESSAGE;
+}
+const timeValue = value => typeof value === 'string' && value.length <= 40 && !Number.isNaN(Date.parse(value));
+const lineValue = (value, fallback, max) => typeof value === 'string' && value.trim() && value.length <= max ? value.trim() : fallback;
+function repairTreeValues(tree, now) {
+  if (!tree || typeof tree !== 'object' || Array.isArray(tree)) return tree;
+  const moments = Array.isArray(tree.moments) ? tree.moments : [];
+  const out = { ...tree };
+  if (!timeValue(out.updatedAt)) out.updatedAt = timeValue(out.createdAt) ? out.createdAt : now;
+  if (!timeValue(out.createdAt)) out.createdAt = out.updatedAt;
+  if (typeof out.subject !== 'string' || !out.subject.trim() || out.subject.length > 60) out.subject = lineValue(out.title, '기록', 60);
+  if (typeof out.title !== 'string' || !out.title.trim() || out.title.length > 100) out.title = lineValue(out.subject, '제목 없는 트리', 100);
+  if (typeof out.coverMomentId !== 'string' || (out.coverMomentId && !moments.some(moment => moment?.id === out.coverMomentId))) out.coverMomentId = '';
+  const ids = new Set(moments.map(moment => moment?.id).filter(Boolean));
+  const roots = moments.filter(moment => moment?.parentId === null);
+  if (roots.length === 1) {
+    out.moments = moments.map(moment => {
+      if (!moment || typeof moment !== 'object' || Array.isArray(moment) || typeof moment.parentId !== 'string' || ids.has(moment.parentId)) return moment;
+      return { ...moment, parentId: roots[0].id, relation: '' };
+    });
+  }
+  return out;
 }
 
 export function requestHashOf(validatedState, expectedRevision) {
@@ -41,8 +61,7 @@ export function readStoredDocument(doc, now = new Date().toISOString()) {
   for (const raw of doc.trees) {
     let single;
     try {
-      const { tree } = repairTreeForRead(raw, now);
-      single = validateState({ version: 1, trees: [tree], prefs: doc.prefs }).trees[0];
+      single = validateState({ version: 1, trees: [repairTreeValues(raw, now)], prefs: doc.prefs }).trees[0];
     }
     catch { quarantined.push(raw); continue; }
     // 같은 id 트리가 이미 읽혔으면 나중 것을 뺀다 — 저장 때 "새 것이 이긴다"는 규칙과 같은 셈이다.

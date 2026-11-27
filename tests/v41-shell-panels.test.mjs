@@ -169,7 +169,7 @@ test('setEditorMode(add, parentId)는 그 순간을 부모로 삼는다', () => 
   } finally { h.restore(); }
 });
 
-test('파일 전송 중이거나 순간이 없으면 모드를 바꾸지 않는다', () => {
+test('파일 전송 중에는 모드를 바꾸지 않고 순간 0개에서는 추가를 연다', () => {
   const busy = harness({ tree: sampleTree(), busy: true });
   try {
     busy.panels.setEditorMode('edit');
@@ -179,8 +179,9 @@ test('파일 전송 중이거나 순간이 없으면 모드를 바꾸지 않는�
   const empty = harness({ tree: { id: 't', title: '빈', moments: [] } });
   try {
     empty.panels.setEditorMode('add');
-    assert.deepEqual(empty.notes, ['먼저 순간을 선택해 주세요.']);
-    assert.equal(empty.els['write-panel-title']?.textContent ?? '', '', '편집기 제목을 건드리지 않는다');
+    assert.deepEqual(empty.notes, [], '순간 0개는 첫 순간 추가로 진행한다');
+    assert.equal(empty.els['write-panel-title']?.textContent, '순간 추가');
+    assert.equal(empty.els['editor-context']?.textContent, '', '이어질 순간이 없으면 빈 문맥을 유지한다');
   } finally { empty.restore(); }
 });
 
