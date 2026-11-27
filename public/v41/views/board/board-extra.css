@@ -380,7 +380,7 @@ body.board-hint-drag .board-empty-hint{border-color:var(--lt-gold-line);color:va
 #detailActions{flex-wrap:wrap}
 #detailActions .miniBtn.accent{flex:1 1 auto;white-space:normal}
 @media(min-width:761px){.detail{width:clamp(350px,30vw,440px)}.leftPanel{max-height:calc(100% - var(--lt-board-frame-top) - 16px)}}
-@media(max-width:760px){.detail{max-width:none;max-height:calc(100% - var(--lt-board-frame-top) - 84px)}}
+@media(max-width:760px){.detail{max-width:none;max-height:min(48vh,calc(100% - var(--lt-board-frame-top) - 84px))}}
 @media(min-width:761px) and (max-height:500px){.leftPanel{bottom:12px;max-height:none}.detail{bottom:12px;max-height:none}}
 /* 보드 크게 보기만: 정보와 영상은 서로 다른 줄에 둔다. */
 .lt-lightbox{grid-template-rows:auto minmax(0,1fr) auto auto;gap:8px;padding:12px 64px}
@@ -404,3 +404,6 @@ body.board-hint-drag .board-empty-hint{border-color:var(--lt-gold-line);color:va
 /* #1529: 숨겨진 고급 패널의 실제 누름 영역. 공통 도구 줄은 변경하지 않는다. */
 #leftPanel :is(.filterSelect,.wideTool,.themeBtn,.styleMini,.collapseBtn){min-height:44px;height:auto}
 #leftPanel .collapseBtn{min-width:44px}
+
+/* #1529: 휴대폰 상세 판이 순간 고르기·책 열기 단추를 덮지 않는다. */
+@media(max-width:760px){html[data-v41-screen=board] #detail{top:auto;bottom:72px;max-height:48vh}}
