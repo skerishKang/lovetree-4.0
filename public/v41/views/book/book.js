@@ -56,7 +56,12 @@ function phoneSession(){try{if(parent!==window)return Math.min(parent.innerWidth
 let mobileDoubleActive=false;
 let mobileSpreadHistory=false;
 function single(){return phoneSession()?!mobileDoubleActive:(viewChoice??defaultView())==='single'}
+// 내 기록을 셸에서 읽을 때만 떠 있는 ＋ 단추의 자리를 확보한다.
+function syncBookAddSpace(){
+ document.documentElement.toggleAttribute('data-book-add-space',parent!==window&&LTDEMO.writable&&!LTDEMO.readOnly);
+}
 function applyViewAttr(){
+ syncBookAddSpace();
  document.documentElement.dataset.bookView=single()?'single':'double';
  document.documentElement.dataset.bookShape=phoneSession()&&!mobileDoubleActive?'phone':'wide';
  document.documentElement.classList.toggle('book-mobile-spread',mobileDoubleActive);
@@ -403,6 +408,7 @@ window.__TRACK59__={playbackMoments:()=>allMoments(),getState:()=>({current,mach
 addEventListener('message',e=>{
  if(!globalThis.LT41_isShellMessage?.(e)||(e.data?.type!==globalThis.LT41_MSG.momentsSaved&&!(e.data?.type===globalThis.LT41_MSG.treesSaved&&e.data.background)))return;
  if(typeof LTDEMO.refresh!=='function'||!LTDEMO.refresh())return;
+ syncBookAddSpace();
  if(e.data.background)LTDEMO.refreshLibrary?.();
  const fm=LTDEMO.moments.find(m=>m.first)||LTDEMO.moments[0]||null;
  const next=fm?LT59Model.buildSpreads(LTDEMO.moments):[];
