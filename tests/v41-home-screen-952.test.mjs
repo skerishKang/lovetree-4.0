@@ -1719,7 +1719,8 @@ test('#1473 알림 띠와 숫자판 겹침 0', {skip: REQUIRE952 ? false : skip9
  }finally{await browser.close()}
 });
 
-test('#1521 머리줄과 가운데 단추 일치',{timeout:240000},async()=>{
+test('#1521 머리줄과 가운데 단추 일치',{skip: REQUIRE952 ? false : skip952, timeout:240000},async()=>{
+ if (skip952) assert.fail(skip952);
  const browser=await chromium952.launch({headless:true});
  try{
  for(const [width,height] of [[390,844],[844,390],[1440,900]])for(const theme of ['night','garden'])for(const member of [false,true]){
