@@ -2902,7 +2902,25 @@ test('#987 보드 첫 줄과 모바일 셸 겹침·현재 표시', { skip: REQUI
         await frame.waitForFunction(n => document.querySelectorAll('.card[data-id]').length === n, count);
         await frame.evaluate(() => selectMoment(document.querySelector('.card[data-id]').dataset.id,true));
         await frame.locator('#detail.open').waitFor();
-        await page.waitForTimeout(600);
+        await frame.waitForFunction(expected => {
+          const viewport = document.querySelector('#viewport');
+          const world = document.querySelector('#world');
+          const cards = [...document.querySelectorAll('.card[data-id]')];
+          if (!viewport || !world || cards.length !== expected || viewport.getAnimations().some(animation => animation.playState === 'running')) return false;
+          const rect = viewport.getBoundingClientRect();
+          if (expected === 8 && cards.filter(card => {
+            const box = card.getBoundingClientRect();
+            return box.left >= rect.left - 1 && box.right <= rect.right + 1;
+          }).length !== 8) return false;
+          const key = viewport.clientWidth + '|' + world.style.transform;
+          if (key !== window.__lt987BoardLayoutKey) {
+            window.__lt987BoardLayoutKey = key;
+            window.__lt987BoardLayoutFrames = 1;
+            return false;
+          }
+          window.__lt987BoardLayoutFrames = (window.__lt987BoardLayoutFrames || 0) + 1;
+          return window.__lt987BoardLayoutFrames >= 2;
+        }, count, { timeout: 10000 });
         const m = await frame.evaluate(() => {
           const title = document.querySelector('.lt-screen-toolbar').getBoundingClientRect(), vp = document.querySelector('#viewport').getBoundingClientRect(), btn = document.querySelector('#cinemaBtn').getBoundingClientRect();
           const cards = [...document.querySelectorAll('.card[data-id]')].map(e => e.getBoundingClientRect());
