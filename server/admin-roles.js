@@ -82,6 +82,34 @@ export function createAdminRoleService({ store, productId, clock = () => new Dat
       }
     },
 
+    /** 공개 목록용 역할 일괄 확인. 단건과 동일한 제품·식별자·역할 판정을 적용한다. */
+    async rolesFor({ productId: requestedProductId, subjectIds }, { unknownOnFailure = false } = {}) {
+      const ids = [...new Set(subjectIds)];
+      const result = new Map();
+      if (requestedProductId !== productId) return new Map(ids.map(id => [id, null]));
+      const valid = [];
+      for (const id of ids) {
+        if (typeof id !== 'string') result.set(id, null);
+        else if (!SUBJECT.test(id)) result.set(id, unknownOnFailure ? ROLE_UNKNOWN : null);
+        else valid.push(id);
+      }
+      if (!valid.length) return result;
+      if (typeof store.rolesFor === 'function') {
+        try {
+          const rows = await store.rolesFor({ productId, subjectIds: valid });
+          for (const id of valid) {
+            const row = rows.get(id);
+            result.set(id, row && row.productId === productId && row.subjectId === id && ROLES.includes(row.role) ? row.role : null);
+          }
+          return result;
+        } catch {
+          // 일괄 조회 실패 시 단건의 기존 닫는 방향 판정으로 돌아간다.
+        }
+      }
+      for (const id of valid) result.set(id, await readRole(id, unknownOnFailure));
+      return result;
+    },
+
     /**
      * 최초 관리자 부팅은 이 함수로 하지 않는다.
      *

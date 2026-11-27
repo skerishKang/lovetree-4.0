@@ -18,6 +18,15 @@ export function createModelAdminRoleStore({ now = Date.UTC(2026, 9, 27) } = {}) 
       return row ? { ...row } : null;
     },
 
+    async rolesFor({ productId, subjectIds }) {
+      const out = new Map();
+      for (const subjectId of new Set(subjectIds)) {
+        const row = rows.get(key(productId, subjectId));
+        if (row) out.set(subjectId, { ...row });
+      }
+      return out;
+    },
+
     async assign({ productId, subjectId, role, grantedBy, reason = null, at }) {
       const previous = rows.get(key(productId, subjectId)) ?? null;
       const row = { productId, subjectId, role, grantedBy: grantedBy ?? null, updatedAt: at ?? stamp() };
