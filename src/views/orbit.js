@@ -316,7 +316,6 @@ export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSel
  // #586: 패럴랙스는 pointermove마다 화면 중심을 재지 않는다 — 끄는 동안 pointermove가 프레임보다
  // 자주 불려 강제 배치 읽기가 늘었다. rect는 창 크기가 바뀔 때(fitNotice)만 다시 재고 캐시를 쓴다.
  let appBox=null;
- const motionOn=() => !paused && !hoveredCard && !dialog.open && !document.hidden;
  const motionRunning=()=>!paused&&!reduced&&!dialog.open&&!document.hidden;
  const neutralizePointer=() => { cameraTarget={x:0,y:0}; camera={x:0,y:0}; };
  // #213 2번: 움직임 켜기/멈춤은 도구 줄의 "보기" 메뉴가 부른다(setMotionPaused).

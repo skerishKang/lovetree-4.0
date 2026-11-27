@@ -108,7 +108,7 @@ test('8. 화면은 같은 계산을 다시 구현하지 않고 한 벌을 부른
   assert.doesNotMatch(SCREEN, /clamp\(Math\.min\(\(vw-26\)/);
   assert.doesNotMatch(SCREEN, /for\(let i=0;i<p\.nodes\.length-1;i\+\+\)/);
   assert.doesNotMatch(SCREEN, /a=-2\.8\+j\*\.78,dist=100\+j\*38/, '#366 나선 배치 공식은 LT56Model.networkLayout 한 벌로 옮겨졌다');
-  for (const call of ['LT56Model.branchPoint', 'LT56Model.pickGroups', 'LT56Model.labelTitle', 'LT56Model.fitBox', 'LT56Model.bezierGeometry', 'LT56Model.placeLabels', 'LT56Model.shortTitle', 'LT56Model.routeEdges', 'LT56Model.networkLayout', 'LT56Model.concentricLayout', 'LT56Model.originPath', 'LT56Model.pathEmphasis', 'LT56Model.bezierPoint', 'LT56Model.relationText']) {
+  for (const call of ['LT56Model.pickGroups', 'LT56Model.labelTitle', 'LT56Model.fitBox', 'LT56Model.bezierGeometry', 'LT56Model.placeLabels', 'LT56Model.shortTitle', 'LT56Model.routeEdges', 'LT56Model.networkLayout', 'LT56Model.concentricLayout', 'LT56Model.originPath', 'LT56Model.pathEmphasis', 'LT56Model.bezierPoint', 'LT56Model.relationText']) {
     assert.ok(SCREEN.includes(call), call);
   }
   // #601: 묶음은 감정별 — 화면이 7개씩 자르거나 묶음 이름을 다시 만들지 않는다(모델 한 벌).

@@ -105,7 +105,6 @@ let soundButton=null;
  // #1098 2단계: 그 순간의 ♡·댓글 수 — 공개 숫자 규칙(#824 결정 7)을 그대로, 3 미만은 숫자를 남기지 않는다.
  const momentStats={hearts:0,comments:0};
  const paintCount=(span,value)=>{if(span)span.textContent=Number(value)>=3?String(value):'';};
- const railCountLabel=(span,value)=>{if(span)span.textContent=Number(value)>=3?String(value):span.dataset.fallback||'';};
  const paintCounts=()=>{paintCount(heartCount,momentStats.hearts);paintCount(commentsCount,momentStats.comments);};
  const applyStats=(answer)=>{
   if(!answer)return;

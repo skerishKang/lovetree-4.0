@@ -170,13 +170,7 @@
     hubR: 12,
     shelf: !!g.shelf
   }));
-  let seed = 120811;
-  const rnd = () => {
-    seed = (seed * 1664525 + 1013904223) >>> 0;
-    return seed / 4294967296;
-  };
-  const rr = (a, b) => a + (b - a) * rnd(),
-    clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const titles = [
     '처음 눈에 들어온 무대',
     '연습실 짧은 영상',
@@ -255,149 +249,6 @@
       indexInPath,
       first
     };
-  }
-  const branchPoint = (c, angle, step, len, branchIndex) =>
-    LT56Model.branchPoint(c, angle, step, len, branchIndex);
-  function generateCluster(c) {
-    const hub = { ...c, kind: 'cluster', r: c.hubR };
-    const entry = {
-      id: `a${c.index}_entry`,
-      kind: 'anchor',
-      cluster: c.index,
-      x: c.x,
-      y: c.y,
-      r: 15,
-      color: c.color,
-      label: 'ENTRY',
-      level: 0
-    };
-    anchors.push(entry);
-    let created = 0;
-    const primaries = [];
-    const baseLens = [];
-    for (let b = 0; b < c.branchCount; b++) baseLens.push(7 + ((c.index + b) % 4));
-    for (let b = 0; b < c.branchCount; b++) {
-      const pid = `p${c.index}_${b}`,
-        len = baseLens[b],
-        seq = [];
-      for (let j = 0; j < len && created < c.count; j++) {
-        const p = branchPoint(c, c.branchAngles[b], j, len, b),
-          id = `m${c.index}_${created}`;
-        const n = momentBase(c.index, id, p.x, p.y, 0, pid, j, c.index === 0 && b === 0 && j === 0);
-        if (n.first) {
-          n.x = c.x - 34;
-          n.y = c.y + 18;
-          n.r = 9.5;
-          n.title = '첫 순간 · 처음 마음이 움직인 순간';
-          n.note = '여기서 여러 주요 감정 경로가 시작되었다.';
-        }
-        nodes.push(n);
-        seq.push(id);
-        created++;
-        if (j === 0)
-          addEdge({ a: entry.id, b: id, cluster: c.index, kind: 'primary', pathId: pid, order: j });
-        else
-          addEdge({
-            a: seq[j - 1],
-            b: id,
-            cluster: c.index,
-            kind: 'primary',
-            pathId: pid,
-            order: j
-          });
-      }
-      const path = addPath({
-        id: pid,
-        cluster: c.index,
-        label: `${String(c.index + 1).padStart(2, '0')} · 주경로 ${String.fromCharCode(65 + b)}`,
-        tone: b,
-        kind: 'primary',
-        nodes: seq,
-        children: [],
-        branchAt: Math.min(3, Math.max(2, seq.length - 3))
-      });
-      primaries.push(path);
-    }
-    // one secondary branch from each primary, plus selected extra branch on dense clusters
-    primaries.forEach((parent, b) => {
-      if (created >= c.count) return;
-      const attachIndex = Math.min(parent.branchAt, parent.nodes.length - 2),
-        attach = nodes.find(n => n.id === parent.nodes[attachIndex]);
-      const sid = `${parent.id}s1`,
-        seq = [attach.id],
-        len = Math.min(4 + ((b + c.index) % 3), c.count - created + 1);
-      const baseAngle = c.branchAngles[b] + (b % 2 ? -0.62 : 0.58);
-      for (let j = 1; j < len && created < c.count; j++) {
-        const dist = 75 + j * 62,
-          ang = baseAngle + j * 0.035 * (b % 2 ? -1 : 1),
-          id = `m${c.index}_${created}`,
-          n = momentBase(
-            c.index,
-            id,
-            attach.x + Math.cos(ang) * dist,
-            attach.y + Math.sin(ang) * dist * 0.78,
-            1,
-            sid,
-            j
-          );
-        nodes.push(n);
-        seq.push(id);
-        created++;
-        addEdge({
-          a: seq[j - 1],
-          b: id,
-          cluster: c.index,
-          kind: 'secondary',
-          pathId: sid,
-          order: j
-        });
-      }
-      if (seq.length > 1) {
-        addPath({
-          id: sid,
-          cluster: c.index,
-          label: `${parent.label} · 분기`,
-          tone: b + 0.35,
-          kind: 'secondary',
-          nodes: seq,
-          parent: parent.id,
-          children: []
-        });
-        parent.children.push(sid);
-      }
-    });
-    // contextual moments sit near existing path nodes and use weak support edges only
-    const cPathNodes = () => nodes.filter(n => n.cluster === c.index && n.level <= 1);
-    while (created < c.count) {
-      const bases = cPathNodes(),
-        base = bases[Math.floor(rnd() * bases.length)],
-        ang = rr(0, Math.PI * 2),
-        dist = rr(28, 82),
-        id = `m${c.index}_${created}`,
-        n = momentBase(
-          c.index,
-          id,
-          base.x + Math.cos(ang) * dist,
-          base.y + Math.sin(ang) * dist,
-          2,
-          base.pathId,
-          -1
-        );
-      nodes.push(n);
-      created++;
-      addEdge({ a: base.id, b: id, cluster: c.index, kind: 'support', pathId: base.pathId });
-    }
-    // sparse semantic cross-links: adjacent primary branches only
-    for (let b = 0; b < primaries.length - 1; b++) {
-      const A = primaries[b].nodes,
-        B = primaries[b + 1].nodes,
-        ai = Math.min(4, A.length - 1),
-        bi = Math.min(3, B.length - 1);
-      if (A[ai] && B[bi]) addEdge({ a: A[ai], b: B[bi], cluster: c.index, kind: 'cross' });
-    }
-    // hub support to entry only; avoid spoke flower
-    addEdge({ a: c.id, b: entry.id, cluster: c.index, kind: 'anchor' });
-    return hub;
   }
   // Use the same forty sample moments and actual links as the orbit.
   // #601 묶음 이름은 감정(색)과 개수 — "01 설렘 · 7개". 묶음이 2개 미만이면 범례를 숨긴다(#951 ⑥).
@@ -504,24 +355,6 @@
   function pathSequenceForNode(n) {
     if (!n?.pathId) return null;
     return pathById[n.pathId] || null;
-  }
-  function edgePathIncluded(e, pid) {
-    return e.pathId === pid;
-  }
-  function clusterRouteEdges(ci) {
-    return edges.filter(
-      e =>
-        e.cluster === ci &&
-        [
-          'parent',
-          'related',
-          'primary',
-          'secondary',
-          'bridge',
-          'bridgeSecondary',
-          'anchor'
-        ].includes(e.kind)
-    );
   }
   function originRevealEdges() {
     return edges.filter(
@@ -925,14 +758,6 @@
       }
     }
   }
-  function fitConcentric() {
-    fitView();
-    document.querySelector('.hero')?.classList.add('dim');
-    scheduleDraw();
-  }
-  function centerConcentricFirst() {
-    selectMoment(FIRST, true);
-  }
   function computeTag(recenter = true) {
     layoutTag();
     applyPoints(TAGFIT);
@@ -1048,20 +873,6 @@
             ? '첫 순간이나 아래 묶음을 눌러 보세요.'
             : '첫 순간이나 묶음을 눌러 보세요.'
       );
-  }
-  function mobileOverview(show = true) {
-    fitView();
-    state.cluster = null;
-    state.selected = null;
-    scheduleDraw();
-    if (show) toast('묶음을 누르면 그 묶음의 순간을 크게 봅니다.');
-  }
-  function centerMobileCluster(ci, show = true) {
-    const c = CLUSTERS[ci];
-    state.mobileCluster = ci;
-    centerOn(c, clusterZoom());
-    syncRibbon();
-    if (show) toast(`${clusterChip(ci, CLUSTERS[ci]?.name)} 묶음을 봅니다.`);
   }
   // 확대해서 한 점을 지도 상자 가운데로. 배율은 전체 보기(1) 기준 배수다.
   function centerOn(n, scale) {
@@ -1486,13 +1297,6 @@
     hideMoreMenu();
   });
   // #461 누르는 범위는 화면 px로 잰다(배치가 화면 좌표라 확대해도 묶음 점이 옆 순간을 가로채지 않게).
-  function hubList() {
-    return state.view === 'tag'
-      ? TAG_CLUSTERS.filter(c => !c.shelf)
-      : state.view === 'network'
-        ? CLUSTERS
-        : [];
-  }
   function hitTest(sx, sy) {
     const w = s2w(sx, sy);
     let best = null,
@@ -2285,10 +2089,6 @@
     $('routeStatusTitle').textContent = title;
     $('routeStatusText').textContent = text;
     $('routeStatus').classList.add('show');
-    placeToast();
-  }
-  function hideRouteStatus() {
-    if (state.mode === 'OVERVIEW') $('routeStatus').classList.remove('show');
     placeToast();
   }
   /* #951 ⑤: 좁은 화면 토스트 자리 — 아래 묶음 단추 줄 바로 위(위 단추 줄·순간 고르기 줄을 덮지 않는다).

@@ -5,8 +5,8 @@ export const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]):n
 export const DIALOGS = Object.freeze([
   ['#archivePanel', 'open'], ['#detail', 'open'], ['#viewer', 'open'],
   ['#branchModal', 'open'], ['#overview', 'open'],
-  ['#viewerModal', 'open'], ['#addModal', 'open'], ['#editModal', 'open'], ['#whyModal', 'open'],
-  ['#nextChooser', 'open'], ['#postAdd', 'show'], ['#branchChooser', 'open']
+  ['#viewerModal', 'open'], ['#addModal', 'open'], ['#editModal', 'open'],
+  ['#nextChooser', 'open'], ['#branchChooser', 'open']
 ]);
 
 export const connectionLabel = count => { const n = Number.isSafeInteger(Number(count)) ? Number(count) : 0; return `이어진 선 ${n}개`; };
@@ -206,7 +206,7 @@ export function applyViewAccessibility(doc, win = doc?.defaultView) {
       if (!el) continue;
       const open = isOpen(el, mode);
       // 닫힌 겹은 초점 대상에서 뺀다. 이 화면의 겹 몇몇은 display:none 대신 transform·opacity로
-      // 치워 둔다(보드·책의 #detail, 책의 #overview, 보드 #postAdd) — 닫혀도 눈에 보이지 않을 뿐
+      // 치워 둔다(보드·책의 #detail, 책의 #overview) — 닫혀도 눈에 보이지 않을 뿐
       // 탭이 들어와 초점이 보이지 않는 단추에 남는다. inert는 그리기·본문 동작에 영향이 없다.
       if (open) el.removeAttribute('inert');
       else if (!el.hasAttribute('inert')) el.setAttribute('inert', '');
