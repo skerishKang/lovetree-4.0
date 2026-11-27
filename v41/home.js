@@ -524,7 +524,7 @@ infoStyle.textContent=`.home-add-top{margin-top:12px;font-size:15px;pointer-even
 /* #1446: 두 줄이 붙어 보이지 않게 2px 띄운다. */
 .home-count-line + .home-count-line{margin-top:2px}
 .home-count[hidden]{display:none}
-.home-count[data-reserve][hidden]{display:block;visibility:hidden}
+.home-count[data-reserve][hidden]{display:block;visibility:hidden;min-height:88px}
 .home-count-item{display:flex;align-items:baseline;justify-content:space-between;gap:4px;width:100%;min-width:0;white-space:nowrap}
 .home-count-name{color:var(--lt-muted);text-align:left}
 .home-count-value{color:var(--lt-pearl);font-weight:700;font-variant-numeric:tabular-nums;text-align:right}
@@ -535,6 +535,25 @@ infoStyle.textContent=`.home-add-top{margin-top:12px;font-size:15px;pointer-even
 .recent-menu{position:fixed;z-index:4000;inset:auto;margin:0;min-width:220px;max-width:min(300px,86vw);max-height:calc(100dvh - 16px);overflow:hidden;padding:6px;border:1px solid var(--lt-line,rgba(255,255,255,.14));border-radius:14px;background:#07070c;box-shadow:0 18px 44px rgba(0,0,0,.5)}.recent-menu::backdrop{background:transparent}.recent-menu-list{display:grid;gap:1px;max-height:min(60dvh,420px);overflow-y:auto;overscroll-behavior:contain}.recent-menu button{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;min-height:44px;padding:0 12px;border:0;border-radius:8px;background:none;cursor:pointer;font:inherit;font-size:13px;color:#e6ddef;text-align:left}.recent-menu button[aria-checked="true"]{color:var(--lt-gold,#ffe6a6)}.recent-menu button[disabled]{color:var(--lt-muted,#9b98a6);cursor:default}.recent-menu button:focus-visible{outline:2px solid #e8b8c9;outline-offset:-2px}.recent-menu .recent-menu-sub{padding-left:22px;font-size:12px;color:#cfc6dd}:host([data-lt-theme=garden]) .recent-menu{background:var(--lt-paper,#f7f0e8);border-color:var(--lt-line-paper)}:host([data-lt-theme=garden]) .recent-menu button{color:var(--lt-ink)}:host([data-lt-theme=garden]) .recent-menu button[aria-checked="true"]{color:var(--lt-gold-ink)}:host([data-lt-theme=garden]) .recent-menu button[disabled],:host([data-lt-theme=garden]) .recent-menu .recent-menu-sub{color:var(--lt-muted)}`;
 shadow.append(infoStyle);
 const mobileFit=document.createElement('style');mobileFit.textContent='@media(max-width:768px){.topbar{gap:12px;flex-wrap:wrap;align-items:center;padding:8px 12px}.top-actions{gap:6px;flex-shrink:0;flex-wrap:wrap;margin-left:auto}.topbar .menuBtn{white-space:nowrap;padding:10px 9px;font-size:14px}.actions .subtleBtn{font-size:14px}.center .center-note{font-size:14px}.hint{font-size:14px}}';shadow.append(mobileFit);
+// #1571: 세 단추와 숫자를 같은 격자에 두고, 문자 모양은 유지한 채 누름 영역을 44px로 확보한다.
+const homeDesign1571=document.createElement('style');
+homeDesign1571.textContent=`
+.center .actions[data-inline]{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));column-gap:clamp(16px,2vw,18px);row-gap:4px;align-items:start}
+@media(min-width:651px){.center .actions[data-inline]{width:100%;max-width:432px;column-gap:18px;margin-inline:auto}}
+.center .actions[data-inline] .home-action-group{display:flex;flex-direction:column;align-items:stretch;gap:4px;min-width:0;max-width:none}
+.center .actions[data-inline] .home-action-group>.subtleBtn{width:100%;height:44px}
+.home-count{min-height:0;font-size:12px;line-height:1.25}
+.home-count-line{display:flex;align-items:center;min-height:44px;line-height:1.25}
+.home-count-line:empty{display:none}
+.home-count-item{min-height:44px;align-items:center}
+.home-count button{box-sizing:border-box;min-height:44px;font-size:13px}
+/* 이름표는 정원에서도 충분히 진한 공통 보조 글자색을 사용한다. */
+/* 카드 글자 상자 크기는 그대로 두고 가상 요소 누름 영역만 44px 이상으로 만든다. */
+.recent-head-row>.recent-head,.recent-head-row>.recent-change{z-index:1}
+.recent-head::after,.recent-change::after{top:-12px;bottom:-12px}
+.topbar .menuBtn{box-sizing:border-box;min-height:44px}
+`;
+shadow.append(homeDesign1571);
 // #380 5번: 첫 화면 오른쪽 위 "보기 ▾" 메뉴(테마·움직임·카드 출처)는 없앴다.
 // 로그인 상태의 같은 항목은 설정 창(셸)의 '화면' 묶음에 있고, 셸이 아래 두 메시지로 알려 준다.
 // 로그아웃에는 설정 입구가 없으므로 테마만 오른쪽 위 작은 ◐ 단추로 남긴다(저장 키 lt41.theme 그대로).
