@@ -8,7 +8,8 @@ import {
   renderMyNews,
   mountMyNews,
   MY_NEWS_NOT_READY_TEXT,
-  MY_NEWS_PANEL_ID
+  MY_NEWS_PANEL_ID,
+  discoverLineText
 } from '../public/v41/my-news.mjs';
 
 // #1098 3단계 — 내 소식 창의 줄 모양·문구·점 숫자 규칙(순수 한 벌). 실제 창 동작은 화면 시험(브라우저)이 잡는다.
@@ -181,4 +182,55 @@ test('빈 목록을 열어도 점은 0으로 지워진다(읽음 표시는 서�
   await mount.open();
   assert.ok($('my-news-list').innerHTML.includes('아직 새 소식이 없어요'));
   assert.deepEqual(painted, [0, 0]);
+});
+
+
+// #1495: 소개 물음 창 대신 내 소식에 남기는 한 줄(화면 쪽 줄, 서버 소식과 함께 그린다).
+test('#1495 소개 줄 문구는 대표 확인 문구 그대로다', () => {
+  assert.equal(discoverLineText('여름 무대'), "'여름 무대'에 순간이 3개 모였어요. 둘러보기에 소개할 수 있어요.");
+});
+
+test('#1495 소개 줄은 [소개하기] 단추와 함께 그리고, 서버 소식이 없어도 빈 안내 대신 보인다', () => {
+  const html = renderMyNews([], { trees: TREES, local: [{ treeId: 't1', day: '2026-11-27', done: false }] });
+  assert.ok(html.replaceAll('&#39;', "'").includes(discoverLineText('첫 무대')), html);
+  assert.match(html, /<button[^>]*data-discover-tree="t1"[^>]*>소개하기<\/button>/);
+  assert.ok(!html.includes('아직 새 소식이 없어요'), '줄이 있으면 빈 안내를 쓰지 않는다');
+});
+
+test('#1495 소개한 뒤의 줄은 다시 누를 수 없다(단추 없이 소개했다는 표시)', () => {
+  const html = renderMyNews([], { trees: TREES, local: [{ treeId: 't1', day: '2026-11-27', done: true }] });
+  assert.ok(!/data-discover-tree=/.test(html), '단추가 없다');
+  assert.ok(html.includes('둘러보기에 소개했어요'), html);
+});
+
+test('#1495 소개 줄과 서버 소식은 날짜 최신순으로 함께 그린다', () => {
+  const html = renderMyNews([{ day: '2026-11-26', kind: 'heart', count: 2, treeId: 't1' }], { trees: TREES, local: [{ treeId: 't1', day: '2026-11-27', done: false }] });
+  assert.ok(html.indexOf('data-discover-line="t1"') < html.indexOf('♡ 2'), '오늘 줄이 어제 줄보다 앞이다');
+  assert.equal((html.match(/class="my-news-day"/g) || []).length, 2, '날짜 줄이 둘');
+});
+
+test('#1495 지워진 트리의 소개 줄은 그리지 않는다', () => {
+  const html = renderMyNews([], { trees: TREES, local: [{ treeId: 'gone', day: '2026-11-27', done: false }] });
+  assert.ok(html.includes('아직 새 소식이 없어요'));
+});
+
+test('#1495 점 숫자는 서버 안 읽은 수에 읽지 않은 소개 줄을 더한다', async () => {
+  const seen = [];
+  const ok = mountMyNews({ fetchCount: async () => ({ ok: true, unreadCount: 2 }), localUnread: () => 1, onCount: n => seen.push(n), document: null });
+  assert.equal(await ok.refreshCount(), 3);
+  const failed = mountMyNews({ fetchCount: async () => { throw new Error('끊김'); }, localUnread: () => 1, onCount: n => seen.push(n), document: null });
+  assert.equal(await failed.refreshCount(), 1, '서버 수를 몰라도 소개 줄은 센다');
+  const none = mountMyNews({ fetchCount: async () => null, localUnread: () => 0, onCount: n => seen.push(n), document: null });
+  assert.equal(await none.refreshCount(), null, '둘 다 없으면 지금처럼 점을 바꾸지 않는다');
+  assert.deepEqual(seen, [3, 1]);
+});
+
+test('#1495 창을 열면 서버 소식을 못 받아도 소개 줄을 보이고, 소개 줄을 읽은 것으로 바꾼다', async () => {
+  const els = { 'my-news-list': { innerHTML: '' }, 'my-news-error': { hidden: true, textContent: '' } };
+  let seenCalls = 0;
+  const mount = mountMyNews({ $: id => els[id], showPanel: () => {}, fetchNews: async () => { throw new Error('끊김'); }, getTrees: () => TREES, getLocalLines: () => [{ treeId: 't1', day: '2026-11-27', done: false }], onLocalSeen: () => { seenCalls += 1; } });
+  await mount.open();
+  assert.match(els['my-news-list'].innerHTML, /data-discover-tree="t1"/);
+  assert.equal(els['my-news-error'].hidden, false, '서버 소식 실패 안내는 그대로 남긴다');
+  assert.equal(seenCalls, 1);
 });

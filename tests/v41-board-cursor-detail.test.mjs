@@ -18,6 +18,7 @@ import { testBackNavigation } from './helpers/history-assert.mjs';
 
 const ROOT = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
 const PUB = path.join(ROOT, 'public');
+const TEST_PORT = Number(process.env.LT_BOARD_583_PORT || 0);
 
 let chromium, skip = false;
 // CI(미리보기 검사)에서는 LT_BOARD_583_REQUIRE=1 — 크롬이 준비된 잡에서 건너뜀을 실패로 본다.
@@ -53,7 +54,7 @@ function serve(extra = {}) {
     }
     res.writeHead(404); res.end('not found');
   });
-  return listenOnSafePort(server, '127.0.0.1').then(() => server);
+  return listenOnSafePort(server, '127.0.0.1', { port: TEST_PORT }).then(() => server);
 }
 
 // 내 기록 보드 호스트: 셸처럼 data-member="in"을 본문에 남긴다.
@@ -109,10 +110,16 @@ const shellWorkspace = () => {
   };
 };
 
-async function openShellBoard(browser, base, { width = 1440, height = 900 } = {}) {
+async function openShellBoard(browser, base, { width = 1440, height = 900, workspace = shellWorkspace(), writeTab = 'easy', empty = false } = {}) {
+  const treeId = workspace.state.trees[0]?.id || 't6';
   const context = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
-  await context.addInitScript(() => localStorage.setItem('lt41.tips.firstTree', '1'));
+  await context.addInitScript(({ writeTab, treeId }) => {
+    localStorage.setItem('lt41.tips.firstTree', '1');
+    localStorage.setItem('lt41.writeTab', writeTab);
+    localStorage.setItem('lt41.discoverAsked', JSON.stringify([treeId]));
+  }, { writeTab, treeId });
   const page = await context.newPage();
+  page.on('dialog', dialog => dialog.accept());
   if (process.env.LT_BOARD_CPU_RATE) {
     const cdp = await context.newCDPSession(page);
     await cdp.send('Emulation.setCPUThrottlingRate', { rate: Number(process.env.LT_BOARD_CPU_RATE) });
@@ -120,21 +127,36 @@ async function openShellBoard(browser, base, { width = 1440, height = 900 } = {}
   const errors = [];
   page.on('pageerror', error => errors.push(String(error.message || error)));
   page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
-  await page.route('**/api/workspace*', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(shellWorkspace()) }));
+  let stored = workspace;
+  let revision = Number(stored.revision) || 1;
+  const puts = [];
+  await page.route('**/api/workspace*', route => {
+    const request = route.request();
+    if (request.method() === 'PUT') {
+      const body = JSON.parse(request.postData() || '{}');
+      puts.push(body);
+      stored = { ...stored, state: body.state, revision: ++revision };
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, revision, subject: stored.subject }) });
+    }
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ...stored, revision, ok: true, savedAt: '2026-11-27T00:00:00.000Z' }) });
+  });
   await page.goto(`${base}/v41/?account=1`, { waitUntil: 'load' });
   try {
-    await page.waitForFunction(() => window.LT41?.tree?.id === 't6', null, { timeout: 20000 });
+    await page.waitForFunction(treeId => window.LT41?.tree?.id === treeId, treeId, { timeout: 20000 });
     await page.evaluate(() => document.querySelector('[data-view="track58-pinboard.html"]').click());
-    await page.waitForFunction(() => {
+    await page.waitForFunction(empty => {
       const frame = document.querySelector('#view');
-      return frame?.contentDocument?.querySelectorAll('#cardLayer .card').length === 6 && !frame.contentDocument.querySelector('#detail.open');
-    }, null, { timeout: 20000 });
+      if (!frame?.contentDocument) return false;
+      return empty
+        ? !frame.contentDocument.querySelector('#boardEmptyGuide')?.hidden
+        : frame.contentDocument.querySelectorAll('#cardLayer .card').length === 6 && !frame.contentDocument.querySelector('#detail.open');
+    }, empty, { timeout: 20000 });
   } catch (error) {
     throw new Error(`${error.message} / ${errors.join(' | ')}`);
   }
   await page.waitForTimeout(500);
   const handle = await page.$('#view');
-  return { context, page, frame: await handle.contentFrame() };
+  return { context, page, frame: await handle.contentFrame(), puts, stored: () => stored };
 }
 
 // #952: 커서·상세 단추의 소스 글자 검사 10개를 걷어냈다. 남은 것은 화면에서 재는 동작이다.
@@ -478,4 +500,197 @@ test('18. 화면: 시네마 재생·장면 이동·다시 보기는 뒤로 가�
   await testBackNavigation(page, { frame, recorded: false, action: () => frame.click('#cinNext') });
   await testBackNavigation(page, { frame, recorded: false, action: () => frame.click('#cinRestart') });
   await testBackNavigation(page, { frame, recorded: false, action: () => frame.evaluate(() => { document.getElementById('finalCTA').classList.add('show'); document.getElementById('walkAgain').click(); }) });
+});
+
+test('19. 화면: 보드에서 고른 순간이 쉬운 추가의 부모로 저장되고 기존 기록은 그대로다', { skip: REQUIRE ? false : skip, timeout: 240000 }, async (t) => {
+  const browser = await chromium.launch({ headless: true });
+  const server = await serve();
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const workspace = shellWorkspace();
+  const { context, page, frame, puts, stored } = await openShellBoard(browser, base, { workspace });
+  const before = await page.evaluate(() => structuredClone(window.LT41.tree.moments));
+  t.after(async () => { await context.close(); await browser.close(); server.close(); });
+  await frame.click('.card[data-id="m2"]');
+  await frame.waitForSelector('.card.selected[data-id="m2"]');
+  assert.equal(await page.evaluate(() => window.LT41.momentId), 'm2', '보드 선택이 셸의 현재 순간으로 전달된다');
+  await page.click('#write-menu');
+  await page.waitForSelector('#write-panel[open]');
+  await page.fill('#quick-url', 'https://example.com/board-parent');
+  await page.click('#quick-submit');
+  const deadline = Date.now() + 10000;
+  while (Date.now() < deadline && puts.length === 0) await page.waitForTimeout(100);
+  assert.equal(puts.length, 1, '공용 쉬운 추가가 저장 요청을 한 번 보낸다');
+  const moments = stored().state.trees[0].moments;
+  assert.equal(moments.length, before.length + 1, '기존 순간을 지우지 않고 하나만 추가한다');
+  assert.deepEqual(moments.slice(0, before.length), before, '기존 순간의 값과 순서가 바뀌지 않는다');
+  assert.equal(moments.at(-1).parentId, 'm2', '고른 순간이 새 순간의 부모로 저장된다');
+});
+
+test('20. 화면: 보드에서 고른 순간이 자세한 추가의 부모로 저장된다', { skip: REQUIRE ? false : skip, timeout: 240000 }, async (t) => {
+  const browser = await chromium.launch({ headless: true });
+  const server = await serve();
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const workspace = shellWorkspace();
+  const { context, page, frame, puts, stored } = await openShellBoard(browser, base, { workspace });
+  t.after(async () => { await context.close(); await browser.close(); server.close(); });
+  await frame.click('.card[data-id="m2"]');
+  await frame.waitForSelector('.card.selected[data-id="m2"]');
+  await page.click('#write-menu');
+  await page.waitForSelector('#write-panel[open]');
+  await page.click('#write-tab-detailed');
+  await page.waitForFunction(() => document.querySelector('#editor-context')?.textContent.includes('순간 2'), null, { timeout: 5000 });
+  await page.fill('#moment-form [name="title"]', '고른 순간 다음');
+  await page.fill('#moment-form [name="note"]', '부모 연결 시험 기록');
+  await page.locator('#moment-form button[type="submit"]').click();
+  const deadline = Date.now() + 10000;
+  while (Date.now() < deadline && puts.length === 0) await page.waitForTimeout(100);
+  assert.equal(puts.length, 1, '공용 자세한 추가가 저장 요청을 한 번 보낸다');
+  assert.equal(stored().state.trees[0].moments.at(-1).parentId, 'm2', '자세한 추가도 고른 순간을 부모로 저장한다');
+});
+
+test('21. 화면: 순간 0개 트리도 보드 빈 상태를 열고 첫 순간을 추가한다', { skip: REQUIRE ? false : skip, timeout: 240000 }, async (t) => {
+  const browser = await chromium.launch({ headless: true });
+  const server = await serve();
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const workspace = shellWorkspace();
+  workspace.state.trees[0].moments = [];
+  workspace.state.trees[0].edges = [];
+  workspace.state.trees[0].coverMomentId = '';
+  const { context, page, frame, puts, stored } = await openShellBoard(browser, base, { workspace, empty: true });
+  t.after(async () => { await context.close(); await browser.close(); server.close(); });
+  assert.equal(await page.evaluate(() => window.LT41.tree.id), 't6', '빈 트리를 트리 없음으로 바꾸지 않는다');
+  assert.equal(await page.locator('#empty').isVisible(), false, '셸의 트리 0개 안내는 숨는다');
+  assert.equal((await page.locator('body').innerText()).includes('열 수 없는 트리'), false, '빈 트리를 격리 안내로 만들지 않는다');
+  assert.equal(await frame.locator('#boardEmptyGuide').isVisible(), true, '보드 프레임의 빈 안내가 보인다');
+  assert.equal(await frame.locator('#boardFirstMoment').isVisible(), true, '첫 순간 추가 단추가 보인다');
+  await frame.click('#boardFirstMoment');
+  await page.waitForSelector('#write-panel[open]');
+  await page.fill('#quick-url', 'https://example.com/first-board-moment');
+  await page.click('#quick-submit');
+  const deadline = Date.now() + 10000;
+  while (Date.now() < deadline && puts.length === 0) await page.waitForTimeout(100);
+  assert.equal(puts.length, 1, '첫 순간 추가가 저장 요청을 보낸다');
+  const tree = stored().state.trees.find(item => item.id === 't6');
+  assert.equal(tree.title, '사슬 6', '기존 트리와 이름을 유지한다');
+  assert.equal(tree.moments.length, 1, '첫 순간 하나만 생긴다');
+  assert.equal(tree.moments[0].parentId, null, '첫 순간은 시작 순간으로 저장된다');
+});
+
+test('22. 화면: 보드 수정은 공용 편집 창으로 저장하고 순간 정체성은 유지한다', { skip: REQUIRE ? false : skip, timeout: 240000 }, async (t) => {
+  const browser = await chromium.launch({ headless: true });
+  const server = await serve();
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const { context, page, frame, puts, stored } = await openShellBoard(browser, base);
+  t.after(async () => { await context.close(); await browser.close(); server.close(); });
+  const before = await page.evaluate(() => structuredClone(window.LT41.tree.moments.find(moment => moment.id === 'm2')));
+  await frame.click('.card[data-id="m2"]');
+  await frame.waitForSelector('#detail.open');
+  await frame.evaluate(() => { document.getElementById('detailMoreBtn').click(); document.getElementById('editMomentBtn').click(); });
+  await page.waitForSelector('#write-panel[open]', { timeout: 5000 });
+  assert.equal(await frame.locator('#editModal.open').count(), 0, '보드 자체 편집 창은 열리지 않는다');
+  assert.equal(await page.locator('#write-panel-title').textContent(), '순간 수정');
+  assert.equal(await page.inputValue('#moment-form [name="title"]'), '순간 2');
+  await page.fill('#moment-form [name="title"]', '공용 창에서 고친 순간');
+  await page.locator('#moment-form button[type="submit"]').click();
+  const deadline = Date.now() + 10000;
+  while (Date.now() < deadline && puts.length === 0) await page.waitForTimeout(100);
+  assert.equal(puts.length, 1, '공용 편집 저장이 요청을 한 번 보낸다');
+  const after = stored().state.trees[0].moments.find(moment => moment.id === 'm2');
+  assert.equal(after.title, '공용 창에서 고친 순간');
+  assert.equal(after.id, before.id);
+  assert.equal(after.parentId, before.parentId);
+  assert.equal(after.date, before.date);
+  assert.deepEqual(after.links, before.links);
+});
+
+test('23. 화면: 보드 삭제는 공용 저장과 되돌리기로 원래 순간을 복원한다', { skip: REQUIRE ? false : skip, timeout: 240000 }, async (t) => {
+  const browser = await chromium.launch({ headless: true });
+  const server = await serve();
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const { context, page, frame, puts, stored } = await openShellBoard(browser, base);
+  t.after(async () => { await context.close(); await browser.close(); server.close(); });
+  const before = await page.evaluate(() => structuredClone(window.LT41.tree.moments));
+  await frame.click('.card[data-id="m2"]');
+  await frame.waitForSelector('#detail.open');
+  await frame.evaluate(() => { document.getElementById('detailMoreBtn').click(); document.getElementById('deleteMomentBtn').click(); });
+  let deadline = Date.now() + 10000;
+  while (Date.now() < deadline && puts.length < 1) await page.waitForTimeout(100);
+  assert.equal(puts.length, 1, '공용 삭제가 저장 요청을 한 번 보낸다');
+  const deleted = stored().state.trees[0].moments;
+  assert.equal(deleted.some(moment => moment.id === 'm2'), false, '고른 순간이 삭제된다');
+  assert.equal(deleted.find(moment => moment.id === 'm3').parentId, 'm1', '자식 순간은 이전 순간으로 이어진다');
+  assert.equal(deleted.some(moment => (moment.links || []).includes('m2')), false, '남은 관련 연결에서 삭제 순간을 뺀다');
+  assert.equal(await page.locator('#toast .toast-action').textContent(), '되돌리기');
+  await page.click('#toast .toast-action');
+  deadline = Date.now() + 10000;
+  while (Date.now() < deadline && puts.length < 2) await page.waitForTimeout(100);
+  assert.equal(puts.length, 2, '되돌리기가 복원 저장 요청을 보낸다');
+  assert.deepEqual(stored().state.trees[0].moments, before, '되돌리기가 순간·부모·연결·순서를 원래대로 복원한다');
+  await frame.waitForSelector('.card[data-id="m2"]');
+});
+
+test('24. 화면: 보드 크게 보기는 공용 미디어 창을 쓰고 닫으면 흔적이 남지 않는다', { skip: REQUIRE ? false : skip, timeout: 240000 }, async (t) => {
+  const browser = await chromium.launch({ headless: true });
+  const server = await serve();
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const workspace = shellWorkspace();
+  workspace.state.trees[0].moments.forEach((moment, index) => {
+    moment.url = `https://www.youtube.com/watch?v=${['aqz-KE-bpKQ', 'M7lc1UVf-VE', 'dQw4w9WgXcQ', '9bZkp7q19f0', 'kJQP7kiw5Fk', '3JZ_D3ELwOQ'][index]}`;
+  });
+  const { context, page, frame } = await openShellBoard(browser, base, { workspace });
+  t.after(async () => { await context.close(); await browser.close(); server.close(); });
+  await context.route('**/www.youtube-nocookie.com/**', route => route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>가짜 영상</title>' }));
+  await context.route('**/api/youtube/oembed*', route => route.fulfill({ status: 200, contentType: 'application/json', body: '{"title":"가짜 영상"}' }));
+  await context.route('**/i.ytimg.com/**', route => route.fulfill({ status: 200, contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="320" height="180"><rect width="320" height="180" fill="#765"/></svg>' }));
+  await frame.click('.card[data-id="m1"]');
+  await frame.waitForSelector('#detail.open');
+  await frame.click('#openMoment');
+  await frame.waitForSelector('.lt-lightbox', { timeout: 5000 });
+  await frame.waitForSelector('.lt-lightbox iframe', { timeout: 10000 });
+  assert.equal(await frame.locator('#viewerModal.open').count(), 0, '보드 자체 뷰어는 열리지 않는다');
+  assert.equal(await frame.locator('.lt-lightbox iframe').count(), 1, '공용 미디어 창이 영상을 연다');
+  await page.keyboard.press('Escape');
+  assert.equal(await frame.locator('.lt-lightbox').count(), 0, 'Esc로 공용 미디어 창이 닫힌다');
+  assert.equal(await frame.locator('.lt-lightbox iframe').count(), 0, '닫은 뒤 영상 iframe이 남지 않는다');
+});
+
+test('25. 화면: 삭제 뒤 기록이 바뀌면 되돌리기 실패를 보여 주고 변경을 지우지 않는다', { skip: REQUIRE ? false : skip, timeout: 240000 }, async (t) => {
+  const browser = await chromium.launch({ headless: true });
+  const server = await serve();
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const { context, page, frame, puts, stored } = await openShellBoard(browser, base);
+  t.after(async () => { await context.close(); await browser.close(); server.close(); });
+  await frame.click('.card[data-id="m2"]');
+  await frame.evaluate(() => { document.getElementById('detailMoreBtn').click(); document.getElementById('deleteMomentBtn').click(); });
+  await page.waitForSelector('#toast .toast-action');
+  await page.waitForFunction(() => document.getElementById('write-menu')?.textContent !== '저장 안 됨', null, { timeout: 10000 });
+  await page.click('#write-menu');
+  await page.waitForSelector('#write-panel[open]');
+  await page.fill('#quick-url', 'https://example.com/after-delete');
+  await page.click('#quick-submit');
+  const deadline = Date.now() + 10000;
+  while (Date.now() < deadline && !stored().state.trees[0].moments.some(moment => moment.url === 'https://example.com/after-delete')) await page.waitForTimeout(100);
+  assert.equal(stored().state.trees[0].moments.some(moment => moment.url === 'https://example.com/after-delete'), true, '삭제 뒤 빠른 추가가 저장된다');
+  await page.evaluate(() => document.getElementById('write-panel').close());
+  await page.click('#toast .toast-action');
+  await page.waitForFunction(() => document.getElementById('toast')?.textContent.includes('되돌릴 작업을 찾을 수 없어요'), null, { timeout: 5000 });
+  assert.equal(stored().state.trees[0].moments.some(moment => moment.id === 'm2'), false, '실패한 되돌리기가 삭제 상태를 복원하지 않는다');
+  assert.equal(stored().state.trees[0].moments.some(moment => moment.url === 'https://example.com/after-delete'), true, '뒤의 추가는 그대로 남는다');
+});
+
+test('26. 화면: 순간 0개 보드에서 시네마를 눌러도 브라우저 예외가 없다', { skip: REQUIRE ? false : skip, timeout: 240000 }, async (t) => {
+  const browser = await chromium.launch({ headless: true });
+  const server = await serve();
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const workspace = shellWorkspace();
+  workspace.state.trees[0].moments = [];
+  workspace.state.trees[0].edges = [];
+  const { context, page, frame } = await openShellBoard(browser, base, { workspace, empty: true });
+  const errors = [];
+  page.on('pageerror', error => errors.push(String(error.message || error)));
+  t.after(async () => { await context.close(); await browser.close(); server.close(); });
+  await frame.click('#cinemaBtn');
+  await page.waitForTimeout(300);
+  assert.deepEqual(errors, [], '빈 보드 시네마 클릭에서 브라우저 예외가 없다');
+  assert.equal(await frame.locator('#cinemaOverlay.active').count(), 0, '순간이 없으면 시네마를 시작하지 않는다');
 });

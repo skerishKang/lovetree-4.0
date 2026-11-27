@@ -96,7 +96,7 @@ async function openHost(browser, url, { width, height } = {}) {
 
 // 화면 좌표 기준 겹침·칸 수·빈 칸 비율.
 const geometry = (frame) => frame.evaluate(() => {
-  const cards = [...document.querySelectorAll('#cardLayer .card')].map((c) => ({ id: c.dataset.id, x: c.offsetLeft, y: c.offsetTop, w: c.offsetWidth, h: c.offsetHeight }));
+  const cards = [...document.querySelectorAll('#cardLayer .card')].map((c) => ({ id: c.dataset.id, x: c.offsetLeft, y: c.offsetTop, w: c.offsetWidth, h: c.offsetHeight, featured: c.classList.contains('isFeatured') }));
   let pairs = 0;
   for (let i = 0; i < cards.length; i++) for (let j = i + 1; j < cards.length; j++) {
     const a = cards[i], b = cards[j];
@@ -106,25 +106,30 @@ const geometry = (frame) => frame.evaluate(() => {
   }
   const cols = [...new Set(cards.map((c) => c.x))].sort((a, b) => a - b);
   const slots = cards.length ? cols.length * ([...new Set(cards.map((c) => c.y))].length) : 0;
-  return { n: cards.length, pairs, cols: cols.length, filledRatio: cards.length ? cards.length / slots : 0, threads: document.querySelectorAll('svg.threads,.threadGroup').length };
+  const rest = cards.filter(card => !card.featured);
+  const restCols = [...new Set(rest.map((c) => c.x))].length;
+  const restRows = [...new Set(rest.map((c) => c.y))].length;
+  const restFilledRatio = rest.length ? rest.length / (restCols * restRows) : 1;
+  return { n: cards.length, pairs, cols: cols.length, filledRatio: cards.length ? cards.length / slots : 0, restFilledRatio, threads: document.querySelectorAll('svg.threads,.threadGroup').length };
 });
 
 // #952: 줄·핀 연결·이유 창·배치 전환·상세 지도 단추·시네마 비트를 소스 글자로 고정하던 30개 단정을 걷어냈다.
 // 화면에서 남길 것(줄 요소 0·연결 창 0·배치 전환 단추·지도 메시지)은 아래 실브라우저 시험이 직접 잰다.
-test('#582 화면: 모아둔 순간 26(평평한 트리) — 1440 4칸·390 1칸, 겹침 0, 빈 칸 비율, 줄 요소 0', { skip: REQUIRE ? false : skip, timeout: 300000 }, async () => {
+test('#582 화면: 모아둔 순간 26(평평한 트리) — 1440 4칸·390 featured+2칸, 겹침 0, 빈 칸 비율, 줄 요소 0', { skip: REQUIRE ? false : skip, timeout: 300000 }, async () => {
   if (skip) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip}`);
   const tree = starTree(26);
   const server = await serve({ '/__host-582.html': hostHTML(tree) });
   const base = `http://127.0.0.1:${server.address().port}`;
   const browser = await chromium.launch({ headless: true });
   try {
-    for (const [w, h, cols] of [[1440, 900, 4], [390, 844, 1]]) {
+    for (const [w, h, cols] of [[1440, 900, 4], [390, 844, 3]]) {
       const { context, frame, problems } = await openHost(browser, `${base}/__host-582.html`, { width: w, height: h });
       const g = await geometry(frame);
       assert.equal(g.n, 26, `${w}: 순간 26장이 모두 꽂힌다`);
       assert.equal(g.pairs, 0, `${w}: 겹친 카드 쌍 0`);
       assert.equal(g.cols, cols, `${w}: 칸 수는 화면 폭이 정한다(${cols}칸)`);
-      assert.ok(g.filledRatio >= 0.9, `${w}: 빈 칸 비율 ${(g.filledRatio * 100).toFixed(0)}% — 바둑판은 구멍 없이 채운다`);
+      const filledRatio = w === 390 ? g.restFilledRatio : g.filledRatio;
+      assert.ok(filledRatio >= 0.9, `${w}: 빈 칸 비율 ${(filledRatio * 100).toFixed(0)}% — 바둑판은 구멍 없이 채운다`);
       assert.equal(g.threads, 0, `${w}: 줄 요소 0개`);
       const gone = await frame.evaluate(() => ['threadSvg', 'whyModal', 'whyBubble', 'postAdd', 'pathModeBtn'].filter((id) => document.getElementById(id)).length);
       assert.equal(gone, 0, `${w}: #582에서 치운 연결 요소가 화면에 없다`);
@@ -267,13 +272,7 @@ test('조작 버튼 히트박스는 44x44 이상이다(렌더링 ::after 터치 
     assert.ok(hit.rw > 0 && hit.rh > 0, `${hit.sel} 버튼이 보인다(${hit.rw}x${hit.rh})`);
     // 터치 타깃 ::after 메커니즘이 살아있다(이동이 규칙을 잃지 않았다).
     assert.ok(hit.expand && hit.inset && hit.inset !== 'auto', `${hit.sel}에 ::after inset 터치 규칙이 있다(content ${hit.content}, inset ${hit.inset})`);
-    if (hit.sel === '#detailYtLink') {
-      // 사전 존재 격차: 링크 실제 높이 24px + inset 10px = 34px(<44). 옛 소스 시험은 하드코딩 34px로 44로 잘못 통과시켰다.
-      // #886은 화면 변화 0이라 이 값을 그대로 보존한다(별도 접근성 과제). 여기서는 보존된 실제 값만 확인한다.
-      assert.equal(hit.h, 34, `#detailYtLink 히트박스 높이는 보존된 34px이다(실제 ${hit.h})`);
-    } else {
-      assert.ok(hit.w >= 44 && hit.h >= 44, `${hit.sel} 히트박스 ${hit.w}x${hit.h}가 44 미만이다(inset ${hit.inset})`);
-    }
+    assert.ok(hit.w >= 44 && hit.h >= 44, `\${hit.sel} 히트박스 \${hit.w}x\${hit.h}가 44 미만이다(inset \${hit.inset})`);
   }
    await context.close();
  });
@@ -379,7 +378,7 @@ test('#1249 390에서 모든 카드가 판 안에 있음: 밝은·밤, 스크롤
         assert.equal(first.scrollTop,0,theme+' 첫 카드부터 표시');
         assert.ok(first.scrollHeight>first.height,theme+' 실제 세로 스크롤 길이');
         assert.ok(first.scrollWidth<=first.width,theme+' 가로 넘침 0');
-        assert.equal(first.cards.filter(c=>c.visible).length,2,theme+' 첫 화면에 카드 두 장');
+        assert.equal(first.cards.filter(c=>c.visible).length,3,theme+' 첫 화면에 카드 세 장');
         assert.equal(first.cards.filter(c=>c.inside&&c.contentTop>=0&&c.contentBottom<=first.scrollHeight+1).length,5,theme+' 모든 카드가 판과 스크롤 범위 안');
         const reached=new Set(first.cards.filter(c=>c.visible).map(c=>c.id));
         await page.mouse.move(30,550);
@@ -403,4 +402,101 @@ test('#1249 390에서 모든 카드가 판 안에 있음: 밝은·밤, 스크롤
       } finally {await ctx.close();}
     }
   } finally {await browser.close();await new Promise(r=>server.close(r));}
+});
+
+test('#1529 844x390: 세로 스크롤로 마지막 카드 접근·끌기 두 방향 저장', { skip: REQUIRE ? false : skip, timeout: 120000 }, async (t) => {
+  const tree = starTree(8);
+  const server = await serve({ '/__host-1529.html': hostHTML(tree) });
+  const browser = await chromium.launch({ headless: true });
+  t.after(async () => { await browser.close(); server.close(); });
+  const { context, page, frame, problems } = await openHost(browser,
+    'http://127.0.0.1:' + server.address().port + '/__host-1529.html', { width: 844, height: 390 });
+  t.after(async () => context.close());
+  await frame.evaluate(() => document.body.classList.add('lt-advanced'));
+  const touch = await frame.evaluate(() => [...document.querySelectorAll('#leftPanel .filterSelect,#leftPanel .wideTool,#leftPanel .themeBtn,#leftPanel .styleMini,#leftPanel .collapseBtn')]
+    .filter(e => e.getClientRects().length).map(e => ({ id: e.id, height: e.getBoundingClientRect().height, width: e.getBoundingClientRect().width })));
+  assert.ok(touch.length >= 8, '844 고급 도구의 선택·테마 단추 존재');
+  for (const hit of touch) assert.ok(hit.height >= 44 && hit.width >= 44, '844 고급 도구 누름 영역 44px: ' + JSON.stringify(hit));
+  const before = await frame.evaluate(() => {
+    const viewport = document.querySelector('#viewport');
+    return { scrollable: viewport.scrollHeight > viewport.clientHeight,
+      height: viewport.clientHeight, total: viewport.scrollHeight };
+  });
+  assert.ok(before.scrollable, '844 가로 화면 카드 세로 스크롤 활성화');
+  await frame.evaluate(() => { const v = document.querySelector('#viewport'); v.scrollTop = v.scrollHeight; });
+  await page.waitForTimeout(250);
+  const end = await frame.evaluate(() => {
+    const cards = [...document.querySelectorAll('.card')];
+    const bottom = Math.max(...cards.map(c => c.getBoundingClientRect().bottom));
+    const v = document.querySelector('#viewport').getBoundingClientRect();
+    return { bottom, viewportBottom: v.bottom };
+  });
+  assert.ok(end.bottom <= end.viewportBottom + 8, '끝까지 스크롤하면 모든 카드 아래끝에 접근');
+  await frame.evaluate(() => { document.querySelector('#viewport').scrollTop = 0; });
+  await page.waitForTimeout(250);
+  const dragOnce = async (direction) => {
+    const pair = await frame.evaluate(() => {
+      const v = document.querySelector('#viewport').getBoundingClientRect();
+      return [...document.querySelectorAll('.card')].map(c => {
+        const r = c.getBoundingClientRect();
+        return { id: c.dataset.id, x: r.x + r.width / 2, y: r.y + r.height / 2, visible: r.top >= v.top && r.bottom <= v.bottom };
+      }).filter(c => c.visible).slice(0, 2);
+    });
+    assert.equal(pair.length, 2, '화면에 끌 카드 두 장 표시');
+    const [a,b] = direction === 'forward' ? pair : pair.reverse();
+    await page.mouse.move(a.x,a.y); await page.mouse.down();
+    await page.mouse.move(b.x,b.y,{steps:12}); await page.mouse.up();
+    await page.waitForTimeout(350);
+  };
+  await dragOnce('forward');
+  assert.equal(await frame.locator('[data-board-mode="mine"]').getAttribute('aria-pressed'), 'true', '첫 끌기 뒤 내 배치');
+  const first = await page.evaluate(() => window.LT41_MESSAGES.filter(m => m.type === 'lt41-board-sync').length);
+  assert.ok(first > 0, '첫 끌기 저장 메시지');
+  await dragOnce('back');
+  const second = await page.evaluate(() => window.LT41_MESSAGES.filter(m => m.type === 'lt41-board-sync').length);
+  assert.ok(second > first, '반대 방향 끌기 저장 메시지');
+  assert.deepEqual(problems, [], '브라우저 오류 없음');
+});
+
+test('#1529 390: 접힌 도구 줄을 통해 두 종류의 거르기 사용', { skip: REQUIRE ? false : skip, timeout: 90000 }, async (t) => {
+  const tree = starTree(8);
+  tree.moments.forEach((m,i) => { m.keywords = [i%2 ? '여행' : '일상']; });
+  const server = await serve({ '/__host-1529-filter.html': hostHTML(tree) });
+  const browser = await chromium.launch({ headless: true });
+  t.after(async () => { await browser.close(); server.close(); });
+  const { context, page, frame, problems } = await openHost(browser,
+    'http://127.0.0.1:' + server.address().port + '/__host-1529-filter.html', { width: 390, height: 844 });
+  t.after(async () => context.close());
+  await frame.evaluate(() => document.body.classList.add('lt-advanced'));
+  if (!await frame.locator('#mobileTools').isVisible()) await frame.locator('.lt-toolbar-more').click();
+  await frame.locator('#mobileTools').click();
+  await frame.locator('#keywordFilter').selectOption('여행');
+  assert.equal(await frame.locator('.card:not(.filteredOut)').count(), 4, '꼬리표 조건 결과 4장');
+  await frame.locator('#keywordFilter').selectOption('all');
+  await frame.locator('#mediaFilter').selectOption('video');
+  assert.equal(await frame.locator('.card:not(.filteredOut)').count(), 7, '영상 조건 결과 7장');
+  assert.deepEqual(problems, [], '브라우저 오류 없음');
+});
+
+test('#1529 1440: 카드 40장 상세 판을 열어도 읽을 수 있는 크기 유지', { skip: REQUIRE ? false : skip, timeout: 120000 }, async (t) => {
+  const tree = starTree(40);
+  const server = await serve({ '/__host-1529-many.html': hostHTML(tree) });
+  const browser = await chromium.launch({ headless: true });
+  t.after(async () => { await browser.close(); server.close(); });
+  const { context, frame, problems } = await openHost(browser,
+    'http://127.0.0.1:' + server.address().port + '/__host-1529-many.html', { width: 1440, height: 900 });
+  t.after(async () => context.close());
+  await frame.evaluate(() => selectMoment('s1', true));
+  await frame.waitForFunction(() => document.querySelector('#detail')?.classList.contains('open'));
+  const result = await frame.evaluate(() => {
+    const detail = document.querySelector('#detail').getBoundingClientRect();
+    const area = document.querySelector('#viewport').getBoundingClientRect();
+    const cards = [...document.querySelectorAll('.card')].map(c => c.getBoundingClientRect());
+    const visible = cards.filter(r => r.right > area.left && r.left < area.right && r.bottom > area.top && r.top < area.bottom);
+    return { maxWidth: Math.max(0, ...visible.map(r => r.width)), panel: detail.right,
+      overlap: visible.filter(r => r.left < detail.right && r.right > detail.left && r.top < detail.bottom && r.bottom > detail.top).length };
+  });
+  assert.ok(result.maxWidth >= 180, '1440 40장 상세 판의 보이는 카드 너비는 180px 이상: ' + JSON.stringify(result));
+  assert.equal(result.overlap, 0, '상세 판과 보이는 카드 겹침 0');
+  assert.deepEqual(problems, [], '브라우저 오류 없음');
 });

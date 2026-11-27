@@ -1,5 +1,5 @@
 import {createSyncController} from './sync-controller.mjs';
-import {EMPTY_STATE,validateState,createTree,editTree,addMoment,editMoment,reparentMoment,removeMoment,linkMoments,unlinkMoments,cacheMomentMediaMetadata,quickAdd,moveMoment,treeFromMoments,organizeMoments,undoOrganize,MAX_TREES,newId,updatePrefs} from './domain.mjs';
+import {EMPTY_STATE,validateState,createTree,editTree,addMoment,editMoment,reparentMoment,removeMoment,undoMomentDelete,linkMoments,unlinkMoments,cacheMomentMediaMetadata,quickAdd,moveMoment,treeFromMoments,organizeMoments,undoOrganize,MAX_TREES,newId,updatePrefs} from './domain.mjs';
 // Reuses 4.0 persistence, retries and revision conflicts; demo/file records cannot enter this session.
 function sessionDraftStorage(){try{return globalThis.sessionStorage||null;}catch{return null;}}
 function sessionCacheStorage(){try{return globalThis.localStorage||null;}catch{return null;}}
@@ -78,7 +78,7 @@ export function createMemberSession({api,onState=()=>{},onStatus=()=>{},onGuard=
    if(action==='quickAdd'||action==='moveMoment'||action==='treeFromMoments'||action==='organizeMoments'||action==='undoOrganize'){
      const result=action==='quickAdd'?quickAdd(document,input)
        :action==='moveMoment'?moveMoment(document,selection.treeId,selection.momentId,input.toTreeId,input.parentId)
-       :action==='organizeMoments'?organizeMoments(document,{mode:input.mode,fromTreeId:selection.treeId,momentIds:input.momentIds,toTreeIds:input.toTreeIds,skip:input.skip})
+       :action==='organizeMoments'?organizeMoments(document,{mode:input.mode,fromTreeId:selection.treeId,momentIds:input.momentIds,toTreeIds:input.toTreeIds,skip:input.skip,newTreeName:input.newTreeName})
        :action==='undoOrganize'?undoOrganize(document,input.record)
        :treeFromMoments(document,selection.treeId,input.momentIds,{subject:input.subject});
      document=validateState(result.state);
@@ -97,6 +97,7 @@ export function createMemberSession({api,onState=()=>{},onStatus=()=>{},onGuard=
     else if(action==='cacheMediaMetadata'){next=cacheMomentMediaMetadata(tree,momentId,input.url,input.mediaMetadata);if(next===tree)return {treeId,momentId,changed:false};}
     else if(action==='reparent')next=reparentMoment(tree,momentId,input.targetId,input.relation);
     else if(action==='delete'){next=removeMoment(tree,momentId);momentId=next.moments.find(m=>m.id===tree.moments.find(m=>m.id===momentId)?.parentId)?.id||next.moments[0].id;}
+    else if(action==='undoDelete'){next=undoMomentDelete(tree,input.record);momentId=input.momentId;}
     else if(action==='link')next=linkMoments(tree,momentId,input.targetId);
     else if(action==='unlink')next=unlinkMoments(tree,momentId,input.targetId);
     else if(action==='deleteTree'){trees=trees.filter(t=>t.id!==tree.id);treeId=trees[0]?.id||null;momentId=trees[0]?.moments[0]?.id||null;}

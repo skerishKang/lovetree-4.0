@@ -18,7 +18,7 @@ export function syncedNoticeText({ writable = false, momentCount = 0 } = {}) {
 // 서버(#538 저장 훅)가 저장 뒤 자동 공유 행(origin='auto')을 만들고, 둘러보기 목록 SQL은
 // moment_count>=3(순간 3개)부터 소개한다. 그래서 '자동 공개가 새로 일어난 저장'은
 // 둘러보기 소개 기준(순간 3개, #538 SQL moment_count>=3과 같다). 2026-11-16 결정으로
-// '공개됐어요' 토스트(#718)는 남기지 않는다 — 3개에 도달한 저장은 셸의 질문 창(discover-ask)이 대신 묻는다.
+// '공개됐어요' 토스트(#718)는 남기지 않는다 — 3개에 도달한 트리는 내 소식의 둘러보기 소개 줄이 알린다(#1495).
 export const AUTO_PUBLISH_MIN_MOMENTS = 3;
 // 직전 기기 스냅샷(before: {트리 아이디: 순간 수})과 저장 뒤(after)를 비교해
 // 순간 3개에 처음 도달한 트리만 돌려준다. before에 없던 트리는 이 기기에서 처음
@@ -80,6 +80,9 @@ function paintToast(toast, text, action) {
   btn.type = 'button';
   btn.className = 'toast-action';
   btn.textContent = action.label;
-  btn.addEventListener('click', () => action.run());
+  btn.addEventListener('click', () => {
+    action.run();
+    if (btn.isConnected && toast.contains(btn)) { toast.replaceChildren(); toast.hidden = true; }
+  });
   toast.replaceChildren(span, btn);
 }

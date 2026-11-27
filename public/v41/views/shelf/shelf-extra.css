@@ -285,6 +285,63 @@ html[data-v41-screen=shelf][data-lt-theme=garden] .book-card > .book-manage {
   color: var(--lt-paper);
 }
 
+/* #1495: 둘러보기에 소개된 트리만 표지 테두리 안 왼쪽 위(안쪽 8px)에 아주 작은 '둘러보기에 보임'. 표지 안에 있어 기울기·떠오름을 따르고 밖으로 걸치지 않는다.
+   좁은 표지(한 줄이 안쪽 8px에 안 들어가는 폭)에서는 '공개'+눈 아이콘 한 줄로 줄인다(대표 결정 B). 누르는 단추는 그 자리에 투명하게 겹치고(키보드·화면 읽기용, 누름은 통과), 표시를 누르면 그 트리 공유 판. */
+html[data-v41-screen=shelf] .book-cover > .book-discover-mark {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  box-sizing: border-box;
+  max-width: calc(100% - 16px);
+  padding: 1px 7px;
+  border: 1px solid var(--lt-gold-line);
+  border-radius: var(--lt-r-pill);
+  background: var(--lt-glass-strong);
+  color: var(--lt-pearl);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.2;
+  white-space: nowrap;
+  cursor: pointer;
+}
+html[data-v41-screen=shelf] .book-discover-mark .mark-short { display: none; align-items: center; gap: 3px; }
+html[data-v41-screen=shelf] .book-discover-mark.is-short .mark-full { display: none; }
+html[data-v41-screen=shelf] .book-discover-mark.is-short .mark-short { display: inline-flex; }
+html[data-v41-screen=shelf] .book-discover-mark .mark-eye { flex: 0 0 auto; }
+/* 누름 높이 44px — 위로는 표지 안에서만 넓힌다. */
+html[data-v41-screen=shelf] .book-cover > .book-discover-mark::after {
+  content: '';
+  position: absolute;
+  top: -8px;
+  right: -4px;
+  bottom: -18px;
+  left: -8px;
+}
+html[data-v41-screen=shelf][data-lt-theme=garden] .book-cover > .book-discover-mark {
+  border-color: var(--lt-line-paper);
+  background: var(--lt-ink);
+  color: var(--lt-paper);
+}
+/* 선반 보기의 '.book-card > button{height:auto}'보다 뒤·같은 무게로 둔다. */
+html[data-v41-screen=shelf] .shelf-viewport .book-card > button.book-discover {
+  position: absolute;
+  top: calc(var(--discover-y, 8px) - 10px);
+  left: calc(var(--discover-x, 8px) - 4px);
+  z-index: 5;
+  width: calc(var(--discover-w, 100px) + 8px);
+  height: max(44px, calc(var(--discover-h, 24px) + 20px));
+  padding: 0;
+  border: 0;
+  border-radius: var(--lt-r-card);
+  background: transparent;
+  pointer-events: none;
+}
+html[data-v41-screen=shelf] .shelf-viewport .book-card > button.book-discover:focus-visible { outline: none; }
+html[data-v41-screen=shelf] .book-card:has(> .book-discover:focus-visible) .book-discover-mark { outline: 2px solid var(--lt-gold); outline-offset: 2px; }
+
 /* 큰 화면 서재의 본문은 1920px까지 넓힌다. 1920 화면에서 스크롤바가 생겨도 적용된다. */
 @media (min-width: 1900px) {
   html[data-v41-screen=shelf] .page { max-width: 1920px; }

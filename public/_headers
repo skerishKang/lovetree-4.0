@@ -1,0 +1,6 @@
+/v41/home
+  Cache-Control: no-store
+/v41/home.html
+  Cache-Control: no-store
+/v41/deploy-recovery.js
+  Cache-Control: no-cache

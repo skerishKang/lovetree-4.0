@@ -24,6 +24,7 @@ await import('../public/v41/views/board/board-model.js');
 const LT58Model = globalThis.LT58Model;
 
 const REQUIRE = process.env.LT_BOARD_601_REQUIRE === '1';
+const TEST_PORT = Number(process.env.LT_BOARD_601_PORT || 0);
 const ROOT = path.resolve(process.env.LT_BOARD_601_ROOT || fileURLToPath(new URL('../public', import.meta.url)));
 let chromium, skip = false;
 try {
@@ -65,7 +66,7 @@ function serve(extra = {}) {
     }
     res.writeHead(404); res.end('not found');
   });
-  return listenOnSafePort(server, '127.0.0.1').then(() => server);
+  return listenOnSafePort(server, '127.0.0.1', { port: TEST_PORT }).then(() => server);
 }
 
 const hostHTML = (tree) => `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>보드 호스트</title></head><body data-member="in" data-record-source="server">
@@ -525,6 +526,8 @@ test('#662 화면: 상세 판의 행동 단추를 실제 좌표 클릭으로 누
   try {
     for (const [width, height] of [[1440, 900], [390, 844]]) {
       const { context, page, frame, problems } = await openHost(browser, `${base}/__host-662.html`, { width, height });
+      await context.route('**/api/youtube/oembed*', route => route.fulfill({ status: 200, contentType: 'application/json', body: '{"title":"가짜 영상"}' }));
+      await context.route('**/www.youtube-nocookie.com/**', route => route.fulfill({ status: 200, contentType: 'text/html', body: '<title>가짜 영상</title>' }));
       try {
         // 화면 안에 온전히 보이는 카드를 골라 상세를 연다(실제 마우스 클릭).
         const card = await frame.evaluate(() => {
@@ -564,8 +567,8 @@ test('#662 화면: 상세 판의 행동 단추를 실제 좌표 클릭으로 누
         const om = await center('openMoment');
         await page.mouse.click(om.x, om.y);
         await page.waitForTimeout(500);
-        assert.equal(await frame.evaluate(() => document.getElementById('viewerModal').classList.contains('open')), true, `${width}px: '크게 보기'를 실제 클릭으로 누르면 감상 창이 열린다`);
-        await frame.evaluate(() => document.getElementById('viewerModal').classList.remove('open'));
+        assert.equal(await frame.evaluate(() => !!document.querySelector('.lt-lightbox')), true, `${width}px: '크게 보기'를 실제 클릭으로 누르면 공용 감상 창이 열린다`);
+        await frame.evaluate(() => LTMedia.closeLightbox());
         await page.waitForTimeout(200);
         // 지도에서 관계 보기 → 셸로 lt41-open-network이 간다(메뉴를 다시 연다 — 크게 보기 누름에서 닫혔다).
         await frame.click('#detailMoreBtn');

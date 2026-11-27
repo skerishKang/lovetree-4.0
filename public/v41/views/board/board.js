@@ -243,6 +243,33 @@ function gridPlan(vw) {
   const tops = LT58Model.gridRowTops(slots, id => reservedHeights.get(id) || BASE_RESERVED_H);
   return { slots, tops };
 }
+function featuredMomentId() {
+  if (innerWidth >= 700) return '';
+  return boardMode === 'date' ? (LT58Model.dateDescOrder(moments)[0] || '') : (momentOrder[0] || '');
+}
+function boardStackPositions(seq) {
+  const ids = Array.isArray(seq) ? seq : [];
+  const narrow = innerWidth < 700;
+  const cols = LT58Model.gridColumns(innerWidth, ids.length);
+  const featured = narrow && cols === 2 ? ids[0] : null;
+  const rest = featured ? ids.slice(1) : ids;
+  const startY = featured ? GRID_MARGIN + (reservedHeights.get(featured) || BASE_RESERVED_H) + 36 : GRID_MARGIN;
+  const layout = LT58Model.stackLayout(rest, {
+    cols,
+    reservedOf: id => reservedHeights.get(id) || BASE_RESERVED_H,
+    startY
+  });
+  const margin = narrow ? Math.max(8, (innerWidth - 336) / 2) : GRID_MARGIN;
+  const pitch = narrow ? 176 : GRID_COL_PITCH;
+  const out = new Map();
+  if (featured) out.set(featured, { x: (innerWidth - 264) / 2, y: GRID_MARGIN, rot: -2, featured: true });
+  let i = 0;
+  for (const id of rest) {
+    const slot = layout.get(id);
+    if (slot) out.set(id, LT58Model.gridPosition(slot.col, slot.y, i++, { margin, pitch }));
+  }
+  return out;
+}
 function projectBoardMoments() {
   return LTDEMO.moments.map((m, i) => {
     const saved = Number.isFinite(m.x) && Number.isFinite(m.y) && LT58Model.isPinboardSlot(m.x);
@@ -324,15 +351,10 @@ function discardBoardUndoSnapshot(value) {
 // 세로(쇼츠) 카드가 섞인 열 아래가 비지 않는다. #619-6: '내 배치'는 좌표가 아니라 순서로 쌓는다.
 function placeStacked() {
   const seq = boardMode === 'date' ? LT58Model.dateDescOrder(moments) : momentOrder;
-  const layout = LT58Model.stackLayout(seq, {
-    cols: LT58Model.gridColumns(innerWidth, moments.length),
-    reservedOf: id => reservedHeights.get(id) || BASE_RESERVED_H
-  });
-  let i = 0;
+  const positions = boardStackPositions(seq);
   for (const m of moments) {
-    const s = layout.get(m.id);
-    if (!s) continue;
-    const pos = LT58Model.gridPosition(s.col, s.y, i++);
+    const pos = positions.get(m.id);
+    if (!pos) continue;
     m.x = pos.x;
     m.y = pos.y;
     m.rot = pos.rot;
@@ -341,6 +363,7 @@ function placeStacked() {
       el.style.left = pos.x + 'px';
       el.style.top = pos.y + 'px';
       el.style.setProperty('--rot', pos.rot + 'deg');
+      el.classList.toggle('isFeatured', !!pos.featured);
     }
   }
 }
@@ -352,19 +375,15 @@ function placeAll() {
 // #619-6: 끼워 넣기 — 끄는 동안 자리를 보이기 위해 끌고 있는 카드를 뺀 나머지 카드를 현재 순서로 다시 쌓은 자리다.
 function insertCells(excludeId) {
   const seq = momentOrder.filter(id => id !== excludeId);
-  const layout = LT58Model.stackLayout(seq, {
-    cols: LT58Model.gridColumns(innerWidth, moments.length),
-    reservedOf: id => reservedHeights.get(id) || BASE_RESERVED_H
-  });
+  const positions = boardStackPositions(seq);
   return seq.map((id, i) => {
-    const s = layout.get(id);
-    const m = moments.find(x => x.id === id);
+    const pos = positions.get(id);
     const el = cardLayer.querySelector(`[data-id="${id}"]`);
     return {
       id,
       index: i,
-      x: GRID_MARGIN + s.col * 300,
-      y: s.y,
+      x: pos.x,
+      y: pos.y,
       w: el ? el.offsetWidth || 242 : 242,
       h: el
         ? el.offsetHeight || reservedHeights.get(id) || BASE_RESERVED_H
@@ -505,15 +524,10 @@ function previewShift(dragId, hit) {
   const sig = at + '|' + seq.join(',');
   if (sig === previewSig) return;
   previewSig = sig;
-  const layout = LT58Model.stackLayout(seq, {
-    cols: LT58Model.gridColumns(innerWidth, moments.length),
-    reservedOf: id2 => reservedHeights.get(id2) || BASE_RESERVED_H
-  });
-  let i = 0;
+  const positions = boardStackPositions(seq);
   for (const id2 of seq) {
-    const s = layout.get(id2);
-    if (!s) continue;
-    const pos = LT58Model.gridPosition(s.col, s.y, i++);
+    const pos = positions.get(id2);
+    if (!pos) continue;
     if (id2 === dragId) {
       if (typeof placeDropPlaceholder === 'function') placeDropPlaceholder(dragId, pos);
       continue;
@@ -780,7 +794,8 @@ function settlePlacedCards() {
 }
 
 let mobileBoardBaseY = 0;
-function mobileBoardScroll() { return innerWidth < 700 && !cinema; }
+function shortBoard() { return innerWidth >= 700 && innerWidth < 1200 && innerHeight <= 500; }
+function mobileBoardScroll() { return (innerWidth < 700 || shortBoard()) && !cinema; }
 function mobileBoardBounds() {
   const cards = boardCards();
   if (!cards.length) return null;
@@ -918,7 +933,7 @@ function boardSafeArea(expectDetail = false) {
       let r = lp.getBoundingClientRect();
       if (r.width && r.right - vr.left < vw / 2) left = Math.max(16, r.right - vr.left + 12);
     }
-    if (dt && (expectDetail || dt.classList.contains('open'))) right = dt.offsetWidth + 32;
+    if (dt && (expectDetail || dt.classList.contains('open')) && !parseFloat(viewport.style.marginRight)) right = dt.offsetWidth + 32;
   } else {
     /* #267: 좁은 판에서는 위에 순간 탐색 판(선택·책 열기)이, 오른쪽 아래에 시네마 단추가 카드 위에 뜬다 —
   처음 맞춤이 카드를 그 밑에 두도록 위·아래 자리를 비켜 둔다(판이 없으면 지금처럼 12px만 남긴다). */
@@ -1018,6 +1033,17 @@ function boardStartViewInner() {
     } else fitAll(false);
     return;
   }
+  if (shortBoard()) {
+    const bounds = mobileBoardBounds(), safe = boardSafeArea();
+    if (bounds) {
+      viewMode = 'start';
+      view.z = Math.min(0.8, safe.w / Math.max(1, bounds.right - bounds.left));
+      view.x = safe.x + (safe.w - (bounds.right - bounds.left) * view.z) / 2 - bounds.left * view.z;
+      view.y = safe.y - bounds.top * view.z;
+      applyView(false);
+      return;
+    }
+  }
   let vw = viewport.clientWidth,
     vh = viewport.clientHeight,
     cards = boardCards(),
@@ -1025,7 +1051,7 @@ function boardStartViewInner() {
   // #536: 기억한 자리의 적용·버림 판정까지 모델(LT58Model.startView)이 맡는다 — 처음 자리와 같은
   // 판 규칙(덮거나 가운데)을 함께 거치게 해 넓은 화면에서 판이 한쪽으로 쏠리지 않게 한다.
   growBoard();
-  const safe = boardSafeArea(true);
+  const safe = boardSafeArea();
   let v = LT58Model.startView({
     viewport: { w: vw, h: vh },
     safe,
@@ -1045,7 +1071,7 @@ function boardStartViewInner() {
     v.y = Math.max(v.y, safe.y + 20 - Math.min(...cards.map(c => c.y)) * v.z);
   viewMode = v.mode === 'user' ? 'user' : 'start';
   if (v.mode === 'user') userView = saved;
-  else if (innerWidth >= 1200) {
+  else if (innerWidth >= 1200 && !(moments.length > 8 && $('#detail').classList.contains('open'))) {
     const horizontal = wideBoardHorizontal(cards, vw, v.z);
     if (horizontal) Object.assign(v, horizontal);
   }
@@ -1079,6 +1105,12 @@ function fitAll(animated = true) {
   let vw = viewport.clientWidth,
     vh = viewport.clientHeight,
     cards = boardCards();
+  if ((innerWidth < 700 || shortBoard()) && cards.length) {
+    boardStartView();
+    viewMode = 'fit';
+    applyView(animated);
+    return;
+  }
   if (!cards.length) {
     let z = LT58Model.fitZoom(vw, vh);
     view.z = z;
@@ -1440,28 +1472,6 @@ function confirmAdd() {
   addMoment(n, selected);
 }
 
-function openViewer(id) {
-  let m = moments.find(x => x.id === id);
-  if (!m) return;
-  const _vi = titleInfo(m);
-  $('#vTitle').textContent = _vi.main;
-  let box = $('#viewerMedia');
-  if (m.url) box.innerHTML = LTMedia.markup(m.url, m.title, m.mediaMetadata, m.id);
-  else if (m.type === 'video')
-    box.innerHTML = `<video src="${m.video}" poster="${m.asset}" controls autoplay muted playsinline class="viewerFitVideo"></video>`;
-  else if (m.type === 'note') box.innerHTML = `<div class="viewerNoteQuote">“${esc(m.memo)}”</div>`;
-  else box.innerHTML = `<img src="${m.asset}" alt="${esc(m.title)}" class="viewerFitImg">`;
-  $('#vMeta').innerHTML = window.viewerMetaHTML({
-    head: `${esc(LTLabels.type(m.originalType || m.type))} · ${esc(dateText(m.date))} · ${esc(m.emotion)}`,
-    source: esc(m.source),
-    url: m.url ? esc(m.url) : '',
-    keywords: (m.keywords || []).map((keyword) => esc(keyword)),
-    memo: esc(m.memo || ''),
-    mediaTitle: _vi.sub ? esc(_vi.sub) : ''
-  });
-  $('#viewerModal').classList.add('open');
-}
-
 function focusMoment(id, caption) {
   let m = moments.find(x => x.id === id),
     el = cardLayer.querySelector(`[data-id="${id}"]`),
@@ -1683,11 +1693,6 @@ $('#detailClose').onclick = () => {
   if (window.parent !== window) parent.postMessage({ type: globalThis.LT41_MSG.boardDetail, open: false }, location.origin);
 };
 $('#openMoment').onclick = () => openViewer(selected);
-$('#closeViewer').onclick = () => {
-  let v = $('#viewerMedia video');
-  if (v) v.pause();
-  $('#viewerModal').classList.remove('open');
-};
 // #601: '다음 순간 보기'·'이전 순간 보기' 단추는 상세의 이어진 순간 카드로 대체됐다.
 // 전체 보기는 '처음으로' 돌아가는 단추이기도 하다: 기억한 자리를 지운다(다음에 열면 읽을 수 있는 처음 자리).
 function fitAllByUser() {
@@ -1764,14 +1769,17 @@ function bootDetailPanel() {
 // #891: 상세 판이 열리면 보드를 덮지 않고 민다(넓은 화면 ≥760). 판 너비만큼 무대 오른쪽 여백을 벌려
 // 카드가 줄어든 영역에 다시 쌓이게 한다. 좁은 화면은 아래 시트 그대로(덮음) — 예전 규칙을 유지한다.
 function syncBoardPush() {
-  if (innerWidth < 760) return;
   const dt = $('#detail');
   if (!dt) return;
   const open = dt.classList.contains('open');
-  viewport.style.marginRight = open ? dt.offsetWidth + 32 + 'px' : '0px';
-  $('#boardControls').style.marginRight = viewport.style.marginRight;
+  const margin = open && innerWidth >= 760 ? dt.offsetWidth + 32 + 'px' : '0px';
+  if ((viewport.style.marginRight || '0px') === margin) return;
+  viewport.style.marginRight = margin;
+  $('#boardControls').style.marginRight = margin;
   placeAll();
-  if (viewMode === 'fit') fitAll(false);
+  // 8장 이하는 판과 모든 카드를 한눈에 맞추고, 많은 카드에서는 읽을 수 있는
+  // 기본 배율을 지킨다. 40장 전체 맞춤은 카드가 49px로 줄어드는 회귀를 만든다.
+  if (viewMode === 'fit' || (open && innerWidth >= 760 && moments.length <= 8 && viewMode !== 'user')) fitAll(false);
   else boardStartView();
 }
 

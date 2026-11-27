@@ -9,7 +9,7 @@ import { createMemberSession } from '../public/v41/member-session.mjs';
 import { addMoment, createTree, linkMoments, validateState } from '../src/domain.js';
 import { ApiError } from '../server/errors.js';
 import { createApiHandler, createNodeHandler } from '../server/http.js';
-import { createWorkspaceService } from '../server/workspace-service.js';
+import { createWorkspaceService, readStoredDocument } from '../server/workspace-service.js';
 import { createMemoryWorkspaceRepo } from '../server/testing/memory-workspace-repo.js';
 import { assertIsolatedTestDatabase } from '../server/testing/isolated-test-database.js';
 
@@ -291,16 +291,17 @@ test('GET and PUT work over a real socket', async () => {
   const server = createServer(createNodeHandler(handle));
   await listenOnSafePort(server, '127.0.0.1');
   try {
+    // 다음 시험이 같은 포트를 다시 열 때 이전 HTTP 연결을 재사용하지 않도록 한다.
     const origin = `http://127.0.0.1:${server.address().port}`;
-    const empty = await fetch(`${origin}/api/workspace`);
+    const empty = await fetch(`${origin}/api/workspace`, { headers: { connection: 'close' } });
     assert.equal(empty.status, 200);
     assert.equal((await empty.json()).revision, 0);
     const saved = await fetch(`${origin}/api/workspace`, {
-      method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ state: sampleState(), expectedRevision: 0, clientKey: 'k-1' })
+      method: 'PUT', headers: { 'content-type': 'application/json', connection: 'close' }, body: JSON.stringify({ state: sampleState(), expectedRevision: 0, clientKey: 'k-1' })
     });
     assert.equal(saved.status, 200);
     assert.equal((await saved.json()).revision, 1);
-    assert.equal((await (await fetch(`${origin}/api/workspace`)).json()).revision, 1);
+    assert.equal((await (await fetch(`${origin}/api/workspace`, { headers: { connection: 'close' } })).json()).revision, 1);
   } finally {
     await new Promise(resolve => server.close(resolve));
   }
@@ -426,6 +427,29 @@ test('a stored tree with broken timestamps and names is repaired on read, not qu
   assert.equal(got.body.state.trees[0].subject, '윤슬, 나의 순간들', '빈 대상 이름은 제목으로 채운다');
 });
 
+test('#1434 stored empty trees and broken parent references are repaired on read without rewriting storage', () => {
+  const root = createTree({ ...base, title: '정상 트리' }, CLOCK);
+  const grown = addMoment(root, { ...base, title: '끊어진 순간', relation: '남은 이유' }, root.moments[0].id, CLOCK);
+  const broken = structuredClone(grown);
+  broken.id = 't-broken';
+  broken.moments[1].parentId = 'missing-parent';
+  broken.moments.push({ ...broken.moments[1], id: 'valid-child', parentId: broken.moments[0].id, relation: '남길 이유' });
+  const empty = { ...structuredClone(root), id: 't-empty', title: '빈 트리', moments: [] };
+  const malformed = { ...structuredClone(root), id: 't-malformed', moments: [structuredClone(root.moments[0]), { ...structuredClone(root.moments[0]), id: 'bad-parent', parentId: 42 }] };
+  const doc = { version: 1, prefs: {}, trees: [empty, broken, malformed, root] };
+  const original = structuredClone(doc);
+  const read = readStoredDocument(doc, CLOCK);
+  assert.deepEqual(read.quarantined.map(tree => tree.id), ['t-malformed'], '형식이 잘못된 parentId만 격리한다');
+  assert.deepEqual(read.state.trees.map(tree => tree.id), ['t-empty', 't-broken', root.id]);
+  assert.deepEqual(read.state.trees[0].moments, []);
+  assert.equal(read.state.trees[1].moments[1].parentId, root.moments[0].id);
+  assert.equal(read.state.trees[1].moments[1].relation, '');
+  assert.equal(read.state.trees[1].moments.find(moment => moment.id === 'valid-child').parentId, root.moments[0].id, '정상 부모 참조는 그대로 읽는다');
+  assert.equal(read.state.trees[1].moments.find(moment => moment.id === 'valid-child').relation, '남길 이유');
+  assert.equal(read.state.trees[2].moments[0].parentId, null, '정상 부모는 추측해 바꾸지 않는다');
+  assert.deepEqual(doc, original, '저장 문서 원본은 읽기 보정으로 바뀌지 않는다');
+});
+
 test('onCommit receives the validated state only — quarantined originals stay out', async () => {
   const seen = [];
   const repo = createMemoryWorkspaceRepo();
@@ -486,4 +510,23 @@ test('#1062: 저장소 오류의 500 기록에는 원인만 남고 요청 값은
   for (const secret of [requestBody, email, cookie, dbUrl]) {
     assert.equal(lines[0].includes(secret), false, '기록에 요청 본문·식별자·비밀값이 없다');
   }
+});
+
+test('#1434 다른 트리를 저장해도 읽기용 부모 보정은 원본에 반영되지 않는다', async () => {
+  const repo = createMemoryWorkspaceRepo();
+  const service = createWorkspaceService({ repo, productId: PRODUCT });
+  const principal = { productId: PRODUCT, subjectId: 'usr_repair' };
+  const root = createTree({ ...base, title: '원본' }, CLOCK);
+  const broken = addMoment(root, { ...base, title: '연결', relation: '기존 연결 이유' }, root.moments[0].id, CLOCK);
+  broken.moments[1].parentId = 'missing-parent';
+  const other = createTree({ ...base, title: '다른 트리' }, CLOCK);
+  const original = structuredClone(broken);
+  await seedDoc(repo, principal.subjectId, { version: 1, trees: [broken, other] });
+  const read = await service.read(principal);
+  assert.equal(read.state.trees[0].moments[1].parentId, root.moments[0].id);
+  read.state.trees[1].title = '수정한 트리';
+  await service.write(principal, { state: read.state, expectedRevision: 1, clientKey: 'preserve-original' });
+  const stored = await repo.load(principal);
+  assert.deepEqual(stored.doc.trees[0], original);
+  assert.equal(stored.doc.trees[1].title, '수정한 트리');
 });

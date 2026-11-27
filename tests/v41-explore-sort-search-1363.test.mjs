@@ -18,12 +18,12 @@ const card=(n,ai)=>({
 });
 test('#1363 정렬 직접 메뉴·검색 입력·#1361 안내 위치 — 390·1440 밤·정원', {skip:REQUIRE?false:(skipReason||undefined),timeout:180000},async()=>{
  if(skipReason)assert.fail(skipReason);
- const server=await serve();const browser=await chromium.launch({headless:true});
+ const server=await serve({}, {port:Number(process.env.LT1499_PORT||0)});const browser=await chromium.launch({headless:true});
  const base='http://127.0.0.1:'+server.address().port;
  const capture=process.env.LT1363_CAPTURE_DIR;
  if(capture)await mkdir(capture,{recursive:true});
  try {
-  for(const [width,height] of [[390,844],[1440,900]])for(const theme of ['night','garden']){
+  for(const [width,height] of [[390,844],[844,390],[1440,900]])for(const theme of ['night','garden']){
    const ctx=await browser.newContext({viewport:{width,height},reducedMotion:'reduce'});
    const queries=[];
    try{
@@ -57,6 +57,7 @@ test('#1363 정렬 직접 메뉴·검색 입력·#1361 안내 위치 — 390·14
     assert.deepEqual(initial.owner,['AI 명예회원 하늘'],width+'/'+theme+' 명예회원만 이름');
     if(capture)await page.screenshot({path:capture+'/'+width+'-'+theme+'.png',animations:'disabled'});
     const btn=page.locator('.community-sort-trigger');
+    assert.match(await btn.textContent(), /최신순/);
     await btn.click();
     if(capture)await page.screenshot({path:capture+'/'+width+'-'+theme+'-sort-open.png',animations:'disabled'});
     assert.equal(await btn.getAttribute('aria-expanded'),'true');
@@ -66,6 +67,7 @@ test('#1363 정렬 직접 메뉴·검색 입력·#1361 안내 위치 — 390·14
     await btn.press('ArrowDown');await btn.press('Enter');
     assert.equal(await page.locator('#community-sort').inputValue(),'popular',width+'/'+theme+' 키보드로 인기순');
     assert.equal(await page.locator('.community-sort-option.is-selected').textContent(),'✓  많이 담긴 순');
+    assert.match(await btn.textContent(), /많이 담긴 순/);
     assert.equal(await btn.getAttribute('aria-expanded'),'false');
     await btn.click();await btn.press('ArrowUp');await btn.press('Enter');
     assert.equal(await page.locator('#community-sort').inputValue(),'newest',width+'/'+theme+' 키보드로 최신순');

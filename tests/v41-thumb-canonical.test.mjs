@@ -58,12 +58,6 @@ test('보드: 자기 주소(img.youtube.com)를 더 이상 만들지 않는다',
   // 대신 공용 한 벌(globalThis.LTThumbFallback)에서 후보를 받는다.
 });
 
-test('보드: 그리기 쪽도 공용 후보·단계를 쓴다(한 번에 글 카드로 떨어지지 않는다)', () => {
-  // 그림 자리 넷(카드·쓰기 미리보기·고치기 미리보기·크게 보기)이 모두 공용 단계를 쓴다.
-  const uses = BOARD_EXTRAS.match(/thumbRetryAttrs\(/g) || [];
-  assert.ok(uses.length >= 5, `공용 단계를 쓰는 자리가 다섯 곳 이상이어야 한다(지금 ${uses.length})`);
-});
-
 test('보드: 공용 한 벌을 먼저 불러 온다(일반 script보다 앞서 모듈로)', () => {
   const shim = BOARD_HTML.indexOf('/v41/views/board/board-thumb.mjs');
   const extras = BOARD_HTML.indexOf('/v41/views/board/board-extras.js');

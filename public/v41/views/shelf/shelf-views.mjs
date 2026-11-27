@@ -65,7 +65,7 @@ function bindRail(ctx, policy) {
   var clearLp = function () { if (lpTimer) { clearTimeout(lpTimer); lpTimer = null; } lpStart = null; };
 
   function onClick(event) {
-    if (event.target.closest('[data-manage-id]')) return;
+    if (event.target.closest('[data-manage-id]') || (event.target.hasAttribute && event.target.hasAttribute('data-discover-share'))) return;
     if (lpFired) { lpFired = false; lpTarget = null; return; }
     if (event.detail === 0) {
       var card = event.target.closest('[data-book-index]');
@@ -75,7 +75,7 @@ function bindRail(ctx, policy) {
   function onDown(event) {
     // 빈 칸은 단추다 — 레일이 포인터를 붙잡아 클릭을 삼키지 않게 여기서 걷어낸다.
     if (event.target.closest && event.target.closest('.shelf-empty-slot')) return;
-    if (event.target.closest('[data-manage-id]')) return;
+    if (event.target.closest('[data-manage-id]') || (event.target.hasAttribute && event.target.hasAttribute('data-discover-share'))) return;
     var card = event.target.closest('.book-card');
     lpFired = false;
     lpTarget = (card && card.dataset && card.dataset.bookIndex !== undefined) ? card : null;

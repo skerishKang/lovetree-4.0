@@ -413,18 +413,23 @@ function closeLightbox(){
  if(opener&&opener.isConnected)try{opener.focus({preventScroll:true})}catch{}
 }
 function lightboxKey(e){if(e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();closeLightbox()}}
-async function openLightbox(url,title='',verticalHint=null){
- const m=describe(url);
- if(m.kind!=='youtube'&&m.kind!=='video')return;
+async function openLightbox(url,title='',verticalHint=null,details=null){
+ const m=describe(url||'');
+ if(!['youtube','video','photo'].includes(m.kind)&&!details)return;
  closeLightbox();
  lightboxOpener=document.activeElement;
  const vertical=verticalHint===null?!!m.vertical:!!verticalHint;
  const overlay=document.createElement('div');
  overlay.className='lt-lightbox'+(vertical?' lt-lightbox-vertical':'');
- overlay.setAttribute('role','dialog');overlay.setAttribute('aria-modal','true');overlay.setAttribute('aria-label','영상 크게 보기');
- overlay.innerHTML='<div class="lt-lightbox-stage"></div><button type="button" class="lt-lightbox-close" aria-label="크게 보기 닫기">×</button><p class="lt-lightbox-title"></p>';
+ overlay.setAttribute('role','dialog');overlay.setAttribute('aria-modal','true');overlay.setAttribute('aria-label',details?'순간 크게 보기':'영상 크게 보기');
+ overlay.innerHTML='<div class="lt-lightbox-stage"></div><button type="button" class="lt-lightbox-close" aria-label="크게 보기 닫기">×</button><p class="lt-lightbox-kicker" hidden></p><p class="lt-lightbox-title"></p><p class="lt-lightbox-meta" hidden></p>';
  overlay.querySelector('.lt-lightbox-title').textContent=title||m.label||'';
- const stage=overlay.querySelector('.lt-lightbox-stage');
+ const kicker=overlay.querySelector('.lt-lightbox-kicker');kicker.hidden=!details;if(details)kicker.textContent='순간 크게 보기';
+ const stage=overlay.querySelector('.lt-lightbox-stage'),meta=overlay.querySelector('.lt-lightbox-meta');
+ if(details){
+  const rows=[details.head,details.source?'출처: '+details.source:'',details.url?'주소: '+details.url:'',(details.keywords||[]).length?'꼬리표: '+(details.keywords||[]).map(tag=>'#'+tag).join(' '):'',details.memo?'마음 한마디: '+details.memo:''].filter(Boolean);
+  meta.textContent=rows.join('\n');meta.hidden=!rows.length;
+ }
  document.body.append(overlay);
  lightbox=overlay;
  document.dispatchEvent(new Event('lt-media-lightbox-open'));
@@ -468,7 +473,7 @@ async function openLightbox(url,title='',verticalHint=null){
   // 상태를 알 수 없으면 네트워크 일시 오류로 보고 플레이어를 임의로 제거하지 않습니다.
   void loadVideoStatusModule().then(mod=>mod?.fetchVideoStatus?.(m.videoId))
    .then(status=>{if(['noembed','gone','private'].includes(status))failEmbed()}).catch(()=>{});
- }else{
+ }else if(m.kind==='video'){
   let src=m.loadUrl;
   if(m.privateFile){
    try{const {createWorkspaceApi}=await import('/v41/api.mjs');const answer=await createWorkspaceApi().fetchMedia(new URL(m.loadUrl).pathname.slice(11));if(!answer.ok)throw Error('unavailable');if(!alive())return;src=URL.createObjectURL(answer.blob);lightboxBlob=src}
@@ -480,6 +485,31 @@ async function openLightbox(url,title='',verticalHint=null){
   // 영상 정보의 가로세로: 세로면 틀도 세로로 바꾼다.
   video.addEventListener('loadedmetadata',()=>{if(!alive())return;overlay.classList.toggle('lt-lightbox-vertical',video.videoWidth>0&&video.videoHeight>video.videoWidth)},{once:true});
   video.src=src;stage.replaceChildren(video);
+ }else if(m.kind==='photo'){
+  let src=m.loadUrl;
+  if(m.privateFile){
+   try{const {createWorkspaceApi}=await import('/v41/api.mjs');const answer=await createWorkspaceApi().fetchMedia(new URL(m.loadUrl).pathname.slice(11));if(!answer.ok)throw Error('unavailable');if(!alive())return;src=URL.createObjectURL(answer.blob);lightboxBlob=src}
+   catch{if(alive())stage.innerHTML='<p class="lt-lightbox-note">파일을 불러오지 못했어요. 로그인 확인 후 다시 시도해 주세요.</p>';return}
+  }
+  if(!alive())return;
+  const status=document.createElement('p');
+  status.className='lt-media-status';status.setAttribute('role','status');
+  const retry=document.createElement('button');retry.type='button';retry.textContent='다시 불러오기';retry.hidden=true;
+  const image=document.createElement('img');image.className='lt-lightbox-media lt-lightbox-photo';image.alt=title||'기록의 사진';
+  const loadPhoto=()=>{
+   if(!alive())return;
+   status.textContent='사진을 불러오는 중이에요.';retry.hidden=true;image.hidden=false;
+   image.removeAttribute('src');image.src=src;
+  };
+  image.addEventListener('load',()=>{if(alive()){status.textContent='사진을 불러왔어요.';retry.hidden=true;}});
+  image.addEventListener('error',()=>{if(alive()){image.hidden=true;status.textContent='사진을 불러오지 못했어요. 다시 시도해 주세요.';retry.hidden=false;}});
+  retry.addEventListener('click',loadPhoto);
+  stage.replaceChildren(image,retry,status);loadPhoto();
+ }else{
+  const note=document.createElement('p');note.className='lt-lightbox-note';note.textContent=details?.memo?`“${details.memo}”`:details?.head||'';
+  stage.replaceChildren(note);
+  const openUrl=details?.url||m.openUrl;
+  if(openUrl){const link=document.createElement('a');link.href=openUrl;link.target='_blank';link.rel='noopener noreferrer';link.textContent='원본 링크 열기 ↗';stage.append(link)}
  }
 }
 // #632: 사라진 영상 감지·표시 — 내 기록(auto) YouTube 카드만, 보이는 카드만 검사하고 결과는 하루 기억한다.

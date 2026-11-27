@@ -301,3 +301,12 @@ test('#1250: 사이트맵·공유 미리보기가 서버를 직접 부를 때도
   assert.ok(seen.length >= 1);
   for (const call of seen) assert.equal(call.proof, null);
 });
+
+// #1535: shell documents must not survive a deployment in the HTTP cache.
+test('#1535 v41 shell response is not stored', async () => {
+  for (const origin of [PROD, DEV]) {
+    const res=await v41Root({request:new Request(origin+'/v41/'),env:{ASSETS:{fetch:async()=>new Response('<html>app</html>',{headers:{'cache-control':'public, max-age=0, must-revalidate','content-type':'text/html'}})}},next:()=>{throw new Error('unexpected fallback');}});
+    assert.equal(res.headers.get('cache-control'),'no-store');
+    assert.equal(await res.text(),'<html>app</html>');
+  }
+});

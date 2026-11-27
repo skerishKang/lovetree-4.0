@@ -129,7 +129,7 @@ export function createShareService({ shareRepo, workspaceRepo, visibilityRepo = 
         const activeTrees = new Set(existing.filter(row => row.status === 'active').map(row => row.treeId));
         for (const tree of trees) {
           const treeId = tree.id, momentCount = tree.moments.length;
-          if (!momentCount) continue;
+          if (!momentCount && !activeTrees.has(treeId)) continue;
           if (touched && !touched.has(treeId) && activeTrees.has(treeId)) continue;
           await shares.updateMomentCount({ productId, subjectId, treeId, momentCount });
           if (activeTrees.has(treeId)) continue;

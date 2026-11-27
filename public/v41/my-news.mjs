@@ -44,19 +44,39 @@ export function newsDayLabel(day, currentYear = new Date().getFullYear()) {
   return year === currentYear ? label : `${year}년 ${label}`;
 }
 
+/** #1495 소개 줄 문구(대표 확인) — 트리 이름은 따옴표로 감싼다. */
+export function discoverLineText(name) {
+  return `'${String(name || '').trim() || '내 트리'}'에 순간이 3개 모였어요. 둘러보기에 소개할 수 있어요.`;
+}
+
 const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[ch]));
 
 /** 목록 HTML — 서버 순서(최신순)를 그대로 그린다. 댓글 줄에는 가장 최근 본문을 함께 쓴다(잘리지 않게 어기고). */
-export function renderMyNews(lines, { trees = [] } = {}) {
-  const rows = (Array.isArray(lines) ? lines : [])
+export function renderMyNews(lines, { trees = [], local = [] } = {}) {
+  const treeList = Array.isArray(trees) ? trees : [];
+  const serverRows = (Array.isArray(lines) ? lines : [])
     .map(line => ({ line, label: newsLineLabel(line) }))
     .filter(row => row.label);
+  // #1495: 화면 쪽 소개 줄 — 트리가 남아 있을 때만, 서버 줄과 함께 날짜 최신순(같은 날은 소개 줄이 앞)으로 그린다.
+  const localRows = (Array.isArray(local) ? local : [])
+    .map(item => ({ item, tree: treeList.find(tree => tree && tree.id === item?.treeId) }))
+    .filter(row => row.tree)
+    .map(row => ({ line: { day: row.item.day }, local: row.item, tree: row.tree }));
+  const rows = [...localRows, ...serverRows].map((row, index) => ({ ...row, index }))
+    .sort((a, b) => String(b.line?.day || '').localeCompare(String(a.line?.day || '')) || a.index - b.index);
   if (!rows.length) return '<p class="panel-note my-news-empty">아직 새 소식이 없어요. 누군가 내 트리에 마음을 남기면 여기에 모여요.</p>';
   let lastDay = '';
-  const items = rows.map(({ line, label }) => {
+  const items = rows.map(({ line, label, local: item, tree }) => {
     const day = String(line?.day || '');
     const dayRow = day && day !== lastDay ? `<li class="my-news-day">${esc(newsDayLabel(day))}</li>` : '';
     if (day) lastDay = day;
+    if (item) {
+      const name = String(tree.title || tree.subject || '').trim() || '내 트리';
+      const action = item.done
+        ? '<span class="my-news-done">둘러보기에 소개했어요</span>'
+        : `<button type="button" class="my-news-action" data-discover-tree="${esc(item.treeId)}">소개하기</button>`;
+      return `${dayRow}<li class="my-news-line my-news-discover" role="listitem" data-discover-line="${esc(item.treeId)}"><span class="my-news-text">${esc(discoverLineText(name))}</span>${action}</li>`;
+    }
     const target = newsTargetLabel(line, trees);
     const ai = newsAiLabel(line);
     const last = line?.kind === 'comment' && String(line?.lastBody || '') ? `<span class="my-news-last">${esc(line.lastBody)}</span>` : '';
@@ -71,7 +91,7 @@ export const MY_NEWS_PANEL_ID = 'my-news-panel';
 export const MY_NEWS_NOT_READY_TEXT = '소식을 불러오지 못했어요. 잠시 뒤 다시 열어 주세요.';
 
 /** 셸 배선. fetchNews·fetchCount는 시험에서 갈아 낀다(운영값은 shell.mjs가 community-api의 두 경로를 넘긴다). */
-export function mountMyNews({ $ = null, showPanel = null, fetchNews, fetchCount, getTrees = () => [], onCount = () => {}, document: doc = globalThis.document } = {}) {
+export function mountMyNews({ $ = null, showPanel = null, fetchNews, fetchCount, getTrees = () => [], onCount = () => {}, getLocalLines = () => [], localUnread = () => 0, onLocalSeen = () => {}, onDiscover = null, document: doc = globalThis.document } = {}) {
   const readNews = typeof fetchNews === 'function' ? fetchNews : async () => null;
   const readCount = typeof fetchCount === 'function' ? fetchCount : async () => null;
   const $id = id => (typeof $ === 'function' ? $(id) : doc?.getElementById?.(id)) || null;
@@ -85,8 +105,40 @@ export function mountMyNews({ $ = null, showPanel = null, fetchNews, fetchCount,
     try { value = await readCount(); } catch { value = null; }
     const raw = value !== null && typeof value === 'object' ? value.unreadCount : value;
     const n = raw === null || raw === undefined ? NaN : Number(raw);
-    if (Number.isFinite(n) && n >= 0) paint(n);
-    return Number.isFinite(n) && n >= 0 ? n : null;
+    // #1495: 읽지 않은 소개 줄을 더한다. 서버 수를 몰라도 소개 줄이 있으면 그 수로 점을 그린다.
+    let extra = 0;
+    try { extra = Math.max(0, Number(localUnread()) || 0); } catch { extra = 0; }
+    const known = Number.isFinite(n) && n >= 0;
+    if (!known && !extra) return null;
+    const total = (known ? n : 0) + extra;
+    paint(total);
+    return total;
+  }
+  // #1495: [소개하기] — 누르는 동안 막고, 성공하면 그 줄을 다시 누를 수 없는 표시로 바꾼다.
+  async function handleDiscover(button) {
+    const treeId = button?.dataset?.discoverTree;
+    if (!treeId || typeof onDiscover !== 'function' || button.disabled) return;
+    button.disabled = true;
+    let answer = null;
+    try { answer = await onDiscover(treeId); } catch { answer = null; }
+    const error = $id('my-news-error');
+    if (answer && answer.ok) { render(); return; }
+    button.disabled = false;
+    if (error) { error.textContent = answer?.message || '소개 설정을 저장하지 못했어요.'; error.hidden = false; }
+  }
+  let lastLines = [];
+  function render() {
+    const list = $id('my-news-list');
+    let local = [];
+    try { local = getLocalLines() || []; } catch { local = []; }
+    if (list) list.innerHTML = renderMyNews(lastLines, { trees: getTrees() || [], local });
+  }
+  const listEl = $id('my-news-list');
+  if (listEl && typeof listEl.addEventListener === 'function') {
+    listEl.addEventListener('click', event => {
+      const button = event.target?.closest?.('[data-discover-tree]');
+      if (button) void handleDiscover(button);
+    });
   }
   // 목록 창 — 성공하면(읽음 표시가 서버에 남았으므로) 점을 바로 지운다. 실패하면 점을 그대로 두고
   // 창 안에 안내 한 줄을 남긴다. 두 길 모두 창은 같은 틀로 열린다(접근성 이름은 창 머리글이 맡는다).
@@ -100,18 +152,23 @@ export function mountMyNews({ $ = null, showPanel = null, fetchNews, fetchCount,
       const answer = await readNews();
       lines = answer && answer.ok !== false && Array.isArray(answer.lines) ? answer.lines : null;
     } catch { lines = null; }
+    let local = [];
+    try { local = getLocalLines() || []; } catch { local = []; }
     if (list) {
+      lastLines = lines || [];
       if (lines === null) {
-        list.innerHTML = '';
+        // 서버 소식을 못 받아도 소개 줄은 보인다(소개 줄이 없으면 지금처럼 비운다).
+        list.innerHTML = local.length ? renderMyNews([], { trees: getTrees() || [], local }) : '';
         if (error) { error.textContent = MY_NEWS_NOT_READY_TEXT; error.hidden = false; }
       } else {
-        list.innerHTML = renderMyNews(lines, { trees: getTrees() || [] });
+        list.innerHTML = renderMyNews(lines, { trees: getTrees() || [], local });
         paint(0);
       }
     }
+    try { onLocalSeen(); } catch { /* 표시만 못 바꾼다 */ }
     if (typeof showPanel === 'function') showPanel(MY_NEWS_PANEL_ID);
     else $id(MY_NEWS_PANEL_ID)?.showModal?.();
     return lines;
   }
-  return { open, refreshCount, lastCount: () => lastCount };
+  return { open, refreshCount, render, lastCount: () => lastCount };
 }

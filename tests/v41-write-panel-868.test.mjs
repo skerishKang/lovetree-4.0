@@ -35,7 +35,6 @@ async function openWrite(browser, origin, width, height) {
   page.on('pageerror', (e) => errors.push(String(e.message || e)));
   await page.goto(`${origin}/v41/?account=1#shelf`, { waitUntil: 'load' });
   await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
-  await page.locator('#discover-ask-no').click().catch(() => {});
   if (await page.locator('#write-menu').isVisible()) await page.click('#write-menu');
   else await page.click('#mobile-add');
   await page.waitForFunction(() => document.getElementById('write-panel')?.open === true, null, { timeout: 10000 });

@@ -214,6 +214,8 @@ export function createNavigationRuntime(ctx){
       onFrameReveal:()=>ctx.syncFrameSheet?.(),
       onFrameReady:frame=>{
         const d=frame.contentDocument;if(!d)return;
+        // #1495: 서재 카드의 '둘러보기에 보임'은 셸이 아는 소개 값을 읽는다 — 서재가 뜨면 내 트리들의 값을 한 번 확인한다.
+        try{if(/track32-bookshelf\.html$/.test(frame.contentWindow.location.pathname))void ctx.loadDiscoverForTrees?.();}catch{}
         (0,ctx.mountConnectionTool)(d);applyViewAccessibility(d);ctx.shellQuick.mountFrame(d);(0,ctx.watchFrameSheet)(frame);
         /* 이슈 458: 모바일(781px 미만)에서는 셸의 ＋ 단추가 오른쪽 아래에 뜬다 — 첫 화면 궤도가 그 자리를 비끼게
            프레임 html에 표시를 남긴다(궤도 쪽 좁은 화면 배치가 이 표시를 읽는다). */

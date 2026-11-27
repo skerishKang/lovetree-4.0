@@ -8,7 +8,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
 import { serve } from './helpers/screen-audit.mjs';
-import { dismissDiscoverAskIfOpen } from './helpers/discover-ask.mjs';
+import {createTree} from '../public/v41/domain.mjs';
 
 const read = (p) => readFileSync(new URL('../' + p, import.meta.url), 'utf8');
 const workspaceRuntime = read('public/v41/shell/workspace-runtime.mjs');
@@ -125,7 +125,6 @@ test('970 실행: 빈 화면(순간 0개) — 안내·단추가 화면 안에, �
       // 빈 안내는 기록 화면에서 보인다(홈은 예시 궤도를 보여 준다 — 261118 결정). 책 화면으로 들어간다.
       await page.goto(`${origin}/v41/?account=1#my/book`, { waitUntil: 'load', timeout: 60000 });
       await page.waitForFunction(() => document.body.dataset.treeCount === '0' && !document.getElementById('empty')?.hidden, null, { timeout: 20000 });
-      await dismissDiscoverAskIfOpen(page);
       const m = await page.evaluate(() => {
         const rect = (el) => { const b = el.getBoundingClientRect(); return { l: Math.round(b.left), t: Math.round(b.top), r: Math.round(b.right), b: Math.round(b.bottom) }; };
         const empty = document.getElementById('empty');
@@ -194,4 +193,35 @@ test('#1488 낮은 화면의 빈 상태: 로그인 단추가 화면 안·알림�
     await browser.close();
     await new Promise((ok) => server.close(ok));
   }
+});
+
+
+test('#1434 순간 0개 트리는 책 화면 여섯 조건에서 오류 없이 안내한다', {skip: skip970 || !REQUIRE970 ? skip970 || 'LT_970_REQUIRE=1 일 때 실행' : false, timeout: 180000}, async () => {
+  if (skip970) assert.fail(skip970);
+  const server=await serve();
+  const origin='http://127.0.0.1:'+server.address().port;
+  const browser=await chromium970.launch({headless:true,args:['--disable-gpu']});
+  try {
+    for(const width of [390,844,1440])for(const theme of ['night','garden']){
+      const context=await browser.newContext({viewport:{width,height:width===390?844:width===844?390:900},reducedMotion:'reduce'});
+      try {
+        await context.addInitScript(t=>{try{localStorage.setItem('lt41.theme',t)}catch{}},theme);
+        const tree={...createTree({subject:'시험',title:'빈 트리',date:'2026-11-27',emotion:'설렘',note:'',url:''}),'moments':[]};
+        await context.route('**/api/**',r=>r.fulfill({status:200,contentType:'application/json',body:'{"ok":true,"items":[]}'}));
+        await context.route('**/api/workspace*',r=>r.fulfill({status:200,contentType:'application/json',body:JSON.stringify({revision:1,state:{version:1,trees:[tree],prefs:{}},subject:'test-empty',writeSubjectBound:true,savedAt:'2026-11-27T00:00:00.000Z'})}));
+        const page=await context.newPage(),errors=[];
+        page.on('pageerror',e=>errors.push(e.message));
+        await page.goto(origin+'/v41/?account=1',{waitUntil:'load'});
+        await page.waitForFunction(()=>window.LT41?.tree?.moments?.length===0,{timeout:20000});
+        await page.locator('[data-view="track59-sketchbook.html"]').first().evaluate(el=>el.click());
+        await page.waitForTimeout(900);
+        const frame=page.frames().find(f=>f.url().includes('track59-sketchbook'));
+        assert.ok(frame,width+'/'+theme+': 책 화면이 열린다');
+        const bookText=await frame.locator('body').innerText();
+        assert.match(bookText,/순간.*없|비어 있|빈 트리/,width+'/'+theme+': 빈 트리 안내('+bookText.slice(0,180)+')');
+        await page.waitForTimeout(450);
+        assert.deepEqual(errors,[],width+'/'+theme+': 오류 0건');
+      }finally{await context.close();}
+    }
+  }finally{await browser.close();server.close();}
 });

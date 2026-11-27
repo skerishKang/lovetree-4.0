@@ -63,9 +63,6 @@ async function boot952(browser, { width = 1440, height = width === 390 ? 844 : 9
   await page.goto(`${base}/v41/${member ? '?account=1' : ''}#home`, { waitUntil });
   if (member) {
     await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
-    const ask = page.locator('#discover-ask-no');
-    await ask.waitFor({ state: 'visible', timeout: 4000 }).catch(() => {});
-    if (await ask.isVisible()) await ask.click();
   }
   await page.frameLocator('#view').locator('.center .actions').waitFor({ state: 'visible', timeout: 15000 });
   // 셸은 두 장(#view·#view-next)을 교대한다(#428) — 숨은 장이 about:blank로 비워질 때까지 기다려
@@ -1623,4 +1620,202 @@ test('#1487 로그인 확인 중 서재 주소: 불러오는 중을 보이고, �
       }
     }
   } finally { await browser.close(); }
+});
+
+test('#1473 첫 화면 배치', {skip: REQUIRE952 ? false : skip952, timeout:240000}, async()=>{
+ if(skip952) assert.fail(skip952);
+ const {mkdirSync}=await import('node:fs');
+ const dir=process.env.LT_1473_CAPTURE;
+ if(dir)mkdirSync(dir,{recursive:true});
+ const browser=await chromium952.launch({headless:true});
+ try{
+ for(const [width,height] of [[390,844],[844,390],[1440,900]])for(const theme of ['night','garden'])for(const member of [false,true]){
+ const h=await boot952(browser,{width,height,member,initStorage:{'lt41.theme':theme}});
+ try{
+ await h.frame.waitForFunction(()=>globalThis.__LT_ORBIT_TEST__?.canvasSettled());
+ await h.frame.waitForFunction(()=>document.querySelector('#orbit')?.shadowRoot?.querySelector('.center .eyebrow')?.textContent?.trim());
+ if(dir)await h.page.screenshot({path:dir+'/'+width+'-'+theme+'-'+member+'.png',animations:'disabled'});
+ const m=await h.frame.evaluate(()=>{
+ const root=document.querySelector('#orbit').shadowRoot, app=root.querySelector('.app').getBoundingClientRect(), hook=globalThis.__LT_ORBIT_TEST__;
+ const rect=e=>{const r=e.getBoundingClientRect();return {l:r.left,t:r.top,r:r.right,b:r.bottom,w:r.width,h:r.height}};
+ const title=[...root.querySelectorAll('.center .eyebrow,.center h1')].map(rect);
+ const nodes=[...root.querySelectorAll('.card')];
+ const cards=hook.poses().filter((p,i)=>p&&!p.hidden&&!nodes[i]?.classList.contains('off')&&!nodes[i]?.classList.contains('clash')).map(p=>({l:Math.max(0,app.left+p.box.l),t:Math.max(0,app.top+p.box.t),r:Math.min(innerWidth,app.left+p.box.r),b:Math.min(innerHeight,app.top+p.box.b)})).filter(c=>c.r>c.l&&c.b>c.t);
+ const overlap=(a,b)=>Math.max(0,Math.min(a.r,b.r)-Math.max(a.l,b.l))*Math.max(0,Math.min(a.b,b.b)-Math.max(a.t,b.t));
+ const buttons=[...root.querySelectorAll('.center .actions button')].filter(e=>!e.hidden).map(e=>{const s=getComputedStyle(e);return {action:e.dataset.do,...rect(e),bg:s.backgroundColor,border:s.borderTopColor,primary:e.classList.contains('primary-cta')}});
+ const shell=parent.document, brand=shell.querySelector('.brand>span'), f=frameElement.getBoundingClientRect();
+ const links=[...shell.querySelectorAll('.home-links a,.home-links button')].filter(e=>e.getBoundingClientRect().width>0).map(e=>rect(e));
+ return {title,cardBottom:Math.max(...cards.map(c=>c.b)),titleOverlap:Math.max(0,...title.flatMap(t=>cards.map(c=>overlap(t,c)))),buttons,font:getComputedStyle(brand).fontFamily,weight:getComputedStyle(brand).fontWeight,links,linkOverlap:Math.max(0,...links.flatMap(l=>cards.map(c=>overlap(l,{l:c.l+f.left,r:c.r+f.left,t:c.t+f.top,b:c.b+f.top}))))};
+ });
+ const tag=width+' '+theme+' '+member;
+ assert.equal(m.titleOverlap,0,tag+' 제목 겹침');
+ if(width<1440) assert.equal(m.linkOverlap,0,tag+' 바닥 겹침'); // 넓은 화면의 바닥 링크는 기존 고정 위치를 유지한다.
+ assert.equal(m.links.length,4,tag);
+ assert.ok(m.links.every(l=>l.h>=44),tag);
+ assert.ok(m.buttons.filter(b=>b.action).every(b=>b.h>=44&&b.w>=44),tag);
+ assert.equal(m.font.includes('Gowun Batang'),theme==='garden',tag);
+ assert.equal(m.weight,'700',tag);
+ if(!member){
+  assert.equal(m.buttons.filter(b=>b.primary).length,1,tag);
+  assert.equal(m.buttons.filter(b=>b.bg!=='rgba(0, 0, 0, 0)').length,1,tag);
+  assert.equal(m.buttons.find(b=>b.action==='guide').border,'rgba(0, 0, 0, 0)',tag);
+ }
+ console.log('MEASURE',JSON.stringify({width,height,theme,member,...m}));
+ }finally{await close952(h)}
+ }
+ }finally{await browser.close()}
+});
+
+test('#1473 알림 띠와 숫자판 겹침 0', {skip: REQUIRE952 ? false : skip952, timeout:240000}, async()=>{
+ const browser=await chromium952.launch({headless:true});
+ try{
+ for(const [width,height] of [[390,844],[844,390],[1440,900]])
+ for(const theme of ['night','garden']) for(const member of [false,true]){
+ const h=await boot952(browser,{width,height,member,initStorage:{'lt41.theme':theme},port:Number(process.env.LT_TEST_PORT)||4564});
+ try{
+ await h.frame.waitForFunction(()=>globalThis.__LT_ORBIT_TEST__?.canvasSettled());
+ await h.page.evaluate(()=>{const c=document.getElementById('updates-card');c.hidden=false;document.getElementById('updates-card-text').textContent='\uB7EC\uBE0C\uD2B8\uB9AC\uAC00 \uC0C8\uB85C\uC6CC\uC84C\uC5B4\uC694';});
+ await h.page.waitForTimeout(60);
+ const m=await h.page.evaluate(()=>{
+ const r=e=>{if(!e)return null;const x=e.getBoundingClientRect();if(!x.width||!x.height||e.hidden||getComputedStyle(e).display==='none')return null;return {l:x.left,t:x.top,r:x.right,b:x.bottom,w:x.width,h:x.height}};
+ const f=document.getElementById('view'),fr=r(f),root=f.contentDocument?.getElementById('orbit')?.shadowRoot;
+ const shift=e=>{const x=r(e);return x&&{l:x.l+fr.l,t:x.t+fr.t,r:x.r+fr.l,b:x.b+fr.t,w:x.w,h:x.h}};
+ const nodes=[...root.querySelectorAll('.home-count,.center .actions button')].map(e=>({type:e.classList.contains('home-count')?'count':'button',rect:shift(e)})).concat([...document.querySelectorAll('.home-links a,.home-links button')].map(e=>({type:'link',rect:r(e)}))).filter(x=>x.rect);
+ const notice=r(document.getElementById('updates-card')),toast=r(document.getElementById('toast'));
+ const overlap=(a,b)=>a&&b?Math.max(0,Math.min(a.r,b.r)-Math.max(a.l,b.l))*Math.max(0,Math.min(a.b,b.b)-Math.max(a.t,b.t)):0;
+ return {notice,toast,targets:nodes,clashes:nodes.map(x=>({type:x.type,area:Math.round(overlap(notice,x.rect)*100)/100})).filter(x=>x.area>0),memberState:document.body.dataset.member};
+ });
+
+ const tag=width+' '+theme+' '+(member?'member':'guest');
+ assert.ok(m.notice,tag+' updates card must be visible');
+ assert.equal(m.clashes.length,0,tag+' updates card overlap: '+JSON.stringify(m.clashes));
+ if(width===390&&member){
+  const counts=m.targets.filter(x=>x.type==='count');
+  assert.ok(counts.length>0,tag+' counts');
+  assert.ok(counts.every(x=>x.rect.l>=16&&x.rect.r<=width-16),tag+' count safe margins: '+JSON.stringify(counts));
+ }
+ await h.page.evaluate(()=>{
+   const card=document.getElementById('updates-card');card.hidden=true;
+   const toast=document.getElementById('toast');toast.textContent='??';toast.hidden=false;
+   dispatchEvent(new Event('resize'));
+ });
+ await h.page.waitForTimeout(75);
+ const tm=await h.page.evaluate(()=>{
+   const rect=e=>{if(!e)return null;const a=e.getBoundingClientRect();if(!a.width||!a.height||e.hidden||getComputedStyle(e).display==='none')return null;return {l:a.left,t:a.top,r:a.right,b:a.bottom}};
+   const f=document.getElementById('view'),fr=rect(f),root=f.contentDocument.getElementById('orbit').shadowRoot;
+   const shift=e=>{const a=rect(e);return a&&{l:a.l+fr.l,t:a.t+fr.t,r:a.r+fr.l,b:a.b+fr.t}};
+   const nodes=[...root.querySelectorAll('.home-count,.center .actions button')].map(shift).concat([...document.querySelectorAll('.home-links a,.home-links button')].map(rect)).filter(Boolean);
+   const toast=rect(document.getElementById('toast'));
+   const hit=(a,b)=>Math.max(0,Math.min(a.r,b.r)-Math.max(a.l,b.l))*Math.max(0,Math.min(a.b,b.b)-Math.max(a.t,b.t));
+   return {toast,overlap:toast?Math.max(0,...nodes.map(n=>hit(toast,n))):0};
+ });
+ assert.ok(tm.toast,tag+' toast is visible');
+ assert.equal(tm.overlap,0,tag+' toast overlap: '+JSON.stringify(tm));
+ console.log('NOTICE1473',JSON.stringify({width,height,theme,member,updatesTop:m.notice.t,updatesBottom:m.notice.b,updateMaxArea:0,toastMaxArea:tm.overlap,countLeft:Math.min(...m.targets.filter(x=>x.type==='count').map(x=>x.rect.l)),countRight:Math.max(0,...m.targets.filter(x=>x.type==='count').map(x=>x.rect.r))}));
+
+ const dir=process.env.LT_1473_2_CAPTURE;if(dir){const {mkdirSync}=await import('node:fs');mkdirSync(dir,{recursive:true});await h.page.screenshot({path:dir+'/'+width+'-'+theme+'-'+member+'.png',animations:'disabled'});}
+ }finally{await close952(h)}
+ }
+ }finally{await browser.close()}
+});
+
+test('#1521 머리줄과 가운데 단추 일치',{skip: REQUIRE952 ? false : skip952, timeout:240000},async()=>{
+ if (skip952) assert.fail(skip952);
+ const browser=await chromium952.launch({headless:true});
+ try{
+ for(const [width,height] of [[390,844],[844,390],[1440,900]])for(const theme of ['night','garden'])for(const member of [false,true]){
+ const h=await boot952(browser,{width,height,member,initStorage:{'lt41.theme':theme},port:Number(process.env.LT_TEST_PORT)||4564});
+ try{
+ await h.frame.waitForFunction(()=>globalThis.__LT_ORBIT_TEST__?.canvasSettled());
+ await h.frame.waitForFunction(()=>document.getElementById('orbit')?.shadowRoot?.querySelector('.center .eyebrow')?.textContent?.trim());
+ const m=await h.page.evaluate(()=>{
+ const f=document.getElementById('view'),root=f.contentDocument.getElementById('orbit').shadowRoot;
+ const get=e=>{if(!e)return null;const s=e.ownerDocument.defaultView.getComputedStyle(e),r=e.getBoundingClientRect();return {visible:!!(r.width&&r.height&&s.visibility!=='hidden'),w:r.width,h:r.height,x:r.x,y:r.y,font:s.fontFamily,size:s.fontSize,weight:s.fontWeight,radius:s.borderTopLeftRadius,bg:s.backgroundColor,ink:s.color,border:s.borderTopColor,padding:s.padding,gap:s.gap,line:s.lineHeight,letter:s.letterSpacing,transform:s.transform}};
+ return {headerAdd:get(document.querySelector('#write-menu')),headerExplore:get(document.querySelector('#community-menu')),centerAdd:get(root.querySelector('.home-add-top')),centerExplore:get(root.querySelector('.actions [data-do=community]')),buttons:[...root.querySelectorAll('.actions .subtleBtn')].map(get),counts:[...root.querySelectorAll('.home-count')].map(get)};
+ });
+ const fields=['w','h','font','size','weight','radius','bg','ink','border'];
+ const tag=[width,theme,member].join('-');
+ for(const [a,b] of [[m.headerAdd,m.centerAdd],[m.headerExplore,m.centerExplore]]){
+ if(a?.visible&&b?.visible)for(const k of fields)assert.equal(a[k],b[k],tag+' '+k);
+ }
+ assert.equal(m.buttons.length,3,tag);
+ for(const b of m.buttons)assert.equal(b.h,44,tag+' height');
+ if(member)assert.equal(m.centerAdd.h,44,tag+' add height');
+ for(const c of m.counts.filter(c=>c.visible))assert.ok(m.buttons.some(b=>Math.abs(b.w-c.w)<=1&&Math.abs(b.x-c.x)<=1),tag+' count alignment');
+ console.log('MEASURE1521',tag);
+ const dir=process.env.LT_1521_CAPTURE;if(dir){const{mkdirSync,writeFileSync}=await import('node:fs');mkdirSync(dir,{recursive:true});writeFileSync(dir+'/'+width+'-'+theme+'-'+member+'.json',JSON.stringify(m));await h.page.screenshot({path:dir+'/'+width+'-'+theme+'-'+member+'.png',animations:'disabled'});}
+ }finally{await close952(h)}
+ }
+ }finally{await browser.close()}
+});
+
+test('#1530 cold thumbnail states',{skip: REQUIRE952 ? false : skip952,timeout:120000},async()=>{
+ if(skip952)assert.fail(skip952);
+ const browser=await chromium952.launch({headless:true});
+ try{for(const [kind,url] of [['vertical','https://www.youtube.com/shorts/abc123DEF45'],['horizontal','https://youtu.be/abc123DEF45'],['missing','https://youtu.be/abc123DEF45']]){
+ const tree=createTree({subject:'Test',title:'Test video',date:'2026-11-20',emotion:'test',url},'2026-11-20T00:00:00.000Z');
+ const workspace={revision:1,state:{version:1,trees:[tree],prefs:{}},subject:'visual-audit-fake',writeSubjectBound:true};
+ let release;const gate=new Promise(r=>release=r);const events=[];
+ const h=await boot952(browser,{member:true,width:1440,waitUntil:'domcontentloaded',routes:{'/api/workspace':r=>r.fulfill({json:workspace}),'/api/youtube/oembed':r=>r.fulfill({status:kind==='missing'?404:403,json:{}})},thumb:async(r,u)=>{events.push(['request',u.pathname,Date.now()]);await gate; if(kind==='missing'||u.pathname.includes('oardefault')){events.push(['abort',u.pathname,Date.now()]);return r.abort()}events.push(['success',u.pathname,Date.now()]);return THUMB(r)}});
+ try{const m=h.frame.locator('.recent-media');const snap=()=>m.evaluate(e=>{const i=e.querySelector('img');return {state:e.dataset.recentState,src:i?.src,width:i?.naturalWidth,opacity:i&&getComputedStyle(i).opacity,cover:!!e.querySelector('.lt-recent-fallback'),h:e.getBoundingClientRect().height}});const before=await snap();assert.equal(before.state,'loading');assert.equal(before.cover,false);assert.equal(before.opacity,'0');release();await h.frame.waitForFunction(()=>{const e=document.querySelector('#orbit')?.shadowRoot?.querySelector('.recent-media');const i=e?.querySelector('img');return e?.querySelector('.lt-recent-fallback')||i?.naturalWidth>0});const after=await snap();assert.equal(after.state,kind==='missing'?'failed':'ready');assert.equal(after.cover,kind==='missing');assert.equal(after.opacity,kind==='missing'?'0':'1');assert.equal(after.h,before.h);assert.equal(after.width>0,kind!=='missing');if(kind==='vertical')assert.match(after.src,/hqdefault/);assert.equal(await m.locator('.recent-play').isVisible(),false);}finally{release();await close952(h)}
+ }}finally{await browser.close()}
+});
+
+// #1535: a document from the previous deployment must not leave an empty shell.
+test('#1535 deployment chunk recovery is bounded and shared by the home frame', {skip:skip952 && !REQUIRE952 ? skip952 : false}, async () => {
+  assert.ok(!skip952, String(skip952));
+  const server = await serve({}, {port:Number(process.env.LT_TEST_PORT)||0});
+  const browser = await chromium952.launch({headless:true});
+  const base = `http://127.0.0.1:${server.address().port}`;
+  try {
+    for (const mode of ['once','always','frame','late']) {
+      const ctx = await browser.newContext();
+      let docs=0, bad=0;
+      try {
+        await ctx.route('**/*', async r => {
+          const u=new URL(r.request().url());
+          if(u.origin!==base)return r.abort();
+          if(u.pathname.startsWith('/api/'))return r.fulfill({contentType:'application/json',body:'{"ok":true,"items":[]}'});
+          if(u.pathname==='/v41/'){
+            docs++;
+            if(mode==='frame'||mode==='late'||mode==='once'&&docs>1)return r.continue();
+            const res=await r.fetch();
+            return r.fulfill({response:res,body:(await res.text()).replace(/\/assets\/v41shell-[\w-]+\.js/g,'/assets/v41shell-oldchunk.js')});
+          }
+          if(mode==='frame'&&docs===1&&u.pathname==='/v41/home.html'){
+            const res=await r.fetch();
+            return r.fulfill({response:res,body:(await res.text()).replace(/\/assets\/v41home-[\w-]+\.js/g,'/assets/v41home-oldchunk.js')});
+          }
+          if(u.pathname.includes('oldchunk')){
+            bad++;
+            return r.fulfill({status:mode==='frame'?404:200,contentType:'text/html',body:'<html>missing chunk</html>'});
+          }
+          return r.continue();
+        });
+        const page=await ctx.newPage();
+        await page.goto(base+'/v41/#home').catch(error=>{if(!/ERR_ABORTED/.test(String(error)))throw error;});
+        const home=page.frameLocator('#view').locator('.center .actions');
+        if(mode==='late'){
+          await home.waitFor({state:'visible',timeout:15000});
+          await page.evaluate(()=>{import('/assets/late-oldchunk.js').catch(()=>{});});
+          // Vite emits this event on a failed dynamic dependency even when the caller catches it.
+          await page.evaluate(()=>dispatchEvent(new Event('vite:preloadError',{cancelable:true})));
+        }
+        if(mode==='always'){
+          const notice=page.locator('#lt-deploy-recovery button');
+          await notice.waitFor({state:'visible',timeout:15000});
+          assert.equal(await notice.textContent(),'\uc0c8 \ubc84\uc804\uc774 \uc788\uc5b4\uc694 \u2014 \ub2e4\uc2dc \ubd88\ub7ec\uc624\uae30');
+          assert.equal(await page.evaluate(()=>sessionStorage.getItem('lt41.deployRecovery.v1')),'1');
+        }else{
+          await page.waitForFunction(()=>performance.getEntriesByType('navigation')[0]?.type==='reload',null,{timeout:15000});
+          await home.waitFor({state:'visible',timeout:15000});
+          assert.equal(await page.locator('#lt-deploy-recovery').count(),0);
+          assert.equal(await page.evaluate(()=>sessionStorage.getItem('lt41.deployRecovery.v1')),null);
+        }
+        await page.waitForTimeout(1000);
+        assert.equal(docs,2,mode+' reload count');
+        assert.equal(bad,mode==='always'?2:1,mode+' missing chunk requests');
+      }finally{await ctx.close();}
+    }
+  }finally{await browser.close();await new Promise(r=>server.close(r));}
 });

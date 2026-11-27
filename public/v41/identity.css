@@ -136,9 +136,12 @@ html[data-lt-theme=garden] .lt-media-body button{color:var(--lt-paper)}
 .lt-lightbox-media{display:block;border:0;border-radius:12px;background:#000;width:min(94vw,calc((100dvh - 96px)*16/9));max-height:calc(100dvh - 96px);aspect-ratio:16/9}
 video.lt-lightbox-media{object-fit:contain}
 .lt-lightbox-vertical .lt-lightbox-media{width:auto;height:min(calc(100dvh - 72px),calc(94vw*16/9));max-width:94vw;max-height:calc(100dvh - 72px);aspect-ratio:9/16}
+.lt-lightbox-kicker{position:absolute;top:18px;left:50%;transform:translateX(-50%);margin:0;color:var(--lt-muted);font-size:13px;line-height:1.4;text-align:center}
 .lt-lightbox-close{position:absolute;top:14px;right:16px;min-width:44px;min-height:44px;border:1px solid var(--lt-line);border-radius:50%;background:var(--lt-glass);color:var(--lt-pearl);font-size:20px;line-height:1;cursor:pointer}
 .lt-lightbox-close:hover{border-color:var(--lt-gold-line);color:var(--lt-gold)}
 .lt-lightbox-title{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);max-width:90vw;margin:0;color:var(--lt-muted);font-size:13px;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lt-lightbox-meta{position:absolute;left:50%;bottom:48px;transform:translateX(-50%);max-width:90vw;max-height:24vh;overflow:auto;margin:0;padding:10px 14px;border:1px solid var(--lt-line);border-radius:12px;background:var(--lt-glass-strong);color:var(--lt-muted);font-size:13px;line-height:1.6;text-align:center;white-space:pre-line;pointer-events:none}
+.lt-lightbox-photo{width:auto;height:auto;max-width:94vw;max-height:calc(100dvh - 96px);aspect-ratio:auto;object-fit:contain}
 .lt-lightbox-note{margin:0;padding:20px;color:var(--lt-pearl);font-size:14px;line-height:1.7;text-align:center}
 @media(prefers-reduced-motion:reduce){.lt-lightbox{backdrop-filter:none}}
 
@@ -283,7 +286,7 @@ html[data-lt-theme=garden] body,html[data-lt-theme=garden] .app-header{transitio
 /* #942: 첫 화면의 순간 추가 단추만 장미색으로 되돌린다. 둘러보기·안내·궤도는 그대로 둔다. */
 :host .center .home-add-top.primary-cta,:host .center .home-add-top.primary-cta:hover,:host([data-lt-theme=garden]) .center .home-add-top.primary-cta,:host([data-lt-theme=garden]) .center .home-add-top.primary-cta:hover{background:var(--lt-cta-rose);border-color:var(--lt-cta-rose);color:var(--lt-cta-white)}
 /* #1350/#1435: line-height·padding의 소수점 합과 무관하게 누름 높이를 44px 이상으로 고정한다. */
-:host .center .actions .subtleBtn,:host .center .home-add-top{min-height:46px}
+:host .center .actions .subtleBtn,:host .center .home-add-top{box-sizing:border-box;height:44px;min-height:44px}
 :host .center .actions .subtleBtn{background:var(--lt-primary);color:var(--lt-primary-ink);border-color:var(--lt-primary)}
 :host .center .actions .subtleBtn:hover,:host .center .actions .subtleBtn:active{filter:brightness(.94)}
 :host([data-lt-theme=garden]) .center .actions .subtleBtn{background:var(--lt-paper);color:var(--lt-ink);border-color:var(--lt-line-paper)}
@@ -303,6 +306,7 @@ html[data-lt-theme=garden] body,html[data-lt-theme=garden] .app-header{transitio
 :host([data-lt-theme=garden]) .center .actions .subtleBtn[data-do=community]:active{
  background:var(--lt-role-hover-bg);border-color:var(--lt-role-hover-border);filter:none
 }
+:host .center .actions .subtleBtn[data-do=guide],:host([data-lt-theme=garden]) .center .actions .subtleBtn[data-do=guide]{background:transparent;border-color:transparent;color:var(--lt-muted);text-decoration:underline;text-underline-offset:3px}
 :host .center .actions .home-compass{width:15px;height:15px;flex:none}
 :host([data-lt-theme=garden]) .hint,:host([data-lt-theme=garden]) .caption{color:var(--lt-muted);text-shadow:none}
 :host([data-lt-theme=garden]) .firstMark{border-color:var(--lt-rose);background:rgba(255,253,248,.86);color:var(--lt-ink);box-shadow:none}
@@ -578,3 +582,7 @@ html[data-lt-theme=garden] select{color-scheme:light}
 .lt-bg-item[aria-checked="true"]::before{content:"✓";font-size:11px}
 html[data-lt-theme=garden] .lt-bg-item:hover,html[data-lt-theme=garden] .lt-bg-item:focus-visible{background:rgba(75,51,42,.08)}
 .bgDrop{position:relative;display:inline-flex}
+
+/* #1535: visible even when the entry module cannot mount. */
+#lt-deploy-recovery{position:fixed;inset:0;z-index:9999;display:grid;place-items:center;background:var(--lt-bg,#000)}
+#lt-deploy-recovery button{min-height:44px;padding:12px 20px;font:inherit;color:inherit;background:var(--lt-panel,transparent);border:1px solid currentColor;border-radius:8px;cursor:pointer}

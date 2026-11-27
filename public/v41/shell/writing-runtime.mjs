@@ -79,7 +79,7 @@ export function createWritingRuntime(ctx){
       getMember:()=>ctx.member,
       getSource:()=>ctx.source,
       getUploads:()=>uploads,
-      notify:text=>(0,ctx.notify)(text),
+      notify:(text,options)=>(0,ctx.notify)(text,options),
       panel:id=>(0,ctx.panel)(id),
       // #368: 읽기 전용 안내는 내 기록 창 대신 설정 "내 데이터" 묶음으로 연다.
       openSettingsData:intent=>(0,ctx.openAccountData)(intent),
@@ -132,6 +132,7 @@ export function createWritingRuntime(ctx){
       openSettingsData:intent=>(0,ctx.openAccountData)(intent),
       choose:(id,momentId)=>(0,ctx.choose)(id,momentId),
       openEditor:(mode,parentId)=>openEditor(mode,parentId),
+      prepareAddParent:parentId=>shellPanels.prepareAddParent(parentId),
       resumeMember:intent=>(0,ctx.resumeMember)(intent),
       resetEditorBaseline:()=>shellPanels.startQuickSession(),
       openLoginStart:intent=>(0,ctx.openLoginStart)(intent),
@@ -183,7 +184,7 @@ export function createWritingRuntime(ctx){
     // 보일지 말지는 빈 화면을 그리는 곳(workspace-runtime paintEmptyForScreen)이 정한다.
     bookmarkEmptyEntry=mountEmptyBookmarkEntry({$:ctx.$,onOpen:()=>shellBookmarkImport.open()});
 
-    (0,ctx.$)('write-menu').onclick=()=>{if(ctx.source!=='server'&&ctx.member?.snapshot().owned){void (0,ctx.resumeMember)('write');return;}if(ctx.member?.snapshot().dirty){(0,ctx.explainSaveState)();return;}shellQuick.openWrite();};
+    (0,ctx.$)('write-menu').onclick=()=>{if(ctx.source!=='server'&&ctx.member?.snapshot().owned){void (0,ctx.resumeMember)('write');return;}if(ctx.member?.snapshot().dirty){(0,ctx.explainSaveState)();return;}const tree=window.LT41?.tree;const target=ctx.current==='track58-pinboard.html'&&tree&&window.LT41.momentId?{treeId:tree.id,parentId:window.LT41.momentId}:{};shellQuick.openWrite(target);};
 
     // #458: 모바일 떠 있는 ＋ 단추 — 헤더의 ＋ 순간 추가와 같은 길(같은 창)을 연다. 단추는 body.lt-fab-ok일 때만 보인다.
     (0,ctx.$)('mobile-add').addEventListener('click',()=>(0,ctx.$)('write-menu').click());
@@ -203,6 +204,7 @@ export function createWritingRuntime(ctx){
     // #327 2부: 모아둔 순간 정리 창. #380 5번: 입구는 트리 ▾ 드롭다운의 '정리 전 N개 정리하기' 한 곳뿐이고,
     // 순간 상세의 '다른 트리로 옮기기'(lt41-move 메시지)는 그 순간을 옮기는 별개 동작으로 남는다.
     shellCleanup=(0,ctx.lazyPanel)(()=>import('./cleanup.mjs').then(m=>m.createCleanup({
+      holdPanel:(id,on)=>ctx.shellDialogs.holdPanel(id,on),
       $:ctx.$,
       getMember:()=>ctx.member,
       getSource:()=>ctx.source,
@@ -272,8 +274,9 @@ export function createWritingRuntime(ctx){
       // #480 L13: 공유 목록·공유 미리보기의 날짜도 계정 설정 한 벌을 따른다(책·보드·지도·첫 화면과 같음).
       getDateStyle:()=>(0,ctx.currentDateStyle)(),
       shareApi:ctx.shareApi,
-      discoverOf:treeId=>ctx.discoverState.has(treeId)?ctx.discoverState.get(treeId):null,
-      rememberDiscover:(treeId,discover)=>ctx.discoverState.set(treeId,discover===true),
+      discoverOf:treeId=>ctx.discoverOf?.(treeId)??null,
+      // #1495: 공유 판에서 바꾼 값은 서재 표시·내 소식 줄이 같이 본다.
+      rememberDiscover:(treeId,discover)=>ctx.rememberDiscover?.(treeId,discover),
       notify:text=>(0,ctx.notify)(text),
       panel:id=>(0,ctx.panel)(id),
       openSettingsData:intent=>(0,ctx.openAccountData)(intent),
@@ -284,6 +287,7 @@ export function createWritingRuntime(ctx){
       openTreeManager:()=>shellPanels.openTreeManager(),
       openTagManager:opts=>shellTagManager.open(opts),
       openEditor:(mode,parentId)=>openEditor(mode,parentId),
+      deleteMoment:options=>shellPanels.deleteMoment(options),
       openNewTree:()=>openEditor('new'),
       // 이슈 671: lt41-write의 새로 추가(new·add)는 쓰기 창 한 길로 — 목적지(트리·이어질 순간)를 함께 넘긴다.
       openWriteEntry:target=>shellQuick.openWrite(target),

@@ -1,76 +1,88 @@
-// 둘러보기 소개 여부와 첫 공개 안내.
+// 둘러보기 소개 상태와 내 소식의 소개 한 줄(#1495).
+// 2026-11-27 대표 결정: 순간이 3개가 될 때 뜨던 소개 물음 창은 없앴다. 같은 조건(쓰기 가능한 계정·순간 3개 이상·
+// 아직 소개 안 함)이면 내 소식에 트리마다 한 줄을 남기고, [소개하기]는 창의 '소개하기'와 같은 저장(PUT /api/trees/<id>/discover)이다.
+// 옛 물음 기록(lt41.discoverAsked)은 그대로 두고 읽지 않는다. 떠 있던 첫 공개 안내(#538)도 공유 판 설명으로 옮겨 없앴다.
+import {localDateOnly} from '../local-date.mjs';
 
+// 소개 줄 기록: [{treeId, day, offered, seen}] — offered는 줄을 보일지(확인 당시 소개 안 함), seen은 내 소식을 열어 봤는지.
+// 소개 켜짐/꺼짐 값 자체는 저장하지 않는다(서버 discover 값이 기준이다).
+export const DISCOVER_NEWS_KEY = 'lt41.discoverNews';
 
-export function createDiscoverRuntime(ctx){
+export function createDiscoverRuntime(ctx,{storage:given=null}={}){
   let countTreeMoments, discoverState;
-  function discoverAskedList(){try{const raw=JSON.parse(localStorage.getItem('lt41.discoverAsked')||'[]');return Array.isArray(raw)?raw.filter(v=>typeof v==='string'):[]}catch{return[]}}
+  const storage = () => { try { return given || globalThis.localStorage || null; } catch { return null; } };
+  function readNews(){
+   try{const raw=JSON.parse(storage()?.getItem(DISCOVER_NEWS_KEY)||'[]');return Array.isArray(raw)?raw.filter(row=>row&&typeof row.treeId==='string'):[];}catch{return[];}
+  }
+  function writeNews(rows){try{storage()?.setItem(DISCOVER_NEWS_KEY,JSON.stringify(rows));}catch{/* 저장소가 막히면 이번 접속만 */}}
 
-  function markDiscoverAsked(treeId){try{const list=discoverAskedList();if(!list.includes(treeId))list.push(treeId);localStorage.setItem('lt41.discoverAsked',JSON.stringify(list));}catch{}}
-
-  // 트리 id → 마지막으로 확인한 소개 값(배너·공유 판이 같은 값을 본다)
+  // 트리 id → 마지막으로 확인한 소개 값(내 소식 줄·공유 판·서재 표시가 같은 값을 본다)
   async function refreshTreeDiscover(treeId){
    try{const answer=await ctx.shareApi.getTreeDiscover(treeId);if(!answer.ok)return null;
-    discoverState.set(treeId,answer.discover===true);return answer.discover===true;}catch{return null}
+    discoverState.set(treeId,answer.discover===true);publishDiscover();return answer.discover===true;}catch{return null}
+  }
+  function discoverOf(treeId){return discoverState.has(treeId)?discoverState.get(treeId):null;}
+  function rememberDiscover(treeId,discover){discoverState.set(treeId,discover===true);publishDiscover();}
+  // 서재 화면이 카드 표시를 그릴 때 읽는 값(소개된 트리만 true) — 바뀌면 화면들에 알린다.
+  function publishDiscover(){
+   const out={};for(const [id,on] of discoverState)if(on)out[id]=true;
+   try{globalThis.LT41_DISCOVER=out;}catch{}
+   try{const type=globalThis.LT41_MSG?.discoverState;if(type)for(const frame of (ctx.frames?.()||[]))frame.contentWindow?.postMessage({type,trees:out},globalThis.location?.origin);}catch{}
   }
 
-  // #1446 재현 조건: 서버 저장이 확인된 뒤(status=synced·직전 dirty) 쓰기 가능한 계정에서,
-  // 순간이 2개→3개가 된 트리(newlyPublishedTrees) 중 아직 묻지 않은 것에만 한 번 부른다.
-  // 이미 소개 중이면 건너뛰고, 공유 주소로 이동한 뒤 늦은 응답은 창을 열지 않는다.
-  async function askDiscover(treeId){
-   try{
+  // #1446 조건 그대로: 서버 저장이 확인된 뒤(status=synced) 쓰기 가능한 계정에서 순간 3개 이상 트리 중 아직 줄을 남기지 않은 것.
+  // 이미 소개 중이면 줄 없이 기록만, 확인에 실패하면 기록하지 않아 다음 저장 때 다시 본다.
+  // 공유 주소로 이동한 뒤 늦게 온 응답은 이전 계정의 줄을 남기지 않는다.
+  async function offerDiscover(treeIds){
+   let added=false;
+   for(const treeId of treeIds||[]){
+    if(readNews().some(row=>row.treeId===treeId))continue;
     const discover=await refreshTreeDiscover(treeId);
-    if(ctx.source!=='server'||/^#share\//.test(globalThis.location?.hash||''))return; // 공유 주소로 이동한 뒤 늦은 응답은 이전 계정 질문을 열지 않는다.
-    if(discover===null)return; // 확인 실패 — 마킹하지 않아 다음 저장 때 다시 본다
-    markDiscoverAsked(treeId);
-    if(discover===true)return; // 이미 소개 켜진 트리(#739 백필)는 묻지 않는다
-    (0,ctx.$)('discover-ask-feedback').textContent='';
-    (0,ctx.$)('discover-ask').dataset.treeId=treeId;
-    (0,ctx.$)('discover-ask').showModal();
-    try{localStorage.setItem('lt41.publicNoticeShown','1');}catch{} // 질문 창이 #538 첫 공개 안내와 같은 사실을 대신한다 — 답한 뒤 배너가 또 뜨지 않게
-   }catch{/* 이미 다른 창이 열려 있으면 다음 저장 때 다시 본다 */}
+    if(ctx.source!=='server'||/^#share\//.test(globalThis.location?.hash||''))return;
+    if(discover===null)continue;
+    const rows=readNews();if(rows.some(row=>row.treeId===treeId))continue;
+    rows.push({treeId,day:localDateOnly(new Date())||'',offered:discover===false,seen:false});
+    writeNews(rows);
+    if(discover===false)added=true;
+   }
+   if(added)void ctx.shellSettings?.refreshMyNewsCount?.();
   }
-
-  function answerDiscover(discover){
-   const treeId=(0,ctx.$)('discover-ask').dataset.treeId;
-   if(!treeId)return;
-   ctx.shareApi.setTreeDiscover(treeId,discover).then(answer=>{
-    if(!answer.ok){(0,ctx.$)('discover-ask-feedback').textContent=answer.message||'소개 설정을 저장하지 못했어요.';return;}
-    discoverState.set(treeId,discover);
-    markDiscoverAsked(treeId);
-    // 261117 대표 검수: 답변 확인 알림은 띄우지 않는다 — 첫 화면 숫자 줄을 가리고, 질문 창 본문이
-    // 이미 같은 사실을 말한다. 소개 상태는 공유 판(언제든 켜고 끄는 곳)에서 확인한다.
-    (0,ctx.$)('discover-ask').close();
-   }).catch(()=>{(0,ctx.$)('discover-ask-feedback').textContent='소개 설정을 저장하지 못했어요.';});
+  function discoverNewsLines(){
+   const trees=Array.isArray(ctx.model?.trees)?ctx.model.trees:[];
+   return readNews().filter(row=>row.offered&&trees.some(tree=>tree.id===row.treeId))
+    .map(row=>({treeId:row.treeId,day:row.day,done:discoverState.get(row.treeId)===true}));
   }
-
-  // 상단 배너(첫 저장 안내): 소개 상태에 맞는 문장 — 이름·아이디는 안 보인다는 말은 유지한다.
-  async function notifyPublicBanner(treeId){
-   let discover=false;
-   if(treeId){const got=await refreshTreeDiscover(treeId);if(got!==null)discover=got;}
-    const text=discover
-     ?'이 트리는 둘러보기에 소개 중이에요. 공유 판에서 끌 수 있어요. 이름·아이디는 보이지 않아요.'
-     :'내 트리는 링크를 받은 사람만 볼 수 있어요. 둘러보기 소개는 공유 판에서 켤 수 있어요. 이름·아이디는 보이지 않아요.';
-    try{localStorage.setItem('lt41.publicNoticeShown','1');}catch{} // #538 기기당 1회 — 질문 창과 같은 사실을 알리는 안내다
-    (0,ctx.notify)(text);
+  function unseenDiscoverCount(){return discoverNewsLines().filter(line=>!line.done&&!readNews().find(row=>row.treeId===line.treeId)?.seen).length;}
+  function markDiscoverNewsSeen(){const rows=readNews();if(!rows.some(row=>!row.seen))return;writeNews(rows.map(row=>({...row,seen:true})));}
+  // [소개하기]: 창의 '소개하기'와 같은 저장. 실패하면 줄을 그대로 두고 안내 문구를 돌려준다.
+  async function introduceTree(treeId){
+   try{
+    const answer=await ctx.shareApi.setTreeDiscover(treeId,true);
+    if(!answer?.ok)return {ok:false,message:answer?.message||'소개 설정을 저장하지 못했어요.'};
+    rememberDiscover(treeId,true);
+    return {ok:true};
+   }catch{return {ok:false,message:'소개 설정을 저장하지 못했어요.'};}
+  }
+  // 서재가 뜰 때 내 트리들의 소개 값을 한 번씩 확인한다(이미 아는 트리는 다시 묻지 않는다).
+  async function loadDiscoverForTrees(){
+   if(ctx.source!=='server')return;
+   for(const tree of (ctx.model?.trees||[])){if(!discoverState.has(tree.id))await refreshTreeDiscover(tree.id);}
+   publishDiscover();
   }
   Object.defineProperties(ctx,{
     countTreeMoments:{get:()=>countTreeMoments,set:value=>{countTreeMoments=value;}},
-    discoverAskedList:{value:discoverAskedList},
     discoverState:{get:()=>discoverState,set:value=>{discoverState=value;}},
-    askDiscover:{value:askDiscover},
-    notifyPublicBanner:{value:notifyPublicBanner}
+    offerDiscover:{value:offerDiscover},
+    discoverNewsLines:{value:discoverNewsLines},
+    unseenDiscoverCount:{value:unseenDiscoverCount},
+    markDiscoverNewsSeen:{value:markDiscoverNewsSeen},
+    introduceTree:{value:introduceTree},
+    discoverOf:{value:discoverOf},
+    rememberDiscover:{value:rememberDiscover},
+    loadDiscoverForTrees:{value:loadDiscoverForTrees}
   });
   return {mount(){
-    // 둘러보기 소개 질문(261116 대표 결정 — 기본 꺼짐·고객이 고름, 무료): 순간이 2개→3개가 되는 저장
-    // 직후 한 번 묻는다(쉬운 추가·자세한 추가·책 추가 모두 — 저장 동기화 지점이 한 곳). 고른 값은
-    // PUT /api/trees/<id>/discover(#739)로 저장하고, 한 트리에 한 번만 묻는다(고른 뒤 다시 묻지 않음).
-    // 이미 소개가 켜진 트리(#739 백필)는 묻지 않는다. #718의 '공개됐어요' 안내는 이 질문 창으로 대신한다.
     countTreeMoments=()=>{const out={};for(const tree of (ctx.model?.trees||[]))out[tree.id]=(tree.moments||[]).length;return out;};
-
     discoverState=new Map();
-
-    (0,ctx.$)('discover-ask-yes').onclick = () => answerDiscover(true);
-
-    (0,ctx.$)('discover-ask-no').onclick = () => answerDiscover(false);
   }};
 }

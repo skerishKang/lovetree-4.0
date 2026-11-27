@@ -119,6 +119,18 @@ for (const [name, domain] of [['서버', server], ['브라우저', screen]]) {
     }
   });
 
+  test(name + '에서 순간 0개 트리에 첫 순간을 추가하면 시작 순간으로 저장된다', () => {
+    const tree = domain.createTree({ subject: '봄날', title: '빈 트리', note: '첫 마음', emotion: '설렘', date: '2026-11-01', url: '' }, '2026-11-01T00:00:00.000Z');
+    const empty = { ...tree, moments: [] };
+    const grown = domain.addMoment(empty, { title: '첫 순간', note: '첫 마음', emotion: '설렘', date: '2026-11-01', url: '' }, '');
+    assert.equal(grown.moments.length, 1);
+    assert.equal(grown.moments[0].parentId, null);
+    assert.equal(domain.validateState({ version: 1, trees: [grown], prefs: {} }).trees[0].moments[0].parentId, null);
+    const quick = domain.quickAdd({ version: 1, trees: [empty], prefs: {} }, { treeId: empty.id, url: 'https://example.com/first' }, '2026-11-01T00:00:00.000Z');
+    assert.equal(quick.state.trees[0].moments.length, 1);
+    assert.equal(quick.state.trees[0].moments[0].parentId, null);
+  });
+
   test(name + '에서 백업을 기존 목록에 합치면 새 식별자에도 열 화면이 보존된다', () => {
     const currentTree = { ...FIXED_STATE.trees[0], openView: 'network' };
     const current = { version: 1, trees: [currentTree] };

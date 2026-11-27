@@ -85,7 +85,7 @@ test('8. 말풍선은 한 번만 — 닫으면 저장하고, 저장소가 막히
   assert.equal(readTipsSeen(broken), false);
   assert.equal(writeTipsSeen(broken), false);
 
-  assert.equal(tipsWanted({owned: true, treeCount: 1, seen: false}), true);
+  assert.equal(tipsWanted({owned: true, treeCount: 1, seen: false, momentCount: 1}), true);
   assert.equal(tipsWanted({owned: true, treeCount: 1, seen: true}), false, '두 번째부터는 안 나온다');
   assert.equal(tipsWanted({owned: false, treeCount: 1, seen: false}), false);
   assert.equal(tipsWanted({owned: true, treeCount: 0, seen: false}), false);
@@ -93,10 +93,11 @@ test('8. 말풍선은 한 번만 — 닫으면 저장하고, 저장소가 막히
   // true로 남는다 — source로 한 번 더 막아 예시·공유(읽기 전용)를 "내 첫 트리"로 보지 않게 한다.
   assert.equal(tipsWanted({owned: true, treeCount: 1, seen: false, source: 'example'}), false, '예시 둘러보기는 안 뜬다');
   assert.equal(tipsWanted({owned: true, treeCount: 1, seen: false, source: 'share'}), false, '공유(읽기 전용)는 안 뜬다');
-  assert.equal(tipsWanted({owned: true, treeCount: 1, seen: false, source: 'server'}), true, '실제 내 트리는 그대로 뜬다');
+  assert.equal(tipsWanted({owned: true, treeCount: 1, seen: false, source: 'server', momentCount: 1}), true, '실제 내 트리는 그대로 뜬다');
   // #619-5: '첫 트리를 막 만든 직후'만 — 트리 2 개이거나 순간이 2 개 이상이면 안 뜬다.
   assert.equal(tipsWanted({owned: true, treeCount: 1, seen: false, source: 'server', momentCount: 1}), true, '첫 트리·첫 순간은 뜬다');
   assert.equal(tipsWanted({owned: true, treeCount: 1, seen: false, source: 'server', momentCount: 2}), false, '순간이 2 개 이상이면 안 뜬다');
+  assert.equal(tipsWanted({owned: true, treeCount: 1, seen: false, source: 'server', momentCount: 0}), false, '순간 0개 트리는 첫 트리 안내를 덧씌우지 않는다');
   assert.equal(tipsWanted({owned: true, treeCount: 2, seen: false, source: 'server', momentCount: 0}), false, '트리가 2 개 이상이면 안 뜬다');
   // 'shell.mjs가 현재 source를 넘긴다' 배선 글자 검사는 지웠다(이슈 952) — 예시·공유에서 말풍선이
 // 뜨지 않는 결과는 위 tipsWanted 표(source 인수 포함)가 함수 입출력으로 확인한다.
