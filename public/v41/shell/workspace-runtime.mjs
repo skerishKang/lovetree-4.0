@@ -5,6 +5,7 @@ import {accountPresentation,treePickerLabel,treePickerText,treeViewsVisible,writ
 import {connectionSignature} from "./panel-dirty.mjs";
 import {createConnections} from "./connections.mjs";
 import {createTreeTips} from "./tree-tips.mjs";
+import {askAppConfirm} from "../confirm.mjs";
 
 export function createWorkspaceRuntime(ctx){
   let shellConnections, mapMetaText, mountConnectionTool, setConnectionCount, connectionDirty, links, motionPaused, shellTreeTips, anyDialogOpen, tipsFollowDialogs, closeTreeTips, accountMenuOpen, tipsFollowAccountMenu, showTreeTips, syncTreeTips, navBar, narrowNav, onExploreRoute;
@@ -152,13 +153,13 @@ export function createWorkspaceRuntime(ctx){
 
   function treeDirty(){return ctx.shellPanels.treeDirty();}
 
-  function canLeave(){return !(formDirty()||treeDirty()||ctx.member?.snapshot().dirty)||confirm('아직 저장되지 않은 입력이 있어요. 현재 기록을 백업한 뒤 이동하는 것을 권합니다. 저장하지 않고 이동할까요?');}
+  async function canLeave(){return !(formDirty()||treeDirty()||ctx.member?.snapshot().dirty)||(await askAppConfirm('아직 저장되지 않은 입력이 있어요. 현재 기록을 백업한 뒤 이동하는 것을 권합니다. 저장하지 않고 이동할까요?'));}
 
-  function leaveMember(){if(!canLeave())return false;ctx.member?.dispose();ctx.member=null;return true;}
+  async function leaveMember(){if(!(await canLeave()))return false;ctx.member?.dispose();ctx.member=null;return true;}
 
   // #453 A: 예시를 둘러보는 동안에도 "로그인한 계정"은 그대로 둔다. 저장 연결만 끊어(dispose) 예시 내용이 계정에 섞이지 않게 하고,
   // 다시 내 기록으로 돌아올 때는 startMember()가 새 연결을 연다. 로그아웃 상태면 지금처럼 셸 상태를 비운다.
-  function pauseMember(){if(!canLeave())return false;if(!ctx.member?.snapshot().owned){ctx.member?.dispose();ctx.member=null;return true;}ctx.member.dispose();return true;}
+  async function pauseMember(){if(!(await canLeave()))return false;if(!ctx.member?.snapshot().owned){ctx.member?.dispose();ctx.member=null;return true;}ctx.member.dispose();return true;}
 
   // #453 A: 예시를 둘러보는 중에 순간 추가·새 트리를 누르면 내 기록으로 돌아와서 이어 간다(로그인 화면으로 보내지 않는다).
   function resumeMember(intent){ctx.resumeAfterStart=intent||'write';return (0,ctx.startMember)();}

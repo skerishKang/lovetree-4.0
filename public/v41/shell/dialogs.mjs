@@ -33,7 +33,7 @@ export function createDialogs(deps) {
     return [...root.querySelectorAll(SHELL_FOCUSABLE)].filter(el => !el.disabled && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden');
   }
   function trapShellTab(event) {
-    if (event.key !== 'Tab') return;
+    if (event.key !== 'Tab' || $('lt-confirm')?.open) return;
     // #425: 순간 추가는 한 창(write-panel)이다 — 고르기 창·빠른 추가·편집기가 하나로 합쳐졌다.
     const write = $('write-panel'), assets = $('account-assets');
     const dialog = write?.open ? write : assets?.open ? assets : null;
@@ -50,7 +50,7 @@ export function createDialogs(deps) {
 
   // 첫 트리 안내 말풍선 Esc: 열린 모달 대화상자가 있으면 말풍선은 건드리지 않는다.
   document.addEventListener('keydown', event => {
-    if (event.key !== 'Escape') return;
+    if (event.key !== 'Escape' || $('lt-confirm')?.open) return;
     const box = $('tree-tips');
     if (!box || box.hidden) return;
     if ([...document.querySelectorAll('dialog[open]')].some(d => d.matches(':modal'))) return;
@@ -60,7 +60,7 @@ export function createDialogs(deps) {
 
   // 계정 메뉴 Esc: 닫고 계정 동그라미로 초점을 돌린다.
   document.addEventListener('keydown', e => {
-    if (e.key !== 'Escape') return;
+    if (e.key !== 'Escape' || $('lt-confirm')?.open) return;
     const pop = $('account-popover');
     if (pop && !pop.hidden) { closeAccountMenu(); $('account-avatar').focus(); }
   });
@@ -93,7 +93,7 @@ export function createDialogs(deps) {
     if (message) deps.notify?.(message);
     return message;
   }
-  // #978: 앱 안 닫기 확인 틀 — 브라우저 기본 confirm() 대신 앱 모양으로 "저장하지 않고 닫을까요?"를 묻는다.
+  // #978: 앱 안 닫기 확인 틀 — 브라우저 기본 확인 창 대신 앱 모양으로 "저장하지 않고 닫을까요?"를 묻는다.
   // 공통 닫기 틀의 더러운 창은 모두 이 틀을 쓴다(정리·편집기·트리 관리·순간 잇기·공유·설정).
   // 물음은 비동기(단추를 눌러야 답이 온다)라서, 더러운 창은 일단 닫지 않고(return false) 틀을 띄운 뒤
   // '예'를 누르면 그때 실제로 닫는다. Esc·바깥 클릭 = 아니요(창은 그대로), 초점은 틀 안에 머물고
@@ -142,7 +142,7 @@ export function createDialogs(deps) {
     });
     // 초점은 틀 안에 머물게 한다 — Tab/Shift+Tab은 예·아니요 두 단추 안에서만 순환한다.
     el.addEventListener('keydown', (event) => {
-      if (event.key !== 'Tab') return;
+      if (event.key !== 'Tab' || $('lt-confirm')?.open) return;
       const list = [yes, no];
       const at = list.indexOf(document.activeElement);
       event.preventDefault();
@@ -269,7 +269,7 @@ export function createDialogs(deps) {
   // 앞 창을 못 닫았으면(사용자가 취소) 그 위에 겹친다 — 예상 못한 길을 막지 않는다. 확인 질문(confirm)
   // 은 브라우저 판이라 여기서 다루지 않는다.
   // #876: 같은 영상 안내 창(video-dup-panel)도 잠깐 판이다 — 순간 추가 창 위에 겹쳐 열린다(창은 #876이 만든다).
-  const STACK_ALLOWED = new Set(['move-picker', 'account-assets', 'community-preview', 'video-dup-panel', 'community-group-find', CLOSE_CONFIRM_ID]);
+  const STACK_ALLOWED = new Set(['move-picker', 'account-assets', 'community-preview', 'video-dup-panel', 'community-group-find', 'lt-confirm', CLOSE_CONFIRM_ID]);
   // #933: 둘러보기 창은 자기 닫기 규칙(둘러보기 모듈)을 그대로 쓴다 — 이 틀이 대신 닫지 않는다.
   const PANEL_SKIP_AUTO_CLOSE = new Set(['community-panel', 'community-preview']);
   let dialogGuard = false;     // 창 기록을 쌓아 둔 상태

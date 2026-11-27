@@ -251,7 +251,7 @@ pass next_sha_and_retention
 
 # 서버·화면 공통 판정 파일이 단독으로 바뀌어도 그 커밋을 설치한다.
 mkdir -p "$seed/public/v41"
-for module in src/domain.js src/moment-range.js src/stage-key.js public/v41/tags.mjs public/v41/tree-open-view.mjs public/v41/youtube-id.mjs; do
+for module in src/domain.js src/moment-range.js src/stage-key.js public/v41/tags.mjs public/v41/theme-registry.js public/v41/tree-open-view.mjs public/v41/public-thumbnail.mjs public/v41/youtube-id.mjs; do
   printf '\n// updated\n' >> "$seed/$module"
   release=$(push_commit "update $module")
   run_autodeploy

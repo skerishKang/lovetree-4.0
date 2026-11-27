@@ -1,4 +1,5 @@
 import { validateRange, rangeFields, fillStartFromUrl } from './moment-range.js';
+import '../public/v41/theme-registry.js';
 import { DEFAULT_TREE_OPEN_VIEW, normalizeTreeOpenView } from '../public/v41/tree-open-view.mjs';
 export const EMOTIONS = ['설렘', '위로', '벅참', '그리움', '고마움', '즐거움'];
 // #256-3: 책(트리)마다 고르는 디자인 표지. 테마 표지 색(--lt-cover-N) 위의 질감 변형 6종.
@@ -107,6 +108,7 @@ export function normalizeTreeChipOrder(value) {
 }
 export function normalizePrefs(value) {
   return {
+    theme: globalThis.LT41_THEME_REGISTRY.normalize(value?.theme),
     titleDisplay: normalizeTitleDisplay(value?.titleDisplay),
     displayName: normalizeDisplayName(value?.displayName),
     accentColor: normalizeAccentColor(value?.accentColor),
@@ -142,18 +144,6 @@ function optionalText(value, name, max) {
   if (typeof value !== 'string' || value.length > max) throw new Error(`${name}을(를) 1~${max}자로 적어 주세요.`);
   return value.trim();
 }
-function safeMediaThumbnail(value) {
-  if (value === undefined || value === null || value === '') return '';
-  if (typeof value !== 'string' || value.length > 2048) return '';
-  const trimmed = value.trim();
-  if (!trimmed) return '';
-  try {
-    const parsed = new URL(trimmed);
-    return parsed.protocol === 'https:' && !parsed.username && !parsed.password && /(?:^|\.)ytimg\.com$/i.test(parsed.hostname) ? parsed.href : '';
-  } catch {
-    return '';
-  }
-}
 // #1038: 세로 판정값(선택) — 없는 값은 '모름'으로 두고, 있으면 형식만 엄격히 지킨다.
 // 문자열·음수·Infinity·NaN은 저장하지 않고 거부한다(새 필드가 생겨도 옛 문서는 그대로 읽힌다 → 이전 불필요).
 function normalizeVerticalMedia(value) {
@@ -170,19 +160,33 @@ function normalizeVerticalMedia(value) {
   }
   return out;
 }
+// 저장 원본의 공개 여부는 판단하지 않고 허용된 모양만 유지한다.
+function normalizeStoredMediaMetadata(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('미디어 정보는 객체여야 해요.');
+  const out = {};
+  for (const [key, max] of [['title', 240], ['channel', 160], ['source', 2048], ['thumbnail', 2048], ['thumbnailUrl', 2048], ['poster', 2048], ['image', 2048], ['authorName', 2048]]) {
+    const item = value[key];
+    if (item === undefined || item === null) continue;
+    if (typeof item !== 'string' || item.length > max) throw new Error('미디어 정보의 글자 수와 형식을 확인해 주세요.');
+    out[key] = item;
+  }
+  return {...out, ...normalizeVerticalMedia(value)};
+}
 function normalizeMediaMetadata(value, url) {
   if (value === undefined || value === null) return null;
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('미디어 정보를 확인해 주세요.');
   const title = optionalText(value.title, '미디어 제목', 240);
   const channel = optionalText(value.channel, '미디어 채널', 160);
-  const thumbnail = safeMediaThumbnail(value.thumbnail);
+  // 저장은 주소의 공개 가능 여부를 판단하지 않는다. 공개 응답에서만 거른다.
+  const images = {};
+  for (const key of ['thumbnail', 'thumbnailUrl', 'poster', 'image', 'authorName']) {
+    if (typeof value[key] === 'string' && value[key].length <= 2048 && value[key]) images[key] = value[key];
+  }
   const vertical = normalizeVerticalMedia(value);
-  if (!title && !channel && !thumbnail && !Object.keys(vertical).length) return null;
+  if (!title && !channel && !Object.keys(images).length && !Object.keys(vertical).length) return null;
   const source = url ? new URL(url).hostname : '';
   if (!source) return null;
-  const result = {title, channel, source, ...vertical};
-  if (thumbnail) result.thumbnail = thumbnail;
-  return result;
+  return {title, channel, source, ...vertical, ...images};
 }
 function shortened(value, max = 40) {
   const text = Array.from(value.replace(/\s+/g, ' ').trim()).join('');
@@ -541,7 +545,13 @@ export function validateState(value) {
       delete clean.startSeconds; delete clean.endSeconds;
       // #1439: 복사한 순간은 원본 순간 id(copiedFrom)를 남긴다. 원본은 다른 트리에 있거나 지워졌을 수 있어 모양만 본다.
       const copiedFrom = idValid(m.copiedFrom) && m.copiedFrom !== m.id ? { copiedFrom: m.copiedFrom } : {};
-      return { ...validateMomentInput(clean), ...rangeFields(m, m.url), id: m.id, parentId: m.parentId, links: [...new Set(rawLinks)], createdAt: m.createdAt, ...boardLayoutOf(m), ...copiedFrom };
+      // 이미 저장된 미디어 정보는 새 입력의 정리 결과로 덮어쓰지 않는다.
+      // 허용된 미디어 필드만 검사해 저장하고, 주소의 공개 여부는 공개 응답에서 판단한다.
+      const validated = validateMomentInput(clean);
+      if (m.mediaMetadata !== undefined && m.mediaMetadata !== null) {
+        validated.mediaMetadata = normalizeStoredMediaMetadata(m.mediaMetadata);
+      }
+      return { ...validated, ...rangeFields(m, m.url), id: m.id, parentId: m.parentId, links: [...new Set(rawLinks)], createdAt: m.createdAt, ...boardLayoutOf(m), ...copiedFrom };
     });
     if (moments.length && moments.filter(m => m.parentId === null).length !== 1) throw new Error('트리의 시작 순간은 하나여야 해요.');
     const byId = new Map(moments.map(m => [m.id, m]));

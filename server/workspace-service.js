@@ -122,10 +122,10 @@ export function createWorkspaceService({ repo, productId, onCommit = null, onAcc
       const stored = await repo.load({ productId: principal.productId, subjectId: principal.subjectId });
       // subject는 검증된 주체 식별자만 되돌린다. 이 기기에 남은 미전송 기록이
       // 어느 계정의 것인지 다음 로그인에 가려 읽기 위한 최소 정보다.
-      if (!stored) return { revision: 0, savedAt: null, state: EMPTY_STATE(), subject: principal.subjectId };
+      if (!stored) return { revision: 0, savedAt: null, state: EMPTY_STATE(), subject: principal.subjectId, themeMissing: true };
       const scan = readStoredDocument(stored.doc);
       if (!scan) throw new ApiError(500, 'stored_document_invalid', '보관된 기록을 읽을 수 없어요.');
-      const body = { revision: stored.revision, savedAt: stored.savedAt, state: scan.state, subject: principal.subjectId };
+      const body = { revision: stored.revision, savedAt: stored.savedAt, state: scan.state, subject: principal.subjectId, ...(!Object.hasOwn(stored.doc.prefs || {}, 'theme') ? { themeMissing: true } : {}) };
       // 빠진(격리된) 트리는 개수만 알린다 — 원본 내용은 응답에 보내지 않는다.
       if (scan.quarantined.length) body.quarantined = scan.quarantined.length;
       return body;
@@ -141,7 +141,19 @@ export function createWorkspaceService({ repo, productId, onCommit = null, onAcc
       const scan = stored ? readStoredDocument(stored.doc) : null;
       const changedTreeIds = changedTreeIdsOf(scan?.state, validated);
       const changed = new Set(changedTreeIds);
-      const trees = validated.trees.map(tree => changed.has(tree.id) ? tree : (scan?.originals.get(tree.id) ?? tree));
+      // 변경하지 않은 트리의 다른 원본 필드는 유지하되, 미디어 정보는 검증된 허용 키만 다시 저장한다.
+      const trees = validated.trees.map(tree => {
+        if (changed.has(tree.id)) return tree;
+        const original = scan?.originals.get(tree.id);
+        if (!original) return tree;
+        const validatedMoments = new Map(tree.moments.map(moment => [moment.id, moment]));
+        return {...original, moments: original.moments.map(moment => {
+          const checked = validatedMoments.get(moment.id);
+          if (!checked) return moment;
+          const {mediaMetadata: _discarded, ...preserved} = moment;
+          return checked.mediaMetadata === undefined ? preserved : {...preserved, mediaMetadata: checked.mediaMetadata};
+        })};
+      });
       const doc = withQuarantinedTrees({ ...validated, trees }, scan?.quarantined ?? []);
       const outcome = await repo.commit({
         productId: principal.productId,

@@ -176,7 +176,7 @@ test('users cannot reach each other workspace', async () => {
   await put(alice, { state: sampleState(), expectedRevision: 0, clientKey: 'k-1' });
   const read = await get(bob);
   assert.equal(read.status, 200);
-  assert.deepEqual(read.body, { revision: 0, savedAt: null, state: { version: 1, trees: [], prefs: { titleDisplay: 'both', displayName: '', accentColor: '', dateStyle: 'dot', startPlace: 'resume', shareView: 'book', shareDiscover: false, treeChipOrder: [], bookDisplay: 'book', shelfView: 'carousel', homeMoment: { mode: 'last', treeId: '', momentId: '' } } }, subject: 'usr_b' });
+  assert.deepEqual(read.body, { revision: 0, savedAt: null, state: { version: 1, trees: [], prefs: { theme: 'night', titleDisplay: 'both', displayName: '', accentColor: '', dateStyle: 'dot', startPlace: 'resume', shareView: 'book', shareDiscover: false, treeChipOrder: [], bookDisplay: 'book', shelfView: 'carousel', homeMoment: { mode: 'last', treeId: '', momentId: '' } } }, subject: 'usr_b', themeMissing: true });
 
 });
 
@@ -291,16 +291,17 @@ test('GET and PUT work over a real socket', async () => {
   const server = createServer(createNodeHandler(handle));
   await listenOnSafePort(server, '127.0.0.1');
   try {
+    // 다음 시험이 같은 포트를 다시 열 때 이전 HTTP 연결을 재사용하지 않도록 한다.
     const origin = `http://127.0.0.1:${server.address().port}`;
-    const empty = await fetch(`${origin}/api/workspace`);
+    const empty = await fetch(`${origin}/api/workspace`, { headers: { connection: 'close' } });
     assert.equal(empty.status, 200);
     assert.equal((await empty.json()).revision, 0);
     const saved = await fetch(`${origin}/api/workspace`, {
-      method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ state: sampleState(), expectedRevision: 0, clientKey: 'k-1' })
+      method: 'PUT', headers: { 'content-type': 'application/json', connection: 'close' }, body: JSON.stringify({ state: sampleState(), expectedRevision: 0, clientKey: 'k-1' })
     });
     assert.equal(saved.status, 200);
     assert.equal((await saved.json()).revision, 1);
-    assert.equal((await (await fetch(`${origin}/api/workspace`)).json()).revision, 1);
+    assert.equal((await (await fetch(`${origin}/api/workspace`, { headers: { connection: 'close' } })).json()).revision, 1);
   } finally {
     await new Promise(resolve => server.close(resolve));
   }

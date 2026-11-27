@@ -1,17 +1,23 @@
 import { logServerError } from './error-log.js';
 import { createHash, randomBytes } from 'node:crypto';
 import { coverModeOf, normalizeCoverDesign } from '../src/domain.js';
+import { normalizeTreeOpenView } from '../public/v41/tree-open-view.mjs';
+import { safePublicThumbnail } from '../public/v41/public-thumbnail.mjs';
+import { isPrivateMediaUrl, projectPublicStats, projectPublicTree, projectPublicVisitPrefs } from './public-projection.js';
+import { youtubeIdFrom, youtubeStageThumbUrl } from '../public/v41/youtube-id.mjs';
 import { ApiError } from './errors.js';
 import { readStoredDocument } from './workspace-service.js';
 import { refreshStageIndex } from './stage-index-refresh.js';
 import { parsePrincipal } from './principal.js';
 import { aiTesterFor } from './admin-roles.js';
+import { isHiddenShare } from './hidden-share.js';
 
 const SHARE_ID = /^[A-Za-z0-9_-]{20,64}$/;
 const RECORD_ID = /^[A-Za-z0-9_-]{1,80}$/;
 const TREE_ID = /^[A-Za-z0-9_-]{1,80}$/;
 const VIEWS = new Set(['book', 'board', 'network']);
 const NO_STORE = { 'cache-control': 'no-store, max-age=0', pragma: 'no-cache', 'x-content-type-options': 'nosniff' };
+const VISIT_NO_STORE = { 'cache-control': 'private, no-cache', pragma: 'no-cache', 'x-content-type-options': 'nosniff' };
 
 function jsonBody(request) {
   if (!String(request?.headers?.['content-type'] || '').toLowerCase().startsWith('application/json'))
@@ -19,38 +25,30 @@ function jsonBody(request) {
   try { return JSON.parse(typeof request.body === 'string' ? request.body : String(request.body || '')); }
   catch { throw new ApiError(400, 'invalid_json', '공유 요청 형식을 읽을 수 없어요.'); }
 }
-function cleanView(value) { return VIEWS.has(value) ? value : 'book'; }
-function privateMedia(value) {
-  if (typeof value !== 'string' || !value) return false;
-  try { return new URL(value, 'https://lovetree.invalid').pathname.startsWith('/api/media/'); }
-  catch { return true; }
+function visitResponse(request, body) {
+  const etag = '"' + createHash('sha256').update(JSON.stringify(body)).digest('base64url') + '"';
+  const headers = { ...VISIT_NO_STORE, etag };
+  if (request?.headers?.['if-none-match'] === etag) return { status: 304, body: undefined, headers };
+  return { status: 200, body, headers };
 }
+function cleanView(value) { return VIEWS.has(value) ? value : 'book'; }
 // #1067: 이미 검증한 주인 문서 사본으로 트리 공개 사본을 만든다(요청 안에서만 재사용).
-export function projectSharedTreeFromScan(scan, treeId) {
+export function projectSharedTreeFromScan(scan, treeId, publicId = '') {
   // #986: 저장된 문서에 격리 트리가 섞여 있어도, 읽을 수 있는 트리의 공유는 그대로 동작한다.
   // 문서 전체를 검사하면 트리 하나 때문에 공유 만들기·공개 읽기·커뮤니티 카드가 함께 실패한다.
   if (!scan) throw new ApiError(500, 'stored_document_invalid', '보관된 기록을 읽을 수 없어요.');
   const source = scan.state.trees.find(tree => tree.id === treeId);
   if (!source) throw new ApiError(410, 'share_removed', '공유된 트리가 삭제되었거나 더 이상 존재하지 않아요.');
-  let omittedPrivateMedia = 0;
-  const tree = {
-    ...source,
-    moments: source.moments.map(moment => {
-      const url = privateMedia(moment.url) ? '' : moment.url;
-      if (url !== moment.url) omittedPrivateMedia += 1;
-      const shared = { ...moment, url, links: [...moment.links] };
-      // #1439: 복사 원본 id(copiedFrom)는 내 다른 트리의 순간을 가리키는 안쪽 값이라 공개 사본에는 싣지 않는다.
-      delete shared.copiedFrom;
-      return shared;
-    })
-  };
+  const omittedPrivateMedia = source.moments.filter(moment => isPrivateMediaUrl(moment.url) || isPrivateMediaUrl(moment.mediaMetadata?.thumbnail)).length;
+  const tree = projectPublicTree(source);
+  tree.id = publicId || source.id;
   // #425 2번: 올린 사진 표지(coverMode=photo)는 공개 응답에서만 디자인 표지로,
   // 디자인이 없으면 기본 색 표지로 바꾼다. 저장본은 건드리지 않는다.
   if (coverModeOf(source) === 'photo') tree.coverMode = normalizeCoverDesign(source.coverDesign) ? 'design' : 'basic';
   return { tree, omittedPrivateMedia };
 }
-export function projectSharedTree(document, treeId) {
-  return projectSharedTreeFromScan(readStoredDocument(document), treeId);
+export function projectSharedTree(document, treeId, publicId = '') {
+  return projectSharedTreeFromScan(readStoredDocument(document), treeId, publicId);
 }
 function selectEntry(tree, value) {
   if (typeof value === 'string' && RECORD_ID.test(value) && tree.moments.some(moment => moment.id === value)) return value;
@@ -59,8 +57,34 @@ function selectEntry(tree, value) {
 function shareSummary(row) {
   return { id: row.shareId, treeId: row.treeId, entryMomentId: row.entryMomentId, view: row.view, status: row.status, createdAt: row.createdAt, revokedAt: row.revokedAt || null, discoverable: row.discoverable === true, discoverableAt: row.discoverableAt || null, origin: row.origin || 'owner', momentCount: Number(row.momentCount ?? 0) };
 }
+function publicShareSummary(row) {
+  return { id: row.shareId, entryMomentId: row.entryMomentId, view: row.view };
+}
+function shelfCover(tree) {
+  const cover = tree.moments.find(moment => moment.id === tree.coverMomentId) || tree.moments[0];
+  if (!cover) return null;
+  const videoId = youtubeIdFrom(cover.url);
+  return {
+    momentId: cover.id,
+    title: cover.title,
+    url: cover.url,
+    type: videoId ? 'youtube' : cover.url ? 'link' : '',
+    thumbnailUrl: safePublicThumbnail(cover.mediaMetadata?.thumbnail) || (videoId ? youtubeStageThumbUrl(videoId, 'mqdefault') : '')
+  };
+}
+function shelfItem(tree, shareId) {
+  return {
+    shareId,
+    title: tree.title,
+    subject: tree.subject,
+    momentCount: tree.moments.length,
+    updatedAt: tree.updatedAt,
+    openView: normalizeTreeOpenView(tree.openView),
+    cover: shelfCover(tree)
+  };
+}
 
-export function createShareService({ shareRepo, workspaceRepo, visibilityRepo = null, discoverRepo = null, admin = null, stageIndex = null, pendingShowSync = null, productId, makeId = () => randomBytes(18).toString('base64url') }) {
+export function createShareService({ shareRepo, workspaceRepo, visibilityRepo = null, discoverRepo = null, communityRepo = null, admin = null, stageIndex = null, pendingShowSync = null, visitCounts = null, productId, makeId = () => randomBytes(18).toString('base64url') }) {
   const refreshStages = subjectId => refreshStageIndex(stageIndex, { productId, subjectId });
   // #1163(#1068 2단계): 응답 뒤에 시작되는 보임 동기화의 진행 중 Promise — 시험·종료 정리가 기다린다.
   const showTasks = new Set();
@@ -172,6 +196,16 @@ export function createShareService({ shareRepo, workspaceRepo, visibilityRepo = 
     if (!discoverRepo) return { discover: true };
     return discoverRepo.get({ productId, subjectId, treeId });
   }
+  async function sharedTree(row) {
+    if (await treeVisibility(row.subjectId, row.treeId) === 'private')
+      throw new ApiError(403, 'share_private', '소유자가 이 트리를 비공개로 바꿨어요.');
+    const stored = await workspaceRepo.load({ productId, subjectId: row.subjectId });
+    if (!stored) throw new ApiError(410, 'share_removed', '공유된 트리가 삭제되었거나 더 이상 존재하지 않아요.');
+    const { tree, omittedPrivateMedia } = projectSharedTree(stored.doc, row.treeId, row.shareId);
+    if (!tree.moments.length) throw new ApiError(422, 'share_empty', '공유할 순간이 아직 없어요.');
+    const aiTester = await aiTesterFor({ admin, productId, subjectId: row.subjectId }) === true;
+    return { tree, omittedPrivateMedia, aiTester, stored };
+  }
   async function ownTree(subjectId, treeId) {
     if (!TREE_ID.test(treeId || '')) throw new ApiError(404, 'tree_not_found', '트리를 찾을 수 없어요.');
     const stored = await workspaceRepo.load({ productId, subjectId });
@@ -227,18 +261,64 @@ export function createShareService({ shareRepo, workspaceRepo, visibilityRepo = 
       const row = await shareRepo.load({ productId, shareId });
       if (!row) throw new ApiError(404, 'share_not_found', '공유 주소를 찾을 수 없어요.');
       if (row.status !== 'active') throw new ApiError(410, 'share_revoked', '소유자가 이 공유를 취소했어요.');
-      // #538: 비공개 트리는 공개 읽기 경로에서도 서버가 막는다(화면 잠금만으로 막지 않는다).
-      if (await treeVisibility(row.subjectId, row.treeId) === 'private')
-        throw new ApiError(403, 'share_private', '소유자가 이 트리를 비공개로 바꿨어요.');
-      const stored = await workspaceRepo.load({ productId, subjectId: row.subjectId });
-      if (!stored) throw new ApiError(410, 'share_removed', '공유된 트리가 삭제되었거나 더 이상 존재하지 않아요.');
-      const { tree, omittedPrivateMedia } = projectSharedTree(stored.doc, row.treeId);
-      if (!tree.moments.length) throw new ApiError(422, 'share_empty', '공유할 순간이 아직 없어요.');
-      const shared = { share: shareSummary(row), tree, omittedPrivateMedia };
+      if (await isHiddenShare(communityRepo, { ...row, productId })) throw new ApiError(404, 'share_not_found', '공유 주소를 찾을 수 없어요.');
+      const { tree, omittedPrivateMedia, aiTester } = await sharedTree(row);
+      const shared = { share: publicShareSummary(row), tree, omittedPrivateMedia };
       // #611 3번: AI 명예회원 기록은 공개 읽기 결과에 'AI 명예회원' 배지 한 비트만 내린다.
       // 사본 화면(내 트리)에서는 붙이지 않는다 — 여기 read()는 남에게 보이는 공개 응답뿐이다.
-      if (await aiTesterFor({ admin, productId, subjectId: row.subjectId })) shared.aiTester = true;
+      if (aiTester) shared.aiTester = true;
       return shared;
+    },
+    async readVisit(shareId, visitor = {}) {
+      if (!SHARE_ID.test(shareId)) throw new ApiError(404, 'share_invalid', '공유 주소 형식이 올바르지 않아요.');
+      const row = await shareRepo.load({ productId, shareId });
+      if (!row) throw new ApiError(404, 'share_not_found', '공유 주소를 찾을 수 없어요.');
+      if (row.status !== 'active') throw new ApiError(410, 'share_revoked', '소유자가 이 공유를 취소했어요.');
+      if (await isHiddenShare(communityRepo, { ...row, productId })) throw new ApiError(404, 'share_not_found', '공유 주소를 찾을 수 없어요.');
+      const { tree, omittedPrivateMedia, aiTester, stored } = await sharedTree(row);
+      const shelf = [shelfItem(tree, row.shareId)];
+      const shelfShareIds = new Map([[row.treeId, row.shareId]]);
+      if ((await treeDiscover(row.subjectId, row.treeId)).discover) {
+        const summaries = communityRepo?.listDiscoverableSummaries
+          ? await communityRepo.listDiscoverableSummaries({ productId, viewerSubjectId: null, limit: 240 })
+          : null;
+        const candidates = summaries
+          ? summaries.map(summary => summary.share)
+          : await shareRepo.list({ productId, subjectId: row.subjectId });
+        const seen = new Set([row.treeId]);
+        for (const candidate of candidates) {
+          if (shelf.length >= 24) break;
+          if (!candidate || candidate.subjectId !== row.subjectId || candidate.status !== 'active' || seen.has(candidate.treeId)) continue;
+          seen.add(candidate.treeId);
+          if (!summaries && !(await treeDiscover(candidate.subjectId, candidate.treeId)).discover) continue;
+          if (await treeVisibility(candidate.subjectId, candidate.treeId) === 'private') continue;
+          let projected;
+          try { projected = projectSharedTree(stored.doc, candidate.treeId, candidate.shareId); }
+          catch { continue; }
+          if (!projected.tree.moments.length) continue;
+          shelf.push(shelfItem(projected.tree, candidate.shareId));
+          shelfShareIds.set(candidate.treeId, candidate.shareId);
+        }
+      }
+      const stats = communityRepo?.stats
+        ? await communityRepo.stats({ productId, shareId: row.shareId, viewerSubjectId: null })
+        : {};
+      return {
+        visit: {
+          shareId: row.shareId,
+          view: normalizeTreeOpenView(tree.openView),
+          entryMomentId: selectEntry(tree, row.entryMomentId),
+          momentCount: tree.moments.length,
+          updatedAt: tree.updatedAt,
+          aiTester,
+          ownerLabel: '',
+          prefs: projectPublicVisitPrefs(stored.doc.prefs, shelfShareIds),
+          omittedPrivateMedia
+        },
+        tree,
+        shelf,
+        stats: { ...projectPublicStats(stats), visits: visitCounts ? await visitCounts.record(shareId, visitor) : 0 }
+      };
     },
     // === 저장 성공 뒤 공유 동기화(#538, B-12 2단계 #1163) ===
     // 응답 전에 숨김(회수·소개 정리·무대 색인 재조정)을 끝내고 응답을 돌려 준다 — 보임(수 갱신·자동
@@ -290,7 +370,7 @@ export function createShareService({ shareRepo, workspaceRepo, visibilityRepo = 
   };
 }
 
-export function createShareHandler({ authenticate, service, productId }) {
+export function createShareHandler({ authenticate, service, productId, visitProxyTrusted = () => false }) {
   async function owner(request) {
     let verified;
     try { verified = await authenticate(request); }
@@ -303,6 +383,20 @@ export function createShareHandler({ authenticate, service, productId }) {
     if (publicMatch) {
       if (method !== 'GET') throw new ApiError(405, 'method_not_allowed', '이 요청은 지원하지 않아요.');
       return { status: 200, body: await service.read(publicMatch[1]), headers: NO_STORE };
+    }
+    const visitMatch = path.match(/^\/api\/public\/visits\/([^/]+)$/);
+    if (visitMatch) {
+      if (method !== 'GET') throw new ApiError(405, 'method_not_allowed', '이 요청은 지원하지 않아요.');
+      let visitor = {};
+      if (visitProxyTrusted(request)) {
+        const cookie = String(request.headers?.cookie || '');
+        const hasCredential = /(?:^|;\s*)__Host-lovetree-access=/.test(cookie) || !!request.headers?.authorization;
+        visitor = { trusted: true, clientIp: request.headers?.['x-lovetree-client-ip'], authKnown: !hasCredential };
+        if (hasCredential) {
+          try { visitor.subjectId = await owner(request); visitor.authKnown = true; } catch { /* 확인되지 않은 로그인은 세지 않는다. */ }
+        }
+      }
+      return visitResponse(request, await service.readVisit(visitMatch[1], visitor));
     }
     const subjectId = await owner(request);
     if (path === '/api/shares/preview') {

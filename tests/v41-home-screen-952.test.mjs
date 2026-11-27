@@ -14,6 +14,7 @@ import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 import { serve } from './helpers/screen-audit.mjs';
 import { createTree, addMoment } from '../public/v41/domain.mjs';
+import { SHARE_COPY_FAILURE } from '../public/v41/share-link.mjs';
 
 const REQUIRE952 = process.env.LT_HOME_952_REQUIRE === '1';
 let chromium952 = null;
@@ -252,6 +253,27 @@ test('#379 인기 카드를 누르면 #share/ 공유 화면으로 간다', { ski
       await card.locator('.surface').evaluate(e => e.click());
       await h.page.waitForFunction(() => location.hash.startsWith('#share/'), null, { timeout: 5000 });
       assert.equal(await h.page.evaluate(() => location.hash), '#share/share-pop-00000001/book', '공개 카드는 공유 화면으로 이동한다');
+    } finally { await close952(h); }
+  } finally { await browser.close(); }
+});
+
+test('#1540 첫 화면 ⋯ 공유는 실패 안내로 공유 판과 같은 문구를 띄운다', { skip: REQUIRE952 ? false : skip952, timeout: 180000 }, async () => {
+  if (skip952) assert.fail(skip952);
+  const browser = await chromium952.launch({ headless: true });
+  try {
+    const h = await boot952(browser, { member: false, initStorage: { 'lt41.homeCards': 'example' } });
+    try {
+      const card = h.frame.locator('#orbit .card').first();
+      await card.waitFor({ state: 'visible', timeout: 15000 });
+      await card.locator('.surface').evaluate(e => e.click());
+      await h.frame.locator('#mediaViewerHome.open').waitFor({ state: 'visible', timeout: 5000 });
+      await h.frame.evaluate(() => {
+        Object.defineProperty(navigator, 'share', { value: undefined, configurable: true });
+        Object.defineProperty(navigator, 'clipboard', { value: { writeText: async () => { throw Error('denied'); } }, configurable: true });
+      });
+      await h.frame.locator('#mediaMoreHome').click();
+      await h.frame.locator('#mediaMoreMenuHome button').filter({ hasText: '공유' }).click();
+      await h.frame.getByText(SHARE_COPY_FAILURE).waitFor({ state: 'visible', timeout: 5000 });
     } finally { await close952(h); }
   } finally { await browser.close(); }
 });
@@ -1111,7 +1133,8 @@ test('#1437 delayed member response does not paint guest title, corrects stale h
  const {mkdirSync}=await import('node:fs');
  const {join}=await import('node:path');
  const browser=await chromium952.launch({headless:true});
- const server=await serve({},{ port: 4143 }),base='http://127.0.0.1:4143';
+ const port=Number(process.env.LT_TEST_PORT||4143);
+ const server=await serve({},{ port }),base='http://127.0.0.1:'+port;
  const tree=tree952({subject:'시험 순간',count:3});
  const testCases=[
   {key:'member',member:true,trees:[tree],hint:false,expected:'다시, 그 순간으로.',neverGuest:true},
@@ -1181,7 +1204,8 @@ test('#1437 delayed member response does not paint guest title, corrects stale h
 test('#1437 pending center is text-free until confirmed response and reserves stable height', {skip:REQUIRE952?false:skip952,timeout:90000},async()=>{
  if(skip952)assert.fail(skip952);
  const browser=await chromium952.launch({headless:true,args:['--disable-gpu']});
- const server=await serve({'/1437-harness.html':'<!doctype html><html><head><script>document.documentElement.dataset.ltAuthPhase="pending";</script></head><body data-member="out" style="margin:0"><iframe src="/v41/home.html" style="border:0;width:100vw;height:100vh"></iframe></body></html>'},{ port: 4144 }),base='http://127.0.0.1:4144';
+ const port=Number(process.env.LT_TEST_PORT||4144);
+  const server=await serve({'/1437-harness.html':'<!doctype html><html><head><script>document.documentElement.dataset.ltAuthPhase="pending";</script></head><body data-member="out" style="margin:0"><iframe src="/v41/home.html" style="border:0;width:100vw;height:100vh"></iframe></body></html>'},{ port }),base='http://127.0.0.1:'+port;
  const {mkdirSync}=await import('node:fs');const {join}=await import('node:path');
  const tree=tree952({subject:'시험 순간',count:3});
  try{
@@ -1310,7 +1334,7 @@ test('#1449 첫 화면 순간 상세 창 정보·출처·테마·누름 영역�
   const only=process.env.LT_1449_ONLY||'';
   const debug=process.env.LT_1449_DEBUG==='1';
   if(capture)mkdirSync(capture,{recursive:true});
-  const port=4520,base=`http://127.0.0.1:${port}`;
+  const port=Number(process.env.LT_TEST_PORT||4520),base=`http://127.0.0.1:${port}`;
   const at=i=>'2026-11-'+String(i+1).padStart(2,'0')+'T00:00:00.000Z';
   const scenes=[
     {key:'vertical',label:'세로 영상',url:'https://www.youtube.com/shorts/a1111111111',vertical:true,external:'YouTube에서 보기 ↗'},

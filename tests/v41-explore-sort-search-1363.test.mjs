@@ -18,7 +18,7 @@ const card=(n,ai)=>({
 });
 test('#1363 정렬 직접 메뉴·검색 입력·#1361 안내 위치 — 390·1440 밤·정원', {skip:REQUIRE?false:(skipReason||undefined),timeout:180000},async()=>{
  if(skipReason)assert.fail(skipReason);
- const server=await serve({}, {port:Number(process.env.LT1499_PORT||0)});const browser=await chromium.launch({headless:true});
+ const server=await serve({}, {port:Number(process.env.LT_TEST_PORT||process.env.LT1499_PORT||0)});const browser=await chromium.launch({headless:true});
  const base='http://127.0.0.1:'+server.address().port;
  const capture=process.env.LT1363_CAPTURE_DIR;
  if(capture)await mkdir(capture,{recursive:true});

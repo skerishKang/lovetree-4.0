@@ -42,7 +42,12 @@ function prepareTreeChoice(bar, screen, title, titleFrom) {
     choice.addEventListener('click', event => {
       event.stopPropagation();
       const box = choice.getBoundingClientRect();
-      window.parent.postMessage({type:MSG.toolbarTreePicker, rect:{left:box.left,top:box.top,right:box.right,bottom:box.bottom}, via:event.detail===0?'keyboard':'mouse'}, location.origin);
+      const data={type:MSG.toolbarTreePicker, rect:{left:box.left,top:box.top,right:box.right,bottom:box.bottom}, via:event.detail===0?'keyboard':'mouse'};
+      // 프레임 교대 사이에 비동기 메시지가 유실되지 않도록 같은 출처의 셸에 바로 전달한다.
+      let receive;
+      try { receive=window.parent.LT41_OPEN_TREE_PICKER; } catch {}
+      if(typeof receive==='function') receive(window,data);
+      else window.parent.postMessage(data,location.origin);
     });
     window.addEventListener('message', event => {
       if(event.source!==window.parent || event.origin!==location.origin || event.data?.type!==MSG.toolbarTreePickerState)return;

@@ -519,7 +519,8 @@ window.__ready1480=true;
 </script></body></html>`;
 
 test('#1480 실패한 작은 영상 썸네일을 보이는 대체 표지로 교체하고 성공한 그림을 보존한다',{skip:REQUIRE?false:skip,timeout:60000},async()=>{
- const server=await serve({'/1480.html':harness1480},{port:4148});
+ const port=Number(process.env.LT_TEST_PORT||4148);
+ const server=await serve({'/1480.html':harness1480},{port});
  const browser=await chromium.launch({headless:true});
  try{
   for(const width of [390,1440]){
@@ -530,7 +531,7 @@ test('#1480 실패한 작은 영상 썸네일을 보이는 대체 표지로 교�
    });
    const page=await context.newPage();
    const errors=[];page.on('pageerror',e=>errors.push(e.message));
-   await page.goto('http://127.0.0.1:4148/1480.html',{waitUntil:'load'});
+   await page.goto('http://127.0.0.1:'+port+'/1480.html',{waitUntil:'load'});
    await page.waitForFunction(()=>window.__ready1480===true);
    await page.waitForFunction(()=>document.querySelectorAll('.cleanup-moment-thumb-slot .lt-recent-fallback').length===1 && document.querySelectorAll('.journey-thumb .lt-recent-fallback').length===1 && document.querySelectorAll('.branch-thumb .lt-recent-fallback').length===1,{timeout:10000});
    const result=await page.evaluate(()=>{

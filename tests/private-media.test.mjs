@@ -132,3 +132,18 @@ test('explicit frontend alias uploads share canonical storage; unlisted or malfo
  assert.equal((await invalid(post(primary))).status,503);
  assert.equal((await store.list(A)).items.length,2);
 });
+test('#1549 미디어 올리기 쓰기 경로: 출처·주인 머리말 거부와 파일 형식 오류',async t=>{
+ const {store}=await setup(t);
+ const handle=createMediaHandler({authenticate:async r=>r.headers?.user==='A'?A:null,productId:A.productId,store,publicOrigin:'https://front.test'});
+ const base={method:'POST',path:'/api/media',headers:{user:'A',origin:'https://front.test','content-type':'image/png','x-lovetree-subject':A.subjectId,'x-lovetree-upload-id':randomUUID()},rawBody:png};
+ const noOrigin=await handle({...base,headers:{...base.headers,origin:undefined}});
+ assert.equal(noOrigin.status,403);assert.equal(noOrigin.body.error.code,'media_origin');
+ const wrongSubject=await handle({...base,headers:{...base.headers,'x-lovetree-subject':B.subjectId}});
+ assert.equal(wrongSubject.status,401);assert.equal(wrongSubject.body.error.code,'account_changed');
+ const badId=await handle({...base,headers:{...base.headers,'x-lovetree-upload-id':'../outside'}});
+ assert.equal(badId.status,400);assert.equal(badId.body.error.code,'media_request_id');
+ const badType=await handle({...base,headers:{...base.headers,'content-type':'image/svg+xml'},rawBody:Buffer.from('<svg/>')});
+ assert.equal(badType.status,415,'현재는 지원하지 않는 형식을 415로 돌려준다');assert.equal(badType.body.error.code,'media_type');
+ const badBytes=await handle({...base,headers:{...base.headers,'x-lovetree-upload-id':randomUUID()},rawBody:Buffer.from('<html/>')});
+ assert.equal(badBytes.status,415);assert.equal(badBytes.body.error.code,'media_signature');
+});

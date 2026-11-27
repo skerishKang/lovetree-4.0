@@ -9,7 +9,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 // 운영 자동 배포가 서버 설치 대상으로 보는 파일(설치 스크립트 목록과 맞춘다).
 const INSTALL_FILES = new Set([
   'src/domain.js', 'src/moment-range.js', 'src/stage-key.js',
-  'public/v41/tags.mjs', 'public/v41/tree-open-view.mjs', 'public/v41/youtube-id.mjs', 'public/v41/youtube-id.js',
+  'public/v41/tags.mjs', 'public/v41/theme-registry.js', 'public/v41/tree-open-view.mjs', 'public/v41/public-thumbnail.mjs', 'public/v41/youtube-id.mjs', 'public/v41/youtube-id.js',
   'tools/admin-role.mjs', 'tools/env-file.mjs', 'tools/ops-reply.mjs',
   'tools/relink-opinion-author.mjs', 'tools/export-ai-customer-db.mjs',
   'tools/ci/server-changes.mjs', '.github/workflows/ci.yml',

@@ -296,7 +296,7 @@ test('1001b 실행: 지도 순간 변경(고치기·연결·삭제) — 재적�
     assert.equal(afterLink.doc, 'alive', '연결 뒤에도 같은 문서다');
     assert.equal(afterLink.sel, m3, '연결 뒤에도 고른 순간이 그대로다');
     // ③ 삭제: 점이 사라지고 재적재 0.
-    await openEditor(m3); await page.click('#delete-moment'); await waitPut(3); await page.waitForTimeout(1800);
+    await openEditor(m3); await page.click('#delete-moment'); await page.waitForSelector('#lt-confirm[open]', { timeout: 10000 }); await page.click('#lt-confirm-ok'); await waitPut(3); await page.waitForTimeout(1800);
     const afterDelete = await frame.evaluate(() => ({ doc: window.__doc1001b, nodes: window.__lt.nodes.length }));
     assert.equal(afterDelete.doc, 'alive', '삭제 뒤에도 같은 문서다');
     assert.equal(afterDelete.nodes, before.nodes - 1, '점이 하나 줄어든다');

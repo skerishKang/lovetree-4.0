@@ -71,6 +71,7 @@ test('server/의 정적 import 그래프는 install.sh가 복사하는 파일 �
   assert.ok(/cp -a "\$source_root\/server" "\$app\/server"/.test(script), 'server/ 디렉터리는 통째로 복사된다');
   assert.ok(singleFiles.includes('src/domain.js'), 'src/domain.js는 서버·화면 한 벌로 복사된다');
   assert.ok(singleFiles.includes('public/v41/tags.mjs'), 'public/v41/tags.mjs는 꼬리표 판정 한 벌(#695) — 누락되면 운영 설치가 preflight에서 멈춘다');
+  assert.ok(singleFiles.includes('public/v41/public-thumbnail.mjs'), 'public/v41/public-thumbnail.mjs는 공개 썸네일 판정 한 벌 — 설치 파일에 있어야 한다');
   assert.ok(singleFiles.includes('public/v41/youtube-id.mjs'), 'public/v41/youtube-id.mjs는 YouTube 표지 URL 판정 한 벌 — 설치 파일에 있어야 한다');
 
   const dir = await mkdtemp(join(tmpdir(), 'lovetree-install-graph-'));

@@ -58,7 +58,7 @@ export function createAuth(deps) {
     $('account-avatar').hidden = true;
     closeAccountMenu();
     // #368: 안내 줄은 설정 창 상태 줄·토스트(notify)가 한 벌로 맡는다.
-    notify('로그인 확인이 필요해요. 다시 로그인해 주세요.');
+    notify('로그인이 풀렸어요. 다시 로그인해 주세요.');
   }
   function authRequired() {
     if (!getMember()?.snapshot().owned) return Promise.resolve();

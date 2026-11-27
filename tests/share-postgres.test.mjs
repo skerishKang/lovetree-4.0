@@ -1,7 +1,9 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {applySchema,createPool} from '../server/db/postgres.js';
+import {applySchema,createPool,createWorkspaceRepo} from '../server/db/postgres.js';
 import {createShareRepo} from '../server/db/shares-postgres.js';
+import {createShareService,createShareHandler} from '../server/share-service.js';
 import {assertIsolatedTestDatabase} from '../server/testing/isolated-test-database.js';
+import {ApiError} from '../server/errors.js';
 const DATABASE_URL=process.env.LOVETREE_TEST_DATABASE_URL??'';
 const skip=DATABASE_URL?false:'격리된 PostgreSQL 테스트 DB가 없습니다(LOVETREE_TEST_DATABASE_URL 설정 필요). 이 파일의 검증은 미수행입니다.';
 const suffix=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,9);
@@ -41,4 +43,20 @@ test('#1046: 저장 뒤 동기화가 취소한 자동 공유 행을 되살리지
     assert.equal((await repo.load({productId,shareId:fresh.shareId})).status,'active');
     assert.equal((await repo.load({productId,shareId:auto.shareId})).status,'revoked','옛 주소는 그대로 막힌다');
   }finally{await pool.end();}
+});
+
+test('#1549 공유 만들기·소개 스위치 미로그인 판정은 Postgres에서도 같다',{skip},async()=>{
+ assertIsolatedTestDatabase(DATABASE_URL);const pool=await createPool(DATABASE_URL,{max:3});
+ try{
+  await applySchema(pool);const productId='lt-'+suffix();
+  const service=createShareService({shareRepo:createShareRepo(pool),workspaceRepo:createWorkspaceRepo(pool),productId});
+  const handle=createShareHandler({service,productId,authenticate:async()=>{throw new ApiError(401,'unauthenticated','로그인이 필요해요.');}});
+  const call=(method,path)=>handle({method,path,headers:{}});
+  const created=await call('POST','/api/shares');
+  assert.equal(created.status,401);assert.equal(created.body.error.code,'unauthenticated');
+  for(const method of ['PUT','DELETE']){
+   const switched=await call(method,'/api/shares/'+'s'.repeat(24)+'/discovery');
+   assert.equal(switched.status,401);assert.equal(switched.body.error.code,'unauthenticated');
+  }
+ }finally{await pool.end();}
 });

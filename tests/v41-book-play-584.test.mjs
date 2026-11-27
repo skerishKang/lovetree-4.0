@@ -823,7 +823,7 @@ test('1001b 실행: 책 순간 변경(고치기·연결·해제·이전 순간·
     assert.equal(afterLinks.doc, 'alive', '연결·해제·이전 순간 뒤에도 같은 문서다');
     assert.ok(afterLinks.msg >= 4, '각 변경의 알림이 도착한다');
     // ③ 삭제: 고른 순간이 사라지면 선택은 이어지는 순간으로 폴백하고 화면은 다시 뜨지 않는다.
-    await openEditor(m2); await page.click('#delete-moment'); await waitPut(8); await page.waitForTimeout(1800);
+    await openEditor(m2); await page.click('#delete-moment'); await page.waitForSelector('#lt-confirm[open]', { timeout: 10000 }); await page.click('#lt-confirm-ok'); await waitPut(8); await page.waitForTimeout(1800);
     const afterDelete = await frame.evaluate(() => ({ doc: window.__doc1001b, sel: LTDEMO.get(), count: LTDEMO.moments.length }));
     assert.equal(afterDelete.doc, 'alive', '삭제 뒤에도 같은 문서다');
     assert.equal(afterDelete.count, 3, '순간이 하나 줄어든다');

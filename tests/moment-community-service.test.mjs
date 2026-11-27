@@ -74,6 +74,16 @@ test('트리와 순간이 둘 다 공개일 때만 순간 ♡·댓글을 남길 
  assert.equal(stats.status,200);assert.equal(stats.body.hearts,1);
 });
 
+test('순간 통계 응답은 허용 목록만 내린다',async()=>{
+ const {handle,tree,communityRepo}=await setup();
+ communityRepo.momentStats=async()=>({hearts:1,aiHearts:0,comments:2,hearted:true,futureStat:'future-moment-stat'});
+ const read=await call(handle,'GET',momentPath(tree.moments[0].id));
+ assert.deepEqual(Object.keys(read.body).sort(),['aiHearts','comments','hearted','hearts']);
+ const reaction=await call(handle,'PUT',reactionPath(tree.moments[0].id),{account:'bob'});
+ assert.deepEqual(Object.keys(reaction.body).sort(),['aiHearts','comments','hearted','hearts']);
+ assert.equal(JSON.stringify(reaction.body).includes('future'),false);
+});
+
 test('같은 요청 두 번은 한 건만 — 댓글은 idempotency 키로, 반응은 한 칸으로',async()=>{
  const {handle,tree,communityRepo}=await setup();
  const own=tree.moments[0].id,second=tree.moments[1].id;

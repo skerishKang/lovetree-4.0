@@ -50,7 +50,7 @@ function harness({ owned = true, writable = true, source = 'server', busy = fals
 
   const saved = {
     document: globalThis.document, window: globalThis.window,
-    FormData: globalThis.FormData, LTMedia: globalThis.LTMedia, confirm: globalThis.confirm, location: globalThis.location
+    FormData: globalThis.FormData, LTMedia: globalThis.LTMedia, confirm: globalThis.confirm, LT41Confirm: globalThis.LT41Confirm, location: globalThis.location
   };
   const LT41 = tree ? { tree, momentId: tree.moments[0]?.id, trees: [tree] } : null;
   globalThis.window = { LT41 };
@@ -62,6 +62,7 @@ function harness({ owned = true, writable = true, source = 'server', busy = fals
   };
   globalThis.LTMedia = { describe: url => ({ kind: url ? 'photo' : 'none', label: url ? '사진' : '' }), markup: () => '' };
   globalThis.confirm = () => true;
+  globalThis.LT41Confirm = {ask: async () => true};
 
   const member = { snapshot: () => ({ owned, writable, dirty: false, subject: 'sub_test0001' }), apply: (...args) => { calls.push(args); return applyImpl ? applyImpl(...args) : {}; }, dispose() {} };
   const uploads = { busy, resets: 0, reset() { this.resets += 1; } };
@@ -89,6 +90,7 @@ function harness({ owned = true, writable = true, source = 'server', busy = fals
     globalThis.FormData = saved.FormData;
     globalThis.LTMedia = saved.LTMedia;
     globalThis.confirm = saved.confirm;
+    globalThis.LT41Confirm = saved.LT41Confirm;
     globalThis.location = saved.location;
   };
   return {
@@ -249,7 +251,7 @@ test('이전 순간·이유 변경도 저장하기 한 번에 함께 저장한�
   } finally { h.restore(); }
 });
 
-test('책 정보 관리는 값·기준값·저장·삭제를 그대로 쓴다', () => {
+test('책 정보 관리는 값·기준값·저장·삭제를 그대로 쓴다', async () => {
   const h = harness({ tree: sampleTree() });
   try {
     h.panels.openTreeManager();
@@ -262,7 +264,7 @@ test('책 정보 관리는 값·기준값·저장·삭제를 그대로 쓴다', 
     h.els['tree-form'].onsubmit({ preventDefault() {}, target: h.els['tree-form'] });
     assert.equal(h.calls[0][0], 'editTree');
     assert.equal(h.calls[0][1].title, '새 이름');
-    h.els['tree-delete'].onclick();
+    await h.els['tree-delete'].onclick();
     assert.equal(h.calls[1][0], 'deleteTree');
   } finally { h.restore(); }
 });

@@ -1,4 +1,4 @@
-// 공통 앱 안 확인 창 — 브라우저 기본 confirm() 대신 창 모양 통일(#1109)의 부품을 쓴다.
+// 공통 앱 안 확인 창 — 브라우저 기본 확인 창 대신 창 모양 통일(#1109)의 부품을 쓴다.
 // 일반 스크립트와 모듈이 같은 함수를 쓰게 전역에 등록한다. 취소가 기본 초점이다.
 (function () {
   let dialog = null;
@@ -38,6 +38,10 @@
     };
     cancel.addEventListener('click', () => settle(false));
     ok.addEventListener('click', () => settle(true));
+    dialog.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') { event.preventDefault(); settle(true); }
+      if (event.key === 'Escape') event.stopPropagation();
+    });
     dialog.addEventListener('cancel', (event) => { event.preventDefault(); settle(false); });
     dialog.addEventListener('click', (event) => { if (event.target === dialog) settle(false); });
     return dialog;

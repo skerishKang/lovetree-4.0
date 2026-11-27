@@ -39,10 +39,20 @@ export function createLocation(deps) {
     }
   }
 
+  function treeDetailOpen() {
+    if (getCurrent() !== 'track61-tree.html') return false;
+    try {
+      return !!$('view')?.contentDocument?.querySelector('#treeDetail[open]');
+    } catch {
+      return false;
+    }
+  }
+
   function locationState() {
-    return getCurrent() === 'track58-pinboard.html'
-      ? { lt58Board: true, lt41BoardDetail: boardDetailOpen() }
-      : null;
+    if (getCurrent() === 'track58-pinboard.html') return { lt58Board: true, lt41BoardDetail: boardDetailOpen() };
+    // #1525: 보드와 같은 셸 기록 방식을 쓴다. 새로고침·주소 재열기 때 프레임의 ?open=으로 이어진다.
+    if (getCurrent() === 'track61-tree.html') return { lt41Tree: true, lt41TreeDetail: treeDetailOpen() };
+    return null;
   }
 
   function boardScroll() {
@@ -73,13 +83,14 @@ export function createLocation(deps) {
 
   function writeLocation(mode = 'push', boardState = null) {
     const position = ownerPosition();
+    const routePosition = getCurrent() === 'track61-tree.html' ? {...position, detail:treeDetailOpen()} : position;
     const owned = getSource() === 'server' && getMember()?.snapshot().owned && position;
     const shareId = getActiveShareId();
     // #1175: 공유 주소는 공유에서 보는 화면(책·보드·지도)에서만 남긴다. 첫 화면·서재 같은 다른 화면으로
     // 나가는 길이 share 주소(#share/<아이디>/home 같은 없는 경로)로 덮이면 그 주소로 다시 들어올 때마다
     // 공유 기록을 새로 읽어 '감상' 안내가 되풀이되고, 로그아웃 상태에서는 공유 상태에서 빠져나오지 못한다.
     const shareView = ['book', 'board', 'network'].includes(viewForFile(getCurrent()));
-    const hash = getSource() === 'share' && shareId && shareView ? `#share/${shareId}/${viewForFile(getCurrent())}` : owned ? ownerSelectionRoute(position) : '#' + viewForFile(getCurrent());
+    const hash = getSource() === 'share' && shareId && shareView ? `#share/${shareId}/${viewForFile(getCurrent())}` : owned ? ownerSelectionRoute(routePosition) : '#' + viewForFile(getCurrent());
     const state = locationState();
     const detailChanged = !!state?.lt41BoardDetail !== handledBoardDetail;
     if (mode === 'push' && owned && getCurrent() === 'track58-pinboard.html' && globalThis.history?.state?.lt58Board) {
@@ -127,6 +138,8 @@ export function createLocation(deps) {
     if (route.scope === 'owner') {
       if (getSource() !== 'server' || !getMember()?.snapshot().owned) { show(getCurrent(), false); void startMember(); return; }
       const saved = accountPosition(localStorage, getMember().snapshot().subject) || {}, resolved = resolveAccountPosition(deps.getModel()?.trees || [], route, saved);
+      // #1525: 주소의 detail=1을 보드의 셸 상태와 같은 방식으로 복원한다.
+      if(route.view==='tree'&&route.detail&&resolved.position.momentId===route.momentId)history.replaceState({...history.state,lt41Tree:true,lt41TreeDetail:true},'',location.hash);
       // #583 '이 순간 열기': 주소가 지도(network)의 특정 순간을 가리키고 그 순간을 실제로 찾았을 때만
       // 지도가 그 순간을 가운데 두고 열리게 한다(찾지 못했으면 시작 순간 안내만 — 가운데 뜸 없음).
       // choose()가 안에서 show()로 지도 프레임을 새로 띄우므로, 표시는 choose 전에 남긴다.

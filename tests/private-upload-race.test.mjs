@@ -83,6 +83,47 @@ test('옵션이 없으면 기존 동작 그대로: url 칸에 보관 주소를 �
  } finally {h.restore();}
 });
 
+test('보관 파일 삭제는 앱 확인 창의 취소·확인을 따른다', async () => {
+ const oldDocument=globalThis.document,oldFetch=globalThis.fetch,oldWindow=globalThis.window,oldLocation=globalThis.location,oldConfirm=globalThis.LT41Confirm;
+ class Element {
+  constructor(){this.children=[];this.listeners={};this.textContent='';this.open=false;this.hidden=false;this.disabled=false;this.attrs={};this.files=[];}
+  addEventListener(name,fn){this.listeners[name]=fn;}
+  setAttribute(name,value){this.attrs[name]=String(value);}
+  append(...nodes){this.children.push(...nodes);}
+  replaceChildren(...nodes){this.children=nodes;this.textContent='';}
+  close(){this.open=false;}
+  querySelectorAll(){return [];}
+ }
+ const slot=new Element(),assetsEl=new Element(),slotElements=new Map(),assetElements=new Map();
+ for(const key of ['[data-media-file]','[data-upload-status]','[data-stop]'])slotElements.set(key,new Element());
+ slot.querySelector=key=>slotElements.get(key);
+ for(const key of ['[data-assets]','[data-usage]','[data-refresh]','[data-assets-detail]'])assetElements.set(key,new Element());
+ assetsEl.querySelector=key=>assetElements.get(key);
+ globalThis.document={createElement:()=>new Element()};
+ globalThis.window={LTMedia:{privateAssetName:url=>String(url||'').includes('a.png')?'a.png':null}};
+ globalThis.location={origin:'https://example.test'};
+ const deletes=[];
+ globalThis.fetch=async(url,init={})=>{
+  if(init.method==='DELETE'){deletes.push(url);return Response.json({ok:true});}
+  return Response.json({subject:'user',usedBytes:1,quotaBytes:100,maxItems:200,items:[{name:'a.png',mime:'image/png',size:1,createdAt:'2026-01-01'}]});
+ };
+ const form={querySelector:key=>key==='[data-media-slot]'?slot:key==='[type=submit]'?new Element():null,elements:{url:{value:'https://example.test/api/media/a.png'}}};
+ try{
+  for(const answer of [false,true]){
+   const before=deletes.length;
+   globalThis.LT41Confirm={ask:async()=>answer};
+   const api=mountPrivateUpload({form,assets:assetsEl,getSubject:()=> 'user',getState:()=>({trees:[]}),onChange(){}});
+   api.openAssets();await new Promise(resolve=>setImmediate(resolve));
+   const card=assetElements.get('[data-assets]').children[0];card.children[0].onclick();
+   const detail=assetElements.get('[data-assets-detail]');
+   const row=detail.children.find(node=>node.className==='button-row');
+   await row.children[1].onclick();
+   assert.equal(deletes.length-before,answer?1:0);
+   assert.equal(form.elements.url.value,answer?'':'https://example.test/api/media/a.png');
+  }
+ }finally{globalThis.document=oldDocument;globalThis.fetch=oldFetch;globalThis.window=oldWindow;globalThis.location=oldLocation;globalThis.LT41Confirm=oldConfirm;}
+});
+
 test('imagesOnly는 영상 파일을 기존 형식 안내로 막는다', async () => {
  const h=uploaderHarness({onUploaded:()=>{},imagesOnly:true});
  try {

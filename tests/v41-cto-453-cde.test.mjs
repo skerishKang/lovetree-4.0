@@ -44,15 +44,17 @@ const COMMUNITY_ITEM = {
   stats: { hearts: 3, favorites: 1, hearted: false, favored: false, reactions: { heart: 3 }, mine: [] }
 };
 
-function communityHarness({ items = [], defer = false, emptyHidden = true } = {}) {
+function communityHarness({ items = [], defer = false, emptyHidden = true, confirmAnswer = true } = {}) {
   const saved = {};
-  for (const key of ['window', 'document', 'location', 'addEventListener', 'fetch']) { saved[key] = globalThis[key]; delete globalThis[key]; }
+  for (const key of ['window', 'document', 'location', 'addEventListener', 'fetch', 'LT41Confirm']) { saved[key] = globalThis[key]; delete globalThis[key]; }
   globalThis.addEventListener = () => {};
   globalThis.location = { origin: 'https://example.test', hostname: 'lovetree-4-0.pages.dev' };
   let resolveFetch = () => {};
+  const requests = [];
   globalThis.fetch = defer
-    ? () => new Promise((resolve) => { resolveFetch = resolve; })
-    : async () => ({ ok: true, status: 200, json: async () => ({ items, totalVisible: items.length, nextCursor: '' }) });
+    ? url => { requests.push(String(url)); return new Promise((resolve) => { resolveFetch = resolve; }); }
+    : async url => { requests.push(String(url)); return { ok: true, status: 200, json: async () => ({ items, totalVisible: items.length, nextCursor: '' }) }; };
+  globalThis.LT41Confirm = {ask: async () => confirmAnswer};
   globalThis.window = {};
   const els = {};
   const get = (id) => (els[id] ||= fakeElement({ id }));
@@ -73,7 +75,7 @@ function communityHarness({ items = [], defer = false, emptyHidden = true } = {}
     getDateStyle: () => 'dot'
   });
   return {
-    get, tab, button: get('community-menu'), dialog,
+    get, tab, button: get('community-menu'), dialog, requests,
     open: () => get('community-menu').onclick(),
     close: () => dialog.dispatch('close'),
     search: async () => { get('community-search-form').onsubmit({ preventDefault() {} }); await new Promise((r) => setTimeout(r, 0)); },
@@ -101,6 +103,24 @@ test('D1: 대화상자를 닫으면 빈 화면이 아닐 때만 탭의 "지금 �
       assert.equal(h.tab.dataset.wasCurrent, undefined, '기억은 닫을 때 지운다');
       assert.equal(h.tab.attrs['aria-current'], c.restored, c.name);
       assert.equal(h.button.attrs['aria-current'], 'false', '둘러보기 단추 표시도 내려놓는다');
+    } finally { h.restore(); }
+  }
+});
+
+test('#1541 둘러보기 숨기기는 앱 확인 창의 취소·확인을 따른다', async () => {
+  const find = (node, text) => node.textContent === text ? node : (node.children || []).map(child => find(child, text)).find(Boolean);
+  for (const answer of [false, true]) {
+    const h = communityHarness({items: [COMMUNITY_ITEM], confirmAnswer: answer});
+    try {
+      h.open();
+      await new Promise(resolve => setTimeout(resolve, 0));
+      const card = h.get('community-list').children.find(node => node.dataset.shareId === 's1');
+      card.onclick();
+      const block = find(h.get('community-preview'), '이 공개자의 트리 숨기기');
+      assert.ok(block);
+      await block.onclick();
+      assert.equal(h.requests.some(url => url.includes('/block')), answer);
+      assert.equal(h.get('community-list').children.some(node => node.dataset.shareId === 's1'), !answer);
     } finally { h.restore(); }
   }
 });

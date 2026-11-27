@@ -16,9 +16,10 @@ const PRODUCT='lovetree-test',principal=subjectId=>({productId:PRODUCT,subjectId
 const CLOCK='2026-11-01T00:00:00.000Z';
 const PHOTO='https://front.test/api/media/123e4567-e89b-42d3-a456-426614174000.jpg';
 function sampleTree(url=PHOTO){return createTree({subject:'윤슬',title:'첫 무대',note:'다시 보고 싶은 빛',emotion:'설렘',date:'2026-11-01',url},CLOCK);}
-async function setup({url=PHOTO,coverMode='',coverDesign='',admin=null,signupAtFor=null}={}){
+async function setup({url=PHOTO,coverMode='',coverDesign='',mediaMetadata=null,admin=null,signupAtFor=null}={}){
  const workspaceRepo=createMemoryWorkspaceRepo(),workspace=createWorkspaceService({repo:workspaceRepo,productId:PRODUCT});
  let tree=sampleTree(url);
+ if(mediaMetadata)tree={...tree,moments:tree.moments.map((moment,index)=>index===0?{...moment,mediaMetadata}:moment)};
  if(coverMode)tree=editTree(tree,{title:tree.title,subject:tree.subject,coverMomentId:tree.moments[0].id,coverDesign,coverMode});
  await workspace.write(principal('alice'),{state:{version:1,trees:[tree]},expectedRevision:0,clientKey:'seed'});
  const shareRepo=createMemoryShareRepo();let share=await shareRepo.create({productId:PRODUCT,shareId:'s'.repeat(24),subjectId:'alice',treeId:tree.id,entryMomentId:tree.moments[0].id,view:'book',momentCount:3});
@@ -128,6 +129,21 @@ test('browse cover sends an address only for moment mode — photo/design/basic 
  assert.equal((await call(photoBasic.handle,'GET','/api/community/shares')).body.items[0].cover.url,'','사진 표지 + 디자인 없음은 기본 색 표지');
 });
 
+test('비유튜브 링크 표지는 외부 이미지 호스트를 거르고 기본 그림을 사용한다',async()=>{
+ const external='https://images.example.com/articles/og.jpg';
+ const linked=await setup({url:'https://example.com/article',coverMode:'moment',mediaMetadata:{title:'기사 제목',channel:'기사 채널',thumbnail:external}});
+ const card=(await call(linked.handle,'GET','/api/community/shares')).body.items[0];
+ assert.equal(card.cover.thumbnailUrl,'','유튜브 밖 썸네일은 공개하지 않는다');
+ assert.equal((await linked.workspaceRepo.load(principal('alice'))).doc.trees[0].moments[0].mediaMetadata.thumbnail,external,'저장 원본에 썸네일은 유지된다');
+ const blocked=await setup({url:'https://example.com/article',coverMode:'moment',mediaMetadata:{title:'기사 제목',thumbnail:'javascript:alert(1)'}});
+ const blockedCard=(await call(blocked.handle,'GET','/api/community/shares')).body.items[0];
+ assert.equal(blockedCard.cover.thumbnailUrl,'');
+ const imageLink=await setup({url:'https://images.example.com/cover.jpg',coverMode:'moment'});
+ assert.equal((await call(imageLink.handle,'GET','/api/community/shares')).body.items[0].cover.thumbnailUrl,'','그림 확장자 링크라도 허용 목록 밖 주소는 거른다');
+ const plain=await setup({url:'http://example.com/article',coverMode:'moment'});
+ assert.equal((await call(plain.handle,'GET','/api/community/shares')).body.items[0].cover.thumbnailUrl,'','평문 링크 주소는 썸네일로 쓰지 않는다');
+});
+
 test('#611 3번: AI 테스터 기록은 둘러보기 카드에 aiTester 한 비트만 내린다',async()=>{
  const {handle}=await setup();
  // 보통 기록(alice)은 표지가 없고 계정 정보도 없다.
@@ -140,6 +156,25 @@ test('#611 3번: AI 테스터 기록은 둘러보기 카드에 aiTester 한 비�
  assert.equal(tester.body.items[0].aiTester,true);
  assert.equal(JSON.stringify(tester.body).includes('alice'),false);
  assert.equal(JSON.stringify(tester.body).includes('@'),false);
+});
+
+test('둘러보기 카드와 반응 응답은 통계 허용 목록만 내린다',async()=>{
+ const {handle,communityRepo}=await setup(),shareId='s'.repeat(24);
+ const summaries=communityRepo.listDiscoverableSummaries.bind(communityRepo);
+ communityRepo.listDiscoverableSummaries=async input=>{
+  const rows=await summaries(input);
+  for(const row of rows){row.stats.futureStat='future-stat-value';row.stats.reactions.future='future-reaction';row.stats.mine.push('future');}
+  return rows;
+ };
+ communityRepo.stats=async()=>({favorites:1,hearts:2,comments:3,favored:false,hearted:true,reactions:{heart:2,like:1,future:9},mine:['heart','future'],futureStat:'future-stat-value'});
+ const list=await call(handle,'GET','/api/community/shares');
+ const stats=list.body.items[0].stats;
+ assert.deepEqual(Object.keys(stats).sort(),['comments','favored','favorites','hearted','hearts','mine','reactions','weeklyFavorites']);
+ assert.deepEqual(Object.keys(stats.reactions).sort(),['angry','heart','laugh','love','sad','wow','like'].sort());
+ assert.deepEqual(stats.mine,[]);
+ const reaction=await call(handle,'PUT',`/api/community/shares/${shareId}/reaction`,{account:'bob',body:{kind:'like'}});
+ assert.deepEqual(Object.keys(reaction.body.stats).sort(),['comments','favored','favorites','hearted','hearts','mine','reactions','voted','weeklyFavorites']);
+ assert.equal(JSON.stringify(reaction.body).includes('future'),false);
 });
 
 test('favorites and reactions are authenticated, idempotent and remain outside workspace JSON',async()=>{
@@ -280,6 +315,7 @@ test('reaction kinds are allowlisted, per-kind idempotent, toggleable, and block
 
 test('report, block and moderation are separate audited data and blocked owners disappear for that member',async()=>{
  const {handle,communityRepo}=await setup(),shareId='s'.repeat(24);
+ const before=await call(handle,'GET','/api/community/shares');
  const report=await call(handle,'POST',`/api/community/shares/${shareId}/report`,{account:'bob',key:'report-key-0001',body:{reason:'확인이 필요해요'}});
  assert.equal(report.status,201);
  assert.equal((await call(handle,'GET','/api/community/admin/reports',{account:'bob'})).status,403);
@@ -289,6 +325,7 @@ test('report, block and moderation are separate audited data and blocked owners 
  assert.deepEqual((await call(handle,'GET','/api/community/shares')).body.items,[]);
  const restored=await call(handle,'PATCH',`/api/community/admin/reports/${report.body.report.id}`,{account:'admin',body:{status:'dismissed',visibility:'visible'}});
  assert.equal(restored.body.report.hidden,false);assert.equal(communityRepo.inspect().audits.length,4);
+ assert.deepEqual((await call(handle,'GET','/api/community/shares')).body.items,before.body.items,'숨김을 풀면 둘러보기 목록이 원래대로 돌아온다');
  await call(handle,'POST',`/api/community/shares/${shareId}/block`,{account:'bob'});
  const hidden=await call(handle,'GET','/api/community/shares',{account:'bob'});assert.deepEqual(hidden.body.items,[]);
  const anonymous=await call(handle,'GET','/api/community/shares');assert.equal(anonymous.body.items.length,1);
@@ -551,6 +588,14 @@ test('tag-moments: 소개가 꺼진 트리의 순간은 나오지 않는다(2026
  await data.discoverRepo.set({productId:PRODUCT,subjectId:'s2',treeId:data.shareRows.find(r=>r.subjectId==='s2').treeId,discover:true});
  const after=await tagCall(data.handle,'노래:Super Shy');
  assert.deepEqual(after.body.items.map(item=>item.title),['켠 트리 순간','끈 트리 순간'],'켜면 다른 팬 보기에 나온다');
+});
+
+test('tag-moments: 비유튜브 링크의 외부 썸네일은 공개하지 않는다',async()=>{
+ const external='https://images.example.com/articles/og.jpg';
+ const data=await tagSetup({accounts:[{subject:'link-owner',trees:[{title:'기사 트리',moments:[{title:'기사 순간',date:'2026-11-05',url:'https://example.com/article',keywords:['무대:링크'],mediaMetadata:{thumbnail:external}}]}]}]});
+ const response=await tagCall(data.handle,'무대:링크');
+ assert.equal(response.status,200);
+ assert.equal(response.body.items[0].thumbnail,'');
 });
 
 test('tag-moments: 응답은 제목·영상 주소·썸네일·무대 날짜·트리 이름·공유 링크·aiTester뿐 — 개인정보 필드가 없다',async()=>{
@@ -1026,4 +1071,49 @@ test('#1356 내 순간 API: 로그인 필수·subjectId 인자 무시·공개 �
   const ex=await call(handle,'GET',path,{account:'alice',query:'exclude=aaaa1111111'});
   assert.equal(ex.body.total,2);
   assert.ok(!ex.body.items.some(i=>i.videoId==='aaaa1111111'));
+});
+
+test('#1548 POST /api/community/shares/:id/report: 미로그인 401, 빈 이유 400', async () => {
+ const {handle} = await setup(), shareId = 's'.repeat(24), path = '/api/community/shares/' + shareId + '/report';
+ const anon = await call(handle, 'POST', path, {body: {reason: '확인이 필요해요'}, key: 'report-key-1548-01'});
+ assert.equal(anon.status, 401);
+ assert.equal(anon.body.error.code, 'unauthenticated');
+ const empty = await call(handle, 'POST', path, {account: 'bob', body: {reason: ''}, key: 'report-key-1548-02'});
+ assert.equal(empty.status, 400);
+ assert.equal(empty.body.error.code, 'report_reason_required');
+});
+
+test('#1548 GET /api/public/tag-moments: 빈 태그와 긴 태그에서 응답 모양이 유지된다', async () => {
+ const {handle} = await setup();
+ const empty = await tagCall(handle, '', undefined);
+ assert.equal(empty.status, 400);
+ assert.equal(empty.body.error.code, 'tag_invalid');
+ const long = await tagCall(handle, '노래:' + 'a'.repeat(100), undefined);
+ assert.equal(long.status, 200);
+ assert.equal(typeof long.body.tag, 'string');
+ assert.ok(long.body.tag.length <= 28);
+ assert.ok(Array.isArray(long.body.items));
+});
+
+test('#1549 공개 순간 목록: 잘못된 limit·exclude·shareId는 500 없이 빈 목록으로 처리된다',async()=>{
+ const {handle}=await setup();
+ for(const query of ['limit=abc','limit=-5','limit=999999999999999999999','exclude=,,,','shareId=bad','limit=abc&exclude=,,,&shareId=bad']){
+  const response=await call(handle,'GET','/api/public/moments',{query});
+  assert.equal(response.status,200,query);
+  assert.ok(Array.isArray(response.body.items),query);
+  assert.equal(response.body.items.length,0,query);
+  assert.equal(response.body.error,undefined,query);
+ }
+});
+
+test('#1552 공유 신고 이유 500자는 저장하고 501자는 빈 이유와 같은 400이다', async () => {
+ const {handle,communityRepo} = await setup(), shareId = 's'.repeat(24), path = '/api/community/shares/' + shareId + '/report';
+ const ok = await call(handle, 'POST', path, {account: 'bob', body: {reason: '가'.repeat(500)}, key: 'report-key-1552-ok'});
+ assert.equal(ok.status, 201);
+ assert.equal(communityRepo.inspect().reports.find(r => r.id === ok.body.report.id).reason.length, 500);
+ const empty = await call(handle, 'POST', path, {account: 'bob', body: {reason: ''}, key: 'report-key-1552-empty'});
+ const tooLong = await call(handle, 'POST', path, {account: 'bob', body: {reason: '가'.repeat(501)}, key: 'report-key-1552-long'});
+ assert.equal(empty.status, 400);
+ assert.equal(tooLong.status, 400);
+ assert.deepEqual(tooLong.body, empty.body);
 });
