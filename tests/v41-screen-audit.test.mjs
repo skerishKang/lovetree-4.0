@@ -1164,10 +1164,13 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
       assert.equal(await badge.count(), 1, '소개된 트리의 서재 카드에 표시가 하나');
       const mark = pageAsk.frameLocator('#view').locator('#shelfRail .book-card .book-cover .book-discover-mark');
       assert.equal(await mark.count(), 1, '보이는 표시는 표지 안에 하나');
-      assert.equal((await mark.first().textContent()).trim(), '둘러보기에 보임');
+      // 대표 결정 B: 넓은 표지는 '둘러보기에 보임', 한 줄이 안 들어가는 좁은 표지(390)는 '공개'+눈 아이콘. 두 줄 접기는 없다.
+      assert.equal((await mark.first().evaluate(e => e.innerText)).trim(), width === 390 ? '공개' : '둘러보기에 보임', '표시 글자');
+      if (width === 390) assert.equal(await mark.first().locator('.mark-short svg').count(), 1, '좁은 표지의 짧은 표시는 눈 아이콘을 같이 쓴다');
       assert.equal(await badge.first().getAttribute('aria-label'), (await badge.first().evaluate(e => e.closest('.book-card').querySelector('.book-cover .cover-title, .book-cover .cover-name-band')?.textContent || '')).trim() + ' 둘러보기에 보임, 공유 판 열기', '단추 읽기 이름');
-      const geo = await mark.first().evaluate(e => { const r = e.getBoundingClientRect(), c = e.closest('.book-cover').getBoundingClientRect(), b = e.closest('.book-card').querySelector('.book-discover').getBoundingClientRect(), s = getComputedStyle(e, '::after'); return { font: parseFloat(getComputedStyle(e).fontSize), lineH: parseFloat(getComputedStyle(e).lineHeight), h: e.offsetHeight, inL: r.left - c.left, inT: r.top - c.top, inR: c.right - r.right, inB: c.bottom - r.bottom, hitH: e.offsetHeight + Math.max(0, -parseFloat(s.top || '0')) + Math.max(0, -parseFloat(s.bottom || '0')), topHit: document.elementFromPoint((r.left + r.right) / 2, (r.top + r.bottom) / 2) === e, covers: b.left <= r.left + 1 && b.right >= r.right - 1 && b.top <= r.top + 16 && b.bottom >= r.bottom - 1 }; });
-      assert.ok(geo.h <= geo.lineH * 2 + 8, '표시는 아주 작다(두 줄 이하): ' + JSON.stringify(geo));
+      const geo = await mark.first().evaluate(e => { const r = e.getBoundingClientRect(), c = e.closest('.book-cover').getBoundingClientRect(), b = e.closest('.book-card').querySelector('.book-discover').getBoundingClientRect(), s = getComputedStyle(e, '::after'); return { font: parseFloat(getComputedStyle(e).fontSize), lineH: parseFloat(getComputedStyle(e).lineHeight), h: e.offsetHeight, share: r.height / c.height, inL: r.left - c.left, inT: r.top - c.top, inR: c.right - r.right, inB: c.bottom - r.bottom, hitH: e.offsetHeight + Math.max(0, -parseFloat(s.top || '0')) + Math.max(0, -parseFloat(s.bottom || '0')), topHit: document.elementFromPoint((r.left + r.right) / 2, (r.top + r.bottom) / 2) === e, covers: b.left <= r.left + 1 && b.right >= r.right - 1 && b.top <= r.top + 16 && b.bottom >= r.bottom - 1 }; });
+      assert.ok(geo.h <= geo.lineH + 6, '표시는 한 줄이다: ' + JSON.stringify(geo));
+      assert.ok(geo.share <= 0.15, '표시는 표지 높이의 15% 이하: ' + JSON.stringify(geo));
       assert.ok(geo.font >= 13, '표시 글자 13px 이상(#548 단추 기준): ' + geo.font);
       assert.ok(geo.inL >= 7 && geo.inL <= 10 && geo.inT >= 7 && geo.inT <= 10, '표시는 표지 테두리 안 왼쪽 위(안쪽 8px): ' + JSON.stringify(geo));
       assert.ok(geo.inR >= 7 && geo.inB >= 7, '표시는 표지 밖으로 걸치지 않는다(오른쪽·아래도 안쪽 8px 이상): ' + JSON.stringify(geo));

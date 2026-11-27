@@ -137,7 +137,7 @@ import { VIEWS } from './shelf-views.mjs';
           var discovered=(function(){try{return !!(parent.LT41_DISCOVER&&parent.LT41_DISCOVER[book.id]===true)}catch(e){return false}})();
           // 보이는 글자는 표지 안(테두리 안쪽 8px)에 두어 표지의 기울기·떠오름을 그대로 따르고, 마우스·손가락 누름도 이 글자가 받는다.
           // 단추 안에 단추를 둘 수 없어, 키보드·화면 읽기용 단추는 그 자리에 투명하게 겹치고 누름은 통과시킨다.
-          var discoverMark=discovered?'<span class="book-discover-mark" data-discover-share="'+esc(book.id)+'" aria-hidden="true">둘러보기에 보임</span>':'';
+          var discoverMark=discovered?'<span class="book-discover-mark" data-discover-share="'+esc(book.id)+'" aria-hidden="true"><span class="mark-full">둘러보기에 보임</span><span class="mark-short"><svg class="mark-eye" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="8" cy="8" r="2" fill="currentColor"/></svg>공개</span></span>':'';
           var discoverBadge=discovered?'<button type="button" class="book-discover" data-discover-share="'+esc(book.id)+'" aria-label="'+esc(book.name)+' 둘러보기에 보임, 공유 판 열기"></button>':'';
           return '<article class="book-card" data-book-index="'+index+'"><button type="button" data-book-id="'+esc(book.id)+'" aria-label="'+esc(book.name)+' 책 열기">'+
             '<div class="book-cover'+coverClasses(book)+'"'+(book.design?' data-cover-design="'+esc(book.design)+'"':'')+'>'+(book.coverMedia?'<img class="book-cover-media" src="'+esc(book.coverMedia)+'"'+coverFallbackAttrs(book.coverCandidates||[book.coverMedia])+' alt="" loading="lazy" referrerpolicy="no-referrer">':'')+'<span class="cover-symbol"><span>'+esc(book.symbol)+'</span></span>'+(book.coverMedia?'<span class="cover-name-band">'+esc(book.name)+'</span>':'<strong class="cover-title">'+esc(book.name)+'</strong>')+discoverMark+'</div>'+
@@ -152,6 +152,11 @@ import { VIEWS } from './shelf-views.mjs';
         $$('#shelfRail .book-card').forEach(function(card){
           var button=card.querySelector('.book-discover'),mark=card.querySelector('.book-discover-mark'),cover=card.querySelector('.book-cover');
           if(!button||!mark||!cover)return;
+          // 대표 결정 B: 한 줄 '둘러보기에 보임'이 표지 안쪽 8px에 들어가지 않는 좁은 표지에서만 '공개'+눈 아이콘으로 줄인다(두 줄 접기 없음).
+          mark.classList.remove('is-short');
+          var full=mark.querySelector('.mark-full'),cs=getComputedStyle(mark);
+          var need=(full?full.offsetWidth:0)+parseFloat(cs.paddingLeft)+parseFloat(cs.paddingRight)+parseFloat(cs.borderLeftWidth)+parseFloat(cs.borderRightWidth);
+          if(need>cover.clientWidth-16)mark.classList.add('is-short');
           var x=0,y=0,node=mark;
           while(node&&node!==card){x+=node.offsetLeft;y+=node.offsetTop;node=node.offsetParent;}
           card.style.setProperty('--discover-x',x+'px');card.style.setProperty('--discover-y',y+'px');
