@@ -1671,7 +1671,7 @@ test('#1473 알림 띠와 숫자판 겹침 0', {skip: REQUIRE952 ? false : skip9
  try{
  for(const [width,height] of [[390,844],[844,390],[1440,900]])
  for(const theme of ['night','garden']) for(const member of [false,true]){
- const h=await boot952(browser,{width,height,member,initStorage:{'lt41.theme':theme},port:4560});
+ const h=await boot952(browser,{width,height,member,initStorage:{'lt41.theme':theme},port:Number(process.env.LT_TEST_PORT)||4564});
  try{
  await h.frame.waitForFunction(()=>globalThis.__LT_ORBIT_TEST__?.canvasSettled());
  await h.page.evaluate(()=>{const c=document.getElementById('updates-card');c.hidden=false;document.getElementById('updates-card-text').textContent='\uB7EC\uBE0C\uD2B8\uB9AC\uAC00 \uC0C8\uB85C\uC6CC\uC84C\uC5B4\uC694';});
@@ -1714,6 +1714,36 @@ test('#1473 알림 띠와 숫자판 겹침 0', {skip: REQUIRE952 ? false : skip9
  console.log('NOTICE1473',JSON.stringify({width,height,theme,member,updatesTop:m.notice.t,updatesBottom:m.notice.b,updateMaxArea:0,toastMaxArea:tm.overlap,countLeft:Math.min(...m.targets.filter(x=>x.type==='count').map(x=>x.rect.l)),countRight:Math.max(0,...m.targets.filter(x=>x.type==='count').map(x=>x.rect.r))}));
 
  const dir=process.env.LT_1473_2_CAPTURE;if(dir){const {mkdirSync}=await import('node:fs');mkdirSync(dir,{recursive:true});await h.page.screenshot({path:dir+'/'+width+'-'+theme+'-'+member+'.png',animations:'disabled'});}
+ }finally{await close952(h)}
+ }
+ }finally{await browser.close()}
+});
+
+test('#1521 머리줄과 가운데 단추 일치',{skip: REQUIRE952 ? false : skip952, timeout:240000},async()=>{
+ if (skip952) assert.fail(skip952);
+ const browser=await chromium952.launch({headless:true});
+ try{
+ for(const [width,height] of [[390,844],[844,390],[1440,900]])for(const theme of ['night','garden'])for(const member of [false,true]){
+ const h=await boot952(browser,{width,height,member,initStorage:{'lt41.theme':theme},port:Number(process.env.LT_TEST_PORT)||4564});
+ try{
+ await h.frame.waitForFunction(()=>globalThis.__LT_ORBIT_TEST__?.canvasSettled());
+ await h.frame.waitForFunction(()=>document.getElementById('orbit')?.shadowRoot?.querySelector('.center .eyebrow')?.textContent?.trim());
+ const m=await h.page.evaluate(()=>{
+ const f=document.getElementById('view'),root=f.contentDocument.getElementById('orbit').shadowRoot;
+ const get=e=>{if(!e)return null;const s=e.ownerDocument.defaultView.getComputedStyle(e),r=e.getBoundingClientRect();return {visible:!!(r.width&&r.height&&s.visibility!=='hidden'),w:r.width,h:r.height,x:r.x,y:r.y,font:s.fontFamily,size:s.fontSize,weight:s.fontWeight,radius:s.borderTopLeftRadius,bg:s.backgroundColor,ink:s.color,border:s.borderTopColor,padding:s.padding,gap:s.gap,line:s.lineHeight,letter:s.letterSpacing,transform:s.transform}};
+ return {headerAdd:get(document.querySelector('#write-menu')),headerExplore:get(document.querySelector('#community-menu')),centerAdd:get(root.querySelector('.home-add-top')),centerExplore:get(root.querySelector('.actions [data-do=community]')),buttons:[...root.querySelectorAll('.actions .subtleBtn')].map(get),counts:[...root.querySelectorAll('.home-count')].map(get)};
+ });
+ const fields=['w','h','font','size','weight','radius','bg','ink','border'];
+ const tag=[width,theme,member].join('-');
+ for(const [a,b] of [[m.headerAdd,m.centerAdd],[m.headerExplore,m.centerExplore]]){
+ if(a?.visible&&b?.visible)for(const k of fields)assert.equal(a[k],b[k],tag+' '+k);
+ }
+ assert.equal(m.buttons.length,3,tag);
+ for(const b of m.buttons)assert.equal(b.h,44,tag+' height');
+ if(member)assert.equal(m.centerAdd.h,44,tag+' add height');
+ for(const c of m.counts.filter(c=>c.visible))assert.ok(m.buttons.some(b=>Math.abs(b.w-c.w)<=1&&Math.abs(b.x-c.x)<=1),tag+' count alignment');
+ console.log('MEASURE1521',tag);
+ const dir=process.env.LT_1521_CAPTURE;if(dir){const{mkdirSync,writeFileSync}=await import('node:fs');mkdirSync(dir,{recursive:true});writeFileSync(dir+'/'+width+'-'+theme+'-'+member+'.json',JSON.stringify(m));await h.page.screenshot({path:dir+'/'+width+'-'+theme+'-'+member+'.png',animations:'disabled'});}
  }finally{await close952(h)}
  }
  }finally{await browser.close()}

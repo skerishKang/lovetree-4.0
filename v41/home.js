@@ -514,9 +514,9 @@ if(hasMoments){
  ]);
  }catch{ /* 집계를 받지 못하면 해당 줄만 숨긴다. */ }finally{clearTimeout(timer);}})();
 const infoStyle=document.createElement('style');
-infoStyle.textContent=`.home-add-top{margin-top:12px;font-size:15px;pointer-events:auto}@media(max-width:650px){.home-add-top{font-size:14px}}
+infoStyle.textContent=`.home-add-top{margin-top:12px;font-size:15px;pointer-events:auto;width:122px}@media(max-width:650px){.home-add-top{font-size:14px}}
 .center .actions{gap:18px;align-items:flex-start;flex-wrap:nowrap}
-.center .actions .home-action-group{flex:1 1 0%;max-width:176px;min-width:0;display:flex;flex-direction:column;align-items:stretch;gap:4px}
+.center .actions .home-action-group{flex:1 1 0%;max-width:132px;min-width:0;display:flex;flex-direction:column;align-items:stretch;gap:4px}
 .center .actions .home-action-group .subtleBtn{flex:none;width:100%;max-width:none;box-sizing:border-box;height:44px;white-space:nowrap;overflow-wrap:normal}
 .home-count{display:block;font-size:12px;line-height:15px;min-height:32px;white-space:nowrap;color:var(--lt-muted)}
 .home-count-line{display:block;min-height:15px;line-height:15px}

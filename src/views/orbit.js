@@ -98,7 +98,7 @@ extraCSS+=`@keyframes lt-home-rise{from{opacity:0;transform:translateY(12px)}to{
 .center .lt-home-pending-indicator[hidden]{display:none}
 .lt-home-pending-orbit[hidden],.lt-home-pending-label[hidden]{display:none}
 .center[data-lt-empty-owned]>p:not(.center-note){min-height:3.6em}
-@media(max-width:650px){.center[data-lt-empty-owned] .actions{padding-bottom:46px}}
+@media(max-width:650px){.center[data-lt-empty-owned] .actions{padding-bottom:44px}}
 .lt-home-pending-orbit{width:42px;height:42px;border-radius:50%;border:1px solid var(--lt-gold-line);display:grid;place-items:center;box-shadow:0 0 28px var(--lt-gold-glow);animation:lt-home-wait-pulse 2.8s ease-in-out infinite}
 .lt-home-pending-orbit:before{content:'';width:8px;height:8px;border-radius:50%;background:var(--lt-gold-deep);box-shadow:0 0 14px var(--lt-gold-glow)}
 .lt-home-pending-label{font-size:12px;letter-spacing:.06em;white-space:nowrap}
