@@ -229,10 +229,10 @@ test('#942 첫 화면 추가 단추와 숫자 묶음', { skip: REQUIRE ? false :
         check(JSON.stringify(buttons.map(b=>b.text))===JSON.stringify(member?['순간 목록','둘러보기','서재']:['＋ 첫 순간 추가','둘러보기','어떻게 쓰나요']),key+' 가운데 순서');
         const light=theme==='night'?'rgb(238, 233, 224)':'rgb(255, 253, 248)';
         check(member?buttons[0]?.bg===light:buttons[0]?.bg===rose,key+' 첫 단추의 기존 색 '+JSON.stringify(buttons[0]));
-        check(buttons[2]?.bg===light&&buttons[2].border!=='0px',key+' 셋째 밝은 단추 '+JSON.stringify(buttons[2]));
+        check(member?(buttons[2]?.bg===light&&buttons[2].border!=='0px'):(buttons[2]?.bg==='rgba(0, 0, 0, 0)'&&buttons[2].borderColor==='rgba(0, 0, 0, 0)'&&pairContrast(buttons[2].ink,stageBg)>=4.5),key+' 셋째 밝은 단추 '+JSON.stringify(buttons[2]));
         const explore=buttons[1];
         check(explore.bg==='rgba(0, 0, 0, 0)'&&explore.border==='1px'&&explore.borderStyle==='solid'&&explore.radius>=22&&explore.icon&&explore.ink!==rose,key+' 둘러보기 투명·테두리·선 나침반 '+JSON.stringify(explore));
-        check(!buttons[0].icon&&!buttons[2].icon&&explore.bg!==buttons[0].bg&&explore.bg!==buttons[2].bg,key+' 둘러보기만 다른 모양');
+        check(!buttons[0].icon&&!buttons[2].icon&&explore.bg!==buttons[0].bg&&(member?explore.bg!==buttons[2].bg:explore.borderColor!==buttons[2].borderColor),key+' 둘러보기만 다른 모양');
         // #1350: 둘러보기 글자 대비는 기존 접근성 기준(4.5:1)을 지킨다.
         const ec=pairContrast(explore.ink,stageBg);
         check(ec>=4.5,key+' 둘러보기 글자 대비 '+JSON.stringify({ink:explore.ink,stage:stageBg,contrast:Math.round(ec*100)/100}));
