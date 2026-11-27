@@ -96,7 +96,7 @@ test('#1175 ③ 창이 열려 있어도 알림은 머리글 아래에 둔다 —
 
 test('#1175 ③ 로그아웃 상태 시작의 저장 연결 확인(401)은 진입 알림을 띄우지 않는다', () => {
   // 로그인한 상태에서 세션이 만료된 뒤에만('in' 표시가 있을 때) 알림을 띄운다.
-  assert.match(memberRuntime, /status\.phase\s*===\s*'login'\s*&&\s*!\s*status\.dirty\s*&&\s*document\.body\.dataset\.member\s*===\s*'in'\s*\)\s*\(\s*0\s*,\s*ctx\.notify\s*\)\s*\(\s*'로그인이 필요해요\.'/);
+  assert.match(memberRuntime, /status\.phase\s*===\s*'login'\s*&&\s*!\s*status\.dirty\s*&&\s*document\.body\.dataset\.member\s*===\s*'in'\s*\)\s*\(\s*0\s*,\s*ctx\.notify\s*\)\s*\(\s*'로그인이 풀렸어요\. 다시 로그인해 주세요\.'/);
 });
 
 test('#1175 ① 공유에서 첫 화면으로 나갈 때 감상 알림을 지우고 방문자 기록으로 돌아간다', async () => {

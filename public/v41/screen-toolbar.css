@@ -273,3 +273,8 @@ html[data-v41-screen=board] .lt-screen-toolbar .lt-toolbar-tools #boardBgBtn{wid
 .lt-screen-toolbar .lt-toolbar-tools :is(.view-toggle,.shelf-view-inline,.boardModeSwitch,.view-switch){overflow:clip;overflow-clip-margin:9px}
 /* #1489(#1497 1번): 넓은 화면에서도 도구 줄 트리 고르기 칸에 최대 폭(420px — 스물두 글자 이름이 안 잘리는 #885 기준을 넘지 않게)을 두고 긴 이름은 줄임표로 끝낸다. */
 @media(min-width:601px){.lt-toolbar-tree-choice{max-width:min(420px,calc(100vw - 200px))}}
+
+/* #1525: 보이는 도구 단추는 36px로 두고 누름 폭만 44px로 넓힌다. */
+html[data-v41-screen=tree] .lt-toolbar-tools :is(#zoomOut,#zoomIn)::before{left:50%;right:auto;width:44px;transform:translateX(-50%)}
+html[data-v41-screen=tree] .lt-toolbar-tools :is(#zoomOut,#zoomIn):is(:hover,:focus-visible){background:var(--lt-role-hover-bg);border-color:var(--lt-role-hover-border)}
+html[data-v41-screen=tree] .lt-toolbar-tools button:focus-visible{outline:2px solid var(--lt-gold);outline-offset:2px}

@@ -122,7 +122,7 @@ export function createMemberRuntime(ctx){
     // 아직 소개 안 함). 화면을 막지 않고 트리마다 한 번만 남긴다. 떠 있던 첫 공개 안내(#538)는 공유 판 설명으로 옮겨 띄우지 않는다.
     if(status.writable)void ctx.offerDiscover?.(newlyPublishedTrees(null,(0,ctx.countTreeMoments)()).map(row=>row.treeId));
    }
-   else if(status.phase==='login'&&!status.dirty&&document.body.dataset.member==='in')(0,ctx.notify)('로그인이 필요해요.');/* #1175: 로그아웃 상태로 시작할 때(저장 연결 확인 401)는 진입만으로 알림을 띄우지 않는다 — 머리글의 로그인 단추가 이미 길을 알린다. */
+   else if(status.phase==='login'&&!status.dirty&&document.body.dataset.member==='in')(0,ctx.notify)('로그인이 풀렸어요. 다시 로그인해 주세요.');/* #1175: 로그아웃 상태로 시작할 때(저장 연결 확인 401)는 진입만으로 알림을 띄우지 않는다 — 머리글의 로그인 단추가 이미 길을 알린다. */
    else if(!status.dirty&&status.phase==='offline')(0,ctx.notify)(status.detail||'내 기록을 불러오지 못했어요.');
    (0,ctx.$)('write-menu').textContent=status.dirty?'저장 안 됨' :'＋ 순간 추가';
    // #1487: 로그인 확인을 기다리던 안쪽 화면은 확인이 끝난 이 순간에 빈 상태를 그린다(손님·읽기 실패).
