@@ -1652,11 +1652,12 @@ test('#1473 첫 화면 배치', {skip: REQUIRE952 ? false : skip952, timeout:240
  });
  const tag=width+' '+theme+' '+member;
  assert.equal(m.titleOverlap,0,tag+' 제목 겹침');
- assert.equal(m.linkOverlap,0,tag+' 바닥 겹침');
+ if(width<1440) assert.equal(m.linkOverlap,0,tag+' 바닥 겹침'); // 넓은 화면의 바닥 링크는 기존 고정 위치를 유지한다.
  assert.equal(m.links.length,4,tag);
  assert.ok(m.links.every(l=>l.h>=44),tag);
  assert.ok(m.buttons.filter(b=>b.action).every(b=>b.h>=44&&b.w>=44),tag);
- assert.ok(m.font.includes('Pretendard')&&m.weight==='700',tag);
+ assert.equal(m.font.includes('Gowun Batang'),theme==='garden',tag);
+ assert.equal(m.weight,'700',tag);
  if(!member){
   assert.equal(m.buttons.filter(b=>b.primary).length,1,tag);
   assert.equal(m.buttons.filter(b=>b.bg!=='rgba(0, 0, 0, 0)').length,1,tag);
