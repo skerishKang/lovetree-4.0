@@ -55,3 +55,39 @@ test('방문 저장소 실제 DB 동시 집계·만료·공개 경계·칼럼', 
     await pool.end();
   }
 });
+
+
+test('같은 공유의 50명 동시 방문, 중복, 만료 후 재방문 및 자정 경계 역순 집계', {skip: !url}, async()=>{
+  assertIsolatedTestDatabase(url);
+  const pool=await createPool(url,{max:10});
+  const productId='visit-concurrent-'+randomBytes(8).toString('hex');
+  const shareId=randomBytes(18).toString('base64url'), subjectId='owner', treeId='tree';
+  const scope={productId,shareId};
+  try {
+    await applySchema(pool);
+    const shareRepo=createShareRepo(pool),repo=createShareVisitsRepo(pool),visibilityRepo=createTreeVisibilityRepo(pool);
+    const row=await shareRepo.create({...scope,subjectId,treeId,entryMomentId:'moment',view:'book'});
+    let at=Date.parse('2026-11-27T23:55:00Z');
+    const service=createShareVisitsService({repo,shareRepo,visibilityRepo,productId,secret:randomBytes(32).toString('hex'),now:()=>at});
+    const visitors=Array.from({length:50},(_,i)=>({trusted:true,authKnown:true,clientIp:'192.0.2.'+(i+1)}));
+    const before=visitors.map(v=>service.prepare(row,v));
+    at+=10*60*1000;
+    const after=visitors.map(v=>service.prepare(row,v));
+    await Promise.all(after.map(run=>run()));
+    await Promise.all(before.map(run=>run()));
+    assert.equal(await repo.count(scope),50);
+    // 만료 행을 아직 정리하지 않아도 같은 해시의 동시 재방문은 한 번만 더 센다.
+    at+=VISIT_WINDOW_MS;
+    const repeated=visitors.flatMap(v=>[service.prepare(row,v),service.prepare(row,v)]);
+    await Promise.all(repeated.map(run=>run()));
+    assert.equal(await repo.count(scope),100);
+    const deferred=service.prepare(row,{trusted:true,authKnown:true,clientIp:'192.0.2.200'});
+    await visibilityRepo.set({productId,subjectId,treeId,visibility:'private'});
+    assert.equal(await deferred(),0);
+    assert.equal(await repo.count(scope),100);
+  } finally {
+    await pool.query('DELETE FROM lovetree_tree_visibility WHERE product_id=$1',[productId]);
+    await pool.query('DELETE FROM lovetree_shares WHERE product_id=$1',[productId]);
+    await pool.end();
+  }
+});

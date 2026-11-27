@@ -6,6 +6,9 @@ export function createMemoryTreeVisibilityRepo() {
     async get({ productId, subjectId, treeId }) {
       return privateKeys.has(key(productId, subjectId, treeId)) ? { visibility: 'private', updatedAt: null } : { visibility: 'public', updatedAt: null };
     },
+    async privateTreeIds({ productId, subjectId, treeIds }) {
+      return new Set(treeIds.filter(treeId => privateKeys.has(key(productId, subjectId, treeId))));
+    },
     async set({ productId, subjectId, treeId, visibility }) {
       const k = key(productId, subjectId, treeId);
       if (visibility === 'private') privateKeys.add(k); else privateKeys.delete(k);
