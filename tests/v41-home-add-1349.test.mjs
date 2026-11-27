@@ -288,3 +288,76 @@ test('#1514 궤도·첫 화면·책·지도·그래프 조작의 실제 누름 �
   await new Promise(resolve=>server.close(resolve));
  }
 });
+
+function titleFixture(){
+ let tree=createTree({subject:'제목 시험',title:'내 첫 제목',note:'',emotion:'설렘',date:'2026-11-10',url:'https://youtu.be/AbC123xyZ_0',mediaMetadata:{title:'영상 제목',channel:'채널'}},'2026-11-10T00:00:00Z');
+ tree.moments[0].mediaMetadata={title:'영상 제목',channel:'채널',source:'youtu.be'};
+ tree=addMoment(tree,{title:'내 둘째 제목',note:'',emotion:'위로',date:'2026-11-11',url:'https://youtu.be/AbC123xyZ_0',mediaMetadata:{title:'둘째 영상 제목'}},tree.moments[0].id,'2026-11-11T00:00:00Z');
+ tree.moments[1].mediaMetadata={title:'둘째 영상 제목',channel:'채널',source:'youtu.be'};
+ tree.edges=[{kind:'parent',from:tree.moments[0].id,to:tree.moments[1].id,reason:''}];
+ return tree;
+}
+function titleHost(path,tree,id){
+ return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>제목 시험</title></head><body data-member="in" data-tree-count="1"><script>window.LT41={source:'server',writable:true,owned:true,momentId:'${id}',prefs:{titleDisplay:'both',dateStyle:'dot'},tree:${JSON.stringify(tree)},trees:[${JSON.stringify(tree)}]};</script><iframe id="screen" src="${path}" style="position:fixed;inset:0;width:100vw;height:100vh;border:0"></iframe></body></html>`;
+}
+
+test('#1540 첫 화면 상세·지도·트리·그래프가 제목 표시 설정을 즉시 반영하고 저장 제목은 바꾸지 않는다',{
+ skip:!REQUIRED?'화면 전용 검사로 따로 실행합니다.':false,timeout:300000
+},async()=>{
+ if(unavailable)assert.fail(unavailable);
+ const tree=titleFixture(),id=tree.moments[0].id;
+ const routes={
+  '/title-home.html':titleHost('/v41/home.html',tree,id),
+  '/title-map.html':titleHost(`/v41/views/track56-network.html?open=${encodeURIComponent(id)}`,tree,id),
+  '/title-tree.html':titleHost('/v41/views/track61-tree.html',tree,id),
+  '/title-graph.html':titleHost('/v41/views/graph/track60-graph.html',tree,id)
+ };
+ const server=await serve1514(routes),base=`http://127.0.0.1:${server.address().port}`;
+ const browser=await chromium.launch({headless:true});
+ try{
+  for(const [name,path,selector,mineTitle,videoTitle] of [
+   ['home','/title-home.html','#mediaTitleHome','내 둘째 제목','둘째 영상 제목'],
+   ['map','/title-map.html','#detailTitle','내 첫 제목','영상 제목'],
+   ['tree','/title-tree.html','#treeDetailTitle','내 첫 제목','영상 제목'],
+   ['graph','/title-graph.html','#detailCard h2','내 첫 제목','영상 제목']
+  ]){
+   const ctx=await browser.newContext({viewport:{width:1440,height:900},reducedMotion:'reduce'});
+   await ctx.addInitScript(()=>{try{localStorage.setItem('lt41.theme','night')}catch{}});
+   const page=await ctx.newPage(),errors=[];page.on('pageerror',e=>errors.push(String(e.message||e)));
+   await page.goto(base+path,{waitUntil:'load'});
+   let frame=page.frameLocator('#screen');
+   let live=await page.locator('#screen').elementHandle().then(h=>h.asElement().contentFrame());
+   if(name==='home'){
+    await live.waitForFunction(()=>!!document.getElementById('orbit')?.shadowRoot?.querySelector('.recent-open'),null,{timeout:15000});
+    await frame.locator('.recent-open').evaluate(el=>el.click());
+   }else if(name==='tree'){
+    await frame.locator('.ts-card').first().click();
+   }else if(name==='graph'){
+    await frame.locator('#gsvg g[data-moment]').first().evaluate(el=>el.dispatchEvent(new MouseEvent('click',{bubbles:true})));
+   }else{
+    await live.waitForFunction(()=>document.getElementById('detail')?.classList.contains('open'),null,{timeout:15000});
+   }
+   await frame.locator(selector).filter({hasText:mineTitle}).waitFor({timeout:15000});
+   for(const [setting,expected] of [['video',videoTitle],['mine',mineTitle],['both',mineTitle]]){
+    await page.evaluate(value=>{window.LT41.prefs={...window.LT41.prefs,titleDisplay:value}},setting);
+    const child=await page.locator('#screen').elementHandle();
+    const current=await child.asElement().contentFrame();
+    await current.evaluate(value=>{try{localStorage.setItem('lt41.titleDisplay',value)}catch{}},setting);
+    if(name==='home')await current.evaluate(value=>postMessage({type:'lt41-title-display',value},location.origin),setting);
+    else await page.evaluate(value=>document.getElementById('screen').contentWindow.postMessage({type:'lt41-title-display',value},location.origin),setting);
+    if(name==='home'){
+     await current.waitForFunction(()=>!window.__titleMarker||window.__titleMarker!==location.href,null,{timeout:15000}).catch(()=>{});
+     live=await child.asElement().contentFrame();
+     await live.waitForFunction(()=>!!document.getElementById('orbit')?.shadowRoot?.querySelector('.recent-open'),null,{timeout:15000});
+     await live.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+     await live.locator('.recent-open').evaluate(el=>el.click());
+     frame=page.frameLocator('#screen');
+    }else live=current;
+    await frame.locator(selector).filter({hasText:expected}).waitFor({timeout:15000});
+   }
+   assert.equal(await page.evaluate(()=>window.LT41.tree.moments[0].title),'내 첫 제목','저장된 제목은 그대로다');
+   assert.deepEqual(errors,[],`${name}: 화면 오류 없음`);
+   await ctx.close();
+  }
+ }finally{await browser.close();await new Promise(r=>server.close(r));}
+});

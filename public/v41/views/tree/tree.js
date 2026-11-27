@@ -3,7 +3,7 @@ import { buildHierarchy, layoutTree, branchWidth, edgeWidths, branchRibbon, bran
 import { thumbnailCandidates, nextThumbnailStep } from '/v41/thumb-fallback.mjs';
 import { mountScreenToolbar } from '/v41/screen-toolbar.mjs';
 import { MSG, isShellMessage } from '/v41/frame-messages.mjs';
-import {formatDisplayDate} from '/v41/book-usability.mjs';
+import {formatDisplayDate,titleView,readTitleDisplay,normalizeTitleDisplay} from '/v41/book-usability.mjs';
 import {localDateOnly} from '/v41/local-date.mjs';
 
 const scriptStart = performance.now();
@@ -78,6 +78,9 @@ const svg = (tag, cls, attrs) => { const e = document.createElementNS(SVG, tag);
 let dateStyle='dot';
 try{const value=document.documentElement.getAttribute('data-lt-date-style')||localStorage.getItem('lt41.dateStyle');dateStyle=value==='dash'||value==='long'?value:'dot'}catch{}
 const dateText = (m) => formatDisplayDate(m.date||(m.createdAt?localDateOnly(m.createdAt):''),dateStyle);
+const readTitleSetting=()=>{try{return readTitleDisplay(parent.LT41?.prefs?parent.LT41:{titleDisplay:localStorage.getItem('lt41.titleDisplay')})}catch{return 'both'}};
+let titleDisplay=readTitleSetting();
+const titleMain=(m)=>titleView(m,titleDisplay).main||m.title||'제목 없음';
 
 function sizeOf(item) {
   const s = state.sizes;
@@ -125,10 +128,10 @@ function drawCards(layout) {
       const meta = el('span', 'ts-meta');
       // 카드 폭에 늘 들어가도록 감정은 색 점으로만, 낱말은 고른 순간 안내와 풍선말·읽어 주는 이름에 둔다.
       meta.append(el('i', 'ts-emo'), document.createTextNode(dateText(m)));
-      node.title = `${dateText(m)} · ${m.emotion} · ${m.title || '제목 없음'}`;
-      cap.append(meta, el('span', 'ts-title', m.title || '제목 없음'));
+      node.title = `${dateText(m)} · ${m.emotion} · ${titleMain(m)}`;
+      cap.append(meta, el('span', 'ts-title', titleMain(m)));
       node.append(cap);
-      node.setAttribute('aria-label', `${c.root ? '첫 순간' : '뿌리에서 ' + (c.depth + 1) + '번째'} · ${dateText(m)} · ${m.emotion} · ${m.title || '제목 없음'}`);
+      node.setAttribute('aria-label', `${c.root ? '첫 순간' : '뿌리에서 ' + (c.depth + 1) + '번째'} · ${dateText(m)} · ${m.emotion} · ${titleMain(m)}`);
     } else if (c.kind === 'bundle') {
       node = el('button', 'ts-chip', `+${c.count}개`);
       node.setAttribute('aria-label', `접힌 갈림 ${c.count}개 펼치기 (순간 ${c.size}개)`);
@@ -384,7 +387,7 @@ function openDetail(id){
  const m=data.moments.find(m=>m.id===id);if(!m)return;
  // #1333: 고른 순간을 셸의 현재 순간으로 넘긴다. #1295 기록 중복을 피하려고 '기록하지 않음'을 함께 보낸다.
  if(typeof data.select==='function')data.select(id,{noHistory:true});
- $('treeDetailTitle').textContent=m.title||'제목 없음';
+ $('treeDetailTitle').textContent=titleMain(m);
  $('treeDetailNote').textContent=[dateText(m),m.emotion,m.memo].filter(Boolean).join(' · ');
  const host=$('treeDetailMedia');host.replaceChildren();
  const src=thumbnailCandidates(m,{autoLoad:data.source==='server'})[0];
@@ -416,6 +419,13 @@ addEventListener('message',e=>{
  if(e.data.type===MSG.dateStyle){
   dateStyle=e.data.value==='dash'||e.data.value==='long'?e.data.value:'dot';
   try{document.documentElement.setAttribute('data-lt-date-style',dateStyle)}catch{}
+  if(state.root)draw();
+  if(detail.open&&state.pick)openDetail(state.pick);
+  return;
+ }
+ if(e.data.type===MSG.titleDisplay){
+  titleDisplay=normalizeTitleDisplay(e.data.value);
+  try{localStorage.setItem('lt41.titleDisplay',titleDisplay)}catch{}
   if(state.root)draw();
   if(detail.open&&state.pick)openDetail(state.pick);
   return;

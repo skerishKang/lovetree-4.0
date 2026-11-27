@@ -163,6 +163,10 @@ export function createNodeHandler(requestHandler, { maxBodyBytes = DEFAULT_MAX_B
     const result = await requestHandler({ method: req.method, path, query, headers: req.headers, body: media ? '' : bytes.toString('utf8'), ...(media || path === OPS_INGEST_PATH ? { rawBody: bytes, bodyTooLarge: size > limit } : {}) });
     if (res.destroyed) return;
     res.writeHead(result.status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', ...(result.headers ?? {}) });
+    // 요청별 뒤처리는 200과 304 모두 응답을 내보낸 뒤 실행한다.
+    if (typeof result.afterResponse === 'function') {
+      res.once('finish', () => { void Promise.resolve().then(result.afterResponse).catch(() => console.warn('[lovetree-http] 응답 뒤 작업 실패')); });
+    }
     res.end(result.binary ?? JSON.stringify(result.body));
     // 응답은 이미 나갔다 — 뒤처리는 요청을 막지 않는다.
     if (typeof afterResponse === 'function') void Promise.resolve().then(afterResponse).catch(() => {});

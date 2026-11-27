@@ -55,7 +55,6 @@ dialog.community-group-find::backdrop{background:transparent}
 .community-stages{max-width:1500px;margin:10px auto 4px;min-width:0}
 .community-stages-title{margin:0 0 6px;font-size:13px;font-weight:700;color:var(--lt-gold);letter-spacing:.02em}
 .community-stage-list{display:flex;flex-wrap:wrap;gap:6px 10px;min-width:0}
-.community-stages-empty{margin:0;color:var(--lt-muted);font-size:13px;line-height:1.6}
 .community-stage{display:inline-flex;align-items:center;gap:8px;max-width:100%;min-width:0;padding:6px 12px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-pill);background:rgba(255,230,166,.05);font-size:13px;line-height:1.4;color:var(--lt-pearl)}
 .community-stage-title{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .community-stage-count{flex:0 0 auto;color:var(--lt-muted);font-size:12px;white-space:nowrap}
@@ -117,8 +116,6 @@ dialog.community-group-find::backdrop{background:transparent}
 .moments-chip{min-height:40px;padding:0 14px;border:1px solid var(--lt-role-idle-border);border-radius:var(--lt-r-pill);background:var(--lt-role-idle-bg);color:var(--lt-role-idle-ink);font:inherit;font-size:13px;cursor:pointer}
 ".moments-chip.is-active{border-color:var(--lt-role-accent-bg);background:var(--lt-role-accent-bg);color:var(--lt-role-accent-ink)}
 /* #1356: 순간 보기 범위 칩(전체·이 트리만·내 순간) — 가수 칩과 같은 역할 색 한 벌. */
-.moments-scope-chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 2px}
-.moments-scope-chips[hidden]{display:none}
 .moments-scope-chip{min-height:44px;padding:0 13px;border:1px solid var(--lt-role-idle-border);border-radius:var(--lt-r-pill);background:var(--lt-role-idle-bg);color:var(--lt-role-idle-ink);font:inherit;font-size:13px;cursor:pointer}
 .moments-scope-chip.is-active{border-color:var(--lt-role-accent-bg);background:var(--lt-role-accent-bg);color:var(--lt-role-accent-ink)}
 .moments-scope-chip:focus-visible{outline:2px solid var(--lt-role-hover-border);outline-offset:2px}
@@ -156,7 +153,7 @@ html[data-lt-theme=garden] .moments-comments-dialog{background:var(--lt-paper);c
 /* #1098 2단계: 레일 숫자 — ♡·댓글 수(3 미만은 숫자 없음). 390에서도 아이콘 아래 숫자가 같은 자리에 온다. */
 .moments-rail-count{font-size:12px;color:var(--lt-pearl);min-height:14px}
 
-.moments-owner,.moments-owner-text,.moments-swipe-layer,.moments-player-controls,.moments-swipe-hint{display:none}
+.moments-owner,.moments-owner-text{display:none}
 
 /* #1286 휴대폰 순간 보기: 공통 색 토큰만 사용, 넓은 화면은 기존 규칙 유지. */
 @media(max-width:780px){
@@ -186,7 +183,6 @@ html[data-lt-theme=garden] .moments-comments-dialog{background:var(--lt-paper);c
  #community-moments-panel .moments-media{background:var(--lt-stage)}
  #community-moments-panel .moments-poster{object-fit:cover}
  #community-moments-panel .moments-media[data-orientation="landscape"] .moments-frame:not(.moments-next){width:100%;height:100%;transform:scale(2.2);transform-origin:center}
- #community-moments-panel .moments-swipe-layer{position:absolute;inset:0;z-index:2;touch-action:pan-x}
  /* #1340: 소리 단추가 추가되어도 아래 글자 묶음과 겹치지 않도록 줄 전체를 올린다. */
  #community-moments-panel .moments-rail{position:absolute;right:7px;bottom:calc(180px + env(safe-area-inset-bottom));z-index:5;gap:4px;padding:0}
  #community-moments-panel .moments-rail-button{
@@ -212,18 +208,11 @@ html[data-lt-theme=garden] .moments-comments-dialog{background:var(--lt-paper);c
  #community-moments-panel .moments-note[aria-expanded="true"]{display:block;max-height:40dvh;overflow-y:auto}
  #community-moments-panel .moments-tags{font-size:11px}
  #community-moments-panel .moments-progress{height:3px;z-index:8;bottom:env(safe-area-inset-bottom)}
- #community-moments-panel .moments-player-controls{position:absolute;z-index:6;right:10px;bottom:calc(12px + env(safe-area-inset-bottom))}
- #community-moments-panel .moments-swipe-hint{position:absolute;left:50%;top:46%;transform:translate(-50%,-50%);z-index:8;max-width:80%;padding:8px 12px;border-radius:var(--lt-r-pill);background:var(--lt-glass-strong);color:var(--lt-pearl);font-size:13px;pointer-events:none}
- #community-moments-panel .moments-swipe-hint[hidden]{display:none}
 }
 
-/* #1332: 음소거 재생 중 소리 켜기 알약 — 기존 테마 토큰만 쓴다. */
-#community-moments-panel .moments-sound-pill{position:absolute;z-index:7;left:50%;bottom:auto;top:62%;transform:translateX(-50%);min-height:44px;max-width:calc(100% - 32px);padding:10px 20px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-pill);background:var(--lt-glass-strong);color:var(--lt-pearl);font:inherit;font-size:14px;font-weight:600;white-space:nowrap;cursor:pointer}
-#community-moments-panel .moments-sound-pill[hidden]{display:none}
-#community-moments-panel .moments-sound-pill.is-small{padding:8px 16px;font-size:13px;font-weight:400}
 #community-moments-panel .moments-rail-button.is-muted{color:var(--lt-rose)}
 #community-moments-panel .moments-rail-button.is-sound{order:-1}
-@media(max-width:780px){#community-moments-panel .moments-player-controls,#community-moments-panel .moments-swipe-layer,#community-moments-panel .moments-owner,#community-moments-panel .moments-owner-text{display:flex}#community-moments-panel .moments-owner{display:grid}#community-moments-panel .moments-swipe-hint:not([hidden]){display:block}#community-moments-panel .moments-note[hidden]{display:none}}
+@media(max-width:780px){#community-moments-panel .moments-owner,#community-moments-panel .moments-owner-text{display:flex}#community-moments-panel .moments-owner{display:grid}#community-moments-panel .moments-note[hidden]{display:none}}
 .moments-note{padding:0;border:0;background:transparent;color:inherit;font:inherit;font-size:13px;text-align:left;line-height:1.3}
 
 /* #1286: 유튜브 시간은 모바일 기본 진행 요소로 표시하여 인라인 스타일을 만들지 않는다. */
@@ -246,11 +235,9 @@ html[data-lt-theme=garden] .moments-comments-dialog{background:var(--lt-paper);c
  #community-search-form{order:1;margin:44px 0 0;width:100%;box-sizing:border-box}
  #community-tree-panel .community-group-rail{order:2;margin:8px 0 10px}
  #community-popular-stages{order:3;margin:0}
- #community-popular-stages .community-stage-list,
- #community-popular-stages .community-stages-empty{display:none}
+ #community-popular-stages .community-stage-list{display:none}
  #community-popular-stages .community-stages-title{margin:0;font-size:12px;line-height:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
  #community-tree-panel .community-results{order:4;margin:0;width:100%;box-sizing:border-box}
- #community-tree-panel .community-policy{order:5}
  /* 그룹 찾기는 가수 단추 줄 맨 끝에 같은 모양으로 붙는다. */
  #community-panel .community-group-find{min-height:40px;padding:0 12px;font-size:13px}
 }
@@ -268,13 +255,7 @@ html[data-lt-theme=garden] .moments-comments-dialog{background:var(--lt-paper);c
 #community-panel .community-top-row .community-tabs{position:static;inset:auto;z-index:auto;display:flex;align-items:center;flex:0 0 auto;width:auto;max-width:none;height:48px;margin:0;padding:0;gap:6px;border:0;border-radius:0;background:none}
 #community-panel .community-top-row .community-tabs button{min-height:44px}
 #community-panel .community-top-row #community-search-form{position:relative;display:flex;flex:0 0 108px;align-items:center;gap:0;min-width:0;max-width:100%;height:48px;margin:0 0 0 auto;padding:0}
-#community-panel .community-top-row #community-search-form.is-expanded{flex:1 1 auto}
-#community-panel .community-search-trigger{display:inline-flex;align-items:center;justify-content:center;flex:0 0 108px;width:108px;min-width:0;height:48px;padding:0 10px;border:1px solid var(--lt-line-paper);border-radius:var(--lt-r-pill);background:var(--lt-paper);color:var(--lt-ink);font-size:13px;white-space:nowrap;cursor:pointer}
-#community-panel #community-search-form.is-expanded .community-search-trigger{flex:0 0 44px;width:44px;font-size:0}
-#community-panel #community-search-form.is-expanded .community-search-trigger::before{content:"🔍";font-size:16px}
 #community-panel .community-top-row #community-query{flex:0 0 0;width:0;min-width:0;height:48px;min-height:48px;margin:0;padding:0;border:0;opacity:0;pointer-events:none}
-#community-panel .community-top-row #community-search-form.is-expanded #community-query{flex:1 1 auto;width:auto;min-width:0;padding:0 12px;border:1px solid var(--lt-role-input-border);border-radius:var(--lt-r-pill);opacity:1;pointer-events:auto}
-#community-panel .community-top-row .community-search-submit{display:none}
 #community-panel .community-top-row .community-sort-label{position:relative;display:flex;align-items:center;justify-content:center;flex:0 0 auto;width:auto;height:48px;cursor:pointer}
 #community-panel .community-top-row .community-sort-label::before{content:"↕";display:flex;align-items:center;justify-content:center;width:44px;height:44px;border:1px solid var(--lt-role-secondary-border);border-radius:var(--lt-r-pill);background:var(--lt-role-secondary-bg);color:var(--lt-role-secondary-ink);font-size:22px;pointer-events:none}
 #community-panel .community-top-row #community-sort{position:absolute;inset:0;width:48px;min-width:0;height:48px;min-height:48px;margin:0;padding:0;opacity:0;cursor:pointer}
@@ -295,7 +276,6 @@ html[data-lt-theme=garden] .moments-comments-dialog{background:var(--lt-paper);c
  #community-panel:has(#community-tab-trees[aria-selected="true"]) .community-top-row .community-tabs{position:static;top:auto;left:auto;right:auto;width:auto;height:48px;margin:0;padding:0}
  #community-panel #community-search-form{order:initial;margin:0}
  #community-panel .community-top-row #community-search-form{margin:0 0 0 auto;flex-basis:90px}
- #community-panel .community-search-trigger{width:90px;flex-basis:90px}
  #community-panel .community-group-rail{margin-top:0}
  #community-moments-panel .moments-stage{margin-top:0}
 }
@@ -354,10 +334,6 @@ html[data-lt-theme=garden] .moments-comments-dialog{background:var(--lt-paper);c
 #community-moments-panel .moments-rail-label{display:block;color:var(--lt-muted);font-size:11px}
 #community-moments-panel .moments-nav{grid-column:4;grid-row:1;position:static;display:grid;align-self:center;gap:12px;transform:none}
 #community-moments-panel .moments-step{width:46px;height:46px}
-#community-moments-panel .moments-sound-pill,
-#community-moments-panel .moments-swipe-layer,
-#community-moments-panel .moments-swipe-hint,
-#community-moments-panel .moments-player-controls{display:none}
 #community-moments-panel .moments-progress{display:none}
 #community-moments-panel .moments-owner,#community-moments-panel .moments-owner-text{display:inline-flex}
 #community-moments-panel .moments-owner{display:grid;place-items:center;flex:none;width:32px;height:32px;border:1px solid var(--lt-line);border-radius:50%;background:var(--lt-glass)}

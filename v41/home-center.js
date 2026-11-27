@@ -4,7 +4,7 @@
 // 로그아웃의 세 자리[＋ 첫 순간 추가·둘러보기·어떻게 쓰나요]는 지금처럼 첫 버튼만 흰 강조다.
 // 로그아웃 문구는 이 화면이 쓴다(4.0 첫 화면의 말투 그대로). 로그인 상태 문구는 header-state 의 homeCenterState 와 같게 둔다.
 
-import {homeCenterState, homeStartLoginUrl, readTheme} from '../public/v41/header-state.mjs';
+import {homeCenterState} from '../public/v41/header-state.mjs';
 
 // 상태별 문구와 강조는 헤더 상태 함수 한 곳에서 정한다.
 
@@ -22,9 +22,4 @@ export function applyHomeCenter(buttons, state) {
     button.removeAttribute('title');
   });
   return plan;
-}
-
-// 로그아웃 상태의 첫 버튼: 로그인/가입으로 보내고 next는 4.1 첫 화면으로 돌아온다.
-export function homeStartTarget() {
-  return homeStartLoginUrl(readTheme(globalThis.localStorage));
 }

@@ -13,6 +13,13 @@ export function createTreeVisibilityRepo(pool) {
       const row = result.rows[0];
       return row ? { visibility: row.visibility, updatedAt: iso(row.updated_at) } : { visibility: 'public', updatedAt: null };
     },
+    async privateTreeIds({ productId, subjectId, treeIds }) {
+      if (!treeIds.length) return new Set();
+      const result = await pool.query(
+        "SELECT tree_id FROM lovetree_tree_visibility WHERE product_id=$1 AND subject_id=$2 AND tree_id=ANY($3::text[]) AND visibility='private'",
+        [productId, subjectId, treeIds]);
+      return new Set(result.rows.map(row => row.tree_id));
+    },
     async set({ productId, subjectId, treeId, visibility }) {
       if (visibility === 'private') {
         await pool.query(

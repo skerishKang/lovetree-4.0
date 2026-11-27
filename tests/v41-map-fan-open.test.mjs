@@ -208,12 +208,15 @@ test('#366 지도 화면 결과: 안내 불투명·연결 이유 툴팁·눌린 
         const on = document.getElementById('viewNet'), off = document.getElementById('viewConc');
         return {
           pressed: on.getAttribute('aria-pressed'),
-          onBg: getComputedStyle(on).backgroundColor, offBg: getComputedStyle(off).backgroundColor,
+          onBg: getComputedStyle(on).backgroundColor, offBg: getComputedStyle(off).backgroundColor, onBorder: getComputedStyle(on).borderTopColor, offBorder: getComputedStyle(off).borderTopColor, onWidth: getComputedStyle(on).borderTopWidth, onInk: getComputedStyle(on).color,
           rail: getComputedStyle(document.querySelector('.progress-rail')).display
         };
       });
       assert.equal(chrome.pressed, 'true', '그물 보기가 눌린 상태');
-      assert.notEqual(chrome.onBg, chrome.offBg, `눌린 보기 단추가 색으로 구분된다 (${chrome.onBg} / ${chrome.offBg})`);
+      assert.equal(chrome.onBg, chrome.offBg, "보기 선택은 채움 없이 표시");
+      assert.equal(chrome.onWidth, "1px");
+      assert.equal(chrome.onBorder, chrome.onInk);
+      assert.notEqual(chrome.onBorder, chrome.offBorder, "선택 테두리 구분");
       assert.equal(chrome.rail, 'none', '오른쪽 진행 막대는 숨긴다');
 
       // 누름(탭)으로 바로 고르면 그 이유를 고정(pinned)으로 띄운다 — 손을 떼고 조금 지나도 남는다.

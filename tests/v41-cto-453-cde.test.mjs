@@ -289,3 +289,48 @@ test('C3 동작: 설정 프로필은 표시 이름을 먼저 쓰고 이메일은
   }
 });
 
+
+test('#1568 공개자 숨기기: 요청 중 중복 클릭을 막고 실패 뒤 다시 활성화한다', async () => {
+  const h = communityHarness({items: [COMMUNITY_ITEM]});
+  const find = (node, text) => node.textContent === text ? node : (node.children || []).map(child => find(child, text)).find(Boolean);
+  const savedFetch = globalThis.fetch;
+  let first, second, retry;
+  const deferred = [];
+  let blockRequests = 0;
+  try {
+    h.open();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    const card = h.get('community-list').children.find(node => node.dataset.shareId === 's1');
+    assert.ok(card);
+    card.onclick();
+    const block = find(h.get('community-preview'), '이 공개자의 트리 숨기기');
+    assert.ok(block);
+    globalThis.fetch = (url, init) => {
+      if (String(url).includes('/block')) {
+        blockRequests += 1;
+        return new Promise(resolve => deferred.push(resolve));
+      }
+      return savedFetch(url, init);
+    };
+    const fail = () => ({ok: false, status: 503, json: async () => ({error: {message: '잠시 오류'}})});
+    first = block.onclick();
+    second = block.onclick();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    assert.equal(blockRequests, 1, '확인 및 요청이 진행되는 동안 한 번만 전송한다');
+    assert.equal(block.disabled, true, '요청 중 단추 비활성화');
+    for (const release of deferred.splice(0)) release(fail());
+    await Promise.all([first, second]);
+    assert.equal(block.disabled, false, '실패해도 단추가 다시 활성화된다');
+
+    retry = block.onclick();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    assert.equal(blockRequests, 2, '실패 뒤 다시 요청할 수 있다');
+    for (const release of deferred.splice(0)) release(fail());
+    await retry;
+    assert.equal(block.disabled, false);
+  } finally {
+    for (const release of deferred) release({ok: false, status: 503, json: async () => ({})});
+    await Promise.allSettled([first, second, retry].filter(Boolean));
+    h.restore();
+  }
+});
