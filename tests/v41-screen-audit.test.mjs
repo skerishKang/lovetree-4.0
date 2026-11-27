@@ -476,11 +476,13 @@ const raiseToast = async (page) => {
   const box = await page.evaluate(() => {
     const t = document.getElementById('toast');
     const r = t.getBoundingClientRect();
-    return { hidden: t.hidden, top: Math.round(r.top), bottom: Math.round(r.bottom), gap: getComputedStyle(document.documentElement).getPropertyValue('--lt-toast-bottom').trim(), text: t.textContent };
+    // #1488: 안쪽 화면에는 바닥 링크가 없다 — 아래에 붙은 것(링크 줄·＋ 단추·새 소식 카드)이 보일 때만 그 위로 올라가야 한다.
+    const attached = [...document.querySelectorAll('.home-links,#mobile-add,.updates-card')].some((el) => { if (el.hidden) return false; const cs = getComputedStyle(el), b = el.getBoundingClientRect(); return cs.display !== 'none' && cs.visibility !== 'hidden' && b.width > 0 && b.height > 0; });
+    return { hidden: t.hidden, top: Math.round(r.top), bottom: Math.round(r.bottom), gap: getComputedStyle(document.documentElement).getPropertyValue('--lt-toast-bottom').trim(), text: t.textContent, attached };
   });
   assert.equal(box.hidden, false, '알림 줄이 떠 있다');
   assert.ok(box.text.trim().length > 0, '알림 줄에 글자가 있다');
-  assert.ok(Number.parseFloat(box.gap) > 0, `알림 줄 자리를 아래에 붙은 것들 위로 잡았다(--lt-toast-bottom: ${box.gap || '없음'})`);
+  if (box.attached) assert.ok(Number.parseFloat(box.gap) > 0, `알림 줄 자리를 아래에 붙은 것들 위로 잡았다(--lt-toast-bottom: ${box.gap || '없음'})`);
   return box;
 };
 const lowerToast = async (page) => { await page.evaluate(() => { const t = document.getElementById('toast'); if (t) t.hidden = true; }); };

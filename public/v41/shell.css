@@ -173,9 +173,15 @@ nav #record-menu[hidden]{display:none}
 @media(max-width:780px){.main-nav>button#community-menu{padding-inline:10px;scroll-snap-align:center}}
 /* #1246: 같은 순간 추가 동작은 모든 화면에서 같은 장미색을 사용한다.
    #1350: 가운데 '+ 순간 추가'와 글자 크기·모서리도 맞춘다. 높이만 머리줄 안에 들어가는 만큼 둔다. */
-html .header-actions #write-menu.primary-action,html .header-actions #write-menu.primary-action:hover{
+html .header-actions #write-menu.primary-action{
  background:var(--lt-cta-rose);border-color:var(--lt-cta-rose);color:var(--lt-cta-white);box-shadow:none;
  font-size:15px;letter-spacing:.02em;border-radius:var(--lt-r-pill)
+}
+/* #1488 5번: 마우스를 올리면 탭 올림과 같은 역할 토큰으로 바탕(장미색 위 옅은 칠)·테두리가 바뀐다. 장미색 채움 위에서도 두 테마 모두
+   보이도록 테두리는 무대색 2px 틈 바깥 고리(--lt-role-hover-border)로 그린다. 글자색·크기·자리는 그대로다. */
+html .header-actions #write-menu.primary-action:hover{
+ background-color:var(--lt-cta-rose);background-image:linear-gradient(var(--lt-role-hover-bg),var(--lt-role-hover-bg));border-color:var(--lt-role-hover-border);
+ box-shadow:0 0 0 2px var(--lt-stage),0 0 0 3px var(--lt-role-hover-border)
 }
 @media(max-width:650px){html .header-actions #write-menu.primary-action{font-size:14px}}
 body.home-existing.lt-fab-ok #mobile-add{display:none}
@@ -247,10 +253,11 @@ html[data-lt-theme=garden] .view-toggle button[aria-checked="true"]{background:v
 #account-logout{border-top:1px solid var(--lt-role-border);margin-top:4px;padding-top:4px}
 .account-email{margin:0;padding:8px 10px 10px;border-bottom:1px solid var(--lt-line);font-size:12px;line-height:1.6;color:var(--lt-muted);overflow-wrap:anywhere}
 /* 판 안 단추는 스스로 flex 칸이다 — 상단 칩 규칙이 더는 내려오지 않으므로 정렬·줄바꿈 금지를 여기서 정한다. */
-.account-popover button{display:flex;align-items:center;gap:6px;justify-content:flex-start;white-space:nowrap;width:100%;min-height:44px;padding:0 10px;border:0;border-radius:10px;background:transparent;font-size:13px;letter-spacing:.02em;color:var(--lt-pearl)}
-.account-popover button:hover,.account-popover button:focus-visible,.account-popover button:active{background:rgba(255,255,255,.08)}
+/* #1488: 안쪽 화면에서 뺀 바닥 링크의 처리방침·약관은 계정 메뉴의 링크 항목(a[role=menuitem])으로 — 단추 항목과 같은 모양이다. */
+.account-popover button,.account-popover a[role=menuitem]{display:flex;align-items:center;gap:6px;justify-content:flex-start;white-space:nowrap;width:100%;min-height:44px;padding:0 10px;border:0;border-radius:10px;background:transparent;font-size:13px;letter-spacing:.02em;color:var(--lt-pearl);text-decoration:none}
+.account-popover button:hover,.account-popover button:focus-visible,.account-popover button:active,.account-popover a[role=menuitem]:hover,.account-popover a[role=menuitem]:focus-visible{background:rgba(255,255,255,.08)}
 /* 마우스로 연 메뉴는 첫 항목에 초점을 두되 칠하지 않는다(:focus-visible은 키보드일 때만). */
-.account-popover[data-lt-opened-by=mouse] button:focus-visible:not(:hover){background:transparent;outline:0;box-shadow:none}
+.account-popover[data-lt-opened-by=mouse] button:focus-visible:not(:hover),.account-popover[data-lt-opened-by=mouse] a[role=menuitem]:focus-visible:not(:hover){background:transparent;outline:0;box-shadow:none}
 /* 초점은 있지만 키보드에서 온 게 아니면 테두리를 아예 그리지 않는다(계산 outline-width 0). */
 .account-popover button:focus:not(:focus-visible){outline:0;box-shadow:none}
 /* 2026-11-16 계정 메뉴 정리: 관리자 항목(운영센터)은 구분선 아래에 둔다. 라벨 글자는 운영센터와 겹쳐 2026-11-17에 없앴고,
@@ -584,7 +591,8 @@ html[data-lt-theme=garden] #cleanup-panel input:not([type=checkbox]),html[data-l
 
 /* 2026-11-10 대표 승인 메뉴 정리: 맨 위 한 줄 · 트리 드롭다운 · 계정 메뉴 */
 .app-header{min-height:64px;padding:10px 20px;gap:14px;flex-wrap:nowrap}
-.app-header .brand{min-height:40px}
+/* #1488 4번: 로고 링크 누름 높이 44px(머리줄 높이는 그대로). */
+.app-header .brand{min-height:44px}
 .main-nav{display:flex;align-items:center;gap:2px;flex:1;min-width:0}
 .main-nav>button{min-height:40px;padding:0 10px;font-size:13px}
 /* 261118 대표 지적 2차 5: [서재][책][보드][지도]는 한 묶음(같은 크기·글자 14px) — 서재 탭을 트리 틀 안에 두고
@@ -659,6 +667,8 @@ nav .tree-frame{scroll-snap-align:center}
 #header-overflow{display:none}
 #header-overflow.is-open{display:grid;position:absolute;top:64px;right:16px;z-index:70;min-width:190px;padding:8px;border:1px solid var(--lt-line);border-radius:var(--lt-r-card);background:var(--lt-glass-strong);backdrop-filter:blur(24px);box-shadow:0 18px 50px #0009}
 #header-overflow button{min-height:44px;text-align:left;border:0;border-radius:10px;background:none;color:var(--lt-pearl);padding:0 10px;font-size:13px}
+/* #1488: 휴대폰 메뉴의 처리방침·약관 링크 항목도 단추 항목과 같은 줄 모양이다. */
+#header-overflow a[role=menuitem]{display:flex;align-items:center;min-height:44px;border-radius:10px;color:var(--lt-pearl);padding:0 10px;font-size:13px;text-decoration:none}
 /* #1285 11번: 접힌 메뉴의 둘러보기 항목도 데스크탑 탭과 같은 투명 테두리·나침반으로 구분한다. */
 #header-overflow button.lt-discover-item:not([aria-current]){border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-pill);background:transparent;display:flex;align-items:center;gap:8px;padding:0 12px}
 #header-overflow button.lt-discover-item .header-compass{width:16px;height:16px;flex:0 0 auto;color:var(--lt-gold)}
@@ -695,7 +705,10 @@ nav .tree-frame{scroll-snap-align:center}
  body.lt-fab-ok.lt-sheet-open #mobile-add{display:none}
  /* 화면마다 아래쪽에 이미 있는 단추·탭 위로 올린다(390·360 실측값 — 겹침 0 근거는 이슈 458 보고).
     책: 갈라치기 탭(아래 99px) 위, 보드: 시네마 보기(아래 68px) 위, 지도: 이동 리본(이슈 638로 올라감, 아래 160px) 위, 책장: 넘김 화살표(아래 28px) 위. */
- body.lt-fab-ok[data-fab-lift="book"] #mobile-add{bottom:calc(104px + env(safe-area-inset-bottom))}
+ /* #1488 2번: 책 아래 단추 줄(←·쪽·→·▶ 이어 보기, 아래에서 169px까지)과 첫 안내 카드('알겠어요')보다 12px 위에 둔다(390 실측). */
+ body.lt-fab-ok[data-fab-lift="book"] #mobile-add{bottom:calc(181px + env(safe-area-inset-bottom))}
+ /* #1488 2번: 트리 화면에도 ＋ 단추를 둔다(다섯 화면 같게) — 아래 상태 줄('순간 n/n개') 위 12px. */
+ body.lt-fab-ok[data-fab-lift="tree"] #mobile-add{bottom:calc(60px + env(safe-area-inset-bottom))}
   /* #1287: keep the add control above the book's lower controls, shrink while scrolling. */
   body.lt-fab-ok[data-fab-lift="book"] #mobile-add{transition:transform .16s ease;transform-origin:right bottom}
   body.lt-fab-ok.lt-book-scrolling[data-fab-lift="book"] #mobile-add{transform:scale(.72)}
@@ -755,16 +768,23 @@ html[data-lt-theme=garden] .home-links .feedback-link:hover{color:var(--lt-ink)}
  body.home-screen .home-links a.feedback-link{display:inline-flex}
  body.home-screen .home-links .feedback-link{flex:0 0 auto;min-width:0;height:44px;min-height:44px;padding:2px 4px;font-size:13px;letter-spacing:0;white-space:nowrap;overflow:visible}
  /* 계정 글꼴 폭이 달라져도 오른쪽 단추가 수평으로 이동하지 않는다. */
- .app-header .account-slot{flex:0 0 66px;width:66px;justify-content:flex-end}
+ .app-header .account-slot{flex:0 0 56px;width:56px;justify-content:center}
 }
 /* 390 지도·책·서재 목록: 조작 줄·책 테두리·'책 속의 트리' 상자와 겹치던 아래 링크 줄을 숨긴다(1440은 지금 자리).
    서재 목록은 프레임 안이 스크롤되므로 화면에 붙은 링크 줄이 지나가는 글자 위에 포개진다 — 책·지도와 같은 길로 숨긴다. */
 /* #1093: 여러 줄 선반 위에 화면에 붙은 링크가 포개지므로 서재는 폭과 무관하게 숨긴다. */
-/* #777: 트리 보기는 별도 상태 줄과 나무 영역을 사용하므로 첫 화면 전용 링크와 부유 ＋ 단추를 숨긴다.
-   새 순간 추가는 휴대폰의 상단 접기 메뉴에서 계속 사용할 수 있다. */
-body[data-fab-lift=tree] .home-links,body[data-fab-lift=tree] #mobile-add{display:none}
-body[data-fab-lift=shelf] .home-links{display:none}
-@media(max-width:520px){body[data-fab-lift=book] .home-links,body[data-fab-lift=network] .home-links{display:none}}
+/* #777: 트리 보기는 별도 상태 줄과 나무 영역을 사용하므로 첫 화면 전용 링크를 숨긴다(#1488부터 ＋ 단추는 다섯 화면 모두에 둔다). */
+/* #1488 1번(CTO 결정 #1452): 바닥 링크(새 소식·의견 보내기·개인정보 처리방침·이용약관)는 안쪽 다섯 화면(서재·트리·보드·책·지도)에서 뺀다.
+   같은 네 항목은 계정 메뉴와 휴대폰 메뉴(☰)에 있다. 첫 화면·공개 감상에는 남긴다. 안쪽 화면 주소로 들어오면(data-lt-shell-entry)
+   첫 그림부터 숨긴다. 공개 감상은 트리 보기와 390 책·지도에서만 지금처럼 숨긴다. */
+body:not(.share-visitor):is([data-fab-lift=shelf],[data-fab-lift=tree],[data-fab-lift=board],[data-fab-lift=book],[data-fab-lift=network]) .home-links,
+html[data-lt-shell-entry] body:not(.share-visitor) .home-links,
+body.share-visitor[data-fab-lift=tree] .home-links{display:none}
+@media(max-width:520px){body.share-visitor:is([data-fab-lift=book],[data-fab-lift=network]) .home-links{display:none}}
+/* #1488 1번: 공개 감상에서 바닥 링크가 보이는 화면은 화면 틀(iframe) 아래 끝을 링크 줄(44px) 위에 두어 내용과 겹치지 않게 한다. */
+/* iframe는 위·아래를 정해도 저절로 늘어나지 않으므로(기본 150px) 높이를 직접 준다. */
+@media(min-width:521px){body.share-visitor:not(.home-screen):is([data-fab-lift=board],[data-fab-lift=book],[data-fab-lift=network]) #stage>iframe{bottom:auto;height:calc(100% - max(10px,env(safe-area-inset-bottom)) - 44px)}}
+@media(max-width:520px){body.share-visitor:not(.home-screen)[data-fab-lift=board] #stage>iframe{bottom:auto;height:calc(100% - max(10px,env(safe-area-inset-bottom)) - 44px)}}
 /* 이슈 611: 계정 단추 점 — 새 소식이나 새 답글이 있을 때. */
 .account-avatar{position:relative}
 .account-avatar.has-dot::after{content:'';position:absolute;top:2px;right:2px;width:9px;height:9px;border-radius:50%;background:var(--lt-rose);border:1px solid var(--lt-stage)}
@@ -780,7 +800,8 @@ body[data-fab-lift=shelf] .home-links{display:none}
 @media(max-width:780px){.updates-card{left:16px;right:16px;top:auto;bottom:calc(max(10px, env(safe-area-inset-bottom)) + 76px);max-width:none}
  /* ＋ 단추가 보이면 카드 끝을 단추 윗변보다 8px 위에 둔다. 보드·책·지도에서 단추를 올린 값도 그대로 따른다. */
  body.lt-fab-ok .updates-card{bottom:calc(76px + env(safe-area-inset-bottom))}
- body.lt-fab-ok[data-fab-lift="book"] .updates-card{bottom:calc(168px + env(safe-area-inset-bottom))}
+ body.lt-fab-ok[data-fab-lift="book"] .updates-card{bottom:calc(245px + env(safe-area-inset-bottom))}
+ body.lt-fab-ok[data-fab-lift="tree"] .updates-card{bottom:calc(124px + env(safe-area-inset-bottom))}
  body.lt-fab-ok[data-fab-lift="board"] .updates-card{bottom:calc(132px + env(safe-area-inset-bottom))}
  body.lt-fab-ok[data-fab-lift="network"] .updates-card{bottom:calc(224px + env(safe-area-inset-bottom))}}
  @media(max-width:520px){.updates-card-actions{margin-left:auto}.updates-card-actions button{position:relative;min-height:38px}.updates-card-actions button:last-child{min-width:38px}.updates-card-actions button::after{content:'';position:absolute;inset:-4px}.updates-card{padding:3px 3px 3px 12px;gap:8px;bottom:calc(max(10px, env(safe-area-inset-bottom)) + 66px)}body.lt-fab-ok .updates-card{bottom:calc(76px + env(safe-area-inset-bottom))}.updates-card-text{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
@@ -1162,6 +1183,9 @@ html[data-lt-theme=garden] #empty[data-empty-view=shelf] #empty-records{backgrou
   #empty:not([data-empty-view=shelf]) .empty-tree-art svg{width:auto;height:150px;max-width:100%}
   #empty:not([data-empty-view=shelf]) .empty-tree-art::before{inset:-10% -8% -6%}
 }
+/* #1488 6번: 높이 500px 이하(844×390 등 가로 휴대폰)에서는 빈 상태 그림(첫·다음·그다음 순간)을 숨겨 제목·설명·'로그인' 단추를
+   화면 안에 두고, 화면 아래 짧은 알림과 설명 사이를 띄운다. 글자·단추는 그대로다. */
+@media(max-height:500px){#empty .empty-tree-art{display:none}}
 /* 고르지 않은 탭은 밤·정원 모두 같은 토큰 색을 쓴다(빈 상태에서 색이 어긋나지 않게). */
 .tree-frame .tree-views>button:not([aria-current=true]){color:var(--lt-muted)}
 .tree-frame .tree-views>button:not([aria-current=true]):hover,.tree-frame .tree-views>button:not([aria-current=true]):focus-visible{color:var(--lt-pearl)}
@@ -1404,7 +1428,7 @@ body>.tree-popover.lt-toolbar-picker[hidden]{display:none}
 .app-header .main-nav{gap:var(--lt-head-items);min-width:0}
 .app-header .tree-frame{margin-left:0;min-width:0}
 .app-header .tree-frame .tree-views{display:flex;gap:var(--lt-head-items);margin:0;padding:0;align-items:center}
-.app-header .tree-frame .tree-views>button[data-view]{flex:0 0 auto;width:auto;margin:0;padding-inline:10px}
+.app-header .tree-frame .tree-views>button[data-view]{flex:0 0 auto;width:auto;min-width:44px;margin:0;padding-inline:10px}
 .app-header .tree-frame .tree-views>button[data-view="track61-tree.html"]{margin-left:0;width:auto}
 .app-header .header-actions{gap:var(--lt-head-items)}
 .app-header .header-actions>.account-slot{width:auto;flex:0 0 auto;justify-content:flex-end}
@@ -1426,11 +1450,7 @@ body>.tree-popover.lt-toolbar-picker[hidden]{display:none}
  .app-header .main-nav>#community-menu{display:none}
  .app-header .header-actions{gap:var(--lt-head-items)}
 }
-/* #1447: 공개 감상 머리줄은 넓은 화면에서 보기 탭 묶음 뒤에 둘러보기를 둔다. */
-@media(min-width:781px){
- body.lt-header-visitor .app-header .main-nav .tree-frame{order:0}
- body.lt-header-visitor .app-header .main-nav>#community-menu{order:1}
-}
+/* #1488 7번(CTO 결정 #1452): 공개 감상 머리줄의 둘러보기도 다른 상태와 같이 로고 바로 뒤(문서 순서 그대로)에 둔다 — #1447의 순서 바꿈을 걷어냈다. */
 #lt-visitor-caption{flex:0 0 auto;min-height:23px;padding:3px var(--lt-visitor-pad,16px);background:var(--lt-role-bg);color:var(--lt-role-text-strong);font-size:12px;line-height:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #lt-visitor-caption[hidden]{display:none}
 @media(max-width:780px){#lt-visitor-caption{--lt-visitor-pad:8px}}
@@ -1441,7 +1461,14 @@ body.lt-header-visitor #toast[data-visitor-intro]{display:none}
 .lt-toolbar-picker .tree-cover img{position:relative;z-index:1;background:var(--lt-cover-1)}
 
 /* #1350: 휴대폰 머리줄의 계정 칸 너비를 미리 잡아 둔다. */
-@media(max-width:780px){.app-header .header-actions>.account-slot{flex:0 0 66px;width:66px}}
+/* #1488 3번: 휴대폰 머리줄 오른쪽 세 단추(테마·계정·☰)는 8px 간격으로 같게 둔다. 계정 칸은 56px로 줄이고 로그인 단추·계정 동그라미가
+   칸을 채운다(동그라미는 넓은 화면 80px 알약과 같이 칸 폭 알약) — 로그인·로그아웃·확인 중 모두 같은 자리·같은 간격이다. */
+@media(max-width:780px){
+ .app-header .header-actions{gap:8px}
+ .app-header .header-actions>.account-slot{flex:0 0 56px;width:56px;justify-content:center}
+ .app-header .account-slot>#account-entry{box-sizing:border-box;width:56px;min-width:56px;justify-content:center}
+ .app-header .account-slot>#account-avatar{box-sizing:border-box;width:56px;min-width:56px;border-radius:var(--lt-r-pill)}
+}
 
 /* #1447: 넓은 화면에서 머리줄 오른쪽 세 단추(테마·순간 추가·계정) 사이 간격을 로그인 상태와 상관없이 같게 맞춘다. */
 @media(min-width:781px){
@@ -1460,15 +1487,11 @@ body.lt-header-visitor #toast[data-visitor-intro]{display:none}
  }
 }
 
-/* #1447: visitor small-screen nav shows the current view and the browse return. */
+/* #1447·#1488 7번: 좁은 화면의 공개 감상 머리줄은 로고 바로 뒤에 둘러보기를 보인다. 보기 탭은 내 트리 390과 같이 머리줄에 두지 않고
+   ☰ 메뉴에서 고른다(지금 화면 표시는 메뉴에 있다). 둘러보기 글자는 다른 폭과 같은 크기(12px 이상)다. */
 @media(max-width:780px){
  body.lt-header-visitor .app-header .main-nav{display:flex;flex:1 1 0;min-width:0;overflow:hidden}
- body.lt-header-visitor .app-header .main-nav .tree-frame{display:flex;flex:0 0 auto;min-width:0;order:0}
- body.lt-header-visitor .app-header .tree-frame .tree-views{display:flex;gap:0;min-height:44px}
- body.lt-header-visitor .app-header .tree-frame .tree-views>button:not([aria-current=true]){display:none}
- body.lt-header-visitor .app-header .tree-frame .tree-views>button[aria-current=true]{display:flex;align-items:center;justify-content:center;min-width:44px;padding:0 6px}
- body.lt-header-visitor .app-header .main-nav>#community-menu{display:inline-flex;order:1;padding-inline:5px;min-width:0;margin-left:var(--lt-head-items)}
- body.lt-header-visitor #community-menu .community-menu-label{font-size:11px}
+ body.lt-header-visitor .app-header .main-nav>#community-menu{display:inline-flex;padding-inline:8px;min-width:0;margin-left:var(--lt-head-items)}
 }
 .lt-toolbar-picker .tree-cover{width:36px;height:36px;flex-basis:36px;border-radius:var(--lt-r-card);box-shadow:none}
 
