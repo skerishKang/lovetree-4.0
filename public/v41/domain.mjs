@@ -678,7 +678,14 @@ export function organizeMoments(state, { mode = '', fromTreeId = '', momentIds =
         relation: i ? m.relation : '', links: [], createdAt: clock, copiedFrom: m.copiedFrom || m.id
       })) };
     }
-    const extra = existing.length ? organizeMoments(state, { mode, fromTreeId, momentIds: wanted, toTreeIds: existing, skip }, clock, makeId) : null;
+    if (existing.includes(fromTreeId)) throw new Error('같은 트리 안에서는 옮길 수 없어요. 이전 순간 바꾸기를 사용해 주세요.');
+    for (const id of existing) if (!state.trees.some(tree => tree.id === id)) throw new Error('트리를 찾을 수 없어요.');
+    const active = existing.filter(id => {
+      const omitted = new Set(Array.isArray(skip?.[id]) ? skip[id] : []);
+      return wanted.some(momentId => !omitted.has(momentId));
+    });
+    const extra = active.length ? organizeMoments(state, { mode, fromTreeId, momentIds: wanted, toTreeIds: active, skip }, clock, makeId) : null;
+    const allSkipped = (existing.length - active.length) * wanted.length;
     const next = validateState(mode === 'move' ? made.state : { ...state, trees: [...(extra?.state.trees || state.trees), target] });
     const involved = [fromTreeId, ...existing, target.id];
     const before = involved.map(id => {
@@ -692,7 +699,7 @@ export function organizeMoments(state, { mode = '', fromTreeId = '', momentIds =
     const done = [...(extra?.record.done || []), ...target.moments.map((m, i) => ({ treeId: target.id, momentId: m.id, sourceId: sources[i].id }))];
     return { state: next, treeId: next.trees.some(t => t.id === fromTreeId) ? fromTreeId : target.id,
       record: { mode, fromTreeId, toTreeIds: [...existing, target.id], before, after, done, at: clock },
-      summary: { moments: wanted.length, trees: new Set(done.map(d => d.treeId)).size, placed: done.length, skipped: extra?.summary.skipped || 0 } };
+      summary: { moments: wanted.length, trees: new Set(done.map(d => d.treeId)).size, placed: done.length, skipped: allSkipped + (extra?.summary.skipped || 0) } };
   }
   const targets = [...new Set(Array.isArray(toTreeIds) ? toTreeIds : [])];
   if (!targets.length) throw new Error('넣을 트리를 골라 주세요.');

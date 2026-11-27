@@ -16,8 +16,11 @@ export function renderThemeChoices() {
       button.type = 'button'; button.role = 'radio'; button.textContent = item.label;
       button.setAttribute('aria-checked', String(registry.readCleanupView() === item.id));
       button.onclick = () => {
-        registry.writeCleanupView(item.id);
+        const saved = registry.writeCleanupView(item.id);
         for (const sibling of views.children) sibling.setAttribute('aria-checked', String(sibling === button));
+        const notice = $('settings-cleanup-storage-note');
+        notice.hidden = saved;
+        notice.textContent = saved ? '' : '저장할 수 없어 이번 접속에서만 적용해요.';
       };
       views.append(button);
     }

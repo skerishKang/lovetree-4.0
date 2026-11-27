@@ -418,3 +418,23 @@ test('#1440 새 트리와 기존 트리에 함께 복사하고 한 번에 복원
   changed.trees.find(t => t.subject === '새 기억').title = '고친 이름';
   assert.throws(() => webDomain.undoOrganize(changed, result.record, OUT), /트리가 바뀌었어요/);
 });
+
+test('#1440 기존 대상에서 모두 건너뛰어도 새 트리에 복사하고 한 번에 복원한다', () => {
+  const state = threeTrees();
+  const args = { mode: 'copy', fromTreeId: 't1', momentIds: ['mb'], toTreeIds: ['t2','t3'], skip: { t2: ['mb'], t3: ['mb'] } };
+  assert.throws(() => webDomain.organizeMoments(state, args, OUT, counter('newcopy')), /넣을 순간이 없어요/);
+  const result = webDomain.organizeMoments(state, {...args,newTreeName:'새 기억'}, OUT, counter('newcopy'));
+  assert.deepEqual(result.state.trees.slice(0,3),state.trees);
+  assert.deepEqual(result.state.trees[3].moments.map(m=>m.copiedFrom),['mb']);
+  assert.deepEqual(result.summary,{moments:1,trees:1,placed:1,skipped:2});
+  assert.deepEqual(webDomain.undoOrganize(result.state,result.record,OUT).state,state);
+});
+test('#1440 전체 이동은 지금 방식과 동일하게 원본 트리를 없앤다', () => {
+  const state=threeTrees(), ids=['ma','mb','mc'];
+  const classic=webDomain.treeFromMoments(state,'t1',ids,{subject:'새 기억'},OUT);
+  const cards=webDomain.organizeMoments(state,{mode:'move',fromTreeId:'t1',momentIds:ids,newTreeName:'새 기억'},OUT);
+  assert.equal(classic.state.trees.some(t=>t.id==='t1'),false);
+  assert.equal(cards.state.trees.some(t=>t.id==='t1'),false);
+  assert.deepEqual(cards.state.trees.at(-1).moments,classic.state.trees.at(-1).moments);
+  assert.deepEqual(webDomain.undoOrganize(cards.state,cards.record,OUT).state,state);
+});
