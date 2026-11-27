@@ -70,12 +70,13 @@ async function captureOnce(page, { frame = null, panels = [] } = {}) {
   const target = await visibleShellFrame(page) || frame;
   const selectors = [...DEFAULT_PANELS, ...panels];
   const shell = await page.evaluate(captureDocument, selectors);
-  if (!target) return { ...shell, frame: null, frameHistoryLength: 0 };
+  if (!target) return { ...shell, frame: null, frameHistoryLength: 0, frameUrl: '' };
   const inner = await target.evaluate(captureDocument, selectors);
   return {
     ...shell,
     frame: inner,
     frameHistoryLength: inner.historyLength,
+    frameUrl: target.url(),
     panels: [...shell.panels.map(selector => `shell:${selector}`), ...inner.panels.map(selector => `frame:${selector}`)],
     selectedMoment: inner.selectedMoment || shell.selectedMoment,
     scroll: { shell: shell.scroll, frame: inner.scroll }
@@ -97,7 +98,7 @@ export async function backState(page, options = {}) {
 }
 
 function comparable(state) {
-  const { historyLength, frameHistoryLength, historyState, frame, ...rest } = state;
+  const { historyLength, frameHistoryLength, frameUrl, historyState, frame, ...rest } = state;
   if (!frame) return rest;
   const { historyLength: innerHistoryLength, historyState: innerHistoryState, ...inner } = frame;
   return { ...rest, frame: inner };
@@ -144,10 +145,11 @@ const signalCounts = target => target
   : Promise.resolve({ msg: 0, dom: 0 });
 
 async function waitForGrowth(page, frame, before, waitMs) {
-  const grew = await page.waitForFunction(n => history.length > n, before, { timeout: waitMs }).then(() => true, () => false);
-  if (grew) return true;
-  if (!frame) return false;
-  return frame.waitForFunction(n => history.length > n, before, { timeout: waitMs }).then(() => true, () => false);
+  const targets = [[page, before.historyLength]];
+  if (frame) targets.push([frame, before.frameHistoryLength]);
+  return Promise.any(targets.map(([target, length]) =>
+    target.waitForFunction(n => history.length > n, length, { timeout: waitMs }).then(() => true)
+  )).then(() => true, () => false);
 }
 
 async function waitForProcessed(page, frame, before, waitMs) {
@@ -181,22 +183,32 @@ export async function testBackNavigation(page, { frame = null, recorded, action,
   await installObserver(page, { messages: true });
   await installObserver(frame);
   const before = await backState(page, options);
-  const beforeHistory = Math.max(before.historyLength, before.frameHistoryLength);
   const signalsBefore = { shell: await signalCounts(page), inner: await signalCounts(frame) };
   await action();
 
   if (recorded) {
     const hashAfter = await page.evaluate(() => location.hash);
     if (hashAfter !== before.hash) {
-      await page.waitForFunction(({ n, hash }) => history.length > n && location.hash === hash, { n: beforeHistory, hash: hashAfter }, { timeout: waitMs }).catch(() => {});
+      await page.waitForFunction(({ n, hash }) => history.length > n && location.hash === hash, { n: before.historyLength, hash: hashAfter }, { timeout: waitMs }).catch(() => {});
     }
-    const grew = await waitForGrowth(page, frame, beforeHistory, waitMs);
+    const grew = await waitForGrowth(page, frame, before, waitMs);
     await settleShell(page, waitMs);
     const afterAction = await backState(page, options);
-    const afterHistory = Math.max(afterAction.historyLength, afterAction.frameHistoryLength);
-    assert.equal(grew, true, `기록하는 동작 후 기록이 늘어나야 한다 / ${JSON.stringify({ before: beforeHistory, after: afterHistory, messageSeen: (await signalCounts(page)).msg - signalsBefore.shell.msg })}`);
-    assert.equal(afterHistory, beforeHistory + 1, `기록하는 동작은 history를 한 칸 늘린다 / ${JSON.stringify({ before: before.historyState, after: afterAction.historyState, beforeLength: beforeHistory, afterLength: afterHistory, frameBefore: before.frameHistoryLength, frameAfter: afterAction.frameHistoryLength })}`);
-    const backTarget = afterAction.frameHistoryLength > before.frameHistoryLength ? (await visibleShellFrame(page) || frame) : page;
+    const sameFrame = before.frameUrl === afterAction.frameUrl;
+    const shellGrowth = afterAction.historyLength - before.historyLength;
+    const frameGrowth = sameFrame ? afterAction.frameHistoryLength - before.frameHistoryLength : 0;
+    const lengths = {
+      shellBefore: before.historyLength,
+      shellAfter: afterAction.historyLength,
+      frameBefore: before.frameHistoryLength,
+      frameAfter: afterAction.frameHistoryLength
+    };
+    assert.equal(grew, true, `기록하는 동작 후 기록이 늘어나야 한다 / ${JSON.stringify({ ...lengths, messageSeen: (await signalCounts(page)).msg - signalsBefore.shell.msg })}`);
+    assert.ok(
+      shellGrowth >= 0 && frameGrowth >= 0 && shellGrowth <= 1 && frameGrowth <= 1 && (shellGrowth === 1 || frameGrowth === 1),
+      `기록하는 동작은 history를 한 칸 늘린다 / ${JSON.stringify(lengths)}`
+    );
+    const backTarget = frameGrowth > 0 ? (await visibleShellFrame(page) || frame) : page;
     await backTarget.evaluate(() => history.back());
     const afterBack = await waitForPrevious(page, before, options);
     return { before, afterAction, afterBack };
@@ -206,8 +218,10 @@ export async function testBackNavigation(page, { frame = null, recorded, action,
   await settleShell(page, waitMs);
   await page.waitForTimeout(OBSERVE_MS);
   const afterAction = await backState(page, options);
-  const afterHistory = Math.max(afterAction.historyLength, afterAction.frameHistoryLength);
-  assert.equal(afterHistory, beforeHistory, '기록하지 않는 동작은 history.length를 늘리지 않는다');
+  assert.ok(
+    afterAction.historyLength === before.historyLength && afterAction.frameHistoryLength === before.frameHistoryLength,
+    `기록하지 않는 동작은 history.length를 늘리지 않는다 / ${JSON.stringify({ shellBefore: before.historyLength, shellAfter: afterAction.historyLength, frameBefore: before.frameHistoryLength, frameAfter: afterAction.frameHistoryLength })}`
+  );
   return { before, afterAction, afterBack: null };
 }
 
