@@ -3,6 +3,8 @@ import { createServer } from 'node:http';
 import { pathToFileURL } from 'node:url';
 import { createPool, createWorkspaceRepo } from './db/postgres.js';
 import { createShareRepo } from './db/shares-postgres.js';
+import { createShareVisitsRepo } from './db/share-visits-postgres.js';
+import { createShareVisitsService } from './share-visits-service.js';
 import { createShareShowPendingRepo } from './db/share-show-pending-postgres.js';
 import { createStageIndexRepo } from './db/stage-index-postgres.js';
 import { createTreeVisibilityRepo } from './db/tree-visibility-postgres.js';
@@ -85,7 +87,12 @@ const adminStats = createAdminStatsService({ repo: createStatsRepo(pool), produc
 const rankingPolicy = { hasRealCustomers: hasRealCustomersFromEnv(process.env) };
 const communityRepo = createMyNewsRepo(createMomentCommunityRepo(createCommunityRepo(pool, rankingPolicy), pool), pool);
 const shareShowPending = createShareShowPendingRepo(pool);
+const visitCounts = createShareVisitsService({ repo: createShareVisitsRepo(pool), shareRepo, visibilityRepo, communityRepo, productId: LOVETREE_PRODUCT_ID, secret: LOVETREE_PROXY_SECRET });
+void visitCounts.prune().catch(() => {});
+const visitRetentionTimer = setInterval(() => { void visitCounts.prune().catch(() => {}); }, 15 * 60 * 1000);
+visitRetentionTimer.unref?.();
 const shareService = createShareService({
+  visitCounts,
   shareRepo,
   communityRepo,
   stageIndex,
@@ -147,6 +154,7 @@ const storageHandler = createApiHandler({
   allowedOrigins: publicOrigins
 });
 const shareHandler = createShareHandler({
+  visitProxyTrusted: request => verifyProxyProof(request, { secret: LOVETREE_PROXY_SECRET, enforce: true }).reason === 'valid',
  authenticate: guardedAuthenticate,
  service: shareService,
  productId: LOVETREE_PRODUCT_ID

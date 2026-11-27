@@ -195,7 +195,7 @@ test('방문 읽기는 허용 목록과 서재 범위를 지키고 ETag 재검�
  assert.equal(response.headers['cache-control'],'private, no-cache');
  assert.match(response.headers.etag,/^"[A-Za-z0-9_-]+"$/);
  assert.deepEqual(Object.keys(response.body).sort(),['shelf','stats','tree','visit']);
- assert.deepEqual(Object.keys(response.body.stats).sort(),['comments','favored','favorites','hearted','hearts','mine','reactions']);
+ assert.deepEqual(Object.keys(response.body.stats).sort(),['comments','favored','favorites','hearted','hearts','mine','reactions','visits']);
  assert.deepEqual(Object.keys(response.body.visit).sort(),['aiTester','entryMomentId','momentCount','omittedPrivateMedia','ownerLabel','shareId','updatedAt','view']);
  assert.equal(response.body.tree.id,shares[0].shareId);
  assert.equal(response.body.visit.ownerLabel,'');
