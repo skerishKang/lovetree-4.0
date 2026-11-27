@@ -258,13 +258,17 @@ export function createFeedbackBoard({$, notify, show, showFull, onReplyCount, on
     }
     for (const button of plist.querySelectorAll('[data-reply-delete]')) {
       button.addEventListener('click', async () => {
-        const replyId = button.closest('.myposts-reply')?.dataset.replyId || '';
-        const postId = button.closest('.myposts-item')?.querySelector('[data-followup]')?.dataset.followup || '';
-        if (!(await askAppConfirm('이 덧붙임을 지울까요? 지우면 내 의견 목록에서 사라져요.'))) return;
-        const res = await api.call(`/api/board/mine/${encodeURIComponent(postId)}/followup/${encodeURIComponent(replyId)}`, {method: 'DELETE'});
-        if (!res.ok) { if (typeof notify === 'function') notify(res.message || '지우지 못했어요.'); return; }
-        if (typeof notify === 'function') notify('지웠어요.');
-        await openMyPosts();
+         if (button.disabled) return;
+         button.disabled = true;
+         try {
+          const replyId = button.closest('.myposts-reply')?.dataset.replyId || '';
+          const postId = button.closest('.myposts-item')?.querySelector('[data-followup]')?.dataset.followup || '';
+          if (!(await askAppConfirm('이 덧붙임을 지울까요? 지우면 내 의견 목록에서 사라져요.'))) return;
+          const res = await api.call(`/api/board/mine/${encodeURIComponent(postId)}/followup/${encodeURIComponent(replyId)}`, {method: 'DELETE'});
+          if (!res.ok) { if (typeof notify === 'function') notify(res.message || '지우지 못했어요.'); return; }
+          if (typeof notify === 'function') notify('지웠어요.');
+          await openMyPosts();
+         } finally { button.disabled = false; }
       });
     }
   }

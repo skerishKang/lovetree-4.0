@@ -357,7 +357,21 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
   reportInput.maxLength=500;reportInput.required=true;reportInput.placeholder='신고 이유';reportInput.setAttribute('aria-label','신고 이유');reportButton.type='submit';reportForm.append(reportInput,reportButton);
   reportForm.onsubmit=async event=>{event.preventDefault();const answer=await api.report(item.shareId,reportInput.value);message(answer.ok?'신고를 접수했어요. 운영 검토 전에는 자동 숨김 처리하지 않아요.':loginMessage(answer));if(answer.ok)reportInput.value='';};
   const block=el('button','community-link danger','이 공개자의 트리 숨기기');block.type='button';
-  block.onclick=async()=>{if(!(await askAppConfirm('이 공개자의 트리를 내 둘러보기 목록에서 숨길까요?')))return;const answer=await api.block(item.shareId);if(!answer.ok){message(loginMessage(answer));return;}items=items.filter(value=>value.shareId!==item.shareId);selectedId=items[0]?.shareId||null;if(preview.open)preview.close();render();message('내 둘러보기 목록에서 숨겼어요.');if(!selectedId)groups.querySelector('.community-group-chip')?.focus();};
+  block.onclick=async()=>{
+   if(block.disabled)return;
+   block.disabled=true;
+   try{
+    if(!(await askAppConfirm('이 공개자의 트리를 내 둘러보기 목록에서 숨길까요?')))return;
+    const answer=await api.block(item.shareId);
+    if(!answer.ok){message(loginMessage(answer));return;}
+    items=items.filter(value=>value.shareId!==item.shareId);
+    selectedId=items[0]?.shareId||null;
+    if(preview.open)preview.close();
+    render();
+    message('내 둘러보기 목록에서 숨겼어요.');
+    if(!selectedId)groups.querySelector('.community-group-chip')?.focus();
+   }finally{block.disabled=false;}
+  };
   panel.append(reportForm,block);details.append(summary,panel);
   return details;
  }
