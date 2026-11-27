@@ -212,9 +212,7 @@ html[data-lt-auth-phase=pending] .app-header #account-entry{visibility:hidden;po
 html[data-lt-auth-phase=pending][data-lt-auth-hint=out] .app-header #account-entry{visibility:visible;pointer-events:auto}
 html[data-lt-auth-phase=pending][data-lt-auth-hint=in] .app-header #account-entry{display:none}
 html[data-lt-auth-phase=pending][data-lt-auth-hint=in] .app-header #account-avatar[hidden]{display:flex;visibility:visible;pointer-events:none}
-html[data-lt-auth-phase=pending][data-lt-auth-hint=in] .app-header #record-menu{display:flex;visibility:visible;pointer-events:none}
-/* #1026: cached member picker stays in place while authentication is checked. */
-html[data-lt-auth-phase=pending][data-lt-auth-hint=in] .app-header nav #record-menu[hidden]{display:flex;visibility:visible;pointer-events:none}
+/* #1433: 머리줄 트리 고르기는 확인 중에도 펼치지 않는다(#1421로 도구 줄로 옮김). 펼쳤다 접으면 둘러보기·화면 탭이 밀린다. */
 html[data-lt-auth-phase=pending] #mobile-add{visibility:hidden;pointer-events:none}
 /* #1231: 데스크톱은 권한 메뉴의 폭을 예약하고 화면 탭 좌표를 고정한다.
    인증 전후 트리 선택·쓰기·계정의 존재 변화가 탭/테마를 밀지 않게 한다. */
@@ -1500,3 +1498,13 @@ body.lt-header-visitor #toast[data-visitor-intro]{display:none}
 
 /* #1447: keep the persistent visit label unobtrusive while video is expanded. */
 body.lt-book-lightbox-open #lt-visitor-caption{visibility:hidden}
+
+/* #1433: 넓은 머리줄의 글자 칸(로고·둘러보기·화면 탭)은 마지막 글꼴로 잰 폭을 처음부터 쓴다. #1447 뒤 글자 폭만큼 넓어지게 되어,
+   글꼴이 늦게 오는 느린 연결(리눅스 대체 글꼴)에서 첫 그림 뒤 화면 탭이 30px 넘게 밀렸다. 칸 사이 간격(--lt-head-*)과 보이는 모양은 그대로다.
+   '책' 탭은 #1488의 누름 크기(최소 44px)와 같은 44px로 둔다. */
+@media(min-width:781px){
+ .app-header .brand{flex:0 0 101px;width:101px}
+ .app-header .main-nav>button#community-menu{flex:0 0 auto;width:calc(43px + 3.46em);padding-inline:0}
+ .app-header .tree-frame .tree-views>button[data-view]{width:45px;padding-inline:0}
+ .app-header .tree-frame .tree-views>button[data-view="track59-sketchbook.html"]{width:44px}
+}

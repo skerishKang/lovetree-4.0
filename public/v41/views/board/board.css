@@ -173,3 +173,9 @@ body.lt-bloom-glow .threadGlow{opacity:.82}
 #viewport.board-scroll{overflow-x:hidden;overflow-y:auto;touch-action:pan-y;overscroll-behavior-y:contain;scrollbar-width:thin}
 #viewport.board-scroll #boardScrollSpace{display:block;position:relative;width:100%;overflow:clip}
 #viewport.board-scroll:not(.board-scroll-editing) .card{touch-action:pan-y}
+
+/* #1433: 판(.boardWorld)은 첫 자리(배율·위치·넓은 화면 판 여백)를 정한 뒤 보인다 — board.js markBoardViewReady.
+   정하기 전 모습이 먼저 그려지면 판 여백(left)이 바뀔 때 판 전체가 밀린 것으로 잡힌다(보드 CLS 0.1). */
+html[data-v41-screen=board]:not([data-lt-board-view]) .boardWorld{visibility:hidden}
+/* #1433: 읽기 전용 테마 표시는 글자가 늦게 바뀌어도 자리(오른쪽 끝 기준)가 같도록 최소 폭을 둔다. */
+.themeBadge{min-width:14em;text-align:right}

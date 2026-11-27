@@ -5,9 +5,9 @@
 <script src="/v41/theme-registry.js"></script><script>try{const registry=LT41_THEME_REGISTRY;let stored='';try{stored=localStorage.getItem('lt41.theme')||''}catch{}let theme=registry.find(stored);if(!stored&&window.parent!==window)theme=registry.find(parent.document.documentElement.getAttribute('data-lt-theme'));registry.apply(document.documentElement,theme?.id)}catch(e){}</script>
 <link rel="stylesheet" href="/v41/screen-toolbar.css"><link rel="stylesheet" href="/v41/views/tree/tree.css"><link rel="stylesheet" href="/v41/identity.css">
 </head><body>
-<div class="lt-screen-toolbar" role="region" aria-label="화면 도구"><div class="lt-toolbar-left"><span class="lt-toolbar-title">트리</span></div><div class="lt-toolbar-tools">
+<div class="lt-screen-toolbar" role="region" aria-label="화면 도구"><div class="lt-toolbar-left"><button class="lt-toolbar-tree-choice" type="button" disabled aria-label="트리 고르기" title="트리 고르기" aria-haspopup="dialog" aria-pressed="true"><span class="lt-toolbar-tree-thumb" aria-hidden="true"></span><span class="lt-toolbar-tree-name"></span><span class="lt-toolbar-tree-caret" aria-hidden="true">▾</span></button><span class="lt-toolbar-title" hidden>트리</span></div><div class="lt-toolbar-tools">
 <button id="goRoot" type="button">뿌리로</button><button id="goFit" type="button">전체</button><button id="zoomOut" type="button" aria-label="축소">−</button><button id="zoomIn" type="button" aria-label="확대">＋</button>
-</div></div>
+</div></div><script>/* #1433: 첫 그림 전에 도구 줄을 마지막 모양으로 맞춘다. 남의 트리·예시는 트리 이름 표로 바꾸고(screen-toolbar.mjs가 같은 판정으로 이어받는다). */(function(){var bar=document.currentScript.previousElementSibling,own=false;try{var c=window.parent.LT41;own=!!(c&&c.source==='server'&&c.writable===true&&c.tree&&!c.tree.demoData)}catch(e){}var choice=bar.querySelector('.lt-toolbar-tree-choice');if(!own&&choice){var label=document.createElement('span');label.className='lt-toolbar-tree-choice lt-toolbar-tree-label';label.innerHTML='<span class="lt-toolbar-tree-name"></span>';choice.replaceWith(label)}})()</script>
 <main class="ts-stage" id="stage" tabindex="0" aria-label="트리 보기 — 끌어서 옮기고, 휠이나 두 손가락으로 확대합니다">
   <div class="ts-world" id="world">
     <svg class="ts-wood" id="wood" aria-hidden="true"><g id="ground"></g><g id="leaves"></g><g id="limbs"></g><g id="lit"></g></svg>
