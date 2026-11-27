@@ -28,7 +28,8 @@ export const HOME_PHOTO_MIN = 3;
 const text = value => (typeof value === 'string' ? value.trim() : '');
 export const localImage = (value) => {
   const url = text(value);
-  if (/^data:image\//i.test(url)) return url;
+  // 원본 데이터는 보존하되 첫 화면 카드에는 안전한 그림 형식만 표시한다.
+  if (/^data:image\/(?:png|jpe?g|gif|webp);base64,/i.test(url)) return url;
   return /^\/(?!\/)/.test(url) ? url : '';
 };
 const PUBLIC_ORIGINS = new Set(['https://lovetree-4-0.pages.dev', 'https://lovetree.padiem.net']);
@@ -85,7 +86,7 @@ export function cardOf(treeId, moment, currentOrigin, youtube = null) {
   // 썸네일 주소는 LTMedia.describe의 loadUrl 한 벌에서 온다 — 새로 만들지 않는다(quick-add와 같은 규칙).
   const media = (!image && youtube?.auto) ? youtube.describe?.(text(moment?.url)) : null;
   const ytCandidates = (!image && youtube?.auto)
-    ? thumbnailCandidates(moment, { autoLoad: true, currentOrigin })
+    ? thumbnailCandidates(moment, { autoLoad: true, currentOrigin }).filter(value => !/^data:image\/svg\+xml(?:;|,)/i.test(value))
     : [];
   const thumb = ytCandidates[0] || (media?.kind === 'youtube' && media.loadUrl ? media.loadUrl : '');
   const thumbCandidates = image ? [image] : ytCandidates;

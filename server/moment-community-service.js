@@ -2,6 +2,7 @@ import {randomUUID} from 'node:crypto';
 import {ApiError} from './errors.js';
 import {parsePrincipal} from './principal.js';
 import {projectSharedTree} from './share-service.js';
+import {projectPublicMomentStats} from './public-projection.js';
 import {createRateLimiter} from './rate-limit.js';
 import {isAiTesterRole} from './admin-roles.js';
 
@@ -74,7 +75,7 @@ export function createMomentCommunityService({communityRepo,shareRepo,workspaceR
   // 순간 ♡·댓글 공개 숫자(읽기) — 시험 계정 몫은 빠져 있고, AI 명예회원 몫은 aiHearts로 구분된다.
   async stats({viewerSubjectId=null,shareId,momentId}){
    await publicMoment(shareId,momentId);
-   return communityRepo.momentStats({productId,shareId,momentId,viewerSubjectId});
+   return projectPublicMomentStats(await communityRepo.momentStats({productId,shareId,momentId,viewerSubjectId}));
   },
   async react(subjectId,shareId,momentId,enabled,kind='heart'){
    // 순간 반응 종류는 ♡ 하나 — 다른 종은 트리 반응(7종)과 달리 받지 않는다.
@@ -83,7 +84,7 @@ export function createMomentCommunityService({communityRepo,shareRepo,workspaceR
    rate(subjectId,'moment-reaction',40);
    await assertNotBlocked(subjectId,share.subjectId,'reaction_blocked','차단한 기록의 순간에는 반응할 수 없어요.');
    await communityRepo.setMomentReaction({productId,shareId,momentId,subjectId,enabled,kind:'heart'});
-   return communityRepo.momentStats({productId,shareId,momentId,viewerSubjectId:subjectId});
+   return projectPublicMomentStats(await communityRepo.momentStats({productId,shareId,momentId,viewerSubjectId:subjectId}));
   },
   async comments(shareId,momentId,viewerSubjectId){
    await publicMoment(shareId,momentId);

@@ -4,15 +4,17 @@ import {ApiError} from './errors.js';
 import {parsePrincipal} from './principal.js';
 import {createRateLimiter} from './rate-limit.js';
 import {projectSharedTree,projectSharedTreeFromScan} from './share-service.js';
+import {projectPublicStats,PUBLIC_REACTION_KINDS} from './public-projection.js';
 import {readStoredDocument} from './workspace-service.js';
 import {refreshStageIndex} from './stage-index-refresh.js';
 import {ROLE_TESTER,ROLE_UNKNOWN,isAiTesterRole,aiTesterFor} from './admin-roles.js';
 import {coverModeOf} from '../src/domain.js';
 // 꼬리표 판정은 화면과 같은 한 벌 — 서버에 규칙을 복사하지 않는다(#627 3단계 '다른 팬 보기').
 import {parseTag, tagKey, isChannelLikeArtist} from '../public/v41/tags.mjs';
-import {isVerticalMoment,safeYoutubeThumb,youtubeIdFrom,youtubeStageThumbUrl} from '../public/v41/youtube-id.mjs';
+import {isVerticalMoment,youtubeIdFrom,youtubeStageThumbUrl} from '../public/v41/youtube-id.mjs';
+import {safePublicThumbnail} from '../public/v41/public-thumbnail.mjs';
 
-export const REACTION_KINDS=Object.freeze(['heart','like','love','laugh','wow','sad','angry']);
+export const REACTION_KINDS=PUBLIC_REACTION_KINDS;
 const isReactionKind=value=>typeof value==='string'&&REACTION_KINDS.includes(value);
 
 const SHARE_ID=/^[A-Za-z0-9_-]{20,64}$/;
@@ -33,7 +35,7 @@ function feedMomentItem(moment,tree,shareId,aiTester,videoId){
   treeTitle:tree.title,
   title:moment.title,
   url:moment.url||'',
-  thumbnail:safeYoutubeThumb(moment.mediaMetadata?.thumbnail||'')||(videoId?youtubeStageThumbUrl(videoId,'oardefault'):'')||moment.mediaMetadata?.thumbnail||'',
+  thumbnail:safePublicThumbnail(moment.mediaMetadata?.thumbnail||'')||(videoId?youtubeStageThumbUrl(videoId,'oardefault'):'')||'',
   note:moment.note||'',
   emotion:moment.emotion||'',
   date:moment.date||'',
@@ -147,15 +149,16 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
   const coverIsMoment=coverModeOf(tree)==='moment';
   const coverUrl=coverIsMoment?(cover?.url||''):'';
   const vertical=['video','youtube'].includes(coverType)&&isVerticalMoment(cover);
-  const safeCoverThumbnail=safeYoutubeThumb(cover?.mediaMetadata?.thumbnail);
+  const safeCoverThumbnail=safePublicThumbnail(cover?.mediaMetadata?.thumbnail);
   const thumbnailId=youtubeId||youtubeIdFrom(safeCoverThumbnail);
   const youtubeThumbnail=youtubeStageThumbUrl(thumbnailId,'mqdefault')||safeCoverThumbnail;
   // #887: 표지 후보 사슬 — 명시 표지(모드 moment) → 사진 표지(같은 자리) → 첫 YouTube 순간 썸네일(mqdefault) → 글자 칸.
   // 기본·디자인 표지 트리도 썸네일을 비워 보내면 카드가 글자 칸만 남는다(운영 7카드 전부 해당 — 261118 확인).
-  // 사진 주소는 #425 규칙 그대로 모드가 'moment'일 때만 내보내고, 없는 트리는 공개 YouTube 썸네일
-  // (i.ytimg.com mqdefault)로만 채운다 — 개인 미디어 주소는 흘리지 않는다.
+  // 사진 주소는 #425 규칙 그대로 모드가 'moment'일 때만 내보내고, 공개 HTTPS 썸네일이 있으면 비YouTube 링크도 그 그림을 쓴다.
+  // 비공개 업로드·위험 주소는 safePublicThumbnail이 거른다.
+  const coverImageUrl=/\.(?:png|jpe?g|gif|webp|avif)(?:$|[?#])/i.test(coverUrl)?safePublicThumbnail(coverUrl):'';
   let thumbnailUrl=coverIsMoment
-   ? coverType==='youtube'?youtubeThumbnail:coverUrl
+   ? coverType==='youtube'?youtubeThumbnail:(safeCoverThumbnail||coverImageUrl)
    : '';
   let cardCoverType=coverType,cardVertical=vertical;
   if(!thumbnailUrl){
@@ -165,7 +168,7 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
   }
   const emotions=[...new Set(tree.moments.map(moment=>moment.emotion).filter(Boolean))];
   const stats=statsOverride||await communityRepo.stats({productId,shareId:share.shareId,viewerSubjectId});
-  const card={shareId:share.shareId,title:tree.title,subject:tree.subject,summary:clean(cover?.note,160),emotions,momentCount:tree.moments.length,entryMomentId:share.entryMomentId,view:share.view,cover:{momentId:cover.id,title:cover?.title||tree.title,url:coverUrl,thumbnailUrl,type:cardCoverType,vertical:cardVertical,emotion:cover?.emotion||''},createdAt:share.createdAt,lastActivityAt:lastActivityAt||share.createdAt,stats};
+  const card={shareId:share.shareId,title:tree.title,subject:tree.subject,summary:clean(cover?.note,160),emotions,momentCount:tree.moments.length,entryMomentId:share.entryMomentId,view:share.view,cover:{momentId:cover.id,title:cover?.title||tree.title,url:coverUrl,thumbnailUrl,type:cardCoverType,vertical:cardVertical,emotion:cover?.emotion||''},createdAt:share.createdAt,lastActivityAt:lastActivityAt||share.createdAt,stats:projectPublicStats(stats)};
   // #611 3번: AI 명예회원 기록은 남에게 보이는 카드에 'AI 명예회원' 배지 한 비트만 내린다
   // (계정·이메일·subject는 공개 응답에 넣지 않는다).
   if(aiTesterLookup&&await aiTesterLookup(share.subjectId))card.aiTester=true;
@@ -336,7 +339,7 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
       treeTitle:tree.title,
       title:moment.title,
       url:moment.url||'',
-      thumbnail:moment.mediaMetadata?.thumbnail||'',
+      thumbnail:safePublicThumbnail(moment.mediaMetadata?.thumbnail||'')||'',
       date:moment.date||'',
       aiTester
      });
@@ -431,7 +434,7 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
    const stats=await communityRepo.stats({productId,shareId,viewerSubjectId:subjectId});
    const voted=await communityRepo.hasVoted({productId,targetKind:'tree',targetId:shareId,subjectId});
    const weeklyFavorites=(await communityRepo.weeklyVoteCounts({productId,targetKind:'tree',...votingWeek()}))[shareId]||0;
-   return {...stats,voted,weeklyFavorites};
+   return {...projectPublicStats(stats),voted,weeklyFavorites};
   },
   async favorites(subjectId){return communityRepo.listFavorites({productId,subjectId});},
   async react(subjectId,shareId,enabled,kind='heart'){
@@ -446,7 +449,7 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
    const stats=await communityRepo.stats({productId,shareId,viewerSubjectId:subjectId});
    const voted=await communityRepo.hasVoted({productId,targetKind:'tree',targetId:shareId,subjectId});
    const weeklyFavorites=(await communityRepo.weeklyVoteCounts({productId,targetKind:'tree',...votingWeek()}))[shareId]||0;
-   return {...stats,voted,weeklyFavorites};},
+   return {...projectPublicStats(stats),voted,weeklyFavorites};},
   async comments(shareId,viewerSubjectId){await activeShare(shareId);const isAdmin=!!viewerSubjectId&&!!admin&&await admin.roleFor({productId,subjectId:viewerSubjectId})==='admin';return (await communityRepo.listComments({productId,shareId,limit:50})).map(row=>publicComment(row,viewerSubjectId,isAdmin));},
   async comment(subjectId,shareId,body,key){const share=await activeShare(shareId);rate(subjectId,'comment',12);if(communityRepo?.isBlocked){const blocked=await communityRepo.isBlocked({productId,blockerSubjectId:subjectId,blockedSubjectId:share.subjectId});if(blocked)throw new ApiError(403,'comment_blocked','차단한 기록에는 댓글을 남길 수 없어요.');}const text=clean(body,1000);if(!text)throw new ApiError(400,'comment_empty','댓글을 입력해 주세요.');const row=await communityRepo.createComment({productId,commentId:makeId(),shareId,subjectId,body:text,clientKey:key});return publicComment(row,subjectId);},
   async updateComment(subjectId,commentId,body){if(!ITEM_ID.test(commentId))throw new ApiError(404,'comment_not_found','댓글을 찾을 수 없어요.');rate(subjectId,'comment',12);const text=clean(body,1000);if(!text)throw new ApiError(400,'comment_empty','댓글을 입력해 주세요.');const current=await communityRepo.getComment?.({productId,commentId});if(!current||current.status!=='visible')throw new ApiError(404,'comment_not_found','댓글을 찾을 수 없어요.');if(current.subjectId!==subjectId)throw new ApiError(403,'comment_forbidden','이 댓글을 수정할 수 없어요.');const share=await shareRepo.load({productId,shareId:current.shareId});if(!share||share.status!=='active')throw new ApiError(404,'share_not_found','공개 트리를 찾을 수 없어요.');if(communityRepo?.isBlocked){const blocked=await communityRepo.isBlocked({productId,blockerSubjectId:subjectId,blockedSubjectId:share.subjectId});if(blocked)throw new ApiError(403,'comment_blocked','차단한 기록에는 댓글을 남길 수 없어요.');}const row=await communityRepo.updateComment({productId,commentId,subjectId,body:text});if(!row)throw new ApiError(403,'comment_forbidden','이 댓글을 수정할 수 없어요.');return publicComment(row,subjectId);},
