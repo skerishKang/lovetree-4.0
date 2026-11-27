@@ -33,7 +33,7 @@ html,body{height:100%;margin:0}
 body{background:var(--lt-stage);color:var(--lt-pearl);font-family:var(--lt-ui);overflow:hidden;-webkit-text-size-adjust:100%}
 
 /* 무대 */
-.ts-stage{position:absolute;inset:var(--lt-toolbar-height) 0 var(--ts-footer-h) 0;overflow:hidden;background:var(--ts-page);touch-action:none;cursor:grab;outline:0}
+.ts-stage{position:absolute;inset:calc(var(--lt-toolbar-top) + var(--lt-toolbar-height)) 0 var(--ts-footer-h) 0;overflow:hidden;background:var(--ts-page);touch-action:none;cursor:grab;outline:0}
 .ts-stage[data-dragging=true]{cursor:grabbing}
 .ts-world{position:absolute;left:0;top:0;width:0;height:0;transform-origin:0 0}
 .ts-stage[data-dragging=true] .ts-world{will-change:transform}
@@ -99,7 +99,8 @@ body{background:var(--lt-stage);color:var(--lt-pearl);font-family:var(--lt-ui);o
 .ts-stage[data-lod=far] .ts-card.is-root{box-shadow:0 0 0 2px var(--lt-gold-deep),0 0 40px var(--lt-gold-glow)}
 
 
-html[data-v41-screen=tree]{--lt-toolbar-top:0px;--ts-footer-h:48px}
+/* #1489: 도구 줄 위끝을 서재·보드·책·지도와 같이 머리줄 아래 4px에 둔다(전에는 0px라 트리만 4px 위였다). 판은 그만큼 아래서 시작한다. */
+html[data-v41-screen=tree]{--lt-toolbar-top:4px;--ts-footer-h:48px}
 .ts-footer{position:absolute;inset:auto 0 0;height:var(--ts-footer-h);display:flex;align-items:center;padding:0 16px;border-top:1px solid var(--lt-line);background:var(--lt-glass);color:var(--lt-pearl)}
 .ts-note{margin:0;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:13px}
 .ts-note span{color:var(--lt-muted);margin-left:8px}
