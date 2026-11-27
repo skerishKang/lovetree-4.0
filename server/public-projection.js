@@ -1,9 +1,18 @@
 import { safePublicThumbnail } from '../public/v41/public-thumbnail.mjs';
+import { normalizePrefs } from '../src/domain.js';
 
 export const PUBLIC_REACTION_KINDS = Object.freeze(['heart', 'like', 'love', 'laugh', 'wow', 'sad', 'angry']);
 export const PUBLIC_TREE_FIELDS = Object.freeze(['id', 'subject', 'title', 'openView', 'coverMomentId', 'coverDesign', 'coverMode', 'createdAt', 'updatedAt', 'moments']);
 export const PUBLIC_MOMENT_FIELDS = Object.freeze(['id', 'parentId', 'title', 'note', 'emotion', 'date', 'url', 'mediaMetadata', 'startSeconds', 'endSeconds', 'relation', 'links', 'x', 'y', 'rot', 'pinStyle', 'cardStyle', 'color', 'keywords', 'createdAt']);
 export const PUBLIC_MEDIA_FIELDS = Object.freeze(['title', 'channel', 'source', 'thumbnail', 'vertical', 'width', 'height']);
+
+export const PUBLIC_VISIT_PREFS = Object.freeze(['dateStyle', 'titleDisplay', 'bookDisplay', 'shelfView', 'treeChipOrder']);
+
+export function projectPublicVisitPrefs(value, shelfShareIds) {
+  const prefs = normalizePrefs(value);
+  prefs.treeChipOrder = prefs.treeChipOrder.filter(id => shelfShareIds.has(id)).map(id => shelfShareIds.get(id));
+  return Object.fromEntries(PUBLIC_VISIT_PREFS.map(key => [key, prefs[key]]));
+}
 
 const text = value => typeof value === 'string' ? value : '';
 const number = value => typeof value === 'number' && Number.isFinite(value) ? value : null;

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createTree,editTree,addMoment,validateState as validateServerState} from '../src/domain.js';
+import {createTree,editTree,addMoment,validateState as validateServerState,normalizePrefs} from '../src/domain.js';
 import {validateState as validateBrowserState} from '../public/v41/domain.mjs';
 import {createWorkspaceService} from '../server/workspace-service.js';
 import {createMemoryWorkspaceRepo} from '../server/testing/memory-workspace-repo.js';
@@ -8,7 +8,7 @@ import {createMemoryShareRepo} from '../server/testing/memory-share-repo.js';
 import {createMemoryTreeDiscoverRepo} from '../server/testing/memory-tree-discover-repo.js';
 import {createMemoryCommunityRepo} from '../server/testing/memory-community-repo.js';
 import {createShareHandler,createShareService,projectSharedTree,projectSharedTreeFromScan} from '../server/share-service.js';
-import {PUBLIC_TREE_FIELDS,PUBLIC_MOMENT_FIELDS,PUBLIC_MEDIA_FIELDS} from '../server/public-projection.js';
+import {PUBLIC_TREE_FIELDS,PUBLIC_MOMENT_FIELDS,PUBLIC_MEDIA_FIELDS,PUBLIC_VISIT_PREFS,projectPublicVisitPrefs} from '../server/public-projection.js';
 import {createMemberSession} from '../public/v41/member-session.mjs';
 import {safePublicThumbnail} from '../public/v41/public-thumbnail.mjs';
 import {ApiError} from '../server/errors.js';
@@ -182,7 +182,8 @@ test('방문 읽기는 허용 목록과 서재 범위를 지키고 ETag 재검�
  const discoverRepo=createMemoryTreeDiscoverRepo();
  const visibilityRepo={get:async({treeId})=>({visibility:treeId===privateTree.id?'private':'public'})};
  const communityRepo=createMemoryCommunityRepo({isPrivateTree:(p,s,t)=>t===privateTree.id,isDiscoverOn:(p,s,t)=>discoverRepo.isOn(p,s,t)});
- const {handle,shareRepo}=await setup({version:1,trees:[current,introduced,linkOnly,privateTree]},null,{discoverRepo,visibilityRepo,communityRepo});
+ const prefs={dateStyle:'long',titleDisplay:'mine',bookDisplay:'list',shelfView:'shelf',treeChipOrder:[privateTree.id,introduced.id,'all',current.id,introduced.id,linkOnly.id,'unknown-id'],displayName:'private@example.test',accentColor:'rose',startPlace:'home',shareView:'board',shareDiscover:true,homeMoment:{mode:'tree',treeId:privateTree.id},futureKey:'secret-future',theme:'dark'};
+ const {handle,shareRepo}=await setup({version:1,trees:[current,introduced,linkOnly,privateTree],prefs},null,{discoverRepo,visibilityRepo,communityRepo});
  const shares=[];
  for(const [shareId,tree] of [['v'.repeat(24),current],['w'.repeat(24),introduced],['x'.repeat(24),linkOnly],['y'.repeat(24),privateTree]]){
   const share=await shareRepo.create({productId:PRODUCT,shareId,subjectId:'alice',treeId:tree.id,entryMomentId:tree.moments[0].id,view:'book',momentCount:tree.moments.length});
@@ -196,9 +197,11 @@ test('방문 읽기는 허용 목록과 서재 범위를 지키고 ETag 재검�
  assert.match(response.headers.etag,/^"[A-Za-z0-9_-]+"$/);
  assert.deepEqual(Object.keys(response.body).sort(),['shelf','stats','tree','visit']);
  assert.deepEqual(Object.keys(response.body.stats).sort(),['comments','favored','favorites','hearted','hearts','mine','reactions']);
- assert.deepEqual(Object.keys(response.body.visit).sort(),['aiTester','entryMomentId','momentCount','omittedPrivateMedia','ownerLabel','shareId','updatedAt','view']);
+ assert.deepEqual(Object.keys(response.body.visit).sort(),['aiTester','entryMomentId','momentCount','omittedPrivateMedia','ownerLabel','prefs','shareId','updatedAt','view']);
  assert.equal(response.body.tree.id,shares[0].shareId);
  assert.equal(response.body.visit.ownerLabel,'');
+ assert.deepEqual(response.body.visit.prefs,{dateStyle:'long',titleDisplay:'mine',bookDisplay:'list',shelfView:'shelf',treeChipOrder:[shares[1].shareId,shares[0].shareId]});
+ assert.deepEqual(Object.keys(response.body.visit.prefs).sort(),[...PUBLIC_VISIT_PREFS].sort());
  assert.deepEqual(response.body.shelf.map(item=>item.shareId),[shares[0].shareId,shares[1].shareId]);
  const body=JSON.stringify(response.body);
  for(const value of [current.id,introduced.id,linkOnly.id,privateTree.id,linkOnly.title,privateTree.title,'alice','@'])assert.equal(body.includes(value),false,value);
@@ -206,6 +209,7 @@ test('방문 읽기는 허용 목록과 서재 범위를 지키고 ETag 재검�
  assert.equal(cached.status,304);assert.equal(cached.body,undefined);assert.equal(cached.headers.etag,response.headers.etag);
  const linkResponse=await request(handle,'GET','/api/public/visits/'+shares[2].shareId);
  assert.equal(linkResponse.status,200);assert.deepEqual(linkResponse.body.shelf.map(item=>item.shareId),[shares[2].shareId],'링크 전용 입구는 자기 트리만 서재에 둔다');
+ assert.deepEqual(linkResponse.body.visit.prefs.treeChipOrder,[shares[2].shareId]);
  const privateResponse=await request(handle,'GET','/api/public/visits/'+shares[3].shareId);
  assert.equal(privateResponse.status,403);assert.equal(privateResponse.body.error.code,'share_private');
  await shareRepo.revoke({productId:PRODUCT,subjectId:'alice',shareId:shares[0].shareId});
@@ -220,6 +224,26 @@ function deviantTree() {
   const grown = { ...tree, moments: [...tree.moments, { ...tree.moments[0], id: 'moment-second-root', parentId: null }] };
   return grown;
 }
+
+test('방문 설정은 저장 문서의 새 필드와 개인 설정을 공개하지 않고 옛 문서는 기본값을 사용한다',async()=>{
+ const {handle,workspaceRepo,shareRepo}=await setup();
+ const shareId='p'.repeat(24);
+ await shareRepo.create({productId:PRODUCT,shareId,subjectId:'alice',treeId:first.id,entryMomentId:first.moments[0].id,view:'book',momentCount:first.moments.length});
+ const defaults=Object.fromEntries(PUBLIC_VISIT_PREFS.map(key=>[key,normalizePrefs()[key]]));
+ const raw={dateStyle:'bad@example.test',titleDisplay:{subjectId:'alice'},bookDisplay:'bad',shelfView:'bad',treeChipOrder:[second.id,'all','unknown-id'],displayName:'owner@example.test',accentColor:'gold',startPlace:'home',shareView:'board',shareDiscover:true,homeMoment:{mode:'tree',treeId:second.id},futureKey:'secret-future',theme:'dark'};
+ for(const [index,prefs] of [undefined,raw].entries()){
+  const doc={version:1,trees:[first,second],...(prefs===undefined?{}:{prefs})};
+  assert.equal((await workspaceRepo.commit({productId:PRODUCT,subjectId:'alice',doc,expectedRevision:index+1,clientKey:'raw-prefs-'+index,requestHash:String(index).repeat(64)})).status,'saved');
+  const response=await request(handle,'GET','/api/public/visits/'+shareId);
+  assert.equal(response.status,200);
+  assert.deepEqual(response.body.visit.prefs,defaults);
+  assert.deepEqual(Object.keys(response.body.visit.prefs).sort(),[...PUBLIC_VISIT_PREFS].sort());
+  const body=JSON.stringify(response.body);
+  for(const value of ['@','alice','subjectId',first.id,second.id,'secret-future','displayName','accentColor','startPlace','shareView','shareDiscover','homeMoment','futureKey','theme','unknown-id'])assert.equal(body.includes(value),false,value);
+  assert.deepEqual((await workspaceRepo.load({productId:PRODUCT,subjectId:'alice'})).doc,doc);
+ }
+ assert.deepEqual(projectPublicVisitPrefs(raw,new Map()),defaults);
+});
 
 async function setupWithQuarantinedTree() {
   const workspaceRepo = createMemoryWorkspaceRepo();
