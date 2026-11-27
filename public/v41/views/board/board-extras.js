@@ -1288,9 +1288,6 @@ updateKeywordFilter();
 formFor(addType);
 fitAll(false);
 applyPathHighlight();
-setTimeout(() => {
-  /* #891: 탭으로 들어오면 닫힘, ?open= 주소만 자동 열림(board.js bootDetailPanel) */ bootDetailPanel();
-}, 100);
 window.__LT58V11 = {
   youtubeId,
   youtubeThumb,
