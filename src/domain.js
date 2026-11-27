@@ -1,4 +1,5 @@
 import { validateRange, rangeFields, fillStartFromUrl } from './moment-range.js';
+import '../public/v41/theme-registry.js';
 import { DEFAULT_TREE_OPEN_VIEW, normalizeTreeOpenView } from '../public/v41/tree-open-view.mjs';
 export const EMOTIONS = ['설렘', '위로', '벅참', '그리움', '고마움', '즐거움'];
 // #256-3: 책(트리)마다 고르는 디자인 표지. 테마 표지 색(--lt-cover-N) 위의 질감 변형 6종.
@@ -107,6 +108,7 @@ export function normalizeTreeChipOrder(value) {
 }
 export function normalizePrefs(value) {
   return {
+    theme: globalThis.LT41_THEME_REGISTRY.normalize(value?.theme),
     titleDisplay: normalizeTitleDisplay(value?.titleDisplay),
     displayName: normalizeDisplayName(value?.displayName),
     accentColor: normalizeAccentColor(value?.accentColor),

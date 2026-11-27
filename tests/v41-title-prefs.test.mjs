@@ -22,10 +22,10 @@ test('0. 설정 값·기본값·정규화가 두 벌에서 같다', () => {
   const nonDefault = { titleDisplay: 'mine', dateStyle: 'dash', startPlace: 'shelf', shareView: 'network', shareDiscover: true };
   assert.deepEqual(src.normalizePrefs(nonDefault), pub.normalizePrefs(nonDefault));
   assert.deepEqual(src.normalizePrefs(nonDefault), {
-    titleDisplay: 'mine', displayName: '', accentColor: '', dateStyle: 'dash', startPlace: 'shelf', shareView: 'network', shareDiscover: true, treeChipOrder: [], bookDisplay: 'book', shelfView: 'carousel', homeMoment: { mode: 'last', treeId: '', momentId: '' },
+    theme: 'night', titleDisplay: 'mine', displayName: '', accentColor: '', dateStyle: 'dash', startPlace: 'shelf', shareView: 'network', shareDiscover: true, treeChipOrder: [], bookDisplay: 'book', shelfView: 'carousel', homeMoment: { mode: 'last', treeId: '', momentId: '' },
   });
-  assert.deepEqual(src.EMPTY_STATE().prefs, { titleDisplay: 'both', displayName: '', accentColor: '', dateStyle: 'dot', startPlace: 'resume', shareView: 'book', shareDiscover: false, treeChipOrder: [], bookDisplay: 'book', shelfView: 'carousel', homeMoment: { mode: 'last', treeId: '', momentId: '' } });
-  assert.deepEqual(pub.EMPTY_STATE().prefs, { titleDisplay: 'both', displayName: '', accentColor: '', dateStyle: 'dot', startPlace: 'resume', shareView: 'book', shareDiscover: false, treeChipOrder: [], bookDisplay: 'book', shelfView: 'carousel', homeMoment: { mode: 'last', treeId: '', momentId: '' } });
+  assert.deepEqual(src.EMPTY_STATE().prefs, { theme: 'night', titleDisplay: 'both', displayName: '', accentColor: '', dateStyle: 'dot', startPlace: 'resume', shareView: 'book', shareDiscover: false, treeChipOrder: [], bookDisplay: 'book', shelfView: 'carousel', homeMoment: { mode: 'last', treeId: '', momentId: '' } });
+  assert.deepEqual(pub.EMPTY_STATE().prefs, { theme: 'night', titleDisplay: 'both', displayName: '', accentColor: '', dateStyle: 'dot', startPlace: 'resume', shareView: 'book', shareDiscover: false, treeChipOrder: [], bookDisplay: 'book', shelfView: 'carousel', homeMoment: { mode: 'last', treeId: '', momentId: '' } });
   // 261116 PR 2: 첫 화면 카드 모드(normalizeHomeMoment)도 두 벌이 같다. 모르는 값은 '마지막', id는 80자로 정리한다.
   assert.deepEqual(src.HOME_MOMENT_MODES, pub.HOME_MOMENT_MODES);
   assert.deepEqual(src.HOME_MOMENT_MODES, ['last', 'pin', 'day', 'random', 'tree']);
@@ -34,8 +34,8 @@ test('0. 설정 값·기본값·정규화가 두 벌에서 같다', () => {
   }
   assert.deepEqual(src.normalizeHomeMoment({ mode: 'pin', momentId: ' m1 ', treeId: ' t1 ' }), { mode: 'pin', treeId: 't1', momentId: 'm1' });
   assert.deepEqual(src.normalizeHomeMoment({ mode: 'evil' }), { mode: 'last', treeId: '', momentId: '' });
-  assert.deepEqual(src.EMPTY_STATE().prefs, { titleDisplay: 'both', displayName: '', accentColor: '', dateStyle: 'dot', startPlace: 'resume', shareView: 'book', shareDiscover: false, treeChipOrder: [], bookDisplay: 'book', shelfView: 'carousel', homeMoment: { mode: 'last', treeId: '', momentId: '' } });
-  assert.deepEqual(pub.EMPTY_STATE().prefs, { titleDisplay: 'both', displayName: '', accentColor: '', dateStyle: 'dot', startPlace: 'resume', shareView: 'book', shareDiscover: false, treeChipOrder: [], bookDisplay: 'book', shelfView: 'carousel', homeMoment: { mode: 'last', treeId: '', momentId: '' } });
+  assert.deepEqual(src.EMPTY_STATE().prefs, { theme: 'night', titleDisplay: 'both', displayName: '', accentColor: '', dateStyle: 'dot', startPlace: 'resume', shareView: 'book', shareDiscover: false, treeChipOrder: [], bookDisplay: 'book', shelfView: 'carousel', homeMoment: { mode: 'last', treeId: '', momentId: '' } });
+  assert.deepEqual(pub.EMPTY_STATE().prefs, { theme: 'night', titleDisplay: 'both', displayName: '', accentColor: '', dateStyle: 'dot', startPlace: 'resume', shareView: 'book', shareDiscover: false, treeChipOrder: [], bookDisplay: 'book', shelfView: 'carousel', homeMoment: { mode: 'last', treeId: '', momentId: '' } });
 
 });
 
@@ -69,7 +69,7 @@ test('0-3. #368 3차 화면·시작·공유 기본값 규칙이 두 벌에서 �
   // 옛 저장본(새 값 없음)은 지금 동작 그대로 읽힌다.
   const oldSave = { version: 1, trees: [], prefs: { titleDisplay: 'video' } };
   assert.deepEqual(src.validateState(structuredClone(oldSave)).prefs,
-    { titleDisplay: 'video', displayName: '', accentColor: '', dateStyle: 'dot', startPlace: 'resume', shareView: 'book', shareDiscover: false, treeChipOrder: [], bookDisplay: 'book', shelfView: 'carousel', homeMoment: { mode: 'last', treeId: '', momentId: '' } });
+    { theme: 'night', titleDisplay: 'video', displayName: '', accentColor: '', dateStyle: 'dot', startPlace: 'resume', shareView: 'book', shareDiscover: false, treeChipOrder: [], bookDisplay: 'book', shelfView: 'carousel', homeMoment: { mode: 'last', treeId: '', momentId: '' } });
 
   assert.deepEqual(pub.validateState(structuredClone(oldSave)).prefs, src.validateState(structuredClone(oldSave)).prefs);
 });
@@ -98,7 +98,7 @@ test('0-1. #368 2차 프로필 규칙(표시 이름 20자·동그라미 색)이 
   // 옛 저장본(프로필 값 없음)은 그대로 읽힌다 — 제목 보기만 남고 새 키는 빈 값이다.
   const old = { version: 1, trees: [], prefs: { titleDisplay: 'mine' } };
   assert.deepEqual(src.validateState(structuredClone(old)).prefs,
-    { titleDisplay: 'mine', displayName: '', accentColor: '', dateStyle: 'dot', startPlace: 'resume', shareView: 'book', shareDiscover: false, treeChipOrder: [], bookDisplay: 'book', shelfView: 'carousel', homeMoment: { mode: 'last', treeId: '', momentId: '' } });
+    { theme: 'night', titleDisplay: 'mine', displayName: '', accentColor: '', dateStyle: 'dot', startPlace: 'resume', shareView: 'book', shareDiscover: false, treeChipOrder: [], bookDisplay: 'book', shelfView: 'carousel', homeMoment: { mode: 'last', treeId: '', momentId: '' } });
 
   assert.deepEqual(pub.validateState(structuredClone(old)).prefs, src.validateState(structuredClone(old)).prefs);
 });
@@ -118,14 +118,14 @@ test('0-2. 프로필은 계정 기록(PUT→GET)을 지나도 남는다', async 
   assert.equal(lastPut.prefs.accentColor, 'teal', 'PUT 본문에 동그라미 색이 실린다');
   const restored = createMemberSession({ api });
   await restored.start();
-  assert.deepEqual(restored.state().prefs, { titleDisplay: 'both', displayName: '윤슬 지기', accentColor: 'teal', dateStyle: 'dot', startPlace: 'resume', shareView: 'book', shareDiscover: false, treeChipOrder: [], bookDisplay: 'book', shelfView: 'carousel', homeMoment: { mode: 'last', treeId: '', momentId: '' } }, 'GET으로 돌아온 프로필');
+  assert.deepEqual(restored.state().prefs, { theme: 'night', titleDisplay: 'both', displayName: '윤슬 지기', accentColor: 'teal', dateStyle: 'dot', startPlace: 'resume', shareView: 'book', shareDiscover: false, treeChipOrder: [], bookDisplay: 'book', shelfView: 'carousel', homeMoment: { mode: 'last', treeId: '', momentId: '' } }, 'GET으로 돌아온 프로필');
 
   // 이름을 지우면 빈 값(이메일 폴백)으로 저장된다.
   restored.apply('setPrefs', { displayName: '   ', accentColor: '' });
   await restored.act('retry');
   const again = createMemberSession({ api });
   await again.start();
-  assert.deepEqual(again.state().prefs, { titleDisplay: 'both', displayName: '', accentColor: '', dateStyle: 'dot', startPlace: 'resume', shareView: 'book', shareDiscover: false, treeChipOrder: [], bookDisplay: 'book', shelfView: 'carousel', homeMoment: { mode: 'last', treeId: '', momentId: '' } });
+  assert.deepEqual(again.state().prefs, { theme: 'night', titleDisplay: 'both', displayName: '', accentColor: '', dateStyle: 'dot', startPlace: 'resume', shareView: 'book', shareDiscover: false, treeChipOrder: [], bookDisplay: 'book', shelfView: 'carousel', homeMoment: { mode: 'last', treeId: '', momentId: '' } });
 
   // 두 검증기 모두 같은 상태를 받아들인다.
   assert.deepEqual(src.validateState(structuredClone(state)), pub.validateState(structuredClone(state)));
@@ -241,4 +241,48 @@ test('책/목록 보기는 두 벌에서 같고 계정 기록을 지나도 남�
   const restoredShelf = createMemberSession({ api });
   await restoredShelf.start();
   assert.equal(restoredShelf.state().prefs.shelfView, 'carousel', 'PUT→GET을 지나도 남는다');
+});
+
+
+test('#1558 ?? ?? ???? ??? ????? ??', () => {
+  const registry = globalThis.LT41_THEME_REGISTRY;
+  for (const value of [...registry.themes.map(t=>t.id), undefined, null, 'unknown', {}, 7]) {
+    assert.equal(src.normalizePrefs({theme:value}).theme,registry.normalize(value));
+    assert.deepEqual(src.normalizePrefs({theme:value}),pub.normalizePrefs({theme:value}));
+  }
+});
+
+test('#1558 ? ??? ? ???? ? ? ???? ? ?? ??? ???? ???', async () => {
+  const {createMemoryWorkspaceRepo}=await import('../server/testing/memory-workspace-repo.js');
+  const {createWorkspaceService}=await import('../server/workspace-service.js');
+  const repo=createMemoryWorkspaceRepo(), principal={productId:'test',subjectId:'theme-user'};
+  await repo.commit({...principal,doc:{version:1,trees:[],prefs:{titleDisplay:'mine'}},expectedRevision:0,clientKey:'legacy',requestHash:'legacy'});
+  const workspace=createWorkspaceService({repo,productId:'test'});
+  let puts=0;
+  const api={get:async()=>({ok:true,writeSubjectBound:true,...await workspace.read(principal)}),
+    put:async body=>{assert.equal(body.expectedSubject,principal.subjectId);puts++;return {ok:true,...await workspace.write(principal,body)};},
+    logout:async()=>({ok:true})};
+  const storage=value=>{const data=new Map([['lt41.theme',value]]);return {getItem:k=>data.get(k)??null,setItem:(k,v)=>data.set(k,String(v)),removeItem:k=>data.delete(k)};};
+  const a=storage('garden'),b=storage('night');
+  const create=store=>createMemberSession({api,cacheStorage:store,themeStorage:store,delay:()=>new Promise(()=>{}),onState:state=>store.setItem('lt41.theme',state.prefs.theme)});
+  const first=create(a),second=create(b);
+  try {
+    assert.equal((await workspace.read(principal)).themeMissing,true);
+    await first.start();
+    assert.equal(first.state().prefs.theme,'garden');
+    await first.act('retry');
+    assert.equal(puts,1);
+    assert.equal((await workspace.read(principal)).themeMissing,undefined);
+    assert.equal((await workspace.read(principal)).state.prefs.titleDisplay,'mine');
+    await second.start();
+    assert.equal(second.state().prefs.theme,'garden');
+    assert.equal(b.getItem('lt41.theme'),'garden');
+    assert.equal(puts,1);
+    second.apply('setPrefs',{theme:'night'});
+    await second.act('retry');
+    await first.act('check');
+    assert.equal(first.state().prefs.theme,'night');
+    assert.equal(a.getItem('lt41.theme'),'night');
+    assert.equal(puts,2);
+  } finally {first.dispose();second.dispose();}
 });

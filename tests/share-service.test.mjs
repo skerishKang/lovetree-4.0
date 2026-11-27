@@ -182,7 +182,7 @@ test('방문 읽기는 허용 목록과 서재 범위를 지키고 ETag 재검�
  const discoverRepo=createMemoryTreeDiscoverRepo();
  const visibilityRepo={get:async({treeId})=>({visibility:treeId===privateTree.id?'private':'public'})};
  const communityRepo=createMemoryCommunityRepo({isPrivateTree:(p,s,t)=>t===privateTree.id,isDiscoverOn:(p,s,t)=>discoverRepo.isOn(p,s,t)});
- const prefs={dateStyle:'long',titleDisplay:'mine',bookDisplay:'list',shelfView:'shelf',treeChipOrder:[privateTree.id,introduced.id,'all',current.id,introduced.id,linkOnly.id,'unknown-id'],displayName:'private@example.test',accentColor:'rose',startPlace:'home',shareView:'board',shareDiscover:true,homeMoment:{mode:'tree',treeId:privateTree.id},futureKey:'secret-future',theme:'dark'};
+ const prefs={dateStyle:'long',titleDisplay:'mine',bookDisplay:'list',shelfView:'shelf',treeChipOrder:[privateTree.id,introduced.id,'all',current.id,introduced.id,linkOnly.id,'unknown-id'],displayName:'private@example.test',accentColor:'rose',startPlace:'home',shareView:'board',shareDiscover:true,homeMoment:{mode:'tree',treeId:privateTree.id},futureKey:'secret-future',theme:'garden'};
  const {handle,shareRepo}=await setup({version:1,trees:[current,introduced,linkOnly,privateTree],prefs},null,{discoverRepo,visibilityRepo,communityRepo});
  const shares=[];
  for(const [shareId,tree] of [['v'.repeat(24),current],['w'.repeat(24),introduced],['x'.repeat(24),linkOnly],['y'.repeat(24),privateTree]]){
@@ -200,7 +200,7 @@ test('방문 읽기는 허용 목록과 서재 범위를 지키고 ETag 재검�
  assert.deepEqual(Object.keys(response.body.visit).sort(),['aiTester','entryMomentId','momentCount','omittedPrivateMedia','ownerLabel','prefs','shareId','updatedAt','view']);
  assert.equal(response.body.tree.id,shares[0].shareId);
  assert.equal(response.body.visit.ownerLabel,'');
- assert.deepEqual(response.body.visit.prefs,{dateStyle:'long',titleDisplay:'mine',bookDisplay:'list',shelfView:'shelf',treeChipOrder:[shares[1].shareId,shares[0].shareId]});
+ assert.deepEqual(response.body.visit.prefs,{dateStyle:'long',titleDisplay:'mine',bookDisplay:'list',shelfView:'shelf',theme:'garden',treeChipOrder:[shares[1].shareId,shares[0].shareId]});
  assert.deepEqual(Object.keys(response.body.visit.prefs).sort(),[...PUBLIC_VISIT_PREFS].sort());
  assert.deepEqual(response.body.shelf.map(item=>item.shareId),[shares[0].shareId,shares[1].shareId]);
  const body=JSON.stringify(response.body);
@@ -239,7 +239,7 @@ test('방문 설정은 저장 문서의 새 필드와 개인 설정을 공개하
   assert.deepEqual(response.body.visit.prefs,defaults);
   assert.deepEqual(Object.keys(response.body.visit.prefs).sort(),[...PUBLIC_VISIT_PREFS].sort());
   const body=JSON.stringify(response.body);
-  for(const value of ['@','alice','subjectId',first.id,second.id,'secret-future','displayName','accentColor','startPlace','shareView','shareDiscover','homeMoment','futureKey','theme','unknown-id'])assert.equal(body.includes(value),false,value);
+  for(const value of ['@','alice','subjectId',first.id,second.id,'secret-future','displayName','accentColor','startPlace','shareView','shareDiscover','homeMoment','futureKey','unknown-id'])assert.equal(body.includes(value),false,value);
   assert.deepEqual((await workspaceRepo.load({productId:PRODUCT,subjectId:'alice'})).doc,doc);
  }
  assert.deepEqual(projectPublicVisitPrefs(raw,new Map()),defaults);
