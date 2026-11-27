@@ -3447,7 +3447,7 @@ test('#1489 도구 줄: 다섯 화면 위끝 차 0px·누름 44px 이상·긴 �
         assert.ok(value.hit.length > 0, tag + ': 도구 줄 단추가 없다');
         for (const h of value.hit) assert.ok(h.px >= 44, tag + ' 누름 영역 ' + h.px + 'px < 44px: ' + h.name);
         assert.ok(value.choiceRight <= value.barRight + 0.5, tag + ' 트리 고르기가 도구 줄 밖으로 넘친다');
-        assert.ok(value.choiceRight - 0 <= (width === 390 ? 260 : 390), tag + ' 긴 이름이 트리 고르기 칸을 넓힌다: 오른쪽 끝 ' + value.choiceRight);
+        assert.ok(value.choiceRight - 0 <= (width === 390 ? 260 : 450), tag + ' 긴 이름이 트리 고르기 칸을 넓힌다: 오른쪽 끝 ' + value.choiceRight);
         assert.equal(value.overflowX, 0, tag + ' 가로 넘침');
         // 고른 상태(aria-pressed=true)의 올림 테두리 — 마우스를 올리면 테두리 색이 바뀐다.
         if (value.pressed === 'true' && await frame.locator('button.lt-toolbar-tree-choice').isEnabled()) {

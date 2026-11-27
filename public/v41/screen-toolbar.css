@@ -271,5 +271,5 @@ html[data-v41-screen=board] .lt-screen-toolbar .lt-toolbar-tools #boardBgBtn{wid
 /* 묶음·도구 줄의 가장자리가 늘어난 누름 영역을 자르지 않게 위쪽 9px 여유를 둔다(보이는 모양은 그대로). */
 .lt-screen-toolbar .lt-toolbar-tools{padding-top:9px;margin-top:-9px}
 .lt-screen-toolbar .lt-toolbar-tools :is(.view-toggle,.shelf-view-inline,.boardModeSwitch,.view-switch){overflow:clip;overflow-clip-margin:9px}
-/* #1489(#1497 1번): 넓은 화면에서도 도구 줄 트리 고르기 칸에 최대 폭을 두고 긴 이름은 줄임표로 끝낸다. */
-@media(min-width:601px){.lt-toolbar-tree-choice{max-width:min(360px,calc(100vw - 200px))}}
+/* #1489(#1497 1번): 넓은 화면에서도 도구 줄 트리 고르기 칸에 최대 폭(420px — 스물두 글자 이름이 안 잘리는 #885 기준을 넘지 않게)을 두고 긴 이름은 줄임표로 끝낸다. */
+@media(min-width:601px){.lt-toolbar-tree-choice{max-width:min(420px,calc(100vw - 200px))}}
