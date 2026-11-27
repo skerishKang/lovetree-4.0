@@ -463,3 +463,24 @@ test('#1439 안내 줄은 공통 타이머(#1273)로 단추 있으면 8초, 마�
     h.els['move-actions'].children[0].onclick();
   } finally { h.restore(); }
 });
+
+test('#1527 순간 상세에서 빈 대상에 옮기고 되돌려도 대상 트리가 남는다', () => {
+  for (const all of [false,true]) {
+    const h = organizeHarness();
+    try {
+      h.box.state.trees[1].moments = [];
+      if(all) {
+        h.box.state.trees[0].moments = h.box.state.trees[0].moments.slice(0,1);
+      }
+      const before = structuredClone(h.box.state);
+      assert.equal(h.cleanup.openMove({momentId:'m1'}),true);
+      h.get('move-picker-list').children[0].dispatch('click');
+      assert.equal(h.applied[0][0],'organizeMoments');
+      assert.equal(h.box.state.trees.find(t=>t.id==='tree2').moments[0].parentId,null);
+      assert.equal(h.els['move-actions'].children[0].textContent,'되돌리기');
+      h.els['move-actions'].children[0].onclick();
+      assert.equal(h.applied[1][0],'undoOrganize');
+      assert.deepEqual(h.box.state,before);
+    } finally { h.restore(); }
+  }
+});

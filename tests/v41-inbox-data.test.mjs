@@ -438,3 +438,36 @@ test('#1440 전체 이동은 지금 방식과 동일하게 원본 트리를 없�
   assert.deepEqual(cards.state.trees.at(-1).moments,classic.state.trees.at(-1).moments);
   assert.deepEqual(webDomain.undoOrganize(cards.state,cards.record,OUT).state,state);
 });
+
+test('#1527 빈 대상에 여러 순간을 담고 한 번에 복원한다', async () => {
+  const {duplicatesByTree}=await import('../public/v41/quick-intake.mjs');
+  for(const mode of ['move','copy']) {
+    const initial=threeTrees();
+    initial.trees[1].moments=[];
+    const state=webDomain.validateState(initial);
+    assert.deepEqual(duplicatesByTree(state.trees,state.trees[0].moments,['t2']),[]);
+    for(const ids of [['mb'],['mb','mc'],['ma','mb','mc']]){
+      const result=webDomain.organizeMoments(state,{mode,fromTreeId:'t1',momentIds:ids,toTreeIds:['t2']},OUT,counter('emptycopy'));
+      const target=result.state.trees.find(t=>t.id==='t2');
+      assert.equal(target.moments.length,ids.length);
+      assert.equal(target.moments[0].parentId,null);
+      assert.equal(target.moments[0].relation,'');
+      assert.deepEqual(target.moments.slice(1).map(m=>m.parentId),ids.slice(1).map(()=>target.moments[0].id));
+      assert.deepEqual(target.moments.map(m=>m.links),ids.map(()=>[]));
+      assert.deepEqual(duplicatesByTree(result.state.trees,state.trees[0].moments,['t2']),[{treeId:'t2',momentIds:ids}]);
+      assert.doesNotThrow(()=>serverDomain.validateState(result.state));
+      assert.deepEqual(webDomain.undoOrganize(result.state,result.record,OUT).state,state);
+    }
+  }
+});
+
+test('#1527 빈 대상에 담은 뒤 수정하면 기록 보호를 위해 일괄 복원을 거부한다', () => {
+  for(const mode of ['move','copy']){
+    const state=threeTrees();
+    state.trees[1].moments=[];
+    const result=webDomain.organizeMoments(state,{mode,fromTreeId:'t1',momentIds:['mb'],toTreeIds:['t2']},OUT,counter('emptycopy'));
+    const changed=structuredClone(result.state);
+    changed.trees.find(t=>t.id==='t2').moments[0].note='새로 고친 메모';
+    assert.throws(()=>webDomain.undoOrganize(changed,result.record,OUT),/트리가 바뀌었어요/);
+  }
+});

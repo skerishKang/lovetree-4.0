@@ -495,7 +495,12 @@ export function createCleanup(deps) {
     const original = tree.moments.find(m => m.id === momentId);
     moveUndo = { fromTreeId: tree.id, momentId, parentId: original?.parentId ?? null, toTreeId: target.id, targetLabel: target.label };
     try {
-      getMember().apply('moveMoment', { toTreeId: target.id }, { treeId: tree.id, momentId });
+      if (getTrees().find(t => t.id === target.id)?.moments.length === 0) {
+        const result = getMember().apply('organizeMoments', { mode: 'move', momentIds: [momentId], toTreeIds: [target.id] }, { treeId: tree.id });
+        moveUndo.record = result.record;
+      } else {
+        getMember().apply('moveMoment', { toTreeId: target.id }, { treeId: tree.id, momentId });
+      }
     } catch (error) {
       moveUndo = null;
       notify(error?.message || '옮기지 못했어요. 다시 시도해 주세요.');
@@ -509,7 +514,7 @@ export function createCleanup(deps) {
     const undo = moveUndo;
     if (!undo) return;
     // 원래 트리가 사라졌으면(옮긴 뒤 비어 지워진 트리) 되돌릴 길이 없다 — 안내만 보인다.
-    const canUndo = getTrees().some(t => t.id === undo.fromTreeId);
+    const canUndo = !!undo.record || getTrees().some(t => t.id === undo.fromTreeId);
     const notice = movedNotice({ targetLabel: undo.targetLabel, action: canUndo ? '되돌리기' : '' });
     showNotice(notice.text, notice.action ? [{ label: notice.action, onClick: onUndoMove }] : []);
   }
@@ -518,9 +523,14 @@ export function createCleanup(deps) {
     if (!undo) { hideMoveNotice(); return; }
     const targetStillHas = getTrees().some(t => t.id === undo.toTreeId && t.moments.some(m => m.id === undo.momentId));
     const fromStillThere = getTrees().some(t => t.id === undo.fromTreeId);
-    if (!targetStillHas || !fromStillThere) { hideMoveNotice(); return; }
+    if (!undo.record && (!targetStillHas || !fromStillThere)) { hideMoveNotice(); return; }
     try {
-      getMember().apply('moveMoment', { toTreeId: undo.fromTreeId, parentId: undo.parentId || undefined }, { treeId: undo.toTreeId, momentId: undo.momentId }, {moment:true});
+      if (undo.record) {
+        getMember().apply('undoOrganize', { record: undo.record }, { treeId: undo.fromTreeId });
+        choose(undo.fromTreeId, undo.momentId);
+      } else {
+        getMember().apply('moveMoment', { toTreeId: undo.fromTreeId, parentId: undo.parentId || undefined }, { treeId: undo.toTreeId, momentId: undo.momentId }, {moment:true});
+      }
     } catch (error) {
       notify(error?.message || '되돌리지 못했어요. 다시 시도해 주세요.');
       return;
