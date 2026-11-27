@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { serve, auditPage, failuresOf } from './helpers/screen-audit.mjs';
 import { waitForShownScreen } from './helpers/visible-frame.mjs';
 import { createTree, addMoment } from '../public/v41/domain.mjs';
+import { SHARE_COPY_FAILURE } from '../public/v41/share-link.mjs';
 import './helpers/explore-moments-1441.mjs';
 
 const REQUIRE = process.env.LT_MOMENTS_1025_REQUIRE === '1';
@@ -238,6 +239,10 @@ test('#1025 2단계 — 가수 칩 필터·구간 주소·나무 선 아이콘·
    await h.page.waitForFunction(() => (globalThis.__copied || []).length > 0, null, { timeout: 5000 });
    const copied = await h.page.evaluate(() => globalThis.__copied[0]);
    assert.match(copied, /\/t\/share0/, '공개 트리 주소를 복사한다: ' + copied);
+   // #1540: 클립보드가 막히면 셸 공유 판과 같은 문구로 안내한다.
+   await h.page.evaluate(() => { Object.defineProperty(navigator, 'clipboard', { value: { writeText: async () => { throw Error('denied'); } }, configurable: true }); });
+   await panel.locator('.moments-rail-button[aria-label="공유"]').click();
+   await h.page.getByText(SHARE_COPY_FAILURE).waitFor({ state: 'visible', timeout: 5000 });
    // 나무 아이콘 — 컬러 이모지 없이 선 아이콘(svg path)이다.
    const icon = await panel.locator('.moments-rail-button', { hasText: '트리' }).locator('.moments-rail-svg').evaluate(el => ({ paths: el.querySelectorAll('path').length, stroke: getComputedStyle(el).stroke, text: el.textContent }));
    assert.ok(icon.paths >= 1 && !/♣/.test(icon.text), '나무 선 아이콘: ' + JSON.stringify(icon));

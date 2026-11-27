@@ -19,6 +19,7 @@ import {youtubeIdFrom,isVerticalMoment} from '../public/v41/youtube-id.mjs';
 import {isAutoTitle} from '../public/v41/auto-title.mjs';
 import {fetchVideoMetadata} from '../public/v41/video-title.mjs';
 import {fetchVideoStatus,readVideoStatusCache} from '../public/v41/video-status.mjs';
+import {shareUrlFor,SHARE_COPY_FAILURE} from '../public/v41/share-link.mjs';
 // 261116 PR 2: 카드 모드(마지막·고정·그날·무작위·트리)·숫자 줄이기 — 순수 계산 한 벌.
 import {HOME_MOMENT_KEY, readHomeMoment, normalizeHomeMoment, homeMomentPick, homeDayMoment, homeMomentMenu, formatCount} from './home-card-mode.js';
 const themeHost=document.getElementById('orbit');
@@ -153,7 +154,7 @@ function renderMoreMenu(){
   {label:'공유',action:()=>{closeHomeViewer();bridge.actions.shareMoment(tree.id,moment.id);}}
  ]:[
   {label:'담기',action:()=>{closeHomeViewer();if(moment?.shareId)parent.location.hash=`#explore/moments?share=${encodeURIComponent(moment.shareId)}`;bridge.actions.community('moments');}},
-  {label:'공유',action:()=>{const url=moment?.shareId?new URL(`/v41/#share/${encodeURIComponent(moment.shareId)}/${encodeURIComponent(moment.view||'book')}`,location.origin).href:location.origin;closeHomeViewer();if(navigator.share)navigator.share({title:moment?.title||'',url}).catch(()=>{});else if(navigator.clipboard)navigator.clipboard.writeText(url).catch(()=>{});}}
+  {label:'공유',action:async()=>{const url=moment?.shareId?shareUrlFor(moment.shareId,moment.view||'book'):location.origin;try{if(navigator.share)await navigator.share({title:moment?.title||'',url});else if(navigator.clipboard)await navigator.clipboard.writeText(url);else throw Error('copy unavailable');closeHomeViewer();}catch{const menu=vEl('mediaMoreMenuHome'),note=document.createElement('p');note.textContent=SHARE_COPY_FAILURE;menu.append(note);menu.hidden=false;vEl('mediaMoreHome').setAttribute('aria-expanded','true');}}}
  ];
  for(const item of items){const button=document.createElement('button');button.type='button';button.setAttribute('role','menuitem');button.textContent=item.label;button.onclick=item.action;menu.append(button);}
  more.setAttribute('aria-label','더 보기');
