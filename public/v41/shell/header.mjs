@@ -45,12 +45,15 @@ function renderHeaderLayout({publicReading, owned, parts, current, tree}) {
     document.querySelector('.app-header')?.after(label);
   }
   if(!label)return;
-  label.hidden=!publicReading;
-  if(publicReading) {
-    const name=String(tree?.title||window.LT41?.tree?.title||'트리').trim();
-    const owner=String(tree?.ownerName||tree?.owner?.name||'').trim();
-    label.textContent=owner?`${owner}님의 트리 '${name}' 감상 중`:`공개 트리 '${name}' 감상 중`;
-  }
+  const publicTree=tree||window.LT41?.tree;
+  label.hidden=!publicReading||!publicTree;
+  if(!publicReading)root.removeAttribute?.('data-public-ai-tester');
+  if(publicReading&&publicTree) {
+    // #1513: 공개 응답에 허용된 제목과 명예회원 표시만 사용한다.
+    const name=String(publicTree.title||'트리').trim();
+    const intro=root.hasAttribute?.('data-public-ai-tester')?'AI 명예회원의 공개 트리':'공개 트리';
+    label.textContent=intro+" '"+name+"' 감상 중";
+  }else label.textContent='';
 }
 
 function flowNavigation(){
