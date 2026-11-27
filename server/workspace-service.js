@@ -14,6 +14,27 @@ function documentMessage(error) {
   const message = error?.message;
   return typeof message === 'string' && message.length <= 200 && !/[\u0000-\u001f]/.test(message) ? message : GENERIC_DOCUMENT_MESSAGE;
 }
+const timeValue = value => typeof value === 'string' && value.length <= 40 && !Number.isNaN(Date.parse(value));
+const lineValue = (value, fallback, max) => typeof value === 'string' && value.trim() && value.length <= max ? value.trim() : fallback;
+function repairTreeValues(tree, now) {
+  if (!tree || typeof tree !== 'object' || Array.isArray(tree)) return tree;
+  const moments = Array.isArray(tree.moments) ? tree.moments : [];
+  const out = { ...tree };
+  if (!timeValue(out.updatedAt)) out.updatedAt = timeValue(out.createdAt) ? out.createdAt : now;
+  if (!timeValue(out.createdAt)) out.createdAt = out.updatedAt;
+  if (typeof out.subject !== 'string' || !out.subject.trim() || out.subject.length > 60) out.subject = lineValue(out.title, '기록', 60);
+  if (typeof out.title !== 'string' || !out.title.trim() || out.title.length > 100) out.title = lineValue(out.subject, '제목 없는 트리', 100);
+  if (typeof out.coverMomentId !== 'string' || (out.coverMomentId && !moments.some(moment => moment?.id === out.coverMomentId))) out.coverMomentId = '';
+  const ids = new Set(moments.map(moment => moment?.id).filter(Boolean));
+  const roots = moments.filter(moment => moment?.parentId === null);
+  if (roots.length === 1) {
+    out.moments = moments.map(moment => {
+      if (!moment || typeof moment !== 'object' || Array.isArray(moment) || typeof moment.parentId !== 'string' || ids.has(moment.parentId)) return moment;
+      return { ...moment, parentId: roots[0].id, relation: '' };
+    });
+  }
+  return out;
+}
 
 export function requestHashOf(validatedState, expectedRevision) {
   // 기본 화면은 옛 문서에서 생략됐다. 배포 전에 저장된 요청도 같은 키로 다시 보낼 수 있게 한다.
@@ -31,37 +52,25 @@ export function requestHashOf(validatedState, expectedRevision) {
 // 그래서 저장된 문서는 트리 하나씩 검사한다 — 고칠 수 있는 값(시각·이름·표지)은 기본값으로
 // 고쳐 읽고, 그래도 읽지 못하는 트리는 원본 그대로 격리한다. 격리 본문은 응답으로 보내지 않고
 // 개수만 알리며, 저장할 때도 서버에 남은 원본을 손대지 않고 다시 붙여 보관한다(유실 0).
-const timeValue = value => typeof value === 'string' && value.length <= 40 && !Number.isNaN(Date.parse(value));
-const lineValue = (value, fallback, max) => typeof value === 'string' && value.trim() && value.length <= max ? value.trim() : fallback;
-
-function repairTreeValues(tree, now) {
-  if (!tree || typeof tree !== 'object' || Array.isArray(tree)) return tree;
-  const moments = Array.isArray(tree.moments) ? tree.moments : [];
-  const out = { ...tree };
-  if (!timeValue(out.updatedAt)) out.updatedAt = timeValue(out.createdAt) ? out.createdAt : now;
-  if (!timeValue(out.createdAt)) out.createdAt = out.updatedAt;
-  if (typeof out.subject !== 'string' || !out.subject.trim() || out.subject.length > 60) out.subject = lineValue(out.title, '기록', 60);
-  if (typeof out.title !== 'string' || !out.title.trim() || out.title.length > 100) out.title = lineValue(out.subject, '제목 없는 트리', 100);
-  if (typeof out.coverMomentId !== 'string' || (out.coverMomentId && !moments.some(moment => moment?.id === out.coverMomentId))) out.coverMomentId = '';
-  return out;
-}
-
 // 돌려주는 값: { state — 읽을 수 있는 트리만 담은 검증된 상태, quarantined — 뺀 트리의 원본 배열 }.
 // 문서 뼈대 자체(version·trees)가 어긋나면 트리별 복구가 불가하므로 null을 돌려준다.
 // 공유·커뮤니티처럼 저장된 문서를 읽는 다른 서비스도 같은 판정을 쓴다(#986).
 export function readStoredDocument(doc, now = new Date().toISOString()) {
   if (!doc || doc.version !== 1 || !Array.isArray(doc.trees)) return null;
-  const accepted = [], quarantined = [];
+  const accepted = [], quarantined = [], originals = new Map();
   for (const raw of doc.trees) {
     let single;
-    try { single = validateState({ version: 1, trees: [repairTreeValues(raw, now)], prefs: doc.prefs }).trees[0]; }
+    try {
+      single = validateState({ version: 1, trees: [repairTreeValues(raw, now)], prefs: doc.prefs }).trees[0];
+    }
     catch { quarantined.push(raw); continue; }
     // 같은 id 트리가 이미 읽혔으면 나중 것을 뺀다 — 저장 때 "새 것이 이긴다"는 규칙과 같은 셈이다.
     if (accepted.some(tree => tree.id === single.id) || accepted.length >= MAX_TREES) { quarantined.push(raw); continue; }
     accepted.push(single);
+    originals.set(single.id, raw);
   }
   // 트리별 검증을 통과한 목록은 전체 검사도 통과한다 — 마지막 검사는 inbox 정리를 위한 것이다.
-  return { state: validateState({ version: 1, trees: accepted, prefs: doc.prefs }), quarantined };
+  return { state: validateState({ version: 1, trees: accepted, prefs: doc.prefs }), quarantined, originals };
 }
 
 // 저장 본문·삭제 뒤 문서에 서버가 보관 중인 격리 트리 원본을 다시 붙인다. 사용자가 같은 id의
@@ -130,7 +139,10 @@ export function createWorkspaceService({ repo, productId, onCommit = null, onAcc
       // 같은 내용의 되묻기는 격리 원본을 다시 붙이기 전과 똑같이 한 번으로 묶인다.
       const stored = await repo.load({ productId: principal.productId, subjectId: principal.subjectId });
       const scan = stored ? readStoredDocument(stored.doc) : null;
-      const doc = withQuarantinedTrees(validated, scan ? scan.quarantined : []);
+      const changedTreeIds = changedTreeIdsOf(scan?.state, validated);
+      const changed = new Set(changedTreeIds);
+      const trees = validated.trees.map(tree => changed.has(tree.id) ? tree : (scan?.originals.get(tree.id) ?? tree));
+      const doc = withQuarantinedTrees({ ...validated, trees }, scan?.quarantined ?? []);
       const outcome = await repo.commit({
         productId: principal.productId,
         subjectId: principal.subjectId,
@@ -145,7 +157,7 @@ export function createWorkspaceService({ repo, productId, onCommit = null, onAcc
       if (outcome.status === 'keyConflict') {
         throw new ApiError(409, 'client_key_conflict', '같은 요청 키로 다른 내용을 보내려 해요. 새 키로 다시 시도해 주세요.');
       }
-      await afterCommit(principal.subjectId, validated, changedTreeIdsOf(scan ? scan.state : null, validated));
+      await afterCommit(principal.subjectId, validated, changedTreeIds);
       return { revision: outcome.revision, savedAt: outcome.savedAt };
     }
   };

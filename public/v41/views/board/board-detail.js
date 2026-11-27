@@ -69,7 +69,7 @@
     const _tags=(window.LTTagLine?window.LTTagLine.cardTags(m.keywords):[])||[];
     const _tagRow=_tags.length?`<div class="cardTags">${_tags.map(_t=>`<span class="lt-tag-chip is-card">${esc(_t.value)}</span>`).join('')}</div>`:'';
     let heading=titleMain(m);
-    return `<article class="card ${m.first?'first':''} ${m.type==='note'?'noteCard':''} ${pinClass(m)} ${cardClass(m)}" data-id="${m.id}" style="--card-x:${m.x}px;--card-y:${m.y}px;--rot:${m.rot}deg;--pin:${colors[m.color]};--halo:${colors[m.color]}55">${m.first?'<div class="firstTag">첫 순간</div>':''}<button class="pin" data-pin="${m.id}" aria-hidden="true" tabindex="-1"></button>${media}<div class="cardBody"><h3 class="cardTitle">${esc(heading)}</h3><div class="cardMeta"><span class="emotionDot"></span>${esc(m.emotion)} · ${esc(dateText(m.date))}</div>${_tagRow}</div>${cardOrderHTML(m)}</article>`;
+    return `<article class="card ${m.first?'first':''} ${m.type==='note'?'noteCard':''} ${_tagRow?'hasTags':''} ${m.id===featuredMomentId()?'isFeatured':''} ${pinClass(m)} ${cardClass(m)}" data-id="${m.id}" style="--card-x:${m.x}px;--card-y:${m.y}px;--rot:${m.rot}deg;--pin:${colors[m.color]};--halo:${colors[m.color]}55">${m.first?'<div class="firstTag">첫 순간</div>':''}<button class="pin" data-pin="${m.id}" aria-hidden="true" tabindex="-1"></button>${media}<div class="cardBody"><h3 class="cardTitle">${esc(heading)}</h3><div class="cardMeta"><span class="emotionDot"></span>${esc(m.emotion)} · ${esc(dateText(m.date))}</div>${_tagRow}</div>${cardOrderHTML(m)}</article>`;
   };
 
   /* Composer: VIDEO supports local or YouTube source; VIDEO LINK remains a direct YouTube 순간. */
@@ -112,58 +112,18 @@
     $('#addModal').classList.remove('open');addMomentV11(n,lastParentId);
   };
 
-  function videoEditBlock(m){let src=m.videoSource||'local',yt=src==='youtube';return `<div class="label">VIDEO SOURCE</div><div class="videoSourceChoice"><label><input type="radio" name="editVideoSource" value="local" ${!yt?'checked':''}> 로컬 영상</label><label><input type="radio" name="editVideoSource" value="youtube" ${yt?'checked':''}> YouTube 링크</label></div><div class="videoSourcePanel" id="editVideoLocal" ${yt?'hidden':''}><input class="field" id="editMediaFile" type="file" accept="video/*" aria-label="바꿀 영상 파일 고르기"><div class="netNote">순간 ID·날짜·Connection은 유지하고 미디어만 교체합니다.</div></div><div class="videoSourcePanel" id="editVideoYoutube" ${!yt?'hidden':''}><input class="field" id="editVideoUrl" value="${esc(originalUrl(m)||REAL_YT_TEST)}" aria-label="바꿀 YouTube 링크 주소"><div class="netNote">YouTube URL로 바꿔도 순간 provenance와 board position은 유지합니다.</div></div>`}
-  editMediaFields=function(m){
-    if(m.type==='photo')return `<div class="label">PHOTO</div><div class="netNote">기존 이미지 미리보기 · 교체하거나 기본 상태로 복귀할 수 있어요.</div><input class="field" id="editMediaFile" type="file" accept="image/*" aria-label="바꿀 그림 파일 고르기"><button type="button" class="miniBtn" id="removePhoto">이미지 제거</button>`;
-    if(m.type==='video')return videoEditBlock(m);
-    if(m.type==='link')return `<div class="label">LINK</div><input class="field" id="editUrl" value="${esc(m.url||'')}" aria-label="바꿀 링크 주소">`;
-    if(m.type==='youtube')return `<div class="label">VIDEO LINK / YOUTUBE</div><input class="field" id="editUrl" value="${esc(originalUrl(m)||REAL_YT_TEST)}" aria-label="바꿀 YouTube 링크 주소"><div class="netNote">실제 thumbnail은 maxres → HQ → offline fallback 순서로 표시됩니다.</div>`;
-    return `<div class="label">마음 한마디</div><textarea class="field" id="editNoteBody" rows="4" aria-label="마음 한마디">${esc(m.memo)}</textarea>`;
-  };
-  function editVideoSource(){return document.querySelector('input[name="editVideoSource"]:checked')?.value||'local'}
   openEdit=function(){
-    let m=moments.find(x=>x.id===selected);if(!m)return;editBase=JSON.parse(JSON.stringify(m));removePhotoFlag=false;editTempAsset=null;
-    let f=$('#editFields');f.innerHTML=`${editMediaFields(m)}<input class="field" id="editTitle" value="${esc(m.title)}" aria-label="순간 제목"><textarea class="field" id="editMemo" rows="3" aria-label="마음 한마디">${esc(m.memo)}</textarea>${styleFieldsHTML('edit',m)}<div class="label labelSpaced">날짜</div><input class="field" id="editDate" type="date" value="${esc(m.date||'')}" aria-label="순간 날짜"><div class="netNote">공개 범위 · ${esc(m.privacy||'비공개')} · 순간 ID ${esc(m.id)}</div>`;
-    bindKeywordPicker('edit',updateEditPreview);f.querySelectorAll('input,textarea,select').forEach(x=>x.addEventListener('input',updateEditPreview));$('#editMediaFile')?.addEventListener('change',updateEditPreview);$('#editUrl')?.addEventListener('input',updateEditPreview);$('#editVideoUrl')?.addEventListener('input',updateEditPreview);$('#removePhoto')?.addEventListener('click',()=>{removePhotoFlag=true;updateEditPreview()});
-    f.querySelectorAll('input[name="editVideoSource"]').forEach(r=>r.addEventListener('change',()=>{let yt=r.value==='youtube'&&r.checked;$('#editVideoLocal').hidden=yt;$('#editVideoYoutube').hidden=!yt;updateEditPreview()}));
-    pushBoardPanel('edit');$('#editModal').classList.add('open');updateEditPreview();
+    const m=moments.find(x=>x.id===selected);if(!m||LTDEMO.readOnly)return;
+    parent.postMessage({type:globalThis.LT41_MSG.write,mode:'edit',treeId:LTDEMO.treeId,momentId:m.id},location.origin);
   };
-  editPreviewState=function(){
-    let m=moments.find(x=>x.id===selected),type=m.type,asset=m.asset,video=m.video,url=$('#editUrl')?.value??m.url,sourceUrl=m.sourceUrl||m.url||'',videoSource=m.videoSource||'local',videoId=m.videoId||'';let file=$('#editMediaFile')?.files?.[0];
-    if(type==='video'){
-      videoSource=editVideoSource();
-      if(videoSource==='youtube'){url=$('#editVideoUrl')?.value||sourceUrl||REAL_YT_TEST;sourceUrl=url;videoId=ytId(url);asset=ytMax(url)||V12_FALLBACK(url);video=null}
-      else {sourceUrl='';url=null;videoId='';if(file){editTempAsset=URL.createObjectURL(file);video=editTempAsset;asset=ASSET.first}}
-    }else if(file){editTempAsset=URL.createObjectURL(file);asset=editTempAsset}
-    if(removePhotoFlag&&type==='photo')asset=ASSET.note;if(type==='youtube'){sourceUrl=url;videoId=ytId(url||'');asset=ytMax(url||'')||V12_FALLBACK(url||'')}
-    return{...m,title:$('#editTitle')?.value||m.title,memo:$('#editNoteBody')?.value||$('#editMemo')?.value||m.memo,emotion:$('#editEmotion')?.value||m.emotion,date:$('#editDate')?$('#editDate').value:m.date,source:$('#editSource')?.value||m.source,pinStyle:$('#editPinStyle')?.value||m.pinStyle,cardStyle:$('#editCardStyle')?.value||m.cardStyle,keywords:selectedKeywords('edit'),asset,video,url,sourceUrl,videoSource,videoId,thumbnailUrl:(type==='youtube'||(type==='video'&&videoSource==='youtube'))?ytMax(sourceUrl||url||''):m.thumbnailUrl||''};
-  };
-  updateEditPreview=function(){
-    let m=editPreviewState(),media='';
-    if(m.type==='note')media=`<div class="previewMedia previewNote">“${esc(m.memo)}”</div>`;
-    else if(isYtMoment(m))media=`<div class="previewMedia">${ytMediaHTML(originalUrl(m))}</div>`;
-    else if(m.type==='video')media=`<div class="previewMedia"><video src="${m.video||''}" poster="${m.asset}" muted playsinline controls></video></div>`;
-    else media=`<div class="previewMedia"><img src="${m.asset}" alt="${esc(m.title)} 바꿀 그림 미리보기" data-fallback="${ASSET.link}" onerror="this.onerror=null;this.src=this.dataset.fallback"></div>`;
-    $('#editPreview').innerHTML=`<div class="label">LIVE PREVIEW</div><div class="previewCard"><span class="previewPin"></span>${media}<div class="previewTypeRow">${esc(LTLabels.type(m.originalType||m.type))} · ${esc(m.emotion)}${m.type==='video'?' · '+(m.videoSource==='youtube'?'YOUTUBE':'LOCAL'):''}</div><h3 class="previewTitle">${esc(m.title)}</h3><div class="previewMemo">${esc(m.memo)}</div></div>`;
-  };
-  saveEdit=function(){let m=moments.find(x=>x.id===selected),n=editPreviewState();// #608: 날짜는 책의 수정 경로(editMoment→validateMomentInput)와 같은 규칙으로 미리 걷는다 — 도메인도 저장 때 boardSync→validateState에서 같은 규칙으로 거른다.
-    const _d=String(n.date||'');if(!/^\d{4}-\d{2}-\d{2}$/.test(_d)||Number.isNaN(Date.parse(_d))||new Date(_d).toISOString().slice(0,10)!==_d){toast('날짜를 확인해 주세요.');return}
-    snapshot();let invariant={id:m.id,privacy:m.privacy,x:m.x,y:m.y,rot:m.rot,first:m.first,createdOrder:m.createdOrder};Object.assign(m,n,invariant);$('#editModal').classList.remove('open');// #608: 날짜는 이제 바꿀 수 있다(#608) — 신원(invariant)에서 날짜만 뺀다.
-    // #608: 날짜가 바뀌면 '날짜순' 바둑판 자리를 새 날짜에 맞게 다시 꽂는다(#582). '내 배치'의 저장 자리는 그대로 둔다(#395 계약 — placeAll은 저장 자리가 있는 카드를 건드리지 않는다).
-    if(editBase&&m.date!==editBase.date)placeAll();renderCards();renderThreads();updateKeywordFilter();selectMoment(m.id,true);persistBoard();toast('순간을 저장했어요. 순간 ID·Connection과 provenance는 그대로 유지됩니다.')};
-
   openViewer=function(id){
-    let m=moments.find(x=>x.id===id);if(!m)return;$('#vTitle').textContent=titleMain(m)||'순간';let box=$('#viewerMedia');
-    if(ytId(originalUrl(m)))box.innerHTML=LTMedia.markup(originalUrl(m),m.title,m.mediaMetadata,m.id,null,{emotion:m.emotion,date:m.date,note:m.memo});
-    else if(m.url)box.innerHTML=LTMedia.markup(m.url,m.title,m.mediaMetadata,m.id,null,{emotion:m.emotion,date:m.date,note:m.memo});
-    else if(m.type==='video')box.innerHTML=`<video src="${m.video}" poster="${m.asset}" controls autoplay muted playsinline class="viewerFitVideo"></video>`;
-    else if(m.type==='note')box.innerHTML=`<div class="viewerNoteQuote">“${esc(m.memo)}”</div>`;
-    else box.innerHTML=`<img src="${m.asset}" alt="${esc(m.title)}" data-fallback="${ASSET.link}" onerror="this.onerror=null;this.src=this.dataset.fallback" class="viewerFitImg">`;
-    $('#vMeta').innerHTML=window.viewerMetaHTML({head:`${esc(LTLabels.type(m.originalType||m.type))}${m.type==='video'&&m.videoSource?` · ${esc(m.videoSource)}`:''} · ${esc(m.date)} · ${esc(m.emotion)}`,source:esc(m.source),url:originalUrl(m)?esc(originalUrl(m)):'',keywords:(m.keywords||[]).map(k=>esc(k)),memo:esc(m.memo||'')});pushBoardPanel('viewer');$('#viewerModal').classList.add('open');
+    const m=moments.find(x=>x.id===id);if(!m)return;
+    const url=originalUrl(m)||m.url||'';
+    LTMedia.openLightbox(url,titleMain(m)||'순간',LTMedia.verticalVideo(url,m.mediaMetadata),{head:`${LTLabels.type(m.originalType||m.type)} · ${m.date} · ${m.emotion}`,source:m.source||'',url:originalUrl(m)||'',keywords:m.keywords||[],memo:m.memo||''});
   };
 
   /* Wire overwritten handlers and render actual YouTube source. */
-  $('#editMomentBtn').onclick=openEdit;$('#editSave').onclick=saveEdit;$('#confirmAdd').onclick=()=>confirmAdd();
+  $('#editMomentBtn').onclick=openEdit;$('#deleteMomentBtn').onclick=()=>{const m=moments.find(x=>x.id===selected);if(!m||LTDEMO.readOnly)return;parent.postMessage({type:globalThis.LT41_MSG.deleteMoment,treeId:LTDEMO.treeId,momentId:m.id},location.origin);};$('#confirmAdd').onclick=()=>confirmAdd();
   renderCards();renderThreads();updateKeywordFilter();formFor(addType);boardStartView();applyPathHighlight();setTimeout(()=>{/* #891: 탭으로 들어오면 닫힘, ?open= 주소만 자동 열림(board.js bootDetailPanel) */bootDetailPanel()},100);
   // #627: 꼬리표 줄 모듈(tag-line.mjs)이 늦게 붙는다 — 카드 칩은 규칙이 도착하면 한 번 다시 그린다.
   addEventListener('lt41-tagline-ready',()=>{if(moments.some(m=>(m.keywords||[]).length))renderCards()});
@@ -173,7 +133,7 @@
   const labelBoardYoutube=()=>$('#cardLayer').querySelectorAll('.card .lt-media [data-lt-play]').forEach(b=>b.setAttribute('aria-label','영상 크게 보기'));
   labelBoardYoutube();
   new MutationObserver(labelBoardYoutube).observe($('#cardLayer'),{childList:true,subtree:true});
-  let boardYoutubePointer=null,boardYoutubeOpener=null;
+  let boardYoutubePointer=null;
   const cardLayerYoutube=$('#cardLayer');
   cardLayerYoutube.addEventListener('pointerdown',e=>{
     const card=e.target.closest('.card[data-id]');
@@ -194,46 +154,9 @@
     if(!e.target.closest('[data-lt-play]'))return;
     if(e.detail!==0&&boardYoutubePointer?.id===card.dataset.id&&boardYoutubePointer.moved)return;
     e.preventDefault();e.stopImmediatePropagation();
-    boardYoutubeOpener=e.target.closest('button')||card.querySelector('[data-lt-play]');
     openViewer(card.dataset.id);
-    $('#closeViewer').focus();
     boardYoutubePointer=null;
   },true);
-  $('#closeViewer').addEventListener('click',()=>{
-    // 단순히 숨기면 iframe의 소리가 남으므로 노드를 반드시 제거합니다.
-    $('#viewerMedia').replaceChildren();
-    if(boardYoutubeOpener?.isConnected)boardYoutubeOpener.focus();
-    boardYoutubeOpener=null;
-  });
-  document.addEventListener('keydown',e=>{
-    if(e.key!=='Escape'||!$('#viewerModal').classList.contains('open'))return;
-    if(document.querySelector('.lt-lightbox'))return;
-    e.preventDefault();e.stopImmediatePropagation();
-    $('#closeViewer').click();
-  },true);
-  // 크게 보기 안에서 실제 재생된 YouTube iframe만 상태를 확인합니다.
-  const boardYoutubeFrameObserver=new MutationObserver(()=>{
-    for(const frame of $('#viewerMedia').querySelectorAll('iframe.lt-yt-frame')){
-      if(frame.dataset.boardChecked)return;
-      frame.dataset.boardChecked='1';
-      const root=frame.closest('.lt-media');
-      const videoId=ytId(root?.dataset.ltUrl||'');
-      const unavailable=()=>{
-        if(!frame.isConnected||!root?.isConnected)return;
-        frame.remove();
-        window.LTMedia?.applyNoEmbed?.(root);
-      };
-      frame.addEventListener('error',unavailable,{once:true});
-      if(videoId)void import('/v41/video-status.mjs').then(mod=>mod.fetchVideoStatus(videoId))
-        .then(status=>{if(['noembed','gone','private'].includes(status))unavailable()}).catch(()=>{});
-      window.addEventListener('message',event=>{
-        if(!frame.isConnected||event.source!==frame.contentWindow||!['https://www.youtube.com','https://www.youtube-nocookie.com'].includes(event.origin))return;
-        let data=event.data;
-        if(typeof data==='string'){try{data=JSON.parse(data)}catch{return}}
-        if(data?.event==='onError'&&[2,5,100,101,150,153].includes(Number(data.info)))unavailable();
-      },{signal:(()=>{const c=new AbortController();const o=new MutationObserver(()=>{if(!frame.isConnected){c.abort();o.disconnect()}});o.observe($('#viewerMedia'),{childList:true,subtree:true});return c.signal})()});
-    }
-  });
-  boardYoutubeFrameObserver.observe($('#viewerMedia'),{childList:true,subtree:true});
-  window.__LT58V12={...window.__LT58V11,ytId,ytMax,ytHQ,ytEmbed,isYtMoment,openViewer,openEdit,saveEdit,get cinema(){return typeof cinemaV11!=='undefined'?{...cinemaV11}:null},get state(){return{moments:moments.length,connections:connections.length,selected,theme:document.body.dataset.theme,ytMoments:moments.filter(isYtMoment).map(m=>({id:m.id,url:originalUrl(m),videoId:ytId(originalUrl(m)),thumb:ytMax(originalUrl(m)),source:m.videoSource||m.type}))}}};
+  document.addEventListener('lt-media-lightbox-open',()=>pushBoardPanel('viewer'));
+  window.__LT58V12={...window.__LT58V11,ytId,ytMax,ytHQ,ytEmbed,isYtMoment,openViewer,openEdit,get cinema(){return typeof cinemaV11!=='undefined'?{...cinemaV11}:null},get state(){return{moments:moments.length,connections:connections.length,selected,theme:document.body.dataset.theme,ytMoments:moments.filter(isYtMoment).map(m=>({id:m.id,url:originalUrl(m),videoId:ytId(originalUrl(m)),thumb:ytMax(originalUrl(m)),source:m.videoSource||m.type}))}}};
 })();

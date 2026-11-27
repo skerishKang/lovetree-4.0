@@ -16,6 +16,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const REPO = path.resolve(fileURLToPath(new URL('../..', import.meta.url)));
+const TEST_PORT = Number(process.env.LT_SCREEN_AUDIT_PORT || 0);
 
 // dist를 우선 쓰고(빌드 결과), 없으면 public을 바로 쓴다(#635와 같은 판정).
 export function distOrPublic() {
@@ -25,7 +26,7 @@ export function distOrPublic() {
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.woff2': 'font/woff2' };
 
 // extraRoutes: { '/share-host.html': html } 처럼 시험용 호스트 페이지를 얹는다(#635 방식).
-export function serve(extraRoutes = {}, { port = 0 } = {}) {
+export function serve(extraRoutes = {}, { port = TEST_PORT } = {}) {
   const ROOT = distOrPublic();
   const server = createServer(async (req, res) => {
     const clean = decodeURIComponent((req.url || '/').split('?')[0]);

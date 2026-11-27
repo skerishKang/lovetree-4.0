@@ -1,5 +1,5 @@
 // #469 → #582: 보드 배치 계약. 관계 기준 배치(treeSpread)는 거두고 날짜 최신순 바둑판으로 바뀌었다.
-// - 칸 수는 화면 폭이 정한다(1440 4칸, 390 1칸).
+// - 칸 수는 화면 폭이 정한다(1440 4칸, 390 2칸).
 // - 저장 자리(사람이 꽂은 칸)는 그대로 남고(#395 계약), 나머지를 빈 칸에 채운다.
 // - 카드끼리 겹치지 않고, 빈 칸 비율(판 대비 카드가 차지하는 칸)이 합리적이다.
 import test from 'node:test';
@@ -41,16 +41,16 @@ function filledRatio(slots) {
   return slots.size / (cols * rows);
 }
 
-test('#582 예시 40순간: 1440은 4칸 바둑판 — 겹침 0, 빈 칸 비율 90% 이상, 390은 1칸', () => {
+test('#582 예시 40순간: 1440은 4칸 바둑판 — 겹침 0, 빈 칸 비율 90% 이상, 390은 2칸', () => {
   const moments = exampleTree.moments;
   const { slots, pos } = gridOf(moments, 1440);
   assert.equal(slots.size, moments.length, '모든 순간이 자리를 받는다');
   assert.deepEqual(overlapPairs(pos), [], '카드끼리 겹치지 않는다');
   assert.equal(Math.max(...[...slots.values()].map((s) => s.col)) + 1, 4, '1440은 4칸');
   assert.ok(filledRatio(slots) >= 0.9, `빈 칸 비율 ${(filledRatio(slots) * 100).toFixed(0)}% — 바둑판은 구멍 없이 채운다`);
-  // 좁은 화면(390)은 1칸 — 세로로 쌓인다.
+  // 좁은 화면(390)은 2칸 — 첫 카드 아래로 두 줄로 쌓인다.
   const narrow = gridOf(moments, 390);
-  assert.equal(Math.max(...[...narrow.slots.values()].map((s) => s.col)) + 1, 1, '390은 1칸');
+  assert.equal(Math.max(...[...narrow.slots.values()].map((s) => s.col)) + 1, 2, '390은 2칸');
   assert.deepEqual(overlapPairs(narrow.pos), [], '390에서도 겹침 0');
 });
 

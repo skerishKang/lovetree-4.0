@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readCachedWorkspace, writeCachedWorkspace, clearCachedWorkspace, readLoginSubject, rememberLoginSubject, forgetLoginSubject} from '../public/v41/workspace-cache.mjs';
 import {createMemberSession} from '../public/v41/member-session.mjs';
-import {createTree, EMPTY_STATE} from '../public/v41/domain.mjs';
+import {createTree, addMoment, removeMoment, undoMomentDelete, EMPTY_STATE} from '../public/v41/domain.mjs';
 
 const CLOCK = '2026-11-11T00:00:00.000Z';
 const fields = {subject: '별', title: '처음', note: '기억할 마음', date: '2026-11-11', emotion: '설렘', url: ''};
@@ -217,12 +217,47 @@ test('#986 저장본에 어긋난 트리가 섞여 있으면 그 트리만 빼�
   const storage = fakeStorage();
   writeCachedWorkspace(storage, 'member-A', stateOf('정상 기록'));
   const entry = JSON.parse(storage.getItem(entryKey('member-A')));
-  entry.state.trees.push({ id: 't-broken', title: '어긋난 트리', moments: [] });
+  entry.state.trees.push({ id: 't-broken', title: '어긋난 트리', moments: [{ id: 'm-broken' }] });
   storage.setItem(entryKey('member-A'), JSON.stringify(entry));
   const cached = readCachedWorkspace(storage, 'member-A');
   assert.equal(cached.subject, 'member-A');
   assert.deepEqual(cached.state.trees.map(tree => tree.subject), ['별'], '어긋난 트리만 빠진다');
   assert.ok(storage.getItem(entryKey('member-A')), '저장본을 지우지 않는다');
+});
+
+test('#1434 저장본은 순간 0개와 끊어진 부모를 읽을 때 보정하고 원본은 바꾸지 않는다', () => {
+  const storage = fakeStorage();
+  const root = createTree({ ...fields, title: '정상 트리' }, CLOCK);
+  const grown = addMoment(root, { ...fields, title: '끊어진 순간', relation: '남은 이유' }, root.moments[0].id, CLOCK);
+  const broken = structuredClone(grown);
+  broken.id = 't-broken';
+  broken.moments[1].parentId = 'missing-parent';
+  broken.moments.push({ ...broken.moments[1], id: 'valid-child', parentId: broken.moments[0].id, relation: '남길 이유' });
+  const empty = { ...structuredClone(root), id: 't-empty', title: '빈 트리', moments: [], edges: [] };
+  const malformed = { ...structuredClone(root), id: 't-malformed', moments: [structuredClone(root.moments[0]), { ...structuredClone(root.moments[0]), id: 'bad-parent', parentId: 42 }] };
+  const raw = { version: 1, subject: 'member-A', state: { version: 1, prefs: {}, trees: [empty, broken, malformed, root] } };
+  storage.setItem(entryKey('member-A'), JSON.stringify(raw));
+  const cached = readCachedWorkspace(storage, 'member-A');
+  assert.deepEqual(cached.state.trees.map(tree => tree.id), ['t-empty', 't-broken', root.id], '형식이 잘못된 parentId는 격리한다');
+  assert.deepEqual(cached.state.trees[0].moments, [], '순간 0개 트리를 트리 없음으로 버리지 않는다');
+  assert.equal(cached.state.trees[1].moments[1].parentId, root.moments[0].id, '끊어진 부모는 시작 순간으로 붙여 읽는다');
+  assert.equal(cached.state.trees[1].moments[1].relation, '', '부모가 바뀌면 남은 연결 이유는 비운다');
+  assert.equal(cached.state.trees[1].moments.find(moment => moment.id === 'valid-child').parentId, root.moments[0].id, '정상 부모 참조는 그대로 읽는다');
+  assert.equal(cached.state.trees[1].moments.find(moment => moment.id === 'valid-child').relation, '남길 이유', '정상 연결 이유는 지우지 않는다');
+  assert.equal(cached.state.trees[2].moments[0].parentId, null, '정상 시작 순간은 그대로다');
+  assert.equal(storage.getItem(entryKey('member-A')), JSON.stringify(raw), '저장된 원본은 읽기 보정으로 덮어쓰지 않는다');
+});
+
+test('#1434 삭제 되돌리기는 그사이 기록이 바뀌면 덮어쓰지 않는다', () => {
+  const root = createTree({ ...fields, title: '삭제 전 트리' }, CLOCK);
+  const grown = addMoment(root, { ...fields, title: '둘째 순간' }, root.moments[0].id, CLOCK);
+  const removed = removeMoment(grown, grown.moments[1].id, CLOCK);
+  const record = { treeId: grown.id, before: structuredClone(grown), after: structuredClone(removed) };
+  assert.deepEqual(undoMomentDelete(removed, record, CLOCK), grown, '바뀐 것이 없으면 원래 순간·부모·연결을 복원한다');
+  const changed = structuredClone(removed);
+  changed.moments[0].title = '그사이 고친 제목';
+  assert.throws(() => undoMomentDelete(changed, record, CLOCK), /되돌릴 작업을 찾을 수 없어요/);
+  assert.equal(changed.moments[0].title, '그사이 고친 제목', '실패한 되돌리기가 뒤의 변경을 지우지 않는다');
 });
 
 // ---- A-18: 기기 저장본을 먼저 그리기 전에 계정을 확인한다 ----

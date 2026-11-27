@@ -96,7 +96,7 @@ async function openHost(browser, url, { width, height } = {}) {
 
 // 화면 좌표 기준 겹침·칸 수·빈 칸 비율.
 const geometry = (frame) => frame.evaluate(() => {
-  const cards = [...document.querySelectorAll('#cardLayer .card')].map((c) => ({ id: c.dataset.id, x: c.offsetLeft, y: c.offsetTop, w: c.offsetWidth, h: c.offsetHeight }));
+  const cards = [...document.querySelectorAll('#cardLayer .card')].map((c) => ({ id: c.dataset.id, x: c.offsetLeft, y: c.offsetTop, w: c.offsetWidth, h: c.offsetHeight, featured: c.classList.contains('isFeatured') }));
   let pairs = 0;
   for (let i = 0; i < cards.length; i++) for (let j = i + 1; j < cards.length; j++) {
     const a = cards[i], b = cards[j];
@@ -106,25 +106,30 @@ const geometry = (frame) => frame.evaluate(() => {
   }
   const cols = [...new Set(cards.map((c) => c.x))].sort((a, b) => a - b);
   const slots = cards.length ? cols.length * ([...new Set(cards.map((c) => c.y))].length) : 0;
-  return { n: cards.length, pairs, cols: cols.length, filledRatio: cards.length ? cards.length / slots : 0, threads: document.querySelectorAll('svg.threads,.threadGroup').length };
+  const rest = cards.filter(card => !card.featured);
+  const restCols = [...new Set(rest.map((c) => c.x))].length;
+  const restRows = [...new Set(rest.map((c) => c.y))].length;
+  const restFilledRatio = rest.length ? rest.length / (restCols * restRows) : 1;
+  return { n: cards.length, pairs, cols: cols.length, filledRatio: cards.length ? cards.length / slots : 0, restFilledRatio, threads: document.querySelectorAll('svg.threads,.threadGroup').length };
 });
 
 // #952: 줄·핀 연결·이유 창·배치 전환·상세 지도 단추·시네마 비트를 소스 글자로 고정하던 30개 단정을 걷어냈다.
 // 화면에서 남길 것(줄 요소 0·연결 창 0·배치 전환 단추·지도 메시지)은 아래 실브라우저 시험이 직접 잰다.
-test('#582 화면: 모아둔 순간 26(평평한 트리) — 1440 4칸·390 1칸, 겹침 0, 빈 칸 비율, 줄 요소 0', { skip: REQUIRE ? false : skip, timeout: 300000 }, async () => {
+test('#582 화면: 모아둔 순간 26(평평한 트리) — 1440 4칸·390 featured+2칸, 겹침 0, 빈 칸 비율, 줄 요소 0', { skip: REQUIRE ? false : skip, timeout: 300000 }, async () => {
   if (skip) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip}`);
   const tree = starTree(26);
   const server = await serve({ '/__host-582.html': hostHTML(tree) });
   const base = `http://127.0.0.1:${server.address().port}`;
   const browser = await chromium.launch({ headless: true });
   try {
-    for (const [w, h, cols] of [[1440, 900, 4], [390, 844, 1]]) {
+    for (const [w, h, cols] of [[1440, 900, 4], [390, 844, 3]]) {
       const { context, frame, problems } = await openHost(browser, `${base}/__host-582.html`, { width: w, height: h });
       const g = await geometry(frame);
       assert.equal(g.n, 26, `${w}: 순간 26장이 모두 꽂힌다`);
       assert.equal(g.pairs, 0, `${w}: 겹친 카드 쌍 0`);
       assert.equal(g.cols, cols, `${w}: 칸 수는 화면 폭이 정한다(${cols}칸)`);
-      assert.ok(g.filledRatio >= 0.9, `${w}: 빈 칸 비율 ${(g.filledRatio * 100).toFixed(0)}% — 바둑판은 구멍 없이 채운다`);
+      const filledRatio = w === 390 ? g.restFilledRatio : g.filledRatio;
+      assert.ok(filledRatio >= 0.9, `${w}: 빈 칸 비율 ${(filledRatio * 100).toFixed(0)}% — 바둑판은 구멍 없이 채운다`);
       assert.equal(g.threads, 0, `${w}: 줄 요소 0개`);
       const gone = await frame.evaluate(() => ['threadSvg', 'whyModal', 'whyBubble', 'postAdd', 'pathModeBtn'].filter((id) => document.getElementById(id)).length);
       assert.equal(gone, 0, `${w}: #582에서 치운 연결 요소가 화면에 없다`);
@@ -379,7 +384,7 @@ test('#1249 390에서 모든 카드가 판 안에 있음: 밝은·밤, 스크롤
         assert.equal(first.scrollTop,0,theme+' 첫 카드부터 표시');
         assert.ok(first.scrollHeight>first.height,theme+' 실제 세로 스크롤 길이');
         assert.ok(first.scrollWidth<=first.width,theme+' 가로 넘침 0');
-        assert.equal(first.cards.filter(c=>c.visible).length,2,theme+' 첫 화면에 카드 두 장');
+        assert.equal(first.cards.filter(c=>c.visible).length,3,theme+' 첫 화면에 카드 세 장');
         assert.equal(first.cards.filter(c=>c.inside&&c.contentTop>=0&&c.contentBottom<=first.scrollHeight+1).length,5,theme+' 모든 카드가 판과 스크롤 범위 안');
         const reached=new Set(first.cards.filter(c=>c.visible).map(c=>c.id));
         await page.mouse.move(30,550);
