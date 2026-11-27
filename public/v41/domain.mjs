@@ -436,8 +436,9 @@ export function editTree(tree, input, clock = new Date().toISOString()) {
 }
 export function addMoment(tree, input, parentId, clock = new Date().toISOString()) {
   if (tree.moments.length >= MAX_MOMENTS) throw new Error(`한 트리에는 ${MAX_MOMENTS}개의 순간까지 담을 수 있어요.`);
-  if (!tree.moments.some(m => m.id === parentId)) throw new Error('이어질 순간을 먼저 선택해 주세요.');
-  const moment = { ...validateMomentInput(input), id: newId(), parentId, links: [], createdAt: clock };
+  const empty = tree.moments.length === 0;
+  if (!empty && !tree.moments.some(m => m.id === parentId)) throw new Error('이어질 순간을 먼저 선택해 주세요.');
+  const moment = { ...validateMomentInput(input), id: newId(), parentId: empty ? null : parentId, links: [], createdAt: clock };
   return { ...tree, updatedAt: clock, moments: [...tree.moments, moment] };
 }
 export function editMoment(tree, id, input, clock = new Date().toISOString()) {
@@ -447,6 +448,11 @@ export function editMoment(tree, id, input, clock = new Date().toISOString()) {
   return { ...tree, updatedAt: clock, moments: tree.moments.map(m => {
     if (m.id !== id) return m;
     const edited = {...m, ...next, relation: m.parentId ? next.relation : ''};
+    for (const key of ['pinStyle', 'cardStyle']) {
+      if (!Object.hasOwn(input, key)) continue;
+      if (input[key] === '') delete edited[key];
+      else if (boardLayoutOf(input)[key]) edited[key] = boardLayoutOf(input)[key];
+    }
     if (next.url !== m.url && !next.mediaMetadata) delete edited.mediaMetadata;
     return edited;
   }) };
@@ -509,6 +515,13 @@ export function removeMoment(tree, id, clock = new Date().toISOString()) {
   return { ...tree, coverMomentId: tree.coverMomentId === id ? '' : tree.coverMomentId || '', updatedAt: clock, moments: remaining.map(m => m.parentId === id ? { ...m, parentId, relation: '' } : m) };
 }
 
+export function undoMomentDelete(tree, record, clock = new Date().toISOString()) {
+  if (!record || record.treeId !== tree.id || !record.before || !record.after || organizePrint(tree) !== organizePrint(record.after)) {
+    throw new Error('되돌릴 작업을 찾을 수 없어요.');
+  }
+  return { ...structuredClone(record.before), id: tree.id, updatedAt: clock };
+}
+
 // #327(① 데이터 규칙): 옮겨진 순간들을 한 트리에서 떼어 낸다. 남은 순간은 옮겨진 조상 중
 // 가장 가까운 남은 조상 아래로 다시 붙는다(한 개를 옮길 때는 '옮긴 순간의 부모에게 다시 붙는다'와
 // 같은 결과다). 남은 조상이 하나도 없으면 남은 순간 중 가장 먼저 만든 것을 새 시작 순간으로 올리고
@@ -566,7 +579,7 @@ export function quickAdd(state, input, clock = new Date().toISOString()) {
   if (chosen) {
     // 이슈 671: '그 순간 다음에 담기'(input.parentId)가 이 트리의 순간이면 그 순간 바로 다음에 잇는다.
     // 목적지가 없거나 못 찾으면(오래된 화면·지워진 순간) 기존 규칙대로 가장 최근 순간 다음에 담는다.
-    const after = chosen.moments.some(m => m.id === input?.parentId) ? input.parentId : (latestMomentId(chosen) || chosen.moments.find(m => m.parentId === null).id);
+    const after = chosen.moments.length === 0 ? null : (chosen.moments.some(m => m.id === input?.parentId) ? input.parentId : (latestMomentId(chosen) || chosen.moments.find(m => m.parentId === null).id));
     const grown = addMoment(chosen, source, after, clock);
     return { state: { version: 1, trees: trees.map(tree => tree.id === chosen.id ? grown : tree), prefs: normalizePrefs(state.prefs) }, treeId: chosen.id, momentId: grown.moments.at(-1).id };
   }
@@ -577,7 +590,7 @@ export function quickAdd(state, input, clock = new Date().toISOString()) {
     return { state: { version: 1, trees: [...trees, tree], prefs: normalizePrefs(state.prefs) }, treeId: tree.id, momentId: moment.id };
   }
   // '가' 결정: 빠른 추가는 이전 순간을 고를 길이 없으므로 가장 최근 순간 다음에 잇는다(첫 순간 하나뿐이면 첫 순간).
-  const grown = addMoment(inbox, source, latestMomentId(inbox) || inbox.moments.find(m => m.parentId === null).id, clock);
+  const grown = addMoment(inbox, source, inbox.moments.length === 0 ? null : (latestMomentId(inbox) || inbox.moments.find(m => m.parentId === null).id), clock);
   return { state: { version: 1, trees: trees.map(tree => tree.id === inbox.id ? grown : tree), prefs: normalizePrefs(state.prefs) }, treeId: inbox.id, momentId: grown.moments.at(-1).id };
 }
 
@@ -851,7 +864,7 @@ export function validateState(value) {
   let inboxSeen = false;
   const trees = value.trees.map(tree => {
     if (!tree || typeof tree !== 'object') throw new Error('트리 데이터가 올바르지 않아요.');
-    if (!idValid(tree.id) || treeIds.has(tree.id) || !Array.isArray(tree.moments) || !tree.moments.length || tree.moments.length > MAX_MOMENTS || !time(tree.createdAt) || !time(tree.updatedAt)) throw new Error('트리 데이터가 올바르지 않아요.');
+    if (!idValid(tree.id) || treeIds.has(tree.id) || !Array.isArray(tree.moments) || tree.moments.length > MAX_MOMENTS || !time(tree.createdAt) || !time(tree.updatedAt)) throw new Error('트리 데이터가 올바르지 않아요.');
     treeIds.add(tree.id);
     const ids = new Set();
     const moments = tree.moments.map(m => {
@@ -868,7 +881,7 @@ export function validateState(value) {
       const copiedFrom = idValid(m.copiedFrom) && m.copiedFrom !== m.id ? { copiedFrom: m.copiedFrom } : {};
       return { ...validateMomentInput(clean), ...rangeFields(m, m.url), id: m.id, parentId: m.parentId, links: [...new Set(rawLinks)], createdAt: m.createdAt, ...boardLayoutOf(m), ...copiedFrom };
     });
-    if (moments.filter(m => m.parentId === null).length !== 1) throw new Error('트리의 시작 순간은 하나여야 해요.');
+    if (moments.length && moments.filter(m => m.parentId === null).length !== 1) throw new Error('트리의 시작 순간은 하나여야 해요.');
     const byId = new Map(moments.map(m => [m.id, m]));
     for (const moment of moments) for (const link of moment.links) if (!byId.has(link)) throw new Error('연결된 순간이 파일에 없어요.');
     for (const moment of moments) {

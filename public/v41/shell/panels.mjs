@@ -42,6 +42,7 @@ export function createPanels(deps) {
 
   // 편집기 모드와 폼 기준값은 이 파일이 들고 있는다(셸은 formDirty·treeDirty만 묻는다).
   let editorMode = 'add';
+  let restoreEditor = false;
   let formBaseline = '';
   let parentBaseline = '';
   let treeBaseline = '';
@@ -70,7 +71,7 @@ export function createPanels(deps) {
   }
   // #1097: 머리 한 줄 — 트리 이름 · 담은 날(순간의 날짜). add 모드는 기존 문구를 그대로 둔다.
   function editorContextLine(mode, m) {
-    if (mode !== 'edit') return `새 순간 추가 · ${m.title}에서 이어집니다.`;
+    if (mode !== 'edit') return m ? `새 순간 추가 · ${m.title}에서 이어집니다.` : '';
     const treeTitle = displayTreeTitle(String(window.LT41?.tree?.title || window.LT41?.tree?.subject || '') || '트리');
     let dateText = '';
     try { dateText = formatDisplayDate(m.date, getMember()?.state?.()?.prefs?.dateStyle) || ''; } catch { dateText = ''; }
@@ -157,6 +158,7 @@ export function createPanels(deps) {
   function startQuickSession() {
     // #462: ＋ 순간 추가는 늘 새 순간이다. 직전에 '이 순간 수정'으로 연 상태(제목 '순간 수정'·그 순간의 값·
     // 수정 전용 묶음)가 남아, 자세한 추가에서 저장하면 그 순간을 고쳐 버리던 것을 여기서 비운다.
+    parentChoice = '';
     if (editorMode === 'edit') resetToAdd();
     formBaseline = '';
     parentBaseline = parentValue();
@@ -166,6 +168,9 @@ export function createPanels(deps) {
     parentChoice = '';
     getUploads()?.reset?.();
     $('moment-form').reset();
+    $('editor-board-styles').hidden = true;
+    $('editor-restore').hidden = true;
+    for (const key of ['cardStyle', 'pinStyle']) if ($('moment-form').elements[key]) $('moment-form').elements[key].disabled = true;
     $('write-panel-title').textContent = '순간 추가';
     $('write-eyebrow').textContent = '순간 추가';
     $('relation-label').hidden = false;
@@ -235,20 +240,24 @@ export function createPanels(deps) {
     if (parentChoice && c?.tree?.moments.some(moment => moment.id === parentChoice)) return parentChoice;
     return (c?.tree && latestMomentId(c.tree)) || c?.momentId || '';
   }
+  function prepareAddParent(parentId = '') {
+    const c = window.LT41;
+    parentChoice = parentId && c?.tree?.moments.some(moment => moment.id === parentId) ? parentId : '';
+  }
   function setEditorMode(mode, parentId = '') {
     const uploads = getUploads();
     if (uploads.busy) {
       notify('파일 전송을 마치거나 취소한 뒤 작업을 바꿔 주세요.');
       return;
     }
-    if (formDirty() && !confirm('현재 입력을 비우고 작업을 바꿀까요?')) return;
+    if (formDirty() && !restoreEditor && !confirm('현재 입력을 비우고 작업을 바꿀까요?')) return;
     uploads.reset();
     const c = window.LT41;
-    parentChoice = mode === 'add' && parentId && c?.tree.moments.some(moment => moment.id === parentId) ? parentId : '';
+    prepareAddParent(mode === 'add' ? parentId : '');
     const m = mode === 'add'
       ? c?.tree.moments.find(moment => moment.id === addParentMomentId())
       : c?.tree.moments.find(moment => moment.id === c.momentId);
-    if (!m) {
+    if (!m && !(mode === 'add' && c?.tree?.moments.length === 0)) {
       notify('먼저 순간을 선택해 주세요.');
       return;
     }
@@ -260,6 +269,19 @@ export function createPanels(deps) {
     if (mode !== 'edit') dwrite.show('detailed');
     const form = $('moment-form');
     form.reset();
+    $('editor-board-styles').hidden = mode !== 'edit';
+    $('editor-restore').hidden = mode !== 'edit';
+    for (const key of ['cardStyle', 'pinStyle']) {
+      const field = form.elements[key];
+      if (!field) continue;
+      field.disabled = mode !== 'edit';
+      for (const option of [...field.options]) if (option.dataset.legacy) option.remove();
+      const value = mode === 'edit' ? m[key] || '' : '';
+      if (value && ![...field.options].some(option => option.value === value)) {
+        const option = document.createElement('option'); option.textContent = value; option.value = value; option.dataset.legacy = '1'; field.add(option);
+      }
+      field.value = value;
+    }
     $('relation-label').hidden = mode !== 'add';
     $('relation-hint').hidden = mode !== 'add';
     $('delete-moment').hidden = mode !== 'edit';
@@ -506,6 +528,7 @@ export function createPanels(deps) {
     // #1097: 영상은 미리보기 본문(compact)만 — 크게 보기·열기는 아래 한 줄(renderMediaActions)로 옮긴다.
     $('url-media-preview').innerHTML = url ? LTMedia.markup(url, form.elements.title.value, null, '', null, null, {compact: true}) : '';
     renderMediaActions(info, url, form.elements.title.value);
+    $('editor-photo-clear').hidden = editorMode !== 'edit' || info.kind !== 'photo';
     // #792: 시작·끝 구간 칸은 YouTube 주소일 때만 보인다. 주소에 t=·start=가 있으면 빈 시작 칸을 채운다(이미 적은 값은 그대로).
     const rangeFields = $('range-fields');
     if (rangeFields) rangeFields.hidden = info.kind !== 'youtube';
@@ -770,6 +793,20 @@ export function createPanels(deps) {
   };
   // #380 4 2차: Esc·바깥 클릭·× 닫기와 "저장하지 않고 닫을까요?" 확인은 shell/dialogs.mjs 공통 틀이 맡는다
   // (트리 관리와 같은 규칙). 편집기만의 규칙은 공통 틀보다 우선한다 — 업로드 중이면 닫지 않는다.
+  $('editor-photo-clear').onclick = () => {
+    if (getUploads()?.busy) return;
+    getUploads()?.reset?.();
+    const form = $('moment-form');
+    form.elements.url.value = '';
+    form.elements.startSeconds.value = '';
+    form.elements.endSeconds.value = '';
+    updateMediaPreview();
+  };
+  $('editor-restore').onclick = () => {
+    if (editorMode !== 'edit' || getUploads()?.busy) return;
+    restoreEditor = true;
+    try { setEditorMode('edit'); } finally { restoreEditor = false; }
+  };
   $('editor-cancel').onclick = () => { requestClose?.('write-panel'); };
   // #1097: 영상 바꾸기 펼침 — 닫힌 상태가 기본이고, 닫기 시 더러움 확인은 그대로다(폼 기준값이 맡는다).
   $('media-change-toggle').onclick = () => { setMediaChangeOpen($('media-change-box').hidden); };
@@ -784,12 +821,33 @@ export function createPanels(deps) {
       renderContinueSummary();
     }
   };
-  $('delete-moment').onclick = () => {
+  function deleteMoment({ treeId = '', momentId = '' } = {}) {
+    const tree = getMember()?.state?.().trees.find(item => item.id === treeId);
+    if (!tree?.moments.some(moment => moment.id === momentId)) {
+      notify('이 순간을 찾을 수 없어요.');
+      return;
+    }
     if (!confirm('이 순간을 삭제할까요? 자식 순간은 이전 순간으로 이어지고 관련 연결은 해제됩니다.')) return;
+    const before = structuredClone(tree);
     try {
-      getMember().apply('delete', {}, selection());
+      getMember().apply('delete', {}, { treeId: tree.id, momentId });
+      const after = getMember().state().trees.find(item => item.id === tree.id);
       $('write-panel').close();
-    } catch (e) { $('form-error').textContent = e.message; }
+      notify('지웠어요.', {
+        hold: true,
+        action: {
+          label: '되돌리기',
+          run: () => {
+            try {
+              getMember().apply('undoDelete', { treeId: tree.id, momentId, record: { treeId: tree.id, before, after } }, { treeId: tree.id, momentId }, { moment: true });
+            } catch (error) { notify(error.message, { hold: true }); }
+          }
+        }
+      });
+    } catch (error) { notify(error.message); }
+  }
+  $('delete-moment').onclick = () => {
+    deleteMoment(selection());
   };
 
   // 업로드 모듈이 파일을 바꾼 뒤 미리보기·자동 제목 안내를 다시 그린다.
@@ -809,6 +867,7 @@ export function createPanels(deps) {
   return {
     setEditorMode,
     openEditor,
+    deleteMoment,
     focusTitleInput,
     openTreeManager,
     updateTreeCoverHint,
@@ -817,6 +876,7 @@ export function createPanels(deps) {
     formDirty,
     detailedDirty,
     startQuickSession,
+    prepareAddParent,
     onWriteTab,
     treeDirty,
     editorMode: () => editorMode

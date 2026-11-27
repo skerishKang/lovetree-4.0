@@ -1665,3 +1665,56 @@ test('#1473 첫 화면 배치', {skip: REQUIRE952 ? false : skip952, timeout:240
  }
  }finally{await browser.close()}
 });
+
+test('#1473 알림 띠와 숫자판 겹침 0', {skip: REQUIRE952 ? false : skip952, timeout:240000}, async()=>{
+ const browser=await chromium952.launch({headless:true});
+ try{
+ for(const [width,height] of [[390,844],[844,390],[1440,900]])
+ for(const theme of ['night','garden']) for(const member of [false,true]){
+ const h=await boot952(browser,{width,height,member,initStorage:{'lt41.theme':theme},port:4560});
+ try{
+ await h.frame.waitForFunction(()=>globalThis.__LT_ORBIT_TEST__?.canvasSettled());
+ await h.page.evaluate(()=>{const c=document.getElementById('updates-card');c.hidden=false;document.getElementById('updates-card-text').textContent='\uB7EC\uBE0C\uD2B8\uB9AC\uAC00 \uC0C8\uB85C\uC6CC\uC84C\uC5B4\uC694';});
+ await h.page.waitForTimeout(60);
+ const m=await h.page.evaluate(()=>{
+ const r=e=>{if(!e)return null;const x=e.getBoundingClientRect();if(!x.width||!x.height||e.hidden||getComputedStyle(e).display==='none')return null;return {l:x.left,t:x.top,r:x.right,b:x.bottom,w:x.width,h:x.height}};
+ const f=document.getElementById('view'),fr=r(f),root=f.contentDocument?.getElementById('orbit')?.shadowRoot;
+ const shift=e=>{const x=r(e);return x&&{l:x.l+fr.l,t:x.t+fr.t,r:x.r+fr.l,b:x.b+fr.t,w:x.w,h:x.h}};
+ const nodes=[...root.querySelectorAll('.home-count,.center .actions button')].map(e=>({type:e.classList.contains('home-count')?'count':'button',rect:shift(e)})).concat([...document.querySelectorAll('.home-links a,.home-links button')].map(e=>({type:'link',rect:r(e)}))).filter(x=>x.rect);
+ const notice=r(document.getElementById('updates-card')),toast=r(document.getElementById('toast'));
+ const overlap=(a,b)=>a&&b?Math.max(0,Math.min(a.r,b.r)-Math.max(a.l,b.l))*Math.max(0,Math.min(a.b,b.b)-Math.max(a.t,b.t)):0;
+ return {notice,toast,targets:nodes,clashes:nodes.map(x=>({type:x.type,area:Math.round(overlap(notice,x.rect)*100)/100})).filter(x=>x.area>0),memberState:document.body.dataset.member};
+ });
+
+ const tag=width+' '+theme+' '+(member?'member':'guest');
+ assert.ok(m.notice,tag+' updates card must be visible');
+ assert.equal(m.clashes.length,0,tag+' updates card overlap: '+JSON.stringify(m.clashes));
+ if(width===390&&member){
+  const counts=m.targets.filter(x=>x.type==='count');
+  assert.ok(counts.length>0,tag+' counts');
+  assert.ok(counts.every(x=>x.rect.l>=16&&x.rect.r<=width-16),tag+' count safe margins: '+JSON.stringify(counts));
+ }
+ await h.page.evaluate(()=>{
+   const card=document.getElementById('updates-card');card.hidden=true;
+   const toast=document.getElementById('toast');toast.textContent='??';toast.hidden=false;
+   dispatchEvent(new Event('resize'));
+ });
+ await h.page.waitForTimeout(75);
+ const tm=await h.page.evaluate(()=>{
+   const rect=e=>{if(!e)return null;const a=e.getBoundingClientRect();if(!a.width||!a.height||e.hidden||getComputedStyle(e).display==='none')return null;return {l:a.left,t:a.top,r:a.right,b:a.bottom}};
+   const f=document.getElementById('view'),fr=rect(f),root=f.contentDocument.getElementById('orbit').shadowRoot;
+   const shift=e=>{const a=rect(e);return a&&{l:a.l+fr.l,t:a.t+fr.t,r:a.r+fr.l,b:a.b+fr.t}};
+   const nodes=[...root.querySelectorAll('.home-count,.center .actions button')].map(shift).concat([...document.querySelectorAll('.home-links a,.home-links button')].map(rect)).filter(Boolean);
+   const toast=rect(document.getElementById('toast'));
+   const hit=(a,b)=>Math.max(0,Math.min(a.r,b.r)-Math.max(a.l,b.l))*Math.max(0,Math.min(a.b,b.b)-Math.max(a.t,b.t));
+   return {toast,overlap:toast?Math.max(0,...nodes.map(n=>hit(toast,n))):0};
+ });
+ assert.ok(tm.toast,tag+' toast is visible');
+ assert.equal(tm.overlap,0,tag+' toast overlap: '+JSON.stringify(tm));
+ console.log('NOTICE1473',JSON.stringify({width,height,theme,member,updatesTop:m.notice.t,updatesBottom:m.notice.b,updateMaxArea:0,toastMaxArea:tm.overlap,countLeft:Math.min(...m.targets.filter(x=>x.type==='count').map(x=>x.rect.l)),countRight:Math.max(0,...m.targets.filter(x=>x.type==='count').map(x=>x.rect.r))}));
+
+ const dir=process.env.LT_1473_2_CAPTURE;if(dir){const {mkdirSync}=await import('node:fs');mkdirSync(dir,{recursive:true});await h.page.screenshot({path:dir+'/'+width+'-'+theme+'-'+member+'.png',animations:'disabled'});}
+ }finally{await close952(h)}
+ }
+ }finally{await browser.close()}
+});

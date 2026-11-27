@@ -151,6 +151,15 @@ export function createMessages(deps) {
     // #315: 공유 감상(share)은 읽기 전용이다. 안쪽 화면의 버튼 정리를 통과한 쓰기 메시지가 남아도 여기서 막는다(이중).
     if (data?.type === MSG.newTree) { if (getSource() !== 'share') openNewTree(); return; }
     if (data?.type === MSG.write && getSource() === 'share') return;
+    if (data?.type === MSG.deleteMoment && getSource() === 'server' && data.momentId) {
+      const targetTree = data.treeId
+        ? getModel()?.trees.find(t => t.id === data.treeId && t.moments.some(m => m.id === data.momentId))
+        : (window.LT41?.tree?.moments.some(m => m.id === data.momentId) ? window.LT41.tree : getModel()?.trees.find(t => t.moments.some(m => m.id === data.momentId)));
+      if (!targetTree) return;
+      if (window.LT41?.tree?.id !== targetTree.id) choose(targetTree.id, data.momentId);
+      deps.deleteMoment({ treeId: targetTree.id, momentId: data.momentId });
+      return;
+    }
     if (data?.type === MSG.write && data.mode === 'edit' && data.momentId) {
       const targetTree = data.treeId
         ? getModel()?.trees.find(t => t.id === data.treeId && t.moments.some(m => m.id === data.momentId))
