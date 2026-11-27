@@ -286,12 +286,19 @@ export function createShareService({ shareRepo, workspaceRepo, visibilityRepo = 
           ? summaries.map(summary => summary.share)
           : await shareRepo.list({ productId, subjectId: row.subjectId });
         const seen = new Set([row.treeId]);
-        for (const candidate of candidates) {
-          if (shelf.length >= 24) break;
-          if (!candidate || candidate.subjectId !== row.subjectId || candidate.status !== 'active' || seen.has(candidate.treeId)) continue;
+        const ownCandidates = candidates.filter(candidate => {
+          if (!candidate || candidate.subjectId !== row.subjectId || candidate.status !== 'active' || seen.has(candidate.treeId)) return false;
           seen.add(candidate.treeId);
+          return true;
+        });
+        // 후보를 모두 한 번에 확인해야 중간에 비공개가 섞여도 공개 서재 24권을 채울 수 있다.
+        const privateIds = visibilityRepo?.privateTreeIds
+          ? await visibilityRepo.privateTreeIds({ productId, subjectId: row.subjectId, treeIds: ownCandidates.map(candidate => candidate.treeId) })
+          : null;
+        for (const candidate of ownCandidates) {
+          if (shelf.length >= 24) break;
           if (!summaries && !(await treeDiscover(candidate.subjectId, candidate.treeId)).discover) continue;
-          if (await treeVisibility(candidate.subjectId, candidate.treeId) === 'private') continue;
+          if (privateIds ? privateIds.has(candidate.treeId) : await treeVisibility(candidate.subjectId, candidate.treeId) === 'private') continue;
           let projected;
           try { projected = projectSharedTree(stored.doc, candidate.treeId, candidate.shareId); }
           catch { continue; }
@@ -303,7 +310,9 @@ export function createShareService({ shareRepo, workspaceRepo, visibilityRepo = 
       const stats = communityRepo?.stats
         ? await communityRepo.stats({ productId, shareId: row.shareId, viewerSubjectId: null })
         : {};
-      return {
+      const visits = visitCounts ? await visitCounts.count(shareId, row) : 0;
+      const afterResponse = visitCounts?.prepare(row, visitor);
+      return { afterResponse, body: {
         visit: {
           shareId: row.shareId,
           view: normalizeTreeOpenView(tree.openView),
@@ -317,8 +326,8 @@ export function createShareService({ shareRepo, workspaceRepo, visibilityRepo = 
         },
         tree,
         shelf,
-        stats: { ...projectPublicStats(stats), visits: visitCounts ? await visitCounts.record(shareId, visitor) : 0 }
-      };
+        stats: { ...projectPublicStats(stats), visits }
+      }};
     },
     // === 저장 성공 뒤 공유 동기화(#538, B-12 2단계 #1163) ===
     // 응답 전에 숨김(회수·소개 정리·무대 색인 재조정)을 끝내고 응답을 돌려 준다 — 보임(수 갱신·자동
@@ -396,7 +405,8 @@ export function createShareHandler({ authenticate, service, productId, visitProx
           try { visitor.subjectId = await owner(request); visitor.authKnown = true; } catch { /* 확인되지 않은 로그인은 세지 않는다. */ }
         }
       }
-      return visitResponse(request, await service.readVisit(visitMatch[1], visitor));
+      const { body, afterResponse } = await service.readVisit(visitMatch[1], visitor);
+      return { ...visitResponse(request, body), ...(afterResponse ? { afterResponse } : {}) };
     }
     const subjectId = await owner(request);
     if (path === '/api/shares/preview') {
