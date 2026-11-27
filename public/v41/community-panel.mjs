@@ -16,6 +16,7 @@ import {mountMoments} from './community-moments.mjs';
 import {createExploreLayers} from './community-history.mjs';
 // #1098 2단계: 판의 순간 목록 — 순간 카드에 그 순간의 ♡·댓글 수, ♡ 누르기·댓글 쓰기는 순간 단위 API(서버 #1136).
 import {mountMomentList} from './community-moment-list.mjs';
+import {askAppConfirm} from './confirm.mjs';
 const el=(tag,className,text)=>{const node=document.createElement(tag);if(className)node.className=className;if(text!=null)node.textContent=text;return node;};
 // 셸이 낯선 주소를 #home으로 바꾸기 전에(module import 시점) 직접 들어온 주소를 기억한다(#1025).
 const hashNow=()=>typeof location!=='undefined'?(location.hash||''):'';
@@ -356,7 +357,7 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
   reportInput.maxLength=500;reportInput.required=true;reportInput.placeholder='신고 이유';reportInput.setAttribute('aria-label','신고 이유');reportButton.type='submit';reportForm.append(reportInput,reportButton);
   reportForm.onsubmit=async event=>{event.preventDefault();const answer=await api.report(item.shareId,reportInput.value);message(answer.ok?'신고를 접수했어요. 운영 검토 전에는 자동 숨김 처리하지 않아요.':loginMessage(answer));if(answer.ok)reportInput.value='';};
   const block=el('button','community-link danger','이 공개자의 트리 숨기기');block.type='button';
-  block.onclick=async()=>{if(!confirm('이 공개자의 트리를 내 둘러보기 목록에서 숨길까요?'))return;const answer=await api.block(item.shareId);if(!answer.ok){message(loginMessage(answer));return;}items=items.filter(value=>value.shareId!==item.shareId);selectedId=items[0]?.shareId||null;if(preview.open)preview.close();render();message('내 둘러보기 목록에서 숨겼어요.');if(!selectedId)groups.querySelector('.community-group-chip')?.focus();};
+  block.onclick=async()=>{if(!(await askAppConfirm('이 공개자의 트리를 내 둘러보기 목록에서 숨길까요?')))return;const answer=await api.block(item.shareId);if(!answer.ok){message(loginMessage(answer));return;}items=items.filter(value=>value.shareId!==item.shareId);selectedId=items[0]?.shareId||null;if(preview.open)preview.close();render();message('내 둘러보기 목록에서 숨겼어요.');if(!selectedId)groups.querySelector('.community-group-chip')?.focus();};
   panel.append(reportForm,block);details.append(summary,panel);
   return details;
  }

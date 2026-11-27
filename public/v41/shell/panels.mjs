@@ -11,6 +11,7 @@ import {displayTreeTitle} from '../tree-name.mjs';
 import {mountPrivateUpload} from '../private-upload.mjs';
 import {fetchVideoTitle} from '../video-title.mjs';
 import {loadYouTubeIframeApi, createSegmentCapture} from '../segment-capture.mjs';
+import {askAppConfirm} from '../confirm.mjs';
 
 // #934: 링크 칸에 열 수 없는 주소가 남았을 때의 안내 — 미리보기 경고('링크를 열 수 없어요')와
 // 저장 판정이 같은 뜻을 말하도록 한 문장으로 둔다. 칸을 비우면 링크 없이 저장하는 길을 알려 준다.
@@ -244,13 +245,12 @@ export function createPanels(deps) {
     const c = window.LT41;
     parentChoice = parentId && c?.tree?.moments.some(moment => moment.id === parentId) ? parentId : '';
   }
-  function setEditorMode(mode, parentId = '') {
+  function applyEditorMode(mode, parentId = '') {
     const uploads = getUploads();
     if (uploads.busy) {
       notify('파일 전송을 마치거나 취소한 뒤 작업을 바꿔 주세요.');
       return;
     }
-    if (formDirty() && !restoreEditor && !confirm('현재 입력을 비우고 작업을 바꿀까요?')) return;
     uploads.reset();
     const c = window.LT41;
     prepareAddParent(mode === 'add' ? parentId : '');
@@ -326,7 +326,13 @@ export function createPanels(deps) {
     parentBaseline = parentValue();
   }
 
-  function openEditor(requestedMode, parentId = '') {
+  function setEditorMode(mode, parentId = '') {
+    if (formDirty() && !restoreEditor) return false;
+    applyEditorMode(mode, parentId);
+    return true;
+  }
+
+  async function openEditor(requestedMode, parentId = '') {
     if (!getMember()?.snapshot().owned) {
       openLoginStart('new-tree'); return;
     }
@@ -337,7 +343,8 @@ export function createPanels(deps) {
     }
     const mode = ['new', 'add', 'edit'].includes(requestedMode) ? requestedMode : window.LT41 ? 'add' : 'new';
     if (mode === 'new') { openFirstJourney(); return; }
-    setEditorMode(mode, parentId);
+    if (formDirty() && !restoreEditor && !(await askAppConfirm('현재 입력을 비우고 작업을 바꿀까요?'))) return;
+    applyEditorMode(mode, parentId);
     panel('write-panel');
     // #898: 창을 열 때는 맨 위부터 — 쉬운 추가에서 내용을 읽다가 '지금 다듬기'로 넘어오면 스크롤이 중간에 남고,
     // 초점을 노트 칸으로 옮기는 것만으로도 창이 스크롤된다. 초점을 준 뒤에 맨 위로 되돌린다.
@@ -627,9 +634,9 @@ export function createPanels(deps) {
       // #905: 저장 진행·성공은 알리지 않는다 — apply 는 동기이라 1초 안에 끝나고, 실패는 폼 오류 줄로 알린다.
     } catch (error) { $('tree-form-error').textContent = error.message; }
   };
-  $('tree-delete').onclick = () => {
+  $('tree-delete').onclick = async () => {
     const tree = window.LT41?.tree;
-    if (!tree || !confirm(`“${displayTreeTitle(tree.title)}”과 ${tree.moments.length}개 순간을 모두 삭제할까요? 이 작업은 되돌릴 수 없습니다.`)) return;
+    if (!tree || !(await askAppConfirm(`“${displayTreeTitle(tree.title)}”과 ${tree.moments.length}개 순간을 모두 삭제할까요? 이 작업은 되돌릴 수 없습니다.`))) return;
     try {
       getMember().apply('deleteTree', {}, selection());
       treeBaseline = '';
@@ -821,13 +828,13 @@ export function createPanels(deps) {
       renderContinueSummary();
     }
   };
-  function deleteMoment({ treeId = '', momentId = '' } = {}) {
+  async function deleteMoment({ treeId = '', momentId = '' } = {}) {
     const tree = getMember()?.state?.().trees.find(item => item.id === treeId);
     if (!tree?.moments.some(moment => moment.id === momentId)) {
       notify('이 순간을 찾을 수 없어요.');
       return;
     }
-    if (!confirm('이 순간을 삭제할까요? 자식 순간은 이전 순간으로 이어지고 관련 연결은 해제됩니다.')) return;
+    if (!(await askAppConfirm('이 순간을 삭제할까요? 자식 순간은 이전 순간으로 이어지고 관련 연결은 해제됩니다.'))) return;
     const before = structuredClone(tree);
     try {
       getMember().apply('delete', {}, { treeId: tree.id, momentId });
@@ -847,7 +854,7 @@ export function createPanels(deps) {
     } catch (error) { notify(error.message); }
   }
   $('delete-moment').onclick = () => {
-    deleteMoment(selection());
+    void deleteMoment(selection());
   };
 
   // 업로드 모듈이 파일을 바꾼 뒤 미리보기·자동 제목 안내를 다시 그린다.

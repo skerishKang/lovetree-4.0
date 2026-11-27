@@ -11,6 +11,7 @@ import {copyPublicMoment} from '../moments-copy.mjs';
 import {thumbnailCandidates} from '../thumb-fallback.mjs';
 // #1072 A-16: 화면 공용 오류 기록 — 저장·보드·미디어 경로에서 조용히 넘기던 빈 catch를 여기서 기록한다.
 import {report} from '../report.mjs';
+import {askAppConfirm} from '../confirm.mjs';
 
 // 261118 대표 지적 2차 5: 서재 화면이 알려 준 '마지막에 본 트리'(가운데 책의 트리).
 // 서재 화면에서 콕·보드·지도 탭을 누르면 이 트리로 열린다(shell.mjs의 data-view 눌림에서 쓴다).
@@ -375,7 +376,7 @@ export function createMessages(deps) {
         revoke.type = 'button';
         revoke.textContent = '공유 취소';
         revoke.onclick = async () => {
-          if (!confirm('이 공유 주소를 지금 회수할까요? 둘러보기에 올렸다면 목록에서도 즉시 내려갑니다.')) return;
+          if (!(await askAppConfirm('이 공유 주소를 지금 회수할까요? 둘러보기에 올렸다면 목록에서도 즉시 내려갑니다.'))) return;
           revoke.disabled = true;
           const answer = await shareApi.revoke(item.id);
           if (!answer.ok) { $('share-feedback').textContent = shareFailure(answer); revoke.disabled = false; return; }

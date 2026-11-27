@@ -2,10 +2,12 @@ import {clickToolbarTreeChoice,treeChoiceExpanded,treeChoiceFocused} from './hel
 // #1109: 정리 창과 순간 목록 창의 닫기 단추·뒤 덮개·390 크기를 같게, 정리 창 아래 단추는 스크롤 끝에서 보이게.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { serve } from './helpers/screen-audit.mjs';
 import { createTree, addMoment } from '../public/v41/domain.mjs';
+import {askAppConfirm} from '../public/v41/confirm.mjs';
 
 const REQUIRE = process.env.LT_DIALOG_UNIFY_REQUIRE === '1';
 let chromium, skip = false;
@@ -25,6 +27,53 @@ function sampleTree() {
 }
 const otherTree = () => createTree({ subject: '다른 트리', title: '다른 트리', note: '', emotion: '설렘', date: '2026-11-20', url: '' }, '2026-11-20T00:00:00Z');
 const workspace = (tree) => JSON.stringify({ revision: 1, state: { version: 1, trees: [tree, otherTree()], prefs: {} }, subject: '시험계정', writeSubjectBound: true, savedAt: '2026-11-20T09:00:00.000Z' });
+
+test('#1541 공용 확인 함수는 앱 확인 창의 Promise를 그대로 쓰고 없으면 취소한다', async () => {
+  const saved = globalThis.LT41Confirm;
+  const messages = [];
+  try {
+    globalThis.LT41Confirm = {ask: async message => { messages.push(message); return true; }};
+    assert.equal(await askAppConfirm('확인 문구'), true);
+    globalThis.LT41Confirm = {ask: async () => false};
+    assert.equal(await askAppConfirm('취소 문구'), false);
+    delete globalThis.LT41Confirm;
+    assert.equal(await askAppConfirm('창 없음'), false);
+    assert.deepEqual(messages, ['확인 문구']);
+  } finally {
+    if (saved === undefined) delete globalThis.LT41Confirm;
+    else globalThis.LT41Confirm = saved;
+  }
+});
+
+test('#1541 v41 제품 코드에 브라우저 기본 확인 창 호출이 남지 않는다', () => {
+  const root = fileURLToPath(new URL('../public/v41/', import.meta.url));
+  const files = readdirSync(root, {recursive: true}).filter(file => /\.(?:js|mjs|html)$/.test(file));
+  const hits = files.flatMap(file => {
+    const source = readFileSync(join(root, file), 'utf8');
+    return [...source.matchAll(/\bconfirm\s*\(/g)].map(match => ({file, line: source.slice(0, match.index).split('\n').length}));
+  });
+  assert.deepEqual(hits, []);
+});
+
+test('#1541 앱 확인 창은 취소 초점·Enter 확인·Esc 취소·바깥 누름 취소를 따른다', {skip: skip || undefined}, async (t) => {
+  if (skip) { t.skip(skip); return; }
+  const server = await serve({'/__confirm1541.html': '<!doctype html><meta charset="utf-8"><script src="/v41/confirm-dialog.js"></script>'});
+  const browser = await chromium.launch({headless: true});
+  try {
+    const page = await browser.newPage();
+    await page.goto(`http://127.0.0.1:${server.address().port}/__confirm1541.html`);
+    const focused = await page.evaluate(() => { window.__confirmAnswer = LT41Confirm.ask('Enter 확인'); return document.activeElement.id; });
+    assert.equal(focused, 'lt-confirm-cancel');
+    await page.keyboard.press('Enter');
+    assert.equal(await page.evaluate(() => window.__confirmAnswer), true);
+    await page.evaluate(() => { window.__confirmAnswer = LT41Confirm.ask('Esc 취소'); window.__escPropagation = 0; document.addEventListener('keydown', event => { if (event.key === 'Escape') window.__escPropagation += 1; }); });
+    await page.keyboard.press('Escape');
+    assert.equal(await page.evaluate(() => window.__confirmAnswer), false);
+    assert.equal(await page.evaluate(() => window.__escPropagation), 0);
+    await page.evaluate(() => { window.__confirmAnswer = LT41Confirm.ask('바깥 취소'); document.getElementById('lt-confirm').click(); });
+    assert.equal(await page.evaluate(() => window.__confirmAnswer), false);
+  } finally { await browser.close(); await new Promise(resolve => server.close(resolve)); }
+});
 
 async function withShell(tree, { width, height, theme, deferred = false, cached = deferred, hash = '' }, fn) {
   const server = await serve({}, {port:Number(process.env.LT_TEST_PORT)||0});

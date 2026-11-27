@@ -5,6 +5,7 @@ import { loginUrlWithTheme, themeTone } from '../header-state.mjs';
 // 상태는 deps의 getter로 받는다(모듈이 shell을 다시 import하지 않는다).
 // #1072 A-16: 의견 보내기의 '함께 보낼 정보'에 실릴 최근 오류 기록은 report.mjs 한 곳에서 가져온다.
 import {reportEntries} from '../report.mjs';
+import {askAppConfirm} from '../confirm.mjs';
 export function createSettings(deps){
 const { $, notify, setTitleDisplay, openLoginStart, links, screenForView, choose, panel, show, frames, frameLoaded, hideFrames, closeAccountMenu, openAccountMenu, renderAccount, updateAccountControls, openAssets, openEditor, sample, backup, clear, startMember, leaveMember, pauseMember, openFallbackShell, writeLocation, load, flowNavigation, closePanels, renderTreeMenu, requestBoardOpen, lastShelfTreeId, shellHeader, shellDialogs,  shareApi, accountApi, myNewsApi, readTheme, writeTheme, normalizeAccentColor, normalizeDateStyle, normalizeStartPlace, normalizeShareView, normalizeHomeMoment,  readPageTurn, writePageTurn, readShelfView, frameMessage, displayTreeTitle, accountPresentation, createFeedbackDialog, createFeedbackBoard, mountUpdates, mountMyNews, readWriteTab, writeWriteTab, clearCachedWorkspace, forgetLoginSubject, createWorkspaceApi, paintThemeControls, applyTheme, toggleTheme, paintBookDisplayControls, setShelfView } = deps;
 const $on=(id,fn)=>{const el=$(id);if(el)el.onclick=fn;};
@@ -176,7 +177,7 @@ $('empty-records').onclick=()=>{if(!deps.member?.snapshot().owned){
   return;
  }deps.member.snapshot().writable?openEditor():openAccountData();};
 $('empty-sample').onclick=sample;
-$('sample').onclick=sample;$('clear').onclick=()=>{if(!leaveMember())return;++deps.loadGeneration;clear();$('save-feedback').hidden=true;$('file').value='';if($('account-settings').open)$('account-settings').close();};
+$('sample').onclick=sample;$('clear').onclick=async()=>{if(!(await leaveMember()))return;++deps.loadGeneration;clear();$('save-feedback').hidden=true;$('file').value='';if($('account-settings').open)$('account-settings').close();};
 $('server').onclick=()=>{void startMember().catch(error=>openFallbackShell(error));};
 const ACCOUNT_DELETE_PHRASE='탈퇴합니다';
 let accountExpected=null;
@@ -502,7 +503,7 @@ $('account-form').onsubmit=async event=>{
  event.preventDefault();
  const value=$('account-confirm').value.trim();
  if(!value||!accountConfirmMatches())return;
- if(!confirm('계정을 탈퇴하면 되돌릴 수 없습니다. 계속할까요?'))return;
+ if(!(await askAppConfirm('계정을 탈퇴하면 되돌릴 수 없습니다. 계속할까요?')))return;
  const button=$('account-delete');
  button.disabled=true;
  $('account-delete-status').textContent='탈퇴를 처리하고 있어요.';
@@ -521,7 +522,7 @@ $('account-form').onsubmit=async event=>{
 $('file').onchange=async()=>{
  const f=$('file').files[0];
  if(!f)return;
- if(!leaveMember())return;
+ if(!(await leaveMember()))return;
  const generation=++deps.loadGeneration;
  try{
   if(f.size>4194304)throw Error('4MiB 이하 파일만 읽습니다.');
@@ -545,7 +546,7 @@ function publicProblem(answer){
 async function showPublicRoute(route){
  const requestedHash=location.hash;
  // 로그인한 방문자의 계정 연결은 보존하고, 이 트리의 데이터만 읽기 전용으로 싣는다.
- if(deps.member&&!(deps.member.snapshot().owned?pauseMember():leaveMember())){writeLocation('replace');return;}
+ if(deps.member&&!(await (deps.member.snapshot().owned?pauseMember():leaveMember()))){writeLocation('replace');return;}
  const generation=++deps.loadGeneration;
  deps.activeShareId=route.shareId;
  deps.current=screenForView(['tree','book','board','network'].includes(route.view)?route.view:'book')[1];

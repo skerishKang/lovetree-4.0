@@ -85,7 +85,7 @@ function harness({
 
   const saved = {
     document: globalThis.document, window: globalThis.window, LT41: globalThis.LT41,
-    FormData: globalThis.FormData, confirm: globalThis.confirm, queueMicrotask: globalThis.queueMicrotask,
+    FormData: globalThis.FormData, confirm: globalThis.confirm, LT41Confirm: globalThis.LT41Confirm, queueMicrotask: globalThis.queueMicrotask,
     LTMedia: globalThis.LTMedia
   };
   globalThis.window = globalThis;
@@ -98,6 +98,7 @@ function harness({
   globalThis.FormData = FakeFormData;
   // 시험 정비 2차: 확인 창에 어떤 문구가 갔는지 기록한다(트리 삭제 확인 문구 계약).
   globalThis.confirm = (message) => { calls.confirmMessages.push(message); return confirmAnswer; };
+  globalThis.LT41Confirm = {ask: async message => { calls.confirmMessages.push(message); return confirmAnswer; }};
   globalThis.queueMicrotask = (fn) => fn();
   globalThis.document = { createElementNS: (ns, tag) => ({ tagName: String(tag), namespaceURI: String(ns), attrs: {}, children: [], setAttribute(n,v){this.attrs[n]=String(v)}, getAttribute(n){return this.attrs[n]??null}, append(...k){this.children.push(...k)}, querySelector(){return null}, querySelectorAll(){return []} }), 
     querySelectorAll: () => [],
@@ -115,7 +116,13 @@ function harness({
     },
     getMember: () => ({
       snapshot: () => ({ owned, writable, subject: 's1' }),
-      apply: (mode, payload, sel) => { calls.apply.push({ mode, payload, sel }); return { treeId: 'tree-1', momentId: 'm3' }; }
+      state: () => ({trees: lt41.tree ? [lt41.tree] : []}),
+      apply: (mode, payload, sel) => {
+        calls.apply.push({ mode, payload, sel });
+        if (mode === 'delete') lt41.tree = {...lt41.tree, moments: lt41.tree.moments.filter(moment => moment.id !== sel.momentId)};
+        if (mode === 'deleteTree') lt41.tree = null;
+        return { treeId: 'tree-1', momentId: 'm3' };
+      }
     }),
     getCurrent: () => screen,
     getSource: () => source,
@@ -141,6 +148,7 @@ function harness({
     globalThis.LT41 = saved.LT41;
     globalThis.FormData = saved.FormData;
     globalThis.confirm = saved.confirm;
+    globalThis.LT41Confirm = saved.LT41Confirm;
     globalThis.queueMicrotask = saved.queueMicrotask;
     globalThis.LTMedia = saved.LTMedia;
   };
@@ -228,7 +236,7 @@ test('편집 불가 안내에는 읽을 수 있다는 말이 함께 나간다', 
   } finally { h.restore(); }
 });
 
-test('setEditorMode 표: 파일 전송 중·입력 있음이면 바꾸지 않고, 제목·안내·더 적기를 모드에 맞춘다', () => {
+test('setEditorMode 표: 파일 전송 중·입력 있음이면 바꾸지 않고, 제목·안내·더 적기를 모드에 맞춘다', async () => {
   const busy = harness({ busy: true });
   try {
     busy.panels.setEditorMode('edit');
@@ -241,7 +249,7 @@ test('setEditorMode 표: 파일 전송 중·입력 있음이면 바꾸지 않고
   try {
     dirty.elements['write-panel'].open = true;
     dirty.elements['moment-form'].values.note = '쓰던 글';
-    dirty.panels.setEditorMode('edit');
+    await dirty.panels.openEditor('edit');
     assert.equal(dirty.panels.editorMode(), 'add', '확인을 거절하면 그대로');
   } finally { dirty.restore(); }
 
@@ -451,10 +459,49 @@ test('#314 회귀: 사진으로 표지를 만든 뒤 책 정보 저장을 다시
 });
 
 // 시험 정비 2차(2026-11-15): 트리 이름 호출점을 소스 글자 대신 동작으로 본다(v41-shell-tree-title에서 옮김).
-test('트리 삭제 확인 문구는 줄인 이름을 쓰고, 확인하면 deleteTree를 적용한다', () => {
+test('편집기 작업 전환은 앱 확인 창의 취소·확인을 따른다', async () => {
+  for (const answer of [false, true]) {
+    const h = harness({confirmAnswer: answer});
+    try {
+      h.panels.setEditorMode('add');
+      h.elements['write-panel'].open = true;
+      h.elements['moment-form'].values.note = '쓰던 글';
+      await h.panels.openEditor('edit');
+      assert.match(h.calls.confirmMessages[0], /현재 입력을 비우고 작업을 바꿀까요/);
+      assert.equal(h.panels.editorMode(), answer ? 'edit' : 'add');
+      assert.equal(h.calls.panel.includes('write-panel'), answer);
+    } finally { h.restore(); }
+  }
+});
+
+test('트리 삭제는 취소하면 아무 변경 없이 끝나고 확인하면 deleteTree를 적용한다', async () => {
+  for (const answer of [false, true]) {
+    const h = harness({confirmAnswer: answer, lt41: {tree: {...TREE_A, title: '리센느, 나의 순간들'}, momentId: 'a1'}});
+    try {
+      await h.elements['tree-delete'].onclick();
+      assert.match(h.calls.confirmMessages[0], /“리센느”과 2개 순간을 모두 삭제할까요\?/);
+      assert.equal(h.calls.apply.some(call => call.mode === 'deleteTree'), answer);
+      assert.equal(h.lt41.tree === null, answer);
+    } finally { h.restore(); }
+  }
+});
+
+test('순간 삭제는 취소하면 기록을 바꾸지 않고 확인하면 delete를 적용한다', async () => {
+  for (const answer of [false, true]) {
+    const h = harness({confirmAnswer: answer});
+    try {
+      await h.panels.deleteMoment({treeId: 'tree-1', momentId: 'm1'});
+      assert.match(h.calls.confirmMessages[0], /이 순간을 삭제할까요/);
+      assert.equal(h.calls.apply.some(call => call.mode === 'delete'), answer);
+      assert.equal(h.lt41.tree.moments.length, answer ? 1 : 2);
+    } finally { h.restore(); }
+  }
+});
+
+test('트리 삭제 확인 문구는 줄인 이름을 쓰고, 확인하면 deleteTree를 적용한다', async () => {
   const h = harness({ lt41: { tree: { ...TREE_A, title: '리센느, 나의 순간들' }, momentId: 'a1' } });
   try {
-    h.elements['tree-delete'].onclick();
+    await h.elements['tree-delete'].onclick();
     assert.match(h.calls.confirmMessages[0], /“리센느”과 2개 순간을 모두 삭제할까요\?/, '삭제 확인은 줄인 이름으로 묻는다');
     assert.ok(!h.calls.confirmMessages[0].includes('나의 순간들'), '자동 꼬리말이 확인 문구에 남지 않는다');
     assert.equal(h.calls.apply.at(-1).mode, 'deleteTree', '확인하면 삭제를 적용한다');
