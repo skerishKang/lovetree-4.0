@@ -20,7 +20,8 @@ export function parseSelectionRoute(hash = '') {
   if (path.startsWith('my/')) {
     const treeId = safe(new URLSearchParams(query).get('tree'));
     const momentId = safe(new URLSearchParams(query).get('moment'));
-    return {scope:'owner', view:viewName(path.slice(3)), treeId, momentId, explicit:true};
+    const detail = new URLSearchParams(query).get('detail') === '1';
+    return {scope:'owner', view:viewName(path.slice(3)), treeId, momentId, ...(detail ? {detail:true} : {}), explicit:true};
   }
   if (path.startsWith('share/')) {
     const parts = path.split('/');
@@ -38,11 +39,12 @@ export function memberStartupView(active, pending, saved, fallback='home') {
   return active?.scope === 'screen' ? viewName(active.view) : viewName(saved?.view || fallback);
 }
 
-export function ownerSelectionRoute({view='home', treeId, momentId} = {}) {
+export function ownerSelectionRoute({view='home', treeId, momentId, detail=false} = {}) {
   const params = new URLSearchParams();
   const tree = safe(treeId), moment = safe(momentId);
   if (tree) params.set('tree', tree);
   if (moment) params.set('moment', moment);
+  if (detail && moment) params.set('detail', '1');
   const query = params.toString();
   return `#my/${viewName(view)}${query ? `?${query}` : ''}`;
 }

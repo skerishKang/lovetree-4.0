@@ -56,7 +56,7 @@ body{background:var(--lt-stage);color:var(--lt-pearl);font-family:var(--lt-ui);o
 .ts-card{display:flex;flex-direction:column;overflow:hidden;contain:strict;text-align:left;border:1px solid var(--ts-card-line);border-radius:var(--lt-r-card);
   background:var(--ts-card-bg);color:var(--ts-card-ink);box-shadow:var(--ts-card-shadow)}
 .ts-card::after{content:'';position:absolute;inset:2px;border:1px solid var(--ts-card-line);border-radius:calc(var(--lt-r-card) - 2px);pointer-events:none;opacity:.7}
-.ts-card:hover{border-color:var(--lt-gold-deep)}
+.ts-card:hover{border-color:var(--lt-gold);box-shadow:0 0 0 2px var(--lt-gold-line),var(--ts-card-shadow);filter:brightness(1.06)}
 .ts-thumb{position:relative;display:block;flex:0 0 var(--thumb);height:var(--thumb);background:var(--lt-stage-2);overflow:hidden}
 .ts-thumb img{display:block;width:100%;height:100%;object-fit:cover;pointer-events:none}
 .ts-cap{display:flex;flex-direction:column;justify-content:center;gap:1px;flex:1 1 auto;min-height:0;padding:0 8px}
@@ -71,7 +71,7 @@ body{background:var(--lt-stage);color:var(--lt-pearl);font-family:var(--lt-ui);o
 /* #777 확정 시안: 사진 면적을 넓히고 제목만 한 줄로 작게 남긴다. */
 .ts-stage .ts-card .ts-cap{flex:0 0 20px;min-height:20px;padding:0 7px;justify-content:center}
 .ts-card .ts-meta{display:none}
-.ts-stage .ts-card .ts-title{display:block;font-size:11px;line-height:1.25;font-weight:400;color:var(--lt-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ts-stage .ts-card .ts-title{display:block;font-size:12px;line-height:1.25;font-weight:400;color:var(--lt-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ts-stage .ts-card .ts-thumb{flex:1 1 auto;height:auto;min-height:0}
 .ts-stage .ts-card.is-note .ts-cap{flex:1 1 auto}
 .ts-stage .ts-card.is-note .ts-title{color:var(--ts-note-ink)}

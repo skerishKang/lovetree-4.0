@@ -590,7 +590,9 @@ html[data-lt-theme=garden] #cleanup-panel input:not([type=checkbox]),html[data-l
 /* 2026-11-10 대표 승인 메뉴 정리: 맨 위 한 줄 · 트리 드롭다운 · 계정 메뉴 */
 .app-header{min-height:64px;padding:10px 20px;gap:14px;flex-wrap:nowrap}
 /* #1488 4번: 로고 링크 누름 높이 44px(머리줄 높이는 그대로). */
-.app-header .brand{min-height:44px}
+.app-header .brand{min-height:44px;position:relative}
+/* #1525: 390의 작은 로고 글자는 그대로 두고 누름 영역만 44px로 넓힌다. */
+.app-header .brand::before{content:'';position:absolute;left:-8px;right:-8px;top:0;bottom:0}
 .main-nav{display:flex;align-items:center;gap:2px;flex:1;min-width:0}
 .main-nav>button{min-height:40px;padding:0 10px;font-size:13px}
 /* 261118 대표 지적 2차 5: [서재][책][보드][지도]는 한 묶음(같은 크기·글자 14px) — 서재 탭을 트리 틀 안에 두고
@@ -646,7 +648,7 @@ nav .tree-frame{scroll-snap-align:center}
 .tree-cover[data-cover-design="texture-5"]{background:linear-gradient(135deg,var(--lt-stage-2),rgba(255,230,166,.55),var(--lt-stage-2))}
 .tree-cover[data-cover-design="texture-6"]{background:linear-gradient(180deg,var(--lt-gold-line),var(--lt-stage-2) 38%,var(--lt-gold-line))}
 .tree-name{min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
-.tree-count{font-size:11px;color:var(--lt-muted);white-space:nowrap}
+.tree-count{font-size:12px;color:var(--lt-muted);white-space:nowrap}
 .tree-check{color:var(--lt-gold);font-weight:800}
 .tree-foot{display:grid;gap:3px;margin-top:4px;padding-top:4px;border-top:1px solid var(--lt-line)}
 /* #1285 6번: 묶음 구분선과 위험 동작 표시 — 기존 토큰만 쓴다. */
@@ -1436,10 +1438,13 @@ body>.tree-popover.lt-toolbar-picker[hidden]{display:none}
 .lt-toolbar-picker .tree-foot button{color:var(--lt-role-text-strong)}
 .lt-toolbar-picker .tree-search input{color:var(--lt-role-text-strong);background:var(--lt-role-bg);border-color:var(--lt-role-border)}
 @media(max-width:900px){
- body>.tree-popover.lt-toolbar-picker{top:8dvh;left:0;right:0;bottom:0;width:100%;max-height:92dvh;border-radius:var(--lt-r-card) var(--lt-r-card) 0 0}
+ body>.tree-popover.lt-toolbar-picker{top:calc(var(--lt-panel-top,64px) + 8px);left:0;right:0;bottom:0;width:100%;max-height:none;border-radius:var(--lt-r-card) var(--lt-r-card) 0 0}
  .lt-toolbar-picker .tree-foot{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));max-height:28dvh}
  .lt-toolbar-picker .tree-group-divider{grid-column:1/-1}
 }
+/* #1525: 세로 화면에서는 아래 ＋ 단추 위에, 가로 화면에서는 머리줄 아래에 창을 가둔다. */
+@media(max-width:900px) and (orientation:portrait){body>.tree-popover.lt-toolbar-picker{bottom:calc(116px + env(safe-area-inset-bottom))}}
+@media(max-width:900px) and (orientation:landscape){body>.tree-popover.lt-toolbar-picker{left:8px;right:8px;bottom:8px;width:auto}}
 @media(min-width:601px) and (max-width:900px){.lt-toolbar-picker .tree-foot{grid-template-columns:repeat(3,minmax(0,1fr))}}
 
 /* #1447: 머리줄 간격 세 가지(바깥 여백·묶음 사이·항목 사이)를 변수 하나씩으로 맞춘다. */
