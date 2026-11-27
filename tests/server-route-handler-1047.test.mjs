@@ -1,6 +1,7 @@
 // #1047: 프록시가 넘기는 모든 경로가 서버 진입 분기에서 실제 핸들러를 갖는지 표로 확인한다.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { ALLOWED_PATHS } from '../functions/_lib/proxy.js';
 import { handlerForPath } from '../server/route-handler.mjs';
 import { createTree, addMoment } from '../src/domain.js';
@@ -33,6 +34,29 @@ test('프록시 허용 경로 전체가 기대한 핸들러로 간다(빠진 경
   console.log('ROUTE_TABLE', JSON.stringify(rows));
   assert.deepEqual(bad, [], '핸들러가 없거나 어긋난 경로: ' + JSON.stringify(bad));
   assert.equal(handlerForPath('/api/public/moments'), 'community', '공개 순간 조회는 커뮤니티 핸들러로');
+});
+
+test('#1548 후속 서버 /auth/*는 모든 메서드·하위 경로에서 같은 410을 돌려준다', () => {
+  const source = readFileSync(new URL('../server/index.js', import.meta.url), 'utf8');
+  const declaration = source.split('\n').find(row => row.includes('const retiredLogin ='));
+  assert.ok(declaration, '옛 로그인 핸들러 줄이 있다');
+  const expression = declaration.slice(declaration.indexOf('const retiredLogin = ') + 'const retiredLogin = '.length).replace(/;$/, '');
+  const retiredLogin = new Function('return ' + expression)();
+  const paths = ['/auth/login', '/auth/callback', '/auth/logout', '/auth/legacy', '/auth/'];
+  for (const path of paths) {
+    assert.equal(handlerForPath(path), 'auth', path + '는 옛 로그인 핸들러로 간다');
+    for (const method of ['GET', 'POST']) {
+      const response = retiredLogin({ method, path, headers: {}, body: '' });
+      assert.equal(response.status, 410, method + ' ' + path);
+      assert.deepEqual(Object.keys(response), ['status', 'body'], '응답 머리말을 붙이지 않는다');
+      assert.deepEqual(response.body, { error: { code: 'auth_moved', message: '로그인은 공용 로그인으로 옮겼어요.' } });
+      const text = JSON.stringify(response);
+      for (const forbidden of ['set-cookie', 'cookie', 'token', 'location', '/internal/', 'postgres']) {
+        assert.equal(text.includes(forbidden), false, forbidden + '가 응답에 없다');
+      }
+    }
+  }
+  assert.equal(paths.length * 2, 10, '다섯 경로와 두 메서드를 확인했다');
 });
 
 test('로그아웃 GET /api/public/moments?limit=1 → 200과 items 배열', async () => {
