@@ -1051,3 +1051,15 @@ test('#1548 GET /api/public/tag-moments: 빈 태그와 긴 태그에서 응답 �
  assert.ok(long.body.tag.length <= 28);
  assert.ok(Array.isArray(long.body.items));
 });
+
+test('#1552 공유 신고 이유 500자는 저장하고 501자는 빈 이유와 같은 400이다', async () => {
+ const {handle,communityRepo} = await setup(), shareId = 's'.repeat(24), path = '/api/community/shares/' + shareId + '/report';
+ const ok = await call(handle, 'POST', path, {account: 'bob', body: {reason: '가'.repeat(500)}, key: 'report-key-1552-ok'});
+ assert.equal(ok.status, 201);
+ assert.equal(communityRepo.inspect().reports.find(r => r.id === ok.body.report.id).reason.length, 500);
+ const empty = await call(handle, 'POST', path, {account: 'bob', body: {reason: ''}, key: 'report-key-1552-empty'});
+ const tooLong = await call(handle, 'POST', path, {account: 'bob', body: {reason: '가'.repeat(501)}, key: 'report-key-1552-long'});
+ assert.equal(empty.status, 400);
+ assert.equal(tooLong.status, 400);
+ assert.deepEqual(tooLong.body, empty.body);
+});
