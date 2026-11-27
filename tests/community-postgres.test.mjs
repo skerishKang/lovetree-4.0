@@ -234,6 +234,9 @@ test('community rows are independent, idempotent and auditable',{skip},async()=>
   const {rows}=await pool.query(`SELECT count(*)::int AS n FROM lovetree_community_moderation_audit WHERE product_id=$1`,[productId]);assert.equal(rows[0].n,4);
   const service=createCommunityService({communityRepo:repo,shareRepo:createShareRepo(pool),workspaceRepo:createWorkspaceRepo(pool),productId,admin:{roleFor:async()=>null}});
   await assert.rejects(()=>service.report('reader',shareId,'','report-key-'+tag+'-empty'),e=>e.status===400&&e.code==='report_reason_required');
+  const exact500=await service.report('reader',shareId,'가'.repeat(500),'report-key-'+tag+'-exact500');
+  assert.equal((await repo.listReports({productId,limit:100})).find(r=>r.id===exact500.id).reason.length,500);
+  await assert.rejects(()=>service.report('reader',shareId,'가'.repeat(501),'report-key-'+tag+'-too-long'),e=>e.status===400&&e.code==='report_reason_required');
   await assert.rejects(()=>service.tagMoments({tag:'',viewerSubjectId:null}),e=>e.status===400&&e.code==='tag_invalid');
   await repo.blockOwner({productId,blockerSubjectId:'reader',blockedSubjectId:'owner-'+tag});
   assert.equal((await repo.listDiscoverable({productId,viewerSubjectId:'reader'})).length,0);
