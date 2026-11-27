@@ -280,6 +280,7 @@ test('reaction kinds are allowlisted, per-kind idempotent, toggleable, and block
 
 test('report, block and moderation are separate audited data and blocked owners disappear for that member',async()=>{
  const {handle,communityRepo}=await setup(),shareId='s'.repeat(24);
+ const before=await call(handle,'GET','/api/community/shares');
  const report=await call(handle,'POST',`/api/community/shares/${shareId}/report`,{account:'bob',key:'report-key-0001',body:{reason:'확인이 필요해요'}});
  assert.equal(report.status,201);
  assert.equal((await call(handle,'GET','/api/community/admin/reports',{account:'bob'})).status,403);
@@ -289,6 +290,7 @@ test('report, block and moderation are separate audited data and blocked owners 
  assert.deepEqual((await call(handle,'GET','/api/community/shares')).body.items,[]);
  const restored=await call(handle,'PATCH',`/api/community/admin/reports/${report.body.report.id}`,{account:'admin',body:{status:'dismissed',visibility:'visible'}});
  assert.equal(restored.body.report.hidden,false);assert.equal(communityRepo.inspect().audits.length,4);
+ assert.deepEqual((await call(handle,'GET','/api/community/shares')).body.items,before.body.items,'숨김을 풀면 둘러보기 목록이 원래대로 돌아온다');
  await call(handle,'POST',`/api/community/shares/${shareId}/block`,{account:'bob'});
  const hidden=await call(handle,'GET','/api/community/shares',{account:'bob'});assert.deepEqual(hidden.body.items,[]);
  const anonymous=await call(handle,'GET','/api/community/shares');assert.equal(anonymous.body.items.length,1);
@@ -1026,4 +1028,26 @@ test('#1356 내 순간 API: 로그인 필수·subjectId 인자 무시·공개 �
   const ex=await call(handle,'GET',path,{account:'alice',query:'exclude=aaaa1111111'});
   assert.equal(ex.body.total,2);
   assert.ok(!ex.body.items.some(i=>i.videoId==='aaaa1111111'));
+});
+
+test('#1548 POST /api/community/shares/:id/report: 미로그인 401, 빈 이유 400', async () => {
+ const {handle} = await setup(), shareId = 's'.repeat(24), path = '/api/community/shares/' + shareId + '/report';
+ const anon = await call(handle, 'POST', path, {body: {reason: '확인이 필요해요'}, key: 'report-key-1548-01'});
+ assert.equal(anon.status, 401);
+ assert.equal(anon.body.error.code, 'unauthenticated');
+ const empty = await call(handle, 'POST', path, {account: 'bob', body: {reason: ''}, key: 'report-key-1548-02'});
+ assert.equal(empty.status, 400);
+ assert.equal(empty.body.error.code, 'report_reason_required');
+});
+
+test('#1548 GET /api/public/tag-moments: 빈 태그와 긴 태그에서 응답 모양이 유지된다', async () => {
+ const {handle} = await setup();
+ const empty = await tagCall(handle, '', undefined);
+ assert.equal(empty.status, 400);
+ assert.equal(empty.body.error.code, 'tag_invalid');
+ const long = await tagCall(handle, '노래:' + 'a'.repeat(100), undefined);
+ assert.equal(long.status, 200);
+ assert.equal(typeof long.body.tag, 'string');
+ assert.ok(long.body.tag.length <= 28);
+ assert.ok(Array.isArray(long.body.items));
 });

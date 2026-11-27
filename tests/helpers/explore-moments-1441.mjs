@@ -8,7 +8,7 @@ let chromium, browserUnavailable=false;
 try { ({chromium}=await import('playwright')); if(!existsSync(chromium.executablePath()))browserUnavailable='Playwright Chromium이 없어 건너뜀'; } catch { browserUnavailable='Playwright 패키지가 없어 건너뜀'; }
 
 const ROOT=resolve(fileURLToPath(new URL('../..',import.meta.url)));
-const PORT=Number(process.env.LT1499_PORT||4614);
+const PORT=Number(process.env.LT_TEST_PORT||process.env.LT1499_PORT||4614);
 const SHOTS=process.env.LT_1441_SHOT_DIR||'';
 const ONLY=process.env.LT_1441_CAPTURE_ONLY==='1';
 const format={'.html':'text/html; charset=utf-8','.js':'text/javascript','.mjs':'text/javascript','.css':'text/css','.json':'application/json','.svg':'image/svg+xml','.png':'image/png','.woff2':'font/woff2'};

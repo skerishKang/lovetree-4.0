@@ -286,7 +286,7 @@ html[data-lt-theme=garden] body,html[data-lt-theme=garden] .app-header{transitio
 /* #942: 첫 화면의 순간 추가 단추만 장미색으로 되돌린다. 둘러보기·안내·궤도는 그대로 둔다. */
 :host .center .home-add-top.primary-cta,:host .center .home-add-top.primary-cta:hover,:host([data-lt-theme=garden]) .center .home-add-top.primary-cta,:host([data-lt-theme=garden]) .center .home-add-top.primary-cta:hover{background:var(--lt-cta-rose);border-color:var(--lt-cta-rose);color:var(--lt-cta-white)}
 /* #1350/#1435: line-height·padding의 소수점 합과 무관하게 누름 높이를 44px 이상으로 고정한다. */
-:host .center .actions .subtleBtn,:host .center .home-add-top{min-height:46px}
+:host .center .actions .subtleBtn,:host .center .home-add-top{box-sizing:border-box;height:44px;min-height:44px}
 :host .center .actions .subtleBtn{background:var(--lt-primary);color:var(--lt-primary-ink);border-color:var(--lt-primary)}
 :host .center .actions .subtleBtn:hover,:host .center .actions .subtleBtn:active{filter:brightness(.94)}
 :host([data-lt-theme=garden]) .center .actions .subtleBtn{background:var(--lt-paper);color:var(--lt-ink);border-color:var(--lt-line-paper)}
@@ -582,3 +582,7 @@ html[data-lt-theme=garden] select{color-scheme:light}
 .lt-bg-item[aria-checked="true"]::before{content:"✓";font-size:11px}
 html[data-lt-theme=garden] .lt-bg-item:hover,html[data-lt-theme=garden] .lt-bg-item:focus-visible{background:rgba(75,51,42,.08)}
 .bgDrop{position:relative;display:inline-flex}
+
+/* #1535: visible even when the entry module cannot mount. */
+#lt-deploy-recovery{position:fixed;inset:0;z-index:9999;display:grid;place-items:center;background:var(--lt-bg,#000)}
+#lt-deploy-recovery button{min-height:44px;padding:12px 20px;font:inherit;color:inherit;background:var(--lt-panel,transparent);border:1px solid currentColor;border-radius:8px;cursor:pointer}

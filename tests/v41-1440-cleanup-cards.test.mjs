@@ -8,7 +8,7 @@ import fs from 'node:fs/promises';
 const require1440 = process.env.LT_1440_REQUIRE === '1';
 test('#1440 순간 정리 방식 선택과 조작', {skip: !require1440 ? '전용 브라우저 검사에서 실행' : undefined, timeout:240000}, async t => {
 const {chromium} = await import('playwright');
-const port=Number(process.env.LT1440_PORT || 4548);
+const port=Number(process.env.LT_TEST_PORT||process.env.LT1440_PORT||4548);
 const server=await serve({}, {port}), base='http://127.0.0.1:'+port;
 let browser;
 const out=process.env.LT1440_CAPTURE_DIR;if(out) await fs.mkdir(out,{recursive:true});
@@ -154,4 +154,79 @@ finally{await ctx.close()}
 });
 }finally{await browser?.close();await new Promise(r=>server.close(r))}
 
+});
+
+test('#1527 지금 방식과 새 방식에서 빈 트리에 담고 되돌린다', {skip:!require1440?'전용 브라우저 검사에서 실행':undefined,timeout:120000}, async t=>{
+  const {chromium}=await import('playwright');
+  const port=Number(process.env.LT_TEST_PORT||process.env.LT1440_PORT||4548);
+  const server=await serve({}, {port}),base='http://127.0.0.1:'+port;
+  const browser=await chromium.launch({headless:true,args:['--disable-gpu']});
+  const clock='2026-11-18T00:00:00Z',input=title=>({subject:title,title,note:'',emotion:'설렘',date:'2026-11-18',url:''});
+  let source=createTree(input('모아둔 순간'),clock);
+  for(const title of ['첫 선택','둘째 선택'])source=addMoment(source,input(title),source.moments[0].id,clock);
+  source.inbox=true;
+  const empty={...createTree(input('빈 대상'),clock),moments:[]};
+  const duplicate=createTree(input('같은 순간 대상'),clock);
+  duplicate.moments[0].copiedFrom=source.moments[1].id;
+  const state={version:1,trees:[source,empty,duplicate],prefs:{}};
+  try{
+    for(const view of ['classic','cards'])await t.test(view,async()=>{
+      const ctx=await browser.newContext({viewport:{width:1440,height:900},reducedMotion:'reduce'});
+      await ctx.addInitScript(v=>localStorage.setItem('lt41.cleanupView',v),view);
+      await ctx.route('**/*',r=>new URL(r.request().url()).origin===base?r.continue():r.abort());
+      await ctx.route('**/api/**',r=>r.fulfill({status:200,json:{ok:true,items:[]}}));
+      await ctx.route('**/api/workspace**',r=>r.fulfill({status:200,json:{revision:1,state,subject:'fixture',writeSubjectBound:true,savedAt:clock}}));
+      const p=await ctx.newPage();
+      try{
+        await p.goto(base+'/v41/?account=1',{waitUntil:'load',timeout:60000});
+        await p.waitForFunction(()=>!!window.LT41?.trees?.length,null,{timeout:20000});
+        await p.locator('#discover-ask-no').click({timeout:1000}).catch(()=>{});
+        const snapshot=()=>p.evaluate(()=>structuredClone(window.LT41.trees));
+        const before=await snapshot();
+        const open=async()=>{
+          if(await p.locator('#cleanup-panel[open]').count())return;
+          await clickToolbarTreeChoice(p);
+          await p.locator('[data-tree-action=cleanup]').click();
+          await p.locator('#cleanup-panel[open]').waitFor();
+        };
+        const select=async()=>{
+          const rows=p.locator('#cleanup-moments input');
+          await rows.nth(1).check();await rows.nth(2).check();
+          assert.equal(await p.locator('.cleanup-target').nth(0).locator('.cleanup-dup').isVisible(),false);
+          assert.match(await p.locator('.cleanup-target').nth(1).locator('.cleanup-dup').innerText(),/이미 있음 1개/);
+        };
+        for(const mode of ['move','copy']){
+          await open();await select();
+          if(view==='cards'){
+            if(mode==='move')await p.locator('.cleanup-card-action').first().click();
+            else{
+              await p.locator('#cleanup-copy').click();
+              await p.locator('#cleanup-targets input').first().check();
+              await p.locator('#cleanup-targets input').nth(1).check();
+              await p.locator('#cleanup-copy-finish').click();
+            }
+          }else{
+            await p.locator('#cleanup-targets input').first().check();
+            if(mode==='copy')await p.locator('#cleanup-targets input').nth(1).check();
+            await p.locator('#cleanup-'+mode).click();
+          }
+          if(mode==='copy'){
+            await p.locator('#video-dup-panel[open]').waitFor();
+            await p.locator('#video-dup-skip').click();
+          }
+          const notice=p.locator(view==='cards'?'.cleanup-local-notice:not([hidden])':'#move-feedback:not([hidden])');
+          await notice.waitFor({timeout:10000});
+          const after=await snapshot(), target=after.find(t=>t.id===empty.id);
+          assert.equal(target.moments.length,2);
+          assert.equal(target.moments[0].parentId,null);
+          assert.equal(target.moments[1].parentId,target.moments[0].id);
+          assert.equal(after.find(t=>t.id===source.id).moments.length,mode==='move'?1:3);
+          assert.equal(after.find(t=>t.id===duplicate.id).moments.length,mode==='copy'?2:1);
+          await notice.locator('button').click();
+          assert.deepEqual(await snapshot(),before);
+        }
+        console.log('PASS #1527',view);
+      }finally{await ctx.close()}
+    });
+  }finally{await browser.close();await new Promise(r=>server.close(r))}
 });

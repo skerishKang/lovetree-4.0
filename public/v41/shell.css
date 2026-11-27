@@ -1365,7 +1365,7 @@ html .main-nav>button#community-menu{
 html .main-nav>button#community-menu:is(:hover,:focus-visible,[aria-current=true]){
  border-color:var(--lt-pearl);color:var(--lt-pearl);background:transparent;text-decoration:none;box-shadow:none
 }
-html .main-nav>button#community-menu[aria-current=true]{font-weight:600}
+html .main-nav>button#community-menu[aria-current=true]{font-weight:600;border-color:var(--lt-gold);color:var(--lt-gold)}
 #community-menu .header-compass{width:15px;height:15px;flex:none}
 }
 
@@ -1533,6 +1533,11 @@ body.lt-book-lightbox-open #lt-visitor-caption{visibility:hidden}
  .app-header .tree-frame .tree-views>button[data-view="track59-sketchbook.html"]{width:44px}
 }
 
+/* #1521 */
+body.home-screen .app-header .main-nav>button#community-menu{font-size:14px;letter-spacing:.02em;font-weight:400;color:var(--lt-role-text-strong);border-color:var(--lt-role-text-strong);gap:5px}
+body.home-screen .app-header .main-nav>button#community-menu:is(:hover,:focus-visible,[aria-current=true]){border-color:var(--lt-gold);color:var(--lt-gold)}
+body.home-screen .app-header .main-nav>button#community-menu[aria-current=true]{font-weight:600}
+@media(min-width:781px){body.home-screen .app-header .main-nav>button#community-menu{width:132px}}
 /* 새 정리 보기만 적용한다. */
 #cleanup-panel[data-cleanup-cards]{width:min(1120px,96vw);max-width:none}
 #cleanup-panel[data-cleanup-cards] .cleanup-scroll{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:12px 24px;align-content:start}

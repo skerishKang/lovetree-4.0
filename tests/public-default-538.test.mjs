@@ -325,6 +325,60 @@ test('moment_count는 저장 때마다 갱신된다 — 순간 추가·삭제·�
   assert.equal((await h.browse()).items.length, 1, '다시 3개 이상이면 소개된다');
 });
 
+test('순간이 1→0→1로 바뀌면 공유 수·공개 읽기·둘러보기가 함께 따라간다', async () => {
+  const h = await setup();
+  const owner = principal('alice');
+  let tree = treeWithMoments(3);
+  await h.workspace.write(owner, { state: { version: 1, trees: [tree] }, expectedRevision: 0, clientKey: 'seed-empty-share' });
+  await h.waitForShowSync();
+  await h.discoverOn(tree);
+  const [auto] = await h.shareRepo.list({ productId: PRODUCT, subjectId: 'alice' });
+  const input = { treeId: tree.id, entryMomentId: tree.moments[0].id, view: 'book' };
+  const preview = await h.request(h.shareHandle, 'POST', '/api/shares/preview', input, 'alice');
+  const made = await h.request(h.shareHandle, 'POST', '/api/shares', { ...input, previewToken: preview.body.preview.previewToken }, 'alice');
+  assert.equal(made.status, 201);
+  const shareIds = [auto.shareId, made.body.share.id];
+
+  const expectPhase = async (momentCount, readStatus, browseCount) => {
+    const shares = await Promise.all(shareIds.map(shareId => h.shareRepo.load({ productId: PRODUCT, shareId })));
+    const reads = await Promise.all(shareIds.map(shareId => h.request(h.shareHandle, 'GET', `/api/public/shares/${shareId}`)));
+    const browse = (await h.browse()).items;
+    assert.deepEqual({
+      shares: shares.map(row => ({ id: row?.shareId, status: row?.status, momentCount: row?.momentCount })),
+      reads: reads.map(response => ({ status: response.status, code: response.body.error?.code ?? null, momentCount: response.body.tree?.moments.length ?? null })),
+      browse: browse.map(item => item.momentCount)
+    }, {
+      shares: shareIds.map(id => ({ id, status: 'active', momentCount })),
+      reads: shareIds.map(() => ({ status: readStatus, code: readStatus === 422 ? 'share_empty' : null, momentCount: readStatus === 200 ? momentCount : null })),
+      browse: Array.from({ length: browseCount }, () => momentCount)
+    });
+  };
+
+  await expectPhase(3, 200, 1);
+  tree = removeMoment(tree, tree.moments.at(-1).id, '2026-11-01T00:00:02.000Z');
+  tree = removeMoment(tree, tree.moments.at(-1).id, '2026-11-01T00:00:03.000Z');
+  await h.workspace.write(owner, { state: { version: 1, trees: [tree] }, expectedRevision: 1, clientKey: 'leave-one' });
+  await h.waitForShowSync();
+  await expectPhase(1, 200, 0);
+
+  const empty = { ...tree, coverMomentId: '', updatedAt: '2026-11-01T00:00:04.000Z', moments: [] };
+  await h.workspace.write(owner, { state: { version: 1, trees: [empty] }, expectedRevision: 2, clientKey: 'leave-empty' });
+  await h.waitForShowSync();
+  await expectPhase(0, 422, 0);
+
+  tree = addMoment(empty, { subject: '윤슬', title: '다시 넣은 순간', note: '기록', emotion: '설렘', date: '2026-11-01', url: '' }, null, '2026-11-01T00:00:05.000Z');
+  await h.workspace.write(owner, { state: { version: 1, trees: [tree] }, expectedRevision: 3, clientKey: 'return-one' });
+  await h.waitForShowSync();
+  await expectPhase(1, 200, 0);
+
+  tree = addMoment(tree, { subject: '윤슬', title: '둘째 순간', note: '기록', emotion: '위로', date: '2026-11-02', url: '' }, tree.moments[0].id, '2026-11-01T00:00:06.000Z');
+  tree = addMoment(tree, { subject: '윤슬', title: '셋째 순간', note: '기록', emotion: '고마움', date: '2026-11-03', url: '' }, tree.moments[0].id, '2026-11-01T00:00:07.000Z');
+  await h.workspace.write(owner, { state: { version: 1, trees: [tree] }, expectedRevision: 4, clientKey: 'return-three' });
+  await h.waitForShowSync();
+  await expectPhase(3, 200, 1);
+  assert.equal((await h.discoverRepo.get({ productId: PRODUCT, subjectId: 'alice', treeId: tree.id })).discover, true);
+});
+
 test('신고 숨김·차단은 공개 기본에서도 그대로 막는다', async () => {
   const h = await setup();
   const tree = treeWithMoments(3);

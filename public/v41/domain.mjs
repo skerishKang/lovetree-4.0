@@ -608,7 +608,7 @@ export function moveMoment(state, fromTreeId, momentId, toTreeId, parentId, cloc
   if (target.moments.length >= MAX_MOMENTS) throw new Error(`한 트리에는 ${MAX_MOMENTS}개의 순간까지 담을 수 있어요.`);
   let attachTo = parentId ?? null;
   if (!attachTo) attachTo = target.moments.find(m => m.parentId === null)?.id || null;
-  if (!attachTo || !target.moments.some(m => m.id === attachTo)) throw new Error('옮겨 붙일 순간을 대상 트리에서 골라 주세요.');
+  if ((target.moments.length || attachTo) && !target.moments.some(m => m.id === attachTo)) throw new Error('옮겨 붙일 순간을 대상 트리에서 골라 주세요.');
   const moved = { ...moving, parentId: attachTo, relation: '', links: [] };
   const targetNext = { ...target, updatedAt: clock, moments: [...target.moments, moved] };
   const moments = detachMoments(from, new Set([momentId]));
@@ -728,12 +728,13 @@ export function organizeMoments(state, { mode = '', fromTreeId = '', momentIds =
     for (const toTreeId of targets) {
       const skipSet = skipped(toTreeId);
       const target = trees.find(tree => tree.id === toTreeId);
-      const root = target.moments.find(m => m.parentId === null)?.id || null;
-      if (!root) throw new Error('넣을 트리의 시작 순간을 찾을 수 없어요.');
+      let root = target.moments.find(m => m.parentId === null)?.id || null;
+      if (target.moments.length && !root) throw new Error('넣을 트리의 시작 순간을 찾을 수 없어요.');
       const copies = [];
       for (const source of sources) {
         if (skipSet.has(source.id)) { skippedCount += 1; continue; }
         const copy = { ...source, id: makeId(), parentId: root, links: [], createdAt: clock, copiedFrom: source.copiedFrom || source.id };
+        if (!root) { copy.relation = ''; root = copy.id; }
         copies.push(copy);
         done.push({ treeId: toTreeId, momentId: copy.id, sourceId: source.id });
       }
@@ -778,9 +779,9 @@ export function undoOrganize(state, record, clock = new Date().toISOString()) {
     return print === null ? !now : !!now && organizePrint(now) === print;
   });
   let trees = state.trees.slice();
-  // 새 트리를 포함한 작업은 이후 수정이 있으면 통째로 되돌리지 않는다.
+  // 새 트리나 빈 대상 트리에 담은 작업은 이후 수정이 있으면 통째로 되돌리지 않는다.
   // 기존 기록을 덮거나 새로 담은 순간을 잃지 않도록 한다.
-  if (!untouched && record.before.some(item => item.tree === null)) {
+  if (!untouched && record.before.some(item => item.tree === null || (record.toTreeIds.includes(item.id) && item.tree.moments.length === 0))) {
     throw new Error('정리한 뒤 트리가 바뀌었어요. 기록을 지키기 위해 되돌리지 않았어요.');
   }
   if (untouched) {

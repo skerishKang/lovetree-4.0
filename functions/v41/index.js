@@ -5,12 +5,13 @@ import { isSearchOpenHost } from '../_lib/search-meta.mjs';
 
 export async function onRequest({ request, env, next }) {
   const url = new URL(request.url);
-  if (isSearchOpenHost(url.hostname) || request.method !== 'GET') return next();
+  if (!['GET', 'HEAD'].includes(request.method)) return next();
   const response = await env.ASSETS.fetch(new Request(new URL('/v41/', url.origin), request));
   if (!response.ok) return response;
   const html = await response.text();
   const headers = new Headers(response.headers);
-  headers.set('x-robots-tag', 'noindex');
+  headers.set('cache-control', 'no-store');
+  if (!isSearchOpenHost(url.hostname)) headers.set('x-robots-tag', 'noindex');
   headers.delete('content-length');
   return new Response(html, { status: response.status, headers });
 }
