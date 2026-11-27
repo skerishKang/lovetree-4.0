@@ -57,6 +57,42 @@ async function open(browser,width,theme){
 }
 async function rect(locator){return locator.evaluate(el=>{const a=el.getBoundingClientRect();return {x:a.x,y:a.y,width:a.width,height:a.height};});}
 function aligned(a,b,key){for(const k of ['x','y','width','height'])assert.ok(Math.abs(a[k]-b[k])<=1,key+' '+k+': '+a[k]+' vs '+b[k]);}
+test('#1515 가로 순간 영상과 조작 줄·반응 막대가 겹치지 않는다', {skip:browserUnavailable,timeout:240000},async()=>{
+ const server=await serve();const browser=await chromium.launch({headless:true});
+ const failures=[];
+ try{
+  for(const width of [844,390,1440])for(const theme of ['night','garden']){
+   const {context,page}=await open(browser,width,theme);
+   try{
+    await page.goto('http://127.0.0.1:'+PORT+'/v41/#explore/moments',{waitUntil:'load'});
+    await page.locator('#community-panel[open]').waitFor({state:'visible',timeout:20000});
+    await page.waitForFunction(()=>!!document.querySelector('.moments-stage')?.dataset.ltMomentsId,null,{timeout:15000});
+    const data=await page.evaluate(()=>{
+     const r=s=>{const a=document.querySelector(s).getBoundingClientRect();return {x:a.x,y:a.y,w:a.width,h:a.height,right:a.right,bottom:a.bottom}};
+     const video=r('.moments-card'),media=r('.moments-media'),stage=r('.moments-stage'),rail=r('.moments-rail'),toolbar=r('.community-top-row');
+     const overlap=(a,b)=>Math.max(0,Math.min(a.right,b.right)-Math.max(a.x,b.x))*Math.max(0,Math.min(a.bottom,b.bottom)-Math.max(a.y,b.y));
+     const clip=Math.max(0,video.bottom-innerHeight)+Math.max(0,-video.y);
+     const blocked=[...document.querySelectorAll('.community-top-row button,.moments-rail button')].filter(el=>{
+      const a=el.getBoundingClientRect();
+      if(!a.width||!a.height||getComputedStyle(el).visibility==='hidden')return false;
+      return !el.contains(document.elementFromPoint(a.x+a.width/2,a.y+a.height/2));
+     }).map(el=>el.getAttribute('aria-label')||el.textContent.trim());
+     return {video,media,stage,rail,toolbar,clip,railOverlap:overlap(video,rail),toolbarOverlap:overlap(video,toolbar),height:innerHeight,width:innerWidth,blocked};
+    });
+    console.log('#1515',width,theme,JSON.stringify(data));
+    if(SHOTS){mkdirSync(SHOTS,{recursive:true});await page.screenshot({path:join(SHOTS,width+'-'+theme+'-moments.png'),animations:'disabled'});}
+    if(width===844){
+     if(data.clip!==0)failures.push(theme+' 잘림 '+data.clip+'px');
+     if(data.blocked.length)failures.push(theme+' 가려진 단추 '+data.blocked.join(', '));
+     if(data.railOverlap!==0)failures.push(theme+' 반응 막대 겹침 '+data.railOverlap);
+     if(data.toolbarOverlap!==0)failures.push(theme+' 조작 줄 겹침 '+data.toolbarOverlap);
+    }
+   }finally{await context.close();}
+  }
+ }finally{await browser.close();await new Promise(ok=>server.close(ok));}
+ assert.deepEqual(failures,[]);
+});
+
 test('#1441 두 보기 자리·범위·길·주소·공개 제한·세로 줄·소리 유지', {skip:browserUnavailable,timeout:240000},async()=>{
  const server=await serve(); const browser=await chromium.launch({headless:true});
  try{

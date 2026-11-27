@@ -548,3 +548,16 @@ html[data-lt-theme=garden] .moments-comments-dialog{background:var(--lt-paper);c
 
 #community-panel .community-top-row.is-moments .moments-toolbar{order:3;margin-left:0}
 #community-panel .community-top-row.is-moments .moments-scope-control{order:2;margin-left:auto}
+
+/* #1515: 낮은 가로 화면에서는 조작 줄 아래의 높이만 영상에 쓴다. */
+@media (min-width:781px) and (max-width:1000px) and (max-height:520px) and (orientation:landscape){
+ #community-panel[data-lt-panel=full]:has(#community-tab-moments[aria-selected="true"]){inset:0;width:100vw;max-width:none;height:100dvh;max-height:100dvh;padding:env(safe-area-inset-top) 8px env(safe-area-inset-bottom);overflow:hidden}
+ body:has(#community-panel[open] #community-tab-moments[aria-selected="true"]) .app-header{visibility:hidden;pointer-events:none}
+ #community-panel:has(#community-tab-moments[aria-selected="true"]) .community-top{display:none}
+ #community-panel .community-top-row.is-moments{height:48px;margin:0 auto;padding:0}
+ #community-moments-panel .moments-stage{height:calc(100dvh - 60px - env(safe-area-inset-top) - env(safe-area-inset-bottom));min-height:0;grid-template-columns:minmax(140px,250px) minmax(0,1fr) 144px;grid-template-rows:minmax(0,1fr)}
+ #community-moments-panel .moments-card{width:min(100%,calc((100dvh - 60px - env(safe-area-inset-top) - env(safe-area-inset-bottom))*9/16));min-width:0;min-height:0}
+ #community-moments-panel .moments-context{min-height:0;max-height:100%;box-sizing:border-box}
+ #community-moments-panel .moments-rail{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-content:center;justify-items:center;min-height:0;max-height:100%;overflow-y:auto;justify-content:stretch}
+ #community-moments-panel .moments-rail-button{flex:none;min-height:44px;padding:3px}
+}
