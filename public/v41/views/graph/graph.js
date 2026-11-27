@@ -14,6 +14,7 @@ import { videoKey } from '../../same-stage.mjs';
 import { applyThemeAttribute, readTheme } from '../../header-state.mjs';
 // #1060: 썸네일 주소는 정본(youtube-id.mjs)의 단계 함수로만 만든다. 그래프는 종전처럼 세로 구분 없이 hqdefault.
 import { youtubeStageThumbUrl } from '../../youtube-id.mjs';
+import { safePublicThumbnail } from '../../public-thumbnail.mjs';
 
 const KIND_LABEL = { stage: '무대', song: '노래', member: '멤버', artist: '가수' };
 const KIND_OWN = { stage: '이 무대의 내 순간들', song: '이 노래의 내 순간들', member: '이 멤버의 내 순간들', artist: '이 가수의 내 순간들' };
@@ -49,7 +50,8 @@ let filterHub = null;
 let walkIndex = -1, walkTimer = null;
 
 const thumbOf = (m) => {
-  const t = m?.mediaMetadata?.thumbnail;
+  // 원본은 보관하고 그림에 넣을 주소만 검사한다.
+  const t = safePublicThumbnail(m?.mediaMetadata?.thumbnail);
   if (t) return t;
   const key = videoKey(m?.url || '');
   if (key) return youtubeStageThumbUrl(key, 'hqdefault');

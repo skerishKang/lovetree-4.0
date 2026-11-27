@@ -2,7 +2,6 @@
 import { localDateOnly } from './local-date.mjs';
 import { isAutoTitle, autoTitleFor } from './auto-title.mjs';
 import { DEFAULT_TREE_OPEN_VIEW, normalizeTreeOpenView } from './tree-open-view.mjs';
-import { safePublicThumbnail } from './public-thumbnail.mjs';
 
 // #792: 순간 구간의 순수 계산(서버 사본 src/moment-range.js와 같은 규칙 — tests/moment-range-792.test.mjs가 대조).
 export const MAX_RANGE_SECONDS = 12 * 60 * 60;
@@ -308,14 +307,16 @@ function normalizeMediaMetadata(value, url) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('미디어 정보를 확인해 주세요.');
   const title = optionalText(value.title, '미디어 제목', 240);
   const channel = optionalText(value.channel, '미디어 채널', 160);
-  const thumbnail = safePublicThumbnail(value.thumbnail);
+  // 저장은 주소의 공개 가능 여부를 판단하지 않는다. 공개 응답에서만 거른다.
+  const images = {};
+  for (const key of ['thumbnail', 'thumbnailUrl', 'poster', 'image', 'authorName']) {
+    if (typeof value[key] === 'string' && value[key].length <= 2048 && value[key]) images[key] = value[key];
+  }
   const vertical = normalizeVerticalMedia(value);
-  if (!title && !channel && !thumbnail && !Object.keys(vertical).length) return null;
+  if (!title && !channel && !Object.keys(images).length && !Object.keys(vertical).length) return null;
   const source = url ? new URL(url).hostname : '';
   if (!source) return null;
-  const result = {title, channel, source, ...vertical};
-  if (thumbnail) result.thumbnail = thumbnail;
-  return result;
+  return {title, channel, source, ...vertical, ...images};
 }
 function shortened(value, max = 40) {
   const text = Array.from(value.replace(/\s+/g, ' ').trim()).join('');
@@ -449,7 +450,14 @@ export function editMoment(tree, id, input, clock = new Date().toISOString()) {
 export function cacheMomentMediaMetadata(tree, id, url, metadata, clock = new Date().toISOString()) {
   const current = tree.moments.find(m => m.id === id);
   if (!current || !url || current.url !== safeUrl(url)) return tree;
-  const mediaMetadata = normalizeMediaMetadata(metadata, current.url);
+  const refreshed = normalizeMediaMetadata(metadata, current.url);
+  // 같은 주소의 영상 정보를 다시 받더라도 응답에 없는 기존 정보는 지우지 않는다.
+  const mediaMetadata = refreshed ? { ...current.mediaMetadata, ...refreshed } : null;
+  if (mediaMetadata && current.mediaMetadata) {
+    for (const key of ['title', 'channel']) {
+      if (!refreshed[key] && typeof current.mediaMetadata[key] === 'string') mediaMetadata[key] = current.mediaMetadata[key];
+    }
+  }
   const metadataChanged = !!mediaMetadata && JSON.stringify(current.mediaMetadata || null) !== JSON.stringify(mediaMetadata);
   // #678 후속(둘러보기 트리 재발, 2026-11-15): 늦게 도착한 영상 제목은 mediaMetadata뿐 아니라 자동 제목
   // ('<도메인>에서 간직한 순간' — suggestMomentTitle의 기본 문구)까지 바로잡는다. 고객이 직접 적은
@@ -876,7 +884,13 @@ export function validateState(value) {
       delete clean.startSeconds; delete clean.endSeconds;
       // #1439: 복사한 순간은 원본 순간 id(copiedFrom)를 남긴다. 원본은 다른 트리에 있거나 지워졌을 수 있어 모양만 본다.
       const copiedFrom = idValid(m.copiedFrom) && m.copiedFrom !== m.id ? { copiedFrom: m.copiedFrom } : {};
-      return { ...validateMomentInput(clean), ...rangeFields(m, m.url), id: m.id, parentId: m.parentId, links: [...new Set(rawLinks)], createdAt: m.createdAt, ...boardLayoutOf(m), ...copiedFrom };
+      // 이미 저장된 미디어 정보는 새 입력의 정리 결과로 덮어쓰지 않는다.
+      // 형식 검사는 유지하고, 공개 여부와 미래 필드는 공개 응답에서만 판단한다.
+      const validated = validateMomentInput(clean);
+      if (m.mediaMetadata !== undefined && m.mediaMetadata !== null) {
+        validated.mediaMetadata = structuredClone(m.mediaMetadata);
+      }
+      return { ...validated, ...rangeFields(m, m.url), id: m.id, parentId: m.parentId, links: [...new Set(rawLinks)], createdAt: m.createdAt, ...boardLayoutOf(m), ...copiedFrom };
     });
     if (moments.length && moments.filter(m => m.parentId === null).length !== 1) throw new Error('트리의 시작 순간은 하나여야 해요.');
     const byId = new Map(moments.map(m => [m.id, m]));

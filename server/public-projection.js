@@ -19,7 +19,8 @@ function publicMediaMetadata(metadata, url) {
   const out = {};
   for (const key of ['title', 'channel']) if (typeof metadata[key] === 'string') out[key] = metadata[key];
   if (!isPrivateMediaUrl(url)) {
-    try { out.source = new URL(url).hostname; } catch { out.source = text(metadata.source); }
+    // 원본 출처는 보관용 값이다. 공개 출처는 실제 공개 링크에서만 얻는다.
+    try { const parsed = new URL(url); if (['http:', 'https:'].includes(parsed.protocol) && parsed.hostname) out.source = parsed.hostname; } catch {}
   }
   const thumbnail = safePublicThumbnail(metadata.thumbnail);
   if (thumbnail) out.thumbnail = thumbnail;

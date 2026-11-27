@@ -84,3 +84,14 @@ test('#1038: 실측 세로값은 미디어 정보 캐시에 남고 내보내기�
   assert.throws(()=>cacheMomentMediaMetadata(state.trees[0],'trial-moment',url,{vertical:'true'},timestamp),/참이나 거짓/);
   assert.throws(()=>cacheMomentMediaMetadata(state.trees[0],'trial-moment',url,{height:-5},timestamp),/숫자/);
 });
+
+
+test('같은 주소의 영상 정보 갱신은 기존 썸네일과 별칭을 지우지 않는다', () => {
+ const original={title:'기존 제목',channel:'채널',source:'video.example',thumbnail:'http://video.example/old.jpg',thumbnailUrl:'https://video.example/alias.jpg',poster:'/api/media/private.jpg',image:'data:image/png;base64,AAAA',vertical:true,width:1080,height:1920,futureMediaField:{saved:true}};
+ const state=stateWithMoment({mediaMetadata:original});
+ const updated=cacheMomentMediaMetadata(state.trees[0],'trial-moment',url,{title:'새 영상 제목',channel:'새 채널'},timestamp);
+ assert.deepEqual(updated.moments[0].mediaMetadata,{...original,title:'새 영상 제목',channel:'새 채널'});
+ const dimensions=cacheMomentMediaMetadata(state.trees[0],'trial-moment',url,{width:720,height:1280},timestamp);
+ assert.deepEqual(dimensions.moments[0].mediaMetadata,{...original,width:720,height:1280});
+ assert.deepEqual(state.trees[0].moments[0].mediaMetadata,original);
+});

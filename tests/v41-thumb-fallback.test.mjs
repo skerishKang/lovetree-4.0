@@ -377,7 +377,7 @@ test('#429 "제목 달기" 클릭·키보드는 지정 순간 편집을 열고 �
   dispose();
 });
 
-test('#429 도메인 두 벌은 공개 HTTPS 썸네일을 저장하고 비공개·위험 주소는 버린다', async () => {
+test('#429 도메인 두 벌은 공개 여부와 별개로 썸네일 원본을 저장한다', async () => {
   const now = '2026-11-12T00:00:00.000Z';
   for (const domain of [serverDomain, webDomain]) {
     const saved = domain.createTree({
@@ -398,7 +398,7 @@ test('#429 도메인 두 벌은 공개 HTTPS 썸네일을 저장하고 비공개
     const roundtrip = domain.validateState({ version: 1, trees: [saved] });
     assert.equal(roundtrip.trees[0].moments[0].mediaMetadata.thumbnail, 'https://i.ytimg.com/vi/9NXOCr-T8LU/oar2.jpg');
 
-    // 공개 HTTPS 외부 이미지는 저장하고, 비공개·위험 주소는 저장하지 않는다
+    // 공개 여부와 별개로 저장 원본 주소를 유지한다
     const external='https://images.example.com/articles/og.jpg';
     const kept=domain.createTree({
       subject:'리센느',url:'https://example.com/article',mediaMetadata:{title:'기사',thumbnail:external},
@@ -407,7 +407,7 @@ test('#429 도메인 두 벌은 공개 HTTPS 썸네일을 저장하고 비공개
     const stripped=domain.createTree({
       subject:'리센느',url:'https://example.com/article',mediaMetadata:{title:'기사',thumbnail:'http://images.example.com/og.jpg'},
     },now);
-    assert.equal('thumbnail' in stripped.moments[0].mediaMetadata,false);
+    assert.equal(stripped.moments[0].mediaMetadata.thumbnail,'http://images.example.com/og.jpg');
   }
 
   const meta = await fetchVideoMetadata('9NXOCr-T8LU', async () => ({

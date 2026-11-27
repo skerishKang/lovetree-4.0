@@ -8,6 +8,7 @@ import {createMemoryTreeDiscoverRepo} from '../server/testing/memory-tree-discov
 import {createMemoryCommunityRepo} from '../server/testing/memory-community-repo.js';
 import {createShareHandler,createShareService,projectSharedTree,projectSharedTreeFromScan} from '../server/share-service.js';
 import {PUBLIC_TREE_FIELDS,PUBLIC_MOMENT_FIELDS,PUBLIC_MEDIA_FIELDS} from '../server/public-projection.js';
+import {createMemberSession} from '../public/v41/member-session.mjs';
 import {safePublicThumbnail} from '../public/v41/public-thumbnail.mjs';
 
 const PRODUCT='lovetree-test',CLOCK='2026-11-01T00:00:00.000Z';
@@ -86,7 +87,8 @@ test('공개 썸네일은 HTTPS 외부 이미지를 유지하고 비공개·위�
  const projected=projectSharedTree({version:1,trees:[tree]},tree.id);
  assert.equal(projected.tree.moments[0].mediaMetadata.thumbnail,external,'실제 저장·공개 투영 경로에서 외부 HTTPS 썸네일이 남는다');
  const blocked=createTree({subject:'시험 대상',title:'위험 링크',note:'위험 썸네일',emotion:'설렘',date:'2026-11-27',url:'https://example.com/article',mediaMetadata:{title:'기사 제목',thumbnail:'http://images.example.com/og.jpg'}},CLOCK);
- assert.equal(blocked.moments[0].mediaMetadata.thumbnail,undefined,'저장 정규화에서도 평문 썸네일은 빠진다');
+ assert.equal(blocked.moments[0].mediaMetadata.thumbnail,'http://images.example.com/og.jpg','저장 원본에는 평문 썸네일이 남는다');
+ assert.equal(projectSharedTree({version:1,trees:[blocked]},blocked.id).tree.moments[0].mediaMetadata.thumbnail,undefined,'공개 응답에서만 평문 주소를 거른다');
 });
 
 test('#611 3번: 공개 공유 읽기에는 aiTester 한 비트만 내린다(계정·이메일·subject는 넣지 않는다)',async()=>{
@@ -236,4 +238,47 @@ test('격리 트리가 섞인 기록에서도 본인 트리의 공개 상태 스
   assert.equal(shown.body.visibility, 'private');
   const gone = await request(handle, 'PUT', '/api/trees/' + deviant.id + '/visibility', { visibility: 'private' }, 'alice');
   assert.equal(gone.status, 404, '격리 트리는 화면에 없으므로 대상이 되지 않는다');
+});
+
+
+test('다른 트리 저장과 제목 수정에도 미디어 원본을 보존하고 공개 응답에서만 거른다',async()=>{
+ const original={title:'영상 제목',channel:'채널',source:'example.com',thumbnail:'http://images.example.com/old.jpg',thumbnailUrl:'https://images.example.com/alias.jpg',poster:'/api/media/private.jpg',image:'data:image/png;base64,AAAA',authorName:'옛 채널',vertical:true,width:1080,height:1920,futureMediaField:{memo:'보관할 내부 정보'}};
+ let a=createTree({subject:'기록',note:'첫 순간',emotion:'설렘',date:'2026-11-01',url:'https://example.com/video'},CLOCK);
+ a.moments[0].mediaMetadata=structuredClone(original);
+ a=addMoment(a,{title:'주소 없는 순간',note:'기록',emotion:'설렘',date:'2026-11-01',url:''},a.moments[0].id,CLOCK);
+ const linkless={title:'보관 제목',channel:'채널',source:'INTERNAL_SOURCE_MARKER',thumbnail:'/api/media/private.jpg',poster:'https://example.com/alias.jpg'};
+ a.moments[1].mediaMetadata=structuredClone(linkless);
+ const b=structuredClone(second);
+ const workspaceRepo=createMemoryWorkspaceRepo(),workspace=createWorkspaceService({repo:workspaceRepo,productId:PRODUCT});
+ const owner=principal('alice');
+ await workspaceRepo.commit({...owner,doc:{version:1,trees:[a,b]},expectedRevision:0,clientKey:'legacy',requestHash:'legacy'});
+ const shareRepo=createMemoryShareRepo();const service=createShareService({shareRepo,workspaceRepo,productId:PRODUCT});
+ const shareId='v'.repeat(24);await shareRepo.create({...owner,shareId,treeId:a.id,entryMomentId:a.moments[0].id,view:'book'});
+ const handle=createShareHandler({authenticate:async()=>owner,service,productId:PRODUCT});
+ const writes=[];
+ const session=createMemberSession({api:{get:async()=>({ok:true,...await workspace.read(owner),subject:owner.subjectId,writeSubjectBound:true}),put:async body=>{writes.push(structuredClone(body));return {ok:true,...await workspace.write(owner,body)};}},delay:()=>new Promise(()=>{}),draftStorage:null,cacheStorage:null});
+ try {
+  await session.start();
+  assert.deepEqual(session.state().trees[0].moments[0].mediaMetadata,original);
+  for(const tree of [b,a]){
+   const title=tree.title+' 수정';
+   session.apply('editTree',{subject:tree.subject,title,coverMomentId:tree.coverMomentId},{treeId:tree.id});
+   await session.act('retry');
+   assert.deepEqual(writes.at(-1).state.trees[0].moments[0].mediaMetadata,original);
+   const stored=await workspaceRepo.load(owner);
+   assert.equal(stored.doc.trees.find(t=>t.id===tree.id).title,title);
+   assert.deepEqual(stored.doc.trees[0].moments[0].mediaMetadata,original);
+   assert.deepEqual(stored.doc.trees[0].moments[1].mediaMetadata,linkless);
+   assert.deepEqual((await workspace.read(owner)).state.trees[0].moments[0].mediaMetadata,original);
+   for(const kind of ['shares','visits']){
+    const response=await request(handle,'GET','/api/public/'+kind+'/'+shareId);
+    assert.equal(response.status,200);
+    assert.deepEqual(response.body.tree.moments[0].mediaMetadata,{title:original.title,channel:original.channel,source:'example.com',vertical:true,width:1080,height:1920});
+    assert.deepEqual(response.body.tree.moments[1].mediaMetadata,{title:linkless.title,channel:linkless.channel});
+    assert.equal(JSON.stringify(response.body).includes(linkless.source),false);
+   }
+   assert.deepEqual((await workspaceRepo.load(owner)).doc,stored.doc,'공개 읽기는 저장 원본을 바꾸지 않는다');
+  }
+  assert.equal(writes.length,2);
+ } finally {session.dispose();}
 });
