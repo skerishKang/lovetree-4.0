@@ -11,12 +11,11 @@ import {homePresentation} from './home-presentation.js';
 import {readHomeTitleHint} from '../public/v41/home-title-state.mjs';
 import {applyHomeCenter} from './home-center.js';
 import {readTheme,writeTheme,appliedTheme,applyThemeAttribute} from '../public/v41/header-state.mjs';
-import {readTitleDisplay, titleDisplayOf, shouldReloadForTitleDisplay, formatDisplayDate} from '../public/v41/book-usability.mjs';
+import {readTitleDisplay, titleDisplayOf, shouldReloadForTitleDisplay, formatDisplayDate, titleView} from '../public/v41/book-usability.mjs';
 import {localDateOnly} from '../public/v41/local-date.mjs';
 import {momentListEntries, momentListTrees, momentHeadTitle} from './moment-list.js';
 import {momentExternalView, momentConnections, treeChipView} from '../public/v41/moment-detail.mjs';
 import {youtubeIdFrom,isVerticalMoment} from '../public/v41/youtube-id.mjs';
-import {isAutoTitle} from '../public/v41/auto-title.mjs';
 import {fetchVideoMetadata} from '../public/v41/video-title.mjs';
 import {fetchVideoStatus,readVideoStatusCache} from '../public/v41/video-status.mjs';
 // 261116 PR 2: 카드 모드(마지막·고정·그날·무작위·트리)·숫자 줄이기 — 순수 계산 한 벌.
@@ -176,10 +175,9 @@ function closeHomeViewer(){
 function paintHomeViewer(moment){
  cancelAnimationFrame(viewerFocusFrame);viewerFocusFrame=0;
  const videoId=youtubeIdFrom(moment.url||''),sequence=++viewerSequence;viewerSignal.abort();viewerSignal=new AbortController();viewerMoment=moment;closeMoreMenu();
- const savedTitle=typeof moment.mediaMetadata?.title==='string'?moment.mediaMetadata.title.trim():'';
- const namedTitle=!isAutoTitle(moment.title)&&typeof moment.title==='string'?moment.title.trim():'';
- vEl('mediaTitleHome').textContent=namedTitle||savedTitle||(videoId?fallbackVideoTitle:'간직한 순간');
- if(videoId&&!savedTitle&&!namedTitle)fetchVideoMetadata(videoId).then(meta=>{if(sequence===viewerSequence&&viewer.classList.contains('open')&&meta?.title)vEl('mediaTitleHome').textContent=meta.title;}).catch(()=>{});
+ const mainTitle=titleView(moment,readTitleDisplay(parent.LT41)).main;
+ vEl('mediaTitleHome').textContent=mainTitle||(videoId?fallbackVideoTitle:'간직한 순간');
+ if(videoId&&!mainTitle)fetchVideoMetadata(videoId).then(meta=>{if(sequence===viewerSequence&&viewer.classList.contains('open')&&meta?.title)vEl('mediaTitleHome').textContent=meta.title;}).catch(()=>{});
  vEl('mediaMetaHome').textContent=[viewerDate(moment),moment.emotion||''].filter(Boolean).join(' · ');
  vEl('mediaKickerHome').textContent=`순간 · ${mediaKind(videoId,moment)}`;
  const body=vEl('mediaBodyHome');body.textContent=moment.note||'';body.hidden=!body.textContent;

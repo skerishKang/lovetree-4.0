@@ -1220,12 +1220,9 @@
   const escHtml = globalThis.LTEscapeHtml; // A-15: 글자 막기 정본(html-escape.js) 한 벌
   function autoTitleOf(n) {
     const raw = LTDEMO.moments.find(x => x.id === n.id);
-    const autoRe = /^(?:[a-z0-9-]+\.)+[a-z]{2,}(?::\d{1,5})?에서 간직한 순간$/i;
-    const t = String(n.title || '').trim();
-    const clean = autoRe.test(t)
-      ? String(raw?.mediaMetadata?.title || '').trim() || n.note || '순간'
-      : n.title;
-    return { raw, clean };
+    const view = window.LTTitle?.titleView?.(raw || n) || {};
+    const clean = String(view.main || '').trim() || String(n.note || '').trim() || '순간';
+    return { raw, clean, sub: String(view.sub || '').trim() };
   }
   function detailMediaHTML(n) {
     const m = LTDEMO.moments.find(x => x.id === n.id) || {};
@@ -1242,11 +1239,10 @@
     return '';
   }
   function paintDetail(n) {
-    const { raw, clean } = autoTitleOf(n);
+    const { raw, clean, sub } = autoTitleOf(n);
     $('detailKicker').textContent = n.first ? '첫 순간' : '순간';
     $('detailTitle').textContent = clean;
-    const sub = String(raw?.mediaMetadata?.title || '').trim(),
-      ds = $('detailSub');
+    const ds = $('detailSub');
     if (ds) {
       const show = !!sub && sub !== clean;
       ds.textContent = show ? '▶ ' + sub : '';
@@ -2909,6 +2905,11 @@
    lt41-moments-saved로 알린다 — 지도를 다시 띄우지 않고 점·선·묶음을 부모 LT41.tree에서 다시 읽어
    결정적 배치로 같은 자리에 다시 그린다. 고른 순간·보기·배율·열린 상세 판은 그대로 둔다(재적재 0).
    실제 기록(서버 트리) 기준 — 예시·공유는 읽기 전용이라 이 알림이 오지 않는다. */
+  addEventListener('lt-title-ready', () => { if ($('detail').classList.contains('open') && state.selected) paintDetail(state.selected); });
+  addEventListener('lt-title-display-changed', () => {
+    if ($('detail').classList.contains('open') && state.selected) paintDetail(state.selected);
+    if ($('ltViewer').classList.contains('open') && state.selected) openViewer();
+  });
   addEventListener('message', e => {
     if (
       e.origin !== location.origin ||
