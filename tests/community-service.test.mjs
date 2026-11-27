@@ -1051,3 +1051,14 @@ test('#1548 GET /api/public/tag-moments: 빈 태그와 긴 태그에서 응답 �
  assert.ok(long.body.tag.length <= 28);
  assert.ok(Array.isArray(long.body.items));
 });
+
+test('#1549 공개 순간 목록: 잘못된 limit·exclude·shareId는 500 없이 빈 목록으로 처리된다',async()=>{
+ const {handle}=await setup();
+ for(const query of ['limit=abc','limit=-5','limit=999999999999999999999','exclude=,,,','shareId=bad','limit=abc&exclude=,,,&shareId=bad']){
+  const response=await call(handle,'GET','/api/public/moments',{query});
+  assert.equal(response.status,200,query);
+  assert.ok(Array.isArray(response.body.items),query);
+  assert.equal(response.body.items.length,0,query);
+  assert.equal(response.body.error,undefined,query);
+ }
+});

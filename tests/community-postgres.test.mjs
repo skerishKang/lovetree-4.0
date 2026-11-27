@@ -769,3 +769,27 @@ test('#1544 Postgres에서도 숨긴 공유 직접 읽기는 없는 공유와 �
     await pool.end();
   }
 });
+
+test('#1549 공개 순간 목록의 잘못된 값은 Postgres에서도 빈 목록으로 처리된다', { skip }, async () => {
+  assertIsolatedTestDatabase(DATABASE_URL);
+  const pool = await createPool(DATABASE_URL, { max: 3 });
+  try {
+    await applySchema(pool);
+    const productId = 'lt-' + suffix();
+    const service = createCommunityService({
+      productId,
+      communityRepo: createCommunityRepo(pool),
+      shareRepo: createShareRepo(pool),
+      workspaceRepo: createWorkspaceRepo(pool),
+      visibilityRepo: createTreeVisibilityRepo(pool)
+    });
+    const handle = createCommunityHandler({ productId, service, authenticate: async () => null });
+    for (const query of ['limit=abc', 'exclude=,,,', 'shareId=bad']) {
+      const response = await handle({ method: 'GET', path: '/api/public/moments', headers: {}, query: new URLSearchParams(query) });
+      assert.equal(response.status, 200, query);
+      assert.deepEqual(response.body.items, [], query);
+    }
+  } finally {
+    await pool.end();
+  }
+});

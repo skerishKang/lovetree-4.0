@@ -6,6 +6,7 @@ import {createMemoryWorkspaceRepo} from '../server/testing/memory-workspace-repo
 import {createMemoryShareRepo} from '../server/testing/memory-share-repo.js';
 import {createMemoryCommunityRepo} from '../server/testing/memory-community-repo.js';
 import {createShareHandler,createShareService} from '../server/share-service.js';
+import {ApiError} from '../server/errors.js';
 
 const PRODUCT='lovetree-test',CLOCK='2026-11-01T00:00:00.000Z';
 const principal=subjectId=>({productId:PRODUCT,subjectId});
@@ -19,7 +20,7 @@ async function setup(documentState=state,admin=null,communityRepo=null){
  const shareRepo=createMemoryShareRepo();let n=0;
  const service=createShareService({shareRepo,workspaceRepo,communityRepo,productId:PRODUCT,admin,makeId:()=>String(++n).padStart(24,'s')});
  const authenticate=async request=>principal(request.headers?.account||'alice');
- return {workspace,workspaceRepo,shareRepo,handle:createShareHandler({authenticate,service,productId:PRODUCT})};
+ return {workspace,workspaceRepo,shareRepo,service,handle:createShareHandler({authenticate,service,productId:PRODUCT})};
 }
 const request=(handle,method,path,body,account)=>handle({method,path,headers:{...(body?{'content-type':'application/json'}:{}),...(account?{account}:{})},body:body?JSON.stringify(body):''});
 
@@ -203,4 +204,39 @@ test('#1544 숨김은 같은 트리의 다른 공유 주소에도 적용된다(�
  assert.equal(await communityRepo.isHiddenShare({productId:PRODUCT,shareId:id,subjectId:'alice',treeId:first.id}),true);
  assert.equal((await request(handle,'GET','/api/public/shares/'+id)).status,404,'같은 트리의 다른 주소도 막힌다');
  assert.equal(await communityRepo.isHiddenShare({productId:PRODUCT,shareId:id,subjectId:'bob',treeId:first.id}),false,'다른 계정의 같은 트리 아이디에는 번지지 않는다');
+});
+
+test('#1549 공유 만들기 쓰기 경로: 미로그인 401, 깨진 본문 400, 다른 형식 415',async()=>{
+ const {service}=await setup();
+ const handle=createShareHandler({
+  authenticate:async()=>{throw new ApiError(401,'unauthenticated','로그인이 필요해요.');},
+  service,productId:PRODUCT
+ });
+ const call=(method,body,contentType='application/json')=>handle({
+  method,path:'/api/shares',headers:{'content-type':contentType},
+  body:contentType==='application/json'?JSON.stringify(body):String(body)
+ });
+ const anon=await call('POST',{treeId:first.id});
+ assert.equal(anon.status,401);assert.equal(anon.body.error.code,'unauthenticated');
+ const normal=createShareHandler({authenticate:async request=>principal(request.headers?.account||'alice'),service,productId:PRODUCT});
+ const wrongType=await normal({method:'POST',path:'/api/shares',headers:{account:'alice','content-type':'text/plain'},body:'x'});
+ assert.equal(wrongType.status,415,'현재는 형식 오류를 415로 돌려준다');assert.equal(wrongType.body.error.code,'unsupported_media_type');
+ const brokenJson=await normal({method:'POST',path:'/api/shares',headers:{account:'alice','content-type':'application/json'},body:'{'});
+ assert.equal(brokenJson.status,400);assert.equal(brokenJson.body.error.code,'invalid_json');
+});
+
+test('#1549 소개 스위치 쓰기 경로: 미로그인 PUT·DELETE 401, 잘못된 주소 404',async()=>{
+ const {service}=await setup();
+ const handle=createShareHandler({
+  authenticate:async()=>{throw new ApiError(401,'unauthenticated','로그인이 필요해요.');},
+  service,productId:PRODUCT
+ });
+ const path='/api/shares/'+'s'.repeat(24)+'/discovery';
+ for(const method of ['PUT','DELETE']){
+  const anon=await handle({method,path,headers:{}});
+  assert.equal(anon.status,401,method);assert.equal(anon.body.error.code,'unauthenticated');
+ }
+ const normal=createShareHandler({authenticate:async request=>principal(request.headers?.account||'alice'),service,productId:PRODUCT});
+ const malformed=await normal({method:'PUT',path:'/api/shares/bad/discovery',headers:{account:'alice'}});
+ assert.equal(malformed.status,404);assert.equal(malformed.body.error.code,'share_not_found');
 });

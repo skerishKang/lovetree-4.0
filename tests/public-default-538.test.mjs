@@ -490,3 +490,15 @@ test('#1046: 공유 취소 뒤 저장이 있어도 옛 자동 주소는 410으�
   assert.equal((await h.request(h.shareHandle, 'GET', `/api/public/shares/${made.body.share.id}`)).status, 200, '새 주소는 열린다');
   assert.equal((await h.request(h.shareHandle, 'GET', `/api/public/shares/${oldId}`)).status, 410, '옛 주소는 여전히 410');
 });
+
+test('#1549 트리 소개 쓰기 경로: 미로그인 PUT 401, 잘못된 값 400', async () => {
+  const h = await setup();
+  const tree = treeWithMoments(3);
+  const path = `/api/trees/${tree.id}/discover`;
+  const anon = await h.request(h.shareHandle, 'PUT', path, { discover: true }, null);
+  assert.equal(anon.status, 401, '로그인 없이는 소개를 켤 수 없다');
+  assert.equal(anon.body.error.code, 'unauthenticated');
+  const malformed = await h.request(h.shareHandle, 'PUT', path, { discover: 'yes' }, 'alice');
+  assert.equal(malformed.status, 400);
+  assert.equal(malformed.body.error.code, 'discover_invalid');
+});
