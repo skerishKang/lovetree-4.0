@@ -492,7 +492,19 @@ async function openLightbox(url,title='',verticalHint=null,details=null){
    catch{if(alive())stage.innerHTML='<p class="lt-lightbox-note">파일을 불러오지 못했어요. 로그인 확인 후 다시 시도해 주세요.</p>';return}
   }
   if(!alive())return;
-  const image=document.createElement('img');image.className='lt-lightbox-media lt-lightbox-photo';image.alt=title||'기록한 사진';image.src=src;stage.replaceChildren(image);
+  const status=document.createElement('p');
+  status.className='lt-media-status';status.setAttribute('role','status');
+  const retry=document.createElement('button');retry.type='button';retry.textContent='다시 불러오기';retry.hidden=true;
+  const image=document.createElement('img');image.className='lt-lightbox-media lt-lightbox-photo';image.alt=title||'기록의 사진';
+  const loadPhoto=()=>{
+   if(!alive())return;
+   status.textContent='사진을 불러오는 중이에요.';retry.hidden=true;image.hidden=false;
+   image.removeAttribute('src');image.src=src;
+  };
+  image.addEventListener('load',()=>{if(alive()){status.textContent='사진을 불러왔어요.';retry.hidden=true;}});
+  image.addEventListener('error',()=>{if(alive()){image.hidden=true;status.textContent='사진을 불러오지 못했어요. 다시 시도해 주세요.';retry.hidden=false;}});
+  retry.addEventListener('click',loadPhoto);
+  stage.replaceChildren(image,retry,status);loadPhoto();
  }else{
   const note=document.createElement('p');note.className='lt-lightbox-note';note.textContent=details?.memo?`“${details.memo}”`:details?.head||'';
   stage.replaceChildren(note);

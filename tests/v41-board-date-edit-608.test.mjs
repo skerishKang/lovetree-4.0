@@ -353,3 +353,48 @@ test('#1044 화면: 보드에서 저장한 뒤 셸 모델에 구간·만든 시�
   assert.deepEqual(problems, [], `화면 문제 없음 (${problems.join(' | ') || '없음'})`);
   await context.close();
 });
+
+
+test('#1434 공용 편집 창에서 카드·핀 모양을 저장하고 사진을 빼며 원래 값으로 돌아간다', {skip: REQUIRE ? false : skip, timeout: 120000}, async t => {
+  if (skip) assert.fail(skip);
+  const tree = chainTree(2);
+  tree.moments[0].cardStyle = 'film';
+  tree.moments[0].pinStyle = 'star';
+  tree.moments[0].url = 'https://example.test/photo.jpg';
+  const server = await serve();
+  const browser = await chromium.launch({headless:true});
+  t.after(async () => { await browser.close(); server.close(); });
+  const {context,page,frame,puts,problems}=await openShellEditHost(browser,'http://127.0.0.1:'+server.address().port,tree);
+  const open = async () => {
+    await frame.locator('.card[data-id="m1"]').click();
+    await frame.locator('#detailMoreBtn').click();
+    await frame.locator('#editMomentBtn').click();
+    await page.waitForSelector('#write-panel[open]');
+  };
+  await open();
+  assert.equal(await page.inputValue('[name="cardStyle"]'),'film');
+  assert.equal(await page.inputValue('[name="pinStyle"]'),'star');
+  assert.equal(await page.locator('#editor-photo-clear').isVisible(),true);
+  await page.locator('[name="cardStyle"]').selectOption('ticket');
+  await page.locator('[name="pinStyle"]').selectOption('heart');
+  await page.locator('#editor-photo-clear').click();
+  assert.equal(await page.inputValue('#moment-form [name="url"]'),'');
+  await page.locator('#editor-restore').click();
+  assert.equal(await page.inputValue('[name="cardStyle"]'),'film');
+  assert.equal(await page.inputValue('[name="pinStyle"]'),'star');
+  assert.equal(await page.inputValue('#moment-form [name="url"]'),'https://example.test/photo.jpg');
+  await page.locator('[name="cardStyle"]').selectOption('ticket');
+  await page.locator('[name="pinStyle"]').selectOption('heart');
+  await page.locator('#editor-photo-clear').click();
+  await page.locator('#moment-form button[type="submit"]').click();
+  await page.waitForFunction(()=>!document.querySelector('#write-panel')?.open);
+  const deadline=Date.now()+10000;
+  while(Date.now()<deadline&&!puts.length)await page.waitForTimeout(100);
+  const last=puts.at(-1)?.state?.trees?.[0]?.moments?.find(m=>m.id==='m1');
+  assert.ok(last,'저장 요청');
+  assert.equal(last.cardStyle,'ticket');
+  assert.equal(last.pinStyle,'heart');
+  assert.equal(last.url,'');
+  assert.deepEqual(problems,[]);
+  await context.close();
+});

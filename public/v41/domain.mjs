@@ -448,6 +448,11 @@ export function editMoment(tree, id, input, clock = new Date().toISOString()) {
   return { ...tree, updatedAt: clock, moments: tree.moments.map(m => {
     if (m.id !== id) return m;
     const edited = {...m, ...next, relation: m.parentId ? next.relation : ''};
+    for (const key of ['pinStyle', 'cardStyle']) {
+      if (!Object.hasOwn(input, key)) continue;
+      if (input[key] === '') delete edited[key];
+      else if (boardLayoutOf(input)[key]) edited[key] = boardLayoutOf(input)[key];
+    }
     if (next.url !== m.url && !next.mediaMetadata) delete edited.mediaMetadata;
     return edited;
   }) };

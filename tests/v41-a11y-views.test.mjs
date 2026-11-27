@@ -130,7 +130,7 @@ test('실행: 접근성 세 규칙(image-alt·button-name·label) 위반은 0이
         await scanPage(pageIn, '모의로그인·보드 추가 창');
         await frameB.evaluate(() => document.getElementById('addModal')?.classList.remove('open')).catch(() => {});
         await frameB.evaluate((id) => { selectMoment(id, true); openEdit(); }, firstId).catch(() => {});
-        await pageIn.waitForSelector('#write-panel[open]', {timeout: 8000}).catch(() => {});
+        await pageIn.waitForSelector('#write-panel[open]', {timeout: 8000});
         await pageIn.waitForTimeout(700);
         await scanPage(pageIn, '모의로그인·보드 공용 편집 창');
         await pageIn.evaluate(() => document.getElementById('write-panel')?.close()).catch(() => {});

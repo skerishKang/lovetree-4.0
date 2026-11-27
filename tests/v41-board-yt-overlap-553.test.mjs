@@ -412,7 +412,7 @@ test('970 실행: 썸네일 — 영상·사진이 화면 안에 보인다(가짜
         status: document.querySelector('.lt-lightbox .lt-media-status')?.textContent || '',
       }));
       assert.ok(detailAfter.nw > 0, `${w}: 공용 크게 보기에서도 사진이 실린다`);
-      assert.equal(detailAfter.status, '', `${w}: 큰 사진에는 불러오기 상태 글자를 덧붙이지 않는다`);
+      assert.equal(detailAfter.status, '사진을 불러왔어요.', `${w}: 큰 사진에는 불러오기 상태 글자를 덧붙이지 않는다`);
       assert.deepEqual(problems.slice(beforeDetailErrors), [], `${w}: 공용 크게 보기 불러오기에서도 새 콘솔 오류 0`);
       await frame.evaluate(() => LTMedia.closeLightbox());
       await context.close();
@@ -443,6 +443,11 @@ test('#1273 2번 화면: 크게 보기에 영어 라벨과 빈 한마디 줄이 
     const text = await frame.locator('.lt-lightbox').innerText();
     assert.match(text, /순간 크게 보기/);
     assert.match(text, /꼬리표: #가수:BTS/);
+    await frame.evaluate(() => LTMedia.openLightbox('', '시험', null, {head:'사진', source:'내 기록', url:'https://example.test/v', keywords:['가수:BTS'], memo:'좋아요'}));
+    const full = await frame.locator('.lt-lightbox-meta').innerText();
+    for (const value of ['출처: 내 기록','주소: https://example.test/v','꼬리표: #가수:BTS','마음 한마디: 좋아요']) assert.ok(full.includes(value), value);
+    await frame.evaluate(() => LTMedia.openLightbox('', '시험', null, {head:'사진', source:'', url:'', keywords:[], memo:''}));
+    assert.equal(await frame.locator('.lt-lightbox-meta').innerText(), '사진');
     assert.doesNotMatch(text, /PROVENANCE|VIEWER|Keywords:|URL:|Source:|Note:/, `영어 라벨 없음: ${text}`);
     assert.doesNotMatch(text, /마음 한마디:/, `빈 한마디 줄은 화면에 없다: ${text}`);
     await context.close();
@@ -618,4 +623,29 @@ test('#1298 보드 영상 크게 보기 뒤로 가기: 창 닫힘·iframe 0·스
       } finally { await context.close(); }
     }
   } finally { await browser.close(); await new Promise(r => server.close(r)); }
+});
+
+
+test('#1434 공용 사진 크게 보기에서 실패 안내 뒤 다시 불러오기 성공', {skip: REQUIRE ? false : skip, timeout: 120000}, async () => {
+  if (skip) assert.fail(skip);
+  const tree = starTree(2);
+  const server=await serve({'/__host-retry.html':hostHTML(tree)});
+  const browser=await chromium.launch({headless:true});
+  try {
+    const base='http://127.0.0.1:'+server.address().port;
+    const {context,frame}=await openHost(browser,base+'/__host-retry.html',{width:390,height:844});
+    let attempts=0;
+    const pixel=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=','base64');
+    await context.route('**/photo-retry.jpg',route=>{attempts++;return attempts===1
+      ? route.fulfill({status:404,body:'not found'})
+      : route.fulfill({status:200,contentType:'image/png',body:pixel});});
+    await frame.evaluate(()=>LTMedia.openLightbox('https://example.test/photo-retry.jpg','사진',null,{head:'사진'}));
+    await frame.waitForFunction(()=>document.querySelector('.lt-lightbox .lt-media-status')?.textContent.includes('불러오지 못했어요'));
+    assert.equal(await frame.locator('.lt-lightbox button').filter({hasText:'다시 불러오기'}).isVisible(),true);
+    await frame.locator('.lt-lightbox button').filter({hasText:'다시 불러오기'}).click();
+    await frame.waitForFunction(()=>document.querySelector('.lt-lightbox .lt-media-status')?.textContent.includes('불러왔어요'));
+    assert.ok(attempts>=2);
+    assert.equal(await frame.locator('.lt-lightbox img.lt-lightbox-photo').evaluate(el=>el.naturalWidth>0),true);
+    await context.close();
+  } finally {await browser.close();server.close();}
 });

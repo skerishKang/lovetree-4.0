@@ -510,3 +510,22 @@ test('#1062: 저장소 오류의 500 기록에는 원인만 남고 요청 값은
     assert.equal(lines[0].includes(secret), false, '기록에 요청 본문·식별자·비밀값이 없다');
   }
 });
+
+test('#1434 다른 트리를 저장해도 읽기용 부모 보정은 원본에 반영되지 않는다', async () => {
+  const repo = createMemoryWorkspaceRepo();
+  const service = createWorkspaceService({ repo, productId: PRODUCT });
+  const principal = { productId: PRODUCT, subjectId: 'usr_repair' };
+  const root = createTree({ ...base, title: '원본' }, CLOCK);
+  const broken = addMoment(root, { ...base, title: '연결', relation: '기존 연결 이유' }, root.moments[0].id, CLOCK);
+  broken.moments[1].parentId = 'missing-parent';
+  const other = createTree({ ...base, title: '다른 트리' }, CLOCK);
+  const original = structuredClone(broken);
+  await seedDoc(repo, principal.subjectId, { version: 1, trees: [broken, other] });
+  const read = await service.read(principal);
+  assert.equal(read.state.trees[0].moments[1].parentId, root.moments[0].id);
+  read.state.trees[1].title = '수정한 트리';
+  await service.write(principal, { state: read.state, expectedRevision: 1, clientKey: 'preserve-original' });
+  const stored = await repo.load(principal);
+  assert.deepEqual(stored.doc.trees[0], original);
+  assert.equal(stored.doc.trees[1].title, '수정한 트리');
+});

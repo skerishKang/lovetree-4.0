@@ -57,7 +57,7 @@ export function requestHashOf(validatedState, expectedRevision) {
 // 공유·커뮤니티처럼 저장된 문서를 읽는 다른 서비스도 같은 판정을 쓴다(#986).
 export function readStoredDocument(doc, now = new Date().toISOString()) {
   if (!doc || doc.version !== 1 || !Array.isArray(doc.trees)) return null;
-  const accepted = [], quarantined = [];
+  const accepted = [], quarantined = [], originals = new Map();
   for (const raw of doc.trees) {
     let single;
     try {
@@ -67,9 +67,10 @@ export function readStoredDocument(doc, now = new Date().toISOString()) {
     // 같은 id 트리가 이미 읽혔으면 나중 것을 뺀다 — 저장 때 "새 것이 이긴다"는 규칙과 같은 셈이다.
     if (accepted.some(tree => tree.id === single.id) || accepted.length >= MAX_TREES) { quarantined.push(raw); continue; }
     accepted.push(single);
+    originals.set(single.id, raw);
   }
   // 트리별 검증을 통과한 목록은 전체 검사도 통과한다 — 마지막 검사는 inbox 정리를 위한 것이다.
-  return { state: validateState({ version: 1, trees: accepted, prefs: doc.prefs }), quarantined };
+  return { state: validateState({ version: 1, trees: accepted, prefs: doc.prefs }), quarantined, originals };
 }
 
 // 저장 본문·삭제 뒤 문서에 서버가 보관 중인 격리 트리 원본을 다시 붙인다. 사용자가 같은 id의
@@ -138,7 +139,10 @@ export function createWorkspaceService({ repo, productId, onCommit = null, onAcc
       // 같은 내용의 되묻기는 격리 원본을 다시 붙이기 전과 똑같이 한 번으로 묶인다.
       const stored = await repo.load({ productId: principal.productId, subjectId: principal.subjectId });
       const scan = stored ? readStoredDocument(stored.doc) : null;
-      const doc = withQuarantinedTrees(validated, scan ? scan.quarantined : []);
+      const changedTreeIds = changedTreeIdsOf(scan?.state, validated);
+      const changed = new Set(changedTreeIds);
+      const trees = validated.trees.map(tree => changed.has(tree.id) ? tree : (scan?.originals.get(tree.id) ?? tree));
+      const doc = withQuarantinedTrees({ ...validated, trees }, scan?.quarantined ?? []);
       const outcome = await repo.commit({
         productId: principal.productId,
         subjectId: principal.subjectId,
@@ -153,7 +157,7 @@ export function createWorkspaceService({ repo, productId, onCommit = null, onAcc
       if (outcome.status === 'keyConflict') {
         throw new ApiError(409, 'client_key_conflict', '같은 요청 키로 다른 내용을 보내려 해요. 새 키로 다시 시도해 주세요.');
       }
-      await afterCommit(principal.subjectId, validated, changedTreeIdsOf(scan ? scan.state : null, validated));
+      await afterCommit(principal.subjectId, validated, changedTreeIds);
       return { revision: outcome.revision, savedAt: outcome.savedAt };
     }
   };

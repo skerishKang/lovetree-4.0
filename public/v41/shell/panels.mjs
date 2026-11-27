@@ -42,6 +42,7 @@ export function createPanels(deps) {
 
   // 편집기 모드와 폼 기준값은 이 파일이 들고 있는다(셸은 formDirty·treeDirty만 묻는다).
   let editorMode = 'add';
+  let restoreEditor = false;
   let formBaseline = '';
   let parentBaseline = '';
   let treeBaseline = '';
@@ -167,6 +168,9 @@ export function createPanels(deps) {
     parentChoice = '';
     getUploads()?.reset?.();
     $('moment-form').reset();
+    $('editor-board-styles').hidden = true;
+    $('editor-restore').hidden = true;
+    for (const key of ['cardStyle', 'pinStyle']) if ($('moment-form').elements[key]) $('moment-form').elements[key].disabled = true;
     $('write-panel-title').textContent = '순간 추가';
     $('write-eyebrow').textContent = '순간 추가';
     $('relation-label').hidden = false;
@@ -246,7 +250,7 @@ export function createPanels(deps) {
       notify('파일 전송을 마치거나 취소한 뒤 작업을 바꿔 주세요.');
       return;
     }
-    if (formDirty() && !confirm('현재 입력을 비우고 작업을 바꿀까요?')) return;
+    if (formDirty() && !restoreEditor && !confirm('현재 입력을 비우고 작업을 바꿀까요?')) return;
     uploads.reset();
     const c = window.LT41;
     prepareAddParent(mode === 'add' ? parentId : '');
@@ -265,6 +269,19 @@ export function createPanels(deps) {
     if (mode !== 'edit') dwrite.show('detailed');
     const form = $('moment-form');
     form.reset();
+    $('editor-board-styles').hidden = mode !== 'edit';
+    $('editor-restore').hidden = mode !== 'edit';
+    for (const key of ['cardStyle', 'pinStyle']) {
+      const field = form.elements[key];
+      if (!field) continue;
+      field.disabled = mode !== 'edit';
+      for (const option of [...field.options]) if (option.dataset.legacy) option.remove();
+      const value = mode === 'edit' ? m[key] || '' : '';
+      if (value && ![...field.options].some(option => option.value === value)) {
+        const option = new Option(value, value); option.dataset.legacy = '1'; field.add(option);
+      }
+      field.value = value;
+    }
     $('relation-label').hidden = mode !== 'add';
     $('relation-hint').hidden = mode !== 'add';
     $('delete-moment').hidden = mode !== 'edit';
@@ -511,6 +528,7 @@ export function createPanels(deps) {
     // #1097: 영상은 미리보기 본문(compact)만 — 크게 보기·열기는 아래 한 줄(renderMediaActions)로 옮긴다.
     $('url-media-preview').innerHTML = url ? LTMedia.markup(url, form.elements.title.value, null, '', null, null, {compact: true}) : '';
     renderMediaActions(info, url, form.elements.title.value);
+    $('editor-photo-clear').hidden = editorMode !== 'edit' || info.kind !== 'photo';
     // #792: 시작·끝 구간 칸은 YouTube 주소일 때만 보인다. 주소에 t=·start=가 있으면 빈 시작 칸을 채운다(이미 적은 값은 그대로).
     const rangeFields = $('range-fields');
     if (rangeFields) rangeFields.hidden = info.kind !== 'youtube';
@@ -775,6 +793,20 @@ export function createPanels(deps) {
   };
   // #380 4 2차: Esc·바깥 클릭·× 닫기와 "저장하지 않고 닫을까요?" 확인은 shell/dialogs.mjs 공통 틀이 맡는다
   // (트리 관리와 같은 규칙). 편집기만의 규칙은 공통 틀보다 우선한다 — 업로드 중이면 닫지 않는다.
+  $('editor-photo-clear').onclick = () => {
+    if (getUploads()?.busy) return;
+    getUploads()?.reset?.();
+    const form = $('moment-form');
+    form.elements.url.value = '';
+    form.elements.startSeconds.value = '';
+    form.elements.endSeconds.value = '';
+    updateMediaPreview();
+  };
+  $('editor-restore').onclick = () => {
+    if (editorMode !== 'edit' || getUploads()?.busy) return;
+    restoreEditor = true;
+    try { setEditorMode('edit'); } finally { restoreEditor = false; }
+  };
   $('editor-cancel').onclick = () => { requestClose?.('write-panel'); };
   // #1097: 영상 바꾸기 펼침 — 닫힌 상태가 기본이고, 닫기 시 더러움 확인은 그대로다(폼 기준값이 맡는다).
   $('media-change-toggle').onclick = () => { setMediaChangeOpen($('media-change-box').hidden); };
