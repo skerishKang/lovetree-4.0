@@ -6,6 +6,7 @@ import { readStoredDocument } from './workspace-service.js';
 import { refreshStageIndex } from './stage-index-refresh.js';
 import { parsePrincipal } from './principal.js';
 import { aiTesterFor } from './admin-roles.js';
+import { isHiddenShare } from './hidden-share.js';
 
 const SHARE_ID = /^[A-Za-z0-9_-]{20,64}$/;
 const RECORD_ID = /^[A-Za-z0-9_-]{1,80}$/;
@@ -60,7 +61,7 @@ function shareSummary(row) {
   return { id: row.shareId, treeId: row.treeId, entryMomentId: row.entryMomentId, view: row.view, status: row.status, createdAt: row.createdAt, revokedAt: row.revokedAt || null, discoverable: row.discoverable === true, discoverableAt: row.discoverableAt || null, origin: row.origin || 'owner', momentCount: Number(row.momentCount ?? 0) };
 }
 
-export function createShareService({ shareRepo, workspaceRepo, visibilityRepo = null, discoverRepo = null, admin = null, stageIndex = null, pendingShowSync = null, productId, makeId = () => randomBytes(18).toString('base64url') }) {
+export function createShareService({ shareRepo, workspaceRepo, visibilityRepo = null, discoverRepo = null, communityRepo = null, admin = null, stageIndex = null, pendingShowSync = null, productId, makeId = () => randomBytes(18).toString('base64url') }) {
   const refreshStages = subjectId => refreshStageIndex(stageIndex, { productId, subjectId });
   // #1163(#1068 2단계): 응답 뒤에 시작되는 보임 동기화의 진행 중 Promise — 시험·종료 정리가 기다린다.
   const showTasks = new Set();
@@ -227,6 +228,7 @@ export function createShareService({ shareRepo, workspaceRepo, visibilityRepo = 
       const row = await shareRepo.load({ productId, shareId });
       if (!row) throw new ApiError(404, 'share_not_found', '공유 주소를 찾을 수 없어요.');
       if (row.status !== 'active') throw new ApiError(410, 'share_revoked', '소유자가 이 공유를 취소했어요.');
+      if (await isHiddenShare(communityRepo, { ...row, productId })) throw new ApiError(404, 'share_not_found', '공유 주소를 찾을 수 없어요.');
       // #538: 비공개 트리는 공개 읽기 경로에서도 서버가 막는다(화면 잠금만으로 막지 않는다).
       if (await treeVisibility(row.subjectId, row.treeId) === 'private')
         throw new ApiError(403, 'share_private', '소유자가 이 트리를 비공개로 바꿨어요.');

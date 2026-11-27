@@ -280,6 +280,7 @@ test('reaction kinds are allowlisted, per-kind idempotent, toggleable, and block
 
 test('report, block and moderation are separate audited data and blocked owners disappear for that member',async()=>{
  const {handle,communityRepo}=await setup(),shareId='s'.repeat(24);
+ const before=await call(handle,'GET','/api/community/shares');
  const report=await call(handle,'POST',`/api/community/shares/${shareId}/report`,{account:'bob',key:'report-key-0001',body:{reason:'확인이 필요해요'}});
  assert.equal(report.status,201);
  assert.equal((await call(handle,'GET','/api/community/admin/reports',{account:'bob'})).status,403);
@@ -289,6 +290,7 @@ test('report, block and moderation are separate audited data and blocked owners 
  assert.deepEqual((await call(handle,'GET','/api/community/shares')).body.items,[]);
  const restored=await call(handle,'PATCH',`/api/community/admin/reports/${report.body.report.id}`,{account:'admin',body:{status:'dismissed',visibility:'visible'}});
  assert.equal(restored.body.report.hidden,false);assert.equal(communityRepo.inspect().audits.length,4);
+ assert.deepEqual((await call(handle,'GET','/api/community/shares')).body.items,before.body.items,'숨김을 풀면 둘러보기 목록이 원래대로 돌아온다');
  await call(handle,'POST',`/api/community/shares/${shareId}/block`,{account:'bob'});
  const hidden=await call(handle,'GET','/api/community/shares',{account:'bob'});assert.deepEqual(hidden.body.items,[]);
  const anonymous=await call(handle,'GET','/api/community/shares');assert.equal(anonymous.body.items.length,1);
