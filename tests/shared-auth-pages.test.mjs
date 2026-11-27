@@ -373,3 +373,26 @@ test('email_assertion: 서명 일치·aud·만료·sub·필드 검증을 통과�
     }
   }
 });
+
+test('#1548 후속 POST /auth/callback은 빈·잘못된 입력에서 302로 거절하고 쿠키를 만들지 않는다', async () => {
+  let upstreamCalls = 0;
+  const auth = createSharedPagesAuth({
+    fetcher: async () => { upstreamCalls++; throw Error('외부 인증을 부르면 안 된다'); },
+    verify: async () => ({ accountId: '검사용' })
+  });
+  const handler = createAuthPagesHandler({ shared: auth });
+  const cases = [
+    ['빈 본문', new Request('https://lovetree-4-0.pages.dev/auth/callback', { method: 'POST' })],
+    ['빈 코드와 상태', new Request('https://lovetree-4-0.pages.dev/auth/callback?code=&state=', { method: 'POST' })],
+    ['잘못된 상태 쿠키', new Request('https://lovetree-4-0.pages.dev/auth/callback?code=x&state=y', { method: 'POST', headers: { cookie: 'lovetree_auth_state=bad' } })]
+  ];
+  for (const [name, request] of cases) {
+    const response = await handler({ request, env: {} });
+    assert.equal(response.status, 302, name + '에서 서버 오류가 나면 안 된다');
+    assert.equal(response.headers.get('location'), '/v41/?loginNotice=1', name);
+    assert.equal(response.headers.get('set-cookie'), null, name + '에서 쿠키가 생기면 안 된다');
+    assert.equal(response.headers.get('cache-control'), 'no-store', name);
+    assert.equal(await response.text(), '', name + '에 응답 본문이 없어야 한다');
+  }
+  assert.equal(upstreamCalls, 0, '외부 인증 서비스를 부르지 않는다');
+});
