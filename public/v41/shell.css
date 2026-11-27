@@ -1529,3 +1529,7 @@ body.lt-book-lightbox-open #lt-visitor-caption{visibility:hidden}
  .app-header .tree-frame .tree-views>button[data-view]{width:45px;padding-inline:0}
  .app-header .tree-frame .tree-views>button[data-view="track59-sketchbook.html"]{width:44px}
 }
+
+/* #1521 */
+body.home-screen .app-header .main-nav>button#community-menu{font-size:14px;letter-spacing:.02em;font-weight:400;color:var(--lt-role-text-strong);border-color:var(--lt-role-text-strong);gap:5px}
+@media(min-width:781px){body.home-screen .app-header .main-nav>button#community-menu{width:132px}}
