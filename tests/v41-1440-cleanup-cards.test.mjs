@@ -1,11 +1,13 @@
 import test from 'node:test';
-import {chromium} from 'playwright';
+
 import {serve} from './helpers/screen-audit.mjs';
 import {createTree,addMoment} from '../public/v41/domain.mjs';
 import {clickToolbarTreeChoice} from './helpers/tree-picker-pr3.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
-test('#1440 순간 정리 방식 선택과 조작', {timeout:240000}, async t => {
+const require1440 = process.env.LT_1440_REQUIRE === '1';
+test('#1440 순간 정리 방식 선택과 조작', {skip: !require1440 ? '전용 브라우저 검사에서 실행' : undefined, timeout:240000}, async t => {
+const {chromium} = await import('playwright');
 const server=await serve({}, {port:4604}), base='http://127.0.0.1:4604';
 let browser;
 const out=process.env.LT1440_CAPTURE_DIR;if(out) await fs.mkdir(out,{recursive:true});
