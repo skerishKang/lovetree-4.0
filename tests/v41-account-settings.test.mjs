@@ -175,3 +175,5 @@ test('설정 창 실행: 개인정보 묶음의 정책 링크는 새 창이고 �
     assert.equal(logoutVisible, true, '로그아웃 단추가 계정 팝오버에 보인다');
   } finally { await browser.close(); server.close(); }
 });
+
+import './helpers/account-visit-1581.mjs';

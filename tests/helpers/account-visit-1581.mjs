@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
-import { serve } from './helpers/screen-audit.mjs';
-import { createTree, addMoment } from '../src/domain.js';
-import { projectSharedTree } from '../server/share-service.js';
+import { serve } from './screen-audit.mjs';
+import { createTree, addMoment } from '../../src/domain.js';
+import { projectSharedTree } from '../../server/share-service.js';
 
 let chromium;
 try { ({chromium}=await import('playwright')); } catch {}
