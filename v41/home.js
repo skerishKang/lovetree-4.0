@@ -539,6 +539,7 @@ const mobileFit=document.createElement('style');mobileFit.textContent='@media(ma
 const homeDesign1571=document.createElement('style');
 homeDesign1571.textContent=`
 .center .actions[data-inline]{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));column-gap:clamp(8px,2vw,18px);row-gap:4px;align-items:start}
+@media(min-width:651px){.center .actions[data-inline]{width:100%;max-width:432px;column-gap:18px;margin-inline:auto}}
 .center .actions[data-inline] .home-action-group{display:contents}
 .center .actions[data-inline] .home-action-group>.subtleBtn{grid-row:1;width:100%;height:44px}
 .center .actions[data-inline] .home-action-group>.home-count{grid-row:2}
