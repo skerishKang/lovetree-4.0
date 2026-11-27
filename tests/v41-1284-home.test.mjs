@@ -91,6 +91,8 @@ test('#1284 home layout and playback (1440/390, two themes, three media types)',
     assert.ok(!detail.kind.includes('VIDEO'),'한국어 영상 종류');
     assert.equal(detail.frame,false,'설명 창 즉시 외부 재생 금지');
     if(OUT)await snap(page,scene.type+'-'+theme+'-'+width+'-detail.png');
+    // #1495: 예전에는 소개 창 닫기 줄(최대 3초)이 막힌 영상 정보 응답을 기다려 줬다 — 그 대기를 안내 글자 조건으로 바꿔 둔다(단정은 그대로).
+    if(scene.blocked)await page.waitForFunction(()=>document.querySelector('#view')?.contentDocument?.querySelector('#orbit')?.shadowRoot?.querySelector('#mediaExternalHome')?.textContent==='YouTube에서 보기',null,{timeout:5000}).catch(()=>{});
     if(scene.blocked)await frame.locator('#mediaExternalHome').evaluate(el=>{if(el.textContent!=='YouTube에서 보기')throw Error('blocked 안내 누락');});
     if(!scene.blocked&&width===390&&theme==='night'){await frame.locator('#mediaPlayHome').click();await frame.locator('#mediaViewerHome iframe').waitFor();const code=scene.type==='landscape'?101:150;await frame.locator('#orbit').evaluate((el,code)=>{dispatchEvent(new MessageEvent('message',{origin:'https://www.youtube-nocookie.com',data:JSON.stringify({event:'onError',info:code})}));},code);await frame.locator('#mediaExternalHome').evaluate(el=>{if(el.textContent!=='YouTube에서 보기')throw Error('오류 신호 안내 누락');});assert.equal(await frame.locator('#mediaViewerHome iframe').count(),0,'101/150 오류 즉시 임베드 제거');}
     await frame.locator('#mediaCloseHome').click();
