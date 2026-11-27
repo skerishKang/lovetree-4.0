@@ -809,6 +809,8 @@ body:has(dialog[open]) .updates-card,body.lt-sheet-open .updates-card,
 body:has(dialog[open]) .home-links,body.lt-sheet-open .home-links,body.lt-viewer-open #toast,
 /* 책 '크게 보기'(.lt-lightbox)는 dialog가 아니라 화면 안 겹이라 위 규칙에 걸리지 않았다 — 아래 링크·새 소식 띠가 어두운 바탕 위에 떠 보였다(#1259 캡처). */
 body.lt-book-lightbox-open .home-links,body.lt-book-lightbox-open .updates-card{display:none}
+/* #1497 5번: 화면 안 크게 보기(.lt-lightbox — 책·서재 최근 순간)가 열린 동안에는 휴대폰 ＋ 단추·알림도 창 위에 뜨지 않게 숨긴다(창이 맨 위). 닫으면 돌아온다. */
+body.lt-book-lightbox-open #mobile-add,body.lt-book-lightbox-open #toast{display:none}
 /* #1284: 아래 링크가 본문 흐름으로 내려간 첫 화면에서는 새 소식 띠를 숫자판 위로 올린다. */
 @media(max-width:520px){body.home-screen[data-member="in"] .updates-card,body.home-screen[data-member="in"].lt-fab-ok .updates-card{bottom:calc(132px + env(safe-area-inset-bottom))}}
 /* 짧은 알림은 창 밖에 둔다. 셸 창이 열려 있어도 로고·상단 메뉴를 덮지 않게 머리글 바로 아래 띠에 둔다(#1175). */
