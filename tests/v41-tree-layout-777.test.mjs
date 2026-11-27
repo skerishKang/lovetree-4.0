@@ -450,24 +450,27 @@ try {
   if (!existsSync(chromium.executablePath())) skip = 'Playwright Chromium이 없어 트리 보기 뒤로 가기 시험을 건너뜀';
 } catch { skip = 'playwright 패키지가 없어 트리 보기 뒤로 가기 시험을 건너뜀'; }
 
-const treeWorkspace = () => {
-  const moments = Array.from({ length: 6 }, (_, i) => ({
-    id: 'm' + (i + 1), parentId: i ? 'm' + i : null, relation: i ? '이어짐' : '',
-    title: '순간 ' + (i + 1), date: `2026-01-0${i + 1}`, emotion: '설렘', note: '기록 ' + (i + 1),
-    type: 'memo', url: '', keywords: [], createdOrder: i + 1, links: i < 5 ? ['m' + (i + 2)] : [],
-    createdAt: `2026-01-0${i + 1}T00:00:00.000Z`
-  }));
+const treeWorkspace = (count = 6) => {
+  const moments = Array.from({ length: count }, (_, i) => {
+    const date = new Date(Date.UTC(2026, 0, 1 + i)).toISOString().slice(0, 10);
+    return {
+      id: 'm' + (i + 1), parentId: i ? 'm' + i : null, relation: i ? '이어짐' : '',
+      title: '순간 ' + (i + 1), date, emotion: '설렘', note: '기록 ' + (i + 1),
+      type: 'memo', url: '', keywords: [], createdOrder: i + 1, links: i < 5 ? ['m' + (i + 2)] : [],
+      createdAt: date + 'T00:00:00.000Z'
+    };
+  });
   return { revision: 1, subject: 'trial-subject', writeSubjectBound: true, state: { version: 1, prefs: {}, trees: [{
     id: 't6', subject: '시험 사용자', title: '사슬 6', coverMomentId: '', inbox: false,
     createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-06T00:00:00.000Z', moments
   }] } };
 };
 
-async function openShellTree(browser, base, width, theme = 'night') {
-  const context = await browser.newContext({ viewport: { width, height: width === 390 ? 844 : 900 }, reducedMotion: 'reduce' });
+async function openShellTree(browser, base, width, theme = 'night', count = 6) {
+  const context = await browser.newContext({ viewport: { width, height: width === 390 ? 844 : width === 844 ? 390 : 900 }, reducedMotion: 'reduce' });
   await context.addInitScript(theme => { localStorage.setItem('lt41.tips.firstTree', '1'); localStorage.setItem('lt41.theme', theme); }, theme);
   const page = await context.newPage();
-  await page.route('**/api/workspace*', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(treeWorkspace()) }));
+  await page.route('**/api/workspace*', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(treeWorkspace(count)) }));
   await page.goto(`${base}/v41/?account=1`, { waitUntil: 'load' });
   await page.waitForFunction(() => window.LT41?.tree?.id === 't6', null, { timeout: 20000 });
   await page.evaluate(() => document.querySelector('[data-view="track61-tree.html"]').click());
@@ -527,6 +530,135 @@ test('#1333 화면: 트리 보기에서 고른 순간이 책·보드로 옮겨�
   }
 });
 
+
+test('#1525 트리 보기 글자·누름 영역·올림·고르기 창 수치', { skip: REQUIRE ? false : skip, timeout: 300000 }, async (t) => {
+  if (skip) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip}`);
+  const { serve } = await import('./helpers/screen-audit.mjs');
+  const server = await serve();
+  const browser = await chromium.launch({ headless: true });
+  t.after(async () => { await browser.close(); server.close(); });
+  for (const width of [390, 844, 1440]) for (const theme of ['night', 'garden']) await t.test(`${width} ${theme}`, async () => {
+    const { page, frame, context } = await openShellTree(browser, `http://127.0.0.1:${server.address().port}`, width, theme);
+    try {
+      const measured = await frame.evaluate(() => {
+        const box = element => element.getBoundingClientRect();
+        const tools = [...document.querySelectorAll('#goRoot,#goFit,#zoomOut,#zoomIn')].map(element => {
+          const rect = box(element), before = getComputedStyle(element, '::before');
+          return { id: element.id, width: rect.width, height: rect.height, hitWidth: Math.max(rect.width, parseFloat(before.width) || 0), hitHeight: rect.height + Math.max(0, -parseFloat(before.top || 0)) };
+        });
+        return { titleFont: parseFloat(getComputedStyle(document.querySelector('.ts-title')).fontSize), tools };
+      });
+      assert.ok(measured.titleFont >= 12, `카드 제목 ${measured.titleFont}px`);
+      for (const tool of measured.tools) {
+        assert.equal(tool.height, 36, `${tool.id} 보이는 높이`);
+        assert.ok(tool.hitWidth >= 44 && tool.hitHeight >= 44, `${tool.id} 누름 영역 ${tool.hitWidth}×${tool.hitHeight}`);
+      }
+      const brand = await page.evaluate(() => {
+        const element = document.querySelector('.app-header .brand'), rect = element.getBoundingClientRect(), before = getComputedStyle(element, '::before');
+        return { width: rect.width, hitWidth: rect.width + Math.max(0, -parseFloat(before.left || 0)) + Math.max(0, -parseFloat(before.right || 0)) };
+      });
+      assert.ok(brand.hitWidth >= 44, `390 로고 누름 폭 ${brand.hitWidth}px`);
+
+      const card = frame.locator('#cards [data-kind="moment"]:not(.is-root)').first();
+      const cardBefore = await card.evaluate(element => getComputedStyle(element).filter);
+      const cardBox = await card.boundingBox();
+      await page.mouse.move(cardBox.x + cardBox.width / 2, cardBox.y + cardBox.height / 2);
+      await page.waitForTimeout(50);
+      const cardAfter = await card.evaluate(element => getComputedStyle(element).filter);
+      assert.notEqual(cardAfter, cardBefore, '카드 마우스 올림이 보이는 변화를 준다');
+      const zoom = frame.locator('#zoomOut');
+      const zoomBefore = await zoom.evaluate(element => getComputedStyle(element).backgroundColor);
+      await zoom.hover();
+      const zoomAfter = await zoom.evaluate(element => getComputedStyle(element).backgroundColor);
+      assert.notEqual(zoomAfter, zoomBefore, '축소 단추 마우스 올림이 보이는 변화를 준다');
+      await zoom.focus();
+      assert.ok(parseFloat(await zoom.evaluate(element => getComputedStyle(element).outlineWidth)) >= 2, '초점 테두리 2px 이상');
+
+      await frame.locator('.lt-toolbar-tree-choice').click();
+      await page.waitForSelector('body>.tree-popover.lt-toolbar-picker:not([hidden])');
+      const picker = await page.evaluate(() => {
+        const rect = element => element.getBoundingClientRect();
+        const area = (a, b) => Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left)) * Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
+        const popup = document.querySelector('body>.tree-popover.lt-toolbar-picker');
+        const header = document.querySelector('.app-header');
+        const mobile = document.querySelector('#mobile-add');
+        const mobileRect = mobile?.checkVisibility?.() ? rect(mobile) : null;
+        return {
+          countFont: parseFloat(getComputedStyle(popup.querySelector('.tree-count')).fontSize),
+          headerOverlap: area(rect(popup), rect(header)),
+          mobileOverlap: mobileRect ? Math.max(0, ...[...popup.querySelectorAll('.tree-foot button')].map(button => area(rect(button), mobileRect))) : 0
+        };
+      });
+      assert.ok(picker.countFont >= 12, `순간 수 글자 ${picker.countFont}px`);
+      assert.equal(picker.headerOverlap, 0, `머리줄 겹침 ${picker.headerOverlap}px²`);
+      assert.equal(picker.mobileOverlap, 0, `아래 단추 겹침 ${picker.mobileOverlap}px²`);
+    } finally { await context.close(); }
+  });
+});
+
+test('#1525 많은 순간 첫 보기는 누름 가능한 크기이고 전체 맞춤은 전체 단추에서만 한다', { skip: REQUIRE ? false : skip, timeout: 300000 }, async (t) => {
+  if (skip) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip}`);
+  const { serve } = await import('./helpers/screen-audit.mjs');
+  const server = await serve();
+  const browser = await chromium.launch({ headless: true });
+  t.after(async () => { await browser.close(); server.close(); });
+  for (const width of [390, 844, 1440]) for (const theme of ['night', 'garden']) await t.test(`${width} ${theme}`, async () => {
+    const { page, frame, context } = await openShellTree(browser, `http://127.0.0.1:${server.address().port}`, width, theme, 120);
+    try {
+      const initial = await frame.evaluate(() => ({
+        mode: window.__LT_TREE_VIEW__.state.mode,
+        scale: window.__LT_TREE_VIEW__.state.scale,
+        minWidth: Math.min(...[...document.querySelectorAll('#cards [data-kind="moment"]')].map(element => element.getBoundingClientRect().width)),
+        minHeight: Math.min(...[...document.querySelectorAll('#cards [data-kind="moment"]')].map(element => element.getBoundingClientRect().height))
+      }));
+      assert.equal(initial.mode, 'root');
+      assert.ok(initial.scale >= 1);
+      assert.ok(initial.minWidth >= 44 && initial.minHeight >= 44, `처음 보기 최소 카드 ${initial.minWidth}×${initial.minHeight}`);
+      await frame.locator('#stage').focus();
+      await page.keyboard.press('0');
+      await page.waitForTimeout(50);
+      assert.equal(await frame.evaluate(() => window.__LT_TREE_VIEW__.state.mode), 'root', '키보드 0으로는 전체 맞춤하지 않는다');
+      await frame.locator('#goFit').click();
+      await page.waitForTimeout(50);
+      const fitted = await frame.evaluate(() => ({
+        mode: window.__LT_TREE_VIEW__.state.mode,
+        minWidth: Math.min(...[...document.querySelectorAll('#cards [data-kind="moment"]')].map(element => element.getBoundingClientRect().width)),
+        minHeight: Math.min(...[...document.querySelectorAll('#cards [data-kind="moment"]')].map(element => element.getBoundingClientRect().height))
+      }));
+      assert.equal(fitted.mode, 'fit');
+      assert.ok(fitted.minWidth < 44 || fitted.minHeight < 44, '전체 단추를 눌렀을 때만 전체 맞춤으로 작아진다');
+    } finally { await context.close(); }
+  });
+});
+
+test('#1525 상세 창은 새로고침·뒤로 가기·주소 다시 열기 6/6 복원된다', { skip: REQUIRE ? false : skip, timeout: 300000 }, async (t) => {
+  if (skip) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip}`);
+  const { serve } = await import('./helpers/screen-audit.mjs');
+  const server = await serve();
+  const browser = await chromium.launch({ headless: true });
+  t.after(async () => { await browser.close(); server.close(); });
+  for (const theme of ['night', 'garden']) await t.test(theme, async () => {
+    const { page, context } = await openShellTree(browser, `http://127.0.0.1:${server.address().port}`, 1440, theme);
+    try {
+      let frame = await page.$('#view').then(handle => handle.contentFrame());
+      await frame.locator('#cards [data-kind="moment"]:not(.is-root)').first().click();
+      await frame.locator('#treeDetail[open]').waitFor({ state: 'visible' });
+      const openedUrl = page.url();
+      await page.reload({ waitUntil: 'load' });
+      await page.waitForFunction(() => document.querySelector('#view')?.contentDocument?.querySelector('#treeDetail[open]'), null, { timeout: 10000 });
+      frame = await page.$('#view').then(handle => handle.contentFrame());
+      assert.equal(await frame.locator('#treeDetail[open]').count(), 1, '새로고침');
+      await page.goBack({ waitUntil: 'load' });
+      await page.waitForTimeout(500);
+      frame = await page.$('#view').then(handle => handle.contentFrame());
+      assert.equal(await frame.locator('#treeDetail[open]').count(), 0, '뒤로 가기');
+      await page.goto(openedUrl, { waitUntil: 'load' });
+      await page.waitForFunction(() => document.querySelector('#view')?.contentDocument?.querySelector('#treeDetail[open]'), null, { timeout: 10000 });
+      frame = await page.$('#view').then(handle => handle.contentFrame());
+      assert.equal(await frame.locator('#treeDetail[open]').count(), 1, '주소 다시 열기');
+    } finally { await context.close(); }
+  });
+});
 
 /* #1368: 트리 상세는 DOM [open]뿐 아니라 실제 픽셀에서도 글자가 읽혀야 한다. */
 test('#1368 트리 상세 판 글자 대비와 무대 흐림 — 390·1440 밤·정원', {

@@ -15,6 +15,7 @@ import { createAdminRoleService } from './admin-roles.js';
 import { createAdminStatsService } from './admin-stats.js';
 import { createStatsRepo } from './db/stats-postgres.js';
 import { resolveListen } from './listen-config.js';
+import { retiredLogin } from './retired-login.js';
 import { createApiHandler, createNodeHandler } from './http.js';
 import { createWorkspaceService } from './workspace-service.js';
 import { createShareService, createShareHandler } from './share-service.js';
@@ -65,9 +66,6 @@ if (!LOVETREE_DATABASE_URL) throw new Error('LOVETREE_DATABASE_URL가 필요합�
 // 로그인·세션은 공용 로그인(auth.padiem.net)과 Pages 콜백(functions/_lib/shared-auth.mjs)만 쓴다.
 // 공용 접근 쿠키가 없는 요청은 옛 경로로 넘기지 않고 로그인 필요로 닫는다.
 const noLegacySession = async () => { throw new ApiError(401, 'unauthenticated', '로그인이 필요해요.'); };
-// 옛 /auth/* API 라우트는 닫혀 있다 — 로그인은 Pages(/auth/*)가 공용 로그인으로 처리한다.
-const retiredLogin = () => ({ status: 410, body: { error: { code: 'auth_moved', message: '로그인은 공용 로그인으로 옮겼어요.' } } });
-
 const maxBodyBytes = Number(LOVETREE_MAX_BODY_BYTES || 0) || undefined;
 const pool = await createPool(LOVETREE_DATABASE_URL);
 const repo = createWorkspaceRepo(pool);

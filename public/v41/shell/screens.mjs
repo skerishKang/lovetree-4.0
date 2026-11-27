@@ -258,6 +258,8 @@ export function createScreens(deps) {
     if (file === 'track56-network.html' && openMoment) url.searchParams.set('open', openMoment);
     // #891: 보드는 주소가 특정 순간을 가리켰을 때만 ?open=을 붙인다 — 판 자동 열림의 한 벌 판정.
     if (file === 'track58-pinboard.html' && openBoardMoment) url.searchParams.set('open', openBoardMoment);
+    // #1525: 보드의 ?open= 방식으로 트리 상세 열림을 새 프레임에 전달한다.
+    if (file === 'track61-tree.html' && globalThis.history?.state?.lt41TreeDetail && window.LT41?.momentId) url.searchParams.set('open', window.LT41.momentId);
     showInFrame(url.href, '러브트리 · ' + screenTitle(file));
     if (write) writeLocation();
     links();
