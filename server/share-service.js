@@ -3,7 +3,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { coverModeOf, normalizeCoverDesign } from '../src/domain.js';
 import { normalizeTreeOpenView } from '../public/v41/tree-open-view.mjs';
 import { safePublicThumbnail } from '../public/v41/public-thumbnail.mjs';
-import { isPrivateMediaUrl, projectPublicStats, projectPublicTree } from './public-projection.js';
+import { isPrivateMediaUrl, projectPublicStats, projectPublicTree, projectPublicVisitPrefs } from './public-projection.js';
 import { youtubeIdFrom, youtubeStageThumbUrl } from '../public/v41/youtube-id.mjs';
 import { ApiError } from './errors.js';
 import { readStoredDocument } from './workspace-service.js';
@@ -277,6 +277,7 @@ export function createShareService({ shareRepo, workspaceRepo, visibilityRepo = 
       if (await isHiddenShare(communityRepo, { ...row, productId })) throw new ApiError(404, 'share_not_found', '공유 주소를 찾을 수 없어요.');
       const { tree, omittedPrivateMedia, aiTester, stored } = await sharedTree(row);
       const shelf = [shelfItem(tree, row.shareId)];
+      const shelfShareIds = new Map([[row.treeId, row.shareId]]);
       if ((await treeDiscover(row.subjectId, row.treeId)).discover) {
         const summaries = communityRepo?.listDiscoverableSummaries
           ? await communityRepo.listDiscoverableSummaries({ productId, viewerSubjectId: null, limit: 240 })
@@ -296,6 +297,7 @@ export function createShareService({ shareRepo, workspaceRepo, visibilityRepo = 
           catch { continue; }
           if (!projected.tree.moments.length) continue;
           shelf.push(shelfItem(projected.tree, candidate.shareId));
+          shelfShareIds.set(candidate.treeId, candidate.shareId);
         }
       }
       const stats = communityRepo?.stats
@@ -310,6 +312,7 @@ export function createShareService({ shareRepo, workspaceRepo, visibilityRepo = 
           updatedAt: tree.updatedAt,
           aiTester,
           ownerLabel: '',
+          prefs: projectPublicVisitPrefs(stored.doc.prefs, shelfShareIds),
           omittedPrivateMedia
         },
         tree,
