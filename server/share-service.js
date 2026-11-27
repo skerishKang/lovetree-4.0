@@ -10,6 +10,7 @@ import { readStoredDocument } from './workspace-service.js';
 import { refreshStageIndex } from './stage-index-refresh.js';
 import { parsePrincipal } from './principal.js';
 import { aiTesterFor } from './admin-roles.js';
+import { isHiddenShare } from './hidden-share.js';
 
 const SHARE_ID = /^[A-Za-z0-9_-]{20,64}$/;
 const RECORD_ID = /^[A-Za-z0-9_-]{1,80}$/;
@@ -260,6 +261,7 @@ export function createShareService({ shareRepo, workspaceRepo, visibilityRepo = 
       const row = await shareRepo.load({ productId, shareId });
       if (!row) throw new ApiError(404, 'share_not_found', '공유 주소를 찾을 수 없어요.');
       if (row.status !== 'active') throw new ApiError(410, 'share_revoked', '소유자가 이 공유를 취소했어요.');
+      if (await isHiddenShare(communityRepo, { ...row, productId })) throw new ApiError(404, 'share_not_found', '공유 주소를 찾을 수 없어요.');
       const { tree, omittedPrivateMedia, aiTester } = await sharedTree(row);
       const shared = { share: publicShareSummary(row), tree, omittedPrivateMedia };
       // #611 3번: AI 명예회원 기록은 공개 읽기 결과에 'AI 명예회원' 배지 한 비트만 내린다.
@@ -272,6 +274,7 @@ export function createShareService({ shareRepo, workspaceRepo, visibilityRepo = 
       const row = await shareRepo.load({ productId, shareId });
       if (!row) throw new ApiError(404, 'share_not_found', '공유 주소를 찾을 수 없어요.');
       if (row.status !== 'active') throw new ApiError(410, 'share_revoked', '소유자가 이 공유를 취소했어요.');
+      if (await isHiddenShare(communityRepo, { ...row, productId })) throw new ApiError(404, 'share_not_found', '공유 주소를 찾을 수 없어요.');
       const { tree, omittedPrivateMedia, aiTester, stored } = await sharedTree(row);
       const shelf = [shelfItem(tree, row.shareId)];
       if ((await treeDiscover(row.subjectId, row.treeId)).discover) {

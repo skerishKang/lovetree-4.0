@@ -282,3 +282,53 @@ test('다른 트리 저장과 제목 수정에도 미디어 원본을 보존하�
   assert.equal(writes.length,2);
  } finally {session.dispose();}
 });
+
+test('#1544 운영이 숨긴 공유는 없는 공유와 같은 404로 읽히고 숨김을 풀면 200이다',async()=>{
+ const communityRepo=createMemoryCommunityRepo();
+ const {handle}=await setup(state,null,{communityRepo});
+ const input={treeId:first.id,view:'book'};
+ const preview=await request(handle,'POST','/api/shares/preview',input,'alice');
+ const made=await request(handle,'POST','/api/shares',{...input,previewToken:preview.body.preview.previewToken},'alice');
+ const id=made.body.share.id;
+ const otherInput={treeId:second.id,view:'book'};
+ const otherPreview=await request(handle,'POST','/api/shares/preview',otherInput,'alice');
+ const otherMade=await request(handle,'POST','/api/shares',{...otherInput,previewToken:otherPreview.body.preview.previewToken},'alice');
+ communityRepo.seedShares([
+  {productId:PRODUCT,subjectId:'alice',treeId:first.id,shareId:id,status:'active',momentCount:first.moments.length},
+  {productId:PRODUCT,subjectId:'alice',treeId:second.id,shareId:otherMade.body.share.id,status:'active',momentCount:second.moments.length}
+ ]);
+ const missing=await request(handle,'GET','/api/public/shares/'+'x'.repeat(24));
+ assert.equal(missing.status,404);
+ const normal=await request(handle,'GET','/api/public/shares/'+id);
+ assert.equal(normal.status,200);
+ await communityRepo.createReport({productId:PRODUCT,reportId:'report-1544-hide',shareId:id,subjectId:'moderator',reason:'확인',clientKey:'key-1544-hide'});
+ const moderated=await communityRepo.moderateReport({productId:PRODUCT,reportId:'report-1544-hide',status:'resolved',visibility:'hidden',actorSubjectId:'moderator'});
+ assert.equal(moderated.hidden,true);
+ const hidden=await request(handle,'GET','/api/public/shares/'+id);
+ assert.equal(hidden.status,404);
+ assert.equal((await request(handle,'GET','/api/public/visits/'+id)).status,404);
+ assert.deepEqual(hidden.body,missing.body,'응답 본문이 없는 공유와 같다');
+ assert.deepEqual(hidden.headers,missing.headers,'응답 머리말이 없는 공유와 같다');
+ assert.equal((await request(handle,'GET','/api/public/shares/'+otherMade.body.share.id)).status,200,'숨기지 않은 공유는 영향 없음');
+ await communityRepo.moderateReport({productId:PRODUCT,reportId:'report-1544-hide',status:'dismissed',visibility:'visible',actorSubjectId:'moderator'});
+ assert.equal((await request(handle,'GET','/api/public/shares/'+id)).status,200,'숨김을 풀면 200');
+ assert.equal((await request(handle,'GET','/api/public/visits/'+id)).status,200);
+});
+
+test('#1544 숨김은 같은 트리의 다른 공유 주소에도 적용된다(둘러보기·무대와 같은 기준)',async()=>{
+ const communityRepo=createMemoryCommunityRepo();
+ const {handle}=await setup(state,null,{communityRepo});
+ const input={treeId:first.id,view:'book'};
+ const preview=await request(handle,'POST','/api/shares/preview',input,'alice');
+ const made=await request(handle,'POST','/api/shares',{...input,previewToken:preview.body.preview.previewToken},'alice');
+ const id=made.body.share.id,sibling='s'.repeat(24);
+ communityRepo.seedShares([
+  {productId:PRODUCT,subjectId:'alice',treeId:first.id,shareId:id,status:'active',momentCount:first.moments.length},
+  {productId:PRODUCT,subjectId:'alice',treeId:first.id,shareId:sibling,status:'active',momentCount:first.moments.length}
+ ]);
+ await communityRepo.createReport({productId:PRODUCT,reportId:'report-1544-sibling',shareId:sibling,subjectId:'moderator',reason:'확인',clientKey:'key-1544-sibling'});
+ await communityRepo.moderateReport({productId:PRODUCT,reportId:'report-1544-sibling',status:'resolved',visibility:'hidden',actorSubjectId:'moderator'});
+ assert.equal(await communityRepo.isHiddenShare({productId:PRODUCT,shareId:id,subjectId:'alice',treeId:first.id}),true);
+ assert.equal((await request(handle,'GET','/api/public/shares/'+id)).status,404,'같은 트리의 다른 주소도 막힌다');
+ assert.equal(await communityRepo.isHiddenShare({productId:PRODUCT,shareId:id,subjectId:'bob',treeId:first.id}),false,'다른 계정의 같은 트리 아이디에는 번지지 않는다');
+});
