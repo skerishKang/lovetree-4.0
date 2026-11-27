@@ -1364,7 +1364,7 @@ html .main-nav>button#community-menu{
 html .main-nav>button#community-menu:is(:hover,:focus-visible,[aria-current=true]){
  border-color:var(--lt-pearl);color:var(--lt-pearl);background:transparent;text-decoration:none;box-shadow:none
 }
-html .main-nav>button#community-menu[aria-current=true]{font-weight:600}
+html .main-nav>button#community-menu[aria-current=true]{font-weight:600;border-color:var(--lt-gold);color:var(--lt-gold)}
 #community-menu .header-compass{width:15px;height:15px;flex:none}
 }
 
@@ -1532,4 +1532,6 @@ body.lt-book-lightbox-open #lt-visitor-caption{visibility:hidden}
 
 /* #1521 */
 body.home-screen .app-header .main-nav>button#community-menu{font-size:14px;letter-spacing:.02em;font-weight:400;color:var(--lt-role-text-strong);border-color:var(--lt-role-text-strong);gap:5px}
+body.home-screen .app-header .main-nav>button#community-menu:is(:hover,:focus-visible,[aria-current=true]){border-color:var(--lt-gold);color:var(--lt-gold)}
+body.home-screen .app-header .main-nav>button#community-menu[aria-current=true]{font-weight:600}
 @media(min-width:781px){body.home-screen .app-header .main-nav>button#community-menu{width:132px}}
