@@ -130,17 +130,32 @@ function closeTreeMenu(focus=false){
  tellFrame(false,focus);
  activeFrame=null;
 }
-window.addEventListener('message',event=>{
- if(event.origin!==location.origin || event.data?.type!==MSG.toolbarTreePicker)return;
- const frame=activeViewFrame();
- if(!frame || event.source!==frame.contentWindow || deps.source!=='server' || !deps.member?.snapshot().owned || !deps.member?.snapshot().writable || !window.LT41?.tree)return;
- if(!['track32-bookshelf.html','track59-sketchbook.html','track58-pinboard.html','track56-network.html','track61-tree.html'].includes(deps.current))return;
- if(!treePopover.hidden){closeTreeMenu(true);return;}
- const r=event.data.rect;
- if(!r||![r.left,r.bottom].every(Number.isFinite))return;
- const fr=frame.getBoundingClientRect();
- openTreeMenu(event.data.via,{left:Math.max(0,Math.min(innerWidth-44,fr.left+r.left)),bottom:fr.top+r.bottom},frame);
-});
+ function receiveTreePicker(source,data){
+  const frame=activeViewFrame();
+  if(!frame || source!==frame.contentWindow || frame.hidden || frame.inert || deps.source!=='server' || !deps.member?.snapshot().owned || !deps.member?.snapshot().writable || !window.LT41?.tree)return;
+  if(!['track32-bookshelf.html','track59-sketchbook.html','track58-pinboard.html','track56-network.html','track61-tree.html'].includes(deps.current))return;
+  if(!treePopover.hidden){closeTreeMenu(true);return;}
+  const r=data.rect;
+  if(!r||![r.left,r.bottom].every(Number.isFinite))return;
+  const fr=frame.getBoundingClientRect();
+  openTreeMenu(data.via,{left:Math.max(0,Math.min(innerWidth-44,fr.left+r.left)),bottom:fr.top+r.bottom},frame);
+ }
+ // 같은 출처의 실제 활성 화면에서 누른 입력은 프레임 교대 전에 처리한다.
+ window.LT41_OPEN_TREE_PICKER=(source,data)=>receiveTreePicker(source,data);
+ window.addEventListener('message',event=>{
+  if(event.origin!==location.origin || event.data?.type!==MSG.toolbarTreePicker)return;
+  receiveTreePicker(event.source,event.data);
+ });
+ function syncTreePickerFrame(){
+  if(!treePopover||treePopover.hidden)return;
+  const frame=activeViewFrame();
+  if(!frame||frame===activeFrame)return;
+  tellFrame(false);
+  activeFrame=frame;
+  bindFrame(frame);
+  tellFrame(true);
+ }
+ window.addEventListener('lt41-frame-revealed',syncTreePickerFrame);
 if(treePopover)treePopover.addEventListener('keydown',event=>{
  const items=[...treePopover.querySelectorAll('button')].filter(b=>!b.hidden && b.getClientRects().length);
  const at=items.indexOf(document.activeElement);
