@@ -69,6 +69,11 @@ export function createMemoryCommunityRepo({isPrivateTree=null,isDiscoverOn=null,
    return out;
   },
   seedShares(rows){this.shares=rows.map(copy);},
+  // #1544: 운영 숨김 판정 — 둘러보기 후보 판정(candidates)과 같은 (제품, 주인, 트리) 기준이다.
+  async isHiddenShare({productId,shareId,subjectId,treeId}){
+   if(hiddenShares.has(key(productId,shareId)))return true;
+   return (this.shares||[]).some(row=>row.productId===productId&&row.subjectId===subjectId&&row.treeId===treeId&&hiddenShares.has(key(productId,row.shareId)));
+  },
   // #627 3단계: 태그 검색이 훑을 공개 공유 행 — active, 사람×트리당 한 행(auto 우선), 숨김·비공개·
   // 차단(양방향)·요청자 본인을 뺀다. 2026-11-16 대표 결정: 소개 켜짐 + 순간 3개 이상만 훑는다
   // (둘러보기 목록과 같은 조건). isDiscoverOn 이 없으면(예전 모형) 켜짐으로 본다.
