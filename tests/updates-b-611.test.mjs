@@ -212,3 +212,44 @@ test('#1273 6번: 창을 닫은 상태에서 보낸 의견도 다시 열면 목�
     assert.match(html, /닫힌 상태에서 보낸 의견/);
   } finally { restore(); }
 });
+
+test('#1568 덧붙임 삭제: 확인부터 응답까지 한 요청만 보내고 실패하면 단추를 푼다', async () => {
+  const posts = [{id: 5, kind: 'opinion', status: 'fixed', body: '의견', replies: [{id: 21, mine: true, canDelete: true, body: '덧붙임'}]}];
+  const deferred = [];
+  let deletes = 0;
+  const {board, els, restore} = mount((path, init) => {
+    if (init?.method === 'DELETE') {
+      deletes += 1;
+      return new Promise(resolve => deferred.push(resolve));
+    }
+    return {ok: true, status: 200, json: async () => ({posts})};
+  }, posts);
+  let first, second, retry;
+  try {
+    const reply = fakeEl('reply'); reply.dataset.replyId = '21';
+    const post = fakeEl('post'); post.dataset.followup = '5';
+    const button = fakeEl('delete');
+    button.closest = selector => selector === '.myposts-reply' ? reply : post;
+    els['myposts-list'].querySelectorAll = selector => selector === '[data-reply-delete]' ? [button] : [];
+    await board.openMyPosts();
+    const fail = () => ({ok: false, status: 503, json: async () => ({error: {message: '잠시 오류'}})});
+    first = button.listeners.click();
+    second = button.listeners.click();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    assert.equal(deletes, 1, '확인·삭제 요청 중 두 번 눌러도 전송은 한 번');
+    assert.equal(button.disabled, true, '요청 중 단추 비활성화');
+    for (const release of deferred.splice(0)) release(fail());
+    await Promise.all([first, second]);
+    assert.equal(button.disabled, false, '실패 후 단추 활성화');
+    retry = button.listeners.click();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    assert.equal(deletes, 2, '실패 후 다시 요청 가능');
+    for (const release of deferred.splice(0)) release(fail());
+    await retry;
+    assert.equal(button.disabled, false);
+  } finally {
+    for (const release of deferred) release({ok: false, status: 503, json: async () => ({})});
+    await Promise.allSettled([first, second, retry].filter(Boolean));
+    restore();
+  }
+});

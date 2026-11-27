@@ -132,11 +132,14 @@ function closeTreeMenu(focus=false){
 }
  function receiveTreePicker(source,data){
   const frame=activeViewFrame();
-  if(!frame || source!==frame.contentWindow || frame.hidden || frame.inert || deps.source!=='server' || !deps.member?.snapshot().owned || !deps.member?.snapshot().writable || !window.LT41?.tree)return;
+  if(!frame || source!==frame.contentWindow || frame.hidden || frame.inert || !treePopover || deps.source!=='server' || !deps.member?.snapshot().owned || !deps.member?.snapshot().writable || !window.LT41?.tree)return;
+  if(source?.frameElement!==frame)return;
   if(!['track32-bookshelf.html','track59-sketchbook.html','track58-pinboard.html','track56-network.html','track61-tree.html'].includes(deps.current))return;
-  if(!treePopover.hidden){closeTreeMenu(true);return;}
+  if(!data || typeof data!=='object' || Array.isArray(data) || data.type!==MSG.toolbarTreePicker)return;
   const r=data.rect;
-  if(!r||![r.left,r.bottom].every(Number.isFinite))return;
+  if(!r || typeof r!=='object' || Array.isArray(r) || ![r.left,r.top,r.right,r.bottom].every(Number.isFinite) || r.right<r.left || r.bottom<r.top)return;
+  if(data.via!=='mouse' && data.via!=='keyboard')return;
+  if(!treePopover.hidden){closeTreeMenu(true);return;}
   const fr=frame.getBoundingClientRect();
   openTreeMenu(data.via,{left:Math.max(0,Math.min(innerWidth-44,fr.left+r.left)),bottom:fr.top+r.bottom},frame);
  }
