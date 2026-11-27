@@ -3,9 +3,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  COVER_PALETTE, addedLabel, allBooks, bookMeta, buildShelf, carouselTransform, coverStyle, escapeShelf,
+  COVER_PALETTE, addedLabel, bookMeta, buildShelf, carouselTransform, coverStyle, escapeShelf,
   filterShelf, findBook, lastMomentDate, leftPageMarkup, pageMeta, pageTarget, resolveShelfIndex,
-  resumeCard, rightPageMarkup, shelfBook, shelfRowLayout, shelfRotationLayout, treeTitleOf, youtubeId
+  resumeCard, rightPageMarkup, shelfBook, shelfDragShift, shelfRowLayout, shelfRotationLayout, treeTitleOf, youtubeId
 } from '../public/v41/views/shelf/shelf-model.mjs';
 import { youtubeIdFrom } from '../public/v41/youtube-id.mjs';
 import { createReader } from '../public/v41/views/shelf/shelf-reader.js';
@@ -69,7 +69,6 @@ test('검색은 이름·설명·꼬리표·장 제목을 보고 앞뒤 공백은
   assert.deepEqual(titles('all', 'm2 순간'), ['첫사랑, 나의 순간들']); // 장 제목
   assert.deepEqual(titles('all', '파도'), ['바다']);
   assert.deepEqual(titles('all', '없는말'), []);
-  assert.equal(allBooks([books[0]], []).length, 1);
   assert.equal(findBook(books, 'tree2').name, '바다');
 });
 
@@ -416,7 +415,8 @@ test('이어 읽기 문구는 자동 제목 끝의 마침표를 덧붙이지 않
 
 // ── #256-1 보완(CTO 검토): 칸은 책 목록이 바뀔 때 다시 그린다 ──
 // shelf.js를 가짜 DOM으로 싣어 본다. 모델 시험만으로는 "다시 그림"이 보이지 않기 때문이다.
-test('새 책을 만들면 이어 보기 띠를 다시 그린다 · 검색으로 좁아져도 띠는 그대로', async () => {
+// #1468: 숨겨진 '새 책 만들기' 폼은 지웠다 — 책은 셸의 새 트리 흐름으로만 생기고, 서재는 받은 책 목록으로 띠를 그린다.
+test('트리가 있으면 이어 보기 띠를 그린다 · 검색으로 좁아져도 띠는 그대로 · 트리 0개이면 숨긴다', async () => {
   const els = new Map();
   const el = (selector) => {
     if (!els.has(selector)) els.set(selector, fakeEl({
@@ -431,7 +431,7 @@ test('새 책을 만들면 이어 보기 띠를 다시 그린다 · 검색으로
     }));
     return els.get(selector);
   };
-  const library = { list: [] };
+  const library = { list: [tree({ id: 'tree1', title: '가을 산책', moments: [moment('m1', { title: '처음 마음이 움직인 장면' })] })] };
   globalThis.window = globalThis;
   globalThis.document = { createElementNS: (ns, tag) => ({ tagName: String(tag), namespaceURI: String(ns), attrs: {}, children: [], setAttribute(n,v){this.attrs[n]=String(v)}, getAttribute(n){return this.attrs[n]??null}, append(...k){this.children.push(...k)}, querySelector(){return null}, querySelectorAll(){return []} }), 
     querySelector: (selector) => el(selector),
@@ -443,16 +443,11 @@ test('새 책을 만들면 이어 보기 띠를 다시 그린다 · 검색으로
   globalThis.LTDEMO = { library: library.list, moments: [], get: () => globalThis.parent.LT41.momentId, select() {}, openBook() {} };
   globalThis.CSS = { escape: (value) => String(value).replace(/"/g, '\\"') };
   await import('../public/v41/views/shelf/shelf.js');
-  // 처음: 책이 없으면 띠를 숨긴다(소개 문이 그 자리를 쓴다 — 트리 0개 화면은 #817)
-  assert.equal(el('#resumeStrip').hidden, true, '책이 없으면 이어 보기 띠를 숨긴다');
-  // 새 책 만들기 폼을 제출하면 띠가 다시 그려진다(숨은 채로 남지 않는다)
-  el('#newBookName').value = '가을 산책';
-  el('#newBookUrl').value = 'https://example.com/a';
-  el('#newBookForm').dispatch('submit', { preventDefault() {} });
-  assert.equal(el('#resumeStrip').hidden, false, '새 책 뒤에는 띠가 보인다');
+  // 책 목록으로 띠를 그린다(숨은 채로 남지 않는다) — 소개 문이 그 자리를 쓰는 것은 트리 0개 화면이다(#817).
+  assert.equal(el('#resumeStrip').hidden, false, '트리가 있으면 이어 보기 띠가 보인다');
   assert.equal(el('#resumeStrip').dataset.resumeKind, 'resume');
   assert.equal(el('#resumeTree').textContent, '가을 산책');
-  assert.match(el('#resumeMoment').textContent, /처음 마음이 움직인 장면|첫 마음/);
+  assert.match(el('#resumeMoment').textContent, /처음 마음이 움직인 장면/);
   assert.equal(el('#resumeGo').textContent, '이어 보기 ▶');
   // 검색으로 레일이 좁아져도(0권) 띠는 전체 책 기준이라 그대로다
   el('#searchInput').value = '찾을 수 없는 책 이름';
@@ -460,6 +455,10 @@ test('새 책을 만들면 이어 보기 띠를 다시 그린다 · 검색으로
   assert.equal(el('#resultCount').textContent, '트리 0개');
   assert.equal(el('#resumeStrip').hidden, false, '검색으로 좁아져도 띠는 바뀌지 않는다');
   assert.equal(el('#resumeStrip').dataset.resumeKind, 'resume');
+  // 트리 0개인 계정: 같은 화면을 빈 서재로 한 번 더 싣는다(모듈은 주소로 구분하므로 주소에 표식을 붙인다).
+  library.list.length = 0;
+  await import('../public/v41/views/shelf/shelf.js?empty-shelf');
+  assert.equal(el('#resumeStrip').hidden, true, '트리가 없으면 이어 보기 띠를 숨긴다');
 });
 
 // #1093: 회전 보기는 예전 책장의 가운데 배치를 되살리되 모든 책을 끝까지 보이게 둔다.
@@ -629,4 +628,61 @@ test('최근 순간 줄은 순간이 없으면 비어 있고 최대 여섯 개�
   const list = recentChapters(many);
   assert.equal(list.length, 6);
   assert.deepEqual(list.map((m) => m.id), ['m8', 'm7', 'm6', 'm5', 'm4', 'm3']);
+});
+
+// ── #1468: 회전 보기 밀기 — 판 폭 15%(최소 40px)부터 한 칸, 빠른 튕기기 한 칸 ──
+test('#1468 회전 보기 밀기 값: 60px 밀기 한 칸 · 짧고 느린 밀기 제자리 · 빠른 튕기기 한 칸 · 좌우 방향', () => {
+  const shift = (dx, velocity = 0) => shelfDragShift(dx, { velocity });
+  assert.equal(shift(0), 0, '움직임 없음');
+  assert.equal(shift(-60), 1, '390에서 60px 왼쪽 밀기는 다음 책 한 칸');
+  assert.equal(shift(60), -1, '오른쪽 60px 밀기는 앞 책 한 칸');
+  assert.equal(shift(-39), 0, '39px는 임계값(40px) 아이라 제자리');
+  assert.equal(shift(-30), 0, '30px 느린 밀기는 제자리');
+  assert.equal(shift(-30, -0.6), 1, '30px라도 빠르게 튕기면(0.6px/ms) 다음 책 한 칸');
+  assert.equal(shift(20, 0.9), -1, '오른쪽 빠른 튕기기는 앞 책 한 칸');
+  assert.equal(shift(-30, 0.6), 0, '밀다가 되돌리며 놓으면(거리와 속도 방향이 어긋남) 튕기기가 아니다');
+  // 100px을 넘으면 옛 규칙(Math.round(-dx/200))과 같다. 정확히 +100px은 옛 반올림(-0)이 0이었지만 좌우 같게 한 칸으로 본다.
+  for (const dx of [-100, -149, -150, -199, -250, -349, -400, 101, 240, 430]) {
+    assert.equal(shift(dx), Math.round(-dx / 200), `dx=${dx}`);
+  }
+  assert.equal(shift(100), -1, '+100px도 앞 책 한 칸');
+  // 다른 칸 간격·판 폭에서도 같은 규칙(판 폭 15%, 최소 40px, 그 넘게 밀면 간격만큼 센다).
+  assert.equal(shelfDragShift(-45, { pitch: 300, cardW: 400 }), 0, '판 폭 400의 15%는 60px — 45px는 제자리');
+  assert.equal(shelfDragShift(-60, { pitch: 300, cardW: 400 }), 1, '판 폭 400의 15%(60px)부터 한 칸');
+  assert.equal(shelfDragShift(-320, { pitch: 300, cardW: 400 }), 1, '간격 300px: 320px는 한 칸');
+  assert.equal(shelfDragShift(-460, { pitch: 300, cardW: 400 }), 2, '간격 300px: 460px는 두 칸');
+});
+
+test('#1468 회전 보기 레일 밀기: 60px로 가운데 책이 한 칸 · 빠른 튕기기 한 칸 · 짧게 밀고 멈춘 뒤 놓으면 제자리', () => {
+  const savedSetTimeout = globalThis.setTimeout, savedClearTimeout = globalThis.clearTimeout;
+  const timers = [];
+  globalThis.setTimeout = (fn, ms) => { const t = { fn, ms, cleared: false }; timers.push(t); return t; };
+  globalThis.clearTimeout = (id) => { if (id) id.cleared = true; };
+  // 한 번의 밀기: 가운데 책(start)을 누른 뒤 moves[가로 위치, 그까지 걸린 ms]만큼 움직이고 놓는다.
+  // releaseAt은 마지막 움직임 뒤 놓기까지 더 머문 시간이다.
+  const drag = (moves, { start = 3, releaseAt = 0 } = {}) => {
+    const h = viewHarness('carousel', { count: 12 });
+    h.view.mount(h.ctx);
+    h.ctx.setCenter(start);
+    const target = { closest: (sel) => (sel === '[data-manage-id]' || sel === '.shelf-empty-slot' ? null : h.cards[start]) };
+    let t = 1000, x = 200;
+    h.listeners.pointerdown[0]({ target, clientX: x, clientY: 20, pointerId: 1, timeStamp: t });
+    for (const [next, after] of moves) { t += after; x = next; h.listeners.pointermove[0]({ clientX: x, clientY: 20, pointerId: 1, timeStamp: t }); }
+    h.listeners.pointerup[0]({ clientX: x, clientY: 20, pointerId: 1, timeStamp: t + releaseAt });
+    h.view.destroy();
+    return h.state.center;
+  };
+  try {
+    assert.equal(drag([[180, 60], [160, 60], [150, 30], [140, 60]]), 4, '60px 천천히 밀기 → 다음 책 한 칸');
+    assert.equal(drag([[190, 60], [180, 60], [170, 60]]), 3, '30px 천천히 밀기 → 제자리');
+    assert.equal(drag([[190, 4], [180, 4], [170, 4]]), 4, '30px 빠르게 튕기기 → 다음 책 한 칸');
+    assert.equal(drag([[190, 5], [180, 5], [170, 5]], { releaseAt: 200 }), 3, '30px 밀고 멈춘 뒤(200ms) 놓기 → 제자리');
+    assert.equal(drag([[220, 60], [240, 60], [250, 30], [260, 60]]), 2, '오른쪽 60px 밀기 → 앞 책 한 칸');
+    assert.equal(drag(Array.from({ length: 9 }, (_, i) => [200 - (i + 1) * 50, 20])), 5, '450px 밀기 → 두 칸(간격 200px로 센다)');
+    assert.equal(drag([[210, 5], [220, 5], [230, 5]], { start: 0 }), 0, '첫 책에서 앞으로는 더 갈 곳이 없다');
+    assert.ok(timers.every((timer) => timer.cleared), '길게 누르기 타이머가 남지 않는다');
+  } finally {
+    globalThis.setTimeout = savedSetTimeout;
+    globalThis.clearTimeout = savedClearTimeout;
+  }
 });

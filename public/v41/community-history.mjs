@@ -3,7 +3,7 @@ export function createExploreLayers(host=globalThis) {
  const open=new Map();
  let serial=0;
  const token=()=>host.history?.state?.lt41ExploreLayer;
- const isExplore=()=>/^#explore(?:\/moments)?$/.test(host.location?.hash||'');
+ const isExplore=()=>/^#explore(?:\/moments)?(?:\?|$)/.test(host.location?.hash||'');
  // 공유 감상에서 돌아올 때 셸이 둘러보기 주소를 늦게 다시 쓰는 경우가 있다(느린 실행기).
  // 주소가 아직 둘러보기가 아니면 미리보기 복원을 버리지 않고 다음 주소 바뀜까지 기다린다.
  const resumeWhenExplore=(name,item,tries=0)=>{

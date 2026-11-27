@@ -204,6 +204,9 @@ export function createNavigationRuntime(ctx){
       syncTips:()=>(0,ctx.syncTreeTips)(),
       flowNavigation,
       paintEmptyForScreen:ctx.paintEmptyForScreen,
+      // #1487 후속: 로그인 확인 중 탭으로 연 안쪽 화면은 빈 상태 대신 확인이 끝나기를 기다린다.
+      authPending:()=>!!ctx.authPendingGuest?.(),
+      waitAuth:()=>ctx.waitAuthThenEmpty?.(),
       paintEmptyCopy:ctx.paintEmptyCopy,
       applyTheme:ctx.applyTheme,
       writeLocation,

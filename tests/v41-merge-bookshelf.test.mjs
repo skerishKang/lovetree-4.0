@@ -51,7 +51,8 @@ test('#212 개선(표지 사진·줄임)이 두 모드 공통 코드로 남는�
 });
 
 test('셸 연결(lt41-* 메시지·DOM id)은 그대로다', () => {
-  for (const id of ['shelfRail', 'shelfViewport', 'readerTitle', 'coverTitle', 'newBookModal']) {
+  // #1468: 숨겨진 '새 책 만들기' 창(newBookModal)은 지웠다. 셸이 서재를 여는 데 쓰는 나머지 id는 그대로다.
+  for (const id of ['shelfRail', 'shelfViewport', 'readerTitle', 'coverTitle']) {
     assert.ok(SERVER.includes(`id="${id}"`), id);
   }
   assert.match(SERVER, /parent\.LT41|LTDEMO\.select/);

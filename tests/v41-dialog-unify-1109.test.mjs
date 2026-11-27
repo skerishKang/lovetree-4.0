@@ -299,7 +299,12 @@ test('#1109 회원 기록 확인 중과 읽기 실패에도 빈 화면 탐색을
      assert.equal(await page.locator('#account-avatar').isHidden(),true,'확인 전 계정 표시 없음');
      if(width===390)await page.locator('#header-overflow button').filter({hasText:/^서재$/}).click();
      else await page.locator('#tree-views button[data-view="track32-bookshelf.html"]').click();
-     assert.equal(await page.locator('#empty h1').textContent(),'로그인하면 내 서재가 보여요','인증 확인 중에는 개인 기록을 미리 공개하지 않는다');
+     // #1487 결정(2026-11-27): 확인 중에 탭으로 연 안쪽 화면도 주소로 들어올 때처럼 '불러오는 중'을 보이고,
+     // 로그인 안내는 확인이 끝난 뒤에만 그린다(응답 뒤 단정은 아래 그대로).
+     await page.waitForFunction(()=>!document.getElementById('stage-loading').hidden,null,{timeout:5000});
+     assert.equal(await page.locator('#empty').isHidden(),true,'확인 중에는 빈 상태 안내(로그인 안내 포함)를 보이지 않는다');
+     assert.equal(await page.evaluate(()=>{const f=document.getElementById('view');try{return f.hidden||!/track32-bookshelf/.test(f.contentWindow.location.pathname);}catch{return true;}}),true,'인증 확인 중에는 개인 기록(서재 화면)을 미리 공개하지 않는다');
+     assert.equal(new URL(page.url()).hash,'#shelf','확인 중에도 고른 서재 주소를 남긴다');
      release();
     }
     await page.waitForFunction(wanted=>document.body.dataset.recordSource==='server'&&document.body.dataset.member===wanted,['empty','delayed'].includes(state)?'in':'out');

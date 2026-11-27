@@ -68,7 +68,7 @@ test('3. 정리 목록은 주입된 화면 규칙으로 제목·썸네일을 그
   const [first, second, third, fourth] = host.children;
   assert.equal(first.children[0].tagName, 'INPUT');
   assert.equal(first.children[0].checked, false);
-  assert.equal(first.children[1].src, 'https://i.ytimg.com/vi/abcdefghijk/hqdefault.jpg', '썸네일 연결');
+  assert.equal(first.children[1].children[0].src, 'https://i.ytimg.com/vi/abcdefghijk/hqdefault.jpg', '썸네일 연결');
   assert.equal(first.children[2].textContent, '영상 제목 · 시작 순간', '자동 제목 대신 화면 규칙 제목');
     assert.equal(second.children.length, 2, '썸네일 없는 순간은 img 없이');
     assert.equal(second.children[1].textContent, '내 제목');

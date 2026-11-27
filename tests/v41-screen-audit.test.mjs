@@ -188,7 +188,8 @@ test('#942 첫 화면 추가 단추와 숫자 묶음', { skip: REQUIRE ? false :
           check(buttons.length===2&&groups.length===2,key+' 빈 기록 단추/집계 묶음 개수 '+JSON.stringify(groups));
           check(groups.every(g=>g.btnH>=44),key+' 빈 기록 단추 높이 44px 이상 '+JSON.stringify(groups));
           check(buttons[0]?.radius>=22&&buttons[1]?.radius>=22,key+' 빈 기록 둥근 단추 모양 '+JSON.stringify(buttons));
-          check(!head.visible&&!fab.visible&&!top?.visible,key+' 빈 기록에서 쓰기 단추는 가운데 한 곳만 표시');
+          // #1487 결정(2026-11-27): 빈 기록 첫 화면도 가운데 '첫 순간 추가'와 함께 넓은 화면은 머리줄 추가, 휴대폰은 + 단추를 보인다(#942의 가운데 한 곳만을 바꿈).
+          check(head.visible===(width===1440)&&fab.visible===(width===390)&&!top?.visible,key+' 빈 기록 쓰기 입구: 가운데 + 넓은 화면 머리줄 또는 휴대폰 + 단추 '+JSON.stringify({head:head.visible,fab:fab.visible,top:!!top?.visible}));
           check(buttons.every(b=>b.border==='1px'&&b.radius>=22&&pairContrast(b.ink,b.bg)>=4.5),key+' 빈 기록 단추 글자 대비 4.5:1 이상 및 테두리 '+JSON.stringify(buttons));
           if(groups.length===2){const a=groups[0],b=groups[1],gap=Math.abs(a.y-b.y)<2?b.x-a.x-a.w:b.y-a.y-a.h;check(gap>=Math.max(width===1440?16:14,15),key+' 빈 기록 단추 간격 '+gap);}
 
@@ -475,11 +476,13 @@ const raiseToast = async (page) => {
   const box = await page.evaluate(() => {
     const t = document.getElementById('toast');
     const r = t.getBoundingClientRect();
-    return { hidden: t.hidden, top: Math.round(r.top), bottom: Math.round(r.bottom), gap: getComputedStyle(document.documentElement).getPropertyValue('--lt-toast-bottom').trim(), text: t.textContent };
+    // #1488: 안쪽 화면에는 바닥 링크가 없다 — 아래에 붙은 것(링크 줄·＋ 단추·새 소식 카드)이 보일 때만 그 위로 올라가야 한다.
+    const attached = [...document.querySelectorAll('.home-links,#mobile-add,.updates-card')].some((el) => { if (el.hidden) return false; const cs = getComputedStyle(el), b = el.getBoundingClientRect(); return cs.display !== 'none' && cs.visibility !== 'hidden' && b.width > 0 && b.height > 0; });
+    return { hidden: t.hidden, top: Math.round(r.top), bottom: Math.round(r.bottom), gap: getComputedStyle(document.documentElement).getPropertyValue('--lt-toast-bottom').trim(), text: t.textContent, attached };
   });
   assert.equal(box.hidden, false, '알림 줄이 떠 있다');
   assert.ok(box.text.trim().length > 0, '알림 줄에 글자가 있다');
-  assert.ok(Number.parseFloat(box.gap) > 0, `알림 줄 자리를 아래에 붙은 것들 위로 잡았다(--lt-toast-bottom: ${box.gap || '없음'})`);
+  if (box.attached) assert.ok(Number.parseFloat(box.gap) > 0, `알림 줄 자리를 아래에 붙은 것들 위로 잡았다(--lt-toast-bottom: ${box.gap || '없음'})`);
   return box;
 };
 const lowerToast = async (page) => { await page.evaluate(() => { const t = document.getElementById('toast'); if (t) t.hidden = true; }); };

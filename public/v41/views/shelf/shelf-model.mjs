@@ -92,7 +92,6 @@ export function shelfBook(tree, index, palette, namer) {
 
 export const buildShelf = (library, palette, namer) => library.map((tree, index) => shelfBook(tree, index, palette, namer));
 
-export const allBooks = (books, customBooks) => books.concat(customBooks);
 export const findBook = (list, id) => list.find((book) => book.id === id);
 
 export const coverStyle = (book) => '--cover:' + book.color + ';--cover-accent:' + book.accent + ';--tilt:' + ((book.id.length % 5) - 2) + 'deg;';
@@ -224,6 +223,21 @@ export function shelfRotationLayout(count, railWidth, { pitch = 200, cardW = 190
     depth: (index, center) => index === center ? 0 : -Math.abs(index - center) * 40,
     centerFor: (index, current = 0) => Math.max(0, Math.min(maxCenter, Number.isFinite(index) ? index : current))
   };
+}
+
+// ── #1468: 회전 보기 밀기 ──
+// 한 번의 밀기로 가운데 책이 몇 칸 움직일지 정하는 순수 계산(가운데 책 번호의 변화량을 그대로 돌려준다).
+// 판 폭의 15%(최소 40px)부터 한 칸으로 인정하고(390에서 60px 밀기), 그 넘게 밀면 칸 간격(pitch)만큼씩 센다
+// — 100px 이상에서의 값은 옛 규칙(Math.round(-dx/200))과 같다. 빠르게 튕긴 밀기(놓은 순간의 속도, px/ms)는 거리가 짧아도 한 칸으로 본다.
+// 왼쪽으로 밀면(dx<0) 다음 책이라 +1, 오른쪽으로 밀면 앞 책이라 -1을 돌려준다.
+export function shelfDragShift(dx, { pitch = 200, cardW = 190, velocity = 0, minFlickVelocity = 0.4 } = {}) {
+  const signed = Number(dx) || 0;
+  if (!signed) return 0;
+  const distance = Math.abs(signed), way = Math.sign(signed);
+  const raw = Math.round(-signed / pitch);
+  const byDistance = distance >= Math.max(40, cardW * 0.15) ? Math.sign(raw || -way) * Math.max(1, Math.abs(raw)) : 0;
+  const byFlick = (Number(velocity) || 0) * way >= minFlickVelocity ? -way : 0;
+  return byDistance || byFlick;
 }
 
 // #1366 ⑥: 고른 트리의 최근 순간 줄. 순간이 없으면 빈 줄을 만들지 않는다.

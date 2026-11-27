@@ -233,9 +233,9 @@ html[data-lt-theme=garden] .account-popover{background:var(--lt-glass-strong);bo
 html[data-lt-theme=garden] .account-menu-count{background:var(--lt-rose-ink);color:var(--lt-paper)}
 /* 계정 메뉴 항목은 판 배경을 그대로 비운다(.header-actions button의 옅은 칸은 여기서 덮는다).
    옅은 칠은 올림·초점·눌림에서만 — 기본 상태의 항목 박스가 정원에서 особенно 도드라졌다(2026-11-17). */
-html[data-lt-theme=garden] .account-popover button{color:var(--lt-ink);background:transparent}
-html[data-lt-theme=garden] .account-popover button:hover,html[data-lt-theme=garden] .account-popover button:focus-visible,html[data-lt-theme=garden] .account-popover button:active{background:rgba(152,80,94,.08)}
-html[data-lt-theme=garden] .account-popover[data-lt-opened-by=mouse] button:focus-visible:not(:hover){background:transparent;outline:0;box-shadow:none}
+html[data-lt-theme=garden] .account-popover button,html[data-lt-theme=garden] .account-popover a[role=menuitem]{color:var(--lt-ink);background:transparent}
+html[data-lt-theme=garden] .account-popover button:hover,html[data-lt-theme=garden] .account-popover button:focus-visible,html[data-lt-theme=garden] .account-popover button:active,html[data-lt-theme=garden] .account-popover a[role=menuitem]:hover,html[data-lt-theme=garden] .account-popover a[role=menuitem]:focus-visible{background:rgba(152,80,94,.08)}
+html[data-lt-theme=garden] .account-popover[data-lt-opened-by=mouse] button:focus-visible:not(:hover),html[data-lt-theme=garden] .account-popover[data-lt-opened-by=mouse] a[role=menuitem]:focus-visible:not(:hover){background:transparent;outline:0;box-shadow:none}
 html[data-lt-theme=garden] .account-email{color:var(--lt-muted);border-bottom-color:var(--lt-line)}
 /* 공통 도움말 풍선은 각 테마의 배경·글자·테두리 토큰 쌍을 쓴다. */
 .lt-tip-bubble{position:fixed;z-index:80;max-width:min(320px,80vw);padding:6px 10px;border:1px solid var(--lt-gold-line);border-radius:10px;background:var(--lt-glass-strong);color:var(--lt-pearl);font-size:13px;line-height:1.45;pointer-events:none;box-shadow:0 6px 18px rgba(0,0,0,.35)}
@@ -382,15 +382,6 @@ html[data-v41-screen=shelf][data-lt-theme=garden] .reader-hint{background:rgba(2
 html[data-v41-screen=shelf][data-lt-theme=garden] .reader-control{background:rgba(255,253,248,.9);border-color:var(--lt-line-paper);color:var(--lt-ink)}
 html[data-v41-screen=shelf][data-lt-theme=garden] .reader-control:hover{background:var(--lt-paper)}
 html[data-v41-screen=shelf][data-lt-theme=garden] .page-counter{color:var(--lt-muted)}
-html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .modal{border-color:var(--lt-line);background:var(--lt-stage-2);color:var(--lt-pearl);box-shadow:0 34px 82px rgba(0,0,0,.6)}
-html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .modal>p{color:var(--lt-muted)}
-html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .modal h2{color:var(--lt-pearl)}
-html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .modal .eyebrow{color:var(--lt-gold)}
-html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .modal-close{color:var(--lt-muted);background:rgba(255,255,255,.07)}
-html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .new-book-form label{color:var(--lt-muted)}
-html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .new-book-form input{border-color:var(--lt-line);color:var(--lt-pearl);background:rgba(10,10,17,.7)}
-html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .open-video{border-color:var(--lt-primary);color:var(--lt-primary-ink);background:var(--lt-primary)}
-html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .open-video:hover{background:var(--lt-pearl)}
 html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .reader-control{border-color:var(--lt-line);color:var(--lt-pearl);background:rgba(0,0,0,.4)}
 html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .reader-control:hover{border-color:var(--lt-gold-line);background:rgba(255,230,166,.14)}
 html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .toast{color:var(--lt-pearl);background:var(--lt-glass-strong);border-color:var(--lt-line)}

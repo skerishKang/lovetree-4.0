@@ -560,7 +560,8 @@ test('#635 PR C 화면: 메뉴 시작 입구·첫날 표기·크게 보기 대�
           assert.equal(problems.length, 0, `책 ${width}·${theme}: 화면 오류 ${problems.join(' | ')}`);
           const bookBox = await frame.locator(width === 390 ? '.mobile-page' : '.book-wrap').first().boundingBox();
           assert.ok(bookBox, `${width}·${theme}: 책 자리를 못 읽었다`);
-          if (width === 390) {
+          // #1488(CTO 결정 #1452): 안쪽 책 화면은 폭과 상관없이 아래 링크 줄이 없다(계정 메뉴·☰ 메뉴로 옮김) — 1440도 390과 같이 숨김을 본다.
+          if (width === 390 || width === 1440) {
             const hidden = await page.evaluate(() => {
               const el = document.querySelector('.home-links');
               if (!el) return true;
@@ -875,7 +876,8 @@ test('방문자 공용 화면: 1440·390 책·보드·지도, 옛 공유 주소,
               assert.deepEqual(m.tabs,['트리','보드','책','지도'],width+' '+theme+' '+view+': 공유 탭 구성');
               assert.equal(m.browseVisible,true,'데스크톱 둘러보기 단추');
             } else {
-              assert.deepEqual(m.tabs,[{book:'\uCC45',board:'\uBCF4\uB4DC',network:'\uC9C0\uB3C4'}[view]],'모바일은 내 화면처럼 접기 메뉴에서 탭을 표시한다');
+              // #1488 7번(CTO 결정 #1452): 390 공개 감상의 보기 탭은 내 트리 390과 같은 규칙 — 머리줄에는 같은 탭 구성(없음), 탭은 접기 메뉴에서 고른다.
+              assert.deepEqual(m.tabs,ownerLayouts[390][view].tabs,'모바일 보기 탭은 내 트리 390과 같다');
               await visiting.page.locator('#mobile-more').click();
               const items=await visiting.page.locator('#header-overflow button').allTextContents();
               for(const name of ['트리','책','보드','지도','둘러보기'])assert.ok(items.includes(name),'모바일 메뉴 '+name);
