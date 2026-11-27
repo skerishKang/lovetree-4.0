@@ -11,7 +11,8 @@ import {homePresentation} from './home-presentation.js';
 import {readHomeTitleHint} from '../public/v41/home-title-state.mjs';
 import {applyHomeCenter} from './home-center.js';
 import {readTheme,writeTheme,appliedTheme,applyThemeAttribute} from '../public/v41/header-state.mjs';
-import {readTitleDisplay, titleDisplayOf, shouldReloadForTitleDisplay} from '../public/v41/book-usability.mjs';
+import {readTitleDisplay, titleDisplayOf, shouldReloadForTitleDisplay, formatDisplayDate} from '../public/v41/book-usability.mjs';
+import {localDateOnly} from '../public/v41/local-date.mjs';
 import {momentListEntries, momentListTrees, momentHeadTitle} from './moment-list.js';
 import {momentExternalView, momentConnections, treeChipView} from '../public/v41/moment-detail.mjs';
 import {youtubeIdFrom,isVerticalMoment} from '../public/v41/youtube-id.mjs';
@@ -72,6 +73,7 @@ const setHomePortrait=moment=>{const vertical=!!(moment&&isVerticalMoment(moment
 setHomePortrait(homeMomentChoice.moment);
 // 이 문서가 그려질 때 쓴 날짜 표기. 셸이 같은 값을 다시 보내면 새로고침하지 않는다(아래 메시지 처리).
 const renderedDateStyle=dateStyleOf(ltDateStyle());
+const viewerDate=moment=>formatDisplayDate(moment?.rawDate||moment?.date||(moment?.createdAt?localDateOnly(moment.createdAt):''),renderedDateStyle);
 // #481: 이 문서가 그릴 때 쓴 제목 보기. 받은 값이 이것과 다를 때만 다시 띄운다.
 const renderedTitleDisplay=titleDisplayOf(readTitleDisplay(parent.LT41));
  const homeHistory=createHomeHistory(document.getElementById('orbit'));
@@ -178,7 +180,7 @@ function paintHomeViewer(moment){
  const namedTitle=!isAutoTitle(moment.title)&&typeof moment.title==='string'?moment.title.trim():'';
  vEl('mediaTitleHome').textContent=namedTitle||savedTitle||(videoId?fallbackVideoTitle:'간직한 순간');
  if(videoId&&!savedTitle&&!namedTitle)fetchVideoMetadata(videoId).then(meta=>{if(sequence===viewerSequence&&viewer.classList.contains('open')&&meta?.title)vEl('mediaTitleHome').textContent=meta.title;}).catch(()=>{});
- vEl('mediaMetaHome').textContent=[moment.date||'',moment.emotion||''].filter(Boolean).join(' · ');
+ vEl('mediaMetaHome').textContent=[viewerDate(moment),moment.emotion||''].filter(Boolean).join(' · ');
  vEl('mediaKickerHome').textContent=`순간 · ${mediaKind(videoId,moment)}`;
  const body=vEl('mediaBodyHome');body.textContent=moment.note||'';body.hidden=!body.textContent;
  const why=vEl('mediaWhyHome');why.textContent=moment.whyNext||'';why.closest('.mediaWhy').hidden=!why.textContent;

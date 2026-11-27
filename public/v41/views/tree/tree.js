@@ -3,6 +3,8 @@ import { buildHierarchy, layoutTree, branchWidth, edgeWidths, branchRibbon, bran
 import { thumbnailCandidates, nextThumbnailStep } from '/v41/thumb-fallback.mjs';
 import { mountScreenToolbar } from '/v41/screen-toolbar.mjs';
 import { MSG, isShellMessage } from '/v41/frame-messages.mjs';
+import {formatDisplayDate} from '/v41/book-usability.mjs';
+import {localDateOnly} from '/v41/local-date.mjs';
 
 const scriptStart = performance.now();
 const SVG = 'http://www.w3.org/2000/svg';
@@ -73,7 +75,9 @@ const perf = { scriptStartMs: scriptStart, layoutMs: 0, drawMs: 0, firstBuildMs:
 
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 const svg = (tag, cls, attrs) => { const e = document.createElementNS(SVG, tag); if (cls) e.setAttribute('class', cls); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; };
-const shortDate = (d) => String(d || '').slice(2).replaceAll('-', '.');
+let dateStyle='dot';
+try{const value=document.documentElement.getAttribute('data-lt-date-style')||localStorage.getItem('lt41.dateStyle');dateStyle=value==='dash'||value==='long'?value:'dot'}catch{}
+const dateText = (m) => formatDisplayDate(m.date||(m.createdAt?localDateOnly(m.createdAt):''),dateStyle);
 
 function sizeOf(item) {
   const s = state.sizes;
@@ -120,11 +124,11 @@ function drawCards(layout) {
       const cap = el('span', 'ts-cap');
       const meta = el('span', 'ts-meta');
       // 카드 폭에 늘 들어가도록 감정은 색 점으로만, 낱말은 고른 순간 안내와 풍선말·읽어 주는 이름에 둔다.
-      meta.append(el('i', 'ts-emo'), document.createTextNode(shortDate(m.date)));
-      node.title = `${m.date} · ${m.emotion} · ${m.title || '제목 없음'}`;
+      meta.append(el('i', 'ts-emo'), document.createTextNode(dateText(m)));
+      node.title = `${dateText(m)} · ${m.emotion} · ${m.title || '제목 없음'}`;
       cap.append(meta, el('span', 'ts-title', m.title || '제목 없음'));
       node.append(cap);
-      node.setAttribute('aria-label', `${c.root ? '첫 순간' : '뿌리에서 ' + (c.depth + 1) + '번째'} · ${m.date} · ${m.emotion} · ${m.title || '제목 없음'}`);
+      node.setAttribute('aria-label', `${c.root ? '첫 순간' : '뿌리에서 ' + (c.depth + 1) + '번째'} · ${dateText(m)} · ${m.emotion} · ${m.title || '제목 없음'}`);
     } else if (c.kind === 'bundle') {
       node = el('button', 'ts-chip', `+${c.count}개`);
       node.setAttribute('aria-label', `접힌 갈림 ${c.count}개 펼치기 (순간 ${c.size}개)`);
@@ -382,7 +386,7 @@ function openDetail(id){
  // #1333: 고른 순간을 셸의 현재 순간으로 넘긴다. #1295 기록 중복을 피하려고 '기록하지 않음'을 함께 보낸다.
  if(typeof data.select==='function')data.select(id,{noHistory:true});
  $('treeDetailTitle').textContent=m.title||'제목 없음';
- $('treeDetailNote').textContent=[m.date,m.emotion,m.memo].filter(Boolean).join(' · ');
+ $('treeDetailNote').textContent=[dateText(m),m.emotion,m.memo].filter(Boolean).join(' · ');
  const host=$('treeDetailMedia');host.replaceChildren();
  const src=thumbnailCandidates(m,{autoLoad:data.source==='server'})[0];
  if(src){const img=el('img');img.alt='';img.src=src;img.addEventListener('error',()=>img.remove(),{once:true});host.append(img);}
@@ -404,6 +408,16 @@ function load(){
  rememberTree();
 }
 new ResizeObserver(()=>{const before={...view};measure();if(!state.root||(before.w===view.w&&before.h===view.h))return;if((before.w<700)!==(view.w<700))draw();rehome();}).observe(stage);
-addEventListener('message',e=>{if(!isShellMessage(e))return;if(e.data.type===MSG.momentsSaved&&data.refresh()){titleSource.textContent=data.title;load();}});
+addEventListener('message',e=>{
+ if(!isShellMessage(e))return;
+ if(e.data.type===MSG.dateStyle){
+  dateStyle=e.data.value==='dash'||e.data.value==='long'?e.data.value:'dot';
+  try{document.documentElement.setAttribute('data-lt-date-style',dateStyle)}catch{}
+  if(state.root)draw();
+  if(detail.open&&state.pick)openDetail(state.pick);
+  return;
+ }
+ if(e.data.type===MSG.momentsSaved&&data.refresh()){titleSource.textContent=data.title;load();}
+});
 load();perf.firstBuildMs=perf.drawMs;requestAnimationFrame(()=>requestAnimationFrame(()=>{perf.firstPaintMs=performance.now();}));
 window.__LT_TREE_VIEW__={state,perf,fitAll,toRoot};

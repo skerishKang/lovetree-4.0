@@ -138,7 +138,7 @@ export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSel
  const mainOf=m=>titleOf(m).main||m.title||'';
  // #441 후속: 첫 화면 날짜도 책·보드·지도와 같은 계정 설정(dateStyle)을 따른다. 이 화면은 저장소를
  // 직접 읽지 않으므로(server-only-contract) 호출하는 쪽(v41/home.js)이 미리 읽어 넘긴다.
- const dateOf=m=>formatDisplayDate(m.date,dateStyle);
+ const dateOf=m=>formatDisplayDate(m.rawDate||m.date,dateStyle);
  const subMarkup=m=>{const sub=titleOf(m).sub;return sub?'<span class="videoTitle">▶ '+esc(sub)+'</span>':''};
  // 2026-11-08: 내 순간이 궤도 수보다 적으면 남는 자리만 예시로 채운다(흐린 카드).
  // 2026-11-10(#340): 내 기록 YouTube 썸네일 카드(youtubeThumb)는 사진 카드 모양에 재생 표시(.card.video .playGlyph)를 붙인다.
