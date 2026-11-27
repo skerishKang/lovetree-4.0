@@ -165,6 +165,7 @@ body.lt-bloom-glow .threadGlow{opacity:.82}
 /* #1249: 한 열로 배치하는 휴대폰에서는 카드 경계를 곧게 유지한다. */
 @media(max-width:699px){
   html[data-v41-screen=board] .card:not(.dragLift):not(.dropSettle):not(.landing){transform:none}
+  html[data-v41-screen=board] .surface{left:0;right:0}
   html[data-v41-screen=board] .card{width:160px;min-height:180px}
   html[data-v41-screen=board] .card.first{width:160px;min-height:180px}
   html[data-v41-screen=board] .card.isFeatured{width:264px;min-height:260px}

@@ -1,6 +1,8 @@
 // 시험 서버가 Chromium이 막는 포트에 뜨면 브라우저가 접속을 거부한다(#1420).
 // 금지 포트 목록은 Chromium 소스 net/base/port_util.cc 의 kRestrictedPorts 를 옮긴 것이다.
 // 출처: https://chromium.googlesource.com/chromium/src/+/main/net/base/port_util.cc
+const SESSION_PORT = Number(process.env.LT_SESSION_PORT || 0);
+
 export const CHROMIUM_RESTRICTED_PORTS = new Set([
   0, 1, 7, 9, 11, 13, 15, 17, 19, 20, 21, 22, 23, 25, 37, 42, 43, 53, 69,
   77, 79, 87, 95, 101, 102, 103, 104, 109, 110, 111, 113, 115, 117, 119, 123,
@@ -21,7 +23,7 @@ export const MAX_SAFE_PORT_TRIES = 24;
  * @returns {Promise<number>} 실제로 열린 포트
  */
 export function listenOnSafePort(server, host, options = {}) {
-  const port = options.port ?? 0;
+  const port = options.port ?? SESSION_PORT;
   const maxTries = options.maxTries ?? MAX_SAFE_PORT_TRIES;
   const open = callback => {
     if (host === undefined) server.listen(port, callback);

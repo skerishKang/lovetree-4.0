@@ -214,7 +214,7 @@ test('아래 ＋ 단추: 1440 폭에서는 보이지 않는다', async (t) => {
 // #977: 작업 공간에 형식이 어긋난 트리가 하나 섞여 있어도 셸은 읽을 수 있는 트리로 열린다.
 // 정식 생성기로 만든 트리 2개 + 손으로 적은 트리 1개(#977 재현 그대로)를 /api/workspace로만 물린다.
 const PIXEL = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64');
-const MALFORMED_TREE = { id: 't2', title: '다른 트리', moments: [] };
+const MALFORMED_TREE = { id: 't2', title: '다른 트리', moments: [{ id: 'bad-moment' }] };
 
 function guardTree(subject) {
   let tree = createTree({ subject, title: subject, note: '', emotion: '설렘', date: '2026-11-20', url: '' }, '2026-11-20T00:00:00Z');
