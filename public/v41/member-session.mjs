@@ -78,7 +78,7 @@ export function createMemberSession({api,onState=()=>{},onStatus=()=>{},onGuard=
    if(action==='quickAdd'||action==='moveMoment'||action==='treeFromMoments'||action==='organizeMoments'||action==='undoOrganize'){
      const result=action==='quickAdd'?quickAdd(document,input)
        :action==='moveMoment'?moveMoment(document,selection.treeId,selection.momentId,input.toTreeId,input.parentId)
-       :action==='organizeMoments'?organizeMoments(document,{mode:input.mode,fromTreeId:selection.treeId,momentIds:input.momentIds,toTreeIds:input.toTreeIds,skip:input.skip})
+       :action==='organizeMoments'?organizeMoments(document,{mode:input.mode,fromTreeId:selection.treeId,momentIds:input.momentIds,toTreeIds:input.toTreeIds,skip:input.skip,newTreeName:input.newTreeName})
        :action==='undoOrganize'?undoOrganize(document,input.record)
        :treeFromMoments(document,selection.treeId,input.momentIds,{subject:input.subject});
      document=validateState(result.state);

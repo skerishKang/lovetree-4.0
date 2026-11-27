@@ -1535,3 +1535,25 @@ body.home-screen .app-header .main-nav>button#community-menu{font-size:14px;lett
 body.home-screen .app-header .main-nav>button#community-menu:is(:hover,:focus-visible,[aria-current=true]){border-color:var(--lt-gold);color:var(--lt-gold)}
 body.home-screen .app-header .main-nav>button#community-menu[aria-current=true]{font-weight:600}
 @media(min-width:781px){body.home-screen .app-header .main-nav>button#community-menu{width:132px}}
+/* 새 정리 보기만 적용한다. */
+#cleanup-panel[data-cleanup-cards]{width:min(1120px,96vw);max-width:none}
+#cleanup-panel[data-cleanup-cards] .cleanup-scroll{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:12px 24px;align-content:start}
+#cleanup-panel[data-cleanup-cards] .cleanup-scroll>p{grid-column:1/-1}
+#cleanup-panel[data-cleanup-cards] #cleanup-create-box{grid-column:1/-1}
+#cleanup-panel[data-cleanup-cards] #cleanup-targets{grid-template-columns:repeat(2,minmax(0,1fr));max-height:46vh}
+#cleanup-panel[data-cleanup-cards] .cleanup-target{position:relative;min-height:104px;flex-wrap:wrap}
+#cleanup-panel[data-cleanup-cards] .cleanup-target>span{display:flex;align-items:center;gap:8px;flex:1}
+.cleanup-tree-cover{width:48px;height:64px;flex:none;display:grid;place-items:center;border:1px solid var(--lt-gold-line);border-radius:6px;background:var(--lt-glass)}
+.cleanup-tree-cover img{width:100%;height:100%;object-fit:cover;border-radius:6px}
+#cleanup-panel[data-cleanup-cards] .cleanup-card-action,#cleanup-new-card,#cleanup-back{min-height:44px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-card);padding:8px}
+#cleanup-panel[data-cleanup-cards] .cleanup-drop-hot{outline:2px solid var(--lt-gold);background:var(--lt-glass-strong)}
+.cleanup-local-notice{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px;border-top:1px solid var(--lt-gold-line)}
+.cleanup-local-notice button{min-height:44px}
+#cleanup-panel[data-cleanup-cards] [hidden],.cleanup-local-notice[hidden]{display:none}
+@media(max-width:700px),(pointer:coarse){
+#cleanup-panel[data-cleanup-cards] {width:100vw;height:100dvh;max-height:100dvh;border-radius:0}
+#cleanup-panel[data-cleanup-cards] .cleanup-scroll{display:block}
+#cleanup-panel[data-cleanup-cards] #cleanup-targets{grid-template-columns:1fr;max-height:none}
+#cleanup-panel[data-cleanup-cards] .cleanup-moments{max-height:none}
+#cleanup-panel[data-cleanup-cards][data-target-page]>.panel-heading{display:none}
+}
