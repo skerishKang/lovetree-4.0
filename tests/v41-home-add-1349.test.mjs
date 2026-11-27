@@ -89,7 +89,7 @@ async function serve1514(routes){
  for(let port=basePort;port<basePort+10;port++){
   try{return await serve(routes,{port})}catch(error){if(error?.code!=='EADDRINUSE')throw error}
  }
- throw new Error('4580~4589 포트가 모두 사용 중이다');
+ throw new Error(`${basePort}~${basePort+9} 포트가 모두 사용 중이다`);
 }
 
 function dateFixture(){
