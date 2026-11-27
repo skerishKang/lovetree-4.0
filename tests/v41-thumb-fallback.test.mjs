@@ -377,7 +377,7 @@ test('#429 "제목 달기" 클릭·키보드는 지정 순간 편집을 열고 �
   dispose();
 });
 
-test('#429 도메인 두 벌은 oEmbed ytimg 썸네일 주소만 저장하고 임의 외부 이미지 주소는 버린다', async () => {
+test('#429 도메인 두 벌은 공개 HTTPS 썸네일을 저장하고 비공개·위험 주소는 버린다', async () => {
   const now = '2026-11-12T00:00:00.000Z';
   for (const domain of [serverDomain, webDomain]) {
     const saved = domain.createTree({
@@ -398,16 +398,16 @@ test('#429 도메인 두 벌은 oEmbed ytimg 썸네일 주소만 저장하고 �
     const roundtrip = domain.validateState({ version: 1, trees: [saved] });
     assert.equal(roundtrip.trees[0].moments[0].mediaMetadata.thumbnail, 'https://i.ytimg.com/vi/9NXOCr-T8LU/oar2.jpg');
 
-    // ytimg가 아닌 외부 주소는 저장하지 않는다
-    const stripped = domain.createTree({
-      subject: '리센느',
-      url: 'https://www.youtube.com/watch?v=abc123DEF45',
-      mediaMetadata: {
-        title: '무대',
-        thumbnail: 'https://evil.example/steal.jpg',
-      },
-    }, now);
-    assert.equal('thumbnail' in stripped.moments[0].mediaMetadata, false);
+    // 공개 HTTPS 외부 이미지는 저장하고, 비공개·위험 주소는 저장하지 않는다
+    const external='https://images.example.com/articles/og.jpg';
+    const kept=domain.createTree({
+      subject:'리센느',url:'https://example.com/article',mediaMetadata:{title:'기사',thumbnail:external},
+    },now);
+    assert.equal(kept.moments[0].mediaMetadata.thumbnail,external);
+    const stripped=domain.createTree({
+      subject:'리센느',url:'https://example.com/article',mediaMetadata:{title:'기사',thumbnail:'http://images.example.com/og.jpg'},
+    },now);
+    assert.equal('thumbnail' in stripped.moments[0].mediaMetadata,false);
   }
 
   const meta = await fetchVideoMetadata('9NXOCr-T8LU', async () => ({

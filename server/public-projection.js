@@ -1,4 +1,4 @@
-import { safeYoutubeThumb } from '../public/v41/youtube-id.mjs';
+import { safePublicThumbnail } from '../public/v41/public-thumbnail.mjs';
 
 export const PUBLIC_REACTION_KINDS = Object.freeze(['heart', 'like', 'love', 'laugh', 'wow', 'sad', 'angry']);
 export const PUBLIC_TREE_FIELDS = Object.freeze(['id', 'subject', 'title', 'openView', 'coverMomentId', 'coverDesign', 'coverMode', 'createdAt', 'updatedAt', 'moments']);
@@ -21,7 +21,7 @@ function publicMediaMetadata(metadata, url) {
   if (!isPrivateMediaUrl(url)) {
     try { out.source = new URL(url).hostname; } catch { out.source = text(metadata.source); }
   }
-  const thumbnail = safeYoutubeThumb(metadata.thumbnail);
+  const thumbnail = safePublicThumbnail(metadata.thumbnail);
   if (thumbnail) out.thumbnail = thumbnail;
   if (typeof metadata.vertical === 'boolean') out.vertical = metadata.vertical;
   for (const key of ['width', 'height']) {

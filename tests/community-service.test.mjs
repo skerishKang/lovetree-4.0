@@ -16,9 +16,10 @@ const PRODUCT='lovetree-test',principal=subjectId=>({productId:PRODUCT,subjectId
 const CLOCK='2026-11-01T00:00:00.000Z';
 const PHOTO='https://front.test/api/media/123e4567-e89b-42d3-a456-426614174000.jpg';
 function sampleTree(url=PHOTO){return createTree({subject:'윤슬',title:'첫 무대',note:'다시 보고 싶은 빛',emotion:'설렘',date:'2026-11-01',url},CLOCK);}
-async function setup({url=PHOTO,coverMode='',coverDesign='',admin=null,signupAtFor=null}={}){
+async function setup({url=PHOTO,coverMode='',coverDesign='',mediaMetadata=null,admin=null,signupAtFor=null}={}){
  const workspaceRepo=createMemoryWorkspaceRepo(),workspace=createWorkspaceService({repo:workspaceRepo,productId:PRODUCT});
  let tree=sampleTree(url);
+ if(mediaMetadata)tree={...tree,moments:tree.moments.map((moment,index)=>index===0?{...moment,mediaMetadata}:moment)};
  if(coverMode)tree=editTree(tree,{title:tree.title,subject:tree.subject,coverMomentId:tree.moments[0].id,coverDesign,coverMode});
  await workspace.write(principal('alice'),{state:{version:1,trees:[tree]},expectedRevision:0,clientKey:'seed'});
  const shareRepo=createMemoryShareRepo();let share=await shareRepo.create({productId:PRODUCT,shareId:'s'.repeat(24),subjectId:'alice',treeId:tree.id,entryMomentId:tree.moments[0].id,view:'book',momentCount:3});
@@ -126,6 +127,16 @@ test('browse cover sends an address only for moment mode — photo/design/basic 
  assert.equal((await call(photoDesign.handle,'GET','/api/community/shares')).body.items[0].cover.url,'','사진 표지는 공개에서 디자인이 되고 주소가 없다');
  const photoBasic=await setup({coverMode:'photo'});
  assert.equal((await call(photoBasic.handle,'GET','/api/community/shares')).body.items[0].cover.url,'','사진 표지 + 디자인 없음은 기본 색 표지');
+});
+
+test('비YouTube 링크 표지는 공개 HTTPS 썸네일을 쓰고 위험 썸네일은 링크 주소로 대체한다',async()=>{
+ const external='https://images.example.com/articles/og.jpg';
+ const linked=await setup({url:'https://example.com/article',coverMode:'moment',mediaMetadata:{title:'기사 제목',channel:'기사 채널',thumbnail:external}});
+ const card=(await call(linked.handle,'GET','/api/community/shares')).body.items[0];
+ assert.equal(card.cover.thumbnailUrl,external);
+ const blocked=await setup({url:'https://example.com/article',coverMode:'moment',mediaMetadata:{title:'기사 제목',thumbnail:'javascript:alert(1)'}});
+ const blockedCard=(await call(blocked.handle,'GET','/api/community/shares')).body.items[0];
+ assert.equal(blockedCard.cover.thumbnailUrl,'https://example.com/article');
 });
 
 test('#611 3번: AI 테스터 기록은 둘러보기 카드에 aiTester 한 비트만 내린다',async()=>{
@@ -570,6 +581,14 @@ test('tag-moments: 소개가 꺼진 트리의 순간은 나오지 않는다(2026
  await data.discoverRepo.set({productId:PRODUCT,subjectId:'s2',treeId:data.shareRows.find(r=>r.subjectId==='s2').treeId,discover:true});
  const after=await tagCall(data.handle,'노래:Super Shy');
  assert.deepEqual(after.body.items.map(item=>item.title),['켠 트리 순간','끈 트리 순간'],'켜면 다른 팬 보기에 나온다');
+});
+
+test('tag-moments: 비YouTube 링크의 공개 HTTPS 썸네일을 유지한다',async()=>{
+ const external='https://images.example.com/articles/og.jpg';
+ const data=await tagSetup({accounts:[{subject:'link-owner',trees:[{title:'기사 트리',moments:[{title:'기사 순간',date:'2026-11-05',url:'https://example.com/article',keywords:['무대:링크'],mediaMetadata:{thumbnail:external}}]}]}]});
+ const response=await tagCall(data.handle,'무대:링크');
+ assert.equal(response.status,200);
+ assert.equal(response.body.items[0].thumbnail,external);
 });
 
 test('tag-moments: 응답은 제목·영상 주소·썸네일·무대 날짜·트리 이름·공유 링크·aiTester뿐 — 개인정보 필드가 없다',async()=>{

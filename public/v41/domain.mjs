@@ -2,6 +2,7 @@
 import { localDateOnly } from './local-date.mjs';
 import { isAutoTitle, autoTitleFor } from './auto-title.mjs';
 import { DEFAULT_TREE_OPEN_VIEW, normalizeTreeOpenView } from './tree-open-view.mjs';
+import { safePublicThumbnail } from './public-thumbnail.mjs';
 
 // #792: 순간 구간의 순수 계산(서버 사본 src/moment-range.js와 같은 규칙 — tests/moment-range-792.test.mjs가 대조).
 export const MAX_RANGE_SECONDS = 12 * 60 * 60;
@@ -286,18 +287,6 @@ function optionalText(value, name, max) {
   if (typeof value !== 'string' || value.length > max) throw new Error(`${name}을(를) 1~${max}자로 적어 주세요.`);
   return value.trim();
 }
-function safeMediaThumbnail(value) {
-  if (value === undefined || value === null || value === '') return '';
-  if (typeof value !== 'string' || value.length > 2048) return '';
-  const trimmed = value.trim();
-  if (!trimmed) return '';
-  try {
-    const parsed = new URL(trimmed);
-    return parsed.protocol === 'https:' && !parsed.username && !parsed.password && /(?:^|\.)ytimg\.com$/i.test(parsed.hostname) ? parsed.href : '';
-  } catch {
-    return '';
-  }
-}
 // #1038: 세로 판정값(선택) — 없는 값은 '모름'으로 두고, 있으면 형식만 엄격히 지킨다.
 // src/domain.js와 같은 규칙이다(서버·화면 왕복에서 값이 지워지지 않게).
 function normalizeVerticalMedia(value) {
@@ -319,7 +308,7 @@ function normalizeMediaMetadata(value, url) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('미디어 정보를 확인해 주세요.');
   const title = optionalText(value.title, '미디어 제목', 240);
   const channel = optionalText(value.channel, '미디어 채널', 160);
-  const thumbnail = safeMediaThumbnail(value.thumbnail);
+  const thumbnail = safePublicThumbnail(value.thumbnail);
   const vertical = normalizeVerticalMedia(value);
   if (!title && !channel && !thumbnail && !Object.keys(vertical).length) return null;
   const source = url ? new URL(url).hostname : '';

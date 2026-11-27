@@ -1,5 +1,6 @@
 import { validateRange, rangeFields, fillStartFromUrl } from './moment-range.js';
 import { DEFAULT_TREE_OPEN_VIEW, normalizeTreeOpenView } from '../public/v41/tree-open-view.mjs';
+import { safePublicThumbnail } from '../public/v41/public-thumbnail.mjs';
 export const EMOTIONS = ['설렘', '위로', '벅참', '그리움', '고마움', '즐거움'];
 // #256-3: 책(트리)마다 고르는 디자인 표지. 테마 표지 색(--lt-cover-N) 위의 질감 변형 6종.
 // 값은 이 목록뿐이다. 모르는 값·타입은 저장 거부가 아니라 ''(기본 표지)로 되돌린다.
@@ -142,18 +143,6 @@ function optionalText(value, name, max) {
   if (typeof value !== 'string' || value.length > max) throw new Error(`${name}을(를) 1~${max}자로 적어 주세요.`);
   return value.trim();
 }
-function safeMediaThumbnail(value) {
-  if (value === undefined || value === null || value === '') return '';
-  if (typeof value !== 'string' || value.length > 2048) return '';
-  const trimmed = value.trim();
-  if (!trimmed) return '';
-  try {
-    const parsed = new URL(trimmed);
-    return parsed.protocol === 'https:' && !parsed.username && !parsed.password && /(?:^|\.)ytimg\.com$/i.test(parsed.hostname) ? parsed.href : '';
-  } catch {
-    return '';
-  }
-}
 // #1038: 세로 판정값(선택) — 없는 값은 '모름'으로 두고, 있으면 형식만 엄격히 지킨다.
 // 문자열·음수·Infinity·NaN은 저장하지 않고 거부한다(새 필드가 생겨도 옛 문서는 그대로 읽힌다 → 이전 불필요).
 function normalizeVerticalMedia(value) {
@@ -175,7 +164,7 @@ function normalizeMediaMetadata(value, url) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('미디어 정보를 확인해 주세요.');
   const title = optionalText(value.title, '미디어 제목', 240);
   const channel = optionalText(value.channel, '미디어 채널', 160);
-  const thumbnail = safeMediaThumbnail(value.thumbnail);
+  const thumbnail = safePublicThumbnail(value.thumbnail);
   const vertical = normalizeVerticalMedia(value);
   if (!title && !channel && !thumbnail && !Object.keys(vertical).length) return null;
   const source = url ? new URL(url).hostname : '';

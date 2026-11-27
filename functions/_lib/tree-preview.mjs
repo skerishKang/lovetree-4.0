@@ -6,7 +6,7 @@
  *   HTML 을 돌려준다. 봇 판정을 놓친 브라우저를 위해 HTML 안에 스크립트 넘기기를 한 겹 더 둔다.
  * - 카드 내용은 서버의 공개 공유 읽기(GET /api/public/shares/:id)에서 온다:
  *   제목 = 트리 제목, 설명 = '순간 N개 · 좋아하는 대상' + 첫 순간 제목 한 줄,
- *   그림 = 첫 순간이 YouTube 면 i.ytimg.com hqdefault, 아니면 기본 카드 그림.
+ *   그림 = 저장된 공개 썸네일, 첫 순간이 YouTube 면 i.ytimg.com hqdefault, 아니면 기본 카드 그림.
  * - 계정 이름·아이디·이메일·내부 id(트리·순간 id)는 HTML 어디에도 쓰지 않는다.
  *   직접 올린 사진(/api/media/)은 카드 그림으로 쓰지 않는다(#427 전까지).
  * - 취소·삭제·없는 공유는 '공유가 취소되었어요' 기본 카드(noindex)이고, 사람은 첫 화면으로 보낸다.
@@ -14,7 +14,8 @@
  */
 import { jsonError, upstreamOrigin, proxyProofHeaders } from './proxy.js';
 // #1060: 썸네일 주소 글자는 화면과 같은 정본(youtube-id.mjs) 한 벌에서만 만든다.
-import { safeYoutubeThumb, youtubeIdFrom, youtubeStageThumbUrl } from '../../public/v41/youtube-id.mjs';
+import { youtubeIdFrom, youtubeStageThumbUrl } from '../../public/v41/youtube-id.mjs';
+import { safePublicThumbnail } from '../../public/v41/public-thumbnail.mjs';
 import {
   CARD_IMAGE_URL, PRODUCTION_HOST, SEARCH_OPEN, SHARE_ID, SITE_TAGLINE, SITE_TITLE,
   appHomeUrl, appShareUrl, escapeHtml, isBotUserAgent, isProductionHost, oneLine
@@ -31,13 +32,13 @@ const youtubeVideoId = youtubeIdFrom;
 export { youtubeVideoId };
 
 // 저장 썸네일 검사·단계 주소 모두 정본(youtube-id.mjs)을 부른다(#1060).
-// https + ytimg.com 만 받는 규칙도 정본의 safeYoutubeThumb 한 벌이다(임의 외부 호스트·사내 주소 차단).
+// 공개 썸네일은 HTTPS 외부 이미지를 허용하고 비공개 업로드·위험 주소만 거른다.
 
 // 카드 그림: 저장 썸네일 → 첫 순간 링크의 YouTube hqdefault → 기본 카드 그림.
-// /api/media/ 사진은 어떤 경로로도 나가지 않게 애초에 ytimg 주소만 허용한다.
+// /api/media/ 사진은 어떤 경로로도 나가지 않게 safePublicThumbnail에서 막는다.
 export function cardImageFor(moment) {
   if (!moment) return '';
-  const saved = safeYoutubeThumb(moment.mediaMetadata?.thumbnail);
+  const saved = safePublicThumbnail(moment.mediaMetadata?.thumbnail);
   if (saved) return saved;
   const id = youtubeVideoId(moment.url);
   return id ? youtubeStageThumbUrl(id, 'hqdefault') : '';

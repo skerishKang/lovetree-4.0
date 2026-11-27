@@ -2,8 +2,9 @@ import { logServerError } from './error-log.js';
 import { createHash, randomBytes } from 'node:crypto';
 import { coverModeOf, normalizeCoverDesign } from '../src/domain.js';
 import { normalizeTreeOpenView } from '../public/v41/tree-open-view.mjs';
+import { safePublicThumbnail } from '../public/v41/public-thumbnail.mjs';
 import { isPrivateMediaUrl, projectPublicStats, projectPublicTree } from './public-projection.js';
-import { safeYoutubeThumb, youtubeIdFrom, youtubeStageThumbUrl } from '../public/v41/youtube-id.mjs';
+import { youtubeIdFrom, youtubeStageThumbUrl } from '../public/v41/youtube-id.mjs';
 import { ApiError } from './errors.js';
 import { readStoredDocument } from './workspace-service.js';
 import { refreshStageIndex } from './stage-index-refresh.js';
@@ -67,7 +68,7 @@ function shelfCover(tree) {
     title: cover.title,
     url: cover.url,
     type: videoId ? 'youtube' : cover.url ? 'link' : '',
-    thumbnailUrl: safeYoutubeThumb(cover.mediaMetadata?.thumbnail) || (videoId ? youtubeStageThumbUrl(videoId, 'mqdefault') : '')
+    thumbnailUrl: safePublicThumbnail(cover.mediaMetadata?.thumbnail) || (videoId ? youtubeStageThumbUrl(videoId, 'mqdefault') : '')
   };
 }
 function shelfItem(tree, shareId) {

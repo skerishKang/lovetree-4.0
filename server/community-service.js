@@ -11,7 +11,8 @@ import {ROLE_TESTER,ROLE_UNKNOWN,isAiTesterRole,aiTesterFor} from './admin-roles
 import {coverModeOf} from '../src/domain.js';
 // 꼬리표 판정은 화면과 같은 한 벌 — 서버에 규칙을 복사하지 않는다(#627 3단계 '다른 팬 보기').
 import {parseTag, tagKey, isChannelLikeArtist} from '../public/v41/tags.mjs';
-import {isVerticalMoment,safeYoutubeThumb,youtubeIdFrom,youtubeStageThumbUrl} from '../public/v41/youtube-id.mjs';
+import {isVerticalMoment,youtubeIdFrom,youtubeStageThumbUrl} from '../public/v41/youtube-id.mjs';
+import {safePublicThumbnail} from '../public/v41/public-thumbnail.mjs';
 
 export const REACTION_KINDS=PUBLIC_REACTION_KINDS;
 const isReactionKind=value=>typeof value==='string'&&REACTION_KINDS.includes(value);
@@ -34,7 +35,7 @@ function feedMomentItem(moment,tree,shareId,aiTester,videoId){
   treeTitle:tree.title,
   title:moment.title,
   url:moment.url||'',
-  thumbnail:safeYoutubeThumb(moment.mediaMetadata?.thumbnail||'')||(videoId?youtubeStageThumbUrl(videoId,'oardefault'):'')||'',
+  thumbnail:safePublicThumbnail(moment.mediaMetadata?.thumbnail||'')||(videoId?youtubeStageThumbUrl(videoId,'oardefault'):'')||'',
   note:moment.note||'',
   emotion:moment.emotion||'',
   date:moment.date||'',
@@ -148,15 +149,15 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
   const coverIsMoment=coverModeOf(tree)==='moment';
   const coverUrl=coverIsMoment?(cover?.url||''):'';
   const vertical=['video','youtube'].includes(coverType)&&isVerticalMoment(cover);
-  const safeCoverThumbnail=safeYoutubeThumb(cover?.mediaMetadata?.thumbnail);
+  const safeCoverThumbnail=safePublicThumbnail(cover?.mediaMetadata?.thumbnail);
   const thumbnailId=youtubeId||youtubeIdFrom(safeCoverThumbnail);
   const youtubeThumbnail=youtubeStageThumbUrl(thumbnailId,'mqdefault')||safeCoverThumbnail;
   // #887: 표지 후보 사슬 — 명시 표지(모드 moment) → 사진 표지(같은 자리) → 첫 YouTube 순간 썸네일(mqdefault) → 글자 칸.
   // 기본·디자인 표지 트리도 썸네일을 비워 보내면 카드가 글자 칸만 남는다(운영 7카드 전부 해당 — 261118 확인).
-  // 사진 주소는 #425 규칙 그대로 모드가 'moment'일 때만 내보내고, 없는 트리는 공개 YouTube 썸네일
-  // (i.ytimg.com mqdefault)로만 채운다 — 개인 미디어 주소는 흘리지 않는다.
+  // 사진 주소는 #425 규칙 그대로 모드가 'moment'일 때만 내보내고, 공개 HTTPS 썸네일이 있으면 비YouTube 링크도 그 그림을 쓴다.
+  // 비공개 업로드·위험 주소는 safePublicThumbnail이 거른다.
   let thumbnailUrl=coverIsMoment
-   ? coverType==='youtube'?youtubeThumbnail:coverUrl
+   ? coverType==='youtube'?youtubeThumbnail:(safeCoverThumbnail||coverUrl)
    : '';
   let cardCoverType=coverType,cardVertical=vertical;
   if(!thumbnailUrl){
@@ -337,7 +338,7 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
       treeTitle:tree.title,
       title:moment.title,
       url:moment.url||'',
-      thumbnail:safeYoutubeThumb(moment.mediaMetadata?.thumbnail||'')||'',
+      thumbnail:safePublicThumbnail(moment.mediaMetadata?.thumbnail||'')||'',
       date:moment.date||'',
       aiTester
      });

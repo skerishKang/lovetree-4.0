@@ -6,8 +6,9 @@ import {createMemoryWorkspaceRepo} from '../server/testing/memory-workspace-repo
 import {createMemoryShareRepo} from '../server/testing/memory-share-repo.js';
 import {createMemoryTreeDiscoverRepo} from '../server/testing/memory-tree-discover-repo.js';
 import {createMemoryCommunityRepo} from '../server/testing/memory-community-repo.js';
-import {createShareHandler,createShareService,projectSharedTreeFromScan} from '../server/share-service.js';
+import {createShareHandler,createShareService,projectSharedTree,projectSharedTreeFromScan} from '../server/share-service.js';
 import {PUBLIC_TREE_FIELDS,PUBLIC_MOMENT_FIELDS,PUBLIC_MEDIA_FIELDS} from '../server/public-projection.js';
+import {safePublicThumbnail} from '../public/v41/public-thumbnail.mjs';
 
 const PRODUCT='lovetree-test',CLOCK='2026-11-01T00:00:00.000Z';
 const principal=subjectId=>({productId:PRODUCT,subjectId});
@@ -75,6 +76,17 @@ test('공개 투영은 허용 목록 밖 필드를 버리고 내부 트리 id를
  for(const value of ['owner@example.test','owner-subject','owner-tree','future-tree-value','copied-source','future-moment-value','future-link','future-keyword','future-media-value','/api/media/'])assert.equal(body.includes(value),false,value);
  assert.equal(source.email,'owner@example.test','주인 저장 사본은 바뀌지 않는다');
  assert.equal(moment.copiedFrom,'copied-source','원본 복사 출처도 저장 사본에 남는다');
+});
+
+test('공개 썸네일은 HTTPS 외부 이미지를 유지하고 비공개·위험 주소를 거른다',()=>{
+ const external='https://images.example.com/articles/og.jpg?size=large';
+ for(const value of [external,'https://i.ytimg.com/vi/abc123DEF45/hqdefault.jpg'])assert.equal(safePublicThumbnail(value),value);
+ for(const value of ['/api/media/private.png','https://front.test/api/media/private.png','http://images.example.com/og.jpg','data:image/png;base64,AAAA','javascript:alert(1)','ftp://images.example.com/og.jpg','https://user:pass@images.example.com/og.jpg'])assert.equal(safePublicThumbnail(value),'',value);
+ const tree=createTree({subject:'시험 대상',title:'기사 링크',note:'비YouTube 링크',emotion:'설렘',date:'2026-11-27',url:'https://example.com/article',mediaMetadata:{title:'기사 제목',channel:'기사 채널',thumbnail:external}},CLOCK);
+ const projected=projectSharedTree({version:1,trees:[tree]},tree.id);
+ assert.equal(projected.tree.moments[0].mediaMetadata.thumbnail,external,'실제 저장·공개 투영 경로에서 외부 HTTPS 썸네일이 남는다');
+ const blocked=createTree({subject:'시험 대상',title:'위험 링크',note:'위험 썸네일',emotion:'설렘',date:'2026-11-27',url:'https://example.com/article',mediaMetadata:{title:'기사 제목',thumbnail:'http://images.example.com/og.jpg'}},CLOCK);
+ assert.equal(blocked.moments[0].mediaMetadata.thumbnail,undefined,'저장 정규화에서도 평문 썸네일은 빠진다');
 });
 
 test('#611 3번: 공개 공유 읽기에는 aiTester 한 비트만 내린다(계정·이메일·subject는 넣지 않는다)',async()=>{
