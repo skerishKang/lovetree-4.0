@@ -298,6 +298,7 @@ html[data-v41-screen=network][data-lt-board-theme=night] body .controls h3{color
 html[data-v41-screen=network] body .controls .mini,
 html[data-lt-theme=garden][data-v41-screen=network] body .controls .mini,
 html[data-v41-screen=network][data-lt-board-theme=night] body .controls .mini{background:transparent;border:0;color:#ddcfe4;box-shadow:none}
+@media(min-width:641px){html[data-v41-screen=network] .lt-toolbar-tools{overflow:visible}.view-switch{overflow:visible}.view-switch .pill{position:relative}.view-switch .pill::after{content:"";position:absolute;inset:-4px 0;border-radius:inherit}.view-switch .pill:hover,.view-switch .pill:focus-within{z-index:1}}
 html[data-v41-screen=network] body .controls .mini:hover,
 html[data-v41-screen=network] body .controls .mini:focus-visible,
 html[data-lt-theme=garden][data-v41-screen=network] body .controls .mini:hover,

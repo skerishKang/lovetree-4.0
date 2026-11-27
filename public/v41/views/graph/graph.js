@@ -1,4 +1,6 @@
-import { MSG } from '../../frame-messages.mjs';
+import { MSG, isShellMessage } from '../../frame-messages.mjs';
+import {formatDisplayDate} from '../../book-usability.mjs';
+import {localDateOnly} from '../../local-date.mjs';
 // 그래프 보기(#627 2단계 PR3) — 실제 트리(셸이 iframe에 넘기는 LT41.tree)를 graph-model.mjs 한 벌로
 // 묶음 원형(결정론)으로 그린다. 설계: docs/GRAPH_VIEW_20261115.md §2·§4(시안 v2를 실제 데이터로 옮긴 것).
 // - 허브(노래·멤버·무대·가수)가 큰 점, 순간은 고리 위 썸네일 동그라미(시간 순서 시계 방향).
@@ -25,6 +27,15 @@ const svg = document.getElementById('gsvg');
 
 // 테마도 본 사이트와 같은 한 벌(저장 키 lt41.theme) — 셸이 속성을 넘겨 주기 전에 스스로 적용한다(호스트로 열 때도).
 applyThemeAttribute(document.documentElement, readTheme(localStorage));
+let dateStyle='dot';
+try{const value=document.documentElement.getAttribute('data-lt-date-style')||localStorage.getItem('lt41.dateStyle');dateStyle=value==='dash'||value==='long'?value:'dot'}catch{}
+
+addEventListener('message',e=>{
+ if(!isShellMessage(e)||e.data.type!==MSG.dateStyle)return;
+ dateStyle=e.data.value==='dash'||e.data.value==='long'?e.data.value:'dot';
+ try{document.documentElement.setAttribute('data-lt-date-style',dateStyle)}catch{}
+ refresh();
+});
 
 const ctx = parent.LT41 || {};
 const tree = ctx.tree || {};
@@ -45,8 +56,9 @@ const thumbOf = (m) => {
   const demoImg = ctx.exampleMedia?.[m?.id]?.image;
   return demoImg || '';
 };
-const dayOf = (m) => String(MOMENT_OF.get(m?.id)?.date || '');
-const byTime = (a, b) => dayOf(b).localeCompare(dayOf(a)) || String(b.id).localeCompare(String(a.id));
+const rawDateOf = (m) => String(MOMENT_OF.get(m?.id)?.date || (MOMENT_OF.get(m?.id)?.createdAt ? localDateOnly(MOMENT_OF.get(m?.id).createdAt) : '') || '');
+const dayOf = (m) => formatDisplayDate(rawDateOf(m),dateStyle);
+const byTime = (a, b) => rawDateOf(b).localeCompare(rawDateOf(a)) || String(b.id).localeCompare(String(a.id));
 const momentById = (id) => GRAPH.moments.find((m) => m.id === id) || null;
 const hubById = (key) => GRAPH.hubs.find((h) => h.id === key) || null;
 const titleOf = (m) => String(MOMENT_OF.get(m?.id)?.title || MOMENT_OF.get(m?.id)?.subject || m?.id || '');
