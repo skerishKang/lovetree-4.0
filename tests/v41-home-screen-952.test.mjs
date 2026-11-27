@@ -1674,7 +1674,7 @@ test('#1473 ?? ?? ??? ?? 0', {skip: REQUIRE952 ? false : skip952, timeout:240000
  const h=await boot952(browser,{width,height,member,initStorage:{'lt41.theme':theme},port:4560});
  try{
  await h.frame.waitForFunction(()=>globalThis.__LT_ORBIT_TEST__?.canvasSettled());
- await h.page.evaluate(()=>{const c=document.getElementById('updates-card');c.hidden=false;document.getElementById('updates-card-text').textContent='Notice';});
+ await h.page.evaluate(()=>{const c=document.getElementById('updates-card');c.hidden=false;document.getElementById('updates-card-text').textContent='\uB7EC\uBE0C\uD2B8\uB9AC\uAC00 \uC0C8\uB85C\uC6CC\uC84C\uC5B4\uC694';});
  await h.page.waitForTimeout(60);
  const m=await h.page.evaluate(()=>{
  const r=e=>{if(!e)return null;const x=e.getBoundingClientRect();if(!x.width||!x.height||e.hidden||getComputedStyle(e).display==='none')return null;return {l:x.left,t:x.top,r:x.right,b:x.bottom,w:x.width,h:x.height}};
