@@ -4,7 +4,7 @@ import {createAccountRepo} from '../server/db/account-postgres.js';
 import {subjectHash} from '../server/account-service.js';
 import {createTree,addMoment} from '../src/domain.js';
 import {createShareRepo} from '../server/db/shares-postgres.js';
-import {createShareService} from '../server/share-service.js';
+import {createShareService,createShareHandler} from '../server/share-service.js';
 import {createShareShowPendingRepo} from '../server/db/share-show-pending-postgres.js';
 import {createStageIndexRepo} from '../server/db/stage-index-postgres.js';
 import {createStageVoteRepo} from '../server/db/stage-votes-postgres.js';
@@ -725,6 +725,44 @@ test('같은 tree_id를 가진 두 계정은 둘 다 소개되고 한쪽 숨김�
     await pool.query('DELETE FROM lovetree_community_hidden_shares WHERE product_id=$1', [productId]);
     assert.deepEqual(subjectsOf(await repo.listDiscoverableSummaries({ productId, limit: 10 })), ['owner-a', 'owner-b']);
   } finally {
+    await pool.end();
+  }
+});
+
+test('#1544 Postgres에서도 숨긴 공유 직접 읽기는 없는 공유와 같은 404다', { skip }, async () => {
+  assertIsolatedTestDatabase(DATABASE_URL);
+  const pool = await createPool(DATABASE_URL, { max: 4 });
+  const productId = 'lt-' + suffix();
+  try {
+    await applySchema(pool);
+    const { shareId, tree } = await publishStageTestTree(pool, productId, 'owner', [{ url: stageTestUrl }]);
+    const repo = createCommunityRepo(pool);
+    const service = createShareService({
+      shareRepo: createShareRepo(pool),
+      workspaceRepo: createWorkspaceRepo(pool),
+      communityRepo: repo,
+      productId
+    });
+    const handle = createShareHandler({
+      authenticate: async () => ({ productId, subjectId: 'owner' }),
+      service,
+      productId
+    });
+    const read = (id) => handle({ method: 'GET', path: '/api/public/shares/' + id, headers: {}, body: '' });
+    const missing = await read('m'.repeat(24));
+    assert.equal(missing.status, 404);
+    assert.equal((await read(shareId)).status, 200);
+    assert.equal(await repo.isHiddenShare({ productId, shareId, subjectId: 'owner', treeId: tree.id }), false);
+    await pool.query('INSERT INTO lovetree_community_hidden_shares(product_id,share_id,hidden_by) VALUES($1,$2,$3)', [productId, shareId, 'moderator']);
+    assert.equal(await repo.isHiddenShare({ productId, shareId, subjectId: 'owner', treeId: tree.id }), true);
+    const hidden = await read(shareId);
+    assert.equal(hidden.status, 404);
+    assert.deepEqual(hidden.body, missing.body, '응답 본문이 없는 공유와 같다');
+    assert.deepEqual(hidden.headers, missing.headers, '응답 머리말이 없는 공유와 같다');
+    await pool.query('DELETE FROM lovetree_community_hidden_shares WHERE product_id=$1 AND share_id=$2', [productId, shareId]);
+    assert.equal((await read(shareId)).status, 200, '숨김을 풀면 200');
+  } finally {
+    await pool.query('DELETE FROM lovetree_community_hidden_shares WHERE product_id=$1', [productId]);
     await pool.end();
   }
 });

@@ -178,7 +178,22 @@ export function createCommunityRepo(pool, { hasRealCustomers = false } = {}){
    );
    return rows.map(shareRow);
   },
-  async stats({productId,shareId,viewerSubjectId=null}){
+  // #1544: 운영 숨김 판정 — 둘러보기·무대와 같은 (제품, 주인, 트리) 기준이다.
+  // 주어진 주소가 직접 숨겨졌거나, 같은 트리의 다른 주소가 숨겨졌으면 숨김이다.
+  async isHiddenShare({productId,shareId,subjectId,treeId}){
+   const {rows}=await pool.query(
+    `SELECT 1 FROM lovetree_community_hidden_shares h
+     WHERE h.product_id=$1 AND (
+       h.share_id=$2 OR EXISTS (
+         SELECT 1 FROM lovetree_shares s
+         WHERE s.product_id=$1 AND s.share_id=h.share_id AND s.subject_id=$3 AND s.tree_id=$4
+       )
+     ) LIMIT 1`,
+    [productId,shareId,subjectId,treeId]
+   );
+   return rows.length>0;
+  },
+   async stats({productId,shareId,viewerSubjectId=null}){
    const {rows}=await pool.query(
     `SELECT
       (SELECT count(*)::int FROM lovetree_community_favorites WHERE product_id=$1 AND share_id=$2) AS favorites,
