@@ -85,7 +85,8 @@ test('#1349 가운데 순간 추가: 390·1440 × 밤·정원 × 로그인·방�
 });
 
 async function serve1514(routes){
- for(let port=4580;port<=4589;port++){
+ const basePort=Number(process.env.LT_TEST_PORT||4580);
+ for(let port=basePort;port<basePort+10;port++){
   try{return await serve(routes,{port})}catch(error){if(error?.code!=='EADDRINUSE')throw error}
  }
  throw new Error('4580~4589 포트가 모두 사용 중이다');

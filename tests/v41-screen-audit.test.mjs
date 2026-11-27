@@ -607,7 +607,8 @@ test('#657 화면 공통 검사기: 아홉 화면 둘레·스크롤 주인 관�
   const baseline = JSON.parse(readFileSync(new URL('./fixtures/frame-observation-baseline.json', import.meta.url), 'utf8'));
   const shard = process.env.LT_SCREEN_AUDIT_SHARD || '';
   const outputDir = fileURLToPath(new URL('../test-results/v41-frame-observation/' + (shard || 'all') + '/', import.meta.url));
-  const server = await serve({}, { port: 4401 });
+  const port = Number(process.env.LT_TEST_PORT || 4401);
+  const server = await serve({}, { port });
   const base = `http://127.0.0.1:${server.address().port}`;
   const browser = await chromium.launch({ headless: true });
   const started = Date.now();

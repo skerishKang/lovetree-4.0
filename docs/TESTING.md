@@ -116,3 +116,7 @@ npm run baseline:frames -- --check
 
 판정 도구는 `tools/baseline-frames.mjs`, 판단 시험은 `tests/baseline-frames.test.mjs`다.
 
+## 고정 포트 시험 (#1542)
+
+`LT_TEST_PORT=4770 node --test tests/v41-home-screen-952.test.mjs`처럼 `LT_TEST_PORT`를 주면 시험 서버의 고정 포트를 바꿀 수 있다(없으면 각 시험의 기존 숫자를 그대로 쓴다).
+
