@@ -524,7 +524,7 @@ infoStyle.textContent=`.home-add-top{margin-top:12px;font-size:15px;pointer-even
 /* #1446: 두 줄이 붙어 보이지 않게 2px 띄운다. */
 .home-count-line + .home-count-line{margin-top:2px}
 .home-count[hidden]{display:none}
-.home-count[data-reserve][hidden]{display:block;visibility:hidden}
+.home-count[data-reserve][hidden]{display:block;visibility:hidden;min-height:88px}
 .home-count-item{display:flex;align-items:baseline;justify-content:space-between;gap:4px;width:100%;min-width:0;white-space:nowrap}
 .home-count-name{color:var(--lt-muted);text-align:left}
 .home-count-value{color:var(--lt-pearl);font-weight:700;font-variant-numeric:tabular-nums;text-align:right}
@@ -538,23 +538,19 @@ const mobileFit=document.createElement('style');mobileFit.textContent='@media(ma
 // #1571: 세 단추와 숫자를 같은 격자에 두고, 문자 모양은 유지한 채 누름 영역을 44px로 확보한다.
 const homeDesign1571=document.createElement('style');
 homeDesign1571.textContent=`
-.center .actions[data-inline]{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));column-gap:clamp(8px,2vw,18px);row-gap:4px;align-items:start}
+.center .actions[data-inline]{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));column-gap:clamp(16px,2vw,18px);row-gap:4px;align-items:start}
 @media(min-width:651px){.center .actions[data-inline]{width:100%;max-width:432px;column-gap:18px;margin-inline:auto}}
-.center .actions[data-inline] .home-action-group{display:contents}
-.center .actions[data-inline] .home-action-group>.subtleBtn{grid-row:1;width:100%;height:44px}
-.center .actions[data-inline] .home-action-group>.home-count{grid-row:2}
-.center .actions[data-inline] .home-action-group:nth-child(1)>*{grid-column:1}
-.center .actions[data-inline] .home-action-group:nth-child(2)>*{grid-column:2}
-.center .actions[data-inline] .home-action-group:nth-child(3)>*{grid-column:3}
+.center .actions[data-inline] .home-action-group{display:flex;flex-direction:column;align-items:stretch;gap:4px;min-width:0;max-width:none}
+.center .actions[data-inline] .home-action-group>.subtleBtn{width:100%;height:44px}
 .home-count{min-height:0;font-size:12px;line-height:1.25}
 .home-count-line{display:flex;align-items:center;min-height:44px;line-height:1.25}
 .home-count-line:empty{display:none}
 .home-count-item{min-height:44px;align-items:center}
 .home-count button{box-sizing:border-box;min-height:44px;font-size:13px}
-:host([data-lt-theme=garden]) .home-count-name{color:var(--lt-ink)}
-.recent-change{box-sizing:border-box;min-width:44px;min-height:44px;margin:-10px -5px;padding:10px 5px}
-.recent-head{box-sizing:border-box;min-height:44px;margin-block:-14px;padding-block:10px}
-.recent-head::after,.recent-change::after{inset:0 -8px}
+/* 이름표는 정원에서도 충분히 진한 공통 보조 글자색을 사용한다. */
+/* 카드 글자 상자 크기는 그대로 두고 가상 요소 누름 영역만 44px 이상으로 만든다. */
+.recent-head-row>.recent-head,.recent-head-row>.recent-change{z-index:1}
+.recent-head::after,.recent-change::after{top:-12px;bottom:-12px}
 .topbar .menuBtn{box-sizing:border-box;min-height:44px}
 `;
 shadow.append(homeDesign1571);

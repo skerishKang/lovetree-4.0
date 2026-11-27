@@ -120,10 +120,17 @@ extraCSS+=`@keyframes lt-home-rise{from{opacity:0;transform:translateY(12px)}to{
 `;
 
 // #1571: 낮은 첫 화면은 본문을 스크롤하고 제목·카드·조작줄을 위에서부터 배치한다.
-extraCSS+=`@media(max-width:650px){.app{overflow-y:auto;overscroll-behavior-y:contain}}
-@media(max-width:650px) and (max-height:850px){:host([data-lt-home-portrait]) .center .recent-card:not(.is-playing-mobile){width:min(252px,calc(100vw - 32px));margin-top:8px}}
+extraCSS+=`.home-count[data-reserve][hidden]{display:block;visibility:hidden;min-height:88px}
+@media(max-width:900px) and (max-height:750px){
+ .app{height:auto;min-height:100dvh;overflow:visible;overscroll-behavior-y:contain}
+}
+@media(max-width:650px) and (max-height:850px){
+ :host([data-lt-home-portrait]) .center .recent-card:not(.is-playing-mobile){width:min(230px,calc(100vw - 32px));margin-top:8px}
+}
+@media(max-width:650px) and (min-height:700px){
+ :host(:not([data-lt-home-portrait])) .center{top:calc(48% + 20px)}
+}
 @media(min-width:651px) and (max-width:900px) and (max-height:520px){
- .app{overflow-y:auto;overflow-x:hidden;overscroll-behavior-y:contain}
  .center{position:relative;left:auto;top:auto;width:min(500px,calc(100% - 32px));margin:18px auto 64px;transform:none}
  .center.dim{transform:scale(.96)}
  .center .eyebrow{font-size:12px}
