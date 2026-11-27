@@ -1111,7 +1111,8 @@ test('#1437 delayed member response does not paint guest title, corrects stale h
  const {mkdirSync}=await import('node:fs');
  const {join}=await import('node:path');
  const browser=await chromium952.launch({headless:true});
- const server=await serve({},{ port: 4143 }),base='http://127.0.0.1:4143';
+ const port=Number(process.env.LT_TEST_PORT||4143);
+ const server=await serve({},{ port }),base='http://127.0.0.1:'+port;
  const tree=tree952({subject:'시험 순간',count:3});
  const testCases=[
   {key:'member',member:true,trees:[tree],hint:false,expected:'다시, 그 순간으로.',neverGuest:true},
@@ -1181,7 +1182,8 @@ test('#1437 delayed member response does not paint guest title, corrects stale h
 test('#1437 pending center is text-free until confirmed response and reserves stable height', {skip:REQUIRE952?false:skip952,timeout:90000},async()=>{
  if(skip952)assert.fail(skip952);
  const browser=await chromium952.launch({headless:true,args:['--disable-gpu']});
- const server=await serve({'/1437-harness.html':'<!doctype html><html><head><script>document.documentElement.dataset.ltAuthPhase="pending";</script></head><body data-member="out" style="margin:0"><iframe src="/v41/home.html" style="border:0;width:100vw;height:100vh"></iframe></body></html>'},{ port: 4144 }),base='http://127.0.0.1:4144';
+ const port=Number(process.env.LT_TEST_PORT||4144);
+  const server=await serve({'/1437-harness.html':'<!doctype html><html><head><script>document.documentElement.dataset.ltAuthPhase="pending";</script></head><body data-member="out" style="margin:0"><iframe src="/v41/home.html" style="border:0;width:100vw;height:100vh"></iframe></body></html>'},{ port }),base='http://127.0.0.1:'+port;
  const {mkdirSync}=await import('node:fs');const {join}=await import('node:path');
  const tree=tree952({subject:'시험 순간',count:3});
  try{
@@ -1310,7 +1312,7 @@ test('#1449 첫 화면 순간 상세 창 정보·출처·테마·누름 영역�
   const only=process.env.LT_1449_ONLY||'';
   const debug=process.env.LT_1449_DEBUG==='1';
   if(capture)mkdirSync(capture,{recursive:true});
-  const port=4520,base=`http://127.0.0.1:${port}`;
+  const port=Number(process.env.LT_TEST_PORT||4520),base=`http://127.0.0.1:${port}`;
   const at=i=>'2026-11-'+String(i+1).padStart(2,'0')+'T00:00:00.000Z';
   const scenes=[
     {key:'vertical',label:'세로 영상',url:'https://www.youtube.com/shorts/a1111111111',vertical:true,external:'YouTube에서 보기 ↗'},
@@ -1759,4 +1761,63 @@ test('#1530 cold thumbnail states',{skip: REQUIRE952 ? false : skip952,timeout:1
  const h=await boot952(browser,{member:true,width:1440,waitUntil:'domcontentloaded',routes:{'/api/workspace':r=>r.fulfill({json:workspace}),'/api/youtube/oembed':r=>r.fulfill({status:kind==='missing'?404:403,json:{}})},thumb:async(r,u)=>{events.push(['request',u.pathname,Date.now()]);await gate; if(kind==='missing'||u.pathname.includes('oardefault')){events.push(['abort',u.pathname,Date.now()]);return r.abort()}events.push(['success',u.pathname,Date.now()]);return THUMB(r)}});
  try{const m=h.frame.locator('.recent-media');const snap=()=>m.evaluate(e=>{const i=e.querySelector('img');return {state:e.dataset.recentState,src:i?.src,width:i?.naturalWidth,opacity:i&&getComputedStyle(i).opacity,cover:!!e.querySelector('.lt-recent-fallback'),h:e.getBoundingClientRect().height}});const before=await snap();assert.equal(before.state,'loading');assert.equal(before.cover,false);assert.equal(before.opacity,'0');release();await h.frame.waitForFunction(()=>{const e=document.querySelector('#orbit')?.shadowRoot?.querySelector('.recent-media');const i=e?.querySelector('img');return e?.querySelector('.lt-recent-fallback')||i?.naturalWidth>0});const after=await snap();assert.equal(after.state,kind==='missing'?'failed':'ready');assert.equal(after.cover,kind==='missing');assert.equal(after.opacity,kind==='missing'?'0':'1');assert.equal(after.h,before.h);assert.equal(after.width>0,kind!=='missing');if(kind==='vertical')assert.match(after.src,/hqdefault/);assert.equal(await m.locator('.recent-play').isVisible(),false);}finally{release();await close952(h)}
  }}finally{await browser.close()}
+});
+
+// #1535: a document from the previous deployment must not leave an empty shell.
+test('#1535 deployment chunk recovery is bounded and shared by the home frame', {skip:skip952 && !REQUIRE952 ? skip952 : false}, async () => {
+  assert.ok(!skip952, String(skip952));
+  const server = await serve({}, {port:Number(process.env.LT_TEST_PORT)||0});
+  const browser = await chromium952.launch({headless:true});
+  const base = `http://127.0.0.1:${server.address().port}`;
+  try {
+    for (const mode of ['once','always','frame','late']) {
+      const ctx = await browser.newContext();
+      let docs=0, bad=0;
+      try {
+        await ctx.route('**/*', async r => {
+          const u=new URL(r.request().url());
+          if(u.origin!==base)return r.abort();
+          if(u.pathname.startsWith('/api/'))return r.fulfill({contentType:'application/json',body:'{"ok":true,"items":[]}'});
+          if(u.pathname==='/v41/'){
+            docs++;
+            if(mode==='frame'||mode==='late'||mode==='once'&&docs>1)return r.continue();
+            const res=await r.fetch();
+            return r.fulfill({response:res,body:(await res.text()).replace(/\/assets\/v41shell-[\w-]+\.js/g,'/assets/v41shell-oldchunk.js')});
+          }
+          if(mode==='frame'&&docs===1&&u.pathname==='/v41/home.html'){
+            const res=await r.fetch();
+            return r.fulfill({response:res,body:(await res.text()).replace(/\/assets\/v41home-[\w-]+\.js/g,'/assets/v41home-oldchunk.js')});
+          }
+          if(u.pathname.includes('oldchunk')){
+            bad++;
+            return r.fulfill({status:mode==='frame'?404:200,contentType:'text/html',body:'<html>missing chunk</html>'});
+          }
+          return r.continue();
+        });
+        const page=await ctx.newPage();
+        await page.goto(base+'/v41/#home').catch(error=>{if(!/ERR_ABORTED/.test(String(error)))throw error;});
+        const home=page.frameLocator('#view').locator('.center .actions');
+        if(mode==='late'){
+          await home.waitFor({state:'visible',timeout:15000});
+          await page.evaluate(()=>{import('/assets/late-oldchunk.js').catch(()=>{});});
+          // Vite emits this event on a failed dynamic dependency even when the caller catches it.
+          await page.evaluate(()=>dispatchEvent(new Event('vite:preloadError',{cancelable:true})));
+        }
+        if(mode==='always'){
+          const notice=page.locator('#lt-deploy-recovery button');
+          await notice.waitFor({state:'visible',timeout:15000});
+          assert.equal(await notice.textContent(),'\uc0c8 \ubc84\uc804\uc774 \uc788\uc5b4\uc694 \u2014 \ub2e4\uc2dc \ubd88\ub7ec\uc624\uae30');
+          assert.equal(await page.evaluate(()=>sessionStorage.getItem('lt41.deployRecovery.v1')),'1');
+        }else{
+          await page.waitForFunction(()=>performance.getEntriesByType('navigation')[0]?.type==='reload',null,{timeout:15000});
+          await home.waitFor({state:'visible',timeout:15000});
+          assert.equal(await page.locator('#lt-deploy-recovery').count(),0);
+          assert.equal(await page.evaluate(()=>sessionStorage.getItem('lt41.deployRecovery.v1')),null);
+        }
+        await page.waitForTimeout(1000);
+        assert.equal(docs,2,mode+' reload count');
+        assert.equal(bad,mode==='always'?2:1,mode+' missing chunk requests');
+      }finally{await ctx.close();}
+    }
+  }finally{await browser.close();await new Promise(r=>server.close(r));}
 });

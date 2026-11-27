@@ -576,3 +576,6 @@ const labels=new MutationObserver(()=>{const b=dialog.querySelector('[data-do=bo
 labels.observe(dialog,{childList:true,subtree:true});
 addEventListener('pagehide',()=>labels.disconnect(),{once:true});
 addEventListener('pagehide',()=>orbit(),{once:true});
+
+// #1535: only a successfully mounted home clears the one-shot recovery marker.
+window.LT41DeployRecovery?.ready();

@@ -8,7 +8,7 @@ import fs from 'node:fs/promises';
 const require1440 = process.env.LT_1440_REQUIRE === '1';
 test('#1440 순간 정리 방식 선택과 조작', {skip: !require1440 ? '전용 브라우저 검사에서 실행' : undefined, timeout:240000}, async t => {
 const {chromium} = await import('playwright');
-const port=Number(process.env.LT1440_PORT || 4548);
+const port=Number(process.env.LT_TEST_PORT||process.env.LT1440_PORT||4548);
 const server=await serve({}, {port}), base='http://127.0.0.1:'+port;
 let browser;
 const out=process.env.LT1440_CAPTURE_DIR;if(out) await fs.mkdir(out,{recursive:true});
@@ -158,7 +158,7 @@ finally{await ctx.close()}
 
 test('#1527 지금 방식과 새 방식에서 빈 트리에 담고 되돌린다', {skip:!require1440?'전용 브라우저 검사에서 실행':undefined,timeout:120000}, async t=>{
   const {chromium}=await import('playwright');
-  const port=Number(process.env.LT1440_PORT||4548);
+  const port=Number(process.env.LT_TEST_PORT||process.env.LT1440_PORT||4548);
   const server=await serve({}, {port}),base='http://127.0.0.1:'+port;
   const browser=await chromium.launch({headless:true,args:['--disable-gpu']});
   const clock='2026-11-18T00:00:00Z',input=title=>({subject:title,title,note:'',emotion:'설렘',date:'2026-11-18',url:''});
