@@ -119,6 +119,23 @@ extraCSS+=`@keyframes lt-home-rise{from{opacity:0;transform:translateY(12px)}to{
 @media(max-height:500px){.center{width:min(500px,62vw);top:45%}.center .eyebrow{margin-bottom:6px;font-size:10px}.center h1{font-size:30px}.center>p:not(.center-note){display:none}.center .actions{margin-top:12px}.center .recent-card{width:min(300px,40vw);margin-top:10px}.center .recent-media{aspect-ratio:16/7}.center-scrim{width:min(700px,90vw);height:min(300px,80dvh)}}
 `;
 
+// #1571: 낮은 첫 화면은 본문을 스크롤하고 제목·카드·조작줄을 위에서부터 배치한다.
+extraCSS+=`.home-count[data-reserve][hidden]{display:block;visibility:hidden;min-height:88px}
+@media(max-width:900px) and (max-height:750px){
+ .app{height:auto;min-height:100dvh;overflow:visible;overscroll-behavior-y:contain}
+}
+@media(max-width:650px) and (max-height:850px){
+ :host([data-lt-home-portrait]) .center .recent-card:not(.is-playing-mobile){width:min(230px,calc(100vw - 32px));margin-top:8px}
+}
+@media(max-width:650px) and (min-height:700px){
+ :host(:not([data-lt-home-portrait])) .center{top:calc(48% + 20px)}
+}
+@media(min-width:651px) and (max-width:900px) and (max-height:520px){
+ .center{position:relative;left:auto;top:auto;width:min(500px,calc(100% - 32px));margin:18px auto 64px;transform:none}
+ .center.dim{transform:scale(.96)}
+ .center .eyebrow{font-size:12px}
+}
+:host([data-lt-theme=garden]) .center .eyebrow{color:var(--lt-ink)}`;
 export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSelect=()=>{},recordNote=null,examples=[],onOpen=null,empty=false,titleDisplay='both',momentList=null,dateStyle='dot',prefs=null,initialPicking=false,initialNotice=null,homePin=null,loggedIn,homeTitlePending=false,homeTitleHint=false}) {
  performance.mark('m0');
  const example=context.readOnly;

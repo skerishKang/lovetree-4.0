@@ -209,6 +209,23 @@ test('#1488 휴대폰 ＋ 단추: 다섯 화면에 보이고 화면 안 단추·
         const close = near.filter((e) => e.gap < 12);
         assert.deepEqual(close, [], `${screen} ${width}×${height} ${theme}: ＋ 단추와 12px 안에 있는 고정 요소 ${JSON.stringify(close)}`);
         if (screen === 'book') {
+          // 스크롤과 단추 크기 전환 중에도 이동 줄 전체가 원래 크기의 ＋ 단추 오른쪽 자리와 겹치지 않아야 한다.
+          const lane = await page.evaluate(() => {
+            const view = document.querySelector('#view');
+            const add = document.querySelector('#mobile-add');
+            const nav = view.contentDocument.querySelector('.nav-pill');
+            const fullAddLeft = add.getBoundingClientRect().right - add.offsetWidth;
+            const navRight = view.getBoundingClientRect().left + nav.getBoundingClientRect().right;
+            const buttons = [...nav.querySelectorAll('button')].filter(e => e.getClientRects().length).map(e => {
+              const r = e.getBoundingClientRect();
+              return { id: e.id, w: r.width, h: r.height };
+            });
+            return { gap: fullAddLeft - navRight, overflow: nav.scrollWidth - nav.clientWidth, buttons };
+          });
+          rows.push({ screen: 'book-lane', width, height, theme, ...lane });
+          assert.ok(lane.gap >= 12, `book ${width}×${height} ${theme}: 이동 줄과 원래 크기의 ＋ 단추 가로 간격 12px 이상 ${JSON.stringify(lane)}`);
+          assert.ok(lane.overflow <= 1, '이동 줄 가로 넘침 없음');
+          assert.ok(lane.buttons.every(b => b.w >= 44 && b.h >= 44), '이동 줄 단추 누름 44px 이상');
           // 낮은 화면(360×740)은 책 문서가 굴러간다 — 맨 아래까지 굴린 자리에서도 아래 단추 줄·첫 안내('알겠어요')와 12px 이상.
           await page.evaluate(() => { const d = document.querySelector('#view')?.contentDocument; const s = d?.scrollingElement; if (s) s.scrollTop = s.scrollHeight; });
           await page.waitForTimeout(500);
