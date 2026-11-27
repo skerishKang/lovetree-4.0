@@ -194,6 +194,16 @@ const ASSETS_PENDING = `(() => {
   return pending;
 })()`;
 
+// #1585: 같은 코드의 두 촬영에서 궤도·리본 카드가 서로 다른 시각에 머무르지 않게 한다.
+// 실제 화면은 건드리지 않고 비교용 iframe에 공개된 시험 훅으로 같은 위상만 그린다.
+const FIX_ORBIT_PHASE = `(() => {
+  const orbit = globalThis.__LT_ORBIT_TEST__;
+  if (!orbit) return;
+  orbit.pauseFloat?.();
+  orbit.hold?.(true);
+  orbit.seek?.(0.25);
+})()`;
+
 async function settleInside(frame, page) {
   // 화면 교체 애니메이션이 소수점 배율로 남으면 같은 화면도 픽셀이 흔들리므로, 다 열린 뒤 배율을 1로 고정한다.
   await page.evaluate(SETTLE_SHELL).catch(() => {});
@@ -201,6 +211,7 @@ async function settleInside(frame, page) {
   // 글꼴·그림을 먼저 다 읽혀 둔다. 읽는 중 상태도 "두 장이 같은" 안정 상태라 그대로 저장될 수 있다.
   await frame.evaluate(WAIT_ASSETS).catch(() => {});
   await page.evaluate(WAIT_ASSETS).catch(() => {});
+  await frame.evaluate(FIX_ORBIT_PHASE).catch(() => {});
   await page.waitForTimeout(200);
 }
 
