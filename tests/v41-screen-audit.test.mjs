@@ -3624,13 +3624,13 @@ function fakeServer(ports) {
 
 test('#1420 막힌 포트를 받으면 닫고 다시 받아 안전한 포트를 쓴다', async () => {
   const { server, stats } = fakeServer([5061, 6668, 4102]);
-  const port = await listenOnSafePort(server, '127.0.0.1');
+  const port = await listenOnSafePort(server, '127.0.0.1', { port: 0 });
   assert.equal(port, 4102);
   assert.deepEqual(stats(), { listens: 3, closes: 2 });
 });
 
 test('#1420 다시 받는 횟수가 상한을 넘으면 분명한 오류로 끝난다', async () => {
   const { server, stats } = fakeServer([6669, 6669, 6669]);
-  await assert.rejects(listenOnSafePort(server, '127.0.0.1', { maxTries: 3 }), /다시 받았지만/);
+  await assert.rejects(listenOnSafePort(server, '127.0.0.1', { port: 0, maxTries: 3 }), /다시 받았지만/);
   assert.deepEqual(stats(), { listens: 3, closes: 3 });
 });
