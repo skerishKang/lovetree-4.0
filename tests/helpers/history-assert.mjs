@@ -56,7 +56,8 @@ function captureDocument(panelSelectors) {
     panels: panelSelectors.filter(selector => document.querySelector(selector)),
     selectedMoment: selected,
     scroll: { x: window.scrollX, y: window.scrollY, elements: scrollers },
-    historyLength: history.length,
+    // iframe 탐색이 전체 history.length를 앞서 늘릴 수 있어 현재 문서의 탐색 위치로 기록 증가를 확인한다.
+    historyLength: Number.isInteger(window.navigation?.currentEntry?.index) ? window.navigation.currentEntry.index + 1 : history.length,
     historyState: history.state
   };
 }
@@ -148,7 +149,10 @@ async function waitForGrowth(page, frame, before, waitMs) {
   const targets = [[page, before.historyLength]];
   if (frame) targets.push([frame, before.frameHistoryLength]);
   return Promise.any(targets.map(([target, length]) =>
-    target.waitForFunction(n => history.length > n, length, { timeout: waitMs }).then(() => true)
+    target.waitForFunction(n => {
+      const index = window.navigation?.currentEntry?.index;
+      return Number.isInteger(index) ? index + 1 > n : history.length > n;
+    }, length, { timeout: waitMs }).then(() => true)
   )).then(() => true, () => false);
 }
 
