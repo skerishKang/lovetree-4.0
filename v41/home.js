@@ -12,7 +12,8 @@ import {readHomeTitleHint} from '../public/v41/home-title-state.mjs';
 import {applyHomeCenter} from './home-center.js';
 import {readTheme,writeTheme,appliedTheme,applyThemeAttribute} from '../public/v41/header-state.mjs';
 import {readTitleDisplay, titleDisplayOf, shouldReloadForTitleDisplay} from '../public/v41/book-usability.mjs';
-import {momentListEntries, momentListTrees} from './moment-list.js';
+import {momentListEntries, momentListTrees, momentHeadTitle} from './moment-list.js';
+import {momentExternalView, momentConnections, treeChipView} from '../public/v41/moment-detail.mjs';
 import {youtubeIdFrom,isVerticalMoment} from '../public/v41/youtube-id.mjs';
 import {isAutoTitle} from '../public/v41/auto-title.mjs';
 import {fetchVideoMetadata} from '../public/v41/video-title.mjs';
@@ -75,6 +76,10 @@ const renderedDateStyle=dateStyleOf(ltDateStyle());
 const renderedTitleDisplay=titleDisplayOf(readTitleDisplay(parent.LT41));
  const homeHistory=createHomeHistory(document.getElementById('orbit'));
  window.LTHomeHistory=homeHistory;
+ const homePin={
+  pinned:c=>homeMomentValue.mode==='pin'&&homeMomentValue.momentId===c.id&&homeMomentValue.treeId===c.treeId,
+  toggle:c=>{setHomeMoment(isPinnedMoment(c)?{mode:'last'}:{mode:'pin',momentId:c.id,treeId:c.treeId});return isPinnedMoment(c);}
+ };
  const orbit=mountOrbit(document.getElementById('orbit'),{
  trees:cardTrees,examples:cardsPlan.examples?ORBIT_EXAMPLE.moments.slice(0,cardsPlan.examples):[],
  // 내 것만 0장은 예시로 대체하지 않고 빈 궤도와 첫 순간 안내를 남긴다.
@@ -86,10 +91,7 @@ const renderedTitleDisplay=titleDisplayOf(readTitleDisplay(parent.LT41));
  titleDisplay:readTitleDisplay(parent.LT41),
  dateStyle:renderedDateStyle,
  // 261116 PR 2: 순간 창의 '첫 화면에 걸기' — 계정 설정에 고정하고 모드를 '고정한 순간'으로 바꾼다.
- homePin:{
-  pinned:c=>homeMomentValue.mode==='pin'&&homeMomentValue.momentId===c.id&&homeMomentValue.treeId===c.treeId,
-  toggle:c=>{setHomeMoment(isPinnedMoment(c)?{mode:'last'}:{mode:'pin',momentId:c.id,treeId:c.treeId});return isPinnedMoment(c);}
- },
+ homePin,
  onOpen:card=>{if(card.source==='public'){parent.location.hash=`#share/${card.shareId}/${card.view||'book'}`;return;}bridge.actions.openMine(card.treeId,card.id);},
  storage:{getItem:()=>null,setItem:()=>{}},context:{...presentation.context,readOnly:cardsPlan.kind==='example'},
  authHtml:`<button class="menuBtn auth-entry" data-home-account>${presentation.accountLabel}</button>`,actions:bridge.actions
@@ -98,82 +100,136 @@ const renderedTitleDisplay=titleDisplayOf(readTitleDisplay(parent.LT41));
 if(momentsRequest){try{parent.postMessage({type:MSG.momentsOpened},location.origin)}catch{}}
 const shadow=document.getElementById('orbit').shadowRoot;
 const viewerStyle=document.createElement('style');
-viewerStyle.textContent=`#mediaViewerHome .mediaVisual iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#000}#mediaViewerHome .mediaActions button,#mediaViewerHome .mediaActions a{display:inline-flex;align-items:center;justify-content:center;font-size:13px;min-height:44px;padding:8px 14px}#mediaViewerHome .mediaWhy[hidden]{display:none}#mediaViewerHome .mediaVisual [hidden]{display:none}#mediaViewerHome .mediaVisual .videoPlay{z-index:3}#mediaViewerHome .mediaVisual .mediaClose{z-index:4}#mediaViewerHome .mediaVisual.lt-home-youtube-playing iframe{top:64px;height:calc(100% - 64px);min-height:200px}`;
+viewerStyle.textContent=`#mediaViewerHome .mediaVisual iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:var(--lt-stage)}#mediaViewerHome .mediaVisual .videoPlay{z-index:3}#mediaViewerHome .mediaVisual.lt-home-youtube-playing iframe{z-index:2;top:64px;height:calc(100% - 64px);min-height:200px}`;
 shadow.append(viewerStyle);
 const viewer=document.createElement('div');viewer.className='mediaViewer';viewer.id='mediaViewerHome';viewer.setAttribute('aria-hidden','true');
-viewer.innerHTML=`<div class="mediaShell" role="dialog" aria-modal="true" aria-labelledby="mediaTitleHome"><div class="mediaVisual" id="mediaVisualHome"><button class="mediaClose" id="mediaCloseHome" aria-label="미디어 닫기">×</button><div class="videoBadge" id="mediaTypeBadgeHome">사진</div><img id="mediaImageHome" alt="" src="" hidden><button class="videoPlay" id="mediaPlayHome" aria-label="미디어 미리보기 재생">▶</button><div class="mediaMemo" id="mediaMemoHome" hidden><div class="memoLabel">순간 기록</div><div class="memoMain" id="mediaMemoBodyHome"></div><div class="memoDate" id="mediaMemoDateHome"></div></div></div><div class="mediaInfo"><div class="mediaKicker" id="mediaKickerHome">순간</div><h3 id="mediaTitleHome"></h3><div class="mediaMeta" id="mediaMetaHome"></div><div class="mediaWhy" hidden><b>이어지는 이야기</b><p id="mediaWhyHome"></p></div><div class="mediaActions"><button class="primary" id="mediaBookHome">책에서 이어 보기</button><a id="mediaExternalHome" href="#" target="_blank" rel="noopener" hidden>원본 보기 ↗</a></div></div></div>`;
+viewer.innerHTML=`<div class="mediaShell" role="dialog" aria-modal="true" aria-labelledby="mediaTitleHome"><button class="mediaClose" id="mediaCloseHome" aria-label="닫기">×</button><div class="mediaVisual" id="mediaVisualHome"><img id="mediaImageHome" alt="" src="" hidden><button class="videoPlay" id="mediaPlayHome" aria-label="미디어 미리보기 재생">▶</button><div class="mediaMemo" id="mediaMemoHome" hidden><span class="mediaMemoLetter" id="mediaMemoBodyHome"></span><span class="mediaMemoTree" id="mediaMemoDateHome"></span></div></div><div class="mediaInfo"><div class="mediaKicker" id="mediaKickerHome" hidden>순간</div><div class="mediaTreeRow"><button type="button" class="media-tree-chip" id="mediaTreeChipHome"><span class="media-tree-cover" id="mediaTreeCoverHome" aria-hidden="true"></span><span class="media-tree-name" id="mediaTreeNameHome"></span></button><div class="mediaMeta" id="mediaMetaHome"></div></div><h3 id="mediaTitleHome"></h3><p class="mediaBody" id="mediaBodyHome" hidden></p><div class="mediaWhy" hidden><b>다음으로 간 이유</b><p id="mediaWhyHome"></p></div><section class="media-connected-section" hidden><h4>이어진 순간</h4><div class="media-connected" id="mediaConnectedHome"></div></section></div><div class="mediaActions"><button class="primary" id="mediaBookHome">책에서 이어 보기</button><a id="mediaExternalHome" href="#" target="_blank" rel="noopener noreferrer" hidden></a><div class="mediaMoreWrap"><button type="button" id="mediaMoreHome" aria-haspopup="menu" aria-expanded="false" aria-label="더 보기">⋯</button><div class="mediaMoreMenu" id="mediaMoreMenuHome" role="menu" hidden></div></div></div></div>`;
 shadow.append(viewer);
 const vEl=id=>shadow.querySelector('#'+id);
-shadow.querySelector('.recent-card')?.setAttribute('tabindex','0');
 let viewerOpener=null;
+let viewerMoment=null;
+let viewerFocusObserver=null;
+let viewerFocusTimer=0;
+let viewerFocusFrame=0;
 let viewerSequence=0;
 let viewerSignal=new AbortController();
 const mediaKind=(videoId,moment)=>videoId?'동영상':moment.image?'사진':'기록';
 const fallbackVideoTitle='함께 간직한 영상';
+const viewerTrees=()=>Array.isArray(parent.LT41?.trees)?parent.LT41.trees:Array.isArray(context.trees)?context.trees:[];
+const viewerTree=()=>{const trees=viewerTrees();return trees.find(tree=>tree.id===viewerMoment?.treeId)||trees.find(tree=>tree.moments?.some(moment=>moment.id===viewerMoment?.id))||null;};
+const viewerTreeIndex=tree=>Math.max(0,viewerTrees().findIndex(item=>item.id===tree?.id));
+const viewerConnectionMoments=()=>{const entries=momentList?.entries||[],ordered=viewerTree()?.moments;return Array.isArray(ordered)?ordered.map(raw=>entries.find(entry=>entry.id===raw.id)||raw):entries;};
+function fillCover(node,model){
+ node.replaceChildren();
+ if(model.design)node.dataset.coverDesign=model.design;else delete node.dataset.coverDesign;
+ if(model.image){const image=document.createElement('img');image.alt='';image.referrerPolicy='no-referrer';image.src=model.image;node.append(image);}
+ else node.textContent=model.initial;
+}
+function closeMoreMenu(){const menu=vEl('mediaMoreMenuHome');menu.hidden=true;vEl('mediaMoreHome').setAttribute('aria-expanded','false');}
+function connectedButton(direction,moment,branchCount,model){
+ const button=document.createElement('button');button.type='button';button.className='media-connected-button';button.dataset.connectedDir=direction;button.setAttribute('aria-label',direction==='prev'?'앞 순간':'다음 순간');
+ const thumb=document.createElement('span');thumb.className='media-connected-thumb';thumb.style.setProperty('--lt-connected-color',model.color);
+ if(moment.image){const image=document.createElement('img');image.alt='';if(moment.youtubeThumb)image.referrerPolicy='no-referrer';image.src=moment.image;thumb.append(image);}else thumb.textContent=model.initial;
+ const copy=document.createElement('span');copy.className='media-connected-copy';
+ const title=document.createElement('span');title.className='media-connected-title';title.textContent=momentHeadTitle(moment,readTitleDisplay(parent.LT41)).main||moment.title||'제목 없는 순간';copy.append(title);
+ if(direction==='next'&&branchCount>1){const branch=document.createElement('span');branch.className='media-connected-branch';branch.textContent=`갈림길 ${branchCount}`;copy.append(branch);}
+ button.append(thumb,copy);return button;
+}
+function renderConnected(){
+ const connections=momentConnections(viewerMoment,viewerConnectionMoments()),section=vEl('mediaConnectedHome').closest('.media-connected-section'),list=vEl('mediaConnectedHome');
+ section.hidden=!connections.parent&&!connections.next;list.replaceChildren();
+ const model=treeChipView(viewerTree(),viewerTreeIndex(viewerTree()));
+ if(connections.parent)list.append(connectedButton('prev',connections.parent,connections.children.length,model));
+ if(connections.next)list.append(connectedButton('next',connections.next,connections.branchCount,model));
+}
+function renderMoreMenu(){
+ const menu=vEl('mediaMoreMenuHome'),more=vEl('mediaMoreHome'),moment=viewerMoment,tree=viewerTree();menu.replaceChildren();closeMoreMenu();
+ const own=moment?.source==='mine'&&!!tree;
+ const items=own?[
+  {label:'고치기',action:()=>{closeHomeViewer();parent.postMessage({type:MSG.write,mode:'edit',treeId:tree.id,momentId:moment.id},location.origin);}},
+  {label:homePin?.pinned(moment)?'내리기':'첫 화면에 걸기',action:()=>{homePin?.toggle?.(moment);renderMoreMenu();}},
+  {label:'공유',action:()=>{closeHomeViewer();bridge.actions.shareMoment(tree.id,moment.id);}}
+ ]:[
+  {label:'담기',action:()=>{closeHomeViewer();if(moment?.shareId)parent.location.hash=`#explore/moments?share=${encodeURIComponent(moment.shareId)}`;bridge.actions.community('moments');}},
+  {label:'공유',action:()=>{const url=moment?.shareId?new URL(`/v41/#share/${encodeURIComponent(moment.shareId)}/${encodeURIComponent(moment.view||'book')}`,location.origin).href:location.origin;closeHomeViewer();if(navigator.share)navigator.share({title:moment?.title||'',url}).catch(()=>{});else if(navigator.clipboard)navigator.clipboard.writeText(url).catch(()=>{});}}
+ ];
+ for(const item of items){const button=document.createElement('button');button.type='button';button.setAttribute('role','menuitem');button.textContent=item.label;button.onclick=item.action;menu.append(button);}
+ more.setAttribute('aria-label','더 보기');
+}
 function closeHomeViewer(){
  if(!viewer.classList.contains('open'))return;
- viewerSequence++;viewerSignal.abort();viewer.querySelector('iframe')?.remove();vEl('mediaVisualHome').classList.remove('lt-home-youtube-playing');
- viewer.classList.remove('open');viewer.setAttribute('aria-hidden','true');
+ cancelAnimationFrame(viewerFocusFrame);viewerFocusFrame=0;
+ closeMoreMenu();viewerSequence++;viewerSignal.abort();viewer.querySelector('iframe')?.remove();vEl('mediaVisualHome').classList.remove('lt-home-youtube-playing');
+ viewer.classList.remove('open');viewer.setAttribute('aria-hidden','true');viewerMoment=null;
  homeHistory.dismiss('viewer');
  try{parent.postMessage({type:MSG.viewer,open:false},location.origin)}catch{}
  vEl('mediaImageHome').hidden=true;vEl('mediaMemoHome').hidden=true;
- viewerOpener?.focus?.();viewerOpener=null;
+ const opener=viewerOpener;viewerOpener=null;
+ viewerFocusObserver?.disconnect();clearTimeout(viewerFocusTimer);
+ const restoreFocus=()=>{const active=shadow.activeElement;const movedElsewhere=active&&active!==shadow.host&&active!==document.body&&!viewer.contains(active)&&active!==opener&&!active.classList?.contains('recent-open');if(movedElsewhere){viewerFocusObserver?.disconnect();return;}const target=opener?.isConnected?opener:shadow.querySelector('.recent-open');target?.focus?.();};
+ restoreFocus();
+ viewerFocusObserver=new MutationObserver(restoreFocus);viewerFocusObserver.observe(shadow,{childList:true,subtree:true});
+ viewerFocusTimer=setTimeout(()=>{viewerFocusObserver?.disconnect();viewerFocusObserver=null;},3000);
 }
-function openHomeViewer(moment,opener=null){
- if(!moment||viewer.classList.contains('open'))return;
- const orbitDialog=shadow.querySelector('dialog');if(orbitDialog?.open)orbitDialog.close();
- viewerOpener=opener||shadow.querySelector('.recent-card')||document.activeElement;
- const videoId=youtubeIdFrom(moment.url||'');
- const sequence=++viewerSequence;viewerSignal.abort();viewerSignal=new AbortController();
+function paintHomeViewer(moment){
+ cancelAnimationFrame(viewerFocusFrame);viewerFocusFrame=0;
+ const videoId=youtubeIdFrom(moment.url||''),sequence=++viewerSequence;viewerSignal.abort();viewerSignal=new AbortController();viewerMoment=moment;closeMoreMenu();
  const savedTitle=typeof moment.mediaMetadata?.title==='string'?moment.mediaMetadata.title.trim():'';
  const namedTitle=!isAutoTitle(moment.title)&&typeof moment.title==='string'?moment.title.trim():'';
  vEl('mediaTitleHome').textContent=namedTitle||savedTitle||(videoId?fallbackVideoTitle:'간직한 순간');
- if(videoId&&!savedTitle&&!namedTitle){fetchVideoMetadata(videoId).then(meta=>{if(sequence===viewerSequence&&viewer.classList.contains('open')&&meta?.title)vEl('mediaTitleHome').textContent=meta.title;}).catch(()=>{});}
+ if(videoId&&!savedTitle&&!namedTitle)fetchVideoMetadata(videoId).then(meta=>{if(sequence===viewerSequence&&viewer.classList.contains('open')&&meta?.title)vEl('mediaTitleHome').textContent=meta.title;}).catch(()=>{});
  vEl('mediaMetaHome').textContent=[moment.date||'',moment.emotion||''].filter(Boolean).join(' · ');
- const why=vEl('mediaWhyHome'),whyRow=why.closest('.mediaWhy');
- why.textContent=moment.whyNext||'';whyRow.hidden=!why.textContent;
  vEl('mediaKickerHome').textContent=`순간 · ${mediaKind(videoId,moment)}`;
- vEl('mediaTypeBadgeHome').textContent=mediaKind(videoId,moment);
- const img=vEl('mediaImageHome'),memo=vEl('mediaMemoHome');
+ const body=vEl('mediaBodyHome');body.textContent=moment.note||'';body.hidden=!body.textContent;
+ const why=vEl('mediaWhyHome');why.textContent=moment.whyNext||'';why.closest('.mediaWhy').hidden=!why.textContent;
+ const tree=viewerTree(),treeModel=treeChipView(tree,viewerTreeIndex(tree));vEl('mediaTreeChipHome').hidden=!tree;vEl('mediaTreeNameHome').textContent=treeModel.title;fillCover(vEl('mediaTreeCoverHome'),treeModel);
+ const img=vEl('mediaImageHome'),memo=vEl('mediaMemoHome'),visual=vEl('mediaVisualHome');visual.querySelector('iframe')?.remove();visual.classList.remove('lt-home-youtube-playing','is-vertical');
  img.hidden=!moment.image;memo.hidden=!!videoId||!!moment.image;
- if(moment.image)img.src=moment.image;
- if(!videoId&&!moment.image){vEl('mediaMemoBodyHome').textContent=moment.note||moment.title||'';vEl('mediaMemoDateHome').textContent=[moment.date||'',moment.emotion||''].filter(Boolean).join(' · ');}
+ if(moment.image){img.src=moment.image;img.alt=momentHeadTitle(moment,readTitleDisplay(parent.LT41)).main||moment.title||'';if(isVerticalMoment(moment)){visual.classList.add('is-vertical');visual.style.setProperty('--lt-home-thumb',`url(${JSON.stringify(moment.image)})`);}else visual.style.removeProperty('--lt-home-thumb');}
+ else{img.removeAttribute('src');visual.style.removeProperty('--lt-home-thumb');if(!videoId){memo.style.setProperty('--lt-memo-color',treeModel.color);vEl('mediaMemoBodyHome').textContent=treeModel.initial;vEl('mediaMemoDateHome').textContent=treeModel.title;}}
+ const externalView=momentExternalView(moment),external=vEl('mediaExternalHome');external.hidden=!externalView;if(externalView){external.href=externalView.href;external.textContent=`${externalView.label} ↗`;}
  const play=vEl('mediaPlayHome');play.hidden=true;play.onclick=null;
- const book=vEl('mediaBookHome'),external=vEl('mediaExternalHome');
- book.onclick=()=>{closeHomeViewer();bridge.actions.openBook(moment.treeId,moment.id);};
- external.hidden=!moment.url;if(moment.url)external.href=moment.url;
- const visual=vEl('mediaVisualHome');
- visual.querySelector('iframe')?.remove();
+ vEl('mediaBookHome').onclick=()=>{closeHomeViewer();bridge.actions.openBook(moment.treeId,moment.id);};
+ renderConnected();renderMoreMenu();
  if(videoId){
-  const showExternalOnly=()=>{if(sequence!==viewerSequence)return;visual.querySelector('iframe')?.remove();visual.classList.remove('lt-home-youtube-playing');img.hidden=!moment.image;play.hidden=true;external.hidden=false;external.textContent='YouTube에서 보기';};
-  const startEmbed=()=>{if(sequence!==viewerSequence||!viewer.classList.contains('open'))return;visual.querySelector('iframe')?.remove();
-   visual.classList.add('lt-home-youtube-playing');
+  const showExternalOnly=()=>{if(sequence!==viewerSequence)return;visual.querySelector('iframe')?.remove();visual.classList.remove('lt-home-youtube-playing');img.hidden=!moment.image;play.hidden=true;external.hidden=false;external.textContent=`${externalView.label} ↗`;};
+  const startEmbed=()=>{if(sequence!==viewerSequence||!viewer.classList.contains('open'))return;visual.querySelector('iframe')?.remove();visual.classList.add('lt-home-youtube-playing');
    const frame=document.createElement('iframe');frame.src=`https://www.youtube-nocookie.com/embed/${encodeURIComponent(videoId)}?autoplay=1&playsinline=1&enablejsapi=1&origin=${encodeURIComponent(location.origin)}`;
-   frame.allow='autoplay; encrypted-media; picture-in-picture';frame.allowFullscreen=true;frame.title=vEl('mediaTitleHome').textContent;
-   img.hidden=true;play.hidden=true;visual.append(frame);};
+   frame.allow='autoplay; encrypted-media; picture-in-picture';frame.allowFullscreen=true;frame.title=vEl('mediaTitleHome').textContent;img.hidden=true;play.hidden=true;visual.append(frame);};
   play.onclick=startEmbed;
-  fetchVideoStatus(videoId).then(status=>{if(sequence!==viewerSequence||!viewer.classList.contains('open'))return;
-   if(status==='noembed'||status==='private'||status==='gone'){showExternalOnly();return;}
-   play.hidden=false;img.hidden=!moment.image;
-  }).catch(()=>{if(sequence===viewerSequence)play.hidden=false;});
-  addEventListener('message',event=>{if(sequence!==viewerSequence||!['https://www.youtube.com','https://www.youtube-nocookie.com'].includes(event.origin))return;
-   let data=event.data;try{if(typeof data==='string')data=JSON.parse(data);}catch{return;}
-    if(data?.event==='onError'&&[2,5,100,101,150,153].includes(Number(data.info)))showExternalOnly();
-  },{signal:viewerSignal.signal});
+  fetchVideoStatus(videoId).then(status=>{if(sequence!==viewerSequence||!viewer.classList.contains('open'))return;if(status==='noembed'||status==='private'||status==='gone'){showExternalOnly();return;}play.hidden=false;img.hidden=!moment.image;}).catch(()=>{if(sequence===viewerSequence)play.hidden=false;});
+  addEventListener('message',event=>{if(sequence!==viewerSequence||!['https://www.youtube.com','https://www.youtube-nocookie.com'].includes(event.origin))return;let data=event.data;try{if(typeof data==='string')data=JSON.parse(data);}catch{return;}if(data?.event==='onError'&&[2,5,100,101,150,153].includes(Number(data.info)))showExternalOnly();},{signal:viewerSignal.signal});
  }
- viewer.classList.add('open');viewer.setAttribute('aria-hidden','false');
- homeHistory.open('viewer',closeHomeViewer);
+}
+function openHomeViewer(moment,opener=null){
+ if(!moment)return;
+ const orbitDialog=shadow.querySelector('dialog');if(orbitDialog?.open)orbitDialog.close();
+ const opening=!viewer.classList.contains('open');if(opening){viewerFocusObserver?.disconnect();clearTimeout(viewerFocusTimer);viewerOpener=opener||shadow.querySelector('.recent-open')||shadow.querySelector('.recent-card')||document.activeElement;}
+ paintHomeViewer(moment);
+ if(!opening)return;
+ viewer.classList.add('open');viewer.setAttribute('aria-hidden','false');homeHistory.open('viewer',closeHomeViewer);
  try{parent.postMessage({type:MSG.viewer,open:true},location.origin)}catch{}
  vEl('mediaCloseHome').focus();
 }
+function stepHomeDetail(direction){
+ const connections=momentConnections(viewerMoment,viewerConnectionMoments()),next=direction<0?connections.parent:connections.next;if(!next)return;
+ paintHomeViewer(next);viewerFocusFrame=requestAnimationFrame(()=>{viewerFocusFrame=0;const target=vEl('mediaTreeChipHome').closest('.mediaShell').querySelector(`[data-connected-dir="${direction<0?'prev':'next'}"]`);(target||vEl('mediaCloseHome')).focus();});
+}
 vEl('mediaCloseHome').onclick=closeHomeViewer;
-viewer.addEventListener('click',event=>{if(event.target===viewer)closeHomeViewer();});
-addEventListener('keydown',event=>{if(event.key==='Escape')closeHomeViewer();});
+vEl('mediaTreeChipHome').onclick=()=>{const moment=viewerMoment;if(!moment)return;closeHomeViewer();bridge.actions.openTree(moment.treeId,moment.id);};
+vEl('mediaMoreHome').onclick=event=>{event.stopPropagation();const menu=vEl('mediaMoreMenuHome');menu.hidden=!menu.hidden;vEl('mediaMoreHome').setAttribute('aria-expanded',String(!menu.hidden));};
+vEl('mediaConnectedHome').addEventListener('click',event=>{const button=event.target.closest('[data-connected-dir]');if(button)stepHomeDetail(button.dataset.connectedDir==='prev'?-1:1);});
+viewer.addEventListener('click',event=>{if(event.target===viewer)closeHomeViewer();if(!event.target.closest?.('.mediaMoreWrap'))closeMoreMenu();});
+addEventListener('keydown',event=>{
+ if(!viewer.classList.contains('open'))return;
+ if(event.key==='Escape'){event.preventDefault();if(!vEl('mediaMoreMenuHome').hidden)closeMoreMenu();else closeHomeViewer();return;}
+ if(vEl('mediaMoreMenuHome').hidden&&event.key==='ArrowLeft'){event.preventDefault();stepHomeDetail(-1);}
+ else if(vEl('mediaMoreMenuHome').hidden&&event.key==='ArrowRight'){event.preventDefault();stepHomeDetail(1);}
+});
 shadow.addEventListener('click',event=>{
- if(!event.target.closest?.('.recent-card'))return;
+ const card=event.target.closest?.('.recent-card');if(!card)return;
  if(event.target.closest?.('[data-recent-head],[data-recent-change],[data-recent-play]'))return;
- event.stopPropagation();event.preventDefault();
- openHomeViewer(homeMomentChoice?.moment);
+ event.stopPropagation();event.preventDefault();openHomeViewer(homeMomentChoice?.moment,card.querySelector('.recent-open'));
 },true);
 shadow.addEventListener('click',event=>{
  const floating=event.target.closest?.('.card');
@@ -182,8 +238,7 @@ shadow.addEventListener('click',event=>{
  const pool=[...(momentList?.entries||[]),...(ORBIT_EXAMPLE?.moments||[])];
  const moment=pool.find(entry=>entry.id===floating.dataset.id||(entry.title&&label.includes(entry.title)));
  if(!moment)return;
- event.stopPropagation();event.preventDefault();
- openHomeViewer(moment,floating.querySelector('.surface')||floating);
+ event.stopPropagation();event.preventDefault();openHomeViewer(moment,floating.querySelector('.surface')||floating);
 },true);
 // 261116 PR 2: 오른쪽 위 '순간 목록' 단추는 없앤다 — 목록 입구는 가운데 세트 첫 단추로 옮겼다.
 shadow.querySelector('.top-actions > .menuBtn[data-do="index"]')?.remove();

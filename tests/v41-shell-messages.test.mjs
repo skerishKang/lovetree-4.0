@@ -271,6 +271,26 @@ test('lt41-open-view는 보드·지도에서 다른 트리를 같은 보기로 �
   } finally { h.restore(); }
 });
 
+test('lt41-open-tree는 트리가 정한 열 화면으로 가고 lt41-share는 그 순간을 골라 공유 판을 연다', async () => {
+  const h = messagesHarness({model:{trees:[
+    {id:'tree1',openView:'board',moments:[{id:'m1'}]},
+    {id:'tree2',openView:'network',moments:[{id:'m2'}]}
+  ]}});
+  try {
+    h.receive({type:'lt41-open-tree',treeId:'tree2',id:'m2'});
+    assert.deepEqual(h.calls.chooses,[['tree2','m2']]);
+    assert.equal(h.state().current,'track56-network.html','트리의 열 화면을 따른다');
+    const before=h.calls.chooses.length;
+    h.receive({type:'lt41-open-tree',treeId:'nope',id:'m1'});
+    h.receive({type:'lt41-open-tree',treeId:'tree1',id:'nope'});
+    assert.equal(h.calls.chooses.length,before,'없는 트리·순간은 무시한다');
+    h.receive({type:'lt41-share',treeId:'tree1',id:'m1'});
+    assert.equal(globalThis.window.LT41.momentId,'m1','공유할 순간을 고른다');
+    assert.equal(h.calls.panels.at(-1),'share-panel','기존 공유 판을 연다');
+    await new Promise(resolve=>setTimeout(resolve,0));
+  } finally { h.restore(); }
+});
+
 test('로그아웃 상태의 lt41-navigate(내 책장)는 화면을 열지 않고 로그인으로 보낸다', () => {
   const h = messagesHarness({owned: false});
   try {

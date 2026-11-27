@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createLocation} from '../public/v41/shell/location.mjs';
 import {ownerSelectionRoute} from '../public/v41/selection-location.mjs';
+import {testBackNavigation} from './helpers/history-assert.mjs';
 
 // #231 1-B 후속: shell/location.mjs를 직접 호출해 주소 읽기·쓰기를 고정한다(가짜 history·location).
 
@@ -137,4 +138,120 @@ test('#my/network?moment=…는 지도 열기 요청을 남기고, 못 찾은 �
   const book = setup({hash: '#my/book?tree=t1&moment=m9', source: 'server', owned: true, trees});
   book.api.applyBrowserLocation();
   assert.deepEqual(book.calls.filter(c => c[0] === 'networkOpen'), []);
+});
+
+function fakeHistoryTarget(length, { hash = '#book', url = 'http://example.test/book', waitGrowth = null } = {}) {
+  const initialLength = length;
+  const state = {
+    hash,
+    screen: 'book',
+    frameScreen: '',
+    panels: [],
+    selectedMoment: 'm1',
+    scroll: { x: 0, y: 0, elements: [] },
+    historyLength: length,
+    historyState: null
+  };
+  let growthCalls = 0;
+  return {
+    state,
+    get growthCalls() { return growthCalls; },
+    url: () => url,
+    evaluate: async (fn, arg) => {
+      const source = String(fn);
+      if (fn.name === 'captureDocument') return structuredClone(state);
+      if (source.includes('history.back()')) {
+        state.historyLength = initialLength;
+        state.historyState = null;
+        return;
+      }
+      if (source.includes('location.hash')) return state.hash;
+      return { msg: 0, dom: 0 };
+    },
+    waitForFunction: async (fn, arg) => {
+      if (!String(fn).includes('history.length >')) return true;
+      growthCalls += 1;
+      if (waitGrowth) return waitGrowth(arg);
+      if (state.historyLength > arg) return true;
+      throw new Error('기록 증가 없음');
+    }
+  };
+}
+
+function fakeHistoryPage(shell, frame) {
+  return {
+    $: async () => ({ contentFrame: () => frame }),
+    evaluate: shell.evaluate,
+    waitForFunction: shell.waitForFunction
+  };
+}
+
+test('#1485 기록은 셸·프레임 각각의 길이를 기준으로 한 칸 증가해야 한다', async () => {
+  const shell = fakeHistoryTarget(5, { hash: '#board', url: 'http://example.test/#board' });
+  const frame = fakeHistoryTarget(7);
+  const page = fakeHistoryPage(shell, frame);
+  const result = await testBackNavigation(page, {
+    frame,
+    recorded: true,
+    timeoutMs: 50,
+    action: () => {
+      shell.state.historyLength = 6;
+      shell.state.historyState = { after: true };
+    }
+  });
+  assert.equal(result.before.historyLength, 5);
+  assert.equal(result.afterAction.historyLength, 6);
+  assert.equal(result.afterAction.frameHistoryLength, 7);
+});
+
+test('#1485 같은 방문 기록이 셸·프레임을 함께 늘려도 한 칸으로 판정한다', async () => {
+  const shell = fakeHistoryTarget(3, { hash: '#board', url: 'http://example.test/#board' });
+  const frame = fakeHistoryTarget(3);
+  const page = fakeHistoryPage(shell, frame);
+  const result = await testBackNavigation(page, {
+    frame,
+    recorded: true,
+    timeoutMs: 50,
+    action: () => {
+      shell.state.historyLength = 4;
+      frame.state.historyLength = 4;
+    }
+  });
+  assert.equal(result.afterAction.historyLength, 4);
+  assert.equal(result.afterAction.frameHistoryLength, 4);
+});
+
+test('#1485 한 동작이 한 문맥에서 두 칸 늘면 실패한다', async () => {
+  const shell = fakeHistoryTarget(3, { hash: '#board', url: 'http://example.test/#board' });
+  const frame = fakeHistoryTarget(3);
+  const page = fakeHistoryPage(shell, frame);
+  await assert.rejects(testBackNavigation(page, {
+    frame,
+    recorded: true,
+    timeoutMs: 50,
+    action: () => { shell.state.historyLength = 5; }
+  }), /history를 한 칸 늘린다/);
+});
+
+test('#1485 프레임 기록 증가는 셸 대기가 끝나기 전에 확인한다', async () => {
+  let rejectShell;
+  const shellWait = new Promise((resolve, reject) => { rejectShell = reject; });
+  const shell = fakeHistoryTarget(5, { waitGrowth: () => shellWait });
+  const frame = fakeHistoryTarget(5);
+  const page = fakeHistoryPage(shell, frame);
+  const pending = testBackNavigation(page, {
+    frame,
+    recorded: true,
+    timeoutMs: 1000,
+    action: () => {
+      frame.state.historyLength = 6;
+      frame.state.historyState = { after: true };
+    }
+  }).then(() => null, error => error);
+  await new Promise(resolve => setImmediate(resolve));
+  const observedFrameWaits = frame.growthCalls;
+  rejectShell(new Error('셸 기록 증가 없음'));
+  const error = await pending;
+  assert.equal(observedFrameWaits, 1, '셸 약속이 끝나기 전에 프레임 증가를 확인해야 한다');
+  assert.equal(error, null);
 });

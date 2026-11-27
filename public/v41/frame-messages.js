@@ -56,6 +56,7 @@
     // #1495: 서재 카드의 '둘러보기에 보임' — 그 트리 공유 판을 연다.
     openShare: fromView('lt41-open-share', 'treeId'),
     openTags: fromView('lt41-open-tags', 'suggest'),
+    openTree: fromView('lt41-open-tree', 'treeId, id?'),
     openView: fromView('lt41-open-view', 'treeId, view'),
     toolbarTreePicker: fromView('lt41-toolbar-tree-picker', 'rect, via'),
     toolbarTreePickerState: fromShell('lt41-toolbar-tree-picker-state', 'open, focus'),
@@ -64,6 +65,7 @@
     prefs: fromView('lt41-prefs', 'patch'),
     report: fromView('lt41-report', 'message, where, at'),
     select: fromView('lt41-select', 'id'),
+    share: fromView('lt41-share', 'treeId, id'),
     setShelfView: fromView('lt41-set-shelf-view', 'value'),
     shelfFilter: fromShell('lt41-shelf-filter', 'value'),
     shelfSelectTree: fromShell('lt41-shelf-select-tree', 'treeId'),

@@ -990,7 +990,21 @@ function wideBoardHorizontal(cards, viewportWidth, zoom) {
   const z = Math.min(zoom, (viewportWidth - 48) / box.w);
   return { z, x: (viewportWidth - box.w * z) / 2 - box.x * z };
 }
+// #1433: 판(.boardWorld)은 첫 자리(배율·위치·넓은 화면 판 여백)를 정한 뒤에 보인다(board.css).
+// 정하기 전 모습이 먼저 그려졌다가 판 여백(left)이 바뀌면 판 전체가 밀린 것으로 잡힌다.
+function markBoardViewReady() {
+  document.documentElement.dataset.ltBoardView = 'ready';
+}
+// 시작 자리 계산이 오지 않는 예외에서도 판은 보인다.
+setTimeout(markBoardViewReady, 4000);
 function boardStartView() {
+  try {
+    boardStartViewInner();
+  } finally {
+    markBoardViewReady();
+  }
+}
+function boardStartViewInner() {
   if (innerWidth < 700) {
     const bounds = mobileBoardBounds();
     viewMode = 'start';
@@ -1700,16 +1714,23 @@ for (const b of document.querySelectorAll('[data-board-mode]')) {
   };
 }
 function addBoardResetButton() {
+  // #1433: '처음대로'는 첫 그림부터 HTML에 있다(배치 묶음 폭이 늦게 바뀌지 않게). 쓸 수 없는 보드에서는 걷어 낸다.
+  let button = document.getElementById('boardResetOrderBtn');
   const group = document.querySelector('.boardModeSwitch');
-  if (!group || !boardSaveEnabled() || LTDEMO.readOnly) return;
-  const button = document.createElement('button');
-  button.type = 'button';
-  button.id = 'boardResetOrderBtn';
-  button.className = 'tool modeSwitchBtn boardResetOrderBtn';
-  button.textContent = '처음대로';
-  button.setAttribute('aria-label', '내 배치 순서를 날짜순으로 되돌리기');
+  if (!group || !boardSaveEnabled() || LTDEMO.readOnly) {
+    button?.remove();
+    return;
+  }
+  if (!button) {
+    button = document.createElement('button');
+    button.type = 'button';
+    button.id = 'boardResetOrderBtn';
+    button.className = 'tool modeSwitchBtn boardResetOrderBtn';
+    button.textContent = '처음대로';
+    button.setAttribute('aria-label', '내 배치 순서를 날짜순으로 되돌리기');
+    group.appendChild(button);
+  }
   button.addEventListener('click', resetBoardOrder);
-  group.appendChild(button);
 }
 addBoardResetButton();
 $('#undoBtn').onclick = undo;

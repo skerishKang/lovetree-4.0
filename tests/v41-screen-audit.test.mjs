@@ -100,7 +100,7 @@ const THUMB = (route) => route.fulfill({ status: 200, contentType: 'image/png', 
 // #942: 초심자·기존 사용자의 추가 단추와 단추별 숫자 묶음을 실제 화면에서 잰다.
 test('#942 첫 화면 추가 단추와 숫자 묶음', { skip: REQUIRE ? false : skip, timeout: 180000 }, async () => {
   if (skip) assert.fail(skip);
-  const server=await serve(),base='http://127.0.0.1:'+server.address().port;
+  const server=await serve({}, {port:Number(process.env.LT_TEST_PORT)||0}),base='http://127.0.0.1:'+server.address().port;
   const browser=await chromium.launch({headless:true});
   const dest=process.env.LT_HOME_CTA_CAPTURE;
   if(dest)mkdirSync(dest,{recursive:true});
@@ -473,11 +473,13 @@ const raiseToast = async (page) => {
   const box = await page.evaluate(() => {
     const t = document.getElementById('toast');
     const r = t.getBoundingClientRect();
-    return { hidden: t.hidden, top: Math.round(r.top), bottom: Math.round(r.bottom), gap: getComputedStyle(document.documentElement).getPropertyValue('--lt-toast-bottom').trim(), text: t.textContent };
+    // #1488: 안쪽 화면에는 바닥 링크가 없다 — 아래에 붙은 것(링크 줄·＋ 단추·새 소식 카드)이 보일 때만 그 위로 올라가야 한다.
+    const attached = [...document.querySelectorAll('.home-links,#mobile-add,.updates-card')].some((el) => { if (el.hidden) return false; const cs = getComputedStyle(el), b = el.getBoundingClientRect(); return cs.display !== 'none' && cs.visibility !== 'hidden' && b.width > 0 && b.height > 0; });
+    return { hidden: t.hidden, top: Math.round(r.top), bottom: Math.round(r.bottom), gap: getComputedStyle(document.documentElement).getPropertyValue('--lt-toast-bottom').trim(), text: t.textContent, attached };
   });
   assert.equal(box.hidden, false, '알림 줄이 떠 있다');
   assert.ok(box.text.trim().length > 0, '알림 줄에 글자가 있다');
-  assert.ok(Number.parseFloat(box.gap) > 0, `알림 줄 자리를 아래에 붙은 것들 위로 잡았다(--lt-toast-bottom: ${box.gap || '없음'})`);
+  if (box.attached) assert.ok(Number.parseFloat(box.gap) > 0, `알림 줄 자리를 아래에 붙은 것들 위로 잡았다(--lt-toast-bottom: ${box.gap || '없음'})`);
   return box;
 };
 const lowerToast = async (page) => { await page.evaluate(() => { const t = document.getElementById('toast'); if (t) t.hidden = true; }); };
@@ -3004,7 +3006,25 @@ test('#987 보드 첫 줄과 모바일 셸 겹침·현재 표시', { skip: REQUI
         await frame.waitForFunction(n => document.querySelectorAll('.card[data-id]').length === n, count);
         await frame.evaluate(() => selectMoment(document.querySelector('.card[data-id]').dataset.id,true));
         await frame.locator('#detail.open').waitFor();
-        await page.waitForTimeout(600);
+        await frame.waitForFunction(expected => {
+          const viewport = document.querySelector('#viewport');
+          const world = document.querySelector('#world');
+          const cards = [...document.querySelectorAll('.card[data-id]')];
+          if (!viewport || !world || cards.length !== expected || viewport.getAnimations().some(animation => animation.playState === 'running')) return false;
+          const rect = viewport.getBoundingClientRect();
+          if (expected === 8 && cards.filter(card => {
+            const box = card.getBoundingClientRect();
+            return box.left >= rect.left - 1 && box.right <= rect.right + 1;
+          }).length !== 8) return false;
+          const key = viewport.clientWidth + '|' + world.style.transform;
+          if (key !== window.__lt987BoardLayoutKey) {
+            window.__lt987BoardLayoutKey = key;
+            window.__lt987BoardLayoutFrames = 1;
+            return false;
+          }
+          window.__lt987BoardLayoutFrames = (window.__lt987BoardLayoutFrames || 0) + 1;
+          return window.__lt987BoardLayoutFrames >= 2;
+        }, count, { timeout: 10000 });
         const m = await frame.evaluate(() => {
           const title = document.querySelector('.lt-screen-toolbar').getBoundingClientRect(), vp = document.querySelector('#viewport').getBoundingClientRect(), btn = document.querySelector('#cinemaBtn').getBoundingClientRect();
           const cards = [...document.querySelectorAll('.card[data-id]')].map(e => e.getBoundingClientRect());

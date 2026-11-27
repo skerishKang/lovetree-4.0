@@ -154,3 +154,42 @@ test('970 실행: 빈 화면(순간 0개) — 안내·단추가 화면 안에, �
     }
   } finally { await browser.close(); await new Promise((ok) => server.close(ok)); }
 });
+
+// #1488 6번(공통 틀 #1452 점검): 높이가 낮은 화면(844×390 등, 높이 500px 이하)의 빈 상태 — '로그인' 단추가 화면 안에 있고,
+// 짧은 알림('로그아웃했어요.')과 설명 줄 사이가 8px 이상이다. 빈 상태 그림은 높이 500px 이하에서 줄이거나 숨긴다.
+test('#1488 낮은 화면의 빈 상태: 로그인 단추가 화면 안·알림과 설명 사이 8px 이상', { skip: skip970 || !REQUIRE970 ? skip970 || 'LT_970_REQUIRE=1 일 때 실행' : false, timeout: 240000 }, async () => {
+  const { openShellState, BOX_FN } = await import('./helpers/shell-states.mjs');
+  const server = await serve();
+  const origin = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium970.launch({ headless: true });
+  const rows = [];
+  try {
+    for (const [width, height] of [[844, 390], [360, 480]]) for (const theme of ['night', 'garden']) for (const logoutNotice of [false, true]) {
+      const { ctx, page } = await openShellState(browser, origin, { kind: 'guest', screen: 'shelf', width, height, theme, logoutNotice });
+      try {
+        if (logoutNotice) await page.waitForFunction(() => { const t = document.getElementById('toast'); return t && !t.hidden && /로그아웃/.test(t.textContent); }, null, { timeout: 15000 });
+        const m = await page.evaluate((boxSrc) => {
+          const box = new Function('return ' + boxSrc)();
+          const empty = document.getElementById('empty');
+          const items = [...empty.querySelectorAll('h1,h2,p,button,a')].map((e) => ({ tag: e.tagName.toLowerCase(), t: e.textContent.trim().slice(0, 24), b: box(e) })).filter((x) => x.b);
+          return { vh: innerHeight, items, toast: box('#toast'), login: box('#empty-records') };
+        }, BOX_FN.toString());
+        rows.push({ width, height, theme, logoutNotice, ...m });
+        assert.ok(m.login, `${width}×${height} ${theme}: 빈 상태 '로그인' 단추가 보인다`);
+        assert.ok(m.login.b <= m.vh && m.login.y >= 0, `${width}×${height} ${theme}: '로그인' 단추(${m.login.y}~${m.login.b})가 화면(높이 ${m.vh}) 안에 있다`);
+        if (logoutNotice) {
+          assert.ok(m.toast, '알림이 보인다');
+          for (const it of m.items) {
+            const dx = Math.max(m.toast.x, it.b.x) - Math.min(m.toast.r, it.b.r);
+            const dy = Math.max(m.toast.y, it.b.y) - Math.min(m.toast.b, it.b.b);
+            assert.ok(dx >= 0 || dy >= 8, `${width}×${height} ${theme}: 알림(${m.toast.y}~${m.toast.b})과 '${it.t}'(${it.b.y}~${it.b.b}) 사이 8px 이상`);
+          }
+        }
+      } finally { await ctx.close(); }
+    }
+  } finally {
+    console.log('#1488 낮은 빈 상태', JSON.stringify(rows));
+    await browser.close();
+    await new Promise((ok) => server.close(ok));
+  }
+});

@@ -233,9 +233,9 @@ html[data-lt-theme=garden] .account-popover{background:var(--lt-glass-strong);bo
 html[data-lt-theme=garden] .account-menu-count{background:var(--lt-rose-ink);color:var(--lt-paper)}
 /* 계정 메뉴 항목은 판 배경을 그대로 비운다(.header-actions button의 옅은 칸은 여기서 덮는다).
    옅은 칠은 올림·초점·눌림에서만 — 기본 상태의 항목 박스가 정원에서 особенно 도드라졌다(2026-11-17). */
-html[data-lt-theme=garden] .account-popover button{color:var(--lt-ink);background:transparent}
-html[data-lt-theme=garden] .account-popover button:hover,html[data-lt-theme=garden] .account-popover button:focus-visible,html[data-lt-theme=garden] .account-popover button:active{background:rgba(152,80,94,.08)}
-html[data-lt-theme=garden] .account-popover[data-lt-opened-by=mouse] button:focus-visible:not(:hover){background:transparent;outline:0;box-shadow:none}
+html[data-lt-theme=garden] .account-popover button,html[data-lt-theme=garden] .account-popover a[role=menuitem]{color:var(--lt-ink);background:transparent}
+html[data-lt-theme=garden] .account-popover button:hover,html[data-lt-theme=garden] .account-popover button:focus-visible,html[data-lt-theme=garden] .account-popover button:active,html[data-lt-theme=garden] .account-popover a[role=menuitem]:hover,html[data-lt-theme=garden] .account-popover a[role=menuitem]:focus-visible{background:rgba(152,80,94,.08)}
+html[data-lt-theme=garden] .account-popover[data-lt-opened-by=mouse] button:focus-visible:not(:hover),html[data-lt-theme=garden] .account-popover[data-lt-opened-by=mouse] a[role=menuitem]:focus-visible:not(:hover){background:transparent;outline:0;box-shadow:none}
 html[data-lt-theme=garden] .account-email{color:var(--lt-muted);border-bottom-color:var(--lt-line)}
 /* 공통 도움말 풍선은 각 테마의 배경·글자·테두리 토큰 쌍을 쓴다. */
 .lt-tip-bubble{position:fixed;z-index:80;max-width:min(320px,80vw);padding:6px 10px;border:1px solid var(--lt-gold-line);border-radius:10px;background:var(--lt-glass-strong);color:var(--lt-pearl);font-size:13px;line-height:1.45;pointer-events:none;box-shadow:0 6px 18px rgba(0,0,0,.35)}
@@ -272,10 +272,10 @@ html[data-lt-theme=garden] body,html[data-lt-theme=garden] .app-header{transitio
 :host([data-lt-theme=garden]) .card{border-color:var(--lt-gold-deep);--lt-orbit-shadow:var(--lt-garden-shadow)}
 :host([data-lt-theme=garden]) .card.memo{border-color:var(--lt-ink)}
 /* #1027: 정원 이어 보기 카드만 종이와 잉크로 맞춘다. */
-:host([data-lt-theme=garden]) .recent-card{background:var(--lt-paper);color:var(--lt-ink)}
+:host([data-lt-theme=garden]) .recent-card{--lt-recent-meta-bg:var(--lt-paper);background:var(--lt-paper);color:var(--lt-ink)}
 :host([data-lt-theme=garden]) .recent-media{background:var(--lt-paper)}
  :host([data-lt-theme=garden]) .recent-media.vertical::before{opacity:.7}
-:host([data-lt-theme=garden]) .recent-meta{background:var(--lt-paper);border-top:1px solid var(--lt-line-paper)}
+:host([data-lt-theme=garden]) .recent-meta{border-top:1px solid var(--lt-line-paper)}
 :host([data-lt-theme=garden]) .recent-head,:host([data-lt-theme=garden]) .recent-head-arrow,:host([data-lt-theme=garden]) .recent-meta small{color:var(--lt-muted)}
 :host([data-lt-theme=garden]) .recent-head:hover,:host([data-lt-theme=garden]) .recent-memo{color:var(--lt-ink)}
 :host([data-lt-theme=garden]) .menuBtn,:host([data-lt-theme=garden]) .subtleBtn{background:rgba(255,253,248,.9);border-color:rgba(119,91,82,.34);color:var(--lt-ink)}
@@ -283,7 +283,7 @@ html[data-lt-theme=garden] body,html[data-lt-theme=garden] .app-header{transitio
 /* #942: 첫 화면의 순간 추가 단추만 장미색으로 되돌린다. 둘러보기·안내·궤도는 그대로 둔다. */
 :host .center .home-add-top.primary-cta,:host .center .home-add-top.primary-cta:hover,:host([data-lt-theme=garden]) .center .home-add-top.primary-cta,:host([data-lt-theme=garden]) .center .home-add-top.primary-cta:hover{background:var(--lt-cta-rose);border-color:var(--lt-cta-rose);color:var(--lt-cta-white)}
 /* #1350/#1435: line-height·padding의 소수점 합과 무관하게 누름 높이를 44px 이상으로 고정한다. */
-:host .center .actions .subtleBtn,:host .center .home-add-top{min-height:44px}
+:host .center .actions .subtleBtn,:host .center .home-add-top{min-height:46px}
 :host .center .actions .subtleBtn{background:var(--lt-primary);color:var(--lt-primary-ink);border-color:var(--lt-primary)}
 :host .center .actions .subtleBtn:hover,:host .center .actions .subtleBtn:active{filter:brightness(.94)}
 :host([data-lt-theme=garden]) .center .actions .subtleBtn{background:var(--lt-paper);color:var(--lt-ink);border-color:var(--lt-line-paper)}
