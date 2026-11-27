@@ -278,7 +278,7 @@ export function createPanels(deps) {
       for (const option of [...field.options]) if (option.dataset.legacy) option.remove();
       const value = mode === 'edit' ? m[key] || '' : '';
       if (value && ![...field.options].some(option => option.value === value)) {
-        const option = new Option(value, value); option.dataset.legacy = '1'; field.add(option);
+        const option = document.createElement('option'); option.textContent = value; option.value = value; option.dataset.legacy = '1'; field.add(option);
       }
       field.value = value;
     }
