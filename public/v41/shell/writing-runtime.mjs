@@ -204,6 +204,7 @@ export function createWritingRuntime(ctx){
     // #327 2부: 모아둔 순간 정리 창. #380 5번: 입구는 트리 ▾ 드롭다운의 '정리 전 N개 정리하기' 한 곳뿐이고,
     // 순간 상세의 '다른 트리로 옮기기'(lt41-move 메시지)는 그 순간을 옮기는 별개 동작으로 남는다.
     shellCleanup=(0,ctx.lazyPanel)(()=>import('./cleanup.mjs').then(m=>m.createCleanup({
+      holdPanel:(id,on)=>ctx.shellDialogs.holdPanel(id,on),
       $:ctx.$,
       getMember:()=>ctx.member,
       getSource:()=>ctx.source,

@@ -117,6 +117,9 @@ html[data-lt-theme="garden"] .d-list button:hover{background:rgba(64,53,54,.07)}
 /* 발자취 걷기(레일 맨 아래) */
 .g-walk{min-height:44px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-pill);font-size:13.5px;color:var(--lt-gold);background:rgba(255,230,166,.06)}
 .g-walk:hover{background:rgba(255,230,166,.14)}
+.g-legend-item{position:relative}
+.g-legend-item::after{content:"";position:absolute;inset:-7px 0;border-radius:inherit}
+.g-legend-item:hover,.g-legend-item:focus-within{z-index:1}
 .g-walk[data-on="true"]{color:var(--lt-stage);background:var(--lt-gold);border-color:var(--lt-gold)}
 
 /* 390: 무대가 화면 폭을 다 쓰고, 레일은 아래 시트로 내려온다(지도 390 조작 줄 잘림 패턴 반복 없음). */

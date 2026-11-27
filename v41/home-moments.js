@@ -97,6 +97,7 @@ export function cardOf(treeId, moment, currentOrigin, youtube = null) {
     id: text(moment?.id),
     title: text(moment?.title),
     date: text(formatDisplayDate(moment?.date, ltDateStyle())),
+    rawDate: text(moment?.date || moment?.createdAt || ''),
     emotion: text(moment?.emotion),
     note: noteOf(moment),
     image: image || thumb,

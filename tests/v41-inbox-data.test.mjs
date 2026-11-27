@@ -390,3 +390,84 @@ test('#1439 되돌리기: 그사이 다른 것을 고쳤으면 그 고침은 지
   assert.equal(undone.state.trees.find(t => t.id === 't2').moments.some(m => m.id === 'mc'), false);
   assert.equal(undone.state.trees.find(t => t.id === 't2').moments[0].title, '또 고침');
 });
+
+
+test('#1440 새 트리 생성과 담기는 한 번의 정리와 되돌리기로 처리한다', () => {
+  for (const mode of ['move', 'copy']) {
+    const state = threeTrees();
+    const result = webDomain.organizeMoments(state, { mode, fromTreeId: 't1', momentIds: ['ma', 'mb', 'mc'], newTreeName: '새 기억' }, OUT, counter('newcopy'));
+    const target = result.state.trees.find(t => t.subject === '새 기억');
+    assert.equal(target.moments.length, 3);
+    assert.equal(result.summary.moments, 3);
+    assert.equal(result.state.trees.some(t => t.id === 't1'), mode === 'copy');
+    if (mode === 'copy') {
+      assert.deepEqual(result.state.trees.find(t => t.id === 't1'), state.trees[0]);
+      assert.deepEqual(target.moments.map(m => m.copiedFrom), ['ma', 'mb', 'mc']);
+    }
+    assert.doesNotThrow(() => serverDomain.validateState(result.state));
+    assert.deepEqual(webDomain.undoOrganize(result.state, result.record, OUT).state, state);
+  }
+});
+
+test('#1440 새 트리와 기존 트리에 함께 복사하고 한 번에 복원한다', () => {
+  const state = threeTrees();
+  const result = webDomain.organizeMoments(state, { mode: 'copy', fromTreeId: 't1', momentIds: ['mb'], toTreeIds: ['t2'], newTreeName: '새 기억' }, OUT, counter('newcopy'));
+  assert.equal(result.summary.placed, 2);
+  assert.deepEqual(webDomain.undoOrganize(result.state, result.record, OUT).state, state);
+  const changed = structuredClone(result.state);
+  changed.trees.find(t => t.subject === '새 기억').title = '고친 이름';
+  assert.throws(() => webDomain.undoOrganize(changed, result.record, OUT), /트리가 바뀌었어요/);
+});
+
+test('#1440 기존 대상에서 모두 건너뛰어도 새 트리에 복사하고 한 번에 복원한다', () => {
+  const state = threeTrees();
+  const args = { mode: 'copy', fromTreeId: 't1', momentIds: ['mb'], toTreeIds: ['t2','t3'], skip: { t2: ['mb'], t3: ['mb'] } };
+  assert.throws(() => webDomain.organizeMoments(state, args, OUT, counter('newcopy')), /넣을 순간이 없어요/);
+  const result = webDomain.organizeMoments(state, {...args,newTreeName:'새 기억'}, OUT, counter('newcopy'));
+  assert.deepEqual(result.state.trees.slice(0,3),state.trees);
+  assert.deepEqual(result.state.trees[3].moments.map(m=>m.copiedFrom),['mb']);
+  assert.deepEqual(result.summary,{moments:1,trees:1,placed:1,skipped:2});
+  assert.deepEqual(webDomain.undoOrganize(result.state,result.record,OUT).state,state);
+});
+test('#1440 전체 이동은 지금 방식과 동일하게 원본 트리를 없앤다', () => {
+  const state=threeTrees(), ids=['ma','mb','mc'];
+  const classic=webDomain.treeFromMoments(state,'t1',ids,{subject:'새 기억'},OUT);
+  const cards=webDomain.organizeMoments(state,{mode:'move',fromTreeId:'t1',momentIds:ids,newTreeName:'새 기억'},OUT);
+  assert.equal(classic.state.trees.some(t=>t.id==='t1'),false);
+  assert.equal(cards.state.trees.some(t=>t.id==='t1'),false);
+  assert.deepEqual(cards.state.trees.at(-1).moments,classic.state.trees.at(-1).moments);
+  assert.deepEqual(webDomain.undoOrganize(cards.state,cards.record,OUT).state,state);
+});
+
+test('#1527 빈 대상에 여러 순간을 담고 한 번에 복원한다', async () => {
+  const {duplicatesByTree}=await import('../public/v41/quick-intake.mjs');
+  for(const mode of ['move','copy']) {
+    const initial=threeTrees();
+    initial.trees[1].moments=[];
+    const state=webDomain.validateState(initial);
+    assert.deepEqual(duplicatesByTree(state.trees,state.trees[0].moments,['t2']),[]);
+    for(const ids of [['mb'],['mb','mc'],['ma','mb','mc']]){
+      const result=webDomain.organizeMoments(state,{mode,fromTreeId:'t1',momentIds:ids,toTreeIds:['t2']},OUT,counter('emptycopy'));
+      const target=result.state.trees.find(t=>t.id==='t2');
+      assert.equal(target.moments.length,ids.length);
+      assert.equal(target.moments[0].parentId,null);
+      assert.equal(target.moments[0].relation,'');
+      assert.deepEqual(target.moments.slice(1).map(m=>m.parentId),ids.slice(1).map(()=>target.moments[0].id));
+      assert.deepEqual(target.moments.map(m=>m.links),ids.map(()=>[]));
+      assert.deepEqual(duplicatesByTree(result.state.trees,state.trees[0].moments,['t2']),[{treeId:'t2',momentIds:ids}]);
+      assert.doesNotThrow(()=>serverDomain.validateState(result.state));
+      assert.deepEqual(webDomain.undoOrganize(result.state,result.record,OUT).state,state);
+    }
+  }
+});
+
+test('#1527 빈 대상에 담은 뒤 수정하면 기록 보호를 위해 일괄 복원을 거부한다', () => {
+  for(const mode of ['move','copy']){
+    const state=threeTrees();
+    state.trees[1].moments=[];
+    const result=webDomain.organizeMoments(state,{mode,fromTreeId:'t1',momentIds:['mb'],toTreeIds:['t2']},OUT,counter('emptycopy'));
+    const changed=structuredClone(result.state);
+    changed.trees.find(t=>t.id==='t2').moments[0].note='새로 고친 메모';
+    assert.throws(()=>webDomain.undoOrganize(changed,result.record,OUT),/트리가 바뀌었어요/);
+  }
+});

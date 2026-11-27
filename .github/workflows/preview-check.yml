@@ -755,6 +755,7 @@ jobs:
           start=$(date +%s)
           npx vite build > /dev/null
           node --test --test-concurrency=1 tests/v41-account-settings.test.mjs tests/v41-header-tabs-mobile.test.mjs tests/v41-a11y-shell-names.test.mjs tests/v41-theme-ab.test.mjs tests/v41-shell-notice.test.mjs
+          LT_1440_REQUIRE=1 node --test --test-concurrency=1 tests/v41-1440-cleanup-cards.test.mjs
           echo "셸·설정·테마 화면 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
 
       - name: 색 토큰 계산 화면 시험(건너뜀=실패 — #886)

@@ -1671,7 +1671,7 @@ test('#1473 알림 띠와 숫자판 겹침 0', {skip: REQUIRE952 ? false : skip9
  try{
  for(const [width,height] of [[390,844],[844,390],[1440,900]])
  for(const theme of ['night','garden']) for(const member of [false,true]){
- const h=await boot952(browser,{width,height,member,initStorage:{'lt41.theme':theme},port:4560});
+ const h=await boot952(browser,{width,height,member,initStorage:{'lt41.theme':theme},port:Number(process.env.LT_TEST_PORT)||4564});
  try{
  await h.frame.waitForFunction(()=>globalThis.__LT_ORBIT_TEST__?.canvasSettled());
  await h.page.evaluate(()=>{const c=document.getElementById('updates-card');c.hidden=false;document.getElementById('updates-card-text').textContent='\uB7EC\uBE0C\uD2B8\uB9AC\uAC00 \uC0C8\uB85C\uC6CC\uC84C\uC5B4\uC694';});
@@ -1717,4 +1717,46 @@ test('#1473 알림 띠와 숫자판 겹침 0', {skip: REQUIRE952 ? false : skip9
  }finally{await close952(h)}
  }
  }finally{await browser.close()}
+});
+
+test('#1521 머리줄과 가운데 단추 일치',{skip: REQUIRE952 ? false : skip952, timeout:240000},async()=>{
+ if (skip952) assert.fail(skip952);
+ const browser=await chromium952.launch({headless:true});
+ try{
+ for(const [width,height] of [[390,844],[844,390],[1440,900]])for(const theme of ['night','garden'])for(const member of [false,true]){
+ const h=await boot952(browser,{width,height,member,initStorage:{'lt41.theme':theme},port:Number(process.env.LT_TEST_PORT)||4564});
+ try{
+ await h.frame.waitForFunction(()=>globalThis.__LT_ORBIT_TEST__?.canvasSettled());
+ await h.frame.waitForFunction(()=>document.getElementById('orbit')?.shadowRoot?.querySelector('.center .eyebrow')?.textContent?.trim());
+ const m=await h.page.evaluate(()=>{
+ const f=document.getElementById('view'),root=f.contentDocument.getElementById('orbit').shadowRoot;
+ const get=e=>{if(!e)return null;const s=e.ownerDocument.defaultView.getComputedStyle(e),r=e.getBoundingClientRect();return {visible:!!(r.width&&r.height&&s.visibility!=='hidden'),w:r.width,h:r.height,x:r.x,y:r.y,font:s.fontFamily,size:s.fontSize,weight:s.fontWeight,radius:s.borderTopLeftRadius,bg:s.backgroundColor,ink:s.color,border:s.borderTopColor,padding:s.padding,gap:s.gap,line:s.lineHeight,letter:s.letterSpacing,transform:s.transform}};
+ return {headerAdd:get(document.querySelector('#write-menu')),headerExplore:get(document.querySelector('#community-menu')),centerAdd:get(root.querySelector('.home-add-top')),centerExplore:get(root.querySelector('.actions [data-do=community]')),buttons:[...root.querySelectorAll('.actions .subtleBtn')].map(get),counts:[...root.querySelectorAll('.home-count')].map(get)};
+ });
+ const fields=['w','h','font','size','weight','radius','bg','ink','border'];
+ const tag=[width,theme,member].join('-');
+ for(const [a,b] of [[m.headerAdd,m.centerAdd],[m.headerExplore,m.centerExplore]]){
+ if(a?.visible&&b?.visible)for(const k of fields)assert.equal(a[k],b[k],tag+' '+k);
+ }
+ assert.equal(m.buttons.length,3,tag);
+ for(const b of m.buttons)assert.equal(b.h,44,tag+' height');
+ if(member)assert.equal(m.centerAdd.h,44,tag+' add height');
+ for(const c of m.counts.filter(c=>c.visible))assert.ok(m.buttons.some(b=>Math.abs(b.w-c.w)<=1&&Math.abs(b.x-c.x)<=1),tag+' count alignment');
+ console.log('MEASURE1521',tag);
+ const dir=process.env.LT_1521_CAPTURE;if(dir){const{mkdirSync,writeFileSync}=await import('node:fs');mkdirSync(dir,{recursive:true});writeFileSync(dir+'/'+width+'-'+theme+'-'+member+'.json',JSON.stringify(m));await h.page.screenshot({path:dir+'/'+width+'-'+theme+'-'+member+'.png',animations:'disabled'});}
+ }finally{await close952(h)}
+ }
+ }finally{await browser.close()}
+});
+
+test('#1530 cold thumbnail states',{skip: REQUIRE952 ? false : skip952,timeout:120000},async()=>{
+ if(skip952)assert.fail(skip952);
+ const browser=await chromium952.launch({headless:true});
+ try{for(const [kind,url] of [['vertical','https://www.youtube.com/shorts/abc123DEF45'],['horizontal','https://youtu.be/abc123DEF45'],['missing','https://youtu.be/abc123DEF45']]){
+ const tree=createTree({subject:'Test',title:'Test video',date:'2026-11-20',emotion:'test',url},'2026-11-20T00:00:00.000Z');
+ const workspace={revision:1,state:{version:1,trees:[tree],prefs:{}},subject:'visual-audit-fake',writeSubjectBound:true};
+ let release;const gate=new Promise(r=>release=r);const events=[];
+ const h=await boot952(browser,{member:true,width:1440,waitUntil:'domcontentloaded',routes:{'/api/workspace':r=>r.fulfill({json:workspace}),'/api/youtube/oembed':r=>r.fulfill({status:kind==='missing'?404:403,json:{}})},thumb:async(r,u)=>{events.push(['request',u.pathname,Date.now()]);await gate; if(kind==='missing'||u.pathname.includes('oardefault')){events.push(['abort',u.pathname,Date.now()]);return r.abort()}events.push(['success',u.pathname,Date.now()]);return THUMB(r)}});
+ try{const m=h.frame.locator('.recent-media');const snap=()=>m.evaluate(e=>{const i=e.querySelector('img');return {state:e.dataset.recentState,src:i?.src,width:i?.naturalWidth,opacity:i&&getComputedStyle(i).opacity,cover:!!e.querySelector('.lt-recent-fallback'),h:e.getBoundingClientRect().height}});const before=await snap();assert.equal(before.state,'loading');assert.equal(before.cover,false);assert.equal(before.opacity,'0');release();await h.frame.waitForFunction(()=>{const e=document.querySelector('#orbit')?.shadowRoot?.querySelector('.recent-media');const i=e?.querySelector('img');return e?.querySelector('.lt-recent-fallback')||i?.naturalWidth>0});const after=await snap();assert.equal(after.state,kind==='missing'?'failed':'ready');assert.equal(after.cover,kind==='missing');assert.equal(after.opacity,kind==='missing'?'0':'1');assert.equal(after.h,before.h);assert.equal(after.width>0,kind!=='missing');if(kind==='vertical')assert.match(after.src,/hqdefault/);assert.equal(await m.locator('.recent-play').isVisible(),false);}finally{release();await close952(h)}
+ }}finally{await browser.close()}
 });
