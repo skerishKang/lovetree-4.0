@@ -659,16 +659,28 @@ test('#1525 상세 창은 새로고침·뒤로 가기·주소 다시 열기 6/6 
         const view = document.getElementById('view'), doc = view?.contentDocument;
         return !view?.hidden && doc?.readyState === 'complete' &&
           !!doc.querySelector('#cards [data-kind="moment"]') &&
-          !!doc.getElementById('treeDetail')?.open;
-      }, null, { timeout: 10000 });
+          !!doc.getElementById('treeDetail')?.open &&
+          view.contentWindow?.history.state?.lt41TreePanel === 'detail';
+      }, null, { timeout: 10000 }).catch(async error => {
+        const snapshot=await page.evaluate(() => {
+          const view=document.getElementById('view'),doc=view?.contentDocument;
+          return {hash:location.hash,shellState:history.state,frameUrl:view?.contentWindow?.location.href,
+            viewHidden:view?.hidden,ready:doc?.readyState,cards:doc?.querySelectorAll('#cards [data-kind="moment"]').length,
+            detailOpen:doc?.getElementById('treeDetail')?.open,frameState:view?.contentWindow?.history.state};
+        }).catch(e=>({inspectionError:String(e)}));
+        console.error('TREE_RELOAD_RESTORE_CHECK',theme,JSON.stringify(snapshot));
+        throw error;
+      });
       frame = await page.$('#view').then(handle => handle.contentFrame());
       assert.equal(await frame.locator('#treeDetail[open]').count(), 1, '새로고침');
-      // 상세 열림은 같은 문서의 history 항목이다. 새 load 대신 닫힌 상세와 카드 복원을 기다린다.
-      await page.evaluate(() => history.back());
+      // 상세 기록을 만든 iframe에서 뒤로 가고, 같은 iframe의 복원 결과를 확인한다.
+      await frame.evaluate(() => history.back());
       await page.waitForFunction(() => {
-        const doc = document.getElementById('view')?.contentDocument;
-        // 기존 단언과 같이 열린 상세가 사라졌는지만 확인한다.
-        return doc?.readyState === 'complete' && !doc.querySelector('#treeDetail[open]');
+        const view = document.getElementById('view'), doc = view?.contentDocument;
+        return !view?.hidden && doc?.readyState === 'complete' &&
+          view.contentWindow?.history.state?.lt41TreePanel !== 'detail' &&
+          !doc.querySelector('#treeDetail[open]') &&
+          doc.querySelectorAll('#cards [data-kind="moment"]').length === 6;
       }, null, { timeout: 10000 });
       frame = await page.$('#view').then(handle => handle.contentFrame());
       assert.equal(await frame.locator('#treeDetail[open]').count(), 0, '뒤로 가기');
@@ -681,6 +693,84 @@ test('#1525 상세 창은 새로고침·뒤로 가기·주소 다시 열기 6/6 
       }, null, { timeout: 10000 });
       frame = await page.$('#view').then(handle => handle.contentFrame());
       assert.equal(await frame.locator('#treeDetail[open]').count(), 1, '주소 다시 열기');
+    } finally { await context.close(); }
+  });
+});
+
+test('#1525 상세 재적재는 뒤로 가기 기록을 중복 생성하지 않는다', { skip: REQUIRE ? false : skip, timeout: 120000 }, async t => {
+  if (skip) assert.fail(`필수 화면 시험 환경 누락: ${skip}`);
+  const { serve } = await import('./helpers/screen-audit.mjs');
+  const server = await serve();
+  const browser = await chromium.launch({headless:true});
+  t.after(async () => { await browser.close(); server.close(); });
+  for (const theme of ['night','garden']) await t.test(theme, async () => {
+    const {page,frame:initialFrame,context}=await openShellTree(browser,`http://127.0.0.1:${server.address().port}`,1440,theme);
+    let frame=initialFrame;
+    try {
+      await frame.locator('#cards [data-kind="moment"]:not(.is-root)').first().click();
+      await page.waitForFunction(() => {
+        const view=document.getElementById('view');
+        return !view?.hidden && !!view.contentDocument?.getElementById('treeDetail')?.open &&
+          view.contentWindow?.history.state?.lt41TreePanel==='detail' &&
+          history.state?.lt41TreeDetail === true;
+      },null,{timeout:10000});
+      await page.reload({waitUntil:'load'});
+      await page.waitForFunction(() => {
+        const view=document.getElementById('view');
+        return !view?.hidden && !!view.contentDocument?.getElementById('treeDetail')?.open &&
+          view.contentWindow?.history.state?.lt41TreePanel==='detail' &&
+          new URL(view.contentWindow.location.href).searchParams.has('open');
+      },null,{timeout:10000});
+      // 복원된 iframe의 초기 그림만으로 셸 계정 문서 준비를 단정하지 않는다.
+      await page.waitForFunction(() => {
+        const inner=document.getElementById('view')?.contentWindow;
+        return inner?.LTDEMO?.treeId && window.LT41?.tree?.id===inner.LTDEMO.treeId;
+      },null,{timeout:10000});
+      frame=await page.$('#view').then(handle=>handle.contentFrame());
+      const before=await frame.evaluate(() => ({index:window.navigation?.currentEntry?.index,length:history.length,pick:history.state?.lt41TreePick}));
+      await page.evaluate(() => {
+        const inner=document.getElementById('view').contentWindow;
+        inner.__lt1525RefreshDone=false;
+        inner.__lt1525RefreshCalled=false;
+        const original=inner.LTDEMO.refresh;
+        inner.LTDEMO.refresh=(...args)=>{
+          const result=original(...args);
+          inner.__lt1525RefreshCalled=true;
+          inner.requestAnimationFrame(()=>{inner.__lt1525RefreshDone=result;});
+          return result;
+        };
+        inner.postMessage({type:window.LT41_MSG.momentsSaved},location.origin);
+      });
+      await frame.waitForFunction(() => window.__lt1525RefreshDone === true,null,{timeout:10000}).catch(async error=>{
+        const snapshot=await page.evaluate(()=>{
+          const view=document.getElementById('view'),inner=view?.contentWindow;
+          return {shellTree:window.LT41?.tree?.id,frameTree:inner?.LTDEMO?.treeId,
+            shellSource:window.LT41?.source,viewHidden:view?.hidden,
+            frameUrl:inner?.location.href,frameState:inner?.history.state,
+            called:inner?.__lt1525RefreshCalled,done:inner?.__lt1525RefreshDone,
+            frameReady:view?.contentDocument?.readyState};
+        }).catch(e=>({snapshotError:String(e)}));
+        console.error('TREE_RELOAD_DATA_SIGNAL',theme,JSON.stringify(snapshot));
+        throw error;
+      });
+      const after=await frame.evaluate(() => ({index:window.navigation?.currentEntry?.index,length:history.length,panel:history.state?.lt41TreePanel,pick:history.state?.lt41TreePick}));
+      assert.equal(after.index ?? after.length,before.index ?? before.length,'같은 상세 재적재는 기록을 늘리지 않는다');
+      assert.equal(after.panel,'detail','재적재 뒤 상세 기록 유지');
+      assert.equal(after.pick,before.pick,'재적재 뒤 선택한 순간 유지');
+      assert.equal(await frame.locator('#treeDetail[open]').count(),1,'재적재 뒤 상세 창 유지');
+      await frame.evaluate(()=>history.back());
+      await frame.waitForFunction(() => !document.querySelector('#treeDetail[open]') &&
+        history.state?.lt41TreePanel !== 'detail' &&
+        document.querySelectorAll('#cards [data-kind="moment"]').length===6,null,{timeout:10000});
+      // 주소의 ?open 값은 이미 소비됐다. 뒤로 간 뒤 데이터 재적재가 상세를 다시 열지 않는다.
+      const closedIndex=await frame.evaluate(() => window.navigation?.currentEntry?.index ?? history.length);
+      await frame.evaluate(() => {window.__lt1525RefreshDone=false;});
+      await page.evaluate(() => document.getElementById('view').contentWindow.postMessage(
+        {type:window.LT41_MSG.momentsSaved},location.origin));
+      await frame.waitForFunction(() => window.__lt1525RefreshDone===true,null,{timeout:10000});
+      assert.equal(await frame.locator('#treeDetail[open]').count(),0,'뒤로 간 상세는 재적재에도 닫힌 상태');
+      assert.equal(await frame.evaluate(() => window.navigation?.currentEntry?.index ?? history.length),
+        closedIndex,'닫힌 상세의 재적재는 기록 추가 없음');
     } finally { await context.close(); }
   });
 });
