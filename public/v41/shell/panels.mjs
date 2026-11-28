@@ -603,14 +603,19 @@ export function createPanels(deps) {
     const root = tree.moments.find(moment => moment.parentId === null);
     const title = $('tree-cover-title').value.trim();
     let added;
+    deps.holdPanel?.('tree-manager', true);
     try {
-      added = getMember().apply('add', { url, ...(title ? { title } : {}) }, { treeId: tree.id, momentId: root.id });
-    } catch (error) { throw Error('사진은 보관 파일로 남았어요. 순간으로 만들지는 못했어요 — ' + error.message); }
-    try {
-      getMember().apply('editTree', { title: tree.title, subject: tree.subject, coverMomentId: added.momentId, coverDesign: tree.coverDesign || '', coverMode: 'photo' }, { treeId: tree.id });
-    } catch (error) {
-      fillTreeCoverOptions(window.LT41?.tree || tree);
-      throw Error('사진은 순간으로 남았지만 표지 지정은 실패했어요 — ' + error.message + ' · 위 “표지”에서 직접 골라 저장할 수 있어요.');
+      try {
+        added = getMember().apply('add', { url, ...(title ? { title } : {}) }, { treeId: tree.id, momentId: root.id });
+      } catch (error) { throw Error('사진은 보관 파일로 남았어요. 순간으로 만들지는 못했어요 — ' + error.message); }
+      try {
+        getMember().apply('editTree', { title: tree.title, subject: tree.subject, coverMomentId: added.momentId, coverDesign: tree.coverDesign || '', coverMode: 'photo' }, { treeId: tree.id });
+      } catch (error) {
+        fillTreeCoverOptions(window.LT41?.tree || tree);
+        throw Error('사진은 순간으로 남았지만 표지 지정은 실패했어요 — ' + error.message + ' · 위 “표지”에서 직접 골라 저장할 수 있어요.');
+      }
+    } finally {
+      deps.holdPanel?.('tree-manager', false);
     }
     const updated = window.LT41?.tree;
     if (updated && updated.id === tree.id) { fillTreeCoverOptions(updated); $('tree-cover').value = added.momentId; }
