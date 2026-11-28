@@ -359,7 +359,8 @@ test('984 실행: 표지 — 저장 직후 서재·열린 책 반영, 실패하�
         assert.deepEqual(errors, [], `${w}: 페이지 오류 없음(성공)`);
         await page.close();
       }
-      // ② 열린 책(리더) — 저장 성공 직후 표지가 새 값. 책 화면으로의 넘어감을 가짜 응답으로 늦춰 리더를 관찰한다.
+      // ② 실제 책 화면 — '바로 펼치기'로 진입한 뒤 저장 직후 책 표지와
+      // 한 번 뒤로 간 서재 표지가 새 값으로 바뀌는지 검사한다.
       {
         const page = await browser.newPage({ viewport: { width: w, height: h } });
         const errors = [];
@@ -368,21 +369,25 @@ test('984 실행: 표지 — 저장 직후 서재·열린 책 반영, 실패하�
         const puts = [];
         await mockWorkspace984(page, { storedTree, puts, failPut: false });
         await page.route('**/api/account', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, email: 't@t.test', name: '시험' }) }));
-        await page.route('**/views/track59-sketchbook.html*', async (route) => {
-          await new Promise((resolve) => setTimeout(resolve, 10000));
-          await route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><html lang="ko"><head><title>책</title></head><body>책</body></html>' });
-        });
+        // 직접 펼치는 경로에서는 실제 책 화면을 검증한다.
+        // 예전 미리보기만 관찰하기 위해 책 HTML을 10초 동안 가로채던 가짜 응답은 사용하지 않는다.
         await page.goto(`${base}/v41/?account=1#my/shelf`, { waitUntil: 'load', timeout: 60000 });
         const frame = await findShelfFrame984(page, w);
-        // #1094: 기본(책) 방식은 서재에서 바로 책으로 가므로, 열린 책(목록)을 관찰하려면 설정에서 목록을 택한다(머리줄 토글은 책 화면 줄로 옮겨졌다).
+        // #1631: 책 보기(bookDisplay)와 서재 열기(shelfOpenMode)는 별개 설정이다.
         await page.click('#account-avatar');
         await page.click('#account-open-settings');
-        await page.click('#account-settings [data-book-display="list"]');
-        await page.waitForFunction(() => window.LT41?.prefs?.bookDisplay === 'list', null, { timeout: 10000 });
+        await page.click('#account-settings [data-shelf-open-mode="direct"]');
+        await page.waitForFunction(() => window.LT41?.prefs?.shelfOpenMode === 'direct', null, { timeout: 10000 });
         await page.click('#account-settings [data-close="account-settings"]');
         await frame.locator('.book-card button[data-book-id="tree1"]').click();
-        await frame.waitForSelector('#readerScreen.active', { timeout: 10000 });
-        const readerBefore = await frame.evaluate(() => document.getElementById('bookCoverFace')?.getAttribute('data-cover-design') || '');
+        // 예전 가짜 표지 미리보기 대신 실제 책 iframe의 준비 상태로 진입을 판정한다.
+        await page.waitForFunction(() => {
+          const f=document.querySelector('#view:not([hidden])');
+          return f?.contentWindow?.location.pathname.endsWith('/track59-sketchbook.html')
+            && !!f.contentDocument?.querySelector('.lt-toolbar-tree-thumb');
+        }, null, { timeout: 10000 });
+        const readerBefore=await page.evaluate(() => document.querySelector('#view:not([hidden])')
+          ?.contentDocument?.querySelector('.lt-toolbar-tree-thumb')?.getAttribute('data-cover-design') || '');
         assert.equal(readerBefore, 'texture-3', `${w}: 열린 책 표지는 저장된 디자인`);
         await clickToolbarTreeChoice(page);
         await page.waitForFunction(() => document.getElementById('tree-popover')?.hidden === false, null, { timeout: 10000 });
@@ -390,8 +395,22 @@ test('984 실행: 표지 — 저장 직후 서재·열린 책 반영, 실패하�
         await pickDesign984(page, 'texture-5');
         for (let i = 0; i < 40 && puts.length < 1; i++) await page.waitForTimeout(250);
         assert.equal(puts.length, 1, `${w}: 저장은 한 번(PUT)`);
-        await frame.waitForFunction(() => document.getElementById('bookCoverFace')?.getAttribute('data-cover-design') === 'texture-5', null, { timeout: 8000 });
-        await frame.waitForFunction(() => document.querySelector('.book-card .book-cover')?.getAttribute('data-cover-design') === 'texture-5', null, { timeout: 8000 });
+        // 원래 표지 디자인 기대값(texture-5)과 8초 상한은 유지한다.
+        await page.waitForFunction(() => {
+          const f=document.querySelector('#view:not([hidden])');
+          return f?.contentWindow?.location.pathname.endsWith('/track59-sketchbook.html')
+            && f.contentDocument?.querySelector('.lt-toolbar-tree-thumb')?.getAttribute('data-cover-design') === 'texture-5';
+        }, null, { timeout: 8000 });
+        // #1290: 책을 열기 전 바로 그 서재로 한 번 뒤로 가서 표지를 확인한다.
+        await page.goBack({ waitUntil: 'load' });
+        await page.waitForFunction(() => {
+          const f=document.querySelector('#view:not([hidden])');
+          return location.hash.startsWith('#my/shelf')
+            && f?.contentDocument?.documentElement?.dataset.v41Screen === 'shelf'
+            && !!f.contentDocument.querySelector('.book-card .book-cover');
+        }, null, { timeout: 8000 });
+        await page.waitForFunction(() => document.querySelector('#view:not([hidden])')
+          ?.contentDocument?.querySelector('.book-card .book-cover')?.getAttribute('data-cover-design') === 'texture-5', null, { timeout: 8000 });
         assert.deepEqual(errors, [], `${w}: 페이지 오류 없음(열린 책)`);
         await page.close();
       }
