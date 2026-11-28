@@ -102,6 +102,31 @@ test('#1631 서재 미리보기·바로 펼치기 선택과 복원', {
         && !!f.contentDocument?.querySelector('button[data-book-id]');
     },null,{timeout:20000});
   }
+  // #1634: 'active'만으로 촬영하지 않는다. 애니메이션·덮개가 확정된 뒤 캡처한다.
+  async function previewSettled(page) {
+    await page.waitForFunction(() => {
+      const d=document.querySelector('#view')?.contentDocument;
+      const shelf=d?.querySelector('#shelfScreen'),reader=d?.querySelector('#readerScreen');
+      if(!shelf||!reader)return false;
+      return shelf.classList.contains('is-covered')&&!shelf.classList.contains('is-leaving')
+        && reader.classList.contains('active')&&!reader.classList.contains('is-preparing')
+        && getComputedStyle(reader).opacity==='1'
+        && reader.getAnimations({subtree:false}).every(a=>a.playState==='finished');
+    },null,{timeout:20000});
+    const state=await page.frameLocator('#view').locator('#readerScreen').evaluate(reader => {
+      const d=reader.ownerDocument,shelf=d.querySelector('#shelfScreen');
+      const css=getComputedStyle(reader),rect=reader.getBoundingClientRect(),viewport=d.documentElement;
+      const bg=css.backgroundColor;
+      const opaque=/^rgb\(/.test(bg)||/^rgba\([^)]*,\s*1(?:\.0+)?\)$/.test(bg);
+      const hidesShelf=getComputedStyle(shelf).display==='none'||!shelf.checkVisibility({checkVisibilityCSS:true});
+      const coversShelf=css.position==='fixed'&&css.opacity==='1'&&css.visibility==='visible'
+        &&opaque&&rect.left<=0&&rect.top<=0&&rect.right>=viewport.clientWidth
+        &&rect.bottom>=viewport.clientHeight
+        &&reader.contains(d.elementFromPoint(viewport.clientWidth/2,viewport.clientHeight/2));
+      return {covered:shelf.classList.contains('is-covered'),hidesShelf,coversShelf};
+    });
+    assert.ok(state.covered&&(state.hidesShelf||state.coversShelf),'완료된 미리보기의 불투명한 화면이 책장과 최근 순간을 가려야 한다');
+  }
   async function bookReady(page) {
     await page.waitForFunction(() => {
       const f=document.querySelector('#view');
@@ -142,6 +167,7 @@ test('#1631 서재 미리보기·바로 펼치기 선택과 복원', {
         await activate(page,input);
         if(mode==='preview') {
           await page.frameLocator('#view').locator('#readerScreen.active').waitFor({state:'visible',timeout:10000});
+          await previewSettled(page);
           assert.match(new URL(page.url()).hash,/^#my\/shelf/,'기본은 서재 미리보기');
           assert.equal(await page.frameLocator('#view').locator('#shelfDirectNext').isChecked(),false);
           if(SHOTS && width===1440 && theme==='night' && input==='mouse') {
@@ -168,6 +194,7 @@ test('#1631 서재 미리보기·바로 펼치기 선택과 복원', {
       await activate(page,'mouse');
       const box=page.frameLocator('#view').locator('#shelfDirectNext');
       await box.waitFor({state:'visible'});
+      await previewSettled(page);
       await box.check();
       await page.waitForFunction(()=>window.LT41?.prefs?.shelfOpenMode==='direct',null,{timeout:10000});
       await until(()=>state.prefs.shelfOpenMode==='direct','체크 설정이 계정에 저장되어야 한다');
