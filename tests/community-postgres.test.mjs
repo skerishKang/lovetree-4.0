@@ -15,6 +15,7 @@ import {lockVideo} from '../server/db/stage-assignments-postgres.js';
 import {stageKeyForMoment} from '../src/stage-key.js';
 import {listVisibleStageMoments} from '../server/db/stage-visibility-sql.js';
 import {createCommunityRepo} from '../server/db/community-postgres.js';
+import {createMomentCommunityRepo} from '../server/db/moment-community-postgres.js';
 import {createTreeVisibilityRepo} from '../server/db/tree-visibility-postgres.js';
 import {createTreeDiscoverRepo} from '../server/db/tree-discover-postgres.js';
 import {createStatsRepo} from '../server/db/stats-postgres.js';
@@ -781,7 +782,7 @@ test('PostgreSQL에서 숨긴 공유의 커뮤니티 결과와 저장 행을 보
   try {
     await applySchema(pool);
     const {shareId}=await publishStageTestTree(pool,productId,'owner',[{url:stageTestUrl}]);
-    const communityRepo=createCommunityRepo(pool),shareRepo=createShareRepo(pool),workspaceRepo=createWorkspaceRepo(pool);
+    const communityRepo=createMomentCommunityRepo(createCommunityRepo(pool),pool),shareRepo=createShareRepo(pool),workspaceRepo=createWorkspaceRepo(pool);
     const authenticate=async request=>({productId,subjectId:request.headers?.account||'viewer'});
     const treeService=createCommunityService({communityRepo,shareRepo,workspaceRepo,productId});
     const momentService=createMomentCommunityService({communityRepo,shareRepo,workspaceRepo,productId});
