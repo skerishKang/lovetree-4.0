@@ -521,8 +521,24 @@ test('#1378 보드: 카드 썸네일에서 크게 보기 재생·닫기(390·144
         }));
         await frame.evaluate(t=>{document.body.dataset.theme=t;document.documentElement.dataset.ltTheme=t;},theme);
         const card=frame.locator('#cardLayer .card[data-id="s1"]');
-        const open=card.locator('[data-lt-play]');
-        assert.equal(await open.count(),1,w+'/'+theme+': 카드의 크게 보기 단추');
+        const open=card.locator('.lt-media-toolbar button[data-lt-play]');
+        assert.equal(await open.count(),1,w+'/'+theme+': 아래 줄의 재생·크게 보기 단추');
+        const placement=await card.evaluate(el=>{
+          const poster=el.querySelector('.lt-yt-preview'),button=el.querySelector('.lt-media-toolbar button[data-lt-play]');
+          if(!poster||!button)return null;
+          const a=poster.getBoundingClientRect(),b=button.getBoundingClientRect();
+          const expand=el.querySelector('button[data-lt-expand]'),c=expand?.getBoundingClientRect();
+          return {overlays:poster.querySelectorAll('button,a,[role="button"]').length,
+            text:poster.innerText.trim(),below:b.top>=a.bottom-.5,width:b.width,height:b.height,
+            name:button.getAttribute('aria-label'),overlap:c?Math.max(0,Math.min(b.right,c.right)-Math.max(b.left,c.left))*Math.max(0,Math.min(b.bottom,c.bottom)-Math.max(b.top,c.top)):0};
+        });
+        assert.ok(placement,w+'/'+theme+': 재생 단추의 위치 측정');
+        assert.equal(placement.overlays,0,w+'/'+theme+': 썸네일 위 버튼 0');
+        assert.equal(placement.text,'',w+'/'+theme+': 썸네일 위 글자 0');
+        assert.equal(placement.below,true,w+'/'+theme+': 썸네일 아래 재생 단추');
+        assert.ok(placement.width>=44&&placement.height>=44,w+'/'+theme+': 누름 영역 44px');
+        assert.equal(placement.name,'영상 크게 보기',w+'/'+theme+': 보드의 기존 화면 읽기 이름 유지');
+        assert.equal(placement.overlap,0,w+'/'+theme+': 크게 보기와 겹침 0');
         assert.equal(await card.locator('iframe').count(),0,'카드 iframe 0');
         const geometryBefore=await card.evaluate(el=>{const r=el.getBoundingClientRect();return {width:r.width,height:r.height};});
         const capture=process.env.LT_1378_BOARD_CAPTURE_DIR;

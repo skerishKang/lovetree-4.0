@@ -1117,3 +1117,34 @@ test('#1552 공유 신고 이유 500자는 저장하고 501자는 빈 이유와 
  assert.equal(tooLong.status, 400);
  assert.deepEqual(tooLong.body, empty.body);
 });
+
+test('숨긴 공유는 트리 커뮤니티 읽기·쓰기 경로에서 404를 반환한다', async () => {
+ const {handle,communityRepo}=await setup();
+ const shareId='s'.repeat(24), basePath='/api/community/shares/'+shareId;
+ const made=await call(handle,'POST',basePath+'/comments',{account:'bob',key:'hidden-tree-seed-1',body:{body:'기존 댓글'}});
+ assert.equal(made.status,201);
+ assert.equal((await call(handle,'PUT',basePath+'/reaction',{account:'bob',body:{kind:'heart'}})).status,200);
+ await communityRepo.createReport({productId:PRODUCT,reportId:'hidden-tree-report',shareId,subjectId:'moderator',reason:'관리 검토',clientKey:'hidden-tree-report-1'});
+ await communityRepo.moderateReport({productId:PRODUCT,reportId:'hidden-tree-report',status:'resolved',visibility:'hidden',actorSubjectId:'moderator'});
+ const before=communityRepo.inspect();
+ const requests=[
+  ['GET',basePath+'/comments',{}],
+  ['POST',basePath+'/comments',{account:'eve',key:'hidden-tree-new-1',body:{body:'새 댓글'}}],
+  ['PUT',basePath+'/reaction',{account:'eve',body:{kind:'heart'}}],
+  ['DELETE',basePath+'/reaction',{account:'bob'}],
+  ['PUT',basePath+'/favorite',{account:'eve'}],
+  ['DELETE',basePath+'/favorite',{account:'bob'}],
+  ['POST',basePath+'/report',{account:'eve',key:'hidden-tree-report-2',body:{reason:'관리 검토'}}],
+  ['POST',basePath+'/block',{account:'eve'}],
+  ['PATCH','/api/community/comments/'+made.body.comment.id,{account:'bob',body:{body:'수정'}}],
+  ['DELETE','/api/community/comments/'+made.body.comment.id,{account:'bob'}]
+ ];
+ for(const [method,path,options] of requests){
+  const result=await call(handle,method,path,options);
+  assert.equal(result.status,404,method+' '+path);
+  assert.equal(result.body.error.code,'share_not_found',method+' '+path);
+ }
+ const after=communityRepo.inspect();
+ for(const key of ['comments','reactions','favorites','reports','blocks'])
+  assert.deepEqual(after[key],before[key],key+' 기존 행 보존');
+});

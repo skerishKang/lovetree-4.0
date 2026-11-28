@@ -5,6 +5,7 @@ import {projectSharedTree} from './share-service.js';
 import {projectPublicMomentStats} from './public-projection.js';
 import {createRateLimiter} from './rate-limit.js';
 import {isAiTesterRole} from './admin-roles.js';
+import {isHiddenShare} from './hidden-share.js';
 
 // #1098 2단계 — 순간 단위 ♡·댓글 서버 규칙(러브버드 규칙 — 코드는 옮기지 않고 규칙만 가져왔다).
 // · 트리와 그 순간이 둘 다 공개일 때만 남이 쓸 수 있다. 4.1에는 순간 단위 공개 값이 없으므로
@@ -44,6 +45,7 @@ export function createMomentCommunityService({communityRepo,shareRepo,workspaceR
   if(!SHARE_ID.test(shareId))throw new ApiError(404,'share_not_found','공개 트리를 찾을 수 없어요.');
   const share=await shareRepo.load({productId,shareId});
   if(!share||share.status!=='active')throw new ApiError(404,'share_not_found','공개 트리를 찾을 수 없어요.');
+  if(await isHiddenShare(communityRepo,{...share,productId}))throw new ApiError(404,'share_not_found','공개 트리를 찾을 수 없어요.');
   // #538: 비공개 트리는 커뮤니티 경로에서 없는 것과 같이 막는다 — 순간 쓰기도 같은 규칙(러브버드 규칙의 '트리가 공개').
   if(visibilityRepo){const visibility=(await visibilityRepo.get({productId,subjectId:share.subjectId,treeId:share.treeId})).visibility;if(visibility==='private')throw new ApiError(404,'share_not_found','공개 트리를 찾을 수 없어요.');}
   return share;
@@ -79,8 +81,8 @@ export function createMomentCommunityService({communityRepo,shareRepo,workspaceR
   },
   async react(subjectId,shareId,momentId,enabled,kind='heart'){
    // 순간 반응 종류는 ♡ 하나 — 다른 종은 트리 반응(7종)과 달리 받지 않는다.
-   if(kind!=='heart')throw new ApiError(400,'reaction_kind_invalid','순간 반응은 공감(♡)만 남길 수 있어요.');
    const {share}=await publicMoment(shareId,momentId);
+   if(kind!=='heart')throw new ApiError(400,'reaction_kind_invalid','순간 반응은 공감(♡)만 남길 수 있어요.');
    rate(subjectId,'moment-reaction',40);
    await assertNotBlocked(subjectId,share.subjectId,'reaction_blocked','차단한 기록의 순간에는 반응할 수 없어요.');
    await communityRepo.setMomentReaction({productId,shareId,momentId,subjectId,enabled,kind:'heart'});
