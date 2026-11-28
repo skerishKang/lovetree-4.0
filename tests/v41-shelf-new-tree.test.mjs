@@ -39,10 +39,11 @@ async function openShelf(browser, origin, width = 1440, count = 1) {
   return { ctx, page };
 }
 
-const countBooks = (page) => evaluateWhenReady(page, () => [...document.querySelectorAll('iframe')].reduce((n, f) => {
-  const doc = f.contentDocument;
-  return n + (doc ? doc.querySelectorAll('.book-card').length : 0);
-}, 0));
+const countBooks = (page) => evaluateWhenReady(page, () => {
+  const frame = [...document.querySelectorAll('iframe')].find((f) => !f.hidden && /track32-bookshelf/.test(f.contentDocument?.URL || ''));
+  const doc = frame?.contentDocument;
+  return doc ? doc.querySelectorAll('.book-card').length : false;
+});
 
 for (const [name, fn] of [
   ['서재 + 새 트리 → 트리 만들기 창', async (page) => {

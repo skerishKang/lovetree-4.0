@@ -70,8 +70,7 @@ test('#1077 390 로그아웃 첫 화면의 떠다니는 카드는 바닥 링크�
         await page.waitForFunction(() => { const c = document.getElementById('updates-card'); return c && !c.hidden && c.getBoundingClientRect().width > 0; }, null, { timeout: 15000 });
         await page.waitForTimeout(1500);
         let frame = null;
-        const frameDeadline = Date.now() + 15000;
-        while (!frame && Date.now() < frameDeadline) {
+        while (!frame) {
           for (const f of page.frames()) {
             if (f === page.mainFrame()) continue;
             const ok = await f.evaluate(() => { const root = document.documentElement, body = document.body; return !!root && !!body && root.getBoundingClientRect().width > 0 && !!document.getElementById('orbit')?.shadowRoot?.querySelector('button.card'); });

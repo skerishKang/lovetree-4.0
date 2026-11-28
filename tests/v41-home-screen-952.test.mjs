@@ -511,12 +511,12 @@ test('#1087 390 새 소식 띠와 숫자 두 줄 겹침 0', { skip: REQUIRE952 ?
         await frame.locator('.home-count-line').first().waitFor({ state: 'visible', timeout: 15000 });
         const geo = await evaluateWhenReady(h.page, () => {
           const bandEl = document.getElementById('updates-card');
-          bandEl.hidden = false;
-          const band = bandEl.getBoundingClientRect();
           const iframe = document.getElementById('view');
           const off = iframe?.getBoundingClientRect();
           const root = iframe?.contentDocument?.querySelector('#orbit')?.shadowRoot;
-          if (!iframe || !off || !root) return false;
+          if (!bandEl || !iframe || !off || !root) return false;
+          bandEl.hidden = false;
+          const band = bandEl.getBoundingClientRect();
           const rows = [...root.querySelectorAll('.home-count-line')].map(row => {
             const el = row.lastElementChild || row;
             if (!el.textContent.trim()) return null;

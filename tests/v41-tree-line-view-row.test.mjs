@@ -346,14 +346,16 @@ test('#1249 이어 보기: 화면·권한·폭별 공통 테두리, 장미색 �
           const btn=frame.locator('#'+id);
           await btn.waitFor({state:'visible',timeout:12000});
           if(screen==='book'&&width===390) await frame.locator('.nav-pill #playAllBtn').waitFor({state:'visible',timeout:12000});
-          const result=await evaluateWhenReady(frame,el=>{
+          const result=await evaluateWhenReady(frame,id=>{
             if(!document.body)return false;
+            const el=document.getElementById(id);
+            if(!el)return false;
             const s=getComputedStyle(el),r=el.getBoundingClientRect(),range=document.createRange();
             range.selectNodeContents(el);
             const sample=document.createElement('span');sample.style.background='var(--lt-primary)';sample.style.color='var(--lt-pearl)';document.body.append(sample);
             const primary=getComputedStyle(sample).backgroundColor;sample.remove();
             return {style:{background:s.backgroundColor,image:s.backgroundImage,border:s.borderTopColor,borderWidth:s.borderTopWidth,borderStyle:s.borderTopStyle,radius:s.borderTopLeftRadius,color:s.color,font:s.fontWeight},primary,inside:r.left>=0&&r.right<=innerWidth+1&&r.top>=0&&r.bottom<=innerHeight+1,clipped:range.getBoundingClientRect().width>el.clientWidth-parseFloat(s.paddingLeft)-parseFloat(s.paddingRight)+1};
-          });
+          },id);
           const label=[theme,width,visitor?'방문자':'소유자',screen].join(' ');
           if(!expected)expected=result.style;
           assert.deepEqual(result.style,expected,label+' 동일한 공통 스타일');
@@ -389,9 +391,11 @@ test('#1249 서재 검색칸: 390 안내 글자 전체 표시, 검색 동작, �
         await frame.waitForSelector('.lt-screen-toolbar',{timeout:12000});
         await frame.waitForFunction(()=>document.querySelectorAll('.book-card').length===2);
         const field=frame.locator('#searchInput');
-        const measure=()=>evaluateWhenReady(frame,el=>{
+        const measure=()=>evaluateWhenReady(frame,()=>{
           const root=document.documentElement;
           if(!root)return false;
+          const el=document.getElementById('searchInput');
+          if(!el)return false;
           const s=getComputedStyle(el),placeholder=getComputedStyle(el,'::placeholder'),r=el.getBoundingClientRect();
           const canvas=document.createElement('canvas'),c=canvas.getContext('2d');
           c.font=[placeholder.fontWeight,placeholder.fontSize,placeholder.fontFamily].join(' ');

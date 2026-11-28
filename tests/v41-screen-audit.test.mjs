@@ -2428,7 +2428,7 @@ test('#my/graph는 로그인 진입·로그인 왕복·hash 이동 세 경우 �
     const f = await frameOf(page, GRAPH_FRAME);
     const screen = f ? await evaluateWhenReady(f, () => {
       const root = document.documentElement;
-      return root ? root.getAttribute('data-v41-screen') || '' : false;
+      return root?.getAttribute('data-v41-screen') === 'graph' ? 'graph' : false;
     }) : '';
     return { frame: f ? f.url() : '(프레임 없음)', screen, hash: await page.evaluate(() => location.hash) };
   };
