@@ -58,6 +58,7 @@ export function createSyncController({getState, replaceState, api, draftStorage 
   let editCount = 0;
   // 보관본 세대는 로컬 편집마다 증가한다. 늦게 끝난 전송은 뒤 편집의 보관본을 덮지 않는다.
   let draftGeneration = 0;
+  let lastHideFailureGeneration = null;
   let draftBackupFailed = false;
   // 이슈 644 3번: 충돌 띠 문구는 쉬운 말 한 벌만 쓴다 — 고친 개수가 있으면 개수를, 없으면 내용만 말한다.
   const conflictDetail = () => editCount > 0
@@ -93,10 +94,12 @@ export function createSyncController({getState, replaceState, api, draftStorage 
     } catch { return false; }
   }
 
-  function clearAcknowledgedDraft(serial) {
-    // 성공한 요청 본문과 같은 보관본만 지운다. 그 뒤의 편집은 서버에 저장된 적이 없다.
+  function clearAcknowledgedDraft(serial, sentGeneration) {
+    // 같은 본문이거나 성공한 PUT가 담은 세대 이하인 보관본만 지운다.
+    // 응답 대기 중 생긴 더 최신 세대의 다른 본문은 지우지 않는다.
     const pending = readPendingDraft(activeSubject);
-    if (pending?.serial === serial) clearPendingDraft();
+    if (pending && (pending.serial === serial || pending.draftGeneration <= sentGeneration))
+      clearPendingDraft();
   }
 
   function readPendingDraft(subject) {
@@ -188,6 +191,7 @@ export function createSyncController({getState, replaceState, api, draftStorage 
     if (!attempt || attempt.serial !== serial || attempt.expected !== revision)
       attempt = {serial, expected:revision, key:makeClientKey()};
     const sent = attempt;
+    const sentGeneration = draftGeneration;
     emit(status({phase:'syncing'}));
     let answer;
     try { answer = await api.put({state:JSON.parse(sent.serial),expectedRevision:sent.expected,clientKey:sent.key}, {keepalive:options.keepalive === true}); }
@@ -208,7 +212,7 @@ export function createSyncController({getState, replaceState, api, draftStorage 
         }
         return push();
       }
-      clearAcknowledgedDraft(sent.serial);
+      clearAcknowledgedDraft(sent.serial, sentGeneration);
       draftBackupFailed = false;
       return emit(status({phase:'synced',actions:actions.logout}));
     }
@@ -291,8 +295,13 @@ export function createSyncController({getState, replaceState, api, draftStorage 
     // 숨기기 전에 먼저 동기 보관한다. 작은 keepalive도 네트워크가 끊기면 도달하지 않는다.
     const saved = savePendingDraft(attempt, 'hide');
     draftBackupFailed = !saved;
-    if (!saved) emit(status({phase:'rejected',
-      detail:'기기에 기록을 보관하지 못했어요. 이 화면을 닫지 말고 백업해 주세요.',actions:actions.backup}));
+    if (saved) lastHideFailureGeneration = null;
+    else if (lastHideFailureGeneration !== draftGeneration) {
+      // visibilitychange와 pagehide가 연속 와도 같은 편집의 보관 실패는 한 번만 알린다.
+      lastHideFailureGeneration = draftGeneration;
+      emit(status({phase:'rejected',
+        detail:'기기에 기록을 보관하지 못했어요. 이 화면을 닫지 말고 백업해 주세요.',actions:actions.backup}));
+    }
     // keepalive는 글자 수가 아니라 전체 PUT 본문의 UTF-8 바이트로 판단한다.
     // 64KiB 한도에 헤더·부가 필드를 위한 여유를 둔다.
     const bytes = new TextEncoder().encode(JSON.stringify({

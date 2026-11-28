@@ -4,7 +4,7 @@ import {validateState,createTree} from '../public/v41/domain.mjs';
 // 저장소 고정(환경 가정 제거): Node 26은 전역 sessionStorage를 노출하지만 CI의 Node 22는 노출하지 않는다.
 // 고정하지 않으면 앞 시험이 401로 남긴 초안이 전역 저장소를 통해 뒤 시험으로 새어 들어간다
 // (같은 subject·revision에서 복원 → 'rejected'·dirty). 저장소 없이 도는 CI 환경과 같게 명시적으로 고정한다.
-function setup(options={}){let server={version:1,trees:[]},revision=0;const writes=[],events=[],gets=[];const api={get:async()=>{gets.push(1);return {ok:true,revision,state:server,subject:'member-A',writeSubjectBound:true,...options.read};},put:async body=>{writes.push(body);if(options.put)return options.put(body,writes);server=structuredClone(body.state);return {ok:true,revision:++revision};},logout:async()=>({ok:true})};const session=createMemberSession({api,delay:()=>new Promise(()=>{}),makeClientKey:(()=>{let i=0;return()=>`key-${++i}`})(),onState:s=>events.push(s),draftStorage:options.draftStorage||null,cacheStorage:null});return {session,writes,events,api,gets,changeServer:next=>{server=next;revision+=1;}};}
+function setup(options={}){let server={version:1,trees:[]},revision=0;const writes=[],events=[],gets=[];const api={get:async()=>{gets.push(1);return {ok:true,revision,state:server,subject:'member-A',writeSubjectBound:true,...options.read};},put:async body=>{writes.push(body);if(options.put)return options.put(body,writes);server=structuredClone(body.state);return {ok:true,revision:++revision};},logout:async()=>({ok:true})};const session=createMemberSession({api,delay:()=>new Promise(()=>{}),makeClientKey:(()=>{let i=0;return()=>`key-${++i}`})(),onState:s=>events.push(s),onStatus:options.onStatus||(()=>{}),draftStorage:options.draftStorage||null,cacheStorage:null});return {session,writes,events,api,gets,changeServer:next=>{server=next;revision+=1;}};}
 function memStorage(){const map=new Map();return {getItem:key=>map.has(key)?map.get(key):null,setItem:(key,value)=>{map.set(key,String(value))},removeItem:key=>{map.delete(key)},key:index=>[...map.keys()][index]??null,get length(){return map.size}};}
 const fields={subject:'별',title:'처음',note:'기억할 마음',date:'2026-10-31',emotion:'설렘',url:''};
 test('old API is readable but cannot write without subject-binding capability',async()=>{const {session,writes}=setup({read:{writeSubjectBound:false}});await session.start();assert.equal(session.snapshot().owned,true);assert.throws(()=>session.apply('new',fields));assert.equal(writes.length,0);});
@@ -346,4 +346,72 @@ test('#1643 보강: 기기 보관 실패와 keepalive 네트워크 실패를 사
   assert.equal(session.status().phase,'offline');
   assert.match(session.status().detail,/보관|백업/,'네트워크·기기 보관 모두 실패했음을 숨기지 않는다');
   session.dispose();
+});
+
+
+test('#1646 검토 1: 401 보관 복원 후 둘째 수정 저장 성공이면 옛 초안이 지워지고 다음 접속도 정상', async () => {
+  const draftStorage = memStorage();
+  const {session:expired} = setup({
+    draftStorage,put:()=>({ok:false,status:401,code:'unauthenticated'})
+  });
+  await expired.start();
+  const first=expired.apply('new',fields);
+  expired.apply('add',{...fields,title:'둘째'},first);
+  await expired.act('retry');
+  assert.deepEqual(titles1643(draft1643(draftStorage).state),['처음','둘째']);
+  expired.dispose();
+
+  const {session:relogged,writes} = setup({draftStorage});
+  await relogged.start();
+  assert.equal(relogged.status().phase,'rejected','같은 계정의 미전송 초안 복원');
+  assert.deepEqual(titles1643(relogged.state()),['처음','둘째']);
+  const tree=relogged.state().trees[0];
+  relogged.apply('edit',{...fields,title:'둘째 수정'},
+    {treeId:tree.id,momentId:tree.moments[1].id});
+  await relogged.act('retry');
+  assert.equal(relogged.status().phase,'synced','편집을 서버에 저장함');
+  assert.deepEqual(titles1643(writes[0].state),['처음','둘째 수정']);
+  assert.equal(draftStorage.length,0,'서버가 수락한 세대보다 오래된 401 보관본 제거');
+  const {session:next} = setup({draftStorage,read:{revision:1,state:writes[0].state}});
+  await next.start();
+  assert.equal(next.status().phase,'synced','다음 접속에서 거짓 충돌 없음');
+  assert.deepEqual(titles1643(next.state()),['처음','둘째 수정']);
+  next.dispose();
+  relogged.dispose();
+});
+
+test('#1646 검토 2: visibilitychange/pagehide 중복 숨김은 같은 보관 실패를 한 번만 알린다', async () => {
+  const statuses=[];
+  const storage={
+    getItem:()=>null,
+    setItem:()=>{throw Error('quota exceeded')},
+    removeItem:()=>{}
+  };
+  const {session,writes}=setup({
+    draftStorage:storage,onStatus:status=>statuses.push(status),
+    put:()=>new Promise(()=>{})
+  });
+  await session.start();
+  const first=session.apply('new',fields);
+  assert.equal(session.flushOnHide(),true,'첫 숨김에서 keepalive 전송');
+  session.flushOnHide();
+  const warnings=()=>statuses.filter(s=>s.detail?.includes('기기에 기록을 보관하지 못했어요'));
+  assert.equal(warnings().length,1,'같은 편집에 대한 보관 실패 안내는 한 번');
+  session.apply('add',{...fields,title:'다음 편집'},first);
+  session.flushOnHide();
+  assert.equal(warnings().length,2,'이후 새 편집이 실패하면 별도로 한 번 안내');
+  assert.equal(writes.length,1,'진행 중인 PUT를 중복 전송하지 않음');
+  session.dispose();
+});
+
+test('#1646 검토 3: dispose 뒤 공개 flushOnHide는 계정별 보관·PUT를 일으키지 않는다', async () => {
+  const draftStorage=memStorage();
+  const {session,writes}=setup({draftStorage});
+  await session.start();
+  session.apply('new',fields);
+  assert.equal(session.snapshot().dirty,true,'저장 대기 중');
+  session.dispose();
+  assert.equal(session.flushOnHide(),false,'닫힌 세션에서 숨김 처리 차단');
+  assert.equal(draftStorage.length,0,'닫힌 세션은 보관본을 새로 쓰지 않음');
+  assert.equal(writes.length,0,'닫힌 세션은 keepalive PUT를 하지 않음');
 });
