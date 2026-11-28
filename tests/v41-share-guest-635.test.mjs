@@ -1415,7 +1415,7 @@ test('#1378 공유 감상: 390·1440 × 밤·정원 재생 iframe 최소 크기�
           await context.route('**/youtube-nocookie.com/**', route => route.fulfill({
             status: 200, contentType: 'text/html', body: '<!doctype html><title>YouTube video</title>',
           }));
-          await frame.locator('[data-yt-play]').first().click({ force: true });
+          await frame.locator('.media-links button.media-play-btn[data-yt-play]').first().click({ force: true });
           await frame.waitForSelector('iframe.yt-frame', { timeout: 10000 });
           if (process.env.LT_1378_SHARE_CAPTURE_DIR) {
             mkdirSync(process.env.LT_1378_SHARE_CAPTURE_DIR, { recursive: true });
@@ -1453,7 +1453,7 @@ test('#1378 공유 감상: 읽기 전용 영상의 임베드 거절은 플레이
       await context.route('**/youtube-nocookie.com/**', route => route.fulfill({
         status: 200, contentType: 'text/html', body: '<title>YouTube video</title>',
       }));
-      await frame.locator('[data-yt-play]').first().click({ force: true });
+      await frame.locator('.media-links button.media-play-btn[data-yt-play]').first().click({ force: true });
       await frame.waitForSelector('.yt-unavailable-note', { timeout: 10000 });
       assert.equal(await frame.locator('iframe.yt-frame').count(), 0, '재생 불가 iframe 제거');
       assert.equal(await frame.locator('.yt-unavailable-link[href*="youtube.com"]').count(), 1,
