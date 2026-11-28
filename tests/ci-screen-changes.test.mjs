@@ -238,7 +238,7 @@ test('#1611 schedule, visual selection and every original screen command are pre
   for (const job of SELECTABLE_JOBS)
     assert.deepEqual(current[job],baseline.jobs[job],job+': 재배치 후 시험 파일·명령·timeout·retry 보존');
   // #1620 자체 실행기별 npm 캐시 준비는 테스트 명령이 아니며 그대로 남겨야 한다.
-  assert.match(after,/run: echo "npm_config_cache=\$HOME\/\.npm-lovetree-ci-cache" >> "\$GITHUB_ENV"/);
+  assert.match(after,/run: echo "npm_config_cache=\$HOME\/\.npm-runner-\$RUNNER_NAME" >> "\$GITHUB_ENV"/);
 });
 
 test('#1616 dedicated home source picks five owner jobs, A/B/C and only home visuals', async () => {

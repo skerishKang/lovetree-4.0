@@ -17,7 +17,7 @@ export function screenCommandContract(workflowText, jobNames) {
     const lines = body.split('\n');
     // #1620 자체 실행기 캐시 준비 명령은 화면 시험 명령·재시도가 아니다.
     // 해당 준비 단계는 워크플로에 그대로 두고 별도의 존재 확인 시험으로 지킨다.
-    const runnerCache = 'run: echo "npm_config_cache=$HOME/.npm-lovetree-ci-cache" >> "$GITHUB_ENV"';
+    const runnerCache = 'run: echo "npm_config_cache=$HOME/.npm-runner-$RUNNER_NAME" >> "$GITHUB_ENV"';
     const commandLines = lines.filter(line => COMMAND_LINE.test(line) && line.trim() !== runnerCache);
     const testFiles = [...new Set([...body.matchAll(TEST_FILE)].map(m=>m[0]))].sort();
     if (!testFiles.length || !commandLines.length) throw new Error('기준이 비어 있는 화면 잡: ' + job);

@@ -136,7 +136,7 @@ jobs:
       # (2026-11-24: EINTEGRITY·ENOENT로 시험 전에 실패). 자체 실행기에서는 실행기마다 캐시 폴더를 따로 둔다.
       - name: 실행기별 npm 캐시 폴더(자체 실행기)
         if: runner.environment == 'self-hosted'
-        run: echo "npm_config_cache=$HOME/.npm-lovetree-ci-cache" >> "$GITHUB_ENV"
+        run: echo "npm_config_cache=$HOME/.npm-runner-$RUNNER_NAME" >> "$GITHUB_ENV"
       - uses: actions/setup-node@v4
         if: runner.environment == 'self-hosted'
         with:
@@ -304,7 +304,7 @@ jobs:
       # (2026-11-24: EINTEGRITY·ENOENT로 시험 전에 실패). 자체 실행기에서는 실행기마다 캐시 폴더를 따로 둔다.
       - name: 실행기별 npm 캐시 폴더(자체 실행기)
         if: runner.environment == 'self-hosted'
-        run: echo "npm_config_cache=$HOME/.npm-lovetree-ci-cache" >> "$GITHUB_ENV"
+        run: echo "npm_config_cache=$HOME/.npm-runner-$RUNNER_NAME" >> "$GITHUB_ENV"
       - uses: actions/setup-node@v4
         if: runner.environment == 'self-hosted'
         with:
@@ -410,7 +410,7 @@ jobs:
       # (2026-11-24: EINTEGRITY·ENOENT로 시험 전에 실패). 자체 실행기에서는 실행기마다 캐시 폴더를 따로 둔다.
       - name: 실행기별 npm 캐시 폴더(자체 실행기)
         if: runner.environment == 'self-hosted'
-        run: echo "npm_config_cache=$HOME/.npm-lovetree-ci-cache" >> "$GITHUB_ENV"
+        run: echo "npm_config_cache=$HOME/.npm-runner-$RUNNER_NAME" >> "$GITHUB_ENV"
       - uses: actions/setup-node@v4
         if: runner.environment == 'self-hosted'
         with:
@@ -488,7 +488,7 @@ jobs:
       # (2026-11-24: EINTEGRITY·ENOENT로 시험 전에 실패). 자체 실행기에서는 실행기마다 캐시 폴더를 따로 둔다.
       - name: 실행기별 npm 캐시 폴더(자체 실행기)
         if: runner.environment == 'self-hosted'
-        run: echo "npm_config_cache=$HOME/.npm-lovetree-ci-cache" >> "$GITHUB_ENV"
+        run: echo "npm_config_cache=$HOME/.npm-runner-$RUNNER_NAME" >> "$GITHUB_ENV"
       - uses: actions/setup-node@v4
         if: runner.environment == 'self-hosted'
         with:
@@ -581,9 +581,9 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
           clean: true
-      - name: 공용 npm 캐시(자체 실행기)
+      - name: 실행기별 npm 캐시(자체 실행기)
         if: runner.environment == 'self-hosted'
-        run: echo "npm_config_cache=$HOME/.npm-lovetree-ci-cache" >> "$GITHUB_ENV"
+        run: echo "npm_config_cache=$HOME/.npm-runner-$RUNNER_NAME" >> "$GITHUB_ENV"
       - uses: actions/setup-node@v4
         if: runner.environment == 'self-hosted'
         with:
@@ -624,9 +624,9 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
           clean: true
-      - name: 공용 npm 캐시(자체 실행기)
+      - name: 실행기별 npm 캐시(자체 실행기)
         if: runner.environment == 'self-hosted'
-        run: echo "npm_config_cache=$HOME/.npm-lovetree-ci-cache" >> "$GITHUB_ENV"
+        run: echo "npm_config_cache=$HOME/.npm-runner-$RUNNER_NAME" >> "$GITHUB_ENV"
       - uses: actions/setup-node@v4
         if: runner.environment == 'self-hosted'
         with:
@@ -728,7 +728,7 @@ jobs:
           clean: true
       - name: Runner-specific npm cache (self-hosted)
         if: runner.environment == 'self-hosted'
-        run: echo "npm_config_cache=$HOME/.npm-lovetree-ci-cache" >> "$GITHUB_ENV"
+        run: echo "npm_config_cache=$HOME/.npm-runner-$RUNNER_NAME" >> "$GITHUB_ENV"
       - uses: actions/setup-node@v4
         if: runner.environment == 'self-hosted'
         with:
@@ -829,9 +829,9 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
           clean: true
-      - name: 공용 npm 캐시(자체 실행기)
+      - name: 실행기별 npm 캐시(자체 실행기)
         if: runner.environment == 'self-hosted'
-        run: echo "npm_config_cache=$HOME/.npm-lovetree-ci-cache" >> "$GITHUB_ENV"
+        run: echo "npm_config_cache=$HOME/.npm-runner-$RUNNER_NAME" >> "$GITHUB_ENV"
       - uses: actions/setup-node@v4
         if: runner.environment == 'self-hosted'
         with:
@@ -960,9 +960,9 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
           clean: true
-      - name: 공용 npm 캐시(자체 실행기)
+      - name: 실행기별 npm 캐시(자체 실행기)
         if: runner.environment == 'self-hosted'
-        run: echo "npm_config_cache=$HOME/.npm-lovetree-ci-cache" >> "$GITHUB_ENV"
+        run: echo "npm_config_cache=$HOME/.npm-runner-$RUNNER_NAME" >> "$GITHUB_ENV"
       - uses: actions/setup-node@v4
         if: runner.environment == 'self-hosted'
         with:
@@ -1033,7 +1033,7 @@ jobs:
           fetch-depth: 0
       - name: Runner-specific npm cache (self-hosted)
         if: runner.environment == 'self-hosted'
-        run: echo "npm_config_cache=$HOME/.npm-lovetree-ci-cache" >> "$GITHUB_ENV"
+        run: echo "npm_config_cache=$HOME/.npm-runner-$RUNNER_NAME" >> "$GITHUB_ENV"
       - uses: actions/setup-node@v4
         if: runner.environment == 'self-hosted'
         with:
@@ -1185,7 +1185,7 @@ jobs:
       # 같은 CGI 컴퓨터의 자체 실행기 여러 개가 홈의 npm 캐시를 함께 쓰면 동시에 받다가 깨진다(보드 잡과 같은 식).
       - name: 실행기별 npm 캐시 폴더(자체 실행기)
         if: runner.environment == 'self-hosted'
-        run: echo "npm_config_cache=$HOME/.npm-lovetree-ci-cache" >> "$GITHUB_ENV"
+        run: echo "npm_config_cache=$HOME/.npm-runner-$RUNNER_NAME" >> "$GITHUB_ENV"
       - uses: actions/setup-node@v4
         if: runner.environment == 'self-hosted'
         with:
@@ -1299,9 +1299,9 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
-      - name: 공용 npm 캐시(자체 실행기)
+      - name: 실행기별 npm 캐시(자체 실행기)
         if: runner.environment == 'self-hosted'
-        run: echo "npm_config_cache=$HOME/.npm-lovetree-ci-cache" >> "$GITHUB_ENV"
+        run: echo "npm_config_cache=$HOME/.npm-runner-$RUNNER_NAME" >> "$GITHUB_ENV"
       - uses: actions/setup-node@v4
         if: runner.environment == 'self-hosted'
         with:
@@ -1453,9 +1453,9 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
           clean: true
-      - name: 공용 npm 캐시(자체 실행기)
+      - name: 실행기별 npm 캐시(자체 실행기)
         if: runner.environment == 'self-hosted'
-        run: echo "npm_config_cache=$HOME/.npm-lovetree-ci-cache" >> "$GITHUB_ENV"
+        run: echo "npm_config_cache=$HOME/.npm-runner-$RUNNER_NAME" >> "$GITHUB_ENV"
       - uses: actions/setup-node@v4
         if: runner.environment == 'self-hosted'
         with:
@@ -1599,7 +1599,7 @@ jobs:
           fetch-depth: 0
       - name: Runner-specific npm cache (self-hosted)
         if: runner.environment == 'self-hosted'
-        run: echo "npm_config_cache=$HOME/.npm-lovetree-ci-cache" >> "$GITHUB_ENV"
+        run: echo "npm_config_cache=$HOME/.npm-runner-$RUNNER_NAME" >> "$GITHUB_ENV"
       - uses: actions/setup-node@v4
         if: runner.environment == 'self-hosted'
         with:
@@ -1783,9 +1783,9 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
-      - name: 공용 npm 캐시(자체 실행기)
+      - name: 실행기별 npm 캐시(자체 실행기)
         if: runner.environment == 'self-hosted'
-        run: echo "npm_config_cache=$HOME/.npm-lovetree-ci-cache" >> "$GITHUB_ENV"
+        run: echo "npm_config_cache=$HOME/.npm-runner-$RUNNER_NAME" >> "$GITHUB_ENV"
       - uses: actions/setup-node@v4
         if: runner.environment == 'self-hosted'
         with:

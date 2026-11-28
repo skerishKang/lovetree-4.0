@@ -27,7 +27,7 @@ test('CGI 빈자리 판정은 선택된 16개 화면 잡 각각의 runs-on 출�
     const block=jobBody(job);
     assert.ok(block.includes("runs-on: ${{ fromJSON(needs.runner_picker.outputs."+key+" || '[\"ubuntu-latest\"]') }}"),job);
     assert.match(block,/needs: \[screen-changes, runner_picker\]/,job);
-    assert.match(block,/npm_config_cache=\$HOME\/\.npm-lovetree-ci-cache/,job);
+    assert.match(block,/npm_config_cache=\$HOME\/\.npm-runner-\$RUNNER_NAME/,job);
     assert.match(block,/node tools\/ci\/has-playwright-browser\.mjs/,job);
     assert.match(block,/npx playwright install chromium/,job);
     assert.ok(block.indexOf('npm_config_cache=') < block.indexOf('actions/setup-node@v4'),job);
@@ -37,7 +37,7 @@ test('CGI 빈자리 판정은 선택된 16개 화면 잡 각각의 runs-on 출�
 test('실행기·브라우저 준비 변경은 기존 화면 시험 명령과 대기 계약을 보존한다',()=>{
   const after=screenCommandContract(workflow,JOBS);
   for(const job of JOBS)assert.deepEqual(after[job],baseline.jobs[job],job);
-  assert.ok(!workflow.includes('npm_config_cache=$HOME/.npm-runner-$RUNNER_NAME'));
+  assert.ok(!workflow.includes('npm_config_cache=$HOME/.npm-lovetree-ci-cache'));
 });
 test('비화면 필수 잡 이름·동시성·알림용 겉모습 잡은 바꾸지 않는다',()=>{
   assert.match(workflow,/group: preview-check-\$\{\{ github\.event\.pull_request\.number \|\| github\.run_id \}\}/);
@@ -66,7 +66,7 @@ test('자체 실행기 setup-node 캐시 복원은 금지하고 GitHub cache npm
       /- uses: actions\/setup-node@v4\n\s+if: runner\.environment == 'self-hosted'\n\s+with:\n\s+node-version: 22\n\s+- uses: actions\/setup-node@v4\n\s+if: runner\.environment != 'self-hosted'\n\s+with:\n\s+node-version: 22\n\s+cache: npm/,
       job+' 자체 실행기에서는 cache npm 복원을 하지 않음');
     assert.equal((block.match(/cache: npm/g)||[]).length,1,job+' GitHub 캐시 한 개');
-    assert.ok(block.indexOf('npm_config_cache=$HOME/.npm-lovetree-ci-cache') <
+    assert.ok(block.indexOf('npm_config_cache=$HOME/.npm-runner-$RUNNER_NAME') <
       block.indexOf('actions/setup-node@v4'),job+' 공용 캐시 설정 순서');
   }
 });
