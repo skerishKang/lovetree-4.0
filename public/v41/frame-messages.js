@@ -16,6 +16,7 @@
     boardSaved: fromShell('lt41-board-saved', 'ok, error?'),
     boardDetail: fromShell('lt41-board-detail', 'open'),
     boardPanel: fromView('lt41-board-panel', 'state'),
+    treeDetail: fromView('lt41-tree-detail', 'open'),
     boardRestore: fromShell('lt41-board-restore', 'momentId, detailOpen, view?, scroll?, panel?, cinemaIndex?'),
     boardSync: fromView('lt41-board-sync', 'treeId, moments'),
     // 셸은 옛 화면에서 같은 이름으로 보낸 판 선택도 받는다.
@@ -68,10 +69,12 @@
     select: fromView('lt41-select', 'id'),
     share: fromView('lt41-share', 'treeId, id'),
     setShelfView: fromView('lt41-set-shelf-view', 'value'),
+    setShelfOpenMode: fromView('lt41-set-shelf-open-mode', 'value'),
     shelfFilter: fromShell('lt41-shelf-filter', 'value'),
     shelfSelectTree: fromShell('lt41-shelf-select-tree', 'treeId'),
     shelfTree: fromView('lt41-shelf-tree', 'treeId'),
     shelfView: fromShell('lt41-shelf-view', 'value'),
+    shelfOpenMode: fromShell('lt41-shelf-open-mode', 'value'),
     start: fromView('lt41-start', '없음'),
     storySave: fromView('lt41-story-save', 'treeId, fromMomentId, momentId, relation'),
     // 성공일 때도 error를 빈 문자열로 함께 보낸다.

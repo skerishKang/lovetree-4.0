@@ -1,9 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { SELECTABLE_JOBS } from '../tools/ci/screen-changes.mjs';
 import { checkScreenResults } from '../tools/ci/screen-results.mjs';
 
-const SCREENS = ['screen-board', 'screen-home', 'screen-home-followup', 'screen-book', 'screen-reload', 'screen-shell', 'screen-map-a', 'screen-shelf', 'screen-map-b', 'screen-book-screen', 'screen-audit-a', 'screen-audit-b', 'screen-audit-c'];
-const gate = (result, changed) => ({ result, outputs: { changed } });
+const SCREENS = SELECTABLE_JOBS;
+const gate = (result, changed) => ({ result, outputs: { changed, jobs: changed === 'true' ? 'all' : 'none' } });
 const results = (screenResult, gateResult = gate('success', 'false')) => {
   const needs = { 'screen-changes': gateResult };
   for (const name of SCREENS) needs[name] = { result: screenResult };
@@ -34,4 +35,32 @@ test('판정 잡이 취소되면 화면 잡이 모두 건너뛰어도 실패한�
 test('바뀜 판정이고 화면 잡이 모두 성공이면 통과한다', () => {
   const r = checkScreenResults(results('success', gate('success', 'true')));
   assert.equal(r.ok, true, JSON.stringify(r.failures));
+});
+
+
+test('화면 변경 시 모든 선택 잡이 skipped이면 모음 검사는 반드시 실패한다', () => {
+  const needs = results('skipped', gate('success','true'));
+  needs.runner_picker = { result: 'success' };
+  const result = checkScreenResults(needs);
+  assert.equal(result.ok,false);
+  assert.equal(result.failures.filter(x=>x.includes('changed screen job skipped')).length,SCREENS.length);
+});
+
+test('선택기 실패 또는 취소 이후 GitHub에서 화면 시험이 전부 통과하면 모음 검사도 통과한다', () => {
+  for (const picker of ['failure','cancelled']) {
+    const needs=results('success',gate('success','true'));
+    needs.runner_picker={result:picker};
+    const result=checkScreenResults(needs);
+    assert.equal(result.ok,true,JSON.stringify(result.failures));
+  }
+});
+
+test('unknown or renamed screen jobs are rejected even if successful or skipped', () => {
+  for (const status of ['success', 'skipped', 'failure', 'cancelled']) {
+    const needs = results('success', gate('success', 'true'));
+    needs['screen-future'] = { result: status };
+    const outcome = checkScreenResults(needs);
+    assert.equal(outcome.ok, false);
+    assert.ok(outcome.failures.some(reason => reason.includes('screen-future')));
+  }
 });

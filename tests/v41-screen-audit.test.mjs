@@ -1,3 +1,5 @@
+// #1605: 기존 화면 공통 시험 진입점에서 안쪽 띠·책 안내·많은 트리 회귀 검사를 실행한다.
+import './helpers/final-findings-1605-tests.mjs';
 import {clickToolbarTreeChoice,treeChoiceExpanded,treeChoiceFocused} from './helpers/tree-picker-pr3.mjs';
 // 검사 함수는 tests/helpers/screen-audit.mjs에 있다(①겹침·가려짐 #635 규칙 ②가로 넘침·잘림 ③흔적 값 넷 #635 ④글자 기준선 #548 ⑤알림 줄이 아래 링크 줄·＋ 단추·새 소식 카드를 덮지 않음 #666).
 // 화면 목록: 첫 화면(예시)·책(공유 링크, 마지막 장 포함)·보드·지도·둘러보기·의견 보내기 창(보내기 전·후)·어떻게 쓰나요 안내.
@@ -123,7 +125,13 @@ test('#942 첫 화면 추가 단추와 숫자 묶음', { skip: REQUIRE ? false :
     if (!first?.checkVisibility() || doc.fonts.status !== 'loaded') return false;
     // 공개 집계와 공유 목록은 따로 도착한다. 숫자의 값과 치수는 아래에서 그대로 판정한다.
     const countFor = action => root.querySelector('.actions [data-do='+action+']')?.parentElement.querySelector('.home-count');
-    if (kind!=='empty' && !countFor('community')?.checkVisibility()) return false;
+    if (kind!=='empty') {
+      const publicCount = countFor('community');
+      if (!publicCount?.checkVisibility()) return false;
+      // 공개 집계 요청 뒤 최종 숫자 두 칸이 그려지기 전에는 값을 읽지 않는다.
+      const values = [...publicCount.querySelectorAll('.home-count-value')].map(element => element.textContent.trim());
+      if (values[0] !== '17' || values[1] !== '1.2k') return false;
+    }
     if (member && !countFor('trees')?.querySelector('.home-count-line:nth-child(2) > *')) return false;
 
     const measure = e => {
@@ -613,9 +621,21 @@ test('#657 화면 공통 검사기: 아홉 화면 둘레·스크롤 주인 관�
   const browser = await chromium.launch({ headless: true });
   const started = Date.now();
   try {
-    const report = await observeFrameMatrix({ browser, base, outputDir, shard });
+    const requested = process.env.LT_SCREEN_AUDIT_SCREENS || 'all';
+    const groups = {
+      home: ['home'], board: ['board'], book: ['book', 'share-guest'],
+      shelf: ['shelf'], map: ['map'], shell: ['home','shelf','book','board','map','tree','explore','settings','share-guest'],
+      'explore/settings': ['explore','settings']
+    };
+    const keys = requested === 'all' ? Object.keys(groups) : requested.split(',');
+    assert.ok(keys.length && keys.every(k => Object.hasOwn(groups,k)), 'invalid audit screen selection');
+    const screens = [...new Set(keys.flatMap(k => groups[k]))];
+    assert.ok(screens.length, 'empty audit selection');
+    const report = await observeFrameMatrix({ browser, base, outputDir, shard, screens });
     assert.deepEqual(report.errors, [], '관측 중 화면 오류가 없다');
-    assert.equal(report.screens.length, !shard ? 36 : shard === 'c' ? 18 : 9, '선택한 shard의 아홉 화면을 모두 관측했다');
+    assert.equal(report.screens.length, screens.length * (!shard ? 4 : shard === 'c' ? 2 : 1), 'selected screen matrix complete');
+    const combos = [[390,'night','b'],[1440,'night','a'],[390,'garden','c'],[1440,'garden','c']];
+    assert.deepEqual(report.screens.map(r => r.viewport.width+'/'+r.theme+'/'+r.screen).sort(), combos.filter(c => !shard || c[2] === shard).flatMap(c => screens.map(id => c[0]+'/'+c[1]+'/'+id)).sort());
     const assertObservedStyle = (actual, expected, width, theme, label) => {
       assert.ok(actual, `${label} 요소가 있다`);
       assert.deepEqual(actual.padding, expected.padding[width], `${label} padding`);
@@ -687,6 +707,10 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
   for (const theme of ['night', 'garden']) for (const size of SIZES) if (!SHARD || SHARD === shardOf(theme, size[0])) COMBOS.push([size, theme]);
 
   // 한 조합(크기·테마)을 돌고 실패 줄을 돌려준다.
+  const auditRequest = process.env.LT_SCREEN_AUDIT_SCREENS || 'all';
+  const auditAreas = new Set(auditRequest.split(','));
+  assert.ok(auditRequest === 'all' || [...auditAreas].every(x => ['home','board','book','shelf','map','shell','explore/settings'].includes(x)), 'invalid audit areas');
+  const auditSelected = (...owners) => auditRequest === 'all' || owners.includes('common') || owners.some(x => auditAreas.has(x));
   const runCombo = async ([width, height], theme) => {
     const context = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
     await context.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); } catch {} }, theme);
@@ -709,6 +733,7 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
       }
     };
 
+    if (auditSelected('home')) {
     // 첫 화면(예시) → 어떻게 쓰나요 안내
     await page.goto(`${base}/home-host.html`, { waitUntil: 'domcontentloaded' });
     const home = await frameOf(page, /home\.html/);
@@ -721,7 +746,9 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     await page.waitForTimeout(400);
     await take(page, '어떻게 쓰나요 안내');
     await context.close();
+    }
 
+    if (auditSelected('book')) {
     // 책(공유 링크) — 첫 장부터 마지막 장까지 넘기며 매 장 검사
     const ctx2 = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
     await ctx2.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); } catch {} }, theme);
@@ -760,7 +787,9 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     }
     await take(page2, '책·공유 마지막 장');
     await ctx2.close();
+    }
 
+    if (auditSelected('board', 'map', 'shell')) {
     // 셸 화면 — 보드 → 지도 → 둘러보기(한 번 뜬 셸에서 주소와 패널만 바꿔 본다)
     const ctx3 = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
     await ctx3.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); } catch {} }, theme);
@@ -878,7 +907,9 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
       }
     }
     await ctx3.close();
+    }
 
+    if (auditSelected('home', 'shell', 'explore/settings', 'shelf')) {
     // 둘러보기 → 의견 보내기 창 — 새로 뜬 셸에서(지도 잔상 상태에 좌우되지 않게)
     const ctx4 = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
     await ctx4.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); } catch {} }, theme);
@@ -1439,7 +1470,9 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     assert.equal(editState.hiddenCount, 1, '고치는 덧붙임 카드 하나가 숨는다');
     await take(page4, '내 의견 덧붙임 고치기 열림');
     await ctx4.close();
+    }
 
+    if (auditSelected('common')) {
     // 2026-11-17: 운영센터 '한눈에' — 숫자 4장·할 일 3장이 1440·1920에서 각각 한 줄, 390은 줄바꿈(가로 넘침 0),
     // 모든 카드가 같은 누름 모양(role·tabindex·44px 이상)이고, 탭이 있는 카드는 그 탭을 조건으로 열며
     // 탭이 없는 카드는 내역을 펼친다(다시 누르면 접힘). 관리자 세션은 가짜 API(응답 모형)로 만든다.
@@ -1567,7 +1600,9 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     await pageAdm.waitForFunction(() => location.hash.startsWith('#board?status='), null, { timeout: 8000 });
     assert.equal(await pageAdm.evaluate(() => location.hash), '#board?status=pending', 'Space로도 카드가 열린다');
     await ctxAdm.close();
+    }
 
+    if (auditSelected('home', 'board', 'book', 'map', 'shell')) {
     // #666 2번: 계정 메뉴가 열린 자리에서 첫 트리 안내가 메뉴를 덮지 않는다(한 번에 하나만).
     // 안내가 뜨고 메뉴가 열리면 안내를 잠시 접고, 메뉴를 닫으면 다시 뜨는 것까지 확인한다.
     const ctx5 = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
@@ -1984,7 +2019,9 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     assert.deepEqual(treeAfterTrip, treeBeforeTrip, '왕복 뒤에도 지금 트리·순간이 유지된다');
     await pageMap.close();
     await ctx5.close();
+    }
 
+    if (auditSelected('map')) {
     // #627 PR3: 그래프 보기 — 지금은 주소(#my/graph)로만 열리는 화면이라 호스트가 LT41을 직접 넘긴다
     // (share-host와 같은 틀, 실제 트리 = 셸이 넘기는 순간들과 같은 모양). 허브 이름 상자 겹침 0·
     // 가로 넘침 0·고리 썸네일 동그라미 보임을 수치로 단정한다.
@@ -2191,7 +2228,9 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     assert.equal(emptyCheck.empty, '아직 같은 노래를 담은 다른 팬이 없어요', `빈 상태 문구(실제 "${emptyCheck.empty}")`);
     assert.equal(emptyCheck.overflow, 0, `다른 팬 칸이 있어도 가로 넘침 0(실제 ${emptyCheck.overflow})`);
     await ctx7.close();
+    }
 
+    if (auditSelected('map', 'shell')) {
     // 주소로 열리는지(#my/graph) — 셸이 그래프 보기를 화면 파일로 띄우는지 단정한다(메뉴 단추는 없다).
     const ctx8 = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
     await ctx8.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); } catch {} }, theme);
@@ -2210,7 +2249,9 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     assert.match(graphByHash.url(), /views\/graph\/track60-graph\.html(?:\?|$)/, '#my/graph 프레임 주소에 그래프 하위 폴더가 있다');
     assert.equal(await graphByHash.evaluate(() => document.documentElement.getAttribute('data-v41-screen')), 'graph', '#my/graph 프레임 문서가 그래프 화면이다');
     await ctx8.close();
+    }
 
+    if (auditSelected('home')) {
     // 261117 대표 결정: 글자 카드 세부 검사(존재·줄·말줄임·배치)는 1440에서 한다 — 390은 가운데가 커져
     // 위·아래 띠가 카드를 못 담아 안전망이 궤도 카드를 숨길 수 있다(소수 카드 숨김 계약은
     // '#657 후속 261117' 단언이 본다). 390에서 이 상태의 겹침 검사는 보이는 카드가 없어 자동 만족이다.
@@ -2297,6 +2338,7 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     assert.equal(cardCheck.overflow, 0, `첫 화면 가로 넘침 0(실제 ${cardCheck.overflow})`);
     await take(page9, '첫 화면 글자 카드');
     await ctx9.close();
+    }
     } // width 1440 — 390 리본은 별도 겹침 시험이 담당한다
 
     await context.close();
@@ -3772,16 +3814,71 @@ test('#1084 세로 영상 첫 화면의 미디어 칸에는 회색 여백이 없
           });
           for (const slot of ['book', 'board']) {
             await page.evaluate(({id, slot}) => { location.hash = 'my/' + slot + '?tree=' + id; }, {id: tree.id, slot});
-            const locator = page.frameLocator('#view').locator(slot === 'book' ? '#rightPage .yt-play.is-remote-vertical' : '.lt-media[data-lt-vertical="1"] .lt-yt-preview');
+            const screenshotSelector = slot === 'book' ? '#rightPage .yt-play.is-remote-vertical' : '.lt-media[data-lt-vertical="1"] .lt-yt-preview';
+            const locator = page.frameLocator('#view').locator(screenshotSelector);
+            // 기존 15초 준비 상한 안에서 요소 표시와 이미지 로딩을 함께 확인한다.
+            const readyDeadline = Date.now() + 15000;
             await locator.waitFor({state: 'visible', timeout: 15000});
+            const ready = await page.waitForFunction(selector => {
+              // 판정할 때 iframe 안의 현재 요소를 다시 찾아 오래된 DOM 참조를 피한다.
+              const frame = document.getElementById('view'), doc = frame?.contentDocument;
+              const el = doc?.querySelector(selector);
+              const layer = el?.querySelector('.yt-vertical-backdrop,.lt-vertical-backdrop');
+              const pic = layer?.querySelector('img');
+              const css = layer ? doc.defaultView.getComputedStyle(layer) : null;
+              if (!el?.getClientRects().length || !(pic?.naturalWidth > 0) || !css?.filter?.includes('blur(')) return false;
+              window.__lt1084Tracked = {node: el, frame: frame.contentWindow, document: doc, href: frame.contentWindow.location.href};
+              const r = el.getBoundingClientRect();
+              return {image: pic.currentSrc || '', loaded: true, filter: css.filter, width: r.width, height: r.height};
+            }, screenshotSelector, {timeout: Math.max(1, readyDeadline - Date.now())});
+            const info = await ready.jsonValue();
             if (process.env.LT_1084_CAPTURE_DIR) await page.screenshot({path: join(process.env.LT_1084_CAPTURE_DIR, `${slot}-after-${width}-${theme}.png`), animations: 'disabled'});
-            const info = await locator.evaluate(el => {
-              const layer = el.querySelector('.yt-vertical-backdrop,.lt-vertical-backdrop');
-              const pic = layer?.querySelector('img'), css = layer ? getComputedStyle(layer) : null, r = el.getBoundingClientRect();
-              return {image: pic?.currentSrc || '', loaded: (pic?.naturalWidth || 0) > 0, filter: css?.filter || '', width: r.width, height: r.height};
-            });
             assert.ok(info.loaded && info.image && info.filter.includes('blur('), slot + ': 세로 썸네일 배경이 이미지로 채워진다');
-            const png = await locator.screenshot({animations: 'disabled'});
+            // #1084: 화면 이동 후 보드 미디어가 다시 그려질 수 있다.
+            // 요소가 스크린샷 도중 분리될 때만 현재 iframe에서 다시 찾아 촬영한다.
+            // Playwright 기본 30초 상한을 모든 시도에 합쳐서 적용한다. 고정 대기는 없다.
+            const screenshotDeadline = Date.now() + 30000;
+            let png;
+            for (let attempt = 0; attempt < 3; attempt++) {
+              try {
+                const remaining = Math.max(1, screenshotDeadline - Date.now());
+                png = await page.frameLocator('#view').locator(screenshotSelector).screenshot({animations: 'disabled', timeout: remaining});
+                break;
+              } catch (error) {
+                if (/Element is not attached to the DOM/.test(String(error.message)) && attempt < 2 && Date.now() < screenshotDeadline) {
+                  console.log('#1084 요소 재탐색', JSON.stringify({slot, width, theme, nextAttempt: attempt + 2}));
+                  continue;
+                }
+              const diagnostic = await page.evaluate(slot => {
+                const before = window.__lt1084Tracked;
+                const frame = document.getElementById('view');
+                const doc = frame?.contentDocument;
+                const selector = slot === 'book' ? '#rightPage .yt-play.is-remote-vertical' : '.lt-media[data-lt-vertical="1"] .lt-yt-preview';
+                const matches = doc ? [...doc.querySelectorAll(selector)] : [];
+                const node = before?.node;
+                const now = matches.find(el => el.getClientRects().length > 0) || matches[0];
+                return {
+                  hash: location.hash,
+                  frameUrl: frame?.contentWindow?.location?.href || null,
+                  priorFrameUrl: before?.href || null,
+                  previousConnected: node?.isConnected ?? null,
+                  previousInDocument: doc?.contains(node) ?? null,
+                  previousOwnerIsCurrentDocument: before?.document === doc,
+                  previousFrameIsCurrent: before?.frame === frame?.contentWindow,
+                  previousIsCurrentMatch: matches.includes(node),
+                  matchCount: matches.length,
+                  matchedConnected: now?.isConnected ?? null,
+                  matchedVisible: now ? now.getClientRects().length > 0 : null,
+                  matchedTag: now?.tagName || null,
+                  matchedClass: now?.className || null,
+                  shellDocumentLoaded: document.readyState,
+                  frameDocumentLoaded: doc?.readyState || null
+                };
+              }, slot).catch(e => ({diagnosticError: String(e)}));
+                console.error('#1084 DOM_AT_FAILURE ' + JSON.stringify({slot, width, theme, message: String(error.message).slice(0, 350), ...diagnostic}));
+                throw error;
+              }
+            }
             const count = await page.evaluate(async b64 => {
               const blob = await (await fetch('data:image/png;base64,' + b64)).blob();
               const bmp = await createImageBitmap(blob), cv = new OffscreenCanvas(bmp.width, bmp.height), cx = cv.getContext('2d');

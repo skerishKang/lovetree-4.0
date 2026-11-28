@@ -20,8 +20,11 @@ function closeBookHistory(id){
  if(!bookHistoryRestoring&&!bookHistoryTransferring&&history.state?.ltBookOverlay===id)history.back();
 }
 function completeBookJump(id,page){
+ const fromList=history.state?.ltBookOverlay==='archivePanel';
  const state={...history.state,ltBookOverlay:null,ltBookMoment:id,ltBookPage:page,ltBookScrollY:window.scrollY};
- history.replaceState(state,'',location.href);
+ // 목록을 펼친 채 고른 책장은 새 방문 기록이다. 뒤로 가면 원래 목록으로 돌아온다.
+ if(fromList)history.pushState(state,'',location.href);
+ else history.replaceState(state,'',location.href);
 }
 const bookDialogs=[]; /* 열린 창 스택 — Esc는 맨 위 창 하나만 닫는다(공통 창 닫기 규칙과 같은 방식). */
 function setBookOpen(el, open){if(!el)return;if(open&&!el.classList.contains('open'))recordBookOpen(el.id);if(!open&&el.classList.contains('open'))closeBookHistory(el.id);el.classList.toggle('open',!!open);if(el.id==='viewer'&&!open)$('#viewerMedia')?.replaceChildren();const i=bookDialogs.indexOf(el);if(i>=0)bookDialogs.splice(i,1);if(open){el.removeAttribute('inert');bookDialogs.push(el)}else el.setAttribute('inert','')}
@@ -123,6 +126,11 @@ window.addEventListener('popstate',event=>{
    }
   }
   if($('#archivePanel')?.classList.contains('open')&&target!=='archivePanel')closeArchive();
+  if(target==='archivePanel'&&!$('#archivePanel')?.classList.contains('open')){
+   archiveByDisplay=true;
+   paintInlineBookDisplay('list');
+   openArchive();
+  }
   if($('#overview')?.classList.contains('open')&&target!=='overview')window.__BOOK_USABILITY__?.closeJourney?.();
   if(target!=='lightbox'&&document.querySelector('.lt-lightbox'))LTMedia.closeLightbox();
   if(!['detailSide','viewer','lightbox'].includes(target)&&(document.querySelector('.page-detail')||($('#detailSide')&&!$('#detailSide').hidden)))window.__BOOK_USABILITY__?.closeDetail?.();
@@ -272,18 +280,38 @@ if(!single()){if(smoothTurn()){leftPage.innerHTML=momentContent({...tar.left,spr
 else if(phone){mobileContent.innerHTML=singlePageContent(tarM,t,total)}
 else{rightPage.innerHTML=momentContent({...tarM,spread:spreadOfPos(t)});$('#rightFolio').textContent=pad2(t+1)}
 markOverflowPages();turn.frontFace=front;turn.backFace=back;turn.shadowLayer=sh.querySelector('.flip-shadow');turn.shadeLayer=sh.querySelector('.flip-shade');turn.sheenLayer=sh.querySelector('.flip-sheen');$('#turnWhy').querySelector('span').textContent=whyOverride||'책의 순서대로 페이지를 넘깁니다.';setTurnProgress(0);return true}
-function finishTurn(commit){if(!turn)return;turn.held=false;cancelAnimationFrame(turnAnim);machineState=commit?'PAGE_COMMITTING':'PAGE_DRAGGING';/* #1231: 움직임 감소에서는 화면 넘김 효과를 유지하되, 현재 장과 단추의 상태만 클릭 즉시 확정한다. */
-if(reduced&&commit){current=turn.target;$('#prevBtn').disabled=current<=0;$('#nextBtn').disabled=current>=pageCount()-1;}
-/* #1468: 고리는 자기가 시작한 넘김(mine)만 움직인다 — 그 사이 turn이 비워졌거나 다른 넘김으로 바뀌었으면 멈춘다. */
-const mine=turn,from=mine.progress,to=commit?1:0,dur=smoothTurn()?350:Math.max(220,650*Math.abs(to-from));const start=performance.now();function step(now){if(turn!==mine)return;const q=Math.min(1,(now-start)/dur);/* #393 3: 천천히 들리고 가운데 빠르고 천천히 내려앉는 ease-in-out */const ease=smoothTurn()?q:(q<.5?2*q*q:1-Math.pow(-2*q+2,2)/2);setTurnProgress(from+(to-from)*ease);if(q<1){turnAnim=requestAnimationFrame(step);return}const target=mine.target;$('#turnWhy').classList.remove('show');
-/* #393 3: 새 페이지를 먼저 완성하고 같은 프레임에 종이를 치운다 — 넘김 끝 빈 틈 0. (기존 80ms setTimeout 틈이 '뚝'이었다) */
-/* #1468: 넘김 고리는 여기서 끝난다 — 아래 그리기는 넘김의 마무리라 renderSpread의 문을 열어 두고, 나머지 정리와 미뤄 둔 요청은 settleTurn이 한다. */
- turn=null;
- try{
- if(commit){machineState='LANDING';const landingFocus=focusAfter||(single()?momentAtPos(target)?.id:SPREADS[target].left.id)||'';focusAfter=null;renderSpread(target,landingFocus,true)}else{machineState='IDLE';renderSpread(current,LTDEMO.get(),false)}
- }finally{settleTurn()}
+function finishTurn(commit){
+ if(!turn)return;
+ turn.held=false;
+ cancelAnimationFrame(turnAnim);
+ machineState=commit?'PAGE_COMMITTING':'PAGE_DRAGGING';
+ const mine=turn,from=mine.progress,to=commit?1:0;
+ const dur=smoothTurn()?350:Math.max(220,650*Math.abs(to-from));
+ const finalize=()=>{
+  if(turn!==mine)return;
+  const target=mine.target;
+  $('#turnWhy').classList.remove('show');
+  turn=null;
+  try{
+   if(commit){machineState='LANDING';const landingFocus=focusAfter||(single()?momentAtPos(target)?.id:SPREADS[target].left.id)||'';focusAfter=null;renderSpread(target,landingFocus,true)}
+   else{machineState='IDLE';renderSpread(current,LTDEMO.get(),false)}
+  }finally{settleTurn()}
+ };
+ // 시스템에서 움직임 줄이기를 켜면 종이 회전이나 페이드 없이 즉시 해당 장으로 간다.
+ if(reduced){finalize();return}
+ const start=performance.now();
+ function step(now){
+  if(turn!==mine)return;
+  const q=Math.min(1,(now-start)/dur);
+  const ease=smoothTurn()?q:(q<.5?2*q*q:1-Math.pow(-2*q+2,2)/2);
+  setTurnProgress(from+(to-from)*ease);
+  if(q<1){turnAnim=requestAnimationFrame(step);return}
+  // 이전에는 100% 각도를 같은 프레임에서 지워 종이 넘김의 마지막 그림이 생략됐다.
+  // 마지막 종이 프레임을 표시한 다음 프레임에서만 다음 쪽을 확정한다.
+  turnAnim=requestAnimationFrame(finalize);
+ }
+ turnAnim=requestAnimationFrame(step);
 }
-turnAnim=requestAnimationFrame(step)}
 /* #1468: 넘김 정리 — 종이·상태를 대기로 돌리고, 넘기는 동안 미뤄 둔 것을 처리한다. '지금 쪽 다시 그리기'(요청할 때의 쪽·선택이
    그대로인 요청: 날짜 표기·제목 보기 변경, 상세 닫기)는 끝난 뒤의 쪽·선택으로 바꿔 그려 넘어간 쪽으로 되돌아가지 않게 하고,
    다른 쪽으로 가려던 요청(뒤로 가기·건너뛰기)은 그대로 따른다. 그다음 미뤄 둔 넘김 입력 한 번을 이어 간다.
@@ -352,7 +380,7 @@ function closeArchive(){if(archiveByDisplay){
  try{localStorage.setItem('lt41.bookDisplay','book')}catch{}
  try{parent.postMessage({type:globalThis.LT41_MSG.prefs,patch:{bookDisplay:'book'}},location.origin)}catch{}
  }
-const panel=$('#archivePanel');if(panel.classList.contains('open'))closeBookHistory(panel.id);panel.classList.remove('open');panel.inert=true;$('#archiveBtn').setAttribute('aria-expanded','false');archiveOpener?.focus()}function openArchive(){archiveOpener=document.activeElement;renderArchive();const panel=$('#archivePanel');if(!panel.classList.contains('open'))recordBookOpen(panel.id);panel.inert=false;panel.classList.add('open');$('#archiveBtn').setAttribute('aria-expanded','true');$('#archiveClose').focus()}$('#archiveBtn').setAttribute('aria-expanded','false');$('#archiveBtn').setAttribute('aria-controls','archivePanel');$('#archiveBtn').onclick=openArchive;$('#book-display-inline')?.addEventListener('click',e=>{
+const panel=$('#archivePanel');if(panel.classList.contains('open'))closeBookHistory(panel.id);panel.classList.remove('open');panel.inert=true;archiveOpener?.focus()}function openArchive(){archiveOpener=document.activeElement;renderArchive();const panel=$('#archivePanel');if(!panel.classList.contains('open'))recordBookOpen(panel.id);panel.inert=false;panel.classList.add('open');$('#archiveClose').focus()}$('#book-display-inline')?.addEventListener('click',e=>{
  const choice=e.target.closest('[data-book-display]')?.dataset.bookDisplay;
  if(!choice)return;
  paintInlineBookDisplay(choice);

@@ -267,6 +267,20 @@ test('#1514 궤도·첫 화면·책·지도·그래프 조작의 실제 누름 �
    await mapPage.waitForFunction(()=>!!document.getElementById('screen').contentWindow.__lt?.dots?.()?.length);
    await mapPage.evaluate(()=>{const frame=document.getElementById('screen').contentWindow;frame.__lt.selectMoment(frame.__lt.nodes[0],true)});
    await map.locator('#detail.open').waitFor();
+   // 열린 클래스만으로는 이동 중인 상세 창이 화면 밖에 남을 수 있다.
+   // 실제 닫기 손잡이의 화면 안 배치·이동 완료를 기다린 다음 원래 네 점 단언을 한다.
+   await mapPage.waitForFunction(() => {
+     const win = document.getElementById('screen')?.contentWindow;
+     const panel = win?.document.getElementById('detail'), button = win?.document.getElementById('detailClose');
+     if (!panel?.classList.contains('open') || !button) return false;
+     const box = panel.getBoundingClientRect(), hit = button.getBoundingClientRect();
+     const style = win.getComputedStyle(panel);
+     const transform = style.transform === 'none' ? null : new win.DOMMatrixReadOnly(style.transform);
+     return box.left >= -1 && box.right <= win.innerWidth + 1 &&
+       hit.left >= 0 && hit.right <= win.innerWidth && hit.top >= 0 && hit.bottom <= win.innerHeight &&
+       (!transform || (Math.abs(transform.m41) < .5 && Math.abs(transform.m42) < .5)) &&
+       panel.getAnimations().every(animation => animation.playState !== 'running');
+   }, null, { timeout: 10000 });
    assertHit(await hitMeasurement(map,'#detailClose',width===390?44:32),`${width}/${theme} 지도 상세 닫기`);
    if(width===1440)assertHit(await hitMeasurement(map,'#viewNet',36),`${width}/${theme} 지도 필터`);
    await mapCtx.close();

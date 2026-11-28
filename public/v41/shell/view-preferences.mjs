@@ -81,6 +81,33 @@ export function createViewPreferences(ctx){
    try{(0,ctx.$)('view').contentWindow.postMessage({type:MSG.shelfView,value:currentShelfView()},location.origin)}catch{}
   }
 
+  // #1631: 로그인은 계정값과 기기 미러, 로그아웃은 기기값을 읽는다.
+  // 방문에서는 방문자 자신의 설정만 읽고 두 저장소 모두 건드리지 않는다.
+  const shelfOpenModeOf=value=>value==='direct'?'direct':'preview';
+  function currentShelfOpenMode(){
+    const owned=ctx.member?.snapshot?.().owned===true;
+    if(owned){try{return shelfOpenModeOf(ctx.member.state().prefs?.shelfOpenMode)}catch{}}
+    try{return shelfOpenModeOf(localStorage.getItem('lt41.shelfOpenMode'))}catch{return 'preview'}
+  }
+  function rememberShelfOpenMode(value){try{localStorage.setItem('lt41.shelfOpenMode',shelfOpenModeOf(value))}catch{}}
+  function paintShelfOpenModeControls(){
+    const value=currentShelfOpenMode();
+    document.documentElement.dataset.ltShelfOpenMode=value;
+    for(const b of document.querySelectorAll('[data-shelf-open-mode]'))b.setAttribute('aria-checked',String(b.dataset.shelfOpenMode===value));
+    try{ctx.$('view').contentWindow?.postMessage({type:MSG.shelfOpenMode,value},location.origin)}catch{}
+  }
+  function setShelfOpenMode(value){
+    if(isVisitMode()){paintShelfOpenModeControls();return false;}
+    const next=shelfOpenModeOf(value);
+    if(ctx.member?.snapshot?.().owned){
+      try{ctx.member.apply('setPrefs',{shelfOpenMode:next});}catch{ctx.notify('서재 책 열기 설정을 저장하지 못했어요. 다시 시도해 주세요.');return false;}
+      if(window.LT41)window.LT41.prefs=ctx.member.state().prefs;
+    }
+    rememberShelfOpenMode(next);
+    paintShelfOpenModeControls();
+    return true;
+  }
+
   async function runTitleBackfill(state,session){
    if(ctx.source!=='server'||!session.snapshot().owned)return;
    await backfillVideoTitles({state,source:ctx.source,apply:(action,input)=>session.apply(action,input),attempted:backfillAttempted});
@@ -147,6 +174,10 @@ export function createViewPreferences(ctx){
     rememberShelfView:{value:rememberShelfView},
     paintShelfViewControls:{value:paintShelfViewControls},
     setShelfView:{value:setShelfView},
+    currentShelfOpenMode:{value:currentShelfOpenMode},
+    rememberShelfOpenMode:{value:rememberShelfOpenMode},
+    paintShelfOpenModeControls:{value:paintShelfOpenModeControls},
+    setShelfOpenMode:{value:setShelfOpenMode},
     backfillStarted:{get:()=>backfillStarted,set:value=>{backfillStarted=value;}},
     backfillAttempted:{get:()=>backfillAttempted,set:value=>{backfillAttempted=value;}},
     runTitleBackfill:{value:runTitleBackfill},
