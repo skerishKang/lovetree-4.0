@@ -57,7 +57,7 @@ test('방문 저장소 실제 DB 동시 집계·만료·공개 경계·칼럼', 
 });
 
 
-test('같은 공유의 50명 동시 방문, 중복, 만료 후 재방문 및 자정 경계 역순 집계', {skip: !url}, async()=>{
+test('같은 공유의 50명 동시 방문, 중복, 만료 후 재방문 및 자정 경계 역순 집계', {skip: !url}, async t=>{
   assertIsolatedTestDatabase(url);
   const pool=await createPool(url,{max:10});
   const productId='visit-concurrent-'+randomBytes(8).toString('hex');
