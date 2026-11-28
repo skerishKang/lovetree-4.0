@@ -1420,7 +1420,8 @@ test('#1449 첫 화면 순간 상세 창 정보·출처·테마·누름 영역�
         if(capture)await h.page.screenshot({path:join(capture,detailBase),animations:'disabled'});
         step(tag,'detail-capture');
         const facts=await evaluateWhenReady(h.frame,()=>{
-          const el=document.getElementById('mediaViewerHome'),root=document.documentElement;
+          const root=document.documentElement,shadow=document.querySelector('#orbit')?.shadowRoot;
+          const el=shadow?.getElementById('mediaViewerHome');
           if(!el||!root)return false;
           const shell=el.querySelector('.mediaShell'),close=el.querySelector('#mediaCloseHome'),body=el.querySelector('#mediaBodyHome'),why=el.querySelector('#mediaWhyHome'),tree=el.querySelector('#mediaTreeChipHome'),external=el.querySelector('#mediaExternalHome');
           const rect=n=>{const r=n?.getBoundingClientRect();return r?{left:r.left,top:r.top,right:r.right,bottom:r.bottom,width:r.width,height:r.height}:null;};
