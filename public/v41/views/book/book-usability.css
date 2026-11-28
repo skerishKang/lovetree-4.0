@@ -344,6 +344,18 @@ html[data-v41-screen=book][data-lt-theme=garden] .why-margin{padding:0;border:0;
 /* #1078: 오른쪽 아래 ＋ 단추(56px·right 14px) 자리를 비우고, 한마디 줄의 오른쪽 끝이 단추 밑으로 가지 않게 한다(390만). */
 html[data-book-shape=phone][data-v41-screen=book] .why-margin{order:1;top:auto;bottom:auto;margin:0 76px 0 10px;position:static;left:auto;transform:none;width:auto}
 html[data-book-shape=phone][data-v41-screen=book] .nav-pill{order:2;position:static;bottom:auto;margin:2px auto 0}
+/* #1488: 이동 줄은 문서와 함께 굴러가지만 ＋ 단추는 셸 오른쪽에 고정된다.
+   세로 자리나 축소 전환에 기대지 않고 단추 원래 폭 56px + 오른쪽 14px + 간격 12px를 비운다. */
+@media(max-width:780px){
+ html[data-book-shape=phone][data-v41-screen=book][data-book-add-space] .nav-pill{
+  --lt-book-add-space:82px;
+  box-sizing:border-box;max-width:calc(100% - var(--lt-book-add-space));
+  align-self:center;margin-left:0;margin-right:var(--lt-book-add-space);
+  padding-inline:6px;gap:4px;flex-wrap:wrap;justify-content:center
+ }
+ html[data-book-shape=phone][data-v41-screen=book][data-book-add-space] .nav-pill button{flex-shrink:0}
+ html[data-book-shape=phone][data-v41-screen=book][data-book-add-space] .nav-pill .page-label{min-width:0;flex-shrink:0}
+}
 html[data-book-shape=phone][data-v41-screen=book] .branch-tab{order:3}
 html[data-book-shape=phone][data-v41-screen=book] .yt-play.is-vertical{height:clamp(190px,26vh,230px)}
 html[data-book-shape=phone][data-v41-screen=book] .yt-frame.is-vertical{height:clamp(200px,26vh,230px)}

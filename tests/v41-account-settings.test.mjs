@@ -168,10 +168,12 @@ test('설정 창 실행: 개인정보 묶음의 정책 링크는 새 창이고 �
     });
     assert.deepEqual(
       got.links.map((l) => l.href),
-      ['https://auth.padiem.net/privacy#lovetree', 'https://auth.padiem.net/terms'],
+      ['https://auth.padiem.net/privacy?theme=night#lovetree', 'https://auth.padiem.net/terms?theme=night'],
       '개인정보 처리 방침·이용약관 두 링크다'
     );
     assert.ok(got.links.every((l) => l.target === '_blank' && l.rel.includes('noopener')), '정책 링크는 새 창(noopener)이다');
     assert.equal(logoutVisible, true, '로그아웃 단추가 계정 팝오버에 보인다');
   } finally { await browser.close(); server.close(); }
 });
+
+import './helpers/account-visit-1581.mjs';

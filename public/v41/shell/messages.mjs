@@ -147,6 +147,8 @@ export function createMessages(deps) {
     }
     if ((data?.type === MSG.selection || data?.type === MSG.select) && window.LT41?.tree.moments.some(m => m.id === data.id)) {
       // #1333: 트리 보기에서 고른 순간은 현재 순간으로만 반영하고 방문 기록은 늘리지 않는다.
+      // 서재로 돌아올 때 기존 순간의 선택 알림이 늦게 와도 뒤로 가기 이력을 다시 쌓지 않는다.
+      if (getCurrent() === 'track32-bookshelf.html' && data.type === MSG.selection && window.LT41.momentId === data.id) return;
       window.LT41.momentId = data.id; links(); writeLocation(data.noHistory || data.boardState?.noHistory ? 'replace' : 'push', data.boardState);
     }
     if (data?.type === MSG.boardDetail) { writeLocation('replace'); return; }

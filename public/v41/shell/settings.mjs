@@ -109,6 +109,7 @@ const themeToggleTop=$('theme-toggle');if(themeToggleTop)themeToggleTop.onclick=
  // 로그아웃 빈 화면의 "백업 파일 열기"(#empty-file)는 계정 없이 쓰는 입구로 남긴다.
  $('advanced-import').onclick=()=>$('file').click();
  $('empty-file').onclick=()=>$('file').click();
+ const shareHome=$('empty-share-home');if(shareHome)shareHome.onclick=()=>document.querySelector('.brand')?.click();
  for(const b of document.querySelectorAll('[data-title-display]'))b.onclick=()=>setTitleDisplay(b.dataset.titleDisplay);
  // #380 5번: '보기 ◐' 메뉴(테마·움직임·카드 출처)를 설정 창의 '화면' 묶음으로 옮겼다.
  // 저장 키(lt41.theme·lt41.homeCards)와 기본값은 그대로다.
@@ -310,7 +311,7 @@ paintNetworkViewControls();
 // (쉬운 추가·자세한 추가가 이 한 벌(quickTargetPreference)을 따른다).
 const QUICK_TARGET_KEY='lt41.quickAddTarget';
 const QUICK_TARGET_TREE_KEY='lt41.quickAddTreeId';
-function quickAddTargetMode(){try{return localStorage.getItem(QUICK_TARGET_KEY)==="fixed"?"fixed":"deps.current"}catch{return "deps.current"}}
+function quickAddTargetMode(){try{return localStorage.getItem(QUICK_TARGET_KEY)==="fixed"?"fixed":"current"}catch{return "current"}}
 function quickAddFixedTreeId(){try{return localStorage.getItem(QUICK_TARGET_TREE_KEY)||""}catch{return ""}}
 function quickTargetPreference(){return {mode:quickAddTargetMode(),treeId:quickAddFixedTreeId()}}
 function paintQuickTargetControls(){
@@ -540,7 +541,8 @@ $('file').onchange=async()=>{
 // #380 4 2차: 전체 화면·가운데 창 공통 틀을 쓰는 대화상자(편집기·순간 잇기·트리 관리)는 × 도 바깥 클릭·Esc와 같은 규칙을 쓴다.
 document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>{const target=$(b.dataset.close);if(target?.dataset?.ltPanel){shellDialogs.requestClose(b.dataset.close);return;}target.close();});
 function publicProblem(answer){
- deps.source='share';deps.activeShareId=null;deps.model={trees:[]};window.LT41=null;document.body.dataset.recordSource='share';flowNavigation();document.body.classList.remove('home-screen');hideFrames();$('empty').hidden=false;$('empty-sample').hidden=true;$('empty-records').hidden=true;
+ document.body.removeAttribute('data-public-ai-tester');
+ deps.source='share';deps.activeShareId=null;deps.model={trees:[]};window.LT41=null;document.body.dataset.recordSource='share';flowNavigation();document.body.classList.remove('home-screen');hideFrames();$('empty').hidden=false;$('empty-sample').hidden=true;$('empty-records').hidden=true;$('empty-file').hidden=true;if(shareHome)shareHome.hidden=false;
  const messages={share_invalid:['공유 주소를 찾을 수 없어요.','주소를 다시 확인해 주세요.'],share_not_found:['공유 주소를 찾을 수 없어요.','주소가 잘못되었거나 존재하지 않아요.'],share_revoked:['공유가 취소됐어요.','소유자가 이 공유 주소를 회수했습니다.'],share_removed:['공유된 트리가 없어졌어요.','트리가 삭제되었거나 더 이상 공개할 수 없어요.'],share_empty:['아직 공개할 순간이 없어요.','소유자가 순간을 남긴 뒤 다시 열어 주세요.'],share_forbidden:['이 공유는 볼 수 없어요.','접근 권한을 확인해 주세요.']};
  const [title,detail]=messages[answer.code]||['공유 기록을 불러오지 못했어요.',answer.code==='timeout'?'서버 응답 시간이 초과됐어요. 다시 시도해 주세요.':'잠시 뒤 다시 시도해 주세요.'];$('empty').querySelector('h1').textContent=title;$('empty').querySelector('p').textContent=detail;links();
 }
@@ -552,14 +554,16 @@ async function showPublicRoute(route){
  if(deps.member&&!(await (deps.member.snapshot().owned?pauseMember():leaveMember()))){setVisitMode(false);writeLocation('replace');return;}
  if(visiting&&!route.shareId){setVisitMode(false);publicProblem({code:'share_invalid'});writeLocation('replace');return;}
  const generation=++deps.loadGeneration;
+ document.body.removeAttribute('data-public-ai-tester');
  deps.activeShareId=route.shareId;
  deps.current=screenForView(['tree','book','board','network'].includes(route.view)?route.view:'book')[1];
  deps.handledHash=location.hash;
  $('empty').querySelector('h1').textContent='공유된 순간을 펼치고 있어요.';
  $('empty').querySelector('p').textContent='소유자가 공개한 트리 한 개만 확인합니다.';
- $('empty-sample').hidden=true;$('empty-records').hidden=true;$('view').hidden=true;$('empty').hidden=false;
+ $('empty-sample').hidden=true;$('empty-records').hidden=true;$('empty-file').hidden=true;if(shareHome)shareHome.hidden=true;$('view').hidden=true;$('empty').hidden=false;
  const answer=await (visiting?shareApi.readVisit(route.shareId):shareApi.read(route.shareId||''));if(generation!==deps.loadGeneration||location.hash!==requestedHash)return;if(!answer.ok){publicProblem(answer);return;}
- const share=visiting?answer.visit:answer.share;
+ const share=visiting?answer.visit:answer.share,meta=visiting?answer.visit:answer;
+ document.body.toggleAttribute('data-public-ai-tester',meta.aiTester===true);
  if(visiting){setVisitPrefs(share.prefs);if(!wasVisiting||!readVisitTheme())setVisitTheme(readTheme(localStorage));window.LT41=null;}
  deps.activeShareId=share.shareId||share.id;const view=['tree','book','board','network'].includes(route.view)?route.view:share.view;deps.current=screenForView(view)[1];load({revision:0,state:{version:1,trees:[answer.tree]}},'share',{treeId:answer.tree.id,momentId:share.entryMomentId});
  if(visiting&&window.LT41)window.LT41.prefs={...(share.prefs||{titleDisplay:'both'}),theme:readVisitTheme()||readTheme(localStorage)};
@@ -570,7 +574,6 @@ async function showPublicRoute(route){
  if(visiting||!deps.member?.snapshot().owned)void accountApi.account().then(account=>{
    if(generation===deps.loadGeneration&&deps.source==='share')deps.onVisitorAccount?.(account?.ok?account:null);
  }).catch(()=>{});
- const meta=visiting?answer.visit:answer;
  notify('공개된 트리를 감상하는 화면이에요. 감상만 할 수 있어요.'+(meta.aiTester?' AI 명예회원이 만든 트리예요.':'')+(meta.omittedPrivateMedia?' 올린 사진 '+meta.omittedPrivateMedia+'장은 나만 볼 수 있어요.':''),{visitorIntro:true});
 }
 document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{

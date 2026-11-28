@@ -306,8 +306,8 @@ test('#426·#635 추가·둘러보기 단추와 안내 패널이 실제로 동�
       const links = await guide.locator('.guide-policy a').evaluateAll(es => es.map(e => ({ href: e.href, target: e.target, rel: e.rel, minH: parseFloat(getComputedStyle(e).minHeight), text: e.textContent.trim() })));
       assert.deepEqual(links.map(l => l.text), ['개인정보 처리방침', '이용약관']);
       assert.ok(links.every(l => l.target === '_blank' && l.rel.includes('noopener')), '두 링크 모두 새 창이다');
-      assert.equal(links[0].href, 'https://auth.padiem.net/privacy#lovetree', '처리방침은 러브트리 절로 바로 간다');
-      assert.equal(links[1].href, 'https://auth.padiem.net/terms');
+      assert.equal(links[0].href, 'https://auth.padiem.net/privacy?theme=night#lovetree', '처리방침은 러브트리 절로 바로 간다');
+      assert.equal(links[1].href, 'https://auth.padiem.net/terms?theme=night');
       assert.ok(links.every(l => l.minH >= 44), '누름 영역 44px: ' + JSON.stringify(links.map(l => l.minH)));
     } finally { await close952(h); }
     // 예시(로그아웃) 가운데 세트의 '어떻게 쓰나요' 단추도 같은 패널을 연다.
@@ -1842,4 +1842,74 @@ test('#1535 deployment chunk recovery is bounded and shared by the home frame', 
       }finally{await ctx.close();}
     }
   }finally{await browser.close();await new Promise(r=>server.close(r));}
+});
+
+// #1592: 실제 화면의 여섯 링크와 접기 메뉴 복제본, 그림자 안내 창의 두 링크를 함께 검사한다.
+test('#1592 정책 링크는 손님·회원의 현재 테마를 따르고 화면을 다시 열지 않아도 갱신된다', { skip: REQUIRE952 ? false : skip952, timeout: 120000 }, async () => {
+  if (skip952) assert.fail(skip952);
+  const browser = await chromium952.launch({ headless: true });
+  const expected = theme => [
+    'https://auth.padiem.net/privacy?theme=' + theme + '#lovetree',
+    'https://auth.padiem.net/terms?theme=' + theme,
+  ];
+  const checkLinks = async (locator, theme) => {
+    const links = await locator.evaluateAll(es => es.map(e => ({
+      href: e.getAttribute('href'), target: e.target, rel: e.rel, text: e.textContent.trim()
+    })));
+    assert.deepEqual(links.map(l => l.href), expected(theme));
+    assert.deepEqual(links.map(l => l.text), ['개인정보 처리방침', '이용약관']);
+    assert.ok(links.every(l => l.target === '_blank' && l.rel.includes('noopener')));
+  };
+  try {
+    for (const initial of ['night', 'garden']) {
+      const next = initial === 'night' ? 'garden' : 'night';
+      const guest = await boot952(browser, { width: 390, member: false, initStorage: { 'lt41.theme': initial } });
+      try {
+        const footer = guest.page.locator('.home-links a');
+        const mobile = guest.page.locator('#header-overflow a');
+        const guide = guest.frame.locator('#guidePanel');
+        const guideLinks = guide.locator('.guide-policy a');
+        await checkLinks(footer, initial);
+        await guest.page.locator('#mobile-more').click();
+        await checkLinks(mobile, initial);
+        await guest.page.locator('#mobile-more').click();
+        await guest.frame.locator('.center .actions [data-do="guide"]').evaluate(e => e.click());
+        await guide.waitFor({ state: 'visible' });
+        await checkLinks(guideLinks, initial);
+        // 안내 창은 바깥 클릭을 막으므로 닫은 뒤 이미 생성된 링크가 갱신되는지 확인.
+        const guideNode = await guide.elementHandle();
+        await guide.locator('[data-do="guide-close"]').click();
+        await guide.waitFor({ state: 'hidden' });
+        await guest.page.locator('#theme-toggle').click();
+        await guest.frame.waitForFunction(theme =>
+          document.querySelector('#orbit').shadowRoot.querySelector('.guide-policy a')?.href.includes('theme=' + theme), next);
+        assert.equal(await guideNode.evaluate(el => el.isConnected), true, '안내 창을 새로 만들지 않는다');
+        await checkLinks(guideLinks, next);
+        await checkLinks(footer, next);
+        await checkLinks(mobile, next);
+        await guest.page.locator('#mobile-more').click();
+        await checkLinks(mobile, next);
+        assert.deepEqual(guest.errors, []);
+      } finally { await close952(guest); }
+
+      const member = await boot952(browser, { member: true, initStorage: { 'lt41.theme': initial } });
+      try {
+        const menu = member.page.locator('#account-popover a.account-policy-link');
+        const settings = member.page.locator('#account-settings-account a.policy-link');
+        await member.page.locator('#account-avatar').click();
+        await checkLinks(menu, initial);
+        await member.page.locator('#account-open-settings').click();
+        await member.page.locator('#settings-tab-account').click();
+        await checkLinks(settings, initial);
+        await member.page.locator('#settings-tab-screen').click();
+        await member.page.locator('#settings-theme-choices [data-set-theme="' + next + '"]').click();
+        await checkLinks(settings, next);
+        await checkLinks(menu, next);
+        await checkLinks(member.page.locator('.home-links a'), next);
+        await member.page.locator('#settings-tab-account').click();
+        await checkLinks(settings, next);
+        assert.deepEqual(member.errors, []);
+      } finally { await close952(member); }
+    }
+  } finally { await browser.close(); }
 });

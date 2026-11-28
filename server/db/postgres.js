@@ -74,6 +74,17 @@ export function createWorkspaceRepo(pool) {
       return { revision: Number(row.revision), savedAt: iso(row.saved_at), doc: row.doc };
     },
 
+    // 공개 목록에서 같은 제품의 문서를 계정별 한 번에 읽는다.
+    async loadMany({ productId, subjectIds }) {
+      const ids = [...new Set(subjectIds)];
+      if (!ids.length) return new Map();
+      const { rows } = await pool.query(
+        'SELECT subject_id, doc, revision, saved_at FROM lovetree_workspaces WHERE product_id = $1 AND subject_id = ANY($2::text[])',
+        [productId, ids]
+      );
+      return new Map(rows.map(row => [row.subject_id, { revision: Number(row.revision), savedAt: iso(row.saved_at), doc: row.doc }]));
+    },
+
     async commit(input) {
       const client = await pool.connect();
       try {

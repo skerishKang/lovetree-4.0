@@ -19,6 +19,16 @@ export function createAdminRoleRepo(pool, { stageIndex = null } = {}) {
       return row ? { productId: row.product_id, subjectId: row.subject_id, role: row.role, grantedBy: row.granted_by, updatedAt: iso(row.updated_at) } : null;
     },
 
+    async rolesFor({ productId, subjectIds }) {
+      const ids = [...new Set(subjectIds)];
+      if (!ids.length) return new Map();
+      const { rows } = await pool.query(
+        'SELECT product_id, subject_id, role, granted_by, updated_at FROM lovetree_product_roles WHERE product_id = $1 AND subject_id = ANY($2::text[])',
+        [productId, ids]
+      );
+      return new Map(rows.map(row => [row.subject_id, { productId: row.product_id, subjectId: row.subject_id, role: row.role, grantedBy: row.granted_by, updatedAt: iso(row.updated_at) }]));
+    },
+
     async assign({ productId, subjectId, role, grantedBy, reason = null, at }) {
       const existing = await pool.query(
         'SELECT role FROM lovetree_product_roles WHERE product_id = $1 AND subject_id = $2',
