@@ -146,12 +146,26 @@ test('#1057 점에 초점을 두고 Enter·Space — 묶음·순간 상세가 �
     // #1057: 배지의 표시와 SVG 점 생성은 같은 준비 조건이 아니다.
     // 두 번째 점이 붙을 때까지 기존 10초 상한 안에서 기다린 뒤 개수를 검사한다.
     await dots.nth(1).waitFor({ state: 'attached', timeout: 10000 });
+    // 글꼴 준비 완료도 SVG를 다시 그리므로 포커스를 주기 전에 끝난 것을 확인한다.
+    await graph.waitForFunction(() => document.fonts.status === 'loaded', null, { timeout: 10000 });
     const count = await dots.count();
     assert.ok(count >= 2, `누를 수 있는 점이 있다(실제 ${count}개)`);
     // 순간 점에 초점을 두고 Enter — 순간 상세가 열린다.
     const first = graph.locator('#gsvg g[data-moment]').first();
     await first.focus();
     assert.equal(await graph.evaluate(() => document.activeElement?.hasAttribute('data-moment')), true, '순간 점에 초점이 갔다');
+    const focusSurvived = await graph.evaluate(() => {
+      const active = document.activeElement;
+      const value = document.documentElement.getAttribute('data-lt-date-style') || 'dot';
+      dispatchEvent(new MessageEvent('message', {
+        data: { type: 'lt41-date-style', value },
+        origin: location.origin,
+        source: parent
+      }));
+      return !!active?.hasAttribute('data-moment') &&
+        document.activeElement === active && active.isConnected;
+    });
+    assert.equal(focusSurvived, true, '같은 날짜 표기 알림은 순간 점의 포커스를 유지한다');
     await page.keyboard.press('Enter');
     await graph.waitForFunction(() => document.querySelector('#detailCard .d-kicker')?.textContent === '순간 · 무대 날짜', null, { timeout: 5000 });
     console.log('#1057 moment Enter', JSON.stringify((await detail()).slice(0, 80)));
@@ -171,6 +185,20 @@ test('#1057 점에 초점을 두고 Enter·Space — 묶음·순간 상세가 �
       await graph.waitForFunction(() => document.querySelector('#detailCard .d-kicker')?.textContent?.includes('묶음'), null, { timeout: 5000 });
       console.log('#1057 hub Enter', JSON.stringify((await detail()).slice(0, 80)));
     }
+    const redrewOnChange = await graph.evaluate(() => {
+      const before = document.querySelector('#gsvg g[data-moment]');
+      const current = document.documentElement.getAttribute('data-lt-date-style') || 'dot';
+      const next = current === 'dot' ? 'dash' : 'dot';
+      dispatchEvent(new MessageEvent('message', {
+        data: { type: 'lt41-date-style', value: next },
+        origin: location.origin,
+        source: parent
+      }));
+      return !!before && !before.isConnected &&
+        document.documentElement.getAttribute('data-lt-date-style') === next &&
+        !!document.querySelector('#gsvg g[data-moment]');
+    });
+    assert.equal(redrewOnChange, true, '다른 날짜 표기 알림은 순간 점을 다시 그린다');
     await page.close();
   } finally {
     if (ctx) await ctx.close();
