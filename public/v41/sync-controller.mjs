@@ -13,6 +13,7 @@ function status({ phase, detail = null, actions = [], changes = 0 }) {
 }
 
 const PENDING_DRAFT_PREFIX = 'lovetree.v41.pending-write:';
+let nextDraftSessionEpoch = 0;
 function pendingDraftKey(subject) {
   return typeof subject === 'string' && /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(subject)
     ? `${PENDING_DRAFT_PREFIX}${subject}` : null;
@@ -70,6 +71,8 @@ export function createSyncController({getState, replaceState, api, draftStorage 
   let editCount = 0;
   // 보관본 세대는 로컬 편집마다 증가한다. 늦게 끝난 전송은 뒤 편집의 보관본을 덮지 않는다.
   let draftGeneration = 0;
+  let draftSessionEpoch = 0;
+  let lastAcknowledgedSerial = null;
   let lastHideFailureGeneration = null;
   let draftBackupFailed = false;
   let rateRetryCount = 0, rateTimer = null, rateWaitSeconds = null;
@@ -125,7 +128,13 @@ export function createSyncController({getState, replaceState, api, draftStorage 
   function clearPendingDraft(subject = activeSubject) {
     const key = pendingDraftKey(subject);
     if (!draftStorage || !key) return;
-    try { draftStorage.removeItem(key); } catch { /* session storage may be unavailable */ }
+    try {
+      let previous = null;
+      try { previous = JSON.parse(draftStorage.getItem(key) || 'null'); } catch {}
+      if (draftSessionEpoch && Number.isSafeInteger(previous?.sessionEpoch) &&
+          previous.sessionEpoch > draftSessionEpoch) return;
+      draftStorage.removeItem(key);
+    } catch { /* session storage may be unavailable */ }
   }
 
   function savePendingDraft(sent, reason = 'auth', savedGeneration = draftGeneration) {
@@ -133,6 +142,8 @@ export function createSyncController({getState, replaceState, api, draftStorage 
     if (!draftStorage || !key) return false;
     // 숨김으로 이미 쓴 최신 세대는 앞 요청의 늦은 401로 교체하지 않는다.
     const previous = readPendingDraft(activeSubject);
+    // 이전 세션의 늦은 응답은 더 최근 세션이 만든 보관본을 바꾸지 않는다.
+    if (previous && previous.sessionEpoch > draftSessionEpoch) return true;
     if (previous && previous.draftGeneration > savedGeneration) return true;
     // 같은 본문이라도 숨김 보관으로 승격은 허용한다. 앞 요청의 늦은 응답은 역으로 낮추지 못한다.
     if (previous && previous.draftGeneration === savedGeneration &&
@@ -142,7 +153,7 @@ export function createSyncController({getState, replaceState, api, draftStorage 
       draftStorage.setItem(key, JSON.stringify({
         version: 1, subject: activeSubject, expectedRevision: sent.expected,
         clientKey: sent.key, state: JSON.parse(sent.serial), reason, editCount,
-        draftGeneration: savedGeneration
+        draftGeneration: savedGeneration, sessionEpoch: draftSessionEpoch
       }));
       return true;
     } catch { return false; }
@@ -170,7 +181,8 @@ export function createSyncController({getState, replaceState, api, draftStorage 
       const state = validateState(draft.state);
       return { key, state, serial: JSON.stringify(state), expectedRevision: draft.expectedRevision, clientKey: draft.clientKey,
         reason: draft.reason === 'hide' ? 'hide' : 'auth', editCount: Number.isSafeInteger(draft.editCount) ? draft.editCount : 0,
-        draftGeneration: Number.isSafeInteger(draft.draftGeneration) && draft.draftGeneration >= 0 ? draft.draftGeneration : 0 };
+        draftGeneration: Number.isSafeInteger(draft.draftGeneration) && draft.draftGeneration >= 0 ? draft.draftGeneration : 0,
+        sessionEpoch: Number.isSafeInteger(draft.sessionEpoch) && draft.sessionEpoch >= 0 ? draft.sessionEpoch : 0 };
     } catch {
       clearPendingDraft(subject);
       return null;
@@ -231,9 +243,20 @@ export function createSyncController({getState, replaceState, api, draftStorage 
       return emit(status({phase:'offline',detail:'서버를 확인하지 못했어요. 다시 시도해 주세요.',actions:[...actions.retry,...actions.login]}));
     }
     owned = true; revision = result.revision; dirty = false; attempt = null; seenRevision = null; editCount = 0; activeSubject = result.subject || null;
+    // 새 세션은 기존 보관본보다 큰 소유 세대를 얻고, 뒤늦은 이전 응답을 막는다.
+    const previousDraft = readPendingDraft(activeSubject);
+    nextDraftSessionEpoch = Math.max(nextDraftSessionEpoch, previousDraft?.sessionEpoch || 0) + 1;
+    draftSessionEpoch = nextDraftSessionEpoch;
+    if (previousDraft) {
+      try {
+        const raw = JSON.parse(draftStorage.getItem(previousDraft.key));
+        draftStorage.setItem(previousDraft.key, JSON.stringify({...raw, sessionEpoch:draftSessionEpoch}));
+      } catch { /* 보관본 복원은 아래 기존 경로가 맡는다. */ }
+    }
     // 서버가 확인한 계정을 로그인 표식으로 남긴다 — 다음 접속에서 같은 계정일 때만 저장본을 먼저 그린다.
     rememberLoginSubject(cacheStorage, activeSubject);
     adoptState(result.state, result.quarantined);
+    lastAcknowledgedSerial = result.serverStateSerial === null ? null : JSON.stringify(getState());
     writeCachedWorkspace(cacheStorage, activeSubject, getState());
     if (restorePendingDraft(activeSubject, revision)) return current;
     return emit(status({phase:'synced',actions:actions.logout}));
@@ -241,9 +264,16 @@ export function createSyncController({getState, replaceState, api, draftStorage 
 
   async function push(options = {}) {
     if (closed || !owned || revision === null || inflight || !dirty || current.phase === 'conflict') return current;
+    const serial = JSON.stringify(getState());
+    // 확인된 서버 본문과 같고 미확인 요청도 없으면 새 개정·키를 만들지 않는다.
+    if (!attempt && lastAcknowledgedSerial !== null && serial === lastAcknowledgedSerial) {
+      dirty = false; editCount = 0;
+      clearAcknowledgedDraft(serial, draftGeneration);
+      draftBackupFailed = false;
+      return emit(status({phase:'synced',actions:actions.logout}));
+    }
     inflight = true;
     const gen = generation;
-    const serial = JSON.stringify(getState());
     if (!attempt || attempt.serial !== serial || attempt.expected !== revision)
       attempt = {serial, expected:revision, key:makeClientKey()};
     const sent = attempt;
@@ -257,6 +287,7 @@ export function createSyncController({getState, replaceState, api, draftStorage 
     if (answer.ok) {
       resetRateRetry();
       revision = answer.revision; attempt = null; editCount = 0;
+      lastAcknowledgedSerial = sent.serial;
       const latestSerial = JSON.stringify(getState());
       dirty = latestSerial !== sent.serial;
       if (dirty) {
@@ -309,6 +340,7 @@ export function createSyncController({getState, replaceState, api, draftStorage 
           adoptState(fixed.state, fixed.quarantined);
           writeCachedWorkspace(cacheStorage, activeSubject, getState());
           dirty = fixed.retry === true;
+          lastAcknowledgedSerial = dirty ? null : JSON.stringify(getState());
           if (dirty) return push({themeRebased:true});
           editCount = 0;
           clearPendingDraft();
@@ -358,6 +390,12 @@ export function createSyncController({getState, replaceState, api, draftStorage 
   function flushOnHide() {
     if (closed || !owned || revision === null || !dirty || current.phase === 'conflict') return false;
     const serial = JSON.stringify(getState());
+    if (!inflight && !attempt && lastAcknowledgedSerial !== null && serial === lastAcknowledgedSerial) {
+      dirty = false; editCount = 0;
+      clearAcknowledgedDraft(serial, draftGeneration);
+      draftBackupFailed = false;
+      return false;
+    }
     if (!attempt || attempt.serial !== serial || attempt.expected !== revision)
       attempt = {serial, expected:revision, key:makeClientKey()};
     // 숨기기 전에 먼저 동기 보관한다. 작은 keepalive도 네트워크가 끊기면 도달하지 않는다.
@@ -395,6 +433,7 @@ export function createSyncController({getState, replaceState, api, draftStorage 
     if (!result.ok || result.revision === revision) return current;
     revision = result.revision; seenRevision = null;
     adoptState(result.state, result.quarantined);
+    lastAcknowledgedSerial = JSON.stringify(getState());
     writeCachedWorkspace(cacheStorage, activeSubject, getState());
     return emit(status({phase:'synced',actions:actions.logout}));
   }
@@ -403,9 +442,22 @@ export function createSyncController({getState, replaceState, api, draftStorage 
     if (closed) return current;
     if (!owned || revision === null) return emit(status({phase:'login',actions:actions.login}));
     if (current.phase === 'conflict') { dirty = true; editCount += 1; return emit(current); }
+    if (!inflight && lastAcknowledgedSerial !== null &&
+        JSON.stringify(getState()) === lastAcknowledgedSerial &&
+        (!attempt || current.phase === 'throttled')) {
+      // 마지막 서버 승인 본문으로 돌아왔으면 429 예약도 해제하고 새 PUT를 만들지 않는다.
+      if (current.phase === 'throttled') resetRateRetry();
+      attempt = null;
+      dirty = false; editCount = 0; queued += 1;
+      for (const pending of pendingSaveWaits) pending.abort();
+      pendingSaveWaits.clear();
+      clearAcknowledgedDraft(lastAcknowledgedSerial, draftGeneration);
+      draftBackupFailed = false;
+      return emit(status({phase:'synced',actions:actions.logout}));
+    }
     if (current.phase === 'throttled') {
       dirty = true; editCount += 1; draftGeneration += 1;
-      // 기다리는 동안 새로 고친 내용도 즉시 보관한다. PUT는 예약된 재시도만 보낸다.
+      // 429 대기 중 고친 본문은 기존 세대 보호 규칙으로 즉시 보관한다. PUT는 예약 재시도만 보낸다.
       const serial = JSON.stringify(getState());
       if (!attempt || attempt.serial !== serial || attempt.expected !== revision)
         attempt = {serial,expected:revision,key:makeClientKey()};
@@ -449,6 +501,7 @@ export function createSyncController({getState, replaceState, api, draftStorage 
       revision = result.revision; dirty = false; attempt = null; seenRevision = null; editCount = 0;
       clearPendingDraft();
       adoptState(result.state, result.quarantined);
+      lastAcknowledgedSerial = JSON.stringify(getState());
       writeCachedWorkspace(cacheStorage, activeSubject, getState());
       return emit(status({phase:'synced',actions:actions.logout}));
     }

@@ -20,6 +20,8 @@ export function createMemberSession({api,onState=()=>{},onStatus=()=>{},onGuard=
      // 원본을 그대로 보관한다. 일반 읽기는 기존 동기화의 트리별 보호 검사를 거쳐야 한다.
      accountState=result.state;accountThemeMissing=themeMissing;migrateTheme=false;
      if(themeMissing&&bound){
+       // 보정한 테마는 서버가 아직 승인한 본문이 아니므로 같은 본문 판정에서 제외한다.
+       result.serverStateSerial=null;
        try{migrateTheme=result.themeMissing===true&&themeStorage?.getItem(THEME_KEY)!=null;}catch{}
        result.state={...result.state,prefs:{...result.state.prefs,theme:readTheme(themeStorage)}};
      }else if(!themeMissing){try{themeStorage?.setItem(THEME_KEY,accountState.prefs.theme);}catch{}}
