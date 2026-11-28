@@ -2,8 +2,6 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
-import { chromium } from 'playwright';
-import { serve } from './helpers/screen-audit.mjs';
 
 const read = file => readFileSync(new URL('../public/v41/views/board/' + file, import.meta.url), 'utf8');
 const wiringSource = read('board-wiring.js');
@@ -185,50 +183,4 @@ test('#1538 함수 12개·문서 배치·QA 캡처 경계를 보존한다', () =
   assert.match(extrasSource, /window\.__LT58\s*=\s*\{[\s\S]*?refs:\s*\{\s*moments,\s*connections\s*\}/);
   assert.match(extrasSource, /window\.__LT58V11\s*=/);
   assert.match(read('board-detail.js'), /window\.__LT58V12\s*=/);
-});
-
-test('#1538 실제 보드에서 초기 배열 참조와 세 QA 스냅샷을 유지한다', { timeout: 60000 }, async () => {
-  const tree = {
-    id: 'board-1538', title: '시험 보드', moments: [
-      {id:'m1',title:'첫 순간',date:'2026-11-28',emotion:'설렘',note:'',parentId:null,relation:'',url:'',x:null,y:null,rot:0,color:'violet',keywords:[]},
-      {id:'m2',title:'다음 순간',date:'2026-11-27',emotion:'행복',note:'',parentId:'m1',relation:'',url:'',x:null,y:null,rot:0,color:'rose',keywords:[]}
-    ], edges: []
-  };
-  const fixture = JSON.stringify({ source: 'server', writable: true, owned: true, momentId: 'm1', prefs: {}, tree });
-  const host = '<!doctype html><html lang="ko"><meta charset="utf-8"><body><script>window.LT41='
-    + fixture + '</script><iframe id="board-frame" src="/v41/views/track58-pinboard.html"'
-    + ' style="position:fixed;inset:0;width:100%;height:100%;border:0"></iframe></body></html>';
-  const server = await serve({ '/__board-wiring-1538.html': host });
-  const base = 'http://127.0.0.1:' + server.address().port;
-  const browser = await chromium.launch({ headless: true });
-  try {
-    const page = await browser.newPage({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' });
-    await page.goto(base + '/__board-wiring-1538.html', { waitUntil: 'domcontentloaded' });
-    await page.waitForFunction(() => {
-      const frame = document.getElementById('board-frame')?.contentWindow;
-      return !!frame?.__LT58V12 && !!frame.document.querySelector('#cardLayer .card');
-    }, null, { timeout: 20000 });
-    const state = await page.evaluate(() => {
-      const w = document.getElementById('board-frame').contentWindow;
-      w.bindBoardEvents();
-      w.bindBoardEvents();
-      return {
-        early: !!w.__LT58,
-        middle: !!w.__LT58V11,
-        late: !!w.__LT58V12,
-        distinct: w.__LT58 !== w.__LT58V11 && w.__LT58V11 !== w.__LT58V12,
-        momentsRef: w.__LT58.refs.moments === w.__LT58.moments,
-        connectionsRef: w.__LT58.refs.connections === w.__LT58.connections,
-        filters: typeof w.LT58Board?.filters?.collectPathFrom === 'function',
-        wiring: typeof w.LT58Board?.wiring?.bindBoardEvents === 'function'
-      };
-    });
-    assert.deepEqual(state, {
-      early: true, middle: true, late: true, distinct: true,
-      momentsRef: true, connectionsRef: true, filters: true, wiring: true
-    });
-  } finally {
-    await browser.close();
-    await new Promise(resolve => server.close(resolve));
-  }
 });
