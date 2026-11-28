@@ -22,7 +22,8 @@ export function createModelAdminRoleStore({ now = Date.UTC(2026, 9, 27) } = {}) 
       const out = new Map();
       for (const subjectId of new Set(subjectIds)) {
         const row = rows.get(key(productId, subjectId));
-        if (row) out.set(subjectId, { ...row });
+        // 역할 행이 없다는 사실도 요청한 키에 null로 명시한다.
+        out.set(subjectId, row ? { ...row } : null);
       }
       return out;
     },
