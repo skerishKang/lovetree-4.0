@@ -37,19 +37,31 @@ function fakeApi(script) {
   };
 }
 
-function harness({ initial, api, storage = new Map(), on = null }) {
+function memStorage() {
+  const values = new Map();
+  return {
+    getItem: key => values.has(key) ? values.get(key) : null,
+    setItem: (key, value) => { values.set(key, String(value)); },
+    removeItem: key => { values.delete(key); },
+    key: index => [...values.keys()][index] ?? null,
+    get length() { return values.size; }
+  };
+}
+
+function harness({ initial, api, storage = new Map(), draftStorage = null, delay = () => Promise.resolve(), on = null }) {
   let state = initial;
   const navigated = [];
   const controller = createSyncController({
     getState: () => state,
     replaceState: (next) => { state = next; },
     api,
+    draftStorage,
     storage: {
       getItem: (key) => (storage.has(key) ? storage.get(key) : null),
       setItem: (key, value) => { storage.set(key, String(value)); return undefined; }
     },
     makeClientKey: () => `ck-${Math.random().toString(36).slice(2, 10)}`,
-    delay: () => Promise.resolve(),
+    delay,
     navigate: (url) => navigated.push(url),
     onChange: on ?? (() => {})
   });
@@ -234,4 +246,76 @@ test('저장 중 세션 만료는 상단 로그인 버튼을 안내한다', asyn
   made.edit(doc('수정')); made.controller.markLocalSave(); await made.settle();
   assert.match(notices[0].message,/오른쪽 위 로그인 버튼/);
   assert.deepEqual(notices[0].actions,[]);
+});
+
+for (const [name, failure] of [['네트워크 실패', networkDown], ['로그인 만료', unauthorized]]) {
+  test(`4.0 ${name} 뒤 새로고침은 같은 계정의 미저장 순간을 복구한다`, async () => {
+    const draftStorage = memStorage();
+    const local = doc('복구할 순간');
+    const firstApi = fakeApi({get:[{...okGet(0,EMPTY),subject:'usr_a'}],put:[failure]});
+    const first = harness({initial:EMPTY,api:firstApi,draftStorage});
+    await first.controller.start();
+    first.edit(local); first.controller.markLocalSave(); await first.settle();
+    assert.equal(draftStorage.length, 1);
+
+    const nextApi = fakeApi({get:[{...okGet(0,EMPTY),subject:'usr_a'}],put:[okPut(1)]});
+    const next = harness({initial:EMPTY,api:nextApi,draftStorage});
+    const restored = await next.controller.start();
+    assert.equal(restored.phase, 'rejected');
+    assert.deepEqual(next.current(), local);
+    assert.equal(next.controller.snapshot().dirty, true);
+    await next.controller.act('retry');
+    assert.equal(next.controller.status().phase, 'synced');
+    assert.deepEqual(nextApi.puts()[0].state, local);
+    assert.equal(draftStorage.length, 0);
+  });
+}
+
+test('4.0 보관본은 다른 계정으로 로그인했을 때 섞지 않는다', async () => {
+  const draftStorage = memStorage();
+  const firstApi = fakeApi({get:[{...okGet(0,EMPTY),subject:'usr_a'}],put:[networkDown]});
+  const first = harness({initial:EMPTY,api:firstApi,draftStorage});
+  await first.controller.start();
+  first.edit(doc('A 계정 순간')); first.controller.markLocalSave(); await first.settle();
+
+  const otherApi = fakeApi({get:[{...okGet(0,EMPTY),subject:'usr_b'}]});
+  const other = harness({initial:EMPTY,api:otherApi,draftStorage});
+  await other.controller.start();
+  assert.deepEqual(other.current(), EMPTY);
+  assert.equal(other.controller.snapshot().dirty, false);
+  assert.equal(draftStorage.length, 1);
+});
+
+test('4.0 복구본보다 서버 개정이 앞서면 자동 덮어쓰지 않는다', async () => {
+  const draftStorage = memStorage();
+  const local = doc('로컬 순간');
+  const firstApi = fakeApi({get:[{...okGet(0,EMPTY),subject:'usr_a'}],put:[networkDown]});
+  const first = harness({initial:EMPTY,api:firstApi,draftStorage});
+  await first.controller.start();
+  first.edit(local); first.controller.markLocalSave(); await first.settle();
+
+  const server = doc('서버 순간');
+  const nextApi = fakeApi({get:[{...okGet(1,server),subject:'usr_a'}]});
+  const next = harness({initial:EMPTY,api:nextApi,draftStorage});
+  const restored = await next.controller.start();
+  assert.equal(restored.phase, 'conflict');
+  assert.deepEqual(next.current(), local);
+  assert.equal(nextApi.puts().length, 0);
+  assert.equal(draftStorage.length, 1);
+});
+
+test('4.0 실패 뒤 추가 편집도 최신 상태로 보관한다', async () => {
+  const draftStorage = memStorage();
+  const firstApi = fakeApi({get:[{...okGet(0,EMPTY),subject:'usr_a'}],put:[networkDown]});
+  const first = harness({initial:EMPTY,api:firstApi,draftStorage,delay:()=>new Promise(()=>{})});
+  await first.controller.start();
+  first.edit(doc('처음 편집')); first.controller.markLocalSave();
+  await first.controller.act('retry');
+  const latest = doc('나중 편집');
+  first.edit(latest); first.controller.markLocalSave();
+
+  const nextApi = fakeApi({get:[{...okGet(0,EMPTY),subject:'usr_a'}]});
+  const next = harness({initial:EMPTY,api:nextApi,draftStorage});
+  await next.controller.start();
+  assert.deepEqual(next.current(), latest);
 });

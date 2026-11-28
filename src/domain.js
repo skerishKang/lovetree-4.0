@@ -106,8 +106,27 @@ export function normalizeTreeChipOrder(value) {
   }
   return out;
 }
+export const MAX_UNKNOWN_PREFS = 32;
+export const MAX_UNKNOWN_PREF_BYTES = 16 * 1024;
+// 배포 중 다른 버전이 추가한 설정은 지우지 않되, 저장본이 무한히 커지지 않게 상한을 둔다.
+function preserveUnknownPrefs(value, knownPrefs) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  const entries = [];
+  let bytes = 0;
+  for (const [key, item] of Object.entries(value)) {
+    if (Object.hasOwn(knownPrefs, key) || entries.length >= MAX_UNKNOWN_PREFS || key.length > 80) continue;
+    let serialized;
+    try { serialized = JSON.stringify(item); } catch { continue; }
+    if (serialized === undefined) continue;
+    const keyBytes = new TextEncoder().encode(JSON.stringify(key)).byteLength;
+    const valueBytes = new TextEncoder().encode(serialized).byteLength;
+    if (bytes + keyBytes + valueBytes > MAX_UNKNOWN_PREF_BYTES) continue;
+    try { entries.push([key, JSON.parse(serialized)]); bytes += keyBytes + valueBytes; } catch { /* JSON으로 보존할 수 없는 값은 제외한다. */ }
+  }
+  return Object.fromEntries(entries);
+}
 export function normalizePrefs(value) {
-  return {
+  const known = {
     theme: globalThis.LT41_THEME_REGISTRY.normalize(value?.theme),
     titleDisplay: normalizeTitleDisplay(value?.titleDisplay),
     displayName: normalizeDisplayName(value?.displayName),
@@ -118,8 +137,8 @@ export function normalizePrefs(value) {
     shareDiscover: normalizeShareDiscover(value?.shareDiscover),
     treeChipOrder: normalizeTreeChipOrder(value?.treeChipOrder),
     bookDisplay: normalizeBookDisplay(value?.bookDisplay), shelfView: normalizeShelfView(value?.shelfView), homeMoment: normalizeHomeMoment(value?.homeMoment)
-
   };
+  return { ...known, ...preserveUnknownPrefs(value, known) };
 }
 export function updatePrefs(state, patch = {}) {
   return { ...state, version: 1, prefs: normalizePrefs({ ...(state?.prefs || {}), ...(patch || {}) }) };

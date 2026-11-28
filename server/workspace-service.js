@@ -1,10 +1,11 @@
 import { createHash } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
-import { EMPTY_STATE, MAX_TREES, validateState } from '../src/domain.js';
+import { EMPTY_STATE, MAX_TREES, normalizePrefs, validateState } from '../src/domain.js';
 import { DEFAULT_TREE_OPEN_VIEW } from '../public/v41/tree-open-view.mjs';
 import { ApiError } from './errors.js';
 
 const CLIENT_KEY = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
+const LEGACY_PREF_KEYS = new Set(['theme', 'titleDisplay', 'displayName', 'accentColor', 'dateStyle', 'startPlace', 'shareView', 'shareDiscover', 'treeChipOrder', 'bookDisplay', 'shelfView', 'homeMoment']);
 const GENERIC_DOCUMENT_MESSAGE = '기록 형식을 확인해 주세요.';
 
 // domain.js의 검증 오류 문구는 애초에 사용자에게 보여 주는 문구다. TypeError·RangeError처럼
@@ -36,14 +37,18 @@ function repairTreeValues(tree, now) {
   return out;
 }
 
-export function requestHashOf(validatedState, expectedRevision) {
-  // 기본 화면은 옛 문서에서 생략됐다. 배포 전에 저장된 요청도 같은 키로 다시 보낼 수 있게 한다.
+export function requestHashOf(validatedState, expectedRevision, prefDefaults = normalizePrefs()) {
+  // 기존 필드는 해시를 바꾸지 않되, 배포 뒤 추가된 설정의 기본값은 옛 요청과 같게 취급한다.
+  const prefs = { ...validatedState.prefs };
+  for (const key of Object.keys(prefs)) {
+    if (!LEGACY_PREF_KEYS.has(key) && Object.hasOwn(prefDefaults, key) && isDeepStrictEqual(prefs[key], prefDefaults[key])) delete prefs[key];
+  }
   const trees = validatedState.trees.map(tree => {
     if (tree.openView !== DEFAULT_TREE_OPEN_VIEW) return tree;
     const { openView, ...previousFields } = tree;
     return previousFields;
   });
-  const document = JSON.stringify({ ...validatedState, trees });
+  const document = JSON.stringify({ ...validatedState, prefs, trees });
   return createHash('sha256').update(`${document}\n${expectedRevision}`, 'utf8').digest('hex');
 }
 

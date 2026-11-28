@@ -10,7 +10,7 @@ import { createMemberSession } from '../public/v41/member-session.mjs';
 import { addMoment, createTree, linkMoments, validateState } from '../src/domain.js';
 import { ApiError } from '../server/errors.js';
 import { createApiHandler, createNodeHandler } from '../server/http.js';
-import { createWorkspaceService, readStoredDocument } from '../server/workspace-service.js';
+import { createWorkspaceService, readStoredDocument, requestHashOf } from '../server/workspace-service.js';
 import { createMemoryWorkspaceRepo } from '../server/testing/memory-workspace-repo.js';
 import { assertIsolatedTestDatabase } from '../server/testing/isolated-test-database.js';
 
@@ -159,6 +159,40 @@ test('열 화면이 없던 저장 요청은 배포 뒤에도 재전송할 수 �
   const conflict = await put(handle, { state: doc, expectedRevision, clientKey });
   assert.equal(conflict.status, 409);
   assert.equal(conflict.body.error.code, 'client_key_conflict');
+});
+
+test('모르는 설정은 읽기·일반 편집·저장 뒤에도 유지된다', async () => {
+  const { handle, repo } = buildHandle();
+  const principal = { productId: PRODUCT, subjectId: 'usr_a' };
+  const state = validateState(sampleState());
+  const stored = { ...state, prefs: { ...state.prefs, futureShelfOpenMode: 'direct' } };
+  await repo.commit({ ...principal, doc: stored, expectedRevision: 0, clientKey: 'seed-future-pref', requestHash: '0'.repeat(64) });
+
+  const first = await get(handle);
+  assert.equal(first.body.state.prefs.futureShelfOpenMode, 'direct');
+  const edited = { ...first.body.state, trees: [{ ...first.body.state.trees[0], title: '일반 편집' }] };
+  const saved = await put(handle, { state: edited, expectedRevision: first.body.revision, clientKey: 'save-future-pref' });
+  assert.equal(saved.status, 200);
+  const reread = await get(handle);
+  assert.equal(reread.body.state.prefs.futureShelfOpenMode, 'direct');
+  assert.equal((await repo.load(principal)).doc.prefs.futureShelfOpenMode, 'direct');
+});
+
+test('새 설정의 기본값은 요청 해시에서 생략하고 다른 값은 포함한다', () => {
+  const state = validateState(sampleState());
+  const legacyTrees = state.trees.map(tree => {
+    if (tree.openView !== 'tree') return tree;
+    const { openView, ...previousFields } = tree;
+    return previousFields;
+  });
+  const legacyHash = createHash('sha256').update(JSON.stringify({ ...state, trees: legacyTrees }) + '\n0', 'utf8').digest('hex');
+  assert.equal(requestHashOf(state, 0), legacyHash, '기존 문서의 해시는 바뀌지 않는다');
+  const defaults = { ...state.prefs, futureOpenMode: 'preview' };
+  const withDefault = { ...state, prefs: { ...state.prefs, futureOpenMode: 'preview' } };
+  const withoutDefault = { ...state, prefs: { ...state.prefs } };
+  const changed = { ...state, prefs: { ...state.prefs, futureOpenMode: 'direct' } };
+  assert.equal(requestHashOf(withDefault, 0, defaults), requestHashOf(withoutDefault, 0, defaults));
+  assert.notEqual(requestHashOf(changed, 0, defaults), requestHashOf(withoutDefault, 0, defaults));
 });
 
 test('cached media metadata survives a save and is returned on the next read', async () => {
