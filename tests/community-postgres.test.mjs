@@ -10,6 +10,7 @@ import {createStageIndexRepo} from '../server/db/stage-index-postgres.js';
 import {createStageVoteRepo} from '../server/db/stage-votes-postgres.js';
 import {hasRealCustomersFromEnv} from '../server/db/ranking-policy-sql.js';
 import {createCommunityHandler,createCommunityService} from '../server/community-service.js';
+import {createMomentCommunityHandler,createMomentCommunityService} from '../server/moment-community-service.js';
 import {lockVideo} from '../server/db/stage-assignments-postgres.js';
 import {stageKeyForMoment} from '../src/stage-key.js';
 import {listVisibleStageMoments} from '../server/db/stage-visibility-sql.js';
@@ -769,6 +770,59 @@ test('#1544 Postgres에서도 숨긴 공유 직접 읽기는 없는 공유와 �
     assert.equal((await read(shareId)).status, 200, '숨김을 풀면 200');
   } finally {
     await pool.query('DELETE FROM lovetree_community_hidden_shares WHERE product_id=$1', [productId]);
+    await pool.end();
+  }
+});
+
+
+test('PostgreSQL에서 숨긴 공유의 커뮤니티 결과와 저장 행을 보호한다', { skip }, async () => {
+  assertIsolatedTestDatabase(DATABASE_URL);
+  const pool=await createPool(DATABASE_URL,{max:4}),productId='lt-'+suffix();
+  try {
+    await applySchema(pool);
+    const {shareId}=await publishStageTestTree(pool,productId,'owner',[{url:stageTestUrl}]);
+    const communityRepo=createCommunityRepo(pool),shareRepo=createShareRepo(pool),workspaceRepo=createWorkspaceRepo(pool);
+    const authenticate=async request=>({productId,subjectId:request.headers?.account||'viewer'});
+    const treeService=createCommunityService({communityRepo,shareRepo,workspaceRepo,productId});
+    const momentService=createMomentCommunityService({communityRepo,shareRepo,workspaceRepo,productId});
+    const treeHandler=createCommunityHandler({authenticate,service:treeService,productId});
+    const handle=createMomentCommunityHandler({authenticate,service:momentService,productId,fallback:treeHandler});
+    const request=(method,path,body,key)=>handle({method,path,headers:{account:'viewer',...(body?{'content-type':'application/json'}:{}),...(key?{'idempotency-key':key}:{})},body:body?JSON.stringify(body):''});
+    const base='/api/community/shares/'+shareId;
+    const treeComment=await request('POST',base+'/comments',{body:'기존 댓글'},'pg-tree-comment-0001');
+    assert.equal(treeComment.status,201);
+    const momentComment=await request('POST',base+'/moments/m0/comments',{body:'기존 순간 댓글'},'pg-moment-comment-0001');
+    assert.equal(momentComment.status,201);
+    const counts=async()=>({
+      comments:Number((await pool.query('SELECT count(*) AS n FROM lovetree_community_comments WHERE product_id=$1 AND share_id=$2',[productId,shareId])).rows[0].n),
+      reactions:Number((await pool.query('SELECT count(*) AS n FROM lovetree_community_reactions WHERE product_id=$1 AND share_id=$2',[productId,shareId])).rows[0].n),
+      reports:Number((await pool.query('SELECT count(*) AS n FROM lovetree_community_reports WHERE product_id=$1 AND share_id=$2',[productId,shareId])).rows[0].n)
+    });
+    await pool.query('INSERT INTO lovetree_community_hidden_shares(product_id,share_id,hidden_by) VALUES($1,$2,$3)',[productId,shareId,'moderator']);
+    const before=await counts();
+    const routes=[
+      ['GET',base+'/comments'],
+      ['POST',base+'/comments',{body:'새 댓글'},'pg-tree-comment-0002'],
+      ['PUT',base+'/reaction',{kind:'heart'}],
+      ['POST',base+'/report',{reason:'관리 검토'},'pg-tree-report-0001'],
+      ['PATCH','/api/community/comments/'+treeComment.body.comment.id,{body:'수정'}],
+      ['DELETE','/api/community/comments/'+treeComment.body.comment.id],
+      ['GET',base+'/moments/m0'],
+      ['GET',base+'/moments/m0/comments'],
+      ['POST',base+'/moments/m0/comments',{body:'새 순간 댓글'},'pg-moment-comment-0002'],
+      ['PUT',base+'/moments/m0/reaction',{kind:'heart'}],
+      ['DELETE',base+'/moments/m0/reaction'],
+      ['PATCH','/api/community/comments/'+momentComment.body.comment.id,{body:'수정'}],
+      ['DELETE','/api/community/comments/'+momentComment.body.comment.id],
+      ['POST',base+'/moments/m0/comments/'+momentComment.body.comment.id+'/report',{reason:'관리 검토'},'pg-moment-report-0001']
+    ];
+    for(const [method,path,body,key] of routes) {
+      const response=await request(method,path,body,key);
+      assert.equal(response.status,404,method+' '+path);
+    }
+    assert.deepEqual(await counts(),before,'기존 저장 행 수 유지');
+  } finally {
+    await pool.query('DELETE FROM lovetree_community_hidden_shares WHERE product_id=$1',[productId]);
     await pool.end();
   }
 });
