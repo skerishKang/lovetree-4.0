@@ -1720,3 +1720,19 @@ body.community-screen #toast[data-lt-first-moment-intro]{display:none}
    키보드로 접근한 경우 초점 표시는 계속 유지한다. */
 #community-panel:focus{outline:none}
 #community-panel:focus-visible{outline:2px solid var(--lt-gold);outline-offset:-2px}
+
+/* #1605: 첫 화면 #1573처럼 안쪽 다섯 화면의 새 소식 띠에 실제 공간을 준다.
+   고정 겹침 대신 셸 flex 흐름에 놓아 iframe의 하단 내용·누름을 띠가 덮지 않는다. */
+body:not(.home-screen):is([data-fab-lift=shelf],[data-fab-lift=tree],[data-fab-lift=board],[data-fab-lift=book],[data-fab-lift=network]) .updates-card:not([hidden]){
+  position:relative;inset:auto;flex:0 0 auto;align-self:flex-end;
+  margin:0 16px max(8px,env(safe-area-inset-bottom));width:max-content;
+  max-width:calc(100% - 32px);
+}
+@media(max-width:780px){
+  /* 모바일 ＋ 단추의 원래 고정 자리를 침범하지 않도록 같은 줄 오른쪽 88px 확보 */
+  body:not(.home-screen):is([data-fab-lift=shelf],[data-fab-lift=tree],[data-fab-lift=board],[data-fab-lift=book],[data-fab-lift=network]) .updates-card:not([hidden]){
+    left:auto;right:auto;bottom:auto;top:auto;align-self:flex-start;
+    width:calc(100% - 104px);max-width:calc(100% - 104px);
+    margin:0 88px max(8px,env(safe-area-inset-bottom)) 16px;
+  }
+}
