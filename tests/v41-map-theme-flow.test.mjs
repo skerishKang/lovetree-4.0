@@ -390,7 +390,7 @@ test('#1609 지도 도구 줄의 위치만 달라져도 배치 영역을 다시 
 });
 
 
-test('#1658 지도 판 설정 변경 완료와 추가 프레임의 단일 그리기', { skip: REQUIRE ? false : skip, timeout: 30000 }, async () => {
+test('지도 테마 변경 완료와 추가 프레임의 단일 그리기', { skip: REQUIRE ? false : skip, timeout: 30000 }, async () => {
   if (skip) assert.fail('필수 지도 화면 시험을 실행할 브라우저가 없다');
   const server = await serve(), base = 'http://127.0.0.1:' + server.address().port;
   let browser, live;
