@@ -23,6 +23,15 @@ export function createMemoryWorkspaceRepo({ now = Date.UTC(2026, 9, 27) } = {}) 
       return row ? { revision: row.revision, savedAt: row.savedAt, doc: structuredClone(row.doc) } : null;
     },
 
+    async loadMany({ productId, subjectIds }) {
+      const out = new Map();
+      for (const subjectId of new Set(subjectIds)) {
+        const row = docs.get(docKey(productId, subjectId));
+        if (row) out.set(subjectId, { revision: row.revision, savedAt: row.savedAt, doc: structuredClone(row.doc) });
+      }
+      return out;
+    },
+
     async commit({ productId, subjectId, doc, expectedRevision, clientKey, requestHash }) {
       const key = `${docKey(productId, subjectId)}\u0000${clientKey}`;
       const existing = claims.get(key);

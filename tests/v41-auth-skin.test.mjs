@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync, existsSync} from 'node:fs';
 import {pathToFileURL, fileURLToPath} from 'node:url';
-import {loginUrlWithTheme, homeStartLoginUrl, readLoginIntent, LOGIN_INTENTS} from '../public/v41/header-state.mjs';
+import {loginUrlWithTheme, policyUrlWithTheme, homeStartLoginUrl, readLoginIntent, LOGIN_INTENTS} from '../public/v41/header-state.mjs';
 import {memberLoginUrl, MEMBER_LOGIN_URL} from '../public/v41/member-entry.mjs';
 
 const read = path => readFileSync(new URL('../' + path, import.meta.url), 'utf8');
@@ -66,6 +66,26 @@ test('lt_theme는 night|garden만 /auth/login에 실리고 그 외 값은 빠진
     assert.equal(url.searchParams.has('lt_theme'), false, String(theme));
     assert.equal(url.searchParams.get('next'), '/v41/');
   }
+});
+
+test('#1592 두 정책 문서의 테마만 교체하고 다른 주소·쿼리·해시는 보존한다', () => {
+  const privacy = 'https://auth.padiem.net/privacy';
+  const terms = 'https://auth.padiem.net/terms';
+  for (const theme of ['night', 'garden']) {
+    assert.equal(policyUrlWithTheme(privacy + '#lovetree', theme), privacy + '?theme=' + theme + '#lovetree');
+    assert.equal(policyUrlWithTheme(terms, theme), terms + '?theme=' + theme);
+    const other = privacy + '?next=%2Fv41%2F&name=a%20b&theme=old&flag&theme=again#lovetree';
+    const expected = privacy + '?next=%2Fv41%2F&name=a%20b&flag&theme=' + theme + '#lovetree';
+    assert.equal(policyUrlWithTheme(other, theme), expected);
+    assert.equal(policyUrlWithTheme(expected, theme), expected);
+    for (const url of ['https://auth.padiem.net/login?theme=night', 'https://other.invalid/privacy#lovetree',
+      'https://auth.padiem.net.evil.invalid/privacy', 'https://auth.padiem.net/privacy/other',
+      'https://auth.padiem.net@other.invalid/terms', 'http://auth.padiem.net/terms',
+      '/auth/login?next=%2Fv41%2F', 'https://auth.padiem.net/terms-old']) {
+      assert.equal(policyUrlWithTheme(url, theme), url);
+    }
+  }
+  for (const theme of ['', 'day', null, undefined]) assert.equal(policyUrlWithTheme(privacy + '#lovetree', theme), privacy + '#lovetree');
 });
 
 test('로그인 intent는 new-tree|shelf만 next에 실리고 모르는 값은 받지 않는다', () => {

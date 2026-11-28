@@ -38,7 +38,7 @@ export function hasPendingDraft(storage, subject = null) {
 // A failed, authenticated write may cross a full-page re-login. Keep its
 // one-tab retry buffer in sessionStorage, scoped to the same account only.
 export function createSyncController({getState, replaceState, api, draftStorage = null, cacheStorage = null,
-  makeClientKey = () => `front-${crypto.randomUUID()}`,
+  resolveRevisionConflict = null, makeClientKey = () => `front-${crypto.randomUUID()}`,
   delay = ms => new Promise(resolve => setTimeout(resolve, ms)),
   onGuard = () => {}, onChange = () => {}, navigate = url => globalThis.location.assign(url)}) {
   let current = status({phase:'checking'}), listener = () => {};
@@ -189,6 +189,38 @@ export function createSyncController({getState, replaceState, api, draftStorage 
       return emit(status({phase:'login',detail:'로그인이 만료되어 서버에 저장하지 못했어요.',actions:actions.login}));
     }
     if (answer.status === 409 && answer.code === 'revision_conflict') {
+      // 회원 테마의 충돌만 별도로 해결한다. 콜백 없는 기존 동기화는 그대로 유지한다.
+      // 해결 중 추가 편집이 생기면 예전 본문으로 새 편집을 지우지 않는다.
+      if (resolveRevisionConflict && !options.themeRebased && JSON.stringify(getState()) === sent.serial) {
+        let fixed = null;
+        inflight = true;
+        try {
+          fixed = await resolveRevisionConflict({
+            state: JSON.parse(sent.serial), expectedRevision: sent.expected,
+            currentRevision: answer.currentRevision
+          });
+        } catch { /* 안전하게 기존 충돌 처리로 돌아간다. */ }
+        finally { inflight = false; }
+        if (gen !== generation) return current;
+        if (fixed && Number.isSafeInteger(fixed.revision) && fixed.revision >= 0 &&
+            JSON.stringify(getState()) === sent.serial) {
+          fixed.accepted?.();
+          revision = fixed.revision; attempt = null; seenRevision = null;
+          adoptState(fixed.state, fixed.quarantined);
+          writeCachedWorkspace(cacheStorage, activeSubject, getState());
+          dirty = fixed.retry === true;
+          if (dirty) return push({themeRebased:true});
+          editCount = 0;
+          clearPendingDraft();
+          return emit(status({phase:'synced',actions:actions.logout}));
+        }
+      }
+      // 테마 병합 뒤 서버가 다시 바뀌어도 전체 기록 덮어쓰기를 권하지 않는다.
+      // 다음 명시적인 재시도에서 최신 번호와 다시 견준다.
+      if (options.themeRebased) return emit(status({
+        phase:'rejected',detail:'서버가 다시 바뀌어 테마를 저장하지 못했어요. 다시 시도해 주세요.',
+        actions:actions.retry
+      }));
       seenRevision = answer.currentRevision;
       // 이슈 644 3번: 띠는 쉬운 말로, 고친 개수를 함께 알린다. 주 단추는 하나(최신 기록 불러오기)이고
       // 덮어쓰기는 셸이 '자세히' 안에 넣는다 — 저장 규칙(개정 번호·충돌 판정)은 그대로다.

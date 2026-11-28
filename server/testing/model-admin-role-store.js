@@ -18,6 +18,16 @@ export function createModelAdminRoleStore({ now = Date.UTC(2026, 9, 27) } = {}) 
       return row ? { ...row } : null;
     },
 
+    async rolesFor({ productId, subjectIds }) {
+      const out = new Map();
+      for (const subjectId of new Set(subjectIds)) {
+        const row = rows.get(key(productId, subjectId));
+        // 역할 행이 없다는 사실도 요청한 키에 null로 명시한다.
+        out.set(subjectId, row ? { ...row } : null);
+      }
+      return out;
+    },
+
     async assign({ productId, subjectId, role, grantedBy, reason = null, at }) {
       const previous = rows.get(key(productId, subjectId)) ?? null;
       const row = { productId, subjectId, role, grantedBy: grantedBy ?? null, updatedAt: at ?? stamp() };

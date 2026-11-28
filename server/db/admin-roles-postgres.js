@@ -19,6 +19,26 @@ export function createAdminRoleRepo(pool, { stageIndex = null } = {}) {
       return row ? { productId: row.product_id, subjectId: row.subject_id, role: row.role, grantedBy: row.granted_by, updatedAt: iso(row.updated_at) } : null;
     },
 
+    async rolesFor({ productId, subjectIds }) {
+      const ids = [...new Set(subjectIds)];
+      if (!ids.length) return new Map();
+      // 요청한 계정을 기준으로 한 SQL 한 번: 역할 행 없음은 Map에 null로 명시한다.
+      const { rows } = await pool.query(
+        'SELECT requested.subject_id AS requested_subject_id, ' +
+        'roles.product_id, roles.subject_id, roles.role, roles.granted_by, roles.updated_at ' +
+        'FROM unnest($2::text[]) AS requested(subject_id) ' +
+        'LEFT JOIN lovetree_product_roles AS roles ' +
+        'ON roles.product_id = $1 AND roles.subject_id = requested.subject_id',
+        [productId, ids]
+      );
+      return new Map(rows.map(row => [
+        row.requested_subject_id,
+        row.subject_id === null
+          ? null
+          : { productId: row.product_id, subjectId: row.subject_id, role: row.role, grantedBy: row.granted_by, updatedAt: iso(row.updated_at) }
+      ]));
+    },
+
     async assign({ productId, subjectId, role, grantedBy, reason = null, at }) {
       const existing = await pool.query(
         'SELECT role FROM lovetree_product_roles WHERE product_id = $1 AND subject_id = $2',

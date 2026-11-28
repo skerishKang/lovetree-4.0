@@ -10,7 +10,7 @@ import {createHomeActions} from './home-actions.js';
 import {homePresentation} from './home-presentation.js';
 import {readHomeTitleHint} from '../public/v41/home-title-state.mjs';
 import {applyHomeCenter} from './home-center.js';
-import {readTheme,writeTheme,appliedTheme,applyThemeAttribute} from '../public/v41/header-state.mjs';
+import {readTheme,writeTheme,appliedTheme,applyThemeAttribute,paintPolicyLinks} from '../public/v41/header-state.mjs';
 import {readTitleDisplay, titleDisplayOf, shouldReloadForTitleDisplay, formatDisplayDate, titleView} from '../public/v41/book-usability.mjs';
 import {localDateOnly} from '../public/v41/local-date.mjs';
 import {momentListEntries, momentListTrees, momentHeadTitle} from './moment-list.js';
@@ -22,7 +22,7 @@ import {shareUrlFor,SHARE_COPY_FAILURE} from '../public/v41/share-link.mjs';
 // 261116 PR 2: 카드 모드(마지막·고정·그날·무작위·트리)·숫자 줄이기 — 순수 계산 한 벌.
 import {HOME_MOMENT_KEY, readHomeMoment, normalizeHomeMoment, homeMomentPick, homeDayMoment, homeMomentMenu, formatCount} from './home-card-mode.js';
 const themeHost=document.getElementById('orbit');
-function syncTheme(theme){applyThemeAttribute(themeHost,appliedTheme(theme,'home'));}
+function syncTheme(theme){applyThemeAttribute(themeHost,appliedTheme(theme,'home'));paintPolicyLinks(themeHost?.shadowRoot,theme);}
 function applyTheme(theme){applyThemeAttribute(document.documentElement,appliedTheme(theme,'home'));syncTheme(theme);}
 applyTheme(readTheme(localStorage));
 const shellBody=parent.document.body;
@@ -311,6 +311,7 @@ guideDialog.id='guidePanel';
 guideDialog.setAttribute('aria-label','어떻게 쓰나요');
 /* 단추는 오른쪽 아래로 모으고(justify-content:flex-end), 주 단추('첫 순간 추가')를 오른쪽 끝에 둔다 — 탭 순서도 보이는 순서와 같게 DOM 순서를 바꾼다. */
 guideDialog.innerHTML=`<button class="close" data-do="guide-close" aria-label="안내 닫기">닫기 ×</button><div class="guide-body"><h2 tabindex="-1">어떻게 쓰나요</h2><ol class="guide-list"><li>좋아하는 영상 링크를 붙여 넣으면 순간이 바로 담겨요</li><li>순간들은 트리로 묶여요(그룹·주제별로 여러 개)</li><li>책·보드·지도로 내 기록을 다시 봐요</li><li>순간이 3개 이상이면 둘러보기에서 다른 팬도 볼 수 있어요(이름·아이디는 보이지 않아요)</li></ol><div class="detail-buttons"><button data-do="guide-community">둘러보기</button><button class="primary-cta" data-do="guide-new">첫 순간 추가</button></div><div class="guide-policy"><a href="https://auth.padiem.net/privacy#lovetree" target="_blank" rel="noopener">개인정보 처리방침</a><a href="https://auth.padiem.net/terms" target="_blank" rel="noopener">이용약관</a></div></div></div>`;
+paintPolicyLinks(guideDialog,readTheme(localStorage));
 shadow.append(guideDialog);
 const guideStyle=document.createElement('style');
 guideStyle.textContent=`#guidePanel{word-break:keep-all}#guidePanel .guide-body{padding:42px;max-width:620px;margin:0 auto}#guidePanel h2{margin:0 0 18px;font-size:26px;outline:none;width:fit-content;max-width:100%}/* #662: 제목 상자가 창 폭을 통째로 차지해 닫기 단추 영역과 포개졌다 — 글자 폭만큼만. */.guide-list{margin:0;padding:0;list-style:none;counter-reset:guide;display:grid;gap:12px}.guide-list li{counter-increment:guide;display:flex;gap:12px;align-items:baseline;font-size:15px;line-height:1.7;color:#d9d2e2}.guide-list li::before{content:counter(guide);flex:0 0 auto;min-width:26px;min-height:26px;display:inline-grid;place-items:center;border:1px solid #615364;border-radius:50%;color:#e8b8c9;font-size:12px}#guidePanel .detail-buttons{margin-top:24px;justify-content:flex-end}/* 처리방침·약관 링크(2026-11-16): 단추 줄 아래 작은 글씨, 새 창. 누름 영역 44px. */#guidePanel .guide-policy{margin-top:18px;display:flex;gap:16px;justify-content:center}#guidePanel .guide-policy a{min-height:44px;display:inline-flex;align-items:center;font-size:14px;letter-spacing:.04em;color:#a99fb5;text-decoration:underline;text-underline-offset:3px}:host([data-lt-theme=garden]) #guidePanel .guide-policy a{color:var(--lt-muted)}:host([data-lt-theme=garden]) #guidePanel{background:var(--lt-paper);color:var(--lt-ink);border-color:var(--lt-line)}:host([data-lt-theme=garden]) #guidePanel h2{color:var(--lt-ink)}:host([data-lt-theme=garden]) .guide-list li{color:var(--lt-muted)}:host([data-lt-theme=garden]) .guide-list li::before{border-color:var(--lt-gold-line);color:var(--lt-gold-ink)}:host([data-lt-theme=garden]) #guidePanel .detail-buttons button{background:var(--lt-paper);color:var(--lt-ink);border-color:var(--lt-line)}:host([data-lt-theme=garden]) #guidePanel .primary-cta{background:var(--lt-primary);color:var(--lt-primary-ink);border-color:var(--lt-primary)}:host([data-lt-theme=garden]) #guidePanel .close{background:var(--lt-paper);color:var(--lt-ink);border-color:var(--lt-line)}`;
@@ -524,7 +525,7 @@ infoStyle.textContent=`.home-add-top{margin-top:12px;font-size:15px;pointer-even
 /* #1446: 두 줄이 붙어 보이지 않게 2px 띄운다. */
 .home-count-line + .home-count-line{margin-top:2px}
 .home-count[hidden]{display:none}
-.home-count[data-reserve][hidden]{display:block;visibility:hidden}
+.home-count[data-reserve][hidden]{display:block;visibility:hidden;min-height:88px}
 .home-count-item{display:flex;align-items:baseline;justify-content:space-between;gap:4px;width:100%;min-width:0;white-space:nowrap}
 .home-count-name{color:var(--lt-muted);text-align:left}
 .home-count-value{color:var(--lt-pearl);font-weight:700;font-variant-numeric:tabular-nums;text-align:right}
@@ -535,6 +536,25 @@ infoStyle.textContent=`.home-add-top{margin-top:12px;font-size:15px;pointer-even
 .recent-menu{position:fixed;z-index:4000;inset:auto;margin:0;min-width:220px;max-width:min(300px,86vw);max-height:calc(100dvh - 16px);overflow:hidden;padding:6px;border:1px solid var(--lt-line,rgba(255,255,255,.14));border-radius:14px;background:#07070c;box-shadow:0 18px 44px rgba(0,0,0,.5)}.recent-menu::backdrop{background:transparent}.recent-menu-list{display:grid;gap:1px;max-height:min(60dvh,420px);overflow-y:auto;overscroll-behavior:contain}.recent-menu button{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;min-height:44px;padding:0 12px;border:0;border-radius:8px;background:none;cursor:pointer;font:inherit;font-size:13px;color:#e6ddef;text-align:left}.recent-menu button[aria-checked="true"]{color:var(--lt-gold,#ffe6a6)}.recent-menu button[disabled]{color:var(--lt-muted,#9b98a6);cursor:default}.recent-menu button:focus-visible{outline:2px solid #e8b8c9;outline-offset:-2px}.recent-menu .recent-menu-sub{padding-left:22px;font-size:12px;color:#cfc6dd}:host([data-lt-theme=garden]) .recent-menu{background:var(--lt-paper,#f7f0e8);border-color:var(--lt-line-paper)}:host([data-lt-theme=garden]) .recent-menu button{color:var(--lt-ink)}:host([data-lt-theme=garden]) .recent-menu button[aria-checked="true"]{color:var(--lt-gold-ink)}:host([data-lt-theme=garden]) .recent-menu button[disabled],:host([data-lt-theme=garden]) .recent-menu .recent-menu-sub{color:var(--lt-muted)}`;
 shadow.append(infoStyle);
 const mobileFit=document.createElement('style');mobileFit.textContent='@media(max-width:768px){.topbar{gap:12px;flex-wrap:wrap;align-items:center;padding:8px 12px}.top-actions{gap:6px;flex-shrink:0;flex-wrap:wrap;margin-left:auto}.topbar .menuBtn{white-space:nowrap;padding:10px 9px;font-size:14px}.actions .subtleBtn{font-size:14px}.center .center-note{font-size:14px}.hint{font-size:14px}}';shadow.append(mobileFit);
+// #1571: 세 단추와 숫자를 같은 격자에 두고, 문자 모양은 유지한 채 누름 영역을 44px로 확보한다.
+const homeDesign1571=document.createElement('style');
+homeDesign1571.textContent=`
+.center .actions[data-inline]{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));column-gap:clamp(16px,2vw,18px);row-gap:4px;align-items:start}
+@media(min-width:651px){.center .actions[data-inline]{width:100%;max-width:432px;column-gap:18px;margin-inline:auto}}
+.center .actions[data-inline] .home-action-group{display:flex;flex-direction:column;align-items:stretch;gap:4px;min-width:0;max-width:none}
+.center .actions[data-inline] .home-action-group>.subtleBtn{width:100%;height:44px}
+.home-count{min-height:0;font-size:12px;line-height:1.25}
+.home-count-line{display:flex;align-items:center;min-height:44px;line-height:1.25}
+.home-count-line:empty{display:none}
+.home-count-item{min-height:44px;align-items:center}
+.home-count button{box-sizing:border-box;min-height:44px;font-size:13px}
+/* 이름표는 정원에서도 충분히 진한 공통 보조 글자색을 사용한다. */
+/* 카드 글자 상자 크기는 그대로 두고 가상 요소 누름 영역만 44px 이상으로 만든다. */
+.recent-head-row>.recent-head,.recent-head-row>.recent-change{z-index:1}
+.recent-head::after,.recent-change::after{top:-12px;bottom:-12px}
+.topbar .menuBtn{box-sizing:border-box;min-height:44px}
+`;
+shadow.append(homeDesign1571);
 // #380 5번: 첫 화면 오른쪽 위 "보기 ▾" 메뉴(테마·움직임·카드 출처)는 없앴다.
 // 로그인 상태의 같은 항목은 설정 창(셸)의 '화면' 묶음에 있고, 셸이 아래 두 메시지로 알려 준다.
 // 로그아웃에는 설정 입구가 없으므로 테마만 오른쪽 위 작은 ◐ 단추로 남긴다(저장 키 lt41.theme 그대로).

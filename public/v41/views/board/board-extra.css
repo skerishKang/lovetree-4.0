@@ -399,7 +399,7 @@ body.board-hint-drag .board-empty-hint{border-color:var(--lt-gold-line);color:va
 #viewport,#boardControls{transition:none}
 
 /* #1529: 낮은 가로 화면도 카드 끝까지 세로로 이동한다. */
-@media(min-width:700px) and (max-width:1199px) and (max-height:500px){html[data-v41-screen=board] .boardFrame{bottom:12px}}
+@media(min-width:700px) and (max-width:1199px) and (max-height:500px){html[data-v41-screen=board] .boardFrame{bottom:24px}}
 
 /* #1529: 숨겨진 고급 패널의 실제 누름 영역. 공통 도구 줄은 변경하지 않는다. */
 #leftPanel :is(.filterSelect,.wideTool,.themeBtn,.styleMini,.collapseBtn){min-height:44px;height:auto}
@@ -407,3 +407,10 @@ body.board-hint-drag .board-empty-hint{border-color:var(--lt-gold-line);color:va
 
 /* #1529: 휴대폰 상세 판이 순간 고르기·책 열기 단추를 덮지 않는다. */
 @media(max-width:760px){html[data-v41-screen=board] #detail{top:auto;bottom:72px;max-height:48vh}}
+
+/* #1581: 상세 창 안쪽 여백과 닫기 단추를 공통 패널 형태에 맞춘다. */
+#detailActions{padding:14px 20px 16px;min-width:0;flex-wrap:wrap}
+#detailActions .miniBtn{min-width:44px;max-width:100%}
+#detailActions .moreWrap{max-width:100%}
+#detailClose{box-sizing:border-box;display:grid;place-items:center;width:44px;height:44px;min-width:44px;min-height:44px;border:1px solid var(--lt-line);border-radius:50%;background:rgba(255,255,255,.04);color:inherit;font-size:24px}
+#detailClose::after{inset:0}

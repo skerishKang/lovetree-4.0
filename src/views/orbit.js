@@ -119,6 +119,32 @@ extraCSS+=`@keyframes lt-home-rise{from{opacity:0;transform:translateY(12px)}to{
 @media(max-height:500px){.center{width:min(500px,62vw);top:45%}.center .eyebrow{margin-bottom:6px;font-size:10px}.center h1{font-size:30px}.center>p:not(.center-note){display:none}.center .actions{margin-top:12px}.center .recent-card{width:min(300px,40vw);margin-top:10px}.center .recent-media{aspect-ratio:16/7}.center-scrim{width:min(700px,90vw);height:min(300px,80dvh)}}
 `;
 
+// #1571: 낮은 첫 화면은 본문을 스크롤하고 제목·카드·조작줄을 위에서부터 배치한다.
+extraCSS+=`.home-count[data-reserve][hidden]{display:block;visibility:hidden;min-height:88px}
+@media(max-width:900px) and (max-height:750px){
+ .app{height:auto;min-height:100dvh;overflow:visible;overscroll-behavior-y:contain}
+}
+@media(max-width:650px) and (max-height:850px){
+ :host([data-lt-home-portrait]) .center .recent-card:not(.is-playing-mobile){width:min(230px,calc(100vw - 32px));margin-top:8px}
+}
+@media(max-width:650px) and (min-height:700px){
+ :host(:not([data-lt-home-portrait])) .center{top:calc(48% + 20px)}
+}
+@media(min-width:651px) and (max-width:900px) and (max-height:520px){
+ .center{position:relative;left:auto;top:auto;width:min(500px,calc(100% - 32px));margin:18px auto 64px;transform:none}
+ .center.dim{transform:scale(.96)}
+ .center .eyebrow{font-size:12px}
+}
+/* #1601: 낮은 가로 첫 화면은 가운데 내용과 여백을 문서 높이에 포함한다.
+   궤도 호스트 안에 별도 스크롤을 만들지 않는다. */
+@media(min-width:651px) and (max-height:520px){
+ :host(.home-stage){height:auto;min-height:100dvh;overflow:clip}
+ :host(.home-stage) .app{display:flow-root;height:auto;min-height:100dvh;overflow:clip;overscroll-behavior-y:contain}
+ :host(.home-stage) .center{position:relative;left:auto;top:auto;width:min(500px,calc(100% - 32px));margin:18px auto 12px;transform:none}
+ :host(.home-stage) .center.dim{transform:scale(.96)}
+ :host(.home-stage) .center .eyebrow{font-size:12px}
+}
+:host([data-lt-theme=garden]) .center .eyebrow{color:var(--lt-ink)}`;
 export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSelect=()=>{},recordNote=null,examples=[],onOpen=null,empty=false,titleDisplay='both',momentList=null,dateStyle='dot',prefs=null,initialPicking=false,initialNotice=null,homePin=null,loggedIn,homeTitlePending=false,homeTitleHint=false}) {
  performance.mark('m0');
  const example=context.readOnly;
@@ -1201,7 +1227,9 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
   const portrait=host.hasAttribute('data-lt-home-portrait')&&innerWidth<=650;
   // 가운데 덩어리가 화면보다 길면 iframe 문서가 스크롤하도록 실제 높이를 넘긴다.
   const contentHeight=portrait?Math.max(app.clientWidth+372,centerHeight+34):centerHeight+32;
-  host.style.height=`${Math.ceil(Math.max(viewportHeight,contentHeight))}px`;appBox=app.getBoundingClientRect();safeZoneDirty=true;schedule();
+  // #1601: 낮은 가로 첫 화면은 실제 문서 흐름이 높이를 결정한다.
+  const landscapeHome=host.classList.contains('home-stage')&&matchMedia('(min-width:651px) and (max-height:520px)').matches;
+  host.style.height=landscapeHome?'':`${Math.ceil(Math.max(viewportHeight,contentHeight))}px`;appBox=app.getBoundingClientRect();safeZoneDirty=true;schedule();
  };
  const noticeResize=typeof ResizeObserver==="function"?new ResizeObserver(fitNotice):null;
  const barNow=document.getElementById("sync-bar");

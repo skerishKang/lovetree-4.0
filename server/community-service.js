@@ -74,27 +74,46 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
  // 모름이면 공개 거름에서 닫고 기록을 한 줄 남긴다(목록·다른 팬 보기·세로 순간이 같은 규칙).
  async function listedRole(subjectId,cache){
   if(cache.has(subjectId))return cache.get(subjectId);
-  let role;
-  try{role=admin?await admin.roleFor({productId,subjectId},{unknownOnFailure:true}):null;}
-  catch{role=ROLE_UNKNOWN;}
-  if(role===ROLE_UNKNOWN)console.warn('[lovetree-community] 역할을 읽지 못해 공개 목록에서 제외');
-  cache.set(subjectId,role);
-  return role;
- }
- // 목록과 같은 주인 거름을 집계에도 쓴다(역할은 주인당 한 번만 읽는다). #1273 5번:
- // 첫 화면 숫자와 둘러보기 목록이 다른 기준으로 세지지 않게 한 벌로 묶는다.
- function hiddenOwnerLookup(){
-  const roleCache=new Map();
-  if(!admin)return async()=>false;
-  return async subjectId=>{
-   if(roleCache.has(subjectId))return roleCache.get(subjectId);
+  // 동시에 여러 트리를 그려도 같은 주인 조회는 한 번만 시작한다.
+  const pending=(async()=>{
    let role;
-   try{role=await admin.roleFor({productId,subjectId},{unknownOnFailure:true});}
+   try{role=admin?await admin.roleFor({productId,subjectId},{unknownOnFailure:true}):null;}
    catch{role=ROLE_UNKNOWN;}
    if(role===ROLE_UNKNOWN)console.warn('[lovetree-community] 역할을 읽지 못해 공개 목록에서 제외');
-   const hidden=role===ROLE_TESTER||role===ROLE_UNKNOWN;
-   roleCache.set(subjectId,hidden);
-   return hidden;
+   return role;
+  })();
+  cache.set(subjectId,pending);
+  return pending;
+ }
+ const ownerIds=shares=>[...new Set(shares.map(share=>share.subjectId))];
+ // 공개 후보의 계정 자료는 요청 안에서만 일괄 읽는다. 다음 요청은 최신 공개 판정을 사용한다.
+ async function primeRoles(shares,cache){
+  if(typeof admin?.rolesFor!=='function')return;
+  const ids=ownerIds(shares).filter(id=>!cache.has(id));
+  if(!ids.length)return;
+  let roles;
+  try{roles=await admin.rolesFor({productId,subjectIds:ids},{unknownOnFailure:true});}
+  catch{return;} // 단건의 기존 오류 판정으로 돌아간다.
+  for(const id of ids){
+   // null은 저장소가 확인한 '역할 없음', 누락된 키는 확인 실패로 공개하지 않는다.
+   const role=roles instanceof Map&&roles.has(id)?roles.get(id):ROLE_UNKNOWN;
+   if(role===ROLE_UNKNOWN)console.warn('[lovetree-community] 역할을 읽지 못해 공개 목록에서 제외');
+   cache.set(id,role);
+  }
+ }
+ async function primeDocuments(shares,cache,project=stored=>stored){
+  if(typeof workspaceRepo?.loadMany!=='function')return;
+  const ids=ownerIds(shares).filter(id=>!cache.has(id));
+  if(ids.length<2)return; // 단일 계정은 기존 단건 조회를 그대로 쓴다.
+  const docs=await workspaceRepo.loadMany({productId,subjectIds:ids});
+  for(const id of ids)cache.set(id,project(docs.get(id)??null));
+ }
+ // 목록·집계·명예회원 표시는 같은 요청 내 역할 판정을 재사용한다.
+ function hiddenOwnerLookup(roleCache=new Map()){
+  if(!admin)return async()=>false;
+  return async subjectId=>{
+   const role=await listedRole(subjectId,roleCache);
+   return role===ROLE_TESTER||role===ROLE_UNKNOWN;
   };
  }
  let totalsCache=null;
@@ -235,7 +254,9 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
     // 목록을 고르는 같은 함수로 센다 — 공개·소개 켬·순간 3개 이상·숨김·비공개 제외와
     // 시험 계정·역할 모름 거름이 첫 화면 숫자에도 그대로 적용된다.
     const rows=await communityRepo.listDiscoverableSummaries({productId,viewerSubjectId:null,limit:240});
-    const hidden=hiddenOwnerLookup();
+    const roleCache=new Map();
+    await primeRoles(rows.map(row=>row.share),roleCache);
+    const hidden=hiddenOwnerLookup(roleCache);
     const seen=new Set();
     let trees=0,moments=0;
     for(const row of rows){
@@ -263,21 +284,29 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
    const roleOf=admin?async subjectId=>listedRole(subjectId,roleCache):null;
    const aiTesterLookup=roleOf?async subjectId=>isAiTesterRole(await roleOf(subjectId)):null;
    // #1273 5번: 집계(discoverTotals)와 같은 주인 거름을 쓴다(#1071 시험 계정·역할 모름 포함).
-   const isHiddenLookup=hiddenOwnerLookup();
+   const isHiddenLookup=hiddenOwnerLookup(roleCache);
+   async function prepareCandidates(shares){
+    await primeRoles(shares,roleCache);
+    const allowed=await Promise.all(shares.map(async share=>!await isHiddenLookup(share.subjectId)));
+    await primeDocuments(shares.filter((_,i)=>allowed[i]),docScanCache,stored=>stored?validateDocument(stored.doc):null);
+    return allowed;
+   }
    let entries;
    if(typeof communityRepo.listDiscoverableSummaries==='function'){
     const {since,until}=votingWeek();
     const summaries=await communityRepo.listDiscoverableSummaries({productId,viewerSubjectId,limit:240,sort:sortKey,weekSince:since,weekUntil:until});
-    entries=await Promise.all(summaries.map(async summary=>{
+    const allowed=await prepareCandidates(summaries.map(summary=>summary.share));
+    entries=await Promise.all(summaries.map(async (summary,i)=>{
      // 시험 계정·역할 모름 트리는 둘러보기 목록·검색에서 뺀다(#678 후속·#1071 — 공유 링크 직접 열기는 그대로).
-     if(await isHiddenLookup(summary.share.subjectId))return null;
+     if(!allowed[i])return null;
      const item=await card(summary.share,viewerSubjectId,summary.stats,summary.lastActivityAt,aiTesterLookup,docScanCache);
      return item;
     }));
    }else{
     const shares=await communityRepo.listDiscoverable({productId,viewerSubjectId,limit:240});
-    entries=await Promise.all(shares.map(async share=>{
-     if(await isHiddenLookup(share.subjectId))return null;
+    const allowed=await prepareCandidates(shares);
+    entries=await Promise.all(shares.map(async (share,i)=>{
+     if(!allowed[i])return null;
      return card(share,viewerSubjectId,null,null,aiTesterLookup,docScanCache);
     }));
    }
@@ -319,6 +348,8 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
    // 충분하다. 공개 트리가 수천 개가 되면 파생 꼬리표 표(moments_tags)+색인으로 SQL에서 바로 걸러 내야 한다.
    const shares=await communityRepo.listPublicTagShares({productId,viewerSubjectId,limit:400});
    const docs=new Map(),roles=new Map(),items=[];
+   await primeDocuments(shares,docs);
+   await primeRoles(shares,roles);
    for(const share of shares){
     let stored=docs.get(share.subjectId);
     if(stored===undefined){stored=await workspaceRepo.load({productId,subjectId:share.subjectId});docs.set(share.subjectId,stored);}
@@ -362,6 +393,8 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
    const matchesTag=moment=>!tagValue||(Array.isArray(moment.keywords)&&moment.keywords.some(raw=>{const p=parseTag(raw);return !!p&&p.kindId===parsedTag.kindId&&tagKey(p.value)===tagValue;}));
    const shares=await communityRepo.listPublicTagShares({productId,viewerSubjectId,limit:400,treeShareId:shareId});
    const docs=new Map(),roles=new Map(),found=[],groupCounts=new Map();
+   await primeDocuments(shares,docs);
+   await primeRoles(shares,roles);
    for(const share of shares){
     let stored=docs.get(share.subjectId);
     if(stored===undefined){stored=await workspaceRepo.load({productId,subjectId:share.subjectId});docs.set(share.subjectId,stored);}

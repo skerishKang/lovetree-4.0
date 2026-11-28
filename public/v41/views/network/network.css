@@ -134,6 +134,8 @@ html[data-v41-screen=network] .top-actions .view-switch .pill{padding:0 5px;font
  .route-status{left:8px;right:8px;bottom:152px;transform:none;min-width:0;max-width:none}.route-status span{white-space:normal}.toast{top:auto;bottom:var(--lt-sheet-bottom,104px);max-width:calc(100vw - 22px);border-radius:15px;text-align:center}.branch-chooser{top:auto;bottom:152px;transform:translate(-50%,16px) scale(.96)}.branch-chooser.open{transform:translate(-50%,0) scale(1)}
 }
 @media(prefers-reduced-motion:reduce){html[data-v41-screen=network] *{animation:none;transition-duration:.01ms}}
+/* #1600: 움직임 줄이기에서는 상세가 열린 순간 닫기 단추가 실제 누름 자리에 있어야 한다. */
+@media(prefers-reduced-motion:reduce){html[data-v41-screen=network] .detail{transition:none}}
 
 /* === 정원 테마 (2026-11-08): 이미 종이 바탕이라 무대·강조·제목 글꼴만 토큰에 맞춘다. === */
 html[data-lt-theme=garden]{--bg:var(--lt-stage);--bg2:var(--lt-stage-2);--ink:var(--lt-ink);--muted:var(--lt-muted);

@@ -6,6 +6,7 @@ import { loginUrlWithTheme, themeTone } from '../header-state.mjs';
 // #1072 A-16: 의견 보내기의 '함께 보낼 정보'에 실릴 최근 오류 기록은 report.mjs 한 곳에서 가져온다.
 import {reportEntries} from '../report.mjs';
 import {askAppConfirm} from '../confirm.mjs';
+import {isVisitMode, readVisitTheme, readVisitPrefs, setVisitMode, setVisitPrefs, setVisitTheme} from '../visit-mode.mjs';
 export function createSettings(deps){
 const { $, notify, setTitleDisplay, openLoginStart, links, screenForView, choose, panel, show, frames, frameLoaded, hideFrames, closeAccountMenu, openAccountMenu, renderAccount, updateAccountControls, openAssets, openEditor, sample, backup, clear, startMember, leaveMember, pauseMember, openFallbackShell, writeLocation, load, flowNavigation, closePanels, renderTreeMenu, requestBoardOpen, lastShelfTreeId, shellHeader, shellDialogs,  shareApi, accountApi, myNewsApi, readTheme, writeTheme, normalizeAccentColor, normalizeDateStyle, normalizeStartPlace, normalizeShareView, normalizeHomeMoment,  readPageTurn, writePageTurn, readShelfView, frameMessage, displayTreeTitle, accountPresentation, createFeedbackDialog, createFeedbackBoard, mountUpdates, mountMyNews, readWriteTab, writeWriteTab, clearCachedWorkspace, forgetLoginSubject, createWorkspaceApi, paintThemeControls, applyTheme, toggleTheme, paintBookDisplayControls, setShelfView } = deps;
 const $on=(id,fn)=>{const el=$(id);if(el)el.onclick=fn;};
@@ -108,6 +109,7 @@ const themeToggleTop=$('theme-toggle');if(themeToggleTop)themeToggleTop.onclick=
  // 로그아웃 빈 화면의 "백업 파일 열기"(#empty-file)는 계정 없이 쓰는 입구로 남긴다.
  $('advanced-import').onclick=()=>$('file').click();
  $('empty-file').onclick=()=>$('file').click();
+ const shareHome=$('empty-share-home');if(shareHome)shareHome.onclick=()=>document.querySelector('.brand')?.click();
  for(const b of document.querySelectorAll('[data-title-display]'))b.onclick=()=>setTitleDisplay(b.dataset.titleDisplay);
  // #380 5번: '보기 ◐' 메뉴(테마·움직임·카드 출처)를 설정 창의 '화면' 묶음으로 옮겼다.
  // 저장 키(lt41.theme·lt41.homeCards)와 기본값은 그대로다.
@@ -265,7 +267,7 @@ for(const b of document.querySelectorAll('[data-settings-shelf-view]'))b.onclick
  notify(b.dataset.settingsShelfView==='shelf'?'서재를 선반으로 보여요.':'서재를 회전으로 보여요.');
 };
 paintSettingsShelfView();
-function currentDateStyle(){try{return normalizeDateStyle(deps.member?.state?.().prefs?.dateStyle)}catch{return 'dot'}}
+function currentDateStyle(){if(isVisitMode())return normalizeDateStyle(readVisitPrefs()?.dateStyle);try{return normalizeDateStyle(deps.member?.state?.().prefs?.dateStyle)}catch{return 'dot'}}
 function sendToFrame(frame,message){
  try{frame.contentWindow?.postMessage(message,location.origin);}catch{}
 }
@@ -309,7 +311,7 @@ paintNetworkViewControls();
 // (쉬운 추가·자세한 추가가 이 한 벌(quickTargetPreference)을 따른다).
 const QUICK_TARGET_KEY='lt41.quickAddTarget';
 const QUICK_TARGET_TREE_KEY='lt41.quickAddTreeId';
-function quickAddTargetMode(){try{return localStorage.getItem(QUICK_TARGET_KEY)==="fixed"?"fixed":"deps.current"}catch{return "deps.current"}}
+function quickAddTargetMode(){try{return localStorage.getItem(QUICK_TARGET_KEY)==="fixed"?"fixed":"current"}catch{return "current"}}
 function quickAddFixedTreeId(){try{return localStorage.getItem(QUICK_TARGET_TREE_KEY)||""}catch{return ""}}
 function quickTargetPreference(){return {mode:quickAddTargetMode(),treeId:quickAddFixedTreeId()}}
 function paintQuickTargetControls(){
@@ -421,7 +423,7 @@ const BOARD_THEME_KEY='lt41.boardTheme';
 // 'auto'면 앱 테마를 따른다(#853). 화면 단추·메뉴는 저장한 상태를 그대로 보여 주고, 프레임에는
 // 해결된 판(종이/밤)을 넘긴다.
 function storedBoardTheme(){try{const saved=localStorage.getItem(BOARD_THEME_KEY);return saved==='night'||saved==='paper'?saved:'auto'}catch{return 'auto'}}
-function resolveBoardTheme(){return storedBoardTheme()==='auto'?(themeTone(readTheme(localStorage))==='light'?'paper':'night'):storedBoardTheme()}
+function resolveBoardTheme(){return storedBoardTheme()==='auto'?(themeTone(readVisitTheme()||readTheme(localStorage))==='light'?'paper':'night'):storedBoardTheme()}
 function currentBoardTheme(){return storedBoardTheme()}
 function paintBoardThemeControls(){const value=currentBoardTheme();for(const b of document.querySelectorAll('button[data-board-theme]'))b.setAttribute('aria-checked',String(b.dataset.boardTheme===value));}
 function applyBoardThemeToFrame(frame){
@@ -539,31 +541,40 @@ $('file').onchange=async()=>{
 // #380 4 2차: 전체 화면·가운데 창 공통 틀을 쓰는 대화상자(편집기·순간 잇기·트리 관리)는 × 도 바깥 클릭·Esc와 같은 규칙을 쓴다.
 document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>{const target=$(b.dataset.close);if(target?.dataset?.ltPanel){shellDialogs.requestClose(b.dataset.close);return;}target.close();});
 function publicProblem(answer){
- deps.source='share';deps.activeShareId=null;deps.model={trees:[]};window.LT41=null;document.body.dataset.recordSource='share';flowNavigation();document.body.classList.remove('home-screen');hideFrames();$('empty').hidden=false;$('empty-sample').hidden=true;$('empty-records').hidden=true;
+ document.body.removeAttribute('data-public-ai-tester');
+ deps.source='share';deps.activeShareId=null;deps.model={trees:[]};window.LT41=null;document.body.dataset.recordSource='share';flowNavigation();document.body.classList.remove('home-screen');hideFrames();$('empty').hidden=false;$('empty-sample').hidden=true;$('empty-records').hidden=true;$('empty-file').hidden=true;if(shareHome)shareHome.hidden=false;
  const messages={share_invalid:['공유 주소를 찾을 수 없어요.','주소를 다시 확인해 주세요.'],share_not_found:['공유 주소를 찾을 수 없어요.','주소가 잘못되었거나 존재하지 않아요.'],share_revoked:['공유가 취소됐어요.','소유자가 이 공유 주소를 회수했습니다.'],share_removed:['공유된 트리가 없어졌어요.','트리가 삭제되었거나 더 이상 공개할 수 없어요.'],share_empty:['아직 공개할 순간이 없어요.','소유자가 순간을 남긴 뒤 다시 열어 주세요.'],share_forbidden:['이 공유는 볼 수 없어요.','접근 권한을 확인해 주세요.']};
  const [title,detail]=messages[answer.code]||['공유 기록을 불러오지 못했어요.',answer.code==='timeout'?'서버 응답 시간이 초과됐어요. 다시 시도해 주세요.':'잠시 뒤 다시 시도해 주세요.'];$('empty').querySelector('h1').textContent=title;$('empty').querySelector('p').textContent=detail;links();
 }
 async function showPublicRoute(route){
  const requestedHash=location.hash;
+ const visiting=route.kind==='visit',wasVisiting=isVisitMode();
+ setVisitMode(visiting);
  // 로그인한 방문자의 계정 연결은 보존하고, 이 트리의 데이터만 읽기 전용으로 싣는다.
- if(deps.member&&!(await (deps.member.snapshot().owned?pauseMember():leaveMember()))){writeLocation('replace');return;}
+ if(deps.member&&!(await (deps.member.snapshot().owned?pauseMember():leaveMember()))){setVisitMode(false);writeLocation('replace');return;}
+ if(visiting&&!route.shareId){setVisitMode(false);publicProblem({code:'share_invalid'});writeLocation('replace');return;}
  const generation=++deps.loadGeneration;
+ document.body.removeAttribute('data-public-ai-tester');
  deps.activeShareId=route.shareId;
  deps.current=screenForView(['tree','book','board','network'].includes(route.view)?route.view:'book')[1];
  deps.handledHash=location.hash;
  $('empty').querySelector('h1').textContent='공유된 순간을 펼치고 있어요.';
  $('empty').querySelector('p').textContent='소유자가 공개한 트리 한 개만 확인합니다.';
- $('empty-sample').hidden=true;$('empty-records').hidden=true;$('view').hidden=true;$('empty').hidden=false;
- const answer=await shareApi.read(route.shareId||'');if(generation!==deps.loadGeneration||location.hash!==requestedHash)return;if(!answer.ok){publicProblem(answer);return;}
- deps.activeShareId=answer.share.id;const view=['tree','book','board','network'].includes(route.view)?route.view:answer.share.view;deps.current=screenForView(view)[1];load({revision:0,state:{version:1,trees:[answer.tree]}},'share',{treeId:answer.tree.id,momentId:answer.share.entryMomentId});
+ $('empty-sample').hidden=true;$('empty-records').hidden=true;$('empty-file').hidden=true;if(shareHome)shareHome.hidden=true;$('view').hidden=true;$('empty').hidden=false;
+ const answer=await (visiting?shareApi.readVisit(route.shareId):shareApi.read(route.shareId||''));if(generation!==deps.loadGeneration||location.hash!==requestedHash)return;if(!answer.ok){publicProblem(answer);return;}
+ const share=visiting?answer.visit:answer.share,meta=visiting?answer.visit:answer;
+ document.body.toggleAttribute('data-public-ai-tester',meta.aiTester===true);
+ if(visiting){setVisitPrefs(share.prefs);if(!wasVisiting||!readVisitTheme())setVisitTheme(readTheme(localStorage));window.LT41=null;}
+ deps.activeShareId=share.shareId||share.id;const view=['tree','book','board','network'].includes(route.view)?route.view:share.view;deps.current=screenForView(view)[1];load({revision:0,state:{version:1,trees:[answer.tree]}},'share',{treeId:answer.tree.id,momentId:share.entryMomentId});
+ if(visiting&&window.LT41)window.LT41.prefs={...(share.prefs||{titleDisplay:'both'}),theme:readVisitTheme()||readTheme(localStorage)};
  // #891: 공유 주소가 특정 순간을 가리키면(시작 순간) 보드만 그 순간의 상세 판을 열어 보여 준다.
- if(view==='board'&&answer.share.entryMomentId)requestBoardOpen(answer.share.entryMomentId);
- deps.activeShareId=answer.share.id;show(deps.current,false);writeLocation('replace');
+ if(view==='board'&&share.entryMomentId)requestBoardOpen(share.entryMomentId);
+ deps.activeShareId=share.shareId||share.id;show(deps.current,false);writeLocation('replace');
  // 기존 공개 읽기 API만 사용한다. 별도로 계정 화면을 불러오지 않고 로그인 표시만 확인한다.
- if(!deps.member?.snapshot().owned)void accountApi.account().then(account=>{
+ if(visiting||!deps.member?.snapshot().owned)void accountApi.account().then(account=>{
    if(generation===deps.loadGeneration&&deps.source==='share')deps.onVisitorAccount?.(account?.ok?account:null);
  }).catch(()=>{});
- notify('공개된 트리를 감상하는 화면이에요. 감상만 할 수 있어요.'+(answer.aiTester?' AI 명예회원이 만든 트리예요.':'')+(answer.omittedPrivateMedia?' 올린 사진 '+answer.omittedPrivateMedia+'장은 나만 볼 수 있어요.':''),{visitorIntro:true});
+ notify('공개된 트리를 감상하는 화면이에요. 감상만 할 수 있어요.'+(meta.aiTester?' AI 명예회원이 만든 트리예요.':'')+(meta.omittedPrivateMedia?' 올린 사진 '+meta.omittedPrivateMedia+'장은 나만 볼 수 있어요.':''),{visitorIntro:true});
 }
 document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{
  // 2026-11-23: 로그아웃 서재 탭도 로그인으로 즉시 이동시키지 않고 빈 상태에서 로그인 단추를 안내한다.

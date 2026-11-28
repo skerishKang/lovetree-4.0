@@ -351,6 +351,12 @@ export function shelfViewPressed(value) {
 
 // 2단계 범위: 공통 헤더·첫 화면·첫 여정은 B를 쓴다. 내 트리는 #212, 책은 2026-11-08 대표 확인으로 B를 받는다.
 // 기억 보드·관계 지도는 계속 A다(대표 결정: 책만 테마를 따라간다).
+// #1598: 로그인된 계정은 저장한 테마가 최우선이다. 계정 테마가 없을 때만 기기 미러를 승계한다.
+export function memberPreferredTheme({ owned = false, accountTheme = null, deviceTheme = null } = {}) {
+  if (owned && themeDefinition(accountTheme)) return normalizeTheme(accountTheme);
+  return normalizeTheme(deviceTheme);
+}
+
 export function appliedTheme(theme, view) {
   return view === 'home' || view === 'journey' || view === 'shelf' || view === 'tree' || view === 'book' || view === 'board' || view === 'network' || view === 'graph' ? normalizeTheme(theme) : DEFAULT_THEME;
 }
@@ -377,6 +383,28 @@ export function loginUrlWithTheme(url, theme, intent = '') {
   if (themeDefinition(theme)) parsed.searchParams.set('lt_theme', theme);
   else parsed.searchParams.delete('lt_theme');
   return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+}
+// #1592: 공용 로그인에서 게시하는 두 정책 문서만 현재 테마를 받는다.
+// 다른 주소·쿼리의 원래 표기와 해시를 보존하고 기존 theme 값만 바꾼다.
+export function policyUrlWithTheme(href, theme) {
+  if (typeof href !== 'string' || !['night', 'garden'].includes(theme)) return href;
+  const match = /^(https:\/\/auth\.padiem\.net\/(?:privacy|terms))(\?[^#]*)?(#[\s\S]*)?$/.exec(href);
+  if (!match) return href;
+  const [, base, query = '', hash = ''] = match;
+  const fields = query.length > 1 ? query.slice(1).split('&') : [];
+  const preserved = fields.filter(field => !new URLSearchParams(field).has('theme'));
+  preserved.push('theme=' + theme);
+  return base + '?' + preserved.join('&') + hash;
+}
+
+// 문서·그림자 루트·안내 창 모두 같은 주소 생성기를 쓴다.
+export function paintPolicyLinks(root, theme) {
+  if (!root) return;
+  for (const link of root.querySelectorAll('a[href^="https://auth.padiem.net/"]')) {
+    const href = link.getAttribute('href');
+    const next = policyUrlWithTheme(href, theme);
+    if (next !== href) link.setAttribute('href', next);
+  }
 }
 export function homeStartLoginUrl(theme, intent) {
   return loginUrlWithTheme(`/auth/login?next=${encodeURIComponent(HOME_LOGIN_NEXT)}`, theme, intent);

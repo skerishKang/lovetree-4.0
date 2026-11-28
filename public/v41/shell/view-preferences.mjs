@@ -1,11 +1,12 @@
 // 화면 표시 설정과 제목 보정.
 import { MSG } from "../frame-messages.mjs";
-import {accountPresentation,treePickerLabel,treePickerText,treeViewsVisible,writeMenuLabel,headerState,headerPartsFor,readTipsSeen,writeTipsSeen,tipsWanted,unsavedNoticeText,FIRST_TREE_TIPS,homeCenterState,homeStartLoginUrl,readTheme,readLoginIntent,writeTheme,nextTheme,themeButtonLabel,themeButtonAriaLabel,themePressed,appliedTheme,applyThemeAttribute,LOGIN_INTENTS,readPageTurn,writePageTurn,readBookDisplay,writeBookDisplay,bookDisplayVisible,readShelfView,writeShelfView,shelfViewVisible} from "../header-state.mjs";
+import {accountPresentation,treePickerLabel,treePickerText,treeViewsVisible,writeMenuLabel,headerState,headerPartsFor,readTipsSeen,writeTipsSeen,tipsWanted,unsavedNoticeText,FIRST_TREE_TIPS,homeCenterState,homeStartLoginUrl,readTheme,memberPreferredTheme,readLoginIntent,normalizeTheme,writeTheme,nextTheme,themeButtonLabel,themeButtonAriaLabel,themePressed,appliedTheme,applyThemeAttribute,LOGIN_INTENTS,readPageTurn,writePageTurn,readBookDisplay,writeBookDisplay,bookDisplayVisible,readShelfView,writeShelfView,shelfViewVisible} from "../header-state.mjs";
 import {frameMessage, frameReadyMessages, FRAME_MESSAGE_TYPES} from "../frame-wiring.mjs";
 import {screens,screenForView,viewForFile,themedViewFor} from "./navigation.mjs";
 import {paintLoginLinks,paintThemeControls,applyTheme as applyThemeFor,toggleTheme as toggleThemeFor} from "./theme.mjs";
 import {normalizeTitleDisplay, normalizeAccentColor, normalizeDateStyle, normalizeStartPlace, normalizeShareView, normalizeHomeMoment, normalizeBookDisplay, normalizeShelfView, coverModeOf, normalizeCoverDesign} from "../domain.mjs";
 import {backfillVideoTitles} from "../title-backfill.mjs";
+import {isVisitMode,readVisitPrefs,readVisitTheme,setVisitTheme} from "../visit-mode.mjs";
 
 export function createViewPreferences(ctx){
   let backfillStarted, backfillAttempted;
@@ -19,7 +20,7 @@ export function createViewPreferences(ctx){
   }
 
   // #347 후속: 계정 제목 보기 설정. 계정 상태(state.prefs.titleDisplay)에 저장하고 화면에 알린다.
-  function currentPrefs(){try{return ctx.member?.state?.().prefs||{titleDisplay:'both'}}catch{return {titleDisplay:'both'}}}
+  function currentPrefs(){if(isVisitMode())return readVisitPrefs()||{titleDisplay:'both'};try{return ctx.member?.state?.().prefs||{titleDisplay:'both'}}catch{return {titleDisplay:'both'}}}
 
   function titleDisplayValue(){return normalizeTitleDisplay(currentPrefs().titleDisplay)}
 
@@ -32,6 +33,7 @@ export function createViewPreferences(ctx){
   function rememberTitleDisplay(value){try{localStorage.setItem('lt41.titleDisplay',normalizeTitleDisplay(value));}catch{}}
 
   function setTitleDisplay(value){
+   if(isVisitMode())return;
    if(!ctx.member?.snapshot().owned){(0,ctx.notify)('로그인한 뒤 제목 보기를 바꿀 수 있어요.');return;}
    try{ctx.member.apply('setPrefs',{titleDisplay:value});}catch(e){(0,ctx.notify)('제목 보기를 저장하지 못했어요. 잠시 뒤 다시 시도해 주세요.');return;}
    if(window.LT41)window.LT41.prefs=ctx.member.state().prefs;
@@ -43,13 +45,14 @@ export function createViewPreferences(ctx){
   // #1094: 책/목록 보기 선택. 계정 상태(state.prefs.bookDisplay)에 저장하고 기기 미러(lt41.bookDisplay)에 함께 둔다
   // (날짜 표기·제목 보기와 같은 길). 머리줄 묶음(.view-toggle)과 설정 창의 같은 data-book-display 단추 두 칸을 칠한다.
   // 서재 안의 프레임은 누르는 순간 부모의 prefs와 미러를 함께 읽어, 중간 화면 없이 고른 방식으로 연다.
-  function currentBookDisplay(){try{return normalizeBookDisplay(ctx.member?.state?.().prefs?.bookDisplay)}catch{return readBookDisplay(localStorage)}}
+  function currentBookDisplay(){if(isVisitMode())return normalizeBookDisplay(readVisitPrefs()?.bookDisplay);try{return normalizeBookDisplay(ctx.member?.state?.().prefs?.bookDisplay)}catch{return readBookDisplay(localStorage)}}
 
   function rememberBookDisplay(value){writeBookDisplay(localStorage,value)}
 
   function paintBookDisplayControls(){const value=currentBookDisplay();for(const b of document.querySelectorAll('[data-book-display]'))b.setAttribute('aria-checked',String(b.dataset.bookDisplay===value));}
 
   function setBookDisplay(value){
+   if(isVisitMode())return;
    const next=normalizeBookDisplay(value);
    if(!ctx.member?.snapshot().owned){(0,ctx.notify)('로그인한 뒤 보기 방식을 바꿀 수 있어요.');return;}
    try{ctx.member.apply('setPrefs',{bookDisplay:next});}catch(e){(0,ctx.notify)('보기 방식을 저장하지 못했어요. 잠시 뒤 다시 시도해 주세요.');return;}
@@ -61,13 +64,14 @@ export function createViewPreferences(ctx){
   // #1093: 서재 진열 방식(선반/회전)도 같은 길로 저장하고, 서재 화면에 바로 알린다.
   // #1366: 값이 없거나 잘못된 값이면 회전이 기본이다. 저장된 'shelf'는 그대로 유지한다.
   const shelfViewOf=value=>value==='shelf'?'shelf':'carousel';
-  function currentShelfView(){try{return shelfViewOf(ctx.member?.state?.().prefs?.shelfView)}catch{return shelfViewOf(readShelfView(localStorage))}}
+  function currentShelfView(){if(isVisitMode())return shelfViewOf(readVisitPrefs()?.shelfView);try{return shelfViewOf(ctx.member?.state?.().prefs?.shelfView)}catch{return shelfViewOf(readShelfView(localStorage))}}
 
   function rememberShelfView(value){writeShelfView(localStorage,value)}
 
   function paintShelfViewControls(){const value=currentShelfView();for(const b of document.querySelectorAll('[data-shelf-view]'))b.setAttribute('aria-checked',String(b.dataset.shelfView===value));}
 
   function setShelfView(value){
+   if(isVisitMode())return;
    const next=shelfViewOf(value);
    if(!ctx.member?.snapshot().owned){(0,ctx.notify)('로그인한 뒤 진열 방식을 바꿀 수 있어요.');return;}
    try{ctx.member.apply('setPrefs',{shelfView:next});}catch(e){(0,ctx.notify)('진열 방식을 저장하지 못했어요. 잠시 뒤 다시 시도해 주세요.');return;}
@@ -84,11 +88,52 @@ export function createViewPreferences(ctx){
 
   function themedView(){return themedViewFor(ctx.current);}
 
-  function applyTheme(theme=readTheme(localStorage)){return applyThemeFor(ctx.current,theme);}
+  function applyTheme(theme){
+    // #1603: 방문은 세션 테마만 사용한다. 계정이나 기기 저장소는 변경하지 않는다.
+    if(isVisitMode())return applyThemeFor(ctx.current,theme===undefined?(readVisitTheme()||readTheme(localStorage)):theme);
+    // #1598: 내 기록에서는 계정 선호값(미저장 사용자 선택 포함)을 우선한다.
+    const owned=ctx.member?.snapshot?.().owned===true;
+    const accountTheme=owned?ctx.member?.state?.()?.prefs?.theme:null;
+    const effective=theme===undefined?memberPreferredTheme({owned,accountTheme,deviceTheme:readTheme(localStorage)}):theme;
+    if(owned&&effective!==readTheme(localStorage))writeTheme(localStorage,effective);
+    return applyThemeFor(ctx.current,effective);
+  }
 
-  function reflectTheme(value){const theme=writeTheme(localStorage,value);applyTheme(theme);paintThemeControls(theme);(0,ctx.syncBoardThemeToApp)(theme);return theme;}
-  function setTheme(value){const theme=reflectTheme(value);if(ctx.member?.snapshot().owned){try{ctx.member.apply('setPrefs',{theme});if(window.LT41)window.LT41.prefs=ctx.member.state().prefs;}catch(error){(0,ctx.notify)('테마를 계정에 저장하지 못했어요. 다시 시도해 주세요.');}}return theme;}
-  function toggleTheme(){return setTheme(nextTheme(readTheme(localStorage)));}
+  function reflectTheme(value){
+    if(isVisitMode()){
+      const theme=normalizeTheme(value||readVisitTheme());
+      setVisitTheme(theme);
+      if(window.LT41)window.LT41.prefs={...(window.LT41.prefs||{}),theme};
+      applyTheme(theme);
+      paintThemeControls(theme);
+      (0,ctx.syncBoardThemeToApp)(theme);
+      return theme;
+    }
+    const theme=writeTheme(localStorage,value);
+    applyTheme(theme);
+    paintThemeControls(theme);
+    (0,ctx.syncBoardThemeToApp)(theme);
+    return theme;
+  }
+  function setTheme(value){
+    const theme=reflectTheme(value);
+    if(isVisitMode())return theme;
+    if(ctx.member?.snapshot().owned){
+      try{
+        ctx.member.apply('setPrefs',{theme});
+        if(window.LT41)window.LT41.prefs=ctx.member.state().prefs;
+      }catch(error){
+        (0,ctx.notify)('테마를 계정에 저장하지 못했어요. 다시 시도해 주세요.');
+      }
+    }
+    return theme;
+  }
+  function toggleTheme(){
+    if(isVisitMode())return setTheme(nextTheme(readVisitTheme()||readTheme(localStorage)));
+    const owned=ctx.member?.snapshot?.().owned===true;
+    const current=memberPreferredTheme({owned,accountTheme:owned?ctx.member?.state?.()?.prefs?.theme:null,deviceTheme:readTheme(localStorage)});
+    return setTheme(nextTheme(current));
+  }
   Object.defineProperties(ctx,{
     openFallbackShell:{value:openFallbackShell},
     currentPrefs:{value:currentPrefs},

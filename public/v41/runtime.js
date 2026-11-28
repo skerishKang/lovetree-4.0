@@ -2,6 +2,46 @@
   const context = parent.LT41;
   if (!context?.tree) throw new Error('트리를 먼저 선택하세요.');
   const tree = context.tree;
+  // #1615: 같은 출처의 안쪽 화면도 자체 저장소 원형을 갖는다.
+  // 셸(visit-mode.mjs)과 같은 두 접두어·두 저장소·전체 지우기 규칙을 적용한다.
+  let storageMethods = null;
+  function syncVisitStorageGuard(next) {
+    if (!next) {
+      if (storageMethods) {
+        Object.defineProperties(storageMethods.proto, storageMethods.originals);
+        storageMethods = null;
+      }
+      return;
+    }
+    if (storageMethods || typeof Storage === 'undefined') return;
+    const proto = Storage.prototype;
+    const originals = Object.fromEntries(['setItem','removeItem','clear'].map(name => [name,Object.getOwnPropertyDescriptor(proto,name)]));
+    const blocked = key => /^(lt41\.|lovetree\.v41\.)/.test(String(key));
+    Object.defineProperties(proto, {
+      setItem: {...originals.setItem, value:function(key, value) {
+        if (!blocked(key)) return originals.setItem.value.apply(this, arguments);
+      }},
+      removeItem: {...originals.removeItem, value:function(key) {
+        if (!blocked(key)) return originals.removeItem.value.apply(this, arguments);
+      }},
+      // 전체 지우기는 보호 키까지 없애므로 두 저장소에서 모두 막는다.
+      clear: {...originals.clear, value:function() {}}
+    });
+    storageMethods = {proto, originals};
+  }
+  const syncVisitStorage = () => syncVisitStorageGuard(!!(parent.LT41_VISIT_READ_ONLY ?? parent.LT41?.visitReadOnly));
+  // 셸의 방문 전환은 프레임 교체보다 먼저 일어날 수 있다. 같은 출처에서 즉시 동기화한다.
+  parent.addEventListener?.('lt41-visit-storage-mode', syncVisitStorage);
+  globalThis.addEventListener?.('pagehide', () => {
+    parent.removeEventListener?.('lt41-visit-storage-mode', syncVisitStorage);
+    syncVisitStorageGuard(false);
+  });
+  globalThis.addEventListener?.('pageshow', () => {
+    parent.addEventListener?.('lt41-visit-storage-mode', syncVisitStorage);
+    syncVisitStorage();
+  });
+  syncVisitStorage();
+  globalThis.LT41_VISIT_READ_ONLY = !!context.visitReadOnly;
   // 예시 기록은 셸이 만들어 둔 demoData를 그대로 쓰고(design/shared.js와 같은 모양), 실제 기록은 서버 트리에서 만든다.
   const demo = tree.demoData;
   // #1001 (3): 순간 변환을 한 함수로 — 처음 그림과 모델 전용 갱신(refresh)이 같은 모양을 쓴다.
@@ -36,10 +76,10 @@
   // #464(2026-11-13): 예시(demoData)도 읽기 전용이다 — 고칠 수 없는 화면이다. 예전에는 source==='share'만
   // 보아 예시 책에 "이 순간에 남기고 싶은 마음을 적어 보세요…"와 "✎ 고치기"가 보였다(CTO 지적).
   const readOnly = context.source === 'share' || context.source === 'example' || !!demo;
-  window.LTDEMO = {title:tree.title,treeId:tree.id,source:context.source,writable:context.source==='server'&&!!context.writable,moments,edges:tree.edges,example:!!demo,readOnly,prefs:context.prefs||{titleDisplay:'both'},
+  window.LTDEMO = {title:tree.title,treeId:tree.id,source:context.source,writable:context.source==='server'&&!!context.writable,moments,edges:tree.edges,example:!!demo,readOnly,visitReadOnly:!!context.visitReadOnly,prefs:context.prefs||{titleDisplay:'both'},
     get:()=>context.momentId,
     select:(id,boardState={})=>{if(moments.some(m=>m.id===id)){context.momentId=id;parent.postMessage({type:globalThis.LT41_MSG.selection,id,...boardState},location.origin)}},
     // #1001 (3): 셸이 모델만 갱신한 뒤(lt41-moments-saved) 화면이 부모 LT41.tree에서 순간·연결을 다시 읽는다.
     // moments 배열은 제자리에서 바꿔, 이미 이 배열을 든 화면(book.js SPREADS 재구축 등)이 같은 참조로 새 값을 본다.
-    refresh:()=>{const fresh=parent.LT41?.tree;if(!fresh||fresh.id!==tree.id)return false;const next=projectMoments(fresh,context);moments.length=0;for(const m of next)moments.push(m);window.LTDEMO.edges=fresh.edges;window.LTDEMO.title=fresh.title;window.LTDEMO.writable=parent.LT41?.source==='server'&&!!parent.LT41.writable;window.LTDEMO.prefs=parent.LT41?.prefs||{titleDisplay:'both'};return true;}};
+    refresh:()=>{const fresh=parent.LT41?.tree;if(!fresh||fresh.id!==tree.id)return false;const next=projectMoments(fresh,context);moments.length=0;for(const m of next)moments.push(m);window.LTDEMO.edges=fresh.edges;window.LTDEMO.title=fresh.title;window.LTDEMO.writable=parent.LT41?.source==='server'&&!!parent.LT41.writable;window.LTDEMO.readOnly=parent.LT41?.source==='share'||parent.LT41?.source==='example'||!!demo;window.LTDEMO.visitReadOnly=!!parent.LT41?.visitReadOnly;globalThis.LT41_VISIT_READ_ONLY=window.LTDEMO.visitReadOnly;syncVisitStorage();window.LTDEMO.prefs=parent.LT41?.prefs||{titleDisplay:'both'};return true;}};
 })();

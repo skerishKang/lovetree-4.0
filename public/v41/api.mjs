@@ -1,5 +1,13 @@
 import {guardWorkspaceState} from './workspace-guard.mjs';
+import {isVisitMode} from './visit-mode.mjs';
 export const DEFAULT_REQUEST_TIMEOUT_MS = 8_000;
+
+export function guardVisitWrite(path, init = {}) {
+  const method = String(init.method || 'GET').toUpperCase();
+  if (['GET', 'HEAD', 'OPTIONS'].includes(method) || (!isVisitMode() && globalThis.LT41_VISIT_READ_ONLY !== true)) return null;
+  try { console.warn('[LT41] 방문은 읽기 전용이에요. 저장 요청을 보내지 않았어요.', {method, path}); } catch {}
+  return {ok:false, status:403, code:'visit_read_only', message:'방문 중에는 기록을 저장할 수 없어요.'};
+}
 
 // 회원 셸 startMember() 전에는 갱신 쿠키가 없어 401을 그대로 돌려준다.
 // 셸을 거치지 않는 단독 클라이언트·시험은 기본값(true)으로 기존 동작을 유지한다.
@@ -10,6 +18,7 @@ export function memberRefreshAllowed() { return memberRefreshStarted; }
 // Serialize cookie rotation across tabs and retry only responses rejected with 401.
 export async function refreshUnauthorized({fetchImpl, request, response, refreshUrl='/auth/refresh', signal, canRefresh = true}) {
   if (response.status !== 401) return response;
+  if (guardVisitWrite('/auth/refresh', {method:'POST'})) return response;
   if (!(typeof canRefresh === 'function' ? canRefresh() : canRefresh)) return response;
   const refreshAndRetry = async () => {
     const retry = await request();
@@ -24,6 +33,8 @@ export async function refreshUnauthorized({fetchImpl, request, response, refresh
 
 export function createWorkspaceApi({ fetchImpl = (...args) => globalThis.fetch(...args), base = '', timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS } = {}) {
   async function call(path, init, { requiresRevision = false, requiresState = false, binary = false, requestTimeout = timeoutMs, signal = null, keepalive = false } = {}) {
+    const blocked = guardVisitWrite(path, init);
+    if (blocked) return blocked;
     // 타이머는 응답 본문까지 읽고 나서 해제한다. 본문을 다 읽지 못한 채 끝나면 아직 성공이 아니다.
     const controller = typeof AbortController === 'function' ? new AbortController() : null;
     let expired = false;

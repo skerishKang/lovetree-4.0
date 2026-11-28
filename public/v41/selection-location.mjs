@@ -27,6 +27,12 @@ export function parseSelectionRoute(hash = '') {
     const parts = path.split('/');
     return {scope:'public', shareId:safe(parts[1]), view:viewName(parts[2] || 'book'), explicit:true};
   }
+  if (path.startsWith('visit/')) {
+    const parts = path.split('/');
+    const requested = VIEW_ALIASES.get(parts[2]) || parts[2] || 'book';
+    const view = ['tree', 'book', 'board', 'network'].includes(requested) ? requested : 'book';
+    return {scope:'public', kind:'visit', shareId:safe(parts[1]), view, explicit:true};
+  }
   return {scope:'screen', view:viewName(path), treeId:null, momentId:null, explicit:VIEWS.has(VIEW_ALIASES.get(path) || path)};
 }
 
@@ -51,6 +57,7 @@ export function ownerSelectionRoute({view='home', treeId, momentId, detail=false
 
 export const isOwnerSelectionRoute = hash => parseSelectionRoute(hash).scope === 'owner';
 export const isPublicSelectionRoute = hash => parseSelectionRoute(hash).scope === 'public';
+export const isVisitSelectionRoute = hash => parseSelectionRoute(hash).kind === 'visit';
 
 function readPositions(storage) {
   try {

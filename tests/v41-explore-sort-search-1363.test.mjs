@@ -106,3 +106,9 @@ test('#1363 정렬 직접 메뉴·검색 입력·#1361 안내 위치 — 390·14
   }
  }finally{await browser.close();await new Promise(ok=>server.close(ok));}
 });
+
+// #1576: 새 화면 계측은 기존 미리보기 CI 화면 시험 레인에서 함께 실행한다.
+import './helpers/explore-design-1576.mjs';
+
+// #1583: 기존 둘러보기 CI 화면 레인에서 회귀 검사를 함께 수행한다.
+import './helpers/explore-followup-1583.mjs';

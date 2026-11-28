@@ -12,7 +12,7 @@ import { createTree } from '../src/domain.js';
 import { createServer } from 'node:http';
 import { performance } from 'node:perf_hooks';
 import { setTimeout as sleep } from 'node:timers/promises';
-import { createNodeHandler } from '../server/http.js';
+import { createAfterResponseQueue, createNodeHandler } from '../server/http.js';
 import { listenOnSafePort } from './helpers/safe-port.mjs';
 import { createShareVisitsRepo } from '../server/db/share-visits-postgres.js';
 import { createTreeVisibilityRepo } from '../server/db/tree-visibility-postgres.js';
@@ -39,6 +39,74 @@ export async function fixture(repo = createMemoryShareVisitsRepo()) {
   }});
   const get = headers=>handle({method:'GET',path:'/api/public/visits/'+shareId,headers:{'x-lovetree-client-ip':visitor.clientIp,...headers}});
   return {repo,visits,get,handle,shareRepo,advance:ms=>{at+=ms},hide:value=>{hidden=value},privatize:value=>{privateTree=value}};
+}
+
+async function waitFor(predicate, label) {
+  const limit = performance.now() + 3_000;
+  while (!(await predicate())) {
+    if (performance.now() > limit) throw new Error('대기 시간 초과: ' + label);
+    await sleep(5);
+  }
+}
+
+async function waitForGate(gate, signal) {
+  if (!signal) return gate;
+  if (signal.aborted) throw signal.reason || Object.assign(new Error('뒤처리 취소'), {name: 'AbortError'});
+  let onAbort;
+  const aborted = new Promise((_, reject) => {
+    onAbort = () => reject(signal.reason || Object.assign(new Error('뒤처리 취소'), {name: 'AbortError'}));
+    signal.addEventListener('abort', onAbort, {once: true});
+  });
+  try { return await Promise.race([gate, aborted]); }
+  finally { signal.removeEventListener('abort', onAbort); }
+}
+
+async function startVisitServer(t, handle, options = {}) {
+  const handler = createNodeHandler(handle, options), server = createServer(handler);
+  await listenOnSafePort(server, '127.0.0.1', {port: Number(process.env.LT_TEST_PORT || 0)});
+  t.after(async () => {
+    await new Promise(resolve => server.close(resolve));
+    await handler.closeAfterResponse();
+  });
+  return {handler, server, url: 'http://127.0.0.1:' + server.address().port + '/api/public/visits/' + shareId};
+}
+
+function createBlockingVisitPool(max = 10) {
+  const waiting = [];
+  let active = 0, maxActive = 0, visitActive = 0, maxVisitActive = 0, visits = 0, release;
+  const gate = new Promise(resolve => { release = resolve; });
+  function pump() {
+    while (active < max && waiting.length) {
+      active += 1;
+      maxActive = Math.max(maxActive, active);
+      waiting.shift()({
+        async query(sql) {
+          if (sql.startsWith('WITH')) {
+            visitActive += 1;
+            maxVisitActive = Math.max(maxVisitActive, visitActive);
+            try {
+              await gate;
+              visits += 1;
+              return {rows: [{visits}]};
+            } finally { visitActive -= 1; }
+          }
+          if (sql.startsWith('SELECT visits')) return {rows: [{visits}]};
+          if (sql === 'SELECT 1') return {rows: [{ok: 1}]};
+          return {rows: []};
+        },
+        release() { active -= 1; pump(); }
+      });
+    }
+  }
+  const pool = {
+    connect() { return new Promise(resolve => { waiting.push(resolve); pump(); }); },
+    async query(sql, params) {
+      const client = await pool.connect();
+      try { return await client.query(sql, params); }
+      finally { client.release(); }
+    }
+  };
+  return {pool, release: () => release(), stats: () => ({active, maxActive, visitActive, maxVisitActive, visits, waiting: waiting.length})};
 }
 
 test('익명 방문과 날짜 경계 중복, 만료 정리 뒤 누적값 유지',async()=>{
@@ -178,4 +246,167 @@ test('서재 공개 여부 일괄 확인과 응답 뒤 집계의 질의 수 상�
   assert.equal(calls.length,15);
   assert.deepEqual(calls.slice(11),['BEGIN','방문자 잠금','원자적 집계','COMMIT']);
   t.diagnostic('서재 24권 응답 11회, 뒤처리 4회, 합계 15회');
+});
+
+test('느린 방문 뒤처리는 실행 2개·대기 4개로 제한하고 다른 DB 요청을 막지 않는다', async t=>{
+  const blocked = createBlockingVisitPool(), repo = createShareVisitsRepo(blocked.pool), logs = [];
+  const f = await fixture(repo);
+  const {handler, url} = await startVisitServer(t, f.handle, {afterResponseLog: line => logs.push(line)});
+  try {
+    const begin = performance.now();
+    const responses = await Promise.all(Array.from({length: 25}, (_, index) => fetch(url, {
+      headers: {connection: 'close', 'x-lovetree-client-ip': '203.0.113.' + (index + 1)}
+    })));
+    assert.ok(responses.every(response => response.status === 200));
+    await Promise.all(responses.map(response => response.text()));
+    const elapsed = performance.now() - begin;
+    await waitFor(() => handler.afterResponseStats().dropped === 19, '뒤처리 초과 19개');
+    const limited = handler.afterResponseStats();
+    assert.equal(limited.runningLimit, 2);
+    assert.equal(limited.waitingLimit, 4);
+    assert.equal(limited.active, 2);
+    assert.equal(limited.queued, 4);
+    assert.equal(limited.dropped, 19);
+    assert.equal(blocked.stats().visitActive, 2);
+    assert.equal(blocked.stats().waiting, 0);
+
+    const otherBegin = performance.now();
+    const other = await blocked.pool.query('SELECT 1');
+    const otherElapsed = performance.now() - otherBegin;
+    assert.deepEqual(other.rows, [{ok: 1}]);
+    assert.ok(otherElapsed < 1_000, '다른 요청이 집계 대기 때문에 막히지 않는다');
+    assert.equal(blocked.stats().maxActive, 3);
+
+    blocked.release();
+    await waitFor(async () => await repo.count(scope) === 6, '허용된 뒤처리 6개 완료');
+    await waitFor(() => handler.afterResponseStats().active === 0 && handler.afterResponseStats().queued === 0, '뒤처리 대기 비움');
+    assert.equal(await repo.count(scope), 6);
+    assert.equal(blocked.stats().maxVisitActive, 2);
+    assert.equal(blocked.stats().waiting, 0);
+    await handler.closeAfterResponse();
+    const overflowLogs = logs.filter(line => line.includes('실행·대기 상한'));
+    assert.equal(overflowLogs.length, 1);
+    assert.match(overflowLogs[0], /19개/);
+    t.diagnostic(`응답 ${Math.round(elapsed)}밀리초, 실행 ${blocked.stats().maxVisitActive}개, 대기 ${limited.queued}개, 버림 ${limited.dropped}개, 다른 요청 ${Math.round(otherElapsed)}밀리초`);
+  } finally {
+    blocked.release();
+    await handler.closeAfterResponse();
+  }
+});
+
+test('35분 차이 방문을 역순으로 처리해도 누적 2회', async t=>{
+  const firstAt = Date.parse('2026-11-28T12:00:00Z');
+  const repo = createMemoryShareVisitsRepo(), realRecord = repo.record;
+  let releaseFirst, firstStartedResolve, holdFirst = true, firstCompleted = false;
+  const firstGate = new Promise(resolve => { releaseFirst = resolve; });
+  const firstStarted = new Promise(resolve => { firstStartedResolve = resolve; });
+  repo.record = async (input, {signal} = {}) => {
+    if (holdFirst && input.now.getTime() === firstAt) {
+      holdFirst = false;
+      firstStartedResolve();
+      await waitForGate(firstGate, signal);
+    }
+    const result = await realRecord(input);
+    if (input.now.getTime() === firstAt) firstCompleted = true;
+    return result;
+  };
+  const f = await fixture(repo);
+  f.advance(firstAt - start);
+  const {handler, url} = await startVisitServer(t, f.handle);
+  try {
+    const first = await fetch(url, {headers: {connection: 'close', 'x-lovetree-client-ip': visitor.clientIp}});
+    assert.equal(first.status, 200);
+    await first.text();
+    await firstStarted;
+    f.advance(VISIT_WINDOW_MS + 5 * 60 * 1000);
+    const second = await fetch(url, {headers: {connection: 'close', 'x-lovetree-client-ip': visitor.clientIp}});
+    assert.equal(second.status, 200);
+    await second.text();
+    await waitFor(async () => await repo.count(scope) === 1, '나중 방문 먼저 집계');
+    releaseFirst();
+    await waitFor(() => firstCompleted, '늦은 첫 방문 집계');
+    assert.equal(await repo.count(scope), 2);
+    t.diagnostic('35분 간격 방문 2회의 기대 누적값 2, 실제 누적값 2');
+  } finally {
+    releaseFirst();
+    await handler.closeAfterResponse();
+  }
+});
+
+test('뒤처리 취소는 PostgreSQL 클라이언트를 파기해 연결을 붙잡지 않는다', async()=>{
+  let queryStartedResolve, released;
+  const queryStarted = new Promise(resolve => { queryStartedResolve = resolve; });
+  const pending = new Promise(() => {});
+  const client = {
+    async query(sql) {
+      if (sql.startsWith('WITH')) { queryStartedResolve(); await pending; }
+      return {rows: []};
+    },
+    release(error) { released = error; }
+  };
+  const repo = createShareVisitsRepo({connect: async () => client});
+  const controller = new AbortController();
+  const recording = repo.record({
+    productId, shareId, hashes: ['a'.repeat(64)], now: new Date(start),
+    expiresAt: new Date(start + VISIT_WINDOW_MS), signal: controller.signal
+  });
+  await queryStarted;
+  controller.abort();
+  await assert.rejects(recording, {name: 'AbortError'});
+  assert.equal(released?.name, 'AbortError');
+});
+
+test('신호를 무시하는 뒤처리도 시간 상한에서 실행 자리를 비운다', async()=>{
+  const logs = [], started = [];
+  const queue = createAfterResponseQueue({concurrency: 1, maxQueue: 1, timeoutMs: 20, log: line => logs.push(line)});
+  queue.enqueue(() => { started.push(1); return new Promise(() => {}); });
+  queue.enqueue(() => { started.push(2); });
+  await waitFor(() => started.length === 2, '신호 무시 뒤 다음 작업 시작');
+  assert.equal(queue.stats().active, 0);
+  assert.equal(queue.stats().queued, 0);
+  assert.equal(logs.filter(line => line.includes('시간 상한')).length, 1);
+  await queue.close();
+  assert.equal(queue.stats().active, 0);
+});
+
+test('뒤처리 시간 상한과 종료 정리는 실행·대기를 비운다', async t=>{
+  const started = [], logs = [];
+  const handle = async () => ({status: 200, body: {ok: true}, afterResponse: ({signal}) => {
+    started.push(signal);
+    return new Promise((resolve, reject) => {
+      if (signal.aborted) { reject(signal.reason); return; }
+      signal.addEventListener('abort', () => reject(signal.reason), {once: true});
+    });
+  }});
+  const {handler, url} = await startVisitServer(t, handle, {
+    afterResponseConcurrency: 1, afterResponseQueueLimit: 1, afterResponseTimeoutMs: 1_000,
+    afterResponseLog: line => logs.push(line)
+  });
+  const first = await fetch(url, {headers: {connection: 'close'}});
+  assert.equal(first.status, 200);
+  await first.text();
+  await waitFor(() => started.length === 1, '첫 뒤처리 시작');
+  const second = await fetch(url, {headers: {connection: 'close'}});
+  assert.equal(second.status, 200);
+  await second.text();
+  await waitFor(() => handler.afterResponseStats().queued === 1, '두 번째 뒤처리 대기');
+  const third = await fetch(url, {headers: {connection: 'close'}});
+  assert.equal(third.status, 200);
+  await third.text();
+  await waitFor(() => handler.afterResponseStats().dropped === 1, '세 번째 뒤처리 버림');
+  await waitFor(() => started.length >= 2, '시간 상한 뒤 다음 작업 시작');
+  const running = handler.afterResponseStats();
+  assert.equal(running.active, 1);
+  assert.equal(running.queued, 0);
+  assert.equal(running.dropped, 1);
+  assert.ok(logs.filter(line => line.includes('시간 상한')).length >= 1);
+  await handler.closeAfterResponse();
+  const closed = handler.afterResponseStats();
+  assert.equal(closed.active, 0);
+  assert.equal(closed.queued, 0);
+  assert.equal(closed.dropped, 1);
+  assert.equal(closed.closed, true);
+  assert.equal(started.length, 2);
+  assert.ok(started.every(signal => signal.aborted));
+  t.diagnostic('시간 상한 1회, 초과 버림 1개, 종료 후 실행 0개·대기 0개');
 });
