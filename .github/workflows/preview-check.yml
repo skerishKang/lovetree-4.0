@@ -5,6 +5,9 @@ on:
   pull_request:
     # ready_for_review: 초안에서 준비 완료로 바꾸면 화면 시험이 돈다.
     types: [opened, synchronize, reopened, ready_for_review]
+  schedule:
+    - cron: "0 2,10,18 * * *"
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -12,7 +15,7 @@ permissions:
   pull-requests: read
 
 concurrency:
-  group: preview-check-${{ github.event.pull_request.number }}
+  group: preview-check-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: true
 
 jobs:
@@ -30,26 +33,38 @@ jobs:
       map_changed: ${{ steps.diff.outputs.map_changed }}
       # 2026-11-24: 한 화면 안에서만 바뀐 PR은 그 화면 잡만 고른다(all이면 전부). tools/ci/screen-changes.mjs 참고.
       jobs: ${{ steps.diff.outputs.jobs }}
+      screens: ${{ steps.diff.outputs.screens }}
+      mode: ${{ steps.diff.outputs.mode }}
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
       - name: 바뀐 파일로 화면 바뀜을 가린다
         id: diff
         run: |
           # 2026-11-23: 초안 PR(추후 개발)은 화면 시험을 건너뛴다 — 미리보기 배포는 그대로 돌아 주소로 확인할 수 있다.
           # 병합하기로 정해 '준비 완료'로 바꾸면 ready_for_review로 다시 돌며 그때 화면 시험을 모두 한다.
+          echo "mode=pr" >> "$GITHUB_OUTPUT"
+          if [ '${{ github.event_name }}' != 'pull_request' ]; then
+            echo 'mode=full' >> "$GITHUB_OUTPUT"
+            printf '%s\n' changed=true map_changed=true jobs=all screens=all >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           if [ '${{ github.event.pull_request.draft }}' = 'true' ]; then
             echo "초안 PR — 화면 시험 건너뜀(준비 완료로 바꾸면 돈다)" | tee -a "$GITHUB_STEP_SUMMARY"
-            echo "changed=false" >> "$GITHUB_OUTPUT"; echo "map_changed=false" >> "$GITHUB_OUTPUT"; echo "jobs=" >> "$GITHUB_OUTPUT"; exit 0
+            echo "changed=false" >> "$GITHUB_OUTPUT"; echo "map_changed=false" >> "$GITHUB_OUTPUT"; echo "jobs=none" >> "$GITHUB_OUTPUT"; echo "screens=none" >> "$GITHUB_OUTPUT"; exit 0
           fi
           base='${{ github.event.pull_request.base.sha }}'
           head='${{ github.event.pull_request.head.sha }}'
-          git diff --name-only "$base...$head" > /tmp/changed-files.txt 2>/dev/null || { echo "diff 실패 — 바뀜으로 둔다"; echo "changed=true" >> "$GITHUB_OUTPUT"; echo "map_changed=true" >> "$GITHUB_OUTPUT"; echo "jobs=all" >> "$GITHUB_OUTPUT"; exit 0; }
+          git diff --name-only -z --no-renames "$base...$head" > /tmp/changed-files.txt 2>/dev/null || { echo "diff 실패 — 바뀜으로 둔다"; echo "changed=true" >> "$GITHUB_OUTPUT"; echo "map_changed=true" >> "$GITHUB_OUTPUT"; echo "jobs=all" >> "$GITHUB_OUTPUT"; echo "screens=all" >> "$GITHUB_OUTPUT"; exit 0; }
           # 판정은 tools/ci/screen-changes.mjs가 한다. 화면 시험 목록은 이 워크플로의 화면 잡 구간에서
           # 자동으로 뽑는다(손으로 따로 적지 않는다) — 시험 파일은 화면 잡이 실제로 실행하는 파일과
           # 그 helpers가 바뀌었을 때만 화면 바뀜이다(이슈 947 — #958 같은 시험 정리 PR도 다 돌던 것을 줄인다).
+          if ! git diff --name-status --no-renames "$base...$head" > /tmp/changed-status.txt || grep -q "^D" /tmp/changed-status.txt; then
+            printf "%s\n" changed=true map_changed=true jobs=all screens=all >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           node tools/ci/screen-changes.mjs /tmp/changed-files.txt
 
   # 2026-11-14: 화면 시험이 한 잡에 줄지어 18분 걸리던 것을 잡 여러 개로 나눠 동시에 돌린다.
@@ -62,11 +77,11 @@ jobs:
     runs-on: ${{ fromJSON((github.event.pull_request.head.repo.full_name == github.repository && vars.USE_CGI_RUNNER == '1') && '["self-hosted","Linux","X64","cgi"]' || '["ubuntu-latest"]') }}
     timeout-minutes: 25
     needs: screen-changes
-    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || needs.screen-changes.outputs.jobs == '' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-board,'))
+    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-board,'))
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
           clean: true
       # 같은 CGI 컴퓨터의 자체 실행기 여러 개가 홈의 npm 캐시를 함께 쓰면 동시에 받다가 깨진다
@@ -221,11 +236,11 @@ jobs:
     runs-on: ${{ fromJSON((github.event.pull_request.head.repo.full_name == github.repository && vars.USE_CGI_RUNNER == '1') && '["self-hosted","Linux","X64","cgi"]' || '["ubuntu-latest"]') }}
     timeout-minutes: 25
     needs: screen-changes
-    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || needs.screen-changes.outputs.jobs == '' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-board,'))
+    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-board-b,'))
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
           clean: true
       # 같은 CGI 컴퓨터의 자체 실행기 여러 개가 홈의 npm 캐시를 함께 쓰면 동시에 받다가 깨진다
@@ -348,11 +363,11 @@ jobs:
     runs-on: ${{ fromJSON((github.event.pull_request.head.repo.full_name == github.repository && vars.USE_CGI_RUNNER == '1') && '["self-hosted","Linux","X64","cgi"]' || '["ubuntu-latest"]') }}
     timeout-minutes: 12
     needs: screen-changes
-    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || needs.screen-changes.outputs.jobs == '' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-home,'))
+    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-home,'))
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
           clean: true
       # 같은 CGI 컴퓨터의 자체 실행기 여러 개가 홈의 npm 캐시를 함께 쓰면 동시에 받다가 깨진다
@@ -417,11 +432,11 @@ jobs:
     runs-on: ${{ fromJSON((github.event.pull_request.head.repo.full_name == github.repository && vars.USE_CGI_RUNNER == '1') && '["self-hosted","Linux","X64","cgi"]' || '["ubuntu-latest"]') }}
     timeout-minutes: 12
     needs: screen-changes
-    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || needs.screen-changes.outputs.jobs == '' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-home,'))
+    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-home-followup,'))
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
           clean: true
       # 같은 CGI 컴퓨터의 자체 실행기 여러 개가 홈의 npm 캐시를 함께 쓰면 동시에 받다가 깨진다
@@ -505,11 +520,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 8
     needs: screen-changes
-    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || needs.screen-changes.outputs.jobs == '' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-home,'))
+    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-home-1284,'))
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
           clean: true
       - uses: actions/setup-node@v4
@@ -532,11 +547,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     needs: screen-changes
-    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || needs.screen-changes.outputs.jobs == '' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-book,'))
+    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-book,'))
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
           clean: true
       - uses: actions/setup-node@v4
@@ -622,11 +637,11 @@ jobs:
     runs-on: ${{ fromJSON((github.event.pull_request.head.repo.full_name == github.repository && vars.USE_CGI_RUNNER == '1') && '["self-hosted","Linux","X64","cgi"]' || '["ubuntu-latest"]') }}
     timeout-minutes: 12
     needs: screen-changes
-    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || needs.screen-changes.outputs.jobs == '' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-shell,'))
+    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-shell,'))
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
           clean: true
       - name: Runner-specific npm cache (self-hosted)
@@ -716,11 +731,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     needs: screen-changes
-    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || needs.screen-changes.outputs.jobs == '' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-shell-extra,'))
+    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-shell-extra,'))
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
           clean: true
       - uses: actions/setup-node@v4
@@ -847,11 +862,13 @@ jobs:
     runs-on: ${{ fromJSON((github.event.pull_request.head.repo.full_name == github.repository && vars.USE_CGI_RUNNER == '1') && '["self-hosted","Linux","X64","cgi"]' || '["ubuntu-latest"]') }}
     timeout-minutes: 12
     needs: screen-changes
-    if: needs.screen-changes.outputs.changed == 'true'
+    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-audit-a,'))
+    env:
+      LT_SCREEN_AUDIT_SCREENS: ${{ needs.screen-changes.outputs.screens }}
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
       - name: Runner-specific npm cache (self-hosted)
         if: runner.environment == 'self-hosted'
@@ -963,11 +980,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     needs: screen-changes
-    if: needs.screen-changes.outputs.changed == 'true'
+    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-audit-b,'))
+    env:
+      LT_SCREEN_AUDIT_SCREENS: ${{ needs.screen-changes.outputs.screens }}
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
@@ -1070,11 +1089,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     needs: screen-changes
-    if: needs.screen-changes.outputs.changed == 'true'
+    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-audit-c,'))
+    env:
+      LT_SCREEN_AUDIT_SCREENS: ${{ needs.screen-changes.outputs.screens }}
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
@@ -1179,11 +1200,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     needs: screen-changes
-    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || needs.screen-changes.outputs.jobs == '' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-reload,'))
+    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-reload,'))
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
           clean: true
       - uses: actions/setup-node@v4
@@ -1239,11 +1260,11 @@ jobs:
     runs-on: ${{ fromJSON((github.event.pull_request.head.repo.full_name == github.repository && vars.USE_CGI_RUNNER == '1') && '["self-hosted","Linux","X64","cgi"]' || '["ubuntu-latest"]') }}
     timeout-minutes: 25
     needs: screen-changes
-    if: needs.screen-changes.outputs.changed == 'true'
+    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-map-a,'))
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
       - name: Runner-specific npm cache (self-hosted)
         if: runner.environment == 'self-hosted'
@@ -1340,7 +1361,7 @@ jobs:
       - name: 지도 실제 대비 시험(건너뜀=실패)
         env:
           LT_MAP_CONTRAST_REQUIRE: '1'
-        if: needs.screen-changes.outputs.changed == 'true' && needs.screen-changes.outputs.map_changed == 'true'
+        if: needs.screen-changes.outputs.changed == 'true'
         run: |
           start=$(date +%s)
           # #529: 이름표 대비는 실제로 그려진 한글 글자를 잰다 — 한글 글꼴은 앞의 '한글 글꼴 준비' 단계에서 둔다.
@@ -1379,11 +1400,11 @@ jobs:
     runs-on: ${{ fromJSON((github.event.pull_request.head.repo.full_name == github.repository && vars.USE_CGI_RUNNER == '1') && '["self-hosted","Linux","X64","cgi"]' || '["ubuntu-latest"]') }}
     timeout-minutes: 12
     needs: screen-changes
-    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || needs.screen-changes.outputs.jobs == '' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-shelf,'))
+    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-shelf,'))
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
           clean: true
       # 같은 CGI 컴퓨터의 자체 실행기 여러 개가 홈의 npm 캐시를 함께 쓰면 동시에 받다가 깨진다(보드 잡과 같은 식).
@@ -1488,11 +1509,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     needs: screen-changes
-    if: needs.screen-changes.outputs.changed == 'true'
+    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-map-b,'))
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
@@ -1658,11 +1679,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     needs: screen-changes
-    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || needs.screen-changes.outputs.jobs == '' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-book-screen,'))
+    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-book-screen,'))
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
           clean: true
       - uses: actions/setup-node@v4
@@ -1789,7 +1810,7 @@ jobs:
     name: 미리보기 배포 검사(postdeploy)
     runs-on: ubuntu-latest
     needs: [screen-changes]
-    if: always() && needs.screen-changes.result == 'success'
+    if: always() && github.event_name == 'pull_request' && needs.screen-changes.result == 'success'
     timeout-minutes: 40
     outputs:
       previewUrl: ${{ steps.preview.outputs.url }}
@@ -1799,7 +1820,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
@@ -1873,8 +1894,8 @@ jobs:
   visual:
     name: 겉모습 비교(알림용)
     runs-on: ubuntu-latest
-    needs: deploy
-    if: needs.deploy.result == 'success'
+    needs: [deploy, screen-changes]
+    if: needs.deploy.result == 'success' && needs.screen-changes.outputs.changed == 'true'
     timeout-minutes: 40
     env:
       PR_SHA: ${{ github.event.pull_request.head.sha }}
@@ -1882,7 +1903,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
@@ -1950,6 +1971,7 @@ jobs:
         env:
           LOVETREE_POSTDEPLOY_BROWSER: chromium
           LT_VISUAL_BUDGET_MS: '330000'
+          SELECTED_SCREENS: ${{ needs.screen-changes.outputs.screens }}
           BEFORE_BASE: ${{ steps.base.outputs.baseUrl }}/v41/
           AFTER_BASE: ${{ needs.deploy.outputs.previewUrl }}/v41/
         run: |
@@ -1957,11 +1979,13 @@ jobs:
           set +e
           # 2026-11-24: 단계 timeout-minutes로 끊으면 continue-on-error여도 잡 전체가 취소(빨강)된다.
           # 도구 안 상한(5분)에 더해 명령만 7분에서 끊어 단계는 종료 코드로 끝나게 한다(알림용 유지).
+          SCENES=$(node --input-type=module -e 'import {visualScenes} from "./tools/ci/screen-changes.mjs"; console.log(visualScenes(process.env.SELECTED_SCREENS))')
+          if [ -z "$SCENES" ]; then exit 1; fi
           shoot() {
             local name=$1 base=$2 out=$3 start
             start=$(date +%s)
             timeout -k 15 420 node tools/visual-baseline/visual-baseline.mjs capture \
-              --base "$base" --out "$out" > "$RUNNER_TEMP/$name.log" 2>&1
+              --base "$base" --out "$out" --scenes "$SCENES" > "$RUNNER_TEMP/$name.log" 2>&1
             echo "$? $(( $(date +%s) - start ))" > "$RUNNER_TEMP/$name.result"
           }
           shoot before "$BEFORE_BASE" visual-before & p1=$!
@@ -2028,11 +2052,14 @@ jobs:
     name: 미리보기 postdeploy(로그아웃)
     runs-on: ubuntu-latest
     if: always()
-    needs: [screen-changes, screen-board, screen-board-b, screen-home, screen-home-followup, screen-book, screen-reload, screen-shell, screen-shell-extra, screen-map-a, screen-shelf, screen-map-b, screen-book-screen, screen-audit-a, screen-audit-b, screen-audit-c, deploy]
+    needs: [screen-changes, screen-board, screen-board-b, screen-home, screen-home-followup, screen-home-1284, screen-book, screen-reload, screen-shell, screen-shell-extra, screen-map-a, screen-shelf, screen-map-b, screen-book-screen, screen-audit-a, screen-audit-b, screen-audit-c, deploy]
     steps:
       - uses: actions/checkout@v4
         with:
-          sparse-checkout: tools/ci
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          sparse-checkout: |
+            tools/ci
+            .github/workflows
       - name: 모든 화면 시험·배포 검사 결과 모으기
         env:
           RESULTS: ${{ toJSON(needs) }}

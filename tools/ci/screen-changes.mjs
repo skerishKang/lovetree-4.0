@@ -8,12 +8,14 @@
 import { readFileSync, existsSync, appendFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { TEST_OWNERS } from './screen-owners.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const WORKFLOW = resolve(ROOT, '.github/workflows/preview-check.yml');
 
 // 화면 잡들은 screen-board부터 deploy 직전까지 나란히 적혀 있다. 그 구간에서 이름이 적힌 시험 파일을 뽑는다.
 export function screenTestFiles(workflowText = readFileSync(WORKFLOW, 'utf8')) {
+  workflowText = workflowText.replace(/\r\n/g, '\n');
   const start = workflowText.indexOf('  screen-board:');
   const end = workflowText.indexOf('  deploy:');
   if (start < 0 || end < 0 || end <= start) throw new Error('워크플로에서 화면 잡 구간을 못 찾는다');
@@ -47,36 +49,47 @@ function isScreenTool(file) {
 // 지도(추후 개발) 쪽 파일: 지도 화면·지도 시험과 helpers·지도가 쓰는 테마 공통 파일. 이 판정 도구와
 // 화면 워크플로가 바뀌어도 지도 시험을 돌린다. 애매하면 바뀜으로 두지 않는다 — 지도는 지금 손대지 않으므로
 // 지도 파일이 실제로 바뀐 PR만 잰다.
-const MAP_FILE = /(?:network|graph|map-|-map|\/map\.|views\/network|identity\.css|theme\.mjs)/;
-export function mapChanged(changedFiles) {
-  return changedFiles.some((f) => f && (
-    MAP_FILE.test(f) || f === '.github/workflows/preview-check.yml' || f === 'tools/ci/screen-changes.mjs'
-  ));
-}
-
-// 2026-11-24: 화면이 바뀌어도 한 화면 안에서만 바뀐 PR은 그 화면 잡과 공통 검사기(a·b·c)·지도 잡만 돌린다.
-// 고를 수 있는 잡은 아래 여덟이다. 공통 검사기와 지도 잡은 지금처럼 늘 판정대로 돈다.
-// #1413 4단계: 지도 대비 잡에서 떼어 낸 서재·날짜 잡(screen-shelf)도 고를 수 있다 — 서재·날짜 시험 파일만 바뀌면 이 잡만 돈다.
-// 화면 시험 파일이 바뀌면 그 파일을 실행하는 잡을, 보드 전용 소스가 바뀌면 보드 잡을 고른다.
-// 그 밖의 화면 파일(공용 모듈·셸·CSS·빌드 설정·helpers 등)이 하나라도 있으면 전부(all)다 — 애매하면 다 돈다.
-export const SELECTABLE_JOBS = ['screen-board', 'screen-home', 'screen-book', 'screen-reload', 'screen-shell', 'screen-shell-extra', 'screen-book-screen', 'screen-shelf'];
-// 한 고르기 이름을 함께 쓰는 잡: 그 이름이 골리면 같이 돈다(워크플로 if도 같은 이름을 본다). 결과 모으기도 이 표를 쓴다.
-// #1413 5단계: 보드 둘째 잡(screen-board-b)은 보드 잡에서 나눈 잡이라 'screen-board'를 쓴다. 첫 화면 휴대폰 잡도
-// 'screen-home'으로 돈다 — 전에는 표에 없어 그 시험 파일만 바뀐 PR에서 잡이 골리지 않았다.
-export const JOB_TOKEN = {
-  'screen-home-followup': 'screen-home',
-  'screen-home-1284': 'screen-home',
-  'screen-board-b': 'screen-board'
-};
-export function tokenOf(job) {
-  return JOB_TOKEN[job] || job;
-}
-const AREA_SOURCES = [
-  [/^public\/v41\/views\/board\//, 'screen-board'],
-  [/^public\/v41\/views\/track58-pinboard\.html$/, 'screen-board']
+export const SCREENS = ['home','board','book','shelf','map','shell','explore/settings'];
+export const AREA_SOURCES = [
+  [/^src\/views\/orbit[^/]*\.(js|css|json)$/, ['home']],
+  [/^src\/views\/book(?:-source\.css|\.js)$/, ['book']],
+  [/^src\/views\/shelf(?:-source\.css|\.css|\.js)$/, ['shelf']],
+  [/^public\/v41\/views\/board\//, ['board']],
+  [/^public\/v41\/views\/track58-pinboard\.html$/, ['board']],
+  [/^public\/v41\/views\/book\//, ['book']],
+  [/^public\/v41\/views\/track59-sketchbook\.html$/, ['book']],
+  [/^public\/v41\/views\/shelf\//, ['shelf']],
+  [/^public\/v41\/views\/track32-bookshelf\.html$/, ['shelf']],
+  [/^public\/v41\/views\/(network|graph)\//, ['map']],
+  [/^public\/v41\/views\/track56-network\.html$/, ['map']]
 ];
-
+export const JOB_TOKEN = {};
+export function tokenOf(job) { return job; }
+export const SELECTABLE_JOBS = Object.keys(jobTestFiles());
+export function selectScreens(changedFiles) {
+  const picked = new Set();
+  if (!changedFiles.length) return 'all';
+  for (const f of changedFiles) {
+    if (!f) return 'all';
+    if (/^(docs|reference)\/.+\.md$/i.test(f) || /^(README|CHANGELOG)\.md$/i.test(f)) continue;
+    const owners = TEST_OWNERS[f];
+    if (owners) {
+      if (owners.includes('common')) return 'all';
+      owners.forEach(x => picked.add(x));
+      continue;
+    }
+    const areas = AREA_SOURCES.filter(([re]) => re.test(f));
+    if (!areas.length) return 'all';
+    for (const [, screens] of areas) screens.forEach(x => picked.add(x));
+  }
+  return SCREENS.filter(x => picked.has(x)).join(',') || 'none';
+}
+export function mapChanged(files) {
+  const screens = selectScreens(files);
+  return screens === 'all' || screens.split(',').includes('map');
+}
 export function jobTestFiles(workflowText = readFileSync(WORKFLOW, 'utf8')) {
+  workflowText = workflowText.replace(/\r\n/g, '\n');
   const start = workflowText.indexOf('  screen-board:');
   const end = workflowText.indexOf('  deploy:');
   const section = workflowText.slice(start, end);
@@ -89,64 +102,42 @@ export function jobTestFiles(workflowText = readFileSync(WORKFLOW, 'utf8')) {
   return jobs;
 }
 
-export function selectJobs(changedFiles, jobTests, screenTests, screenHelpers) {
-  const picked = new Set();
-  for (const f of changedFiles) {
-    if (!f) continue;
-    const one = classify([f], screenTests, screenHelpers);
-    if (!one.changed) continue;
-    if (screenTests.has(f)) {
-      for (const [job, files] of Object.entries(jobTests)) if (files.has(f) && SELECTABLE_JOBS.includes(tokenOf(job))) picked.add(tokenOf(job));
-      continue;
-    }
-    const area = AREA_SOURCES.find(([re]) => re.test(f));
-    if (area) { picked.add(area[1]); continue; }
-    return 'all';
+export function selectJobs(changedFiles, jobTests = jobTestFiles()) {
+  const selection = selectScreens(changedFiles);
+  if (selection === 'all' || selection === 'none') return selection;
+  const screens = new Set(selection.split(','));
+  const picked = [];
+  for (const [job, files] of Object.entries(jobTests)) {
+    if (!files.size) return 'all';
+    for (const file of files) if (!TEST_OWNERS[file]) return 'all';
+    if (job.startsWith('screen-audit-') || [...files].some(f =>
+      TEST_OWNERS[f].some(x => x === 'common' || screens.has(x)))) picked.push(job);
   }
-  // 고른 잡이 하나도 없으면 빈 값이 아니라 'none'으로 적는다. 빈 값은 '판정 도구가 jobs를 몰랐다'(옛 가지)로 보고
-  // 워크플로·결과 모음이 전부 돌린다 — 최신 main을 받지 않은 가지에서 화면 잡이 조용히 다 건너뛰어지지 않게.
-  return SELECTABLE_JOBS.filter((j) => picked.has(j)).join(',') || 'none';
+  return picked.length ? picked.join(',') : 'all';
 }
-
-export function classify(changedFiles, screenTests, screenHelpers) {
-  const reasons = [];
-  let changed = false;
-  for (const f of changedFiles) {
-    if (!f) continue;
-    if (screenTests.has(f) || screenHelpers.has(f)) {
-      reasons.push(`화면 시험: ${f}`); changed = true;
-    } else if (f.startsWith('tests/')) {
-      reasons.push(`화면 밖 시험(화면 잡이 실행하지 않는다): ${f}`);
-    } else if (
-      f.startsWith('public/') || f.startsWith('src/views/') || f.includes('v41') ||
-      /^vite\.[^.]*\.?config/.test(f) || f === 'package.json' || f === 'package-lock.json' ||
-      f === 'index.html' || f === '.github/workflows/preview-check.yml'
-    ) {
-      reasons.push(`화면: ${f}`); changed = true;
-    } else if (
-      f.startsWith('docs/') || f.endsWith('.md') || f.startsWith('reference/') ||
-      f.startsWith('scripts/') || f.startsWith('src/server/') || f.startsWith('server/') ||
-      f.startsWith('functions/') || f.startsWith('deploy/') ||
-      (f.startsWith('tools/') && !isScreenTool(f)) ||
-      f.startsWith('.github/') || f === '.gitignore' || f === 'LICENSE'
-    ) {
-      reasons.push(`화면 밖: ${f}`);
-    } else {
-      reasons.push(`애매 — 바뀜으로: ${f}`); changed = true;
-    }
-  }
-  return { changed, reasons };
+export function classify(changedFiles) {
+  const screens = selectScreens(changedFiles);
+  return { changed: screens !== 'none', reasons: changedFiles.map(f => String(f)), screens };
 }
-
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const changed = readFileSync(process.argv[2], 'utf8').split('\n').map((s) => s.trim()).filter(Boolean);
-  const tests = screenTestFiles();
-  const result = classify(changed, new Set(tests), new Set(helperFiles(tests)));
-  for (const line of result.reasons) console.log(line);
-  console.log(`화면 바뀜: ${result.changed} (${changed.length}개 파일)`);
-  const map = result.changed && mapChanged(changed);
-  console.log(`지도 바뀜: ${map}`);
-  const jobs = result.changed ? selectJobs(changed, jobTestFiles(), new Set(tests), new Set(helperFiles(tests))) : '';
-  console.log(`돌릴 화면 잡: ${jobs === 'all' ? '전부' : (jobs || '없음(공통 검사기·지도만)')}`);
-  if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `changed=${result.changed}\nmap_changed=${map}\njobs=${jobs}\n`);
+  const raw = readFileSync(process.argv[2], 'utf8');
+  const changed = raw.split(raw.includes('\0') ? '\0' : '\n').filter(Boolean);
+  const result = classify(changed);
+  const jobs = selectJobs(changed);
+  const screens = jobs === 'all' ? 'all' : result.screens;
+  const map = screens === 'all' || screens.split(',').includes('map');
+  console.log(JSON.stringify({changed:result.changed,jobs,screens,files:changed}));
+  if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT,
+    `changed=${result.changed}\nmap_changed=${map}\njobs=${jobs}\nscreens=${screens}\n`);
+}
+
+export function visualScenes(selection) {
+  const all = ['home','shelf','book','board','network','account'];
+  const map = {home:['home'],shelf:['shelf'],book:['book'],board:['board'],map:['network'],shell:all,'explore/settings':['account','home']};
+  if (selection === 'none') return '';
+  if (!selection || selection === 'all') return all.join(',');
+  const keys = selection.split(',');
+  if (keys.some(k => !Object.hasOwn(map,k))) return all.join(',');
+  const picked = new Set(keys.flatMap(k => map[k]));
+  return all.filter(k => picked.has(k)).join(',');
 }

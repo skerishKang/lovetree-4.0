@@ -1,9 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { SELECTABLE_JOBS } from '../tools/ci/screen-changes.mjs';
 import { checkScreenResults } from '../tools/ci/screen-results.mjs';
 
-const SCREENS = ['screen-board', 'screen-home', 'screen-home-followup', 'screen-book', 'screen-reload', 'screen-shell', 'screen-map-a', 'screen-shelf', 'screen-map-b', 'screen-book-screen', 'screen-audit-a', 'screen-audit-b', 'screen-audit-c'];
-const gate = (result, changed) => ({ result, outputs: { changed } });
+const SCREENS = SELECTABLE_JOBS;
+const gate = (result, changed) => ({ result, outputs: { changed, jobs: changed === 'true' ? 'all' : 'none' } });
 const results = (screenResult, gateResult = gate('success', 'false')) => {
   const needs = { 'screen-changes': gateResult };
   for (const name of SCREENS) needs[name] = { result: screenResult };
@@ -34,4 +35,15 @@ test('판정 잡이 취소되면 화면 잡이 모두 건너뛰어도 실패한�
 test('바뀜 판정이고 화면 잡이 모두 성공이면 통과한다', () => {
   const r = checkScreenResults(results('success', gate('success', 'true')));
   assert.equal(r.ok, true, JSON.stringify(r.failures));
+});
+
+
+test('unknown future screen job failure and cancellation cannot be ignored', () => {
+  for (const status of ['failure', 'cancelled']) {
+    const needs = results('success', gate('success', 'true'));
+    needs['screen-future'] = { result: status };
+    const outcome = checkScreenResults(needs);
+    assert.equal(outcome.ok, false);
+    assert.ok(outcome.failures.some(reason => reason.includes('screen-future')));
+  }
 });

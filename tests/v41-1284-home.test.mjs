@@ -270,3 +270,52 @@ test('#1601 첫 화면 회원 숫자판 끝과 바닥 띠를 손가락으로 확
   }
  }finally{await new Promise(ok=>server.close(ok));}
 });
+
+
+// #1605: 세로 첫 화면만 새 소식 유무에 따른 마지막 조작줄·숫자판을 확인한다.
+test('#1605 첫 화면 세로 새 소식은 문서 끝 내용을 가리지 않는다',{timeout:240000,skip:!REQUIRE_TOUCH?'터치 화면 전용 시험은 별도 화면 검사에서 실행':false},async()=>{
+ const server=await serve();globalThis._lt1284port=server.address().port;
+ const capture=process.env.LT_1605_CAPTURE_DIR||'';
+ const rows=[];
+ if(capture)await mkdir(capture,{recursive:true});
+ try{
+  for(const [width,height] of [[390,844],[360,740]])for(const theme of ['night','garden'])for(const member of [true,false])for(const updates of [false,true]){
+   const label=width+'x'+height+'-'+theme+'-'+(member?'member':'guest')+'-'+(updates?'news':'no-news');
+   const {context,page}=await open({width,height,theme,scene:scenarios[0],member,fullCounts:true,updates});
+   try{
+    // 프레임과 궤도가 그려진 뒤 좌표를 잰다. 기존 시험의 대기 조건은 그대로 사용한다.
+    await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+    const before=await landscapeState(page);
+    const selected=capture&&width===390&&member&&updates;
+    if(selected)await page.screenshot({path:path.join(capture,label+'-top.png')});
+    let after=before;
+    // 띠가 덮는 위치가 아니라 프레임 안쪽에서 실제 손가락 입력을 보낸다.
+    const box=await page.locator('#view').boundingBox();
+    const bottom=Math.min(box.y+box.height-32,before.notice?before.notice.top-16:Infinity);
+    for(let i=0;i<5;i++){
+     await swipe(page,{x:box.x+box.width/2,y:bottom},{x:box.x+box.width/2,y:box.y+32});
+     after=await landscapeState(page);
+     if(after.doc.top>=after.doc.height-after.doc.client-1)break;
+    }
+    if(selected)await page.screenshot({path:path.join(capture,label+'-bottom.png')});
+    rows.push({label,width,height,theme,member,updates,before,after});
+    console.log('#1605',JSON.stringify(rows.at(-1)));
+   }finally{await context.close();}
+  }
+  if(capture){const {writeFile}=await import('node:fs/promises');await writeFile(path.join(capture,'measurements.json'),JSON.stringify(rows,null,2));}
+  assert.equal(rows.length,16,'세로 화면 16조건');
+  for(const r of rows){
+   const a=r.after;
+   assert.equal(a.shellScroll,0,r.label+': 셸 스크롤 없음');
+   assert.ok(a.shellHeight<=a.viewport.height+1,r.label+': 셸 높이 유지');
+   assert.ok(a.doc.top>=a.doc.height-a.doc.client-1,r.label+': 문서 끝까지 접근');
+   assert.equal(a.allButtonsVisible,true,r.label+': 마지막 단추 포함 조작줄 표시');
+   assert.equal(a.allNumbersVisible,true,r.label+': 숫자판 마지막 줄 포함 표시');
+   assert.equal(a.bandOverlap,0,r.label+': 바닥 링크 겹침 0');
+   assert.equal(a.noticeOverlap,0,r.label+': 새 소식 띠 겹침 0');
+   const other=rows.find(o=>o.width===r.width&&o.height===r.height&&o.theme===r.theme&&o.member===r.member&&o.updates!==r.updates);
+   assert.equal(a.frame.height,other.after.frame.height,r.label+': 새 소식과 프레임 높이 무관');
+   assert.equal(a.app.height,other.after.app.height,r.label+': 새 소식과 궤도 높이 무관');
+  }
+ }finally{await new Promise(ok=>server.close(ok));}
+});
