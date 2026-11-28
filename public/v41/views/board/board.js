@@ -411,7 +411,9 @@ function insertIndexAt(px, py, excludeId) {
     cy = best.y + best.h / 2;
   const dx = px - cx;
   let after;
-  if (Math.abs(dx) > best.w / 2) after = dx > 0;
+  // #1635: 영상 조작 줄로 카드 높이가 달라져도 중앙선 ±1px에서는 좌우 위치로 앞뒤를 판단한다.
+  // 화면 배율·소수점 반올림 때문에 같은 줄 끌기가 한 칸 뒤로 바뀌지 않도록 한다.
+  if (Math.abs(dx) > best.w / 2 || Math.abs(py - cy) <= 1) after = dx > 0;
   else after = py > cy;
   return { index: best.index + (after ? 1 : 0), target: best.id, after };
 }
