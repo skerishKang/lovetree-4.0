@@ -21,6 +21,7 @@ process.on('unhandledRejection', captureUnhandled);
 after(() => process.off('unhandledRejection', captureUnhandled));
 
 const PRODUCT = 'lovetree-test';
+const subjectForHandle = new WeakMap();
 const CLOCK = '2026-10-27T00:00:00.000Z';
 const base = { subject: '윤슬', note: '오래 기억하고 싶은 마음', emotion: '설렘', date: '2026-10-27', url: '' };
 
@@ -41,11 +42,14 @@ function buildHandle({ repo = createMemoryWorkspaceRepo(), principal = { product
     // 테스트 전용 주입. 실제 서버에서는 인증 어댑터가 요청에서 검증된 principal을 만든다.
     return principal;
   };
-  return { handle: createApiHandler({ authenticate, service, productId: PRODUCT, maxBodyBytes }), repo, service };
+  const handle = createApiHandler({ authenticate, service, productId: PRODUCT, maxBodyBytes });
+  subjectForHandle.set(handle, principal.subjectId);
+  return { handle, repo, service };
 }
 
 const put = (handle, payload, extra = {}) => handle({
-  method: 'PUT', path: '/api/workspace', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload), ...extra
+  method: 'PUT', path: '/api/workspace', headers: { 'content-type': 'application/json' },
+  body: JSON.stringify({ ...payload, expectedSubject: subjectForHandle.get(handle) }), ...extra
 });
 const get = (handle, extra = {}) => handle({ method: 'GET', path: '/api/workspace', headers: {}, ...extra });
 
@@ -368,7 +372,7 @@ test('GET and PUT work over a real socket', async () => {
     assert.equal(empty.status, 200);
     assert.equal((await empty.json()).revision, 0);
     const saved = await fetch(`${origin}/api/workspace`, {
-      method: 'PUT', headers: { 'content-type': 'application/json', connection: 'close' }, body: JSON.stringify({ state: sampleState(), expectedRevision: 0, clientKey: 'k-1' })
+      method: 'PUT', headers: { 'content-type': 'application/json', connection: 'close' }, body: JSON.stringify({ state: sampleState(), expectedRevision: 0, clientKey: 'k-1', expectedSubject: 'usr_a' })
     });
     assert.equal(saved.status, 200);
     assert.equal((await saved.json()).revision, 1);
@@ -449,7 +453,7 @@ test('일반 API 본문 크기 제한과 다음 요청 처리', async () => {
     ['POST','/api/feedback',JSON.stringify({note:'ok'}),201],
     ['POST','/api/community/shares/'+'s'.repeat(24)+'/comments',JSON.stringify({body:'ok'}),201],
     ['POST','/api/shares/preview',JSON.stringify({treeId:'t'}),200],
-    ['PUT','/api/workspace',JSON.stringify({state:sampleState(),expectedRevision:0,clientKey:'s3-size-valid-1'}),200]
+    ['PUT','/api/workspace',JSON.stringify({state:sampleState(),expectedRevision:0,clientKey:'s3-size-valid-1',expectedSubject:'usr_a'}),200]
   ];
   try{
     for(const [method,path,valid,success] of routes){

@@ -16,6 +16,7 @@ const DATABASE_URL = process.env.LOVETREE_TEST_DATABASE_URL ?? '';
 const skip = DATABASE_URL ? false : '격리된 PostgreSQL 테스트 DB가 없습니다(LOVETREE_TEST_DATABASE_URL 설정 필요). 이 파일의 검증은 미수행입니다.';
 
 const PRODUCT = 'lovetree-test';
+const subjectForHandle = new WeakMap();
 const CLOCK = '2026-10-27T00:00:00.000Z';
 const base = { subject: '윤슬', note: '오래 기억하고 싶은 마음', emotion: '설렘', date: '2026-10-27', url: '' };
 
@@ -29,11 +30,14 @@ function sampleState(title = '첫 목소리') {
 function buildHandle(repo, subjectId) {
   const service = createWorkspaceService({ repo, productId: PRODUCT });
   const authenticate = async () => ({ productId: PRODUCT, subjectId });
-  return createApiHandler({ authenticate, service, productId: PRODUCT });
+  const handle = createApiHandler({ authenticate, service, productId: PRODUCT });
+  subjectForHandle.set(handle, subjectId);
+  return handle;
 }
 
 const put = (handle, payload) => handle({
-  method: 'PUT', path: '/api/workspace', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload)
+  method: 'PUT', path: '/api/workspace', headers: { 'content-type': 'application/json' },
+  body: JSON.stringify({ ...payload, expectedSubject: subjectForHandle.get(handle) })
 });
 const read = handle => handle({ method: 'GET', path: '/api/workspace', headers: {} });
 

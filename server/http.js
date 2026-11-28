@@ -198,12 +198,11 @@ export function createApiHandler({ authenticate, service, productId, admin = nul
       let payload;
       try { payload = JSON.parse(text); }
       catch { throw new ApiError(400, 'invalid_json', '기록 형식을 읽을 수 없어요.'); }
-      if (payload && Object.prototype.hasOwnProperty.call(payload, 'expectedSubject')) {
-        if (typeof payload.expectedSubject !== 'string' || payload.expectedSubject !== principal.subjectId)
-          throw new ApiError(401, 'account_changed', '로그인한 계정이 바뀌었어요. 다시 기록을 불러와 주세요.');
-        const { expectedSubject, ...write } = payload;
-        payload = write;
-      }
+      // Every workspace write is bound to the account that loaded its state.
+      if (!payload || typeof payload.expectedSubject !== 'string' || payload.expectedSubject !== principal.subjectId)
+        throw new ApiError(401, 'account_changed', '로그인한 계정이 바뀌었어요. 다시 기록을 불러와 주세요.');
+      const { expectedSubject, ...write } = payload;
+      payload = write;
       return { status: 200, body: await service.write(principal, payload, { clientIp: trustedClientIp(request, proxyProofTrusted(request)) }) };
     }
     throw new ApiError(405, 'method_not_allowed', '이 요청은 지원하지 않아요.');
