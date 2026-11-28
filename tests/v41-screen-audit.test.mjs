@@ -125,7 +125,13 @@ test('#942 첫 화면 추가 단추와 숫자 묶음', { skip: REQUIRE ? false :
     if (!first?.checkVisibility() || doc.fonts.status !== 'loaded') return false;
     // 공개 집계와 공유 목록은 따로 도착한다. 숫자의 값과 치수는 아래에서 그대로 판정한다.
     const countFor = action => root.querySelector('.actions [data-do='+action+']')?.parentElement.querySelector('.home-count');
-    if (kind!=='empty' && !countFor('community')?.checkVisibility()) return false;
+    if (kind!=='empty') {
+      const publicCount = countFor('community');
+      if (!publicCount?.checkVisibility()) return false;
+      // 공개 집계 요청 뒤 최종 숫자 두 칸이 그려지기 전에는 값을 읽지 않는다.
+      const values = [...publicCount.querySelectorAll('.home-count-value')].map(element => element.textContent.trim());
+      if (values[0] !== '17' || values[1] !== '1.2k') return false;
+    }
     if (member && !countFor('trees')?.querySelector('.home-count-line:nth-child(2) > *')) return false;
 
     const measure = e => {
