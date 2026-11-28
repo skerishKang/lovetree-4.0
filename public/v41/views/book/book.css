@@ -473,17 +473,3 @@ html[data-lt-theme=garden] #pbRestart{border-color:var(--lt-primary,#c76e8b);bac
 #pbCloseBottom{margin-left:0}
 }
 html[data-lt-theme=garden] .playback-controls{background:linear-gradient(180deg,transparent,rgba(247,240,232,.96) 32%)}
-
-/* #1605: 데스크톱의 '책장 넘기기' 안내는 카드 위가 아닌 책 밑 여백에 잠깐 표시한다.
-   책 하단의 이전·다음 이동 알약 아래에 두고 그 자리에 있던 '연결 이유'와 겹치지 않는다. */
-@media(min-width:900px) and (min-height:580px){
-  html[data-v41-screen=book] .turn-why{
-    top:calc(100% + 60px);bottom:auto;left:50%;width:min(440px,70vw);
-    transform:translateX(-50%) translateY(8px);padding:7px 12px;
-    border-radius:10px;
-  }
-  html[data-v41-screen=book] .turn-why.show{transform:translateX(-50%)}
-  html[data-v41-screen=book] .turn-why b{display:inline;font-size:11px;letter-spacing:.07em;margin:0 8px 0 0}
-  html[data-v41-screen=book] .turn-why span{font-size:12px;line-height:1.35}
-  html[data-v41-screen=book] .book-wrap.turning .why-margin{opacity:0}
-}
