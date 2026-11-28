@@ -752,27 +752,6 @@ function dateText(v) {
   return window.LTTitle?.formatDisplayDate?.(v) || v || '';
 }
 
-function cardHTML(m) {
-  let media = '';
-  if (m.url)
-    media = LTMedia.markup(m.url, m.title, m.mediaMetadata, m.id, null, null, { compact: true, visitorYoutubeCover: true });
-  else if (m.type === 'note') media = `<div class="noteText">“${esc(m.cardMemo || m.memo)}”</div>`;
-  else if (m.type === 'video')
-    media = `<div class="media"><video muted playsinline loop poster="${m.asset}" src="${m.video}"></video><span class="playBadge">▶</span><span class="duration">${m.duration || '00:03'}</span></div>`;
-  else
-    media = `<div class="media ${m.type === 'link' || m.type === 'youtube' ? 'linkMedia' : ''}"><img src="${m.asset}" alt=""><span class="${m.type === 'youtube' ? 'playBadge' : ''}">${m.type === 'youtube' ? '▶' : ''}</span></div>`;
-  // #601: 카드는 훑기용 — 큰 썸네일 + 제목 2줄 + 감정·날짜 한 줄만. 나머지(마음·출처·키워드·크게 보기)는 상세가 맡는다.
-  return `<article class="card ${m.first ? 'first' : ''} ${m.type === 'note' ? 'noteCard' : ''}" data-id="${m.id}" title="끌어서 자리 옮기기" style="--card-x:${m.x}px;--card-y:${m.y}px;--rot:${m.rot}deg;--pin:${colors[m.color]};--halo:${colors[m.color]}55">${m.first ? '<div class="firstTag">첫 순간</div>' : ''}<button class="pin" data-pin="${m.id}" aria-hidden="true" tabindex="-1"></button>${media}<div class="cardBody"><h3 class="cardTitle">${esc(titleMain(m))}</h3><div class="cardMeta"><span class="emotionDot"></span>${esc(m.emotion)} · ${esc(dateText(m.date))}</div></div></article>`;
-}
-
-function renderCards() {
-  cardLayer.innerHTML = moments.map(cardHTML).join('');
-  cardLayer.querySelectorAll('.card').forEach(el => bindCard(el));
-  settlePlacedCards();
-  if (typeof updateEmptyHint === 'function') updateEmptyHint();
-  if (selected) selectMoment(selected, false);
-}
-
 // #1026 묶음 C: 카드 자리는 처음부터 종류별 예약 높이로 정하고 그 뒤 옮기지 않는다.
 // 썸네일이 늦게 와도 같은 열의 카드 top을 다시 잡지 않으므로 모양 바뀜과 자리 밀림이 없다.
 // 자리를 저장한 순간은 그대로 둔다(#395 계약). 예약 높이는 growBoard도 같은 값을 쓰므로 판 크기와도 맞는다.

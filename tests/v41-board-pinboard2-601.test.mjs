@@ -139,26 +139,6 @@ test('#601 모델: isPinboardSlot — 칸 x(±2px 스냅)만 저장 자리다', 
   assert.equal(LT58Model.isPinboardSlot(NaN), false);
 });
 
-test('#601 화면: 카드는 훑기용 — 큰 썸네일·제목 2줄·감정·날짜 한 줄', () => {
-  const extras = read('views/board/board-extras.js');
-  const detail = read('views/board/board-detail.js');
-  const css = read('views/board/board-extra.css') + read('views/board/board.css');
-  for (const s of [extras, detail]) {
-    assert.match(s, /class="cardTitle"/);
-    assert.match(s, /class="cardMeta"/);
-    assert.doesNotMatch(s, /class="eyebrow"/, '종류 라벨은 카드에서 치웠다');
-    assert.doesNotMatch(s, /titleSubMarkup\(m\)/, '두 번째 제목은 카드에서 치웠다');
-    assert.doesNotMatch(s, /class="memo"/, '마음은 상세가 맡는다');
-    assert.doesNotMatch(s, /class="keywordOnCard"/, '키워드 묶음은 카드에서 치웠다');
-    assert.doesNotMatch(s, /class="domain"/, '사이트 주소는 카드에서 치웠다');
-    // 썸네일 한 장 — 안내 글·원본 링크·크게 보기는 상세가 맡는다(compact).
-    // 실제 카드의 안내·원본 링크·크게 보기 부재는 아래 브라우저 시험에서 검사한다.
-  }
-  assert.match(css, /\.card \.cardTitle\{[^}]*-webkit-line-clamp:2/, '제목은 2줄에서 말 줄임');
-  assert.match(css, /\.card \.media\{height:200px\}/, '썸네일은 크게');
-  assert.match(css, /\.card \.lt-media\[data-lt-vertical="1"\][^{]*\{[^}]*height:300px/, '세로 영상은 9:16, 높이 상한 300px');
-});
-
 // #952: 저장 자리·자동 재생·카드/상세 마크업·확대 단추·셸 칸을 파일 글자로 고정하던 단정들을 걷어냈다.
 // 그 결과는 이 파일 아래 실브라우저 시험이 직접 잰다 — 상세 판의 주 단추/더 보기 구성(#662 실제 좌표 클릭),
 // ＋/전체 보기 말풍선(13px·fixed), 마음 저장이 lt41-board-sync의 note로 가는지, 이어진 순간 카드 이동,
