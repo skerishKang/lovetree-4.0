@@ -18,7 +18,7 @@ test('autoLoadMedia: 내 기록(서버·로그인 소유자)만 자동으로 불
  for(const [source,owned,want] of rows)assert.equal(media.autoLoadMedia(source,owned),want,`source=${source} owned=${owned}`);
 });
 
-test('내 기록의 YouTube 순간은 처음부터 썸네일을 보여 주고 재생 표시를 덮는다',()=>{
+test('#1635 내 기록 YouTube 썸네일은 그대로 보이고 재생·크게 보기는 아래 단추 줄에만 있다',()=>{
  const html=media.markup(YT,'바다 산책',null,'m1',{source:'server',owned:true});
  // 썸네일: i.ytimg.com 요청이 처음부터 마크업에 있다(no-referrer·lazy).
  assert.match(html,/src="https:\/\/i\.ytimg\.com\/vi\/abc123DEF45\/hqdefault\.jpg"/);
@@ -26,9 +26,15 @@ test('내 기록의 YouTube 순간은 처음부터 썸네일을 보여 주고 �
  assert.match(html,/loading="lazy"/);
  assert.match(html,/decoding="async"/);
  assert.match(html,/alt="바다 산책"/);
- // 재생 표시: 썸네일 위 단추. 누르기 전에는 iframe 이 없다(autoplay 는 누른 뒤에만).
- assert.match(html,/data-lt-play/);
- assert.match(html,/aria-label="바로 재생"/);
+ // 누르기 전에는 iframe이 없고, 재생 조작은 썸네일 바깥의 아래 줄에 있다.
+ const poster=html.match(/<figure class="lt-yt-preview"[\s\S]*?<\/figure>/)?.[0]||'';
+ assert.ok(poster,'썸네일 그림은 유지한다');
+ assert.doesNotMatch(poster,/<button|data-lt-play|▶/,'썸네일 위 버튼·재생 표시 0');
+ const toolbar=html.match(/<div class="lt-media-toolbar">[\s\S]*?<\/div>/)?.[0]||'';
+ assert.match(toolbar,/<button[^>]*data-lt-play[^>]*aria-label="바로 재생"/,'아래 재생 단추의 화면 읽기 이름 유지');
+ assert.match(toolbar,/▶<\/span> 재생/,'재생 단추가 아래 줄에 표시됨');
+ assert.match(toolbar,/data-lt-expand/,'크게 보기 단추도 같은 줄');
+ assert.ok(html.indexOf('lt-yt-preview')<html.indexOf('lt-media-toolbar'),'미디어 아래에 조작 줄 배치');
  assert.doesNotMatch(html,/<iframe/i);
  assert.doesNotMatch(html,/autoplay/);
  // 원본 링크는 그대로 남고, 시작 시간도 안내에 유지된다.
