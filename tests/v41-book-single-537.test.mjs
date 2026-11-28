@@ -328,7 +328,7 @@ const memoDup = (frame, pageSelector) => frame.evaluate((sel) => {
   };
 }, pageSelector);
 
-test('#book-dup 실제 화면: 메모 장에서 제목·본문을 두 번 쓰지 않고, 390 긴 트리 이름은 목차 단추와 겹치지 않는다', { skip: REQUIRE ? false : skip, timeout: 180000 }, async () => {
+test('#book-dup 실제 화면: 메모 장에서 제목·본문을 두 번 쓰지 않고, 390 긴 트리 이름은 목록 단추와 겹치지 않는다', { skip: REQUIRE ? false : skip, timeout: 180000 }, async () => {
   if (skip) assert.fail(`미리보기 검사에서는 이 시험의 건너뜀이 실패다 — ${skip}`);
   const server = await serve(ROOT);
   const base = `http://127.0.0.1:${server.address().port}`;
@@ -347,13 +347,13 @@ test('#book-dup 실제 화면: 메모 장에서 제목·본문을 두 번 쓰지
     assert.equal(phoneMemo.keepsDate, true, '아래 제목 줄에 날짜가 남아 있어야 한다');
     assert.equal(phoneMemo.keepsEmotion, true, '아래 제목 줄에 감정이 남아 있어야 한다');
 
-    // 390 머리줄: 20자가 넘는 트리 이름도 '목차' 단추와 겹치지 않고 말줄임(…)으로 끊긴다.
+    // 390 머리줄: 20자가 넘는 트리 이름도 '목록' 단추와 겹치지 않고 말줄임(…)으로 끊긴다.
     const longName = '좋아하는 순간들이 이어지는 우리의 오래된 기록 저장소';
     await phone.frame.evaluate((name) => { document.getElementById('bookTitleText').textContent = name; }, longName);
     await phone.frame.waitForFunction((name) => document.querySelector('.lt-toolbar-tree-name')?.textContent === name, longName, { timeout: 5000 });
     const head = await phone.frame.evaluate(() => {
       const box = (q) => { const b = document.querySelector(q)?.getBoundingClientRect(); return b ? { l: b.left, r: b.right } : null; };
-      const title = box('.lt-toolbar-left'), index = box('#archiveBtn');
+      const title = box('.lt-toolbar-left'), index = box('#book-display-inline [data-book-display="list"]');
       const span = document.querySelector('.lt-toolbar-tree-name');
       return {
         overlap: title && index ? Math.max(0, Math.min(title.r, index.r) - Math.max(title.l, index.l)) : null,
@@ -361,7 +361,7 @@ test('#book-dup 실제 화면: 메모 장에서 제목·본문을 두 번 쓰지
         oneLine: getComputedStyle(span).whiteSpace,
       };
     });
-    assert.equal(head.overlap, 0, `긴 트리 이름이 '목차' 단추와 ${head.overlap}px 겹친다`);
+    assert.equal(head.overlap, 0, `긴 트리 이름이 '목록' 단추와 ${head.overlap}px 겹친다`);
     assert.equal(head.ellipsized, true, '긴 트리 이름이 말줄임으로 끊기지 않는다');
     assert.equal(head.oneLine, 'nowrap', '트리 이름이 한 줄로 남지 않았다');
     await phone.ctx.close();
@@ -605,7 +605,7 @@ async function runBookHistory(width,height){
    await testBackNavigation(page,{frame,recorded:false,action:()=>frame.evaluate(()=>window.__TRACK59__.setView('single'))});
    if(shots)await page.screenshot({path:path.join(shots, `book-${width}-before.png`)});
    const original=await snapshot();
-   await testBackNavigation(page,{frame,recorded:true,panels:['#archivePanel.open','#detail.open','#viewer.open','#branchModal.open'],action:()=>frame.evaluate(()=>window.__TRACK59__.openArchive())});
+   await testBackNavigation(page,{frame,recorded:true,panels:['#archivePanel.open','#detail.open','#viewer.open','#branchModal.open'],action:()=>frame.locator('#bookDisplayList').click()});
    assert.equal((await snapshot()).page,original.page,'목차 뒤로 가기 쪽 복원');
 
    const beforeDetail=await snapshot();
@@ -624,12 +624,13 @@ async function runBookHistory(width,height){
    await expectNoHistoryGrowth(frame,()=>frame.evaluate(()=>window.__TRACK59__.turnNext()),'일반 책장 넘김은 기록을 쌓지 않음');
    await waitForBookPage(beforeTurn.page+1);
    const beforeJump=await snapshot();
-   await frame.evaluate(()=>window.__TRACK59__.openArchive());
+   await frame.locator('#bookDisplayList').click();
+   await frame.waitForFunction(()=>document.querySelector('#archivePanel')?.classList.contains('open'));
    await frame.locator('#archiveList [data-jump="3"]').first().click();
    await waitForBookPage(3);
    assert.equal((await snapshot()).page,3,'목록에서 다른 쪽으로 이동');
    await frame.evaluate(()=>history.back());
-   await waitForBookPage(beforeJump.page);
+   await frame.waitForFunction(()=>document.querySelector('#archivePanel')?.classList.contains('open')&&document.getElementById('bookDisplayList')?.getAttribute('aria-checked')==='true',null,{timeout:10000});
    assert.equal((await snapshot()).page,beforeJump.page,'목록 점프 뒤로 가기 이전 쪽');
 
    await env.ctx.close();
@@ -912,4 +913,49 @@ test('#1519 책 더 보기·이전·다음 및 도구 줄: 390·844·1440 밤·�
       } finally { await h.ctx.close(); }
     }
   } finally { await browser.close(); server.close(); }
+});
+
+
+// #1632: 머리줄 중복 목차를 없애고 '목록' 클릭·키보드로 같은 4번째 장에 도착한다.
+test('#1632 책 머리줄 목차 제거·목록에서 같은 장으로 이동·뒤로 가기 복원(390·1440 × 밤·정원)', {
+  skip: REQUIRE ? false : skip, timeout: 180000
+}, async () => {
+  if (skip) assert.fail(skip);
+  const server=await serve(ROOT);
+  const base='http://127.0.0.1:'+server.address().port;
+  const browser=await chromium.launch({headless:true});
+  try{
+    for(const [width,height] of [[390,844],[1440,900]]) for(const theme of ['night','garden']){
+      const env=await openBook(browser,base,width,height,width===390?'single':'double',theme);
+      const {ctx,frame,page,errors}=env;
+      const tag=width+'/'+theme;
+      try{
+        assert.equal(await frame.locator('#archiveBtn').count(),0,tag+' 헤더 목록 단추 0');
+        const list=frame.locator('#bookDisplayList');
+        assert.equal(await list.textContent(),'목록',tag+' 목록 단추');
+        await list.click();
+        await frame.waitForFunction(()=>document.getElementById('archivePanel')?.classList.contains('open'),null,{timeout:10000});
+        assert.equal(await list.getAttribute('aria-checked'),'true',tag+' 목록 선택 표시');
+        const choice=frame.locator('#archiveList [data-jump="3"]').first();
+        await choice.click();
+        await frame.waitForFunction(()=>{
+          const s=window.__TRACK59__.getState();
+          return s.page===3 && s.machineState==='IDLE' && !s.queued;
+        },null,{timeout:10000});
+        assert.equal((await frame.evaluate(()=>window.__TRACK59__.getState())).page,3,tag+' 목록에서 4번째 장 도착');
+        assert.equal(await list.getAttribute('aria-checked'),'false',tag+' 책으로 자동 전환');
+        await frame.evaluate(()=>history.back());
+        await frame.waitForFunction(()=>document.getElementById('archivePanel')?.classList.contains('open'),null,{timeout:10000});
+        assert.equal(await list.getAttribute('aria-checked'),'true',tag+' 뒤로 가면 목록 복귀');
+        await choice.focus();
+        await page.keyboard.press('Enter');
+        await frame.waitForFunction(()=>{
+          const s=window.__TRACK59__.getState();
+          return s.page===3 && s.machineState==='IDLE' && !s.queued;
+        },null,{timeout:10000});
+        assert.equal((await frame.evaluate(()=>window.__TRACK59__.getState())).page,3,tag+' 키보드 Enter도 같은 4번째 장');
+        assert.deepEqual(errors,[],tag+' 실행 오류 없음');
+      }finally{await ctx.close()}
+    }
+  }finally{await browser.close();await new Promise(resolve=>server.close(resolve))}
 });

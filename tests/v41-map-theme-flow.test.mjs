@@ -353,3 +353,39 @@ test('지도 판 실제 흐름: 설정·저장 복원·두 보기·누르기·�
     await new Promise(resolve => server.close(resolve));
   }
 });
+
+test('#1609 지도 도구 줄의 위치만 달라져도 배치 영역을 다시 계산한다', { skip: REQUIRE ? false : skip, timeout: 30000 }, async () => {
+  if (skip) assert.fail('필수 지도 화면 시험에 브라우저가 없다');
+  const server = await serve(), base = `http://127.0.0.1:${server.address().port}`;
+  let browser, live;
+  try {
+    browser = await chromium.launch({ headless: true });
+    live = await openMap(browser, base, { width: 1440, appTheme: 'night' });
+    const frame = live.frame;
+    const before = await frame.evaluate(() => ({
+      box: window.__lt.box(),
+      top: document.documentElement.style.getPropertyValue('--lt-toolbar-top')
+    }));
+    try {
+      await frame.evaluate(() => document.documentElement.style.setProperty('--lt-toolbar-top', '180px'));
+      await frame.waitForFunction(() =>
+        document.querySelector('.lt-screen-toolbar')?.getBoundingClientRect().top >= 175);
+      const expected = await frame.evaluate(() =>
+        window.LT56Model.fitBox(innerWidth, innerHeight, window.__lt.measureInsets(), innerWidth >= 1200 ? 8 : 16));
+      assert.ok(expected.y > before.box.y + 10, '위치 이동은 지도 배치 영역을 바꾼다');
+      await frame.waitForFunction(y => Math.abs(window.__lt.box().y - y) < .1, expected.y, { timeout: 3000 });
+      assert.deepEqual(await frame.evaluate(() => window.__lt.box()), expected,
+        '도구 줄의 높이가 그대로여도 위치 이동을 감지한다');
+    } finally {
+      await frame.evaluate(top => {
+        if (top) document.documentElement.style.setProperty('--lt-toolbar-top', top);
+        else document.documentElement.style.removeProperty('--lt-toolbar-top');
+      }, before.top);
+    }
+    assert.deepEqual(live.errors, [], '배치 갱신에 페이지 오류 없음');
+  } finally {
+    if (live) await live.context.close();
+    if (browser) await browser.close();
+    await new Promise(resolve => server.close(resolve));
+  }
+});

@@ -6,7 +6,7 @@ import {createTree, addMoment, removeMoment, undoMomentDelete, EMPTY_STATE} from
 
 const CLOCK = '2026-11-11T00:00:00.000Z';
 const fields = {subject: '별', title: '처음', note: '기억할 마음', date: '2026-11-11', emotion: '설렘', url: ''};
-const stateOf = (...titles) => ({version: 1, trees: titles.map(t => createTree({...fields, title: t}, CLOCK)), prefs: { theme: 'night', titleDisplay: 'both', displayName: '', accentColor: '', dateStyle: 'dot', startPlace: 'resume', shareView: 'book', shareDiscover: false, treeChipOrder: [], bookDisplay: 'book', shelfView: 'shelf', homeMoment: { mode: 'last', treeId: '', momentId: '' } }});
+const stateOf = (...titles) => ({version: 1, trees: titles.map(t => createTree({...fields, title: t}, CLOCK)), prefs: { theme: 'night', titleDisplay: 'both', displayName: '', accentColor: '', dateStyle: 'dot', startPlace: 'resume', shareView: 'book', shareDiscover: false, treeChipOrder: [], bookDisplay: 'book', shelfView: 'shelf', shelfOpenMode: 'preview', homeMoment: { mode: 'last', treeId: '', momentId: '' } }});
 
 function fakeStorage(map = new Map()) {
   return {

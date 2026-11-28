@@ -165,7 +165,8 @@ test('#1413 5단계: 옮긴 시험 위치·보드 둘째 잡 고르기·공통 �
   const jobBody = (key) => { const s = workflow.indexOf(`\n  ${key}:\n`); const rest = workflow.slice(s + 1); const m = rest.slice(3).search(/\n  [a-z0-9-]+:\n/); return m < 0 ? rest : rest.slice(0, m + 3); };
   const header = (body) => body.slice(0, body.indexOf('\n    steps:'));
   const board = jobBody('screen-board'), boardB = jobBody('screen-board-b');
-  assert.equal(header(boardB).match(/runs-on: .*/)[0], header(board).match(/runs-on: .*/)[0], '보드 둘째 잡은 보드 잡과 같은 실행기 선택식을 쓴다');
+  assert.match(header(board).match(/runs-on: .*/)[0], /needs\.runner_picker\.outputs\.screen_board\b/, '보드 잡은 자신의 실행기 판정을 사용한다');
+  assert.match(header(boardB).match(/runs-on: .*/)[0], /needs\.runner_picker\.outputs\.screen_board_b\b/, '보드 둘째 잡도 자신의 실행기 판정을 사용한다');
   assert.ok(header(boardB).includes("',screen-board-b,'"));
   for (const [job, token] of Object.entries(JOB_TOKEN)) {
     assert.ok(header(jobBody(job)).includes(`',${token},'`), `${job}의 if는 고르기 이름 ${token}을 본다`);
@@ -179,10 +180,11 @@ test('#1413 5단계: 옮긴 시험 위치·보드 둘째 잡 고르기·공통 �
   assert.equal(checkScreenResults(complete('all', {'screen-board-b':{result:'failure'}})).ok, false);
   assert.equal(checkScreenResults(complete('screen-board,screen-board-b,screen-common-a,screen-common-b', {'screen-board-b':{result:'skipped'}})).ok, false, '보드를 골랐는데 보드 둘째가 건너뛰면 실패');
   assert.equal(checkScreenResults(complete('screen-home,screen-common-a,screen-common-b', {'screen-board-b':{result:'skipped'}})).ok, true, '보드를 고르지 않았으면 건너뜀 통과');
-  // 공통 검사기: a는 이름 거르기 없이 파일 전부(새 시험도 여기서 돈다), b·c는 #657 두 시험만 각자 조합으로 돈다.
+  // 공통 검사기: a/b는 공통 A, c는 공통 B에서 돌되 원래 명령·조합은 유지한다.
   const audit = {};
   for (const s of ['a', 'b', 'c']) {
-    const runs = (jobBody('screen-common-a').match(/LT_SCREEN_AUDIT_SHARD=\w .*tests\/v41-screen-audit\.test\.mjs/g) || [])
+    const owner = s === 'c' ? 'screen-common-b' : 'screen-common-a';
+    const runs = (jobBody(owner).match(/LT_SCREEN_AUDIT_SHARD=\w .*tests\/v41-screen-audit\.test\.mjs/g) || [])
       .filter(line => line.startsWith('LT_SCREEN_AUDIT_SHARD=' + s + ' '));
     assert.equal(runs.length, 1, `공통 검사기 ${s}는 검사 파일을 한 번 돈다`);
     assert.ok(runs[0].startsWith(`LT_SCREEN_AUDIT_SHARD=${s} `), `공통 검사기 ${s}는 자기 조합을 고른다`);

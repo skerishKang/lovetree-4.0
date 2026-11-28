@@ -222,7 +222,7 @@ test('책 목차(사용자가 연 겹): 닫으면 원래 단추로 돌아간다(
       })()`);
       assert.equal(closed.open, false, 'Esc로 목차가 닫혀야 한다');
       assert.equal(closed.inert, true, '닫힌 목차는 탭이 들어가지 않아야 한다');
-      assert.equal(closed.focusBack, 'archiveBtn', `닫은 뒤 초점은 목차 단추로 돌아와야 한다(지금: ${closed.focusBack})`);
+      assert.equal(closed.focusBack, 'bookDisplayList', `닫은 뒤 초점은 목록 단추로 돌아와야 한다(지금: ${closed.focusBack})`);
     } finally {
       await ctx.close();
     }
