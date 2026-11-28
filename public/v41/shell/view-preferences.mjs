@@ -94,7 +94,7 @@ export function createViewPreferences(ctx){
     const value=currentShelfOpenMode();
     document.documentElement.dataset.ltShelfOpenMode=value;
     for(const b of document.querySelectorAll('[data-shelf-open-mode]'))b.setAttribute('aria-checked',String(b.dataset.shelfOpenMode===value));
-    try{const checkbox=ctx.$('view').contentDocument?.getElementById('shelfDirectNext');if(checkbox)checkbox.checked=value==='direct'}catch{}
+    try{ctx.$('view').contentWindow?.postMessage({type:MSG.shelfOpenMode,value},location.origin)}catch{}
   }
   function setShelfOpenMode(value){
     if(isVisitMode()){paintShelfOpenModeControls();return false;}

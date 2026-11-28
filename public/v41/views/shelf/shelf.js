@@ -42,6 +42,19 @@ import { VIEWS } from './shelf-views.mjs';
         var view=shelfView();
         $$('#shelf-view-inline [data-shelf-view]').forEach(function(b){b.setAttribute('aria-checked',String(b.dataset.shelfView===view));});
       }
+      // #1631: 서재 선택 단추는 셸 보기 설정과 같은 값을 표시한다.
+      function shelfOpenModeValue(){
+        try{var v=parent.document.documentElement.dataset.ltShelfOpenMode;if(v==='preview'||v==='direct')return v;}catch{}
+        try{return localStorage.getItem('lt41.shelfOpenMode')==='direct'?'direct':'preview';}catch{return 'preview';}
+      }
+      function paintShelfOpenModeInline(value){
+        var mode=(value==='preview'||value==='direct')?value:shelfOpenModeValue();
+        $$('#shelf-open-choice [data-shelf-open-mode]').forEach(function(b){
+          var checked=b.dataset.shelfOpenMode===mode;
+          b.setAttribute('aria-checked',String(checked));
+          b.tabIndex=checked?0:-1;
+        });
+      }
       // #1446: 첫 화면 '내 공개 트리'가 서재를 공개만 걸러 열 때 칸 표시도 같이 맞춘다.
       function paintShelfFilterInline(){
         $$('#shelf-filter-inline [data-filter]').forEach(function(b){b.setAttribute('aria-checked',String(b.dataset.filter===state.filter));});
@@ -335,6 +348,27 @@ import { VIEWS } from './shelf-views.mjs';
       function bindViewSwitch(){
        $$('#shelf-view-inline [data-shelf-view]').forEach(function(b){b.onclick=function(){try{parent.postMessage({type:MSG.setShelfView,value:b.dataset.shelfView},location.origin)}catch{}};});
       }
+      // #1631: 단추·Enter는 같은 경로, 화살표는 두 선택지 사이를 이동한다.
+      function bindShelfOpenModeSwitch(){
+        var buttons=$$('#shelf-open-choice [data-shelf-open-mode]');
+        function choose(b){
+          if(!b)return;
+          paintShelfOpenModeInline(b.dataset.shelfOpenMode);
+          try{parent.postMessage({type:MSG.setShelfOpenMode,value:b.dataset.shelfOpenMode},location.origin)}catch{}
+        }
+        buttons.forEach(function(b,index){
+          b.addEventListener('click',function(){choose(b);});
+          b.addEventListener('keydown',function(event){
+            if(event.key==='Enter'||event.key===' '){event.preventDefault();event.stopPropagation();choose(b);return;}
+            var step=(event.key==='ArrowRight'||event.key==='ArrowDown')?1:(event.key==='ArrowLeft'||event.key==='ArrowUp')?-1:0;
+            if(!step&&event.key!=='Home'&&event.key!=='End')return;
+            event.preventDefault();event.stopPropagation();
+            var target=event.key==='Home'?buttons[0]:event.key==='End'?buttons[buttons.length-1]:buttons[(index+step+buttons.length)%buttons.length];
+            target?.focus();choose(target);
+          });
+        });
+        paintShelfOpenModeInline();
+      }
       // 찾기·걸러 보기·지금 책 바로 열기: 목록이 바뀌면 서재를 다시 그린다.
       function bindSearchActions(){
         $('#shelfJump').addEventListener('click',function(){state.query='';state.filter='all';$('#searchInput').value='';paintShelfFilterInline();renderShelf();var book=getShelfCard(state.shelfIndex)?.querySelector('button[data-book-id]');if(book)openReader(book.dataset.bookId,book.closest('.book-card'));});
@@ -363,9 +397,6 @@ import { VIEWS } from './shelf-views.mjs';
       function bindReaderActions(){
         $('#backToShelf').addEventListener('click',backToShelf);
         $('#openBookButton').addEventListener('click',openBook);
-        $('#shelfDirectNext').addEventListener('change',function(event){
-          parent.postMessage({type:MSG.setShelfOpenMode,value:event.target.checked?'direct':'preview'},location.origin);
-        });
         $('#closeBookButton').addEventListener('click',closeBook);
         $('#prevPage').addEventListener('click',function(){turnPage(-1);});
         $('#nextPage').addEventListener('click',function(){turnPage(1);});
@@ -376,7 +407,7 @@ import { VIEWS } from './shelf-views.mjs';
       function bind(){
         // #1495: 폭이 바뀌면 표지 크기가 달라지니 투명 단추 자리를 다시 잰다.
         if(typeof addEventListener==='function')addEventListener('resize',function(){requestAnimationFrame(placeDiscoverButtons);});
-        bindTreeActions();bindViewSwitch();bindSearchActions();bindCarouselMoves();bindReaderActions();
+        bindTreeActions();bindViewSwitch();bindShelfOpenModeSwitch();bindSearchActions();bindCarouselMoves();bindReaderActions();
       }
 // #481: 제목 보기가 바뀌면 책장의 제목(이어 읽기·표지)도 다시 그려야 한다. 다만 날짜 표기와 같은 판정으로
 // '지금 그린 값과 다르고, 기기 미러가 이미 그 값일 때'만 다시 띄운다 — 받을 때마다 새로고침하면 고리가 된다.
@@ -384,6 +415,7 @@ const renderedTitleDisplay=titleDisplayOf((()=>{try{return parent.LT41?.prefs?.t
 window.__shelfListenerInstalled=true;
 if(typeof addEventListener==='function')addEventListener('message',e=>{
  if(!isShellMessage(e))return;
+ if(e.data?.type===MSG.shelfOpenMode){paintShelfOpenModeInline(e.data.value);return;}
  if(e.data?.type===MSG.shelfView){
    ensureView();view.mount(viewCtx());
    renderShelf();

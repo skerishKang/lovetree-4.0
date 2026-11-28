@@ -139,8 +139,6 @@ export function createReader(deps) {
         if(state.open||state.openProgress>0)renderPage(book);
         applyOpenProgress();
         $('#openBookButton').classList.toggle('hidden',state.open);
-        const choice = $('#shelfDirectNext');
-        if (choice && typeof choice.closest === 'function') { choice.checked = shelfOpenMode()==='direct'; const label=choice.closest('label'); if(label)label.hidden=state.open; }
         $('#closeBookButton').classList.toggle('hidden',!state.open);
         $('#readerHint').textContent=state.open?'책장을 좌우로 끌거나 화살표로 한 장씩 넘겨보세요':'표지를 누른 채 오른쪽으로 움직이면 책이 열려요';
       }
@@ -167,7 +165,7 @@ export function createReader(deps) {
   function openReader(id,sourceCard) {
         var book=getBook(id);
         if(!book)return;
-        state.selectedId=id;state.shelfIndex=Math.max(0,state.shelfList.findIndex(function(item){return item.id===id;}));state.chapterIndex=shelfOpenMode()==='direct'?0:Math.max(0,book.chapters.findIndex(m=>m.id===LTDEMO.get()));state.open=false;state.openProgress=0;save();
+        state.selectedId=id;state.shelfIndex=Math.max(0,state.shelfList.findIndex(function(item){return item.id===id;}));state.chapterIndex=Math.max(0,book.chapters.findIndex(m=>m.id===LTDEMO.get()));state.open=false;state.openProgress=0;save();
         var display=shelfOpenMode();
         // #1094 목록 방식: 중간 화면(표지 애니메이션)을 거치지 않고 표지+순간 목록을 곧바로 보인다.
         if(display==='preview'){

@@ -73,6 +73,7 @@
     shelfSelectTree: fromShell('lt41-shelf-select-tree', 'treeId'),
     shelfTree: fromView('lt41-shelf-tree', 'treeId'),
     shelfView: fromShell('lt41-shelf-view', 'value'),
+    shelfOpenMode: fromShell('lt41-shelf-open-mode', 'value'),
     start: fromView('lt41-start', '없음'),
     storySave: fromView('lt41-story-save', 'treeId, fromMomentId, momentId, relation'),
     // 성공일 때도 error를 빈 문자열로 함께 보낸다.

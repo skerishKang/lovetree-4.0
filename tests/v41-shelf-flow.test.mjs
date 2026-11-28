@@ -311,8 +311,8 @@ test('책을 열면 셸에 기록 id를 넘기고, 이미 열려 있으면 다�
   globalThis.parent = { document: { documentElement: { dataset: { ltShelfOpenMode: 'direct' } } } };
   reader.openReader('tree1', null);
   assert.equal(h.state.selectedId, 'tree1');
-  assert.equal(h.state.chapterIndex, 0);           // 바로 펼치기에서는 첫 장으로 시작
-  assert.deepEqual(opened, ['p1']);
+  assert.equal(h.state.chapterIndex, 1);           // 바로 펼치기에서는 마지막으로 본 순간(m2)
+  assert.deepEqual(opened, ['m2']);
   assert.deepEqual(openedBooks, ['tree1']);
   delete globalThis.LTDEMO;
   delete globalThis.parent;
@@ -348,10 +348,25 @@ test('#1094 책 방식이면 중간 화면 없이 책으로 바로 연다', () =
   globalThis.parent = { LT41: null, document: { documentElement: { dataset: { ltShelfOpenMode: 'direct' } } } };
   try {
     reader.openReader('tree1', null);
-    assert.deepEqual(opened, [['p1', 'tree1']], '바로 펼치기에서는 첫 장으로 책에 간다');
+    assert.deepEqual(opened, [['m2', 'tree1']], '바로 펼치기는 기억한 순간으로 책에 간다');
     assert.equal(nodes.readerScreen.classList.contains('active'), false, '표지+목록 중간 화면은 한 번도 그리지 않는다');
     assert.equal(nodes.shelfScreen.classList.contains('is-leaving'), false, '책장을 떠나지 않는다');
     assert.equal(nodes.shelfScreen.classList.contains('is-covered'), false, '책장을 숨기지 않는다');
+  } finally {
+    delete globalThis.LTDEMO;
+    delete globalThis.parent;
+  }
+});
+
+test('#1631 기억한 순간이 없으면 바로 펼치기는 첫 장으로 간다', () => {
+  const { reader, h } = openReaderHarness();
+  const opened = [];
+  globalThis.LTDEMO = { get: () => null, openBook: (momentId, treeId) => opened.push([momentId, treeId]) };
+  globalThis.parent = { document: { documentElement: { dataset: { ltShelfOpenMode: 'direct' } } } };
+  try {
+    reader.openReader('tree1', null);
+    assert.equal(h.state.chapterIndex, 0);
+    assert.deepEqual(opened, [['p1', 'tree1']]);
   } finally {
     delete globalThis.LTDEMO;
     delete globalThis.parent;

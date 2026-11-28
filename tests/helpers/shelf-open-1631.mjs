@@ -127,14 +127,14 @@ test('#1631 서재 미리보기·바로 펼치기 선택과 복원', {
     });
     assert.ok(state.covered&&(state.hidesShelf||state.coversShelf),'완료된 미리보기의 불투명한 화면이 책장과 최근 순간을 가려야 한다');
   }
-  async function bookReady(page) {
+  async function bookReady(page, expectedMomentId=trees[0].moments[1].id) {
     await page.waitForFunction(() => {
       const f=document.querySelector('#view');
       return location.hash.startsWith('#my/book')
         && f?.contentWindow?.location.pathname.endsWith('/track59-sketchbook.html')
         && !!f.contentDocument?.querySelector('#pageLabel');
     },null,{timeout:20000});
-    assert.equal(await page.evaluate(() => window.LT41?.momentId),trees[0].moments[0].id,'직접 펼치기는 선택한 트리 첫 장');
+    assert.equal(await page.evaluate(() => window.LT41?.momentId),expectedMomentId,'바로 펼치기와 책 열기는 기억한 순간에서 이어야 한다');
   }
   async function backToShelf(page) {
     await page.goBack({waitUntil:'load'});
@@ -149,63 +149,120 @@ test('#1631 서재 미리보기·바로 펼치기 선택과 복원', {
     else{await btn.focus(); await page.keyboard.press('Enter');}
   }
 
+
+  async function checkSynced(page,mode) {
+    await page.waitForFunction(value=>{
+      const doc=document.querySelector('#view')?.contentDocument;
+      const shelf=doc?.querySelector('#shelf-open-choice [data-shelf-open-mode="'+value+'"]');
+      const other=doc?.querySelector('#shelf-open-choice [data-shelf-open-mode="'+(value==='direct'?'preview':'direct')+'"]');
+      const settings=document.querySelector('[data-shelf-open-mode="'+value+'"]');
+      return document.documentElement.dataset.ltShelfOpenMode===value
+        && shelf?.getAttribute('aria-checked')==='true' && shelf?.tabIndex===0
+        && other?.getAttribute('aria-checked')==='false' && other?.tabIndex===-1
+        && settings?.getAttribute('aria-checked')==='true';
+    },mode,{timeout:10000});
+    const info=await page.frameLocator('#view').locator('#shelf-open-choice').evaluate(group=>{
+      const d=group.ownerDocument,r=group.getBoundingClientRect(),bar=d.querySelector('.lt-screen-toolbar');
+      const bounds=e=>{const b=e?.getBoundingClientRect();return b?{x:b.x,y:b.y,right:b.right,bottom:b.bottom,width:b.width,height:b.height}:null};
+      const overlaps=(a,b)=>a&&b&&Math.min(a.right,b.right)-Math.max(a.x,b.x)>0&&Math.min(a.bottom,b.bottom)-Math.max(a.y,b.y)>0;
+      const buttons=[...group.querySelectorAll('[role=radio]')];
+      const buttonBounds=buttons.map(bounds),rect=bounds(group),filter=bounds(d.querySelector('#shelf-filter-inline')),toolbar=bounds(bar);
+      return {
+        role:group.getAttribute('role'),ariaLabel:group.getAttribute('aria-label'),
+        buttonBounds,rect,filter,toolbar,viewport:d.documentElement.clientWidth,
+        filterOverlap:overlaps(rect,filter),toolbarOverlap:overlaps(rect,toolbar),
+        checked:buttons.map(b=>b.getAttribute('aria-checked'))
+      };
+    });
+    assert.equal(info.role,'radiogroup');
+    assert.deepEqual(info.buttonBounds.map(b=>b.height>=44),[true,true],'서재 선택 단추는 44px 이상이어야 한다');
+    assert.ok(info.buttonBounds.every(b=>b.width>=78),'선택 글자가 잘리지 않을 만큼 넓어야 한다');
+    assert.ok(info.rect.x>=-1&&info.rect.right<=info.viewport+1,'서재 열기 방식은 화면 밖으로 넘치지 않는다');
+    assert.equal(info.filterOverlap,false,'전체/공개만과 겹치면 안 된다');
+    assert.equal(info.toolbarOverlap,false,'390·1440 화면 도구줄과 겹치면 안 된다');
+    return info;
+  }
+  async function shelfChoice(page,mode,input) {
+    const b=page.frameLocator('#view').locator('#shelf-open-choice [data-shelf-open-mode="'+mode+'"]');
+    if(input==='Enter')await b.press('Enter');
+    else await b.click();
+    await page.waitForFunction(v=>window.LT41?.prefs?.shelfOpenMode===v,mode,{timeout:10000});
+    return checkSynced(page,mode);
+  }
+
   for (const mode of ['preview','direct']) for (const width of [390,1440]) for (const theme of ['night','garden']) for (const input of ['mouse','Enter']) {
-    const caseName=mode + ' ' + width + ' ' + theme + ' ' + input;
-    if (process.env.LT_SHELF_OPEN_FILTER && !caseName.includes(process.env.LT_SHELF_OPEN_FILTER)) continue;
-    await t.test(caseName, async () => {
-      const {ctx,page,state,errors,getWrites} = await makeContext(mode,width,theme);
-      try {
-        // Setting updates remain reversible, and use the existing account save path.
+    const caseName=mode+' '+width+' '+theme+' '+input;
+    if(process.env.LT_SHELF_OPEN_FILTER&&!caseName.includes(process.env.LT_SHELF_OPEN_FILTER))continue;
+    await t.test(caseName,async()=>{
+      const {ctx,page,state,errors,getWrites}=await makeContext(mode,width,theme);
+      try{
         const other=mode==='preview'?'direct':'preview';
         await setting(page,other);
+        await checkSynced(page,other);
         await setting(page,mode);
-        await until(()=>state.prefs.shelfOpenMode===mode && getWrites()>=1,'계정 저장이 완료되어야 한다');
-        if(SHOTS && mode==='preview' && width===1440 && theme==='night' && input==='mouse') {
-          await page.screenshot({path:path.join(SHOTS,'settings-1440-night.png')});
-        }
+        await checkSynced(page,mode);
         await page.keyboard.press('Escape');
+        await shelfChoice(page,other,input);
+        await shelfChoice(page,mode,input);
+        await until(()=>state.prefs.shelfOpenMode===mode&&getWrites()>=1,'서재 단추 변경이 계정에 저장되어야 한다');
+        await checkSynced(page,mode);
+        if(SHOTS&&width===1440&&theme==='night'&&input==='mouse'){
+          await page.screenshot({path:path.join(SHOTS,'shelf-choice-'+mode+'-1440-night.png')});
+        }
+        await page.evaluate(id=>{window.LT41.momentId=id;},trees[0].moments[1].id);
         await activate(page,input);
-        if(mode==='preview') {
+        if(mode==='preview'){
           await page.frameLocator('#view').locator('#readerScreen.active').waitFor({state:'visible',timeout:10000});
           await previewSettled(page);
-          assert.match(new URL(page.url()).hash,/^#my\/shelf/,'기본은 서재 미리보기');
-          assert.equal(await page.frameLocator('#view').locator('#shelfDirectNext').isChecked(),false);
-          if(SHOTS && width===1440 && theme==='night' && input==='mouse') {
-            await page.screenshot({path:path.join(SHOTS,'preview-check-1440-night.png')});
-          }
+          assert.match(new URL(page.url()).hash,/^#my\/shelf/,'미리보기에서는 서재 주소 유지');
+          assert.equal(await page.frameLocator('#view').locator('#shelfDirectNext').count(),0,'기존 미리보기 체크 칸 제거');
           await page.frameLocator('#view').locator('#openBookButton').click();
         }
-        await bookReady(page);
-        if(SHOTS && mode==='direct' && width===1440 && theme==='night' && input==='mouse') {
-          await page.screenshot({path:path.join(SHOTS,'direct-book-1440-night.png')});
+        await bookReady(page,trees[0].moments[1].id);
+        if(SHOTS&&mode==='direct'&&width===1440&&theme==='night'&&input==='mouse'){
+          await page.screenshot({path:path.join(SHOTS,'direct-book-resume-1440-night.png')});
         }
         await backToShelf(page);
-        assert.equal(await page.evaluate(()=>document.documentElement.dataset.ltShelfOpenMode),mode,'새로고침 뒤 설정 유지');
-        assert.equal(state.prefs.shelfOpenMode,mode,'계정 설정 유지');
-        assert.ok(getWrites()>=1,'계정 저장 요청을 사용한다');
+        await checkSynced(page,mode);
+        assert.equal(state.prefs.shelfOpenMode,mode,'새로고침 뒤에도 계정 설정 유지');
+        assert.ok(getWrites()>=1,'계정 저장 요청 이용');
         assert.deepEqual(errors,[],'화면 오류 없음');
-      } finally { await ctx.close(); }
+      }finally{await ctx.close();}
     });
   }
 
-  if (!process.env.LT_SHELF_OPEN_FILTER || process.env.LT_SHELF_OPEN_FILTER === 'checkbox') await t.test('미리보기 체크는 다음부터 바로 펼치기로 저장',async()=>{
-    const {ctx,page,state,errors} = await makeContext('preview',1440,'night');
-    try{
-      await activate(page,'mouse');
-      const box=page.frameLocator('#view').locator('#shelfDirectNext');
-      await box.waitFor({state:'visible'});
-      await previewSettled(page);
-      await box.check();
-      await page.waitForFunction(()=>window.LT41?.prefs?.shelfOpenMode==='direct',null,{timeout:10000});
-      await until(()=>state.prefs.shelfOpenMode==='direct','체크 설정이 계정에 저장되어야 한다');
-      await page.frameLocator('#view').locator('#backToShelf').click({timeout:3500});
-      await page.frameLocator('#view').locator('#readerScreen.active').waitFor({state:'hidden',timeout:10000});
-      await shelfReady(page);
-      await activate(page,'mouse');
-      await bookReady(page);
-      assert.deepEqual(errors,[]);
-    }finally{await ctx.close()}
+  if(!process.env.LT_SHELF_OPEN_FILTER||process.env.LT_SHELF_OPEN_FILTER==='keyboard')await t.test('서재 열기 라디오 화살표·Enter·Space와 누름 범위',async()=>{
+    for(const width of [390,1440]){
+      const {ctx,page,state,errors}=await makeContext('preview',width,'night');
+      try{
+        await checkSynced(page,'preview');
+        const preview=page.frameLocator('#view').locator('#shelf-open-choice [data-shelf-open-mode="preview"]');
+        const direct=page.frameLocator('#view').locator('#shelf-open-choice [data-shelf-open-mode="direct"]');
+        await preview.press('ArrowRight');
+        await checkSynced(page,'direct');
+        assert.equal(await direct.evaluate(e=>e===e.ownerDocument.activeElement),true,'오른쪽 화살표는 고른 단추로 초점 이동');
+        await direct.press('ArrowLeft');
+        await checkSynced(page,'preview');
+        await direct.press('Enter');
+        await checkSynced(page,'direct');
+        await preview.press('Space');
+        await checkSynced(page,'preview');
+        assert.equal(state.prefs.shelfOpenMode,'preview');
+        assert.deepEqual(errors,[]);
+      }finally{await ctx.close();}
+    }
   });
+
+  if(!process.env.LT_SHELF_OPEN_FILTER||process.env.LT_SHELF_OPEN_FILTER==='fallback')await t.test('기억한 순간이 없으면 첫 장으로 바로 펼친다',async()=>{
+    const {ctx,page,errors}=await makeContext('direct',1440,'night');
+    try{
+      await page.evaluate(()=>{window.LT41.momentId=null;});
+      await activate(page,'mouse');
+      await bookReady(page,trees[0].moments[0].id);
+      assert.deepEqual(errors,[]);
+    }finally{await ctx.close();}
+  });
+
 });
 
 

@@ -43,6 +43,7 @@
           <span class="count" id="resultCount"></span>
           <div class="shelf-view-inline" id="shelf-view-inline" role="group" aria-label="서재 진열 방식"><button type="button" role="radio" aria-checked="true" data-shelf-view="shelf">선반</button><button type="button" role="radio" aria-checked="false" data-shelf-view="carousel">회전</button></div>
           <div class="shelf-filter-inline" id="shelf-filter-inline" role="group" aria-label="서재 보기 필터"><button type="button" role="radio" aria-checked="true" data-filter="all">전체</button><button type="button" role="radio" aria-checked="false" data-filter="public">공개만</button></div>
+          <div class="shelf-open-choice" id="shelf-open-choice" role="radiogroup" aria-label="서재에서 책 열 때"><button type="button" role="radio" aria-checked="true" tabindex="0" data-shelf-open-mode="preview">미리보기</button><button type="button" role="radio" aria-checked="false" tabindex="-1" data-shelf-open-mode="direct">바로 펼치기</button></div>
           <button class="shelf-new-tree" id="shelfNewTree" type="button" aria-label="새 트리 만들기">＋ 새 트리</button>
         </div>
         <!-- 261118 대표 지적 2: 왼쪽 위 세로 책등 줄은 지운다. 아래 넘김 목록(표지+흰 이름)만 남는다. -->
@@ -98,7 +99,6 @@
               <span class="page-counter" id="pageCounter">01 / 01</span>
               <button class="reader-control" id="nextPage" type="button" aria-label="다음 장">›</button>
               <button class="reader-control wide" id="openBookButton" type="button">책 열기</button>
-              <label class="reader-open-next" for="shelfDirectNext"><input id="shelfDirectNext" type="checkbox">다음부터 바로 펼치기</label>
               <button class="reader-control wide hidden" id="closeBookButton" type="button">책 닫기</button>
             </div>
           </section>
