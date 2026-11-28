@@ -9,6 +9,7 @@ import { createReadStream, existsSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { settleMap } from './helpers/map-contrast.mjs';
 
 const ROOT = path.resolve(process.env.LT_MAP_CONTRAST_ROOT || fileURLToPath(new URL('../public', import.meta.url)));
 const REQUIRE = process.env.LT_MAP_CONTRAST_REQUIRE === '1';
@@ -71,7 +72,26 @@ const mapHostMember2GHTML = () => {
   const media = Object.fromEntries(ids.map((id) => [id, { image: PHOTO, type: 'photo' }]));
   return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>지도 호스트</title></head><body data-member="in" data-record-source="server"><script>window.LT41={source:'server',writable:true,tree:${JSON.stringify(tree)},trees:[${JSON.stringify(tree)}],exampleMedia:${JSON.stringify(media)},momentId:'m1'};</script><iframe src="/v41/views/track56-network.html" style="position:fixed;inset:0;width:100%;height:100%;border:0"></iframe></body></html>`;
 };
-const EXTRA_ROUTES = { '/map-host-3.html': mapHostHTML(3), '/map-host-8.html': mapHostHTML(8), '/map-host-thumb.html': mapHostThumbHTML(), '/map-host-member-3.html': mapHostMemberHTML(3), '/map-host-member-8.html': mapHostMemberHTML(8), '/map-host-member-2g.html': mapHostMember2GHTML() };
+const mapHost1574HTML = (n) => {
+  const ids = Array.from({ length: n }, (_, i) => `m${String(i + 1).padStart(2, '0')}`);
+  const dateOf = i => {
+    const d = new Date(Date.UTC(2026, 0, 1 + i));
+    return `${d.getUTCFullYear()}.${String(d.getUTCMonth() + 1).padStart(2, '0')}.${String(d.getUTCDate()).padStart(2, '0')}`;
+  };
+  const moments = ids.map((id, i) => ({
+    id, title: i === 0 ? '처음 눈에 들어온 순간의 긴 제목 '.repeat(14).slice(0, 240) : `순간 제목 ${String(i + 1).padStart(2, '0')} — 알아볼 수 있는 이름`,
+    date: dateOf(i), emotion: '설렘', note: i === 0 ? '긴 제목의 나머지 내용도 상세 판에서 끝까지 읽을 수 있어야 한다.' : '',
+    url: '', parentId: i ? ids[0] : null
+  }));
+  const tree = {
+    id: 't1574', title: '지도 시험', subject: '시험', owned: true, moments,
+    demoData: { moments: moments.map((m, i) => ({ ...m, first: i === 0 })) },
+    edges: ids.slice(1).map(id => ({ kind: 'parent', from: ids[0], to: id, reason: '같은 순간에서 이어졌다.' }))
+  };
+  const media = Object.fromEntries(ids.map(id => [id, { image: PHOTO, type: 'photo' }]));
+  return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>지도 시험</title></head><body data-member="in" data-record-source="server"><script>window.LT41={source:'server',writable:true,tree:${JSON.stringify(tree)},trees:[],exampleMedia:${JSON.stringify(media)},momentId:'m01'};location.hash='#network';</script><iframe src="/v41/views/track56-network.html" style="position:fixed;inset:0;width:100vw;height:100vh;border:0"></iframe></body></html>`;
+};
+const EXTRA_ROUTES = { '/map-host-3.html': mapHostHTML(3), '/map-host-8.html': mapHostHTML(8), '/map-host-thumb.html': mapHostThumbHTML(), '/map-host-member-3.html': mapHostMemberHTML(3), '/map-host-member-8.html': mapHostMemberHTML(8), '/map-host-member-2g.html': mapHostMember2GHTML(), '/map-host-1574-26.html': mapHost1574HTML(26), '/map-host-1574-60.html': mapHost1574HTML(60) };
 async function serve() {
   const server = createServer(async (req, res) => {
     const clean = decodeURIComponent((req.url || '/').split('?')[0]);
@@ -728,6 +748,140 @@ test('#951 ⑥ 넓은 화면 단추 줄: 1440·2560에 큰 판 없음, 단추 44
       assert.equal(before.controls, false, '390: 탐색 판 없음');
       assert.equal(before.legend, false, '390: 범례 없음');
       await ctx.close();
+    }
+  } finally {
+    await browser?.close();
+    server.close();
+  }
+});
+
+test('#1574 밀집 이름표·점·안내 겹침 0, 가로 상세 판과 32/44px 닫기, 긴 제목 전체 보기', { skip: REQUIRE ? false : skip, timeout: 300000 }, async () => {
+  if (skip) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip}`);
+  const server = await serve();
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const PROBE = () => {
+    const lt = window.__lt, box = lt.box(), dots = lt.dots(), labels = lt.labels();
+    const effective = d => Math.max(d.r, d.tr || 0);
+    const rect = l => ({ l: l.rect.l, t: l.rect.t, r: l.rect.r, b: l.rect.b });
+    const dotRect = d => ({ l: d.x - d.r, t: d.y - d.r, r: d.x + d.r, b: d.y + d.r });
+    const hit = (a, b) => a.l < b.r - 1 && b.l < a.r - 1 && a.t < b.b - 1 && b.t < a.b - 1;
+    let dotOverlaps = 0, effectiveDotOverlaps = 0, labelOverlaps = 0, labelClipped = 0, labelOnDot = 0;
+    for (let i = 0; i < dots.length; i++) for (let j = i + 1; j < dots.length; j++) {
+      const distance = Math.hypot(dots[i].x - dots[j].x, dots[i].y - dots[j].y);
+      if (distance < dots[i].r + dots[j].r + 1) dotOverlaps++;
+      if (distance < effective(dots[i]) + effective(dots[j]) + 1) effectiveDotOverlaps++;
+    }
+    for (let i = 0; i < labels.length; i++) {
+      const a = rect(labels[i]);
+      if (a.l < box.x - 2 || a.r > box.x + box.w + 2 || a.t < box.y - 2 || a.b > box.y + box.h + 2) labelClipped++;
+      if (dots.some(d => hit(a, dotRect(d)))) labelOnDot++;
+      for (let j = i + 1; j < labels.length; j++) if (hit(a, rect(labels[j]))) labelOverlaps++;
+    }
+    const guide = document.querySelector('.hero p');
+    const guideRect = guide?.getBoundingClientRect();
+    const guideHits = guideRect ? [...labels.filter(l => hit(rect(l), guideRect)).map(l => l.id), ...dots.filter(d => hit(dotRect(d), guideRect)).map(d => d.id)] : [];
+    const doc = document.documentElement;
+    return {
+      view: lt.state.view, box, dots: dots.length, labels: labels.length,
+      dotOverlaps, effectiveDotOverlaps, labelOverlaps, labelClipped, labelOnDot, guideHits,
+      documentOverflow: Math.max(0, doc.scrollWidth - doc.clientWidth, document.body.scrollWidth - doc.clientWidth)
+    };
+  };
+  let browser;
+  try {
+    browser = await chromium.launch({ headless: true });
+    for (const [width, height, n] of [[390, 844, 26], [390, 844, 60], [844, 390, 60]]) {
+      for (const theme of ['night', 'garden']) {
+        const tag = `${width}x${height}/${n}/${theme}`;
+        const context = await browser.newContext({ viewport: { width, height }, locale: 'ko-KR', reducedMotion: 'reduce' });
+        await context.addInitScript(t => { try { localStorage.setItem('lt41.theme', t); localStorage.removeItem('lt41.boardTheme'); } catch {} }, theme);
+        const page = await context.newPage(), errors = [];
+        page.on('pageerror', e => errors.push(String(e.message || e)));
+        await page.goto(`${base}/map-host-1574-${n}.html`, { waitUntil: 'load' });
+        let frame = null;
+        for (let i = 0; i < 80 && !frame; i++) { frame = page.frames().find(f => /track56-network/.test(f.url())); if (!frame) await page.waitForTimeout(100); }
+        assert.ok(frame, `${tag}: 지도 프레임이 열린다`);
+        await frame.waitForFunction(count => window.__lt?.dots?.()?.length === count, n, { timeout: 20000 });
+        await frame.waitForFunction(() => !!document.querySelector('.lt-screen-toolbar'), null, { timeout: 20000 });
+        await settleMap(frame, { timeout: 8000 });
+        for (const [view, id] of [['network', 'viewNet'], ['tag', 'viewConc'], ['time', 'viewGraph']]) {
+          await frame.evaluate(id => { window.__lt.overview(false); document.getElementById(id).click(); }, id);
+          await settleMap(frame, { timeout: 8000 });
+          const overview = await frame.evaluate('(' + PROBE.toString() + ')()');
+          assert.equal(overview.view, view, `${tag}: ${view} 보기`);
+          assert.ok(overview.labels > 1, `${tag}: ${view} 전체 보기 이름표가 1개보다 많다(${overview.labels})`);
+          assert.equal(overview.dotOverlaps, 0, `${tag}: ${view} 전체 보기 점 겹침 0`);
+          assert.equal(overview.effectiveDotOverlaps, 0, `${tag}: ${view} 전체 보기 썸네일 포함 점 겹침 0`);
+          assert.equal(overview.labelOverlaps, 0, `${tag}: ${view} 전체 보기 이름표 겹침 0`);
+          assert.equal(overview.labelClipped, 0, `${tag}: ${view} 전체 보기 이름표 잘림 0`);
+          assert.equal(overview.labelOnDot, 0, `${tag}: ${view} 전체 보기 이름표와 점 겹침 0`);
+          assert.deepEqual(overview.guideHits, [], `${tag}: ${view} 전체 보기 안내 문구 겹침 0`);
+          assert.equal(overview.documentOverflow, 0, `${tag}: ${view} 전체 보기 문서 가로 넘침 0`);
+          for (const zoom of ['zoomIn', 'zoomOut']) {
+            await frame.evaluate(id => document.getElementById(id).click(), zoom);
+            await settleMap(frame, { timeout: 8000 });
+            const m = await frame.evaluate('(' + PROBE.toString() + ')()');
+            assert.equal(m.dotOverlaps, 0, `${tag}: ${view}/${zoom} 점 겹침 0`);
+            assert.equal(m.effectiveDotOverlaps, 0, `${tag}: ${view}/${zoom} 썸네일 포함 점 겹침 0`);
+            assert.equal(m.labelOverlaps, 0, `${tag}: ${view}/${zoom} 이름표 겹침 0`);
+            assert.equal(m.labelClipped, 0, `${tag}: ${view}/${zoom} 이름표 잘림 0`);
+            assert.equal(m.labelOnDot, 0, `${tag}: ${view}/${zoom} 이름표와 점 겹침 0`);
+            assert.deepEqual(m.guideHits, [], `${tag}: ${view}/${zoom} 안내 문구 겹침 0`);
+            assert.equal(m.documentOverflow, 0, `${tag}: ${view}/${zoom} 문서 가로 넘침 0`);
+          }
+        }
+        await frame.evaluate(() => { document.getElementById('viewNet').click(); window.__lt.selectMoment(window.__lt.FIRST, true); });
+        await settleMap(frame, { timeout: 8000 });
+        await frame.waitForFunction(() => !document.getElementById('detailTitleToggle').hidden, null, { timeout: 5000 });
+        const detail = await frame.evaluate(() => {
+          const panel = document.getElementById('detail'), scroll = document.getElementById('detailScroll');
+          const title = document.getElementById('detailTitle'), toggle = document.getElementById('detailTitleToggle');
+          const close = document.getElementById('detailClose'), r = close.getBoundingClientRect(), after = getComputedStyle(close, '::after');
+          const inset = k => parseFloat(after[k]) || 0;
+          const pr = panel.getBoundingClientRect();
+          const ribbon = document.getElementById('mobileRibbon').getBoundingClientRect();
+          return {
+            open: panel.classList.contains('open'), width: pr.width, left: pr.left, ribbonRight: ribbon.right,
+            box: window.__lt.box(), contentHeight: scroll.clientHeight,
+            title: title.textContent, titleClient: title.clientHeight, titleScroll: title.scrollHeight,
+            toggleText: toggle.textContent, expanded: toggle.getAttribute('aria-expanded'),
+            close: { width: r.width, height: r.height, hitWidth: r.width - inset('left') - inset('right'), hitHeight: r.height - inset('top') - inset('bottom') },
+            labelsInPanel: window.__lt.labels().some(l => { const a = l.rect; return a.l < pr.right - 1 && pr.left < a.r - 1 && a.t < pr.bottom - 1 && pr.top < a.b - 1; })
+          };
+        });
+        assert.equal(detail.open, true, `${tag}: 상세 판 열림`);
+        assert.ok(detail.title.length >= 200, `${tag}: 240자 제목을 판에 표시`);
+        assert.ok(detail.titleScroll > detail.titleClient, `${tag}: 긴 제목은 세 줄로 접힌다`);
+        assert.equal(detail.expanded, 'false', `${tag}: 처음에는 접힌 상태`);
+        assert.deepEqual(detail.close, { width: 32, height: 32, hitWidth: 44, hitHeight: 44 }, `${tag}: 보이는 닫기 32px·누름 영역 44px`);
+        if (width > 640) {
+          assert.equal(detail.width, 400, `${tag}: 가로 상세 판 폭 400px`);
+          assert.ok(detail.contentHeight > 139, `${tag}: 상세 내용 높이 139px 증가(${detail.contentHeight})`);
+          assert.ok(detail.box.x + detail.box.w < detail.left, `${tag}: 지도가 상세 판 왼쪽으로 밀린다`);
+          assert.ok(detail.ribbonRight < detail.left, `${tag}: 아래 단추 줄이 상세 판 왼쪽에 있다`);
+          assert.equal(detail.labelsInPanel, false, `${tag}: 이름표가 상세 판에 가려지지 않는다`);
+        }
+        await frame.locator('#detailTitleToggle').click();
+        const expanded = await frame.evaluate(() => {
+          const title = document.getElementById('detailTitle'), toggle = document.getElementById('detailTitleToggle');
+          return { expanded: title.classList.contains('is-expanded'), aria: toggle.getAttribute('aria-expanded'), text: toggle.textContent, client: title.clientHeight, scroll: title.scrollHeight };
+        });
+        assert.equal(expanded.expanded, true, `${tag}: 전체 보기로 제목을 편다`);
+        assert.equal(expanded.aria, 'true', `${tag}: 전체 보기 상태를 보조기술에 알린다`);
+        assert.equal(expanded.text, '제목 접기', `${tag}: 접기 단추로 바뀐다`);
+        assert.ok(expanded.client >= detail.titleClient, `${tag}: 펼친 제목 높이 증가`);
+        assert.ok(expanded.client + 1 >= expanded.scroll, `${tag}: 펼친 제목을 끝까지 볼 수 있다(${expanded.client}/${expanded.scroll})`);
+        await frame.evaluate(() => window.__lt.selectMoment(window.__lt.nodes.find(n => n.id === 'm02'), false));
+        await settleMap(frame, { timeout: 8000 });
+        await frame.waitForFunction(() => document.getElementById('detailTitleToggle').hidden, null, { timeout: 5000 });
+        await frame.locator('#detailClose').click();
+        await settleMap(frame, { timeout: 8000 });
+        const closed = await frame.evaluate(() => ({ open: document.getElementById('detail').classList.contains('open'), right: window.__lt.box().w + window.__lt.box().x }));
+        assert.equal(closed.open, false, `${tag}: 닫기 단추로 판이 닫힌다`);
+        if (width > 640) assert.ok(closed.right > 800, `${tag}: 닫으면 지도 폭을 되찾는다(${closed.right})`);
+        assert.deepEqual(errors, [], `${tag}: 화면 오류 없음`);
+        await context.close();
+      }
     }
   } finally {
     await browser?.close();

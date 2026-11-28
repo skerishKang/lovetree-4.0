@@ -363,3 +363,48 @@ test('#1273 3번 시작 이름표는 이어진 선 위에 얹히지 않는다', 
   assert.ok(r.b < 197 || r.t > 203, `선을 가리지 않는다(${JSON.stringify(r)})`);
   assert.match(SCREEN, /n\.first \? \{ x: 0, y: -1 \} : dirOf\(p, centerOf\(n\)\)/, '화면도 시작 이름표를 위쪽부터 잡는다');
 });
+
+test('#1574 짧은 가로 화면의 남은 지도 상자를 유지한다', () => {
+  const box = M.fitBox(844, 390, { top: 118, bottom: 162, right: 414 }, 16);
+  assert.deepEqual(box, { x: 16, y: 134, w: 398, h: 78 });
+});
+
+test('#1574 밀집 시간 순은 여러 줄로 배치해 선택 점까지 겹치지 않는다', () => {
+  const dateOf = i => new Date(Date.UTC(2026, 0, 1 + i)).toISOString().slice(0, 10).replaceAll('-', '.');
+  const moments = n => Array.from({ length: n }, (_, i) => ({
+    id: `m${i}`, first: i === 0, date: dateOf(i)
+  }));
+  for (const box of [{ x: 16, y: 196, w: 358, h: 491 }, { x: 16, y: 134, w: 398, h: 78 }]) {
+    for (const n of [26, 60]) {
+      const fit = M.timeLayout(moments(n), { box, dotR: 5, gap: 8, hubR: 9, inset: 64 });
+      assert.ok(fit.rows > 1, `${n}개는 여러 줄로 배치`);
+      assert.deepEqual(fit.order, moments(n).map(m => m.id), '날짜 순서를 유지한다');
+      for (const [i, id] of fit.order.entries()) {
+        const p = fit.points[id], r = i === 0 ? Math.max(8, fit.dotR * 1.6) : fit.dotR + 2;
+        assert.ok(p.x - r >= box.x && p.x + r <= box.x + box.w && p.y - r >= box.y && p.y + r <= box.y + box.h, `${id} 상자 안`);
+        for (const other of fit.order.slice(i + 1)) {
+          const q = fit.points[other], rr = other === 'm0' ? Math.max(8, fit.dotR * 1.6) : fit.dotR + 2;
+          assert.ok(Math.hypot(p.x - q.x, p.y - q.y) + 0.01 >= r + rr, `${id}·${other} 겹침 0`);
+        }
+      }
+    }
+  }
+});
+
+test('#1574 부채꼴 60개는 10% 여백을 지키고 선택 점까지 겹치지 않는다', () => {
+  const moments = [{ id: 'm0', first: true }, ...Array.from({ length: 59 }, (_, i) => ({ id: `m${i + 1}` }))];
+  const edges = moments.slice(1).map(m => ({ kind: 'parent', from: 'm0', to: m.id }));
+  const box = { x: 16, y: 134, w: 398, h: 78 };
+  const fit = M.networkLayout(moments, { box, dotR: 5, firstR: 20, gap: 8, hubR: 9, edges });
+  assert.ok(fit.fan, '부채꼴 배치 유지');
+  for (const p of Object.values(fit.points)) {
+    assert.ok(p.x >= box.x + box.w * 0.1 - 0.01 && p.x <= box.x + box.w * 0.9 + 0.01, '가로 10% 여백');
+    assert.ok(p.y >= box.y + box.h * 0.1 - 0.01 && p.y <= box.y + box.h * 0.9 + 0.01, '세로 10% 여백');
+  }
+  const entries = Object.entries(fit.points);
+  for (const [i, a] of entries.entries()) for (const b of entries.slice(i + 1)) {
+    const ra = a[0] === 'm0' ? fit.dotR * 1.5 + 2 : fit.dotR + 2;
+    const rb = b[0] === 'm0' ? fit.dotR * 1.5 : fit.dotR;
+    assert.ok(Math.hypot(a[1].x - b[1].x, a[1].y - b[1].y) + 0.01 >= ra + rb, `${a[0]}·${b[0]} 겹침 0`);
+  }
+});
