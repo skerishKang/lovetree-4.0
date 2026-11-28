@@ -292,20 +292,34 @@ function parseCandidates(img) {
   }
 }
 
+function showRecentThumbnail(recent, src) {
+  if (!recent) return;
+  recent.dataset.recentState = 'ready';
+  recent.querySelector?.('.lt-recent-fallback')?.remove?.();
+  if (recent.classList?.contains('vertical')) recent.style?.setProperty?.('--lt-recent-bg', `url(${JSON.stringify(src)})`);
+}
+
 export function applyThumbOutcome(img, outcome = {}) {
-  if (!img || img.dataset?.ltThumbSettled === '1') return null;
+  if (!img) return null;
   const candidates = parseCandidates(img);
   if (!candidates.length) return null;
-  const index = Number(img.getAttribute?.('data-lt-cand-index') ?? img.dataset?.ltCandIndex ?? 0) || 0;
-  const step = nextThumbnailStep(candidates, index, outcome);
   const mode = img.getAttribute?.('data-lt-fallback-mode') || img.dataset?.ltFallbackMode || 'card';
   const recent = mode === 'recent-video' ? img.closest?.('.recent-media') : null;
+  // #1530: a late successful load can arrive after a cold-load failure already
+  // displayed the title fallback. Only accept a real thumbnail for this img.
+  if (img.dataset?.ltThumbSettled === '1') {
+    const src = img.currentSrc || img.src;
+    const at = candidates.indexOf(src);
+    if (!recent || outcome.error || at < 0 || isGrayThumbnail(outcome)) return null;
+    if (img.dataset) img.dataset.ltThumbState = 'ok';
+    showRecentThumbnail(recent, src);
+    return { status: 'ok', src, index: at };
+  }
+  const index = Number(img.getAttribute?.('data-lt-cand-index') ?? img.dataset?.ltCandIndex ?? 0) || 0;
+  const step = nextThumbnailStep(candidates, index, outcome);
   if (step.status === 'ok') {
     if (img.dataset) img.dataset.ltThumbState = 'ok';
-    if (recent) {
-      recent.dataset.recentState = 'ready';
-      if (recent.classList?.contains('vertical')) recent.style.setProperty('--lt-recent-bg', `url(${JSON.stringify(step.src)})`);
-    }
+    showRecentThumbnail(recent, step.src);
     return step;
   }
   if (step.status === 'retry') {

@@ -79,6 +79,12 @@ const mediaImage = (moment, currentOrigin) => {
 const noteOf = moment => text(moment?.note) || text(moment?.memo) || text(moment?.whyNext) || text(moment?.title);
 const recent = (a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt);
 
+// #1530: a cold signed-in page can have member records before the media context
+// is ready. Source alone must not turn an owned YouTube moment into a text card.
+export function shouldAutoLoadHomeYoutube({ loggedIn = false, source = '', readOnly = false } = {}) {
+  return loggedIn === true && readOnly !== true && !['share', 'visit', 'example', 'file'].includes(source);
+}
+
 export function cardOf(treeId, moment, currentOrigin, youtube = null) {
   const image = mediaImage(moment, currentOrigin);
   const video = !image && privateMediaKind(moment?.url, currentOrigin)?.kind === 'video';

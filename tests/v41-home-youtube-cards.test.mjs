@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readFileSync} from 'node:fs';
-import {homeMomentCards} from '../v41/home-moments.js';
+import {homeMomentCards,shouldAutoLoadHomeYoutube} from '../v41/home-moments.js';
 import {homeCardsPlan} from '../v41/home-cards.js';
 import '../public/v41/youtube-id.mjs'; // #1060: 정본이 등록한 globalThis.LTYouTubeId 를 vm 에도 넣는다.
 import '../public/v41/html-escape.mjs'; // A-15: 글자 막기 정본을 vm 에도 넣는다.
@@ -129,4 +129,18 @@ test('homeCardsPlan은 youtube 판정을 homeMomentCards에 그대로 넘긴다 
 test('#1026 영상 주소만 있어도 메타데이터 조회 없이 썸네일 후보를 얻는다', () => {
   const {photos}=homeMomentCards(member([yt('y1')]),40,undefined,{auto:true});
   assert.equal(photos[0].image,'https://i.ytimg.com/vi/abc123DEF45/hqdefault.jpg');
+});
+
+test('#1530 cold owner context must not depend on media source bootstrap', () => {
+  assert.equal(shouldAutoLoadHomeYoutube({loggedIn:true,source:'local',readOnly:false}),true);
+  assert.equal(shouldAutoLoadHomeYoutube({loggedIn:true,source:'',readOnly:false}),true);
+  assert.equal(shouldAutoLoadHomeYoutube({loggedIn:true,source:'server',readOnly:false}),true);
+  assert.equal(shouldAutoLoadHomeYoutube({loggedIn:false,source:'example',readOnly:true}),false);
+  assert.equal(shouldAutoLoadHomeYoutube({loggedIn:true,source:'share',readOnly:true}),false);
+  assert.equal(shouldAutoLoadHomeYoutube({loggedIn:true,source:'visit',readOnly:true}),false);
+  const cold={describe:()=>null,auto:shouldAutoLoadHomeYoutube({loggedIn:true,source:'local'})};
+  const entries=homeMomentCards(member([yt('cold-1','https://www.youtube.com/shorts/abc123DEF45')],{source:'local'}),40,undefined,cold);
+  assert.equal(entries.photos.length,1);
+  assert.equal(entries.photos[0].youtubeThumb,true);
+  assert.ok(entries.photos[0].thumbCandidates.some(url=>url.includes('oardefault')));
 });

@@ -4,7 +4,7 @@ import { MSG, isShellMessage } from '../public/v41/frame-messages.mjs';
 // 스타일 재계산이 프레임당 수십 ms가 걸렸다). 그림자가 쓰는 --ui 토큰은 v41/home.html 의 style에 둔다.
 import {mountOrbit,ORBIT_EXAMPLE} from '../src/views/orbit.js';
 import {homeCardsPlan,readHomeCardsMode} from './home-cards.js';
-import {HOME_ORBIT_LIMIT, ltDateStyle, dateStyleOf, shouldReloadForDateStyle} from './home-moments.js';
+import {HOME_ORBIT_LIMIT, ltDateStyle, dateStyleOf, shouldReloadForDateStyle, shouldAutoLoadHomeYoutube} from './home-moments.js';
 import {fetchPopularCards} from './home-popular.js';
 import {createHomeActions} from './home-actions.js';
 import {homePresentation} from './home-presentation.js';
@@ -38,8 +38,9 @@ const mode=readHomeCardsMode(localStorage,{loggedIn});
 const popular=mode==='popular'?await fetchPopularCards({limit:HOME_ORBIT_LIMIT}):[];
 // 2026-11-10 CTO 결정(#340): 내 기록(서버·소유자)의 YouTube 순간은 #330 판정 한 벌(autoLoadMedia)로
 // 썸네일 카드를 처음부터 만든다. 판정 입력은 media-preview의 currentContext(셸 기록 상태)와 같은 값이다.
-const mediaState=globalThis.LTMedia?.currentContext?.()||{source:'',owned:false};
-const youtube={describe:url=>globalThis.LTMedia?.describe?.(url)??null,auto:globalThis.LTMedia?.autoLoadMedia?.(mediaState.source,mediaState.owned)===true || (context.source==='server' && loggedIn && shellBody.dataset.member==='in')};
+// #1530: the member's own record is authoritative even while the media
+// context is still initializing on the first cache-free navigation.
+const youtube={describe:url=>globalThis.LTMedia?.describe?.(url)??null,auto:shouldAutoLoadHomeYoutube({loggedIn,source:context.source,readOnly:context.readOnly})};
 // #1435: 이 기기에 '없음'으로 기록된 영상은 첫 화면 카드(가운데·둘레)에서 빼고, 기록 화면에는 남긴다.
 const available=item=>{const id=youtubeIdFrom(item?.url||item?.externalUrl||'');return !(id&&readVideoStatusCache(localStorage,id)==='gone')};
 const confirmedTreeZero=loggedIn&&!homeTitlePending&&Number(presentation.centerState.treeCount)===0;

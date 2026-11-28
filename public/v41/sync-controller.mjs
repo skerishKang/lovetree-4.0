@@ -39,12 +39,23 @@ export function hasPendingDraft(storage, subject = null) {
 // one-tab retry buffer in sessionStorage, scoped to the same account only.
 export function createSyncController({getState, replaceState, api, draftStorage = null, cacheStorage = null,
   resolveRevisionConflict = null, makeClientKey = () => `front-${crypto.randomUUID()}`,
-  delay = ms => new Promise(resolve => setTimeout(resolve, ms)),
+  delay = (ms, signal) => new Promise(resolve => {
+    if (signal?.aborted) return resolve();
+    const finish = () => {
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', finish);
+      resolve();
+    };
+    const timer = setTimeout(finish, ms);
+    signal?.addEventListener('abort', finish, {once:true});
+  }),
   schedule = (fn, ms) => setTimeout(fn, ms), cancelSchedule = handle => clearTimeout(handle),
   onGuard = () => {}, onChange = () => {}, navigate = url => globalThis.location.assign(url)}) {
   let current = status({phase:'checking'}), listener = () => {};
   let owned = false, revision = null, dirty = false, generation = 0, activeSubject = null;
   let queued = 0, inflight = false, attempt = null, seenRevision = null;
+  let closed = false;
+  const pendingSaveWaits = new Set();
   // #977: 형식이 어긋난 트리는 읽을 때 트리 하나씩 검사해 빼고 연다(#986에서 원본 보존은
   // 서버 몫이 됐다 — 서버가 저장할 때 격리 원본을 다시 붙이고, 응답에는 빠진 개수만 온다).
   const adoptState = (raw, quarantined = 0) => {
@@ -180,6 +191,7 @@ export function createSyncController({getState, replaceState, api, draftStorage 
   }
 
   async function start() {
+    if (closed) return current;
     const gen = generation;
     resetRateRetry();
     emit(status({phase:'checking'}));
@@ -214,7 +226,7 @@ export function createSyncController({getState, replaceState, api, draftStorage 
   }
 
   async function push(options = {}) {
-    if (!owned || revision === null || inflight || !dirty || current.phase === 'conflict') return current;
+    if (closed || !owned || revision === null || inflight || !dirty || current.phase === 'conflict') return current;
     inflight = true;
     const gen = generation;
     const serial = JSON.stringify(getState());
@@ -322,7 +334,7 @@ export function createSyncController({getState, replaceState, api, draftStorage 
   // 답을 받아 상태를 맞춘다. keepalive 몸통 한도(64KB)를 넘는 큰 기록이나 요청이 이미 나간 중이면
   // 보내지 않는 대신 미전송분을 기기 보관함에 동기로 적는다(#1045) — 다음 접속이 개정을 견줘 이어 보낸다.
   function flushOnHide() {
-    if (!owned || revision === null || !dirty || current.phase === 'conflict') return false;
+    if (closed || !owned || revision === null || !dirty || current.phase === 'conflict') return false;
     const serial = JSON.stringify(getState());
     if (!attempt || attempt.serial !== serial || attempt.expected !== revision)
       attempt = {serial, expected:revision, key:makeClientKey()};
@@ -350,7 +362,7 @@ export function createSyncController({getState, replaceState, api, draftStorage 
   // 이슈 644 3번: 다른 곳에서 기록이 바뀌었는지 조용히 확인한다. 이 화면에서 고친 게 없을 때만 서버 기록을
   // 그대로 받아 온다(띠·확인 없음). 고친 게 있으면 아무것도 하지 않는다 — 충돌 판정은 저장(push) 때 그대로 한다.
   async function check() {
-    if (!owned || revision === null || dirty || inflight || current.phase === 'conflict') return current;
+    if (closed || !owned || revision === null || dirty || inflight || current.phase === 'conflict') return current;
     const gen = generation, result = await api.get();
     if (gen !== generation || dirty || inflight) return current;
     if (!result.ok || result.revision === revision) return current;
@@ -361,16 +373,25 @@ export function createSyncController({getState, replaceState, api, draftStorage 
   }
 
   function markLocalSave() {
+    if (closed) return current;
     if (!owned || revision === null) return emit(status({phase:'login',actions:actions.login}));
     if (current.phase === 'conflict') { dirty = true; editCount += 1; return emit(current); }
     if (current.phase === 'throttled') { dirty = true; editCount += 1; draftGeneration += 1; return emit(current); }
     dirty = true; editCount += 1; draftGeneration += 1; const gen = generation, ticket = ++queued;
+    const pending = new AbortController();
+    pendingSaveWaits.add(pending);
     emit(status({phase:'syncing'}));
-    void (async () => { await delay(900); if(gen === generation && ticket === queued) await push(); })();
+    void (async () => {
+      try {
+        await delay(900, pending.signal);
+        if (!closed && !pending.signal.aborted && gen === generation && ticket === queued) await push();
+      } finally { pendingSaveWaits.delete(pending); }
+    })();
     return current;
   }
 
   async function act(name) {
+    if (closed) return current;
     if (name === 'login') {
       resetRateRetry();
       // A-18: 새 로그인은 지금 확인된 계정이 없다는 뜻 — 표식을 비우고 로그인 화면으로 보낸다.
@@ -423,7 +444,17 @@ export function createSyncController({getState, replaceState, api, draftStorage 
     }
     return current;
   }
-  return {start, act, check, markLocalSave, flushOnHide, status:() => current,
-    subscribe:fn => {listener=fn}, snapshot:() => ({owned,revision,dirty}),
-    dispose:() => { generation += 1; resetRateRetry(); }};
+  function dispose() {
+    if (closed) return;
+    closed = true;
+    generation += 1;
+    resetRateRetry();
+    queued += 1;
+    for (const pending of pendingSaveWaits) pending.abort();
+    pendingSaveWaits.clear();
+    owned = false;
+    revision = null;
+  }
+  return {start, act, check, markLocalSave, flushOnHide, dispose, status:() => current,
+    subscribe:fn => {listener=fn}, snapshot:() => ({owned,revision,dirty})};
 }

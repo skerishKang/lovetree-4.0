@@ -433,3 +433,71 @@ test('#1646 검토 3: dispose 뒤 공개 flushOnHide는 계정별 보관·PUT를
   assert.equal(draftStorage.length,0,'닫힌 세션은 보관본을 새로 쓰지 않음');
   assert.equal(writes.length,0,'닫힌 세션은 keepalive PUT를 하지 않음');
 });
+
+
+test('#1652 2번 시드 164661: 종료된 저장 대기는 새 세션의 저장 완료 후 보관본을 변경하지 않는다', async () => {
+  const draftStorage=memStorage();
+  let server={version:1,trees:[]}, revision=0;
+  const keys=()=>Array.from({length:draftStorage.length},(_,i)=>draftStorage.key(i));
+  const sessionWith=(put)=>createMemberSession({
+    api:{
+      get:async()=>({ok:true,revision,state:structuredClone(server),subject:'member-A',writeSubjectBound:true}),
+      put:async(body)=>put(body),
+      logout:async()=>({ok:true})
+    },
+    draftStorage,cacheStorage:null,
+    makeClientKey:(()=>{let i=0;return()=>('seed164661-key-'+(++i))})()
+  });
+
+  // 1. 이전 세션에서 새 순간을 적고 900ms 저장 대기를 남긴다.
+  const old=sessionWith(async()=>({ok:false,status:0}));
+  await old.start();
+  old.apply('new',{...fields,title:'지난 세션 순간'});
+  // 2. 같은 계정으로 다시 접속하며 기존 화면을 닫는다.
+  old.dispose();
+  const intermediate=sessionWith(async()=>({ok:false,status:0}));
+  await intermediate.start();
+  // 3. 새 편집의 전송이 네트워크 문제로 실패해 계정별 보관본이 생긴다.
+  intermediate.apply('new',{...fields,title:'현재 보존할 순간'});
+  await intermediate.act('retry');
+  assert.equal(intermediate.status().phase,'offline');
+  intermediate.flushOnHide();
+  assert.equal(draftStorage.length,1,'네트워크 실패 뒤 숨김 보관본 생성');
+  // 4. 같은 계정의 새 세션에서 미전송 기록을 복원한다.
+  intermediate.dispose();
+  const current=sessionWith(async body=>{
+    server=structuredClone(body.state);
+    return {ok:true,revision:++revision};
+  });
+  await current.start();
+  // 5. 숨김 보관본은 같은 개정에서 자동으로 다시 저장된다.
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(current.status().phase,'synced');
+  assert.equal(draftStorage.length,0);
+  const saved=structuredClone(server);
+  // 6. 이전 두 세션의 기존 900ms 대기가 끝나도 기록을 새로 만들면 안 된다.
+  await new Promise(resolve=>setTimeout(resolve,1100));
+  assert.deepEqual(keys(),[],'종료된 세션의 저장 대기가 보관본을 되살리지 않아야 한다');
+  assert.equal(revision,1,'새로운 서버 저장은 한 번만 일어나야 한다');
+  const again=sessionWith(async()=>({ok:false,status:0}));
+  await again.start();
+  assert.equal(again.status().phase,'synced','다음 접속에 거짓 충돌이 없어야 한다');
+  assert.deepEqual(again.state(),saved);
+  again.dispose();
+  current.dispose();
+});
+
+test('#1652 2번: 종료 후 도착한 저장 응답은 보관본과 상태를 변경하지 않는다',async()=>{
+  const draftStorage=memStorage();
+  let release;
+  const pending=new Promise(resolve=>{release=resolve});
+  const {session,writes}=setup({draftStorage,put:()=>pending});
+  await session.start();
+  session.apply('new',fields);
+  const saving=session.act('retry');
+  assert.equal(writes.length,1,'진행 중인 저장');
+  session.dispose();
+  release({ok:false,status:401,code:'unauthenticated'});
+  await saving;
+  assert.equal(draftStorage.length,0,'닫힌 세션의 늦은 응답은 보관본을 새로 만들지 않는다');
+});

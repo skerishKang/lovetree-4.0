@@ -432,6 +432,71 @@ test('큰 본문은 413으로 응답하고 끊긴 요청은 서버를 쓰러뜨�
 
 // #986: 규칙이 바뀐 예전 문서처럼 저장소에 어긋난 트리가 남아 있어도 읽기·저장이 막히지 않는다.
 // 어긋난 트리는 시작 순간이 둘(parentId === null 2개)이라 화면에서도 고칠 수 없다.
+
+test('일반 API 본문 크기 제한과 다음 요청 처리', async () => {
+  const {handle:workspace}=buildHandle({maxBodyBytes:16*1024});
+  const touched=[];
+  const dispatcher=async request=>{
+    if(request.path==='/api/workspace')return workspace(request);
+    touched.push(request.path);
+    JSON.parse(request.body);
+    return {status:request.path==='/api/shares/preview'?200:201,body:{ok:true}};
+  };
+  const server=createServer(createNodeHandler(dispatcher,{maxBodyBytes:16*1024}));
+  await listenOnSafePort(server,'127.0.0.1');
+  const baseUrl='http://127.0.0.1:'+server.address().port;
+  const routes=[
+    ['POST','/api/feedback',JSON.stringify({note:'ok'}),201],
+    ['POST','/api/community/shares/'+'s'.repeat(24)+'/comments',JSON.stringify({body:'ok'}),201],
+    ['POST','/api/shares/preview',JSON.stringify({treeId:'t'}),200],
+    ['PUT','/api/workspace',JSON.stringify({state:sampleState(),expectedRevision:0,clientKey:'s3-size-valid-1'}),200]
+  ];
+  try{
+    for(const [method,path,valid,success] of routes){
+      const before=touched.length;
+      const tooLarge=await fetch(baseUrl+path,{
+        method,headers:{'content-type':'application/json'},body:valid+' '.repeat(32*1024)
+      });
+      assert.equal(tooLarge.status,413,method+' '+path);
+      assert.equal((await tooLarge.json()).error.code,'payload_too_large');
+      assert.equal(touched.length,before,path+' 라우팅 전 차단');
+      const normal=await fetch(baseUrl+path,{
+        method,headers:{'content-type':'application/json'},body:valid
+      });
+      assert.equal(normal.status,success,method+' '+path+' 다음 요청');
+    }
+    assert.equal((await (await fetch(baseUrl+'/api/workspace')).json()).revision,1);
+    assert.deepEqual(unhandled,[]);
+  }finally{
+    await new Promise(resolve=>server.close(resolve));
+  }
+});
+
+test('본문 수신 제한시간 이후 종료 응답과 다음 요청 처리', async () => {
+  const {handle}=buildHandle();
+  const server=createServer(createNodeHandler(handle,{bodyReadTimeoutMs:80}));
+  await listenOnSafePort(server,'127.0.0.1');
+  const port=server.address().port;
+  try{
+    const response=await new Promise((resolve,reject)=>{
+      const socket=net.connect(port,'127.0.0.1'),parts=[];
+      socket.on('error',reject);
+      socket.on('data',data=>parts.push(data));
+      socket.on('close',()=>resolve(Buffer.concat(parts).toString('utf8')));
+      socket.on('connect',()=>{
+        socket.write('PUT /api/workspace HTTP/1.1\r\nHost: localhost\r\nContent-Type: application/json\r\nContent-Length: 100\r\nConnection: close\r\n\r\n{');
+      });
+    });
+    assert.match(response,/HTTP\/1\.1 408/);
+    assert.match(response,/request_timeout/);
+    const valid=await fetch('http://127.0.0.1:'+port+'/api/workspace');
+    assert.equal(valid.status,200);
+    assert.deepEqual(unhandled,[]);
+  }finally{
+    await new Promise(resolve=>server.close(resolve));
+  }
+});
+
 function deviantTree() {
   const tree = createTree({ ...base, title: '어긋난 옛 트리' }, CLOCK);
   const grown = addMoment(tree, { ...base, title: '둘째 줄기', relation: '직접 만나고 싶어서' }, tree.moments[0].id, CLOCK);
