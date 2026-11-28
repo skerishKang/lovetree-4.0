@@ -153,8 +153,9 @@ let canEditBoard = exampleBoard || boardSaveEnabled();
 // #553: 카드 종류별 예약 높이 — CSS가 정한 최대 높이에 여유를 더한 값(실측: 썸네일이 실린 YouTube 카드
 // 465px·세로 Shorts 648px, 기본 카드는 #548 글자 기준선 올림으로 최대 424px). 줄 간격은 이 예약 높이에서
 // 나오므로 링크 없는 트리(예시 40순간)는 기본 간격 460px(#548과 같다), YouTube 밴드는 그보다 크게 벌어진다.
+// #1635: 세로 영상에 44px 재생 조작 줄이 생겨 실제 카드 높이(520px)를 미리 예약한다.
 const YT_RESERVED_H = 330,
-  YT_VERTICAL_RESERVED_H = 440,
+  YT_VERTICAL_RESERVED_H = 520,
   BASE_RESERVED_H = 330;
 const reservedHeights = new Map(
   LTDEMO.moments.map(m => [
@@ -410,7 +411,9 @@ function insertIndexAt(px, py, excludeId) {
     cy = best.y + best.h / 2;
   const dx = px - cx;
   let after;
-  if (Math.abs(dx) > best.w / 2) after = dx > 0;
+  // #1635: 영상 조작 줄로 카드 높이가 달라져도 중앙선 ±1px에서는 좌우 위치로 앞뒤를 판단한다.
+  // 화면 배율·소수점 반올림 때문에 같은 줄 끌기가 한 칸 뒤로 바뀌지 않도록 한다.
+  if (Math.abs(dx) > best.w / 2 || Math.abs(py - cy) <= 1) after = dx > 0;
   else after = py > cy;
   return { index: best.index + (after ? 1 : 0), target: best.id, after };
 }

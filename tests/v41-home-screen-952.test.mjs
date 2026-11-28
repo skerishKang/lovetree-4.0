@@ -1927,3 +1927,60 @@ test('#1592 정책 링크는 손님·회원의 현재 테마를 따르고 화면
     }
   } finally { await browser.close(); }
 });
+
+test('#1530 late cold thumbnail recovery keeps video slot size and removes title fallback', {skip:REQUIRE952?false:skip952,timeout:150000}, async()=>{
+ if(skip952)assert.fail(skip952);
+ const browser=await chromium952.launch({headless:true});
+ const {fileURLToPath}=await import('node:url');
+ const previewImage=fileURLToPath(new URL('../dist/v41/example-media/ex01.webp',import.meta.url));
+ try{
+ for(const [width,url] of [[390,'https://www.youtube.com/shorts/abc123DEF45'],[1440,'https://youtu.be/abc123DEF45']]){
+  const tree=createTree({subject:'시험',title:'처음 접속 영상 순간',date:'2026-11-28',emotion:'설렘',url},'2026-11-28T00:00:00.000Z');
+  const workspace={revision:1,state:{version:1,trees:[tree],prefs:{}},subject:'cold-video-member',writeSubjectBound:true};
+  let allowRetry=false;const requests=[];
+  const h=await boot952(browser,{width,member:true,waitUntil:'domcontentloaded',routes:{
+    '/api/workspace':route=>route.fulfill({status:200,json:workspace}),
+    '/api/youtube/oembed':route=>route.fulfill({status:403,json:{}})
+  },thumb:(route,u)=>{
+    requests.push({path:u.pathname,afterFailure:allowRetry});
+    return allowRetry?route.fulfill({status:200,contentType:'image/webp',path:previewImage}):route.abort();
+  }});
+  try{
+   // Keep the video card unobstructed in comparable before/after captures.
+   const guideClose=h.frame.locator('[data-do="guide-close"]');
+   if(await guideClose.count()&&await guideClose.isVisible())await guideClose.click();
+   const onboardingClose=h.page.locator('#tree-tips-close');
+   if(await onboardingClose.count()&&await onboardingClose.isVisible())await onboardingClose.click();
+   const media=h.frame.locator('.recent-media[data-recent-video]');await media.waitFor({state:'visible'});
+   const before=await media.boundingBox();
+   await h.frame.waitForFunction(()=>document.querySelector('#orbit')?.shadowRoot?.querySelector('.recent-media')?.dataset.recentState==='failed',{timeout:15000});
+   assert.equal(await media.locator('.lt-recent-fallback').count(),1,'after all cold attempts fail a title card appears');
+   assert.equal(await media.locator('.recent-thumb').evaluate(img=>getComputedStyle(img).opacity),'0');
+   const failed=await media.boundingBox();
+   const directory=process.env.LT_1530_CAPTURE_DIR;
+   if(directory){const {mkdirSync}=await import('node:fs');mkdirSync(directory,{recursive:true});await h.page.screenshot({path:directory+'/'+width+'-night-cold-failed.png',animations:'disabled'});}
+   allowRetry=true;
+   await media.locator('img.recent-thumb').evaluate(img=>{
+     const candidates=JSON.parse(img.dataset.ltCandidates);
+     img.src=candidates[0]; // A real successful late retry after the cold errors.
+   });
+   const recovered=await h.frame.waitForFunction(()=>{
+     const media=document.querySelector('#orbit')?.shadowRoot?.querySelector('.recent-media');
+     const img=media?.querySelector('img.recent-thumb');
+     return media?.dataset.recentState==='ready'&&img?.naturalWidth>0&&!media.querySelector('.lt-recent-fallback');
+   },null,{timeout:5000}).then(()=>true,()=>false);
+   if(directory)await h.page.screenshot({path:directory+'/'+width+'-night-after-late-success.png',animations:'disabled'});
+   assert.equal(recovered,true,'late thumbnail success must replace the cold-load title fallback');
+   const ready=await media.boundingBox();
+   assert.ok(requests.some(r=>r.afterFailure),'a thumbnail was requested again after the first errors');
+   assert.equal(await media.locator('.recent-thumb').evaluate(img=>getComputedStyle(img).opacity),'1');
+   assert.ok(Math.abs(before.height-failed.height)<=1&&Math.abs(ready.height-before.height)<=1,width+' no thumbnail CLS');
+   if(width===390){
+     assert.equal(await media.evaluate(el=>el.classList.contains('vertical')),true);
+     assert.match(await media.evaluate(el=>el.style.getPropertyValue('--lt-recent-bg')),/ytimg.com/);
+   }
+   assert.deepEqual(h.errors,[]);
+  }finally{await close952(h)}
+ }
+ }finally{await browser.close()}
+});
