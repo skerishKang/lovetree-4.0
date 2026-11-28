@@ -324,7 +324,7 @@ const memoDup = (frame, pageSelector) => frame.evaluate((sel) => {
   };
 }, pageSelector);
 
-test('#book-dup 실제 화면: 메모 장에서 제목·본문을 두 번 쓰지 않고, 390 긴 트리 이름은 목차 단추와 겹치지 않는다', { skip: REQUIRE ? false : skip, timeout: 180000 }, async () => {
+test('#book-dup 실제 화면: 메모 장에서 제목·본문을 두 번 쓰지 않고, 390 긴 트리 이름은 목록 단추와 겹치지 않는다', { skip: REQUIRE ? false : skip, timeout: 180000 }, async () => {
   if (skip) assert.fail(`미리보기 검사에서는 이 시험의 건너뜀이 실패다 — ${skip}`);
   const server = await serve(ROOT);
   const base = `http://127.0.0.1:${server.address().port}`;
@@ -343,13 +343,13 @@ test('#book-dup 실제 화면: 메모 장에서 제목·본문을 두 번 쓰지
     assert.equal(phoneMemo.keepsDate, true, '아래 제목 줄에 날짜가 남아 있어야 한다');
     assert.equal(phoneMemo.keepsEmotion, true, '아래 제목 줄에 감정이 남아 있어야 한다');
 
-    // 390 머리줄: 20자가 넘는 트리 이름도 '목차' 단추와 겹치지 않고 말줄임(…)으로 끊긴다.
+    // 390 머리줄: 20자가 넘는 트리 이름도 '목록' 단추와 겹치지 않고 말줄임(…)으로 끊긴다.
     const longName = '좋아하는 순간들이 이어지는 우리의 오래된 기록 저장소';
     await phone.frame.evaluate((name) => { document.getElementById('bookTitleText').textContent = name; }, longName);
     await phone.frame.waitForFunction((name) => document.querySelector('.lt-toolbar-tree-name')?.textContent === name, longName, { timeout: 5000 });
     const head = await phone.frame.evaluate(() => {
       const box = (q) => { const b = document.querySelector(q)?.getBoundingClientRect(); return b ? { l: b.left, r: b.right } : null; };
-      const title = box('.lt-toolbar-left'), index = box('#archiveBtn');
+      const title = box('.lt-toolbar-left'), index = box('#book-display-inline [data-book-display="list"]');
       const span = document.querySelector('.lt-toolbar-tree-name');
       return {
         overlap: title && index ? Math.max(0, Math.min(title.r, index.r) - Math.max(title.l, index.l)) : null,
@@ -357,7 +357,7 @@ test('#book-dup 실제 화면: 메모 장에서 제목·본문을 두 번 쓰지
         oneLine: getComputedStyle(span).whiteSpace,
       };
     });
-    assert.equal(head.overlap, 0, `긴 트리 이름이 '목차' 단추와 ${head.overlap}px 겹친다`);
+    assert.equal(head.overlap, 0, `긴 트리 이름이 '목록' 단추와 ${head.overlap}px 겹친다`);
     assert.equal(head.ellipsized, true, '긴 트리 이름이 말줄임으로 끊기지 않는다');
     assert.equal(head.oneLine, 'nowrap', '트리 이름이 한 줄로 남지 않았다');
     await phone.ctx.close();
@@ -601,7 +601,7 @@ async function runBookHistory(width,height){
    await testBackNavigation(page,{frame,recorded:false,action:()=>frame.evaluate(()=>window.__TRACK59__.setView('single'))});
    if(shots)await page.screenshot({path:path.join(shots, `book-${width}-before.png`)});
    const original=await snapshot();
-   await testBackNavigation(page,{frame,recorded:true,panels:['#archivePanel.open','#detail.open','#viewer.open','#branchModal.open'],action:()=>frame.evaluate(()=>window.__TRACK59__.openArchive())});
+   await testBackNavigation(page,{frame,recorded:true,panels:['#archivePanel.open','#detail.open','#viewer.open','#branchModal.open'],action:()=>frame.locator('#bookDisplayList').click()});
    assert.equal((await snapshot()).page,original.page,'목차 뒤로 가기 쪽 복원');
 
    const beforeDetail=await snapshot();
@@ -620,12 +620,13 @@ async function runBookHistory(width,height){
    await expectNoHistoryGrowth(frame,()=>frame.evaluate(()=>window.__TRACK59__.turnNext()),'일반 책장 넘김은 기록을 쌓지 않음');
    await waitForBookPage(beforeTurn.page+1);
    const beforeJump=await snapshot();
-   await frame.evaluate(()=>window.__TRACK59__.openArchive());
+   await frame.locator('#bookDisplayList').click();
+   await frame.waitForFunction(()=>document.querySelector('#archivePanel')?.classList.contains('open'));
    await frame.locator('#archiveList [data-jump="3"]').first().click();
    await waitForBookPage(3);
    assert.equal((await snapshot()).page,3,'목록에서 다른 쪽으로 이동');
    await frame.evaluate(()=>history.back());
-   await waitForBookPage(beforeJump.page);
+   await frame.waitForFunction(()=>document.querySelector('#archivePanel')?.classList.contains('open')&&document.getElementById('bookDisplayList')?.getAttribute('aria-checked')==='true',null,{timeout:10000});
    assert.equal((await snapshot()).page,beforeJump.page,'목록 점프 뒤로 가기 이전 쪽');
 
    await env.ctx.close();
@@ -812,4 +813,141 @@ test('#1468 책 넘김 중 날짜 표기 메시지가 와도 다음 넘김은 �
     if (browser) await browser.close().catch(() => {});
     server.close();
   }
+});
+
+
+// #1519: 더 보기와 책 넘김의 보이는 크기를 지키고 실제 누름 영역 및 다른 단추 간섭을 검사한다.
+test('#1519 책 더 보기·이전·다음 및 도구 줄: 390·844·1440 밤·정원 44px 누름, 다른 단추 가림 없음', { skip: REQUIRE ? false : skip, timeout: 180000 }, async () => {
+  if (skip && REQUIRE) assert.fail(skip);
+  const server = await serve(ROOT);
+  const base = 'http://127.0.0.1:' + server.address().port;
+  const browser = await chromium.launch({ headless: true });
+  try {
+    for (const [width,height] of [[390,844],[844,390],[1440,900]]) for (const theme of ['night','garden']) {
+      const h = await openBook(browser, base, width, height, width === 1440 ? 'double' : 'single', theme);
+      try {
+        await h.frame.evaluate(() => window.__TRACK59__.jump(1));
+        const result = await h.frame.evaluate(() => {
+          const sel = e => e ? (e.id ? '#' + e.id : (e.tagName.toLowerCase() + (e.className && typeof e.className === 'string' ? '.' + e.className.trim().split(/\s+/).join('.') : ''))) : null;
+          const num = x => x && x !== 'auto' && x !== 'none' ? parseFloat(x) || 0 : 0;
+          const visible = el => {
+            if (!el) return false;
+            for (let n = el; n && n.nodeType === 1; n = n.parentElement) {
+              const c = getComputedStyle(n);
+              if (n.hidden || n.inert || c.display === 'none' || c.visibility === 'hidden') return false;
+            }
+            const r = el.getBoundingClientRect();
+            return r.width > 0 && r.height > 0 && r.right > 0 && r.bottom > 0 && r.left < innerWidth && r.top < innerHeight;
+          };
+          const measure = el => {
+            if (!el) return null;
+            const r = el.getBoundingClientRect(), c = getComputedStyle(el);
+            const boxes = [{left:r.left,right:r.right,top:r.top,bottom:r.bottom}];
+            for (const pseudo of ['::before','::after']) {
+              const s = getComputedStyle(el,pseudo);
+              if (s.content !== 'none' && s.position === 'absolute') boxes.push({
+                left:r.left + num(c.borderLeftWidth) + num(s.left),
+                right:r.right - num(c.borderRightWidth) - num(s.right),
+                top:r.top + num(c.borderTopWidth) + num(s.top),
+                bottom:r.bottom - num(c.borderBottomWidth) - num(s.bottom)
+              });
+            }
+            const left = Math.min(...boxes.map(b=>b.left)), right = Math.max(...boxes.map(b=>b.right));
+            const top = Math.min(...boxes.map(b=>b.top)), bottom = Math.max(...boxes.map(b=>b.bottom));
+            const x = (left + right) / 2, y = (top + bottom) / 2;
+            const targets = [[x,top+1],[x,bottom-1],[left+1,y],[right-1,y]];
+            const owners = targets.map(([px,py])=>{
+              const hit = document.elementFromPoint(px,py);
+              return hit === el || el.contains(hit);
+            });
+            const overlaps = [...document.querySelectorAll('button,a,[role=button],.card')].filter(other=>{
+              if (other === el || !visible(other)) return false;
+              const b = other.getBoundingClientRect();
+              const area = Math.max(0,Math.min(right,b.right)-Math.max(left,b.left)) *
+                Math.max(0,Math.min(bottom,b.bottom)-Math.max(top,b.top));
+              return area > .5;
+            }).map(sel);
+            return {selector:sel(el), visible:visible(el),w:r.width,h:r.height,hitW:right-left,hitH:bottom-top,owners,overlaps};
+          };
+          return {
+            more:measure(document.querySelector('.lt-toolbar-more')),
+            prev:measure(document.getElementById('prevBtn')),
+            next:measure(document.getElementById('nextBtn')),
+            tools:[...document.querySelectorAll('.lt-toolbar-tools button')].map(measure).filter(v=>v?.visible)
+          };
+        });
+        const label = width + '/' + theme;
+        assert.ok(result.more && result.prev && result.next, label + ' 버튼 모두 DOM에 존재');
+        if (width === 390) {
+          assert.equal(result.more.visible, true,label + ' 휴대폰 더 보기 표시');
+          assert.ok(Math.abs(result.more.w-36)<.6 && Math.abs(result.more.h-36)<.6,label+' 36px 모양 유지');
+          assert.ok(result.more.hitW>=44 && result.more.hitH>=44,label+' 더 보기 누름 44px');
+          assert.deepEqual(result.more.owners,[true,true,true,true],label+' 더 보기 네 가장자리');
+          assert.deepEqual(result.more.overlaps,[],label+' 더 보기 다른 단추와 겹치지 않음');
+        }
+        if (width === 1440) {
+          for (const btn of [result.prev,result.next]) {
+            assert.ok(Math.abs(btn.w-34)<.6 && Math.abs(btn.h-30)<.6,label+' 넓은 화면 넘김 모양 34×30 유지');
+          }
+        }
+        for (const btn of [result.prev,result.next]) {
+          if (!btn.visible) continue; // 844×390의 화면 아래로 배치된 알약은 보이지 않는다.
+          assert.ok(btn.hitW>=44 && btn.hitH>=44,label+' 넘김 누름 44px: '+btn.selector);
+          assert.deepEqual(btn.owners,[true,true,true,true],label+' 넘김 가장자리 '+btn.selector);
+          assert.deepEqual(btn.overlaps,[],label+' 넘김과 다른 단추·카드의 간섭 '+btn.selector);
+        }
+        assert.ok(result.tools.length>=4,label+' 책 도구 줄 실제 표시');
+        for (const btn of result.tools) {
+          assert.ok(btn.hitW>=44 && btn.hitH>=44,label+' 도구 줄 44px: '+btn.selector+' '+btn.hitW+'×'+btn.hitH);
+          assert.deepEqual(btn.owners,[true,true,true,true],label+' 도구 줄 가장자리: '+btn.selector);
+        }
+        assert.deepEqual(h.errors,[],label+' 책 실행 오류 없음');
+      } finally { await h.ctx.close(); }
+    }
+  } finally { await browser.close(); server.close(); }
+});
+
+
+// #1632: 머리줄 중복 목차를 없애고 '목록' 클릭·키보드로 같은 4번째 장에 도착한다.
+test('#1632 책 머리줄 목차 제거·목록에서 같은 장으로 이동·뒤로 가기 복원(390·1440 × 밤·정원)', {
+  skip: REQUIRE ? false : skip, timeout: 180000
+}, async () => {
+  if (skip) assert.fail(skip);
+  const server=await serve(ROOT);
+  const base='http://127.0.0.1:'+server.address().port;
+  const browser=await chromium.launch({headless:true});
+  try{
+    for(const [width,height] of [[390,844],[1440,900]]) for(const theme of ['night','garden']){
+      const env=await openBook(browser,base,width,height,width===390?'single':'double',theme);
+      const {ctx,frame,page,errors}=env;
+      const tag=width+'/'+theme;
+      try{
+        assert.equal(await frame.locator('#archiveBtn').count(),0,tag+' 헤더 목록 단추 0');
+        const list=frame.locator('#bookDisplayList');
+        assert.equal(await list.textContent(),'목록',tag+' 목록 단추');
+        await list.click();
+        await frame.waitForFunction(()=>document.getElementById('archivePanel')?.classList.contains('open'),null,{timeout:10000});
+        assert.equal(await list.getAttribute('aria-checked'),'true',tag+' 목록 선택 표시');
+        const choice=frame.locator('#archiveList [data-jump="3"]').first();
+        await choice.click();
+        await frame.waitForFunction(()=>{
+          const s=window.__TRACK59__.getState();
+          return s.page===3 && s.machineState==='IDLE' && !s.queued;
+        },null,{timeout:10000});
+        assert.equal((await frame.evaluate(()=>window.__TRACK59__.getState())).page,3,tag+' 목록에서 4번째 장 도착');
+        assert.equal(await list.getAttribute('aria-checked'),'false',tag+' 책으로 자동 전환');
+        await frame.evaluate(()=>history.back());
+        await frame.waitForFunction(()=>document.getElementById('archivePanel')?.classList.contains('open'),null,{timeout:10000});
+        assert.equal(await list.getAttribute('aria-checked'),'true',tag+' 뒤로 가면 목록 복귀');
+        await choice.focus();
+        await page.keyboard.press('Enter');
+        await frame.waitForFunction(()=>{
+          const s=window.__TRACK59__.getState();
+          return s.page===3 && s.machineState==='IDLE' && !s.queued;
+        },null,{timeout:10000});
+        assert.equal((await frame.evaluate(()=>window.__TRACK59__.getState())).page,3,tag+' 키보드 Enter도 같은 4번째 장');
+        assert.deepEqual(errors,[],tag+' 실행 오류 없음');
+      }finally{await ctx.close()}
+    }
+  }finally{await browser.close();await new Promise(resolve=>server.close(resolve))}
 });

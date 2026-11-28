@@ -1,3 +1,4 @@
+import './helpers/book-hint-1605.mjs';
 import { listenOnSafePort } from './helpers/safe-port.mjs';
 import {clickToolbarTreeChoice,treeChoiceExpanded,treeChoiceFocused} from './helpers/tree-picker-pr3.mjs';
 // 이슈 584: 책의 YouTube 재생·크게 보기·두 장 모드 손보기.
@@ -134,8 +135,9 @@ function tree26() {
 
 
 
-async function openBook(browser, width, height, extraRoutes = [], tree = tree26()) {
-  const ctx = await browser.newContext({ viewport: { width, height } });
+async function openBook(browser, width, height, extraRoutes = [], tree = tree26(), theme = null, reducedMotion = false) {
+  const ctx = await browser.newContext({ viewport: { width, height }, reducedMotion: reducedMotion ? 'reduce' : 'no-preference' });
+  if (theme) await ctx.addInitScript(t => { try { localStorage.setItem('lt41.theme', t); localStorage.setItem('lt41.pageTurn', 'paper'); } catch {} }, theme);
   await ctx.addInitScript((tree) => { window.__TREE__ = tree; }, tree);
   const page = await ctx.newPage();
   const errors = [];
@@ -420,7 +422,7 @@ test('584 실행: 머리줄 — 1장|2장 한 묶음, 돋보기 아이콘, 말�
           toggleStyle: pill(toggle),
           lens: { svg: !!lens.querySelector('svg.lens-icon'), text: lens.textContent.trim(), aria: lens.getAttribute('aria-label'), pressed: lens.getAttribute('aria-pressed') },
           overview: { text: document.getElementById('overviewBtn').textContent, tip: document.getElementById('overviewBtn').getAttribute('data-lt-tip') },
-          archive: { tip: document.getElementById('archiveBtn').getAttribute('data-lt-tip') },
+          archive: { removed: !document.getElementById('archiveBtn'), list: document.querySelector('[data-book-display="list"]')?.textContent.trim() },
         };
       });
       assert.equal(head.cells.length, 2, '두 칸이 한 묶음에 있다');
@@ -435,7 +437,8 @@ test('584 실행: 머리줄 — 1장|2장 한 묶음, 돋보기 아이콘, 말�
       assert.equal(head.lens.aria, '돋보기', '돋보기 단추의 접근성 이름은 돋보기다(켜짐·꺼짐은 aria-pressed)');
       assert.equal(head.overview.text, '이어진 순간');
       assert.equal(head.overview.tip, '처음 순간부터 지금까지 이어진 순간을 한눈에');
-      assert.equal(head.archive.tip, '순간 목차 — 순간을 한눈에 훑어 보기');
+      assert.equal(head.archive.removed, true, '중복된 목차 단추는 머리줄에 없어야 한다');
+      assert.equal(head.archive.list, '목록', '목록 보기 하나만 남는다');
       // 말풍선: 키보드 초점에 뜬다(브라우저 title이 아니다).
       await frame.focus('#lensBtn');
       await frame.waitForSelector('#lt-tip-bubble:not([hidden])', { timeout: 5000 });
@@ -485,7 +488,7 @@ test('642 실행: 재생 중에 창 크기를 바꿔도 그 자리 iframe이 같
     try {
       // 책 안에서 재생: 첫 펼침면의 ▶ 재생을 누른다. 외부 요청은 막혀도 iframe 요소는 그 자리에 만들어진다.
       await frame.waitForFunction(() => { const b = document.querySelector('.yt-play'); return b && !b.querySelector('.lt-fallback-card'); }, null, { timeout: 10000 });
-      await frame.click('.yt-play');
+      await frame.click('.media-links .media-play-btn');
       await frame.waitForSelector('iframe.yt-frame', { state: 'attached', timeout: 10000 });
       // iframe 요소에 표식을 남겨 '다시 만들어진 것'과 구별한다.
       await frame.evaluate(() => { document.querySelector('iframe.yt-frame').__lt642 = 'same'; });
@@ -1205,7 +1208,7 @@ test('#1378 크게 보기: 이미 재생 중인 인라인 영상과 자동 재�
       ['**/www.youtube.com/embed/**', mock],
     ]);
     try {
-      await frame.locator('[data-yt-play]').first().click({ force: true });
+      await frame.locator('.media-links button.media-play-btn[data-yt-play]').first().click({ force: true });
       await frame.waitForSelector('iframe.yt-frame', { timeout: 10000 });
       assert.equal(await countYoutubeAutoplay(frame), 1, '인라인 재생 하나');
       await frame.locator('.yt-video-expand').first().click({ force: true });
@@ -1262,9 +1265,9 @@ test('#1378 책: 390·1440 × 밤·정원 재생 iframe 200×200·가림 0·자�
             localStorage.setItem('lt41.theme', value);
             document.documentElement.setAttribute('data-lt-theme', value);
           }, theme);
-          const before = await frame.locator('[data-yt-play]').count();
+          const before = await frame.locator('.media-links button.media-play-btn[data-yt-play]').count();
           assert.ok(before > 0, '재생 전 영상 표지 존재');
-          await frame.locator('[data-yt-play]').first().click({ force: true });
+          await frame.locator('.media-links button.media-play-btn[data-yt-play]').first().click({ force: true });
           await frame.waitForSelector('iframe.yt-frame', { timeout: 10000 });
           const inspected = await inspectYoutubeIframe(frame.locator('iframe.yt-frame').first());
           assert.equal(inspected.minimum200, true,
@@ -1298,7 +1301,7 @@ test('#1378 책: 임베드 금지 때 플레이어 제거 후 원본 링크', { 
       })],
     ]);
     try {
-      await frame.locator('[data-yt-play]').first().click({ force: true });
+      await frame.locator('.media-links button.media-play-btn[data-yt-play]').first().click({ force: true });
       await frame.waitForSelector('.yt-unavailable-note', { timeout: 10000 });
       assert.equal(await frame.locator('iframe.yt-frame').count(), 0, '재생 불가 iframe 제거');
       assert.equal(await frame.locator('.yt-unavailable-link[href*="youtube.com"]').count(), 1,
@@ -1386,4 +1389,114 @@ test('792 실행: #1468 재생기를 불러오지 못해도 이어 보기의 이
   } finally {
     await browser.close();
   }
+});
+
+
+// #1632: 썸네일 위에는 조작부를 두지 않고 아래 줄에서 키보드로 재생한다.
+test('#1632 영상 재생은 썸네일 아래 44px 조작 줄에만 있다(1440·390 × 밤·정원)', {
+  skip: skip || !REQUIRE ? skip || 'LT_BOOK_584_REQUIRE=1 일 때 실행' : false, timeout: 180000
+}, async () => {
+  if (skip) assert.fail(skip);
+  const browser=await chromium.launch({headless:true});
+  try {
+    for(const [width,height] of [[1440,900],[390,844]]) for(const theme of ['night','garden']){
+      const {ctx,page,frame,errors}=await openBook(browser,width,height,[],tree26(),theme);
+      try {
+        const measured=await frame.evaluate(()=>{
+          const card=document.querySelector('.clipping.moment:has(.yt-play)');
+          const poster=card?.querySelector('.yt-play');
+          const btn=card?.querySelector('.media-links button.media-play-btn');
+          const row=card?.querySelector('.media-links');
+          if(!poster || !btn || !row)return null;
+          const a=poster.getBoundingClientRect(),b=btn.getBoundingClientRect(),c=row.getBoundingClientRect();
+          return {
+            posterText:poster.textContent.trim(),
+            overlays:poster.querySelectorAll('button,a,input,textarea,[role="button"]').length,
+            thumbButton:poster.tagName,
+            button:btn.tagName,buttonName:btn.getAttribute('aria-label'),
+            text:btn.textContent.trim(),height:b.height,width:b.width,
+            below:b.top>=a.bottom-.5 && c.top>=a.bottom-.5,
+            lineContents:row.textContent.trim(),
+            openInOverlay:card.querySelector('.yt-play [data-yt-expand]')!==null
+          };
+        });
+        const label=width+'/'+theme;
+        assert.ok(measured,label+' 영상 조작 요소');
+        assert.equal(measured.posterText,'',label+' 썸네일 글자 0');
+        assert.equal(measured.overlays,0,label+' 썸네일 단추 0');
+        assert.equal(measured.thumbButton,'DIV',label+' 영상 그림은 조작 단추가 아니다');
+        assert.equal(measured.button,'BUTTON',label+' 재생 전용 단추');
+        assert.equal(measured.buttonName,'▶ 재생',label+' 화면 읽기 이름 유지');
+        assert.ok(measured.height>=44 && measured.width>=44,label+' 44px 이상');
+        assert.equal(measured.below,true,label+' 재생 단추가 썸네일 밖 아래에 있다');
+        assert.equal(measured.openInOverlay,false,label+' 크게 보기 안 겹침');
+        assert.match(measured.lineContents,/YouTube ↗.*▶ 재생.*크게 보기/,label+' 세 조작 순서');
+        await frame.locator('.media-links button.media-play-btn').first().focus();
+        assert.equal(await frame.evaluate(()=>document.activeElement?.classList.contains('media-play-btn')),true,label+' 키보드 초점');
+        await page.keyboard.press('Enter');
+        await frame.waitForSelector('iframe.yt-frame',{state:'attached',timeout:10000});
+        assert.deepEqual(errors,[],label+' 화면 오류 없음');
+      }finally{await ctx.close()}
+    }
+  }finally{await browser.close()}
+});
+
+// #1632: 한 장·두 장 책에서 앞뒤 다섯 장의 종이 넘김을 지키고, 움직임 줄이기는 즉시 전환한다.
+test('#1632 책장 앞뒤 5회·마지막 종이 프레임·움직임 줄이기(1440·390 × 밤·정원)', {
+  skip: skip || !REQUIRE ? skip || 'LT_BOOK_584_REQUIRE=1 일 때 실행' : false, timeout: 240000
+}, async () => {
+  if(skip) assert.fail(skip);
+  const browser=await chromium.launch({headless:true});
+  try{
+    for(const [width,height] of [[1440,900],[390,844]]) for(const theme of ['night','garden']){
+      const tag=width+'/'+theme;
+      const {ctx,frame,errors}=await openBook(browser,width,height,[],tree26(),theme);
+      try{
+        const state=()=>frame.evaluate(()=>window.__TRACK59__.getState());
+        async function turn(direction,trace=false){
+          const before=(await state()).page,goal=before+(direction==='next'?1:-1);
+          if(trace){
+            const samples=await frame.evaluate(async dir=>{
+              const sheet=document.getElementById('flipSheet'),frames=[];
+              document.getElementById(dir==='next'?'nextBtn':'prevBtn').click();
+              for(let i=0;i<100;i++){
+                await new Promise(requestAnimationFrame);
+                const active=sheet.classList.contains('active'),phase=window.__TRACK59__.getState().machineState;
+                if(active) frames.push(sheet.style.transform);
+                if(phase==='IDLE' && frames.length)break;
+              }
+              return frames;
+            },direction);
+            if(width===1440){
+              assert.ok(samples.length>=3,tag+' 종이 회전 중간 프레임');
+              const finalAngle=direction==='next'?'rotateY(-180deg)':'rotateY(180deg)';
+              assert.ok(samples.some(s=>s.includes(finalAngle)),tag+' 마지막 180도 종이 프레임 유지 '+direction);
+            }
+          }else await frame.evaluate(dir=>document.getElementById(dir==='next'?'nextBtn':'prevBtn').click(),direction);
+          await frame.waitForFunction(goal=>{
+            const s=window.__TRACK59__.getState();
+            return s.page===goal && s.machineState==='IDLE' && !s.queued;
+          },goal,{timeout:10000});
+          assert.equal((await state()).page,goal,tag+' 장 번호 연속 '+direction);
+        }
+        for(let i=0;i<5;i++)await turn('next',i===0);
+        for(let i=0;i<5;i++)await turn('prev',i===0);
+        assert.equal((await state()).page,0,tag+' 앞뒤 5회 뒤 첫 장');
+        assert.deepEqual(errors,[],tag+' 화면 예외 0');
+      }finally{await ctx.close()}
+      const reduced=await openBook(browser,width,height,[],tree26(),theme,true);
+      try{
+        const changed=await reduced.frame.evaluate(()=>{
+          const old=window.__TRACK59__.getState().page;
+          document.getElementById('nextBtn').click();
+          const now=window.__TRACK59__.getState();
+          const sheet=document.getElementById('flipSheet');
+          return {old,now:now.page,idle:now.machineState==='IDLE',visible:sheet.classList.contains('active')};
+        });
+        assert.equal(changed.now,changed.old+1,tag+' 줄인 움직임에서 즉시 다음 장');
+        assert.equal(changed.idle,true,tag+' 애니메이션 대기 0');
+        assert.equal(changed.visible,false,tag+' 종이 회전 없음');
+      }finally{await reduced.ctx.close()}
+    }
+  }finally{await browser.close()}
 });

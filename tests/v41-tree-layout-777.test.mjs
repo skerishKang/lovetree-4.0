@@ -1,3 +1,4 @@
+import './helpers/tree-forty-1605.mjs';
 // #777 트리 보기 시안 — 자리 잡기(가변 크기 tidy tree) 단위 시험.
 // 화면 없이 숫자로만 본다: 겹침 0, 부모가 항상 아래, 갈림 순서 유지, 접기 개수, 가지가 남의 카드를 지나지 않음.
 // 시험 데이터는 시안 페이지가 쓰는 세 벌(10·40·120개) 그대로와, 크기·모양이 제각각인 무작위 나무다.
@@ -643,17 +644,41 @@ test('#1525 상세 창은 새로고침·뒤로 가기·주소 다시 열기 6/6 
       let frame = await page.$('#view').then(handle => handle.contentFrame());
       await frame.locator('#cards [data-kind="moment"]:not(.is-root)').first().click();
       await frame.locator('#treeDetail[open]').waitFor({ state: 'visible' });
+      // 상세 열림과 기록 저장이 끝나야 새로고침 뒤 같은 내용을 찾는다.
+      await page.waitForFunction(() => {
+        const view = document.getElementById('view'), doc = view?.contentDocument;
+        return !view?.hidden && !!doc?.getElementById('treeDetail')?.open &&
+          !!view.contentWindow?.history.state?.lt41TreePanel &&
+          view.contentWindow.history.state.lt41TreePanel === 'detail' &&
+          history.state?.lt41TreeDetail === true &&
+          new URLSearchParams(location.hash.split('?')[1] || '').get('detail') === '1';
+      }, null, { timeout: 10000 });
       const openedUrl = page.url();
       await page.reload({ waitUntil: 'load' });
-      await page.waitForFunction(() => document.querySelector('#view')?.contentDocument?.querySelector('#treeDetail[open]'), null, { timeout: 10000 });
+      await page.waitForFunction(() => {
+        const view = document.getElementById('view'), doc = view?.contentDocument;
+        return !view?.hidden && doc?.readyState === 'complete' &&
+          !!doc.querySelector('#cards [data-kind="moment"]') &&
+          !!doc.getElementById('treeDetail')?.open;
+      }, null, { timeout: 10000 });
       frame = await page.$('#view').then(handle => handle.contentFrame());
       assert.equal(await frame.locator('#treeDetail[open]').count(), 1, '새로고침');
-      await page.goBack({ waitUntil: 'load' });
-      await page.waitForTimeout(500);
+      // 상세 열림은 같은 문서의 history 항목이다. 새 load 대신 닫힌 상세와 카드 복원을 기다린다.
+      await page.evaluate(() => history.back());
+      await page.waitForFunction(() => {
+        const doc = document.getElementById('view')?.contentDocument;
+        // 기존 단언과 같이 열린 상세가 사라졌는지만 확인한다.
+        return doc?.readyState === 'complete' && !doc.querySelector('#treeDetail[open]');
+      }, null, { timeout: 10000 });
       frame = await page.$('#view').then(handle => handle.contentFrame());
       assert.equal(await frame.locator('#treeDetail[open]').count(), 0, '뒤로 가기');
       await page.goto(openedUrl, { waitUntil: 'load' });
-      await page.waitForFunction(() => document.querySelector('#view')?.contentDocument?.querySelector('#treeDetail[open]'), null, { timeout: 10000 });
+      await page.waitForFunction(() => {
+        const view = document.getElementById('view'), doc = view?.contentDocument;
+        return !view?.hidden && doc?.readyState === 'complete' &&
+          !!doc.querySelector('#cards [data-kind="moment"]') &&
+          !!doc.getElementById('treeDetail')?.open;
+      }, null, { timeout: 10000 });
       frame = await page.$('#view').then(handle => handle.contentFrame());
       assert.equal(await frame.locator('#treeDetail[open]').count(), 1, '주소 다시 열기');
     } finally { await context.close(); }
