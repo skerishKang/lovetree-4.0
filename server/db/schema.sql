@@ -26,6 +26,32 @@ CREATE TABLE IF NOT EXISTS lovetree_request_claims (
 CREATE INDEX IF NOT EXISTS lovetree_request_claims_retention_idx
   ON lovetree_request_claims (claimed_at, product_id, subject_id, client_key);
 
+-- 요청 횟수 제한은 여러 서버 인스턴스가 공유하는 고정 창 카운터다.
+CREATE TABLE IF NOT EXISTS lovetree_rate_limits (
+  product_id text NOT NULL,
+  scope text NOT NULL,
+  window_start timestamptz NOT NULL,
+  count bigint NOT NULL DEFAULT 1 CHECK (count >= 1),
+  PRIMARY KEY (product_id, scope, window_start)
+);
+CREATE INDEX IF NOT EXISTS lovetree_rate_limits_retention_idx
+  ON lovetree_rate_limits (window_start, product_id, scope);
+
+-- 공유 미리보기 토큰은 해시와 1회 소비 결과만 보관한다.
+CREATE TABLE IF NOT EXISTS lovetree_share_previews (
+  token_hash char(64) PRIMARY KEY,
+  product_id text NOT NULL,
+  subject_id text NOT NULL,
+  tree_id text NOT NULL,
+  request_hash char(64) NOT NULL,
+  expires_at timestamptz NOT NULL,
+  consumed_at timestamptz,
+  result_share_id text,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS lovetree_share_previews_retention_idx
+  ON lovetree_share_previews (expires_at, product_id, subject_id);
+
 -- 로그인 상태의 단일 사용 소비(재시작·다중 인스턴스 대응). 값은 해시로만 두고 원본은 남기지 않는다.
 CREATE TABLE IF NOT EXISTS lovetree_login_states (
   state_hash char(64) PRIMARY KEY,

@@ -70,6 +70,7 @@ export function createWorkspaceApi({ fetchImpl = (...args) => globalThis.fetch(.
         code: payload?.error?.code ?? null,
         message: payload?.error?.message ?? null,
         currentRevision: payload?.error?.currentRevision ?? undefined,
+        retryAfterSeconds: Number.isSafeInteger(payload?.error?.retryAfterSeconds) ? payload.error.retryAfterSeconds : Number(response.headers?.get?.('retry-after')) || null,
         revision: Number.isSafeInteger(payload?.revision) ? payload.revision : undefined,
         writeSubjectBound: payload?.writeSubjectBound === true,
         themeMissing: payload?.themeMissing === true,

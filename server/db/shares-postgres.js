@@ -8,6 +8,21 @@ const row = value => value && ({
   discoverable: value.discoverable === true, discoverableAt: iso(value.discoverable_at),
   origin: value.origin || 'owner', momentCount: Number(value.moment_count ?? 0)
 });
+async function withTransaction(pool, work) {
+  if (typeof pool.transaction === 'function') return pool.transaction(work);
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const result = await work(client);
+    await client.query('COMMIT');
+    return result;
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw error;
+  } finally {
+    client.release();
+  }
+}
 export function createShareRepo(pool) {
   return {
     // 최신 원본과 공유행·소개 동의 정리를 한 트랜잭션에서 맞춘다.
@@ -35,6 +50,43 @@ export function createShareRepo(pool) {
         [input.productId,input.shareId,input.subjectId,input.treeId,input.entryMomentId,input.view,input.momentCount ?? 0]
       );
       return row(result.rows[0]);
+    },
+    async createPreview(input) {
+      await pool.query(
+        `INSERT INTO lovetree_share_previews (token_hash, product_id, subject_id, tree_id, request_hash, expires_at)
+         VALUES ($1,$2,$3,$4,$5,$6)`,
+        [input.tokenHash,input.productId,input.subjectId,input.treeId,input.requestHash,input.expiresAt]
+      );
+      return true;
+    },
+    async createShareWithPreview(input) {
+      return withTransaction(pool, async client => {
+        const found = await client.query(
+          'SELECT * FROM lovetree_share_previews WHERE token_hash=$1 AND product_id=$2 FOR UPDATE',
+          [input.tokenHash,input.productId]
+        );
+        const preview = found.rows[0];
+        if (!preview) return {status:'missing'};
+        if (preview.subject_id !== input.subjectId) return {status:'forbidden'};
+        if (preview.consumed_at) {
+          if (!preview.result_share_id) return {status:'stale'};
+          const existing = await client.query('SELECT * FROM lovetree_shares WHERE product_id=$1 AND share_id=$2', [input.productId,preview.result_share_id]);
+          return existing.rows[0] ? {status:'replayed',share:row(existing.rows[0])} : {status:'missing'};
+        }
+        if (new Date(preview.expires_at).getTime() <= (input.now ?? Date.now())) return {status:'expired'};
+        if (preview.tree_id !== input.treeId || preview.request_hash !== input.requestHash) return {status:'stale'};
+        const inserted = await client.query(
+          `INSERT INTO lovetree_shares (product_id, share_id, subject_id, tree_id, entry_moment_id, initial_view, moment_count)
+           VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (product_id, share_id) DO NOTHING RETURNING *`,
+          [input.productId,input.shareId,input.subjectId,input.treeId,input.entryMomentId,input.view,input.momentCount ?? 0]
+        );
+        if (!inserted.rows[0]) return {status:'collision'};
+        await client.query('UPDATE lovetree_share_previews SET consumed_at=now(), result_share_id=$2 WHERE token_hash=$1', [input.tokenHash,input.shareId]);
+        return {status:'created',share:row(inserted.rows[0])};
+      });
+    },
+    async prunePreviews() {
+      await pool.query("DELETE FROM lovetree_share_previews WHERE expires_at < now() - interval '1 day'");
     },
     async load({productId,shareId}) {
       const result = await pool.query('SELECT * FROM lovetree_shares WHERE product_id=$1 AND share_id=$2',[productId,shareId]);
