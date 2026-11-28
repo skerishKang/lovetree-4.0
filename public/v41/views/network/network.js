@@ -460,7 +460,7 @@
       const b = document.createElement('button');
       b.textContent = '전체 맞춤';
       b.onclick = () => {
-        fitView();
+        fitMapView();
         document.querySelector('.hero')?.classList.add('dim');
         scheduleDraw();
       };
@@ -697,11 +697,37 @@
       }
     }
   }
-  // 전체 보기 = 배율 1(배치가 이미 화면 좌표로 상자에 맞춰져 있다).
+  // #1640: 60개 이하의 전체 보기는 기존 배율 1을 유지하고, 밀집 지도만 논리 판을 축소한다.
+  // #1640: 60개 이하는 기존 화면 좌표와 배율을 그대로 둔다.
+  // 150~300개 밀집 지도는 확대된 논리 판을 머리줄/아래 도구 줄을 뺀 BOX 안에 맞춘다.
+  function denseFit() {
+    if (LTDEMO.moments.length <= 60 || !BOX) return null;
+    const points = nodes.filter(n => n.kind === 'moment' && Number.isFinite(n.x) && Number.isFinite(n.y));
+    if (!points.length) return null;
+    const xs = points.map(n => n.x), ys = points.map(n => n.y);
+    const minX = Math.min(...xs), maxX = Math.max(...xs);
+    const minY = Math.min(...ys), maxY = Math.max(...ys);
+    const margin = 12; // 축소된 점 중심이 지도 칸 테두리에 걸리지 않도록 화면 픽셀 여유 확보.
+    const scale = Math.min(
+      1,
+      Math.max(1, BOX.w - margin * 2) / Math.max(1, maxX - minX),
+      Math.max(1, BOX.h - margin * 2) / Math.max(1, maxY - minY)
+    );
+    return { scale, x: (minX + maxX) / 2, y: (minY + maxY) / 2 };
+  }
+  // #461: 60개 이하 지도에서 쓰는 기존 전체 보기 계약은 변경하지 않는다.
   function fitView() {
     state.scale = 1;
     state.tx = 0;
     state.ty = 0;
+  }
+  function fitMapView() {
+    fitView();
+    const fit = denseFit();
+    if (!fit) return;
+    state.scale = fit.scale;
+    state.tx = BOX.x + BOX.w / 2 - fit.x * fit.scale;
+    state.ty = BOX.y + BOX.h / 2 - fit.y * fit.scale;
   }
   function resize() {
     vw = innerWidth;
@@ -726,7 +752,7 @@
       state.mode === 'ORIGIN_REVEAL' ||
       (!state.selected && !state.cluster)
     )
-      fitView();
+      fitMapView();
     else if (state.mode === 'CLUSTER_PATH_OVERVIEW' && state.cluster)
       centerOn(state.cluster, clusterZoom());
     else if (state.selected) centerOn(state.selected, state.scale);
@@ -750,7 +776,7 @@
       }
     }
     if (recenter) {
-      fitView();
+      fitMapView();
       state.mobileCluster = 0;
     }
   }
@@ -768,7 +794,7 @@
     layoutTag();
     applyPoints(TAGFIT);
     if (recenter) {
-      fitView();
+      fitMapView();
       state.mobileCluster = 0;
     }
   }
@@ -776,7 +802,7 @@
     layoutTime();
     applyPoints(TIMEFIT);
     if (recenter) {
-      fitView();
+      fitMapView();
       state.mobileCluster = 0;
     }
   }
@@ -837,7 +863,7 @@
     $('detail')?.classList.remove('open');
     $('routeStatus')?.classList.remove('show');
     if (BOX) layoutForView();
-    fitView();
+    fitMapView();
     state.mobileCluster = 0;
     paintViewButtons();
     paintHero();
@@ -867,7 +893,7 @@
     $('branchChooser').classList.remove('open');
     $('routeStatus').classList.remove('show');
     document.querySelector('.hero')?.classList.remove('dim');
-    fitView();
+    fitMapView();
     paintTagEmpty();
     syncRibbon();
     scheduleDraw();
@@ -929,7 +955,7 @@
     $('detail').classList.remove('open');
     $('branchChooser').classList.remove('open');
     document.querySelector('.hero').classList.add('dim');
-    fitView();
+    fitMapView();
     showRouteStatus(
       '첫 순간 · 01 / 02 / 03 전체 분기',
       '처음 마음이 움직인 순간에서 시작해 세 주요 경로군이 어디로 퍼졌는지 동시에 보여줍니다.'
@@ -2329,10 +2355,15 @@
 
   function zoomAt(f, cx = vw / 2, cy = vh / 2) {
     const before = s2w(cx, cy);
-    /* #461 전체 보기(1) 기준 0.5~4배. 배율은 늘 양수(바닥값). */ state.scale = Math.max(
-      0.5,
-      Math.min(4, state.scale * f)
-    );
+    // #1640: 밀집 지도에서만 0.5보다 작은 맞춤 배율을 허용한다.
+    // 기존 26/60순간의 최소 0.5 및 최대 4배는 그대로 유지한다.
+    const fit = denseFit();
+    if (!fit) {
+      // #461: 기존 26·60순간의 0.5~4배 계약을 그대로 유지한다.
+      state.scale = Math.max(0.5, Math.min(4, state.scale * f));
+    } else {
+      state.scale = Math.max(Math.min(0.5, fit.scale), Math.min(4, state.scale * f));
+    }
     state.tx = cx - before.x * state.scale;
     state.ty = cy - before.y * state.scale;
   }
@@ -2486,6 +2517,16 @@
   }
   function kbPlace(n) {
     const p = w2s(n.x, n.y);
+    // #1640: 밀집 지도에서는 캔버스 전체가 아니라 실제 지도 칸에 Home/End를 놓는다.
+    if (denseFit()) {
+      const margin = 12;
+      if (p.x < BOX.x + margin || p.x > BOX.x + BOX.w - margin ||
+          p.y < BOX.y + margin || p.y > BOX.y + BOX.h - margin) {
+        state.tx += BOX.x + BOX.w / 2 - p.x;
+        state.ty += BOX.y + BOX.h / 2 - p.y;
+      }
+      return;
+    }
     if (p.x < 60 || p.x > vw - 60 || p.y < 90 || p.y > vh - 60) {
       state.tx += vw / 2 - p.x;
       state.ty += vh / 2 - p.y;

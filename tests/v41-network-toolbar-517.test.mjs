@@ -91,7 +91,7 @@ const mapHost1574HTML = (n) => {
   const media = Object.fromEntries(ids.map(id => [id, { image: PHOTO, type: 'photo' }]));
   return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>지도 시험</title></head><body data-member="in" data-record-source="server"><script>window.LT41={source:'server',writable:true,tree:${JSON.stringify(tree)},trees:[],exampleMedia:${JSON.stringify(media)},momentId:'m01'};location.hash='#network';</script><iframe src="/v41/views/track56-network.html" style="position:fixed;inset:0;width:100vw;height:100vh;border:0"></iframe></body></html>`;
 };
-const EXTRA_ROUTES = { '/map-host-3.html': mapHostHTML(3), '/map-host-8.html': mapHostHTML(8), '/map-host-thumb.html': mapHostThumbHTML(), '/map-host-member-3.html': mapHostMemberHTML(3), '/map-host-member-8.html': mapHostMemberHTML(8), '/map-host-member-2g.html': mapHostMember2GHTML(), '/map-host-1574-26.html': mapHost1574HTML(26), '/map-host-1574-60.html': mapHost1574HTML(60), '/map-host-1574-300.html': mapHost1574HTML(300) };
+const EXTRA_ROUTES = { '/map-host-3.html': mapHostHTML(3), '/map-host-8.html': mapHostHTML(8), '/map-host-thumb.html': mapHostThumbHTML(), '/map-host-member-3.html': mapHostMemberHTML(3), '/map-host-member-8.html': mapHostMemberHTML(8), '/map-host-member-2g.html': mapHostMember2GHTML(), '/map-host-1574-26.html': mapHost1574HTML(26), '/map-host-1574-60.html': mapHost1574HTML(60), '/map-host-1574-150.html': mapHost1574HTML(150), '/map-host-1574-300.html': mapHost1574HTML(300) };
 async function serve() {
   const server = createServer(async (req, res) => {
     const clean = decodeURIComponent((req.url || '/').split('?')[0]);
@@ -993,4 +993,125 @@ test('#1640 밀집 300순간은 겹침 0이고 키보드로 끝까지 이동할 
     await browser.close();
     server.close();
   }
+});
+
+test('#1640 밀집 지도 150·300 모든 점 전체 맞춤·최근 순간·Home End 접근', { skip: REQUIRE ? false : skip, timeout: 300000 }, async () => {
+  if (skip) assert.fail('CI에서 브라우저 시험을 건너뛸 수 없다: '+skip);
+  const server = await serve();
+  const base = 'http://127.0.0.1:' + server.address().port;
+  const browser = await chromium.launch({headless:true});
+  try {
+    for (const n of [150,300]) for (const [width,height] of [[1440,900],[844,390],[390,844]]) {
+      const context = await browser.newContext({ viewport:{width,height}, locale:'ko-KR', reducedMotion:'reduce' });
+      try {
+        await context.addInitScript(() => localStorage.setItem('lt41.theme','night'));
+        const page = await context.newPage(), errors = [];
+        page.on('pageerror',e=>errors.push(e.message));
+        await page.goto(base+'/map-host-1574-'+n+'.html',{waitUntil:'load'});
+        let frame = page.frames().find(f=>/track56-network/.test(f.url()));
+        for (let i=0;i<80&&!frame;i++) {
+          await page.waitForTimeout(100);
+          frame = page.frames().find(f=>/track56-network/.test(f.url()));
+        }
+        assert.ok(frame,n+'/'+width+': 지도 iframe');
+        await frame.waitForFunction(count=>window.__lt?.dots?.()?.length===count,n,{timeout:20000});
+        await settleMap(frame,{timeout:8000});
+        const inspect = () => frame.evaluate(() => {
+          const v=window.__lt, box=v.box(), dots=v.dots();
+          const moments=v.nodes.filter(node=>node.kind==='moment');
+          const first=v.FIRST.id, recent=moments.at(-1).id;
+          const inside=p=>!!p && p.x>=box.x && p.x<=box.x+box.w &&
+            p.y>=box.y && p.y<=box.y+box.h;
+          const fullDotInside=p=>!!p && p.x-p.r>=box.x-0.5 && p.x+p.r<=box.x+box.w+0.5 &&
+            p.y-p.r>=box.y-0.5 && p.y+p.r<=box.y+box.h+0.5;
+          return {box, scale:v.state.scale, first, recent,
+            count:dots.length, insideCount:dots.filter(inside).length,
+            fullInsideCount:dots.filter(fullDotInside).length,
+            recentInside:inside(dots.find(p=>p.id===recent)),
+            firstInside:inside(dots.find(p=>p.id===first)),
+            selected:v.state.selected?.id||null};
+        });
+        for (const [mode,button] of [['fan','viewNet'],['time','viewGraph']]) {
+          await frame.evaluate(id=>{document.getElementById(id).click();window.__lt.overview(false)},button);
+          await settleMap(frame,{timeout:8000});
+          const initial=await inspect();
+          const key=n+'/'+width+'/'+mode;
+          assert.equal(initial.count,n,key+': 처음 순간 수');
+          assert.equal(initial.recentInside,true,key+': 최초 최근 순간은 지도 칸 안');
+
+          const fitButton=frame.locator('#overviewBtn');
+          if (!(await fitButton.isVisible())) {
+            const more=frame.locator('.lt-toolbar-more');
+            if (await more.isVisible()) await more.click();
+          }
+          if (await fitButton.isVisible()) await fitButton.click();
+          else await fitButton.evaluate(el=>el.click());
+          await settleMap(frame,{timeout:8000});
+          const fit=await inspect();
+          assert.equal(fit.insideCount,n,key+': 전체 맞춤에서 모든 점 중심 표시');
+          assert.equal(fit.fullInsideCount,n,key+': 전체 맞춤에서 점 원 전체 표시');
+          assert.equal(fit.recentInside,true,key+': 전체 맞춤에서 최근 순간 표시');
+
+          await frame.locator('#stage').focus();
+          await frame.locator('#stage').press('End');
+          await frame.waitForFunction(id=>window.__lt?.state?.selected?.id===id,initial.recent,{timeout:5000});
+          const end=await inspect();
+          assert.equal(end.selected,initial.recent,key+': End 최근 순간 선택');
+          assert.equal(end.recentInside,true,key+': End 최근 순간 지도 칸 안');
+
+          await frame.locator('#stage').press('Home');
+          await frame.waitForFunction(id=>window.__lt?.state?.selected?.id===id,initial.first,{timeout:5000});
+          const home=await inspect();
+          assert.equal(home.selected,initial.first,key+': Home 첫 순간 선택');
+          assert.equal(home.firstInside,true,key+': Home 첫 순간 지도 칸 안');
+          assert.deepEqual(errors,[],key+': 화면 JavaScript 오류 없음');
+          console.log('#1640 DENSE_VIEW',JSON.stringify({n,width,mode,initialRecent:initial.recentInside,
+            fittedDots:fit.insideCount,allDotsFullyInMap:fit.fullInsideCount,scale:fit.scale,
+            end: end.recentInside,home:home.firstInside,box:fit.box}));
+        }
+      } finally { await context.close(); }
+    }
+  } finally { await browser.close(); await new Promise(ok=>server.close(ok)); }
+});
+
+test('#1640 기존 26·60 지도 시간순·부채꼴 화면 좌표와 기본 배율 보존', { skip: REQUIRE ? false : skip, timeout: 300000 }, async () => {
+  if (skip) assert.fail('CI에서 브라우저 시험을 건너뛸 수 없다: '+skip);
+  const server=await serve(), base='http://127.0.0.1:'+server.address().port;
+  const browser=await chromium.launch({headless:true});
+  try {
+    for (const n of [26,60]) for (const [width,height] of [[1440,900],[844,390],[390,844]]) {
+      const context=await browser.newContext({viewport:{width,height},locale:'ko-KR',reducedMotion:'reduce'});
+      try {
+        const page=await context.newPage(),errors=[];
+        page.on('pageerror',e=>errors.push(e.message));
+        await page.goto(base+'/map-host-1574-'+n+'.html',{waitUntil:'load'});
+        let frame=page.frames().find(f=>/track56-network/.test(f.url()));
+        for(let i=0;i<80&&!frame;i++){
+          await page.waitForTimeout(100);
+          frame=page.frames().find(f=>/track56-network/.test(f.url()));
+        }
+        assert.ok(frame,n+'/'+width+': 지도 iframe');
+        await frame.waitForFunction(count=>window.__lt?.dots?.()?.length===count,n,{timeout:20000});
+        await settleMap(frame,{timeout:8000});
+        for(const [mode,button] of [['fan','viewNet'],['time','viewGraph']]){
+          await frame.evaluate(id=>{document.getElementById(id).click();window.__lt.overview(false)},button);
+          await settleMap(frame,{timeout:8000});
+          const current=await frame.evaluate(()=>{
+            const v=window.__lt,nodes=new Map(v.nodes.filter(n=>n.kind==='moment').map(n=>[n.id,n]));
+            const dots=v.dots();
+            return {box:v.box(),scale:v.state.scale,tx:v.state.tx,ty:v.state.ty,count:dots.length,
+              sameCoordinates:dots.every(p=>p.x===nodes.get(p.id)?.x&&p.y===nodes.get(p.id)?.y)};
+          });
+          const label=n+'/'+width+'/'+mode;
+          assert.equal(current.count,n,label+': 기존 순간 수 보존');
+          assert.equal(current.scale,1,label+': 기존 배율 1 보존');
+          assert.equal(current.tx,0,label+': 기존 x 이동 0 보존');
+          assert.equal(current.ty,0,label+': 기존 y 이동 0 보존');
+          assert.equal(current.sameCoordinates,true,label+': 논리 좌표와 화면 좌표 동일');
+          assert.deepEqual(errors,[],label+': JavaScript 오류 없음');
+          console.log('#1640 LEGACY_VIEW',JSON.stringify({n,width,mode,scale:current.scale,tx:current.tx,ty:current.ty,box:current.box}));
+        }
+      }finally{await context.close()}
+    }
+  }finally{await browser.close();await new Promise(ok=>server.close(ok))}
 });
