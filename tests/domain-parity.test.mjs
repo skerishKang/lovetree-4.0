@@ -157,3 +157,20 @@ for (const [name, domain] of [['서버', server], ['브라우저', screen]]) {
     assert.deepEqual(current.trees, [currentTree]);
   });
 }
+
+
+for (const [name,domain] of [['서버',server],['화면',screen]]) {
+  test('#1649 보강 보안 '+name+': 예약된 키와 중첩 오염 키를 지우고 실제 JSON 크기를 지킨다', () => {
+    const raw=JSON.parse('{"__proto__":{"polluted":"yes"},"constructor":{"prototype":{"polluted":"yes"}},"prototype":"danger","nested":{"__proto__":{"polluted":"yes"},"good":1}}');
+    const clean=domain.normalizePrefs(raw);
+    for(const key of ['__proto__','constructor','prototype']) assert.equal(Object.hasOwn(clean,key),false,key+' 제외');
+    assert.equal(Object.hasOwn(clean.nested,'__proto__'),false,'중첩 위험 키 제외');
+    assert.equal(clean.nested.good,1);
+    assert.equal(({}).polluted,undefined,'원형 무오염');
+    const many=Object.fromEntries(Array.from({length:32},(_,i)=>['z'+String(i).padStart(2,'0'),'a'.repeat(505)]));
+    const saved=domain.normalizePrefs(many);
+    const unknown=Object.fromEntries(Object.entries(saved).filter(([key])=>/^z\d\d$/.test(key)));
+    assert.ok(new TextEncoder().encode(JSON.stringify(unknown)).byteLength<=16*1024);
+    assert.ok(Object.keys(unknown).length<32);
+  });
+}

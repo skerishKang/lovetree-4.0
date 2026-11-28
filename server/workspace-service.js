@@ -5,7 +5,8 @@ import { DEFAULT_TREE_OPEN_VIEW } from '../public/v41/tree-open-view.mjs';
 import { ApiError } from './errors.js';
 
 const CLIENT_KEY = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
-const LEGACY_PREF_KEYS = new Set(['theme', 'titleDisplay', 'displayName', 'accentColor', 'dateStyle', 'startPlace', 'shareView', 'shareDiscover', 'treeChipOrder', 'bookDisplay', 'shelfView', 'homeMoment']);
+const LEGACY_PREF_KEYS = new Set(['theme', 'titleDisplay', 'displayName', 'accentColor', 'dateStyle', 'startPlace', 'shareView', 'shareDiscover', 'treeChipOrder', 'bookDisplay', 'shelfView', 'shelfOpenMode', 'homeMoment']);
+const PRE_SHELF_PREF_KEYS = new Set([...LEGACY_PREF_KEYS].filter(key => key !== 'shelfOpenMode'));
 const GENERIC_DOCUMENT_MESSAGE = '기록 형식을 확인해 주세요.';
 
 // domain.js의 검증 오류 문구는 애초에 사용자에게 보여 주는 문구다. TypeError·RangeError처럼
@@ -160,14 +161,29 @@ export function createWorkspaceService({ repo, productId, onCommit = null, onAcc
         })};
       });
       const doc = withQuarantinedTrees({ ...validated, trees }, scan?.quarantined ?? []);
-      const outcome = await repo.commit({
+      const write = {
         productId: principal.productId,
         subjectId: principal.subjectId,
-        doc,
-        expectedRevision,
-        clientKey,
-        requestHash: requestHashOf(validated, expectedRevision)
-      });
+        doc, expectedRevision, clientKey
+      };
+      const currentHash = requestHashOf(validated, expectedRevision);
+      let outcome = await repo.commit({ ...write, requestHash: currentHash });
+      if (outcome.status === 'keyConflict') {
+        // 옛 서버는 알 수 없는 prefs를 버린 뒤 해시를 기록했다. 그 시절의
+        // 알려진 키만 남겨 과거 해시를 비교한다. 새 저장은 항상 전체 설정을 포함한다.
+        for (const keys of [LEGACY_PREF_KEYS, PRE_SHELF_PREF_KEYS]) {
+          // 이전 버전에 없던 설정도 기본값일 때만 옛 해시로 접는다.
+          // 사용자가 새 값으로 바꾼 요청을 예전 것과 같다고 승인하지 않는다.
+          if (keys === PRE_SHELF_PREF_KEYS &&
+              validated.prefs.shelfOpenMode !== normalizePrefs().shelfOpenMode) continue;
+          const prefs = Object.fromEntries(Object.entries(validated.prefs)
+            .filter(([key]) => keys.has(key)));
+          const legacyHash = requestHashOf({ ...validated, prefs }, expectedRevision);
+          if (legacyHash === currentHash) continue;
+          outcome = await repo.commit({ ...write, requestHash: legacyHash });
+          if (outcome.status !== 'keyConflict') break;
+        }
+      }
       if (outcome.status === 'revisionConflict') {
         throw new ApiError(409, 'revision_conflict', '다른 곳에서 먼저 저장했어요. 최신 기록을 불러온 뒤 다시 시도해 주세요.', { currentRevision: outcome.currentRevision });
       }

@@ -49,7 +49,7 @@ export function createSyncController({getState, replaceState, api, draftStorage 
     } catch { /* quota or browser policy: keep the in-page retry state */ }
   }
 
-  function restorePendingDraft(subject, serverRevision) {
+  function restorePendingDraft(subject, serverRevision, serverState) {
     const key = pendingDraftKey(subject);
     if (!draftStorage || !key) return false;
     let draft;
@@ -62,6 +62,11 @@ export function createSyncController({getState, replaceState, api, draftStorage 
           typeof draft.clientKey !== 'string' || !CLIENT_KEY_VALID.test(draft.clientKey)) throw new Error('invalid_pending_draft');
       draft.state = validateState(draft.state);
     } catch {
+      clearPendingDraft(subject);
+      return false;
+    }
+    // 응답만 유실되고 서버 저장은 성공했을 수 있다. 내용이 이미 같다면 재전송·거짓 충돌을 만들지 않는다.
+    if (JSON.stringify(draft.state) === JSON.stringify(serverState)) {
       clearPendingDraft(subject);
       return false;
     }
@@ -88,8 +93,9 @@ export function createSyncController({getState, replaceState, api, draftStorage 
       return emit(status({phase:'offline',detail:'서버를 확인하지 못했어요. 다시 시도해 주세요.',actions:[...actions.retry,...actions.login]}));
     }
     owned = true; revision = result.revision; dirty = false; attempt = null; seenRevision = null; activeSubject = result.subject || null;
-    replaceState(validateState(result.state));
-    if (restorePendingDraft(activeSubject, revision)) return current;
+    const serverState = validateState(result.state);
+    replaceState(serverState);
+    if (restorePendingDraft(activeSubject, revision, serverState)) return current;
     return emit(status({phase:'synced',actions:actions.logout}));
   }
 

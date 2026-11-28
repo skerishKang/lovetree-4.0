@@ -609,3 +609,80 @@ test('#1434 다른 트리를 저장해도 읽기용 부모 보정은 원본에 �
   assert.deepEqual(stored.doc.trees[0], original);
   assert.equal(stored.doc.trees[1].title, '수정한 트리');
 });
+
+
+test('#1649 보강 1: 위험한 설정 키는 HTTP PUT 저장·GET에서 제외하고 객체 원형을 오염시키지 않는다', async () => {
+  const {handle,repo}=buildHandle();
+  const evil=JSON.parse('{"__proto__":{"polluted":"owned"},"constructor":{"prototype":{"polluted":"owned"}},"prototype":{"polluted":"owned"},"safeFuture":{"inner":{"__proto__":{"polluted":"owned"},"good":1}}}');
+  const state={version:1,trees:[],prefs:evil};
+  const response=await put(handle,{state,expectedRevision:0,clientKey:'unsafe-prefs'});
+  assert.equal(response.status,200);
+  const returned=(await get(handle)).body.state.prefs;
+  const stored=(await repo.load({productId:PRODUCT,subjectId:'usr_a'})).doc.prefs;
+  for(const key of ['__proto__','constructor','prototype']){
+    assert.equal(Object.hasOwn(returned,key),false,key+': 응답에 남지 않음');
+    assert.equal(Object.hasOwn(stored,key),false,key+': 저장소에 남지 않음');
+  }
+  assert.equal(returned.safeFuture.inner.good,1,'정상 설정은 유지');
+  assert.equal(Object.hasOwn(returned.safeFuture.inner,'__proto__'),false,'중첩 객체도 위험 키 없음');
+  assert.equal(({}).polluted,undefined,'Object.prototype 무오염');
+});
+
+test('#1649 보강 2: 모르는 설정 묶음의 실제 JSON UTF-8 크기는 서버 PUT에서도 16KiB 이하이다', async () => {
+  const {handle,repo}=buildHandle();
+  const payload=Object.fromEntries(Array.from({length:32},(_,i)=>['k'+String(i).padStart(2,'0'),'a'.repeat(505)]));
+  assert.equal(new TextEncoder().encode(JSON.stringify(payload)).byteLength,16449,'실패 재현의 실제 바이트 수');
+  const response=await put(handle,{state:{version:1,trees:[],prefs:payload},expectedRevision:0,clientKey:'overflow-prefs'});
+  assert.equal(response.status,200);
+  const saved=(await repo.load({productId:PRODUCT,subjectId:'usr_a'})).doc.prefs;
+  const unknown=Object.fromEntries(Object.entries(saved).filter(([key])=>/^k\d\d$/.test(key)));
+  const bytes=new TextEncoder().encode(JSON.stringify(unknown)).byteLength;
+  assert.ok(bytes<=16384,'서버가 보존한 설정 묶음의 실제 직렬화 크기 '+bytes+'바이트');
+  assert.ok(Object.keys(unknown).length<32,'마지막 초과 항목을 결정적 순서로 제외');
+  assert.ok(Object.hasOwn(unknown,'k00'),'앞 설정은 유지');
+  assert.equal(Object.hasOwn(unknown,'k31'),false,'마지막 초과 설정은 제외');
+});
+
+test('#1649 보강 4: 배포 전 서버가 지운 설정을 포함한 옛 PUT는 같은 요청 키로 재전송한다', async () => {
+  const {handle,repo}=buildHandle();
+  const validated=validateState({version:1,trees:[],prefs:{}});
+  const payload={state:{...validated,prefs:{...validated.prefs,futureUnknownOptionX:'keep-after-upgrade'}},
+    expectedRevision:0,clientKey:'old-known-hash'};
+  const oldHash=requestHashOf(validated,0);
+  const previous=await repo.commit({productId:PRODUCT,subjectId:'usr_a',doc:validated,
+    expectedRevision:0,clientKey:payload.clientKey,requestHash:oldHash});
+  assert.equal(previous.status,'saved');
+  const retry=await put(handle,payload);
+  assert.equal(retry.status,200,'오래된 원본 PUT는 동일한 요청으로 인정');
+  assert.equal(retry.body.revision,previous.revision,'재전송으로 개정 증가 없음');
+  const changedKnown={...payload,state:{...payload.state,prefs:{...payload.state.prefs,theme:'garden'}}};
+  const conflict=await put(handle,changedKnown);
+  assert.equal(conflict.status,409,'진짜 다른 기존 설정은 같은 키로 덮어쓰지 못함');
+  assert.equal(conflict.body.error.code,'client_key_conflict');
+  const modern={state:{...validated,prefs:{...validated.prefs,futureUnknownOptionX:'new-one'}},
+    expectedRevision:1,clientKey:'modern-unknown-key'};
+  const modernSaved=await put(handle,modern);
+  assert.equal(modernSaved.status,200);
+  const tampered=await put(handle,{...modern,state:{...modern.state,prefs:{...modern.state.prefs,futureUnknownOptionX:'different'}}});
+  assert.equal(tampered.status,409,'새 기록의 모르는 설정 값 변경은 기존 키를 재사용하지 못함');
+});
+
+
+test('#1649 보강 4b: shelfOpenMode 추가 전 요청도 동일 키로 재전송되며 변경 요청은 충돌한다', async () => {
+  const {handle,repo}=buildHandle();
+  const state=validateState({version:1,trees:[],prefs:{}});
+  const olderPrefs={...state.prefs};
+  delete olderPrefs.shelfOpenMode;
+  const oldState={...state,prefs:olderPrefs};
+  const clientKey='legacy-before-shelf';
+  const previous=await repo.commit({productId:PRODUCT,subjectId:'usr_a',doc:oldState,
+    expectedRevision:0,clientKey,requestHash:requestHashOf(oldState,0)});
+  assert.equal(previous.status,'saved');
+  const retry=await put(handle,{state:oldState,expectedRevision:0,clientKey});
+  assert.equal(retry.status,200,'추가 설정을 몰랐던 옛 서버의 요청도 재전송 성공');
+  assert.equal(retry.body.revision,previous.revision);
+  const changed=await put(handle,{state:{...oldState,prefs:{...oldState.prefs,shelfOpenMode:'direct'}},
+    expectedRevision:0,clientKey});
+  assert.equal(changed.status,409,'실제로 달라진 새 설정 값은 같은 키로 재전송 거부');
+  assert.equal(changed.body.error.code,'client_key_conflict');
+});

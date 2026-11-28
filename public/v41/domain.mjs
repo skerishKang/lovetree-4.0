@@ -256,22 +256,25 @@ export function normalizeTreeChipOrder(value) {
 }
 export const MAX_UNKNOWN_PREFS = 32;
 export const MAX_UNKNOWN_PREF_BYTES = 16 * 1024;
-// 배포 중 다른 버전이 추가한 설정은 지우지 않되, 저장본이 무한히 커지지 않게 상한을 둔다.
+const UNSAFE_PREF_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+// 모르는 설정은 배포 중 지우지 않되, 위험 키와 실제 JSON 크기 초과 항목은 제외한다.
 function preserveUnknownPrefs(value, knownPrefs) {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
-  const entries = [];
-  let bytes = 0;
+  const saved = Object.create(null);
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return saved;
+  const encoder = new TextEncoder();
   for (const [key, item] of Object.entries(value)) {
-    if (Object.hasOwn(knownPrefs, key) || entries.length >= MAX_UNKNOWN_PREFS || key.length > 80) continue;
-    let serialized;
-    try { serialized = JSON.stringify(item); } catch { continue; }
-    if (serialized === undefined) continue;
-    const keyBytes = new TextEncoder().encode(JSON.stringify(key)).byteLength;
-    const valueBytes = new TextEncoder().encode(serialized).byteLength;
-    if (bytes + keyBytes + valueBytes > MAX_UNKNOWN_PREF_BYTES) continue;
-    try { entries.push([key, JSON.parse(serialized)]); bytes += keyBytes + valueBytes; } catch { /* JSON으로 보존할 수 없는 값은 제외한다. */ }
+    if (Object.hasOwn(knownPrefs, key) || UNSAFE_PREF_KEYS.has(key) ||
+        Object.keys(saved).length >= MAX_UNKNOWN_PREFS || key.length > 80) continue;
+    try {
+      const serialized = JSON.stringify(item);
+      if (serialized === undefined) continue;
+      // 보관 값 안쪽의 예약 키도 지운다. 이후 다른 화면의 객체 병합에서 오염되지 않게 한다.
+      saved[key] = JSON.parse(serialized, (name, entry) => UNSAFE_PREF_KEYS.has(name) ? undefined : entry);
+      // 중괄호·쉼표·콜론까지 포함한 실제 미지원 설정 묶음을 UTF-8로 잰다.
+      if (encoder.encode(JSON.stringify(saved)).byteLength > MAX_UNKNOWN_PREF_BYTES) delete saved[key];
+    } catch { delete saved[key]; /* 순환 참조나 깊은 값은 보존하지 않는다. */ }
   }
-  return Object.fromEntries(entries);
+  return saved;
 }
 export function normalizePrefs(value) {
   const known = {

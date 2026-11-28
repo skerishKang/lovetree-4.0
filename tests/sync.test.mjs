@@ -319,3 +319,23 @@ test('4.0 실패 뒤 추가 편집도 최신 상태로 보관한다', async () =
   await next.controller.start();
   assert.deepEqual(next.current(), latest);
 });
+
+
+test('#1649 보강 3: 서버 저장 완료·응답 유실 뒤 다음 접속에 같은 본문이면 충돌 없이 보관본을 지운다', async () => {
+  const draftStorage=memStorage();
+  const unsaved=doc('응답이 사라진 순간');
+  const firstApi=fakeApi({get:[{...okGet(0,EMPTY),subject:'usr_a'}],put:[networkDown]});
+  const first=harness({initial:EMPTY,api:firstApi,draftStorage,delay:()=>new Promise(()=>{})});
+  await first.controller.start();
+  first.edit(unsaved);first.controller.markLocalSave();
+  await first.controller.act('retry');
+  assert.equal(draftStorage.length,1,'응답을 받지 못한 편집은 보관');
+  const openedApi=fakeApi({get:[{...okGet(1,unsaved),subject:'usr_a'}]});
+  const opened=harness({initial:EMPTY,api:openedApi,draftStorage,delay:()=>new Promise(()=>{})});
+  const result=await opened.controller.start();
+  assert.equal(result.phase,'synced','서버 내용이 같다면 거짓 충돌 없음');
+  assert.equal(opened.controller.snapshot().dirty,false,'이미 저장된 본문은 다시 쓸 필요 없음');
+  assert.equal(draftStorage.length,0,'확인된 보관본 제거');
+  assert.deepEqual(opened.current(),unsaved);
+  assert.equal(openedApi.puts().length,0,'동일한 본문을 중복 PUT하지 않음');
+});
