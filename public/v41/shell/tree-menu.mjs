@@ -100,7 +100,18 @@ function activeViewFrame(){
 }
 function tellFrame(open, focus=false){
  const frame=activeFrame;
- if(frame?.contentWindow)frame.contentWindow.postMessage({type:MSG.toolbarTreePickerState,open,focus},location.origin);
+ if(!frame?.contentWindow)return;
+ // #1582: 메뉴와 열림 표시를 같은 호출에서 바꾼다. 상태 메시지가 뒤늦게 도착해 둘이 어긋나지 않게 한다.
+ try{
+  const choice=frame.contentDocument?.querySelector('button.lt-toolbar-tree-choice');
+  if(choice){
+   choice.setAttribute('aria-expanded',String(open));
+   if(focus)choice.focus();
+   return;
+  }
+ }catch{}
+ // 문서 또는 단추를 아직 읽을 수 없는 경우에만 기존 메시지 경로를 쓴다.
+ frame.contentWindow.postMessage({type:MSG.toolbarTreePickerState,open,focus},location.origin);
 }
 function focusChoiceOnReady(){
  const frame=activeViewFrame();
