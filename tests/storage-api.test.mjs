@@ -7,11 +7,12 @@ import net from 'node:net';
 import { createWorkspaceApi, refreshUnauthorized } from '../public/v41/api.mjs';
 import { setVisitMode } from '../public/v41/visit-mode.mjs';
 import { createMemberSession } from '../public/v41/member-session.mjs';
-import { addMoment, createTree, linkMoments, validateState } from '../src/domain.js';
+import { addMoment, createTree, linkMoments, validateState, EMPTY_STATE } from '../src/domain.js';
 import { ApiError } from '../server/errors.js';
 import { createApiHandler, createNodeHandler } from '../server/http.js';
 import { createWorkspaceService, readStoredDocument } from '../server/workspace-service.js';
 import { createMemoryWorkspaceRepo } from '../server/testing/memory-workspace-repo.js';
+import { createRateLimiter } from '../server/rate-limit.js';
 import { assertIsolatedTestDatabase } from '../server/testing/isolated-test-database.js';
 
 const unhandled = [];
@@ -104,6 +105,31 @@ test('save then read preserves ids, parents, links and order', async () => {
   assert.deepEqual(moments.map(m => m.id), state.trees[0].moments.map(m => m.id));
   assert.deepEqual(moments.map(m => m.parentId), state.trees[0].moments.map(m => m.parentId));
   assert.deepEqual(moments.map(m => m.links), state.trees[0].moments.map(m => m.links));
+});
+
+test('4.1 저장 API는 429의 Retry-After를 읽는다', async () => {
+  const api = createWorkspaceApi({fetchImpl:async () => new Response(JSON.stringify({error:{code:'rate_limited'}}), {status:429, headers:{'retry-after':'9'}})});
+  const result = await api.put({state:EMPTY_STATE(), expectedRevision:0, clientKey:'rate-header'});
+  assert.equal(result.status,429);
+  assert.equal(result.retryAfterSeconds,9);
+});
+
+test('워크스페이스 저장 횟수 제한은 개정을 늘리지 않고 창이 지나면 다시 허용한다', async () => {
+  let at = Date.parse('2026-11-28T00:00:00.000Z');
+  const repo = createMemoryWorkspaceRepo();
+  const service = createWorkspaceService({ repo, productId: PRODUCT, rateLimiter: createRateLimiter({now:()=>at}) });
+  const principal = { productId: PRODUCT, subjectId: 'usr_rate' };
+  const state = sampleState();
+  let revision = 0;
+  for (let index = 0; index < 15; index += 1) {
+    const saved = await service.write(principal, {state, expectedRevision:revision, clientKey:`rate-${index}`});
+    revision = saved.revision;
+  }
+  await assert.rejects(() => service.write(principal, {state, expectedRevision:revision, clientKey:'rate-blocked'}), error => error.status === 429 && error.code === 'rate_limited');
+  assert.equal((await repo.load(principal)).revision, 15);
+  at += 10_001;
+  const saved = await service.write(principal, {state, expectedRevision:revision, clientKey:'rate-after-window'});
+  assert.equal(saved.revision, 16);
 });
 
 test('트리별 열 화면은 서버에 저장되고 한 트리를 바꿔도 재로그인 뒤 다른 트리의 값이 유지된다', async (t) => {

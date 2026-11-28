@@ -4,6 +4,7 @@ import { ApiError } from './errors.js';
 import { ROLE_ADMIN } from './admin-roles.js';
 import { parsePrincipal } from './principal.js';
 import { OPS_INGEST_PATH } from './proxy-proof.js';
+import { retryAfterHeaders, trustedClientIp } from './rate-limit.js';
 
 export const DEFAULT_MAX_BODY_BYTES = 4 * 1024 * 1024;
 export const DEFAULT_BODY_READ_TIMEOUT_MS = 30_000;
@@ -105,7 +106,7 @@ export function createAfterResponseQueue({
   };
 }
 
-export function createApiHandler({ authenticate, service, productId, admin = null, adminStats = null, account = null, accountDeleteAuthenticate = null, accountDeleteWorkflow = null, allowedOrigins = [], maxBodyBytes = DEFAULT_MAX_BODY_BYTES }) {
+export function createApiHandler({ authenticate, service, productId, admin = null, adminStats = null, account = null, accountDeleteAuthenticate = null, accountDeleteWorkflow = null, allowedOrigins = [], maxBodyBytes = DEFAULT_MAX_BODY_BYTES, proxyProofTrusted = () => false }) {
   async function handle(request) {
     const { method = 'GET', path = '', body = '' } = request ?? {};
     const text = typeof body === 'string' ? body : String(body);
@@ -203,7 +204,7 @@ export function createApiHandler({ authenticate, service, productId, admin = nul
         const { expectedSubject, ...write } = payload;
         payload = write;
       }
-      return { status: 200, body: await service.write(principal, payload) };
+      return { status: 200, body: await service.write(principal, payload, { clientIp: trustedClientIp(request, proxyProofTrusted(request)) }) };
     }
     throw new ApiError(405, 'method_not_allowed', '이 요청은 지원하지 않아요.');
   }
@@ -214,7 +215,7 @@ export function createApiHandler({ authenticate, service, productId, admin = nul
       // 저장 경로의 응답 모양은 바꾸지 않는다 — 헤더는 실제로 붙인 자리만 지나간다.
       return headers ? { status, body, headers } : { status, body };
     } catch (error) {
-      if (error instanceof ApiError) return { status: error.status, body: errorBody(error) };
+      if (error instanceof ApiError) return { status: error.status, body: errorBody(error), ...(error.code === 'rate_limited' ? { headers: retryAfterHeaders({}, error) } : {}) };
       logServerError(error, 'lovetree-storage');
       return { status: 500, body: { error: { code: 'internal_error', message: '서버에서 처리하지 못했어요.' } } };
     }

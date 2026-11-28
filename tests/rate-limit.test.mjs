@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createRateLimiter} from '../server/rate-limit.js';
+import {createRateLimiter,rateRequest,REQUEST_RATE_LIMITS,retryAfterHeaders,trustedClientIp} from '../server/rate-limit.js';
 import {ApiError} from '../server/errors.js';
 
 const START=Date.parse('2026-11-22T12:00:00.000Z');
@@ -46,4 +46,31 @@ test('판정: 창이 지난 뒤 Map 크기 0',()=>{
  at+=60_001; // 창이 지났고 새 요청은 아직 없다
  limiter.prune();
  assert.equal(limiter.hits.size,0,'빈 목록은 키 삭제 — 창이 지나면 Map이 비는다');
+});
+
+test('저장 요청은 짧은 묶음과 분당 한도를 함께 세고 Retry-After를 준다',async()=>{
+ let at=START;
+ const limiter=createRateLimiter({now:()=>at});
+ for(let index=0;index<15;index+=1)await rateRequest(limiter,{productId:'p',scope:'workspace-put',subjectId:'member',...REQUEST_RATE_LIMITS.workspace});
+ await assert.rejects(()=>rateRequest(limiter,{productId:'p',scope:'workspace-put',subjectId:'member',...REQUEST_RATE_LIMITS.workspace}),error=>
+   error instanceof ApiError&&error.status===429&&error.details.retryAfterSeconds>0&&error.details.retryAfterSeconds<=10);
+ at+=10_001;
+ await rateRequest(limiter,{productId:'p',scope:'workspace-put',subjectId:'member',...REQUEST_RATE_LIMITS.workspace});
+});
+
+test('900ms 간격 자동 저장 1분은 한도에 걸리지 않는다',async()=>{
+ let at=START;
+ const limiter=createRateLimiter({now:()=>at});
+ for(let index=0;index<67;index+=1){
+  await rateRequest(limiter,{productId:'p',scope:'workspace-put',subjectId:'member',...REQUEST_RATE_LIMITS.workspace});
+  at+=901;
+ }
+});
+
+test('IP는 프록시 증명이 있을 때만 쓰고 429 머리말을 만든다',()=>{
+ const request={headers:{'x-lovetree-client-ip':'203.0.113.9'}};
+ assert.equal(trustedClientIp(request,false),null);
+ assert.equal(trustedClientIp(request,true),'203.0.113.9');
+ const error=new ApiError(429,'rate_limited','잠시 뒤 다시 시도해 주세요.',{retryAfterSeconds:7});
+ assert.deepEqual(retryAfterHeaders({'cache-control':'no-store'},error),{'cache-control':'no-store','retry-after':'7'});
 });

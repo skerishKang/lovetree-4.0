@@ -8,6 +8,7 @@ import {createMemoryShareRepo} from '../server/testing/memory-share-repo.js';
 import {createMemoryTreeDiscoverRepo} from '../server/testing/memory-tree-discover-repo.js';
 import {createMemoryCommunityRepo} from '../server/testing/memory-community-repo.js';
 import {createShareHandler,createShareService,projectSharedTree,projectSharedTreeFromScan} from '../server/share-service.js';
+import {createRateLimiter} from '../server/rate-limit.js';
 import {PUBLIC_TREE_FIELDS,PUBLIC_MOMENT_FIELDS,PUBLIC_MEDIA_FIELDS,PUBLIC_VISIT_PREFS,projectPublicVisitPrefs} from '../server/public-projection.js';
 import {createMemberSession} from '../public/v41/member-session.mjs';
 import {safePublicThumbnail} from '../public/v41/public-thumbnail.mjs';
@@ -19,11 +20,11 @@ const first=createTree({subject:'윤슬',title:'첫 장면',note:'비밀 마음'
 const second=createTree({subject:'다른 대상',title:'다른 트리',note:'절대 공개하지 않음',emotion:'위로',date:'2026-11-01',url:'https://example.com/public'},CLOCK);
 const state={version:1,trees:[first,second]};
 
-async function setup(documentState=state,admin=null,{visibilityRepo=null,discoverRepo=null,communityRepo=null}={}){
+async function setup(documentState=state,admin=null,{visibilityRepo=null,discoverRepo=null,communityRepo=null,rateLimiter=null,now=()=>Date.now()}={}){
  const workspaceRepo=createMemoryWorkspaceRepo(),workspace=createWorkspaceService({repo:workspaceRepo,productId:PRODUCT});
  await workspace.write(principal('alice'),{state:documentState,expectedRevision:0,clientKey:'seed',});
  const shareRepo=createMemoryShareRepo();let n=0;
- const service=createShareService({shareRepo,workspaceRepo,visibilityRepo,discoverRepo,communityRepo,productId:PRODUCT,admin,makeId:()=>String(++n).padStart(24,'s')});
+ const service=createShareService({shareRepo,workspaceRepo,visibilityRepo,discoverRepo,communityRepo,productId:PRODUCT,admin,makeId:()=>String(++n).padStart(24,'s'),rateLimiter,now});
  const authenticate=async request=>principal(request.headers?.account||'alice');
  return {workspace,workspaceRepo,shareRepo,visibilityRepo,discoverRepo,communityRepo,service,handle:createShareHandler({authenticate,service,productId:PRODUCT})};
 }
@@ -58,6 +59,58 @@ test('preview is non-mutating and explicit create exposes one projected tree onl
  assert.equal(publicRead.body.tree.moments[0].url,'');
  assert.equal(JSON.stringify(publicRead.body).includes('/api/media/'),false,'공유 응답에 올린 사진 주소가 없다');
  assert.equal(JSON.stringify(publicRead.body).includes(second.title),false);assert.equal('state' in publicRead.body,false);assert.equal(JSON.stringify(publicRead.body).includes('alice'),false);
+});
+
+test('공유 미리보기·만들기 횟수 제한은 행을 늘리지 않고 창이 지나면 다시 허용한다',async()=>{
+ let at=Date.parse('2026-11-28T00:00:00.000Z');
+ const {handle,shareRepo}=await setup(state,null,{rateLimiter:createRateLimiter({now:()=>at}),now:()=>at});
+ const input={treeId:first.id,entryMomentId:first.moments[0].id,view:'book'};
+ for(let index=0;index<10;index+=1)assert.equal((await request(handle,'POST','/api/shares/preview',input,'alice')).status,200);
+ const limitedPreview=await request(handle,'POST','/api/shares/preview',input,'alice');
+ assert.equal(limitedPreview.status,429);assert.equal(limitedPreview.headers['retry-after']!==undefined,true);
+ at+=10_001;
+ const madeIds=[];
+ for(let index=0;index<5;index+=1){
+  const preview=await request(handle,'POST','/api/shares/preview',input,'alice');
+  const made=await request(handle,'POST','/api/shares',{...input,previewToken:preview.body.preview.previewToken},'alice');
+  assert.equal(made.status,201);madeIds.push(made.body.share.id);
+ }
+ const before=(await shareRepo.list({productId:PRODUCT,subjectId:'alice'})).length;
+ const preview=await request(handle,'POST','/api/shares/preview',input,'alice');
+ const limitedCreate=await request(handle,'POST','/api/shares',{...input,previewToken:preview.body.preview.previewToken},'alice');
+ assert.equal(limitedCreate.status,429);assert.equal(limitedCreate.headers['retry-after']!==undefined,true);
+ assert.equal((await shareRepo.list({productId:PRODUCT,subjectId:'alice'})).length,before);
+ at+=10_001;
+ const after=await request(handle,'POST','/api/shares/preview',input,'alice');
+ const allowed=await request(handle,'POST','/api/shares',{...input,previewToken:after.body.preview.previewToken},'alice');
+ assert.equal(allowed.status,201);assert.equal(new Set([...madeIds,allowed.body.share.id]).size,6);
+});
+
+test('미리보기 토큰은 1회성이고 응답 유실 재시도는 같은 공유를 돌려준다',async()=>{
+ const {handle,shareRepo}=await setup(),input={treeId:first.id,entryMomentId:first.moments[0].id,view:'book'};
+ const preview=await request(handle,'POST','/api/shares/preview',input,'alice');
+ const payload={...input,previewToken:preview.body.preview.previewToken};
+ const made=await request(handle,'POST','/api/shares',payload,'alice');
+ const replay=await request(handle,'POST','/api/shares',payload,'alice');
+ assert.equal(made.status,201);assert.equal(replay.status,201);assert.equal(replay.body.share.id,made.body.share.id);
+ assert.equal((await shareRepo.list({productId:PRODUCT,subjectId:'alice'})).length,1);
+ const nextPreview=await request(handle,'POST','/api/shares/preview',input,'alice');
+ const next=await request(handle,'POST','/api/shares',{...input,previewToken:nextPreview.body.preview.previewToken},'alice');
+ assert.equal(next.status,201);assert.notEqual(next.body.share.id,made.body.share.id);
+});
+
+test('미리보기 토큰은 5분 뒤 만료되고 그 사이 기록이 바뀌면 다시 미리 봐야 한다',async()=>{
+ let at=Date.parse('2026-11-28T00:00:00.000Z');
+ const {handle,workspace}=await setup(state,null,{now:()=>at}),input={treeId:first.id,entryMomentId:first.moments[0].id,view:'book'};
+ const expired=await request(handle,'POST','/api/shares/preview',input,'alice');
+ at+=300_001;
+ const expiredCreate=await request(handle,'POST','/api/shares',{...input,previewToken:expired.body.preview.previewToken},'alice');
+ assert.equal(expiredCreate.status,409);assert.equal(expiredCreate.body.error.code,'share_preview_expired');
+ const stale=await request(handle,'POST','/api/shares/preview',input,'alice');
+ const changed=structuredClone(state);changed.trees[0].title='바뀐 제목';
+ await workspace.write(principal('alice'),{state:changed,expectedRevision:1,clientKey:'stale-preview'});
+ const staleCreate=await request(handle,'POST','/api/shares',{...input,previewToken:stale.body.preview.previewToken},'alice');
+ assert.equal(staleCreate.status,409);assert.equal(staleCreate.body.error.code,'share_preview_stale');
 });
 
 test('공개 투영은 허용 목록 밖 필드를 버리고 내부 트리 id를 공유 id로 바꾼다',()=>{

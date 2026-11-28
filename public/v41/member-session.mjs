@@ -10,7 +10,7 @@ function sameWithoutTheme(a,b){
  const {theme:_a,...left}=a.prefs||{}, {theme:_b,...right}=b.prefs||{};
  return JSON.stringify({...a,prefs:left})===JSON.stringify({...b,prefs:right});
 }
-export function createMemberSession({api,onState=()=>{},onStatus=()=>{},onGuard=()=>{},navigate=()=>{},delay,makeClientKey=()=>`v41-${newId()}`,draftStorage=sessionDraftStorage(),cacheStorage=sessionCacheStorage(),themeStorage=cacheStorage}){
+export function createMemberSession({api,onState=()=>{},onStatus=()=>{},onGuard=()=>{},navigate=()=>{},delay,makeClientKey=()=>`v41-${newId()}`,schedule,cancelSchedule,draftStorage=sessionDraftStorage(),cacheStorage=sessionCacheStorage(),themeStorage=cacheStorage}){
  let document=EMPTY_STATE(),subject=null,bound=false,active=true,mismatch=false,themeMissing=false,migrateTheme=false;
  let accountState=null,accountThemeMissing=false,themeIntent=null,firstThemeSave=false;
  const wrapped={get:async()=>{const result=await api.get();if(!active)return {ok:false,status:401};
@@ -64,7 +64,7 @@ export function createMemberSession({api,onState=()=>{},onStatus=()=>{},onGuard=
      try{themeStorage?.setItem(THEME_KEY,next.prefs.theme);}catch{}
    }};
  }
- const sync=createSyncController({resolveRevisionConflict:resolveThemeConflict,getState:()=>document,replaceState:s=>{if(!active)return;document=validateState(s);onState(structuredClone(document));},onGuard,api:wrapped,draftStorage,cacheStorage,delay,makeClientKey,navigate:url=>navigate(url.startsWith('/auth/login')?'/auth/login?next=/v41/':url),onChange:s=>{if(active)onStatus({...s,writable:sync.snapshot().owned&&bound&&!mismatch,dirty:sync.snapshot().dirty});}});
+ const sync=createSyncController({resolveRevisionConflict:resolveThemeConflict,getState:()=>document,replaceState:s=>{if(!active)return;document=validateState(s);onState(structuredClone(document));},onGuard,api:wrapped,draftStorage,cacheStorage,delay,makeClientKey,schedule,cancelSchedule,navigate:url=>navigate(url.startsWith('/auth/login')?'/auth/login?next=/v41/':url),onChange:s=>{if(active)onStatus({...s,writable:sync.snapshot().owned&&bound&&!mismatch,dirty:sync.snapshot().dirty});}});
  // 이슈 644 3번: 탭을 다시 보거나 창으로 돌아오면 최신 기록을 확인한다. 이 화면에서 고친 게 없을 때만
  // 조용히 최신 기록을 불러온다(띠 없음) — 확인 자체는 sync 컨트롤러의 check()가 판정한다. 4초에 한 번 넘지 않게 쉰다.
  let lastQuietCheck = 0;

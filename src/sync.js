@@ -4,7 +4,7 @@ const LABELS = {
   checking: '서버 확인 중', login: '저장하려면 로그인해 주세요',
   synced: '서버와 동기화됨', syncing: '서버에 저장 중',
   offline: '서버 연결을 확인할 수 없어요', conflict: '서버 기록이 먼저 바뀌었어요',
-  rejected: '서버가 이 저장을 받지 않았어요'
+  throttled: '저장 대기', rejected: '서버가 이 저장을 받지 않았어요'
 };
 function status({ phase, detail = null, actions = [] }) {
   return { phase, label: LABELS[phase], detail, actions };
@@ -15,16 +15,46 @@ function status({ phase, detail = null, actions = [] }) {
 export function createSyncController({getState, replaceState, api,
   makeClientKey = () => `front-${crypto.randomUUID()}`,
   delay = ms => new Promise(resolve => setTimeout(resolve, ms)),
+  schedule = (fn, ms) => setTimeout(fn, ms), cancelSchedule = handle => clearTimeout(handle),
   onChange = () => {}, navigate = url => globalThis.location.assign(url)}) {
   let current = status({phase:'checking'}), listener = () => {};
   let owned = false, revision = null, dirty = false, generation = 0;
   let queued = 0, inflight = false, attempt = null, seenRevision = null;
+  let rateRetryCount = 0, rateTimer = null;
   const emit = value => { current = value; onChange(value); listener(value); return value; };
   const actions = { login: [{name:'login',label:'로그인'}], logout: [{name:'logout',label:'로그아웃'}],
-    retry: [{name:'retry',label:'다시 시도'}] };
+    retry: [{name:'retry',label:'다시 시도'}], backup: [{name:'backup',label:'백업 내려받기'}] };
+
+  function cancelRateRetry() {
+    if (rateTimer) cancelSchedule(rateTimer);
+    rateTimer = null;
+  }
+  function resetRateRetry() {
+    cancelRateRetry();
+    rateRetryCount = 0;
+  }
+  function scheduleRateRetry(answer) {
+    cancelRateRetry();
+    if (rateRetryCount >= 4) return emit(status({
+      phase:'throttled', detail:'저장 요청이 잠시 많아요. 다시 시도하거나 기록을 백업해 주세요.',
+      actions:[...actions.retry,...actions.backup]
+    }));
+    const wait = rateRetryCount === 0
+      ? Math.max(2, Math.min(60, answer.retryAfterSeconds || 2))
+      : [2, 4, 8][rateRetryCount - 1];
+    emit(status({phase:'throttled',detail:`저장 대기 중이에요. ${wait}초 뒤 다시 저장합니다.`,actions:[]}));
+    rateTimer = schedule(() => {
+      rateTimer = null;
+      rateRetryCount += 1;
+      void push({rateRetry:true});
+    }, wait * 1000);
+    rateTimer?.unref?.();
+    return current;
+  }
 
   async function start() {
     const gen = generation;
+    resetRateRetry();
     emit(status({phase:'checking'}));
     const result = await api.get();
     if (gen !== generation) return current;
@@ -55,20 +85,24 @@ export function createSyncController({getState, replaceState, api,
     inflight = false;
     if (gen !== generation) return current;
     if (answer.ok) {
+      resetRateRetry();
       revision = answer.revision; attempt = null;
       dirty = JSON.stringify(getState()) !== sent.serial;
       if (dirty) return push();
       return emit(status({phase:'synced',actions:actions.logout}));
     }
     if (answer.status === 401 || answer.code === 'unauthenticated') {
+      resetRateRetry();
       owned = false; revision = null; attempt = null;
       return emit(status({phase:'login',detail:'로그인이 만료되어 서버에 저장하지 못했어요.',actions:actions.login}));
     }
     if (answer.status === 409 && answer.code === 'revision_conflict') {
+      resetRateRetry();
       seenRevision = answer.currentRevision;
       return emit(status({phase:'conflict',detail:'서버 기록이 바뀌었어요. 서버 기록을 열거나 현재 입력으로 덮어쓰기를 선택해 주세요.',
         actions:[{name:'pull',label:'서버 기록 열기'},{name:'force',label:'현재 입력으로 덮어쓰기'}]}));
     }
+    if (answer.status === 429) return scheduleRateRetry(answer);
     if (answer.status === 409 && answer.code === 'client_key_conflict') attempt = null;
     return emit(status({phase:answer.status === 0 ? 'offline' : 'rejected',
       detail:'서버에 저장되지 않았어요. 이 화면을 닫기 전에 다시 시도해 주세요.',actions:actions.retry}));
@@ -77,6 +111,7 @@ export function createSyncController({getState, replaceState, api,
   function markLocalSave() {
     if (!owned || revision === null) return emit(status({phase:'login',actions:actions.login}));
     if (current.phase === 'conflict') { dirty = true; return emit(current); }
+    if (current.phase === 'throttled') { dirty = true; return emit(current); }
     dirty = true; const gen = generation, ticket = ++queued;
     emit(status({phase:'syncing'}));
     void (async () => { await delay(900); if(gen === generation && ticket === queued) await push(); })();
@@ -84,8 +119,11 @@ export function createSyncController({getState, replaceState, api,
   }
 
   async function act(name) {
-    if (name === 'login') { generation++; navigate('/auth/login?next=/'); return current; }
-    if (name === 'retry') return dirty ? push() : start();
+    if (name === 'login') { resetRateRetry(); generation++; navigate('/auth/login?next=/'); return current; }
+    if (name === 'retry') {
+      if (current.phase === 'throttled') resetRateRetry();
+      return dirty ? push() : start();
+    }
     if (name === 'pull') {
       const gen = generation, result = await api.get();
       if (gen !== generation) return current;
@@ -107,6 +145,7 @@ export function createSyncController({getState, replaceState, api,
       return push();
     }
     if (name === 'logout') {
+      resetRateRetry();
       if (dirty || inflight) return emit(status({phase:'rejected',detail:'저장되지 않은 변경이 있어요. 먼저 다시 저장해 주세요.',actions:actions.retry}));
       const gen = ++generation, answer = await api.logout();
       if (gen !== generation) return current;
@@ -166,6 +205,7 @@ export function createWorkspaceApi({ fetchImpl = (...args) => globalThis.fetch(.
         code: payload?.error?.code ?? null,
         message: payload?.error?.message ?? null,
         currentRevision: payload?.error?.currentRevision ?? undefined,
+        retryAfterSeconds: Number.isSafeInteger(payload?.error?.retryAfterSeconds) ? payload.error.retryAfterSeconds : Number(response.headers?.get?.('retry-after')) || null,
         revision: Number.isSafeInteger(payload?.revision) ? payload.revision : undefined,
         subject: typeof payload?.subject === 'string' && payload.subject ? payload.subject : null,
         savedAt: payload?.savedAt ?? null,
@@ -191,13 +231,13 @@ export function createWorkspaceApi({ fetchImpl = (...args) => globalThis.fetch(.
 }
 
 // Save failures are temporary notices; normal sync states do not occupy the page.
-export function mountSync({ controller, notify = () => {} }) {
+export function mountSync({ controller, notify = () => {}, backup = () => {} }) {
   controller.subscribe(state => {
-    if (!controller.snapshot().dirty || !['offline', 'rejected', 'conflict', 'login'].includes(state.phase)) return;
+    if (!controller.snapshot().dirty || !['offline', 'rejected', 'conflict', 'login', 'throttled'].includes(state.phase)) return;
     const message = state.phase === 'login'
       ? '저장하지 못했어요. 오른쪽 위 로그인 버튼을 눌러 주세요.'
       : state.detail || '저장하지 못했어요. 다시 시도해 주세요.';
-    const actions = state.actions.filter(action => ['retry', 'pull', 'force'].includes(action.name));
-    notify(message, actions, name => controller.act(name));
+    const actions = state.actions.filter(action => ['retry', 'pull', 'force', 'backup'].includes(action.name));
+    notify(message, actions, name => name === 'backup' ? backup() : controller.act(name));
   });
 }
