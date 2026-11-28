@@ -89,7 +89,12 @@ test('지도 실제 대비: 앱 2 × 판 2 × 1440·390, 두 보기·선택 상�
           for (const state of view === 'network' ? ['overview', 'focus', 'cluster'] : ['overview', 'focus']) {
             if (state === 'focus') {
               await settleMap(frame);
-              const dot = await frame.evaluate(() => window.__lt.dots().find(d => !d.first));
+              // 안내 카드·도구가 가린 점은 실제 누름이 되지 않으므로 화면에서 받을 수 있는 점을 고른다.
+              const dot = await frame.evaluate(() => {
+                const canvas = document.getElementById('stage'), r = canvas.getBoundingClientRect();
+                return window.__lt.dots().find(d => !d.first && document.elementFromPoint(r.left + d.x, r.top + d.y) === canvas);
+              });
+              assert.ok(dot, '누를 수 있는 순간 점을 찾지 못함');
               await frame.locator('#stage').click({ position: { x: dot.x, y: dot.y } });
               await settleMap(frame);
               assert.ok(await frame.locator('#detail').evaluate(el => el.classList.contains('open')), '점을 누르면 상세가 열려야 함');

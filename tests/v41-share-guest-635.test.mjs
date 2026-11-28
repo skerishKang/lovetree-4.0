@@ -237,6 +237,20 @@ test('#635 화면: 공유 링크 책(로그아웃) 전 장에서 undefined·null
     for (const [width, height] of [[1440, 900], [390, 844]]) {
       for (const theme of ['night', 'garden']) {
         const { context, page, frame, problems } = await openBook(browser, `${base}/share-host.html?w=${width}&t=${theme}`, { width, height, theme, route: (r) => r.abort() });
+        // 영상 칸은 첫 장에서 실제 보이는 썸네일 자리만 판정한다.
+        // 넘긴 뒤 남는 화면 밖의 lazy 복제본은 불러오기가 시작되지 않아 검사 대상이 아니다.
+        const videoCell = await frame.evaluate(() => {
+          const host = [...document.querySelectorAll('.yt-play[data-lt-thumb-host]')].find(el => {
+            const r = el.getBoundingClientRect();
+            return r.width > 0 && r.height > 0 && r.right > 0 && r.bottom > 0 && r.left < innerWidth && r.top < innerHeight;
+          });
+          if (!host) return { kind: '없음' };
+          const img = host.querySelector('img');
+          const card = host.querySelector('.lt-fallback-card');
+          const empty = host.querySelector('.yt-placeholder');
+          return { kind: img ? '썸네일' : card ? '글카드' : empty ? '빈상자' : '기타', imgOk: img ? img.naturalWidth > 0 : null };
+        });
+        assert.equal(videoCell.kind, '글카드', `${width}·${theme}: 재생 전 영상 칸이 빈 상자다(${JSON.stringify(videoCell)})`);
         // 책장을 끝까지 넘기기만 한다 — 매 장의 흔적 값·겹침·가려짐은 화면 공통 검사기(#657)가 같은 규칙으로 잡는다.
         await sweepPages(frame);
         assert.equal(problems.length, 0, `${width}·${theme}: 화면 오류 ${problems.join(' | ')}`);
@@ -244,16 +258,6 @@ test('#635 화면: 공유 링크 책(로그아웃) 전 장에서 undefined·null
         const layout = await scanBookLayout(frame);
         assert.equal(layout.turnWhyShown, false, `${width}·${theme}: 감상 화면에 책장 넘기기 힌트 상자가 보인다`);
         assert.equal(layout.turnWhyOpacity, 0, `${width}·${theme}: 힌트 상자가 반투명으로 남는다`);
-        // #635 PR B: 영상 칸은 빈 상자가 아니다(영상이 있는 장에서) — 썸네일 또는 제목 글 카드다.
-        const videoCell = await frame.evaluate(() => {
-          const btn = document.querySelector('.yt-play');
-          if (!btn) return { kind: '없음' };
-          const img = btn.querySelector('img');
-          const card = btn.querySelector('.lt-fallback-card');
-          const empty = btn.querySelector('.yt-placeholder');
-          return { kind: img ? '썸네일' : card ? '글카드' : empty ? '빈상자' : '기타', imgOk: img ? img.naturalWidth > 0 : null };
-        });
-        if (videoCell.kind !== '없음') assert.equal(videoCell.kind, '글카드', `${width}·${theme}: 재생 전 영상 칸이 빈 상자다(${JSON.stringify(videoCell)})`);
         // #635 PR B: 390에서 책 아래 빈 공간이 화면의 1/5를 넘지 않는다(예전 1/4 → 책이 남은 화면을 쓴다).
         if (width === 390) {
           const emptyRatio = (layout.viewport - layout.wrapBottom) / layout.viewport;
@@ -644,7 +648,7 @@ test('#635 PR C 화면: 메뉴 시작 입구·첫날 표기·크게 보기 대�
     for (const theme of ['night', 'garden']) {
       const { context, page, frame, problems } = await openBook(browser, `${base}/share-host.html`, { width: 390, height: 844, theme, route: (r) => r.abort() });
       assert.equal(problems.length, 0, `대비 ${theme}: 화면 오류 ${problems.join(' | ')}`);
-      const expand = await measureContrast(page, frame, '.media-links button');
+      const expand = await measureContrast(page, frame, '.media-links button[data-yt-expand]');
       assert.ok(expand, `${theme}: '크게 보기' 단추를 찾지 못함`);
       assert.ok(expand.ratio >= 4.5, `${theme}: '크게 보기' 대비 ${expand.ratio}:1(${expand.color} on ${expand.bg})`);
       await context.close();
@@ -1415,7 +1419,7 @@ test('#1378 공유 감상: 390·1440 × 밤·정원 재생 iframe 최소 크기�
           await context.route('**/youtube-nocookie.com/**', route => route.fulfill({
             status: 200, contentType: 'text/html', body: '<!doctype html><title>YouTube video</title>',
           }));
-          await frame.locator('[data-yt-play]').first().click({ force: true });
+          await frame.locator('.media-links button.media-play-btn[data-yt-play]').first().click({ force: true });
           await frame.waitForSelector('iframe.yt-frame', { timeout: 10000 });
           if (process.env.LT_1378_SHARE_CAPTURE_DIR) {
             mkdirSync(process.env.LT_1378_SHARE_CAPTURE_DIR, { recursive: true });
@@ -1453,7 +1457,7 @@ test('#1378 공유 감상: 읽기 전용 영상의 임베드 거절은 플레이
       await context.route('**/youtube-nocookie.com/**', route => route.fulfill({
         status: 200, contentType: 'text/html', body: '<title>YouTube video</title>',
       }));
-      await frame.locator('[data-yt-play]').first().click({ force: true });
+      await frame.locator('.media-links button.media-play-btn[data-yt-play]').first().click({ force: true });
       await frame.waitForSelector('.yt-unavailable-note', { timeout: 10000 });
       assert.equal(await frame.locator('iframe.yt-frame').count(), 0, '재생 불가 iframe 제거');
       assert.equal(await frame.locator('.yt-unavailable-link[href*="youtube.com"]').count(), 1,

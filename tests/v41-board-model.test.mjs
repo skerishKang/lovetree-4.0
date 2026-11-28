@@ -9,7 +9,8 @@ import '../public/v41/html-escape.mjs'; // A-15: 글자 막기 정본을 먼저 
 await import('../public/v41/views/board/board-model.js');
 const M = globalThis.LT58Model;
 const BOARD = fs.readFileSync(new URL('../public/v41/views/board/board.js', import.meta.url), 'utf8');
-const EXTRAS = fs.readFileSync(new URL('../public/v41/views/board/board-extras.js', import.meta.url), 'utf8');
+const EXTRAS = ['board-filters.js', 'board-extras.js'].map(file =>
+  fs.readFileSync(new URL(`../public/v41/views/board/${file}`, import.meta.url), 'utf8')).join('\n');
 
 test('0. 보드 한 벌: 화면이 부르는 함수가 전부 있다', () => {
   assert.deepEqual(Object.keys(M).sort(), ['ORDER_Y_BASE', 'boardSize', 'cinemaBeats', 'clampView', 'collectPath', 'contentBox', 'dateDescOrder', 'decorationMotion', 'detailButtonState', 'editGuard', 'escapeHTML', 'filterVisible', 'fitBox', 'fitViewBox', 'fitZoom', 'gridColumns', 'gridPosition', 'gridRowTops', 'isOrderY', 'isPinboardSlot', 'maxCreatedOrder', 'nextConnections', 'orderFromSaved', 'orderOfMoments', 'pinboardSpread', 'rememberView', 'savedView', 'settleColumnGaps', 'slotOf', 'stackLayout', 'startView', 'visibleCards']);

@@ -82,8 +82,8 @@ test('#1611 예약 전체 검사와 네 필수 검사 이름·실행기 분배�
     assert.ok(body(job).includes('    name: '+name),job+' 필수 검사 이름 그대로');
   assert.match(workflow,/cron: "0 2,10,18 \* \* \*"/);
   assert.match(workflow,/workflow_dispatch:/);
-  assert.match(body('screen-common-a'),/runs-on: .*vars\.USE_CGI_RUNNER/);
-  assert.match(body('screen-common-b'),/runs-on: ubuntu-latest/);
+  assert.match(body('screen-common-a'),/runs-on: .*needs\.runner_picker\.outputs\.screen_common_a/);
+  assert.match(body('screen-common-b'),/runs-on: .*needs\.runner_picker\.outputs\.screen_common_b/);
   const runs=body('screen-common-a').match(/LT_SCREEN_AUDIT_SHARD=[abc] .*tests\/v41-screen-audit\.test\.mjs/g)||[];
   assert.equal(runs.length,3,'공통 검사 A/B/C 원래 세 실행 조합 유지');
   for(const shard of ['a','b','c'])
