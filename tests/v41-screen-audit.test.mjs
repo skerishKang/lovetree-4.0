@@ -3294,7 +3294,8 @@ test('#1026 무대 불러오는 중 표시 — 느림 표시·빠름 비표시·
         await page.evaluate(() => {
           const record = window.stageAudit = {
             loadingAt: null, retryAt: null, before800At: null, before800Visible: null,
-            earlyLoading: false, shownAfter800: false, at10000: null, box: null, cls: 0
+            earlyLoading: false, shownAfter800: false, after800Observed: false,
+            after800Visible: false, at10000: null, box: null, cls: 0
           };
           const addShifts = entries => {
             for (const entry of entries) if (!entry.hadRecentInput) record.cls += entry.value;
@@ -3339,7 +3340,12 @@ test('#1026 무대 불러오는 중 표시 — 느림 표시·빠름 비표시·
               requestAnimationFrame(sample);
             };
             requestAnimationFrame(sample);
-            // 800ms 뒤 '첫 실제 보임'은 위 프레임 관찰로 기록한다.
+            // 늦은 표시 판정은 첫 실제 보임 시각으로 하고, 빠른 응답은
+            // 기존처럼 800ms 이후 두 번의 화면 그리기까지 기다려 비표시를 확인한다.
+            afterPaint(800, () => {
+              record.after800Visible = !!notice();
+              record.after800Observed = true;
+            });
             // 다시 시도 10초 기준은 기존 그대로 유지한다.
             afterPaint(10000, () => { record.at10000 = !!retry(); });
           }, { capture: true, once: true });
@@ -3357,10 +3363,11 @@ test('#1026 무대 불러오는 중 표시 — 느림 표시·빠름 비표시·
         await page.getByRole('heading', { name: share.title, exact: true }).waitFor();
         const cover = await card.locator('img').elementHandle();
         await page.waitForFunction(img => img.complete && img.naturalWidth > 0 && img.checkVisibility({ opacityProperty: true, visibilityProperty: true }), cover);
-        await page.waitForFunction(() => {
+        await page.waitForFunction(needsFastCheck => {
           const state = window.finishStageAudit();
-          return state.before800At !== null && !state.loading && !state.retry;
-        });
+          return state.before800At !== null && (!needsFastCheck || state.after800Observed) &&
+            !state.loading && !state.retry;
+        }, condition === '빠름');
         await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
         const result = await page.evaluate(() => window.finishStageAudit());
         console.log('#1026', condition, JSON.stringify(result));
@@ -3371,6 +3378,8 @@ test('#1026 무대 불러오는 중 표시 — 느림 표시·빠름 비표시·
         assert.equal(result.before800Visible, false, '0.8초 직전 프레임에는 안내가 보이지 않는다');
         assert.equal(result.earlyLoading, false, '0.8초 이전 어느 프레임에서도 안내가 보이지 않는다');
         if (condition === '빠름') {
+          assert.equal(result.after800Observed, true, '빠른 응답도 0.8초 이후 두 프레임까지 관찰한다');
+          assert.equal(result.after800Visible, false, '빠른 응답에서는 0.8초가 지나도 안내가 보이지 않는다');
           assert.equal(result.loadingAt, null, '즉시 응답하면 0.8초가 지나도 안내가 한 번도 보이지 않는다');
         } else {
           assert.ok(result.loadingAt >= 800 && result.shownAfter800,
