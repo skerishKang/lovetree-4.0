@@ -110,8 +110,30 @@ export function normalizeTreeChipOrder(value) {
   }
   return out;
 }
+export const MAX_UNKNOWN_PREFS = 32;
+export const MAX_UNKNOWN_PREF_BYTES = 16 * 1024;
+const UNSAFE_PREF_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+// 모르는 설정은 배포 중 지우지 않되, 위험 키와 실제 JSON 크기 초과 항목은 제외한다.
+function preserveUnknownPrefs(value, knownPrefs) {
+  const saved = Object.create(null);
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return saved;
+  const encoder = new TextEncoder();
+  for (const [key, item] of Object.entries(value)) {
+    if (Object.hasOwn(knownPrefs, key) || UNSAFE_PREF_KEYS.has(key) ||
+        Object.keys(saved).length >= MAX_UNKNOWN_PREFS || key.length > 80) continue;
+    try {
+      const serialized = JSON.stringify(item);
+      if (serialized === undefined) continue;
+      // 보관 값 안쪽의 예약 키도 지운다. 이후 다른 화면의 객체 병합에서 오염되지 않게 한다.
+      saved[key] = JSON.parse(serialized, (name, entry) => UNSAFE_PREF_KEYS.has(name) ? undefined : entry);
+      // 중괄호·쉼표·콜론까지 포함한 실제 미지원 설정 묶음을 UTF-8로 잰다.
+      if (encoder.encode(JSON.stringify(saved)).byteLength > MAX_UNKNOWN_PREF_BYTES) delete saved[key];
+    } catch { delete saved[key]; /* 순환 참조나 깊은 값은 보존하지 않는다. */ }
+  }
+  return saved;
+}
 export function normalizePrefs(value) {
-  return {
+  const known = {
     theme: globalThis.LT41_THEME_REGISTRY.normalize(value?.theme),
     titleDisplay: normalizeTitleDisplay(value?.titleDisplay),
     displayName: normalizeDisplayName(value?.displayName),
@@ -122,8 +144,8 @@ export function normalizePrefs(value) {
     shareDiscover: normalizeShareDiscover(value?.shareDiscover),
     treeChipOrder: normalizeTreeChipOrder(value?.treeChipOrder),
     bookDisplay: normalizeBookDisplay(value?.bookDisplay), shelfView: normalizeShelfView(value?.shelfView), shelfOpenMode: normalizeShelfOpenMode(value?.shelfOpenMode), homeMoment: normalizeHomeMoment(value?.homeMoment)
-
   };
+  return { ...known, ...preserveUnknownPrefs(value, known) };
 }
 export function updatePrefs(state, patch = {}) {
   return { ...state, version: 1, prefs: normalizePrefs({ ...(state?.prefs || {}), ...(patch || {}) }) };

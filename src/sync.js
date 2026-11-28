@@ -10,15 +10,21 @@ function status({ phase, detail = null, actions = [] }) {
   return { phase, label: LABELS[phase], detail, actions };
 }
 
-// No browser storage is consulted. Unsaved edits live only in this page and
-// must be explicitly retried after a failed server write.
-export function createSyncController({getState, replaceState, api,
+const PENDING_DRAFT_PREFIX = 'lovetree.v4.pending-write:';
+const SUBJECT_VALID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
+const CLIENT_KEY_VALID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
+function pendingDraftKey(subject) {
+  return typeof subject === 'string' && SUBJECT_VALID.test(subject) ? `${PENDING_DRAFT_PREFIX}${subject}` : null;
+}
+
+// 실패한 인증 저장은 같은 탭의 계정별 보관본으로 새로고침을 넘어 복구한다.
+export function createSyncController({getState, replaceState, api, draftStorage = null,
   makeClientKey = () => `front-${crypto.randomUUID()}`,
   delay = ms => new Promise(resolve => setTimeout(resolve, ms)),
   schedule = (fn, ms) => setTimeout(fn, ms), cancelSchedule = handle => clearTimeout(handle),
   onChange = () => {}, navigate = url => globalThis.location.assign(url)}) {
   let current = status({phase:'checking'}), listener = () => {};
-  let owned = false, revision = null, dirty = false, generation = 0;
+  let owned = false, revision = null, dirty = false, generation = 0, activeSubject = null;
   let queued = 0, inflight = false, attempt = null, seenRevision = null;
   let rateRetryCount = 0, rateTimer = null;
   const emit = value => { current = value; onChange(value); listener(value); return value; };
@@ -52,6 +58,57 @@ export function createSyncController({getState, replaceState, api,
     return current;
   }
 
+  function clearPendingDraft(subject = activeSubject) {
+    const key = pendingDraftKey(subject);
+    if (!draftStorage || !key) return;
+    try { draftStorage.removeItem(key); } catch { /* session storage may be unavailable */ }
+  }
+
+  function savePendingDraft() {
+    const key = pendingDraftKey(activeSubject);
+    if (!draftStorage || !key || !owned || revision === null) return;
+    const serial = JSON.stringify(getState());
+    if (!attempt || attempt.serial !== serial || attempt.expected !== revision)
+      attempt = {serial, expected:revision, key:makeClientKey()};
+    try {
+      draftStorage.setItem(key, JSON.stringify({
+        version: 1, subject: activeSubject, expectedRevision: revision,
+        clientKey: attempt.key, state: JSON.parse(serial)
+      }));
+    } catch { /* quota or browser policy: keep the in-page retry state */ }
+  }
+
+  function restorePendingDraft(subject, serverRevision, serverState) {
+    const key = pendingDraftKey(subject);
+    if (!draftStorage || !key) return false;
+    let draft;
+    try {
+      const raw = draftStorage.getItem(key);
+      if (!raw) return false;
+      draft = JSON.parse(raw);
+      if (draft?.version !== 1 || draft.subject !== subject ||
+          !Number.isSafeInteger(draft.expectedRevision) || draft.expectedRevision < 0 ||
+          typeof draft.clientKey !== 'string' || !CLIENT_KEY_VALID.test(draft.clientKey)) throw new Error('invalid_pending_draft');
+      draft.state = validateState(draft.state);
+    } catch {
+      clearPendingDraft(subject);
+      return false;
+    }
+    // 응답만 유실되고 서버 저장은 성공했을 수 있다. 내용이 이미 같다면 재전송·거짓 충돌을 만들지 않는다.
+    if (JSON.stringify(draft.state) === JSON.stringify(serverState)) {
+      clearPendingDraft(subject);
+      return false;
+    }
+    replaceState(draft.state);
+    dirty = true;
+    seenRevision = serverRevision;
+    attempt = {serial:JSON.stringify(draft.state), expected:draft.expectedRevision, key:draft.clientKey};
+    if (draft.expectedRevision === serverRevision)
+      return emit(status({phase:'rejected',detail:'저장하지 못한 내용을 복원했어요. 다시 저장해 주세요.',actions:actions.retry}));
+    return emit(status({phase:'conflict',detail:'서버 기록이 바뀌었어요. 서버 기록을 열거나 현재 입력으로 덮어쓰기를 선택해 주세요.',
+      actions:[{name:'pull',label:'서버 기록 열기'},{name:'force',label:'현재 입력으로 덮어쓰기'}]}));
+  }
+
   async function start() {
     const gen = generation;
     resetRateRetry();
@@ -59,14 +116,16 @@ export function createSyncController({getState, replaceState, api,
     const result = await api.get();
     if (gen !== generation) return current;
     if (!result.ok) {
-      owned = false; revision = null; dirty = false; attempt = null;
+      owned = false; revision = null; dirty = false; attempt = null; activeSubject = null;
       replaceState(EMPTY_STATE());
       if (result.status === 401 || result.code === 'unauthenticated')
         return emit(status({phase:'login',actions:actions.login}));
       return emit(status({phase:'offline',detail:'서버를 확인하지 못했어요. 다시 시도해 주세요.',actions:[...actions.retry,...actions.login]}));
     }
-    owned = true; revision = result.revision; dirty = false; attempt = null; seenRevision = null;
-    replaceState(validateState(result.state));
+    owned = true; revision = result.revision; dirty = false; attempt = null; seenRevision = null; activeSubject = result.subject || null;
+    const serverState = validateState(result.state);
+    replaceState(serverState);
+    if (restorePendingDraft(activeSubject, revision, serverState)) return current;
     return emit(status({phase:'synced',actions:actions.logout}));
   }
 
@@ -78,6 +137,7 @@ export function createSyncController({getState, replaceState, api,
     if (!attempt || attempt.serial !== serial || attempt.expected !== revision)
       attempt = {serial, expected:revision, key:makeClientKey()};
     const sent = attempt;
+    savePendingDraft();
     emit(status({phase:'syncing'}));
     let answer;
     try { answer = await api.put({state:JSON.parse(sent.serial),expectedRevision:sent.expected,clientKey:sent.key}); }
@@ -89,30 +149,35 @@ export function createSyncController({getState, replaceState, api,
       revision = answer.revision; attempt = null;
       dirty = JSON.stringify(getState()) !== sent.serial;
       if (dirty) return push();
+      clearPendingDraft();
       return emit(status({phase:'synced',actions:actions.logout}));
     }
     if (answer.status === 401 || answer.code === 'unauthenticated') {
       resetRateRetry();
+      savePendingDraft();
       owned = false; revision = null; attempt = null;
       return emit(status({phase:'login',detail:'로그인이 만료되어 서버에 저장하지 못했어요.',actions:actions.login}));
     }
     if (answer.status === 409 && answer.code === 'revision_conflict') {
       resetRateRetry();
+      savePendingDraft();
       seenRevision = answer.currentRevision;
       return emit(status({phase:'conflict',detail:'서버 기록이 바뀌었어요. 서버 기록을 열거나 현재 입력으로 덮어쓰기를 선택해 주세요.',
         actions:[{name:'pull',label:'서버 기록 열기'},{name:'force',label:'현재 입력으로 덮어쓰기'}]}));
     }
     if (answer.status === 429) return scheduleRateRetry(answer);
     if (answer.status === 409 && answer.code === 'client_key_conflict') attempt = null;
+    savePendingDraft();
     return emit(status({phase:answer.status === 0 ? 'offline' : 'rejected',
       detail:'서버에 저장되지 않았어요. 이 화면을 닫기 전에 다시 시도해 주세요.',actions:actions.retry}));
   }
 
   function markLocalSave() {
     if (!owned || revision === null) return emit(status({phase:'login',actions:actions.login}));
-    if (current.phase === 'conflict') { dirty = true; return emit(current); }
-    if (current.phase === 'throttled') { dirty = true; return emit(current); }
-    dirty = true; const gen = generation, ticket = ++queued;
+    if (current.phase === 'conflict' || current.phase === 'throttled') {
+      dirty = true; savePendingDraft(); return emit(current);
+    }
+    dirty = true; savePendingDraft(); const gen = generation, ticket = ++queued;
     emit(status({phase:'syncing'}));
     void (async () => { await delay(900); if(gen === generation && ticket === queued) await push(); })();
     return current;
@@ -129,6 +194,7 @@ export function createSyncController({getState, replaceState, api,
       if (gen !== generation) return current;
       if (!result.ok) return emit(status({phase:'offline',detail:'서버 기록을 불러오지 못했어요.',actions:actions.retry}));
       revision = result.revision; dirty = false; attempt = null; seenRevision = null;
+      clearPendingDraft();
       replaceState(validateState(result.state));
       return emit(status({phase:'synced',actions:actions.logout}));
     }
@@ -150,6 +216,7 @@ export function createSyncController({getState, replaceState, api,
       const gen = ++generation, answer = await api.logout();
       if (gen !== generation) return current;
       if (!answer.ok) return emit(status({phase:'rejected',detail:'로그아웃하지 못했어요.',actions:actions.logout}));
+      clearPendingDraft();
       owned = false; revision = null; replaceState(EMPTY_STATE()); navigate('#start');
       return emit(status({phase:'login',actions:actions.login}));
     }

@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import * as server from '../src/domain.js';
 import * as screen from '../public/v41/domain.mjs';
 
-// 어느 허용 목록에도 없는 필드들 — 지금은 두 벌 모두 지운다. 한쪽만 허용하면 이 시험이 실패한다.
+// 어느 허용 목록에도 없는 순간 필드 — 지금은 두 벌 모두 지운다. prefs의 junkPref는 보존한다.
 const UNKNOWN_FIELDS = {z: 1.5, w: '남는가', legacyNote: '옛 문서 흔적'};
 
 const FIXED_STATE = {
@@ -85,14 +85,29 @@ test('두 벌의 validateState가 필드가 다 들어간 고정 문서에서 �
   assert.deepEqual(fromScreenCopy, fromServerCopy);
 });
 
-test('어느 허용 목록에도 없는 필드는 두 벌 모두 같은 방식으로 지운다', () => {
+test('모르는 순간 필드는 지우고 모르는 설정은 보존한다', () => {
   const cleaned = screen.validateState(structuredClone(FIXED_STATE));
   const moment = cleaned.trees[0].moments.find(m => m.id === 'm1');
-  assert.equal(Object.keys(moment).some(key => Object.prototype.hasOwnProperty.call(UNKNOWN_FIELDS, key)), false, '모르는 필드는 출력에 남지 않는다');
-  assert.equal('junkPref' in cleaned.prefs, false, '모르는 설정 값은 출력에 남지 않는다');
+  assert.equal(Object.keys(moment).some(key => Object.prototype.hasOwnProperty.call(UNKNOWN_FIELDS, key)), false, '모르는 순간 필드는 출력에 남지 않는다');
+  assert.equal(cleaned.prefs.junkPref, FIXED_STATE.prefs.junkPref, '모르는 설정 값은 다른 버전이 쓸 수 있게 보존한다');
   assert.equal(moment.keywords.includes('k'.repeat(25)), false, '길이 한도를 넘은 꼬리표는 지운다');
   assert.deepEqual(moment.keywords, ['가수:이름', '무대:쇼', 'k'.repeat(24)]);
 });
+
+for (const [name, domain] of [['서버', server], ['브라우저', screen]]) {
+  test(name + '에서 모르는 설정은 개수·바이트·키 길이 상한 안에서만 보존한다', () => {
+    const many = Object.fromEntries(Array.from({length: domain.MAX_UNKNOWN_PREFS + 5}, (_, index) => [`future-${index}`, index]));
+    const longKey = 'x'.repeat(81);
+    const prefs = domain.normalizePrefs({ small: '남김', huge: '가'.repeat(6000), [longKey]: '버림', ...many });
+    const kept = Object.keys(prefs).filter(key => key === 'small' || key.startsWith('future-'));
+    assert.equal(prefs.small, '남김');
+    assert.equal(prefs.huge, undefined);
+    assert.equal(prefs[longKey], undefined);
+    assert.equal(kept.length, domain.MAX_UNKNOWN_PREFS);
+    const unknown = Object.fromEntries(kept.map(key => [key, prefs[key]]));
+    assert.ok(new TextEncoder().encode(JSON.stringify(unknown)).byteLength <= domain.MAX_UNKNOWN_PREF_BYTES);
+  });
+}
 
 for (const [name, domain] of [['서버', server], ['브라우저', screen]]) {
   test(name + '에서 옛 트리와 잘못된 열 화면은 트리 보기로 읽는다', () => {
@@ -140,5 +155,22 @@ for (const [name, domain] of [['서버', server], ['브라우저', screen]]) {
     assert.deepEqual(imported.trees.map(tree => tree.openView), ['network', 'board', 'tree']);
     assert.notEqual(imported.trees[1].id, currentTree.id);
     assert.deepEqual(current.trees, [currentTree]);
+  });
+}
+
+
+for (const [name,domain] of [['서버',server],['화면',screen]]) {
+  test('#1649 보강 보안 '+name+': 예약된 키와 중첩 오염 키를 지우고 실제 JSON 크기를 지킨다', () => {
+    const raw=JSON.parse('{"__proto__":{"polluted":"yes"},"constructor":{"prototype":{"polluted":"yes"}},"prototype":"danger","nested":{"__proto__":{"polluted":"yes"},"good":1}}');
+    const clean=domain.normalizePrefs(raw);
+    for(const key of ['__proto__','constructor','prototype']) assert.equal(Object.hasOwn(clean,key),false,key+' 제외');
+    assert.equal(Object.hasOwn(clean.nested,'__proto__'),false,'중첩 위험 키 제외');
+    assert.equal(clean.nested.good,1);
+    assert.equal(({}).polluted,undefined,'원형 무오염');
+    const many=Object.fromEntries(Array.from({length:32},(_,i)=>['z'+String(i).padStart(2,'0'),'a'.repeat(505)]));
+    const saved=domain.normalizePrefs(many);
+    const unknown=Object.fromEntries(Object.entries(saved).filter(([key])=>/^z\d\d$/.test(key)));
+    assert.ok(new TextEncoder().encode(JSON.stringify(unknown)).byteLength<=16*1024);
+    assert.ok(Object.keys(unknown).length<32);
   });
 }

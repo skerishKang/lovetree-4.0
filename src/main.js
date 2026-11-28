@@ -37,6 +37,7 @@ const icon = (name, cls = '') => `<svg class="icon ${cls}" aria-hidden="true" vi
 // View-only preferences live in memory; existing browser storage is not read.
 const volatile = new Map();
 const storage = { getItem: key => volatile.get(key) ?? null, setItem: (key, value) => volatile.set(key, String(value)) };
+const draftStorage = (() => { try { return globalThis.sessionStorage; } catch { return null; } })();
 let state = EMPTY_STATE();
 let selectedId = null;
 let navPath = null;
@@ -646,6 +647,7 @@ const sync = createSyncController({
   getState: () => state,
   replaceState: (doc) => { state = validateState(doc); render(); },
   api: createWorkspaceApi(),
+  draftStorage,
   // 화면 경로는 이 파일이 소유한다. 안쪽으로 옮길 때는 앱의 이력 추적을 함께 쓴다.
   navigate: (url) => { if (url.startsWith('#')) go(url); else location.assign(url); },
   // 동기화 상태가 바뀌면 화면을 다시 그리지 않고 상단 진입 버튼 문구만 맞춘다.

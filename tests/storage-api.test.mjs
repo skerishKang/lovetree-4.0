@@ -10,7 +10,7 @@ import { createMemberSession } from '../public/v41/member-session.mjs';
 import { addMoment, createTree, linkMoments, validateState, EMPTY_STATE } from '../src/domain.js';
 import { ApiError } from '../server/errors.js';
 import { createApiHandler, createNodeHandler } from '../server/http.js';
-import { createWorkspaceService, readStoredDocument } from '../server/workspace-service.js';
+import { createWorkspaceService, readStoredDocument, requestHashOf } from '../server/workspace-service.js';
 import { createMemoryWorkspaceRepo } from '../server/testing/memory-workspace-repo.js';
 import { createRateLimiter } from '../server/rate-limit.js';
 import { assertIsolatedTestDatabase } from '../server/testing/isolated-test-database.js';
@@ -185,6 +185,40 @@ test('열 화면이 없던 저장 요청은 배포 뒤에도 재전송할 수 �
   const conflict = await put(handle, { state: doc, expectedRevision, clientKey });
   assert.equal(conflict.status, 409);
   assert.equal(conflict.body.error.code, 'client_key_conflict');
+});
+
+test('모르는 설정은 읽기·일반 편집·저장 뒤에도 유지된다', async () => {
+  const { handle, repo } = buildHandle();
+  const principal = { productId: PRODUCT, subjectId: 'usr_a' };
+  const state = validateState(sampleState());
+  const stored = { ...state, prefs: { ...state.prefs, futureShelfOpenMode: 'direct' } };
+  await repo.commit({ ...principal, doc: stored, expectedRevision: 0, clientKey: 'seed-future-pref', requestHash: '0'.repeat(64) });
+
+  const first = await get(handle);
+  assert.equal(first.body.state.prefs.futureShelfOpenMode, 'direct');
+  const edited = { ...first.body.state, trees: [{ ...first.body.state.trees[0], title: '일반 편집' }] };
+  const saved = await put(handle, { state: edited, expectedRevision: first.body.revision, clientKey: 'save-future-pref' });
+  assert.equal(saved.status, 200);
+  const reread = await get(handle);
+  assert.equal(reread.body.state.prefs.futureShelfOpenMode, 'direct');
+  assert.equal((await repo.load(principal)).doc.prefs.futureShelfOpenMode, 'direct');
+});
+
+test('새 설정의 기본값은 요청 해시에서 생략하고 다른 값은 포함한다', () => {
+  const state = validateState(sampleState());
+  const legacyTrees = state.trees.map(tree => {
+    if (tree.openView !== 'tree') return tree;
+    const { openView, ...previousFields } = tree;
+    return previousFields;
+  });
+  const legacyHash = createHash('sha256').update(JSON.stringify({ ...state, trees: legacyTrees }) + '\n0', 'utf8').digest('hex');
+  assert.equal(requestHashOf(state, 0), legacyHash, '기존 문서의 해시는 바뀌지 않는다');
+  const defaults = { ...state.prefs, futureOpenMode: 'preview' };
+  const withDefault = { ...state, prefs: { ...state.prefs, futureOpenMode: 'preview' } };
+  const withoutDefault = { ...state, prefs: { ...state.prefs } };
+  const changed = { ...state, prefs: { ...state.prefs, futureOpenMode: 'direct' } };
+  assert.equal(requestHashOf(withDefault, 0, defaults), requestHashOf(withoutDefault, 0, defaults));
+  assert.notEqual(requestHashOf(changed, 0, defaults), requestHashOf(withoutDefault, 0, defaults));
 });
 
 test('cached media metadata survives a save and is returned on the next read', async () => {
@@ -665,4 +699,81 @@ test('#1434 다른 트리를 저장해도 읽기용 부모 보정은 원본에 �
   const stored = await repo.load(principal);
   assert.deepEqual(stored.doc.trees[0], original);
   assert.equal(stored.doc.trees[1].title, '수정한 트리');
+});
+
+
+test('#1649 보강 1: 위험한 설정 키는 HTTP PUT 저장·GET에서 제외하고 객체 원형을 오염시키지 않는다', async () => {
+  const {handle,repo}=buildHandle();
+  const evil=JSON.parse('{"__proto__":{"polluted":"owned"},"constructor":{"prototype":{"polluted":"owned"}},"prototype":{"polluted":"owned"},"safeFuture":{"inner":{"__proto__":{"polluted":"owned"},"good":1}}}');
+  const state={version:1,trees:[],prefs:evil};
+  const response=await put(handle,{state,expectedRevision:0,clientKey:'unsafe-prefs'});
+  assert.equal(response.status,200);
+  const returned=(await get(handle)).body.state.prefs;
+  const stored=(await repo.load({productId:PRODUCT,subjectId:'usr_a'})).doc.prefs;
+  for(const key of ['__proto__','constructor','prototype']){
+    assert.equal(Object.hasOwn(returned,key),false,key+': 응답에 남지 않음');
+    assert.equal(Object.hasOwn(stored,key),false,key+': 저장소에 남지 않음');
+  }
+  assert.equal(returned.safeFuture.inner.good,1,'정상 설정은 유지');
+  assert.equal(Object.hasOwn(returned.safeFuture.inner,'__proto__'),false,'중첩 객체도 위험 키 없음');
+  assert.equal(({}).polluted,undefined,'Object.prototype 무오염');
+});
+
+test('#1649 보강 2: 모르는 설정 묶음의 실제 JSON UTF-8 크기는 서버 PUT에서도 16KiB 이하이다', async () => {
+  const {handle,repo}=buildHandle();
+  const payload=Object.fromEntries(Array.from({length:32},(_,i)=>['k'+String(i).padStart(2,'0'),'a'.repeat(505)]));
+  assert.equal(new TextEncoder().encode(JSON.stringify(payload)).byteLength,16449,'실패 재현의 실제 바이트 수');
+  const response=await put(handle,{state:{version:1,trees:[],prefs:payload},expectedRevision:0,clientKey:'overflow-prefs'});
+  assert.equal(response.status,200);
+  const saved=(await repo.load({productId:PRODUCT,subjectId:'usr_a'})).doc.prefs;
+  const unknown=Object.fromEntries(Object.entries(saved).filter(([key])=>/^k\d\d$/.test(key)));
+  const bytes=new TextEncoder().encode(JSON.stringify(unknown)).byteLength;
+  assert.ok(bytes<=16384,'서버가 보존한 설정 묶음의 실제 직렬화 크기 '+bytes+'바이트');
+  assert.ok(Object.keys(unknown).length<32,'마지막 초과 항목을 결정적 순서로 제외');
+  assert.ok(Object.hasOwn(unknown,'k00'),'앞 설정은 유지');
+  assert.equal(Object.hasOwn(unknown,'k31'),false,'마지막 초과 설정은 제외');
+});
+
+test('#1649 보강 4: 배포 전 서버가 지운 설정을 포함한 옛 PUT는 같은 요청 키로 재전송한다', async () => {
+  const {handle,repo}=buildHandle();
+  const validated=validateState({version:1,trees:[],prefs:{}});
+  const payload={state:{...validated,prefs:{...validated.prefs,futureUnknownOptionX:'keep-after-upgrade'}},
+    expectedRevision:0,clientKey:'old-known-hash'};
+  const oldHash=requestHashOf(validated,0);
+  const previous=await repo.commit({productId:PRODUCT,subjectId:'usr_a',doc:validated,
+    expectedRevision:0,clientKey:payload.clientKey,requestHash:oldHash});
+  assert.equal(previous.status,'saved');
+  const retry=await put(handle,payload);
+  assert.equal(retry.status,200,'오래된 원본 PUT는 동일한 요청으로 인정');
+  assert.equal(retry.body.revision,previous.revision,'재전송으로 개정 증가 없음');
+  const changedKnown={...payload,state:{...payload.state,prefs:{...payload.state.prefs,theme:'garden'}}};
+  const conflict=await put(handle,changedKnown);
+  assert.equal(conflict.status,409,'진짜 다른 기존 설정은 같은 키로 덮어쓰지 못함');
+  assert.equal(conflict.body.error.code,'client_key_conflict');
+  const modern={state:{...validated,prefs:{...validated.prefs,futureUnknownOptionX:'new-one'}},
+    expectedRevision:1,clientKey:'modern-unknown-key'};
+  const modernSaved=await put(handle,modern);
+  assert.equal(modernSaved.status,200);
+  const tampered=await put(handle,{...modern,state:{...modern.state,prefs:{...modern.state.prefs,futureUnknownOptionX:'different'}}});
+  assert.equal(tampered.status,409,'새 기록의 모르는 설정 값 변경은 기존 키를 재사용하지 못함');
+});
+
+
+test('#1649 보강 4b: shelfOpenMode 추가 전 요청도 동일 키로 재전송되며 변경 요청은 충돌한다', async () => {
+  const {handle,repo}=buildHandle();
+  const state=validateState({version:1,trees:[],prefs:{}});
+  const olderPrefs={...state.prefs};
+  delete olderPrefs.shelfOpenMode;
+  const oldState={...state,prefs:olderPrefs};
+  const clientKey='legacy-before-shelf';
+  const previous=await repo.commit({productId:PRODUCT,subjectId:'usr_a',doc:oldState,
+    expectedRevision:0,clientKey,requestHash:requestHashOf(oldState,0)});
+  assert.equal(previous.status,'saved');
+  const retry=await put(handle,{state:oldState,expectedRevision:0,clientKey});
+  assert.equal(retry.status,200,'추가 설정을 몰랐던 옛 서버의 요청도 재전송 성공');
+  assert.equal(retry.body.revision,previous.revision);
+  const changed=await put(handle,{state:{...oldState,prefs:{...oldState.prefs,shelfOpenMode:'direct'}},
+    expectedRevision:0,clientKey});
+  assert.equal(changed.status,409,'실제로 달라진 새 설정 값은 같은 키로 재전송 거부');
+  assert.equal(changed.body.error.code,'client_key_conflict');
 });
