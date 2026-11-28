@@ -6,7 +6,7 @@ import { resolve } from 'node:path';
 // 평균값이 같은 경우 잡 ID를 기준으로 정렬한다. 워크플로 실행 중에는 API로 재계산하지 않는다.
 export const AVG_SECONDS = Object.freeze({
   'screen-map-a': 953,
-  'screen-audit-a': 462,
+  'screen-common-a': 845,
   'screen-board': 393,
   'screen-book': 379,
   'screen-shell-extra': 346,
@@ -15,9 +15,8 @@ export const AVG_SECONDS = Object.freeze({
   'screen-board-b': 284,
   'screen-reload': 270,
   'screen-map-b': 257,
-  'screen-audit-c': 255,
+  'screen-common-b': 297,
   'screen-home-followup': 246,
-  'screen-audit-b': 211,
   'screen-shell': 167,
   'screen-shelf': 164,
   'screen-home-1284': 95

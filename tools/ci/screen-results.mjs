@@ -16,6 +16,10 @@ export function checkScreenResults(needs = {}) {
       (changed === 'false' && jobs !== 'none') ||
       (changed === 'true' && !selected.length) ||
       selected.some(j => !SELECTABLE_JOBS.includes(j))) failures.push('invalid screen selection');
+  // A changed screen cannot silently skip either dedicated common owner job.
+  if (changed === 'true' && jobs !== 'all')
+    for (const name of SELECTABLE_JOBS.filter(j => j.startsWith('screen-common-')))
+      if (!selected.includes(name)) failures.push(name + ': common job missing from selection');
   for (const [name, value] of Object.entries(needs)) {
     if (!name.startsWith('screen-') || name === 'screen-changes' || SELECTABLE_JOBS.includes(name)) continue;
     if (['failure', 'cancelled'].includes(value?.result)) {

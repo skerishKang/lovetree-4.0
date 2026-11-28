@@ -1,5 +1,5 @@
 // #1611: Explicit ownership of every test referenced by the screen jobs.
-// Unknown tests fail open to all. Common tests select their existing jobs for every screen.
+// Unknown tests fail open to all. Common tests are consolidated into screen-common-a/b.
 export const TEST_OWNERS = {
   "tests/admin-view.test.mjs": [
     "common"
@@ -299,3 +299,7 @@ export const TEST_OWNERS = {
     "book"
   ]
 };
+
+// The ownership table is the only authority for cross-screen test files.
+export const COMMON_OWNER_TESTS = Object.freeze(Object.entries(TEST_OWNERS)
+  .filter(([, owners]) => owners.includes('common')).map(([file]) => file).sort());

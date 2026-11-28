@@ -44,7 +44,7 @@ test('#1069 화면 잡의 Playwright 버전은 잠금 파일에서 읽는다', (
   // #1413: 셸 화면 잡을 둘로 나누고(3단계) 지도 대비 잡에서 서재·날짜 잡을 떼어 내(4단계) 보드 잡을 둘로 나눠(5단계)
   // Playwright 설치 구간은 16곳이다.
   // 밤 측정 쪽도 같은 규칙을 지킨다.
-  assert.equal(installs.length, 16, `PR 화면 잡 16곳이 모두 잠금 파일 버전을 쓴다(실측 ${installs.length})`);
+  assert.equal(installs.length, 15, `PR 화면 잡 15곳이 모두 잠금 파일 버전을 쓴다(실측 ${installs.length})`);
   const nightly = readFileSync(new URL('../.github/workflows/nightly-screen-perf.yml', import.meta.url), 'utf8');
   assert.ok(!/playwright@\d/.test(nightly) && nightly.includes("hashFiles('package-lock.json')"), '밤 측정도 하드코딩 버전 없이 잠금 파일을 쓴다');
   const actual = execFileSync(process.execPath, ['-p', "require('./package-lock.json').packages['node_modules/playwright'].version"], { cwd: new URL('..', import.meta.url), encoding: 'utf8' }).trim();
@@ -109,7 +109,7 @@ test('서재·날짜 잡 떼어 내기: 시험 위치·고르기·모음 잡', a
   assert.equal(mapChanged(['tests/v41-map-contrast.test.mjs']), true, '지도 시험만 바뀌면 지도 대비는 돈다');
   const workflow = readFileSync(new URL('../.github/workflows/preview-check.yml', import.meta.url), 'utf8');
   const needs = workflow.slice(workflow.indexOf('  preview:')).match(/needs: \[([^\]]+)\]/)[1].split(',').map((s) => s.trim());
-  assert.ok(needs.includes('screen-shelf') && needs.includes('screen-map-a') && needs.includes('screen-audit-a'), '새 잡·지도 대비·공통 검사기 a가 모음 잡 needs에 있다');
+  assert.ok(needs.includes('screen-shelf') && needs.includes('screen-map-a') && needs.includes('screen-common-a') && needs.includes('screen-common-b'), '새 잡·지도 대비·공통 검사기 a가 모음 잡 needs에 있다');
   assert.match(workflow, /\n    name: 화면 시험 — 서재·날짜\n/, '새 잡 이름');
   assert.match(workflow, /\n    name: 미리보기 postdeploy\(로그아웃\)\n/, '필수 검사 이름은 그대로다');
 });
@@ -122,7 +122,7 @@ test('#1611 aggregate accepts only complete selected results', async () => {
     deploy:{result:'success'},
     ...Object.fromEntries(SELECTABLE_JOBS.map(j => [j,{result:jobs==='all'||jobs.split(',').includes(j)?'success':'skipped'}]))
   });
-  for (const jobs of ['screen-board','screen-home,screen-home-1284','all']) {
+  for (const jobs of ['screen-board,screen-common-a,screen-common-b','screen-home,screen-home-1284,screen-common-a,screen-common-b','all']) {
     assert.equal(checkScreenResults(build(jobs)).ok,true);
     const picked=jobs==='all'?'screen-home-1284':jobs.split(',')[0];
     for (const result of ['failure','cancelled','skipped']) {
@@ -143,10 +143,12 @@ test('#1413 5단계: 옮긴 시험 위치·보드 둘째 잡 고르기·공통 �
   const tests = screenTestFiles();
   const screen = new Set(tests), helpers = new Set(helperFiles(tests)), jobs = jobTestFiles();
   const moved = {
-    'screen-board-b': ['tests/v41-a11y-514-remaining.test.mjs', 'tests/v41-local-date-547.test.mjs', 'tests/v41-tree-layout-777.test.mjs',
-      'tests/v41-932-937-board-legend.test.mjs', 'tests/v41-bottom-links-850.test.mjs', 'tests/v41-a11y-views.test.mjs', 'tests/v41-orbit-535-float-overlap.test.mjs'],
+    'screen-board-b': ['tests/v41-tree-layout-777.test.mjs',
+      'tests/v41-932-937-board-legend.test.mjs', 'tests/v41-bottom-links-850.test.mjs', 'tests/v41-orbit-535-float-overlap.test.mjs'],
     'screen-reload': ['tests/v41-explore-moments-1025.test.mjs', 'tests/v41-1286-moments.test.mjs', 'tests/v41-explore-sort-search-1363.test.mjs'],
-    'screen-book-screen': ['tests/v41-share-guest-635.test.mjs', 'tests/v41-book-long-note.test.mjs'],
+    'screen-book-screen': ['tests/v41-book-long-note.test.mjs'],
+    'screen-common-b': ['tests/v41-a11y-514-remaining.test.mjs', 'tests/v41-local-date-547.test.mjs',
+      'tests/v41-a11y-views.test.mjs', 'tests/v41-share-guest-635.test.mjs'],
   };
   for (const [job, files] of Object.entries(moved)) for (const f of files) {
     const owners = Object.entries(jobs).filter(([, set]) => set.has(f)).map(([name]) => name);
@@ -176,12 +178,13 @@ test('#1413 5단계: 옮긴 시험 위치·보드 둘째 잡 고르기·공통 �
   const gate = (j) => ({ result: 'success', outputs: { changed: 'true', jobs: j } });
   const complete = (j, override) => ({'screen-changes':gate(j),deploy:{result:'success'},...Object.fromEntries(Object.keys(jobs).map(k=>[k,{result:j==='all'||j.split(',').includes(k)?'success':'skipped'}])),...override});
   assert.equal(checkScreenResults(complete('all', {'screen-board-b':{result:'failure'}})).ok, false);
-  assert.equal(checkScreenResults(complete('screen-board,screen-board-b', {'screen-board-b':{result:'skipped'}})).ok, false, '보드를 골랐는데 보드 둘째가 건너뛰면 실패');
-  assert.equal(checkScreenResults(complete('screen-home', {'screen-board-b':{result:'skipped'}})).ok, true, '보드를 고르지 않았으면 건너뜀 통과');
+  assert.equal(checkScreenResults(complete('screen-board,screen-board-b,screen-common-a,screen-common-b', {'screen-board-b':{result:'skipped'}})).ok, false, '보드를 골랐는데 보드 둘째가 건너뛰면 실패');
+  assert.equal(checkScreenResults(complete('screen-home,screen-common-a,screen-common-b', {'screen-board-b':{result:'skipped'}})).ok, true, '보드를 고르지 않았으면 건너뜀 통과');
   // 공통 검사기: a는 이름 거르기 없이 파일 전부(새 시험도 여기서 돈다), b·c는 #657 두 시험만 각자 조합으로 돈다.
   const audit = {};
   for (const s of ['a', 'b', 'c']) {
-    const runs = jobBody(`screen-audit-${s}`).match(/LT_SCREEN_AUDIT_SHARD=\w .*tests\/v41-screen-audit\.test\.mjs/g) || [];
+    const runs = (jobBody('screen-common-a').match(/LT_SCREEN_AUDIT_SHARD=\w .*tests\/v41-screen-audit\.test\.mjs/g) || [])
+      .filter(line => line.startsWith('LT_SCREEN_AUDIT_SHARD=' + s + ' '));
     assert.equal(runs.length, 1, `공통 검사기 ${s}는 검사 파일을 한 번 돈다`);
     assert.ok(runs[0].startsWith(`LT_SCREEN_AUDIT_SHARD=${s} `), `공통 검사기 ${s}는 자기 조합을 고른다`);
     audit[s] = runs[0];
@@ -220,7 +223,7 @@ test('#1611 schedule, visual selection and every original screen command are pre
   const { screenCommandContract } = await import('../tools/ci/screen-commands.mjs');
   const baseline = JSON.parse(readFileSync(new URL('../tools/ci/screen-commands.baseline.json',import.meta.url),'utf8'));
   const after = readFileSync(new URL('../.github/workflows/preview-check.yml', import.meta.url),'utf8');
-  assert.equal(baseline.sourceRevision,'9896d3a1397dfac19ef7f20cdcf14001fb952cd6','기준은 승인된 9896d3a1 워크플로');
+  assert.equal(baseline.sourceRevision,'eecea158ec4628f96c3b906d5e77fd331340bd59','기준은 승인된 9896d3a1 워크플로');
   assert.match(after, /cron: "0 2,10,18 \* \* \*"/);
   assert.match(after, /workflow_dispatch:/);
   assert.match(after, /--scenes "\$SCENES"/);
@@ -230,10 +233,10 @@ test('#1611 schedule, visual selection and every original screen command are pre
   assert.equal(visualScenes('none'), '');
   assert.equal(visualScenes('shell'), 'home,shelf,book,board,network,account');
   assert.equal(selectScreens(['docs/notes.md']), 'none');
-  assert.deepEqual(Object.keys(baseline.jobs).sort(),[...SELECTABLE_JOBS].sort(),'기존 16개 잡의 누락·추가를 막는다');
+  assert.deepEqual(Object.keys(baseline.jobs).sort(),[...SELECTABLE_JOBS].sort(),'새 15개 잡의 누락·추가를 막는다');
   const current = screenCommandContract(after,SELECTABLE_JOBS);
   for (const job of SELECTABLE_JOBS)
-    assert.deepEqual(current[job],baseline.jobs[job],job+': 9896d3a1 기준 시험 파일·명령·timeout·retry 보존');
+    assert.deepEqual(current[job],baseline.jobs[job],job+': 재배치 후 시험 파일·명령·timeout·retry 보존');
   // #1620 자체 실행기별 npm 캐시 준비는 테스트 명령이 아니며 그대로 남겨야 한다.
   assert.match(after,/run: echo "npm_config_cache=\$HOME\/\.npm-lovetree-ci-cache" >> "\$GITHUB_ENV"/);
 });
@@ -244,7 +247,7 @@ test('#1616 dedicated home source picks five owner jobs, A/B/C and only home vis
   const { TEST_OWNERS } = await import('../tools/ci/screen-owners.mjs');
   const homeJobs = [
     'screen-board-b','screen-home','screen-home-followup','screen-home-1284','screen-shell',
-    'screen-audit-a','screen-audit-b','screen-audit-c'
+    'screen-common-a','screen-common-b'
   ];
   for (const source of [
     'src/views/orbit.js','src/views/orbit-canvas.js','src/views/orbit-source.css',
@@ -261,7 +264,7 @@ test('#1616 dedicated home source picks five owner jobs, A/B/C and only home vis
   assert.ok(jobTests['screen-shell'].has('tests/v41-home-card-1077.test.mjs'));
   assert.ok(jobTests['screen-board-b'].has('tests/v41-orbit-535-float-overlap.test.mjs'));
   assert.ok(jobTests['screen-shell-extra'].has('tests/v41-logo-home.test.mjs'));
-  assert.ok(selectJobs(['src/views/orbit.js']).split(',').includes('screen-shell-extra'));
+  assert.ok(!selectJobs(['src/views/orbit.js']).split(',').includes('screen-shell-extra'), '공통 시험만으로 셸 나머지 잡을 고르지 않는다');
 });
 
 test('#1616 dedicated board/book/shelf/map, shared shell, and shell ownership contracts', async () => {
@@ -270,19 +273,19 @@ test('#1616 dedicated board/book/shelf/map, shared shell, and shell ownership co
   const { TEST_OWNERS } = await import('../tools/ci/screen-owners.mjs');
   const cases = [
     {file:'public/v41/views/board/board.js',screen:'board',visual:'board',
-      jobs:['screen-board','screen-board-b','screen-home-followup','screen-shell-extra','screen-audit-a','screen-audit-b','screen-audit-c','screen-book-screen']},
+      jobs:['screen-board','screen-board-b','screen-home-followup','screen-shell-extra','screen-common-a','screen-common-b','screen-book-screen']},
     {file:'public/v41/views/book/book.js',screen:'book',visual:'book',
-      jobs:['screen-home-followup','screen-book','screen-audit-a','screen-audit-b','screen-audit-c','screen-reload','screen-map-b','screen-book-screen']},
+      jobs:['screen-home-followup','screen-book','screen-common-a','screen-common-b','screen-reload','screen-map-b','screen-book-screen']},
     {file:'public/v41/views/shelf/shelf.js',screen:'shelf',visual:'shelf',
-      jobs:['screen-shell-extra','screen-audit-a','screen-audit-b','screen-audit-c','screen-shelf']},
+      jobs:['screen-shell-extra','screen-common-a','screen-common-b','screen-shelf']},
     {file:'public/v41/views/network/network.js',screen:'map',visual:'network',
-      jobs:['screen-board','screen-audit-a','screen-audit-b','screen-audit-c','screen-map-a','screen-map-b']}
+      jobs:['screen-board','screen-common-a','screen-common-b','screen-map-a','screen-map-b']}
   ];
   for (const {file,screen,visual,jobs} of cases) {
     assert.equal(selectScreens([file]),screen,file);
     assert.ok(jobs.every(job=>selectJobs([file]).split(',').includes(job)),file);
     assert.equal(visualScenes(selectScreens([file])),visual,file);
-    const nonAudit=jobs.filter(x=>!x.startsWith('screen-audit-'));
+    const nonAudit=jobs.filter(x=>!x.startsWith('screen-common-'));
     assert.ok(nonAudit.length >= 2, file+' non-audit group');
   }
   assert.equal(selectScreens(['public/v41/shell.css']),'all');

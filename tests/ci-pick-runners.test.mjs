@@ -25,7 +25,7 @@ const runners = n => [
 ];
 
 test('잡 목록 및 평균 정렬 기준은 16개 화면 잡이다', () => {
-  assert.equal(JOBS.length, 16);
+  assert.equal(JOBS.length, 15);
   assert.deepEqual([...activeJobs('all')].sort(), [...JOBS].sort());
   assert.deepEqual(activeJobs('none'), []);
   assert.throws(() => activeJobs('screen-unknown'), /알 수 없는/);
@@ -43,19 +43,19 @@ test('CGI 2자리면 실제 선택한 잡 중 평균이 긴 순서 2개만 배�
   assert.deepEqual(result.ordered, ['screen-map-a','screen-board','screen-home','screen-shelf']);
   assert.deepEqual(result.chosen, ['screen-map-a','screen-board']);
   assert.deepEqual(result.labels['screen-board'], ['self-hosted','Linux','X64','cgi']);
-  assert.deepEqual(result.labels['screen-audit-a'], ['ubuntu-latest']);
+  assert.deepEqual(result.labels['screen-common-a'], ['ubuntu-latest']);
 });
 test('CGI 4자리면 평균 긴 화면 잡 4개만 CGI로 배정한다', async () => {
   const result=await pickRunners(env, response(runners(4)));
-  assert.deepEqual(result.chosen, ['screen-map-a','screen-audit-a','screen-board','screen-shell-extra']);
+  assert.deepEqual(result.chosen, ['screen-map-a','screen-common-a','screen-board','screen-shell-extra']);
   assert.equal(result.available, 4);
-  assert.equal(result.ordered.length, 16);
+  assert.equal(result.ordered.length, 15);
 });
 test('CGI 빈자리가 16개여도 책 관련 두 잡은 항상 GitHub에서 실행한다', async () => {
   assert.deepEqual(CGI_EXCLUDED_JOBS, ['screen-book','screen-book-screen']);
   const result = await pickRunners(env, response(runners(16)));
   assert.equal(result.available, 16);
-  assert.equal(result.chosen.length, 14);
+  assert.equal(result.chosen.length, 13);
   for(const job of CGI_EXCLUDED_JOBS) {
     assert.equal(result.ordered.includes(job), true, job+' 시험은 빠지지 않는다');
     assert.equal(result.chosen.includes(job), false, job+' CGI 배정 금지');
@@ -111,7 +111,7 @@ test('출력은 잡별로 16개이고 비밀 문자열을 포함하지 않는다
   const output=githubOutputs(result);
   assert.match(output,/screen_map_a=\["self-hosted","Linux","X64","cgi"\]/);
   assert.match(output,/screen_home=\["ubuntu-latest"\]/);
-  assert.equal(output.split('\n').filter(x=>/^screen_.*=/.test(x)).length,16);
+  assert.equal(output.split('\n').filter(x=>/^screen_.*=/.test(x)).length,15);
   assert.doesNotMatch(output,/시험용-가짜값/);
   assert.doesNotMatch(githubSummary(result),/시험용-가짜값/);
 });
