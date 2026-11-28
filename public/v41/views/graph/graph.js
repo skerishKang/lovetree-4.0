@@ -36,8 +36,10 @@ let titleDisplay=readTitleSetting();
 addEventListener('message',e=>{
  if(!isShellMessage(e))return;
  if(e.data.type===MSG.dateStyle){
-  dateStyle=e.data.value==='dash'||e.data.value==='long'?e.data.value:'dot';
-  try{document.documentElement.setAttribute('data-lt-date-style',dateStyle)}catch{}
+  const next=e.data.value==='dash'||e.data.value==='long'?e.data.value:'dot';
+  try{document.documentElement.setAttribute('data-lt-date-style',next)}catch{}
+  if(next===dateStyle)return;
+  dateStyle=next;
   refresh();
   return;
  }
