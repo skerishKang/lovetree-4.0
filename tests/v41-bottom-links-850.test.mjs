@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { existsSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { serve } from './helpers/screen-audit.mjs';
+import { evaluateWhenReady } from './helpers/visible-frame.mjs';
 import { createTree, addMoment } from '../public/v41/domain.mjs';
 
 const REQUIRE = process.env.LT_BOTTOM_LINKS_REQUIRE === '1';
@@ -221,10 +222,12 @@ test('#1488 휴대폰 ＋ 단추: 다섯 화면에 보이고 화면 안 단추·
         assert.deepEqual(close, [], `${screen} ${width}×${height} ${theme}: ＋ 단추와 12px 안에 있는 고정 요소 ${JSON.stringify(close)}`);
         if (screen === 'book') {
           // 스크롤과 단추 크기 전환 중에도 이동 줄 전체가 원래 크기의 ＋ 단추 오른쪽 자리와 겹치지 않아야 한다.
-          const lane = await page.evaluate(() => {
+          const lane = await evaluateWhenReady(page, () => {
             const view = document.querySelector('#view');
             const add = document.querySelector('#mobile-add');
-            const nav = view.contentDocument.querySelector('.nav-pill');
+            const doc = view?.contentDocument;
+            const nav = doc?.querySelector('.nav-pill');
+            if (!view || !add || !nav) return false;
             const fullAddLeft = add.getBoundingClientRect().right - add.offsetWidth;
             const navRight = view.getBoundingClientRect().left + nav.getBoundingClientRect().right;
             const buttons = [...nav.querySelectorAll('button')].filter(e => e.getClientRects().length).map(e => {

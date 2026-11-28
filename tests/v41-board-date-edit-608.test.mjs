@@ -13,6 +13,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createMemberSession } from '../public/v41/member-session.mjs';
 import { validateState } from '../public/v41/domain.mjs';
+import { evaluateWhenReady } from './helpers/visible-frame.mjs';
 
 const ROOT = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
 const PUB = path.join(ROOT, 'public');
@@ -91,7 +92,12 @@ async function openShellEditHost(browser, base, tree, { width = 1440, height = 9
   await page.waitForFunction(treeId => window.LT41?.tree?.id === treeId, tree.id, { timeout: 20000 });
   await page.evaluate(() => document.querySelector('[data-view="track58-pinboard.html"]').click());
   await page.waitForFunction(count => document.querySelector('#view')?.contentDocument?.querySelectorAll('#cardLayer .card').length === count, tree.moments.length, { timeout: 20000 });
-  await page.evaluate(() => document.querySelector('#view')?.contentDocument?.body.classList.add('lt-advanced'));
+  await evaluateWhenReady(page, () => {
+    const body = document.querySelector('#view')?.contentDocument?.body;
+    if (!body) return false;
+    body.classList.add('lt-advanced');
+    return true;
+  });
   await page.waitForTimeout(500);
   return { context, page, frame: await (await page.$('#view')).contentFrame(), problems, puts, state: () => state };
 }

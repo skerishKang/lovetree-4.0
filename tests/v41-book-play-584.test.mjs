@@ -11,7 +11,7 @@ import {clickToolbarTreeChoice,treeChoiceExpanded,treeChoiceFocused} from './hel
 //      세로 판정도 썸네일 실측(oardefault)으로 보강한다 — oEmbed 가로세로는 watch 주소 기준 항상 200×113이라 신호가 못 된다.
 //  (5·6) 머리줄: 1장|2장 한 묶음, 돋보기 아이콘+금색, 말풍선 설명, '여기까지 온 길'→'이어진 순간'.
 // 크롬이 없는 곳에서는 실행 시험을 건너뛴다 — 이유를 남긴다.
-import {waitForShownScreen} from './helpers/visible-frame.mjs';
+import {evaluateWhenReady,waitForShownScreen} from './helpers/visible-frame.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { inspectYoutubeIframe, countYoutubeAutoplay } from './helpers/youtube-embed-audit.mjs';
@@ -805,7 +805,7 @@ test('1001b 실행: 책 순간 변경(고치기·연결·해제·이전 순간·
     await openEditor(m2);
     await page.evaluate(() => { const f = document.querySelector('#moment-form'); f.elements.title.value = '고친 제목'; f.elements.title.dispatchEvent(new Event('input', { bubbles: true })); f.requestSubmit(); });
     await waitPut(1);
-    await frame.waitForFunction(() => document.body.innerText.includes('고친 제목'), null, { timeout: 10000 });
+    await frame.waitForFunction(() => document.body?.innerText?.includes('고친 제목'), null, { timeout: 10000 });
     await page.waitForTimeout(1500);
     const afterEdit = await frame.evaluate(() => ({ doc: window.__doc1001b, msg: window.__msg1001b, sel: LTDEMO.get(), st: window.__TRACK59__.getState(), scroll: window.scrollY, sideOpen: !document.querySelector('#detailSide')?.hidden, pageDetail: !!document.querySelector('.page-detail'), focused: !!document.querySelector(`[data-moment="${LTDEMO.get()}"]`)?.classList.contains('focused'), detailText: (document.querySelector('#detailSide')?.textContent || '') + (document.querySelector('.page-detail')?.textContent || '') }));
     assert.equal(afterEdit.doc, 'alive', '고치기 뒤에도 같은 문서다(재적재 없음)');
@@ -892,8 +892,12 @@ test('1001c 실행: 쓰기 판 날짜·감정·비공개 변경 — 재적재 0�
       await page.evaluate(() => document.querySelector('#moment-form').requestSubmit());
       await waitPut(i + 1);
       await page.waitForTimeout(1300);
-      const liveFrame = page.frames().find(f => /views\/track59-sketchbook/.test(f.url())) || frame;
-      const after = await liveFrame.evaluate(() => ({ sel: LTDEMO.get(), st: window.__TRACK59__.getState(), scroll: window.scrollY, sideOpen: !document.querySelector('#detailSide')?.hidden, pageDetail: !!document.querySelector('.page-detail'), body: document.body.innerText.slice(0, 3000) }));
+      const after = await evaluateWhenReady(page, () => {
+        const f = [...document.querySelectorAll('iframe')].find(f => /views\/track59-sketchbook/.test(f.contentDocument?.URL || ''));
+        const doc = f?.contentDocument, win = f?.contentWindow;
+        if (!doc?.body || !win?.LTDEMO?.get || !win?.__TRACK59__?.getState) return false;
+        return { sel: win.LTDEMO.get(), st: win.__TRACK59__.getState(), scroll: win.scrollY, sideOpen: !doc.querySelector('#detailSide')?.hidden, pageDetail: !!doc.querySelector('.page-detail'), body: doc.body.innerText.slice(0, 3000) };
+      });
       assert.equal(navs.length, 0, `${field} 뒤 화면 재적재는 0회여야 한다(실측 ${navs.length}: ${JSON.stringify(navs)})`);
       assert.equal(after.sel, m2, `${field} 뒤에도 고른 순간이 그대로다`);
       assert.equal(after.st.current, before.st.current, `${field} 뒤에도 보던 펼침면이 그대로다`);

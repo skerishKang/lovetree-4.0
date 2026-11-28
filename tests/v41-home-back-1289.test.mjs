@@ -69,17 +69,17 @@ test('#1289 첫 화면 방문 기록 및 복원',{skip:REQUIRE?false:'필수 화
       async({page,frame})=>{
        await testBackNavigation(page,{frame,recorded:true,panels:['html[data-lt-home-panel="viewer"]'],action:async()=>{
         await frame.locator('#orbit .recent-meta strong').click();
-        await frame.waitForFunction(()=>document.documentElement.dataset.ltHomePanel==='viewer');
+        await frame.waitForFunction(()=>document.documentElement?.dataset?.ltHomePanel==='viewer');
         await screenshot(page,label+'-viewer-open.png');
        }});
        await screenshot(page,label+'-viewer-back.png');
       },
       async({page,frame})=>{
        await frame.evaluate(()=>document.querySelector('#orbit')?.shadowRoot?.querySelector('[data-do="moments"]')?.click());
-       await frame.waitForFunction(()=>document.documentElement.dataset.ltHomePanel==='index');
+       await frame.waitForFunction(()=>document.documentElement?.dataset?.ltHomePanel==='index');
        await testBackNavigation(page,{frame,recorded:true,panels:['html[data-lt-home-panel="index"]','html[data-lt-home-panel="detail"]'],action:async()=>{
         await frame.evaluate(()=>document.querySelector('#orbit')?.shadowRoot?.querySelector('dialog [data-next]')?.click());
-        await frame.waitForFunction(()=>document.documentElement.dataset.ltHomePanel==='detail');
+        await frame.waitForFunction(()=>document.documentElement?.dataset?.ltHomePanel==='detail');
         await screenshot(page,label+'-detail-open.png');
        }});
        assert.equal(await frame.evaluate(()=>!!document.querySelector('#orbit')?.shadowRoot?.querySelector('dialog .index-list')),true,'뒤로 가면 순간 목록');
@@ -94,7 +94,7 @@ test('#1289 첫 화면 방문 기록 및 복원',{skip:REQUIRE?false:'필수 화
      ];
      if(width===390&&theme==='night')cases.push(async({page,frame})=>{
       await frame.evaluate(()=>document.querySelector('#orbit')?.shadowRoot?.querySelector('[data-do="moments"]')?.click());
-      await frame.waitForFunction(()=>document.documentElement.dataset.ltHomePanel==='index');
+      await frame.waitForFunction(()=>document.documentElement?.dataset?.ltHomePanel==='index');
       const prior=await frame.evaluate(()=>{
        const dlg=document.querySelector('#orbit').shadowRoot.querySelector('dialog');
        dlg.style.maxHeight='220px';dlg.scrollTop=100;return dlg.scrollTop;

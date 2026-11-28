@@ -13,6 +13,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 import { serve } from './helpers/screen-audit.mjs';
+import { evaluateWhenReady } from './helpers/visible-frame.mjs';
 import { createTree, addMoment } from '../public/v41/domain.mjs';
 import { SHARE_COPY_FAILURE } from '../public/v41/share-link.mjs';
 
@@ -508,13 +509,14 @@ test('#1087 390 새 소식 띠와 숫자 두 줄 겹침 0', { skip: REQUIRE952 ?
       try {
         const frame = h.frame;
         await frame.locator('.home-count-line').first().waitFor({ state: 'visible', timeout: 15000 });
-        const geo = await h.page.evaluate(() => {
+        const geo = await evaluateWhenReady(h.page, () => {
           const bandEl = document.getElementById('updates-card');
           bandEl.hidden = false;
           const band = bandEl.getBoundingClientRect();
           const iframe = document.getElementById('view');
-          const off = iframe.getBoundingClientRect();
-          const root = iframe.contentDocument.querySelector('#orbit').shadowRoot;
+          const off = iframe?.getBoundingClientRect();
+          const root = iframe?.contentDocument?.querySelector('#orbit')?.shadowRoot;
+          if (!iframe || !off || !root) return false;
           const rows = [...root.querySelectorAll('.home-count-line')].map(row => {
             const el = row.lastElementChild || row;
             if (!el.textContent.trim()) return null;
@@ -719,17 +721,18 @@ test('#1204 실제 테마 전환·저장값 및 가운데 빛 직선 경계 픽�
           await h.page.waitForFunction(()=>document.documentElement.getAttribute('data-lt-theme')==='garden');
         }
         await h.frame.waitForFunction(expected=>(document.querySelector('#orbit')?.getAttribute('data-lt-theme')||'night')===expected,theme,{timeout:10000});
-        const state=await h.page.evaluate(()=>{
+        const state=await evaluateWhenReady(h.page,()=>{
           const frame=document.querySelector('#view')?.contentDocument;
           const host=frame?.querySelector('#orbit'),root=host?.shadowRoot;
           const app=root?.querySelector('.app'),scrim=root?.querySelector('.center-scrim');
-          const a=app?.getBoundingClientRect(),b=scrim?.getBoundingClientRect();
+          if(!frame?.documentElement||!app||!scrim)return false;
+          const a=app.getBoundingClientRect(),b=scrim.getBoundingClientRect();
           return {shell:document.documentElement.getAttribute('data-lt-theme')||'night',
-            frame:frame?.documentElement.getAttribute('data-lt-theme')||'night',
-            host:host?.getAttribute('data-lt-theme')||'night',
+            frame:frame.documentElement.getAttribute('data-lt-theme')||'night',
+            host:host.getAttribute('data-lt-theme')||'night',
             stage:getComputedStyle(app).backgroundImage,
             glow:getComputedStyle(scrim).backgroundImage,
-            box:a&&b?{app:[a.x,a.y,a.width,a.height],glow:[b.x,b.y,b.width,b.height]}:null};
+            box:{app:[a.x,a.y,a.width,a.height],glow:[b.x,b.y,b.width,b.height]}};
         });
         assert.equal(state.shell,theme,'shell header must follow actual theme');
         assert.equal(state.frame,theme,'iframe document must follow actual theme');
@@ -744,8 +747,9 @@ test('#1204 실제 테마 전환·저장값 및 가운데 빛 직선 경계 픽�
         // Render the computed live scrim into a separate, static pixel stage:
         // isolate the gradient from animated orbit canvases and GPU repaints.
         // Keep the actual geometry, gradient, clip and mask properties.
-        await h.frame.evaluate(()=>{
-          const scrim=document.querySelector('#orbit').shadowRoot.querySelector('.center-scrim');
+        await evaluateWhenReady(h.frame,()=>{
+          const scrim=document.querySelector('#orbit')?.shadowRoot?.querySelector('.center-scrim');
+          if(!scrim||!document.body)return false;
           const computed=getComputedStyle(scrim),rect=scrim.getBoundingClientRect();
           const stage=document.createElement('div');stage.id='lt1204-pixel-stage';
           stage.style.cssText='position:fixed;inset:0;z-index:2147483647;background:#050509;pointer-events:none';
@@ -755,6 +759,7 @@ test('#1204 실제 테마 전환·저장값 및 가운데 빛 직선 경계 픽�
             backgroundRepeat:'no-repeat',borderRadius:computed.borderRadius,
             maskImage:computed.maskImage,clipPath:computed.clipPath});
           stage.append(overlay);document.body.append(stage);
+          return true;
         });
         const element=h.frame.locator('body');
         const on=rgbRows(await element.screenshot({animations:'disabled'}));
@@ -1080,9 +1085,11 @@ test('#1378 첫 화면 YouTube 크게 보기 390·1440 × 밤·정원과 닫기'
         await iframe.waitFor({state:'visible'});
         await h.page.locator('body.lt-viewer-open').waitFor({state:'attached'});
         const m=await inspectYoutubeIframe(iframe);
-        const outerBlockers=await h.page.evaluate(()=>{
-          const host=document.querySelector('#view'),root=host.contentDocument.querySelector('#orbit').shadowRoot;
-          const video=root.querySelector('#mediaVisualHome iframe');
+        const outerBlockers=await evaluateWhenReady(h.page,()=>{
+          const host=document.querySelector('#view');
+          const root=host?.contentDocument?.querySelector('#orbit')?.shadowRoot;
+          const video=root?.querySelector('#mediaVisualHome iframe');
+          if(!host||!video)return false;
           const a=host.getBoundingClientRect(),b=video.getBoundingClientRect();
           return [0.1,0.5,0.9].flatMap(y=>[0.1,0.5,0.9].filter(x=>document.elementFromPoint(a.left+b.left+b.width*x,a.top+b.top+b.height*y)!==host)).length;
         });
@@ -1184,8 +1191,9 @@ test('#1437 delayed member response does not paint guest title, corrects stale h
      return frame?.contentDocument?.querySelector('#orbit')?.shadowRoot?.querySelector('.center h1')?.textContent===expect;
     },scenario.expected,{timeout:20000});
     if(capture&&scenario.key==='member')await page.screenshot({path:join(capture,`home-${width}-after.png`)});
-    const result=await page.evaluate(()=>{
-     const f=document.querySelector('#view'),doc=f.contentDocument;
+    const result=await evaluateWhenReady(page,()=>{
+     const f=document.querySelector('#view'),doc=f?.contentDocument;
+     if(!doc?.defaultView)return false;
      return {titles:doc.defaultView.__1437Titles||[],phase:document.documentElement.dataset.ltAuthPhase,headline:doc.querySelector('#orbit')?.shadowRoot?.querySelector('.center h1')?.textContent};
     });
     if(scenario.neverGuest)assert.ok(result.titles.every(row=>row.title!=='좋아하는 순간부터.'),JSON.stringify({width,scenario:scenario.key,result}));
@@ -1411,11 +1419,13 @@ test('#1449 첫 화면 순간 상세 창 정보·출처·테마·누름 영역�
         step(tag,'detail');
         if(capture)await h.page.screenshot({path:join(capture,detailBase),animations:'disabled'});
         step(tag,'detail-capture');
-        const facts=await h.frame.locator('#mediaViewerHome').evaluate(el=>{
+        const facts=await evaluateWhenReady(h.frame,()=>{
+          const el=document.getElementById('mediaViewerHome'),root=document.documentElement;
+          if(!el||!root)return false;
           const shell=el.querySelector('.mediaShell'),close=el.querySelector('#mediaCloseHome'),body=el.querySelector('#mediaBodyHome'),why=el.querySelector('#mediaWhyHome'),tree=el.querySelector('#mediaTreeChipHome'),external=el.querySelector('#mediaExternalHome');
           const rect=n=>{const r=n?.getBoundingClientRect();return r?{left:r.left,top:r.top,right:r.right,bottom:r.bottom,width:r.width,height:r.height}:null;};
           const visible=n=>!!n&&getComputedStyle(n).display!=='none'&&getComputedStyle(n).visibility!=='hidden'&&Number(getComputedStyle(n).opacity)>.05;
-          return {title:el.querySelector('#mediaTitleHome')?.textContent||'',body:body?.textContent||'',bodyVisible:visible(body),why:why?.textContent||'',whyVisible:visible(why?.closest('.mediaWhy')),tree:tree?.textContent||'',external:external?.textContent||'',externalVisible:visible(external),shell:rect(shell),close:rect(close),background:shell?getComputedStyle(shell).backgroundColor:'',color:shell?getComputedStyle(shell).color:'',primary:shell?getComputedStyle(shell.querySelector('#mediaBookHome')).backgroundColor:'',connected:[...el.querySelectorAll('[data-connected-dir]')].map(n=>({dir:n.dataset.connectedDir,text:n.textContent,thumb:!!n.querySelector('img')})),overflow:el.scrollWidth-el.clientWidth,docOverflow:document.documentElement.scrollWidth-document.documentElement.clientWidth,small:[...el.querySelectorAll('button,a')].filter(visible).map(n=>({text:n.textContent.trim(),aria:n.getAttribute('aria-label'),...rect(n)})).filter(r=>r.width>0&&r.height>0&&(r.width<44||r.height<44))};
+          return {title:el.querySelector('#mediaTitleHome')?.textContent||'',body:body?.textContent||'',bodyVisible:visible(body),why:why?.textContent||'',whyVisible:visible(why?.closest('.mediaWhy')),tree:tree?.textContent||'',external:external?.textContent||'',externalVisible:visible(external),shell:rect(shell),close:rect(close),background:shell?getComputedStyle(shell).backgroundColor:'',color:shell?getComputedStyle(shell).color:'',primary:shell?getComputedStyle(shell.querySelector('#mediaBookHome')).backgroundColor:'',connected:[...el.querySelectorAll('[data-connected-dir]')].map(n=>({dir:n.dataset.connectedDir,text:n.textContent,thumb:!!n.querySelector('img')})),overflow:el.scrollWidth-el.clientWidth,docOverflow:root.scrollWidth-root.clientWidth,small:[...el.querySelectorAll('button,a')].filter(visible).map(n=>({text:n.textContent.trim(),aria:n.getAttribute('aria-label'),...rect(n)})).filter(r=>r.width>0&&r.height>0&&(r.width<44||r.height<44))};
         });
         if(debug)console.log('#1449 FACTS',tag,JSON.stringify(facts));
         check(facts.title==='첫 번째 순간',`${tag}: 순간 제목 표시`);
@@ -1700,9 +1710,10 @@ test('#1473 알림 띠와 숫자판 겹침 0', {skip: REQUIRE952 ? false : skip9
  await h.frame.waitForFunction(()=>globalThis.__LT_ORBIT_TEST__?.canvasSettled());
  await h.page.evaluate(()=>{const c=document.getElementById('updates-card');c.hidden=false;document.getElementById('updates-card-text').textContent='\uB7EC\uBE0C\uD2B8\uB9AC\uAC00 \uC0C8\uB85C\uC6CC\uC84C\uC5B4\uC694';});
  await h.page.waitForTimeout(60);
- const m=await h.page.evaluate(()=>{
+ const m=await evaluateWhenReady(h.page,()=>{
  const r=e=>{if(!e)return null;const x=e.getBoundingClientRect();if(!x.width||!x.height||e.hidden||getComputedStyle(e).display==='none')return null;return {l:x.left,t:x.top,r:x.right,b:x.bottom,w:x.width,h:x.height}};
- const f=document.getElementById('view'),fr=r(f),root=f.contentDocument?.getElementById('orbit')?.shadowRoot;
+ const f=document.getElementById('view'),fr=r(f),root=f?.contentDocument?.getElementById('orbit')?.shadowRoot;
+ if(!fr||!root)return false;
  const shift=e=>{const x=r(e);return x&&{l:x.l+fr.l,t:x.t+fr.t,r:x.r+fr.l,b:x.b+fr.t,w:x.w,h:x.h}};
  const nodes=[...root.querySelectorAll('.home-count,.center .actions button')].map(e=>({type:e.classList.contains('home-count')?'count':'button',rect:shift(e)})).concat([...document.querySelectorAll('.home-links a,.home-links button')].map(e=>({type:'link',rect:r(e)}))).filter(x=>x.rect);
  const notice=r(document.getElementById('updates-card')),toast=r(document.getElementById('toast'));
@@ -1724,9 +1735,10 @@ test('#1473 알림 띠와 숫자판 겹침 0', {skip: REQUIRE952 ? false : skip9
    dispatchEvent(new Event('resize'));
  });
  await h.page.waitForTimeout(75);
- const tm=await h.page.evaluate(()=>{
+ const tm=await evaluateWhenReady(h.page,()=>{
    const rect=e=>{if(!e)return null;const a=e.getBoundingClientRect();if(!a.width||!a.height||e.hidden||getComputedStyle(e).display==='none')return null;return {l:a.left,t:a.top,r:a.right,b:a.bottom}};
-   const f=document.getElementById('view'),fr=rect(f),root=f.contentDocument.getElementById('orbit').shadowRoot;
+   const f=document.getElementById('view'),fr=rect(f),root=f?.contentDocument?.getElementById('orbit')?.shadowRoot;
+   if(!fr||!root)return false;
    const shift=e=>{const a=rect(e);return a&&{l:a.l+fr.l,t:a.t+fr.t,r:a.r+fr.l,b:a.b+fr.t}};
    const nodes=[...root.querySelectorAll('.home-count,.center .actions button')].map(shift).concat([...document.querySelectorAll('.home-links a,.home-links button')].map(rect)).filter(Boolean);
    const toast=rect(document.getElementById('toast'));
@@ -1752,8 +1764,9 @@ test('#1521 머리줄과 가운데 단추 일치',{skip: REQUIRE952 ? false : sk
  try{
  await h.frame.waitForFunction(()=>globalThis.__LT_ORBIT_TEST__?.canvasSettled());
  await h.frame.waitForFunction(()=>document.getElementById('orbit')?.shadowRoot?.querySelector('.center .eyebrow')?.textContent?.trim());
- const m=await h.page.evaluate(()=>{
- const f=document.getElementById('view'),root=f.contentDocument.getElementById('orbit').shadowRoot;
+ const m=await evaluateWhenReady(h.page,()=>{
+ const f=document.getElementById('view'),root=f?.contentDocument?.getElementById('orbit')?.shadowRoot;
+ if(!root)return false;
  const get=e=>{if(!e)return null;const s=e.ownerDocument.defaultView.getComputedStyle(e),r=e.getBoundingClientRect();return {visible:!!(r.width&&r.height&&s.visibility!=='hidden'),w:r.width,h:r.height,x:r.x,y:r.y,font:s.fontFamily,size:s.fontSize,weight:s.fontWeight,radius:s.borderTopLeftRadius,bg:s.backgroundColor,ink:s.color,border:s.borderTopColor,padding:s.padding,gap:s.gap,line:s.lineHeight,letter:s.letterSpacing,transform:s.transform}};
  return {headerAdd:get(document.querySelector('#write-menu')),headerExplore:get(document.querySelector('#community-menu')),centerAdd:get(root.querySelector('.home-add-top')),centerExplore:get(root.querySelector('.actions [data-do=community]')),buttons:[...root.querySelectorAll('.actions .subtleBtn')].map(get),counts:[...root.querySelectorAll('.home-count')].map(get)};
  });

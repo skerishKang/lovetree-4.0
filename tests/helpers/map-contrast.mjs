@@ -1,3 +1,5 @@
+import { evaluateWhenReady } from './visible-frame.mjs';
+
 // Canvas colours are measured from a browser screenshot, never from CSS tokens or
 // fillStyle/strokeStyle. The probe records geometry only, to locate the pixels.
 export function installMapPaintProbe() {
@@ -45,6 +47,8 @@ export function installMapPaintProbe() {
 // Called in the map frame with an actual Playwright screenshot PNG and the overlay rects captured
 // right BEFORE that screenshot. The same pixel sampler is used by the executable test and the evidence report.
 export async function measureMapPixelsInPage([png, overlaysArg]) {
+  const root = document.documentElement;
+  if (!root || !document.body) return false;
   const img = new Image(); img.src = png; await img.decode();
   const scratch = document.createElement('canvas'); scratch.width = img.width; scratch.height = img.height;
   const sc = scratch.getContext('2d', { willReadFrequently: true }); sc.drawImage(img, 0, 0);
@@ -111,7 +115,7 @@ export async function measureMapPixelsInPage([png, overlaysArg]) {
   const mask = document.createElement('canvas');
   // Keep the document's Korean language and font-synthesis rules. A detached
   // canvas otherwise picks different fallback glyph metrics on Windows.
-  mask.lang = document.documentElement.lang;
+  mask.lang = root.lang;
   mask.style.cssText = 'position:absolute;left:-10000px;top:0;pointer-events:none';
   document.body.append(mask);
   // The map context uses alpha:false. Match that here so Chromium uses the
@@ -322,7 +326,7 @@ export async function measureMap(frame) {
     // #628: 그리기 기록 전체(문자열) 대신 세대 번호만 본다 — 뜻은 같고 비용은 거의 0이다.
     const before = await frame.evaluate(() => window.__mapPaint?.gen || 0);
     const { screenshot, overlays } = await freshScreenshot(frame);
-    const canvas = await frame.evaluate(measureMapPixelsInPage, [`data:image/png;base64,${screenshot.toString('base64')}`, overlays]);
+    const canvas = await evaluateWhenReady(frame, measureMapPixelsInPage, [`data:image/png;base64,${screenshot.toString('base64')}`, overlays]);
     const dom = await frame.evaluate(measureMapDOMInPage);
     const after = await frame.evaluate(() => window.__mapPaint?.gen || 0);
     if (before === after || attempt >= 2) return { canvas, dom, screenshot };

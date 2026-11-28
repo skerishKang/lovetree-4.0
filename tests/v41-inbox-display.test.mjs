@@ -202,12 +202,10 @@ test('970 실행: 모아둔 순간 — 목록·누르면 맞는 상세·닫으�
       await page.waitForFunction(() => !!window.LT41?.trees?.length, null, {timeout: 20000});
       // 보드 카드와 모바일 고르기 목록은 따로 그려지므로 둘 다 준비될 때까지 기다린다.
       await page.waitForFunction(({n, mobile}) => [...document.querySelectorAll('iframe')].some((f) => {
-        try {
-          const doc = f.contentDocument;
-          return /track58-pinboard/.test(f.contentWindow.location.href)
-            && doc.querySelectorAll('.card').length >= n
-            && (!mobile || doc.querySelectorAll('.lt-moment-picker select option').length >= n);
-        } catch { return false; }
+        const doc = f.contentDocument;
+        return !!doc && /track58-pinboard/.test(doc.URL)
+          && doc.querySelectorAll('.card').length >= n
+          && (!mobile || doc.querySelectorAll('.lt-moment-picker select option').length >= n);
       }), {n: box.moments.length, mobile: width === 390}, {timeout: 20000});
       const frame = page.frames().find((f) => /track58-pinboard/.test(f.url()));
       assert.ok(frame, `${width}: 보드 프레임이 열리지 않음`);

@@ -4,6 +4,7 @@ import { listenOnSafePort } from './helpers/safe-port.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { settleMap } from './helpers/map-contrast.mjs';
+import { evaluateWhenReady } from './helpers/visible-frame.mjs';
 import { createServer } from 'node:http';
 import { createReadStream, existsSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
@@ -113,7 +114,7 @@ async function settingsPlate(page, frame, plate) {
   await frame.evaluate(() => { window.__mapDrawCount = 0; });
   await page.locator(`#account-settings button[data-board-theme="${plate}"]`).click();
   await page.waitForTimeout(180);
-  assert.equal(await frame.evaluate(() => document.documentElement.dataset.ltBoardTheme), plate, '설정 선택이 열린 지도에 전달된다');
+  assert.equal(await evaluateWhenReady(frame, () => document.documentElement?.dataset?.ltBoardTheme || false), plate, '설정 선택이 열린 지도에 전달된다');
   assert.equal(await page.evaluate(() => localStorage.getItem('lt41.boardTheme')), plate, '보드와 같은 저장 키');
   assert.equal(await frame.evaluate(() => window.__mapDrawCount), 1, '바뀐 판은 한 번만 그린다');
   await page.evaluate(() => document.getElementById('account-settings').close());
@@ -122,13 +123,16 @@ async function settingsPlate(page, frame, plate) {
 }
 
 async function assertIdle(frame, page, plate) {
-  await frame.evaluate(plate => {
+  await evaluateWhenReady(frame, plate => {
+    const root = document.documentElement;
+    if (!root) return false;
     window.__mapDrawCount = 0;
     // 셸이 같은 속성과 같은 메시지를 다시 보내도 같은 화면을 다시 칠하지 않는다.
     for (let i = 0; i < 3; i++) {
-      document.documentElement.setAttribute('data-lt-board-theme', plate);
+      root.setAttribute('data-lt-board-theme', plate);
       window.postMessage({ type: 'lt41-board-theme', value: plate }, location.origin);
     }
+    return true;
   }, plate);
   await page.waitForTimeout(600);
   assert.equal(await frame.evaluate(() => window.__mapDrawCount), 0, '같은 설정 반복·유휴 그리기 0');
@@ -300,23 +304,23 @@ test('지도 판 실제 흐름: 설정·저장 복원·두 보기·누르기·�
       try {
         const map = live.page.frames().find(f => /track56-network/.test(f.url()));
         assert.ok(map, '지도가 열린다');
-        assert.equal(await map.evaluate(() => document.documentElement.dataset.ltBoardTheme), 'night', '밤 테마인데 저장한 값이 없으면 밤 판');
+        assert.equal(await evaluateWhenReady(map, () => document.documentElement?.dataset?.ltBoardTheme || false), 'night', '밤 테마인데 저장한 값이 없으면 밤 판');
         // 테마 바꾸기 단추(밤→정원) — 보드·지도 바탕이 바로 따라 바뀐다.
         // #891(13:59 대표 결정): 판 고르기는 세 상태 — 테마 따라가기(auto)가 기본이고 저장값이 없다.
         // 앱 테마를 바꾸면 따라가기는 저장값 없이 그 테마에 맞는 판으로 함께 바뀐다.
         await live.page.evaluate(() => document.getElementById('theme-toggle')?.click());
         await live.page.waitForTimeout(600);
         assert.equal(await live.page.evaluate(() => localStorage.getItem('lt41.boardTheme')), null, '테마 따라가기는 저장값이 없다(auto)');
-        assert.equal(await map.evaluate(() => document.documentElement.dataset.ltBoardTheme), 'paper', '열린 지도도 바로 종이 판');
+        assert.equal(await evaluateWhenReady(map, () => document.documentElement?.dataset?.ltBoardTheme || false), 'paper', '열린 지도도 바로 종이 판');
         await live.page.evaluate(() => { location.hash = 'board'; });
         await live.page.waitForFunction(() => [...document.querySelectorAll('iframe')].some(f => !f.hidden && /track58-pinboard/.test(f.src || f.contentWindow.location.href) && f.contentDocument?.querySelector('#cardLayer .card')));
         const board = live.page.frames().find(f => /track58-pinboard/.test(f.url()));
-        assert.equal(await board.evaluate(() => document.documentElement.dataset.ltBoardTheme), 'paper', '보드도 정원에는 종이 판');
+        assert.equal(await evaluateWhenReady(board, () => document.documentElement?.dataset?.ltBoardTheme || false), 'paper', '보드도 정원에는 종이 판');
         // 저장한 값이 없는 새로운 문서에서도 정원 기본은 종이다.
         const fresh = await openMap(browser, base, { width: 1440, appTheme: 'garden', plate: 'none' });
         try {
           const map2 = fresh.page.frames().find(f => /track56-network/.test(f.url()));
-          assert.equal(await map2.evaluate(() => document.documentElement.dataset.ltBoardTheme), 'paper', '정원 테마 기본은 종이 판');
+          assert.equal(await evaluateWhenReady(map2, () => document.documentElement?.dataset?.ltBoardTheme || false), 'paper', '정원 테마 기본은 종이 판');
         } finally { await fresh.context.close(); }
         assert.deepEqual(live.errors, [], '페이지 오류 0');
       } finally { await live.context.close(); }
@@ -340,7 +344,7 @@ test('지도 판 실제 흐름: 설정·저장 복원·두 보기·누르기·�
         await live.page.evaluate(() => { location.hash = 'network'; });
         await live.page.waitForFunction(() => [...document.querySelectorAll('iframe')].some(f => !f.hidden && f.contentWindow?.__lt?.dots().length));
         const map = live.page.frames().find(f => /track56-network/.test(f.url()));
-        assert.equal(await map.evaluate(() => document.documentElement.dataset.ltBoardTheme), 'night', '다음 지도도 같은 밤 판');
+        assert.equal(await evaluateWhenReady(map, () => document.documentElement?.dataset?.ltBoardTheme || false), 'night', '다음 지도도 같은 밤 판');
         assert.deepEqual(live.errors, [], '보드↔지도 전환 오류 0');
       } finally { await live.context.close(); }
     });

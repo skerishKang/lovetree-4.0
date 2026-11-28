@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
 import { serve } from './screen-audit.mjs';
+import { evaluateWhenReady } from './visible-frame.mjs';
 import { createTree } from '../../public/v41/domain.mjs';
 
 const now='2026-11-28T00:00:00Z';
@@ -80,14 +81,15 @@ export async function checkThemeSaveRace() {
             const f=document.getElementById('view');
             try{return f&&!f.hidden&&f.contentWindow?.location?.href.includes(target)&&f.contentDocument?.readyState==='complete'}catch{return false}
           },file,{timeout:20000});
-          const values=await page.evaluate(()=>{
-            const f=document.getElementById('view');
+          const values=await evaluateWhenReady(page,()=>{
+            const f=document.getElementById('view'),doc=f?.contentDocument;
+            if(!doc?.documentElement||!doc.body)return false;
             return {
               shell:document.documentElement.dataset.ltTheme||'night',
-              inside:f.contentDocument.documentElement.dataset.ltTheme||'night',
+              inside:doc.documentElement.dataset.ltTheme||'night',
               device:localStorage.getItem('lt41.theme'),
               chosen:window.LT41?.prefs?.theme,
-              bodyBackground:getComputedStyle(f.contentDocument.body).backgroundColor
+              bodyBackground:getComputedStyle(doc.body).backgroundColor
             };
           });
           assert.equal(values.shell,expected,mode+'/'+view+' 셸');
@@ -103,13 +105,17 @@ export async function checkThemeSaveRace() {
           assert.equal(completed,1,mode+' 모의 저장 응답 완료');
           await page.evaluate(()=>{location.hash='#my/shelf'});
           await page.waitForFunction(()=>document.getElementById('view')?.contentWindow?.location?.href.includes('track32-bookshelf'),null,{timeout:20000});
-          const result=await page.evaluate(()=>({
-            shell:document.documentElement.dataset.ltTheme||'night',
-            inside:document.getElementById('view').contentDocument.documentElement.dataset.ltTheme||'night',
-            stored:localStorage.getItem('lt41.theme'),
-            selected:window.LT41?.prefs?.theme,
-            feedback:document.getElementById('save-feedback')?.textContent?.trim()||''
-          }));
+          const result=await evaluateWhenReady(page,()=>{
+            const doc=document.querySelector('#view')?.contentDocument;
+            if(!doc?.documentElement)return false;
+            return {
+              shell:document.documentElement.dataset.ltTheme||'night',
+              inside:doc.documentElement.dataset.ltTheme||'night',
+              stored:localStorage.getItem('lt41.theme'),
+              selected:window.LT41?.prefs?.theme,
+              feedback:document.getElementById('save-feedback')?.textContent?.trim()||''
+            };
+          });
           for(const key of ['shell','inside','stored','selected'])assert.equal(result[key],'garden',mode+'/'+key);
           if(mode==='delay')assert.equal(state.prefs.theme,'garden','늦은 계정 저장이 완료되어야 한다');
           else{

@@ -3,6 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { serve } from './helpers/screen-audit.mjs';
+import { evaluateWhenReady } from './helpers/visible-frame.mjs';
 import { testBackNavigation } from './helpers/history-assert.mjs';
 import { createTree, addMoment } from '../public/v41/domain.mjs';
 
@@ -179,7 +180,7 @@ test("서재에서 트리를 고르면 가운데 책이 그 트리로 이동", {
     await page.goto(`${origin}/v41/?account=1`, { waitUntil: "load", timeout: 60000 });
     await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
     await page.evaluate(() => { location.hash = '#my/shelf'; });
-    await page.waitForFunction(() => [...document.querySelectorAll('iframe')].some((f) => { try { return /track32-bookshelf/.test(f.contentWindow.location.href) && f.contentDocument.querySelector('.book-card.is-center'); } catch { return false; } }), null, { timeout: 15000 });
+    await page.waitForFunction(() => [...document.querySelectorAll('iframe')].some((f) => { const doc = f.contentDocument; return !!doc && /track32-bookshelf/.test(doc.URL) && !!doc.querySelector('.book-card.is-center'); }), null, { timeout: 15000 });
     await clickToolbarTreeChoice(page);
     await page.click(`[data-tree-id="${two[1].id}"]`);
     await page.waitForFunction((id) => window.LT41?.tree?.id === id &&
@@ -221,12 +222,14 @@ test('상단 메뉴 261119: 트리 단추 폭·⌄ 자리·목록 규칙·메뉴
           return !!window.LT41?.tree && window.LT41.tree.title === expected &&
             documentReady && !!choice && !choice.disabled && title === expected;
         }, longTree.title, { timeout: 20000 });
-      const bar = await page.evaluate(() => {
+      const bar = await evaluateWhenReady(page, () => {
         const record = document.querySelector('iframe#view')?.contentDocument?.querySelector('button.lt-toolbar-tree-choice');
         const label = record?.querySelector('.lt-toolbar-tree-name');
-        const r = record.getBoundingClientRect();
-        const caret = record.querySelector('.lt-toolbar-tree-caret').getBoundingClientRect();
+        const caret = record?.querySelector('.lt-toolbar-tree-caret');
         const frame = document.querySelector('.tree-frame');
+        if (!record || !label || !caret || !frame) return false;
+        const r = record.getBoundingClientRect();
+        const caretBox = caret.getBoundingClientRect();
         const fcs = getComputedStyle(frame);
         const tabs = [...document.querySelectorAll('#tree-views button[data-view]')];
         const cur = tabs.find((b) => b.getAttribute('aria-current') === 'true') || null;
@@ -235,7 +238,7 @@ test('상단 메뉴 261119: 트리 단추 폭·⌄ 자리·목록 규칙·메뉴
           recordW: Math.round(r.width), recordMax: parseFloat(getComputedStyle(record).maxWidth) || 0,
           recordWidth: parseFloat(getComputedStyle(record).width) || 0,
           paddingRight: parseFloat(getComputedStyle(record).paddingRight) || 0,
-          caretRightGap: Math.round((r.right - caret.right) * 10) / 10,
+          caretRightGap: Math.round((r.right - caretBox.right) * 10) / 10,
           labelClipped: label.scrollWidth > label.clientWidth + 1,
           frameBg: fcs.backgroundColor, frameBorder: parseFloat(fcs.borderTopWidth) || 0,
           tabsHidden: tabs.every((b) => !b.getClientRects().length),
@@ -378,7 +381,7 @@ test('970 실행: 트리 드롭다운은 Esc·바깥 누르기로 닫히고, 키
       await page.waitForFunction(() => {
         const frame = document.querySelector('iframe#view');
         return frame?.contentWindow?.location.pathname.endsWith('/track61-tree.html') &&
-          !!frame.contentDocument?.querySelector('button.lt-toolbar-tree-choice');
+          !!frame?.contentDocument?.querySelector('button.lt-toolbar-tree-choice');
       }, null, { timeout: 5000 });
       await clickToolbarTreeChoice(page);
       await page.waitForFunction(() => !document.getElementById('tree-popover')?.hidden, null, { timeout: 5000 });

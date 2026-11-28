@@ -13,6 +13,7 @@ import { createReadStream, existsSync, readFileSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { evaluateWhenReady } from './helpers/visible-frame.mjs';
 
 const REPO = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
 const BUILT = path.join(REPO, 'dist');
@@ -141,7 +142,10 @@ s('#586 글꼴 토큰이 그대로다(styles.css 제거의 부작용 없음)', a
     const frame = await frameOf(page);
     assert.ok(frame, '첫 화면 안쪽 문서가 열린다');
     await page.waitForTimeout(1500);
-    const font = await frame.evaluate(() => getComputedStyle(document.body).fontFamily);
+    const font = await evaluateWhenReady(frame, () => {
+      const body = document.body;
+      return body ? getComputedStyle(body).fontFamily : false;
+    });
     await context.close();
     assert.match(font, /Pretendard Variable/, `첫 화면 글꼴 토큰이 바뀌지 않는다(실제: ${font})`);
   } finally { await browser.close(); }

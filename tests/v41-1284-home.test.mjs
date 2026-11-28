@@ -8,6 +8,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {chromium} from 'playwright';
 import {createTree} from '../public/v41/domain.mjs';
+import {evaluateWhenReady} from './helpers/visible-frame.mjs';
 
 const ROOT=path.resolve(process.env.LT_1284_DIST||fileURLToPath(new URL('../dist/',import.meta.url)));
 const BASELINE=process.env.LT_1284_BASELINE==='1';
@@ -67,7 +68,7 @@ async function open({width,height=width===390?844:900,theme,scene,member=true,fu
      (member?window.LT41?.source==='server' && !!root.querySelector('.recent-card') && root.querySelectorAll('.home-count:not([hidden]) .home-count-line:not(:empty)').length>=6:document.body.dataset.member==='out' && root.querySelectorAll('.home-count:not([hidden]) .home-count-line:not(:empty)').length>=2) &&
      (updates?!document.getElementById('updates-card')?.hidden:document.getElementById('updates-card')?.hidden);
    },{member,updates},{timeout:15000});
-   await page.evaluate(async()=>{const d=document.querySelector('#view').contentDocument;await document.fonts.ready;await d.fonts.ready;});
+   await evaluateWhenReady(page,async()=>{const d=document.querySelector('#view')?.contentDocument;if(!d?.fonts)return false;await document.fonts.ready;await d.fonts.ready;return true;});
   }
   return {context,page,frame};
  }catch(error){await context.close();throw error;}
@@ -125,9 +126,10 @@ test('#1284 home layout and playback (1440/390, two themes, three media types)',
 });
 
 async function touchState(page){
- return page.evaluate(()=>{
-  const frame=document.getElementById('view'),doc=frame.contentDocument,scroller=doc.scrollingElement;
-  const actions=doc.querySelector('#orbit').shadowRoot.querySelector('.center .actions').getBoundingClientRect();
+ return evaluateWhenReady(page,()=>{
+  const frame=document.getElementById('view'),doc=frame?.contentDocument,scroller=doc?.scrollingElement;
+  const actions=doc?.querySelector('#orbit')?.shadowRoot?.querySelector('.center .actions')?.getBoundingClientRect();
+  if(!frame||!scroller||!actions)return false;
   return {shellScroll:document.scrollingElement.scrollTop,shellBodyScroll:document.body.scrollTop,shellHeight:document.body.scrollHeight,viewport:innerHeight,frameHeight:frame.clientHeight,insideScroll:scroller.scrollTop,insideHeight:scroller.scrollHeight,insideClient:scroller.clientHeight,actions:{top:actions.top,bottom:actions.bottom}};
  });
 }
@@ -204,8 +206,9 @@ test('#1346 첫 화면은 손가락으로 안쪽 문서를 끝까지 스크롤�
 
 // #1601: 회원의 실제 두 줄 숫자판과 새 소식 유무를 포함해 마지막 내용에 손가락으로 닿는지 본다.
 async function landscapeState(page){
- return page.evaluate(()=>{
-  const f=document.querySelector('#view'),d=f.contentDocument,w=f.contentWindow,host=d.querySelector('#orbit'),root=host.shadowRoot,app=root.querySelector('.app'),center=root.querySelector('.center'),fr=f.getBoundingClientRect();
+ return evaluateWhenReady(page,()=>{
+  const f=document.querySelector('#view'),d=f?.contentDocument,w=f?.contentWindow,host=d?.querySelector('#orbit'),root=host?.shadowRoot,app=root?.querySelector('.app'),center=root?.querySelector('.center'),fr=f?.getBoundingClientRect(),scroller=d?.scrollingElement;
+  if(!f||!d||!w||!host||!root||!app||!center||!fr||!scroller)return false;
   const plain=(r)=>({top:r.top,bottom:r.bottom,left:r.left,right:r.right,width:r.width,height:r.height});
   const box=(el,inner=false)=>{
    if(!el||!el.getClientRects().length)return null;
@@ -222,7 +225,7 @@ async function landscapeState(page){
   const intersect=(a,b)=>a&&b&&Math.min(a.right,b.right)>Math.max(a.left,b.left)?Math.max(0,Math.min(a.bottom,b.bottom)-Math.max(a.top,b.top)):0;
   const visible=b=>b&&b.top>=Math.max(0,fr.top)-1&&b.bottom<=Math.min(innerHeight,fr.bottom)+1&&intersect(b,band)<1&&intersect(b,notice)<1;
   const items=[...buttons,...numbers];
-  return {frame:plain(fr),viewport:{width:innerWidth,height:innerHeight},doc:{top:d.scrollingElement.scrollTop,height:d.scrollingElement.scrollHeight,client:d.scrollingElement.clientHeight,overflow:w.getComputedStyle(d.scrollingElement).overflowY},host:{top:host.scrollTop,height:host.scrollHeight,client:host.clientHeight,cssHeight:w.getComputedStyle(host).height,overflow:w.getComputedStyle(host).overflowY},app:{height:app.clientHeight,scrollHeight:app.scrollHeight,overflow:w.getComputedStyle(app).overflowY},center:{height:center.getBoundingClientRect().height,marginTop:w.getComputedStyle(center).marginTop,marginBottom:w.getComputedStyle(center).marginBottom,position:w.getComputedStyle(center).position},shellScroll:document.scrollingElement.scrollTop,shellHeight:document.body.scrollHeight,band,notice,actions,card,buttons,numbers,cardOverlap:intersect(card,band),bandOverlap:Math.max(0,...items.map(r=>intersect(r.box,band))),noticeOverlap:Math.max(0,...items.map(r=>intersect(r.box,notice))),allButtonsVisible:buttons.length>0&&buttons.every(r=>visible(r.box)),allNumbersVisible:numbers.length>0&&numbers.every(r=>visible(r.box)),lastVisible:items.length>0&&visible(items.reduce((a,b)=>a.box.bottom>b.box.bottom?a:b).box)};
+  return {frame:plain(fr),viewport:{width:innerWidth,height:innerHeight},doc:{top:scroller.scrollTop,height:scroller.scrollHeight,client:scroller.clientHeight,overflow:w.getComputedStyle(scroller).overflowY},host:{top:host.scrollTop,height:host.scrollHeight,client:host.clientHeight,cssHeight:w.getComputedStyle(host).height,overflow:w.getComputedStyle(host).overflowY},app:{height:app.clientHeight,scrollHeight:app.scrollHeight,overflow:w.getComputedStyle(app).overflowY},center:{height:center.getBoundingClientRect().height,marginTop:w.getComputedStyle(center).marginTop,marginBottom:w.getComputedStyle(center).marginBottom,position:w.getComputedStyle(center).position},shellScroll:document.scrollingElement.scrollTop,shellHeight:document.body.scrollHeight,band,notice,actions,card,buttons,numbers,cardOverlap:intersect(card,band),bandOverlap:Math.max(0,...items.map(r=>intersect(r.box,band))),noticeOverlap:Math.max(0,...items.map(r=>intersect(r.box,notice))),allButtonsVisible:buttons.length>0&&buttons.every(r=>visible(r.box)),allNumbersVisible:numbers.length>0&&numbers.every(r=>visible(r.box)),lastVisible:items.length>0&&visible(items.reduce((a,b)=>a.box.bottom>b.box.bottom?a:b).box)};
  });
 }
 test('#1601 첫 화면 회원 숫자판 끝과 바닥 띠를 손가락으로 확인한다',{timeout:300000,skip:!REQUIRE_TOUCH?'터치 화면 전용 시험은 별도 화면 검사에서 실행':false},async()=>{
@@ -245,7 +248,7 @@ test('#1601 첫 화면 회원 숫자판 끝과 바닥 띠를 손가락으로 확
     if(width<=915&&height<=520){
      for(let i=0;i<5;i++){await swipeUp(page);after=await landscapeState(page);if(after.doc.top>=after.doc.height-after.doc.client-1&&after.lastVisible)break;}
     }else{
-     await page.evaluate(()=>{const d=document.querySelector('#view').contentDocument;d.scrollingElement.scrollTop=d.scrollingElement.scrollHeight;});
+     await evaluateWhenReady(page,()=>{const d=document.querySelector('#view')?.contentDocument,s=d?.scrollingElement;if(!s)return false;s.scrollTop=s.scrollHeight;return true;});
      after=await landscapeState(page);
     }
     if(capture)await page.screenshot({path:path.join(capture,label+'-bottom.png')});

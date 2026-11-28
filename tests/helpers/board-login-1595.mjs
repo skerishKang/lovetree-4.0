@@ -19,7 +19,7 @@ const makeTree=n=>{
 };
 const rows=[],logos=[],errors=[];
 async function waitBoard(page,n){
- await page.waitForFunction(n=>{const f=document.getElementById('view');const d=f?.contentDocument;return f&&!f.hidden&&d?.documentElement.dataset.v41Screen==='board'&&d.documentElement.dataset.ltBoardView==='ready'&&d.querySelectorAll('#cardLayer .card[data-id]').length===n&&!!d.querySelector('.lt-moment-picker');},n,{timeout:25000});
+ await page.waitForFunction(n=>{const f=document.getElementById('view');const d=f?.contentDocument;return f&&!f.hidden&&d?.documentElement?.dataset?.v41Screen==='board'&&d?.documentElement?.dataset?.ltBoardView==='ready'&&d?.querySelectorAll('#cardLayer .card[data-id]')?.length===n&&!!d?.querySelector('.lt-moment-picker');},n,{timeout:25000});
  await page.waitForFunction(()=>{const f=document.getElementById('view-next');return !f||f.hidden||f.contentWindow?.location?.href==='about:blank'},{},{timeout:10000}).catch(()=>{});
  const frame=await (await page.locator('#view').elementHandle()).contentFrame();
  await frame.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
@@ -120,7 +120,7 @@ async function run(w,h,theme,n){
      for(const [screen,part] of [['home','home.html'],['shelf','track32-bookshelf'],['tree','track61-tree'],['board','track58-pinboard'],['book','track59-sketchbook'],['network','track56-network']]){
        const hash=screen==='home'?'#home':'#my/'+screen+'?tree='+encodeURIComponent(tree.id);
        await page.goto(base+'/v41/?account=1'+hash,{waitUntil:'load'});
-       await page.waitForFunction(part=>{const f=document.getElementById('view');return f&&!f.hidden&&f.contentDocument?.URL.includes(part)&&f.contentDocument.readyState==='complete'},part,{timeout:20000});
+       await page.waitForFunction(part=>{const f=document.getElementById('view'),doc=f?.contentDocument;return f&&!f.hidden&&doc?.URL.includes(part)&&doc.readyState==='complete'},part,{timeout:20000});
        const m=await page.evaluate(logoMeasure);
        logos.push({screen,theme,...m});
      }
