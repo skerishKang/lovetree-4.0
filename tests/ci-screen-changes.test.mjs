@@ -239,3 +239,63 @@ test('#1611 schedule, visual selection and every original screen command are pre
     }
   }
 });
+
+
+test('#1616 dedicated home source picks five owner jobs, A/B/C and only home visuals', async () => {
+  const { selectScreens, selectJobs, visualScenes, jobTestFiles } =
+    await import('../tools/ci/screen-changes.mjs');
+  const { TEST_OWNERS } = await import('../tools/ci/screen-owners.mjs');
+  const homeJobs = [
+    'screen-board-b','screen-home','screen-home-followup','screen-home-1284','screen-shell',
+    'screen-audit-a','screen-audit-b','screen-audit-c'
+  ];
+  for (const source of [
+    'src/views/orbit.js','src/views/orbit-canvas.js','src/views/orbit-source.css',
+    'src/views/orbit-samples.json','public/v41/home-route.js',
+    'public/v41/home-title-state.mjs','public/v41/orbit-safe-zone.mjs'
+  ]) {
+    assert.equal(selectScreens([source]), 'home', source);
+    assert.deepEqual(selectJobs([source]).split(','), homeJobs, source);
+    assert.equal(visualScenes(selectScreens([source])),'home',source);
+  }
+  assert.deepEqual(TEST_OWNERS['tests/v41-home-card-1077.test.mjs'],['home','shell']);
+  assert.deepEqual(TEST_OWNERS['tests/v41-orbit-535-float-overlap.test.mjs'],['home']);
+  assert.deepEqual(TEST_OWNERS['tests/v41-logo-home.test.mjs'],['shell']);
+  const jobTests=jobTestFiles();
+  assert.ok(jobTests['screen-shell'].has('tests/v41-home-card-1077.test.mjs'));
+  assert.ok(jobTests['screen-board-b'].has('tests/v41-orbit-535-float-overlap.test.mjs'));
+  assert.ok(jobTests['screen-shell-extra'].has('tests/v41-logo-home.test.mjs'));
+  assert.ok(!homeJobs.includes('screen-shell-extra'));
+});
+
+test('#1616 dedicated board/book/shelf/map, shared shell, and shell ownership contracts', async () => {
+  const { selectScreens, selectJobs, visualScenes } =
+    await import('../tools/ci/screen-changes.mjs');
+  const { TEST_OWNERS } = await import('../tools/ci/screen-owners.mjs');
+  const cases = [
+    {file:'public/v41/views/board/board.js',screen:'board',visual:'board',
+      jobs:['screen-board','screen-board-b','screen-home-followup','screen-shell-extra','screen-audit-a','screen-audit-b','screen-audit-c','screen-book-screen']},
+    {file:'public/v41/views/book/book.js',screen:'book',visual:'book',
+      jobs:['screen-home-followup','screen-book','screen-audit-a','screen-audit-b','screen-audit-c','screen-reload','screen-map-b','screen-book-screen']},
+    {file:'public/v41/views/shelf/shelf.js',screen:'shelf',visual:'shelf',
+      jobs:['screen-shell-extra','screen-audit-a','screen-audit-b','screen-audit-c','screen-shelf']},
+    {file:'public/v41/views/network/network.js',screen:'map',visual:'network',
+      jobs:['screen-board','screen-audit-a','screen-audit-b','screen-audit-c','screen-map-a','screen-map-b']}
+  ];
+  for (const {file,screen,visual,jobs} of cases) {
+    assert.equal(selectScreens([file]),screen,file);
+    assert.deepEqual(selectJobs([file]).split(','),jobs,file);
+    assert.equal(visualScenes(selectScreens([file])),visual,file);
+    const nonAudit=jobs.filter(x=>!x.startsWith('screen-audit-'));
+    assert.ok(nonAudit.length >= 2 && nonAudit.length <= 6, file+' non-audit group');
+  }
+  assert.equal(selectScreens(['public/v41/shell.css']),'all');
+  assert.equal(selectJobs(['public/v41/shell.css']),'all');
+  assert.equal(selectScreens(['public/v41/shell/header.mjs']),'shell');
+  assert.ok(selectJobs(['public/v41/shell/header.mjs']).split(',').includes('screen-shell-extra'));
+  assert.ok(selectJobs(['public/v41/shell/header.mjs']).split(',').includes('screen-map-a'));
+  for (const [name,owners] of Object.entries(TEST_OWNERS)) {
+    assert.ok(owners.length>0,name);
+    assert.ok(owners.every(x=>['home','board','book','shelf','map','shell','explore/settings','common'].includes(x)),name);
+  }
+});

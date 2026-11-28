@@ -170,7 +170,7 @@ export const TEST_OWNERS = {
     "common"
   ],
   "tests/v41-logo-home.test.mjs": [
-    "home"
+    "shell"
   ],
   "tests/v41-map-contrast.test.mjs": [
     "map"

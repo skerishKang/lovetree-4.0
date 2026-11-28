@@ -51,8 +51,9 @@ function isScreenTool(file) {
 // 지도 파일이 실제로 바뀐 PR만 잰다.
 export const SCREENS = ['home','board','book','shelf','map','shell','explore/settings'];
 export const AREA_SOURCES = [
-  [/^src\/views\/orbit[^/]*\.(js|css|json)$/, ['home','shell']],
-  [/^public\/v41\/(home-route\.js|home-title-state\.mjs|orbit-safe-zone\.mjs)$/, ['home','shell']],
+  [/^src\/views\/orbit[^/]*\.(js|css|json)$/, ['home']],
+  [/^public\/v41\/(home-route\.js|home-title-state\.mjs|orbit-safe-zone\.mjs)$/, ['home']],
+  [/^public\/v41\/shell\/(header|navigation-menu|settings|tree-menu|tree-tips|dialogs)\.mjs$/, ['shell']],
   [/^public\/v41\/views\/(board\/|track58-pinboard\.html$)/, ['board']],
   [/^public\/v41\/views\/(book\/|track59-sketchbook\.html$)/, ['book']],
   [/^src\/views\/book(?:-source\.css|\.js)$/, ['book']],
@@ -111,7 +112,7 @@ export function selectJobs(changedFiles, jobTests = jobTestFiles()) {
     if (!files.size) return 'all';
     for (const file of files) if (!TEST_OWNERS[file]) return 'all';
     if (job.startsWith('screen-audit-') || [...files].some(f =>
-      TEST_OWNERS[f].some(x => x === 'common' || screens.has(x)))) picked.push(job);
+      TEST_OWNERS[f].some(x => x !== 'common' && screens.has(x)))) picked.push(job);
   }
   return picked.length ? picked.join(',') : 'all';
 }
