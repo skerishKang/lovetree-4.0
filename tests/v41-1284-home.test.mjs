@@ -33,13 +33,21 @@ async function serve(){
  await listenOnSafePort(server, '127.0.0.1', {port:Number(process.env.LT_TEST_PORT)||0});
  return server;
 }
-async function open({width,height=width===390?844:900,theme,scene,member=true}){
+async function open({width,height=width===390?844:900,theme,scene,member=true,fullCounts=false,updates=null}){
  const tree=createTree({subject:'시험 트리',title:'youtube.com에서 간직한 순간',note:'시험용 순간',emotion:'설렘',date:'2026-11-24',url:(scene.vertical?'https://www.youtube.com/shorts/':'https://www.youtube.com/watch?v=')+scene.video,mediaMetadata:{vertical:scene.vertical}},'2026-11-24T11:00:00.000Z');
- const data=JSON.stringify({revision:1,state:{version:1,trees:[tree],prefs:{}},subject:'시험 계정',writeSubjectBound:true,savedAt:'2026-11-24T11:00:00.000Z'});
+ const inbox=fullCounts?{...createTree({subject:'모아둔 순간',title:'정리할 순간',note:'시험 자료',emotion:'설렘',date:'2026-11-22',url:''},'2026-11-22T11:00:00.000Z'),inbox:true}:null;
+ const data=JSON.stringify({revision:1,state:{version:1,trees:inbox?[tree,inbox]:[tree],prefs:{}},subject:'시험 계정',writeSubjectBound:true,savedAt:'2026-11-24T11:00:00.000Z'});
  const context=await chromium.launch({headless:true,args:['--disable-gpu']});
  const page=await context.newPage({viewport:{width,height},reducedMotion:'reduce'});
+ if(fullCounts)await page.route('**/*',route=>{const u=new URL(route.request().url());return u.hostname==='127.0.0.1'?route.continue():route.abort();});
  await page.route('**/api/**',route=>route.fulfill({status:200,contentType:'application/json',body:'{"ok":true,"items":[]}'}));
- await page.route('**/api/workspace**',route=>route.fulfill({status:200,contentType:'application/json',body:data}));
+ await page.route('**/api/workspace**',route=>route.fulfill({status:fullCounts&&!member?401:200,contentType:'application/json',body:fullCounts&&!member?'{"ok":false,"error":{"code":"not_logged_in"}}':data}));
+ if(fullCounts){
+  await page.route('**/api/account',route=>route.fulfill({status:member?200:401,contentType:'application/json',body:member?'{"ok":true,"subject":"시험 계정","email":"test@example.test"}':'{"ok":false,"error":{"code":"not_logged_in"}}'}));
+  await page.route('**/api/community/stats',route=>route.fulfill({status:200,contentType:'application/json',body:'{"trees":123,"moments":456}'}));
+  await page.route('**/api/shares',route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({shares:[{status:'active',treeId:tree.id}]})}));
+  await page.route('**/v41/updates.json',route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(updates?[{version:'99.0.0',date:'2026-11-28',items:[{kind:'fix',text:'화면 시험용 새 소식'}]}]:[])}));
+ }
  await page.route('**/api/youtube/oembed**',route=>route.fulfill({status:scene.blocked?401:200,contentType:'application/json',body:scene.blocked?'{"error":"youtube_embed_forbidden"}':JSON.stringify({title:'실제 원본 영상 제목 '+scene.type,authorName:'시험 채널',thumbnailUrl:'https://i.ytimg.com/vi/'+scene.video+'/hqdefault.jpg'})}));
  await page.route('**/i.ytimg.com/**',route=>route.fulfill({status:200,contentType:'image/png',body:BLANK}));
  await page.route('**/youtube-nocookie.com/**',route=>route.fulfill({status:200,contentType:'text/html',body:'<title>YouTube video</title>'}));
@@ -52,6 +60,15 @@ async function open({width,height=width===390?844:900,theme,scene,member=true}){
   const frame=page.frameLocator('#view');
   if(await page.locator('#tree-tips').count())await page.locator('#tree-tips').evaluate(el=>el.remove());
   await page.evaluate(()=>{document.body.scrollTop=0;scrollTo(0,0)});
+  if(fullCounts){
+   await page.waitForFunction(({member,updates})=>{
+    const f=document.querySelector('#view'),root=f?.contentDocument?.querySelector('#orbit')?.shadowRoot;
+    return !!root?.querySelector(member?'.center .actions[data-inline]':'.center .actions') &&
+     (member?window.LT41?.source==='server' && !!root.querySelector('.recent-card') && root.querySelectorAll('.home-count:not([hidden]) .home-count-line:not(:empty)').length>=6:document.body.dataset.member==='out' && root.querySelectorAll('.home-count:not([hidden]) .home-count-line:not(:empty)').length>=2) &&
+     (updates?!document.getElementById('updates-card')?.hidden:document.getElementById('updates-card')?.hidden);
+   },{member,updates},{timeout:15000});
+   await page.evaluate(async()=>{const d=document.querySelector('#view').contentDocument;await document.fonts.ready;await d.fonts.ready;});
+  }
   return {context,page,frame};
  }catch(error){await context.close();throw error;}
 }
@@ -180,6 +197,73 @@ test('#1346 첫 화면은 손가락으로 안쪽 문서를 끝까지 스크롤�
    }else{
     assert.equal(row.after.insideScroll,row.before.insideScroll,`${label}: 내용이 화면 안이면 불필요한 스크롤이 없다`);
     assert.ok(row.after.actions.top>=-1&&row.after.actions.bottom<=row.after.insideClient+1,`${label}: 단추가 처음부터 화면 안에 있다`);
+   }
+  }
+ }finally{await new Promise(ok=>server.close(ok));}
+});
+
+// #1601: 회원의 실제 두 줄 숫자판과 새 소식 유무를 포함해 마지막 내용에 손가락으로 닿는지 본다.
+async function landscapeState(page){
+ return page.evaluate(()=>{
+  const f=document.querySelector('#view'),d=f.contentDocument,w=f.contentWindow,host=d.querySelector('#orbit'),root=host.shadowRoot,app=root.querySelector('.app'),center=root.querySelector('.center'),fr=f.getBoundingClientRect();
+  const plain=(r)=>({top:r.top,bottom:r.bottom,left:r.left,right:r.right,width:r.width,height:r.height});
+  const box=(el,inner=false)=>{
+   if(!el||!el.getClientRects().length)return null;
+   const cs=el.ownerDocument.defaultView.getComputedStyle(el);
+   if(cs.display==='none'||cs.visibility==='hidden')return null;
+   const r=plain(el.getBoundingClientRect());
+   if(inner){r.top+=fr.top;r.bottom+=fr.top;r.left+=fr.left;r.right+=fr.left;}
+   return r;
+  };
+  const band=box(document.querySelector('.home-links')),notice=box(document.querySelector('#updates-card')),actions=box(root.querySelector('.center .actions'),true);
+  const buttons=[...root.querySelectorAll('.home-action-group > button')].map(el=>({text:el.textContent.trim(),box:box(el,true)})).filter(r=>r.box);
+  const numbers=[...root.querySelectorAll('.home-count:not([hidden]) .home-count-line:not(:empty)')].map(el=>({text:el.textContent.trim(),box:box(el,true)})).filter(r=>r.box);
+  const card=box(root.querySelector('.recent-card'),true);
+  const intersect=(a,b)=>a&&b&&Math.min(a.right,b.right)>Math.max(a.left,b.left)?Math.max(0,Math.min(a.bottom,b.bottom)-Math.max(a.top,b.top)):0;
+  const visible=b=>b&&b.top>=Math.max(0,fr.top)-1&&b.bottom<=Math.min(innerHeight,fr.bottom)+1&&intersect(b,band)<1&&intersect(b,notice)<1;
+  const items=[...buttons,...numbers];
+  return {frame:plain(fr),viewport:{width:innerWidth,height:innerHeight},doc:{top:d.scrollingElement.scrollTop,height:d.scrollingElement.scrollHeight,client:d.scrollingElement.clientHeight,overflow:w.getComputedStyle(d.scrollingElement).overflowY},host:{top:host.scrollTop,height:host.scrollHeight,client:host.clientHeight,cssHeight:w.getComputedStyle(host).height,overflow:w.getComputedStyle(host).overflowY},app:{height:app.clientHeight,scrollHeight:app.scrollHeight,overflow:w.getComputedStyle(app).overflowY},center:{height:center.getBoundingClientRect().height,marginTop:w.getComputedStyle(center).marginTop,marginBottom:w.getComputedStyle(center).marginBottom,position:w.getComputedStyle(center).position},shellScroll:document.scrollingElement.scrollTop,shellHeight:document.body.scrollHeight,band,notice,actions,card,buttons,numbers,cardOverlap:intersect(card,band),bandOverlap:Math.max(0,...items.map(r=>intersect(r.box,band))),noticeOverlap:Math.max(0,...items.map(r=>intersect(r.box,notice))),allButtonsVisible:buttons.length>0&&buttons.every(r=>visible(r.box)),allNumbersVisible:numbers.length>0&&numbers.every(r=>visible(r.box)),lastVisible:items.length>0&&visible(items.reduce((a,b)=>a.box.bottom>b.box.bottom?a:b).box)};
+ });
+}
+test('#1601 첫 화면 회원 숫자판 끝과 바닥 띠를 손가락으로 확인한다',{timeout:300000,skip:!REQUIRE_TOUCH?'터치 화면 전용 시험은 별도 화면 검사에서 실행':false},async()=>{
+ const server=await serve();globalThis._lt1284port=server.address().port;
+ const capture=process.env.LT_1601_CAPTURE_DIR||'';
+ const sizes=[[390,844],[844,390],[740,360],[915,412],[1440,900],[2560,1440]];
+ const rows=[];
+ if(capture)await mkdir(capture,{recursive:true});
+ try{
+  for(const [width,height] of sizes)for(const theme of ['night','garden'])for(const member of [true,false])for(const updates of [false,true]){
+   const label=width+'x'+height+'-'+theme+'-'+(member?'member':'guest')+'-'+(updates?'news':'no-news');
+   const {context,page}=await open({width,height,theme,scene:scenarios[0],member,fullCounts:true,updates});
+   try{
+    const before=await landscapeState(page);
+    if(capture)await page.screenshot({path:path.join(capture,label+'-top.png')});
+    let after=before;
+    // 좁고 낮은 화면은 실제 터치 입력으로 내려간다. 문서 끝의 수치는 셸 좌표로 확인한다.
+    if(width<=915&&height<=520){
+     for(let i=0;i<5;i++){await swipeUp(page);after=await landscapeState(page);if(after.doc.top>=after.doc.height-after.doc.client-1&&after.lastVisible)break;}
+    }else{
+     await page.evaluate(()=>{const d=document.querySelector('#view').contentDocument;d.scrollingElement.scrollTop=d.scrollingElement.scrollHeight;});
+     after=await landscapeState(page);
+    }
+    if(capture)await page.screenshot({path:path.join(capture,label+'-bottom.png')});
+    const row={label,width,height,theme,member,updates,before,after};rows.push(row);
+    console.log('#1601',JSON.stringify(row));
+   }finally{await context.close();}
+  }
+  if(capture){const {writeFile}=await import('node:fs/promises');await writeFile(path.join(capture,'measurements.json'),JSON.stringify(rows,null,2));}
+  for(const r of rows){
+   const a=r.after;
+   assert.equal(a.shellScroll,0,r.label+': 셸 스크롤 없음');
+   assert.ok(a.shellHeight<=a.viewport.height+1,r.label+': 셸 높이 유지');
+   assert.ok(a.doc.top>=a.doc.height-a.doc.client-1,r.label+': 안쪽 문서 끝까지 접근');
+   assert.equal(a.allButtonsVisible,true,r.label+': 마지막 단추 포함 조작줄 표시');
+   assert.equal(a.allNumbersVisible,true,r.label+': 숫자판 마지막 줄 포함 표시');
+   assert.equal(a.bandOverlap,0,r.label+': 바닥 링크 겹침 0');
+   assert.equal(a.noticeOverlap,0,r.label+': 새 소식 띠 겹침 0');
+   if(r.width>=651&&r.height<=520){
+    assert.ok(a.host.height<=a.host.client+1,r.label+': 궤도 안 별도 스크롤 없음');
+    assert.equal(a.cardOverlap,0,r.label+': 마지막 위치 카드와 바닥 링크 겹침 0');
    }
   }
  }finally{await new Promise(ok=>server.close(ok));}

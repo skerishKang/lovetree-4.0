@@ -135,6 +135,15 @@ extraCSS+=`.home-count[data-reserve][hidden]{display:block;visibility:hidden;min
  .center.dim{transform:scale(.96)}
  .center .eyebrow{font-size:12px}
 }
+/* #1601: 낮은 가로 첫 화면은 가운데 내용과 여백을 문서 높이에 포함한다.
+   궤도 호스트 안에 별도 스크롤을 만들지 않는다. */
+@media(min-width:651px) and (max-height:520px){
+ :host(.home-stage){height:auto;min-height:100dvh;overflow:clip}
+ :host(.home-stage) .app{display:flow-root;height:auto;min-height:100dvh;overflow:clip;overscroll-behavior-y:contain}
+ :host(.home-stage) .center{position:relative;left:auto;top:auto;width:min(500px,calc(100% - 32px));margin:18px auto 12px;transform:none}
+ :host(.home-stage) .center.dim{transform:scale(.96)}
+ :host(.home-stage) .center .eyebrow{font-size:12px}
+}
 :host([data-lt-theme=garden]) .center .eyebrow{color:var(--lt-ink)}`;
 export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSelect=()=>{},recordNote=null,examples=[],onOpen=null,empty=false,titleDisplay='both',momentList=null,dateStyle='dot',prefs=null,initialPicking=false,initialNotice=null,homePin=null,loggedIn,homeTitlePending=false,homeTitleHint=false}) {
  performance.mark('m0');
@@ -1218,7 +1227,9 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
   const portrait=host.hasAttribute('data-lt-home-portrait')&&innerWidth<=650;
   // 가운데 덩어리가 화면보다 길면 iframe 문서가 스크롤하도록 실제 높이를 넘긴다.
   const contentHeight=portrait?Math.max(app.clientWidth+372,centerHeight+34):centerHeight+32;
-  host.style.height=`${Math.ceil(Math.max(viewportHeight,contentHeight))}px`;appBox=app.getBoundingClientRect();safeZoneDirty=true;schedule();
+  // #1601: 낮은 가로 첫 화면은 실제 문서 흐름이 높이를 결정한다.
+  const landscapeHome=host.classList.contains('home-stage')&&matchMedia('(min-width:651px) and (max-height:520px)').matches;
+  host.style.height=landscapeHome?'':`${Math.ceil(Math.max(viewportHeight,contentHeight))}px`;appBox=app.getBoundingClientRect();safeZoneDirty=true;schedule();
  };
  const noticeResize=typeof ResizeObserver==="function"?new ResizeObserver(fitNotice):null;
  const barNow=document.getElementById("sync-bar");
