@@ -121,6 +121,28 @@ test('952 실행: 세로 영상 틀은 화면에서 9:16, 가로는 16:9다(미�
           LTMedia.markup(urls.watch, '가로 영상', null, 'm2', { source: 'server', owned: true });
       }, { shorts: SHORTS, watch: WATCH });
       assert.equal(await page.evaluate(RATIO('.lt-media[data-lt-vertical="1"] .lt-yt-preview')), '9 / 16', '세로 미리보기 틀');
+       // #1635: 재생·크게 보기 둘 다 그림 바깥 아래 줄에 있고 서로 가리지 않는다.
+       const controls=await page.evaluate(()=>[...document.querySelectorAll('.lt-media')].map(root=>{
+         const poster=root.querySelector('.lt-yt-preview');
+         const play=root.querySelector('.lt-media-toolbar [data-lt-play]');
+         const expand=root.querySelector('.lt-media-toolbar [data-lt-expand]');
+         if(!poster||!play||!expand)return null;
+         const p=poster.getBoundingClientRect(),a=play.getBoundingClientRect(),b=expand.getBoundingClientRect();
+         const overlap=Math.max(0,Math.min(a.right,b.right)-Math.max(a.left,b.left))*Math.max(0,Math.min(a.bottom,b.bottom)-Math.max(a.top,b.top));
+         return {posterButtons:poster.querySelectorAll('button,a,[role="button"]').length,
+           posterText:poster.innerText.trim(),below:a.top>=p.bottom-.5,
+           playW:a.width,playH:a.height,expandW:b.width,expandH:b.height,overlap};
+       }));
+       assert.equal(controls.length,2,'가로·세로 미리보기 둘');
+       for(const c of controls){
+         assert.ok(c,'미리보기 아래 줄에 두 단추가 모두 있음');
+         assert.equal(c.posterButtons,0,'썸네일 위 단추 0');
+         assert.equal(c.posterText,'','썸네일 위 재생 글자 0');
+         assert.equal(c.below,true,'재생 단추는 썸네일 아래');
+         assert.ok(c.playW>=44&&c.playH>=44,'재생 단추 44px');
+         assert.ok(c.expandW>=44&&c.expandH>=44,'크게 보기 단추 44px');
+         assert.equal(c.overlap,0,'재생·크게 보기 겹침 0');
+       }
       // 그 자리 재생: 누른 뒤 만들어지는 재생 틀도 같은 판정을 따르고, 재생 주소는 embedUrl 한 벌에서 온다.
       await page.evaluate(() => document.querySelector('.lt-media[data-lt-moment-id="m2"] [data-lt-play]')?.click());
       await page.waitForSelector('.lt-media[data-lt-moment-id="m2"] .lt-yt-frame', { timeout: 10000 });
