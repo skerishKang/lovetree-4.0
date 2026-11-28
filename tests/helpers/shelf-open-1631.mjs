@@ -45,6 +45,15 @@ test('#1631 서재 미리보기·바로 펼치기 선택과 복원', {
     let revision = 1;
     let writes = 0;
     const errors = [];
+    // Keep a bounded, content-free trace of the iframe -> shell preference handshake.
+    await ctx.addInitScript(() => {
+      window.__shelfOpenTrace = [];
+      window.addEventListener('message', event => {
+        if (!['lt41-set-shelf-open-mode', 'lt41-shelf-open-mode'].includes(event.data?.type)) return;
+        window.__shelfOpenTrace.push({type:event.data.type, value:event.data.value, at:performance.now()});
+        if(window.__shelfOpenTrace.length>16)window.__shelfOpenTrace.shift();
+      }, true);
+    });
     await ctx.addInitScript(({mode,theme}) => {
       localStorage.setItem('lt41.theme', theme);
       localStorage.setItem('lt41.shelfView', 'shelf');
@@ -223,9 +232,57 @@ test('#1631 서재 미리보기·바로 펼치기 선택과 복원', {
   }
   async function shelfChoice(page,mode,input) {
     const b=page.frameLocator('#view').locator('#shelf-open-choice [data-shelf-open-mode="'+mode+'"]');
-    if(input==='Enter')await b.press('Enter');
-    else await b.click();
-    await page.waitForFunction(v=>window.LT41?.prefs?.shelfOpenMode===v,mode,{timeout:10000});
+    const previous=mode==='direct'?'preview':'direct';
+    try {
+      // The settings dialog must be closed, and this must be a real transition, not a no-op.
+      // Wait for the shelf's own controls to finish binding instead of sleeping after Escape.
+      await page.waitForFunction(({previous,mode})=>{
+        const frame=document.querySelector('#view');
+        const doc=frame?.contentDocument;
+        const selected=doc?.querySelector('#shelf-open-choice [data-shelf-open-mode="'+previous+'"]');
+        const target=doc?.querySelector('#shelf-open-choice [data-shelf-open-mode="'+mode+'"]');
+        if(!target)return false;
+        const rect=target.getBoundingClientRect(),hit=doc.elementFromPoint(rect.x+rect.width/2,rect.y+rect.height/2);
+        return !document.querySelector('#account-settings')?.open
+          && window.LT41?.prefs?.shelfOpenMode===previous
+          && frame.contentWindow.__shelfListenerInstalled===true
+          && selected?.getAttribute('aria-checked')==='true'
+          && target.getAttribute('aria-checked')==='false'
+          && rect.width>0&&rect.height>0&&(hit===target||target.contains(hit));
+      },{previous,mode},{timeout:10000});
+      if(input==='Enter'){
+        await b.focus();
+        await page.waitForFunction(v=>{
+          const frame=document.querySelector('#view');
+          return document.activeElement===frame
+            && frame?.contentDocument?.activeElement?.dataset.shelfOpenMode===v;
+        },mode,{timeout:10000});
+        // A real keyboard Enter into the focused iframe, not a synthetic click.
+        if(process.env.LT_SHELF_OPEN_DROP_MESSAGE==='1') await page.evaluate(() => {
+          const original=window.postMessage;
+          window.postMessage=function(data,...args){
+            if(data?.type==='lt41-set-shelf-open-mode')return;
+            return original.call(this,data,...args);
+          };
+        });
+        await page.keyboard.press('Enter');
+      }else await b.click();
+      await page.waitForFunction(v=>window.LT41?.prefs?.shelfOpenMode===v,mode,{timeout:10000});
+    } catch (error) {
+      const diagnostic = await page.evaluate(() => {
+        const frame = document.querySelector('#view')?.contentWindow;
+        const doc = frame?.document;
+        const focus = el => el ? {tag:el.tagName, id:el.id, mode:el.dataset?.shelfOpenMode} : null;
+        const radios = d => Array.from(d?.querySelectorAll('#shelf-open-choice [data-shelf-open-mode]') || []).map(el => ({mode:el.dataset.shelfOpenMode, aria:el.getAttribute('aria-checked'), tabIndex:el.tabIndex, active:d.activeElement===el, hit:d.elementFromPoint(el.getBoundingClientRect().x+el.getBoundingClientRect().width/2,el.getBoundingClientRect().y+el.getBoundingClientRect().height/2)?.dataset?.shelfOpenMode}));
+        return {parentFocus:focus(document.activeElement), frameFocus:focus(doc?.activeElement),
+          parentPref:window.LT41?.prefs?.shelfOpenMode, mirror:localStorage.getItem('lt41.shelfOpenMode'),
+          parentDataset:document.documentElement.dataset.ltShelfOpenMode,
+          frameReady:frame?.__shelfListenerInstalled, settingsOpen:document.querySelector('#account-settings')?.open,
+          radios:radios(doc), parentTrace:window.__shelfOpenTrace, frameTrace:frame?.__shelfOpenTrace};
+      }).catch(e => ({diagnosticError:String(e)}));
+      console.error('SHELF_OPEN_TIMEOUT', JSON.stringify({mode,input,previous,diagnostic}));
+      throw error;
+    }
     return checkSynced(page,mode);
   }
 
@@ -240,7 +297,21 @@ test('#1631 서재 미리보기·바로 펼치기 선택과 복원', {
         await checkSynced(page,other);
         await setting(page,mode);
         await checkSynced(page,mode);
+        // The dialog restores focus to its opener in a queued task after "close".
+        // Observe that completion before focusing inside the iframe; no fixed sleep.
+        await page.evaluate(() => {
+          window.__shelfSettingsFocusRestored=false;
+          document.querySelector('#account-settings').addEventListener('close', () => {
+            // Registered after the shell's handler: this runs after its focus-return task.
+            setTimeout(() => { window.__shelfSettingsFocusRestored=true; },0);
+          },{once:true});
+        });
         await page.keyboard.press('Escape');
+        await page.waitForFunction(() =>
+          window.__shelfSettingsFocusRestored === true
+          && !document.querySelector('#account-settings')?.open
+          && document.activeElement===document.querySelector('#account-avatar'),
+          null,{timeout:10000});
         await shelfChoice(page,other,input);
         await shelfChoice(page,mode,input);
         await until(()=>state.prefs.shelfOpenMode===mode&&getWrites()>=1,'서재 단추 변경이 계정에 저장되어야 한다');
