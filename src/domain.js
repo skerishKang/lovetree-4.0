@@ -93,6 +93,10 @@ export function normalizeBookDisplay(value) {
 export function normalizeShelfView(value) {
   return SHELF_VIEWS.includes(value) ? value : DEFAULT_SHELF_VIEW;
 }
+// #1631: 책장은 미리보기를 기본으로 연다.
+export function normalizeShelfOpenMode(value) {
+  return value === 'direct' ? 'direct' : 'preview';
+}
 // 순간 목록의 트리 칩 순서(2026-11-17, 대표 결정): 계정 설정 칸(state.prefs)에 트리 id 순서로 저장한다.
 // 문자열만 남기고('전체'='all'은 칩 고정이라 저장하지 않는다) 중복을 지우며, 너무 긴 목록은 64개에서 끊는다.
 export function normalizeTreeChipOrder(value) {
@@ -136,7 +140,7 @@ export function normalizePrefs(value) {
     shareView: normalizeShareView(value?.shareView),
     shareDiscover: normalizeShareDiscover(value?.shareDiscover),
     treeChipOrder: normalizeTreeChipOrder(value?.treeChipOrder),
-    bookDisplay: normalizeBookDisplay(value?.bookDisplay), shelfView: normalizeShelfView(value?.shelfView), homeMoment: normalizeHomeMoment(value?.homeMoment)
+    bookDisplay: normalizeBookDisplay(value?.bookDisplay), shelfView: normalizeShelfView(value?.shelfView), shelfOpenMode: normalizeShelfOpenMode(value?.shelfOpenMode), homeMoment: normalizeHomeMoment(value?.homeMoment)
   };
   return { ...known, ...preserveUnknownPrefs(value, known) };
 }

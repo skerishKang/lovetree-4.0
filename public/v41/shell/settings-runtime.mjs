@@ -65,6 +65,8 @@ export function createSettingsRuntime(ctx){
      (0,ctx.setShelfView)(b.dataset.shelfView);
     };
 
+    for(const b of document.querySelectorAll('[data-shelf-open-mode]'))b.onclick=()=>ctx.setShelfOpenMode(b.dataset.shelfOpenMode);
+    (0,ctx.paintShelfOpenModeControls)();
     paintThemeControls();
 
     (0,ctx.applyTheme)();
@@ -74,6 +76,7 @@ export function createSettingsRuntime(ctx){
     (0,ctx.paintBookDisplayControls)();
 
     (0,ctx.paintShelfViewControls)();
+    (0,ctx.paintShelfOpenModeControls)();
 
     applyAdvanced();
   }};

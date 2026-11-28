@@ -2682,15 +2682,15 @@
     let seen = '';
     const SEL = ['.topbar', '.hero p', '.lt-screen-toolbar', '.lt-moment-picker', '.left-rail', '.mobile-ribbon', '#detail'],
       watched = new WeakSet();
-    const check = () => {
+    const check = (force = false) => {
       const i = measureInsets(),
         k = [i.top, i.left, i.right, i.bottom].map(Math.round).join(',');
       if (k === seen) return;
       const first = !seen;
       seen = k;
-      if (!first) resize();
+      if (!first || force) resize();
     };
-    const ro = new ResizeObserver(check),
+    const ro = new ResizeObserver(() => check()),
       watch = () => {
         for (const q of SEL) {
           const el = document.querySelector(q);
@@ -2706,6 +2706,23 @@
     const detail = document.querySelector('#detail');
     if (detail)
       new MutationObserver(watch).observe(detail, { attributes: true, attributeFilter: ['class'] });
+    // #1609: 셸이 머리줄 높이를 재며 도구 줄의 top만 옮길 수 있다.
+    // ResizeObserver는 크기만 보므로, 위치 변수 변화도 배치 갱신 대상으로 삼는다.
+    const root = document.documentElement;
+    let toolbarTop = root.style.getPropertyValue('--lt-toolbar-top');
+    let positionCheckQueued = false;
+    new MutationObserver(() => {
+      const next = root.style.getPropertyValue('--lt-toolbar-top');
+      if (next === toolbarTop) return;
+      toolbarTop = next;
+      if (positionCheckQueued) return;
+      positionCheckQueued = true;
+      // 위치 변수는 첫 프레임에 상속된 좌표가 늦게 반영될 수 있어 다음 프레임에서 잰다.
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        positionCheckQueued = false;
+        check(true);
+      }));
+    }).observe(root, { attributes: true, attributeFilter: ['style'] });
   })();
   /* #461 화면 문서 끝의 <style>(모바일 안내 문구 자리 등)은 이 스크립트 뒤에 읽힌다 — 문서를 다 읽은 뒤·글꼴이 온 뒤 한 번씩 덮개를 다시 재어 맞춘다(한 번뿐, 유휴 반복 없음). */ if (
     document.readyState === 'loading'

@@ -55,8 +55,8 @@ test('선택기 실패 또는 취소 이후 GitHub에서 화면 시험이 전부
   }
 });
 
-test('unknown future screen job failure and cancellation cannot be ignored', () => {
-  for (const status of ['failure', 'cancelled']) {
+test('unknown or renamed screen jobs are rejected even if successful or skipped', () => {
+  for (const status of ['success', 'skipped', 'failure', 'cancelled']) {
     const needs = results('success', gate('success', 'true'));
     needs['screen-future'] = { result: status };
     const outcome = checkScreenResults(needs);

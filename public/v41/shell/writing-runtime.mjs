@@ -268,6 +268,7 @@ export function createWritingRuntime(ctx){
       setCurrent:file=>{ctx.current=file;},
       // #1093: 서재 도구 줄의 토글이 부모 저장 경로를 쓰게 한다.
       setShelfView:ctx.setShelfView,
+      setShelfOpenMode:ctx.setShelfOpenMode,
       getModel:()=>ctx.model,
       getSource:()=>ctx.source,
       getMember:()=>ctx.member,
