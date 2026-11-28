@@ -1,10 +1,30 @@
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';
 import {createShareApi} from '../public/v41/share-api.mjs';
+import {setVisitMode} from '../public/v41/visit-mode.mjs';
 test('share client uses only fixed same-origin endpoints',async()=>{
  const calls=[],fetchImpl=async(url,init={})=>{calls.push([url,init.method||'GET',init.body]);return new Response(JSON.stringify(url.includes('/public/')?{share:{id:'token'},tree:{}}:{shares:[]}),{headers:{'content-type':'application/json'}});};
- const api=createShareApi({fetchImpl});await api.preview({treeId:'t'});await api.create({treeId:'t'});await api.list();await api.revoke('abc');await api.read('abc');
- assert.deepEqual(calls.map(c=>c.slice(0,2)),[['/api/shares/preview','POST'],['/api/shares','POST'],['/api/shares','GET'],['/api/shares/abc','DELETE'],['/api/public/shares/abc','GET']]);
+ const api=createShareApi({fetchImpl});await api.preview({treeId:'t'});await api.create({treeId:'t'});await api.list();await api.revoke('abc');await api.read('abc');await api.readVisit('abc');
+ assert.deepEqual(calls.map(c=>c.slice(0,2)),[['/api/shares/preview','POST'],['/api/shares','POST'],['/api/shares','GET'],['/api/shares/abc','DELETE'],['/api/public/shares/abc','GET'],['/api/public/visits/abc','GET']]);
 });
+test('방문 모드에서는 공유·트리 설정 쓰기가 보내지 않고 방문 읽기는 허용한다', async (t) => {
+  setVisitMode(true);
+  t.after(() => setVisitMode(false));
+  const calls = [];
+  const api = createShareApi({fetchImpl:async (url, init = {}) => {
+    calls.push([url, init.method || 'GET']);
+    return Response.json({visit:{shareId:'token'},tree:{},shelf:[],stats:{}});
+  }});
+  const blocked = await api.setTreeVisibility('tree-a', 'private');
+  const discoverBlocked = await api.setTreeDiscover('tree-a', true);
+  for (const answer of [blocked, discoverBlocked]) {
+    assert.equal(answer.status, 403);
+    assert.equal(answer.code, 'visit_read_only');
+  }
+  assert.deepEqual(calls, []);
+  assert.equal((await api.readVisit('token')).ok, true);
+  assert.deepEqual(calls, [['/api/public/visits/token', 'GET']]);
+});
+
 // #952: 셸·HTML·CSS 글자 검사 16개를 걷어냈다. 링크 만들기 전 미리보기 확인·공개 읽기 경로·회수 안내·
 // 공개 범위 문구는 이제 동작 시험이 본다 — 공유 창 단계(v41-share-steps: 미리보기 전 링크 막힘·3단계·discover PUT),
 // 손님 화면(v41-share-guest-635: ?open=·쓰기 0건), 공개 응답(pages-search-preview: 회수 안내·noindex·카드).

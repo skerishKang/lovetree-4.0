@@ -6,6 +6,7 @@ import {connectionSignature} from "./panel-dirty.mjs";
 import {createConnections} from "./connections.mjs";
 import {createTreeTips} from "./tree-tips.mjs";
 import {askAppConfirm} from "../confirm.mjs";
+import {isVisitMode} from "../visit-mode.mjs";
 
 export function createWorkspaceRuntime(ctx){
   let shellConnections, mapMetaText, mountConnectionTool, setConnectionCount, connectionDirty, links, motionPaused, shellTreeTips, anyDialogOpen, tipsFollowDialogs, closeTreeTips, accountMenuOpen, tipsFollowAccountMenu, showTreeTips, syncTreeTips, navBar, narrowNav, onExploreRoute;
@@ -25,7 +26,7 @@ export function createWorkspaceRuntime(ctx){
   // #380 5번: '정리하기' 입구는 트리 ▾ 드롭다운 한 곳에서만 그린다(renderTreeMenu). 헤더 단추는 없앴다.
   function viewContext(){}
 
-  function choose(id,momentId,skipShow=false){const tree=ctx.model.trees.find(t=>t.id===id);if(skipShow&&window.LT41?.tree?.id===tree?.id){window.LT41.momentId=tree.moments.find(m=>m.id===momentId)?.id||tree.moments.find(m=>m.parentId===null)?.id||tree.moments[0]?.id;window.LT41.prefs=(0,ctx.currentPrefs)();window.LT41.writable=ctx.source==='server'&&!!ctx.member?.snapshot().writable;return;}window.LT41=tree?{tree,trees:ctx.model.trees,source:ctx.source,momentId:tree.moments.find(m=>m.id===momentId)?.id||tree.moments.find(m=>m.parentId===null)?.id||tree.moments[0]?.id,prefs:(0,ctx.currentPrefs)(),writable:ctx.source==='server'&&!!ctx.member?.snapshot().writable,}:null;
+  function choose(id,momentId,skipShow=false){const tree=ctx.model.trees.find(t=>t.id===id),visiting=ctx.source==='share'&&isVisitMode();if(skipShow&&window.LT41?.tree?.id===tree?.id){window.LT41.momentId=tree.moments.find(m=>m.id===momentId)?.id||tree.moments.find(m=>m.parentId===null)?.id||tree.moments[0]?.id;window.LT41.prefs=(0,ctx.currentPrefs)();window.LT41.writable=ctx.source==='server'&&!!ctx.member?.snapshot().writable&&!visiting;window.LT41.readOnly=visiting;window.LT41.visitReadOnly=visiting;return;}window.LT41=tree?{tree,trees:ctx.model.trees,source:ctx.source,momentId:tree.moments.find(m=>m.id===momentId)?.id||tree.moments.find(m=>m.parentId===null)?.id||tree.moments[0]?.id,prefs:(0,ctx.currentPrefs)(),writable:ctx.source==='server'&&!!ctx.member?.snapshot().writable&&!visiting,readOnly:visiting,visitReadOnly:visiting}:null;
     if(!skipShow&&(tree||ctx.current==='src064-orbit.html'))show(ctx.current,false,id||'');
    else if(!skipShow||!tree){(0,ctx.flowNavigation)();document.body.classList.remove('home-screen');hideFrames();
     // #1487: 로그인 확인 중에는 손님 안내('로그인하면 내 … 보여요')를 그리지 않고 첫 화면처럼 '불러오는 중'을 보인다.

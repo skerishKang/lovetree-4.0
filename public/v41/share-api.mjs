@@ -1,7 +1,9 @@
-import {refreshUnauthorized, memberRefreshAllowed} from './api.mjs';
+import {refreshUnauthorized, memberRefreshAllowed, guardVisitWrite} from './api.mjs';
 const TIMEOUT=8_000;
 export function createShareApi({fetchImpl=(...args)=>fetch(...args)}={}) {
   async function call(path,init={}) {
+    const blocked=guardVisitWrite(path,init);
+    if(blocked)return blocked;
     const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),TIMEOUT);
     try {
       const request=()=>fetchImpl(path,{credentials:'same-origin',headers:{accept:'application/json',...(init.body?{'content-type':'application/json'}:{})},...init,signal:controller.signal});let response=await request();if(response.status===401&&!path.startsWith('/api/public/'))response=await refreshUnauthorized({fetchImpl,request,response,signal:controller.signal,canRefresh:memberRefreshAllowed});
@@ -19,6 +21,7 @@ export function createShareApi({fetchImpl=(...args)=>fetch(...args)}={}) {
     setTreeDiscover:(treeId,discover)=>call('/api/trees/'+encodeURIComponent(treeId)+'/discover',{method:'PUT',body:JSON.stringify({discover})}),
     revoke:id=>call('/api/shares/'+encodeURIComponent(id),{method:'DELETE'}),
     read:id=>call('/api/public/shares/'+encodeURIComponent(id)),
+    readVisit:id=>call('/api/public/visits/'+encodeURIComponent(id)),
     // #538: 트리 공개 상태. 비공개는 누구나 무료 — 본인 트리만 바꿀 수 있다(#830).
     setTreeVisibility:(treeId,visibility)=>call('/api/trees/'+encodeURIComponent(treeId)+'/visibility',{method:'PUT',body:JSON.stringify({visibility})}),
     getTreeVisibility:treeId=>call('/api/trees/'+encodeURIComponent(treeId)+'/visibility')
