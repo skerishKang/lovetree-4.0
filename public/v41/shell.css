@@ -1697,6 +1697,18 @@ body.home-screen .updates-card:not([hidden]){
  body.home-screen.lt-fab-ok[data-member="in"] .updates-card:not([hidden]){bottom:calc(76px + env(safe-area-inset-bottom))}
 }
 
+/* #1601: 낮은 가로 첫 화면의 바닥 띠와 새 소식은 프레임 밖 흐름에 둔다. */
+@media (min-width:651px) and (max-height:520px){
+ body.home-screen .home-links{
+  position:relative;inset:auto;flex:0 0 auto;align-self:center;
+  margin:0 auto max(10px,env(safe-area-inset-bottom));
+ }
+ body.home-screen .updates-card:not([hidden]),
+ body.home-screen.lt-fab-ok[data-member="in"] .updates-card:not([hidden]){
+  position:relative;inset:auto;flex:0 0 auto;align-self:flex-end;
+  margin:0 16px 8px;max-width:min(420px,calc(100% - 32px));
+ }
+}
 /* #1571: 알림 단추는 원래 38px 외형과 안쪽 여백을 유지한다.
    기존 ::after의 상하좌우 4px 누름 확장으로 실제 클릭 영역 46px을 확보한다. */
 
