@@ -27,11 +27,11 @@ function tree952(n) {
   return t;
 }
 
-async function boot952(browser, { width = 1440 } = {}) {
+async function boot952(browser, { width = 1440, theme = 'night' } = {}) {
   const server = await serve({});
   const base = `http://127.0.0.1:${server.address().port}`;
   const ctx = await browser.newContext({ viewport: { width, height: width === 390 ? 844 : 900 }, reducedMotion: 'reduce' });
-  await ctx.addInitScript(() => { try { localStorage.setItem('lt41.theme', 'night'); } catch {} });
+  await ctx.addInitScript((value) => { try { localStorage.setItem('lt41.theme', value); } catch {} }, theme);
   await ctx.route('**/api/**', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
   await ctx.route('**/api/workspace*', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ revision: 1, state: { version: 1, trees: [tree952(1)] }, subject: '검사기계정', writeSubjectBound: true, savedAt: '2026-11-16T09:00:00.000Z' }) }));
   const page = await ctx.newPage();
@@ -177,3 +177,117 @@ test('설정 창 실행: 개인정보 묶음의 정책 링크는 새 창이고 �
 });
 
 import './helpers/account-visit-1581.mjs';
+
+
+/* #1636: 선택 줄 정렬은 실제 1440·390, 밤·정원 DOM으로 잰다.
+   CSS 색·단추 동작·탭 접근성은 그대로 유지한다. */
+test('#1636 설정 선택 줄·스위치·메뉴·중복 제목 (1440·390 × 밤·정원)', {
+  skip: skip952 || false, timeout: 240000
+}, async t => {
+  const browser = await chromium952.launch({headless: true});
+  try {
+    for (const width of [1440,390]) for (const theme of ['night','garden']) {
+      await t.test(width+' '+theme, async () => {
+        const {server,ctx,page} = await boot952(browser,{width,theme});
+        try {
+          await openSettings952(page);
+          await page.evaluate(()=>document.fonts?.ready);
+          const allLeft=[],allWidths=[];
+          for(const [tab,fold] of [
+            ['screen','account-settings-screen-more'],
+            ['profile',null],
+            ['records','account-settings-records-more'],
+            ['account',null]
+          ]){
+            await page.locator('#settings-tab-'+tab).click();
+            if(fold)await page.locator('#'+fold+'>summary').click();
+            const data = await page.evaluate((tab)=>{
+              const panel=document.getElementById('account-settings-'+tab);
+              const selected=document.getElementById('settings-tab-'+tab);
+              const rect=e=>{const r=e.getBoundingClientRect();return{x:r.x,y:r.y,width:r.width,height:r.height,right:r.right,bottom:r.bottom}};
+              const rows=[...panel.querySelectorAll('.settings-row')]
+                .filter(e=>e.getClientRects().length>0 && !e.closest('.settings-tree-visibility-list'))
+                .map(row=>{
+                  const choice=row.querySelector(':scope > .settings-choice');
+                  const label=row.querySelector(':scope > .settings-label');
+                  const buttons=choice?[...choice.querySelectorAll(':scope > button')]:[];
+                  if(!label||!buttons.length)return null;
+                  return {label:label.textContent.trim(),labelRect:rect(label),choiceRect:rect(choice),
+                    buttons:buttons.map(b=>{
+                      const st=getComputedStyle(b);
+                      return {text:b.textContent.trim(),role:b.getAttribute('role'),colorSwatch:b.hasAttribute('data-accent-color'),box:rect(b),
+                        scrollWidth:b.scrollWidth,clientWidth:b.clientWidth,whiteSpace:st.whiteSpace,
+                        textAlign:st.textAlign,font:st.font};
+                    })};
+                }).filter(Boolean);
+              const style=getComputedStyle(selected),pageLabel=panel.getAttribute('aria-labelledby');
+              return {
+                rows,headingCount:panel.querySelectorAll(':scope > h3').length,pageLabel,
+                selected: {height:rect(selected).height,borderLeft:style.borderLeftWidth,
+                  color:style.color,borderLeftColor:style.borderLeftColor,
+                  background:style.backgroundColor,boxShadow:style.boxShadow}
+              };
+            },tab);
+            assert.equal(data.headingCount,0,tab+' 오른쪽 상단 중복 제목 없음');
+            assert.equal(data.pageLabel,'settings-tab-'+tab,tab+' 본문은 왼쪽 탭이 이름을 제공');
+            assert.ok(data.selected.height>=44,tab+' 왼쪽 메뉴 누름 높이 44px');
+            assert.ok(parseFloat(data.selected.borderLeft)>=2,tab+' 선택된 메뉴의 왼쪽 금색 줄');
+            assert.equal(data.selected.color,data.selected.borderLeftColor,tab+' 메뉴 글자와 금색 줄 색 일치');
+            assert.equal(data.selected.boxShadow,'none',tab+' 큰 금색 테두리 제거');
+            assert.match(data.selected.background,/rgba?\(.*0\)|transparent/,tab+' 선택 탭 바탕 채움 제거');
+            for(const row of data.rows){
+              allLeft.push({label:tab+':'+row.label,x:row.buttons[0].box.x});
+              if(width===390){
+                assert.ok(row.buttons[0].box.y>=row.labelRect.bottom-1,tab+' '+row.label+' 390 이름 아래 선택 단추');
+                assert.ok(Math.abs(row.labelRect.x-row.buttons[0].box.x)<=1,tab+' '+row.label+' 390 같은 왼쪽 선');
+              }
+              for(const button of row.buttons) {
+                if(button.colorSwatch){
+                  assert.ok(Math.abs(button.box.width-44)<=1,tab+' 색 견본은 기존 원형 44px 유지');
+                  assert.ok(Math.abs(button.box.height-44)<=1,tab+' 색 견본 높이 44px 유지');
+                }else allWidths.push({label:tab+':'+row.label+':'+button.text,width:button.box.width});
+                assert.ok(button.box.height>=44,tab+' '+row.label+' 누름 높이 44px');
+                assert.ok(button.scrollWidth<=button.clientWidth+1,
+                  tab+' '+row.label+' '+button.text+' 잘린 글자 없음');
+                assert.equal(button.whiteSpace,'nowrap',tab+' '+row.label+' 선택지 줄바꿈 없음');
+                assert.ok(button.box.x>=0&&button.box.right<=width+1,
+                  tab+' '+row.label+' 가로 넘침 없음');
+              }
+            }
+          }
+          assert.ok(allLeft.length>=12,'화면·프로필·기록 보기의 선택 행 측정');
+          assert.ok(allWidths.length>=25,'선택 단추 실제 크기 측정');
+          const leftDelta=Math.max(...allLeft.map(x=>x.x))-Math.min(...allLeft.map(x=>x.x));
+          const widthDelta=Math.max(...allWidths.map(x=>x.width))-Math.min(...allWidths.map(x=>x.width));
+          assert.ok(leftDelta<=1,'줄별 첫 단추 시작선 차이 <=1px: '+JSON.stringify({leftDelta,allLeft}));
+          assert.ok(widthDelta<=1,'선택 단추 폭 차이 <=1px: '+JSON.stringify({widthDelta,allWidths}));
+          await page.locator('#settings-tab-screen').click();
+          const motion=page.locator('#settings-motion');
+          assert.equal(await motion.getAttribute('role'),'switch');
+          assert.equal(await motion.getAttribute('aria-checked'),'true');
+          await motion.press('Space');
+          assert.equal(await motion.getAttribute('aria-checked'),'false','Space로 움직임 끄기');
+          assert.equal((await motion.textContent()).trim(),'끔');
+          await motion.press('Enter');
+          assert.equal(await motion.getAttribute('aria-checked'),'true','Enter로 움직임 켜기');
+          assert.equal((await motion.textContent()).trim(),'켬');
+          const visual=await motion.evaluate(el=>({
+            before:getComputedStyle(el,'::before').width,
+            after:getComputedStyle(el,'::after').width,
+            focus:getComputedStyle(el).outlineStyle
+          }));
+          assert.notEqual(visual.before,'auto','스위치 레일 표시');
+          assert.notEqual(visual.after,'auto','스위치 손잡이 표시');
+          await page.locator('#settings-tab-profile').focus();
+          await page.locator('#settings-tab-profile').press('ArrowRight');
+          assert.equal(await page.locator('#settings-tab-records').getAttribute('aria-selected'),'true','메뉴 화살표 이동 유지');
+          console.log('SETTINGS_1636',JSON.stringify({width,theme,leftDelta,widthDelta,rows:allLeft.length,buttons:allWidths.length}));
+        }finally{
+          await ctx.close();
+          server.closeAllConnections?.();
+          await new Promise(resolve=>server.close(resolve));
+        }
+      });
+    }
+  }finally{await browser.close();}
+});
