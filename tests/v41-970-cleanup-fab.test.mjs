@@ -341,6 +341,13 @@ test('#1089 정리 창은 순간 목록 창과 같은 가운데 카드 틀이다
       // 순간 목록 창(안쪽 iframe의 .orbit-dialog)도 같은 폭 규칙이다.
       await page.locator('#cleanup-panel [data-close="cleanup-panel"]').click();
       await page.waitForFunction(() => !document.querySelector('#cleanup-panel')?.open, null, { timeout: 5000 });
+      // 정리 메뉴는 서재 화면을 표시한다. 비교할 순간 목록은 홈 화면으로 돌아간 뒤 연다.
+      await page.locator('.brand').click();
+      await page.waitForFunction(() => {
+        const frame = document.querySelector('#view:not([hidden])');
+        return !!frame && /\/v41\/home\.html$/.test(frame.contentWindow.location.pathname)
+          && !!frame.contentDocument?.querySelector('#orbit')?.shadowRoot?.querySelector('.orbit-dialog');
+      }, null, { timeout: 5000 });
       await page.frameLocator('#view').locator('.orbit-dialog').first().evaluate((el) => el.showModal());
       await page.frameLocator('#view').locator('.orbit-dialog[open]').waitFor({ timeout: 5000 });
       const list = await page.frameLocator('#view').locator('.orbit-dialog').first().evaluate((el) => {

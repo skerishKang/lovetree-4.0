@@ -2,7 +2,8 @@
 // 2026-11-08 리팩터링: 동작·겉모습 변경 0. 계산은 header-state.mjs, 화면 반영은 여기서 한다.
 // 저장 키(lt41.theme)와 버튼 id·문구는 그대로다.
 import {memberLoginUrl} from '../member-entry.mjs';
-import {readTheme, writeTheme, nextTheme, themeButtonLabel, themeButtonAriaLabel, themeIconGlyph, themePressed, appliedTheme, applyThemeAttribute, THEMES, DEFAULT_THEME} from '../header-state.mjs';
+import {readTheme, writeTheme, normalizeTheme, nextTheme, themeButtonLabel, themeButtonAriaLabel, themeIconGlyph, themePressed, appliedTheme, applyThemeAttribute, paintPolicyLinks, THEMES, DEFAULT_THEME} from '../header-state.mjs';
+import {isVisitMode,readVisitTheme,setVisitTheme} from '../visit-mode.mjs';
 import {themedViewFor} from './navigation.mjs';
 
 const $ = id => document.getElementById(id);
@@ -38,14 +39,14 @@ export function renderThemeChoices() {
   }
 }
 
-export function paintLoginLinks(theme = readTheme(localStorage)) {
+export function paintLoginLinks(theme = readVisitTheme()||readTheme(localStorage)) {
   const href = memberLoginUrl(theme);
   const entry = $('account-entry');
   if (entry) entry.href = href;
   for (const a of document.querySelectorAll('[data-guest-login]')) a.href = href;
 }
 
-export function paintThemeControls(theme = readTheme(localStorage)) {
+export function paintThemeControls(theme = readVisitTheme()||readTheme(localStorage)) {
   for (const button of document.querySelectorAll('[data-lt-theme-toggle]')) {
     button.textContent = themeButtonLabel(theme);
     // 계정 메뉴 안에서는 role="menuitemcheckbox"라 aria-pressed가 아니라 aria-checked를 쓴다.
@@ -64,9 +65,10 @@ export function paintThemeControls(theme = readTheme(localStorage)) {
     button.setAttribute('aria-checked', String(button.dataset.setTheme === theme));
   }
   paintLoginLinks(theme);
+  paintPolicyLinks(document, theme);
 }
 
-export function applyTheme(file, theme = readTheme(localStorage)) {
+export function applyTheme(file, theme = readVisitTheme()||readTheme(localStorage)) {
   const applied = applyThemeAttribute(document.documentElement, appliedTheme(theme, themedViewFor(file)));
   const frame = $('view').contentDocument;
   if (frame) applyThemeAttribute(frame.documentElement, applied);
@@ -74,7 +76,9 @@ export function applyTheme(file, theme = readTheme(localStorage)) {
 }
 
 export function toggleTheme(file) {
-  const theme = writeTheme(localStorage, nextTheme(readTheme(localStorage)));
+  const current = readVisitTheme() || readTheme(localStorage);
+  const theme = isVisitMode() ? normalizeTheme(nextTheme(current)) : writeTheme(localStorage, nextTheme(current));
+  if (isVisitMode()) setVisitTheme(theme);
   applyTheme(file, theme);
   paintThemeControls(theme);
   return theme;
