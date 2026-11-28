@@ -1,6 +1,6 @@
 window.addEventListener('resize', boardResize);
 
-renderCards();
+window.LT58Board.cards.renderInitial();
 renderThreads();
 formFor(addType);
 setTimeout(boardStartView, 40);
@@ -167,20 +167,6 @@ function pinClass(m) {
 function cardClass(m) {
   return `cardStyle-${m.cardStyle || 'photo'}`;
 }
-cardHTML = function (m) {
-  let media = '';
-  if (m.url)
-    media = LTMedia.markup(m.url, m.title, m.mediaMetadata, m.id, null, null, { compact: true, visitorYoutubeCover: true });
-  else if (m.type === 'note') media = `<div class="noteText">“${esc(m.cardMemo || m.memo)}”</div>`;
-  else if (m.type === 'video')
-    media = `<div class="media"><video muted playsinline loop poster="${m.asset}" src="${m.video || ''}"></video><span class="playBadge">▶</span><span class="duration">${m.duration || '00:03'}</span></div>`;
-  else {
-    let img = m.type === 'youtube' ? youtubeThumb(m.url || '') : m.asset;
-    media = `<div class="media ${m.type === 'link' || m.type === 'youtube' ? 'linkMedia' : ''}"><img src="${img}" data-fallback="${ASSET.link}" ${thumbRetryAttrs(m)} alt=""><span class="${m.type === 'youtube' ? 'playBadge' : ''}">${m.type === 'youtube' ? '▶' : ''}</span></div>`;
-  }
-  // #601: 카드는 훑기용 — 큰 썸네일 + 제목 2줄 + 감정·날짜 한 줄만. 마음·출처·키워드·크게 보기는 상세가 맡는다.
-  return `<article class="card ${m.first ? 'first' : ''} ${m.type === 'note' ? 'noteCard' : ''} ${pinClass(m)} ${cardClass(m)}" data-id="${m.id}" style="--card-x:${m.x}px;--card-y:${m.y}px;--rot:${m.rot}deg;--pin:${colors[m.color]};--halo:${colors[m.color]}55">${m.first ? '<div class="firstTag">첫 순간</div>' : ''}<button class="pin" data-pin="${m.id}" aria-hidden="true" tabindex="-1"></button>${media}<div class="cardBody"><h3 class="cardTitle">${esc(titleMain(m))}</h3><div class="cardMeta"><span class="emotionDot"></span>${esc(m.emotion)} · ${esc(dateText(m.date))}</div></div>${cardOrderHTML(m)}</article>`;
-};
 // #1072 A-17: 앞으로·뒤로 단추로 순서를 바꾼다 — 끌기와 같은 저장 경로(moveCardOrder·persistBoard)를 쓴다.
 // 옮긴 뒤 같은 단추로 초점을 돌려 보내 키보드로 여러 장을 이어서 옮길 수 있게 한다.
 cardLayer.addEventListener('click', e => {
@@ -199,21 +185,6 @@ if (cardLayer && !cardLayer.dataset.noNativeDrag) {
   cardLayer.dataset.noNativeDrag = '1';
   cardLayer.addEventListener('dragstart', e => e.preventDefault());
 }
-const _renderCardsV1 = renderCards;
-renderCards = function () {
-  cardLayer.innerHTML = moments.map(cardHTML).join('');
-  mobilePicker?.refresh?.();
-  cardLayer.querySelectorAll('.card').forEach(el => bindCardV11(el));
-  // #894: 카드 안의 그림·링크 기본 끌기를 막는다 — 끌기가 보드 밖(셸)으로 새어 나가 '놓으면 담아요' 판이 떴다.
-  cardLayer.querySelectorAll('.card img,.card a').forEach(x => {
-    x.draggable = false;
-    x.setAttribute('draggable', 'false');
-  });
-  if (typeof updateEmptyHint === 'function') updateEmptyHint();
-  if (selected) selectMoment(selected, false);
-  applyFilters();
-  if (mobileBoardScroll() && viewport.classList.contains('board-scroll')) applyView(false);
-};
 function applyDecorMotion() {
   // #536: 휠 확대는 #346 판정의 입력에 없던 것이라 같은 한 벌로 따로 묶는다(이동·드래그 판정은 그대로).
   const zoomPause =
@@ -1095,7 +1066,7 @@ $('#confirmAdd').onclick = () => {
   if (LTDEMO.readOnly) return;
   confirmAdd();
 };
-renderCards();
+window.LT58Board.cards.renderExtended();
 renderThreads();
 updateKeywordFilter();
 formFor(addType);

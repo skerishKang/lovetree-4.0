@@ -41,6 +41,9 @@
   function armYTThumbs(root=document){root.querySelectorAll('.ytThumbWrap img[data-stage]').forEach(img=>{if(img.dataset.timeoutArmed)return;img.dataset.timeoutArmed='1';setTimeout(()=>{if((!img.complete||!img.naturalWidth)&&img.dataset.stage==='max')window.__ytThumbFail(img)},1800);setTimeout(()=>{if((!img.complete||!img.naturalWidth)&&img.dataset.stage==='hq')window.__ytThumbFail(img)},3600)})}
   const ytObserver=new MutationObserver(()=>armYTThumbs());ytObserver.observe(document.body,{childList:true,subtree:true});setTimeout(()=>armYTThumbs(),50);
   window.__LT58YT={id:ytId,max:ytMax,hq:ytHQ,embed:ytEmbed,mediaHTML:ytMediaHTML,isYtMoment,originalUrl,armYTThumbs};
+  const board=(window.LT58Board=window.LT58Board||{});
+  const cards=(board.cards=board.cards||{});
+  cards.media={ytId,originalUrl};
   // #480 L12: 보드가 다시 정의하지 않고 board-extras.js의 한 벌(공용 후보의 첫 주소)을 그대로 쓴다.
   // (이 두 줄이 있으면 썸네일 주소가 화면마다 달라진다 — board-extras.js에서 온 공용 값을 덮어쓰지 않는다.)
 
@@ -55,22 +58,6 @@
     }
     if(m.type==='video' && !m.videoSource) m.videoSource='local';
   });
-
-  const v11CardHTML=cardHTML;
-  cardHTML=function(m){
-    let media='';
-    if(ytId(originalUrl(m)))media=LTMedia.markup(originalUrl(m),m.title,m.mediaMetadata,m.id,null,{emotion:m.emotion,date:m.date,note:m.memo},{compact:true,visitorYoutubeCover:true});
-    else if(m.url)media=LTMedia.markup(m.url,m.title,m.mediaMetadata,m.id,null,{emotion:m.emotion,date:m.date,note:m.memo},{compact:true,visitorYoutubeCover:true});
-    else if(m.type==='note') media=`<div class="noteText">“${esc(m.cardMemo||m.memo)}”</div>`;
-    else if(m.type==='video') media=`<div class="media"><video muted playsinline loop poster="${m.asset}" src="${m.video||''}"></video><span class="playBadge">▶</span><span class="duration">${m.duration||'00:03'}</span></div>`;
-    else media=`<div class="media ${m.type==='link'?'linkMedia':''}"><img src="${m.asset}" data-fallback="${ASSET.link}" onerror="this.onerror=null;this.src=this.dataset.fallback" alt=""></div>`;
-    // #601: 카드는 훑기용 — 큰 썸네일 + 제목 2줄 + 감정·날짜 한 줄만. 마음·출처·크게 보기는 상세가 맡는다.
-    // #627: 확정된 꼬리표는 노래 → 멤버 → 무대 순서로 1~3개만 작게(LTTagLine.cardTags 한 벌). 모듈이 늦으면 다음 그리기 때 붙는다.
-    const _tags=(window.LTTagLine?window.LTTagLine.cardTags(m.keywords):[])||[];
-    const _tagRow=_tags.length?`<div class="cardTags">${_tags.map(_t=>`<span class="lt-tag-chip is-card">${esc(_t.value)}</span>`).join('')}</div>`:'';
-    let heading=titleMain(m);
-    return `<article class="card ${m.first?'first':''} ${m.type==='note'?'noteCard':''} ${_tagRow?'hasTags':''} ${m.id===featuredMomentId()?'isFeatured':''} ${pinClass(m)} ${cardClass(m)}" data-id="${m.id}" style="--card-x:${m.x}px;--card-y:${m.y}px;--rot:${m.rot}deg;--pin:${colors[m.color]};--halo:${colors[m.color]}55">${m.first?'<div class="firstTag">첫 순간</div>':''}<button class="pin" data-pin="${m.id}" aria-hidden="true" tabindex="-1"></button>${media}<div class="cardBody"><h3 class="cardTitle">${esc(heading)}</h3><div class="cardMeta"><span class="emotionDot"></span>${esc(m.emotion)} · ${esc(dateText(m.date))}</div>${_tagRow}</div>${cardOrderHTML(m)}</article>`;
-  };
 
   /* Composer: VIDEO supports local or YouTube source; VIDEO LINK remains a direct YouTube 순간. */
   formFor=function(type){
