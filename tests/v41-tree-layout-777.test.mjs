@@ -649,7 +649,9 @@ test('#1525 상세 창은 새로고침·뒤로 가기·주소 다시 열기 6/6 
         const view = document.getElementById('view'), doc = view?.contentDocument;
         return !view?.hidden && !!doc?.getElementById('treeDetail')?.open &&
           !!view.contentWindow?.history.state?.lt41TreePanel &&
-          view.contentWindow.history.state.lt41TreePanel === 'detail';
+          view.contentWindow.history.state.lt41TreePanel === 'detail' &&
+          history.state?.lt41TreeDetail === true &&
+          new URLSearchParams(location.hash.split('?')[1] || '').get('detail') === '1';
       }, null, { timeout: 10000 });
       const openedUrl = page.url();
       await page.reload({ waitUntil: 'load' });

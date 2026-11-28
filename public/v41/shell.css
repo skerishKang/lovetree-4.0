@@ -1734,6 +1734,17 @@ body.community-screen #toast[data-lt-first-moment-intro]{display:none}
 #community-panel:focus{outline:none}
 #community-panel:focus-visible{outline:2px solid var(--lt-gold);outline-offset:-2px}
 
+/* #1608: 새 소식은 비모달 show()와 Esc·뒤로 가기·겹친 창 규칙을 유지한다.
+   첫 화면에서 열린 동안만 머리줄을 흐리고 눌림을 막는다.
+   #1605 안쪽 다섯 화면의 읽지 않은 점 메뉴 조작은 유지한다.
+   updates-surface의 본문 틀과 #updates-panel(기존 z-index:4)은 변경하지 않는다. */
+body.home-screen:has(#updates-panel[open]) .app-header{position:relative;pointer-events:none}
+body.home-screen:has(#updates-panel[open]) .app-header::after{
+ content:"";position:absolute;inset:0;z-index:10;border-radius:inherit;
+ background:var(--lt-dialog-backdrop);backdrop-filter:var(--lt-dialog-backdrop-blur);
+ pointer-events:auto
+}
+
 /* #1605: 대표 결정(2026-11-28). 첫 화면의 띠는 그대로 두고
    안쪽 다섯 화면에서만 숨긴다. #stage·iframe 크기와 스크롤 계약은 바꾸지 않는다. */
 body:not(.home-screen):is([data-fab-lift=shelf],[data-fab-lift=tree],[data-fab-lift=board],[data-fab-lift=book],[data-fab-lift=network]) #updates-card{display:none}

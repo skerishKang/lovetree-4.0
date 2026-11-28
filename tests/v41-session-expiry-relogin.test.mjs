@@ -106,7 +106,7 @@ test('failed refresh restores the same-account draft after login and never expos
   server.useSubject('sub_member_b'); server.signInAgain();
   const otherAccount=makeSession(api,storage);
   await otherAccount.start();
-  assert.deepEqual(otherAccount.state(),{version:1,trees:[],prefs:{ theme: 'night', titleDisplay:'both', displayName: '', accentColor: '', dateStyle:'dot', startPlace:'resume', shareView:'book', shareDiscover:false, treeChipOrder: [], bookDisplay: 'book', shelfView: 'carousel', homeMoment: { mode: 'last', treeId: '', momentId: '' } }});
+  assert.deepEqual(otherAccount.state(),{version:1,trees:[],prefs:{ theme: 'night', titleDisplay:'both', displayName: '', accentColor: '', dateStyle:'dot', startPlace:'resume', shareView:'book', shareDiscover:false, treeChipOrder: [], bookDisplay: 'book', shelfView: 'carousel', shelfOpenMode: 'preview', homeMoment: { mode: 'last', treeId: '', momentId: '' } }});
 
   assert.equal(otherAccount.snapshot().dirty,false);
   assert.ok(storage.getItem(pendingKey));
