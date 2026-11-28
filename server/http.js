@@ -4,8 +4,10 @@ import { ApiError } from './errors.js';
 import { ROLE_ADMIN } from './admin-roles.js';
 import { parsePrincipal } from './principal.js';
 import { OPS_INGEST_PATH } from './proxy-proof.js';
+import { retryAfterHeaders, trustedClientIp } from './rate-limit.js';
 
 export const DEFAULT_MAX_BODY_BYTES = 4 * 1024 * 1024;
+export const DEFAULT_BODY_READ_TIMEOUT_MS = 30_000;
 
 function errorBody(error) {
   const { code, message, details } = error;
@@ -104,7 +106,7 @@ export function createAfterResponseQueue({
   };
 }
 
-export function createApiHandler({ authenticate, service, productId, admin = null, adminStats = null, account = null, accountDeleteAuthenticate = null, accountDeleteWorkflow = null, allowedOrigins = [], maxBodyBytes = DEFAULT_MAX_BODY_BYTES }) {
+export function createApiHandler({ authenticate, service, productId, admin = null, adminStats = null, account = null, accountDeleteAuthenticate = null, accountDeleteWorkflow = null, allowedOrigins = [], maxBodyBytes = DEFAULT_MAX_BODY_BYTES, proxyProofTrusted = () => false }) {
   async function handle(request) {
     const { method = 'GET', path = '', body = '' } = request ?? {};
     const text = typeof body === 'string' ? body : String(body);
@@ -202,7 +204,7 @@ export function createApiHandler({ authenticate, service, productId, admin = nul
         const { expectedSubject, ...write } = payload;
         payload = write;
       }
-      return { status: 200, body: await service.write(principal, payload) };
+      return { status: 200, body: await service.write(principal, payload, { clientIp: trustedClientIp(request, proxyProofTrusted(request)) }) };
     }
     throw new ApiError(405, 'method_not_allowed', '이 요청은 지원하지 않아요.');
   }
@@ -213,7 +215,7 @@ export function createApiHandler({ authenticate, service, productId, admin = nul
       // 저장 경로의 응답 모양은 바꾸지 않는다 — 헤더는 실제로 붙인 자리만 지나간다.
       return headers ? { status, body, headers } : { status, body };
     } catch (error) {
-      if (error instanceof ApiError) return { status: error.status, body: errorBody(error) };
+      if (error instanceof ApiError) return { status: error.status, body: errorBody(error), ...(error.code === 'rate_limited' ? { headers: retryAfterHeaders({}, error) } : {}) };
       logServerError(error, 'lovetree-storage');
       return { status: 500, body: { error: { code: 'internal_error', message: '서버에서 처리하지 못했어요.' } } };
     }
@@ -222,6 +224,7 @@ export function createApiHandler({ authenticate, service, productId, admin = nul
 
 export function createNodeHandler(requestHandler, {
   maxBodyBytes = DEFAULT_MAX_BODY_BYTES,
+  bodyReadTimeoutMs = DEFAULT_BODY_READ_TIMEOUT_MS,
   afterResponse = null,
   afterResponseConcurrency = DEFAULT_AFTER_RESPONSE_CONCURRENCY,
   afterResponseQueueLimit = DEFAULT_AFTER_RESPONSE_QUEUE_LIMIT,
@@ -241,7 +244,18 @@ export function createNodeHandler(requestHandler, {
     const chunks = [];
     let size = 0;
     let aborted = false;
+    let bodyTimedOut = false;
     req.on('aborted', () => { aborted = true; });
+    // 읽기 시간을 절대 시간으로 제한한다. 드문드문 전송해도 무한히 기다리지 않는다.
+    const readDeadline = setTimeout(() => {
+      bodyTimedOut = true;
+      if (res.destroyed || res.writableEnded) return;
+      req.pause();
+      res.once('finish', () => { if (!req.destroyed) req.destroy(); });
+      res.writeHead(408, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'connection': 'close' });
+      res.end(JSON.stringify({ error: { code: 'request_timeout', message: '요청 본문을 읽는 시간이 초과됐어요.' } }));
+    }, bodyReadTimeoutMs);
+    readDeadline.unref?.();
     try {
       // 한도를 넘겨도 읽기를 멈추지 않고 확보만 멈춘다. 반복자를 중간에 끊으면
       // 스트림이 파괴되어 클라이언트가 413 응답 대신 연결 절단을 보게 된다.
@@ -251,7 +265,10 @@ export function createNodeHandler(requestHandler, {
       }
     } catch {
       aborted = true;
+    } finally {
+      clearTimeout(readDeadline);
     }
+    if (bodyTimedOut) return;
     if (aborted || res.destroyed) { res.destroy(); return; }
 
     let path;
@@ -262,8 +279,13 @@ export function createNodeHandler(requestHandler, {
       res.end(JSON.stringify({ error: { code: 'invalid_path', message: '요청 경로를 읽을 수 없어요.' } }));
       return;
     }
+    if (size > limit) {
+      res.writeHead(413, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+      res.end(JSON.stringify({ error: { code: 'payload_too_large', message: '보내는 내용이 너무 커요. 일부를 나눠서 보내 주세요.' } }));
+      return;
+    }
     const bytes = Buffer.concat(chunks);
-    const result = await requestHandler({ method: req.method, path, query, headers: req.headers, body: media ? '' : bytes.toString('utf8'), ...(media || path === OPS_INGEST_PATH ? { rawBody: bytes, bodyTooLarge: size > limit } : {}) });
+    const result = await requestHandler({ method: req.method, path, query, headers: req.headers, body: media ? '' : bytes.toString('utf8'), ...(media || path === OPS_INGEST_PATH ? { rawBody: bytes, bodyTooLarge: false } : {}) });
     if (res.destroyed) return;
     res.writeHead(result.status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', ...(result.headers ?? {}) });
     // 요청별 뒤처리는 200과 304 모두 응답을 내보낸 뒤 실행한다.

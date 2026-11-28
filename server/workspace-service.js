@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import { EMPTY_STATE, MAX_TREES, normalizePrefs, validateState } from '../src/domain.js';
 import { DEFAULT_TREE_OPEN_VIEW } from '../public/v41/tree-open-view.mjs';
+import { rateRequest, REQUEST_RATE_LIMITS } from './rate-limit.js';
 import { ApiError } from './errors.js';
 
 const CLIENT_KEY = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
@@ -110,7 +111,7 @@ function changedTreeIdsOf(previous, next) {
   return changed;
 }
 
-export function createWorkspaceService({ repo, productId, onCommit = null, onAccess = null }) {
+export function createWorkspaceService({ repo, productId, onCommit = null, onAccess = null, rateLimiter = null }) {
   // #538: 저장이 성공한 뒤 같은 훅에서 공유 행(자동 공개·moment_count)을 동기화한다.
   // B-12(#1068): 훅에 이번 저장에서 바뀐 트리 목록(changedTreeIds)도 넘긴다 — 동기화 질의 수를
   // 바뀐 트리 수에 비례하게 줄이는 데 쓴다.
@@ -137,7 +138,11 @@ export function createWorkspaceService({ repo, productId, onCommit = null, onAcc
       return body;
     },
 
-    async write(principal, payload) {
+    async write(principal, payload, { clientIp = null } = {}) {
+      await rateRequest(rateLimiter, {
+        productId, scope: 'workspace-put', subjectId: principal.subjectId, clientIp,
+        ...REQUEST_RATE_LIMITS.workspace
+      });
       const { validated, expectedRevision, clientKey } = parseWriteInput(payload);
       // 저장 본문은 지금처럼 전체 검사한다(어긋난 트리는 들어올 수 없다). 대신 저장할 때 서버에
       // 이미 보관된 격리 트리 원본을 손대지 않고 다시 붙여 보관한다 — 사용자가 저장해도 어긋난

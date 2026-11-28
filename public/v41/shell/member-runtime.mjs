@@ -20,7 +20,7 @@ export function createMemberRuntime(ctx){
   let memberCheckTimer = 0, checkingStill = false; // #1320: 확인이 5초를 넘겼을 때만 조용한 표시를 켠다.
   function memberStatus(status){
     ctx.shellIntake.flush();
-    const failed=status.dirty&&['offline','rejected','conflict','login'].includes(status.phase);
+    const failed=status.dirty&&['offline','rejected','conflict','login','throttled'].includes(status.phase);
    (0,ctx.$)('save-feedback').hidden=!failed;
    (0,ctx.$)('save-message').textContent=failed?
     (status.phase==='login'
@@ -126,7 +126,7 @@ export function createMemberRuntime(ctx){
    }
    else if(status.phase==='login'&&!status.dirty&&document.body.dataset.member==='in')(0,ctx.notify)('로그인이 풀렸어요. 다시 로그인해 주세요.');/* #1175: 로그아웃 상태로 시작할 때(저장 연결 확인 401)는 진입만으로 알림을 띄우지 않는다 — 머리글의 로그인 단추가 이미 길을 알린다. */
    else if(!status.dirty&&status.phase==='offline')(0,ctx.notify)(status.detail||'내 기록을 불러오지 못했어요.');
-   (0,ctx.$)('write-menu').textContent=status.dirty?'저장 안 됨' :'＋ 순간 추가';
+   (0,ctx.$)('write-menu').textContent=status.phase==='throttled'?'저장 대기':status.dirty?'저장 안 됨' :'＋ 순간 추가';
    // #1487: 로그인 확인을 기다리던 안쪽 화면은 확인이 끝난 이 순간에 빈 상태를 그린다(손님·읽기 실패).
    ctx.settleAuthWait?.();
    // #1109: 내 화면을 먼저 고른 경우 빈 판 안내를 회원 상태 알림이 덮지 않는다.

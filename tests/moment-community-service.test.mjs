@@ -230,3 +230,31 @@ test('잘못된 공유·순간 주소는 404로 닫힌다',async()=>{
  assert.equal((await call(handle,'PUT',momentPath('..%2Fescape','/reaction'),{account:'bob'})).status,404);
  assert.equal((await call(handle,'GET',momentPath(own,'/stage'))).body.stageId,'stub','무대 조회는 기존 경로로 그대로 간다');
 });
+
+test('숨긴 공유는 순간 커뮤니티 읽기·쓰기·신고를 닫는다', async () => {
+ const {handle,tree,communityRepo}=await setup(), momentId=tree.moments[0].id;
+ const comment=await call(handle,'POST',commentPath(momentId),{account:'bob',key:'moment-hidden-seed-1',body:{body:'기존 댓글'}});
+ assert.equal(comment.status,201);
+ assert.equal((await call(handle,'PUT',reactionPath(momentId),{account:'bob'})).status,200);
+ await communityRepo.createReport({productId:PRODUCT,reportId:'moment-hidden-report',shareId:SHARE,subjectId:'moderator',reason:'관리 검토',clientKey:'moment-hidden-report-1'});
+ await communityRepo.moderateReport({productId:PRODUCT,reportId:'moment-hidden-report',status:'resolved',visibility:'hidden',actorSubjectId:'moderator'});
+ const before=communityRepo.inspect();
+ const requests=[
+  ['GET',momentPath(momentId),{}],
+  ['GET',commentPath(momentId),{}],
+  ['POST',commentPath(momentId),{account:'eve',key:'moment-hidden-new-1',body:{body:'추가 댓글'}}],
+  ['PUT',reactionPath(momentId),{account:'eve'}],
+  ['DELETE',reactionPath(momentId),{account:'bob'}],
+  ['PATCH','/api/community/comments/'+comment.body.comment.id,{account:'bob',body:{body:'수정'}}],
+  ['DELETE','/api/community/comments/'+comment.body.comment.id,{account:'bob'}],
+  ['POST',momentPath(momentId,'/comments/'+comment.body.comment.id+'/report'),{account:'eve',key:'moment-hidden-report-2',body:{reason:'관리 검토'}}]
+ ];
+ for(const [method,path,options] of requests){
+  const response=await call(handle,method,path,options);
+  assert.equal(response.status,404,method+' '+path);
+  assert.equal(response.body.error.code,'share_not_found',method+' '+path);
+ }
+ const after=communityRepo.inspect();
+ for(const key of ['comments','momentReactions','reports'])
+  assert.deepEqual(after[key],before[key],key+' 기존 행 보존');
+});

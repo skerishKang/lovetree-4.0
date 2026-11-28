@@ -44,7 +44,8 @@ function pushTree(panel) {
 }
 function rememberTree() {
   if (restoringTree) return;
-  try { history.replaceState(treeSnapshot(null), ''); } catch {}
+  // 크기·위치 재계산으로 현재 열린 상세 기록을 닫힌 상태로 덮어쓰지 않는다.
+  try { history.replaceState(treeSnapshot(detail?.open ? 'detail' : null), ''); } catch {}
 }
 function restoreTree(st) {
   if (!st?.lt41Tree) return;
@@ -399,7 +400,13 @@ $('treeDetailClose').addEventListener('click',()=>detail.close());
 detail.addEventListener('close',()=>{if(!restoringTree){try{history.replaceState(treeSnapshot(null),'');}catch{}if(state.pick&&typeof data?.select==='function')data.select(state.pick,{noHistory:true});parent.postMessage({type:MSG.treeDetail,open:false},location.origin);}});
 $('openMoment').addEventListener('click',()=>{if(state.pick)parent.postMessage({type:MSG.openBook,treeId:data.treeId,id:state.pick},location.origin);});
 function rehome(){if(!state.layout)return;if(state.mode==='fit')fitAll(false);else if(state.mode==='root')toRoot(false);else applyNow();rememberTree();}
+let firstTreeLoad=true;
 function load(){
+ const wasDetailOpen=detail.open;
+ const priorPanel=history.state?.lt41TreePanel;
+ const openId=firstTreeLoad
+   ? new URLSearchParams(location.search).get('open')||(priorPanel==='detail'?history.state?.lt41TreePick:null)
+   : wasDetailOpen?state.pick:null;
  const moments=data.moments.map(m=>{const thumbs=thumbnailCandidates(m,{autoLoad:data.source==='server'});return {...m,id:String(m.id),parentId:m.parentId==null?null:String(m.parentId),thumb:thumbs[0]||'',thumbs};});
  state.root=buildHierarchy(moments);state.expanded.clear();state.pick=null;
  $('treeEmpty').hidden=!!state.root;stage.hidden=!state.root;
@@ -408,10 +415,14 @@ function load(){
  measure();draw();
  // #1525: 순간이 많을 때는 카드를 누를 수 있는 1배로 열고, 전체 맞춤은 '전체' 단추에서만 한다.
  if(state.root.size>=40)toRoot(false);else fitAll(false);
- // 기본 칸도 트리 상태로 적어 둔다 — 뒤로 가기로 돌아올 때 닫힌 상세와 펼침 상태를 복원한다.
- rememberTree();
- const initialOpen=new URLSearchParams(location.search).get('open')||(history.state?.lt41TreePanel==='detail'?history.state.lt41TreePick:null);
- if(initialOpen&&data.moments.some(m=>m.id===initialOpen)){setPick(initialOpen);openDetail(initialOpen);pushTree('detail');}
+ firstTreeLoad=false;
+ if(openId&&data.moments.some(m=>m.id===openId)){
+   // 최초 상세 열기만 새 기록이다. 열린 상세의 데이터 재적재는 같은 기록을 갱신한다.
+   if(!wasDetailOpen&&priorPanel!=='detail')rememberTree();
+   setPick(openId);openDetail(openId);
+   if(wasDetailOpen||priorPanel==='detail')rememberTree();
+   else pushTree('detail');
+ }else rememberTree();
 }
 new ResizeObserver(()=>{const before={...view};measure();if(!state.root||(before.w===view.w&&before.h===view.h))return;if((before.w<700)!==(view.w<700))draw();rehome();}).observe(stage);
 addEventListener('message',e=>{

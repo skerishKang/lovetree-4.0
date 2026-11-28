@@ -653,7 +653,7 @@ const sync = createSyncController({
   // 동기화 상태가 바뀌면 화면을 다시 그리지 않고 상단 진입 버튼 문구만 맞춘다.
   onChange: () => { refreshAuthEntries(document, authSnapshot()); }
 });
-mountSync({ controller: sync, notify: toast });
+mountSync({ controller: sync, notify: toast, backup: () => download(state, `lovetree-backup-${localDateOnly()}.json`) });
 render();
 void sync.start();
 

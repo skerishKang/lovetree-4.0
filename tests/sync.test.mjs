@@ -48,7 +48,8 @@ function memStorage() {
   };
 }
 
-function harness({ initial, api, storage = new Map(), draftStorage = null, delay = () => Promise.resolve(), on = null }) {
+function harness({ initial, api, storage = new Map(), draftStorage = null,
+  delay = () => Promise.resolve(), schedule, cancelSchedule, on = null }) {
   let state = initial;
   const navigated = [];
   const controller = createSyncController({
@@ -56,6 +57,8 @@ function harness({ initial, api, storage = new Map(), draftStorage = null, delay
     replaceState: (next) => { state = next; },
     api,
     draftStorage,
+    schedule,
+    cancelSchedule,
     storage: {
       getItem: (key) => (storage.has(key) ? storage.get(key) : null),
       setItem: (key, value) => { storage.set(key, String(value)); return undefined; }
@@ -338,4 +341,69 @@ test('#1649 보강 3: 서버 저장 완료·응답 유실 뒤 다음 접속에 �
   assert.equal(draftStorage.length,0,'확인된 보관본 제거');
   assert.deepEqual(opened.current(),unsaved);
   assert.equal(openedApi.puts().length,0,'동일한 본문을 중복 PUT하지 않음');
+});
+
+test('4.0 저장 API는 429의 Retry-After를 읽는다', async () => {
+  const api = createWorkspaceApi({fetchImpl:async () => new Response(JSON.stringify({error:{code:'rate_limited',retryAfterSeconds:7}}), {status:429, headers:{'retry-after':'9'}})});
+  const result = await api.put({state:EMPTY, expectedRevision:0, clientKey:'rate-header'});
+  assert.equal(result.status,429);
+  assert.equal(result.retryAfterSeconds,7);
+});
+
+test('4.0 저장 429는 보관본을 유지하고 Retry-After·2→4→8초 뒤 다시 시도한다', async () => {
+  const limited = {ok:false,status:429,code:'rate_limited',retryAfterSeconds:7};
+  const api = fakeApi({get:[okGet(0,EMPTY)],put:[limited,limited,limited,limited,limited,okPut(1)]});
+  const timers = [];
+  const made = harness({
+    initial:EMPTY, api,
+    schedule:(fn,ms)=>{timers.push({fn,ms});return timers.length;},
+    cancelSchedule:()=>{}
+  });
+  await made.controller.start();
+  made.edit(doc('429 복구')); made.controller.markLocalSave(); await made.settle();
+  assert.equal(made.controller.status().phase,'throttled');
+  assert.equal(made.controller.snapshot().dirty,true);
+  assert.deepEqual(timers.map(timer=>timer.ms),[7000]);
+  for (const expected of [2000,4000,8000]) {
+    timers.shift().fn(); await made.settle();
+    assert.equal(made.controller.status().phase,'throttled');
+    assert.deepEqual(timers.map(timer=>timer.ms),[expected]);
+  }
+  timers.shift().fn(); await made.settle();
+  assert.equal(made.controller.status().phase,'throttled');
+  assert.deepEqual(made.controller.status().actions.map(action=>action.name),['retry','backup']);
+  await made.controller.act('retry');
+  assert.equal(made.controller.status().phase,'synced');
+  assert.equal(new Set(api.puts().map(body=>body.clientKey)).size,1);
+});
+
+
+test('4.0 저장 429 대기 중 추가한 편집은 보관본에 남고 나중에 성공하면 정리된다', async () => {
+  const draftStorage = memStorage();
+  const limited = {ok:false,status:429,code:'rate_limited',retryAfterSeconds:7};
+  const api = fakeApi({
+    get:[{...okGet(0,EMPTY),subject:'usr_a'}],
+    put:[limited,okPut(1)]
+  });
+  const timers = [];
+  const made = harness({
+    initial:EMPTY, api, draftStorage,
+    schedule:(fn,ms)=>{timers.push({fn,ms});return timers.length;},
+    cancelSchedule:()=>{}
+  });
+  await made.controller.start();
+  const first = doc('처음 편집');
+  made.edit(first); made.controller.markLocalSave(); await made.settle();
+  assert.equal(made.controller.status().phase,'throttled');
+  assert.deepEqual(JSON.parse(draftStorage.getItem('lovetree.v4.pending-write:usr_a')).state,first);
+  assert.deepEqual(timers.map(timer=>timer.ms),[7000]);
+  const latest = doc('대기 중 추가 편집');
+  made.edit(latest); made.controller.markLocalSave();
+  assert.equal(made.controller.status().phase,'throttled');
+  assert.deepEqual(JSON.parse(draftStorage.getItem('lovetree.v4.pending-write:usr_a')).state,latest);
+  assert.equal(timers.length,1,'편집을 추가해도 예약 재시도가 늘어나지 않는다');
+  timers.shift().fn(); await made.settle();
+  assert.equal(made.controller.status().phase,'synced');
+  assert.deepEqual(api.puts()[1].state,latest,'재시도는 마지막 편집 내용을 전송한다');
+  assert.equal(draftStorage.length,0,'서버 저장 성공 뒤 보관본을 지운다');
 });

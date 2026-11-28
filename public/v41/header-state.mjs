@@ -156,7 +156,9 @@ export function tipsWanted({ owned = false, treeCount = 0, seen = false, source 
 export function unsavedNoticeText(phase = '') {
   return phase === 'syncing'
     ? '바뀐 내용을 서버에 저장하고 있어요. 잠시 뒤 저절로 저장돼요.'
-    : '서버에 저장하지 못했어요. 저장 안내를 확인해 주세요.';
+    : phase === 'throttled'
+      ? '저장 요청이 잠시 많아요. 잠시 뒤 자동으로 다시 저장합니다.'
+      : '서버에 저장하지 못했어요. 저장 안내를 확인해 주세요.';
 }
 
 // 헤더 주 버튼(#write-menu) 문구. 첫 화면 가운데 첫 버튼과 어긋나지 않게 같은 규칙을 쓴다.

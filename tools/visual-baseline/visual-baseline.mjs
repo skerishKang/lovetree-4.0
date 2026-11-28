@@ -13,6 +13,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { installVisualPublicApiStubs } from './public-api-stub.mjs';
 import { STABILIZE, FIX_ORBIT_PHASE } from './capture-stability.mjs';
+import { NOTICE_SCENES, showFixedNotices } from './notice-scenes.mjs';
 
 // 화면별 기준치(%). 기억 보드는 실·핀 선을 매 로드마다 미세하게 다시 그려 0.1%를 넘는 장이 나온다
 // (정리는 리팩터링 3단계 예정, #231).
@@ -29,7 +30,9 @@ const DEFAULTS = {
 // Pages는 `.html` 없이도 같은 화면을 준다(iframe 주소가 .../design/views/track59-sketchbook 형태).
 const SCENES = [
   { name: 'home', hash: '', expect: '/v41/home' },
+  NOTICE_SCENES[0],
   { name: 'shelf', hash: '#shelf', expect: 'track32-bookshelf' },
+  NOTICE_SCENES[1],
   { name: 'book', hash: '#book', expect: 'track59-sketchbook' },
   { name: 'board', hash: '#board', expect: 'track58-pinboard' },
   { name: 'network', hash: '#network', expect: 'track56-network' }
@@ -209,12 +212,13 @@ async function assetsReady(frame, page, deadline = Infinity) {
 // 걸려 캡처 단계 전체가 40분 잡 시간을 다 먹었다. 상한이 지나면 마지막 그림을 '고정 실패'로 남기고 넘어간다.
 const SHOT_BUDGET_MS = 25000;
 
-async function stableShot(frame, page, file) {
+async function stableShot(frame, page, file, notices = null) {
   const deadline = Date.now() + SHOT_BUDGET_MS;
   // 데이터 요청도 기다린다 — 늦게 도착한 데이터는 패널 높이를 바꿔 지도 배치를 다시 그린다.
   // (캡처당 한 번만 기다린다. 매 settle마다 기다리면 계속 연결이 남는 화면에서 8초씩 반복된다.)
   await page.waitForLoadState('networkidle', { timeout: 8000 }).catch(() => {});
   await settleInside(frame, page);
+  if (notices) { await page.evaluate(STABILIZE); await page.evaluate(showFixedNotices, notices); }
   let previous = null;
   for (let attempt = 0; attempt < 8 && Date.now() < deadline; attempt += 1) {
     // 자료가 다 익지 않았으면 찍지 않고 기다린다 — 읽는 중 화면도 "안정"으로 둔갑하기 때문.
@@ -222,6 +226,7 @@ async function stableShot(frame, page, file) {
     // Freeze Web Animations mounted after the first pass, including shadow DOM.
     await frame.evaluate(STABILIZE).catch(() => {});
     await frame.evaluate(FIX_ORBIT_PHASE).catch(() => {});
+    if (notices) { await page.evaluate(STABILIZE); await page.evaluate(showFixedNotices, notices); }
     const buffer = await page.screenshot();
     if (previous && buffer.equals(previous)) {
       writeFileSync(file, buffer);
@@ -229,6 +234,7 @@ async function stableShot(frame, page, file) {
     }
     previous = buffer;
     await settleInside(frame, page);
+    if (notices) { await page.evaluate(STABILIZE); await page.evaluate(showFixedNotices, notices); }
     if (!(await assetsReady(frame, page, deadline))) { previous = null; continue; }
     await page.waitForTimeout(250);
   }
@@ -258,9 +264,13 @@ async function capture(argv) {
   let skipped = 0;
   try {
     for (const viewport of WIDTHS) {
-      const scenes = [...SCENES, ACCOUNT].filter(scene => (!viewport.scenes || viewport.scenes.includes(scene.name)) && (!options.scenes || options.scenes.split(',').includes(scene.name)));
+      const scenes = [...SCENES, ACCOUNT].filter(scene =>
+        (!scene.notices || (viewport.tag === '1440' || viewport.tag === '390')) &&
+        (!viewport.scenes || viewport.scenes.includes(scene.name.replace('-notices', ''))) &&
+        (!options.scenes || options.scenes.split(',').includes(scene.name)));
       for (const theme of THEMES) {
         for (const scene of scenes) {
+          if (scene.notices && theme !== 'night') continue;
           if (Date.now() > stopAt) {
             const name = scene.openAccount ? `account-${viewport.tag}-${theme}.png` : shotName(scene.name, viewport, theme);
             manifest.push({ shot: name, scene: scene.name, opened: false, skipped: 'budget' });
@@ -312,7 +322,7 @@ async function capture(argv) {
               await page.waitForTimeout(400);
             }
             let stable = false;
-            try { stable = await stableShot(frame, page, path.join(out, name)); }
+            try { stable = await stableShot(frame, page, path.join(out, name), scene.notices ? { shift: Number(options['notice-shift'] || 0) } : null); }
             catch (error) {
               manifest.push({ shot: name, scene: scene.name, opened: true, shown: href, stable: false, error: String(error?.message || error).split('\n')[0] });
               console.log(`! ${name}: 찍다 오류 (${String(error?.message || error).split('\n')[0]})`);

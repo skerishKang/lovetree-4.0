@@ -96,7 +96,7 @@ const ALLOWED = new Map([
 ]);
 const LOOPBACK = new Set(['127.0.0.1', 'localhost', '::1', '[::1]']);
 const REQUEST_HEADERS = ['cookie', 'content-type', 'accept', 'accept-language', 'authorization', 'origin', 'idempotency-key', 'x-lovetree-subject', 'x-lovetree-upload-id', 'if-none-match'];
-const RESPONSE_HEADERS = ['content-type', 'location', 'cache-control', 'x-content-type-options', 'www-authenticate', 'content-security-policy', 'etag'];
+const RESPONSE_HEADERS = ['content-type', 'location', 'cache-control', 'x-content-type-options', 'www-authenticate', 'content-security-policy', 'etag', 'retry-after'];
 
 // 응답 본문 상한. 서버가 받아들이는 문서 상한(`server/http.js` DEFAULT_MAX_BODY_BYTES = 4MiB,
 // `LOVETREE_MAX_BODY_BYTES`로 조정)보다 넉넉해야 정상 기록이 프록시에서 잘리지 않는다.
