@@ -445,3 +445,13 @@ html[data-v41-screen=shelf] .shelf-viewport[data-shelf-view=shelf] .shelf-empty-
   position:relative;left:auto;top:auto;width:104px;height:156px;min-height:0;margin:0 auto;
   transform:none;aspect-ratio:auto;align-self:end
 }
+
+/* #1596: 390px '이어 보기'에서 나무 이름이 한 글자로 줄지 않도록 두 줄에 분리한다.
+   기존 색상·글꼴·단추 위치는 유지하고 이름/순간 제목 각각 말줄임만 적용한다. */
+@media (max-width: 480px) {
+  .resume-line { flex-direction: column; align-items: stretch; justify-content: center; gap: 1px; }
+  .resume-line strong { display: block; max-width: 100%; width: 100%; min-width: 0; }
+  .resume-line .resume-dot { display: none; }
+  .resume-line .resume-moment { display: block; width: 100%; max-width: 100%; }
+  .resume-line .resume-moment[hidden] { display: none; }
+}
