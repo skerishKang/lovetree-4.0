@@ -1,5 +1,6 @@
 {
-  "sourceRevision": "9896d3a1397dfac19ef7f20cdcf14001fb952cd6",
+  "sourceRevision": "eecea158ec4628f96c3b906d5e77fd331340bd59",
+  "previousRevision": "9896d3a1397dfac19ef7f20cdcf14001fb952cd6",
   "jobs": {
     "screen-board": {
       "tests": [
@@ -49,10 +50,7 @@
     "screen-board-b": {
       "tests": [
         "tests/v41-932-937-board-legend.test.mjs",
-        "tests/v41-a11y-514-remaining.test.mjs",
-        "tests/v41-a11y-views.test.mjs",
         "tests/v41-bottom-links-850.test.mjs",
-        "tests/v41-local-date-547.test.mjs",
         "tests/v41-orbit-535-float-overlap.test.mjs",
         "tests/v41-tree-layout-777.test.mjs"
       ],
@@ -60,15 +58,9 @@
         "    timeout-minutes: 25",
         "        run: |",
         "        run: |",
-        "          node --test tests/v41-a11y-514-remaining.test.mjs",
-        "        run: |",
-        "          node --test --test-concurrency=1 tests/v41-local-date-547.test.mjs",
-        "        run: |",
         "          node --test --test-concurrency=1 tests/v41-tree-layout-777.test.mjs",
         "        run: |",
         "          node --test --test-concurrency=1 tests/v41-932-937-board-legend.test.mjs tests/v41-bottom-links-850.test.mjs",
-        "        run: |",
-        "          node --test --test-concurrency=1 tests/v41-a11y-views.test.mjs",
         "        run: |",
         "          node --test tests/v41-orbit-535-float-overlap.test.mjs",
         "        run: |"
@@ -195,34 +187,28 @@
       "tests": [
         "tests/updates-screen-611.test.mjs",
         "tests/v41-1440-cleanup-cards.test.mjs",
-        "tests/v41-a11y-shell-names.test.mjs",
         "tests/v41-account-settings.test.mjs",
         "tests/v41-bookmark-import-screen.test.mjs",
-        "tests/v41-frame-blank-996.test.mjs",
         "tests/v41-header-tabs-mobile.test.mjs",
         "tests/v41-logo-home.test.mjs",
         "tests/v41-my-news-screen-1098.test.mjs",
         "tests/v41-quick-gap.test.mjs",
         "tests/v41-shelf-new-tree.test.mjs",
         "tests/v41-shell-notice.test.mjs",
-        "tests/v41-theme-ab.test.mjs",
-        "tests/v41-token-color-886.test.mjs",
         "tests/v41-write-panel-868.test.mjs"
       ],
       "commands": [
         "    timeout-minutes: 12",
         "        run: |",
         "        run: |",
-        "          node --test --test-concurrency=1 tests/v41-account-settings.test.mjs tests/v41-header-tabs-mobile.test.mjs tests/v41-a11y-shell-names.test.mjs tests/v41-theme-ab.test.mjs tests/v41-shell-notice.test.mjs",
+        "          node --test --test-concurrency=1 tests/v41-account-settings.test.mjs tests/v41-header-tabs-mobile.test.mjs tests/v41-shell-notice.test.mjs",
         "          LT_1440_REQUIRE=1 node --test --test-concurrency=1 tests/v41-1440-cleanup-cards.test.mjs",
-        "        run: |",
-        "          node --test --test-concurrency=1 tests/v41-token-color-886.test.mjs",
         "        run: |",
         "          node --test --test-concurrency=1 tests/updates-screen-611.test.mjs",
         "        run: |",
         "          node --test --test-concurrency=1 tests/v41-my-news-screen-1098.test.mjs",
         "        run: |",
-        "          node --test --test-concurrency=1 tests/v41-logo-home.test.mjs tests/v41-frame-blank-996.test.mjs",
+        "          node --test --test-concurrency=1 tests/v41-logo-home.test.mjs",
         "        run: |",
         "          node --test --test-concurrency=1 tests/v41-bookmark-import-screen.test.mjs",
         "        run: |",
@@ -233,78 +219,6 @@
         "    timeout-minutes: 12"
       ],
       "retries": []
-    },
-    "screen-audit-a": {
-      "tests": [
-        "tests/v41-screen-audit.test.mjs"
-      ],
-      "commands": [
-        "    timeout-minutes: 12",
-        "        run: |",
-        "        timeout-minutes: 10",
-        "        run: |",
-        "            if curl -fLsS --retry 2 --connect-timeout 10 --max-time 90 \"https://raw.githubusercontent.com/notofonts/noto-cjk/f8d157532fbfaeda587e826d4cd5b21a49186f7c/Sans/OTC/NotoSansCJK-Regular.ttc\" -o \"$noto_font\"; then",
-        "        timeout-minutes: 10",
-        "        run: |",
-        "          LT_SCREEN_AUDIT_SHARD=a LT_SCREEN_AUDIT_REQUIRE=1 node --test --test-skip-pattern='^#657 후속' tests/v41-screen-audit.test.mjs > /tmp/screen-audit.log 2>&1 & pid=$!",
-        "        run: |"
-      ],
-      "timeouts": [
-        "    timeout-minutes: 12",
-        "        timeout-minutes: 10",
-        "        timeout-minutes: 10"
-      ],
-      "retries": [
-        "            if curl -fLsS --retry 2 --connect-timeout 10 --max-time 90 \"https://raw.githubusercontent.com/notofonts/noto-cjk/f8d157532fbfaeda587e826d4cd5b21a49186f7c/Sans/OTC/NotoSansCJK-Regular.ttc\" -o \"$noto_font\"; then"
-      ]
-    },
-    "screen-audit-b": {
-      "tests": [
-        "tests/v41-screen-audit.test.mjs"
-      ],
-      "commands": [
-        "    timeout-minutes: 12",
-        "        run: |",
-        "        timeout-minutes: 10",
-        "        run: |",
-        "            if curl -fLsS --retry 2 --connect-timeout 10 --max-time 90 \"https://raw.githubusercontent.com/notofonts/noto-cjk/f8d157532fbfaeda587e826d4cd5b21a49186f7c/Sans/OTC/NotoSansCJK-Regular.ttc\" -o \"$noto_font\"; then",
-        "        timeout-minutes: 10",
-        "        run: |",
-        "          LT_SCREEN_AUDIT_SHARD=b LT_SCREEN_AUDIT_REQUIRE=1 node --test --test-name-pattern='^#657 화면 공통 검사기' tests/v41-screen-audit.test.mjs > /tmp/screen-audit.log 2>&1 & pid=$!",
-        "        run: |"
-      ],
-      "timeouts": [
-        "    timeout-minutes: 12",
-        "        timeout-minutes: 10",
-        "        timeout-minutes: 10"
-      ],
-      "retries": [
-        "            if curl -fLsS --retry 2 --connect-timeout 10 --max-time 90 \"https://raw.githubusercontent.com/notofonts/noto-cjk/f8d157532fbfaeda587e826d4cd5b21a49186f7c/Sans/OTC/NotoSansCJK-Regular.ttc\" -o \"$noto_font\"; then"
-      ]
-    },
-    "screen-audit-c": {
-      "tests": [
-        "tests/v41-screen-audit.test.mjs"
-      ],
-      "commands": [
-        "    timeout-minutes: 12",
-        "        run: |",
-        "        timeout-minutes: 10",
-        "        run: |",
-        "            if curl -fLsS --retry 2 --connect-timeout 10 --max-time 90 \"https://raw.githubusercontent.com/notofonts/noto-cjk/f8d157532fbfaeda587e826d4cd5b21a49186f7c/Sans/OTC/NotoSansCJK-Regular.ttc\" -o \"$noto_font\"; then",
-        "        timeout-minutes: 10",
-        "        run: |",
-        "          LT_SCREEN_AUDIT_SHARD=c LT_SCREEN_AUDIT_REQUIRE=1 node --test --test-name-pattern='^#657 화면 공통 검사기' --test-name-pattern='^#657 후속' tests/v41-screen-audit.test.mjs > /tmp/screen-audit.log 2>&1 & pid=$!",
-        "        run: |"
-      ],
-      "timeouts": [
-        "    timeout-minutes: 12",
-        "        timeout-minutes: 10",
-        "        timeout-minutes: 10"
-      ],
-      "retries": [
-        "            if curl -fLsS --retry 2 --connect-timeout 10 --max-time 90 \"https://raw.githubusercontent.com/notofonts/noto-cjk/f8d157532fbfaeda587e826d4cd5b21a49186f7c/Sans/OTC/NotoSansCJK-Regular.ttc\" -o \"$noto_font\"; then"
-      ]
     },
     "screen-reload": {
       "tests": [
@@ -379,8 +293,6 @@
     },
     "screen-map-b": {
       "tests": [
-        "tests/admin-view.test.mjs",
-        "tests/v41-font-floor-548.test.mjs",
         "tests/v41-graph-842-841.test.mjs",
         "tests/v41-map-open-book-518.test.mjs",
         "tests/v41-map-relations-601.test.mjs",
@@ -404,12 +316,6 @@
         "        timeout-minutes: 6",
         "        run: |",
         "          node --test --test-concurrency=1 tests/v41-graph-842-841.test.mjs",
-        "        timeout-minutes: 6",
-        "        run: |",
-        "          node --test tests/v41-font-floor-548.test.mjs",
-        "        timeout-minutes: 6",
-        "        run: |",
-        "          node --test tests/admin-view.test.mjs",
         "        run: |"
       ],
       "timeouts": [
@@ -417,8 +323,6 @@
         "        timeout-minutes: 8",
         "        timeout-minutes: 10",
         "        timeout-minutes: 10",
-        "        timeout-minutes: 6",
-        "        timeout-minutes: 6",
         "        timeout-minutes: 6",
         "        timeout-minutes: 6"
       ],
@@ -428,7 +332,6 @@
     },
     "screen-book-screen": {
       "tests": [
-        "tests/admin-view.test.mjs",
         "tests/v41-board-yt-overlap-553.test.mjs",
         "tests/v41-book-closed-focus-519.test.mjs",
         "tests/v41-book-contrast-515-516.test.mjs",
@@ -437,7 +340,6 @@
         "tests/v41-book-long-note.test.mjs",
         "tests/v41-empty-tree-463.test.mjs",
         "tests/v41-inbox-display.test.mjs",
-        "tests/v41-share-guest-635.test.mjs",
         "tests/v41-tree-rename-tips-571.test.mjs",
         "tests/v41-tree-tag-small-862.test.mjs",
         "tests/v41-tree-tips-549.test.mjs",
@@ -456,11 +358,10 @@
         "        run: |",
         "          node --test --test-concurrency=1 tests/v41-write-tab-462.test.mjs tests/v41-inbox-display.test.mjs tests/v41-empty-tree-463.test.mjs",
         "        run: |",
-        "          node --test --test-concurrency=1 --test-name-pattern='^970' tests/v41-tree-rename-tips-571.test.mjs tests/v41-board-yt-overlap-553.test.mjs tests/admin-view.test.mjs",
+        "          node --test --test-concurrency=1 --test-name-pattern='^970' tests/v41-tree-rename-tips-571.test.mjs tests/v41-board-yt-overlap-553.test.mjs",
         "        run: |",
         "          node --test --test-concurrency=1 tests/v41-book-fullscreen-833.test.mjs tests/v41-tree-tag-small-862.test.mjs",
         "        run: |",
-        "          node --test --test-concurrency=1 tests/v41-share-guest-635.test.mjs",
         "          node --test --test-concurrency=1 tests/v41-book-long-note.test.mjs",
         "        run: |"
       ],
@@ -468,6 +369,110 @@
         "    timeout-minutes: 25"
       ],
       "retries": []
+    },
+    "screen-common-a": {
+      "tests": [
+        "tests/v41-screen-audit.test.mjs"
+      ],
+      "commands": [
+        "    timeout-minutes: 40",
+        "        run: |",
+        "        timeout-minutes: 10",
+        "        run: |",
+        "            if curl -fLsS --retry 2 --connect-timeout 10 --max-time 90 \"https://raw.githubusercontent.com/notofonts/noto-cjk/f8d157532fbfaeda587e826d4cd5b21a49186f7c/Sans/OTC/NotoSansCJK-Regular.ttc\" -o \"$noto_font\"; then",
+        "        timeout-minutes: 10",
+        "        run: |",
+        "          LT_SCREEN_AUDIT_SHARD=a LT_SCREEN_AUDIT_REQUIRE=1 node --test --test-skip-pattern='^#657 후속' tests/v41-screen-audit.test.mjs > /tmp/screen-audit.log 2>&1 & pid=$!",
+        "        run: |",
+        "        timeout-minutes: 10",
+        "        run: |",
+        "          LT_SCREEN_AUDIT_SHARD=b LT_SCREEN_AUDIT_REQUIRE=1 node --test --test-name-pattern='^#657 화면 공통 검사기' tests/v41-screen-audit.test.mjs > /tmp/screen-audit.log 2>&1 & pid=$!",
+        "        run: |",
+        "        timeout-minutes: 10",
+        "        run: |",
+        "          LT_SCREEN_AUDIT_SHARD=c LT_SCREEN_AUDIT_REQUIRE=1 node --test --test-name-pattern='^#657 화면 공통 검사기' --test-name-pattern='^#657 후속' tests/v41-screen-audit.test.mjs > /tmp/screen-audit.log 2>&1 & pid=$!",
+        "        run: |"
+      ],
+      "timeouts": [
+        "    timeout-minutes: 40",
+        "        timeout-minutes: 10",
+        "        timeout-minutes: 10",
+        "        timeout-minutes: 10",
+        "        timeout-minutes: 10"
+      ],
+      "retries": [
+        "            if curl -fLsS --retry 2 --connect-timeout 10 --max-time 90 \"https://raw.githubusercontent.com/notofonts/noto-cjk/f8d157532fbfaeda587e826d4cd5b21a49186f7c/Sans/OTC/NotoSansCJK-Regular.ttc\" -o \"$noto_font\"; then"
+      ]
+    },
+    "screen-common-b": {
+      "tests": [
+        "tests/admin-view.test.mjs",
+        "tests/v41-a11y-514-remaining.test.mjs",
+        "tests/v41-a11y-shell-names.test.mjs",
+        "tests/v41-a11y-views.test.mjs",
+        "tests/v41-font-floor-548.test.mjs",
+        "tests/v41-frame-blank-996.test.mjs",
+        "tests/v41-local-date-547.test.mjs",
+        "tests/v41-share-guest-635.test.mjs",
+        "tests/v41-theme-ab.test.mjs",
+        "tests/v41-token-color-886.test.mjs"
+      ],
+      "commands": [
+        "    timeout-minutes: 55",
+        "        timeout-minutes: 8",
+        "        run: |",
+        "        timeout-minutes: 10",
+        "        run: |",
+        "            if curl -fLsS --retry 2 --connect-timeout 10 --max-time 90 \"https://raw.githubusercontent.com/notofonts/noto-cjk/f8d157532fbfaeda587e826d4cd5b21a49186f7c/Sans/OTC/NotoSansCJK-Regular.ttc\" -o \"$noto_font\"; then",
+        "        timeout-minutes: 25",
+        "        run: |",
+        "          node --test tests/v41-a11y-514-remaining.test.mjs",
+        "        timeout-minutes: 25",
+        "        run: |",
+        "          node --test --test-concurrency=1 tests/v41-local-date-547.test.mjs",
+        "        timeout-minutes: 25",
+        "        run: |",
+        "          node --test --test-concurrency=1 tests/v41-a11y-views.test.mjs",
+        "        timeout-minutes: 12",
+        "        run: |",
+        "          node --test --test-concurrency=1 tests/v41-a11y-shell-names.test.mjs tests/v41-theme-ab.test.mjs",
+        "        timeout-minutes: 12",
+        "        run: |",
+        "          node --test --test-concurrency=1 tests/v41-token-color-886.test.mjs",
+        "        timeout-minutes: 12",
+        "        run: |",
+        "          node --test --test-concurrency=1 tests/v41-frame-blank-996.test.mjs",
+        "        timeout-minutes: 6",
+        "        run: |",
+        "          node --test tests/v41-font-floor-548.test.mjs",
+        "        timeout-minutes: 6",
+        "        run: |",
+        "          node --test tests/admin-view.test.mjs",
+        "        timeout-minutes: 25",
+        "        run: |",
+        "          node --test --test-concurrency=1 --test-name-pattern='^970' tests/admin-view.test.mjs",
+        "        timeout-minutes: 25",
+        "        run: |",
+        "          node --test --test-concurrency=1 tests/v41-share-guest-635.test.mjs"
+      ],
+      "timeouts": [
+        "    timeout-minutes: 55",
+        "        timeout-minutes: 8",
+        "        timeout-minutes: 10",
+        "        timeout-minutes: 25",
+        "        timeout-minutes: 25",
+        "        timeout-minutes: 25",
+        "        timeout-minutes: 12",
+        "        timeout-minutes: 12",
+        "        timeout-minutes: 12",
+        "        timeout-minutes: 6",
+        "        timeout-minutes: 6",
+        "        timeout-minutes: 25",
+        "        timeout-minutes: 25"
+      ],
+      "retries": [
+        "            if curl -fLsS --retry 2 --connect-timeout 10 --max-time 90 \"https://raw.githubusercontent.com/notofonts/noto-cjk/f8d157532fbfaeda587e826d4cd5b21a49186f7c/Sans/OTC/NotoSansCJK-Regular.ttc\" -o \"$noto_font\"; then"
+      ]
     }
   }
 }
