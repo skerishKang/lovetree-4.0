@@ -52,17 +52,16 @@ function isScreenTool(file) {
 export const SCREENS = ['home','board','book','shelf','map','shell','explore/settings'];
 export const AREA_SOURCES = [
   [/^src\/views\/orbit[^/]*\.(js|css|json)$/, ['home']],
-  [/^public\/v41\/(home-route\.js|home-title-state\.mjs|orbit-safe-zone\.mjs)$/, ['home']],
-  [/^public\/v41\/shell\/(header|navigation-menu|settings|tree-menu|tree-tips|dialogs)\.mjs$/, ['shell']],
-  [/^public\/v41\/views\/(board\/|track58-pinboard\.html$)/, ['board']],
-  [/^public\/v41\/views\/(book\/|track59-sketchbook\.html$)/, ['book']],
   [/^src\/views\/book(?:-source\.css|\.js)$/, ['book']],
-  [/^public\/v41\/book-usability\.mjs$/, ['book']],
-  [/^public\/v41\/views\/(shelf\/|track32-bookshelf\.html$)/, ['shelf']],
   [/^src\/views\/shelf(?:-source\.css|\.css|\.js)$/, ['shelf']],
-  [/^public\/v41\/views\/(network\/|graph\/|track56-network\.html$)/, ['map']],
-  [/^public\/v41\/graph-model\.mjs$/, ['map']],
-  [/^public\/v41\/(community-panel\.mjs|community-moments[^/]*\.mjs|community\.css|my-news\.mjs|bookmark-import\.(mjs|css))$/, ['explore/settings','shell']]
+  [/^public\/v41\/views\/board\//, ['board']],
+  [/^public\/v41\/views\/track58-pinboard\.html$/, ['board']],
+  [/^public\/v41\/views\/book\//, ['book']],
+  [/^public\/v41\/views\/track59-sketchbook\.html$/, ['book']],
+  [/^public\/v41\/views\/shelf\//, ['shelf']],
+  [/^public\/v41\/views\/track32-bookshelf\.html$/, ['shelf']],
+  [/^public\/v41\/views\/(network|graph)\//, ['map']],
+  [/^public\/v41\/views\/track56-network\.html$/, ['map']]
 ];
 export const JOB_TOKEN = {};
 export function tokenOf(job) { return job; }
@@ -112,7 +111,7 @@ export function selectJobs(changedFiles, jobTests = jobTestFiles()) {
     if (!files.size) return 'all';
     for (const file of files) if (!TEST_OWNERS[file]) return 'all';
     if (job.startsWith('screen-audit-') || [...files].some(f =>
-      TEST_OWNERS[f].some(x => x !== 'common' && screens.has(x)))) picked.push(job);
+      TEST_OWNERS[f].some(x => x === 'common' || screens.has(x)))) picked.push(job);
   }
   return picked.length ? picked.join(',') : 'all';
 }

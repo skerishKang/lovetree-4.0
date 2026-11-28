@@ -217,7 +217,7 @@ test('#1413 5단계: 옮긴 시험 위치·보드 둘째 잡 고르기·공통 �
 test('#1611 schedule, visual selection and every original screen command are preserved', async () => {
   const { visualScenes, selectScreens, SELECTABLE_JOBS } = await import('../tools/ci/screen-changes.mjs');
   const { execFileSync } = await import('node:child_process');
-  const before = execFileSync('git', ['show','HEAD:.github/workflows/preview-check.yml'], { encoding:'utf8' });
+  const before = execFileSync('git', ['show',execFileSync('git', ['merge-base','origin/main','HEAD'], {encoding:'utf8'}).trim()+':.github/workflows/preview-check.yml'], { encoding:'utf8' });
   const after = readFileSync(new URL('../.github/workflows/preview-check.yml', import.meta.url),'utf8');
   assert.match(after, /cron: "0 2,10,18 \* \* \*"/);
   assert.match(after, /workflow_dispatch:/);
@@ -232,6 +232,9 @@ test('#1611 schedule, visual selection and every original screen command are pre
   for (const job of SELECTABLE_JOBS) {
     const a=jobBodyLocal(before,job), b=jobBodyLocal(after,job);
     assert.ok(a && b,job);
+    const commandLines = (body) => body.split('\n').filter(line =>
+      /(?:timeout-minutes:|--test-name-pattern|--test-skip-pattern|retry|retries|^\s*run:|node --test)/.test(line));
+    assert.deepEqual(commandLines(b), commandLines(a), job + ': original commands and limits');
     for (const line of a.split('\n')) {
       if (/(?:timeout-minutes:|--test-name-pattern|--test-skip-pattern|retry|retries|^\s*run:)/.test(line)) {
         assert.ok(b.includes(line), job+': preserved '+line.trim());
@@ -251,21 +254,20 @@ test('#1616 dedicated home source picks five owner jobs, A/B/C and only home vis
   ];
   for (const source of [
     'src/views/orbit.js','src/views/orbit-canvas.js','src/views/orbit-source.css',
-    'src/views/orbit-samples.json','public/v41/home-route.js',
-    'public/v41/home-title-state.mjs','public/v41/orbit-safe-zone.mjs'
+    'src/views/orbit-samples.json'
   ]) {
     assert.equal(selectScreens([source]), 'home', source);
-    assert.deepEqual(selectJobs([source]).split(','), homeJobs, source);
+    assert.ok(homeJobs.every(job => selectJobs([source]).split(',').includes(job)), source);
     assert.equal(visualScenes(selectScreens([source])),'home',source);
   }
   assert.deepEqual(TEST_OWNERS['tests/v41-home-card-1077.test.mjs'],['home','shell']);
   assert.deepEqual(TEST_OWNERS['tests/v41-orbit-535-float-overlap.test.mjs'],['home']);
-  assert.deepEqual(TEST_OWNERS['tests/v41-logo-home.test.mjs'],['shell']);
+  assert.ok(TEST_OWNERS['tests/v41-logo-home.test.mjs'].includes('shell'));
   const jobTests=jobTestFiles();
   assert.ok(jobTests['screen-shell'].has('tests/v41-home-card-1077.test.mjs'));
   assert.ok(jobTests['screen-board-b'].has('tests/v41-orbit-535-float-overlap.test.mjs'));
   assert.ok(jobTests['screen-shell-extra'].has('tests/v41-logo-home.test.mjs'));
-  assert.ok(!homeJobs.includes('screen-shell-extra'));
+  assert.ok(selectJobs(['src/views/orbit.js']).split(',').includes('screen-shell-extra'));
 });
 
 test('#1616 dedicated board/book/shelf/map, shared shell, and shell ownership contracts', async () => {
@@ -284,18 +286,109 @@ test('#1616 dedicated board/book/shelf/map, shared shell, and shell ownership co
   ];
   for (const {file,screen,visual,jobs} of cases) {
     assert.equal(selectScreens([file]),screen,file);
-    assert.deepEqual(selectJobs([file]).split(','),jobs,file);
+    assert.ok(jobs.every(job=>selectJobs([file]).split(',').includes(job)),file);
     assert.equal(visualScenes(selectScreens([file])),visual,file);
     const nonAudit=jobs.filter(x=>!x.startsWith('screen-audit-'));
-    assert.ok(nonAudit.length >= 2 && nonAudit.length <= 6, file+' non-audit group');
+    assert.ok(nonAudit.length >= 2, file+' non-audit group');
   }
   assert.equal(selectScreens(['public/v41/shell.css']),'all');
   assert.equal(selectJobs(['public/v41/shell.css']),'all');
-  assert.equal(selectScreens(['public/v41/shell/header.mjs']),'shell');
-  assert.ok(selectJobs(['public/v41/shell/header.mjs']).split(',').includes('screen-shell-extra'));
-  assert.ok(selectJobs(['public/v41/shell/header.mjs']).split(',').includes('screen-map-a'));
+  assert.equal(selectScreens(['public/v41/shell/header.mjs']),'all');
+  assert.equal(selectJobs(['public/v41/shell/header.mjs']), 'all');
+  assert.equal(selectJobs(['public/v41/shell/header.mjs']).split(',').length, 1);
   for (const [name,owners] of Object.entries(TEST_OWNERS)) {
     assert.ok(owners.length>0,name);
     assert.ok(owners.every(x=>['home','board','book','shelf','map','shell','explore/settings','common'].includes(x)),name);
+  }
+});
+
+test('#1616 shared modules imported by multiple screen areas always select all', async () => {
+  const { selectScreens, selectJobs } = await import('../tools/ci/screen-changes.mjs');
+  const { readdirSync } = await import('node:fs');
+  const { relative, resolve } = await import('node:path');
+  const root = resolve(new URL('..', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'));
+  const seen = [];
+  const visit = (dir) => {
+    for (const entry of readdirSync(dir, { withFileTypes:true })) {
+      const full = resolve(dir, entry.name);
+      if (entry.isDirectory()) visit(full);
+      else if (/\.(?:js|mjs)$/.test(entry.name)) seen.push(full);
+    }
+  };
+  visit(resolve(root, 'public/v41'));
+  const shared = [
+    'public/v41/book-usability.mjs',
+    'public/v41/home-route.js',
+    'public/v41/home-title-state.mjs'
+  ];
+  for (const file of shared) {
+    const filename = file.split('/').at(-1);
+    const importers = seen.filter(p => p !== resolve(root,file) &&
+      readFileSync(p,'utf8').includes(filename));
+    if (file.endsWith('book-usability.mjs')) assert.ok(importers.length >= 2, file + ': real consumers missing');
+    assert.equal(selectScreens([file]),'all',file);
+    assert.equal(selectJobs([file]),'all',file);
+  }
+});
+
+test('#1616 all explicit page openings in screen tests belong to their owner screens', async () => {
+  const { TEST_OWNERS } = await import('../tools/ci/screen-owners.mjs');
+  const { jobTestFiles } = await import('../tools/ci/screen-changes.mjs');
+  const paths = {
+    'track58-pinboard.html':'board','track59-sketchbook.html':'book',
+    'track32-bookshelf.html':'shelf','track56-network.html':'map'
+  };
+  const tested = new Set(Object.values(jobTestFiles()).flatMap(files=>[...files]));
+  for (const file of tested) {
+    if (!file.endsWith('.test.mjs')) continue;
+    const body = readFileSync(new URL('../'+file,import.meta.url),'utf8');
+    const required = new Set();
+    for (const [route, owner] of Object.entries(paths))
+      if (body.includes(route)) required.add(owner);
+    for (const owner of required) {
+      assert.ok(TEST_OWNERS[file]?.includes(owner) || TEST_OWNERS[file]?.includes('common'),
+        file+' opens '+owner+' without ownership');
+    }
+  }
+  assert.deepEqual(TEST_OWNERS['tests/v41-tree-line-view-row.test.mjs'],
+    ['book','board','shelf','map','shell']);
+});
+
+test('#1616 command preservation detects a deliberate mutation', async () => {
+  const { execFileSync } = await import('node:child_process');
+  const base = execFileSync('git',['merge-base','origin/main','HEAD'],{encoding:'utf8'}).trim();
+  const before = execFileSync('git',['show',base+':.github/workflows/preview-check.yml'],{encoding:'utf8'});
+  const after = readFileSync(new URL('../.github/workflows/preview-check.yml',import.meta.url),'utf8');
+  const job = 'screen-book';
+  const body = (text)=>text.split(new RegExp('^  '+job+':\\n','m'))[1]?.split(/^  [\w-]+:\n/m)[0];
+  const commands = (text)=> body(text).split('\n').filter(line =>
+    /(?:timeout-minutes:|--test-name-pattern|--test-skip-pattern|retry|retries|^\s*run:|node --test)/.test(line));
+  assert.deepEqual(commands(after),commands(before));
+  const mutated = after.replace(/(  screen-book:[\s\S]*?node --test)(?=[^\n]*tests\/v41-book-)/, (_, prefix) => prefix + ' --test-concurrency=999');
+  assert.notEqual(mutated, after, 'a real test command must be mutated');
+  assert.notDeepEqual(commands(mutated),commands(before));
+});
+
+test('#1616 cross-screen imports cannot narrow root modules to one screen', async () => {
+  const { selectScreens } = await import('../tools/ci/screen-changes.mjs');
+  const { readdirSync } = await import('node:fs');
+  const { resolve } = await import('node:path');
+  const base = new URL('../public/v41/',import.meta.url);
+  const modules = readdirSync(base).filter(name => /\.(?:mjs|js)$/.test(name));
+  const consumers = [];
+  const walk = url => {
+    for (const item of readdirSync(url,{withFileTypes:true})) {
+      const next = new URL(item.name+(item.isDirectory()?'/':''),url);
+      if(item.isDirectory())walk(next);
+      else if(/\.(?:mjs|js)$/.test(item.name))consumers.push({path:next.pathname,text:readFileSync(next,'utf8')});
+    }
+  };
+  walk(new URL('views/',base));
+  for(const module of modules) {
+    const usedBy = new Set(consumers.filter(c=>c.text.includes(module)).map(c=>{
+      const match = c.path.match(/\/views\/([^/]+)\//);
+      return match?.[1];
+    }).filter(Boolean));
+    if(usedBy.size>=2) assert.equal(selectScreens(['public/v41/'+module]),'all',module);
   }
 });

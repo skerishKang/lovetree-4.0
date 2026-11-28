@@ -5,7 +5,8 @@ export const TEST_OWNERS = {
     "common"
   ],
   "tests/updates-card-611-followup.test.mjs": [
-    "explore/settings"
+    "explore/settings",
+    "book"
   ],
   "tests/updates-screen-611.test.mjs": [
     "explore/settings"
@@ -48,7 +49,8 @@ export const TEST_OWNERS = {
     "board"
   ],
   "tests/v41-board-cursor-detail.test.mjs": [
-    "board"
+    "board",
+    "book"
   ],
   "tests/v41-board-date-edit-608.test.mjs": [
     "board"
@@ -73,7 +75,8 @@ export const TEST_OWNERS = {
     "board"
   ],
   "tests/v41-board-theme-flow.test.mjs": [
-    "board"
+    "board",
+    "map"
   ],
   "tests/v41-board-wide-view-536.test.mjs": [
     "board"
@@ -97,7 +100,10 @@ export const TEST_OWNERS = {
     "book"
   ],
   "tests/v41-book-play-584.test.mjs": [
-    "book"
+    "book",
+    "board",
+    "shelf",
+    "map"
   ],
   "tests/v41-book-single-537.test.mjs": [
     "book"
@@ -116,13 +122,19 @@ export const TEST_OWNERS = {
     "explore/settings"
   ],
   "tests/v41-dialog-unify-1109.test.mjs": [
-    "shell"
+    "shell",
+    "board",
+    "book",
+    "shelf",
+    "map"
   ],
   "tests/v41-empty-tree-463.test.mjs": [
-    "shell"
+    "shell",
+    "book"
   ],
   "tests/v41-explore-moments-1025.test.mjs": [
-    "explore/settings"
+    "explore/settings",
+    "shelf"
   ],
   "tests/v41-explore-sort-search-1363.test.mjs": [
     "explore/settings"
@@ -137,17 +149,22 @@ export const TEST_OWNERS = {
     "map"
   ],
   "tests/v41-header-ia.test.mjs": [
-    "shell"
+    "shell",
+    "board"
   ],
   "tests/v41-header-tabs-mobile.test.mjs": [
     "shell"
   ],
   "tests/v41-home-1010.test.mjs": [
-    "home"
+    "home",
+    "book"
   ],
   "tests/v41-home-add-1349.test.mjs": [
     "home",
-    "shell"
+    "shell",
+    "board",
+    "book",
+    "map"
   ],
   "tests/v41-home-back-1289.test.mjs": [
     "home"
@@ -161,16 +178,22 @@ export const TEST_OWNERS = {
     "explore/settings"
   ],
   "tests/v41-home-screen-952.test.mjs": [
-    "home"
+    "home",
+    "shelf"
   ],
   "tests/v41-inbox-display.test.mjs": [
-    "shell"
+    "shell",
+    "board"
   ],
   "tests/v41-local-date-547.test.mjs": [
     "common"
   ],
   "tests/v41-logo-home.test.mjs": [
-    "shell"
+    "shell",
+    "board",
+    "book",
+    "shelf",
+    "map"
   ],
   "tests/v41-map-contrast.test.mjs": [
     "map"
@@ -204,7 +227,8 @@ export const TEST_OWNERS = {
   ],
   "tests/v41-quick-add.test.mjs": [
     "home",
-    "shell"
+    "shell",
+    "book"
   ],
   "tests/v41-quick-gap.test.mjs": [
     "shell"
@@ -217,14 +241,18 @@ export const TEST_OWNERS = {
   ],
   "tests/v41-shelf-new-tree.test.mjs": [
     "shelf",
-    "shell"
+    "shell",
+    "board",
+    "book"
   ],
   "tests/v41-shell-dialogs.test.mjs": [
     "shell",
     "home"
   ],
   "tests/v41-shell-notice.test.mjs": [
-    "shell"
+    "shell",
+    "book",
+    "map"
   ],
   "tests/v41-theme-ab.test.mjs": [
     "common"
@@ -233,17 +261,26 @@ export const TEST_OWNERS = {
     "common"
   ],
   "tests/v41-topmenu-885.test.mjs": [
-    "shell"
+    "shell",
+    "board",
+    "book",
+    "shelf",
+    "map"
   ],
   "tests/v41-tree-layout-777.test.mjs": [
-    "shell"
+    "shell",
+    "book"
   ],
   "tests/v41-tree-line-view-row.test.mjs": [
     "book",
+    "board",
+    "shelf",
+    "map",
     "shell"
   ],
   "tests/v41-tree-rename-tips-571.test.mjs": [
-    "shell"
+    "shell",
+    "book"
   ],
   "tests/v41-tree-tag-small-862.test.mjs": [
     "shell"
@@ -258,6 +295,7 @@ export const TEST_OWNERS = {
     "shell"
   ],
   "tests/v41-write-tab-462.test.mjs": [
-    "shell"
+    "shell",
+    "book"
   ]
 };

@@ -36,3 +36,14 @@ test('바뀜 판정이고 화면 잡이 모두 성공이면 통과한다', () =>
   const r = checkScreenResults(results('success', gate('success', 'true')));
   assert.equal(r.ok, true, JSON.stringify(r.failures));
 });
+
+
+test('unknown future screen job failure and cancellation cannot be ignored', () => {
+  for (const status of ['failure', 'cancelled']) {
+    const needs = results('success', gate('success', 'true'));
+    needs['screen-future'] = { result: status };
+    const outcome = checkScreenResults(needs);
+    assert.equal(outcome.ok, false);
+    assert.ok(outcome.failures.some(reason => reason.includes('screen-future')));
+  }
+});
