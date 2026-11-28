@@ -1720,3 +1720,13 @@ body.community-screen #toast[data-lt-first-moment-intro]{display:none}
    키보드로 접근한 경우 초점 표시는 계속 유지한다. */
 #community-panel:focus{outline:none}
 #community-panel:focus-visible{outline:2px solid var(--lt-gold);outline-offset:-2px}
+
+/* #1608: 새 소식은 비모달 show()와 Esc·뒤로 가기·겹친 창 규칙을 유지한다.
+   다만 열린 동안 셸 머리줄은 전체 창의 뒤 배경처럼 흐리고 눌림을 막는다.
+   updates-surface의 본문 틀과 #updates-panel(기존 z-index:4)은 변경하지 않는다. */
+body:has(#updates-panel[open]) .app-header{position:relative;pointer-events:none}
+body:has(#updates-panel[open]) .app-header::after{
+ content:"";position:absolute;inset:0;z-index:10;border-radius:inherit;
+ background:var(--lt-dialog-backdrop);backdrop-filter:var(--lt-dialog-backdrop-blur);
+ pointer-events:auto
+}
