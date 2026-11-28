@@ -825,6 +825,23 @@ function scheduleBoardMoreHint() {
     boardMoreHintFrame = 0;
     const hint = $('#board-more-hint');
     if (!hint) return;
+    // #1599 후속: 선택 줄 때문에 작은 판이 아래로 내려간 경우, 다음 스크롤 한 화면 안의
+    // 지연 썸네일만 먼저 요청한다. 멀리 있는 카드까지 한꺼번에 불러오지 않는다.
+    if (innerWidth < 700 && viewport.classList.contains('board-scroll')) {
+      const bounds = viewport.getBoundingClientRect();
+      const ahead = bounds.bottom + bounds.height;
+      let started = 0;
+      for (const card of cardLayer.querySelectorAll('.card[data-id]:not(.filteredOut)')) {
+        const rect = card.getBoundingClientRect();
+        if (rect.top > ahead || rect.bottom < bounds.top) continue;
+        for (const img of card.querySelectorAll('.lt-yt-preview img[loading="lazy"]')) {
+          if (img.complete) continue;
+          img.loading = 'eager';
+          if (++started >= 8) break;
+        }
+        if (started >= 8) break;
+      }
+    }
     const bottom = viewport.getBoundingClientRect().bottom;
     const more = innerWidth >= 700 && !cinema && [...cardLayer.querySelectorAll('.card[data-id]:not(.filteredOut)')]
       .some(card => card.getBoundingClientRect().bottom > bottom + 1);
