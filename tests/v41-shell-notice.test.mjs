@@ -471,3 +471,13 @@ test('#1103: 우선순위가 앞서는 안내는 나중에 와도 먼저 뜬다'
   q.release('tips');
   assert.deepEqual(visible, ['updates'], '밀린 새 소식 띠가 그다음에 뜬다');
 });
+
+test('#1583 첫 순간 안내만 구분하고 다른 안내는 기존처럼 표시한다',()=>{
+  const h=harness(),markers=[];
+  h.els.toast.toggleAttribute=(name,enabled)=>markers.push({name,enabled});
+  assert.equal(h.notifier.notify(syncedNoticeText({writable:true,momentCount:0}),{firstMomentIntro:true}),true);
+  assert.ok(markers.some(x=>x.name==='data-lt-first-moment-intro'&&x.enabled===true));
+  assert.equal(h.notifier.notify('담았어요.'),true);
+  assert.ok(markers.some(x=>x.name==='data-lt-first-moment-intro'&&x.enabled===false));
+  assert.equal(h.els.toast.textContent,'담았어요.');
+});

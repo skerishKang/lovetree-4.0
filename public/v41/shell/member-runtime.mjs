@@ -113,7 +113,7 @@ export function createMemberRuntime(ctx){
        ctx.noticeQueue.request('toast',{maxWait:5000,
         // #1223: 앞선 우선순위 안내에 밀려 지나간 synced 알림이 notifyOnce 기록에 막혀 다시 뜨지 않았다.
         // 중복은 위의 syncedNoticeKeys가 이미 막으므로 일반 notify로 띄운다(선점 뒤 대기열 재표시 허용).
-        show:()=>ctx.shellNotice.notify(text),
+        show:()=>ctx.shellNotice.notify(text,{firstMomentIntro:true}),
         hide:ctx.hideToast
        });
       }).catch(error=>report(error,'새 소식 확인'));
