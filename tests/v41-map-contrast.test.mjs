@@ -8,6 +8,7 @@ import { stat, mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { installMapPaintProbe, measureMap, worstMapRoles, settleMap } from './helpers/map-contrast.mjs';
+import { evaluateWhenReady } from './helpers/visible-frame.mjs';
 
 const ROOT = path.resolve(process.env.LT_MAP_CONTRAST_ROOT || fileURLToPath(new URL('../public', import.meta.url)));
 const REQUIRE = process.env.LT_MAP_CONTRAST_REQUIRE === '1';
@@ -72,8 +73,10 @@ test('지도 실제 대비: 앱 2 × 판 2 × 1440·390, 두 보기·선택 상�
         await frame.evaluate(() => document.fonts.ready);
         // 환경 확인: 한글 글꼴이 없는 실행기에서는 이름표가 가는 대체 글리프로 그려져 '글자 속' 표본이 0이 된다(#529).
         // 제품 대비 미달과 섞이지 않게, 재기 전에 환경 문제로 분명히 멈춘다.
-        const inkDark = await frame.evaluate(() => {
-          const c = document.createElement('canvas'); c.width = 96; c.height = 48; c.lang = document.documentElement.lang;
+        const inkDark = await evaluateWhenReady(frame, () => {
+          const root = document.documentElement;
+          if (!root) return false;
+          const c = document.createElement('canvas'); c.width = 96; c.height = 48; c.lang = root.lang;
           const x = c.getContext('2d', { alpha: false, willReadFrequently: true });
           x.fillStyle = '#fff'; x.fillRect(0, 0, 96, 48); x.scale(2, 2); x.font = '600 12px Pretendard, sans-serif'; x.fillStyle = '#000'; x.fillText('도시의 창', 2, 16);
           const d = x.getImageData(0, 0, 96, 48).data; let n = 0;

@@ -4,6 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { existsSync } from 'node:fs';
+import { evaluateWhenReady } from './helpers/visible-frame.mjs';
 import { createTree, addMoment } from '../public/v41/domain.mjs';
 import {
   readTheme, writeTheme, memberPreferredTheme, nextTheme, themeButtonLabel, themeButtonAriaLabel, themeIconGlyph, themePressed,
@@ -286,9 +287,10 @@ test('셸과 각 화면 iframe의 테마가 같고 테마 전환은 프레임을
         ['#book','track59-sketchbook.html'], ['#board','track58-pinboard.html'],
         ['#network','track56-network.html'], ['#journey/00','first-journey.html']
       ];
-      const state=()=>page.evaluate(()=>{
-        const frame=document.getElementById('view');
-        return {shell:document.documentElement.getAttribute('data-lt-theme')||'night',frame:frame?.contentDocument?.documentElement.getAttribute('data-lt-theme')||'night',href:frame?.contentWindow?.location?.href||'',loads:{...window.__themeFrameLoads}};
+      const state=()=>evaluateWhenReady(page,()=>{
+        const frame=document.getElementById('view'),doc=frame?.contentDocument;
+        if(!doc?.documentElement)return false;
+        return {shell:document.documentElement.getAttribute('data-lt-theme')||'night',frame:doc.documentElement.getAttribute('data-lt-theme')||'night',href:frame?.contentWindow?.location?.href||'',loads:{...window.__themeFrameLoads}};
       });
       const open=async(hash,file)=>{
         if(hash)await page.evaluate(value=>{location.hash=value},hash);
@@ -438,8 +440,9 @@ test('#1598 로그인 후 기기 테마만 바뀌어도 서재·트리·책·보
             const f=document.getElementById('view');
             try{return f&&!f.hidden&&f.contentWindow?.location?.href?.includes(target)&&f.contentDocument?.readyState==='complete'}catch{return false}
           },file,{timeout:23000});
-          const result=await page.evaluate(()=>{
-            const f=document.getElementById('view'),inner=f.contentDocument;
+          const result=await evaluateWhenReady(page,()=>{
+            const f=document.getElementById('view'),inner=f?.contentDocument;
+            if(!inner?.documentElement||!inner.body)return false;
             return {shell:document.documentElement.getAttribute('data-lt-theme'),frame:inner.documentElement.getAttribute('data-lt-theme'),device:localStorage.getItem('lt41.theme'),account:window.LT41?.prefs?.theme,body:getComputedStyle(inner.body).backgroundColor};
           });
           assert.equal(result.account,accountTheme,view+' 계정 설정');

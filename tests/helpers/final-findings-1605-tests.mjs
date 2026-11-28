@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import {existsSync} from 'node:fs';
 import {chromium} from 'playwright';
 import {serve} from './screen-audit.mjs';
+import {evaluateWhenReady} from './visible-frame.mjs';
 
 const skip=!existsSync(chromium.executablePath());
 const port=Number(process.env.LT_TEST_PORT||0);
@@ -69,17 +70,18 @@ test('#1605 새 소식은 첫 화면에만 띠, 안쪽 다섯 화면은 머리�
       const card=document.getElementById('updates-card');
       card.hidden=false; // 표시 요청이 늦게 와도 안쪽 화면에서는 띠가 그려지지 않아야 한다.
      });
-     const sizes=await page.evaluate(()=>{
+     const sizes=await evaluateWhenReady(page,()=>{
       const frame=document.getElementById('view'),stage=document.getElementById('stage'),card=document.getElementById('updates-card');
       const doc=frame?.contentDocument;
-      const scroll=doc?.scrollingElement;
+      if(!doc?.documentElement)return false;
+      const scroll=doc.scrollingElement;
       return{
        display:getComputedStyle(card).display,
        stageHeight:stage.getBoundingClientRect().height,
        frameHeight:frame.getBoundingClientRect().height,
        frameScroll:!!scroll&&scroll.scrollHeight>scroll.clientHeight+1,
        theme:document.documentElement.dataset.ltTheme,
-       screen:doc?.documentElement.dataset.v41Screen
+       screen:doc?.documentElement?.dataset?.v41Screen
       };
      });
      assert.equal(sizes.display,'none',width+'/'+theme+'/'+screen+' 띠 숨김');

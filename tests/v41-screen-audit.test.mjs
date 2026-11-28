@@ -17,6 +17,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { serve, auditPage, failuresOf, roleStyleFn, assertRolePair, assertOutlinePair } from './helpers/screen-audit.mjs';
+import { evaluateWhenReady } from './helpers/visible-frame.mjs';
 import { createTree, addMoment } from '../public/v41/domain.mjs';
 import { observeFrameMatrix } from './helpers/frame-observation.mjs';
 import { EventEmitter } from 'node:events';
@@ -828,11 +829,12 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     await page3.waitForTimeout(1800);
     await take(page3, '지도');
     // 2026-11-16 대표 결정: 보기 고르기에 [그래프]가 셋째로 붙는다 — 390에서도 세 단추가 머리줄에 들어간다(넘침·겹침 0).
-    const mapHeader = await page3.evaluate(() => {
+    const mapHeader = await evaluateWhenReady(page3, () => {
       const frame = [...document.querySelectorAll('iframe')].find((f) => { try { return /track56-network/.test(f.contentWindow.location.href); } catch { return false; } });
-      if (!frame) return null;
+      if (!frame) return false;
       const doc = frame.contentDocument;
-      const bar = doc.querySelector('.lt-screen-toolbar');
+      const bar = doc?.querySelector('.lt-screen-toolbar');
+      if (!bar || !doc?.documentElement) return false;
       const switchBtns = [...doc.querySelectorAll('.view-switch .pill')];
       const btns = [...doc.querySelectorAll('.lt-screen-toolbar .lt-toolbar-tools button, .lt-screen-toolbar .lt-toolbar-menu button, .lt-screen-toolbar .lt-toolbar-more')].filter((b) => b.getBoundingClientRect().width > 0);
       const rects = btns.map((b) => b.getBoundingClientRect());
@@ -850,7 +852,7 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
         outOfFrame: btns.filter((b) => b.getBoundingClientRect().right > doc.documentElement.clientWidth + 1).map((b) => b.textContent.trim()),
         pairTexts
       };
-    }).catch(() => null);
+    });
     assert.ok(mapHeader, '지도 머리줄을 잰다');
     assert.deepEqual(mapHeader.labels, ['이어진 길', '묶음', '시간 순'], `보기 고르기 세 단추(실제 ${JSON.stringify(mapHeader.labels)})`);
     assert.equal(mapHeader.netPressed, 'true', '현재 보기(그물형) aria-pressed=true');
@@ -860,7 +862,7 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     assert.deepEqual(mapHeader.pairTexts, [], `머리줄 단추 겹침 0(실제 ${JSON.stringify(mapHeader.pairTexts)})`);
     // #638: 지도 390(조작 줄) — iframe 안 조작 줄이 셸의 링크 줄·＋ 단추와 겹치지 않고, 보기 전환 단추 대비 4.5:1.
     if (width === 390) {
-      const ribbonCheck = await page3.evaluate(() => {
+      const ribbonCheck = await evaluateWhenReady(page3, () => {
         const rgb = (s) => { const m = /rgba?\(([^)]+)\)/.exec(s || ''); if (!m) return null; const p = m[1].split(',').map((v) => parseFloat(v)); return [p[0], p[1], p[2], p.length > 3 ? p[3] : 1]; };
         const lum = (c) => { const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }; return 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]); };
         const mix = (t, b) => [t[0] * t[3] + b[0] * (1 - t[3]), t[1] * t[3] + b[1] * (1 - t[3]), t[2] * t[3] + b[2] * (1 - t[3]), 1];
@@ -868,10 +870,11 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
         // iframe은 src 속성이 비어 있다(셸이 contentWindow.location.replace로 화면을 바꾼다) —
         // f.url()은 DOM iframe에 없어서 이 검사가 늘 빈손이었다(#638: contentWindow 주소로 찾는다).
         const frame = [...document.querySelectorAll('iframe')].find((f) => { try { return /track56-network/.test(f.contentWindow.location.href); } catch { return false; } });
-        if (!frame) return null;
+        if (!frame) return false;
         const doc = frame.contentDocument;
+        if (!doc?.body) return false;
         const ribbonEl = doc.getElementById('mobileRibbon');
-        if (!ribbonEl || frame.contentWindow.getComputedStyle(ribbonEl).display === 'none') return null;
+        if (!ribbonEl || frame.contentWindow.getComputedStyle(ribbonEl).display === 'none') return { hidden: true };
         const off = box(frame);
         const vp = (o) => o && { t: o.t + off.t, b: o.b + off.t, l: o.l + off.l, r: o.r + off.l };
         const ribbon = vp(box(ribbonEl));
@@ -897,8 +900,8 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
           contrastNet: contrast(doc.getElementById('viewNet')),
           contrastConc: contrast(doc.getElementById('viewConc'))
         };
-      }).catch(() => null);
-      if (ribbonCheck) {
+      });
+      if (ribbonCheck && !ribbonCheck.hidden) {
         const tail = ` · ${width}·${theme}`;
         if (ribbonCheck.cut > 0) rows.push({ 항목: '잘림', 줄: `지도 390(조작 줄) 잘림 .mobile-ribbon ${Math.round(ribbonCheck.cut)}px 넘침${tail}` });
         if (ribbonCheck.linksOverlap > 0) rows.push({ 항목: '겹침', 줄: `지도 390(조작 줄) 겹침 .mobile-ribbon × .home-links ${Math.round(ribbonCheck.linksOverlap)}px²${tail}` });
@@ -1142,7 +1145,7 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     };
     const shelfBadge = async (pageAsk) => {
       await pageAsk.evaluate(() => document.querySelector('[data-view="track32-bookshelf.html"]')?.click());
-      await pageAsk.waitForFunction(() => { const f = document.getElementById('view'); try { return !f.hidden && f.contentWindow.location.pathname.endsWith('/track32-bookshelf.html') && !!f.contentDocument.querySelector('#shelfRail .book-card'); } catch { return false; } }, null, { timeout: 15000 });
+      await pageAsk.waitForFunction(() => { const f = document.getElementById('view'), doc = f?.contentDocument; return !!f && !f.hidden && !!doc && new URL(doc.URL).pathname.endsWith('/track32-bookshelf.html') && !!doc.querySelector('#shelfRail .book-card'); }, null, { timeout: 15000 });
       await pageAsk.waitForTimeout(800);
       return pageAsk.frameLocator('#view').locator('#shelfRail .book-card .book-discover');
     };
@@ -1153,7 +1156,7 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
       // 서재: 소개하지 않은 트리에는 아무 표시가 없다. 공유 판은 원래처럼 첫 화면 위에서 잰다.
       assert.equal(await (await shelfBadge(pageAsk)).count(), 0, '소개 안 된 트리는 서재 카드에 표시가 없다');
       await pageAsk.evaluate(() => document.querySelector('.app-header .brand')?.click());
-      await pageAsk.waitForFunction(() => { const f = document.getElementById('view'); try { return !f.hidden && /home/.test(f.contentWindow.location.pathname) && f.contentDocument.readyState === 'complete'; } catch { return false; } }, null, { timeout: 15000 });
+      await pageAsk.waitForFunction(() => { const f = document.getElementById('view'), doc = f?.contentDocument; return !!f && !f.hidden && !!doc && /home/.test(new URL(doc.URL).pathname) && doc.readyState === 'complete'; }, null, { timeout: 15000 });
       await pageAsk.waitForTimeout(800);
       // 공유 판: '둘러보기 소개' 줄이 공개 설정의 맨 위이고, 설명이 바로 아래(이름·아이디·이메일 안 보임).
       await pageAsk.evaluate(() => document.getElementById('share-menu')?.click());
@@ -1659,12 +1662,10 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
       for (const f of page5b.frames()) {
         if (f === page5b.mainFrame()) continue;
         let ok = false;
-        try {
-          ok = await Promise.race([
-            f.evaluate(() => document.documentElement.getBoundingClientRect().width > 0 && Boolean(document.getElementById('orbit')?.shadowRoot?.querySelector('[data-do=moments],[data-do=index]'))),
-            page5b.waitForTimeout(2000).then(() => false)
-          ]);
-        } catch { ok = false; }
+        ok = await Promise.race([
+          f.evaluate(() => { const root = document.documentElement, body = document.body; return !!root && !!body && root.getBoundingClientRect().width > 0 && Boolean(document.getElementById('orbit')?.shadowRoot?.querySelector('[data-do=moments],[data-do=index]')); }),
+          page5b.waitForTimeout(2000).then(() => false)
+        ]);
         if (ok) return f;
       }
       return null;
@@ -1992,9 +1993,11 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     // #1095: 시간 순은 지도 프레임 안에서 그리는 보기다(별도 그래프 화면으로 이동하지 않는다).
     await (await tripMapFrame('지도 시간 순: 지도 프레임')).evaluate(() => document.getElementById('viewGraph').click());
     await pageMap.waitForTimeout(600);
-    const tripGraph = await (await tripMapFrame('시간 순 상태 확인')).evaluate(() => {
+    const tripGraph = await evaluateWhenReady(await tripMapFrame('시간 순 상태 확인'), () => {
+      const body = document.body;
+      if (!body) return false;
       const b = [...document.querySelectorAll('.view-switch .pill')];
-      return { n: b.length, pressed: b.map((x) => x.getAttribute('aria-pressed')), view: document.body.dataset.ltView, stored: localStorage.getItem('lt41.network.view') };
+      return { n: b.length, pressed: b.map((x) => x.getAttribute('aria-pressed')), view: body.dataset.ltView, stored: localStorage.getItem('lt41.network.view') };
     });
     assert.equal(tripGraph.n, 3, '지도 머리줄 보기 고르기 세 단추');
     assert.deepEqual(tripGraph.pressed, ['false', 'false', 'true'], '현재 보기(시간 순)만 aria-pressed=true');
@@ -2005,15 +2008,24 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     await (await tripMapFrame('시간 순→묶음: 지도 프레임')).evaluate(() => document.getElementById('viewConc').click());
     await pageMap.waitForFunction(() => {
       const f = [...document.querySelectorAll('iframe')].find((x) => { try { return /track56-network/.test(x.contentWindow.location.href); } catch { return false; } });
-      return Boolean(f && f.contentDocument?.body && f.contentDocument.body.dataset.ltView === 'tag');
+      const doc = f?.contentDocument;
+      return !!doc?.body && doc.body.dataset.ltView === 'tag';
     }, null, { timeout: 10000 });
-    const mapAfterConc = await (await tripMapFrame('동심원 복귀: 지도 프레임')).evaluate(() => ({ view: document.body.dataset.ltView, concPressed: document.getElementById('viewConc')?.getAttribute('aria-pressed'), stored: localStorage.getItem('lt41.network.view') }));
+    const mapAfterConc = await evaluateWhenReady(await tripMapFrame('동심원 복귀: 지도 프레임'), () => {
+      const body = document.body;
+      if (!body) return false;
+      return { view: body.dataset.ltView, concPressed: document.getElementById('viewConc')?.getAttribute('aria-pressed'), stored: localStorage.getItem('lt41.network.view') };
+    });
     assert.equal(mapAfterConc.view, 'tag', '그래프의 [묶음]으로 지도가 꼬리표 묶음 보기로 열린다');
     assert.equal(mapAfterConc.concPressed, 'true', '묶음이 눌린 상태(aria-pressed=true)');
     assert.equal(mapAfterConc.stored, 'tag', '지도 보기 저장 키(lt41.network.view)가 바뀐다');
     await (await tripMapFrame('그물 복귀 누르기: 지도 프레임')).evaluate(() => document.getElementById('viewNet').click());
     const treeAfterTrip = await pageMap.evaluate(() => ({ id: window.LT41?.tree?.id || '', moments: (window.LT41?.tree?.moments || []).length, momentId: window.LT41?.momentId || '' }));
-    const mapAfterNet = await (await readyFrame(pageMap, /track56-network/, { root: '#mapMain', view: 'network', timeout: 45000, why: '그물 복귀 확인: 지도 프레임이 다시 붙고 준비될 때까지' })).evaluate(() => ({ view: document.body.dataset.ltView, netPressed: document.getElementById('viewNet')?.getAttribute('aria-pressed') }));
+    const mapAfterNet = await evaluateWhenReady(await readyFrame(pageMap, /track56-network/, { root: '#mapMain', view: 'network', timeout: 45000, why: '그물 복귀 확인: 지도 프레임이 다시 붙고 준비될 때까지' }), () => {
+      const body = document.body;
+      if (!body) return false;
+      return { view: body.dataset.ltView, netPressed: document.getElementById('viewNet')?.getAttribute('aria-pressed') };
+    });
     assert.equal(mapAfterNet.view, 'network', '지도의 [그물형]으로 그물 보기로 돌아온다');
     assert.equal(mapAfterNet.netPressed, 'true', '그물형이 눌린 상태(aria-pressed=true)');
     assert.deepEqual(treeAfterTrip, treeBeforeTrip, '왕복 뒤에도 지금 트리·순간이 유지된다');
@@ -2048,23 +2060,26 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     assert.ok(graphFrame, '그래프 프레임이 열린다');
     await page7.waitForTimeout(700);
     // 2026-11-16 대표 결정: 그래프 머리줄에도 지도와 같은 모양의 보기 고르기가 있고 그래프가 눌린 상태다.
-    const graphSwitch = await graphFrame.evaluate(() => {
+    const graphSwitch = await evaluateWhenReady(graphFrame, () => {
+      const root = document.documentElement;
+      if (!root) return false;
       const b = [...document.querySelectorAll('.g-view-switch .pill')];
       return {
         n: b.length,
         labels: b.map((x) => x.textContent.trim()),
         pressed: b.map((x) => x.getAttribute('aria-pressed')),
-        overflow: Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth)
+        overflow: Math.max(0, root.scrollWidth - root.clientWidth)
       };
-    }).catch(() => null);
+    });
     assert.ok(graphSwitch, '그래프 머리줄 보기 고르기를 잰다');
     assert.deepEqual(graphSwitch.labels, ['이어진 길', '묶음', '시간 순'], `보기 고르기 세 단추(실제 ${JSON.stringify(graphSwitch.labels)})`);
     assert.deepEqual(graphSwitch.pressed, ['false', 'false', 'true'], '현재 보기(그래프)만 aria-pressed=true');
     assert.equal(graphSwitch.overflow, 0, `그래프 머리줄에서 가로 넘침 0(실제 ${graphSwitch.overflow})`);
     await take(page7, '그래프 보기');
-    const graphCheck = await page7.evaluate(() => {
+    const graphCheck = await evaluateWhenReady(page7, () => {
       const f = [...document.querySelectorAll('iframe')].at(-1);
-      const doc = f.contentDocument;
+      const doc = f?.contentDocument;
+      if (!doc?.documentElement) return false;
       const names = [...doc.querySelectorAll('.g-hubname')];
       const boxes = names.map((x) => x.getBoundingClientRect());
       let hubPairs = 0;
@@ -2139,9 +2154,10 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     assert.ok(graphCheck.stacks.length >= 1, `같은 영상·같은 무대 무더기 개수가 표시된다(실제 ${JSON.stringify(graphCheck.stacks)})`);
     assert.match(graphCheck.badge, /순간 17/, '표시에 순간 수가 있다');
     // CTO 지적(#713 후속): 검사기가 이름 상자끼리만 재었다 — 이름↔허브 점·이름↔'처음/지금'·'×N'↔점도 0이어야 한다.
-    const graphTouch = await page7.evaluate(() => {
+    const graphTouch = await evaluateWhenReady(page7, () => {
       const f = [...document.querySelectorAll('iframe')].at(-1);
-      const doc = f.contentDocument;
+      const doc = f?.contentDocument;
+      if (!doc) return false;
       const rect = (x) => x.getBoundingClientRect().toJSON();
       const hit = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
       const out = { nameOnDot: [], nameOnMark: [], countOnDot: [] };
@@ -2167,14 +2183,23 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     assert.match(graphCheck.badge, /순간 17/, '표시에 순간 수가 있다');
     // #627 3단계: 허브 상세의 '같은 노래를 담은 다른 팬' 칸 — 가짜 응답(무대=5건·AI 1건, 그 외=빈 응답)으로
     // 3개 미리보기·AI 명예회원 표시·'더 보기'·빈 상태 문구·판 안 배치(겹침·넘침 0)를 단정한다.
-    const fansCheck = await page7.evaluate(async () => {
+    await evaluateWhenReady(page7, () => {
       const f = [...document.querySelectorAll('iframe')].at(-1);
-      const doc = f.contentDocument;
-      const hub = [...doc.querySelectorAll('#gsvg g[role="button"]')].find((g) => (g.getAttribute('aria-label') || '').startsWith('무대'));
-      hub?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-      await new Promise((res) => setTimeout(res, 700));
+      const doc = f?.contentDocument;
+      const hub = [...(doc?.querySelectorAll('#gsvg g[role="button"]') || [])].find((g) => (g.getAttribute('aria-label') || '').startsWith('무대'));
+      if (!hub || !doc.getElementById('detailCard')) return false;
+      hub.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      return true;
+    });
+    await page7.waitForTimeout(700);
+    const fansCheck = await evaluateWhenReady(page7, () => {
+      const f = [...document.querySelectorAll('iframe')].at(-1);
+      const doc = f?.contentDocument;
+      if (!doc?.documentElement) return false;
       const box = doc.querySelector('.d-fans');
-      const cardR = doc.getElementById('detailCard').getBoundingClientRect();
+      const card = doc.getElementById('detailCard');
+      if (!card) return false;
+      const cardR = card.getBoundingClientRect();
       const rows = box ? [...box.children].filter((x) => x.querySelector?.('.d-fans-row')) : [];
       const rowRects = rows.map((x) => x.getBoundingClientRect());
       let rowPairs = 0;
@@ -2204,20 +2229,35 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     assert.ok(fansCheck.links.every((l) => l.startsWith('/t/')), `줄이 공개 트리 링크(/t/…)다: ${JSON.stringify(fansCheck.links)}`);
     assert.ok(fansCheck.thumbs >= 1, '썸네일 줄이 있다(썸네일 없는 줄은 자리를 비우지 않는다)');
     assert.match(fansCheck.more, /더 보기/, "나머지는 '더 보기'로");
-    const afterMore = await page7.evaluate(async () => {
+    await evaluateWhenReady(page7, () => {
       const f = [...document.querySelectorAll('iframe')].at(-1);
-      const doc = f.contentDocument;
-      doc.querySelector('.d-fans-more')?.click();
-      await new Promise((res) => setTimeout(res, 250));
+      const doc = f?.contentDocument;
+      const more = doc?.querySelector('.d-fans-more');
+      if (!more) return false;
+      more.click();
+      return true;
+    });
+    await page7.waitForTimeout(250);
+    const afterMore = await evaluateWhenReady(page7, () => {
+      const f = [...document.querySelectorAll('iframe')].at(-1);
+      const doc = f?.contentDocument;
+      if (!doc) return false;
       return [...doc.querySelectorAll('.d-fans > li')].filter((x) => x.querySelector('.d-fans-row')).length;
     });
     assert.equal(afterMore, 5, `'더 보기'로 나머지가 보인다(실제 ${afterMore})`);
-    const emptyCheck = await page7.evaluate(async () => {
+    await evaluateWhenReady(page7, () => {
       const f = [...document.querySelectorAll('iframe')].at(-1);
-      const doc = f.contentDocument;
-      const hub = [...doc.querySelectorAll('#gsvg g[role="button"]')].find((g) => (g.getAttribute('aria-label') || '').startsWith('노래'));
-      hub?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-      await new Promise((res) => setTimeout(res, 700));
+      const doc = f?.contentDocument;
+      const hub = [...(doc?.querySelectorAll('#gsvg g[role="button"]') || [])].find((g) => (g.getAttribute('aria-label') || '').startsWith('노래'));
+      if (!hub) return false;
+      hub.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      return true;
+    });
+    await page7.waitForTimeout(700);
+    const emptyCheck = await evaluateWhenReady(page7, () => {
+      const f = [...document.querySelectorAll('iframe')].at(-1);
+      const doc = f?.contentDocument;
+      if (!doc?.documentElement) return false;
       return {
         empty: doc.querySelector('.d-fans-empty')?.textContent || '',
         head: doc.querySelector('.d-fanshead')?.textContent || '',
@@ -2247,7 +2287,10 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     // 프레임이 열렸어도 주소가 틀리면 배포가 4.0 첫 화면으로 되돌려 준다(2026-11-16 보고) — 문서 표시까지 본다.
     // 의견 #26 수정으로 트리 값이 쿼리에 붙을 수 있다 — 하위 폴더 경로 자체는 그대로다.
     assert.match(graphByHash.url(), /views\/graph\/track60-graph\.html(?:\?|$)/, '#my/graph 프레임 주소에 그래프 하위 폴더가 있다');
-    assert.equal(await graphByHash.evaluate(() => document.documentElement.getAttribute('data-v41-screen')), 'graph', '#my/graph 프레임 문서가 그래프 화면이다');
+    assert.equal(await evaluateWhenReady(graphByHash, () => {
+      const root = document.documentElement;
+      return root ? root.getAttribute('data-v41-screen') : false;
+    }), 'graph', '#my/graph 프레임 문서가 그래프 화면이다');
     await ctx8.close();
     }
 
@@ -2277,9 +2320,12 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
        가짜 결함을 냈다. 그래서 '지금 보이는 장'(frameElement가 hidden·inert가 아닌 장)만 고르고, 재는 사이에
        장이 바뀌면(hiddenFrame) 다시 고른다 — 단정 기준(3줄·같은 줄·겹침·넘침)은 그대로다. */
     const measureCards = () => {
+      const root = document.documentElement;
+      if (!root) return false;
       const fe = window.frameElement;
       if (!fe || fe.hidden || fe.hasAttribute('inert')) return { hiddenFrame: true, cards: 0, bad: [], overflow: 0 };
-      const sh = document.getElementById('orbit').shadowRoot;
+      const sh = document.getElementById('orbit')?.shadowRoot;
+      if (!sh) return false;
       const cards = [...sh.querySelectorAll('.card .lt-fallback-card, .recent-media .lt-fallback-card')];
       const bad = [];
       for (const card of cards) {
@@ -2314,7 +2360,7 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
         const oy = Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
         if (ox * oy > 0) bad.push(`'첫 순간' 배지와 감정 칩이 겹친다(${Math.round(ox * oy)}px²)`);
       }
-      return { cards: cards.length, bad, overflow: Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth) };
+      return { cards: cards.length, bad, overflow: Math.max(0, root.scrollWidth - root.clientWidth) };
     };
     for (let i = 0; i < 80 && !cardCheck; i++) {
       for (const fr of page9.frames()) {
@@ -2380,7 +2426,10 @@ test('#my/graph는 로그인 진입·로그인 왕복·hash 이동 세 경우 �
   };
   const graphState = async (page) => {
     const f = await frameOf(page, GRAPH_FRAME);
-    const screen = f ? await f.evaluate(() => document.documentElement.getAttribute('data-v41-screen') || '') : '';
+    const screen = f ? await evaluateWhenReady(f, () => {
+      const root = document.documentElement;
+      return root?.getAttribute('data-v41-screen') === 'graph' ? 'graph' : false;
+    }) : '';
     return { frame: f ? f.url() : '(프레임 없음)', screen, hash: await page.evaluate(() => location.hash) };
   };
   try {
@@ -2835,7 +2884,12 @@ test('#972 서재·책 상세·둘러보기·새 소식 화면 치수', { skip: 
         const page = await ctx.newPage();
         await page.goto(`${base}/v41/#shelf`);
         await page.waitForFunction(() => document.querySelector('#view')?.contentDocument?.querySelector('.book-card')?.getBoundingClientRect().width > 0);
-        const shelf = await page.frameLocator('#view').locator('.shelf-screen').evaluate(async el => {
+        const shelfFrame = page.frames().find(f => /track32-bookshelf/.test(f.url()));
+        assert.ok(shelfFrame, '서재 프레임을 찾는다');
+        const shelf = await evaluateWhenReady(shelfFrame, async () => {
+          const root = document.documentElement;
+          const el = document.querySelector('.shelf-screen');
+          if (!root || !el) return false;
           // 레일 크기 재계산과 책의 이동 효과가 끝난 실제 배치에서 측정한다.
           await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
           await Promise.allSettled(el.getAnimations({ subtree: true })
@@ -2850,7 +2904,7 @@ test('#972 서재·책 상세·둘러보기·새 소식 화면 치수', { skip: 
             innerGap: cover.top - s.top,
             cardToBase: base.top - card.bottom, firstLeft: card.left - rail.left,
             arrows: [...el.querySelectorAll('.shelf-arrow')].filter(n => !n.hidden).length,
-            overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth };
+            overflow: root.scrollWidth - root.clientWidth };
         });
         assert.equal(shelf.count, 1);
         assert.ok(shelf.upper >= 0 && shelf.upper <= 48, `${theme}/${width}: 펼쳐 보기 아래 여백 ${shelf.upper}px`);
@@ -2986,11 +3040,12 @@ test('#987 보드 첫 줄과 모바일 셸 겹침·현재 표시', { skip: REQUI
       for (const width of [360, 375, 390]) await withPage(width, 844, theme, 8, async (page, snap) => {
         await clickToolbarTreeChoice(page);
         await page.waitForFunction(() => !document.getElementById('tree-popover')?.hidden, null, { timeout: 5000 });
-        const header = await page.evaluate(() => {
+        const header = await evaluateWhenReady(page, () => {
           const frame = document.querySelector('iframe#view');
           const doc = frame?.contentDocument;
           const t = doc?.querySelector('button.lt-toolbar-tree-choice');
           const s = document.querySelector('#theme-toggle'), a = t?.querySelector('.lt-toolbar-tree-caret');
+          if (!frame || !doc || !t || !s || !a) return false;
           const b = t.getBoundingClientRect(), c = s.getBoundingClientRect(), d = a.getBoundingClientRect(), fr = frame.getBoundingClientRect();
           const hit = doc.elementFromPoint(d.x + d.width/2, d.y + d.height/2);
           const overlap = Math.max(0, Math.min(b.right+fr.left,c.right)-Math.max(b.left+fr.left,c.left))*
@@ -3014,9 +3069,12 @@ test('#987 보드 첫 줄과 모바일 셸 겹침·현재 표시', { skip: REQUI
         await page.frameLocator('#view').locator('.moment[data-moment]').first().waitFor();
         // #1078: 한마디 줄 오른쪽 끝이 ＋ 단추에 덮이지 않는다(상세 창을 열기 전, 단추가 보이는 자리에서 잰다).
         await page.waitForTimeout(250);
-        const story = await page.evaluate(() => {
-          const f = document.querySelector('#view'), r = f.getBoundingClientRect();
-          const el = f.contentDocument.querySelector('#whyMargin [data-story-open]');
+        const story = await evaluateWhenReady(page, () => {
+          const f = document.querySelector('#view');
+          const doc = f?.contentDocument;
+          if (!doc?.documentElement || doc.readyState !== 'complete') return false;
+          const r = f.getBoundingClientRect();
+          const el = doc.querySelector('#whyMargin [data-story-open]');
           const fab = document.getElementById('mobile-add');
           if (!el || !fab || !fab.getBoundingClientRect().width) return { skipped: true };
           const d = el.getBoundingClientRect(), a = fab.getBoundingClientRect();
@@ -3031,8 +3089,13 @@ test('#987 보드 첫 줄과 모바일 셸 겹침·현재 표시', { skip: REQUI
         await frame.evaluate(() => { const c = [...document.querySelectorAll('.moment[data-moment]')].find(e => e.getBoundingClientRect().width > 0); showDetail(c.dataset.moment); });
         await frame.locator('#detailSide:not([hidden])').waitFor();
         await page.waitForTimeout(200);
-        const detail = await page.evaluate(() => {
-          const f = document.querySelector('#view'), r = f.getBoundingClientRect(), d = f.contentDocument.querySelector('#detailSide').getBoundingClientRect(), a = document.querySelector('#mobile-add').getBoundingClientRect();
+        const detail = await evaluateWhenReady(page, () => {
+          const f = document.querySelector('#view');
+          const doc = f?.contentDocument;
+          const side = doc?.querySelector('#detailSide');
+          const add = document.querySelector('#mobile-add');
+          if (!f || !side || !add) return false;
+          const r = f.getBoundingClientRect(), d = side.getBoundingClientRect(), a = add.getBoundingClientRect();
           return { overlap: Math.max(0,Math.min(r.x+d.right,a.right)-Math.max(r.x+d.left,a.left))*Math.max(0,Math.min(r.y+d.bottom,a.bottom)-Math.max(r.y+d.top,a.top)), fabWidth: a.width, detailWidth: d.width };
         });
         console.log('#987 book', theme, JSON.stringify(detail));
@@ -3119,12 +3182,15 @@ test('#1094 390 목록 첫 화면 아래 링크 × 책 속의 트리 겹침 0', 
         await frame.waitForFunction(() => document.querySelector('#readerScreen')?.classList.contains('active'));
         await frame.locator('.info-rule').waitFor();
         await page.waitForTimeout(700);
-        const m = await page.evaluate(() => {
-          const f = document.getElementById('view'), fr = f.getBoundingClientRect(), d = f.contentDocument;
+        const m = await evaluateWhenReady(page, () => {
+          const f = document.getElementById('view'), doc = f?.contentDocument;
+          const box = doc?.querySelector('.info-rule'), screen = doc?.querySelector('#readerScreen');
+          if (!f || !box || !screen) return false;
+          const fr = f.getBoundingClientRect(), d = doc;
           const links = document.querySelector('.home-links'), ls = getComputedStyle(links), lr = links.getBoundingClientRect();
           const linksShown = ls.display !== 'none' && ls.visibility !== 'hidden' && lr.width > 0 && lr.height > 0;
-          const box = d.querySelector('.info-rule'), br = box.getBoundingClientRect();
-          const screen = d.querySelector('#readerScreen'), sr = screen.getBoundingClientRect();
+          const br = box.getBoundingClientRect();
+          const sr = screen.getBoundingClientRect();
           const clip = { left: Math.max(fr.left, fr.left + sr.left), right: Math.min(fr.right, fr.left + sr.right), top: Math.max(fr.top, fr.top + sr.top), bottom: Math.min(fr.bottom, fr.top + sr.bottom) };
           const shown = { left: Math.max(fr.left + br.left, clip.left), right: Math.min(fr.left + br.right, clip.right), top: Math.max(fr.top + br.top, clip.top), bottom: Math.min(fr.top + br.bottom, clip.bottom) };
           const overlap = linksShown
@@ -3170,10 +3236,12 @@ test('#1093 선반 40권 아래 링크와 책 겹침 0', { skip: REQUIRE ? false
         const frame = await (await page.locator('#view').elementHandle()).contentFrame();
         await frame.waitForSelector('.book-card', { timeout: 10000 });
         await page.waitForTimeout(500);
-        const m = await page.evaluate(() => {
+        const m = await evaluateWhenReady(page, () => {
           const links = document.querySelector('.home-links');
           const ls = getComputedStyle(links);
-          const f = document.getElementById('view'), fr = f.getBoundingClientRect(), d = f.contentDocument;
+          const f = document.getElementById('view'), d = f?.contentDocument;
+          if (!d) return false;
+          const fr = f.getBoundingClientRect();
           const lr = links.getBoundingClientRect();
           let overlap = 0, cards = 0;
           for (const card of d.querySelectorAll('#shelfRail .book-card')) {
@@ -3470,9 +3538,10 @@ test('화면 전환 단추 중복 0: 서재·책·보드 1440·390 밤·정원',
          return !!bar&&!!bar.querySelector('.lt-toolbar-tools')&&doc.querySelectorAll('.view-toggle,.boardModeSwitch,.shelf-view-inline').length>0;
        }catch{return false}
      },null,{timeout:20000});
-    const result=await page.evaluate(()=>{
+    const result=await evaluateWhenReady(page,()=>{
       const frame=[...document.querySelectorAll('#view,#view-next')].find(f=>!f.hidden&&f.getClientRects().length>0);
-      const inner=frame.contentDocument;
+      const inner=frame?.contentDocument;
+      if(!inner)return false;
       const visible=el=>{
         if(!el||el.hidden||el.getClientRects().length===0)return false;
         const box=el.getBoundingClientRect();
@@ -3601,7 +3670,9 @@ test('#1489 도구 줄: 다섯 화면 위끝 차 0px·누름 44px 이상·긴 �
         const frame = await (await page.$('#view')).contentFrame();
         await frame.waitForSelector('.lt-toolbar-tree-choice',{state:'visible',timeout:15000});
         const offset = (await page.locator('iframe#view').boundingBox()).y;
-        const value = await frame.evaluate(() => {
+        const value = await evaluateWhenReady(frame, () => {
+          const root = document.documentElement;
+          if (!root) return false;
           const bar = document.querySelector('.lt-screen-toolbar');
           const barRect = bar.getBoundingClientRect();
           const buttons = [...bar.querySelectorAll('button')].filter((b) => { const r = b.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(b).visibility !== 'hidden'; });
@@ -3617,10 +3688,12 @@ test('#1489 도구 줄: 다섯 화면 위끝 차 0px·누름 44px 이상·긴 �
           const name = bar.querySelector('.lt-toolbar-tree-name');
           const cr = choice && choice.getBoundingClientRect();
           return { top: barRect.top, hit, choiceRight: cr && cr.right, barRight: barRect.right, nameText: name ? name.textContent : '',
-            pressed: choice && choice.getAttribute('aria-pressed'), overflowX: document.documentElement.scrollWidth - document.documentElement.clientWidth };
+            pressed: choice && choice.getAttribute('aria-pressed'), overflowX: root.scrollWidth - root.clientWidth };
         });
         // #1526: 공통 선택 표시와 실제 간격을 검증한다.
-        const styles = await frame.evaluate(() => {
+        const styles = await evaluateWhenReady(frame, () => {
+          const root = document.documentElement;
+          if (!root) return false;
           const bar = document.querySelector('.lt-screen-toolbar');
           const more = bar.querySelector('.lt-toolbar-more');
           if (more && !more.hidden) more.click();
@@ -3630,7 +3703,7 @@ test('#1489 도구 줄: 다섯 화면 위끝 차 0px·누름 44px 이상·긴 �
             const c = getComputedStyle(e), r = e.getBoundingClientRect();
             let bg = e;
             while (bg && getComputedStyle(bg).backgroundColor === 'rgba(0, 0, 0, 0)') bg = bg.parentElement;
-            const background = bg ? getComputedStyle(bg).backgroundColor : getComputedStyle(document.documentElement).backgroundColor;
+            const background = bg ? getComputedStyle(bg).backgroundColor : getComputedStyle(root).backgroundColor;
             return { color:c.color, background:c.backgroundColor, effectiveBg:background, border:c.borderTopColor, borderWidth:c.borderTopWidth, height:r.height, x:r.x, right:r.right, group:e.matches(groupSelector) };
           };
           const selected = [...bar.querySelectorAll(groupSelector)].filter(visible).flatMap(g=>[...g.querySelectorAll('button:is([aria-pressed=true],[aria-checked=true])')].filter(visible).map(read));
@@ -3676,7 +3749,12 @@ test('#1489 도구 줄: 다섯 화면 위끝 차 0px·누름 44px 이상·긴 �
           const idle = await pick.evaluate((b) => getComputedStyle(b).boxShadow);
           await pick.hover();
           await page.waitForTimeout(300);
-          const over = await pick.evaluate((b) => { const s = getComputedStyle(b); const probe = document.createElement('i'); probe.style.borderColor = 'var(--lt-role-hover-border)'; probe.style.borderStyle = 'solid'; document.body.append(probe); const want = getComputedStyle(probe).borderColor; probe.remove(); return { border: s.borderColor, shadow: s.boxShadow, want }; });
+          const over = await evaluateWhenReady(frame, () => {
+            const b = document.querySelector('button.lt-toolbar-tree-choice');
+            const body = document.body;
+            if (!b || !body) return false;
+            const s = getComputedStyle(b); const probe = document.createElement('i'); probe.style.borderColor = 'var(--lt-role-hover-border)'; probe.style.borderStyle = 'solid'; body.append(probe); const want = getComputedStyle(probe).borderColor; probe.remove(); return { border: s.borderColor, shadow: s.boxShadow, want };
+          });
           assert.equal(idle, 'none', tag + ' 올리지 않았는데 고리가 있다: ' + idle);
           assert.ok(over.shadow !== 'none' && over.shadow.includes(over.want), tag + ' 고른 트리 고르기에 마우스를 올려도 올림 테두리(고리)가 안 보인다: ' + over.shadow);
           await page.mouse.move(2,400);
@@ -3757,10 +3835,13 @@ test('#1084 세로 영상 첫 화면의 미디어 칸에는 회색 여백이 없
           const m = document.querySelector('#view')?.contentDocument?.getElementById('orbit')?.shadowRoot?.querySelector('.recent-media.vertical');
           return m?.dataset.recentState === 'ready' && m.querySelector('img')?.naturalWidth > 0;
         }, null, {timeout: 15000});
-        const geometry = await page.evaluate(() => {
-          const m = document.querySelector('#view').contentDocument.getElementById('orbit').shadowRoot.querySelector('.recent-media.vertical');
-          const doc = m.ownerDocument, pre = doc.defaultView.getComputedStyle(m, '::before'), r = m.getBoundingClientRect();
-          return {media: [r.width, r.height], background: doc.defaultView.getComputedStyle(m).backgroundColor, pseudo: {width: Number.parseFloat(pre.width), height: Number.parseFloat(pre.height), image: pre.backgroundImage, blur: pre.filter}, imageFit: doc.defaultView.getComputedStyle(m.querySelector('img')).objectFit};
+        const geometry = await evaluateWhenReady(page, () => {
+          const doc = document.querySelector('#view')?.contentDocument;
+          const m = doc?.getElementById('orbit')?.shadowRoot?.querySelector('.recent-media.vertical');
+          const image = m?.querySelector('img');
+          if (!m || !image) return false;
+          const pre = doc.defaultView.getComputedStyle(m, '::before'), r = m.getBoundingClientRect();
+          return {media: [r.width, r.height], background: doc.defaultView.getComputedStyle(m).backgroundColor, pseudo: {width: Number.parseFloat(pre.width), height: Number.parseFloat(pre.height), image: pre.backgroundImage, blur: pre.filter}, imageFit: doc.defaultView.getComputedStyle(image).objectFit};
         });
         assert.ok(geometry.pseudo.image.includes('url(') && geometry.pseudo.blur.includes('blur('), '세로 썸네일 흐림 층이 있어야 한다');
         assert.ok(geometry.pseudo.width >= geometry.media[0] && geometry.pseudo.height >= geometry.media[1], '흐림 층이 미디어 칸 전체를 덮는다: ' + JSON.stringify(geometry));
@@ -3800,15 +3881,21 @@ test('#1084 세로 영상 첫 화면의 미디어 칸에는 회색 여백이 없
           await media.locator('.recent-frame').waitFor({state:'detached', timeout: 3000});
 
           // 순간 목록과 궤도 카드 상세도 같은 썸네일을 사용한다.
-          await page.evaluate(() => {
-            const root = document.querySelector('#view').contentDocument.getElementById('orbit').shadowRoot;
-            root.querySelector('[data-do=moments]').click();
+          await evaluateWhenReady(page, () => {
+            const root = document.querySelector('#view')?.contentDocument?.getElementById('orbit')?.shadowRoot;
+            const button = root?.querySelector('[data-do=moments]');
+            if (!button) return false;
+            button.click();
+            return true;
           });
           for (const slot of ['moment-list', 'orbit-detail']) {
             if (slot === 'orbit-detail') {
-              await page.evaluate(() => {
-                const root = document.querySelector('#view').contentDocument.getElementById('orbit').shadowRoot;
-                root.querySelector('.orbit-dialog[open] [data-next]').click();
+              await evaluateWhenReady(page, () => {
+                const root = document.querySelector('#view')?.contentDocument?.getElementById('orbit')?.shadowRoot;
+                const button = root?.querySelector('.orbit-dialog[open] [data-next]');
+                if (!button) return false;
+                button.click();
+                return true;
               });
             }
             const locator = page.frameLocator('#view').locator(slot === 'moment-list'
@@ -3834,9 +3921,12 @@ test('#1084 세로 영상 첫 화면의 미디어 칸에는 회색 여백이 없
             console.log('#1084 공용', slot, JSON.stringify({...info, gray: count}));
             assert.equal(count, 0, slot + ': 미디어 칸 회청색 픽셀 0');
           }
-          await page.evaluate(() => {
-            const root = document.querySelector('#view').contentDocument.getElementById('orbit').shadowRoot;
-            root.querySelector('.orbit-dialog[open] [data-do=close]').click();
+          await evaluateWhenReady(page, () => {
+            const root = document.querySelector('#view')?.contentDocument?.getElementById('orbit')?.shadowRoot;
+            const button = root?.querySelector('.orbit-dialog[open] [data-do=close]');
+            if (!button) return false;
+            button.click();
+            return true;
           });
           for (const slot of ['book', 'board']) {
             await page.evaluate(({id, slot}) => { location.hash = 'my/' + slot + '?tree=' + id; }, {id: tree.id, slot});
@@ -3962,22 +4052,22 @@ test('#1362 확장: 여섯 화면 선택 탭 채움·쉬는 테두리 역할 변
         await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
         const label = `${width}·${theme}`;
         if (width === 390) {
-          const shellLook = await page.evaluate(new Function('selectors', 'return (' + roleFn + ')(selectors);'), ['.tree-frame .tree-views>button[aria-current="true"]', '.tree-frame .tree-views>button[aria-current="false"]']);
+          const shellLook = await evaluateWhenReady(page, new Function('selectors', 'return (' + roleFn + ')(selectors);'), ['.tree-frame .tree-views>button[aria-current="true"]', '.tree-frame .tree-views>button[aria-current="false"]']);
           assertOutlinePair(assert, pairs, label + '·머리줄 탭', shellLook.vars, shellLook.looks['.tree-frame .tree-views>button[aria-current="true"]'], shellLook.looks['.tree-frame .tree-views>button[aria-current="false"]'], '--lt-role-line');
         }
         for (const [name, hash, file, selected, idle] of screens) {
           await page.evaluate((h) => { location.hash = h; }, hash);
           await page.waitForFunction((f) => [...document.querySelectorAll('#stage iframe')].some((el) => !el.hidden && el.contentWindow?.location?.href.includes(f)), file, { timeout: 20000 });
           const frame = await (await page.$('#view:not([hidden])')).contentFrame();
-          const look = await frame.evaluate(new Function('selectors', 'return (' + roleFn + ')(selectors);'), [selected, idle]);
+          const look = await evaluateWhenReady(frame, new Function('selectors', 'return (' + roleFn + ')(selectors);'), [selected, idle]);
           assertOutlinePair(assert, pairs, label + '·' + name, look.vars, look.looks[selected], look.looks[idle], '--lt-role-line');
         }
         await page.evaluate(() => document.getElementById('share-panel').showModal());
-        const share = await page.evaluate(new Function('selectors', 'return (' + roleFn + ')(selectors);'), ['#share-steps li[data-state="current"]', '#share-steps li[data-state="todo"]']);
+        const share = await evaluateWhenReady(page, new Function('selectors', 'return (' + roleFn + ')(selectors);'), ['#share-steps li[data-state="current"]', '#share-steps li[data-state="todo"]']);
         assertRolePair(assert, pairs, label + '·공유 감상', share.vars, share.looks['#share-steps li[data-state="current"]'], share.looks['#share-steps li[data-state="todo"]'], '--lt-role-line');
         await page.evaluate(() => document.getElementById('share-panel').close());
         if (width === 390) { await page.locator('#mobile-more').click(); await page.locator('#header-overflow button.lt-discover-item').click(); } else await page.locator('#community-menu').click();
-        const explore = await page.evaluate(new Function('selectors', 'return (' + roleFn + ')(selectors);'), ['#community-tab-trees', '#community-tab-moments']);
+        const explore = await evaluateWhenReady(page, new Function('selectors', 'return (' + roleFn + ')(selectors);'), ['#community-tab-trees', '#community-tab-moments']);
         assertRolePair(assert, pairs, label + '·둘러보기', explore.vars, explore.looks['#community-tab-trees'], explore.looks['#community-tab-moments'], '--lt-role-line');
       } finally { await ctx.close(); }
     }

@@ -14,6 +14,7 @@ import { SHELF_VIEW_NAMES } from '../public/v41/views/shelf/shelf-views.mjs';
 import { createTree, addMoment } from '../public/v41/domain.mjs';
 import { localDateOnly, localDaysBetween, relativeDayLabel } from '../public/v41/local-date.mjs';
 import { formatDisplayDate } from '../public/v41/book-usability.mjs';
+import { evaluateWhenReady } from './helpers/visible-frame.mjs';
 
 const REQUIRE = process.env.LT_970_REQUIRE === '1';
 let chromium, skip = false;
@@ -89,7 +90,12 @@ async function withShelfSession(fn) {
       setViewport: async (width, height) => { await page.setViewportSize({ width, height }); await page.waitForTimeout(600); },
       setTheme: async (name) => {
         await page.evaluate((theme) => window.LT41_THEME_REGISTRY.apply(document.documentElement, theme), name);
-        await frame.evaluate((theme) => window.LT41_THEME_REGISTRY.apply(document.documentElement, theme), name);
+        await evaluateWhenReady(frame, (theme) => {
+          const root = document.documentElement;
+          if (!root) return false;
+          window.LT41_THEME_REGISTRY.apply(root, theme);
+          return true;
+        }, name);
       },
       setView: async (name) => { view = name; await frame.evaluate((n) => document.querySelector(`#shelf-view-inline [data-shelf-view="${n}"]`).click(), name); await frame.waitForTimeout(600); }
     });
@@ -467,7 +473,12 @@ test('#1497 서재: 표지 제목 3줄 안·잘림 0, 이어 보기 같은 이�
     await withShelf(longBooks(), { width, height, view }, async ({ page, frame, errors }) => {
       for (const theme of ['night', 'garden']) {
         await page.evaluate((n) => window.LT41_THEME_REGISTRY.apply(document.documentElement, n), theme);
-        await frame.evaluate((n) => window.LT41_THEME_REGISTRY.apply(document.documentElement, n), theme);
+        await evaluateWhenReady(frame, (theme) => {
+          const root = document.documentElement;
+          if (!root) return false;
+          window.LT41_THEME_REGISTRY.apply(root, theme);
+          return true;
+        }, theme);
         await frame.waitForTimeout(300);
         const m = await frame.evaluate(() => {
           const shown = (el) => !!el && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden' && el.checkVisibility?.({ checkOpacity: true, checkVisibilityCSS: true }) !== false;

@@ -28,13 +28,23 @@ export async function waitForShownScreen(page, patterns = {}, timeout = 15000) {
   }, {hash: patterns.hash || '', path: patterns.path || ''}, {timeout});
 }
 
+export async function evaluateWhenReady(target, callback, arg) {
+  for (;;) {
+    const value = await target.evaluate(callback, arg);
+    if (value !== false && value != null) return value;
+    await target.waitForTimeout(50);
+  }
+}
+
 // 지금 보이는 프레임 안에서 잰다(숨은 장이 아니라 사용자가 보는 쪽).
 // src는 '문자열 식'이다 — document(=보이는 프레임의 문서)와 arg를 쓴다.
 export async function readShownFrame(page, src, arg) {
   return page.evaluate(({src, arg}) => {
     const frame = [...document.querySelectorAll('#view, #view-next')].find(f => !f.hidden && f.getClientRects().length > 0);
-    if (!frame) throw new Error('보이는 프레임이 없다');
-    return new Function('document', 'arg', 'return (' + src + ');')(frame.contentDocument, arg);
+    if (!frame) return false;
+    const doc = frame.contentDocument;
+    if (!doc) return false;
+    return new Function('document', 'arg', 'return (' + src + ');')(doc, arg);
   }, {src, arg});
 }
 

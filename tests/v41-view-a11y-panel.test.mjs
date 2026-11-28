@@ -1,4 +1,5 @@
 import { listenOnSafePort } from './helpers/safe-port.mjs';
+import { evaluateWhenReady } from './helpers/visible-frame.mjs';
 // 보드·책 겹(패널)의 키보드 초점 계약 — 실제 화면에서 잰다(브라우저 없는 곳은 건너뜀, CI 미리보기 잡은 REQUIRE=1).
 // 계약:
 //  1) 닫힌 겹은 탭이 들어가지 못한다(inert) — 이 화면의 겹 몇몇은 display:none 대신 transform·opacity로
@@ -67,6 +68,7 @@ async function waitFrame(page, testid, timeoutMs = 20000) {
       if (!f) return false;
       try {
         const d = f.contentDocument;
+        if (!d) return false;
         return new RegExp(pattern).test(d.URL) && d.readyState === 'complete' && d.body && d.body.children.length > 0;
       } catch { return false; }
     }, { pattern: testid });
@@ -87,31 +89,36 @@ test('보드 상세: 열린 겹은 탭 가능, 닫으면 겹은 탭 불가(inert
     try {
       assert.ok(await waitFrame(page, 'track58-pinboard'), '보드 프레임이 열리지 않음');
       // #891①: 주소(#my/board?tree=…&moment=m3)가 순간을 가리키면 그 순간의 상세 판이 저절로 열린다.
-      await page.waitForFunction(`(() => { const f = [...document.querySelectorAll('#view,#view-next')].filter((x) => !x.hidden).pop(); const d = f.contentDocument.getElementById('detail'); return d && d.classList.contains('open'); })()`, null, { timeout: 15000 });
-      const opened = await page.evaluate(`(() => {
+      await page.waitForFunction(`(() => { const f = [...document.querySelectorAll('#view,#view-next')].filter((x) => !x.hidden).pop(); const d = f?.contentDocument?.getElementById('detail'); return d && d.classList.contains('open'); })()`, null, { timeout: 15000 });
+      const opened = await evaluateWhenReady(page, `(() => {
         const f = [...document.querySelectorAll('#view,#view-next')].filter((x) => !x.hidden).pop();
-        const d = f.contentDocument.getElementById('detail');
-        return { inert: d.inert, focus: f.contentDocument.activeElement.id || f.contentDocument.activeElement.tagName };
+        const d = f?.contentDocument;
+        const detail = d?.getElementById('detail');
+        const ae = d?.activeElement;
+        if (!detail || !ae) return false;
+        return { inert: detail.inert, focus: ae.id || ae.tagName };
       })()`);
       assert.equal(opened.inert, false, '열린 상세가 inert이면 안 된다');
       assert.equal(opened.focus, 'detailClose', '열린 상세의 첫 초점은 닫기 단추다');
       // 재렌더 비교용 — 닫기 전의 카드 요소를 기록해 둔다(#923).
-      await page.evaluate(`(() => { const f = [...document.querySelectorAll('#view,#view-next')].filter((x) => !x.hidden).pop(); f.contentWindow.__cardAtOpen = f.contentDocument.querySelector('#cardLayer article.card.selected'); })()`);
+      await evaluateWhenReady(page, `(() => { const f = [...document.querySelectorAll('#view,#view-next')].filter((x) => !x.hidden).pop(); const d = f?.contentDocument; const card = d?.querySelector('#cardLayer article.card.selected'); if (!card) return false; f.contentWindow.__cardAtOpen = card; return true; })()`);
 
       await page.keyboard.press('Escape');
       // 닫힘·inert·초점 복귀는 순서대로 안착한다 — 상태가 채워지는 순간을 기다렸다 바로 잰다(#923).
-      await page.waitForFunction(`(() => { const f = [...document.querySelectorAll('#view,#view-next')].filter((x) => !x.hidden).pop(); const d = f.contentDocument.getElementById('detail'); if (!d || d.classList.contains('open') || !d.inert) return false; const ae = f.contentDocument.activeElement; const card = f.contentDocument.querySelector('#cardLayer article.card.selected'); return !!card && (ae === card || card.contains(ae)); })()`, null, { timeout: 10000 });
-      const closed = await page.evaluate(`(() => {
+      await page.waitForFunction(`(() => { const f = [...document.querySelectorAll('#view,#view-next')].filter((x) => !x.hidden).pop(); const d = f?.contentDocument; const detail = d?.getElementById('detail'); if (!detail || detail.classList.contains('open') || !detail.inert) return false; const ae = d.activeElement; const card = d.querySelector('#cardLayer article.card.selected'); return !!card && !!ae && (ae === card || card.contains(ae)); })()`, null, { timeout: 10000 });
+      const closed = await evaluateWhenReady(page, `(() => {
         const f = [...document.querySelectorAll('#view,#view-next')].filter((x) => !x.hidden).pop();
-        const d = f.contentDocument.getElementById('detail');
-        const ae = f.contentDocument.activeElement;
-        const card = f.contentDocument.querySelector('#cardLayer article.card.selected');
+        const d = f?.contentDocument;
+        const detail = d?.getElementById('detail');
+        const ae = d?.activeElement;
+        const card = d?.querySelector('#cardLayer article.card.selected');
+        if (!detail || !ae || !card) return false;
         return {
-          open: d.classList.contains('open'), inert: d.inert,
+          open: detail.classList.contains('open'), inert: detail.inert,
           focusId: ae.id || '', focusTag: ae.tagName,
           focusMomentId: ae.dataset?.id || '',
-          focusOnCard: card ? ae === card || card.contains(ae) : false,
-          cardVisible: card ? card.getClientRects().length > 0 : false
+          focusOnCard: ae === card || card.contains(ae),
+          cardVisible: card.getClientRects().length > 0
         };
       })()`);
       assert.equal(closed.open, false, 'Esc로 상세가 닫혀야 한다');
@@ -122,8 +129,8 @@ test('보드 상세: 열린 겹은 탭 가능, 닫으면 겹은 탭 불가(inert
 
       // #923: 회원 화면이 뜬 직후 카드가 다시 그려지면(요소 교체) 초점이 몸통으로 빠지지 않는다 —
       // 재렌더가 지나간 뒤에도 activeElement는 같은 순간 id의 새 카드여야 한다.
-      await page.waitForFunction(`(() => { const f = [...document.querySelectorAll('#view,#view-next')].filter((x) => !x.hidden).pop(); const d = f.contentDocument; const card = d.querySelector('#cardLayer article.card[data-id="m3"]'); return card && card !== f.contentWindow.__cardAtOpen && d.activeElement === card; })()`, null, { timeout: 15000 });
-      const rerendered = await page.evaluate(`(() => { const f = [...document.querySelectorAll('#view,#view-next')].filter((x) => !x.hidden).pop(); const d = f.contentDocument; const card = d.querySelector('#cardLayer article.card[data-id="m3"]'); return { focusTag: d.activeElement.tagName, focusMomentId: d.activeElement.dataset?.id || '', replaced: card && card !== f.contentWindow.__cardAtOpen, cardVisible: card ? card.getClientRects().length > 0 : false }; })()`);
+      await page.waitForFunction(`(() => { const f = [...document.querySelectorAll('#view,#view-next')].filter((x) => !x.hidden).pop(); const d = f?.contentDocument; const card = d?.querySelector('#cardLayer article.card[data-id="m3"]'); return card && card !== f?.contentWindow?.__cardAtOpen && d.activeElement === card; })()`, null, { timeout: 15000 });
+      const rerendered = await evaluateWhenReady(page, `(() => { const f = [...document.querySelectorAll('#view,#view-next')].filter((x) => !x.hidden).pop(); const d = f?.contentDocument; const card = d?.querySelector('#cardLayer article.card[data-id="m3"]'); const ae = d?.activeElement; if (!card || !ae) return false; return { focusTag: ae.tagName, focusMomentId: ae.dataset?.id || '', replaced: card !== f.contentWindow.__cardAtOpen, cardVisible: card.getClientRects().length > 0 }; })()`);
       assert.equal(rerendered.replaced, true, '카드가 실제로 다시 그려졌어야 한다(요소 교체 확인)');
       assert.equal(rerendered.focusMomentId, 'm3', `재렌더 뒤 초점도 같은 순간의 카드여야 한다(지금: ${rerendered.focusTag}#${rerendered.focusMomentId})`);
       assert.equal(rerendered.cardVisible, true, '재렌더 뒤 초점 카드도 화면에 보여야 한다');
@@ -132,10 +139,11 @@ test('보드 상세: 열린 겹은 탭 가능, 닫으면 겹은 탭 불가(inert
       for (let i = 0; i < 6; i += 1) {
         await page.keyboard.press('Tab');
         await page.waitForTimeout(80);
-        const inside = await page.evaluate(`(() => {
+        const inside = await evaluateWhenReady(page, `(() => {
           const f = [...document.querySelectorAll('#view,#view-next')].filter((x) => !x.hidden).pop();
-          const d = f.contentDocument.getElementById('detail');
-          const ae = f.contentDocument.activeElement;
+          const d = f?.contentDocument?.getElementById('detail');
+          const ae = f?.contentDocument?.activeElement;
+          if (!d || !ae) return false;
           return d.contains(ae) ? ae.id || ae.tagName : '';
         })()`);
         assert.equal(inside, '', `닫힌 상세 안으로 탭이 들어왔다(${i + 1}번째 Tab → ${inside})`);
@@ -164,9 +172,10 @@ test('390 보드: 닫힌 상세는 처음부터 탭이 들어가지 않는다', 
       await page.goto(`${base}/v41/#board`, { waitUntil: 'load' });
       assert.ok(await waitFrame(page, 'track58-pinboard'), '보드 프레임이 열리지 않음');
       await page.waitForTimeout(1800);
-      const state = await page.evaluate(`(() => {
+      const state = await evaluateWhenReady(page, `(() => {
         const f = [...document.querySelectorAll('#view,#view-next')].filter((x) => !x.hidden).pop();
-        const d = f.contentDocument.getElementById('detail');
+        const d = f?.contentDocument?.getElementById('detail');
+        if (!d) return false;
         return { open: d.classList.contains('open'), inert: d.inert };
       })()`);
       assert.equal(state.open, false, '390에서는 상세가 저절로 열리지 않는다');
@@ -192,22 +201,24 @@ test('책 목차(사용자가 연 겹): 닫으면 원래 단추로 돌아간다(
       assert.ok(await waitFrame(page, 'track59-sketchbook'), '책 프레임이 열리지 않음');
       await page.waitForTimeout(1500);
       // 키보드 사용자처럼: 목록 단추에 초점을 두고 Enter로 연다(프로그래밍 클릭은 초점을 옮기지 않는다).
-      await page.evaluate(`(() => { const f = [...document.querySelectorAll('#view,#view-next')].filter((x) => !x.hidden).pop(); f.contentDocument.getElementById('bookDisplayList').focus(); })()`);
+      await evaluateWhenReady(page, `(() => { const f = [...document.querySelectorAll('#view,#view-next')].filter((x) => !x.hidden).pop(); const d = f?.contentDocument; const button = d?.getElementById('bookDisplayList'); if (!button) return false; button.focus(); return true; })()`);
       await page.keyboard.press('Enter');
       await page.waitForTimeout(500);
-      const opened = await page.evaluate(`(() => {
+      const opened = await evaluateWhenReady(page, `(() => {
         const f = [...document.querySelectorAll('#view,#view-next')].filter((x) => !x.hidden).pop();
-        const p = f.contentDocument.getElementById('archivePanel');
+        const p = f?.contentDocument?.getElementById('archivePanel');
+        if (!p) return false;
         return { open: p.classList.contains('open'), inert: p.inert };
       })()`);
       assert.equal(opened.open, true, '목차가 열려야 한다');
       assert.equal(opened.inert, false, '열린 목차는 inert이면 안 된다');
       await page.keyboard.press('Escape');
       await page.waitForTimeout(500);
-      const closed = await page.evaluate(`(() => {
+      const closed = await evaluateWhenReady(page, `(() => {
         const f = [...document.querySelectorAll('#view,#view-next')].filter((x) => !x.hidden).pop();
-        const p = f.contentDocument.getElementById('archivePanel');
-        const ae = f.contentDocument.activeElement;
+        const p = f?.contentDocument?.getElementById('archivePanel');
+        const ae = f?.contentDocument?.activeElement;
+        if (!p || !ae) return false;
         return { open: p.classList.contains('open'), inert: p.inert, focusBack: ae.id || ae.tagName };
       })()`);
       assert.equal(closed.open, false, 'Esc로 목차가 닫혀야 한다');

@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 import { readFileSync } from 'node:fs';
 import { serve } from './helpers/screen-audit.mjs';
+import { evaluateWhenReady } from './helpers/visible-frame.mjs';
 import { createTree, addMoment } from '../public/v41/domain.mjs';
 let chromium, skip = false;
 try { ({ chromium } = await import('playwright')); if (!existsSync(chromium.executablePath())) skip = 'Playwright Chromium이 없어 건너뜀'; } catch { skip = 'playwright 없음'; }
@@ -156,8 +157,11 @@ test('화면 줄 E2E: 방문자 책·보드·지도는 공통 줄을 쓰고 쓰�
         await page.goto(`${base}/${screen}-guest-host.html`, { waitUntil: 'load', timeout: 20000 });
         const frame = page.frames().find((f) => f !== page.mainFrame());
         await frame.waitForSelector('.lt-screen-toolbar', { timeout: 12000 });
-        const result = await frame.evaluate(() => {
+        const result = await evaluateWhenReady(frame, () => {
+          const root = document.documentElement;
+          if (!root) return false;
           const row = document.querySelector('.lt-screen-toolbar');
+          if (!row) return false;
           const visible = (el) => el.getClientRects().length > 0 && getComputedStyle(el).display !== 'none' && getComputedStyle(el).visibility !== 'hidden';
           const buttons = [...row.querySelectorAll('button,select')].filter(visible);
           const writes = [...document.querySelectorAll('.moment-edit,[data-title-edit],[data-note-edit],[data-write],#write-menu,#shelfNewTree')].filter(visible);
@@ -169,7 +173,7 @@ test('화면 줄 E2E: 방문자 책·보드·지도는 공통 줄을 쓰고 쓰�
             titleCount: [...document.querySelectorAll('.lt-toolbar-tree-name')].filter((title) => visible(title) && title.textContent.trim() === '리센느').length,
             writeCount: writes.length,
             playCount: [...document.querySelectorAll('button')].filter((button) => visible(button) && /이어\s*보기/.test(button.textContent)).length,
-            overflow: Math.max(0, document.documentElement.scrollWidth - innerWidth),
+            overflow: Math.max(0, root.scrollWidth - innerWidth),
             buttonHeights: [...new Set(buttons.map((button) => Math.round(button.getBoundingClientRect().height)))].sort((a, b) => a - b),
             buttonDetails: buttons.map((button) => ({ text: button.textContent.trim(), id: button.id, className: button.className, height: Math.round(button.getBoundingClientRect().height) })),
             textClipped: buttons.filter((button) => {
@@ -342,13 +346,16 @@ test('#1249 이어 보기: 화면·권한·폭별 공통 테두리, 장미색 �
           const btn=frame.locator('#'+id);
           await btn.waitFor({state:'visible',timeout:12000});
           if(screen==='book'&&width===390) await frame.locator('.nav-pill #playAllBtn').waitFor({state:'visible',timeout:12000});
-          const result=await btn.evaluate(el=>{
+          const result=await evaluateWhenReady(frame,id=>{
+            if(!document.body)return false;
+            const el=document.getElementById(id);
+            if(!el)return false;
             const s=getComputedStyle(el),r=el.getBoundingClientRect(),range=document.createRange();
             range.selectNodeContents(el);
             const sample=document.createElement('span');sample.style.background='var(--lt-primary)';sample.style.color='var(--lt-pearl)';document.body.append(sample);
             const primary=getComputedStyle(sample).backgroundColor;sample.remove();
             return {style:{background:s.backgroundColor,image:s.backgroundImage,border:s.borderTopColor,borderWidth:s.borderTopWidth,borderStyle:s.borderTopStyle,radius:s.borderTopLeftRadius,color:s.color,font:s.fontWeight},primary,inside:r.left>=0&&r.right<=innerWidth+1&&r.top>=0&&r.bottom<=innerHeight+1,clipped:range.getBoundingClientRect().width>el.clientWidth-parseFloat(s.paddingLeft)-parseFloat(s.paddingRight)+1};
-          });
+          },id);
           const label=[theme,width,visitor?'방문자':'소유자',screen].join(' ');
           if(!expected)expected=result.style;
           assert.deepEqual(result.style,expected,label+' 동일한 공통 스타일');
@@ -384,13 +391,17 @@ test('#1249 서재 검색칸: 390 안내 글자 전체 표시, 검색 동작, �
         await frame.waitForSelector('.lt-screen-toolbar',{timeout:12000});
         await frame.waitForFunction(()=>document.querySelectorAll('.book-card').length===2);
         const field=frame.locator('#searchInput');
-        const measure=()=>field.evaluate(el=>{
+        const measure=()=>evaluateWhenReady(frame,()=>{
+          const root=document.documentElement;
+          if(!root)return false;
+          const el=document.getElementById('searchInput');
+          if(!el)return false;
           const s=getComputedStyle(el),placeholder=getComputedStyle(el,'::placeholder'),r=el.getBoundingClientRect();
           const canvas=document.createElement('canvas'),c=canvas.getContext('2d');
           c.font=[placeholder.fontWeight,placeholder.fontSize,placeholder.fontFamily].join(' ');
           const available=el.clientWidth-parseFloat(s.paddingLeft)-parseFloat(s.paddingRight);
           const bar=document.querySelector('.lt-screen-toolbar').getBoundingClientRect();
-          return {width:r.width,available,needed:Math.ceil(c.measureText(el.placeholder).width),below:r.top>=bar.bottom-1,inToolbar:!!el.closest('.lt-screen-toolbar'),overflow:Math.max(0,document.documentElement.scrollWidth-innerWidth),inside:r.left>=0&&r.right<=innerWidth+1,visible:r.width>0&&r.height>0,viewVisible:!!document.getElementById('shelf-view-inline').getClientRects().length,newVisible:!!document.getElementById('shelfNewTree').getClientRects().length};
+          return {width:r.width,available,needed:Math.ceil(c.measureText(el.placeholder).width),below:r.top>=bar.bottom-1,inToolbar:!!el.closest('.lt-screen-toolbar'),overflow:Math.max(0,root.scrollWidth-innerWidth),inside:r.left>=0&&r.right<=innerWidth+1,visible:r.width>0&&r.height>0,viewVisible:!!document.getElementById('shelf-view-inline').getClientRects().length,newVisible:!!document.getElementById('shelfNewTree').getClientRects().length};
         });
         let m=await measure();console.log(theme,390,JSON.stringify(m));
         assert.ok(m.available>=m.needed,theme+' 안내 문구 전체 폭');
@@ -430,14 +441,16 @@ test('#1249 지도 390: 하단 한 줄, 전체 맞춤 유지, 묶음 선택 가�
         await page.goto(base+'/map-ribbon-host.html',{waitUntil:'load',timeout:20000});
         const frame=page.frames().find(f=>f!==page.mainFrame());
         await frame.waitForFunction(()=>window.__lt?.dots?.()?.length>0);
-        const read=()=>frame.evaluate(()=>{
+        const read=()=>evaluateWhenReady(frame,()=>{
+          const root=document.documentElement;
+          if(!root)return false;
           const r=document.getElementById('mobileRibbon'),rr=r.getBoundingClientRect();
           const buttons=[...r.querySelectorAll(':scope>button')].filter(b=>b.getClientRects().length).map(b=>{
             const a=b.getBoundingClientRect(),s=getComputedStyle(b);
             const range=document.createRange();range.selectNodeContents(b);
             return {label:b.textContent,top:a.top,height:a.height,width:a.width,inside:a.left>=rr.left&&a.right<=rr.right&&a.bottom<=rr.bottom,clipped:range.getBoundingClientRect().width>b.clientWidth-parseFloat(s.paddingLeft)-parseFloat(s.paddingRight)+1};
           });
-          return {height:rr.height,overflow:r.scrollWidth-r.clientWidth,buttons,rows:new Set(buttons.map(b=>b.top)).size,docOverflow:document.documentElement.scrollWidth-innerWidth};
+          return {height:rr.height,overflow:r.scrollWidth-r.clientWidth,buttons,rows:new Set(buttons.map(b=>b.top)).size,docOverflow:root.scrollWidth-innerWidth};
         });
         const m=await read(),label=theme+'/'+width;
         console.log(label,JSON.stringify(m));

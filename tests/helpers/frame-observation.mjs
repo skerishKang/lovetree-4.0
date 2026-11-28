@@ -1,6 +1,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createTree, addMoment } from '../../public/v41/domain.mjs';
+import { evaluateWhenReady } from './visible-frame.mjs';
 
 export const FRAME_SCREENS = [
   { id: 'home', label: '첫 화면', file: 'home.html', root: '#orbit' },
@@ -51,7 +52,8 @@ export async function settleObservation(page, predicate, arg = null, { freezeClo
   await page.evaluate(async freeze => {
     const docs = [document];
     const frame = [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length);
-    try { if (frame?.contentDocument) docs.push(frame.contentDocument); } catch {}
+    const frameDoc = frame?.contentDocument;
+    if (frameDoc) docs.push(frameDoc);
     await Promise.all(docs.map(doc => doc.fonts?.ready));
     const animations = docs.flatMap(doc => doc.getAnimations({ subtree: true })
       .filter(animation => animation.effect?.getTiming().iterations !== Infinity));
@@ -66,7 +68,7 @@ export async function settleObservation(page, predicate, arg = null, { freezeClo
 }
 
 export async function measureFrame(page, screen, theme, width, height) {
-  return page.evaluate(({ screen, theme, width, height }) => {
+  return evaluateWhenReady(page, ({ screen, theme, width, height }) => {
     const round = n => Math.round(n * 1000) / 1000;
     const rect = e => { const r = e.getBoundingClientRect(); return { x: round(r.x), y: round(r.y), width: round(r.width), height: round(r.height), bottom: round(r.bottom), right: round(r.right) }; };
     const style = e => {
@@ -75,6 +77,8 @@ export async function measureFrame(page, screen, theme, width, height) {
       return { rect: r, display: s.display, position: s.position, zIndex: s.zIndex, borderWidth: [s.borderTopWidth, s.borderRightWidth, s.borderBottomWidth, s.borderLeftWidth], borderStyle: [s.borderTopStyle, s.borderRightStyle, s.borderBottomStyle, s.borderLeftStyle], borderColor: [s.borderTopColor, s.borderRightColor, s.borderBottomColor, s.borderLeftColor], borderRadius: [s.borderTopLeftRadius, s.borderTopRightRadius, s.borderBottomRightRadius, s.borderBottomLeftRadius], boxShadow: s.boxShadow, padding: [s.paddingTop, s.paddingRight, s.paddingBottom, s.paddingLeft], margin: [s.marginTop, s.marginRight, s.marginBottom, s.marginLeft], background: s.backgroundColor, backgroundImage: s.backgroundImage, overflowX: s.overflowX, overflowY: s.overflowY, flex: s.flex, order: s.order };
     };
     const frame = [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length);
+    const frameDoc = frame?.contentDocument;
+    if (!frameDoc) return false;
     const panel = screen.panel ? document.querySelector(screen.panel) : null;
     const stage = document.getElementById('stage');
     const toast = document.getElementById('toast');
@@ -94,38 +98,46 @@ export async function measureFrame(page, screen, theme, width, height) {
       if (root && doc.defaultView.getComputedStyle(root).overflowY !== 'hidden' && root.scrollHeight > root.clientHeight + 1) candidates.unshift({ owner, id: root.id, className: String(root.className || ''), overflowY: doc.defaultView.getComputedStyle(root).overflowY, scrollHeight: root.scrollHeight, clientHeight: root.clientHeight, scrollTop: root.scrollTop, rect: rect(root) });
     };
     if (panel) collect(document, 'shell');
-    if (frame) try { collect(frame.contentDocument, 'iframe'); } catch {}
-    const world = frame?.contentDocument?.getElementById('world');
+    if (frameDoc) collect(frameDoc, 'iframe');
+    const world = frameDoc.getElementById('world');
     if (world && ['board', 'map'].includes(screen.id)) candidates.unshift({ owner: 'world', id: 'world', className: String(world.className || ''), overflowY: 'pan-zoom', scrollHeight: world.scrollHeight, clientHeight: world.clientHeight, scrollTop: world.scrollTop, rect: rect(world) });
     candidates.sort((a, b) => (b.owner === 'world') - (a.owner === 'world') || b.scrollHeight - b.clientHeight - (a.scrollHeight - a.clientHeight));
-    const primary = screen.id === 'board' ? frame?.contentDocument?.getElementById('world')
-      : screen.id === 'map' ? frame?.contentDocument?.getElementById('stage')
-      : panel || (frame ? frame.contentDocument.scrollingElement : null);
+    const primary = screen.id === 'board' ? frameDoc.getElementById('world')
+      : screen.id === 'map' ? frameDoc.getElementById('stage')
+      : panel || frameDoc.scrollingElement;
     const selected = primary ? { id: primary.id || primary.tagName.toLowerCase(), className: String(primary.className || ''), owner: panel ? 'shell' : primary.id === 'world' ? 'world' : 'iframe', overflowY: primary === frame ? getComputedStyle(frame).overflowY : (primary.ownerDocument || document).defaultView.getComputedStyle(primary).overflowY } : candidates[0] || null;
     const backdrop = panel?.tagName === 'DIALOG' && panel.open ? (() => { const s = getComputedStyle(panel, '::backdrop'); return { background: s.backgroundColor, filter: s.filter, backdropFilter: s.backdropFilter }; })() : null;
-    return { screen: screen.id, theme, viewport: { width, height }, shell: { ...shell, backdrop }, scroll: { owner: selected ? { id: selected.id, className: selected.className, owner: selected.owner, overflowY: selected.overflowY } : null, shellDocumentScrollable: document.scrollingElement.scrollHeight > document.scrollingElement.clientHeight + 1, frameDocumentScrollable: !!frame && frame.contentDocument.scrollingElement.scrollHeight > frame.contentDocument.scrollingElement.clientHeight + 1, candidates: candidates.slice(0, 8) } };
+    const frameScroll = frameDoc.scrollingElement;
+    return { screen: screen.id, theme, viewport: { width, height }, shell: { ...shell, backdrop }, scroll: { owner: selected ? { id: selected.id, className: selected.className, owner: selected.owner, overflowY: selected.overflowY } : null, shellDocumentScrollable: document.scrollingElement.scrollHeight > document.scrollingElement.clientHeight + 1, frameDocumentScrollable: !!frameScroll && frameScroll.scrollHeight > frameScroll.clientHeight + 1, candidates: candidates.slice(0, 8) } };
   }, { screen, theme, width, height });
 }
 
 async function finishBookObservation(page) {
-  await page.evaluate(() => {
+  await evaluateWhenReady(page, () => {
     const frame = [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length);
-    const api = frame.contentWindow.__TRACK59__, state = api.getState();
+    const api = frame?.contentWindow?.__TRACK59__;
+    if (!api?.getState || !api.jump || !api.momentAtPos) return false;
+    const state = api.getState();
     api.jump(state.page, api.momentAtPos(state.page)?.id);
+    return true;
   });
   await page.waitForFunction(() => [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length)?.contentDocument?.querySelector('.moment.focused'), null, { timeout: 30000 });
-  await page.evaluate(() => {
+  await evaluateWhenReady(page, () => {
     const frame = [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length);
+    if (!frame?.contentWindow) return false;
     frame.contentWindow.dispatchEvent(new frame.contentWindow.Event('lt41-tagline-ready'));
+    return true;
   });
-  await page.waitForFunction(() => { const frame = [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length); const doc = frame?.contentDocument; return !!doc?.querySelector('.moment') && !doc.querySelector('.moment.focused') && !doc.querySelector('.moment.landed'); }, null, { timeout: 30000 });
-  await page.evaluate(() => {
-    const frame = [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length), doc = frame.contentDocument;
+  await page.waitForFunction(() => { const frame = [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length); const doc = frame?.contentDocument; return !!doc?.querySelector('.moment') && !doc?.querySelector('.moment.focused') && !doc?.querySelector('.moment.landed'); }, null, { timeout: 30000 });
+  await evaluateWhenReady(page, () => {
+    const frame = [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length), doc = frame?.contentDocument;
+    if (!doc?.body || !frame?.contentWindow) return false;
     const clean = () => doc.querySelectorAll('.moment.focused,.moment.landed').forEach(element => element.classList.remove('focused', 'landed'));
     clean();
     const observer = new MutationObserver(clean);
     observer.observe(doc.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['class'] });
     frame.contentWindow.__LT_FRAME_OBSERVATION_BOOK_GUARD__ = observer;
+    return true;
   });
   await page.clock.fastForward(0);
 }
@@ -149,26 +161,31 @@ async function openMemberScreen(page, screen) {
   await page.locator('[data-view="' + screen.file + '"]').first().evaluate(e => e.click());
   await settleObservation(page, ({ file, root }) => {
     const f = [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length);
-    return f?.contentWindow?.location?.pathname?.endsWith('/' + file) && f.contentDocument?.querySelector(root) &&
-      !!f.contentDocument.querySelector('.lt-screen-toolbar[data-screen]') &&
+    const doc = f?.contentDocument;
+    return f?.contentWindow?.location?.pathname?.endsWith('/' + file) && doc?.querySelector(root) &&
+      !!doc.querySelector('.lt-screen-toolbar[data-screen]') &&
       (file !== 'track59-sketchbook.html' || !!f.contentWindow.LTTagLine) &&
       (file !== 'track58-pinboard.html' || (typeof f.contentWindow.bootDetailPanel === 'function' && !!f.contentWindow.__LT58V12));
   }, { file: screen.file, root: screen.root });
   if (screen.id === 'book') await finishBookObservation(page);
   if (screen.id === 'board') {
     await page.clock.fastForward(0);
-    await page.evaluate(() => {
+    await evaluateWhenReady(page, () => {
       const frame = [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length);
+      if (!frame?.contentWindow?.bootDetailPanel) return false;
       frame.contentWindow.bootDetailPanel();
+      return true;
     });
     await settleObservation(page, () => {
       const frame = [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length);
       const doc = frame?.contentDocument;
       return !!doc && !doc.getElementById('detail')?.classList.contains('open') && !!doc.querySelector('#cardLayer .card.selected') && [...doc.images].every(image => image.complete);
     });
-    await page.evaluate(() => {
+    await evaluateWhenReady(page, () => {
       const frame = [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length);
+      if (!frame?.contentWindow?.boardStartView) return false;
       frame.contentWindow.boardStartView();
+      return true;
     });
     await page.clock.fastForward(0);
   }
@@ -214,12 +231,14 @@ export async function observeFrameMatrix({ browser, base, outputDir, shard = '',
       try {
         await page.goto(base + '/v41/?account=1#home', { waitUntil: 'load' });
         await settleObservation(page, () => window.LT41?.trees?.length === 1 && document.body.dataset.member === 'in' && [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length)?.contentDocument?.getElementById('orbit') && [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length)?.contentWindow?.__LT_ORBIT_TEST__?.canvasSettled());
-        await page.evaluate(() => {
+        await evaluateWhenReady(page, () => {
           const frame = [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length);
-          const orbit = frame.contentWindow.__LT_ORBIT_TEST__;
+          const orbit = frame?.contentWindow?.__LT_ORBIT_TEST__;
+          if (!orbit?.hold || !orbit.pauseFloat || !orbit.seek) return false;
           orbit.hold(true);
           orbit.pauseFloat();
           orbit.seek(0);
+          return true;
         });
         for (const screen of memberScreens) { await openMemberScreen(page, screen); await capture(page, screen); if (screen.id === 'book' || screen.id === 'board') await page.clock.resume(); }
       } finally { await context.close().catch(() => {}); }
@@ -234,7 +253,7 @@ export async function observeFrameMatrix({ browser, base, outputDir, shard = '',
       try {
         await guestPage.clock.install({ time: new Date('2026-11-20T00:00:00Z') });
         await guestPage.goto(base + '/v41/#share/c000000000000000000000a/book', { waitUntil: 'load' });
-        await guestPage.waitForFunction(() => document.body.dataset.recordSource === 'share' && document.body.dataset.fabLift === 'book' && !document.getElementById('toast')?.hidden && document.getElementById('toast')?.hasAttribute('data-visitor-intro') && [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length)?.contentWindow?.location?.pathname?.endsWith('/track59-sketchbook.html') && [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length)?.contentDocument?.querySelector('.moment,.mobile-page,.book-wrap'), null, { timeout: 30000 });
+        await guestPage.waitForFunction(() => { const body = document.body; return !!body && body.dataset.recordSource === 'share' && body.dataset.fabLift === 'book' && !document.getElementById('toast')?.hidden && document.getElementById('toast')?.hasAttribute('data-visitor-intro') && [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length)?.contentWindow?.location?.pathname?.endsWith('/track59-sketchbook.html') && [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length)?.contentDocument?.querySelector('.moment,.mobile-page,.book-wrap'); }, null, { timeout: 30000 });
         await guestPage.clock.fastForward(0);
         await settleObservation(guestPage, () => { const frame = [...document.querySelectorAll('#view,#view-next')].find(f => !f.hidden && f.getClientRects().length); return !!frame?.contentDocument?.querySelector('.lt-screen-toolbar[data-screen="book"]') && !!frame?.contentWindow?.LTTagLine; }, null, { freezeClock: true });
         await finishBookObservation(guestPage);

@@ -17,6 +17,7 @@ import { listenOnSafePort } from './helpers/safe-port.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { inspectYoutubeIframe, countYoutubeAutoplay } from './helpers/youtube-embed-audit.mjs';
+import { evaluateWhenReady } from './helpers/visible-frame.mjs';
 import { createServer } from 'node:http';
 import { createReadStream, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
@@ -264,13 +265,17 @@ test('#635 화면: 공유 링크 책(로그아웃) 전 장에서 undefined·null
           assert.ok(emptyRatio <= 0.2, `390·${theme}: 책 아래 빈 공간이 화면의 ${Math.round(emptyRatio * 100)}%다`);
         }
         // 감상 화면에서는 '다음 이야기' 안내가 어디에도 없다(글자와 요소 둘 다).
-        const copy = await frame.evaluate(() => ({
-          text: document.body.textContent.includes('이 순간 다음 이야기를 남겨 보세요'),
-          block: !!document.querySelector('.next-page'),
-          nextButton: !!document.querySelector('[data-next-moment]'),
-          emptyWhy: document.body.textContent.includes('이어진 이유를 아직 적지 않았어요') || document.body.textContent.includes('연결 이유는 아직 적지 않았어요'),
-          undefinedTrace: /undefined|null|NaN/.test(document.body.textContent)
-        }));
+        const copy = await evaluateWhenReady(frame, () => {
+          const body = document.body;
+          if (!body) return false;
+          return {
+            text: body.textContent.includes('이 순간 다음 이야기를 남겨 보세요'),
+            block: !!document.querySelector('.next-page'),
+            nextButton: !!document.querySelector('[data-next-moment]'),
+            emptyWhy: body.textContent.includes('이어진 이유를 아직 적지 않았어요') || body.textContent.includes('연결 이유는 아직 적지 않았어요'),
+            undefinedTrace: /undefined|null|NaN/.test(body.textContent)
+          };
+        });
         assert.equal(copy.text, false, `${width}·${theme}: 감상 화면에 다음 이야기 안내가 보인다`);
         assert.equal(copy.block, false, `${width}·${theme}: 감상 화면에 다음 이야기 블록(.next-page)이 남아 있다`);
         assert.equal(copy.nextButton, false, `${width}·${theme}: 감상 화면에 다음 순간 단추가 남아 있다`);
@@ -300,11 +305,15 @@ test('#635 화면: 내 트리 책(로그인) 전 장에서 흔적 값이 없고,
       assert.deepEqual(found, [], `${width}: 화면 흔적 값 ${JSON.stringify(found)}`);
       assert.equal(problems.length, 0, `${width}: 화면 오류 ${problems.join(' | ')}`);
       // 내 트리에서는 안내 문장+단추가 그대로 보인다.
-      const hasGuide = await frame.evaluate(() => ({
-        text: document.body.textContent.includes('이 순간 다음 이야기를 남겨 보세요'),
-        button: !!document.querySelector('[data-next-moment]'),
-        block: !!document.querySelector('.next-page')
-      }));
+      const hasGuide = await evaluateWhenReady(frame, () => {
+        const body = document.body;
+        if (!body) return false;
+        return {
+          text: body.textContent.includes('이 순간 다음 이야기를 남겨 보세요'),
+          button: !!document.querySelector('[data-next-moment]'),
+          block: !!document.querySelector('.next-page')
+        };
+      });
       assert.equal(hasGuide.text, true, `${width}: 내 트리 마지막 장의 안내 문장`);
       assert.equal(hasGuide.button, true, `${width}: 내 트리 마지막 장의 다음 순간 단추`);
       assert.equal(hasGuide.block, true, `${width}: 내 트리 마지막 장의 다음 이야기 블록`);
@@ -1232,11 +1241,12 @@ test('#1259 방문자 책 첫 안내가 제목과 크게 보기 영상 조작부
      return r.continue();
     });
     const p=await context.newPage();await p.goto(base+'/v41/#share/'+shareId+'/book',{waitUntil:'domcontentloaded'});
-    await p.waitForFunction(()=>window.LT41?.source==='share'&&!document.querySelector('#view').hidden&&!!document.querySelector('#view').contentDocument?.querySelector('.moment-title'),null,{timeout:15000});
+    await p.waitForFunction(()=>window.LT41?.source==='share'&&!document.querySelector('#view')?.hidden&&!!document.querySelector('#view')?.contentDocument?.querySelector('.moment-title'),null,{timeout:15000});
     const f=p.frameLocator('#view'),toast=p.locator('#toast');
     await p.locator('#lt-visitor-caption').waitFor({state:'visible'});
-    const measure=()=>p.evaluate(()=>{
-     const t=document.querySelector('#lt-visitor-caption'),f=document.querySelector('#view'),d=f.contentDocument;
+    const measure=()=>evaluateWhenReady(p,()=>{
+     const t=document.querySelector('#lt-visitor-caption'),f=document.querySelector('#view'),d=f?.contentDocument;
+     if(!t||!f||!d)return false;
      const box=(e,dx=0,dy=0)=>{const r=e.getBoundingClientRect();return {left:r.left+dx,right:r.right+dx,top:r.top+dy,bottom:r.bottom+dy,width:r.width,height:r.height}};
      const shown=e=>!!e&&e.checkVisibility({checkOpacity:true,checkVisibilityCSS:true});
      const tr=shown(t)?box(t):null,fr=box(f);
@@ -1312,7 +1322,7 @@ test('#1259 방문자 보드 유튜브 표지는 자동 표시하고 외부 사�
      return r.continue();
     });
     const p=await context.newPage();await p.goto(base+'/v41/#share/'+shareId+'/board',{waitUntil:'domcontentloaded'});
-    await p.waitForFunction(()=>window.LT41?.source==='share'&&!document.querySelector('#view').hidden&&document.querySelector('#view').contentDocument?.querySelectorAll('#cardLayer .card').length===3,null,{timeout:15000});
+    await p.waitForFunction(()=>window.LT41?.source==='share'&&!document.querySelector('#view')?.hidden&&document.querySelector('#view')?.contentDocument?.querySelectorAll('#cardLayer .card').length===3,null,{timeout:15000});
     const f=p.frameLocator('#view');
     for(const id of ['m1','m2']){
      const card=f.locator('.card[data-id="'+id+'"]');

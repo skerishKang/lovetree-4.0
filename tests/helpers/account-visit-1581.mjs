@@ -33,7 +33,7 @@ async function open(page,base,owned,hash){
  await page.goto(base+'/v41/'+(owned?'?account=1':'')+hash);
 }
 async function ready(page,part){
- await page.waitForFunction(part=>{const f=document.getElementById('view');return f&&!f.hidden&&f.contentDocument?.readyState==='complete'&&f.contentDocument.URL.includes(part)},part);
+ await page.waitForFunction(part=>{const f=document.getElementById('view'),doc=f?.contentDocument;return f&&!f.hidden&&doc?.readyState==='complete'&&doc.URL.includes(part)},part);
 }
 const click=(page,id)=>page.evaluate(id=>document.getElementById(id).click(),id);
 

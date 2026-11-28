@@ -13,6 +13,7 @@ import { createReadStream, existsSync } from 'node:fs';
 import { stat, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { evaluateWhenReady } from './helpers/visible-frame.mjs';
 
 const ROOT = path.resolve(process.env.LT_A11Y514_ROOT || fileURLToPath(new URL('../public', import.meta.url)));
 const REQUIRE = process.env.LT_A11Y514_REQUIRE === '1';
@@ -167,13 +168,15 @@ test('#514 메모: 모바일 선택 줄 top을 머리줄 높이에서 계산한�
     browser = await chromium.launch({ headless: true });
     for (const theme of ['night', 'garden']) {
       const { context, frame } = await openScreen(browser, base, { width: 390, theme, screen: SCREENS[1] });
-      const measure = () => frame.evaluate(() => {
+      const measure = () => evaluateWhenReady(frame, () => {
+        const root = document.documentElement;
         const badge = document.getElementById('themeBadge');
         const picker = document.querySelector('.lt-moment-picker');
+        if (!root || !badge || !picker) return false;
         const b = badge.getBoundingClientRect(), p = picker.getBoundingClientRect();
         const w = Math.max(0, Math.round(Math.min(b.right, p.right) - Math.max(b.left, p.left)));
         const h = Math.max(0, Math.round(Math.min(b.bottom, p.bottom) - Math.max(b.top, p.top)));
-        return { badgeBottom: Math.round(b.bottom), pickerTop: Math.round(p.top), overlap: w * h, cssVar: getComputedStyle(document.documentElement).getPropertyValue('--lt-board-picker-top').trim() };
+        return { badgeBottom: Math.round(b.bottom), pickerTop: Math.round(p.top), overlap: w * h, cssVar: getComputedStyle(root).getPropertyValue('--lt-board-picker-top').trim() };
       });
       const one = await measure();
       assert.match(one.cssVar, /^\d+px$/, `${theme}: top을 계산한 값(변수)으로 쓴다(전: 고정 96px)`);
@@ -181,17 +184,21 @@ test('#514 메모: 모바일 선택 줄 top을 머리줄 높이에서 계산한�
       assert.ok(one.pickerTop >= one.badgeBottom, `${theme}: 선택 줄이 표시 아래에서 시작한다`);
 
       // 머리줄이 두 줄이 된 상황: 표시가 두 줄로 늘고 머리줄도 높아진다.
-      const two = await frame.evaluate(async () => {
+      const two = await evaluateWhenReady(frame, async () => {
+        const root = document.documentElement;
         const badge = document.getElementById('themeBadge');
+        const picker = document.querySelector('.lt-moment-picker');
+        const header = document.querySelector('header');
+        if (!root || !badge || !picker || !header) return false;
         badge.style.maxWidth = '120px';
         badge.style.whiteSpace = 'normal';
         badge.textContent = '진주빛 보드 · 읽기 전용 · 두 줄이 된 머리 표시';
-        document.querySelector('header').style.height = '96px';
+        header.style.height = '96px';
         await new Promise((r) => setTimeout(r, 260));
-        const b = badge.getBoundingClientRect(), p = document.querySelector('.lt-moment-picker').getBoundingClientRect();
+        const b = badge.getBoundingClientRect(), p = picker.getBoundingClientRect();
         const w = Math.max(0, Math.round(Math.min(b.right, p.right) - Math.max(b.left, p.left)));
         const h = Math.max(0, Math.round(Math.min(b.bottom, p.bottom) - Math.max(b.top, p.top)));
-        return { badgeBottom: Math.round(b.bottom), pickerTop: Math.round(p.top), overlap: w * h, cssVar: getComputedStyle(document.documentElement).getPropertyValue('--lt-board-picker-top').trim() };
+        return { badgeBottom: Math.round(b.bottom), pickerTop: Math.round(p.top), overlap: w * h, cssVar: getComputedStyle(root).getPropertyValue('--lt-board-picker-top').trim() };
       });
       assert.ok(two.badgeBottom > one.badgeBottom, `${theme}: 표시가 실제로 두 줄이 되어 아래끝이 내려갔다`);
       assert.equal(two.overlap, 0, `${theme}: 머리줄이 두 줄이 되어도 겹침 0(전: 480px²)`);

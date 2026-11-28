@@ -46,6 +46,7 @@ export function serve(extraRoutes = {}, { port = TEST_PORT } = {}) {
 
 // 한 문서(프레임) 안의 네 가지 검사. 페이지·프레임마다 이 함수를 evaluate로 돌린다.
 export const AUDIT_FN = function audit(opts) {
+  if (!document.documentElement || !document.body) return false;
   // '보드·안내' 상태에서는 안내 풍선도 검사 대상이다 — 풍선은 '도구×캔버스' 제외 대상이 아니다(CTO 지시 #662 후속).
   const CHECK_TOAST = !!(opts && opts.checkToast);
   const LENS = new Set(['lens', 'mobileLensStage']); // 렌즈 복제본 — 보이지 않는 거울(#635)
@@ -367,7 +368,13 @@ const auditOnce = async (page, screen) => {
   const out = EMPTY();
   for (const frame of page.frames()) {
     let res;
-    try { res = await frame.evaluate(AUDIT_FN, { checkToast: screen.startsWith('보드·안내') }); } catch (e) {
+    try {
+      for (;;) {
+        res = await frame.evaluate(AUDIT_FN, { checkToast: screen.startsWith('보드·안내') });
+        if (res !== false) break;
+        await frame.waitForTimeout(50);
+      }
+    } catch (e) {
       // 검사 함수가 잘못되면 조용히 건너뛰지 않는다 — 기록해 두고 시험이 실패하게 한다(about:blank 등은 애초에 evaluate가 오류를 내지 않는다).
       out.errors.push({ 화면: screen, 프레임: frame.url(), 오류: String(e).slice(0, 200) });
       continue;
@@ -434,6 +441,7 @@ export function failuresOf(res, 크기, 테마) {
 // #1362 확장: 선택 탭·칩 채움과 쉬는 테두리가 역할 변수를 쓰는지, 글자 대비가 4.5:1인지 잔다.
 // 화면 공통 검사기에서 쓰는 함수다. 페이지·안쪽 프레임 어디에 붙여도 동하게 document 기준으로 읽는다.
 export const roleStyleFn = function roleStyle(selectors) {
+  if (!document.body) return false;
   const rgb = (s) => { const m = /rgba?\(([^)]+)\)/.exec(s || ''); if (!m) return null; const p = m[1].split(',').map((v) => parseFloat(v)); return [p[0], p[1], p[2], p.length > 3 ? p[3] : 1]; };
   const lum = (c) => { const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }; return 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]); };
   const over = (t, b) => [t[0] * t[3] + b[0] * (1 - t[3]), t[1] * t[3] + b[1] * (1 - t[3]), t[2] * t[3] + b[2] * (1 - t[3]), 1];

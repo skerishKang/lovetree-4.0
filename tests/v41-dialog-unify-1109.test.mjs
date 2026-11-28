@@ -155,7 +155,7 @@ test('#1109 두 창의 닫기 단추·덮개·폭이 같고 정리 창 아래 �
       let frame = null;
       for (const f of page.frames()) {
         if (f === page.mainFrame()) continue;
-        const ok = await f.evaluate(() => document.documentElement.getBoundingClientRect().width > 0 && !!document.getElementById('orbit')?.shadowRoot?.querySelector('[data-do=moments],[data-do=index]')).catch(() => false);
+        const ok = await f.evaluate(() => { const root = document.documentElement; return !!root && root.getBoundingClientRect().width > 0 && !!document.getElementById('orbit')?.shadowRoot?.querySelector('[data-do=moments],[data-do=index]'); });
         if (ok) { frame = f; break; }
       }
       assert.ok(frame, '순간 목록을 든 화면을 찾는다');
@@ -179,7 +179,7 @@ test('#1109 두 창의 닫기 단추·덮개·폭이 같고 정리 창 아래 �
 async function momentListFrame(page) {
  for (const f of page.frames()) {
   if (f === page.mainFrame()) continue;
-  const ok = await f.evaluate(() => document.documentElement.getBoundingClientRect().width > 0 && !!document.getElementById('orbit')?.shadowRoot?.querySelector('[data-do=moments],[data-do=index]')).catch(() => false);
+  const ok = await f.evaluate(() => { const root = document.documentElement; return !!root && root.getBoundingClientRect().width > 0 && !!document.getElementById('orbit')?.shadowRoot?.querySelector('[data-do=moments],[data-do=index]'); });
   if (ok) return f;
  }
  return null;
@@ -242,8 +242,8 @@ test('#1109 저장본 뒤 서버 기록이 도착해도 네 화면은 같은 문
   await withShell(tree, { width: 1440, height: 900, theme: 'night', deferred: true, hash: '#my/'+view+'?tree='+tree.id }, async ({ page, errors, initial, release }) => {
    const files={home:'home.html',book:'track59-sketchbook.html',board:'track58-pinboard.html',shelf:'track32-bookshelf.html'};
    await page.waitForFunction(file => {
-    const f=document.getElementById('view');
-    try{return !f.hidden&&f.contentWindow.location.pathname.endsWith(file)&&!!(f.contentDocument.getElementById('orbit')?.shadowRoot?.querySelector('.recent-card')||f.contentWindow.__TRACK59__||f.contentWindow.__LT58V11||f.contentDocument.querySelector('.book-card'));}catch{return false;}
+    const f=document.getElementById('view'),doc=f?.contentDocument;
+    return !!f && !f.hidden && !!doc && new URL(doc.URL).pathname.endsWith(file)&&!!(doc.getElementById('orbit')?.shadowRoot?.querySelector('.recent-card')||f.contentWindow?.__TRACK59__||f.contentWindow?.__LT58V11||doc.querySelector('.book-card'));
    }, files[view], {timeout:20000});
    const active=await page.locator('#view').elementHandle();
    const frame=await active.contentFrame();
@@ -296,7 +296,7 @@ test('#1109 저장본이 없는 회원 진입은 서버 응답 전 빈 첫 화�
   assert.deepEqual(await page.evaluate(()=>[...document.querySelectorAll('#view,#view-next')].map(f=>f.contentWindow.location.href)),['about:blank','about:blank'],'기록을 받기 전에는 빈 문서를 먼저 열지 않는다');
   release(initial);
   await page.waitForFunction(()=>!!window.LT41?.trees?.length);
-  await page.waitForFunction(()=>!!document.getElementById('view').contentDocument?.getElementById('orbit')?.shadowRoot?.querySelector('.recent-card'));
+  await page.waitForFunction(()=>!!document.getElementById('view')?.contentDocument?.getElementById('orbit')?.shadowRoot?.querySelector('.recent-card'));
   assert.equal(await page.evaluate(()=>document.getElementById('view-next').contentWindow.location.href),'about:blank','기록으로 처음부터 한 장만 연다');
   assert.deepEqual(errors,[],'페이지 오류 없음');
  });

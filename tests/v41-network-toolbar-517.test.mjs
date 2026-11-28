@@ -10,6 +10,7 @@ import { stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { settleMap } from './helpers/map-contrast.mjs';
+import { evaluateWhenReady } from './helpers/visible-frame.mjs';
 
 const ROOT = path.resolve(process.env.LT_MAP_CONTRAST_ROOT || fileURLToPath(new URL('../public', import.meta.url)));
 const REQUIRE = process.env.LT_MAP_CONTRAST_REQUIRE === '1';
@@ -125,7 +126,7 @@ async function openMap(browser, base, { width, theme }) {
   await frame.waitForFunction(() => {
     const tb = document.querySelector('.topbar')?.getBoundingClientRect().bottom;
     if (!tb) return false;
-    const v = parseFloat(document.documentElement.style.getPropertyValue('--lt-picker-top') || '0');
+    const v = parseFloat(document.documentElement?.style?.getPropertyValue('--lt-picker-top') || '0');
     return Math.abs(v - (tb + 8)) < 1;
   }, null, { timeout: 10000 }).catch(() => {});
   await page.waitForTimeout(400);
@@ -203,7 +204,9 @@ test('#951 ①② 위 단추 한 줄(높이 같음·줄 수 1) + 순간 3개 작
         const more = frame.locator('.lt-screen-toolbar .lt-toolbar-more');
         if (await more.isVisible()) await more.click();
       }
-      const m = await frame.evaluate(() => {
+      const m = await evaluateWhenReady(frame, () => {
+        const root = document.documentElement;
+        if (!root || !document.body) return false;
         const vis = (el) => { if (!el) return false; const cs = getComputedStyle(el); if (cs.display === 'none' || cs.visibility === 'hidden') return false; const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
         const rect = (el) => { const r = el.getBoundingClientRect(); return { l: Math.round(r.left), r: Math.round(r.right), t: Math.round(r.top), b: Math.round(r.bottom), h: Math.round(r.height) }; };
         // 도구 줄로 옮긴 단추와 접힌 메뉴의 단추를 확인한다(이어 보기는 줄 끝 공통 단추라 세지 않는다).
@@ -246,7 +249,7 @@ test('#951 ①② 위 단추 한 줄(높이 같음·줄 수 1) + 순간 3개 작
           compact: window.__lt.compact(), edgeMax: Math.max(0, ...window.__lt.edgeLen()),
           cx: Math.round(cx), cy: Math.round(cy), missing, dots: dots.length,
           switchFit: !!swRect && swRect.right <= innerWidth + 1 && visibleSwitch.every((b) => b.l >= (swRect.left - 1) && b.r <= swRect.right + 1 && b.t >= swRect.top - 1 && b.b <= swRect.bottom + 1),
-          overflow: Math.max(0, document.documentElement.scrollWidth - innerWidth, ...boxes.map((b) => Math.max(0, b.r - innerWidth))),
+          overflow: Math.max(0, root.scrollWidth - innerWidth, ...boxes.map((b) => Math.max(0, b.r - innerWidth))),
           // CTO 지적(11-19): 390에서 트리 선택 단추가 보기 방식 묶음에 가려 '뉴진'만 보였다 — 겹침 0과 네 글자 보임을 함께 잰다.
           // CTO 지적(11-19): 390·375에서 세 보기 이름이 다 보이고 위 단추끼리 겹치지 않아야 한다.
           viewsFull: [...document.querySelectorAll('.view-switch .pill')].filter(vis).map((b) => { const r = b.getBoundingClientRect(), st = document.querySelector('.view-switch').getBoundingClientRect(); return [b.textContent.trim(), r.left >= st.left - 0.5 && r.right <= st.right + 0.5, getComputedStyle(b).fontSize]; }),
@@ -321,7 +324,7 @@ test('#951 ①② 위 단추 한 줄(높이 같음·줄 수 1) + 순간 3개 작
       assert.ok(await frame.evaluate(() => document.getElementById('netBgMenu').hidden), `${width}: Esc로 메뉴가 닫힌다`);
       await frame.click('#netBgBtn');
       await frame.click('#netBgMenu .lt-bg-item[data-bg=night]');
-      assert.equal(await frame.evaluate(() => document.documentElement.getAttribute('data-lt-board-theme')), 'night', `${width}: '밤'을 고르면 밤 판이 된다`);
+      assert.equal(await evaluateWhenReady(frame, () => document.documentElement?.dataset?.ltBoardTheme || false), 'night', `${width}: '밤'을 고르면 밤 판이 된다`);
       await context.close();
     }
   } finally {
@@ -760,6 +763,8 @@ test('#1574 밀집 이름표·점·안내 겹침 0, 가로 상세 판과 가로 
   const server = await serve();
   const base = `http://127.0.0.1:${server.address().port}`;
   const PROBE = () => {
+    const root = document.documentElement;
+    if (!root || !document.body) return false;
     const lt = window.__lt, box = lt.box(), dots = lt.dots(), labels = lt.labels();
     const effective = d => Math.max(d.r, d.tr || 0);
     const rect = l => ({ l: l.rect.l, t: l.rect.t, r: l.rect.r, b: l.rect.b });
@@ -780,7 +785,7 @@ test('#1574 밀집 이름표·점·안내 겹침 0, 가로 상세 판과 가로 
     const guide = document.querySelector('.hero p');
     const guideRect = guide?.getBoundingClientRect();
     const guideHits = guideRect ? [...labels.filter(l => hit(rect(l), guideRect)).map(l => l.id), ...dots.filter(d => hit(dotRect(d), guideRect)).map(d => d.id)] : [];
-    const doc = document.documentElement;
+    const doc = root;
     return {
       view: lt.state.view, box, dots: dots.length, labels: labels.length,
       dotOverlaps, effectiveDotOverlaps, labelOverlaps, labelClipped, labelOnDot, guideHits,
@@ -807,7 +812,7 @@ test('#1574 밀집 이름표·점·안내 겹침 0, 가로 상세 판과 가로 
         for (const [view, id] of [['network', 'viewNet'], ['tag', 'viewConc'], ['time', 'viewGraph']]) {
           await frame.evaluate(id => { window.__lt.overview(false); document.getElementById(id).click(); }, id);
           await settleMap(frame, { timeout: 8000 });
-          const overview = await frame.evaluate('(' + PROBE.toString() + ')()');
+          const overview = await evaluateWhenReady(frame, '(' + PROBE.toString() + ')()');
           assert.equal(overview.view, view, `${tag}: ${view} 보기`);
           assert.ok(overview.labels > 1, `${tag}: ${view} 전체 보기 이름표가 1개보다 많다(${overview.labels})`);
           assert.equal(overview.dotOverlaps, 0, `${tag}: ${view} 전체 보기 점 겹침 0`);
@@ -820,7 +825,7 @@ test('#1574 밀집 이름표·점·안내 겹침 0, 가로 상세 판과 가로 
           for (const zoom of ['zoomIn', 'zoomOut']) {
             await frame.evaluate(id => document.getElementById(id).click(), zoom);
             await settleMap(frame, { timeout: 8000 });
-            const m = await frame.evaluate('(' + PROBE.toString() + ')()');
+            const m = await evaluateWhenReady(frame, '(' + PROBE.toString() + ')()');
             assert.equal(m.dotOverlaps, 0, `${tag}: ${view}/${zoom} 점 겹침 0`);
             assert.equal(m.effectiveDotOverlaps, 0, `${tag}: ${view}/${zoom} 썸네일 포함 점 겹침 0`);
             assert.equal(m.labelOverlaps, 0, `${tag}: ${view}/${zoom} 이름표 겹침 0`);

@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 import { serve } from './helpers/screen-audit.mjs';
+import { evaluateWhenReady } from './helpers/visible-frame.mjs';
 import { testBackNavigation } from './helpers/history-assert.mjs';
 import { createTree, addMoment } from '../public/v41/domain.mjs';
 
@@ -30,14 +31,19 @@ async function openShelf(browser, origin, width = 1440, count = 1) {
   await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
   await page.evaluate(() => { location.hash = '#my/shelf'; });
   await page.waitForFunction(() => [...document.querySelectorAll('iframe')].some((f) => {
-    try { return /track32-bookshelf/.test(f.contentWindow.location.href) && f.contentDocument.querySelector('.book-card'); } catch { return false; }
+    const doc = f.contentDocument;
+    return !!doc && /track32-bookshelf/.test(doc.URL) && !!doc.querySelector('.book-card');
   }), null, { timeout: 15000 });
   await page.waitForFunction(() => { const f = document.querySelector('#view:not([hidden])'); return f?.contentDocument?.documentElement?.dataset?.v41Screen === 'shelf'; }, null, { timeout: 15000 });
   await page.waitForTimeout(300);
   return { ctx, page };
 }
 
-const countBooks = (page) => page.evaluate(() => [...document.querySelectorAll('iframe')].reduce((n, f) => { try { return n + f.contentDocument.querySelectorAll('.book-card').length; } catch { return n; } }, 0));
+const countBooks = (page) => evaluateWhenReady(page, () => {
+  const frame = [...document.querySelectorAll('iframe')].find((f) => !f.hidden && /track32-bookshelf/.test(f.contentDocument?.URL || ''));
+  const doc = frame?.contentDocument;
+  return doc ? doc.querySelectorAll('.book-card').length : false;
+});
 
 for (const [name, fn] of [
   ['서재 + 새 트리 → 트리 만들기 창', async (page) => {
@@ -59,7 +65,8 @@ for (const [name, fn] of [
     await page.evaluate((t) => { window.LT41.trees.push(t); }, fresh);
     await shelf.evaluate(() => window.dispatchEvent(new MessageEvent('message', { data: { type: 'lt41-trees-renamed', titles: [] }, origin: location.origin, source: window.parent })));
     await page.waitForFunction(() => [...document.querySelectorAll('iframe')].some((f) => {
-      try { return /track32-bookshelf/.test(f.contentWindow.location.href) && f.contentDocument.querySelectorAll('.book-card').length === 2; } catch { return false; }
+      const doc = f.contentDocument;
+      return !!doc && /track32-bookshelf/.test(doc.URL) && doc.querySelectorAll('.book-card').length === 2;
     }), null, { timeout: 10000 });
     const after = await countBooks(page);
     assert.equal(after, 2, '책 수 = 트리 수');
