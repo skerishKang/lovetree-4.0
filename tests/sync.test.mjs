@@ -37,13 +37,15 @@ function fakeApi(script) {
   };
 }
 
-function harness({ initial, api, storage = new Map(), on = null }) {
+function harness({ initial, api, storage = new Map(), schedule, cancelSchedule, on = null }) {
   let state = initial;
   const navigated = [];
   const controller = createSyncController({
     getState: () => state,
     replaceState: (next) => { state = next; },
     api,
+    schedule,
+    cancelSchedule,
     storage: {
       getItem: (key) => (storage.has(key) ? storage.get(key) : null),
       setItem: (key, value) => { storage.set(key, String(value)); return undefined; }
@@ -234,4 +236,38 @@ test('저장 중 세션 만료는 상단 로그인 버튼을 안내한다', asyn
   made.edit(doc('수정')); made.controller.markLocalSave(); await made.settle();
   assert.match(notices[0].message,/오른쪽 위 로그인 버튼/);
   assert.deepEqual(notices[0].actions,[]);
+});
+
+test('4.0 저장 API는 429의 Retry-After를 읽는다', async () => {
+  const api = createWorkspaceApi({fetchImpl:async () => new Response(JSON.stringify({error:{code:'rate_limited',retryAfterSeconds:7}}), {status:429, headers:{'retry-after':'9'}})});
+  const result = await api.put({state:EMPTY, expectedRevision:0, clientKey:'rate-header'});
+  assert.equal(result.status,429);
+  assert.equal(result.retryAfterSeconds,7);
+});
+
+test('4.0 저장 429는 보관본을 유지하고 Retry-After·2→4→8초 뒤 다시 시도한다', async () => {
+  const limited = {ok:false,status:429,code:'rate_limited',retryAfterSeconds:7};
+  const api = fakeApi({get:[okGet(0,EMPTY)],put:[limited,limited,limited,limited,limited,okPut(1)]});
+  const timers = [];
+  const made = harness({
+    initial:EMPTY, api,
+    schedule:(fn,ms)=>{timers.push({fn,ms});return timers.length;},
+    cancelSchedule:()=>{}
+  });
+  await made.controller.start();
+  made.edit(doc('429 복구')); made.controller.markLocalSave(); await made.settle();
+  assert.equal(made.controller.status().phase,'throttled');
+  assert.equal(made.controller.snapshot().dirty,true);
+  assert.deepEqual(timers.map(timer=>timer.ms),[7000]);
+  for (const expected of [2000,4000,8000]) {
+    timers.shift().fn(); await made.settle();
+    assert.equal(made.controller.status().phase,'throttled');
+    assert.deepEqual(timers.map(timer=>timer.ms),[expected]);
+  }
+  timers.shift().fn(); await made.settle();
+  assert.equal(made.controller.status().phase,'throttled');
+  assert.deepEqual(made.controller.status().actions.map(action=>action.name),['retry','backup']);
+  await made.controller.act('retry');
+  assert.equal(made.controller.status().phase,'synced');
+  assert.equal(new Set(api.puts().map(body=>body.clientKey)).size,1);
 });

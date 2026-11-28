@@ -388,14 +388,10 @@
         "        run: |",
         "          LT_SCREEN_AUDIT_SHARD=b LT_SCREEN_AUDIT_REQUIRE=1 node --test --test-name-pattern='^#657 화면 공통 검사기' tests/v41-screen-audit.test.mjs > /tmp/screen-audit.log 2>&1 & pid=$!",
         "        run: |",
-        "        timeout-minutes: 10",
-        "        run: |",
-        "          LT_SCREEN_AUDIT_SHARD=c LT_SCREEN_AUDIT_REQUIRE=1 node --test --test-name-pattern='^#657 화면 공통 검사기' --test-name-pattern='^#657 후속' tests/v41-screen-audit.test.mjs > /tmp/screen-audit.log 2>&1 & pid=$!",
         "        run: |"
       ],
       "timeouts": [
         "    timeout-minutes: 40",
-        "        timeout-minutes: 10",
         "        timeout-minutes: 10",
         "        timeout-minutes: 10",
         "        timeout-minutes: 10"
@@ -413,6 +409,7 @@
         "tests/v41-font-floor-548.test.mjs",
         "tests/v41-frame-blank-996.test.mjs",
         "tests/v41-local-date-547.test.mjs",
+        "tests/v41-screen-audit.test.mjs",
         "tests/v41-share-guest-635.test.mjs",
         "tests/v41-theme-ab.test.mjs",
         "tests/v41-token-color-886.test.mjs"
@@ -453,7 +450,10 @@
         "          node --test --test-concurrency=1 --test-name-pattern='^970' tests/admin-view.test.mjs",
         "        timeout-minutes: 25",
         "        run: |",
-        "          node --test --test-concurrency=1 tests/v41-share-guest-635.test.mjs"
+        "          node --test --test-concurrency=1 tests/v41-share-guest-635.test.mjs",
+        "        timeout-minutes: 10",
+        "        run: |",
+        "          LT_SCREEN_AUDIT_SHARD=c LT_SCREEN_AUDIT_REQUIRE=1 node --test --test-name-pattern='^#657 화면 공통 검사기' --test-name-pattern='^#657 후속' tests/v41-screen-audit.test.mjs > /tmp/screen-audit.log 2>&1 & pid=$!"
       ],
       "timeouts": [
         "    timeout-minutes: 55",
@@ -468,7 +468,8 @@
         "        timeout-minutes: 6",
         "        timeout-minutes: 6",
         "        timeout-minutes: 25",
-        "        timeout-minutes: 25"
+        "        timeout-minutes: 25",
+        "        timeout-minutes: 10"
       ],
       "retries": [
         "            if curl -fLsS --retry 2 --connect-timeout 10 --max-time 90 \"https://raw.githubusercontent.com/notofonts/noto-cjk/f8d157532fbfaeda587e826d4cd5b21a49186f7c/Sans/OTC/NotoSansCJK-Regular.ttc\" -o \"$noto_font\"; then"

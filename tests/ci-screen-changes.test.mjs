@@ -180,10 +180,11 @@ test('#1413 5단계: 옮긴 시험 위치·보드 둘째 잡 고르기·공통 �
   assert.equal(checkScreenResults(complete('all', {'screen-board-b':{result:'failure'}})).ok, false);
   assert.equal(checkScreenResults(complete('screen-board,screen-board-b,screen-common-a,screen-common-b', {'screen-board-b':{result:'skipped'}})).ok, false, '보드를 골랐는데 보드 둘째가 건너뛰면 실패');
   assert.equal(checkScreenResults(complete('screen-home,screen-common-a,screen-common-b', {'screen-board-b':{result:'skipped'}})).ok, true, '보드를 고르지 않았으면 건너뜀 통과');
-  // 공통 검사기: a는 이름 거르기 없이 파일 전부(새 시험도 여기서 돈다), b·c는 #657 두 시험만 각자 조합으로 돈다.
+  // 공통 검사기: a/b는 공통 A, c는 공통 B에서 돌되 원래 명령·조합은 유지한다.
   const audit = {};
   for (const s of ['a', 'b', 'c']) {
-    const runs = (jobBody('screen-common-a').match(/LT_SCREEN_AUDIT_SHARD=\w .*tests\/v41-screen-audit\.test\.mjs/g) || [])
+    const owner = s === 'c' ? 'screen-common-b' : 'screen-common-a';
+    const runs = (jobBody(owner).match(/LT_SCREEN_AUDIT_SHARD=\w .*tests\/v41-screen-audit\.test\.mjs/g) || [])
       .filter(line => line.startsWith('LT_SCREEN_AUDIT_SHARD=' + s + ' '));
     assert.equal(runs.length, 1, `공통 검사기 ${s}는 검사 파일을 한 번 돈다`);
     assert.ok(runs[0].startsWith(`LT_SCREEN_AUDIT_SHARD=${s} `), `공통 검사기 ${s}는 자기 조합을 고른다`);

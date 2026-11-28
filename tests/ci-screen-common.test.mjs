@@ -21,8 +21,11 @@ test('#1611 공통 소유 시험 목록은 단일 권한표에서 나오고 두 
     Object.keys(TEST_OWNERS).filter(file=>TEST_OWNERS[file].includes('common')).sort());
   for(const file of COMMON_OWNER_TESTS){
     const holders=Object.entries(jobs).filter(([,files])=>files.has(file)).map(([name])=>name);
-    assert.equal(holders.length,1,file+' 공통 잡 간 파일 중복·누락 없음');
-    assert.ok(common.includes(holders[0]),file+' 공통 소유는 공통 잡에만 있다');
+    if(file==='tests/v41-screen-audit.test.mjs')
+      assert.deepEqual(holders,common,'공통 검사기 파일은 A의 a/b, B의 c 묶음에 각 한 번');
+    else
+      assert.equal(holders.length,1,file+' 공통 잡 간 파일 중복·누락 없음');
+    assert.ok(holders.every(name=>common.includes(name)),file+' 공통 소유는 공통 잡에만 있다');
   }
   for(const [job,files] of Object.entries(jobs))
     if(!common.includes(job))
@@ -84,12 +87,17 @@ test('#1611 예약 전체 검사와 네 필수 검사 이름·실행기 분배�
   assert.match(workflow,/workflow_dispatch:/);
   assert.match(body('screen-common-a'),/runs-on: .*needs\.runner_picker\.outputs\.screen_common_a/);
   assert.match(body('screen-common-b'),/runs-on: .*needs\.runner_picker\.outputs\.screen_common_b/);
-  const runs=body('screen-common-a').match(/LT_SCREEN_AUDIT_SHARD=[abc] .*tests\/v41-screen-audit\.test\.mjs/g)||[];
-  assert.equal(runs.length,3,'공통 검사 A/B/C 원래 세 실행 조합 유지');
-  for(const shard of ['a','b','c'])
-    assert.ok(runs.some(line=>line.startsWith('LT_SCREEN_AUDIT_SHARD='+shard+' ')),'검사 조합 '+shard);
-  assert.equal((body('screen-common-a').match(/timeout-minutes: 10/g)||[]).length,4,
-    '글꼴 준비 10분과 각 검사 조합 10분 상한 유지');
+  const runsA=body('screen-common-a').match(/LT_SCREEN_AUDIT_SHARD=[abc] .*tests\/v41-screen-audit\.test\.mjs/g)||[];
+  const runsB=body('screen-common-b').match(/LT_SCREEN_AUDIT_SHARD=[abc] .*tests\/v41-screen-audit\.test\.mjs/g)||[];
+  assert.equal(runsA.length,2,'공통 검사 A의 a/b 두 실행 조합');
+  assert.equal(runsB.length,1,'공통 검사 B의 c 한 실행 조합');
+  for(const shard of ['a','b'])
+    assert.ok(runsA.some(line=>line.startsWith('LT_SCREEN_AUDIT_SHARD='+shard+' ')),'A 검사 조합 '+shard);
+  assert.ok(runsB[0].startsWith('LT_SCREEN_AUDIT_SHARD=c '),'B 검사 조합 c');
+  assert.equal((body('screen-common-a').match(/timeout-minutes: 10/g)||[]).length,3,
+    'A 글꼴 준비와 a/b 검사 각각 10분 상한');
+  assert.equal((body('screen-common-b').match(/timeout-minutes: 10/g)||[]).length,2,
+    'B 글꼴 준비와 c 검사 각각 10분 상한');
   const deps=body('preview').match(/needs: \[([^\]]+)\]/)?.[1].split(',').map(s=>s.trim());
   assert.ok(deps);
   for(const name of common)assert.ok(deps.includes(name),name+' 필수 집계 의존성');

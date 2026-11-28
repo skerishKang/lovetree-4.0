@@ -499,3 +499,24 @@ test('#1480 작은 영상 썸네일 실패 시 대체 표지로 바뀌고 깨진
  const computed=thumbFallbackAttrs({title:'첫 순간',type:'video',url:'https://youtu.be/abc123DEF45'},{candidates,mode:'thumb-slot'});
  assert.match(computed,/lt-recent-fallback/,'기존 대체 표지를 사용해야 합니다');
 });
+
+test('#1530 cold late success restores a recent video thumbnail after transient fallback', () => {
+ const candidates=['https://i.ytimg.com/vi/abc123DEF45/oardefault.jpg','https://i.ytimg.com/vi/abc123DEF45/hqdefault.jpg'];
+ const attrs={'data-lt-candidates':JSON.stringify(candidates),'data-lt-cand-index':'0','data-lt-fallback-mode':'recent-video','data-lt-fallback-html':'<span class="lt-recent-fallback">제목 대체</span>'};
+ let fallback=null;const removed=[];
+ const media={dataset:{recentState:'loading'},classList:{contains:n=>n==='vertical'},style:{setProperty(k,v){this[k]=v}},querySelector(s){if(s==='.lt-recent-fallback')return fallback;return null},insertAdjacentHTML(_where,html){fallback={html,remove(){removed.push(html);fallback=null}}}};
+ const img={dataset:{ltFallbackMode:'recent-video'},complete:false,naturalWidth:0,src:candidates[0],currentSrc:candidates[0],getAttribute:k=>attrs[k]??null,setAttribute(k,v){attrs[k]=String(v)},closest:s=>s==='.recent-media'?media:null};
+ assert.equal(applyThumbOutcome(img,{error:true})?.status,'retry');
+ assert.equal(media.dataset.recentState,'loading');
+ assert.equal(fallback,null);
+ assert.equal(applyThumbOutcome(img,{error:true})?.status,'fallback');
+ assert.equal(media.dataset.recentState,'failed');
+ assert.ok(fallback,'all first requests failed; fallback visible');
+ img.currentSrc=candidates[1];img.naturalWidth=480;img.complete=true;
+ assert.equal(applyThumbOutcome(img,{naturalWidth:480,naturalHeight:360})?.status,'ok','a late valid image recovers after failed status');
+ assert.equal(media.dataset.recentState,'ready');
+ assert.equal(img.dataset.ltThumbState,'ok');
+ assert.equal(fallback,null,'recovered image removes obsolete title fallback');
+ assert.equal(removed.length,1);
+ assert.ok(media.style['--lt-recent-bg'].includes('hqdefault.jpg'),'vertical blurred background follows recovered thumbnail');
+});

@@ -219,7 +219,8 @@ function focusSettingsSection(section=''){
  paintSettingsTab(tabId);
  const foldFor={data:'account-settings-more',records:'account-settings-records-more',write:'account-settings-records-more',share:'account-settings-records-more',look:'account-settings-screen-more'};
  const fold=$(foldFor[section]||'');if(fold)fold.open=true;
- queueMicrotask(()=>{const heading=$( {data:'settings-data-title',profile:'settings-profile-title',screen:'settings-screen-title',records:'settings-records-title',account:'settings-account-title'}[section]||'');if(heading){heading.scrollIntoView({block:'start'});heading.focus({preventScroll:true});}});
+ // #1636: 중복 제목 대신 탭으로 이름 붙인 본문 자체에 초점을 옮긴다.
+ queueMicrotask(()=>{const target=$( {data:'settings-data-title',profile:'account-settings-profile',screen:'account-settings-screen',records:'account-settings-records',account:'account-settings-account'}[section]||'');if(target){target.scrollIntoView({block:'start'});target.focus({preventScroll:true});}});
 }
 // #368: 프로필 묶음 표시. 동그라미 글자는 표시 이름 첫 글자 → 이메일 첫 글자 → 나(#368 2차, header-state 규칙),
 // 색은 고른 색이고 고르지 않으면 지금 기본색이다. 이메일은 가리지 않는다(자기 계정 화면).

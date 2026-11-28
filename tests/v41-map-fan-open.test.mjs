@@ -305,8 +305,24 @@ test('#1378 지도 영상: 상세와 크게 보기 390·1440 × 밤·정원', {s
         await page.waitForFunction(()=>!!document.querySelector('#detailPlayer .lt-media'),null,{timeout:10000});
         const capture=process.env.LT_MAP_YT_CAPTURE_DIR;
         if(capture){const fs=await import('node:fs');fs.mkdirSync(capture,{recursive:true});await page.screenshot({path:path.join(capture,'before-'+width+'-'+theme+'.png')});}
-        const detail=page.locator('#detailPlayer'), play=detail.locator('[data-lt-play]');
-        assert.equal(await play.count(),1,'상세 썸네일');
+        const detail=page.locator('#detailPlayer'), play=detail.locator('.lt-media-toolbar button[data-lt-play]');
+        assert.equal(await play.count(),1,'상세 썸네일 아래 재생 단추');
+        const placement=await detail.evaluate(el=>{
+          const poster=el.querySelector('.lt-yt-preview'),button=el.querySelector('.lt-media-toolbar button[data-lt-play]');
+          if(!poster||!button)return null;
+          const a=poster.getBoundingClientRect(),b=button.getBoundingClientRect();
+          const expand=el.querySelector('button[data-lt-expand]'),c=expand?.getBoundingClientRect();
+          return {overlays:poster.querySelectorAll('button,a,[role="button"]').length,
+            text:poster.innerText.trim(),below:b.top>=a.bottom-.5,width:b.width,height:b.height,
+            name:button.getAttribute('aria-label'),overlap:c?Math.max(0,Math.min(b.right,c.right)-Math.max(b.left,c.left))*Math.max(0,Math.min(b.bottom,c.bottom)-Math.max(b.top,c.top)):0};
+        });
+        assert.ok(placement,width+'/'+theme+': 위치 측정');
+        assert.equal(placement.overlays,0,width+'/'+theme+': 썸네일 위 버튼 0');
+        assert.equal(placement.text,'',width+'/'+theme+': 썸네일 위 글자 0');
+        assert.equal(placement.below,true,width+'/'+theme+': 재생 단추가 썸네일 아래');
+        assert.ok(placement.width>=44&&placement.height>=44,width+'/'+theme+': 누름 영역 44px');
+        assert.equal(placement.name,'바로 재생',width+'/'+theme+': 화면 읽기 이름 유지');
+        assert.equal(placement.overlap,0,width+'/'+theme+': 크게 보기와 겹침 0');
         assert.equal(await detail.locator('iframe').count(),0,'상세 초기 iframe 0');
         await play.focus();await play.press('Enter');
         await page.waitForSelector('#ltViewer.open',{timeout:8000});

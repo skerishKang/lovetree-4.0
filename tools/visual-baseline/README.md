@@ -82,3 +82,17 @@ node tools/visual-baseline/visual-baseline.mjs compare --before visual-before --
 | **표지 합성 레이어까지 고정** | **0** | **0.0000%** | **0.0000%** |
 
 별도 비공개 시험 서버에서 실제로 노란색 안내 요소를 강제로 추가하니 네 장 모두 0.6218~2.4487% 차이로 기존 기준을 넘었다. **헛알림은 감소하고 정상 변경 감지는 유지**됨을 검증했다. 앞의 4장은 빠른 국소 재현이며 CI의 19장 전체를 재실행한 수치라고 주장하지 않는다.
+
+## #1626: 알림·새 소식·상태 표시 전용 장면
+
+일반 장면과 `capture-stability.mjs`의 알림 숨김 규칙은 그대로 유지한다. 별도 `home-notices-*`, `shelf-notices-*` 장면만 1440×900·390×844, 밤 테마에 각 1장씩 총 4장 추가한다. 기존 장면의 이름과 판정 기준(기본 0.1%, 보드 0.5%)은 바꾸지 않는다.
+
+전용 장면은 실제 화면의 `#toast`(알림), `#updates-card`(새 소식), `#save-feedback`(상태 표시)에 고정 문구를 넣는다. 촬영 시에만 숨김을 해제하고 기존 제품의 띠 위치 CSS를 사용한다. 촬영마다 다른 알림 문구나 애니메이션은 비교 대상에 넣지 않는다.
+
+```sh
+node tools/visual-baseline/visual-baseline.mjs capture --base http://127.0.0.1:4461/v41/ --out before --scenes home-notices,shelf-notices
+node tools/visual-baseline/visual-baseline.mjs capture --base http://127.0.0.1:4461/v41/ --out after --scenes home-notices,shelf-notices
+node tools/visual-baseline/visual-baseline.mjs compare --before before --after after --out diff --json diff.json
+```
+
+알림 검출 시험에서는 마지막 촬영 명령에 `--notice-shift 32`를 붙여 새 소식 띠만 아래로 32px 옮기고, 원본 사진과 비교해 0.1% 초과를 확인한다. 이 선택지는 전용 장면에만 적용되며 운영 화면과 기존 장면에는 영향을 주지 않는다. 비교는 기존과 동일하게 알림용이다.

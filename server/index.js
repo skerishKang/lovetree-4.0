@@ -45,6 +45,8 @@ import { verifyProxyProof, logProxyProofStartup, createProxyProofMismatchLogger,
 import { createDeletedAccountGuard } from './account-guard.js';
 import { createTrustedAccountDeleteHandler, createSharedAccountDeletionWorkflow } from './shared-account-deletion.js';
 import { createVerifier } from './padiem-access-verify.mjs';
+import { createRateLimiter } from './rate-limit.js';
+import { createRateLimitRepo } from './db/rate-limit-postgres.js';
 
 const {
   LOVETREE_DATABASE_URL = '',
@@ -71,6 +73,8 @@ const noLegacySession = async () => { throw new ApiError(401, 'unauthenticated',
 const maxBodyBytes = Number(LOVETREE_MAX_BODY_BYTES || 0) || undefined;
 const pool = await createPool(LOVETREE_DATABASE_URL);
 const repo = createWorkspaceRepo(pool);
+const rateLimitStore = createRateLimitRepo(pool, { productId: LOVETREE_PRODUCT_ID });
+const rateLimiter = createRateLimiter({ store: rateLimitStore });
 // #538 공개가 기본: 공유 행이 트리의 공개 핸들이다. 저장 성공 뒤 같은 훅에서 자동 공개 행과
 // moment_count 를 동기화하고, 둘러보기 SQL 은 moment_count>=3 으로 거른다.
 // 비공개는 누구나 무료로 바꿀 수 있다 — 본인 트리만 바꿀 수 있다(#830).
@@ -91,6 +95,13 @@ const visitCounts = createShareVisitsService({ repo: createShareVisitsRepo(pool)
 void visitCounts.prune().catch(() => {});
 const visitRetentionTimer = setInterval(() => { void visitCounts.prune().catch(() => {}); }, 15 * 60 * 1000);
 visitRetentionTimer.unref?.();
+void rateLimitStore.prune().catch(() => {});
+void shareRepo.prunePreviews().catch(() => {});
+const requestLimitRetentionTimer = setInterval(() => {
+  void rateLimitStore.prune().catch(() => {});
+  void shareRepo.prunePreviews().catch(() => {});
+}, 15 * 60 * 1000);
+requestLimitRetentionTimer.unref?.();
 const shareService = createShareService({
   visitCounts,
   shareRepo,
@@ -101,13 +112,15 @@ const shareService = createShareService({
   discoverRepo,
   pendingShowSync: shareShowPending,
   productId: LOVETREE_PRODUCT_ID,
-  admin
+  admin,
+  rateLimiter
 });
 const service = createWorkspaceService({
   repo,
   productId: LOVETREE_PRODUCT_ID,
   onCommit: ({ subjectId, changedTreeIds }) => shareService.afterSave(subjectId, changedTreeIds),
-  onAccess: ({ subjectId }) => shareService.retryPendingVisibleSync(subjectId).catch(() => {})
+  onAccess: ({ subjectId }) => shareService.retryPendingVisibleSync(subjectId).catch(() => {}),
+  rateLimiter
 });
 const authenticate = createSharedAccessAuth({ enabled: true, legacy: noLegacySession });
 // 계정 탈퇴 (2026-11-03). 파일 저장소는 미디어 경로와 같은 인스턴스를 쓴다 — 삭제가 같은 폴더를 정리한다.
@@ -141,6 +154,7 @@ accountDeletionRetentionTimer.unref?.();
 const guardedAuthenticate = createDeletedAccountGuard({ authenticate, account: accountService, productId: LOVETREE_PRODUCT_ID });
 const publicOrigins = [process.env.LOVETREE_PUBLIC_ORIGIN, ...(process.env.LOVETREE_ADDITIONAL_PUBLIC_ORIGINS || '').split(',')]
   .map((origin) => String(origin || '').trim()).filter(Boolean);
+const proxyProofTrusted = request => verifyProxyProof(request, { secret: LOVETREE_PROXY_SECRET, enforce: true }).reason === 'valid';
 const storageHandler = createApiHandler({
   authenticate: guardedAuthenticate,
   accountDeleteAuthenticate: authenticate,
@@ -151,10 +165,12 @@ const storageHandler = createApiHandler({
   admin,
   adminStats,
   account: accountService,
-  allowedOrigins: publicOrigins
+  allowedOrigins: publicOrigins,
+  proxyProofTrusted
 });
 const shareHandler = createShareHandler({
-  visitProxyTrusted: request => verifyProxyProof(request, { secret: LOVETREE_PROXY_SECRET, enforce: true }).reason === 'valid',
+  visitProxyTrusted: proxyProofTrusted,
+  proxyProofTrusted,
  authenticate: guardedAuthenticate,
  service: shareService,
  productId: LOVETREE_PRODUCT_ID
@@ -270,6 +286,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
     if (stopping) return;
     stopping = true;
     clearInterval(visitRetentionTimer);
+    clearInterval(requestLimitRetentionTimer);
     const closed = new Promise(resolve => server.close(resolve));
     await nodeHandler.closeAfterResponse();
     await closed;

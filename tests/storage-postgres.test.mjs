@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { addMoment, createTree, linkMoments, validateState } from '../src/domain.js';
 import { createApiHandler } from '../server/http.js';
 import { createWorkspaceService } from '../server/workspace-service.js';
-import { applySchema, createWorkspaceRepo } from '../server/db/postgres.js';
+import { applySchema, createPool, createWorkspaceRepo } from '../server/db/postgres.js';
+import { createRateLimitRepo } from '../server/db/rate-limit-postgres.js';
 import { assertIsolatedTestDatabase } from '../server/testing/isolated-test-database.js';
 
 /**
@@ -206,4 +207,21 @@ test('a stored deviant tree is quarantined on read and kept in storage through a
     assert.equal(again.body.quarantined, 1);
     assert.equal(again.body.state.trees[0].moments.some(m => m.title === '다시 저장한 순간'), true);
   });
+});
+
+test('PostgreSQL request counters enforce the window and recover after it expires', { skip }, async () => {
+  assertIsolatedTestDatabase(DATABASE_URL);
+  const pool = await createPool(DATABASE_URL, { max: 2 });
+  try {
+    await applySchema(pool);
+    const store = createRateLimitRepo(pool, { productId: PRODUCT });
+    const key = `rate-${suffix()}`;
+    await store.rate({key, limit:2, windowMs:100, message:'잠시 뒤 다시 시도해 주세요.'});
+    await store.rate({key, limit:2, windowMs:100, message:'잠시 뒤 다시 시도해 주세요.'});
+    await assert.rejects(() => store.rate({key, limit:2, windowMs:100, message:'잠시 뒤 다시 시도해 주세요.'}), error => error.status === 429 && error.details.retryAfterSeconds > 0);
+    await new Promise(resolve => setTimeout(resolve, 120));
+    await store.rate({key, limit:2, windowMs:100, message:'잠시 뒤 다시 시도해 주세요.'});
+  } finally {
+    await pool.end();
+  }
 });

@@ -10,6 +10,8 @@ import { applySchema, createPool } from '../server/db/postgres.js';
 const TABLES = [
   'lovetree_workspaces',
   'lovetree_request_claims',
+  'lovetree_rate_limits',
+  'lovetree_share_previews',
   'lovetree_login_states',
   'lovetree_product_roles',
   'lovetree_product_role_audit',
