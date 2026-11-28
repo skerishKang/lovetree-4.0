@@ -473,3 +473,17 @@ html[data-lt-theme=garden] #pbRestart{border-color:var(--lt-primary,#c76e8b);bac
 #pbCloseBottom{margin-left:0}
 }
 html[data-lt-theme=garden] .playback-controls{background:linear-gradient(180deg,transparent,rgba(247,240,232,.96) 32%)}
+
+/* #1605: ?곗뒪?ы넲??'梨낆옣 ?섍린湲? ?덈궡??移대뱶 ?꾧? ?꾨땶 梨?諛??щ갚???좉퉸 ?쒖떆?쒕떎.
+   梨??섎떒???댁쟾쨌?ㅼ쓬 ?대룞 ?뚯빟 ?꾨옒???먭퀬 洹??먮━???덈뜕 '?곌껐 ?댁쑀'? 寃뱀튂吏 ?딅뒗?? */
+@media(min-width:900px) and (min-height:580px){
+  html[data-v41-screen=book] .turn-why{
+    top:calc(100% + 60px);bottom:auto;left:50%;width:min(440px,70vw);
+    transform:translateX(-50%) translateY(8px);padding:7px 12px;
+    border-radius:10px;
+  }
+  html[data-v41-screen=book] .turn-why.show{transform:translateX(-50%)}
+  html[data-v41-screen=book] .turn-why b{display:inline;font-size:11px;letter-spacing:.07em;margin:0 8px 0 0}
+  html[data-v41-screen=book] .turn-why span{font-size:12px;line-height:1.35}
+  html[data-v41-screen=book] .book-wrap.turning .why-margin{opacity:0}
+}
