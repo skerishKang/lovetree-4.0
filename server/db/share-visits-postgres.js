@@ -50,15 +50,15 @@ export function createShareVisitsRepo(pool) {
                AND NOT EXISTS (SELECT 1 FROM lovetree_tree_visibility v WHERE v.product_id=s.product_id AND v.subject_id=s.subject_id AND v.tree_id=s.tree_id AND v.visibility='private')
                AND NOT EXISTS (SELECT 1 FROM lovetree_shares h JOIN lovetree_community_hidden_shares x ON x.product_id=h.product_id AND x.share_id=h.share_id WHERE h.product_id=s.product_id AND h.subject_id=s.subject_id AND h.tree_id=s.tree_id)
            ), claimed AS (
-             INSERT INTO lovetree_share_visit_dedup (product_id,share_id,visitor_hash,expires_at)
+             INSERT INTO lovetree_share_visit_dedup AS dedup (product_id,share_id,visitor_hash,expires_at)
              SELECT $1,$2,($3::text[])[1],$5 FROM eligible
              WHERE NOT EXISTS (SELECT 1 FROM lovetree_share_visit_dedup d
                WHERE d.product_id=$1 AND d.share_id=$2 AND d.visitor_hash=ANY($3::text[])
                  AND d.expires_at > $4::timestamptz
                  AND d.expires_at < $4::timestamptz + 2 * ($5::timestamptz - $4::timestamptz))
              ON CONFLICT (product_id,share_id,visitor_hash) DO UPDATE
-               SET expires_at=EXCLUDED.expires_at
-               WHERE EXCLUDED.expires_at>lovetree_share_visit_dedup.expires_at
+               SET expires_at=CASE WHEN EXCLUDED.expires_at>dedup.expires_at
+                 THEN EXCLUDED.expires_at ELSE dedup.expires_at END
              RETURNING 1
            ), bumped AS (
              INSERT INTO lovetree_share_visits (product_id,share_id,visits)
