@@ -570,9 +570,10 @@
     const pickerTop = (topbarBottom || 102) + 22;
     document.documentElement.style.setProperty('--lt-picker-top', pickerTop.toFixed(0) + 'px');
     /* #951 ⑤: 좁은 화면에서 상세 시트가 아래 묶음 단추 줄을 덮지 않게 그 줄 높이를 재어 넘긴다. */
+    const sheetBase = bottom ? vh - bottom.top + 8 : 104;
     document.documentElement.style.setProperty(
       '--lt-sheet-bottom',
-      (bottom ? vh - bottom.top + 8 : 104).toFixed(0) + 'px'
+      (sheetBase + toastSheetExtra).toFixed(0) + 'px'
     );
     /* #951 ⑥: 넓은 화면 묶음 카드·토스트는 아래 단추 줄 위에 앉는다 — 줄 위 끝(화면 아래에서부터의 높이)을 넘긴다. */
     document.documentElement.style.setProperty(
@@ -591,11 +592,14 @@
       '--lt-sheet-top',
       (picker ? pickerTop + picker.height + 8 : 190).toFixed(0) + 'px'
     );
-    /* #951 ⑤: 넓은 화면(981px 이상)에서 상세 판이 열리면 지도 판이 판 너비만큼 왼쪽으로 줄어든다(보드 #891과 같게).
-    판에 가려진 자리에 고른 순간이 놓이지 않도록 오른쪽 여백으로 판을 비켜 준다. 좁은 화면은 아래 시트라 그대로 덮는다. */
-    const detailOpen = vw > 980 && !!document.querySelector('#detail.open'),
-      detailInset = detailOpen ? 446 : 0;
+    const toolbar = box(document.querySelector('.lt-screen-toolbar'));
+    /* #951 ⑤: 상세 판이 실제로 차지하는 오른쪽 영역만큼 지도를 비켜 낸다. */
+    const detailEl = vw > 640 ? document.querySelector('#detail.open') : null;
+    const detailLeft = detailEl
+      ? detailEl.offsetLeft + (detailEl.offsetParent?.getBoundingClientRect().left || 0)
+      : null;
     const tops = ['.topbar', '.hero p'].map(s => box(document.querySelector(s))).filter(Boolean);
+    if (toolbar) tops.push(toolbar);
     const topInset = Math.max(0, ...tops.map(r => r.bottom), picker ? pickerTop + picker.height + 4 : 0) +
       (state.mobile ? 30 : 0);
     const bottomInset = bottom ? vh - bottom.top : 0;
@@ -605,7 +609,7 @@
     return {
       top: topInset,
       left: left ? left.right : 0,
-      right: Math.max(right ? vw - right.left : 0, detailInset),
+      right: Math.max(right ? vw - right.left : 0, detailLeft == null ? 0 : vw - detailLeft),
       bottom: Math.max(bottomInset, balance)
     };
   }
@@ -1052,7 +1056,17 @@
   function paintDetail(n) {
     const { raw, clean, sub } = autoTitleOf(n);
     $('detailKicker').textContent = n.first ? '첫 순간' : '순간';
-    $('detailTitle').textContent = clean;
+    const title = $('detailTitle'), titleToggle = $('detailTitleToggle');
+    title.textContent = clean;
+    title.classList.add('is-clamped');
+    title.classList.remove('is-expanded');
+    titleToggle.hidden = true;
+    titleToggle.textContent = '제목 전체 보기';
+    titleToggle.setAttribute('aria-expanded', 'false');
+    requestAnimationFrame(() => {
+      if (state.selected?.id !== n.id) return;
+      titleToggle.hidden = title.scrollHeight <= title.clientHeight + 1;
+    });
     const ds = $('detailSub');
     if (ds) {
       const show = !!sub && sub !== clean;
@@ -1213,6 +1227,13 @@
   function wireDetail() {
     const back = $('detailClose');
     if (back) back.onclick = closeDetail;
+    const titleToggle = $('detailTitleToggle');
+    if (titleToggle)
+      titleToggle.onclick = () => {
+        const expanded = $('detailTitle').classList.toggle('is-expanded');
+        titleToggle.textContent = expanded ? '제목 접기' : '제목 전체 보기';
+        titleToggle.setAttribute('aria-expanded', String(expanded));
+      };
     const open = $('detailOpen');
     if (open) open.onclick = openViewer;
     const closeV = $('closeViewer');
@@ -1321,9 +1342,11 @@
           : state.view === 'concentric'
             ? CONCENTRIC?.dotR || 4.5
             : NETFIT?.dotR || 5;
-    let r = base * Math.max(0.6, Math.min(1.6, state.scale));
-    if (n.first) r = Math.max(r * 1.5, 6);
-    if (state.selected?.id === n.id || state.play?.currentId === n.id) r += 2;
+    const zoom = Math.max(0.6, Math.min(1.6, state.scale));
+    const timeDots = state.view === 'time' || (state.view === 'tag' && TAGFIT?.empty);
+    let r = base * zoom;
+    if (n.first) r = timeDots ? r * 1.5 : state.view === 'network' && NETFIT?.fan ? r * 1.5 : Math.max(r * 1.5, 6);
+    if (state.selected?.id === n.id || state.play?.currentId === n.id) r += 2 * zoom;
     return r;
   }
   function shouldDrawNode(n) {
@@ -1762,9 +1785,13 @@
     // #951 ②: 순간이 적으면(≤8) 멀리서도 모든 순간에 이름표를 붙인다 — 예전에는 pri<5(첫 순간·갈림길·고른 길)만
     // 후보가 되어 순간 3개짜리 트리에서 1개가 이름표 없이 남았다.
     const SMALL = LTDEMO.moments.length <= 8;
-    const moments = nodes
-      .filter(n => n.kind === 'moment' && shouldDrawNode(n) && (near || SMALL || pri(n) < 5))
+    const ranked = nodes
+      .filter(n => n.kind === 'moment' && shouldDrawNode(n))
       .sort((a, b) => pri(a) - pri(b) || nodes.indexOf(a) - nodes.indexOf(b));
+    const general = ranked.filter(n => pri(n) > 1);
+    const stride = near || SMALL ? 1 : Math.max(1, Math.ceil(general.length / 12));
+    const representatives = new Set(general.filter((_, i) => i % stride === 0).map(n => n.id));
+    const moments = ranked.filter(n => near || SMALL || pri(n) <= 1 || representatives.has(n.id));
     const push = (n, text, p, r, dir, only) => {
       if (!visible(p, 0)) return;
       const lines = [text];
@@ -1841,6 +1868,9 @@
     )
       return 0;
     if (!thumbs.has(n.id) && thumbs.size >= DOT_THUMB_MAX) return 0;
+    const timeDots = state.view === 'time' || (state.view === 'tag' && TAGFIT?.empty);
+    const timeFit = state.view === 'time' ? TIMEFIT : TAGFIT;
+    if (timeDots && (timeFit?.rows > 1 || state.scale < 0.9)) return 0;
     const entry = requestThumb(n.id);
     return entry?.ok && entry.img?.naturalWidth ? Math.max(9, r + 4) : 0;
   }
@@ -1919,8 +1949,8 @@
           obstacles.push({ id: c.id, x: p.x, y: p.y, r: Math.max(10, c.hubR * state.scale) });
         }
       });
-    const b = { x: BOX.x - 12, y: BOX.y - 12, w: BOX.w + 24, h: BOX.h + 24 };
-    LAST_LABELS = LT56Model.placeLabels(labelCands(), obstacles, b, { segments: DRAWN_EDGE_SEGMENTS });
+    const b = { x: BOX.x, y: BOX.y, w: BOX.w, h: BOX.h };
+    LAST_LABELS = LT56Model.placeLabels(labelCands(), obstacles, b, { segments: DRAWN_EDGE_SEGMENTS, clamp: true });
     ctx.font = `600 ${LABEL_PX}px Pretendard,sans-serif`;
     ctx.textAlign = 'left';
     ctx.lineJoin = 'round';
@@ -1979,17 +2009,20 @@
   }
   function drawTimeLine() {
     if (state.view !== 'time' || !TIMEFIT) return;
-    const a = w2s(BOX.x + (BOX.w - Math.max(40, BOX.w - 2 * (16 + 5))) / 2, TIMEFIT.y),
-      b = w2s(BOX.x + (BOX.w + Math.max(40, BOX.w - 2 * (16 + 5))) / 2, TIMEFIT.y);
+    if (!TIMEFIT.rows || TIMEFIT.rows === 1) {
+      const a = w2s(BOX.x + (BOX.w - Math.max(40, BOX.w - 2 * (16 + 5))) / 2, TIMEFIT.y),
+        b = w2s(BOX.x + (BOX.w + Math.max(40, BOX.w - 2 * (16 + 5))) / 2, TIMEFIT.y);
+      ctx.save();
+      ctx.strokeStyle = paint('edge');
+      ctx.lineWidth = 1.4;
+      ctx.globalAlpha = 0.75;
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.stroke();
+      ctx.restore();
+    }
     ctx.save();
-    ctx.strokeStyle = paint('edge');
-    ctx.lineWidth = 1.4;
-    ctx.globalAlpha = 0.75;
-    ctx.beginPath();
-    ctx.moveTo(a.x, a.y);
-    ctx.lineTo(b.x, b.y);
-    ctx.stroke();
-    ctx.globalAlpha = 1;
     const order = TIMEFIT.order || [];
     for (let i = 0; i < order.length - 1; i++) {
       const p0 = byId[order[i]],
@@ -2010,6 +2043,7 @@
       ctx.beginPath();
       ctx.moveTo(A.x, A.y);
       ctx.lineTo(B.x, B.y);
+      DRAWN_EDGE_SEGMENTS.push({ a: A, b: B, pad: 3 });
       ctx.stroke();
       ctx.restore();
     }
@@ -2646,7 +2680,7 @@
   (() => {
     if (typeof ResizeObserver === 'undefined') return;
     let seen = '';
-    const SEL = ['.topbar', '.hero p', '.lt-moment-picker', '.left-rail', '.mobile-ribbon'],
+    const SEL = ['.topbar', '.hero p', '.lt-screen-toolbar', '.lt-moment-picker', '.left-rail', '.mobile-ribbon', '#detail'],
       watched = new WeakSet();
     const check = () => {
       const i = measureInsets(),
@@ -2669,6 +2703,9 @@
       };
     watch();
     new MutationObserver(watch).observe(document.body, { childList: true });
+    const detail = document.querySelector('#detail');
+    if (detail)
+      new MutationObserver(watch).observe(detail, { attributes: true, attributeFilter: ['class'] });
   })();
   /* #461 화면 문서 끝의 <style>(모바일 안내 문구 자리 등)은 이 스크립트 뒤에 읽힌다 — 문서를 다 읽은 뒤·글꼴이 온 뒤 한 번씩 덮개를 다시 재어 맞춘다(한 번뿐, 유휴 반복 없음). */ if (
     document.readyState === 'loading'

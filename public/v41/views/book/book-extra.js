@@ -182,10 +182,12 @@ function playInline(yt,media){
  const frame=document.createElement('iframe');frame.className='yt-frame'+(yt.dataset.ytVertical==='1'?' is-vertical':'');frame.src=url;frame.title='YouTube 영상 재생';
  frame.allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';frame.allowFullscreen=true;
  frame.setAttribute('referrerpolicy','strict-origin-when-cross-origin');
- const host=yt.parentElement;if(!host)return;
+ // 버튼은 썸네일 밖 아래 줄에 있다. 재생기는 이전과 같이 카드 본체를 대체한다.
+ const host=yt.closest('.clipping');if(!host)return;
  // #833: 쇼츠는 재생 중 YouTube가 전체 화면 단추를 숨기므로 칸 모서리 단추로 크게 본다(안 되면 덮는 창).
  const watch=(media&&media.openUrl)?media.openUrl:('https://www.youtube.com/watch?v='+yt.dataset.ytPlay);
- const cell=mountExpandControls(host,{url:watch,openUrl:watch,vertical:yt.dataset.ytVertical==='1',lightbox:(u,ti,v)=>{window.LTMedia&&LTMedia.openLightbox(u,ti,v)}});
+ const vertical=host.querySelector('.yt-play')?.dataset.ytVertical==='1';
+ const cell=mountExpandControls(host,{url:watch,openUrl:watch,vertical,lightbox:(u,ti,v)=>{window.LTMedia&&LTMedia.openLightbox(u,ti,v)}});
  cell.stage.append(frame);
  monitorBookYoutubeFrame(frame,cell.stage,yt.dataset.ytPlay,watch);
  if(end>start)host.insertAdjacentHTML('beforeend','<button type="button" class="yt-from-start" data-yt-from-start="'+t(yt.dataset.ytPlay)+'">처음부터 보기</button>');
@@ -202,8 +204,8 @@ document.addEventListener('pointerdown',e=>{
   const cell=mountExpandControls(host,{url:ytOpenUrl(fromStart.dataset.ytFromStart),openUrl:ytOpenUrl(fromStart.dataset.ytFromStart),lightbox:(u,ti,v)=>{window.LTMedia&&LTMedia.openLightbox(u,ti,v)}});
   cell.stage.append(frame);
   monitorBookYoutubeFrame(frame,cell.stage,fromStart.dataset.ytFromStart,ytOpenUrl(fromStart.dataset.ytFromStart));return}
- const yt=e.target.closest&&e.target.closest('[data-yt-play]');
- if(!yt||yt.querySelector('.lt-fallback-card'))return;
+ const yt=e.target.closest&&e.target.closest('button.media-play-btn[data-yt-play]');
+ if(!yt||yt.closest('.clipping')?.querySelector('.yt-play .lt-fallback-card'))return;
  e.preventDefault();e.stopPropagation();
  const url=yt.dataset.ytPlay?{openUrl:'https://www.youtube.com/watch?v='+yt.dataset.ytPlay+(Number(yt.dataset.ytStart||0)?'&t='+Number(yt.dataset.ytStart||0):'')}:null;
  playInline(yt,url);
@@ -223,8 +225,8 @@ document.addEventListener('click',e=>{
  const openTree=e.target.closest('[data-open-tree]');
  if(openTree){e.preventDefault();e.stopPropagation();const momentId=openTree.dataset.openMoment,treeId=openTree.dataset.openTree;if(momentId&&treeId)LTDEMO.openBook(momentId,treeId);return}
  /* 1. YouTube 그 자리 재생: 누른 뒤에만 iframe을 만든다(시작 시점 반영, referrerpolicy 엄격). */
- const yt=e.target.closest('[data-yt-play]');
- if(yt){if(yt.querySelector('.lt-fallback-card'))return;e.preventDefault();e.stopPropagation();if(!yt.parentElement||yt.parentElement.querySelector('iframe.yt-frame'))return;
+ const yt=e.target.closest('button.media-play-btn[data-yt-play]');
+ if(yt){if(yt.closest('.clipping')?.querySelector('.yt-play .lt-fallback-card'))return;e.preventDefault();e.stopPropagation();if(!yt.closest('.clipping')||yt.closest('.clipping').querySelector('iframe.yt-frame'))return;
   playInline(yt,{openUrl:'https://www.youtube.com/watch?v='+yt.dataset.ytPlay});return}
  /* 책 글자 다듬기(261116) ③: 잘린 제목은 누르면 펼침·다시 누르면 접힌다(✎ 고치기는 그대로). 폰의 길게 누름(0.42초)은
     돋보기에 배정돼 있으므로 누름(탭)에 배정해 충돌이 없다. 펼침은 읽는 동작 — 단추가 있는 책(내 기록)에서만 온다. */
@@ -321,10 +323,11 @@ momentContent=function(m,compact=false){
     :'<img src="'+t(remoteThumb)+'" alt="'+t(safe.title||'YouTube 영상 썸네일')+'"'+thumbFallback+' referrerpolicy="no-referrer" loading="lazy" decoding="async">';
    // YouTube 출처는 링크 한 곳에만 남긴다.
    const piece='<div class="clipping moment" data-moment="'+t(safe.id)+'">'+
-    '<button type="button" class="yt-play'+(vertical?' is-vertical':'')+(vertical&&!thumb?' is-remote-vertical':'')+'"'+' data-lt-thumb-host data-yt-play="'+t(media.videoId)+'" data-yt-start="'+t(media.startSeconds||0)+'" data-yt-end="'+t(m.endSeconds||'')+'"'+(vertical?' data-yt-vertical="1"':'')+'>'+
+    '<div class="yt-play'+(vertical?' is-vertical':'')+(vertical&&!thumb?' is-remote-vertical':'')+'"'+' data-lt-thumb-host data-yt-play="'+t(media.videoId)+'" data-yt-start="'+t(media.startSeconds||0)+'" data-yt-end="'+t(m.endSeconds||'')+'"'+(vertical?' data-yt-vertical="1"':'')+'>'+
     (vertical&&!thumb?'<span class="yt-vertical-backdrop" aria-hidden="true"><img src="'+t(remoteThumb)+'" alt="" referrerpolicy="no-referrer" loading="lazy" decoding="async"></span>':'')+face+
-    '<span class="yt-play-label">'+t(label)+'</span></button>'+
+    '</div>'+
     '<div class="media-links"><a class="media-source-link" href="'+t(media.openUrl)+'" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">YouTube ↗</a>'+
+    '<button type="button" class="media-play-btn" aria-label="'+t(label)+'" data-yt-play="'+t(media.videoId)+'" data-yt-start="'+t(media.startSeconds||0)+'" data-yt-end="'+t(m.endSeconds||'')+'">'+t(label)+'</button>'+
     '<button type="button" data-yt-expand="'+t(safe.id)+'">크게 보기</button></div></div>';
    return piece+paintTitle(safe);
   }

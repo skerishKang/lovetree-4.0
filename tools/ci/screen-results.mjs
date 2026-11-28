@@ -30,7 +30,10 @@ export function checkScreenResults(needs = {}) {
     const result = needs[name]?.result;
     lines.push(name + ': ' + result);
     if (selected.includes(name)) {
-      if (result !== 'success') failures.push(name + ': selected job did not succeed (' + result + ')');
+      if (changed === 'true' && result === 'skipped')
+        failures.push(name + ': changed screen job skipped');
+      else if (result !== 'success')
+        failures.push(name + ': selected job did not succeed (' + result + ')');
     } else if (result !== 'skipped' && result !== 'success') {
       failures.push(name + ': unexpected result (' + result + ')');
     }
