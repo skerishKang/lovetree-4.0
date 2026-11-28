@@ -18,8 +18,10 @@ test('capability is opt-in and matching subject keeps existing write contract',a
  assert.equal((await get(handle,'features=bound-writes')).body.writeSubjectBound,true);
  const document=state();const result=await put(handle,{state:document,expectedRevision:0,clientKey:'bound-1',expectedSubject:'usr_a'});
  assert.equal(result.status,200);assert.equal(result.body.revision,1);assert.deepEqual((await get(handle,'')).body.state,document);
- // Legacy 4.0 requests remain accepted without the optional guard.
- assert.equal((await put(handle,{state:document,expectedRevision:1,clientKey:'legacy-1'})).status,200);
+ // Every write must carry an account binding.
+ const missing=await put(handle,{state:document,expectedRevision:1,clientKey:'unbound-1'});
+ assert.equal(missing.status,401);
+ assert.equal(missing.body.error.code,'account_changed');
 });
 test('cookie account switch rejects A draft before any B write or claim',async()=>{
  const repo=createMemoryWorkspaceRepo(),a=setup('usr_a',repo),b=setup('usr_b',repo),document=state();
@@ -31,4 +33,17 @@ test('cookie account switch rejects A draft before any B write or claim',async()
  // Rejected attempts did not reserve the key in B's workspace.
  assert.equal((await put(b,{state:document,expectedRevision:0,clientKey:'same-key',expectedSubject:'usr_b'})).status,200);
  assert.equal((await get(a,'')).body.state.trees.length,0);
+});
+
+
+test('unbound workspace write does not alter a different account',async()=>{
+ const repo=createMemoryWorkspaceRepo(),a=setup('usr_a',repo),b=setup('usr_b',repo),document=state();
+ assert.equal((await put(a,{state:document,expectedRevision:0,clientKey:'bound-a',expectedSubject:'usr_a'})).status,200);
+ const attempt=await put(b,{state:document,expectedRevision:0,clientKey:'unbound-b'});
+ assert.equal(attempt.status,401);
+ assert.equal(attempt.body.error.code,'account_changed');
+ assert.equal((await get(b,'')).body.revision,0);
+ assert.equal((await get(a,'')).body.revision,1);
+ // A refused request must not reserve a client key in the current account.
+ assert.equal((await put(b,{state:document,expectedRevision:0,clientKey:'unbound-b',expectedSubject:'usr_b'})).status,200);
 });
