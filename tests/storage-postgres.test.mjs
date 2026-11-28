@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { addMoment, createTree, linkMoments, validateState } from '../src/domain.js';
 import { createApiHandler } from '../server/http.js';
 import { createWorkspaceService } from '../server/workspace-service.js';
-import { applySchema, createWorkspaceRepo } from '../server/db/postgres.js';
+import { applySchema, createPool, createWorkspaceRepo } from '../server/db/postgres.js';
 import { createRateLimitRepo } from '../server/db/rate-limit-postgres.js';
 import { assertIsolatedTestDatabase } from '../server/testing/isolated-test-database.js';
 
