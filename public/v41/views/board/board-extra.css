@@ -250,8 +250,7 @@ html[data-lt-theme=garden] .boardModeSwitch .boardResetOrderBtn{color:var(--lt-m
 .card .cardMeta{font-size:12px;color:#61526a;display:flex;align-items:center;white-space:nowrap;overflow:hidden;margin-top:6px}/* #662: 제목 상자(-webkit-line-clamp)가 아래로 8px 더 늘어나 감정·날짜 줄과 포개진다 — 사이를 벌린다. */
 .card .cardMeta .emotionDot{flex:0 0 auto}
 .card .cardMeta{gap:0}
-/* #601: 카드 한가운데 재생 단추가 끌기를 가로막지 않게 — 보드 카드에서는 모서리 작은 표로 줄인다(상세·책은 그대로). */
-.card .lt-yt-preview .lt-yt-play{inset:auto;top:10px;right:10px;width:56px;height:56px}
+/* #1635: 보드 재생 단추는 썸네일 아래 공통 조작 줄(.lt-media-toolbar)에 있다. */
 
 /* #601: 그림 위에서 끌면 브라우저 기본 끌기가 pointercancel로 보드 끌기를 취소하고, 놓으면 기본 동작이 화면을 갈아끊는다 — 기본 끌기·글자 선택을 막는다. */
 .card img{-webkit-user-drag:none}
@@ -259,10 +258,8 @@ html[data-lt-theme=garden] .boardModeSwitch .boardResetOrderBtn{color:var(--lt-m
 
 .card .media{height:200px}
 /* 세로 영상은 9:16 모양 그대로, 높이 상한 300px — 가운데 세운다. */
-.card .lt-media[data-lt-vertical="1"] .lt-yt-preview,
-.card .lt-media:has(.lt-yt-play.is-vertical) .lt-yt-preview{display:grid;place-items:center;height:300px;background:#0b0812}
-.card .lt-media[data-lt-vertical="1"] .lt-yt-preview img,
-.card .lt-media:has(.lt-yt-play.is-vertical) .lt-yt-preview img{width:auto;height:100%;object-fit:contain}
+.card .lt-media[data-lt-vertical="1"] .lt-yt-preview{display:grid;place-items:center;height:300px;background:#0b0812}
+.card .lt-media[data-lt-vertical="1"] .lt-yt-preview img{width:auto;height:100%;object-fit:contain}
 /* #553 카드 재측정: 간소화된 카드 높이에 맞춘 예약 높이는 board.js 상수(YT 330·세로 440·기본 330). */
 
 /* 3. 상세: 플레이어가 맨 위, 내 마음은 크게, 이어진 순간은 작은 썸네일 카드, 할 일 단추는 한 줄. */
@@ -270,10 +267,8 @@ html[data-lt-theme=garden] .boardModeSwitch .boardResetOrderBtn{color:var(--lt-m
 .detailPlayer .lt-media{background:transparent}
 .detailPlayer .lt-yt-preview{margin:0}
 .detailPlayer .lt-yt-preview img{width:100%;height:auto;aspect-ratio:16/9;object-fit:cover;display:block}
-.detailPlayer .lt-media[data-lt-vertical="1"] .lt-yt-preview,
-.detailPlayer .lt-media:has(.lt-yt-play.is-vertical) .lt-yt-preview{display:grid;place-items:center;aspect-ratio:auto;height:340px}
-.detailPlayer .lt-media[data-lt-vertical="1"] .lt-yt-preview img,
-.detailPlayer .lt-media:has(.lt-yt-play.is-vertical) .lt-yt-preview img{width:auto;height:100%;object-fit:contain}
+.detailPlayer .lt-media[data-lt-vertical="1"] .lt-yt-preview{display:grid;place-items:center;aspect-ratio:auto;height:340px}
+.detailPlayer .lt-media[data-lt-vertical="1"] .lt-yt-preview img{width:auto;height:100%;object-fit:contain}
 .detailPlayer .detailVideo{width:100%;max-height:340px;display:block;background:#000}
 .detailPlayer .detailPhoto{width:100%;max-height:340px;object-fit:cover;display:block}
 .detailPlayer .detailNoteMedia{padding:26px 20px;font-size:17px;line-height:1.6;color:#f3e9f5}
