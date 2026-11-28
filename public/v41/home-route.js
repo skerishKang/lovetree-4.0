@@ -3,7 +3,7 @@
    첫 그리기 전에 몸체 클래스를 정해야 하므로 모듈이 아닌 고전 스크립트로 제공한다.
    시험이 셸 판정과 같은지 고정한다(목록이 바뀌면 시험이 깨진다). */
 (function () {
-  const VIEWS = ['home', 'shelf', 'tree', 'book', 'board', 'network', 'graph'];
+  const VIEWS = ['home', 'shelf', 'exhibit', 'tree', 'book', 'board', 'network', 'graph'];
   const VIEW_ALIASES = { map: 'network' };
   const viewName = value => {
     const view = VIEW_ALIASES[value] || value;

@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
-import { serve } from './helpers/screen-audit.mjs';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { serve } from './screen-audit.mjs';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 const root='test-results/1425-impl';
 mkdirSync(root,{recursive:true});
 const host=String.raw`<!doctype html><html lang="ko"><meta charset="utf-8"><style>body{margin:0} iframe{border:0;width:100vw;height:100vh;display:block}</style><script>
@@ -11,11 +11,12 @@ const moments=Array.from({length:count},(_,i)=>({id:String(i+1),parentId:i?Strin
 const tree={id:'test-tree',title:'전시 시험 트리',moments,edges:[]};
 window.LT41={source,writable:source==='server',tree,momentId:count?'1':null,prefs:{titleDisplay:'both'}};
 </script><iframe title="전시" src="/v41/views/exhibit/exhibit.html"></iframe></html>`;
-test('#1425 헤드리스 16개 조합과 200개 CPU 6배 측정', {timeout:120000}, async () => {
+test('#1425 헤드리스 16개 조합과 200개 CPU 6배 측정', {timeout:120000, skip: !process.env.LT_TREE_777_REQUIRE && !existsSync(chromium.executablePath())}, async () => {
 const server=await serve({'/1425-host.html':host},{port:4630});
-const browser=await chromium.launch({headless:true});
+let browser;
 const results=[];
 try {
+ browser=await chromium.launch({headless:true});
  const sizes=[[390,844],[844,390],[1440,900],[2560,1440]];
  for(const [width,height] of sizes)for(const theme of ['night','garden'])for(const source of ['server','share']){
   const page=await browser.newPage({viewport:{width,height},reducedMotion:'reduce'});
@@ -51,7 +52,7 @@ try {
  await session.send('Emulation.setCPUThrottlingRate',{rate:1});
  results.push({test:'200',first,second,nodes,perf});
  await page.close();
-}finally{await browser.close();await new Promise(r=>server.close(r));}
+}finally{try{await browser?.close();}finally{await new Promise((resolve,reject)=>server.close(error=>error?reject(error):resolve()));}}
 writeFileSync(root+'/results.json',JSON.stringify(results,null,2));
 console.log(JSON.stringify(results,null,2));
 
