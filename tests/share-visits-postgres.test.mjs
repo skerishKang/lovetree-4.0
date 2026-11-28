@@ -81,10 +81,19 @@ test('같은 공유의 50명 동시 방문, 중복, 만료 후 재방문 및 자
     const repeated=visitors.flatMap(v=>[service.prepare(row,v),service.prepare(row,v)]);
     await Promise.all(repeated.map(run=>run()));
     assert.equal(await repo.count(scope),100);
+    at=Date.parse('2026-11-28T12:00:00Z');
+    const reverseVisitor={trusted:true,authKnown:true,clientIp:'192.0.2.201'};
+    const earlier=service.prepare(row,reverseVisitor);
+    at+=VISIT_WINDOW_MS+5*60*1000;
+    const later=service.prepare(row,reverseVisitor);
+    await later();
+    await earlier();
+    assert.equal(await repo.count(scope),102);
+    t.diagnostic('50명 동시·중복·만료 후 100회, 자정 10분 역순 중복, 같은 날 35분 역순 2회로 102회');
     const deferred=service.prepare(row,{trusted:true,authKnown:true,clientIp:'192.0.2.200'});
     await visibilityRepo.set({productId,subjectId,treeId,visibility:'private'});
     assert.equal(await deferred(),0);
-    assert.equal(await repo.count(scope),100);
+    assert.equal(await repo.count(scope),102);
   } finally {
     await pool.query('DELETE FROM lovetree_tree_visibility WHERE product_id=$1',[productId]);
     await pool.query('DELETE FROM lovetree_shares WHERE product_id=$1',[productId]);

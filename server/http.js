@@ -14,6 +14,96 @@ function errorBody(error) {
 
 const ACCOUNT_NO_STORE = { 'cache-control': 'private, no-store', 'x-content-type-options': 'nosniff' };
 
+// PostgreSQL 기본 풀 10개보다 작게 유지해 로그인·저장이 쓸 연결을 남긴다.
+export const DEFAULT_AFTER_RESPONSE_CONCURRENCY = 2;
+export const DEFAULT_AFTER_RESPONSE_QUEUE_LIMIT = 4;
+export const DEFAULT_AFTER_RESPONSE_TIMEOUT_MS = 5_000;
+
+export function createAfterResponseQueue({
+  concurrency = DEFAULT_AFTER_RESPONSE_CONCURRENCY,
+  maxQueue = DEFAULT_AFTER_RESPONSE_QUEUE_LIMIT,
+  timeoutMs = DEFAULT_AFTER_RESPONSE_TIMEOUT_MS,
+  log = console.warn
+} = {}) {
+  const runningLimit = Math.max(1, Math.floor(Number(concurrency)) || DEFAULT_AFTER_RESPONSE_CONCURRENCY);
+  const waitingLimit = Number.isFinite(Number(maxQueue)) ? Math.max(0, Math.floor(Number(maxQueue))) : DEFAULT_AFTER_RESPONSE_QUEUE_LIMIT;
+  const timeLimit = Math.max(1, Math.floor(Number(timeoutMs)) || DEFAULT_AFTER_RESPONSE_TIMEOUT_MS);
+  const queue = [], pending = new Set(), timers = new Map();
+  let active = 0, dropped = 0, droppedTotal = 0, closed = false, overflowTimer = null;
+
+  function flushOverflow() {
+    if (overflowTimer) clearTimeout(overflowTimer);
+    overflowTimer = null;
+    if (!dropped) return;
+    log(`[lovetree-http] 응답 뒤 작업 ${dropped}개를 실행·대기 상한으로 버렸습니다.`);
+    dropped = 0;
+  }
+  function noteOverflow(count = 1) {
+    dropped += count;
+    droppedTotal += count;
+    if (!dropped || overflowTimer) return;
+    overflowTimer = setTimeout(flushOverflow, 1_000);
+    overflowTimer.unref?.();
+  }
+  function schedule() {
+    if (closed) return;
+    while (active < runningLimit && queue.length) {
+      const task = queue.shift();
+      active += 1;
+      const controller = new AbortController();
+      let deadline;
+      const timeout = new Promise(resolve => {
+        const timer = setTimeout(() => {
+          controller.abort();
+          log('[lovetree-http] 응답 뒤 작업이 시간 상한을 넘었습니다.');
+          resolve();
+        }, timeLimit);
+        timer.unref?.();
+        deadline = {timer, finish: resolve};
+        timers.set(controller, deadline);
+      });
+      const work = Promise.resolve().then(() => task({signal: controller.signal})).catch(() => {
+        if (!controller.signal.aborted) log('[lovetree-http] 응답 뒤 작업 실패');
+      });
+      const promise = Promise.race([work, timeout]).finally(() => {
+        clearTimeout(deadline.timer);
+        timers.delete(controller);
+        pending.delete(promise);
+        active -= 1;
+        schedule();
+      });
+      pending.add(promise);
+    }
+  }
+  function enqueue(task) {
+    if (closed || active + queue.length >= runningLimit + waitingLimit) {
+      noteOverflow();
+      return false;
+    }
+    queue.push(task);
+    schedule();
+    return true;
+  }
+  async function close() {
+    if (!closed) {
+      closed = true;
+      noteOverflow(queue.length);
+      queue.length = 0;
+      for (const [controller, deadline] of timers) {
+        clearTimeout(deadline.timer);
+        controller.abort();
+        deadline.finish();
+      }
+      flushOverflow();
+    }
+    await Promise.allSettled([...pending]);
+  }
+  return {
+    enqueue, close,
+    stats: () => ({ runningLimit, waitingLimit, timeoutMs: timeLimit, active, queued: queue.length, dropped: droppedTotal, closed })
+  };
+}
+
 export function createApiHandler({ authenticate, service, productId, admin = null, adminStats = null, account = null, accountDeleteAuthenticate = null, accountDeleteWorkflow = null, allowedOrigins = [], maxBodyBytes = DEFAULT_MAX_BODY_BYTES }) {
   async function handle(request) {
     const { method = 'GET', path = '', body = '' } = request ?? {};
@@ -130,8 +220,21 @@ export function createApiHandler({ authenticate, service, productId, admin = nul
   };
 }
 
-export function createNodeHandler(requestHandler, { maxBodyBytes = DEFAULT_MAX_BODY_BYTES, afterResponse = null } = {}) {
-  return async function nodeHandler(req, res) {
+export function createNodeHandler(requestHandler, {
+  maxBodyBytes = DEFAULT_MAX_BODY_BYTES,
+  afterResponse = null,
+  afterResponseConcurrency = DEFAULT_AFTER_RESPONSE_CONCURRENCY,
+  afterResponseQueueLimit = DEFAULT_AFTER_RESPONSE_QUEUE_LIMIT,
+  afterResponseTimeoutMs = DEFAULT_AFTER_RESPONSE_TIMEOUT_MS,
+  afterResponseLog = console.warn
+} = {}) {
+  const afterResponseQueue = createAfterResponseQueue({
+    concurrency: afterResponseConcurrency,
+    maxQueue: afterResponseQueueLimit,
+    timeoutMs: afterResponseTimeoutMs,
+    log: afterResponseLog
+  });
+  async function nodeHandler(req, res) {
     const media = /^\/api\/media(?:\/|$)/.test(String(req.url).split('?')[0]);
     const ingest = String(req.url).split('?')[0] === OPS_INGEST_PATH;
     const limit = media ? MAX_MEDIA_BYTES : ingest ? 8192 : maxBodyBytes;
@@ -165,10 +268,13 @@ export function createNodeHandler(requestHandler, { maxBodyBytes = DEFAULT_MAX_B
     res.writeHead(result.status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', ...(result.headers ?? {}) });
     // 요청별 뒤처리는 200과 304 모두 응답을 내보낸 뒤 실행한다.
     if (typeof result.afterResponse === 'function') {
-      res.once('finish', () => { void Promise.resolve().then(result.afterResponse).catch(() => console.warn('[lovetree-http] 응답 뒤 작업 실패')); });
+      res.once('finish', () => { afterResponseQueue.enqueue(result.afterResponse); });
     }
     res.end(result.binary ?? JSON.stringify(result.body));
     // 응답은 이미 나갔다 — 뒤처리는 요청을 막지 않는다.
     if (typeof afterResponse === 'function') void Promise.resolve().then(afterResponse).catch(() => {});
-  };
+  }
+  nodeHandler.closeAfterResponse = afterResponseQueue.close;
+  nodeHandler.afterResponseStats = afterResponseQueue.stats;
+  return nodeHandler;
 }
