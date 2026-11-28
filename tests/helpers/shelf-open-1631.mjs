@@ -162,22 +162,61 @@ test('#1631 서재 미리보기·바로 펼치기 선택과 복원', {
         && settings?.getAttribute('aria-checked')==='true';
     },mode,{timeout:10000});
     const info=await page.frameLocator('#view').locator('#shelf-open-choice').evaluate(group=>{
-      const d=group.ownerDocument,r=group.getBoundingClientRect(),bar=d.querySelector('.lt-screen-toolbar');
-      const bounds=e=>{const b=e?.getBoundingClientRect();return b?{x:b.x,y:b.y,right:b.right,bottom:b.bottom,width:b.width,height:b.height}:null};
-      const overlaps=(a,b)=>a&&b&&Math.min(a.right,b.right)-Math.max(a.x,b.x)>0&&Math.min(a.bottom,b.bottom)-Math.max(a.y,b.y)>0;
-      const buttons=[...group.querySelectorAll('[role=radio]')];
-      const buttonBounds=buttons.map(bounds),rect=bounds(group),filter=bounds(d.querySelector('#shelf-filter-inline')),toolbar=bounds(bar);
+      const d=group.ownerDocument, toolbar=d.querySelector('.lt-screen-toolbar');
+      const r=e=>{const x=e?.getBoundingClientRect();return x?{x:x.x,y:x.y,width:x.width,height:x.height,right:x.right,bottom:x.bottom}:null;};
+      const overlaps=(a,b)=>!!a&&!!b&&Math.min(a.right,b.right)-Math.max(a.x,b.x)>0&&Math.min(a.bottom,b.bottom)-Math.max(a.y,b.y)>0;
+      const hitSize=b=>{
+        const box=r(b), cx=box.x+box.width/2,cy=box.y+box.height/2;
+        const hit=(x,y)=>{const e=d.elementFromPoint(x,y);return e===b||b.contains(e);};
+        let width=0,height=0;
+        for(let x=Math.floor(box.x-30);x<=box.right+30;x++)if(hit(x,cy))width++;
+        for(let y=Math.floor(box.y-30);y<=box.bottom+30;y++)if(hit(cx,y))height++;
+        return {width,height};
+      };
+      const measure=g=>{
+        const cs=d.defaultView.getComputedStyle(g);
+        return {
+          rect:r(g),background:cs.backgroundColor,border:cs.borderTopColor,radius:cs.borderTopLeftRadius,
+          buttons:[...g.querySelectorAll('button')].map(b=>{
+            const style=d.defaultView.getComputedStyle(b);
+            return {rect:r(b),font:style.fontSize,weight:style.fontWeight,
+              background:style.backgroundColor,color:style.color,border:style.borderTopColor,
+              selected:b.getAttribute('aria-checked')==='true',hit:hitSize(b)};
+          })
+        };
+      };
+      const [reference,filter,choice]=['#shelf-view-inline','#shelf-filter-inline','#shelf-open-choice']
+        .map(sel=>measure(d.querySelector(sel)));
       return {
-        role:group.getAttribute('role'),ariaLabel:group.getAttribute('aria-label'),
-        buttonBounds,rect,filter,toolbar,viewport:d.documentElement.clientWidth,
-        filterOverlap:overlaps(rect,filter),toolbarOverlap:overlaps(rect,toolbar),
-        checked:buttons.map(b=>b.getAttribute('aria-checked'))
+        role:group.getAttribute('role'),reference,filter,choice,
+        filterOverlap:overlaps(filter.rect,choice.rect),
+        toolbarOverlap:overlaps(choice.rect,r(toolbar))||overlaps(filter.rect,r(toolbar)),
+        viewport:d.documentElement.clientWidth,
+        horizontalOverflow:d.documentElement.scrollWidth-d.documentElement.clientWidth
       };
     });
     assert.equal(info.role,'radiogroup');
-    assert.deepEqual(info.buttonBounds.map(b=>b.height>=44),[true,true],'서재 선택 단추는 44px 이상이어야 한다');
-    assert.ok(info.buttonBounds.every(b=>b.width>=78),'선택 글자가 잘리지 않을 만큼 넓어야 한다');
-    assert.ok(info.rect.x>=-1&&info.rect.right<=info.viewport+1,'서재 열기 방식은 화면 밖으로 넘치지 않는다');
+    for(const [name,actual] of [['전체/공개만',info.filter],['미리보기/바로 펼치기',info.choice]]){
+      assert.ok(Math.abs(actual.rect.height-info.reference.rect.height)<=1,name+' 묶음 높이는 선반/회전과 같다');
+      assert.equal(actual.border,info.reference.border,name+' 묶음 테두리 색');
+      assert.equal(actual.background,info.reference.background,name+' 묶음 바탕');
+      assert.equal(actual.radius,info.reference.radius,name+' 묶음 둥근 모서리');
+      for(const button of actual.buttons){
+        const basis=info.reference.buttons.find(item=>item.selected===button.selected);
+        assert.ok(Math.abs(button.rect.height-basis.rect.height)<=1,name+' 보이는 단추 높이는 선반/회전과 같다');
+        assert.equal(button.font,basis.font,name+' 단추 글자 크기');
+        assert.equal(button.weight,basis.weight,name+' 단추 글자 굵기');
+        assert.equal(button.background,basis.background,name+' 단추 바탕');
+        assert.equal(button.color,basis.color,name+' 단추 글자 색');
+        assert.equal(button.border,basis.border,name+' 단추 고른 쪽 테두리');
+        // 단추가 보이는 높이는 36px로 통일하되, 기존 44px 누름 기준은 그대로 검사한다.
+        assert.ok(button.hit.width>=44&&button.hit.height>=44,
+          name+' 실제 누름 영역 44px 이상(가로 '+button.hit.width+', 세로 '+button.hit.height+')');
+      }
+    }
+    assert.ok(info.choice.buttons.every(button=>button.rect.width>=78),'미리보기 선택 글자는 잘리지 않아야 한다');
+    assert.ok(info.choice.rect.x>=-1&&info.choice.rect.right<=info.viewport+1,'서재 열기 방식은 화면 밖으로 넘치지 않는다');
+    assert.ok(info.horizontalOverflow<=0.5,'서재 iframe 문서는 가로 스크롤을 만들지 않는다');
     assert.equal(info.filterOverlap,false,'전체/공개만과 겹치면 안 된다');
     assert.equal(info.toolbarOverlap,false,'390·1440 화면 도구줄과 겹치면 안 된다');
     return info;
