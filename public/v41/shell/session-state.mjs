@@ -7,6 +7,7 @@ import {screens,screenForView,viewForFile,themedViewFor} from "./navigation.mjs"
 import {createCommunityScreen} from "./community-screen.mjs";
 import {createStageLoading} from "./stage-loading.mjs";
 import {createAuth} from "./auth.mjs";
+import {setVisitMode} from "../visit-mode.mjs";
 
 export function createSessionState(ctx){
   let initialRoute, model, current, source, loadGeneration, previousDirty, member, visitorAccount, handledHash, activeShareId, resumeAfterStart, shellStageLoading, shellCommunityScreen, networkOpenMoment, requestNetworkOpen, takeNetworkOpen, boardOpenMoment, requestBoardOpen, takeBoardOpen, shareApi, accountApi, myNewsApi, shellAuth;
@@ -41,6 +42,7 @@ export function createSessionState(ctx){
     // #1092: 둘러보기는 겹쳐 뜨는 창이 아니라 서재·책·보드·지도와 같은 화면이다 — 공통 틀의 Esc·바깥 누름 닫기 규칙(#380)을 쓰지 않는다.
     // 열기·닫기·주소는 shell/community-screen.mjs 한 곳에서 바꾼다(창 모듈 community-panel.mjs는 그대로).
     initialRoute=parseSelectionRoute(location.hash);
+    setVisitMode(initialRoute.kind==='visit');
 
     model=null,current=screenForView(initialRoute.view)[1],source='example',loadGeneration=0,previousDirty=false,member=null,visitorAccount=null,handledHash=null,activeShareId=null,resumeAfterStart=null;
 

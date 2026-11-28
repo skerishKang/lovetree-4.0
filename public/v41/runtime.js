@@ -2,6 +2,23 @@
   const context = parent.LT41;
   if (!context?.tree) throw new Error('트리를 먼저 선택하세요.');
   const tree = context.tree;
+  // 같은 출처의 iframe도 저장소 객체가 따로이므로 화면 코드가 실행되기 전에 보호한다.
+  if (typeof Storage !== 'undefined') {
+    const guard = Symbol('lt41.visitStorageGuard');
+    if (!Storage.prototype[guard]) {
+      const setItem = Storage.prototype.setItem;
+      const removeItem = Storage.prototype.removeItem;
+      const blocked = key => !!parent.LT41?.visitReadOnly && String(key).startsWith('lt41.');
+      Storage.prototype.setItem = function (key, value) {
+        if (this !== localStorage || !blocked(key)) return setItem.call(this, key, value);
+      };
+      Storage.prototype.removeItem = function (key) {
+        if (this !== localStorage || !blocked(key)) return removeItem.call(this, key);
+      };
+      Object.defineProperty(Storage.prototype, guard, {value:true});
+    }
+  }
+  globalThis.LT41_VISIT_READ_ONLY = !!context.visitReadOnly;
   // 예시 기록은 셸이 만들어 둔 demoData를 그대로 쓰고(design/shared.js와 같은 모양), 실제 기록은 서버 트리에서 만든다.
   const demo = tree.demoData;
   // #1001 (3): 순간 변환을 한 함수로 — 처음 그림과 모델 전용 갱신(refresh)이 같은 모양을 쓴다.
@@ -36,10 +53,10 @@
   // #464(2026-11-13): 예시(demoData)도 읽기 전용이다 — 고칠 수 없는 화면이다. 예전에는 source==='share'만
   // 보아 예시 책에 "이 순간에 남기고 싶은 마음을 적어 보세요…"와 "✎ 고치기"가 보였다(CTO 지적).
   const readOnly = context.source === 'share' || context.source === 'example' || !!demo;
-  window.LTDEMO = {title:tree.title,treeId:tree.id,source:context.source,writable:context.source==='server'&&!!context.writable,moments,edges:tree.edges,example:!!demo,readOnly,prefs:context.prefs||{titleDisplay:'both'},
+  window.LTDEMO = {title:tree.title,treeId:tree.id,source:context.source,writable:context.source==='server'&&!!context.writable,moments,edges:tree.edges,example:!!demo,readOnly,visitReadOnly:!!context.visitReadOnly,prefs:context.prefs||{titleDisplay:'both'},
     get:()=>context.momentId,
     select:(id,boardState={})=>{if(moments.some(m=>m.id===id)){context.momentId=id;parent.postMessage({type:globalThis.LT41_MSG.selection,id,...boardState},location.origin)}},
     // #1001 (3): 셸이 모델만 갱신한 뒤(lt41-moments-saved) 화면이 부모 LT41.tree에서 순간·연결을 다시 읽는다.
     // moments 배열은 제자리에서 바꿔, 이미 이 배열을 든 화면(book.js SPREADS 재구축 등)이 같은 참조로 새 값을 본다.
-    refresh:()=>{const fresh=parent.LT41?.tree;if(!fresh||fresh.id!==tree.id)return false;const next=projectMoments(fresh,context);moments.length=0;for(const m of next)moments.push(m);window.LTDEMO.edges=fresh.edges;window.LTDEMO.title=fresh.title;window.LTDEMO.writable=parent.LT41?.source==='server'&&!!parent.LT41.writable;window.LTDEMO.prefs=parent.LT41?.prefs||{titleDisplay:'both'};return true;}};
+    refresh:()=>{const fresh=parent.LT41?.tree;if(!fresh||fresh.id!==tree.id)return false;const next=projectMoments(fresh,context);moments.length=0;for(const m of next)moments.push(m);window.LTDEMO.edges=fresh.edges;window.LTDEMO.title=fresh.title;window.LTDEMO.writable=parent.LT41?.source==='server'&&!!parent.LT41.writable;window.LTDEMO.readOnly=parent.LT41?.source==='share'||parent.LT41?.source==='example'||!!demo;window.LTDEMO.visitReadOnly=!!parent.LT41?.visitReadOnly;globalThis.LT41_VISIT_READ_ONLY=window.LTDEMO.visitReadOnly;window.LTDEMO.prefs=parent.LT41?.prefs||{titleDisplay:'both'};return true;}};
 })();
