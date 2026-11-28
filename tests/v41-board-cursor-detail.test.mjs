@@ -110,14 +110,22 @@ const shellWorkspace = () => {
   };
 };
 
-async function openShellBoard(browser, base, { width = 1440, height = 900, workspace = shellWorkspace(), writeTab = 'easy', empty = false } = {}) {
+const BOARD_1538_MATRIX = [
+  { width: 390, height: 844, theme: 'night' },
+  { width: 390, height: 844, theme: 'garden' },
+  { width: 1440, height: 900, theme: 'night' },
+  { width: 1440, height: 900, theme: 'garden' }
+];
+
+async function openShellBoard(browser, base, { width = 1440, height = 900, workspace = shellWorkspace(), writeTab = 'easy', empty = false, theme = 'night' } = {}) {
   const treeId = workspace.state.trees[0]?.id || 't6';
   const context = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
-  await context.addInitScript(({ writeTab, treeId }) => {
+  await context.addInitScript(({ writeTab, treeId, theme }) => {
     localStorage.setItem('lt41.tips.firstTree', '1');
     localStorage.setItem('lt41.writeTab', writeTab);
     localStorage.setItem('lt41.discoverAsked', JSON.stringify([treeId]));
-  }, { writeTab, treeId });
+    localStorage.setItem('lt41.theme', theme);
+  }, { writeTab, treeId, theme });
   const page = await context.newPage();
   page.on('dialog', dialog => dialog.accept());
   if (process.env.LT_BOARD_CPU_RATE) {
@@ -156,7 +164,28 @@ async function openShellBoard(browser, base, { width = 1440, height = 900, works
   }
   await page.waitForTimeout(500);
   const handle = await page.$('#view');
-  return { context, page, frame: await handle.contentFrame(), puts, stored: () => stored };
+  const frame = await handle.contentFrame();
+  const applied = await frame.evaluate(() => ({
+    stored: localStorage.getItem('lt41.theme'),
+    attribute: document.documentElement.getAttribute('data-lt-theme'),
+    plate: document.documentElement.getAttribute('data-lt-board-theme')
+  }));
+  assert.deepEqual(applied, {
+    stored: theme,
+    attribute: theme === 'garden' ? 'garden' : null,
+    plate: theme === 'night' ? 'night' : 'paper'
+  }, `보드가 요청한 앱 테마와 판 배경을 적용한다(${width}×${height}, ${theme})`);
+  return { context, page, frame, puts, stored: () => stored };
+}
+
+async function openShellWritePanel(page, frame, width) {
+  if (width < 781 && await frame.locator('#detail.open').count()) {
+    await frame.click('#detailClose');
+    await page.waitForFunction(() => !document.body.classList.contains('lt-sheet-open'));
+  }
+  const opener = await page.locator('#write-menu').isVisible() ? '#write-menu' : '#mobile-add';
+  await page.click(opener);
+  await page.waitForSelector('#write-panel[open]');
 }
 
 // #952: 커서·상세 단추의 소스 글자 검사 10개를 걷어냈다. 남은 것은 화면에서 재는 동작이다.
@@ -502,19 +531,22 @@ test('18. 화면: 시네마 재생·장면 이동·다시 보기는 뒤로 가�
   await testBackNavigation(page, { frame, recorded: false, action: () => frame.evaluate(() => { document.getElementById('finalCTA').classList.add('show'); document.getElementById('walkAgain').click(); }) });
 });
 
-test('19. 화면: 보드에서 고른 순간이 쉬운 추가의 부모로 저장되고 기존 기록은 그대로다', { skip: REQUIRE ? false : skip, timeout: 240000 }, async (t) => {
+for (const variant of BOARD_1538_MATRIX) {
+test(`19. 화면: 보드를 열고 고른 순간이 쉬운 추가의 부모로 저장되며 기존 기록은 그대로다 [${variant.width}×${variant.theme}]`, { skip: REQUIRE ? false : skip, timeout: 240000 }, async (t) => {
   const browser = await chromium.launch({ headless: true });
   const server = await serve();
   const base = `http://127.0.0.1:${server.address().port}`;
   const workspace = shellWorkspace();
-  const { context, page, frame, puts, stored } = await openShellBoard(browser, base, { workspace });
+  const { context, page, frame, puts, stored } = await openShellBoard(browser, base, { workspace, ...variant });
   const before = await page.evaluate(() => structuredClone(window.LT41.tree.moments));
   t.after(async () => { await context.close(); await browser.close(); server.close(); });
+  assert.equal(await frame.locator('#cardLayer .card').count(), 6, '보드가 기존 순간 6개로 열린다');
+  assert.equal(await frame.locator('#detail.open').count(), 0, '보드를 처음 열 때 상세는 닫힌다');
+  assert.deepEqual(await frame.evaluate(() => [!!window.__LT58, !!window.__LT58V11, !!window.__LT58V12]), [true, true, true], '세 QA 스냅샷이 모두 유지된다');
   await frame.click('.card[data-id="m2"]');
   await frame.waitForSelector('.card.selected[data-id="m2"]');
   assert.equal(await page.evaluate(() => window.LT41.momentId), 'm2', '보드 선택이 셸의 현재 순간으로 전달된다');
-  await page.click('#write-menu');
-  await page.waitForSelector('#write-panel[open]');
+  await openShellWritePanel(page, frame, variant.width);
   await page.fill('#quick-url', 'https://example.com/board-parent');
   await page.click('#quick-submit');
   const deadline = Date.now() + 10000;
@@ -525,18 +557,19 @@ test('19. 화면: 보드에서 고른 순간이 쉬운 추가의 부모로 저�
   assert.deepEqual(moments.slice(0, before.length), before, '기존 순간의 값과 순서가 바뀌지 않는다');
   assert.equal(moments.at(-1).parentId, 'm2', '고른 순간이 새 순간의 부모로 저장된다');
 });
+}
 
-test('20. 화면: 보드에서 고른 순간이 자세한 추가의 부모로 저장된다', { skip: REQUIRE ? false : skip, timeout: 240000 }, async (t) => {
+for (const variant of BOARD_1538_MATRIX) {
+test(`20. 화면: 보드에서 고른 순간이 자세한 추가의 부모로 저장된다 [${variant.width}×${variant.theme}]`, { skip: REQUIRE ? false : skip, timeout: 240000 }, async (t) => {
   const browser = await chromium.launch({ headless: true });
   const server = await serve();
   const base = `http://127.0.0.1:${server.address().port}`;
   const workspace = shellWorkspace();
-  const { context, page, frame, puts, stored } = await openShellBoard(browser, base, { workspace });
+  const { context, page, frame, puts, stored } = await openShellBoard(browser, base, { workspace, ...variant });
   t.after(async () => { await context.close(); await browser.close(); server.close(); });
   await frame.click('.card[data-id="m2"]');
   await frame.waitForSelector('.card.selected[data-id="m2"]');
-  await page.click('#write-menu');
-  await page.waitForSelector('#write-panel[open]');
+  await openShellWritePanel(page, frame, variant.width);
   await page.click('#write-tab-detailed');
   await page.waitForFunction(() => document.querySelector('#editor-context')?.textContent.includes('순간 2'), null, { timeout: 5000 });
   await page.fill('#moment-form [name="title"]', '고른 순간 다음');
@@ -547,8 +580,10 @@ test('20. 화면: 보드에서 고른 순간이 자세한 추가의 부모로 �
   assert.equal(puts.length, 1, '공용 자세한 추가가 저장 요청을 한 번 보낸다');
   assert.equal(stored().state.trees[0].moments.at(-1).parentId, 'm2', '자세한 추가도 고른 순간을 부모로 저장한다');
 });
+}
 
-test('21. 화면: 순간 0개 트리도 보드 빈 상태를 열고 첫 순간을 추가한다', { skip: REQUIRE ? false : skip, timeout: 240000 }, async (t) => {
+for (const variant of BOARD_1538_MATRIX) {
+test(`21. 화면: 순간 0개 트리도 보드 빈 상태를 열고 첫 순간을 추가한다 [${variant.width}×${variant.theme}]`, { skip: REQUIRE ? false : skip, timeout: 240000 }, async (t) => {
   const browser = await chromium.launch({ headless: true });
   const server = await serve();
   const base = `http://127.0.0.1:${server.address().port}`;
@@ -556,7 +591,7 @@ test('21. 화면: 순간 0개 트리도 보드 빈 상태를 열고 첫 순간�
   workspace.state.trees[0].moments = [];
   workspace.state.trees[0].edges = [];
   workspace.state.trees[0].coverMomentId = '';
-  const { context, page, frame, puts, stored } = await openShellBoard(browser, base, { workspace, empty: true });
+  const { context, page, frame, puts, stored } = await openShellBoard(browser, base, { workspace, empty: true, ...variant });
   t.after(async () => { await context.close(); await browser.close(); server.close(); });
   assert.equal(await page.evaluate(() => window.LT41.tree.id), 't6', '빈 트리를 트리 없음으로 바꾸지 않는다');
   assert.equal(await page.locator('#empty').isVisible(), false, '셸의 트리 0개 안내는 숨는다');
@@ -575,12 +610,14 @@ test('21. 화면: 순간 0개 트리도 보드 빈 상태를 열고 첫 순간�
   assert.equal(tree.moments.length, 1, '첫 순간 하나만 생긴다');
   assert.equal(tree.moments[0].parentId, null, '첫 순간은 시작 순간으로 저장된다');
 });
+}
 
-test('22. 화면: 보드 수정은 공용 편집 창으로 저장하고 순간 정체성은 유지한다', { skip: REQUIRE ? false : skip, timeout: 240000 }, async (t) => {
+for (const variant of BOARD_1538_MATRIX) {
+test(`22. 화면: 보드 수정은 공용 편집 창으로 저장하고 순간 정체성은 유지한다 [${variant.width}×${variant.theme}]`, { skip: REQUIRE ? false : skip, timeout: 240000 }, async (t) => {
   const browser = await chromium.launch({ headless: true });
   const server = await serve();
   const base = `http://127.0.0.1:${server.address().port}`;
-  const { context, page, frame, puts, stored } = await openShellBoard(browser, base);
+  const { context, page, frame, puts, stored } = await openShellBoard(browser, base, { ...variant });
   t.after(async () => { await context.close(); await browser.close(); server.close(); });
   const before = await page.evaluate(() => structuredClone(window.LT41.tree.moments.find(moment => moment.id === 'm2')));
   await frame.click('.card[data-id="m2"]');
@@ -602,12 +639,14 @@ test('22. 화면: 보드 수정은 공용 편집 창으로 저장하고 순간 �
   assert.equal(after.date, before.date);
   assert.deepEqual(after.links, before.links);
 });
+}
 
-test('23. 화면: 보드 삭제는 공용 저장과 되돌리기로 원래 순간을 복원한다', { skip: REQUIRE ? false : skip, timeout: 240000 }, async (t) => {
+for (const variant of BOARD_1538_MATRIX) {
+test(`23. 화면: 보드 삭제는 공용 저장과 되돌리기로 원래 순간을 복원한다 [${variant.width}×${variant.theme}]`, { skip: REQUIRE ? false : skip, timeout: 240000 }, async (t) => {
   const browser = await chromium.launch({ headless: true });
   const server = await serve();
   const base = `http://127.0.0.1:${server.address().port}`;
-  const { context, page, frame, puts, stored } = await openShellBoard(browser, base);
+  const { context, page, frame, puts, stored } = await openShellBoard(browser, base, { ...variant });
   t.after(async () => { await context.close(); await browser.close(); server.close(); });
   const before = await page.evaluate(() => structuredClone(window.LT41.tree.moments));
   await frame.click('.card[data-id="m2"]');
@@ -630,6 +669,7 @@ test('23. 화면: 보드 삭제는 공용 저장과 되돌리기로 원래 순�
   assert.deepEqual(stored().state.trees[0].moments, before, '되돌리기가 순간·부모·연결·순서를 원래대로 복원한다');
   await frame.waitForSelector('.card[data-id="m2"]');
 });
+}
 
 test('24. 화면: 보드 크게 보기는 공용 미디어 창을 쓰고 닫으면 흔적이 남지 않는다', { skip: REQUIRE ? false : skip, timeout: 240000 }, async (t) => {
   const browser = await chromium.launch({ headless: true });
