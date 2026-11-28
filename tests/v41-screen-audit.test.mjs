@@ -613,9 +613,21 @@ test('#657 화면 공통 검사기: 아홉 화면 둘레·스크롤 주인 관�
   const browser = await chromium.launch({ headless: true });
   const started = Date.now();
   try {
-    const report = await observeFrameMatrix({ browser, base, outputDir, shard });
+    const requested = process.env.LT_SCREEN_AUDIT_SCREENS || 'all';
+    const groups = {
+      home: ['home'], board: ['board'], book: ['book', 'share-guest'],
+      shelf: ['shelf'], map: ['map'], shell: ['home','shelf','book','board','map','tree','explore','settings','share-guest'],
+      'explore/settings': ['explore','settings']
+    };
+    const keys = requested === 'all' ? Object.keys(groups) : requested.split(',');
+    assert.ok(keys.length && keys.every(k => Object.hasOwn(groups,k)), 'invalid audit screen selection');
+    const screens = [...new Set(keys.flatMap(k => groups[k]))];
+    assert.ok(screens.length, 'empty audit selection');
+    const report = await observeFrameMatrix({ browser, base, outputDir, shard, screens });
     assert.deepEqual(report.errors, [], '관측 중 화면 오류가 없다');
-    assert.equal(report.screens.length, !shard ? 36 : shard === 'c' ? 18 : 9, '선택한 shard의 아홉 화면을 모두 관측했다');
+    assert.equal(report.screens.length, screens.length * (!shard ? 4 : shard === 'c' ? 2 : 1), 'selected screen matrix complete');
+    const combos = [[390,'night','b'],[1440,'night','a'],[390,'garden','c'],[1440,'garden','c']];
+    assert.deepEqual(report.screens.map(r => r.viewport.width+'/'+r.theme+'/'+r.screen).sort(), combos.filter(c => !shard || c[2] === shard).flatMap(c => screens.map(id => c[0]+'/'+c[1]+'/'+id)).sort());
     const assertObservedStyle = (actual, expected, width, theme, label) => {
       assert.ok(actual, `${label} 요소가 있다`);
       assert.deepEqual(actual.padding, expected.padding[width], `${label} padding`);
@@ -687,6 +699,10 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
   for (const theme of ['night', 'garden']) for (const size of SIZES) if (!SHARD || SHARD === shardOf(theme, size[0])) COMBOS.push([size, theme]);
 
   // 한 조합(크기·테마)을 돌고 실패 줄을 돌려준다.
+  const auditRequest = process.env.LT_SCREEN_AUDIT_SCREENS || 'all';
+  const auditAreas = new Set(auditRequest.split(','));
+  assert.ok(auditRequest === 'all' || [...auditAreas].every(x => ['home','board','book','shelf','map','shell','explore/settings'].includes(x)), 'invalid audit areas');
+  const auditSelected = (...owners) => auditRequest === 'all' || owners.includes('common') || owners.some(x => auditAreas.has(x));
   const runCombo = async ([width, height], theme) => {
     const context = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
     await context.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); } catch {} }, theme);
@@ -709,6 +725,7 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
       }
     };
 
+    if (auditSelected('home')) {
     // 첫 화면(예시) → 어떻게 쓰나요 안내
     await page.goto(`${base}/home-host.html`, { waitUntil: 'domcontentloaded' });
     const home = await frameOf(page, /home\.html/);
@@ -721,7 +738,9 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     await page.waitForTimeout(400);
     await take(page, '어떻게 쓰나요 안내');
     await context.close();
+    }
 
+    if (auditSelected('book')) {
     // 책(공유 링크) — 첫 장부터 마지막 장까지 넘기며 매 장 검사
     const ctx2 = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
     await ctx2.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); } catch {} }, theme);
@@ -760,7 +779,9 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     }
     await take(page2, '책·공유 마지막 장');
     await ctx2.close();
+    }
 
+    if (auditSelected('board', 'map', 'shell')) {
     // 셸 화면 — 보드 → 지도 → 둘러보기(한 번 뜬 셸에서 주소와 패널만 바꿔 본다)
     const ctx3 = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
     await ctx3.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); } catch {} }, theme);
@@ -878,7 +899,9 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
       }
     }
     await ctx3.close();
+    }
 
+    if (auditSelected('home', 'shell', 'explore/settings', 'shelf')) {
     // 둘러보기 → 의견 보내기 창 — 새로 뜬 셸에서(지도 잔상 상태에 좌우되지 않게)
     const ctx4 = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
     await ctx4.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); } catch {} }, theme);
@@ -1439,7 +1462,9 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     assert.equal(editState.hiddenCount, 1, '고치는 덧붙임 카드 하나가 숨는다');
     await take(page4, '내 의견 덧붙임 고치기 열림');
     await ctx4.close();
+    }
 
+    if (auditSelected('common')) {
     // 2026-11-17: 운영센터 '한눈에' — 숫자 4장·할 일 3장이 1440·1920에서 각각 한 줄, 390은 줄바꿈(가로 넘침 0),
     // 모든 카드가 같은 누름 모양(role·tabindex·44px 이상)이고, 탭이 있는 카드는 그 탭을 조건으로 열며
     // 탭이 없는 카드는 내역을 펼친다(다시 누르면 접힘). 관리자 세션은 가짜 API(응답 모형)로 만든다.
@@ -1567,7 +1592,9 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     await pageAdm.waitForFunction(() => location.hash.startsWith('#board?status='), null, { timeout: 8000 });
     assert.equal(await pageAdm.evaluate(() => location.hash), '#board?status=pending', 'Space로도 카드가 열린다');
     await ctxAdm.close();
+    }
 
+    if (auditSelected('home', 'board', 'book', 'map', 'shell')) {
     // #666 2번: 계정 메뉴가 열린 자리에서 첫 트리 안내가 메뉴를 덮지 않는다(한 번에 하나만).
     // 안내가 뜨고 메뉴가 열리면 안내를 잠시 접고, 메뉴를 닫으면 다시 뜨는 것까지 확인한다.
     const ctx5 = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
@@ -1984,7 +2011,9 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     assert.deepEqual(treeAfterTrip, treeBeforeTrip, '왕복 뒤에도 지금 트리·순간이 유지된다');
     await pageMap.close();
     await ctx5.close();
+    }
 
+    if (auditSelected('map')) {
     // #627 PR3: 그래프 보기 — 지금은 주소(#my/graph)로만 열리는 화면이라 호스트가 LT41을 직접 넘긴다
     // (share-host와 같은 틀, 실제 트리 = 셸이 넘기는 순간들과 같은 모양). 허브 이름 상자 겹침 0·
     // 가로 넘침 0·고리 썸네일 동그라미 보임을 수치로 단정한다.
@@ -2191,7 +2220,9 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     assert.equal(emptyCheck.empty, '아직 같은 노래를 담은 다른 팬이 없어요', `빈 상태 문구(실제 "${emptyCheck.empty}")`);
     assert.equal(emptyCheck.overflow, 0, `다른 팬 칸이 있어도 가로 넘침 0(실제 ${emptyCheck.overflow})`);
     await ctx7.close();
+    }
 
+    if (auditSelected('map', 'shell')) {
     // 주소로 열리는지(#my/graph) — 셸이 그래프 보기를 화면 파일로 띄우는지 단정한다(메뉴 단추는 없다).
     const ctx8 = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
     await ctx8.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); } catch {} }, theme);
@@ -2210,7 +2241,9 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     assert.match(graphByHash.url(), /views\/graph\/track60-graph\.html(?:\?|$)/, '#my/graph 프레임 주소에 그래프 하위 폴더가 있다');
     assert.equal(await graphByHash.evaluate(() => document.documentElement.getAttribute('data-v41-screen')), 'graph', '#my/graph 프레임 문서가 그래프 화면이다');
     await ctx8.close();
+    }
 
+    if (auditSelected('home')) {
     // 261117 대표 결정: 글자 카드 세부 검사(존재·줄·말줄임·배치)는 1440에서 한다 — 390은 가운데가 커져
     // 위·아래 띠가 카드를 못 담아 안전망이 궤도 카드를 숨길 수 있다(소수 카드 숨김 계약은
     // '#657 후속 261117' 단언이 본다). 390에서 이 상태의 겹침 검사는 보이는 카드가 없어 자동 만족이다.
@@ -2297,6 +2330,7 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     assert.equal(cardCheck.overflow, 0, `첫 화면 가로 넘침 0(실제 ${cardCheck.overflow})`);
     await take(page9, '첫 화면 글자 카드');
     await ctx9.close();
+    }
     } // width 1440 — 390 리본은 별도 겹침 시험이 담당한다
 
     await context.close();
