@@ -5,6 +5,8 @@
 
 /** 페이지 안에서 실행된다(page.evaluate). 직렬화되므로 바깥 변수를 쓰지 않는다. */
 export function measureBoardCardsInPage() {
+  const root = document.documentElement, body = document.body;
+  if (!root || !body) return false;
   const parseColors = (text) => {
     const out = [];
     const re = /rgba?\(([^)]+)\)/g;
@@ -39,9 +41,9 @@ export function measureBoardCardsInPage() {
     return out;
   };
   // 판 바탕: .surface의 색 멈춤들(불투명하지 않으면 앱 바탕 위에 겹친다).
-  const appEl = document.querySelector('.app') || document.body;
+  const appEl = document.querySelector('.app') || body;
   const appLayers = layerStops(appEl);
-  const bodyLayers = layerStops(document.body);
+  const bodyLayers = layerStops(body);
   const black = [{ r: 0, g: 0, b: 0, a: 1 }];
   const appBase = compose(appLayers.image, compose(appLayers.color, compose(bodyLayers.color, black)));
   const surfaceEl = document.querySelector('.surface');

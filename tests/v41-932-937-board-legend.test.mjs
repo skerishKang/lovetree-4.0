@@ -7,6 +7,7 @@ import { existsSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { serve } from './helpers/screen-audit.mjs';
 import { createTree, addMoment } from '../public/v41/domain.mjs';
+import { evaluateWhenReady } from './helpers/visible-frame.mjs';
 
 const REQUIRE = process.env.LT_932_937_REQUIRE === '1';
 const CAPTURE_DIR = process.env.LT_932_937_CAPTURE_DIR || '';
@@ -95,7 +96,11 @@ test('#932 보드 — 1440·2560·390에서 가로 넘침 0, 상세 판이 화�
       await page.setViewportSize({ width: w, height: h });
       const href = `${origin}/v41/?account=1#my/board?tree=${tree.id}&moment=${tree.moments[0].id}`;
       const frame = await openBoard(page, href);
-      const before = await frame.evaluate(() => ({ scroll: document.documentElement.scrollWidth, client: document.documentElement.clientWidth }));
+      const before = await evaluateWhenReady(frame, () => {
+        const root = document.documentElement;
+        if (!root) return false;
+        return { scroll: root.scrollWidth, client: root.clientWidth };
+      });
       assert.equal(before.scroll - before.client, 0, `${w}: 보드 문서 가로 넘침 0 (scroll ${before.scroll} / client ${before.client})`);
       const shell = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, client: document.documentElement.clientWidth }));
       assert.equal(shell.scroll - shell.client, 0, `${w}: 셸 문서 가로 넘침 0`);
@@ -122,7 +127,10 @@ test('#932 보드 — 1440·2560·390에서 가로 넘침 0, 상세 판이 화�
       });
       assert.ok(rect.left >= -1, `${w}: 상세 판 왼쪽이 화면 밖이 아님 (${rect.left})`);
       assert.ok(rect.right <= rect.inner + 1, `${w}: 상세 판 오른쪽이 화면 밖이 아님 (${rect.right} ≤ ${rect.inner})`);
-      assert.equal(await frame.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth), 0, `${w}: 판을 연 뒤에도 넘침 0`);
+      assert.equal(await evaluateWhenReady(frame, () => {
+        const root = document.documentElement;
+        return root ? root.scrollWidth - root.clientWidth : false;
+      }), 0, `${w}: 판을 연 뒤에도 넘침 0`);
       if (CAPTURE_DIR && w === 2560) {
         mkdirSync(CAPTURE_DIR, { recursive: true });
         await page.screenshot({ path: path.join(CAPTURE_DIR, 'board-2560-detail.png') });

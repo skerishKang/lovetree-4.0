@@ -155,7 +155,7 @@ test('#1109 두 창의 닫기 단추·덮개·폭이 같고 정리 창 아래 �
       let frame = null;
       for (const f of page.frames()) {
         if (f === page.mainFrame()) continue;
-        const ok = await f.evaluate(() => document.documentElement.getBoundingClientRect().width > 0 && !!document.getElementById('orbit')?.shadowRoot?.querySelector('[data-do=moments],[data-do=index]')).catch(() => false);
+        const ok = await f.evaluate(() => { const root = document.documentElement; return !!root && root.getBoundingClientRect().width > 0 && !!document.getElementById('orbit')?.shadowRoot?.querySelector('[data-do=moments],[data-do=index]'); });
         if (ok) { frame = f; break; }
       }
       assert.ok(frame, '순간 목록을 든 화면을 찾는다');
@@ -179,7 +179,7 @@ test('#1109 두 창의 닫기 단추·덮개·폭이 같고 정리 창 아래 �
 async function momentListFrame(page) {
  for (const f of page.frames()) {
   if (f === page.mainFrame()) continue;
-  const ok = await f.evaluate(() => document.documentElement.getBoundingClientRect().width > 0 && !!document.getElementById('orbit')?.shadowRoot?.querySelector('[data-do=moments],[data-do=index]')).catch(() => false);
+  const ok = await f.evaluate(() => { const root = document.documentElement; return !!root && root.getBoundingClientRect().width > 0 && !!document.getElementById('orbit')?.shadowRoot?.querySelector('[data-do=moments],[data-do=index]'); });
   if (ok) return f;
  }
  return null;

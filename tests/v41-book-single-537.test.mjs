@@ -3,7 +3,7 @@ import { listenOnSafePort } from './helpers/safe-port.mjs';
 // 그리고 한 장은 펼침면(순간 둘)이 아니라 순간 하나씩 넘긴다(순간 26개면 1/26 … 26/26).
 // 여기서는 (1) 계산 한 벌을 실제로 실행해 순서·전환을 확인하고, (2) 실제 책 화면을 열어
 // 모든 순간이 한 번씩 크게 나오는지·높이·돋보기·머리줄을 잰다(크롬이 없으면 건너뛴다).
-import {shownFrameBox} from './helpers/visible-frame.mjs';
+import {evaluateWhenReady,shownFrameBox} from './helpers/visible-frame.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync, mkdirSync } from 'node:fs';
@@ -164,12 +164,16 @@ test('#537 실제 화면: 1440·390에서 한 장으로 끝까지 넘기면 모�
     const singleGeom = await geom(wideSingle.frame);
     const wideWalk = await walkAll(wideSingle.frame);
     // #952: 보기 단추는 화면에서 잰다 — 넓은 화면은 1장·2장 둘 다 보이고, 지금은 1장이 눌려 있다.
-    const wideBtns = await wideSingle.frame.evaluate(() => ({
-      single: document.getElementById('singleViewBtn')?.hidden === false,
-      double: document.getElementById('doubleViewBtn')?.hidden === false,
-      pressed: document.getElementById('singleViewBtn')?.getAttribute('aria-pressed'),
-      attr: document.documentElement.dataset.bookView
-    }));
+    const wideBtns = await evaluateWhenReady(wideSingle.frame, () => {
+      const root = document.documentElement;
+      if (!root) return false;
+      return {
+        single: document.getElementById('singleViewBtn')?.hidden === false,
+        double: document.getElementById('doubleViewBtn')?.hidden === false,
+        pressed: document.getElementById('singleViewBtn')?.getAttribute('aria-pressed'),
+        attr: root.dataset.bookView
+      };
+    });
     await wideSingle.ctx.close();
     assert.deepEqual(wideBtns, { single: true, double: true, pressed: 'true', attr: 'single' }, '넓은 화면: 두 단추가 보이고 1장이 눌린다');
 
@@ -794,10 +798,14 @@ test('#1468 책 넘김 중 날짜 표기 메시지가 와도 다음 넘김은 �
         }
         await turnSettled(frame);
         const pages = await stopPageLog(frame);
-        const after = await frame.evaluate(() => ({
-          style: document.documentElement.getAttribute('data-lt-date-style'),
-          text: [...document.querySelectorAll('.page-content, .mobile-content')].map((node) => node.textContent).join(' ')
-        }));
+        const after = await evaluateWhenReady(frame, () => {
+          const root = document.documentElement;
+          if (!root) return false;
+          return {
+            style: root.getAttribute('data-lt-date-style'),
+            text: [...document.querySelectorAll('.page-content, .mobile-content')].map((node) => node.textContent).join(' ')
+          };
+        });
         assert.deepEqual(errors, [], `${width}: 페이지 예외 0`);
         oneStepEach(pages, `${width}`);
         assert.ok(pages.length >= 6, `${width}: 입력이 쪽 넘김으로 이어진다(관찰 ${pages.length}쪽: ${pages.join('→')})`);

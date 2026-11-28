@@ -2,6 +2,7 @@
 // await testBackNavigation(page, { frame, recorded: true, action: () => frame.click('#card') });
 // await testBackNavigation(page, { frame, recorded: false, action: () => frame.click('#themeGrid button') });
 import assert from 'node:assert/strict';
+import { evaluateWhenReady } from './visible-frame.mjs';
 
 const HISTORY_WAIT_MS = 5000;
 const OBSERVE_MS = 100;
@@ -127,7 +128,9 @@ async function settleShell(page, waitMs) {
 // 셸이 안쪽 메시지를 받은 뒤 기록을 늘린다 — 메시지 도착을 실제 신호로 본다(#1412 측정).
 async function installObserver(target, { messages = false } = {}) {
   if (!target) return;
-  await target.evaluate(withMessages => {
+  await evaluateWhenReady(target, withMessages => {
+    const root = document.documentElement;
+    if (!root) return false;
     if (withMessages && !window.__ltHistoryMsgHook) {
       window.__ltHistoryMsgHook = true;
       window.__ltHistoryMsgSeen = 0;
@@ -137,8 +140,9 @@ async function installObserver(target, { messages = false } = {}) {
       window.__ltHistoryDomHook = true;
       window.__ltHistoryDomSeen = 0;
       new MutationObserver(() => { window.__ltHistoryDomSeen += 1; })
-        .observe(document.documentElement, { subtree: true, attributes: true, childList: true, characterData: true });
+        .observe(root, { subtree: true, attributes: true, childList: true, characterData: true });
     }
+    return true;
   }, messages);
 }
 const signalCounts = target => target

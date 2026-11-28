@@ -15,6 +15,7 @@ import { stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { measureBoardCardsInPage, worstByVariant } from './helpers/board-contrast.mjs';
+import { evaluateWhenReady } from './helpers/visible-frame.mjs';
 
 const ROOT = path.resolve(process.env.LT_BOARD_CONTRAST_ROOT || fileURLToPath(new URL('../public', import.meta.url)));
 let chromium = null;
@@ -74,7 +75,7 @@ test('보드 카드: 종이·밤 판 × 밤·정원 테마, 카드 종류마다 
     for (const appTheme of ['night', 'garden']) {
       for (const plate of ['paper', 'night']) {
         const { ctx, frame, errors } = await openBoard(browser, base, { plate, appTheme });
-        const result = await frame.evaluate(measureBoardCardsInPage);
+        const result = await evaluateWhenReady(frame, measureBoardCardsInPage);
         await ctx.close();
         assert.equal(errors.length, 0, `${appTheme}×${plate}: 페이지 오류 ${errors.join(' | ')}`);
         assert.ok(result.cardCount > 0, `${appTheme}×${plate}: 카드가 그려지지 않음`);
@@ -104,13 +105,17 @@ test('보드 안 클릭(카드·전체 보기)은 판을 바꾸지 않는다 —
   try {
     browser = await chromium.launch({ headless: true });
     const { ctx, page, frame, errors } = await openBoard(browser, base, { plate: 'paper', appTheme: 'night' });
-    const read = () => frame.evaluate(() => ({
-      attr: document.documentElement.getAttribute('data-lt-board-theme'),
-      stored: localStorage.getItem('lt41.boardTheme'),
-      body: document.body.dataset.theme,
-      toast: document.getElementById('toast')?.textContent || '',
-      themes: document.querySelectorAll('#themeGrid .themeBtn').length
-    }));
+    const read = () => evaluateWhenReady(frame, () => {
+      const root = document.documentElement, body = document.body;
+      if (!root || !body) return false;
+      return {
+        attr: root.getAttribute('data-lt-board-theme'),
+        stored: localStorage.getItem('lt41.boardTheme'),
+        body: body.dataset.theme,
+        toast: document.getElementById('toast')?.textContent || '',
+        themes: document.querySelectorAll('#themeGrid .themeBtn').length
+      };
+    });
     const before = await read();
     assert.equal(before.attr, 'paper', '기본은 종이 판');
     assert.equal(before.body, 'pearl', '원본 보드 테마(진주빛)는 그대로');
