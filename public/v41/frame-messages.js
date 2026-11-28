@@ -16,6 +16,7 @@
     boardSaved: fromShell('lt41-board-saved', 'ok, error?'),
     boardDetail: fromShell('lt41-board-detail', 'open'),
     boardPanel: fromView('lt41-board-panel', 'state'),
+    treeDetail: fromView('lt41-tree-detail', 'open'),
     boardRestore: fromShell('lt41-board-restore', 'momentId, detailOpen, view?, scroll?, panel?, cinemaIndex?'),
     boardSync: fromView('lt41-board-sync', 'treeId, moments'),
     // 셸은 옛 화면에서 같은 이름으로 보낸 판 선택도 받는다.

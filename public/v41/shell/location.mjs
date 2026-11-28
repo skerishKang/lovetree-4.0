@@ -43,9 +43,14 @@ export function createLocation(deps) {
   function treeDetailOpen() {
     if (getCurrent() !== 'track61-tree.html') return false;
     try {
-      return !!$('view')?.contentDocument?.querySelector('#treeDetail[open]');
+      const frame = $('view'), doc = frame?.contentDocument;
+      // 새로고침으로 프레임이 아직 준비되지 않았을 때 닫힌 것으로 판정하면
+      // 기존 detail=1 기록을 지워 복원을 놓친다. 완성된 프레임부터 DOM을 기준으로 한다.
+      if (!doc || doc.readyState !== 'complete' || !frame.contentWindow?.__LT_TREE_VIEW__)
+        return !!globalThis.history?.state?.lt41TreeDetail;
+      return !!doc.querySelector('#treeDetail[open]');
     } catch {
-      return false;
+      return !!globalThis.history?.state?.lt41TreeDetail;
     }
   }
 
