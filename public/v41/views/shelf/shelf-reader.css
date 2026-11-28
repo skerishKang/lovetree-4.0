@@ -1,6 +1,8 @@
 /* 내 책장 읽기(펼침·3D 책) 스타일 (#231 후속, 2026-11-09). 위 shelf.css에서 이어지는 부분을 그대로 옮겼다. */
     .reader-screen { display: none; }
     .reader-screen.active { position: fixed; inset: 0; z-index: 60; display: block; overflow: auto; padding: 14px 18px 28px; background: var(--paper); animation: reader-in .42s ease both; }
+    /* #1631: 미리보기 단계에서는 화면 도구줄이 돌아가기 단추를 덮지 않는다. */
+    html[data-v41-screen=shelf]:has(.reader-screen.active) .lt-screen-toolbar { visibility: hidden; pointer-events: none; }
     .reader-screen.is-preparing { visibility: hidden; }
     /* #886: 책을 펼치는 동안 책장 화면 숨김도 인라인 display 대신 클래스로 한다(.shelf-screen 규칙보다 한 단계 위). */
     .shelf-screen.is-covered { display: none; }
@@ -88,7 +90,6 @@
     .video-poster.is-short { width: 58%; max-height: 220px; align-self: center; aspect-ratio: 9/16; }
     .video-poster img { display: block; width: 100%; height: 100%; object-fit: cover; }
     .video-poster::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg,transparent 45%,rgba(24,19,22,.5)); }
-    .video-poster .play-mark { position: absolute; left: 50%; top: 50%; z-index: 1; display: grid; place-items: center; width: 54px; height: 54px; border: 1px solid rgba(255,255,255,.75); border-radius: 50%; background: rgba(189,93,114,.88); transform: translate(-50%,-50%); font-size: 21px; }
     .video-poster .poster-caption { position: absolute; left: 12px; right: 12px; bottom: 10px; z-index: 1; font-size: 10px; text-align: left; }
     .page-video iframe { display: block; width: 100%; min-height: 145px; aspect-ratio: 16/9; border: 0; border-radius: 8px; background: #312d30; box-shadow: 0 8px 13px rgba(66,46,40,.16); }
     .page-video iframe.is-short { width: 58%; min-height: 212px; align-self: center; aspect-ratio: 9/16; }

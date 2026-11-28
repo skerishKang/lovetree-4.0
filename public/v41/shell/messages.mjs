@@ -73,6 +73,7 @@ export function createMessages(deps) {
     if (event.origin !== location.origin || !fromView) return;
     // #1093: 서재 도구 줄의 토글이 예전 저장 경로를 그대로 쓴다.
     if (data?.type === MSG.setShelfView) { deps.setShelfView?.(data.value); return; }
+    if (data?.type === MSG.setShelfOpenMode) { deps.setShelfOpenMode?.(data.value); return; }
     if (data?.type === MSG.viewer) { document.body.classList.toggle('lt-viewer-open', data.open === true); return; }
     // 4.1 기억 보드 저장: 화면이 만든 순간·연결·배치를 기존 워크스페이스 저장 경로로 보낸다.
     if (data?.type === MSG.boardSync) {
@@ -152,6 +153,8 @@ export function createMessages(deps) {
       window.LT41.momentId = data.id; links(); writeLocation(data.noHistory || data.boardState?.noHistory ? 'replace' : 'push', data.boardState);
     }
     if (data?.type === MSG.boardDetail) { writeLocation('replace'); return; }
+    // 상세 창이 실제 열린 뒤 셸 주소에도 detail=1을 기록한다. 초기 선택 알림은 창 열기보다 먼저 올 수 있다.
+    if (data?.type === MSG.treeDetail && getCurrent() === 'track61-tree.html') { links(); writeLocation('replace'); return; }
     // #315: 공유 감상(share)은 읽기 전용이다. 안쪽 화면의 버튼 정리를 통과한 쓰기 메시지가 남아도 여기서 막는다(이중).
     if (data?.type === MSG.newTree) { if (getSource() !== 'share') openNewTree(); return; }
     if (data?.type === MSG.write && getSource() === 'share') return;

@@ -97,6 +97,12 @@ function prepareTreeChoice(bar, screen, title, titleFrom) {
     }
   };
   refresh();
+  // #984/#1634: 바로 펼친 책에서 표지를 고친 뒤에도 머리줄 표지가 즉시 바뀌어야 한다.
+  // 셸이 서버 저장을 확인해 보낸 알림에만 반응하고 방문 기록은 건드리지 않는다.
+  if (screen === 'book') window.addEventListener('message', event => {
+    if (event.source !== window.parent || event.origin !== location.origin || event.data?.type !== MSG.treesSaved) return;
+    refresh();
+  });
   // Keep the visible label synchronized even when book title is changed outside the toolbar.
   // The auxiliary hidden book header is still the source for legacy readers.
   if (!own && titleFrom && typeof MutationObserver === 'function') {

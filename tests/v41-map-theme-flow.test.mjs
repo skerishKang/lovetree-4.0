@@ -112,7 +112,10 @@ async function settingsPlate(page, frame, plate) {
   await page.waitForTimeout(120);
   await frame.evaluate(() => { window.__mapDrawCount = 0; });
   await page.locator(`#account-settings button[data-board-theme="${plate}"]`).click();
-  await page.waitForTimeout(180);
+  // 화면 그리기는 다음 animation frame에 예약된다. CI 부하에 따른 180ms 지연값 대신
+  // 첫 실제 배경 그리기를 기다린 뒤 두 프레임을 더 지켜 중복 그리기가 없는지 확인한다.
+  await frame.waitForFunction(() => window.__mapDrawCount >= 1, null, { timeout: 5000 });
+  await frame.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   assert.equal(await frame.evaluate(() => document.documentElement.dataset.ltBoardTheme), plate, '설정 선택이 열린 지도에 전달된다');
   assert.equal(await page.evaluate(() => localStorage.getItem('lt41.boardTheme')), plate, '보드와 같은 저장 키');
   assert.equal(await frame.evaluate(() => window.__mapDrawCount), 1, '바뀐 판은 한 번만 그린다');
@@ -345,6 +348,61 @@ test('지도 판 실제 흐름: 설정·저장 복원·두 보기·누르기·�
       } finally { await live.context.close(); }
     });
   } finally {
+    if (browser) await browser.close();
+    await new Promise(resolve => server.close(resolve));
+  }
+});
+
+test('#1609 지도 도구 줄의 위치만 달라져도 배치 영역을 다시 계산한다', { skip: REQUIRE ? false : skip, timeout: 30000 }, async () => {
+  if (skip) assert.fail('필수 지도 화면 시험에 브라우저가 없다');
+  const server = await serve(), base = `http://127.0.0.1:${server.address().port}`;
+  let browser, live;
+  try {
+    browser = await chromium.launch({ headless: true });
+    live = await openMap(browser, base, { width: 1440, appTheme: 'night' });
+    const frame = live.frame;
+    const before = await frame.evaluate(() => ({
+      box: window.__lt.box(),
+      top: document.documentElement.style.getPropertyValue('--lt-toolbar-top')
+    }));
+    try {
+      await frame.evaluate(() => document.documentElement.style.setProperty('--lt-toolbar-top', '180px'));
+      await frame.waitForFunction(() =>
+        document.querySelector('.lt-screen-toolbar')?.getBoundingClientRect().top >= 175);
+      const expected = await frame.evaluate(() =>
+        window.LT56Model.fitBox(innerWidth, innerHeight, window.__lt.measureInsets(), innerWidth >= 1200 ? 8 : 16));
+      assert.ok(expected.y > before.box.y + 10, '위치 이동은 지도 배치 영역을 바꾼다');
+      await frame.waitForFunction(y => Math.abs(window.__lt.box().y - y) < .1, expected.y, { timeout: 3000 });
+      assert.deepEqual(await frame.evaluate(() => window.__lt.box()), expected,
+        '도구 줄의 높이가 그대로여도 위치 이동을 감지한다');
+    } finally {
+      await frame.evaluate(top => {
+        if (top) document.documentElement.style.setProperty('--lt-toolbar-top', top);
+        else document.documentElement.style.removeProperty('--lt-toolbar-top');
+      }, before.top);
+    }
+    assert.deepEqual(live.errors, [], '배치 갱신에 페이지 오류 없음');
+  } finally {
+    if (live) await live.context.close();
+    if (browser) await browser.close();
+    await new Promise(resolve => server.close(resolve));
+  }
+});
+
+
+test('지도 테마 변경 완료와 추가 프레임의 단일 그리기', { skip: REQUIRE ? false : skip, timeout: 30000 }, async () => {
+  if (skip) assert.fail('필수 지도 화면 시험을 실행할 브라우저가 없다');
+  const server = await serve(), base = 'http://127.0.0.1:' + server.address().port;
+  let browser, live;
+  try {
+    browser = await chromium.launch({ headless: true });
+    live = await openMap(browser, base, { width: 1440, appTheme: 'night' });
+    await settingsPlate(live.page, live.frame, 'night');
+    await settingsPlate(live.page, live.frame, 'paper');
+    await assertIdle(live.frame, live.page, 'paper');
+    assert.deepEqual(live.errors, [], '지도 화면 자바스크립트 오류 0');
+  } finally {
+    if (live) await live.context.close();
     if (browser) await browser.close();
     await new Promise(resolve => server.close(resolve));
   }

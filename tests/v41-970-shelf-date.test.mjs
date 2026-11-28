@@ -1,3 +1,4 @@
+import './helpers/shelf-open-1631.mjs';
 import {clickToolbarTreeChoice,treeChoiceExpanded,treeChoiceFocused} from './helpers/tree-picker-pr3.mjs';
 // #970 동작 시험 — 서재·책장(#938 대표 결정)과 날짜 표시.
 // 1) 서재: 책이 왼쪽부터 놓이고(첫 책이 책장 왼쪽 안쪽), 책장이 화면 세로 가운데에 있으며,

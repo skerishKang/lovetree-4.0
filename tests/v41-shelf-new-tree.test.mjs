@@ -97,6 +97,10 @@ test('#1290 서재 검색·진열은 기록하지 않고 책 열기는 바로 �
         await testBackNavigation(page, { frame, recorded: false, action: () => frame.fill('#searchInput', '') });
         await testBackNavigation(page, { frame, recorded: false, action: () => frame.click('[data-shelf-view="carousel"]') });
         await testBackNavigation(page, { frame, recorded: false, action: () => frame.click('[data-shelf-view="shelf"]') });
+        // #1631: 기본은 미리보기다. #1290의 '기록 1칸 → 책 → 서재' 계약은
+        // 사용자가 '바로 펼치기'를 고른 경로로 검사한다(선택 변경 자체는 기록하지 않음).
+        await testBackNavigation(page, { frame, recorded: false, action: () => frame.click('#shelf-open-choice [data-shelf-open-mode="direct"]') });
+        await page.waitForFunction(() => document.documentElement.dataset.ltShelfOpenMode === 'direct', null, { timeout: 10000 });
         await page.screenshot({ path: `E:/tmp/lt1290-${width}-before.png` });
         await testBackNavigation(page, { frame, recorded: true, action: () => frame.click('[data-book-id]') , settleMs: 450, timeoutMs: 10000 });
         const back = page.frames().find(f => /track32-bookshelf/.test(f.url()));

@@ -77,7 +77,7 @@ export function createMemberSession({api,onState=()=>{},onStatus=()=>{},onGuard=
  // 숨김·닫힘 때 아직 서버에 못 보낸 바뀜을 즉시 보낸다(창 닫힘 유실 막음 — 운영센터 의견 #35).
  // 담은 직후 꼬리표 칩을 확정하고 900ms 저장 대기 안에 창을 닫으면(탭 닫기·앱 전환·휴대폰 화면 꺼짐)
  // 저장이 영영 사라졌다. keepalive로 보내므로 창이 닫혀도 요청은 끝까지 나간다.
- const onHide = () => { sync.flushOnHide(); };
+ const onHide = () => active ? sync.flushOnHide() : false;
  const onVisible = () => {
    if (globalThis.document?.visibilityState === 'visible') { quietCheck(); return; }
    onHide();
@@ -171,5 +171,5 @@ export function createMemberSession({api,onState=()=>{},onStatus=()=>{},onGuard=
    onState(structuredClone(document),{treeId,momentId},modelOnly);sync.markLocalSave();return {treeId,momentId};
  }
  async function start(){await sync.start();if(active&&migrateTheme&&bound&&sync.status().phase==='synced'&&!sync.snapshot().dirty){migrateTheme=false;firstThemeSave=true;try{apply('setPrefs',{theme:document.prefs.theme});}finally{firstThemeSave=false;}}return sync.status();}
- return {start,apply,act:name=>sync.act(name),flushOnHide:()=>sync.flushOnHide(),snapshot:()=>({...sync.snapshot(),subject,writable:sync.snapshot().owned&&bound&&!mismatch,phase:sync.status().phase}),state:()=>structuredClone(document),dispose:()=>{active=false;bound=false;globalThis.document?.removeEventListener?.('visibilitychange',onVisible);globalThis.removeEventListener?.('pagehide',onHide);globalThis.removeEventListener?.('focus',quietCheck);},status:()=>sync.status()};
+ return {start,apply,act:name=>sync.act(name),flushOnHide:onHide,snapshot:()=>({...sync.snapshot(),subject,writable:sync.snapshot().owned&&bound&&!mismatch,phase:sync.status().phase}),state:()=>structuredClone(document),dispose:()=>{active=false;bound=false;sync.dispose();globalThis.document?.removeEventListener?.('visibilitychange',onVisible);globalThis.removeEventListener?.('pagehide',onHide);globalThis.removeEventListener?.('focus',quietCheck);},status:()=>sync.status()};
 }
