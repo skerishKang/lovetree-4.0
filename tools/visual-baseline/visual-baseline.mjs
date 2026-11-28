@@ -11,6 +11,7 @@
 import { mkdirSync, writeFileSync, existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import { installVisualPublicApiStubs } from './public-api-stub.mjs';
 
 // 화면별 기준치(%). 기억 보드는 실·핀 선을 매 로드마다 미세하게 다시 그려 0.1%를 넘는 장이 나온다
 // (정리는 리팩터링 3단계 예정, #231).
@@ -193,6 +194,16 @@ const ASSETS_PENDING = `(() => {
   return pending;
 })()`;
 
+// #1585: 같은 코드의 두 촬영에서 궤도·리본 카드가 서로 다른 시각에 머무르지 않게 한다.
+// 실제 화면은 건드리지 않고 비교용 iframe에 공개된 시험 훅으로 같은 위상만 그린다.
+const FIX_ORBIT_PHASE = `(() => {
+  const orbit = globalThis.__LT_ORBIT_TEST__;
+  if (!orbit) return;
+  orbit.pauseFloat?.();
+  orbit.hold?.(true);
+  orbit.seek?.(0.25);
+})()`;
+
 async function settleInside(frame, page) {
   // 화면 교체 애니메이션이 소수점 배율로 남으면 같은 화면도 픽셀이 흔들리므로, 다 열린 뒤 배율을 1로 고정한다.
   await page.evaluate(SETTLE_SHELL).catch(() => {});
@@ -200,6 +211,7 @@ async function settleInside(frame, page) {
   // 글꼴·그림을 먼저 다 읽혀 둔다. 읽는 중 상태도 "두 장이 같은" 안정 상태라 그대로 저장될 수 있다.
   await frame.evaluate(WAIT_ASSETS).catch(() => {});
   await page.evaluate(WAIT_ASSETS).catch(() => {});
+  await frame.evaluate(FIX_ORBIT_PHASE).catch(() => {});
   await page.waitForTimeout(200);
 }
 
@@ -288,6 +300,9 @@ async function capture(argv) {
             try { localStorage.setItem('lt41.theme', value); } catch {}
           }, theme);
           await context.addInitScript(FREEZE_INNER);
+          // #1585: 두 배포 주소 모두 촬영 브라우저 안에서만 같은 공개 값을 받는다.
+          const apiStubs = new Set();
+          await installVisualPublicApiStubs(context, options.base, (requestPath) => apiStubs.add(requestPath));
           const page = await context.newPage();
           const name = scene.openAccount ? `account-${viewport.tag}-${theme}.png` : shotName(scene.name, viewport, theme);
           try {
@@ -324,7 +339,7 @@ async function capture(argv) {
               unstable += 1;
               continue;
             }
-            manifest.push({ shot: name, scene: scene.name, opened: true, shown: href, stable });
+            manifest.push({ shot: name, scene: scene.name, opened: true, shown: href, stable, apiStubs: [...apiStubs].sort() });
             if (!stable) unstable += 1;
             count += 1;
           } finally {

@@ -18,3 +18,29 @@ node tools/visual-baseline/visual-baseline.mjs compare --before /mnt/e/base-befo
 
 ## 알려진 의도된 차이: shelf 4장 (1.5단계 ④, #231)
 `shelf-*` 4장은 2026-11 예시 판본·실제 기록 판본 통일(#231 ④)로 **4.9~9.0%** 차이가 난다. 고정 팔레트→테마 표지 색, 장식 책 4권→실제 예시 책, 카드 정보 줄·표지 사진·펼침 라벨 문구가 바뀐 결과이며 레이아웃 깨짐은 없다. ⑥단계(셸 경로 정리) 후 기준 스크린샷을 새로 뜨면 0.1% 기준으로 돌아간다.
+
+## #1585 미리보기 공개 API 503에 영향받지 않는 기준 사진
+
+비교 기준은 저장소의 영구 PNG가 아니다. 미리보기 검사에서 `merge-base` 배포본(없으면 운영 대체)을 `before`, PR 미리보기를 `after`로 **매번 새로 캡처**해 만든다. 두 번 모두 같은 버전의 `tools/visual-baseline/visual-baseline.mjs capture`를 사용한다.
+
+캡처 브라우저는 `public-api-stub.mjs`의 고정 시험 응답을 같은 출처의 **GET 공개 API**에만 돌려준다. 숫자판의 `/api/community/stats`는 `{trees:17,moments:42}`이고, 공개 트리 목록·공개 순간 목록·꼬리표 순간 목록·인기 무대 목록은 항상 같은 시험 값이다. 쿼리나 실제 서버 상태와 무관하다. POST·PATCH·DELETE, 로그인/계정 API, 다른 출처 및 지정되지 않은 경로는 그대로 둔다.
+
+이 방식은 **비교용 브라우저에만** 적용된다. 운영 서비스·미리보기 배포 설정·Cloudflare Functions·저장소 연결에 영향을 주지 않으며, `preview-gate.mjs`의 503 분류도 그대로다.
+
+기준 사진을 다시 만드는 방법:
+
+1. 현재 코드에서 `npm ci`, `npm run build`로 비교 도구와 화면을 준비한다.
+2. 다음 캡처 두 명령을 같은 버전의 도구로 실행한다. `--base`에 기준 배포본과 PR 미리보기 URL을 각각 전달한다.
+3. `compare`를 실행해 기준 초과 건수와 diff 이미지를 확인한다. `manifest.json`에는 각 사진의 `apiStubs` 경로가 기록된다.
+
+```sh
+node tools/visual-baseline/visual-baseline.mjs capture --base "https://기준배포주소/v41/" --out visual-before
+node tools/visual-baseline/visual-baseline.mjs capture --base "https://미리보기주소/v41/" --out visual-after
+node tools/visual-baseline/visual-baseline.mjs compare --before visual-before --after visual-after --out visual-diff --json visual-diff.json
+```
+
+워크플로는 원래 두 캡처를 동시에 수행하며, 변경할 필요가 없다. 차이율의 기본 기준 **0.1%**, 보드 기준 **0.5%**도 유지한다. 실제 화면이 바뀌면 비교 알림은 계속 발생한다. 기준 URL이 운영 대체인 경우 운영의 실제 화면 코드 차이는 별도 근거로 구분한다.
+
+### 촬영 시각에 따른 궤도 카드 흔들림 제거
+
+공개 숫자를 고정해도 첫 화면의 궤도·리본 카드가 서로 다른 순간에 그려지면 동일한 코드에서 큰 픽셀 차이가 생긴다. 비교 도구는 **보이는 내부 프레임에서만** 기존 시험용 궤도 훅의 `hold(true)`·`seek(0.25)`·`pauseFloat()`를 사용해 항상 같은 위상을 찍는다. 실제 사용자 화면이나 애니메이션 동작은 바꾸지 않는다. 이 보정은 픽셀 차이율을 무시하거나 알림 임계값을 올리는 방식이 아니므로, 실제 CSS·배치 변화는 그대로 검출한다.
