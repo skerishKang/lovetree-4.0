@@ -11,6 +11,7 @@ import { refreshStageIndex } from './stage-index-refresh.js';
 import { parsePrincipal } from './principal.js';
 import { aiTesterFor } from './admin-roles.js';
 import { isHiddenShare } from './hidden-share.js';
+import { rateRequest, REQUEST_RATE_LIMITS, retryAfterHeaders, trustedClientIp } from './rate-limit.js';
 
 const SHARE_ID = /^[A-Za-z0-9_-]{20,64}$/;
 const RECORD_ID = /^[A-Za-z0-9_-]{1,80}$/;
@@ -84,7 +85,7 @@ function shelfItem(tree, shareId) {
   };
 }
 
-export function createShareService({ shareRepo, workspaceRepo, visibilityRepo = null, discoverRepo = null, communityRepo = null, admin = null, stageIndex = null, pendingShowSync = null, visitCounts = null, productId, makeId = () => randomBytes(18).toString('base64url') }) {
+export function createShareService({ shareRepo, workspaceRepo, visibilityRepo = null, discoverRepo = null, communityRepo = null, admin = null, stageIndex = null, pendingShowSync = null, visitCounts = null, productId, makeId = () => randomBytes(18).toString('base64url'), rateLimiter = null, now = () => Date.now() }) {
   const refreshStages = subjectId => refreshStageIndex(stageIndex, { productId, subjectId });
   // #1163(#1068 2단계): 응답 뒤에 시작되는 보임 동기화의 진행 중 Promise — 시험·종료 정리가 기다린다.
   const showTasks = new Set();
@@ -175,7 +176,7 @@ export function createShareService({ shareRepo, workspaceRepo, visibilityRepo = 
     showTasks.add(task);
     return task;
   }
-  async function projection(subjectId, input) {
+  async function project(subjectId, input) {
     if (!input || typeof input !== 'object' || !RECORD_ID.test(input.treeId || ''))
       throw new ApiError(400, 'invalid_share_request', '공유할 트리를 다시 선택해 주세요.');
     const stored = await workspaceRepo.load({ productId, subjectId });
@@ -183,8 +184,27 @@ export function createShareService({ shareRepo, workspaceRepo, visibilityRepo = 
     const { tree, omittedPrivateMedia } = projectSharedTree(stored.doc, input.treeId);
     if (!tree.moments.length) throw new ApiError(422, 'share_empty', '공유할 순간이 아직 없어요.');
     const entryMomentId=selectEntry(tree,input.entryMomentId),view=cleanView(input.view);
-    const previewToken=createHash('sha256').update(JSON.stringify({revision:stored.revision,tree,entryMomentId,view})).digest('base64url');
-    return { tree, omittedPrivateMedia, entryMomentId, view, previewToken };
+    return { tree, omittedPrivateMedia, entryMomentId, view, revision: stored.revision };
+  }
+  function previewHash(subjectId, preview) {
+    return createHash('sha256').update(JSON.stringify({
+      productId, subjectId, treeId: preview.tree.id, revision: preview.revision,
+      entryMomentId: preview.entryMomentId, view: preview.view, tree: preview.tree
+    })).digest('hex');
+  }
+  async function projection(subjectId, input, { clientIp = null } = {}) {
+    await rateRequest(rateLimiter, {
+      productId, scope: 'share-preview', subjectId, clientIp,
+      ...REQUEST_RATE_LIMITS.sharePreview
+    });
+    const preview = await project(subjectId, input);
+    const previewToken = randomBytes(32).toString('base64url');
+    const tokenHash = createHash('sha256').update(previewToken).digest('hex');
+    await shareRepo.createPreview({
+      tokenHash, productId, subjectId, treeId: preview.tree.id,
+      requestHash: previewHash(subjectId, preview), expiresAt: new Date(now() + 300_000).toISOString()
+    });
+    return { ...preview, previewToken };
   }
   async function treeVisibility(subjectId, treeId) {
     if (!visibilityRepo) return 'public';
@@ -219,17 +239,31 @@ export function createShareService({ shareRepo, workspaceRepo, visibilityRepo = 
   }
   return {
     projection,
-    async create(subjectId, input) {
-      const preview = await projection(subjectId, input);
-      if (typeof input?.previewToken !== 'string' || input.previewToken !== preview.previewToken)
+    async create(subjectId, input, { clientIp = null } = {}) {
+      await rateRequest(rateLimiter, {
+        productId, scope: 'share-create', subjectId, clientIp,
+        ...REQUEST_RATE_LIMITS.shareCreate
+      });
+      const preview = await project(subjectId, input);
+      if (typeof input?.previewToken !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(input.previewToken))
         throw new ApiError(409, 'share_preview_stale', '공개 내용이 바뀌었어요. 다시 미리 본 뒤 링크를 만들어 주세요.');
-      let row;
-      for (let attempt = 0; attempt < 4 && !row; attempt += 1) {
-        row = await shareRepo.create({ productId, subjectId, shareId: makeId(), treeId: preview.tree.id, entryMomentId: preview.entryMomentId, view: preview.view, momentCount: preview.tree.moments.length });
+      const tokenHash = createHash('sha256').update(input.previewToken).digest('hex');
+      const requestHash = previewHash(subjectId, preview);
+      let outcome;
+      for (let attempt = 0; attempt < 4 && (!outcome || outcome.status === 'collision'); attempt += 1) {
+        outcome = await shareRepo.createShareWithPreview({
+          productId, subjectId, shareId: makeId(), treeId: preview.tree.id,
+          entryMomentId: preview.entryMomentId, view: preview.view,
+          momentCount: preview.tree.moments.length, tokenHash, requestHash, now: now()
+        });
       }
-      if (!row) throw new ApiError(503, 'share_unavailable', '공유 주소를 만들지 못했어요. 잠시 뒤 다시 시도해 주세요.');
-      await refreshStages(subjectId);
-      return { share: shareSummary(row), preview };
+      if (!outcome || outcome.status === 'collision') throw new ApiError(503, 'share_unavailable', '공유 주소를 만들지 못했어요. 잠시 뒤 다시 시도해 주세요.');
+      if (outcome.status === 'forbidden') throw new ApiError(403, 'share_forbidden', '다른 계정의 공유는 만들 수 없어요.');
+      if (outcome.status === 'expired') throw new ApiError(409, 'share_preview_expired', '미리보기 유효 시간이 지났어요. 다시 미리 봐 주세요.');
+      if (outcome.status !== 'created' && outcome.status !== 'replayed')
+        throw new ApiError(409, 'share_preview_stale', '공개 내용이 바뀌었어요. 다시 미리 본 뒤 링크를 만들어 주세요.');
+      if (outcome.status === 'created') await refreshStages(subjectId);
+      return { share: shareSummary(outcome.share), preview: { ...preview, previewToken: input.previewToken } };
     },
     async list(subjectId) {
       const rows = await shareRepo.list({ productId, subjectId });
@@ -379,7 +413,7 @@ export function createShareService({ shareRepo, workspaceRepo, visibilityRepo = 
   };
 }
 
-export function createShareHandler({ authenticate, service, productId, visitProxyTrusted = () => false }) {
+export function createShareHandler({ authenticate, service, productId, visitProxyTrusted = () => false, proxyProofTrusted = () => false }) {
   async function owner(request) {
     let verified;
     try { verified = await authenticate(request); }
@@ -409,13 +443,14 @@ export function createShareHandler({ authenticate, service, productId, visitProx
       return { ...visitResponse(request, body), ...(afterResponse ? { afterResponse } : {}) };
     }
     const subjectId = await owner(request);
+    const clientIp = trustedClientIp(request, proxyProofTrusted(request));
     if (path === '/api/shares/preview') {
       if (method !== 'POST') throw new ApiError(405, 'method_not_allowed', '이 요청은 지원하지 않아요.');
-      return { status: 200, body: { preview: await service.projection(subjectId, jsonBody(request)) }, headers: NO_STORE };
+      return { status: 200, body: { preview: await service.projection(subjectId, jsonBody(request), {clientIp}) }, headers: NO_STORE };
     }
     if (path === '/api/shares') {
       if (method === 'GET') return { status: 200, body: { shares: await service.list(subjectId) }, headers: NO_STORE };
-      if (method === 'POST') return { status: 201, body: await service.create(subjectId, jsonBody(request)), headers: NO_STORE };
+      if (method === 'POST') return { status: 201, body: await service.create(subjectId, jsonBody(request), {clientIp}), headers: NO_STORE };
       throw new ApiError(405, 'method_not_allowed', '이 요청은 지원하지 않아요.');
     }
     const discovery = path.match(/^\/api\/shares\/([^/]+)\/discovery$/);
@@ -453,7 +488,7 @@ export function createShareHandler({ authenticate, service, productId, visitProx
   return async request => {
     try { return await handle(request); }
     catch (error) {
-      if (error instanceof ApiError) return { status: error.status, body: { error: { code: error.code, message: error.message, ...(error.details || {}) } }, headers: NO_STORE };
+      if (error instanceof ApiError) return { status: error.status, body: { error: { code: error.code, message: error.message, ...(error.details || {}) } }, headers: error.code === 'rate_limited' ? retryAfterHeaders(NO_STORE, error) : NO_STORE };
       logServerError(error, 'lovetree-share');
       return { status: 500, body: { error: { code: 'internal_error', message: '서버에서 처리하지 못했어요.' } }, headers: NO_STORE };
     }

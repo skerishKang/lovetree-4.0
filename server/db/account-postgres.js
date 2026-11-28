@@ -23,6 +23,8 @@ export const ACCOUNT_USER_TABLES = Object.freeze([
   // #1190: 보내기 줄에도 의견 id가 남으므로 탈퇴할 때 함께 정리한다.
   { table: 'lovetree_feedback_outbox', where: 'feedback_id IN (SELECT id FROM lovetree_feedback WHERE product_id = $1 AND subject_id = $2)' },
   { table: 'lovetree_stage_moments', where: 'subject_id = $2' },
+  // 공유를 만들기 전 단계의 미리보기 토큰도 계정 기록이므로 탈퇴 때 함께 지운다.
+  { table: 'lovetree_share_previews', where: 'subject_id = $2' },
   { table: 'lovetree_shares', where: 'subject_id = $2' },
   { table: 'lovetree_tree_visibility', where: 'subject_id = $2' },
   { table: 'lovetree_tree_discover', where: 'subject_id = $2' },
