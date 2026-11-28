@@ -773,6 +773,48 @@ test('#1544 Postgres에서도 숨긴 공유 직접 읽기는 없는 공유와 �
   }
 });
 
+test('공개 피드는 같은 트리의 다른 별칭 숨김도 따라 트리 전체를 제외한다', { skip }, async () => {
+  assertIsolatedTestDatabase(DATABASE_URL);
+  const pool = await createPool(DATABASE_URL, { max: 3 });
+  const productId = 'lt-' + suffix();
+  const subjectId = 'owner-' + suffix();
+  const autoId = ('auto' + suffix()).padEnd(24, 'a').slice(0, 24);
+  const aliasId = ('alias' + suffix()).padEnd(24, 'b').slice(0, 24);
+  try {
+    await applySchema(pool);
+    let tree = createTree({
+      subject: '공개 피드', title: '숨김 트리', emotion: '설렘', date: '2026-11-28',
+      url: 'https://www.youtube.com/shorts/abcdef12345',
+      mediaMetadata: { title: '가짜 쇼츠', channel: '가짜 채널', vertical: true, width: 1080, height: 1920 }
+    }, '2026-11-28T00:00:00.000Z');
+    tree = { ...tree, moments: tree.moments.map(moment => ({ ...moment, keywords: ['가수:테스트'] })) };
+    tree = addMoment(tree, { subject: '공개 피드', title: '둘째', emotion: '설렘', date: '2026-11-28', url: '' }, tree.moments[0].id, '2026-11-28T00:00:00.000Z');
+    tree = addMoment(tree, { subject: '공개 피드', title: '셋째', emotion: '설렘', date: '2026-11-28', url: '' }, tree.moments[0].id, '2026-11-28T00:00:00.000Z');
+    await pool.query('INSERT INTO lovetree_workspaces(product_id, subject_id, doc) VALUES($1, $2, $3)', [productId, subjectId, { version: 1, trees: [tree] }]);
+    const shares = createShareRepo(pool);
+    await shares.upsertAutoShare({ productId, shareId: autoId, subjectId, treeId: tree.id, entryMomentId: tree.moments[0].id, momentCount: 3 });
+    await shares.create({ productId, shareId: aliasId, subjectId, treeId: tree.id, entryMomentId: tree.moments[0].id, view: 'book', momentCount: 3 });
+    await createTreeDiscoverRepo(pool).set({ productId, subjectId, treeId: tree.id, discover: true });
+    const repo = createCommunityRepo(pool);
+    const service = createCommunityService({
+      productId, communityRepo: repo, shareRepo: shares,
+      workspaceRepo: createWorkspaceRepo(pool), visibilityRepo: createTreeVisibilityRepo(pool)
+    });
+    assert.deepEqual((await repo.listPublicTagShares({ productId, viewerSubjectId: null })).map(row => row.shareId), [autoId]);
+    assert.equal((await service.moments({ viewerSubjectId: null, shareId: autoId })).items.length, 1);
+    assert.equal((await service.tagMoments({ tag: '가수:테스트', viewerSubjectId: null })).items.length, 1);
+
+    await pool.query('INSERT INTO lovetree_community_hidden_shares(product_id, share_id, hidden_by) VALUES($1, $2, $3)', [productId, aliasId, 'moderator']);
+    assert.equal(await repo.isHiddenShare({ productId, shareId: autoId, subjectId, treeId: tree.id }), true);
+    assert.deepEqual(await repo.listPublicTagShares({ productId, viewerSubjectId: null }), []);
+    assert.deepEqual((await service.moments({ viewerSubjectId: null, shareId: autoId })).items, []);
+    assert.deepEqual((await service.tagMoments({ tag: '가수:테스트', viewerSubjectId: null })).items, []);
+  } finally {
+    await pool.query('DELETE FROM lovetree_community_hidden_shares WHERE product_id=$1', [productId]);
+    await pool.end();
+  }
+});
+
 test('#1549 공개 순간 목록의 잘못된 값은 Postgres에서도 빈 목록으로 처리된다', { skip }, async () => {
   assertIsolatedTestDatabase(DATABASE_URL);
   const pool = await createPool(DATABASE_URL, { max: 3 });
