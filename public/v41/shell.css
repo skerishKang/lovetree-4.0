@@ -1743,3 +1743,23 @@ body:has(#updates-panel[open]) .app-header::after{
  background:var(--lt-dialog-backdrop);backdrop-filter:var(--lt-dialog-backdrop-blur);
  pointer-events:auto
 }
+
+/* #1605: 대표 결정(2026-11-28). 첫 화면의 띠는 그대로 두고
+   안쪽 다섯 화면에서만 숨긴다. #stage·iframe 크기와 스크롤 계약은 바꾸지 않는다. */
+body:not(.home-screen):is([data-fab-lift=shelf],[data-fab-lift=tree],[data-fab-lift=board],[data-fab-lift=book],[data-fab-lift=network]) #updates-card{display:none}
+
+/* 읽지 않은 새 소식: 메뉴 글자 옆 작은 점. 밤·정원 모두 배경 대비 3:1 이상. */
+#account-updates.has-dot::before,#header-overflow .lt-updates-entry.has-dot::after{
+  background:var(--lt-rose);width:8px;height:8px;border-radius:50%;
+}
+#header-overflow .lt-updates-entry.has-dot::after{
+  content:'';display:inline-block;flex:0 0 8px;margin-left:7px;
+}
+#mobile-more.has-updates-dot{position:relative}
+#mobile-more.has-updates-dot::after{
+  content:'';position:absolute;top:2px;right:2px;width:8px;height:8px;
+  border-radius:50%;background:var(--lt-rose);border:1px solid var(--lt-stage);
+}
+html[data-lt-theme=garden] #account-updates.has-dot::before,
+html[data-lt-theme=garden] #header-overflow .lt-updates-entry.has-dot::after,
+html[data-lt-theme=garden] #mobile-more.has-updates-dot::after{background:var(--lt-rose-ink)}

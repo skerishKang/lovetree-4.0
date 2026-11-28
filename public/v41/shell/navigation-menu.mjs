@@ -39,6 +39,11 @@ export function createNavigationMenu(ctx){
     // #1488(CTO 결정 #1452): 안쪽 화면에서 뺀 바닥 링크 네 항목을 휴대폰 메뉴에도 둔다 — 새 소식·의견 보내기는 같은 창,
     // 처리방침·약관은 바닥 링크와 같은 주소를 새 창으로 연다.
     add('새 소식',()=>(0,ctx.$)('updates-link').click());
+    const updatesEntry=moreMenu.lastElementChild;
+    const unread=!!(0,ctx.$)('account-updates')?.classList.contains('has-dot');
+    updatesEntry.classList.add('lt-updates-entry');
+    updatesEntry.classList.toggle('has-dot',unread);
+    updatesEntry.setAttribute('aria-label',unread?'새 소식 있음':'새 소식');
     add('의견 보내기',()=>ctx.shellSettings.getFeedbackDialog().open());
     for(const link of document.querySelectorAll('.home-links a.feedback-link')){
      const a=document.createElement('a');a.setAttribute('role','menuitem');a.href=link.getAttribute('href');a.target='_blank';a.rel='noopener';a.textContent=link.textContent.trim();a.onclick=()=>closeMore();moreMenu.append(a);

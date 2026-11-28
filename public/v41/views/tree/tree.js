@@ -407,7 +407,7 @@ function load(){
  if(!state.root){state.layout=null;note.textContent='순간 0개';return;}
  measure();draw();
  // #1525: 순간이 많을 때는 카드를 누를 수 있는 1배로 열고, 전체 맞춤은 '전체' 단추에서만 한다.
- if(state.root.size>50)toRoot(false);else fitAll(false);
+ if(state.root.size>=40)toRoot(false);else fitAll(false);
  // 기본 칸도 트리 상태로 적어 둔다 — 뒤로 가기로 돌아올 때 닫힌 상세와 펼침 상태를 복원한다.
  rememberTree();
  const initialOpen=new URLSearchParams(location.search).get('open')||(history.state?.lt41TreePanel==='detail'?history.state.lt41TreePick:null);

@@ -1,3 +1,4 @@
+import './helpers/book-hint-1605.mjs';
 import { listenOnSafePort } from './helpers/safe-port.mjs';
 import {clickToolbarTreeChoice,treeChoiceExpanded,treeChoiceFocused} from './helpers/tree-picker-pr3.mjs';
 // 이슈 584: 책의 YouTube 재생·크게 보기·두 장 모드 손보기.
