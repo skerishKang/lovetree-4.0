@@ -1696,9 +1696,8 @@ body.home-screen .updates-card:not([hidden]){
  body.home-screen.lt-fab-ok[data-member="in"] .updates-card:not([hidden]){bottom:calc(76px + env(safe-area-inset-bottom))}
 }
 
-/* #1601: 낮은 가로 첫 화면의 바닥 띠와 새 소식은 프레임 밖 흐름에 둔다.
-   좁은 세로 화면도 새 소식이 두 줄 숫자판을 덮지 않게 같은 흐름을 쓴다. */
-@media (min-width:651px) and (max-height:520px), (max-width:650px){
+/* #1601: 낮은 가로 첫 화면의 바닥 띠와 새 소식은 프레임 밖 흐름에 둔다. */
+@media (min-width:651px) and (max-height:520px){
  body.home-screen .home-links{
   position:relative;inset:auto;flex:0 0 auto;align-self:center;
   margin:0 auto max(10px,env(safe-area-inset-bottom));
@@ -1707,6 +1706,14 @@ body.home-screen .updates-card:not([hidden]){
  body.home-screen.lt-fab-ok[data-member="in"] .updates-card:not([hidden]){
   position:relative;inset:auto;flex:0 0 auto;align-self:flex-end;
   margin:0 16px 8px;max-width:min(420px,calc(100% - 32px));
+ }
+}
+/* #1601: 세로 휴대폰은 무대 높이와 고정 알림의 기존 위치를 그대로 둔다.
+   새 소식이 보일 때만 안쪽 화면을 띠 위까지 사용한다.
+   띠 높이 46px + 아래 76px - 바닥 링크 높이 44px - 바깥 여백 10px. */
+@media(max-width:520px) and (min-height:521px){
+ body.home-screen:has(> .updates-card:not([hidden])):not(.lt-viewer-open):not(.lt-sheet-open):not(:has(dialog[open])) #stage>iframe{
+  bottom:auto;height:calc(100% - 68px - min(10px,env(safe-area-inset-bottom)));
  }
 }
 /* #1571: 알림 단추는 원래 38px 외형과 안쪽 여백을 유지한다.
