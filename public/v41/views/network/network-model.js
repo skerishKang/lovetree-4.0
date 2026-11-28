@@ -367,48 +367,58 @@ window.LT56Model = (() => {
   // fan:true·fanHub(가운데 순간)·center·order를 덜어 준다 — 화면이 이름표 방향·묶음 점 처리에 쓴다.
   function fanLayout(moments, box, opts, tree, sizes) {
     const { maxR, firstR, gap, hubR, inset } = sizes, n = moments.length;
-    let rx = Math.max(6, box.w / 2 - inset - maxR), ry = Math.max(6, box.h / 2 - Math.max(inset + maxR, firstR + 2));
-    // #869: 그물 보기의 부채꼴 나무도 노드를 영역 안쪽 여백(가로·세로 10% 이상) 안에 둔다 —
-    // 타원이 상자 끝까지 늘어나 선이 화면 끝·하단 링크 줄까지 뻗던 모양을 막는다.
-    rx = Math.max(6, Math.min(rx, box.w * 0.4)); ry = Math.max(6, Math.min(ry, box.h * 0.4));
     const center = { x: box.x + box.w / 2, y: box.y + box.h / 2 };
-    const ringCount = n - 1;
-    const arc = [{ x: center.x, y: center.y - ry, len: 0 }];
-    for (let i = 1; i <= 720; i++) {
-      const th = -Math.PI / 2 + (2 * Math.PI * i) / 720;
-      const x = center.x + Math.cos(th) * rx, y = center.y + Math.sin(th) * ry;
-      const prev = arc[i - 1];
-      arc.push({ x, y, len: prev.len + Math.hypot(x - prev.x, y - prev.y) });
-    }
-    const perimeter = arc[720].len;
-    const ringPoints = Array.from({ length: ringCount }, (_, j) => {
-      const target = (perimeter * j) / ringCount;
-      let i = 1;
-      while (i < 720 && arc[i].len < target) i++;
-      const a = arc[i - 1], b = arc[i], t = (target - a.len) / Math.max(0.0001, b.len - a.len);
-      return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
-    });
-    const points = {};
-    tree.order.forEach((id, j) => {
-      if (j === 0) { points[id] = { x: center.x, y: center.y }; return; }
-      points[id] = ringPoints[j - 1];
-    });
-    // 점 반지름: 고리 위 이웃과 겹치지 않는 가장 큰 값(1~maxR). 선택 점 2px와 최소 여백 2px를 예약한다.
-    const ids = tree.order.slice(1), firstId = tree.order[0];
-    let dotR = maxR;
-    const fits = r => {
-      for (let i = 0; i < ids.length; i++) {
-        const a = points[ids[i]];
-        if (Math.hypot(a.x - points[firstId].x, a.y - points[firstId].y) < Math.max(firstR, r + 2) + r + 2 + gap) return false;
-        for (let j = i + 1; j < ids.length; j++) {
-          const b = points[ids[j]];
-          if (Math.hypot(a.x - b.x, a.y - b.y) + 0.001 < r + 2 + r + 2 + 2) return false;
-        }
+    let layoutBox = { ...box };
+    for (;;) {
+      let rx = Math.max(6, layoutBox.w / 2 - inset - maxR), ry = Math.max(6, layoutBox.h / 2 - Math.max(inset + maxR, firstR + 2));
+      // #869: 그물 보기의 부채꼴 나무도 노드를 영역 안쪽 여백(가로·세로 10% 이상) 안에 둔다 —
+      // 타원이 상자 끝까지 늘어나 선이 화면 끝·하단 링크 줄까지 뻗던 모양을 막는다.
+      rx = Math.max(6, Math.min(rx, layoutBox.w * 0.4)); ry = Math.max(6, Math.min(ry, layoutBox.h * 0.4));
+      const ringCount = n - 1;
+      const arc = [{ x: center.x, y: center.y - ry, len: 0 }];
+      for (let i = 1; i <= 720; i++) {
+        const th = -Math.PI / 2 + (2 * Math.PI * i) / 720;
+        const x = center.x + Math.cos(th) * rx, y = center.y + Math.sin(th) * ry;
+        const prev = arc[i - 1];
+        arc.push({ x, y, len: prev.len + Math.hypot(x - prev.x, y - prev.y) });
       }
-      return true;
-    };
-    while (dotR > 1 && !fits(dotR)) dotR -= 0.25;
-    return { points, hubs: [], groupSize: n, cols: 1, rows: 1, cell: { w: box.w, h: box.h }, rx, ry, dotR, hubR, box, center, fan: true, fanHub: tree.fanHub, order: tree.order.slice() };
+      const perimeter = arc[720].len;
+      const ringPoints = Array.from({ length: ringCount }, (_, j) => {
+        const target = (perimeter * j) / ringCount;
+        let i = 1;
+        while (i < 720 && arc[i].len < target) i++;
+        const a = arc[i - 1], b = arc[i], t = (target - a.len) / Math.max(0.0001, b.len - a.len);
+        return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+      });
+      const points = {};
+      tree.order.forEach((id, j) => {
+        if (j === 0) { points[id] = { x: center.x, y: center.y }; return; }
+        points[id] = ringPoints[j - 1];
+      });
+      // 점 반지름: 고리 위 이웃과 겹치지 않는 가장 큰 값(1~maxR). 선택 점 2px와 최소 여백 2px를 예약한다.
+      const ids = tree.order.slice(1), firstId = tree.order[0];
+      const fits = r => {
+        for (let i = 0; i < ids.length; i++) {
+          const a = points[ids[i]];
+          if (Math.hypot(a.x - points[firstId].x, a.y - points[firstId].y) < Math.max(firstR, r + 2) + r + 2 + gap) return false;
+          for (let j = i + 1; j < ids.length; j++) {
+            const b = points[ids[j]];
+            if (Math.hypot(a.x - b.x, a.y - b.y) + 0.001 < r + 2 + r + 2 + 2) return false;
+          }
+        }
+        return true;
+      };
+      let dotR = maxR;
+      while (dotR > 1 && !fits(dotR)) dotR -= 0.25;
+      if (n > 60) while (dotR >= 1 && !fits(dotR)) dotR -= 0.25;
+      if (dotR >= 1 && (n <= 60 || fits(dotR))) return {
+        points, hubs: [], groupSize: n, cols: 1, rows: 1, cell: { w: layoutBox.w, h: layoutBox.h },
+        rx, ry, dotR, hubR, box: layoutBox, center, fan: true, fanHub: tree.fanHub,
+        order: tree.order.slice()
+      };
+      const w = layoutBox.w * 1.25, h = layoutBox.h * 1.25;
+      layoutBox = { x: center.x - w / 2, y: center.y - h / 2, w, h };
+    }
   }
 
   // 부채꼴 판정에 쓸 parent 연결: opts.edges(화면이 넘겨 주는 실제 연결)가 없으면 빈 연결로 본다 —
@@ -643,20 +653,20 @@ window.LT56Model = (() => {
     const clearance = Math.min(gap, 2);
     const span = Math.max(40, box.w - 2 * edge);
     const x0 = box.x + (box.w - span) / 2;
-    const verticalInset = Math.max(8, Math.min(inset, box.h * 0.18));
-    const usableH = Math.max(20, box.h - 2 * verticalInset);
     const firstIds = new Set(moments.filter(m => m.first).map(m => m.id));
     const firstR = Math.max(8, maxR * 1.6);
-    const planFor = rows => {
+    const planFor = (rows, area) => {
       const cols = Math.ceil(n / rows);
+      const verticalInset = Math.max(8, Math.min(inset, area.h * 0.18));
+      const usableH = Math.max(20, area.h - 2 * verticalInset);
       const rowGap = rows > 1 ? Math.min(180, usableH / (rows - 1)) : 0;
-      const top = y - ((rows - 1) * rowGap) / 2;
+      const top = area.y + area.h / 2 - ((rows - 1) * rowGap) / 2;
       const points = {};
       order.forEach((id, i) => {
         const row = Math.floor(i / cols), col = i % cols;
         const visualCol = row % 2 ? cols - 1 - col : col;
         points[id] = {
-          x: cols === 1 ? box.x + box.w / 2 : x0 + (span * visualCol) / (cols - 1),
+          x: cols === 1 ? area.x + area.w / 2 : x0 + (span * visualCol) / (cols - 1),
           y: top + row * rowGap
         };
       });
@@ -673,16 +683,27 @@ window.LT56Model = (() => {
       }
       return true;
     };
-    let best = null;
-    for (let rows = 1; rows <= Math.min(n, 8); rows++) {
-      const plan = planFor(rows);
-      let dotR = maxR;
-      while (dotR > 2 && !fits(plan, dotR)) dotR -= 0.25;
-      if (!fits(plan, dotR)) continue;
-      if (!best || dotR > best.dotR || (dotR === best.dotR && rows < best.rows)) best = { ...plan, dotR };
+    const bestFor = (area, rowLimit) => {
+      let best = null;
+      for (let rows = 1; rows <= Math.min(n, rowLimit); rows++) {
+        const plan = planFor(rows, area);
+        let dotR = maxR;
+        while (dotR > 2 && !fits(plan, dotR)) dotR -= 0.25;
+        if (!fits(plan, dotR)) continue;
+        if (!best || dotR > best.dotR || (dotR === best.dotR && rows < best.rows)) best = { ...plan, dotR };
+      }
+      return best;
+    };
+    const minSpacing = 2 * (2 + 2) + clearance;
+    const maxCols = Math.max(1, Math.floor(span / minSpacing) + 1);
+    const rowLimit = Math.min(n, Math.ceil(n / maxCols) + 8);
+    let layoutBox = { ...box };
+    let chosen = bestFor(layoutBox, Math.min(n, 8)) || bestFor(layoutBox, rowLimit);
+    while (!chosen) {
+      layoutBox = { x: layoutBox.x, y: layoutBox.y, w: layoutBox.w, h: layoutBox.h * 1.25 };
+      chosen = bestFor(layoutBox, rowLimit);
     }
-    const chosen = best || { ...planFor(1), dotR: 2 };
-    return { ...empty, ...chosen };
+    return { ...empty, box: layoutBox, y: layoutBox.y + layoutBox.h / 2, ...chosen };
   }
 
   // #461 이름표 자리 고르기: 우선순위 순서대로, 상자 안 + 다른 이름표·점과 겹치지 않는 자리에만 붙인다(못 붙이면 뺀다).

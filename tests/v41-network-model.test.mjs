@@ -408,3 +408,49 @@ test('#1574 부채꼴 60개는 10% 여백을 지키고 선택 점까지 겹치�
     assert.ok(Math.hypot(a[1].x - b[1].x, a[1].y - b[1].y) + 0.01 >= ra + rb, `${a[0]}·${b[0]} 겹침 0`);
   }
 });
+
+const denseBoxes = [
+  ['1440', { x: 256, y: 176, w: 1168, h: 638 }],
+  ['844', M.fitBox(844, 390, { top: 118, bottom: 162, right: 414 }, 16)],
+  ['390', { x: 16, y: 196, w: 358, h: 491 }]
+];
+function denseMoments(n) {
+  const dateOf = i => new Date(Date.UTC(2026, 0, 1 + i)).toISOString().slice(0, 10).replaceAll('-', '.');
+  return Array.from({ length: n }, (_, i) => ({ id: `m${i}`, first: i === 0, date: dateOf(i) }));
+}
+function assertDensePoints(fit, viewport, label) {
+  const entries = Object.entries(fit.points);
+  assert.equal(entries.length, label.count, `${label.name}: 모든 순간 좌표`);
+  assert.ok(fit.box.w >= viewport.w && fit.box.h >= viewport.h, `${label.name}: 레이아웃 상자는 화면보다 작아지지 않는다`);
+  let overlaps = 0;
+  for (const [i, [id, p]] of entries.entries()) {
+    assert.ok(Number.isFinite(p.x) && Number.isFinite(p.y), `${label.name}/${id}: 유한한 좌표`);
+    const r = id === 'm0' ? Math.max(8, fit.dotR * 1.6) : fit.dotR + 2;
+    assert.ok(p.x - r >= fit.box.x - 0.01 && p.x + r <= fit.box.x + fit.box.w + 0.01 &&
+      p.y - r >= fit.box.y - 0.01 && p.y + r <= fit.box.y + fit.box.h + 0.01,
+    `${label.name}/${id}: 레이아웃 상자 안`);
+    for (const [otherId, q] of entries.slice(i + 1)) {
+      const rr = otherId === 'm0' ? Math.max(8, fit.dotR * 1.6) : fit.dotR + 2;
+      if (Math.hypot(p.x - q.x, p.y - q.y) + 0.01 < r + rr) overlaps++;
+    }
+  }
+  assert.equal(overlaps, 0, `${label.name}: 점 겹침 0`);
+}
+
+test('#1640 밀집 시간 순 150·300개는 세 화면 크기에서 겹침 0', () => {
+  for (const n of [150, 300]) for (const [name, box] of denseBoxes) {
+    const fit = M.timeLayout(denseMoments(n), { box, dotR: 5, gap: 8, hubR: 9, inset: 64 });
+    assert.deepEqual(fit.order, denseMoments(n).map(m => m.id), `${name}/${n}: 날짜 순서 유지`);
+    assertDensePoints(fit, box, { name: `${name}/${n}/time`, count: n });
+  }
+});
+
+test('#1640 밀집 부채꼴 150·300개는 세 화면 크기에서 겹침 0', () => {
+  for (const n of [150, 300]) for (const [name, box] of denseBoxes) {
+    const moments = denseMoments(n);
+    const edges = moments.slice(1).map(m => ({ kind: 'parent', from: 'm0', to: m.id }));
+    const fit = M.networkLayout(moments, { box, dotR: 5, firstR: 20, gap: 8, hubR: 9, edges });
+    assert.ok(fit.fan, `${name}/${n}: 부채꼴 배치 유지`);
+    assertDensePoints(fit, box, { name: `${name}/${n}/fan`, count: n });
+  }
+});
