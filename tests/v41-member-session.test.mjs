@@ -221,3 +221,129 @@ test('400·413 거부는 서버 문구와 백업 단추만, 연결 끊김은 재
     session.dispose();
   }
 });
+
+
+// #1643: 저장 실패·숨김과 비동기 응답의 교차에서도 마지막 편집이 남아야 한다.
+const draft1643 = storage => JSON.parse(storage.getItem('lovetree.v41.pending-write:member-A') || 'null');
+const titles1643 = state => state.trees[0]?.moments.map(moment => moment.title) || [];
+const restore1643 = async storage => {
+  const {session} = setup({draftStorage:storage,put:()=>new Promise(()=>{})});
+  await session.start();
+  return session;
+};
+
+test('#1643 ① 지연 PUT 뒤 둘째 편집과 401: 최신 두 순간과 새 요청 키가 보관·복원된다', async () => {
+  const draftStorage=memStorage();
+  let reply;
+  const {session,writes}=setup({draftStorage,put:()=>new Promise(resolve => {reply=resolve;})});
+  await session.start();
+  const first=session.apply('new',fields);
+  const saving=session.act('retry');
+  assert.equal(writes.length,1,'첫 편집의 PUT가 시작됨');
+  session.apply('add',{...fields,title:'둘째'},first);
+  reply({ok:false,status:401,code:'unauthenticated'});
+  await saving;
+  const draft=draft1643(draftStorage);
+  assert.ok(draft,'401 후 계정별 보관본');
+  assert.deepEqual(titles1643(draft.state),['처음','둘째']);
+  assert.notEqual(draft.clientKey,writes[0].clientKey,'전송 당시 본문과 달라 새 요청 키');
+  const restored=await restore1643(draftStorage);
+  assert.deepEqual(titles1643(restored.state()),['처음','둘째'],'다시 로그인 후 복원');
+  restored.dispose();
+  session.dispose();
+});
+
+test('#1643 ② 작은 keepalive 실패: 숨김 직후 보관하고 새로고침 뒤 복원한다', async () => {
+  const draftStorage=memStorage();
+  const {session,writes}=setup({draftStorage,put:()=>({ok:false,status:0})});
+  await session.start();
+  session.apply('new',fields);
+  assert.equal(session.flushOnHide(),true,'작은 본문은 keepalive 시도');
+  assert.deepEqual(titles1643(draft1643(draftStorage)?.state||{trees:[]}),['처음'],'네트워크 응답 전에 동기 보관');
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(writes.length,1);
+  assert.deepEqual(titles1643(draft1643(draftStorage)?.state||{trees:[]}),['처음'],'실패 후에도 보관 유지');
+  const restored=await restore1643(draftStorage);
+  assert.deepEqual(titles1643(restored.state()),['처음'],'새로고침 후 복원');
+  restored.dispose();
+  session.dispose();
+});
+
+test('#1643 ③ 한글 64KiB 초과·60000자 미만: keepalive 없이 계정별 보관·복원한다', async () => {
+  const draftStorage=memStorage();
+  const {session,writes}=setup({draftStorage});
+  await session.start();
+  const first=session.apply('new',fields);
+  for (let i=0;i<50;i++) session.apply('add',{...fields,title:'한글 '+i,note:'가'.repeat(500)},first);
+  const serial=JSON.stringify(session.state());
+  assert.ok(serial.length<60000,'문자 수는 예전 keepalive 한도 이내');
+  assert.ok(new TextEncoder().encode(serial).byteLength>65536,'UTF-8은 keepalive의 64KiB를 초과');
+  assert.equal(session.flushOnHide(),false,'바이트가 크면 keepalive를 보내지 않음');
+  assert.equal(writes.length,0,'거부될 keepalive PUT 0회');
+  const draft=draft1643(draftStorage);
+  assert.ok(draft,'전체 보관본');
+  assert.equal(draft.state.trees[0].moments.length,51);
+  const restored=await restore1643(draftStorage);
+  assert.equal(restored.state().trees[0].moments.length,51,'새로고침 뒤 모든 순간 복원');
+  restored.dispose();
+  session.dispose();
+});
+
+test('#1643 ④ 지연 PUT·둘째 편집·숨김 뒤 앞 PUT 401: 숨김 보관본 세대가 지켜진다', async () => {
+  const draftStorage=memStorage();
+  let reply;
+  const {session,writes}=setup({draftStorage,put:()=>new Promise(resolve=>{reply=resolve;})});
+  await session.start();
+  const first=session.apply('new',fields);
+  const saving=session.act('retry');
+  assert.equal(writes.length,1);
+  session.apply('add',{...fields,title:'둘째'},first);
+  assert.equal(session.flushOnHide(),false,'기존 PUT 진행 중에는 다시 보내지 않음');
+  const before=draft1643(draftStorage);
+  assert.deepEqual(titles1643(before.state),['처음','둘째'],'숨김 시 최신 상태 보관');
+  reply({ok:false,status:401,code:'unauthenticated'});
+  await saving;
+  assert.deepEqual(titles1643(draft1643(draftStorage).state),['처음','둘째'],'늦은 401이 숨김 보관본을 덮지 않음');
+  const restored=await restore1643(draftStorage);
+  assert.deepEqual(titles1643(restored.state()),['처음','둘째'],'새로고침 뒤 복원');
+  restored.dispose();
+  session.dispose();
+});
+
+
+test('#1643 보강: 앞 PUT 성공만으로 최신 숨김 보관본을 지우지 않고 서버 개정에 맞춘다', async () => {
+  const draftStorage=memStorage(), replies=[];
+  const {session,writes}=setup({draftStorage,put:()=>new Promise(resolve=>replies.push(resolve))});
+  await session.start();
+  const first=session.apply('new',fields);
+  const saving=session.act('retry');
+  session.apply('add',{...fields,title:'둘째'},first);
+  assert.equal(session.flushOnHide(),false);
+  assert.equal(draft1643(draftStorage).expectedRevision,0);
+  replies[0]({ok:true,revision:1});
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(writes.length,2,'첫 요청만 성공한 뒤 최신 본문 재전송');
+  assert.deepEqual(titles1643(draft1643(draftStorage).state),['처음','둘째']);
+  assert.equal(draft1643(draftStorage).expectedRevision,1,'숨김 보관본을 서버 최신 개정에 맞춰 보존');
+  assert.equal(writes[1].clientKey,draft1643(draftStorage).clientKey);
+  replies[1]({ok:false,status:0});
+  await saving;
+  assert.deepEqual(titles1643(draft1643(draftStorage).state),['처음','둘째'],'뒷 요청 실패 뒤에도 보관본 유지');
+  session.dispose();
+});
+
+test('#1643 보강: 기기 보관 실패와 keepalive 네트워크 실패를 사용자에게 알린다', async () => {
+  const quotaStorage={
+    getItem:()=>null,
+    setItem:()=>{throw new Error('QuotaExceededError');},
+    removeItem:()=>{}
+  };
+  const {session}=setup({draftStorage:quotaStorage,put:()=>({ok:false,status:0})});
+  await session.start();
+  session.apply('new',fields);
+  assert.equal(session.flushOnHide(),true,'보관 실패 시에도 가능한 keepalive 전송 시도');
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(session.status().phase,'offline');
+  assert.match(session.status().detail,/보관|백업/,'네트워크·기기 보관 모두 실패했음을 숨기지 않는다');
+  session.dispose();
+});
