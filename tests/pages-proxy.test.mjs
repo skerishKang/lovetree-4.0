@@ -258,6 +258,26 @@ test('업스트림 오류 상태는 그대로 전달한다', async () => {
   assert.equal((await response.json()).error.code, 'revision_conflict');
 });
 
+test('429 응답의 Retry-After 헤더를 그대로 전달하고 다른 헤더는 열지 않는다', async () => {
+  for (const [path, method, seconds] of [['/api/workspace', 'PUT', '7'], ['/api/shares/preview', 'POST', '19']]) {
+    const fetcher = recorder(new Response(JSON.stringify({ error: { code: 'rate_limited', retryAfterSeconds: Number(seconds) } }), {
+      status: 429,
+      headers: {
+        'content-type': 'application/json; charset=utf-8',
+        'retry-after': seconds,
+        'x-rate-limit-internal': 'private-test-value'
+      }
+    }));
+    const init = { method, headers: { 'content-type': 'application/json' }, body: '{}' };
+    const response = await onRequest(createProxy({ fetcher }), 'https://lovetree.example' + path, init);
+    assert.equal(response.status, 429, path);
+    assert.equal(response.headers.get('retry-after'), seconds, path + ': 재시도 대기 헤더 원문 유지');
+    assert.equal(response.headers.get('x-rate-limit-internal'), null, path + ': 다른 헤더는 전달하지 않음');
+    assert.equal((await response.json()).error.code, 'rate_limited', path);
+    assert.equal(fetcher.calls.length, 1, path + ': 요청 재전송 없음');
+  }
+});
+
 test('연결 실패는 502, 응답 없음은 504 로 끊는다', async () => {
   const down = createProxy({ fetcher: async () => { throw new TypeError('connect failed'); } });
   const unreachable = await onRequest(down, 'https://lovetree.example/api/workspace');
