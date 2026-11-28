@@ -1,5 +1,5 @@
 import { listenOnSafePort } from './helpers/safe-port.mjs';
-// #625: 390 에서 새 소식 알림 카드가 책 화면 '순간 목차' 단추를 가리지 않는다.
+// #625: 390 에서 새 소식 알림 카드가 책 화면 '목록' 단추를 가리지 않는다.
 // 카드는 첫 화면(빈 주소·#home) 전용이다 — 안쪽 화면(책·보드·지도·내 트리)은 상단 도구 줄과
 // 아래 컨트롤이 화면을 채워 어떤 고정 위치도 단추를 가린다(390 실측: 카드 76~132 vs 책 단추 64~110).
 // 첫 화면을 벗어나면 카드를 숨기고, '접속 때 한 번' 규칙은 그대로 둔다.
@@ -94,20 +94,20 @@ async function openBookWithCard(browser, theme, width, height) {
     if (!frame) await page.waitForTimeout(200);
   }
   assert.ok(frame, '책 프레임이 열린다');
-  await frame.waitForSelector('#archiveBtn', { state: 'attached', timeout: 15000 });
+  await frame.waitForSelector('#bookDisplayList', { state: 'attached', timeout: 15000 });
   // #1249: 휴대폰의 보관함은 공통 줄의 더 보기 안에 들어갈 수 있다.
-  if (!(await frame.locator('#archiveBtn').isVisible())) {
+  if (!(await frame.locator('#bookDisplayList').isVisible())) {
     await frame.locator('.lt-toolbar-more').click();
-    await frame.waitForSelector('#archiveBtn', { timeout: 15000 });
+    await frame.waitForSelector('#bookDisplayList', { timeout: 15000 });
   }
   await page.waitForTimeout(700);
   return { ctx, page, frame, errors };
 }
 
-// 책 화면의 '순간 목차' 단추 사각형을 셸 좌표로 옮긴다(iframe 좌표 + 셸 헤더).
+// 책 화면의 '목록' 단추 사각형을 셸 좌표로 옮긴다(iframe 좌표 + 셸 헤더).
 async function archiveRect(frame) {
   const b = await frame.evaluate(() => {
-    const r = document.getElementById('archiveBtn').getBoundingClientRect();
+    const r = document.getElementById('bookDisplayList').getBoundingClientRect();
     return { top: r.top, bottom: r.bottom, left: r.left, right: r.right };
   });
   return { top: Math.round(b.top + SHELL_HEADER), bottom: Math.round(b.bottom + SHELL_HEADER), left: b.left, right: b.right };
@@ -120,13 +120,13 @@ async function checkAt390(browser, theme) {
     const onHome = await cardState(page);
     assert.equal(onHome.hidden, false, '첫 화면에서는 카드가 보인다');
     assert.ok(onHome.right > onHome.left, '카드 사각형이 있다');
-    // 책 화면으로 이동: 카드가 숨겨져 '순간 목차' 단추를 가리지 않는다.
+    // 책 화면으로 이동: 카드가 숨겨져 '목록' 단추를 가리지 않는다.
     await page.evaluate(() => { location.hash = '#book'; });
     await page.waitForTimeout(500);
     const onBook = await cardState(page);
     assert.equal(onBook.hidden, true, '책 화면에서는 카드가 숨겨진다');
     const archive = await archiveRect(frame);
-    assert.equal(overlaps(onBook.hidden ? null : onBook, archive), false, `'순간 목차' 단추(${JSON.stringify(archive)})와 겹치지 않는다`);
+    assert.equal(overlaps(onBook.hidden ? null : onBook, archive), false, `'목록' 단추(${JSON.stringify(archive)})와 겹치지 않는다`);
     assert.deepEqual(errors, [], '페이지 오류 없음');
     return { onHome, onBook, archive };
   } finally {
@@ -134,12 +134,12 @@ async function checkAt390(browser, theme) {
   }
 }
 
-test('625 실행: 390 밤 테마 — 책 화면에서 새 소식 카드가 순간 목차 단추를 가리지 않는다', { skip }, async () => {
+test('625 실행: 390 밤 테마 — 책 화면에서 새 소식 카드가 순간 목록 단추를 가리지 않는다', { skip }, async () => {
   const browser = await chromium.launch();
   try { await checkAt390(browser, 'night'); } finally { await browser.close(); }
 });
 
-test('625 실행: 390 종이 테마 — 책 화면에서 새 소식 카드가 순간 목차 단추를 가리지 않는다', { skip }, async () => {
+test('625 실행: 390 종이 테마 — 책 화면에서 새 소식 카드가 순간 목록 단추를 가리지 않는다', { skip }, async () => {
   const browser = await chromium.launch();
   try { await checkAt390(browser, 'garden'); } finally { await browser.close(); }
 });

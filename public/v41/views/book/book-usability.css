@@ -18,7 +18,7 @@ html[data-v41-screen=book][data-lt-theme=garden] .moment-title h3,html[data-v41-
 html[data-v41-screen=book][data-lt-theme=garden] .clipping h2,html[data-v41-screen=book][data-lt-theme=garden] .letter h2,
 html[data-v41-screen=book][data-lt-theme=garden] .archive-piece h2{font-family:MaruBuri,'Noto Serif CJK KR',Batang,serif}
 /* 2026-11-08: 카드 위 겹침이 재생 단추 클릭을 가로채지 않게 한다. */
-html[data-v41-screen=book] .yt-play{position:relative;z-index:3;cursor:pointer}
+html[data-v41-screen=book] .yt-play{position:relative;z-index:3;cursor:default}
 html[data-v41-screen=book] .moment-title{pointer-events:none}
 /* #212: 목차 머리에 붙는 트리 이름 한 줄. 두 테마 모두 UI 글꼴을 쓴다. */
 html[data-v41-screen=book] .archive-tree{margin:6px 0 0;font:12px var(--lt-ui);letter-spacing:.06em;color:var(--lt-muted,#a78f92)}
@@ -86,7 +86,7 @@ html[data-v41-screen=book] .moment-title p,.mobile-content .moment-title p{white
 html[data-v41-screen=book] .chips{margin-top:6px;max-height:26px;overflow:hidden}
 /* 1. YouTube 그 자리 재생: 누르기 전에는 썸네일·버튼뿐이고 외부 요청은 없다.
    #393: 틀을 영상 모양에 맞춘다 — 가로 16:9, 세로(쇼츠) 9:16. 세로 썸네일은 잘리지 않게 contain. */
-html[data-v41-screen=book] .yt-play{position:relative;display:block;width:100%;aspect-ratio:16/9;padding:0;border:0;background:transparent;cursor:pointer}
+html[data-v41-screen=book] .yt-play{position:relative;display:block;width:100%;aspect-ratio:16/9;padding:0;border:0;background:transparent;cursor:default}
 html[data-v41-screen=book] .yt-play img{display:block;width:100%;height:100%;object-fit:cover}
 html[data-v41-screen=book] .yt-play.is-vertical{width:auto;height:clamp(240px,52vh,400px);max-width:100%;aspect-ratio:9/16;margin:0 auto}
 /* #1084: 세로 쇼츠의 가로 썸네일에 내장된 회색 여백은 흐린 배경 뒤로 가린다. */
@@ -95,7 +95,8 @@ html[data-v41-screen=book] .yt-play.is-remote-vertical .yt-vertical-backdrop{pos
 html[data-v41-screen=book] .yt-play.is-vertical img{object-fit:contain}
 html[data-v41-screen=book] .yt-play.is-remote-vertical > img{object-fit:cover;clip-path:inset(0 13%)}
 html[data-v41-screen=book] .yt-play.is-remote-vertical .yt-vertical-backdrop img{object-fit:cover;clip-path:none}
-html[data-v41-screen=book] .yt-play .yt-play-label{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);white-space:nowrap;padding:7px 14px;border-radius:var(--lt-r-pill);border:2px solid var(--lt-paper);background:var(--lt-ink);color:var(--lt-paper);box-shadow:0 2px 10px rgba(0,0,0,.42);font-size:13px}
+/* 세로 영상 자동 판정 후에도 썸네일에는 글자·단추를 덧씌우지 않는다. */
+html[data-v41-screen=book] .yt-play .yt-play-label{display:none}
 html[data-v41-screen=book] .yt-placeholder{display:grid;place-items:center;width:100%;height:100%;background:var(--lt-paper);color:var(--lt-ink)}
 /* #635 PR B: 썸네일이 없거나 깨진 영상 칸은 제목 글 카드로 대신한다(회색·빈 상자 금지). 재생 단추 안에서 카드가 칸을 채운다. */
 html[data-v41-screen=book] .yt-play .lt-fallback-card{width:100%;height:100%;display:flex;flex-direction:column;justify-content:center}
@@ -106,9 +107,12 @@ html[data-v41-screen=book] .yt-frame{display:block;width:100%;aspect-ratio:16/9;
 html[data-v41-screen=book] .yt-frame.is-vertical{width:auto;height:clamp(240px,52vh,400px);max-width:100%;aspect-ratio:9/16;margin:0 auto}
 /* 이슈 584: 크게 보기 단추를 영상 위(yt-expand)에서 카드 아래 한 줄로 옮긴다.
    왼쪽 YouTube ↗(원본 링크), 오른쪽 크게 보기 — 영상 위에는 단추가 겹치지 않는다. */
-html[data-v41-screen=book] .media-links{display:flex;align-items:center;gap:8px;margin:6px 0 2px;min-width:0}
+html[data-v41-screen=book] .media-links{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:6px 0 2px;min-width:0}
 html[data-v41-screen=book] .media-links .media-source-link{font-size:13px}
-html[data-v41-screen=book] .media-links button{margin-left:auto;flex:0 0 auto;min-height:44px;padding:8px 14px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-pill);background:rgba(7,7,12,.72);color:var(--lt-pearl);font-size:13px;cursor:pointer}
+html[data-v41-screen=book] .media-links button{flex:0 0 auto;min-height:44px;padding:8px 14px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-pill);background:rgba(7,7,12,.72);color:var(--lt-pearl);font-size:13px;cursor:pointer}
+html[data-v41-screen=book] .media-links .media-play-btn{margin-left:auto}
+html[data-v41-screen=book] .media-links button:focus-visible{outline:2px solid var(--lt-rose-ink);outline-offset:2px}
+html[data-v41-screen=book] .clipping:has(.yt-play .lt-fallback-card) .media-play-btn{display:none}
 /* #635 PR C: '크게 보기' 글자가 밤 배경 위 금색 잉크(#8a6420)라 희미했다 — '재생' 단추와 같은 바탕·글자로 올린다.
    정원(밝은 종이)에서는 종이 바탕에 잉크 글자가 4.5:1 이상이라 그 값을 유지한다. */
 html[data-lt-theme=garden] .media-links button{background:var(--lt-paper);color:var(--lt-gold-ink)}
