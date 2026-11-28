@@ -162,6 +162,8 @@ test('#1425 본 연결: 전시 보기와 소유·공유 주소', () => {
   assert.equal(new URL(screenUrl('track61-tree.html','server',origin)).pathname,'/v41/views/track61-tree.html');
   assert.ok(screens.some(row=>row[0]==='exhibit' && row[1]==='exhibit.html'));
   assert.equal(parseSelectionRoute('#share/test/exhibit').view,'exhibit');
+  assert.equal(parseSelectionRoute('#visit/test/exhibit').view,'exhibit');
+  assert.equal(parseSelectionRoute('#visit/test/exhibit').kind,'visit');
   assert.equal(parseSelectionRoute(ownerSelectionRoute({view:'exhibit',treeId:'a'})).view,'exhibit');
 });
 test('#1425 0·1·5·30·200개 순서 보존', () => {

@@ -42,7 +42,7 @@ export function createNotifier({ $, now = () => Date.now(), holdMs = NOTICE_HOLD
   let timer = null;
   const hide = () => { if (!$('toast')?.hidden) { $('toast').hidden = true; onHide(); } };
   // hold=true는 사용자의 방금 행동에 대한 결과 안내다. holdMs가 지나기 전에는 다른 안내로 덮지 않는다.
-  function notify(text, { hold = false, action = null, visitorIntro = false } = {}) {
+  function notify(text, { hold = false, action = null, visitorIntro = false, firstMomentIntro = false } = {}) {
     const at = now();
     if (hold) holdUntil = at + holdMs;
     else if (at < holdUntil) return false;
@@ -50,6 +50,8 @@ export function createNotifier({ $, now = () => Date.now(), holdMs = NOTICE_HOLD
     // #453 C2: 설정과 무관한 지난 안내가 창 안에 남지 않도록, 설정이 열려 있을 때만 그 줄에 쓴다.
     if ($('settings-feedback') && $('account-settings')?.open) $('settings-feedback').textContent = text;
     $('toast')?.toggleAttribute?.('data-visitor-intro', visitorIntro);
+    // #1583: 둘러보기 화면에만 숨길 첫 순간 안내를 다른 알림과 구별한다.
+    $('toast')?.toggleAttribute?.('data-lt-first-moment-intro', firstMomentIntro);
     paintToast($('toast'), text, action);
     if ($('account-settings')?.open) hide();
     else { beforeShow(); $('toast').hidden = false; afterShow(); setTimer(afterShow, 600); setTimer(afterShow, 1400); }

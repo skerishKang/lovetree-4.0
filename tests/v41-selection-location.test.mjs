@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import {
   parseSelectionRoute, memberStartupView, ownerSelectionRoute, accountPosition,
   rememberAccountPosition, resolveAccountPosition,
-  stashPendingOwnerRoute, pendingOwnerRoute, takePendingOwnerRoute, selectionStorageKeys
+  stashPendingOwnerRoute, pendingOwnerRoute, takePendingOwnerRoute, selectionStorageKeys,
+  isPublicSelectionRoute, isVisitSelectionRoute
 } from '../public/v41/selection-location.mjs';
 import {shouldLoadMemberRecords} from '../public/v41/member-entry.mjs';
 
@@ -52,6 +53,30 @@ test('owner address loads account records but public address never opens private
   assert.equal(shouldLoadMemberRecords('?account=1','','#home'),true);
   assert.equal(shouldLoadMemberRecords('',cookie,'#home'),true);
   assert.equal(shouldLoadMemberRecords('?account=1',cookie,'#share/token/book'),false);
+  assert.equal(shouldLoadMemberRecords('?account=1',cookie,'#visit/token/book'),false);
+});
+
+test('visit routes reuse share validation and keep a safe public view',()=>{
+  for (const view of ['tree','book','board','network','exhibit']) {
+    assert.deepEqual(parseSelectionRoute(`#visit/public-token/${view}`),{
+      scope:'public',kind:'visit',shareId:'public-token',view,explicit:true
+    });
+  }
+  assert.equal(parseSelectionRoute('#visit/public-token').view,'book');
+  assert.equal(parseSelectionRoute('#visit/public-token/map').view,'network');
+  assert.equal(parseSelectionRoute('#share/public-token/exhibit').view,'exhibit');
+  for (const view of ['unknown','shelf','home','graph']) {
+    assert.equal(parseSelectionRoute(`#visit/public-token/${view}`).view,'book');
+  }
+  for (const id of ['', 'bad\u0000id', 'x'.repeat(257)]) {
+    assert.equal(parseSelectionRoute(`#visit/${id}/board`).shareId,null);
+  }
+  assert.deepEqual(parseSelectionRoute('#share/public-token/book'),{
+    scope:'public',shareId:'public-token',view:'book',explicit:true
+  });
+  assert.equal(isPublicSelectionRoute('#visit/public-token/book'),true);
+  assert.equal(isVisitSelectionRoute('#visit/public-token/book'),true);
+  assert.equal(isVisitSelectionRoute('#share/public-token/book'),false);
 });
 
 test('account positions are isolated and contain pointers only',()=>{

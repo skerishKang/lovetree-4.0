@@ -4,7 +4,8 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { createServer } from 'node:http';
 import net from 'node:net';
-import { createWorkspaceApi } from '../public/v41/api.mjs';
+import { createWorkspaceApi, refreshUnauthorized } from '../public/v41/api.mjs';
+import { setVisitMode } from '../public/v41/visit-mode.mjs';
 import { createMemberSession } from '../public/v41/member-session.mjs';
 import { addMoment, createTree, linkMoments, validateState } from '../src/domain.js';
 import { ApiError } from '../server/errors.js';
@@ -46,6 +47,50 @@ const put = (handle, payload, extra = {}) => handle({
   method: 'PUT', path: '/api/workspace', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload), ...extra
 });
 const get = (handle, extra = {}) => handle({ method: 'GET', path: '/api/workspace', headers: {}, ...extra });
+
+test('방문 모드는 저장 요청을 fetch 전에 막고 읽기와 방문 종료 뒤 저장은 유지한다', async (t) => {
+  setVisitMode(true);
+  t.after(() => setVisitMode(false));
+  const calls = [], warnings = [], originalWarn = console.warn;
+  console.warn = (...args) => warnings.push(args);
+  t.after(() => { console.warn = originalWarn; });
+  const api = createWorkspaceApi({fetchImpl:async () => {
+    calls.push('fetch');
+    return Response.json({revision:0,state:{version:1,trees:[]}});
+  }});
+  assert.equal((await api.get()).ok, true);
+  assert.deepEqual(calls, ['fetch']);
+  for (const answer of [await api.put({}), await api.removeMedia('사진', 'subject')]) {
+    assert.equal(answer.ok, false);
+    assert.equal(answer.status, 403);
+    assert.equal(answer.code, 'visit_read_only');
+  }
+  assert.deepEqual(calls, ['fetch']);
+  assert.equal(warnings.length, 2);
+  assert.match(String(warnings[0][0]), /저장 요청을 보내지 않았어요/);
+  setVisitMode(false);
+  globalThis.LT41_VISIT_READ_ONLY = true;
+  assert.equal((await api.put({})).code, 'visit_read_only');
+  globalThis.LT41_VISIT_READ_ONLY = false;
+  assert.equal((await api.put({})).ok, true);
+  assert.deepEqual(calls, ['fetch', 'fetch']);
+  assert.equal(warnings.length, 3);
+});
+
+test('방문 전역 표시는 인증 갱신 POST도 보내지 않는다', async (t) => {
+  setVisitMode(false);
+  globalThis.LT41_VISIT_READ_ONLY = true;
+  t.after(() => { globalThis.LT41_VISIT_READ_ONLY = false; });
+  const calls = [];
+  const response = new Response(null, {status:401});
+  const answer = await refreshUnauthorized({
+    fetchImpl:async () => { calls.push('refresh'); return new Response(null, {status:204}); },
+    request:async () => new Response(null, {status:200}),
+    response
+  });
+  assert.equal(answer, response);
+  assert.deepEqual(calls, []);
+});
 
 test('save then read preserves ids, parents, links and order', async () => {
   const { handle } = buildHandle();
