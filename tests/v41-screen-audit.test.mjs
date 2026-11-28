@@ -2658,7 +2658,7 @@ test('#657 후속 261117: 트리 0개 계정의 탭 5개와 화면별 빈 상태
           const chain=[];for(let e=document.querySelector('#tree-views button[data-view]');e;e=e.parentElement){const s=getComputedStyle(e),r=e.getBoundingClientRect();chain.push({id:e.id,tag:e.tagName,cls:e.className,hidden:e.hidden,display:s.display,visibility:s.visibility,w:r.width,h:r.height,data:{...e.dataset}})}
           return {chain,member:document.body.dataset.member,source:document.body.dataset.recordSource,treeCount:document.body.dataset.treeCount,loading:!document.getElementById('stage-loading')?.hidden};
         })));
-        const labels = { 'track32-bookshelf.html': '서재', 'track61-tree.html': '트리', 'track59-sketchbook.html': '책', 'track58-pinboard.html': '보드', 'track56-network.html': '지도' };
+        const labels = { 'track32-bookshelf.html': '서재', 'exhibit.html': '전시', 'track61-tree.html': '트리', 'track59-sketchbook.html': '책', 'track58-pinboard.html': '보드', 'track56-network.html': '지도' };
         const openMore = async () => {
           if (width !== 390) return;
           const open = await page.locator('#header-overflow').evaluate((el) => el.classList.contains('is-open') && !el.hidden);
@@ -2677,7 +2677,7 @@ test('#657 후속 261117: 트리 0개 계정의 탭 5개와 화면별 빈 상태
           });
           return { buttons, folded, overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth, themeButtons: document.querySelectorAll('#theme-toggle').length };
         }, Object.values(labels));
-        assert.equal(tabs.buttons.length, 5, `${width}/${theme}: 탭 5개 — ${JSON.stringify(tabs.buttons)}`);
+        assert.equal(tabs.buttons.length, 6, `${width}/${theme}: 전시를 포함한 탭 6개 — ${JSON.stringify(tabs.buttons)}`);
         assert.ok(tabs.buttons.every((b) => b.w > 0 && b.h > 0), `${width}/${theme}: 탭 rect>0 — ${JSON.stringify(tabs.buttons)}`);
         assert.ok(tabs.overflow <= 0, `${width}/${theme}: 가로 넘침 ${tabs.overflow}px`);
         assert.equal(tabs.themeButtons, 1, `${width}/${theme}: 머리줄 테마 단추 1개`);
