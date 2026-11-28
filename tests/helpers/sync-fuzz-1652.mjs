@@ -29,20 +29,30 @@ export async function runTrace(seed,override=null,options={}){
   const storage=memStorage();
   const accounts={A:{revision:0,state:emptyState(),keys:new Map(),accepted:[]},B:{revision:0,state:emptyState(),keys:new Map(),accepted:[]}};
   const pending=[],timers=[],sessions=[];
-  const lastSeen={A:new Set(),B:new Set()},editCount={A:0,B:0},successCovered={A:undefined,B:undefined};
+  const lastSeen={A:new Set(),B:new Set()},editCount={A:0,B:0},successCovered={A:null,B:null};
   const owner=new Map(),markers={A:new Set(),B:new Set()},violations=[],actions=[];
   let currentSubject='A',current=null,requestSerial=0,sessionSerial=0,titleSerial=0,step=0,lastAction=null;
 
   const violation=(rule,detail)=>{if(!violations.some(v=>v.rule===rule))violations.push({rule,step,action:lastAction?{...lastAction}:null,detail});};
   const draftRaw=subject=>storage.getItem(`lovetree.v41.pending-write:${subject}`);
   const draftState=subject=>{try{return JSON.parse(draftRaw(subject)||'null')?.state||null;}catch{return null;}};
+  const draftLabel=raw=>{
+    if(raw===null)return 'absent';
+    try{const item=JSON.parse(raw);return `present(revision=${item.expectedRevision},generation=${item.draftGeneration},key=${item.clientKey})`;}
+    catch{return `unreadable(length=${raw.length})`;}
+  };
   const observeOwners=(subject,state)=>{for(const id of ids(state))if(!owner.has(id))owner.set(id,subject);};
   const checkMix=(subject,state,where)=>{for(const id of ids(state))if(owner.has(id)&&owner.get(id)!==subject)violation('account-mix',`${where}: ${owner.get(id)} 순간 ${id}가 ${subject} 상태에 있음`);};
   const check=()=>{
     for(const subject of ['A','B']){
       const available=new Set([...ids(accounts[subject].state),...ids(draftState(subject)),...(current?.subject===subject?ids(current.session.state()):[])]);
       for(const id of lastSeen[subject])if(!available.has(id))violation('lost-moment',`${subject}의 마지막 화면 순간 ${id}가 서버·보관본·현재 화면에 없음`);
-      if(successCovered[subject]!==undefined&&successCovered[subject]===editCount[subject]&&draftRaw(subject))violation('stale-draft',`${subject}: 마지막 편집을 덮는 저장 성공 뒤 보관본이 남음`);
+      const acknowledged=successCovered[subject];
+      // 종료된 세션의 성공은 보관본을 삭제할 권한이 없다(#1656).
+      // 현재 살아 있는 세션이 마지막 편집을 승인받았을 때만 정리를 요구한다.
+      if(acknowledged?.sessionId===current?.id && current?.subject===subject &&
+        acknowledged.editCount===editCount[subject] && draftRaw(subject))
+        violation('stale-draft',`${subject}: 활성 세션 #${current.id} 요청 #${acknowledged.requestId} 성공 후 expected=absent actual=${draftLabel(draftRaw(subject))}`);
       checkMix(subject,accounts[subject].state,'서버');checkMix(subject,draftState(subject),'보관본');
       const raw=draftRaw(subject);if(raw){try{const parsed=JSON.parse(raw);if(parsed.subject!==subject)violation('account-mix',`보관본 키 ${subject}의 subject가 ${parsed.subject}`);}catch{}}
       const serverIds=new Set(ids(accounts[subject].state));for(const id of markers[subject])if(!serverIds.has(id))violation('other-device-overwrite',`다른 기기 순간 ${id}가 서버에서 사라짐`);
@@ -123,13 +133,23 @@ export async function runTrace(seed,override=null,options={}){
       const request=descriptor.requestId?pending.find(r=>r.id===descriptor.requestId):pending[replay?0:Math.floor(random()*pending.length)];
       if(request){
         pending.splice(pending.indexOf(request),1);const outcome=descriptor.outcome||['success','success','401','409','network','413','client-key'][Math.floor(random()*7)];descriptor.requestId=request.id;descriptor.outcome=outcome;let answer;
-        if(outcome==='success'){answer=applyServer(request);if(answer.ok)successCovered[request.subject]=request.editCountAtSend;}
+        const ended=!request.ref.active;
+        const beforeDrafts=ended?{A:draftRaw('A'),B:draftRaw('B')}:null;
+        if(outcome==='success'){answer=applyServer(request);}
         else if(outcome==='lost-success'){const applied=applyServer(request);answer=applied.ok?{ok:false,status:0}:applied;}
         else if(outcome==='401')answer={ok:false,status:401,code:'unauthenticated'};
         else if(outcome==='409'){if(accounts[request.subject].revision===request.body.expectedRevision)saveOtherDevice(request.subject);answer={ok:false,status:409,code:'revision_conflict',currentRevision:accounts[request.subject].revision};}
         else if(outcome==='client-key'){const known=accounts[request.subject].keys.get(request.body.clientKey);answer=known?clone(known.result):{ok:false,status:0};}
         else if(outcome==='413'){const bytes=new TextEncoder().encode(JSON.stringify(request.body)).byteLength;answer=bytes>65536?{ok:false,status:413,code:'payload_too_large',message:'too large'}:{ok:false,status:0};}
-        else answer={ok:false,status:0};request.resolve(answer);await drain();
+        else answer={ok:false,status:0};
+        if(answer.ok&&request.ref.active)
+          successCovered[request.subject]={sessionId:request.ref.id,requestId:request.id,editCount:request.editCountAtSend};
+        request.resolve(answer);await drain();
+        if(ended)for(const subject of ['A','B']){
+          const actual=draftRaw(subject),expected=beforeDrafts[subject];
+          if(actual!==expected)violation('closed-session-draft-mutation',
+            `closed session #${request.ref.id}, response #${request.id}: ${subject} draft expected=${draftLabel(expected)} actual=${draftLabel(actual)}`);
+        }
       }else if(!replay)descriptor.noRequest=true;
     }else if(type==='hide-visibility'||type==='hide-pagehide'){current.session.flushOnHide();await drain();}
     else if(type==='refresh'||type==='relogin-same'){await leaveWithGuard(descriptor,currentSubject,type);}
