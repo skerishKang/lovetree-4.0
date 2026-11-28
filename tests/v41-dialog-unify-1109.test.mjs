@@ -441,3 +441,6 @@ test('#1231 로그아웃 서재·책·보드·지도 빈 상태와 화면별 로
   }
  }finally{await browser.close();await new Promise(resolve=>server.close(resolve))}
 });
+
+// #1608: 새 소식 머리줄 차단과 기존 전체 창을 함께 시험한다.
+import './helpers/updates-cover-1608.mjs';
