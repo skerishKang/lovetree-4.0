@@ -387,3 +387,55 @@ test('#1616 cross-screen imports cannot narrow root modules to one screen', asyn
     if(usedBy.size>=2) assert.equal(selectScreens(['public/v41/'+module]),'all',module);
   }
 });
+
+test('#1642 tree source routes to jobs containing #1525 tests, shared files run all', async () => {
+  const { selectScreens, selectJobs, jobTestFiles, SELECTABLE_JOBS } =
+    await import('../tools/ci/screen-changes.mjs');
+  const { SHARED_SCREEN_SOURCES } = await import('../tools/ci/screen-owners.mjs');
+  const sources = [
+    'public/v41/views/tree/tree.js',
+    'public/v41/views/track61-tree.html'
+  ];
+  const treeTestJob = Object.entries(jobTestFiles())
+    .filter(([, files]) => files.has('tests/v41-tree-layout-777.test.mjs'))
+    .map(([job]) => job);
+  assert.ok(treeTestJob.length > 0, '#1525 tree history test must belong to a screen job');
+  for (const file of sources) {
+    const picked = selectJobs([file]);
+    const jobs = picked === 'all' ? SELECTABLE_JOBS : picked.split(',');
+    assert.ok(jobs.length > 0 && jobs.every(x => SELECTABLE_JOBS.includes(x)),file);
+    assert.ok(treeTestJob.some(x => jobs.includes(x)),file+' must run #1525');
+    assert.ok(selectScreens([file]).includes('shell'),file);
+  }
+  for (const file of [
+    'public/v41/shell/location.mjs',
+    'public/v41/shell/messages.mjs',
+    'public/v41/frame-messages.js',
+    'public/v41/shell.css'
+  ]) {
+    assert.ok(SHARED_SCREEN_SOURCES.some(pattern => pattern.test(file)),file);
+    assert.equal(selectScreens([file]),'all',file);
+    assert.equal(selectJobs([file]),'all',file);
+  }
+  const changed=[
+    'public/v41/views/tree/tree.js','public/v41/shell/location.mjs',
+    'public/v41/shell/messages.mjs','public/v41/frame-messages.js'
+  ];
+  assert.equal(selectJobs(changed),'all','PR #1642 changes must never be silently skipped');
+  assert.equal(selectJobs(['public/v41/views/not-owned/new-widget.js']),'all');
+});
+
+test('#1642 every tracked public/v41 source selects one or more screen jobs', async () => {
+  const { selectJobs, SELECTABLE_JOBS } = await import('../tools/ci/screen-changes.mjs');
+  const tracked = execFileSync('git',['ls-files','-z','--','public/v41/'],{
+    cwd:new URL('../',import.meta.url),encoding:'utf8'
+  }).split('\0').filter(Boolean);
+  assert.ok(tracked.length > 0,'tracked public/v41 sources should be present');
+  for (const file of tracked) {
+    const selection = selectJobs([file]);
+    const jobs = selection === 'all' ? SELECTABLE_JOBS : selection.split(',');
+    assert.notEqual(selection,'none',file+' must not be silently skipped');
+    assert.ok(jobs.length > 0 && jobs.every(x => SELECTABLE_JOBS.includes(x)),
+      file+': selected an unknown or empty job');
+  }
+});

@@ -300,6 +300,13 @@ export const TEST_OWNERS = {
   ]
 };
 
+// Source-wide shared paths are separate from test owners. A change here affects every screen.
+export const SHARED_SCREEN_SOURCES = Object.freeze([
+  /^public\/v41\/shell\//,
+  /^public\/v41\/shell\.css$/,
+  /^public\/v41\/frame-messages\.js$/
+]);
+
 // The ownership table is the only authority for cross-screen test files.
 export const COMMON_OWNER_TESTS = Object.freeze(Object.entries(TEST_OWNERS)
   .filter(([, owners]) => owners.includes('common')).map(([file]) => file).sort());
