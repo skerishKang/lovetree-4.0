@@ -68,8 +68,10 @@ export function paintThemeControls(theme = readTheme(localStorage)) {
 
 export function applyTheme(file, theme = readTheme(localStorage)) {
   const applied = applyThemeAttribute(document.documentElement, appliedTheme(theme, themedViewFor(file)));
-  const frame = $('view').contentDocument;
-  if (frame) applyThemeAttribute(frame.documentElement, applied);
+  // #1598: 교대 로딩 중인 view-next까지 같은 계정 테마로 통일한다.
+  for (const frame of document.querySelectorAll('#view, #view-next')) {
+    try { applyThemeAttribute(frame.contentDocument?.documentElement, applied); } catch { /* 비어 있는 프레임은 로드 뒤 다시 적용 */ }
+  }
   return applied;
 }
 

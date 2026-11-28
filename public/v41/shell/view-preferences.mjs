@@ -1,6 +1,6 @@
 // 화면 표시 설정과 제목 보정.
 import { MSG } from "../frame-messages.mjs";
-import {accountPresentation,treePickerLabel,treePickerText,treeViewsVisible,writeMenuLabel,headerState,headerPartsFor,readTipsSeen,writeTipsSeen,tipsWanted,unsavedNoticeText,FIRST_TREE_TIPS,homeCenterState,homeStartLoginUrl,readTheme,readLoginIntent,writeTheme,nextTheme,themeButtonLabel,themeButtonAriaLabel,themePressed,appliedTheme,applyThemeAttribute,LOGIN_INTENTS,readPageTurn,writePageTurn,readBookDisplay,writeBookDisplay,bookDisplayVisible,readShelfView,writeShelfView,shelfViewVisible} from "../header-state.mjs";
+import {accountPresentation,treePickerLabel,treePickerText,treeViewsVisible,writeMenuLabel,headerState,headerPartsFor,readTipsSeen,writeTipsSeen,tipsWanted,unsavedNoticeText,FIRST_TREE_TIPS,homeCenterState,homeStartLoginUrl,readTheme,memberPreferredTheme,readLoginIntent,writeTheme,nextTheme,themeButtonLabel,themeButtonAriaLabel,themePressed,appliedTheme,applyThemeAttribute,LOGIN_INTENTS,readPageTurn,writePageTurn,readBookDisplay,writeBookDisplay,bookDisplayVisible,readShelfView,writeShelfView,shelfViewVisible} from "../header-state.mjs";
 import {frameMessage, frameReadyMessages, FRAME_MESSAGE_TYPES} from "../frame-wiring.mjs";
 import {screens,screenForView,viewForFile,themedViewFor} from "./navigation.mjs";
 import {paintLoginLinks,paintThemeControls,applyTheme as applyThemeFor,toggleTheme as toggleThemeFor} from "./theme.mjs";
@@ -84,11 +84,22 @@ export function createViewPreferences(ctx){
 
   function themedView(){return themedViewFor(ctx.current);}
 
-  function applyTheme(theme=readTheme(localStorage)){return applyThemeFor(ctx.current,theme);}
+  function applyTheme(theme){
+    const owned=ctx.member?.snapshot?.().owned===true;
+    const accountTheme=owned?ctx.member?.state?.()?.prefs?.theme:null;
+    // #1598: 화면 전환 시 기기 저장값만 바뀌어도 계정 테마를 덮어쓰지 않는다.
+    const effective=theme===undefined?memberPreferredTheme({owned,accountTheme,deviceTheme:readTheme(localStorage)}):theme;
+    if(owned&&effective!==readTheme(localStorage))writeTheme(localStorage,effective);
+    return applyThemeFor(ctx.current,effective);
+  }
 
   function reflectTheme(value){const theme=writeTheme(localStorage,value);applyTheme(theme);paintThemeControls(theme);(0,ctx.syncBoardThemeToApp)(theme);return theme;}
   function setTheme(value){const theme=reflectTheme(value);if(ctx.member?.snapshot().owned){try{ctx.member.apply('setPrefs',{theme});if(window.LT41)window.LT41.prefs=ctx.member.state().prefs;}catch(error){(0,ctx.notify)('테마를 계정에 저장하지 못했어요. 다시 시도해 주세요.');}}return theme;}
-  function toggleTheme(){return setTheme(nextTheme(readTheme(localStorage)));}
+  function toggleTheme(){
+    const owned=ctx.member?.snapshot?.().owned===true;
+    const current=memberPreferredTheme({owned,accountTheme:owned?ctx.member?.state?.()?.prefs?.theme:null,deviceTheme:readTheme(localStorage)});
+    return setTheme(nextTheme(current));
+  }
   Object.defineProperties(ctx,{
     openFallbackShell:{value:openFallbackShell},
     currentPrefs:{value:currentPrefs},

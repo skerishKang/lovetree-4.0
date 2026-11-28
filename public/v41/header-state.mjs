@@ -351,6 +351,12 @@ export function shelfViewPressed(value) {
 
 // 2단계 범위: 공통 헤더·첫 화면·첫 여정은 B를 쓴다. 내 트리는 #212, 책은 2026-11-08 대표 확인으로 B를 받는다.
 // 기억 보드·관계 지도는 계속 A다(대표 결정: 책만 테마를 따라간다).
+// #1598: 로그인된 계정은 저장한 테마가 최우선이다. 계정 테마가 없을 때만 기기 미러를 승계한다.
+export function memberPreferredTheme({ owned = false, accountTheme = null, deviceTheme = null } = {}) {
+  if (owned && themeDefinition(accountTheme)) return normalizeTheme(accountTheme);
+  return normalizeTheme(deviceTheme);
+}
+
 export function appliedTheme(theme, view) {
   return view === 'home' || view === 'journey' || view === 'shelf' || view === 'tree' || view === 'book' || view === 'board' || view === 'network' || view === 'graph' ? normalizeTheme(theme) : DEFAULT_THEME;
 }
