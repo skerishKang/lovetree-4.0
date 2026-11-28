@@ -92,10 +92,11 @@ test('보드 상세: 열린 겹은 탭 가능, 닫으면 겹은 탭 불가(inert
       await page.waitForFunction(`(() => { const f = [...document.querySelectorAll('#view,#view-next')].filter((x) => !x.hidden).pop(); const d = f?.contentDocument?.getElementById('detail'); return d && d.classList.contains('open'); })()`, null, { timeout: 15000 });
       const opened = await evaluateWhenReady(page, `(() => {
         const f = [...document.querySelectorAll('#view,#view-next')].filter((x) => !x.hidden).pop();
-        const d = f?.contentDocument?.getElementById('detail');
+        const d = f?.contentDocument;
+        const detail = d?.getElementById('detail');
         const ae = d?.activeElement;
-        if (!d || !ae) return false;
-        return { inert: d.inert, focus: ae.id || ae.tagName };
+        if (!detail || !ae) return false;
+        return { inert: detail.inert, focus: ae.id || ae.tagName };
       })()`);
       assert.equal(opened.inert, false, '열린 상세가 inert이면 안 된다');
       assert.equal(opened.focus, 'detailClose', '열린 상세의 첫 초점은 닫기 단추다');
@@ -199,8 +200,8 @@ test('책 목차(사용자가 연 겹): 닫으면 원래 단추로 돌아간다(
     try {
       assert.ok(await waitFrame(page, 'track59-sketchbook'), '책 프레임이 열리지 않음');
       await page.waitForTimeout(1500);
-      // 키보드 사용자처럼: 목차 단추에 초점을 두고 Enter로 연다(프로그래밍 클릭은 초점을 옮기지 않는다).
-      await evaluateWhenReady(page, `(() => { const f = [...document.querySelectorAll('#view,#view-next')].filter((x) => !x.hidden).pop(); const d = f?.contentDocument; const button = d?.getElementById('archiveBtn'); if (!button) return false; button.focus(); return true; })()`);
+      // 키보드 사용자처럼: 목록 단추에 초점을 두고 Enter로 연다(프로그래밍 클릭은 초점을 옮기지 않는다).
+      await evaluateWhenReady(page, `(() => { const f = [...document.querySelectorAll('#view,#view-next')].filter((x) => !x.hidden).pop(); const d = f?.contentDocument; const button = d?.getElementById('bookDisplayList'); if (!button) return false; button.focus(); return true; })()`);
       await page.keyboard.press('Enter');
       await page.waitForTimeout(500);
       const opened = await evaluateWhenReady(page, `(() => {
