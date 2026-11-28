@@ -216,9 +216,10 @@ test('#1413 5단계: 옮긴 시험 위치·보드 둘째 잡 고르기·공통 �
 
 test('#1611 schedule, visual selection and every original screen command are preserved', async () => {
   const { visualScenes, selectScreens, SELECTABLE_JOBS } = await import('../tools/ci/screen-changes.mjs');
-  const { execFileSync } = await import('node:child_process');
-  const before = execFileSync('git', ['show',execFileSync('git', ['merge-base','origin/main','HEAD'], {encoding:'utf8'}).trim()+':.github/workflows/preview-check.yml'], { encoding:'utf8' });
+  const { screenCommandContract } = await import('../tools/ci/screen-commands.mjs');
+  const baseline = JSON.parse(readFileSync(new URL('../tools/ci/screen-commands.baseline.json',import.meta.url),'utf8'));
   const after = readFileSync(new URL('../.github/workflows/preview-check.yml', import.meta.url),'utf8');
+  assert.equal(baseline.sourceRevision,'9896d3a1397dfac19ef7f20cdcf14001fb952cd6','기준은 승인된 9896d3a1 워크플로');
   assert.match(after, /cron: "0 2,10,18 \* \* \*"/);
   assert.match(after, /workflow_dispatch:/);
   assert.match(after, /--scenes "\$SCENES"/);
@@ -228,21 +229,13 @@ test('#1611 schedule, visual selection and every original screen command are pre
   assert.equal(visualScenes('none'), '');
   assert.equal(visualScenes('shell'), 'home,shelf,book,board,network,account');
   assert.equal(selectScreens(['docs/notes.md']), 'none');
-  const jobBodyLocal = (content, name) => content.split(new RegExp('^  '+name+':\\n','m'))[1]?.split(/^  [\w-]+:\n/m)[0];
-  for (const job of SELECTABLE_JOBS) {
-    const a=jobBodyLocal(before,job), b=jobBodyLocal(after,job);
-    assert.ok(a && b,job);
-    const commandLines = (body) => body.split('\n').filter(line =>
-      /(?:timeout-minutes:|--test-name-pattern|--test-skip-pattern|retry|retries|^\s*run:|node --test)/.test(line));
-    assert.deepEqual(commandLines(b), commandLines(a), job + ': original commands and limits');
-    for (const line of a.split('\n')) {
-      if (/(?:timeout-minutes:|--test-name-pattern|--test-skip-pattern|retry|retries|^\s*run:)/.test(line)) {
-        assert.ok(b.includes(line), job+': preserved '+line.trim());
-      }
-    }
-  }
+  assert.deepEqual(Object.keys(baseline.jobs).sort(),[...SELECTABLE_JOBS].sort(),'기존 16개 잡의 누락·추가를 막는다');
+  const current = screenCommandContract(after,SELECTABLE_JOBS);
+  for (const job of SELECTABLE_JOBS)
+    assert.deepEqual(current[job],baseline.jobs[job],job+': 9896d3a1 기준 시험 파일·명령·timeout·retry 보존');
+  // #1620 자체 실행기별 npm 캐시 준비는 테스트 명령이 아니며 그대로 남겨야 한다.
+  assert.match(after,/run: echo "npm_config_cache=\$HOME\/\.npm-runner-\$RUNNER_NAME" >> "\$GITHUB_ENV"/);
 });
-
 
 test('#1616 dedicated home source picks five owner jobs, A/B/C and only home visuals', async () => {
   const { selectScreens, selectJobs, visualScenes, jobTestFiles } =
@@ -355,18 +348,15 @@ test('#1616 all explicit page openings in screen tests belong to their owner scr
 });
 
 test('#1616 command preservation detects a deliberate mutation', async () => {
-  const { execFileSync } = await import('node:child_process');
-  const base = execFileSync('git',['merge-base','origin/main','HEAD'],{encoding:'utf8'}).trim();
-  const before = execFileSync('git',['show',base+':.github/workflows/preview-check.yml'],{encoding:'utf8'});
+  const { screenCommandContract } = await import('../tools/ci/screen-commands.mjs');
+  const baseline = JSON.parse(readFileSync(new URL('../tools/ci/screen-commands.baseline.json',import.meta.url),'utf8'));
   const after = readFileSync(new URL('../.github/workflows/preview-check.yml',import.meta.url),'utf8');
   const job = 'screen-book';
-  const body = (text)=>text.split(new RegExp('^  '+job+':\\n','m'))[1]?.split(/^  [\w-]+:\n/m)[0];
-  const commands = (text)=> body(text).split('\n').filter(line =>
-    /(?:timeout-minutes:|--test-name-pattern|--test-skip-pattern|retry|retries|^\s*run:|node --test)/.test(line));
-  assert.deepEqual(commands(after),commands(before));
-  const mutated = after.replace(/(  screen-book:[\s\S]*?node --test)(?=[^\n]*tests\/v41-book-)/, (_, prefix) => prefix + ' --test-concurrency=999');
-  assert.notEqual(mutated, after, 'a real test command must be mutated');
-  assert.notDeepEqual(commands(mutated),commands(before));
+  const commands = text => screenCommandContract(text,[job])[job];
+  assert.deepEqual(commands(after),baseline.jobs[job],'정상 화면 시험 명령은 고정 기준과 일치');
+  const mutated = after.replace(/(  screen-book:[\s\S]*?node --test)(?=[^\n]*tests\/v41-book-)/,(_,prefix)=>prefix+' --test-concurrency=999');
+  assert.notEqual(mutated,after,'실제 시험 명령 한 줄을 바꾼다');
+  assert.notDeepEqual(commands(mutated),baseline.jobs[job],'고정 기준 파일로 변경을 검출한다');
 });
 
 test('#1616 cross-screen imports cannot narrow root modules to one screen', async () => {
