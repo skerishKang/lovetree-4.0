@@ -182,9 +182,11 @@ import { VIEWS } from './shelf-views.mjs';
         if(thumb){
           // #1366 ⑤ 가로 썸네일도 책 표지와 같은 규칙: 그 트리의 표지 사진(첫 순간/바꾼 표지)을 먼저 쓰고,
           // 없으면 순간 사진, 그래도 없으면 표지 색 칸으로 남긴다. 글자는 썸네일 밖에 둔다.
-          var fallbackChapter=info.book.chapters.find(function(c){return c.image});
-          var src=info.book.coverMedia || (info.moment&&info.moment.thumb?info.moment.thumb:'') || (fallbackChapter&&fallbackChapter.image) || '';
-          var candidates=(info.book.coverCandidates&&info.book.coverCandidates.length)?info.book.coverCandidates:(info.moment&&info.moment.thumbCandidates?info.moment.thumbCandidates:(fallbackChapter&&fallbackChapter.thumbCandidates?fallbackChapter.thumbCandidates:[src]));
+          var fallbackChapter=info.book.chapters.find(function(c){return c.image||(c.thumbCandidates&&c.thumbCandidates.length)});
+          var momentCandidates=info.moment&&info.moment.thumbCandidates&&info.moment.thumbCandidates.length?info.moment.thumbCandidates:[];
+          var fallbackCandidates=fallbackChapter&&fallbackChapter.thumbCandidates&&fallbackChapter.thumbCandidates.length?fallbackChapter.thumbCandidates:[];
+          var src=info.book.coverMedia || momentCandidates[0] || (info.moment&&info.moment.image) || fallbackCandidates[0] || (fallbackChapter&&fallbackChapter.image) || '';
+          var candidates=info.book.coverMedia?(info.book.coverCandidates||[src]):(momentCandidates.length?momentCandidates:(fallbackCandidates.length?fallbackCandidates:(src?[src]:[])));
           // #1273 8번: 그림이 없으면 빈 색 칸으로 남지 않게 트리 이름 첫 글자로 표지를 채운다(사진 위에는 글자를 얹지 않는다).
           thumb.innerHTML=src?'<img src="'+esc(src)+'"'+coverFallbackAttrs(candidates||[src])+' alt="" loading="lazy" referrerpolicy="no-referrer">':'<span class="resume-thumb-mark" aria-hidden="true">'+esc(String(info.treeName||info.book.name||'책').slice(0,1))+'</span>';
           thumb.style.setProperty('--cover',info.book.color);

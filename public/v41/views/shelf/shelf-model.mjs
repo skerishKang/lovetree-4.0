@@ -80,7 +80,7 @@ export function shelfBook(tree, index, palette, namer) {
     description: tree.subject ? '좋아하는 대상 · ' + tree.subject : '좋아하는 대상을 기록한 책입니다.',
     tags: [tree.subject || '좋아하는 대상'],
     chapters: tree.moments.map((m) => {
-      const cands = m.image ? (() => { const list = thumbnailCandidates(m, { autoLoad: true }); return list.length ? list : [m.image]; })() : [];
+      const cands = (() => { const list = thumbnailCandidates(m, { autoLoad: true }); return list.length ? list : (m.image ? [m.image] : []); })();
       return {
         title: m.title, url: m.externalUrl || m.url || '', mood: m.emotion, note: m.memo || m.whyNext || '',
         id: m.id, type: m.type, image: m.image || '', date: m.date || '', mediaMetadata: m.mediaMetadata || null,
