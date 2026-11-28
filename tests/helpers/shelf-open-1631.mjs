@@ -297,7 +297,21 @@ test('#1631 서재 미리보기·바로 펼치기 선택과 복원', {
         await checkSynced(page,other);
         await setting(page,mode);
         await checkSynced(page,mode);
+        // The dialog restores focus to its opener in a queued task after "close".
+        // Observe that completion before focusing inside the iframe; no fixed sleep.
+        await page.evaluate(() => {
+          window.__shelfSettingsFocusRestored=false;
+          document.querySelector('#account-settings').addEventListener('close', () => {
+            // Registered after the shell's handler: this runs after its focus-return task.
+            setTimeout(() => { window.__shelfSettingsFocusRestored=true; },0);
+          },{once:true});
+        });
         await page.keyboard.press('Escape');
+        await page.waitForFunction(() =>
+          window.__shelfSettingsFocusRestored === true
+          && !document.querySelector('#account-settings')?.open
+          && document.activeElement===document.querySelector('#account-avatar'),
+          null,{timeout:10000});
         await shelfChoice(page,other,input);
         await shelfChoice(page,mode,input);
         await until(()=>state.prefs.shelfOpenMode===mode&&getWrites()>=1,'서재 단추 변경이 계정에 저장되어야 한다');
