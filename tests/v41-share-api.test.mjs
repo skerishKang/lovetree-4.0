@@ -36,3 +36,11 @@ test('4.1 share api 표면: 트리 공개는 setTreeVisibility·둘러보기 소
  // 옛 setDiscoverable은 share-api.mjs에 남아 있지만 부르는 곳이 없다(셸은 discover PUT을 쓴다 — v41-share-steps 5번).
  // 지울지는 제품 코드 정리 건으로 따로 볼 일이라 이 PR에서 손대지 않는다.
 });
+
+test('공유 목록 이어 받기 주소는 커서만 인코딩하고 첫 호출은 그대로 둔다', async () => {
+  const urls=[];
+  const api=createShareApi({fetchImpl:async url=>{urls.push(url);return Response.json({shares:[],nextCursor:null});}});
+  await api.list();
+  await api.list('cursor+=/');
+  assert.deepEqual(urls,['/api/shares','/api/shares?cursor=cursor%2B%3D%2F']);
+});

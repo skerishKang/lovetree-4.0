@@ -270,6 +270,11 @@ export function createShareService({ shareRepo, workspaceRepo, visibilityRepo = 
       // 공유 상태 응답에 소개 여부(discover)를 넣는다 — 화면이 켜고 끄는 스위치의 현재 값을 여기서 본다.
       return Promise.all(rows.map(async row => ({ ...shareSummary(row), discover: (await treeDiscover(subjectId, row.treeId)).discover })));
     },
+    async listPage(subjectId, cursor = null) {
+      const page = await shareRepo.listPage({ productId, subjectId, cursor });
+      const shares = await Promise.all(page.rows.map(async row => ({ ...shareSummary(row), discover: (await treeDiscover(subjectId, row.treeId)).discover })));
+      return { shares, nextCursor: page.nextCursor };
+    },
     async setDiscoverable(subjectId, shareId, discoverable) {
       if (!SHARE_ID.test(shareId)) throw new ApiError(404, 'share_not_found', '공유 주소를 찾을 수 없어요.');
       const existing = await shareRepo.load({ productId, shareId });
@@ -449,7 +454,7 @@ export function createShareHandler({ authenticate, service, productId, visitProx
       return { status: 200, body: { preview: await service.projection(subjectId, jsonBody(request), {clientIp}) }, headers: NO_STORE };
     }
     if (path === '/api/shares') {
-      if (method === 'GET') return { status: 200, body: { shares: await service.list(subjectId) }, headers: NO_STORE };
+      if (method === 'GET') return { status: 200, body: await service.listPage(subjectId, request?.query?.get('cursor') ?? null), headers: NO_STORE };
       if (method === 'POST') return { status: 201, body: await service.create(subjectId, jsonBody(request), {clientIp}), headers: NO_STORE };
       throw new ApiError(405, 'method_not_allowed', '이 요청은 지원하지 않아요.');
     }

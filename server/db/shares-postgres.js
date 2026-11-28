@@ -1,4 +1,5 @@
 import { createTreeDiscoverRepo } from './tree-discover-postgres.js';
+import { SHARE_LIST_PAGE_SIZE, decodeShareListCursor, encodeShareListCursor } from '../share-list-pagination.js';
 
 const iso = value => value instanceof Date ? value.toISOString() : value ? String(value) : null;
 const row = value => value && ({
@@ -96,6 +97,23 @@ export function createShareRepo(pool) {
     async list({productId,subjectId}) {
       const result = await pool.query('SELECT * FROM lovetree_shares WHERE product_id=$1 AND subject_id=$2 ORDER BY created_at DESC LIMIT 50',[productId,subjectId]);
       return result.rows.map(row);
+    },
+    // 공유 관리 화면만 50개씩 이어 읽는다. 날짜가 같은 행도 ID로 순서를 고정한다.
+    async listPage({productId,subjectId,cursor=null}) {
+      const after = decodeShareListCursor(cursor);
+      const result = await pool.query(
+        `SELECT *, to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS page_created_at
+         FROM lovetree_shares
+         WHERE product_id=$1 AND subject_id=$2
+           AND ($3::timestamptz IS NULL OR (created_at, share_id) < ($3::timestamptz, $4::text))
+         ORDER BY created_at DESC, share_id DESC
+         LIMIT $5`,
+        [productId,subjectId,after?.createdAt??null,after?.shareId??null,SHARE_LIST_PAGE_SIZE+1]
+      );
+      const page = result.rows.slice(0,SHARE_LIST_PAGE_SIZE);
+      const tail = page.at(-1);
+      return {rows:page.map(row),nextCursor:result.rows.length>SHARE_LIST_PAGE_SIZE
+        ? encodeShareListCursor({createdAt:tail.page_created_at,shareId:tail.share_id}) : null};
     },
     async setDiscoverable({productId,subjectId,shareId,discoverable}) {
       const result = await pool.query(

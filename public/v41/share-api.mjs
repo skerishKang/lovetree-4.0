@@ -16,7 +16,7 @@ export function createShareApi({fetchImpl=(...args)=>fetch(...args)}={}) {
   return {
     preview:input=>call('/api/shares/preview',{method:'POST',body:JSON.stringify(input)}),
     create:input=>call('/api/shares',{method:'POST',body:JSON.stringify(input)}),
-    list:()=>call('/api/shares'),
+    list:cursor=>call('/api/shares'+(cursor?'?cursor='+encodeURIComponent(cursor):'')),
     getTreeDiscover:treeId=>call('/api/trees/'+encodeURIComponent(treeId)+'/discover'),
     setTreeDiscover:(treeId,discover)=>call('/api/trees/'+encodeURIComponent(treeId)+'/discover',{method:'PUT',body:JSON.stringify({discover})}),
     revoke:id=>call('/api/shares/'+encodeURIComponent(id),{method:'DELETE'}),

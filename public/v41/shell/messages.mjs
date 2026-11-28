@@ -321,7 +321,8 @@ export function createMessages(deps) {
     // '링크 만들기'가 눌리지 않는 이유를 버튼 옆에 보여 준다.
     $('share-create-reason').hidden = !$('share-create').disabled;
   }
-  function renderShareList(shares = []) {
+  let shareRowsCache = [], shareNextCursor = null, shareListRequestId = 0;
+  function renderShareList(shares = shareRowsCache) {
     const host = $('share-list'), treeId = window.LT41?.tree.id;
     host.replaceChildren();
     // #538: 둘러보기 소개는 서버가 자동으로 판단한다(공개 && 순간 3개 이상). 소유자 목록에는
@@ -329,9 +330,9 @@ export function createMessages(deps) {
     const selected = shares.filter(item => item.treeId === treeId && item.origin !== 'auto');
     if (!selected.length) {
       const p = document.createElement('p');
-      p.textContent = '아직 만든 공유 주소가 없어요. 둘러보기 소개는 기본 꺼짐이에요.';
+      p.textContent = shareNextCursor ? '이 트리의 공유 주소를 더 확인해 주세요.' : '아직 만든 공유 주소가 없어요. 둘러보기 소개는 기본 꺼짐이에요.';
       host.append(p);
-      return;
+      if (!shareNextCursor) return;
     }
     // #369: 살아 있는 주소만 위에, 취소된 주소는 '지난 주소 N개' 접힘 안에 둔다.
     const active = selected.filter(item => item.status === 'active');
@@ -345,6 +346,18 @@ export function createMessages(deps) {
       details.append(summary);
       for (const item of past) details.append(sharePastRow(item));
       host.append(details);
+    }
+    if (shareNextCursor) {
+      const more = document.createElement('button');
+      more.type = 'button';
+      more.className = 'share-more';
+      more.textContent = '더 보기';
+      more.onclick = async () => {
+        more.disabled = true;
+        try { await loadShareList(shareNextCursor); }
+        finally { more.disabled = false; }
+      };
+      host.append(more);
     }
   }
   function shareLabel(item) {
@@ -383,7 +396,9 @@ export function createMessages(deps) {
           if (!answer.ok) { $('share-feedback').textContent = shareFailure(answer); revoke.disabled = false; return; }
           $('share-feedback').textContent = '공유를 취소했어요. 새 요청은 즉시 차단됩니다.';
           if ($('share-url').dataset.shareId === item.id) { $('share-created').hidden = true; }
-          await loadShareList();
+          // 이어 불러온 오래된 주소도 화면에 남기고 '지난 주소'로 이동시킨다.
+          shareRowsCache = shareRowsCache.map(row => row.id === item.id ? {...row,status:'revoked'} : row);
+          renderShareList();
         };
         actions.append(copy, revoke);
         row.append(actions);
@@ -400,9 +415,23 @@ export function createMessages(deps) {
     row.append(text);
     return row;
   }
-  async function loadShareList() {
-    const answer = await shareApi.list();
-    if (answer.ok) renderShareList(answer.shares); else $('share-list').textContent = shareFailure(answer);
+  async function loadShareList(cursor = null) {
+    const requestId = ++shareListRequestId, treeId = window.LT41?.tree?.id;
+    if (!cursor) { shareRowsCache = []; shareNextCursor = null; }
+    const answer = await shareApi.list(cursor);
+    if (requestId !== shareListRequestId || treeId !== window.LT41?.tree?.id) return;
+    if (!answer.ok) {
+      if (cursor) $('share-feedback').textContent = shareFailure(answer);
+      else $('share-list').textContent = shareFailure(answer);
+      return;
+    }
+    const ids = new Set(shareRowsCache.map(item => item.id));
+    for (const item of answer.shares || []) if (!ids.has(item.id)) {
+      shareRowsCache.push(item);
+      ids.add(item.id);
+    }
+    shareNextCursor = typeof answer.nextCursor === 'string' && answer.nextCursor ? answer.nextCursor : null;
+    renderShareList();
   }
   // #1285 5번: 그림 없는 고르기 칸 옆에 고른 순간의 작은 표지를 붙인다.
   function paintShareMomentThumb() {
