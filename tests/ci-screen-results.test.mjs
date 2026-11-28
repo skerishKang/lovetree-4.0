@@ -38,8 +38,8 @@ test('바뀜 판정이고 화면 잡이 모두 성공이면 통과한다', () =>
 });
 
 
-test('unknown future screen job failure and cancellation cannot be ignored', () => {
-  for (const status of ['failure', 'cancelled']) {
+test('unknown or renamed screen jobs are rejected even if successful or skipped', () => {
+  for (const status of ['success', 'skipped', 'failure', 'cancelled']) {
     const needs = results('success', gate('success', 'true'));
     needs['screen-future'] = { result: status };
     const outcome = checkScreenResults(needs);

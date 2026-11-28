@@ -112,3 +112,31 @@ test('#1611 고른 공통 잡을 건너뛰거나 실패·취소하면 필수 결
   const missing={...needs,'screen-changes':{result:'success',outputs:{changed:'true',jobs:'screen-home'}}};
   assert.equal(checkScreenResults(missing).ok,false,'공통 잡 둘이 빠진 선택을 거부');
 });
+
+test('#1629 실제 화면 잡 이름과 모음 잡 needs·판정의 이름이 정확히 같아야 한다',()=>{
+  const assertContract=source=>{
+    const normalized=source.replace(/\r\n/g,'\n');
+    const jobIds=[...normalized.matchAll(/^  (screen-[a-z0-9-]+):[ \t]*$/gm)]
+      .map(m=>m[1]).filter(id=>id!=='screen-changes').sort();
+    const preview=normalized.slice(normalized.indexOf('  preview:\n'));
+    const match=/^    needs: \[([^\]\n]+)\]$/m.exec(preview);
+    assert.ok(match,'모음 잡의 needs가 있다');
+    const expected=match[1].split(',').map(s=>s.trim())
+      .filter(id=>id.startsWith('screen-')&&id!=='screen-changes').sort();
+    assert.deepEqual(expected,jobIds,'실제 워크플로 잡 이름 = 모음 잡 needs');
+    assert.deepEqual(jobIds,[...SELECTABLE_JOBS].sort(),'판정의 선택 가능 잡 = 실제 워크플로 잡');
+    assert.deepEqual(jobIds.filter(id=>id.startsWith('screen-common-')),common,'공통 잡 A/B만 존재한다');
+  };
+  assertContract(workflow);
+  for(const old of ['screen-audit-a','screen-audit-b','screen-audit-c']){
+    const changedNeeds=workflow.replace(
+      /(  preview:\n[\s\S]*?    needs: \[[^\]\n]*?)screen-common-a(?=, screen-common-b, deploy\])/m,
+      (_all,prefix)=>prefix+old
+    );
+    assert.notEqual(changedNeeds,workflow,'이전 잡 이름으로 needs 변경 시험 준비');
+    assert.throws(()=>assertContract(changedNeeds),assert.AssertionError,'옛 이름의 needs를 거부한다');
+    const changedJob=workflow.replace(/^  screen-common-a:$/m,'  '+old+':');
+    assert.notEqual(changedJob,workflow,'이전 잡 이름으로 정의 변경 시험 준비');
+    assert.throws(()=>assertContract(changedJob),assert.AssertionError,'옛 이름의 잡 정의를 거부한다');
+  }
+});

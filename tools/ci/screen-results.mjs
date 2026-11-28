@@ -20,11 +20,11 @@ export function checkScreenResults(needs = {}) {
   if (changed === 'true' && jobs !== 'all')
     for (const name of SELECTABLE_JOBS.filter(j => j.startsWith('screen-common-')))
       if (!selected.includes(name)) failures.push(name + ': common job missing from selection');
+  // Fail closed on any unknown job, even success/skipped: a stale renamed job
+  // must never be silently accepted by the final results aggregator.
   for (const [name, value] of Object.entries(needs)) {
     if (!name.startsWith('screen-') || name === 'screen-changes' || SELECTABLE_JOBS.includes(name)) continue;
-    if (['failure', 'cancelled'].includes(value?.result)) {
-      failures.push(name + ': unrecognized screen job failed (' + value.result + ')');
-    }
+    failures.push(name + ': unrecognized screen job in result contract (' + value?.result + ')');
   }
   for (const name of SELECTABLE_JOBS) {
     const result = needs[name]?.result;
