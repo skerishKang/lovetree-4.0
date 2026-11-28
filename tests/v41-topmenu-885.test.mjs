@@ -213,8 +213,14 @@ test('상단 메뉴 261119: 트리 단추 폭·⌄ 자리·목록 규칙·메뉴
       const page = await ctx.newPage();
       // 긴 이름 트리를 지금 트리로 연다 — 말줄임과 ⌄ 자리를 같은 자리에서 함께 잰다.
       await page.goto(`${origin}/v41/?account=1#my/board?tree=${longTree.id}&moment=${longTree.moments[0].id}`, { waitUntil: 'load', timeout: 60000 });
-      await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
-      await page.waitForTimeout(700);
+      await page.waitForFunction((expected) => {
+          const frame = document.querySelector('iframe#view:not([hidden])');
+          const documentReady = frame?.contentDocument?.readyState === 'complete';
+          const choice = frame?.contentDocument?.querySelector('button.lt-toolbar-tree-choice');
+          const title = choice?.querySelector('.lt-toolbar-tree-name')?.textContent?.trim();
+          return !!window.LT41?.tree && window.LT41.tree.title === expected &&
+            documentReady && !!choice && !choice.disabled && title === expected;
+        }, longTree.title, { timeout: 20000 });
       const bar = await page.evaluate(() => {
         const record = document.querySelector('iframe#view')?.contentDocument?.querySelector('button.lt-toolbar-tree-choice');
         const label = record?.querySelector('.lt-toolbar-tree-name');

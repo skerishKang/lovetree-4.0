@@ -95,7 +95,8 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
   try{roles=await admin.rolesFor({productId,subjectIds:ids},{unknownOnFailure:true});}
   catch{return;} // 단건의 기존 오류 판정으로 돌아간다.
   for(const id of ids){
-   const role=roles.has(id)?roles.get(id):ROLE_UNKNOWN;
+   // null은 저장소가 확인한 '역할 없음', 누락된 키는 확인 실패로 공개하지 않는다.
+   const role=roles instanceof Map&&roles.has(id)?roles.get(id):ROLE_UNKNOWN;
    if(role===ROLE_UNKNOWN)console.warn('[lovetree-community] 역할을 읽지 못해 공개 목록에서 제외');
    cache.set(id,role);
   }

@@ -973,7 +973,39 @@ test('#1443 방문 주소는 로그아웃·로그인 방문자의 기록과 저�
   const publicPrefs = {dateStyle:'dot',titleDisplay:'both',bookDisplay:'book',shelfView:'carousel',treeChipOrder:[],theme:'night'};
   const screens = {book:'track59-sketchbook.html',board:'track58-pinboard.html',network:'track56-network.html',tree:'track61-tree.html',exhibit:'exhibit.html'};
   let activeRequests=[];
-  const snapshot = page => page.evaluate(() => Object.fromEntries(Object.keys(localStorage).filter(key=>key.startsWith('lt41.')).sort().map(key=>[key,localStorage.getItem(key)])));
+  // #1615: 두 기기 저장소의 원래 값과 메서드 정의를 비교한다.
+  const snapshot = page => page.evaluate(() => {
+    const values=storage=>Object.fromEntries(Object.keys(storage).sort().map(key=>[key,storage.getItem(key)]));
+    return {local:values(localStorage),session:values(sessionStorage)};
+  });
+  const methodsRestored = target => target.evaluate(() => ['setItem','removeItem','clear'].every(name=>{
+    const original=window.__visitStorageOriginal[name], now=Object.getOwnPropertyDescriptor(Storage.prototype,name);
+    return original.value===now.value && original.writable===now.writable && original.enumerable===now.enumerable && original.configurable===now.configurable;
+  }));
+  const tryStorageWrites = target => target.evaluate(async()=>{
+    const {writeCachedWorkspace,clearCachedWorkspace,rememberLoginSubject,forgetLoginSubject}=await import('/v41/workspace-cache.mjs');
+    const {rememberAccountPosition,stashPendingOwnerRoute}=await import('/v41/selection-location.mjs');
+    // 실제 작업 공간·로그인 표식·최근 위치 저장 함수와 직접 저장 호출을 모두 통과시킨다.
+    writeCachedWorkspace(localStorage,'fixture-visitor',{version:1,trees:[],prefs:{}});
+    clearCachedWorkspace(localStorage,'fixture-visitor');
+    rememberLoginSubject(localStorage,'other-fixture');
+    forgetLoginSubject(localStorage);
+    rememberAccountPosition(localStorage,'fixture-visitor',{treeId:'other-tree',momentId:'other-moment',view:'board'});
+    stashPendingOwnerRoute(sessionStorage,'#my/board?tree=other-tree&moment=other-moment');
+    for(const storage of [localStorage,sessionStorage]){
+      for(const key of ['lt41.theme','lt41.boardTheme','lovetree.v41.login-subject','lovetree.v41.workspace-cache:fixture-visitor','lovetree.v41.account-positions.v1','lovetree.v41.pending-owner-route.v1']){
+        storage.setItem(key,'방문 중 바꾸기');
+        storage.removeItem(key);
+      }
+      storage.setItem('lt41.visit-new','방문 중 새 값');
+      storage.setItem('lovetree.v41.visit-new','방문 중 새 값');
+      // 보호 대상 밖의 개별 키는 기존 동작을 지킨다.
+      storage.setItem('other.visit-probe','허용');
+      if(storage.getItem('other.visit-probe')!=='허용')throw Error('다른 키 쓰기 차단');
+      storage.removeItem('other.visit-probe');
+      storage.clear();
+    }
+  });
   const waitVisit = async (page,view) => {
     const filename=screens[view];
     try {
@@ -1009,6 +1041,9 @@ test('#1443 방문 주소는 로그아웃·로그인 방문자의 기록과 저�
       try {
         const requests=[];
         activeRequests=requests;
+        await context.addInitScript(()=>{
+          window.__visitStorageOriginal=Object.fromEntries(['setItem','removeItem','clear'].map(name=>[name,Object.getOwnPropertyDescriptor(Storage.prototype,name)]));
+        });
         await context.route('**/api/**',route=>{
           const request=route.request(),u=new URL(request.url());
           requests.push({method:request.method(),path:u.pathname});
@@ -1035,13 +1070,26 @@ test('#1443 방문 주소는 로그아웃·로그인 방문자의 기록과 저�
         const page=await context.newPage(),errors=[];
         page.on('pageerror',e=>errors.push(String(e).slice(0,160)));
         await page.goto(base+'/v41/visit-seed.html',{waitUntil:'domcontentloaded'});
-        await page.evaluate(()=>{
+        await page.evaluate(({ownerTree,publicPrefs})=>{
           const values={
             'lt41.theme':'night','lt41.boardTheme':'night','lt41.bookDisplay':'book','lt41.titleDisplay':'both',
             'lt41.shelfView':'carousel','lt41.dateStyle':'dot','lt41.network.view':'network','lt41.avatarLetter':'V','lt41.tips.bookStory':'seen'
           };
+          Object.assign(values,{
+            'lovetree.v41.workspace-cache:fixture-visitor':JSON.stringify({version:1,subject:'fixture-visitor',state:{version:1,trees:[ownerTree],prefs:publicPrefs}}),
+            'lovetree.v41.workspace-cache:last':'fixture-visitor',
+            'lovetree.v41.login-subject':'fixture-visitor',
+            'lovetree.v41.account-positions.v1':JSON.stringify({version:1,entries:[{subject:'fixture-visitor',treeId:ownerTree.id,momentId:'m1',view:'book'}]}),
+            'other.keep':'그대로'
+          });
           for(const [key,value] of Object.entries(values))localStorage.setItem(key,value);
-        });
+          for(const [key,value] of Object.entries({
+            'lt41.theme':'night','lt41.boardTheme':'night','lt41.logoutNotice':'1',
+            'lovetree.v41.pending-owner-route.v1':'#my/book?tree=owner-fixture&moment=m1',
+            'lovetree.v41.session-probe':'내 세션','other.keep':'그대로'
+          }))sessionStorage.setItem(key,value);
+        },{ownerTree,publicPrefs});
+        assert.equal(await methodsRestored(page),true,label+' 방문 전 원래 저장 함수');
         const before=await snapshot(page),visitMarker=requests.length;
         await page.goto(base+'/v41/#visit/'+shareId+'/book',{waitUntil:'domcontentloaded'});
         await waitVisit(page,'book');
@@ -1051,13 +1099,21 @@ test('#1443 방문 주소는 로그아웃·로그인 방문자의 기록과 저�
           readOnly:window.LT41.readOnly,visitReadOnly:window.LT41.visitReadOnly,writable:window.LT41.writable,
           theme:window.LT41.prefs.theme,globalReadOnly:globalThis.LT41_VISIT_READ_ONLY
         })),{source:'share',treeId:shareId,treeCount:1,readOnly:true,visitReadOnly:true,writable:false,theme:'night',globalReadOnly:true},label+' 공개 트리만 연다');
-        assert.deepEqual(await snapshot(page),before,label+' 진입 직후 lt41.* 저장값 동일');
+        assert.deepEqual(await snapshot(page),before,label+' 진입 직후 두 저장소 값 동일(#1615 실제 로그아웃 안내 제거 경로 포함)');
+        assert.equal(await methodsRestored(page),false,label+' 방문 중 셸 저장 보호 활성');
+        await tryStorageWrites(page);
+        assert.deepEqual(await snapshot(page),before,label+' 셸 작업 공간·로그인·최근 위치·세션·전체 지우기 차단');
         await page.locator('#theme-toggle').click();
         await page.waitForFunction(()=>document.documentElement.getAttribute('data-lt-theme')==='garden'&&window.LT41?.prefs?.theme==='garden',null,{timeout:5000});
         assert.deepEqual(await snapshot(page),before,label+' 테마 변경은 방문 메모리에만 남는다');
         for(const view of ['board','network','tree','exhibit','book']){
           await page.locator(`#tree-views button[data-view="${screens[view]}"]`).click();
           const frame=await waitVisit(page,view);
+          assert.equal(await methodsRestored(frame),false,label+' '+view+' 프레임 저장 보호 활성');
+          await page.evaluate(()=>{
+            const w=document.querySelector('#view').contentWindow;
+            (window.__visitFrameMethods ||= []).push({proto:w.Storage.prototype,original:w.__visitStorageOriginal});
+          });
           const flags=await frame.evaluate(()=>({readOnly:window.LTDEMO.readOnly,visitReadOnly:window.LTDEMO.visitReadOnly,globalReadOnly:globalThis.LT41_VISIT_READ_ONLY,theme:parent.LT41?.prefs?.theme}));
           assert.deepEqual(flags,{readOnly:true,visitReadOnly:true,globalReadOnly:true,theme:'garden'},label+' '+view+' 읽기 전용·세션 테마 유지');
           await frame.evaluate(()=>{
@@ -1066,7 +1122,8 @@ test('#1443 방문 주소는 로그아웃·로그인 방문자의 기록과 저�
             localStorage.setItem('lt41.network.view','tag');
             localStorage.setItem('lt41.bookDisplay','list');
           });
-          assert.deepEqual(await snapshot(page),before,label+' '+view+' 안쪽 저장소 시도 차단');
+          await tryStorageWrites(frame);
+          assert.deepEqual(await snapshot(page),before,label+' '+view+' 안쪽 두 저장소 시도 차단');
         }
         await page.evaluate(({shareId})=>{location.hash=`#visit/${shareId}/board`},{shareId});
         await waitVisit(page,'board');
@@ -1088,12 +1145,22 @@ test('#1443 방문 주소는 로그아웃·로그인 방문자의 기록과 저�
         });
         assert.equal(blocked.status,403,label+' 다른 모듈 영역 저장도 api 관문에서 차단');
         assert.equal(blocked.code,'visit_read_only');
-        assert.deepEqual(await snapshot(page),before,label+' 모든 조작 뒤 lt41.* 저장값 동일');
+        assert.deepEqual(await snapshot(page),before,label+' 모든 조작 뒤 두 저장소 값 동일');
         const visitRequests=requests.slice(visitMarker);
         assert.deepEqual(visitRequests.filter(r=>!['GET','HEAD','OPTIONS'].includes(r.method)),[],label+' 저장·설정·테마 요청 0회');
         assert.equal(visitRequests.some(r=>r.path==='/api/workspace'),false,label+' 방문 중 내 기록 읽기 0회');
         assert.equal(visitRequests.filter(r=>r.path==='/auth/refresh').length,0,label+' 방문 중 인증 갱신 요청 0회');
         if(authenticated)await shot(page,'1443-visit-authenticated-book-garden');
+        // 종료 경계의 값을 기록한다. 옛 공유 화면은 종료 뒤 일반 헤더의 아바타 표식을 다시 정할 수 있다.
+        await page.evaluate(()=>{
+          const atEnd=()=>{
+            if(globalThis.LT41_VISIT_READ_ONLY)return;
+            const values=storage=>Object.fromEntries(Object.keys(storage).sort().map(key=>[key,storage.getItem(key)]));
+            window.__visitEndSnapshot={local:values(localStorage),session:values(sessionStorage)};
+            window.removeEventListener('lt41-visit-storage-mode',atEnd);
+          };
+          window.addEventListener('lt41-visit-storage-mode',atEnd);
+        });
         const shareMarker=requests.length;
         await page.evaluate(({shareId})=>{location.hash=`#share/${shareId}/book`},{shareId});
         await page.waitForFunction(({shareId,filename})=>{
@@ -1103,6 +1170,26 @@ test('#1443 방문 주소는 로그아웃·로그인 방문자의 기록과 저�
             &&frame?.contentWindow?.LTDEMO?.visitReadOnly===false&&frame.contentWindow?.location?.pathname?.endsWith(filename);
         },{shareId,filename:screens.book},{timeout:15000});
         assert.ok(requests.slice(shareMarker).some(r=>r.path===`/api/public/shares/${shareId}`),label+' 옛 공유 주소는 기존 읽기 경로 사용');
+        assert.deepEqual(await page.evaluate(()=>window.__visitEndSnapshot),before,label+' 방문 종료 경계에서 두 저장소 값 동일');
+        assert.equal(await methodsRestored(page),true,label+' 방문 종료 셸 원래 저장 함수와 속성 복귀');
+        const shareFrame=await (await page.locator('#view').elementHandle()).contentFrame();
+        assert.equal(await methodsRestored(shareFrame),true,label+' 방문 종료 새 프레임 원래 저장 함수');
+        assert.equal(await page.evaluate(()=>window.__visitFrameMethods.every(({proto,original})=>Object.keys(original).every(name=>{
+          const now=Object.getOwnPropertyDescriptor(proto,name),old=original[name];
+          return now.value===old.value&&now.writable===old.writable&&now.enumerable===old.enumerable&&now.configurable===old.configurable;
+        }))),true,label+' 지나온 방문 프레임도 원래 저장 함수로 복귀');
+        // 방문을 끝낸 뒤에는 두 저장소의 보호 키를 다시 쓸 수 있다.
+        for(const target of [page,shareFrame]){
+          assert.equal(await target.evaluate(()=>{
+            for(const storage of [localStorage,sessionStorage]){
+              storage.setItem('lovetree.v41.visit-new','종료 뒤 허용');
+              if(storage.getItem('lovetree.v41.visit-new')!=='종료 뒤 허용')return false;
+              storage.removeItem('lovetree.v41.visit-new');
+              if(storage.getItem('lovetree.v41.visit-new')!==null)return false;
+            }
+            return true;
+          }),true,label+' 방문 종료 뒤 저장·제거 복귀');
+        }
         assert.deepEqual(errors,[],label+' 화면 스크립트 오류 없음');
         console.log(label+': 저장 요청 0·저장값 동일·옛 공유 주소 유지 확인');
       } finally {

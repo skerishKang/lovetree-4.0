@@ -500,3 +500,33 @@ test('#1529 1440: 카드 40장 상세 판을 열어도 읽을 수 있는 크기 
   assert.equal(result.overlap, 0, '상세 판과 보이는 카드 겹침 0');
   assert.deepEqual(problems, [], '브라우저 오류 없음');
 });
+
+
+// #1595: 실제 로그인 셸과 세로 영상 자료로 작은 화면 선택 줄·판 이동·공통 로고를 검사한다.
+test('#1595 로그인 보드: 선택 줄 겹침 0, 모든 마지막 카드 접근, 이동 안내와 안쪽 로고 16px', { skip: REQUIRE ? false : skip, timeout: 240000 }, async () => {
+  if (skip) assert.fail('필수 화면 시험 환경 누락: ' + skip);
+  const { auditBoardLogin1595 } = await import('./helpers/board-login-1595.mjs');
+  const { rows, logos, errors } = await auditBoardLogin1595(chromium);
+  assert.deepEqual(errors, [], '실제 셸 시험 오류 없음');
+  assert.equal(rows.length, 16);
+  assert.equal(logos.length, 12);
+  for (const row of rows) {
+    const label = row.w + ' ' + row.theme + ' ' + row.n + '장';
+    assert.equal(row.initial.cards, row.n, label);
+    assert.equal(row.initial.vertical, row.n, label + ' 세로 영상');
+    assert.equal(row.initial.overlap, 0, label + ' 첫 화면 선택 줄 겹침');
+    assert.equal(row.result.reached, true, label + ' 실제 휠 또는 판 끌기로 마지막 카드 아래 접근');
+    assert.equal(row.result.bottomRemaining, 0, label + ' 마지막 카드 아래 잘림 없음');
+    if (row.w === 390) {
+      assert.equal(row.overlapProbe.overlap, 0, label + ' 실제 스크롤 뒤에도 선택 줄 겹침 없음');
+      assert.ok(row.initial.vp.t >= row.initial.picker.b, label + ' 선택 줄과 스크롤 영역 분리');
+    } else {
+      assert.equal(row.initial.hintVisible, row.initial.bottomClipped > 0, label + ' 아래 카드 안내');
+      assert.equal(row.result.end.hintVisible, false, label + ' 끝에 닿으면 안내 숨김');
+    }
+  }
+  for (const logo of logos) {
+    assert.equal(logo.visibleLogoLeft, 16, logo.screen + ' ' + logo.theme + ' 실제 로고 글자 여백');
+    assert.equal(logo.overflow, 0, logo.screen + ' 가로 넘침 없음');
+  }
+});

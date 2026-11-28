@@ -399,7 +399,7 @@ body.board-hint-drag .board-empty-hint{border-color:var(--lt-gold-line);color:va
 #viewport,#boardControls{transition:none}
 
 /* #1529: 낮은 가로 화면도 카드 끝까지 세로로 이동한다. */
-@media(min-width:700px) and (max-width:1199px) and (max-height:500px){html[data-v41-screen=board] .boardFrame{bottom:12px}}
+@media(min-width:700px) and (max-width:1199px) and (max-height:500px){html[data-v41-screen=board] .boardFrame{bottom:24px}}
 
 /* #1529: 숨겨진 고급 패널의 실제 누름 영역. 공통 도구 줄은 변경하지 않는다. */
 #leftPanel :is(.filterSelect,.wideTool,.themeBtn,.styleMini,.collapseBtn){min-height:44px;height:auto}
