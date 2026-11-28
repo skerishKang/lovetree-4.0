@@ -24,6 +24,7 @@ function fakeElement(extra = {}) {
 
 function harness({ owned = true, writable = true, source = 'server', busy = false, tree = null, view = 'track59-sketchbook.html', applyImpl = null } = {}) {
   const calls = [];
+  const holdCalls = [];
   const notes = [];
   const els = {};
   const fields = () => ({ title: fakeElement(), note: fakeElement(), emotion: fakeElement(), date: fakeElement(), url: fakeElement(), relation: fakeElement() });
@@ -81,7 +82,8 @@ function harness({ owned = true, writable = true, source = 'server', busy = fals
     show: () => {},
     selection: () => ({ treeId: tree?.id, momentId: tree?.moments[0]?.id }),
     openFirstJourney: () => { openedJourney += 1; },
-    openLoginStart: intent => { loginIntent = intent; }
+    openLoginStart: intent => { loginIntent = intent; },
+    holdPanel: (id, on) => { holdCalls.push([id, on]); }
   });
 
   const restore = () => {
@@ -94,7 +96,7 @@ function harness({ owned = true, writable = true, source = 'server', busy = fals
     globalThis.location = saved.location;
   };
   return {
-    panels, els, calls, notes, uploads, coverSlotParts, coverSlot,
+    panels, els, calls, holdCalls, notes, uploads, coverSlotParts, coverSlot,
     counts: () => ({ openedJourney, loginIntent, editorPanel, settingsData, tabsVisible }),
     restore
   };
@@ -319,6 +321,7 @@ test('새 사진 표지: 업로드 성공 뒤 순간 추가 → 표지 지정 �
     assert.match(h.notes.join(' '), /새 사진 순간을 표지로 만들었어요/);
     assert.match(h.coverSlotParts['[data-upload-status]'].textContent, /새 사진 순간을 표지로 만들었어요/);
     assert.equal(h.panels.treeDirty(), false, '성공 뒤 기준값을 다시 세워 닫을 때 경고가 없다');
+    assert.deepEqual(h.holdCalls, [['tree-manager', true], ['tree-manager', false]], '두 저장 사이 창을 붙잡고 성공 뒤 풀어 준다');
     assert.equal(h.els['tree-cover-title'].value, '', '제목 칸은 비운다');
   } finally { h.restore(); }
 });
@@ -376,6 +379,7 @@ test('새 사진 표지: 표지 지정이 실패하면 사진은 순간으로 �
     assert.match(h.coverSlotParts['[data-upload-status]'].textContent, /사진은 순간으로 남았지만 표지 지정은 실패했어요/);
     assert.doesNotMatch(h.notes.join(' '), /표지로 만들었어요/);
     assert.equal(h.els['tree-cover'].children.length, 4, '실패해도 새 순간은 선택지에 남는다');
+    assert.deepEqual(h.holdCalls, [['tree-manager', true], ['tree-manager', false]], '표지 지정 실패 뒤에도 창 붙잡기를 풀어 준다');
   } finally { h.restore(); }
 });
 
@@ -391,6 +395,7 @@ test('새 사진 표지: 순간 만들기가 실패하면 사진은 보관 파�
     await driveCoverUpload(h);
     assert.equal(h.calls.length, 1, '표지 지정으로 나가지 않는다');
     assert.match(h.coverSlotParts['[data-upload-status]'].textContent, /사진은 보관 파일로 남았어요/);
+    assert.deepEqual(h.holdCalls, [['tree-manager', true], ['tree-manager', false]], '순간 추가 실패 뒤에도 창 붙잡기를 풀어 준다');
   } finally { h.restore(); }
 });
 

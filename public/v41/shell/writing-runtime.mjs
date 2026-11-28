@@ -94,7 +94,9 @@ export function createWritingRuntime(ctx){
       // #380 4 2차: 편집기의 취소 버튼도 공통 닫기 규칙(×·바깥·Esc와 같은 확인·업로드 중 막기)을 쓴다.
       requestClose:id=>ctx.shellDialogs.requestClose(id),
       // #876: 같은 영상 안내 창 — 자세한 추가도 쉬운 추가와 같은 규칙.
-      videoDup:shellVideoDup
+      videoDup:shellVideoDup,
+      // #1429: 사진 표지의 순간 추가→표지 지정 사이 재적재에서 관리 창이 닫히지 않게 붙잡는다.
+      holdPanel:(id,on)=>ctx.shellDialogs.holdPanel(id,on)
     });
 
     // #453 B: 탭을 보일 때(그리고 창을 여는 두 길 모두에서) 편집기 기준값을 다시 잡는다.

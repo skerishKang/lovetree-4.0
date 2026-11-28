@@ -595,3 +595,59 @@ test('970/1001b-2 실행: 표지 사진 올리기 — 저장 뒤 재적재 1회(
     await ctx.close();
   } finally { await browser.close(); server.close(); }
 });
+
+// #1429: 사진 표지 추가 중 잠깐 닫힘 판정이 나와도, 두 저장이 끝난 뒤에는 깨끗한 창으로 닫혀야 한다.
+test('1429 실행: 사진 표지 저장 후 트리 관리 창은 깨끗하게 닫힌다(390·1440 × 밤·정원)', { skip: skip || !REQUIRE970 ? skip || 'LT_970_REQUIRE=1 일 때 실행' : false, timeout: 240000 }, async () => {
+  if (skip) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip}`);
+  const { createTree } = await import('../public/v41/domain.mjs');
+  const browser = await chromium.launch();
+  try {
+    for (const [width, height, theme] of [[390, 844, 'night'], [390, 844, 'garden'], [1440, 900, 'night'], [1440, 900, 'garden']]) {
+      const ctx = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
+      await ctx.addInitScript(value => { try { localStorage.setItem('lt41.theme', value); localStorage.setItem('lt41.tips.firstTree', '1'); } catch {} }, theme);
+      let tree = createTree(COVER_TREE);
+      let revision = 1;
+      await ctx.route('**/api/**', route => {
+        const path = new URL(route.request().url()).pathname;
+        if (path === '/api/account') return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, email: 'fixture@example.test', admin: false }) });
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, items: [], shares: [], groups: [] }) });
+      });
+      await ctx.route('**/api/workspace**', route => {
+        const request = route.request();
+        if (request.method() === 'PUT') {
+          const body = request.postDataJSON();
+          tree = body.state.trees.find(item => item.id === tree.id) || tree;
+          revision += 1;
+          return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, revision, subject: 'test-account' }) });
+        }
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, revision, subject: 'test-account', writeSubjectBound: true, savedAt: CLOCK970, state: { version: 1, trees: [structuredClone(tree)], prefs: {} } }) });
+      });
+      await ctx.route('**/api/media*', route => route.request().method() === 'POST'
+        ? route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, url: `${base}/api/media/cover-test.png`, name: 'cover-test.png' }) })
+        : route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, items: [] }) }));
+      await ctx.route('**/api/media/cover-test.png**', route => route.fulfill({ status: 200, contentType: 'image/png', body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64') }));
+      const page = await ctx.newPage();
+      const errors = [];
+      page.on('pageerror', error => errors.push(error.message));
+      await page.goto(`${base}/v41/?account=1#my/book?tree=${tree.id}`, { waitUntil: 'load' });
+      await page.waitForFunction(() => !!window.LT41?.tree, null, { timeout: 20000 });
+      await clickToolbarTreeChoice(page);
+      await page.waitForFunction(() => document.getElementById('tree-popover')?.hidden === false, null, { timeout: 10000 });
+      await page.click('[data-tree-action="manage"]');
+      await page.waitForFunction(() => document.getElementById('tree-manager').open, null, { timeout: 10000 });
+      await page.evaluate(() => {
+        const radio = document.querySelector('[name="coverMode"][value="photo"]');
+        radio.checked = true;
+        radio.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+      await page.locator('#tree-form [data-media-file]').setInputFiles({ name: 'cover-test.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64') });
+      await page.waitForFunction(() => document.querySelector('#tree-form [data-upload-status]')?.textContent.includes('표지로 만들었어요'), null, { timeout: 20000 });
+      assert.equal(await page.evaluate(() => !!document.getElementById('lt-close-confirm')?.open), false, `${width}/${theme}: 저장 성공 뒤 닫기 확인이 다시 뜨지 않는다`);
+      await page.locator('#tree-manager [data-close="tree-manager"]').click();
+      await page.waitForFunction(() => !document.getElementById('tree-manager').open, null, { timeout: 5000 });
+      assert.equal(await page.evaluate(() => !!document.getElementById('lt-close-confirm')?.open), false, `${width}/${theme}: 저장된 창은 확인 없이 닫힌다`);
+      assert.deepEqual(errors, []);
+      await ctx.close();
+    }
+  } finally { await browser.close(); }
+});
