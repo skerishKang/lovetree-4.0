@@ -316,7 +316,7 @@ html[data-v41-screen=network][data-lt-board-theme=night] body .map-meta{color:va
 /* 좁은 화면 시트는 아래 묶음 단추 줄 위에서 멈춘다 — 줄 높이(--lt-ribbon-h)는 화면이 잰다(겹침 0). */
 @media(max-width:640px){.detail{bottom:var(--lt-sheet-bottom,104px);max-height:calc(100svh - var(--lt-sheet-top,190px) - var(--lt-sheet-bottom,104px))}}
 .detailScroll{flex:1 1 auto;min-height:0;overflow:auto;padding:18px}
-.detail .close{position:absolute;right:10px;top:10px;width:32px;height:32px;min-width:32px;min-height:32px;margin:0;z-index:2;background:none;border:0;color:inherit;font-size:18px}
+.detail .close{position:relative;left:auto;right:auto;top:auto;flex:0 0 auto;align-self:flex-end;margin:10px 14px 0;z-index:2;background:none;border:0;color:inherit;font-size:18px}
 .detail h2{margin:6px 0 10px;max-width:calc(100% - 46px)}
 .detail h2.is-clamped:not(.is-expanded){display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .detailTitleToggle{min-height:44px;margin:-4px 0 8px;padding:0;border:0;background:none;color:var(--lt-map-paper-muted,rgba(47,43,52,.55));font:inherit;font-size:12px;text-decoration:underline;cursor:pointer}

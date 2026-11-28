@@ -755,7 +755,7 @@ test('#951 ⑥ 넓은 화면 단추 줄: 1440·2560에 큰 판 없음, 단추 44
   }
 });
 
-test('#1574 밀집 이름표·점·안내 겹침 0, 가로 상세 판과 32/44px 닫기, 긴 제목 전체 보기', { skip: REQUIRE ? false : skip, timeout: 300000 }, async () => {
+test('#1574 밀집 이름표·점·안내 겹침 0, 가로 상세 판과 가로 32/44px 닫기, 긴 제목 전체 보기', { skip: REQUIRE ? false : skip, timeout: 300000 }, async () => {
   if (skip) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip}`);
   const server = await serve();
   const base = `http://127.0.0.1:${server.address().port}`;
@@ -853,7 +853,9 @@ test('#1574 밀집 이름표·점·안내 겹침 0, 가로 상세 판과 32/44px
         assert.ok(detail.title.length >= 200, `${tag}: 240자 제목을 판에 표시`);
         assert.ok(detail.titleScroll > detail.titleClient, `${tag}: 긴 제목은 세 줄로 접힌다`);
         assert.equal(detail.expanded, 'false', `${tag}: 처음에는 접힌 상태`);
-        assert.deepEqual(detail.close, { width: 32, height: 32, hitWidth: 44, hitHeight: 44 }, `${tag}: 보이는 닫기 32px·누름 영역 44px`);
+        assert.deepEqual(detail.close, width > 640
+          ? { width: 32, height: 32, hitWidth: 44, hitHeight: 44 }
+          : { width: 44, height: 44, hitWidth: 56, hitHeight: 56 }, `${tag}: 가로 닫기 32/44px·모바일 닫기 44/56px`);
         if (width > 640) {
           assert.equal(detail.width, 400, `${tag}: 가로 상세 판 폭 400px`);
           assert.ok(detail.contentHeight > 139, `${tag}: 상세 내용 높이 139px 증가(${detail.contentHeight})`);
