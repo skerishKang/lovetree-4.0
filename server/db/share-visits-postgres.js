@@ -54,10 +54,11 @@ export function createShareVisitsRepo(pool) {
              SELECT $1,$2,($3::text[])[1],$5 FROM eligible
              WHERE NOT EXISTS (SELECT 1 FROM lovetree_share_visit_dedup d
                WHERE d.product_id=$1 AND d.share_id=$2 AND d.visitor_hash=ANY($3::text[])
-                 AND d.expires_at - ($5 - $4) > $4 - ($5 - $4)
-                 AND d.expires_at - ($5 - $4) < $4 + ($5 - $4))
+                 AND d.expires_at > $4::timestamptz
+                 AND d.expires_at < $4::timestamptz + 2 * ($5::timestamptz - $4::timestamptz))
              ON CONFLICT (product_id,share_id,visitor_hash) DO UPDATE
-               SET expires_at=GREATEST(lovetree_share_visit_dedup.expires_at,EXCLUDED.expires_at)
+               SET expires_at=EXCLUDED.expires_at
+               WHERE EXCLUDED.expires_at>lovetree_share_visit_dedup.expires_at
              RETURNING 1
            ), bumped AS (
              INSERT INTO lovetree_share_visits (product_id,share_id,visits)
