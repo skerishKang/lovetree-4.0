@@ -32,8 +32,8 @@ export function createShareVisitsService({repo, shareRepo, visibilityRepo, commu
     // 비교용 해시만 추가하며 저장되는 해시·소금·만료 시각은 그대로다.
     if (at % DAY_MS >= DAY_MS - VISIT_WINDOW_MS) hashes.push(digest(day+1));
     const input = {...scope(shareId),hashes,now:new Date(at),expiresAt:new Date(at+VISIT_WINDOW_MS)};
-    return async () => {
-      try { return await repo.record(input); }
+    return async ({signal} = {}) => {
+      try { return await repo.record(input, {signal}); }
       catch { warn(); return 0; }
     };
   }

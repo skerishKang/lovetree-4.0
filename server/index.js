@@ -259,13 +259,28 @@ const requestHandler = async (request) => {
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   const { host, port } = resolveListen({ env: process.env });
-  createServer(createNodeHandler(requestHandler, {
-  maxBodyBytes,
-  // #1190: 응답을 돌려준 뒤 남은 보낼 줄을 처리한다(새 데몬 없이 기존 요청 흐름 사용).
-  afterResponse: () => feedbackOutboxDispatcher.drain()
-})).listen(port, host, () => {
-  // 서버를 다시 띄울 때도 남은 줄을 한 번 확인한다.
-  void feedbackOutboxDispatcher.drain();
+  const nodeHandler = createNodeHandler(requestHandler, {
+    maxBodyBytes,
+    // #1190: 응답을 돌려준 뒤 남은 보낼 줄을 처리한다(새 데몬 없이 기존 요청 흐름 사용).
+    afterResponse: () => feedbackOutboxDispatcher.drain()
+  });
+  const server = createServer(nodeHandler);
+  let stopping = false;
+  async function stop() {
+    if (stopping) return;
+    stopping = true;
+    clearInterval(visitRetentionTimer);
+    const closed = new Promise(resolve => server.close(resolve));
+    await nodeHandler.closeAfterResponse();
+    await closed;
+    await pool.end();
+  }
+  server.listen(port, host, () => {
+    const onStop = () => { void stop().catch(error => { console.error('[lovetree-storage] 종료 정리 실패', error); process.exitCode = 1; }); };
+    process.once('SIGTERM', onStop);
+    process.once('SIGINT', onStop);
+    // 서버를 다시 띄울 때도 남은 줄을 한 번 확인한다.
+    void feedbackOutboxDispatcher.drain();
     console.log(`lovetree storage api ${host}:${port}`);
   });
 }
