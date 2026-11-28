@@ -84,6 +84,16 @@ test('격리 PostgreSQL 일괄 조회는 정렬·공개 경계·역할·제품 �
   const docs=await f.workspaceRepo.loadMany({productId,subjectIds:[owner(1),owner(9),owner(1)]});
   assert.equal(docs.size,1);assert.equal(docs.has(owner(9)),false);
   assert.deepEqual(docs.get(owner(1)),await f.workspaceRepo.load({productId,subjectId:owner(1)}));
+  const {response:rawRoles,queries:batchQueries}=await f.measure(() =>
+   f.roleStore.rolesFor({productId,subjectIds:[owner(1),owner(2),owner(3),owner(4),owner(9)]}));
+  assert.equal(batchQueries,1,'요청한 모든 계정에 대해 SQL 한 번');
+  assert.equal(rawRoles.size,5);
+  assert.equal(rawRoles.has(owner(1)),true);
+  assert.equal(rawRoles.get(owner(1)),null,'일반 계정 역할 없음은 명시적 null');
+  assert.equal(rawRoles.get(owner(2)),null,'다른 제품 역할은 섞지 않음');
+  assert.equal(rawRoles.get(owner(3))?.role,'ai_customer');
+  assert.equal(rawRoles.get(owner(4))?.role,'tester');
+  assert.equal(rawRoles.get(owner(9)),null,'역할도 문서도 없는 계정 null');
   const admin=createAdminRoleService({store:f.roleStore,productId}),ids=[owner(2),owner(3),owner(4),'invalid'];
   const roles=await admin.rolesFor({productId,subjectIds:ids},{unknownOnFailure:true});
   for(const id of ids)assert.equal(roles.get(id),await admin.roleFor({productId,subjectId:id},{unknownOnFailure:true}));

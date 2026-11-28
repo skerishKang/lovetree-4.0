@@ -6,7 +6,7 @@ import {createMemoryCommunityRepo} from '../server/testing/memory-community-repo
 import {createAdminRoleService,ROLE_UNKNOWN} from '../server/admin-roles.js';
 import {ownerFixture,owner,shareId,label,viewer,makePublicHandler,compareRequests,paths,clock} from './helpers/public-owner-batch.mjs';
 
-async function memoryFixture(n,mixed=false){
+async function memoryFixture(n,mixed=false,{batchOverride=null,ownerRoleLookup=null}={}){
  const productId='owner-batch-test';
  const data=ownerFixture(n,{mixed}),workspace=createMemoryWorkspaceRepo(),store=createModelAdminRoleStore();
  for(const [subjectId,doc] of data.docs)await workspace.commit({productId,subjectId,doc,expectedRevision:0,clientKey:'fixture',requestHash:'fixture'});
@@ -16,7 +16,7 @@ async function memoryFixture(n,mixed=false){
  const base=createMemoryCommunityRepo({
   isPrivateTree:(_p,s,t)=>index.get(JSON.stringify([s,t]))?.private===true,
   isDiscoverOn:(_p,s,t)=>index.get(JSON.stringify([s,t]))?.discover===true,
-  roleFor:({subjectId})=>roles.get(subjectId)||null,hasRealCustomers:true,now:()=>clock
+  roleFor:ownerRoleLookup||(({subjectId})=>roles.get(subjectId)||null),hasRealCustomers:true,now:()=>clock
  });
  base.seedShares(data.shares.map(s=>({productId,...s})));
  if(mixed){
@@ -29,6 +29,7 @@ async function memoryFixture(n,mixed=false){
  const wrap=(repo,names)=>({...repo,...Object.fromEntries(names.map(name=>[name,async (...args)=>{queries++;return repo[name](...args);}]))});
  const workspaceRepo=wrap(workspace,['load','loadMany']);
  const roleStore=wrap(store,['roleFor','rolesFor']);
+ if(batchOverride)roleStore.rolesFor=async args=>{queries++;return batchOverride(args,store);};
  const communityRepo=wrap(base,['listDiscoverableSummaries','listPublicTagShares']);
  return {workspace,store,productId,makeHandler:legacy=>makePublicHandler({productId,workspaceRepo,roleStore,communityRepo,legacy}),
   measure:async fn=>{queries=0;const response=await fn();return {response,queries};}};
@@ -77,6 +78,10 @@ test('역할 일괄 조회는 제품 격리·없는 행·잘못된 식별자·�
  for(const id of ids)assert.equal(batch.get(id),await svc.roleFor({productId,subjectId:id},opt));
  assert.equal(batch.get(ids[1]),null);
  assert.equal(batch.get(ids[3]),ROLE_UNKNOWN);
+ const explicit=await store.rolesFor({productId,subjectIds:[ids[0],ids[1],ids[2],ids[0]]});
+ assert.equal(explicit.size,3,'요청한 모든 서로 다른 계정 키');
+ assert.equal(explicit.has(ids[1]),true,'역할 없는 정상 계정도 명시적인 키');
+ assert.equal(explicit.get(ids[1]),null);
  const foreign=await svc.rolesFor({productId:'other-product',subjectIds:ids},opt);
  assert.ok([...foreign.values()].every(role=>role===null));
  const broken=createAdminRoleService({productId,store:{...store,
@@ -97,4 +102,50 @@ test('메모리 문서 일괄 조회는 같은 제품만 읽고 없는 계정을
  assert.deepEqual(batch.get(owner(1)),await f.workspace.load({productId:f.productId,subjectId:owner(1)}));
  batch.get(owner(1)).doc.trees.length=0;
  assert.equal((await f.workspace.load({productId:f.productId,subjectId:owner(1)})).doc.trees.length,1);
+});
+
+
+// #1614: 정상 '역할 없음'은 명시적인 null, 부분 결과 누락은 모름으로 닫는다.
+// 이 계약은 서버와 저장소의 양쪽을 함께 검증해야 한다.
+test('#1614 부분 결과: 명시적 역할 없음과 누락된 시험 계정을 구분',async()=>{
+ const productId='owner-batch-test', good=owner(1), missed=owner(4);
+ const store={
+  async roleFor({subjectId}){return subjectId===missed?{productId,subjectId,role:'tester'}:null;},
+  async rolesFor(){return new Map([[good,null]]);}
+ };
+ const admin=createAdminRoleService({store,productId});
+ const roles=await admin.rolesFor({productId,subjectIds:[good,missed]},{unknownOnFailure:true});
+ assert.equal(roles.get(good),null,'명시한 역할 없음은 정상 공개 계정');
+ assert.equal(roles.get(missed),ROLE_UNKNOWN,'누락한 계정은 모름');
+ assert.equal(roles.size,2);
+});
+
+test('#1614 부분 일괄 조회에서 빠진 시험 계정은 공개 카드·태그·순간에서 제외, 질의 상한 유지',async()=>{
+ const missing=owner(4);
+ const f=await memoryFixture(24,true,{
+  ownerRoleLookup:()=>null,
+  batchOverride:async({productId,subjectIds},store)=>{
+   // 모든 일반 계정의 역할 없음은 명시한다. 시험 계정 하나만 누락한다.
+   const result=new Map();
+   for(const subjectId of subjectIds){
+    if(subjectId===missing)continue;
+    result.set(subjectId,await store.roleFor({productId,subjectId}));
+   }
+   return result;
+  }
+ });
+ const handle=f.makeHandler(false);
+ for(const [path,query] of [
+   [paths.shares,{q:label(4)}],
+   [paths.tags,{tag:'노래:검증-4'}],
+   [paths.moments,{limit:'30'}]
+ ]){
+  const {response,queries}=await f.measure(()=>handle(path,query));
+  assert.equal(response.status,200,path);
+  assert.ok(queries<=3,path+' 질의 수: '+queries);
+  assert.equal(response.body.items.some(item=>item.shareId===shareId(4)),false,path+' 부분 결과 누락 계정 제외');
+ }
+ const {response,queries}=await f.measure(()=>handle(paths.shares,{q:label(1)}));
+ assert.equal(queries,3);
+ assert.equal(response.body.items[0]?.shareId,shareId(1),'명시적 역할 없음 일반 계정 공개 유지');
 });

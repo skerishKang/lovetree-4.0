@@ -98,6 +98,12 @@ export function createAdminRoleService({ store, productId, clock = () => new Dat
         try {
           const rows = await store.rolesFor({ productId, subjectIds: valid });
           for (const id of valid) {
+            // 저장소는 정상 '역할 없음'도 명시적인 null로 돌려준다.
+            // 키 자체가 없으면 부분 조회 결과이므로 공개 쪽에서는 '모름'으로 닫는다.
+            if (!rows.has(id)) {
+              result.set(id, unknownOnFailure ? ROLE_UNKNOWN : null);
+              continue;
+            }
             const row = rows.get(id);
             result.set(id, row && row.productId === productId && row.subjectId === id && ROLES.includes(row.role) ? row.role : null);
           }

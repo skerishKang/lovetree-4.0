@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import { existsSync } from 'node:fs';
 import { createTree, addMoment } from '../public/v41/domain.mjs';
 import {
-  readTheme, writeTheme, nextTheme, themeButtonLabel, themeButtonAriaLabel, themeIconGlyph, themePressed,
+  readTheme, writeTheme, memberPreferredTheme, nextTheme, themeButtonLabel, themeButtonAriaLabel, themeIconGlyph, themePressed,
   appliedTheme, applyThemeAttribute, normalizeTheme, THEMES, DEFAULT_THEME, THEME_KEY,
   normalizeBookDisplay, readBookDisplay, writeBookDisplay, bookDisplayVisible,
   bookDisplayLabel, bookDisplayAriaLabel, bookDisplayPressed, BOOK_DISPLAY_KEY,
@@ -391,4 +391,75 @@ test('#1558 guest theme stays local without workspace writes', {skip:skip952t||u
     assert.equal(puts,0);
     await ctx.close();
   } finally {await browser.close();await new Promise(resolve=>server.close(resolve));}
+});
+
+test('#1598 회원 테마는 계정값이 우선이고 계정값이 없을 때만 기기 값을 쓴다', () => {
+  assert.equal(memberPreferredTheme({owned:true,accountTheme:'night',deviceTheme:'garden'}),'night');
+  assert.equal(memberPreferredTheme({owned:true,accountTheme:'garden',deviceTheme:'night'}),'garden');
+  assert.equal(memberPreferredTheme({owned:true,accountTheme:null,deviceTheme:'garden'}),'garden');
+  assert.equal(memberPreferredTheme({owned:false,accountTheme:'night',deviceTheme:'garden'}),'garden');
+});
+
+test('#1598 로그인 후 기기 테마만 바뀌어도 서재·트리·책·보드·지도는 계정 테마를 지킨다', {skip:skip952t||undefined,timeout:180000}, async()=>{
+  const {serve}=await import('./helpers/screen-audit.mjs');
+  const server=await serve({}, {port:Number(process.env.LT_TEST_PORT||0)});
+  const base='http://127.0.0.1:'+server.address().port;
+  const browser=await chromium952t.launch({headless:true});
+  const now='2026-11-28T00:00:00.000Z';
+  const field={subject:'시험',title:'기록 순간',note:'모의 자료',emotion:'설렘',date:'2026-11-28',url:'https://www.youtube.com/watch?v=dQw4w9WgXcQ'};
+  const trees=Array.from({length:4},(_,i)=>({...createTree({...field,title:'모의 트리 '+i},now),id:'theme-case-tree-'+i}));
+  const screens=[['shelf','track32-bookshelf'],['tree','track61-tree'],['book','track59-sketchbook'],['board','track58-pinboard'],['network','track56-network']];
+  try{
+    for(const [accountTheme,deviceTheme] of [['night','garden'],['garden','night']]){
+      const context=await browser.newContext({viewport:{width:390,height:844},reducedMotion:'reduce'});
+      const state={version:1,trees,prefs:{theme:accountTheme,shelfView:'carousel',titleDisplay:'both'}};
+      await context.addInitScript((mirror)=>{
+        if(window!==window.top)return;
+        try{if(!sessionStorage.getItem('theme-case-seeded')){sessionStorage.setItem('theme-case-seeded','1');localStorage.setItem('lt41.theme',mirror);}}catch{}
+      },deviceTheme);
+      await context.route('**/api/**',r=>{
+        const u=new URL(r.request().url());
+        if(u.pathname==='/api/workspace')return r.fulfill({status:200,json:{revision:1,state,subject:'test-member',writeSubjectBound:true,savedAt:now}});
+        if(u.pathname==='/api/account')return r.fulfill({status:200,json:{ok:true,email:'test@example.invalid',subject:'test-member'}});
+        if(u.pathname==='/api/shares')return r.fulfill({status:200,json:{shares:[]}});
+        return r.fulfill({status:200,json:{ok:true,items:[],shares:[]}});
+      });
+      const page=await context.newPage();
+      try{
+        await page.goto(base+'/v41/?account=1#my/book',{waitUntil:'domcontentloaded',timeout:30000});
+        await page.waitForFunction(theme=>window.LT41?.prefs?.theme===theme,accountTheme,{timeout:25000});
+        const normalized=theme=>theme==='night'?null:'garden';
+        assert.equal(await page.evaluate(()=>localStorage.getItem('lt41.theme')),accountTheme,'로그인 시 기기 미러는 계정값으로 복구');
+        // 로그인은 이미 끝났다. 계정 API는 바꾸지 않고 기기 저장값만 다시 반대로 만든다.
+        await page.evaluate(value=>localStorage.setItem('lt41.theme',value),deviceTheme);
+        for(const [view,file] of screens){
+          await page.evaluate(v=>{location.hash='#my/'+v},view);
+          await page.waitForFunction(target=>{
+            const f=document.getElementById('view');
+            try{return f&&!f.hidden&&f.contentWindow?.location?.href?.includes(target)&&f.contentDocument?.readyState==='complete'}catch{return false}
+          },file,{timeout:23000});
+          const result=await page.evaluate(()=>{
+            const f=document.getElementById('view'),inner=f.contentDocument;
+            return {shell:document.documentElement.getAttribute('data-lt-theme'),frame:inner.documentElement.getAttribute('data-lt-theme'),device:localStorage.getItem('lt41.theme'),account:window.LT41?.prefs?.theme,body:getComputedStyle(inner.body).backgroundColor};
+          });
+          assert.equal(result.account,accountTheme,view+' 계정 설정');
+          assert.equal(result.device,accountTheme,view+' 기기 미러 복원');
+          assert.equal(result.shell,normalized(accountTheme),view+' 셸');
+          assert.equal(result.frame,normalized(accountTheme),view+' 안쪽');
+          if(accountTheme==='garden')assert.equal(result.body,'rgb(247, 240, 232)',view+' 정원 배경');
+          else assert.notEqual(result.body,'rgb(247, 240, 232)',view+' 밤 배경');
+        }
+      }finally{await context.close()}
+    }
+  }finally{await browser.close();await new Promise(resolve=>server.close(resolve));}
+});
+
+test('#1598 테마 선택 후 저장 3초 지연·500·오프라인·다른 기기 변경·로그아웃 회귀', {skip:skip952t||undefined,timeout:180000}, async()=>{
+  const {checkThemeSaveRace}=await import('./helpers/theme-save-race-1598.mjs');
+  const observations=await checkThemeSaveRace();
+  assert.equal(observations.filter(r=>r.view).length,20);
+  for(const mode of ['delay','failure','offline']){
+    assert.ok(observations.some(r=>r.mode===mode&&r.afterSave),mode+' 저장 응답 이후 검증');
+  }
+  assert.ok(observations.some(r=>r.mode==='guest'&&r.theme==='garden'&&r.puts===0));
 });

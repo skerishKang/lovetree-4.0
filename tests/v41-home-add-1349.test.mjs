@@ -361,3 +361,60 @@ test('#1540 첫 화면 상세·지도·트리·그래프가 제목 표시 설정
   }
  }finally{await browser.close();await new Promise(r=>server.close(r));}
 });
+
+
+// #1600: 열린 표시 직후부터 실제 닫기 누름 위치가 맞아야 한다.
+test('#1600 넓은 보드·지도 상세 닫기: 움직임 줄이기에서 첫 순간 네 가장자리가 단추 자신이다',{
+ skip:!REQUIRED?'화면 전용 검사로 따로 실행합니다.':false,timeout:180000
+},async()=>{
+ if(unavailable)assert.fail(unavailable);
+ const tree=touchTree();
+ const routes={
+  '/close-map.html':touchHost('/v41/views/track56-network.html',tree),
+  '/close-board.html':touchHost('/v41/views/track58-pinboard.html',tree)
+ };
+ const server=await serve1514(routes),base='http://127.0.0.1:'+server.address().port;
+ const browser=await chromium.launch({headless:true});
+ try{
+  for(const width of [1440,2560])for(const theme of ['night','garden'])for(const screen of ['map','board']){
+   const ctx=await browser.newContext({viewport:{width,height:width===1440?900:1440},reducedMotion:'reduce'});
+   try{
+    await ctx.addInitScript(t=>{try{localStorage.setItem('lt41.theme',t);localStorage.removeItem('lt41.boardTheme')}catch{}},theme);
+    await ctx.route('**/*',r=>{const u=new URL(r.request().url());if(u.origin!==base)return r.abort();if(u.pathname.startsWith('/api/'))return r.fulfill({status:200,json:{ok:true,items:[]}});return r.continue()});
+    const page=await ctx.newPage(),errors=[];
+    page.on('pageerror',e=>errors.push(e.message));
+    await page.goto(base+'/close-'+screen+'.html',{waitUntil:'load'});
+    const frame=await (await page.locator('#screen').elementHandle()).contentFrame();
+    if(screen==='map')await frame.waitForFunction(()=>!!window.__lt?.dots?.()?.length);
+    else await frame.waitForFunction(()=>typeof selectMoment==='function'&&document.querySelectorAll('#cardLayer .card').length===2);
+    const m=await frame.evaluate(({screen,id})=>{
+     const detail=document.getElementById('detail'),el=document.getElementById('detailClose');
+     // 닫힌 자리부터 계산하고 열기와 누름 판정을 같은 실행 안에서 한다.
+     const closed=!detail.classList.contains('open');
+     const beforeOpen=detail.getBoundingClientRect().left;
+     if(screen==='map')window.__lt.selectMoment(window.__lt.nodes[0],true);
+     else selectMoment(id,true);
+     const r=el.getBoundingClientRect(),before=getComputedStyle(el,'::before'),after=getComputedStyle(el,'::after');
+     const px=v=>v&&v!=='auto'?parseFloat(v):0;
+     const hit={left:r.left+Math.min(px(before.left),px(after.left)),right:r.right-Math.min(px(before.right),px(after.right)),top:r.top+Math.min(px(before.top),px(after.top)),bottom:r.bottom-Math.min(px(before.bottom),px(after.bottom))};
+     const cx=(hit.left+hit.right)/2,cy=(hit.top+hit.bottom)/2;
+     const points=Object.fromEntries(Object.entries({top:[cx,hit.top+.5],bottom:[cx,hit.bottom-.5],left:[hit.left+1.5,cy],right:[hit.right-1.5,cy]}).map(([key,[x,y]])=>{
+      const n=document.elementFromPoint(x,y);
+      return [key,{x,y,own:n===el||el.contains(n),selector:n?(n.id?'#'+n.id:n.tagName.toLowerCase()+'.'+[...n.classList].join('.')):null}];
+     }));
+     return {closed,beforeOpen,open:detail.classList.contains('open'),transition:getComputedStyle(detail).transitionProperty,visible:{width:r.width,height:r.height},hit:{width:hit.right-hit.left,height:hit.bottom-hit.top},points};
+    },{screen,id:tree.moments[0].id});
+    const label=width+'/'+theme+'/'+screen;
+    assert.ok(m.closed&&m.open,label+' 닫힌 자리에서 열기');
+    assert.equal(m.transition,'none',label+' 움직임 줄이기에서 남는 전환 없음');
+    assert.equal(m.visible.width,screen==='map'?32:44,label+' 보이는 너비');
+    assertHit({selector:'#detailClose',visible:m.visible,hit:m.hit,expectedHeight:screen==='map'?32:44,topOwn:m.points.top.own,bottomOwn:m.points.bottom.own,leftOwn:m.points.left.own,rightOwn:m.points.right.own},label);
+    assert.deepEqual(Object.values(m.points).map(p=>p.selector),Array(4).fill('#detailClose'),label+' 가장자리 선택자');
+    const box=await page.locator('#screen').boundingBox();
+    await page.mouse.click(box.x+m.points.left.x,box.y+m.points.left.y);
+    await frame.locator('#detail:not(.open)').waitFor({state:'attached'});
+    assert.deepEqual(errors,[],label+' 화면 오류 없음');
+   }finally{await ctx.close();}
+  }
+ }finally{await browser.close();await new Promise(r=>server.close(r));}
+});
