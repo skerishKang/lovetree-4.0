@@ -14,7 +14,7 @@ import {report} from "../report.mjs";
 import {createNotifier, syncedNoticeText, newlyPublishedTrees, NOTICE_HIDE_MS} from "./notice.mjs";
 import {normalizeTitleDisplay, normalizeAccentColor, normalizeDateStyle, normalizeStartPlace, normalizeShareView, normalizeHomeMoment, normalizeBookDisplay, normalizeShelfView, coverModeOf, normalizeCoverDesign} from "../domain.mjs";
 import {askAppConfirm} from "../confirm.mjs";
-import {setVisitMode} from "../visit-mode.mjs";
+import {setVisitMode,isVisitMode} from "../visit-mode.mjs";
 
 export function createMemberRuntime(ctx){
   let memberCheckTimer = 0, checkingStill = false; // #1320: 확인이 5초를 넘겼을 때만 조용한 표시를 켠다.
@@ -187,6 +187,8 @@ export function createMemberRuntime(ctx){
      // #1093: 서재 진열 방식도 같은 이유로 기기 미러를 계정값으로 채운다.
      (0,ctx.rememberShelfView)(state.prefs?.shelfView);
      (0,ctx.paintShelfViewControls)();
+     if(!isVisitMode())(0,ctx.rememberShelfOpenMode)(state.prefs?.shelfOpenMode);
+     (0,ctx.paintShelfOpenModeControls)();
      if(!ctx.backfillStarted&&snapshot.owned){ctx.backfillStarted=true;void (0,ctx.runTitleBackfill)(state,session);}
      if(snapshot.owned&&resolved.position.treeId){if(viewForFile(ctx.current)!=='home'&&!(0,ctx.onExploreRoute)())(0,ctx.writeLocation)('replace');takePendingOwnerRoute(sessionStorage);if(route?.scope==='owner'&&resolved.treeMissing)startupNotice='이 주소의 기록을 현재 계정에서 찾을 수 없어 최근 위치를 열었어요.';else if(route?.scope==='owner'&&resolved.momentMissing)startupNotice='이 주소의 순간을 찾을 수 없어 트리의 시작 순간을 열었어요.';}
    }catch(error){(0,ctx.openFallbackShell)(error);}},onStatus:status=>{if(generation===ctx.loadGeneration)memberStatus(status);},

@@ -24,6 +24,11 @@ export function createReader(deps) {
     } catch {}
     return 'book';
   }
+  // #1631: 부모가 방문자 자신의 계정·기기 설정을 판정해 준다.
+  function shelfOpenMode() {
+    try { const value = parent.document.documentElement.dataset.ltShelfOpenMode; if (value === 'preview' || value === 'direct') return value; } catch {}
+    try { return localStorage.getItem('lt41.shelfOpenMode') === 'direct' ? 'direct' : 'preview'; } catch { return 'preview'; }
+  }
   function openBookInShell(book, index) {
     const chapter = book.chapters[Math.max(0, index)];
     const demo = (typeof LTDEMO !== 'undefined') ? LTDEMO : null;
@@ -134,6 +139,8 @@ export function createReader(deps) {
         if(state.open||state.openProgress>0)renderPage(book);
         applyOpenProgress();
         $('#openBookButton').classList.toggle('hidden',state.open);
+        const choice = $('#shelfDirectNext');
+        if (choice && typeof choice.closest === 'function') { choice.checked = shelfOpenMode()==='direct'; const label=choice.closest('label'); if(label)label.hidden=state.open; }
         $('#closeBookButton').classList.toggle('hidden',!state.open);
         $('#readerHint').textContent=state.open?'책장을 좌우로 끌거나 화살표로 한 장씩 넘겨보세요':'표지를 누른 채 오른쪽으로 움직이면 책이 열려요';
       }
@@ -160,10 +167,10 @@ export function createReader(deps) {
   function openReader(id,sourceCard) {
         var book=getBook(id);
         if(!book)return;
-        state.selectedId=id;state.shelfIndex=Math.max(0,state.shelfList.findIndex(function(item){return item.id===id;}));state.chapterIndex=Math.max(0,book.chapters.findIndex(m=>m.id===LTDEMO.get()));state.open=false;state.openProgress=0;save();
-        var display=shelfBookDisplay();
+        state.selectedId=id;state.shelfIndex=Math.max(0,state.shelfList.findIndex(function(item){return item.id===id;}));state.chapterIndex=shelfOpenMode()==='direct'?0:Math.max(0,book.chapters.findIndex(m=>m.id===LTDEMO.get()));state.open=false;state.openProgress=0;save();
+        var display=shelfOpenMode();
         // #1094 목록 방식: 중간 화면(표지 애니메이션)을 거치지 않고 표지+순간 목록을 곧바로 보인다.
-        if(display==='list'){
+        if(display==='preview'){
           $('#shelfScreen').classList.add('is-covered');
           $('#shelfScreen').classList.remove('is-leaving');
           $('#readerScreen').classList.add('active');
@@ -217,7 +224,7 @@ export function createReader(deps) {
         var book=getBook(state.selectedId);
         if(!book||state.open)return;
         // #1094 목록 방식에서 '책 열기'는 셸의 책으로 곧바로 간다(바탕 화면은 3D 책으로 열린다).
-        if(shelfBookDisplay()==='list'&&openBookInShell(book,state.chapterIndex)){save();return;}
+        if(openBookInShell(book,state.chapterIndex)){save();return;}
         renderPage(book);
         animateOpenProgress(1,function(){
           state.open=true;state.openProgress=1;save();renderReader();

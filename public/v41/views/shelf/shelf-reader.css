@@ -1,6 +1,8 @@
 /* 내 책장 읽기(펼침·3D 책) 스타일 (#231 후속, 2026-11-09). 위 shelf.css에서 이어지는 부분을 그대로 옮겼다. */
     .reader-screen { display: none; }
     .reader-screen.active { position: fixed; inset: 0; z-index: 60; display: block; overflow: auto; padding: 14px 18px 28px; background: var(--paper); animation: reader-in .42s ease both; }
+    /* #1631: 미리보기 단계에서는 화면 도구줄이 돌아가기 단추를 덮지 않는다. */
+    html[data-v41-screen=shelf]:has(.reader-screen.active) .lt-screen-toolbar { visibility: hidden; pointer-events: none; }
     .reader-screen.is-preparing { visibility: hidden; }
     /* #886: 책을 펼치는 동안 책장 화면 숨김도 인라인 display 대신 클래스로 한다(.shelf-screen 규칙보다 한 단계 위). */
     .shelf-screen.is-covered { display: none; }
@@ -114,6 +116,10 @@
     .reader-controls { position: absolute; left: 50%; bottom: 20px; z-index: 4; display: flex; align-items: center; gap: 8px; width: max-content; max-width: calc(100% - 20px); transform: translateX(-50%); }
     .reader-control { min-width: 35px; height: 35px; border: 1px solid rgba(255,255,255,.24); border-radius: 50%; color: #fff9ef; background: rgba(0,0,0,.25); white-space: nowrap; }
     .reader-control:hover { border-color: var(--rose); background: rgba(189,93,114,.56); }
+    .reader-controls { flex-wrap: wrap; justify-content: center; }
+    .reader-open-next { display: inline-flex; align-items: center; gap: 5px; min-height: 35px; white-space: nowrap; font-size: 11px; color: #fff9ef; cursor: pointer; }
+    .reader-open-next input { width: 18px; height: 18px; accent-color: var(--rose); }
+    .reader-open-next[hidden] { display: none; }
     .reader-control.wide { min-width: auto; padding: 0 13px; border-radius: var(--lt-r-pill); font-size: 10px; }
     .page-counter { min-width: 71px; color: rgba(255,249,239,.72); font: 700 10px var(--latin); text-align: center; }
 

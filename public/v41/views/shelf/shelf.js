@@ -363,6 +363,9 @@ import { VIEWS } from './shelf-views.mjs';
       function bindReaderActions(){
         $('#backToShelf').addEventListener('click',backToShelf);
         $('#openBookButton').addEventListener('click',openBook);
+        $('#shelfDirectNext').addEventListener('change',function(event){
+          parent.postMessage({type:MSG.setShelfOpenMode,value:event.target.checked?'direct':'preview'},location.origin);
+        });
         $('#closeBookButton').addEventListener('click',closeBook);
         $('#prevPage').addEventListener('click',function(){turnPage(-1);});
         $('#nextPage').addEventListener('click',function(){turnPage(1);});

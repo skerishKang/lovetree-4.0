@@ -68,6 +68,7 @@
     select: fromView('lt41-select', 'id'),
     share: fromView('lt41-share', 'treeId, id'),
     setShelfView: fromView('lt41-set-shelf-view', 'value'),
+    setShelfOpenMode: fromView('lt41-set-shelf-open-mode', 'value'),
     shelfFilter: fromShell('lt41-shelf-filter', 'value'),
     shelfSelectTree: fromShell('lt41-shelf-select-tree', 'treeId'),
     shelfTree: fromView('lt41-shelf-tree', 'treeId'),

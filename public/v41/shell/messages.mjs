@@ -73,6 +73,7 @@ export function createMessages(deps) {
     if (event.origin !== location.origin || !fromView) return;
     // #1093: 서재 도구 줄의 토글이 예전 저장 경로를 그대로 쓴다.
     if (data?.type === MSG.setShelfView) { deps.setShelfView?.(data.value); return; }
+    if (data?.type === MSG.setShelfOpenMode) { deps.setShelfOpenMode?.(data.value); return; }
     if (data?.type === MSG.viewer) { document.body.classList.toggle('lt-viewer-open', data.open === true); return; }
     // 4.1 기억 보드 저장: 화면이 만든 순간·연결·배치를 기존 워크스페이스 저장 경로로 보낸다.
     if (data?.type === MSG.boardSync) {
