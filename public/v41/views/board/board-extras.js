@@ -232,17 +232,6 @@ addEventListener('pointerdown', () => queueMicrotask(applyDecorMotion));
 addEventListener('pointerup', () => queueMicrotask(applyDecorMotion));
 addEventListener('pointercancel', () => queueMicrotask(applyDecorMotion));
 addEventListener('blur', applyDecorMotion);
-// #553 뒤: 상세의 '다음 순간'·'이전 순간' 단추 한 벌. 누르면 판이 그 카드로 부드럽게 이동하고
-// 카드가 선택되며 상세가 그 순간으로 바뀐다. 이유(why) 글은 단추 아래 작은 글씨로 그대로 둔다.
-// 상세 안의 단추는 이벤트 위임으로 한 번만 맞춘다 — 다음은 실을 따라 흘러가며 이동, 이전은 거꾸로.
-$('#dConn').onclick = e => {
-  let b = e.target.closest('.connCard');
-  if (!b) return;
-  let c = connections.find(x => x.id === b.dataset.cid);
-  if (!c) return;
-  if (b.dataset.dir === 'next') moveViaConnection(c);
-  else pulseConnection(c, () => focusBoardMoment(c.a));
-};
 // #619-6: 끼워 넣기 자리 표시 — 들어갈 카드에 테두리를 두른다(앞/뒤는 좌·우 테두리).
 function clearInsertMark() {
   cardLayer
@@ -709,185 +698,9 @@ function focusBoardMoment(id, open = true) {
   if (!open) LTDEMO.select(id, previousState);
   selectMoment(id, open);
 }
-function pulseConnection(c, after) {
-  let g = threadLayer.querySelector(`[data-cid="${c.id}"]`);
-  if (!g) {
-    after?.();
-    return;
-  }
-  g.classList.add('selectedPath');
-  let p = g.querySelector('.threadColor');
-  animateHotTip(p, 760).then(() => {
-    setTimeout(() => g.classList.remove('selectedPath'), 600);
-    after?.();
-  });
-}
-function moveViaConnection(c) {
-  $('#nextChooser').classList.remove('open');
-  pulseConnection(c, () => focusBoardMoment(c.b));
-}
-let chooserOrigin = null;
-function chooseNext(dir = 'next') {
-  chooserOrigin = dir === 'next' ? $('#nextMoment') : $('#prevMoment');
-  $('#nextChooserTitle').textContent = dir === 'next' ? '다음 경로 선택' : '이전 경로 선택';
-  let list = LT58Model.nextConnections(dir, selected, connections);
-  if (!list.length)
-    return toast(
-      dir === 'next' ? '다음으로 연결된 순간이 없어요.' : '이전으로 연결된 순간이 없어요.'
-    );
-  if (list.length === 1) {
-    let c = list[0];
-    if (dir === 'next') moveViaConnection(c);
-    else {
-      pulseConnection(c, () => focusBoardMoment(c.a));
-    }
-    return;
-  }
-  let box = $('#nextChoices');
-  box.innerHTML = list
-    .map(c => {
-      let target =
-        dir === 'next' ? moments.find(m => m.id === c.b) : moments.find(m => m.id === c.a);
-      return `<button class="routeChoice" data-cid="${c.id}" data-dir="${dir}">${esc(titleMain(target))}<small>${esc(c.why)}</small></button>`;
-    })
-    .join('');
-  pushBoardPanel('chooser');
-  $('#nextChooser').classList.add('open');
-}
-function closeChooser() {
-  $('#nextChooser').classList.remove('open');
-  chooserOrigin?.focus();
-}
-$('#closeChooser').onclick = closeChooser;
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape' && $('#nextChooser').classList.contains('open')) closeChooser();
-});
-$('#nextChoices').onclick = e => {
-  let b = e.target.closest('.routeChoice');
-  if (!b) return;
-  let c = connections.find(x => x.id === b.dataset.cid);
-  if (b.dataset.dir === 'next') moveViaConnection(c);
-  else {
-    pulseConnection(c, () => focusBoardMoment(c.a));
-    $('#nextChooser').classList.remove('open');
-  }
-};
-$('#nextMoment')?.addEventListener('click', () => chooseNext('next'));
-$('#prevMoment')?.addEventListener('click', () => chooseNext('prev'));
-const collectPathFrom = start => LT58Model.collectPath(start, moments.length, connections);
-function highlightPath(start = selected) {
-  let p = collectPathFrom(start);
-  activePathIds = new Set(p.ids);
-  activePathConns = new Set(p.cons);
-  applyPathHighlight();
-  return p;
-}
-function highlightPathFromConnection(cid) {
-  let c = connections.find(x => x.id === cid);
-  if (!c) return;
-  activePathIds = new Set([c.a, c.b]);
-  activePathConns = new Set([cid]);
-  applyPathHighlight();
-}
-function applyPathHighlight() {
-  document
-    .querySelectorAll('.card')
-    .forEach(el => el.classList.toggle('pathMember', activePathIds.has(el.dataset.id)));
-}
-
-function updateKeywordFilter() {
-  let vals = [...new Set(moments.flatMap(m => m.keywords || []))].sort();
-  $('#keywordFilter').innerHTML =
-    '<option value="all">모든 키워드</option>' +
-    vals.map(v => `<option value="${esc(v)}">#${esc(v)}</option>`).join('');
-}
-function applyFilters() {
-  scheduleBoardMoreHint();
-  const state = {
-    mediaFilter: $('#mediaFilter')?.value || 'all',
-    keywordFilter: $('#keywordFilter')?.value || 'all',
-    maxOrder: LT58Model.maxCreatedOrder(moments)
-  };
-  document.querySelectorAll('.card').forEach(el => {
-    const m = moments.find(x => x.id === el.dataset.id);
-    const ok = LT58Model.filterVisible(m, state, connections);
-    el.classList.toggle('filteredOut', !ok);
-  });
-}
-$('#mediaFilter').onchange = applyFilters;
-$('#keywordFilter').onchange = applyFilters;
 updateKeywordFilter();
-$('#themeGrid').onclick = e => {
-  let b = e.target.closest('.themeBtn');
-  if (!b) return;
-  document.body.dataset.theme = b.dataset.theme;
-  document.querySelectorAll('.themeBtn').forEach(x => x.classList.toggle('active', x === b));
-  paintThemeBadge();
-  toast(`${b.textContent} 테마로 바꿨어요.`);
-};
-$('#defaultPin').onchange = e => (defaultPinStyle = e.target.value);
-$('#defaultCard').onchange = e => (defaultCardStyle = e.target.value);
-$('#leftCollapse').onclick = () => {
-  if (innerWidth < 760) {
-    const open = !$('#leftPanel').classList.contains('mobileOpen');
-    $('#leftPanel').classList.toggle('mobileOpen', open);
-    if (open) pushBoardPanel('tools');
-  } else $('#leftPanel').classList.toggle('collapsed');
-};
-/* #891: 도구 줄의 '+ 순간 추가'는 뺐다 — 머리줄 단추(#addBtn) 한 벌만 둔다 */ $(
-  '#toolCinema'
-).onclick = () => startCinemaV11(0);
-$('#toolFit').onclick = () => fitAll(true);
-// #736: 이미 붙은 꼬리표는 고정 목록에 없어도 칩으로 보인다 — 편집 저장이 꼬리표를 몰래 지우지 않게('가수:PSY' 같은
-// 종류:값 꼬리표·옛 낱말 전부). 표기는 꼬리표 칩과 같은 모양(tag-line.mjs의 parseTag·chipText 한 벌, 모듈이 늦으면
-// '#값'으로 표시), data-key는 저장값 그대로라 selectedKeywords가 그대로 읽는다. 고정 목록 17개 고르기는 그대로.
-function tagChipText(raw) {
-  try {
-    const tl = window.LTTagLine;
-    if (tl && tl.parseTag && tl.chipText) {
-      const p = tl.parseTag(raw);
-      if (p) return tl.chipText(p);
-    }
-  } catch (e) {}
-  return '#' + raw;
-}
-function keywordPickerHTML(prefix, selected = []) {
-  const sel = selected || [];
-  /* #736: 켜진 칩은 저장 순서 그대로(고정·커스텀 섞여도 원래 순서) — 저장 때 순서도 보존된다. 고정 목록 나머지는 그 뒤에. */ const offFixed =
-    LT_KEYWORDS.filter(k => !sel.includes(k));
-  const btn = (k, on, custom) =>
-    `<button type="button" class="keywordBtn ${on ? 'on' : ''}${custom ? ' is-custom-tag' : ''}" data-key="${custom ? esc(k) : k}"${custom ? ` aria-label="${esc(tagChipText(k))} · 누르면 꼬리표를 뗀다"` : ''}>${custom ? esc(tagChipText(k)) : k}</button>`;
-  return `<div class="label keywordPickerLead">KEYWORDS · 다중선택</div><div class="keywordPicker" id="${prefix}KeywordPicker">${sel.map(k => btn(k, true, !LT_KEYWORDS.includes(k))).join('')}${offFixed.map(k => btn(k, false, false)).join('')}</div><div class="keywordAddRow"><input class="field" id="${prefix}CustomKeyword" placeholder="커스텀 키워드 추가" aria-label="새 꼬리표 추가"><button type="button" class="miniBtn keywordAddBtn" id="${prefix}AddKeyword">추가</button></div>`;
-}
 function styleFieldsHTML(prefix, m = {}) {
   return `<div class="extraFields"><select class="field selectField" id="${prefix}Emotion" aria-label="감정 고르기">${LT_EMOTIONS.map(x => `<option ${x === (m.emotion || '설렘') ? 'selected' : ''}>${x}</option>`).join('')}</select><input class="field" id="${prefix}Source" placeholder="source label" value="${esc(m.source || '내 보관함')}" aria-label="출처"><select class="field selectField" id="${prefix}PinStyle" aria-label="핀 모양 고르기">${LT_PIN_STYLES.map(x => `<option ${x === (m.pinStyle || defaultPinStyle) ? 'selected' : ''}>${x}</option>`).join('')}</select><select class="field selectField" id="${prefix}CardStyle" aria-label="카드 모양 고르기">${LT_CARD_STYLES.map(x => `<option ${x === (m.cardStyle || defaultCardStyle) ? 'selected' : ''}>${x}</option>`).join('')}</select></div>${keywordPickerHTML(prefix, m.keywords || [])}`;
-}
-function bindKeywordPicker(prefix, refresh) {
-  let box = $(`#${prefix}KeywordPicker`);
-  box.onclick = e => {
-    let b = e.target.closest('.keywordBtn');
-    if (!b) return;
-    b.classList.toggle('on');
-    refresh?.();
-  };
-  $(`#${prefix}AddKeyword`).onclick = () => {
-    let v = $(`#${prefix}CustomKeyword`).value.trim();
-    if (!v) return;
-    /* #736: 같은 값 버튼이 있으면 새로 붙이지 않고 켠다 — 중복 칩·중복 저장을 막는다 */ let existing =
-      [...box.querySelectorAll('.keywordBtn')].find(b => b.dataset.key === v);
-    if (existing) {
-      existing.classList.add('on');
-    } else {
-      let b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'keywordBtn on is-custom-tag';
-      b.dataset.key = v;
-      b.textContent = tagChipText(v);
-      box.appendChild(b);
-    }
-    $(`#${prefix}CustomKeyword`).value = '';
-    refresh?.();
-  };
 }
 function selectedKeywords(prefix) {
   return [...$(`#${prefix}KeywordPicker`).querySelectorAll('.keywordBtn.on')].map(
@@ -1063,9 +876,9 @@ const cinemaV11 = {
 function makeCinemaBeats(startId = null) {
   if (!moments.length) return [];
   let path = startId
-    ? collectPathFrom(startId).ids
+    ? window.LT58Board.filters.collectPathFrom(startId).ids
     : replayPath.filter(id => moments.some(m => m.id === id));
-  if (!path.length) path = collectPathFrom(moments.find(m => m.first)?.id || moments[0].id).ids;
+  if (!path.length) path = window.LT58Board.filters.collectPathFrom(moments.find(m => m.first)?.id || moments[0].id).ids;
   let beats = LT58Model.cinemaBeats(path, moments, connections);
   // #582: 줄이 없으므로 연결·이유·갈림 비트는 건너뛴다 — 시네마는 순간을 차례로 걷는다.
   return beats.filter(b => !['connection', 'why', 'branch'].includes(b.type));
@@ -1207,7 +1020,6 @@ endCinema = function () {
   endCinemaV11(true);
 };
 $('#cinemaBtn').onclick = () => startCinemaV11(0);
-$('#toolCinema').onclick = () => startCinemaV11(0);
 $('#cinemaFromMoment').onclick = () => startCinemaV11(0, selected);
 $('#cinPlay').onclick = () => {
   cinemaV11.paused = !cinemaV11.paused;
