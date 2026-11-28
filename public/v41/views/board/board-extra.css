@@ -260,7 +260,7 @@ html[data-lt-theme=garden] .boardModeSwitch .boardResetOrderBtn{color:var(--lt-m
 /* 세로 영상은 9:16 모양 그대로, 높이 상한 300px — 가운데 세운다. */
 .card .lt-media[data-lt-vertical="1"] .lt-yt-preview{display:grid;place-items:center;height:300px;background:#0b0812}
 .card .lt-media[data-lt-vertical="1"] .lt-yt-preview img{width:auto;height:100%;object-fit:contain}
-/* #553 카드 재측정: 간소화된 카드 높이에 맞춘 예약 높이는 board.js 상수(YT 330·세로 440·기본 330). */
+/* #553 카드 재측정: 간소화된 카드 높이에 맞춘 예약 높이는 board.js 상수(YT 330·세로 520·기본 330). */
 
 /* 3. 상세: 플레이어가 맨 위, 내 마음은 크게, 이어진 순간은 작은 썸네일 카드, 할 일 단추는 한 줄. */
 .detailPlayer{margin:2px 0 10px;border-radius:12px;overflow:hidden;background:#0b0812}
