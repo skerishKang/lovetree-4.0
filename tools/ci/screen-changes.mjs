@@ -110,8 +110,9 @@ export function selectJobs(changedFiles, jobTests = jobTestFiles()) {
   for (const [job, files] of Object.entries(jobTests)) {
     if (!files.size) return 'all';
     for (const file of files) if (!TEST_OWNERS[file]) return 'all';
-    if (job.startsWith('screen-audit-') || [...files].some(f =>
-      TEST_OWNERS[f].some(x => x === 'common' || screens.has(x)))) picked.push(job);
+    // Common jobs always run on a screen change; area jobs only run for their owner areas.
+    if (job.startsWith('screen-common-') || [...files].some(f =>
+      TEST_OWNERS[f].some(x => screens.has(x)))) picked.push(job);
   }
   return picked.length ? picked.join(',') : 'all';
 }

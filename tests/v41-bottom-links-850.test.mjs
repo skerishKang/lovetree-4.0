@@ -195,6 +195,17 @@ test('#1488 휴대폰 ＋ 단추: 다섯 화면에 보이고 화면 안 단추·
     for (const [width, height] of [[390, 844], [360, 740]]) for (const theme of ['night', 'garden']) for (const screen of INNER_SCREENS) {
       const { ctx, page } = await openShellState(browser, origin, { kind: 'member', screen, width, height, theme });
       try {
+        if (screen === 'book') {
+          // 360 높이에서 책 이동 줄·이어 보기·＋ 배치가 끝난 뒤 치수를 잰다.
+          await page.waitForFunction(() => {
+            const view = document.getElementById('view'), doc = view?.contentDocument;
+            const nav = doc?.querySelector('.nav-pill'), play = doc?.getElementById('playAllBtn');
+            const add = document.getElementById('mobile-add');
+            return !!nav?.getClientRects().length && !!play?.getClientRects().length &&
+              !!add?.getClientRects().length && nav.querySelectorAll('button').length >= 3 &&
+              doc.fonts.status === 'loaded';
+          }, null, { timeout: 10000 });
+        }
         const fab = await page.evaluate(BOX_FN, '#mobile-add');
         assert.ok(fab, `${screen} ${width}×${height} ${theme}: ＋ 단추가 보인다`);
         assert.ok(fab.w >= 44 && fab.h >= 44 && fab.b <= height, '＋ 단추 누름 44px 이상·화면 안');
@@ -228,7 +239,15 @@ test('#1488 휴대폰 ＋ 단추: 다섯 화면에 보이고 화면 안 단추·
           assert.ok(lane.buttons.every(b => b.w >= 44 && b.h >= 44), '이동 줄 단추 누름 44px 이상');
           // 낮은 화면(360×740)은 책 문서가 굴러간다 — 맨 아래까지 굴린 자리에서도 아래 단추 줄·첫 안내('알겠어요')와 12px 이상.
           await page.evaluate(() => { const d = document.querySelector('#view')?.contentDocument; const s = d?.scrollingElement; if (s) s.scrollTop = s.scrollHeight; });
-          await page.waitForTimeout(500);
+          // 고정 500ms 대신 실제 문서 스크롤 끝과 ＋ 축소 전환 완료를 확인한다.
+          await page.waitForFunction(() => {
+            const doc = document.getElementById('view')?.contentDocument;
+            const scroll = doc?.scrollingElement, add = document.getElementById('mobile-add');
+            if (!scroll || !add?.getClientRects().length) return false;
+            const bottom = Math.max(0, scroll.scrollHeight - scroll.clientHeight);
+            return Math.abs(scroll.scrollTop - bottom) <= 1.5 &&
+              add.getAnimations().every(animation => animation.playState !== 'running');
+          }, null, { timeout: 10000 });
           const fab2 = await page.evaluate(BOX_FN, '#mobile-add');
           const items2 = (await page.evaluate(FRAME_ITEMS_FN)).filter((e) => !e.scroll);
           // 첫 안내 카드는 390×844에서 보인다(360×740은 책 화면 아래로 잘려 보이지 않는다 — 책 화면 배치 문제로 따로 적는다).
