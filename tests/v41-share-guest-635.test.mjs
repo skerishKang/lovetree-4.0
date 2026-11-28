@@ -408,7 +408,7 @@ test('#635 화면: 첫 화면 어떻게 쓰나요 → 안내 패널이 열리고
 });
 
 // 호스트 페이지: 셸이 iframe에 LT41을 넘기는 것과 같은 틀(공유 감상·내 트리·첫 화면). 저장소 파일을 더럽히지 않는다.
-const EXTRA_ROUTES = { '/share-host.html': hostHTML('share', false), '/own-host.html': hostHTML('server', true), '/home-host.html': homeHostHTML };
+const EXTRA_ROUTES = { '/share-host.html': hostHTML('share', false), '/own-host.html': hostHTML('server', true), '/home-host.html': homeHostHTML, '/visit-seed.html': '<!doctype html><html lang="ko"><meta charset="utf-8"><title>방문 시험</title></html>' };
 
 // #635 PR B: 영상 칸 세 상태 — 유튜브 보관 썸네일이 있으면 그것이 먼저고, 못 부르면(없음·깨짐) 제목 글 카드다.
 // 보관 썸네일 요청은 i.ytimg.com — 시험에서는 경로 가로채기(route)로 있음/없음을 정한다(외부 회선에 기대지 않는다).
@@ -954,6 +954,162 @@ test('방문자 공용 화면: 1440·390 책·보드·지도, 옛 공유 주소,
     assert.equal(matrix.length,12,'지시한 1440·390 × 밤·정원 × 책·보드·지도 12장');
     console.log('방문자 캡처 12장 + 비교 1장 확인:',CAPTURE_DIR);
   }finally{
+    await browser?.close().catch(()=>{});
+    server.close();
+  }
+});
+
+test('#1443 방문 주소는 로그아웃·로그인 방문자의 기록과 저장값을 바꾸지 않는다', {
+  skip: REQUIRE ? false : skip, timeout: 180000
+}, async () => {
+  if (skip) assert.fail('필수 브라우저가 없어 방문 읽기 전용 검증을 진행할 수 없어요: '+skip);
+  const server = await serve();
+  const base = 'http://127.0.0.1:' + server.address().port;
+  const shareId = 'visit-fixture-0000000001';
+  const time = '2026-11-28T00:00:00.000Z';
+  const ownerTree = {...tree, id:'owner-fixture', subject:'내 기록 시험', coverMomentId:'', coverDesign:'', inbox:false, createdAt:time, updatedAt:time,
+    moments:tree.moments.map(m=>({...m,createdAt:time,links:[]}))};
+  const publicTree = {...ownerTree, id:shareId, subject:'공개 기록 시험'};
+  const publicPrefs = {dateStyle:'dot',titleDisplay:'both',bookDisplay:'book',shelfView:'carousel',treeChipOrder:[],theme:'night'};
+  const screens = {book:'track59-sketchbook.html',board:'track58-pinboard.html',network:'track56-network.html',tree:'track61-tree.html'};
+  let activeRequests=[];
+  const snapshot = page => page.evaluate(() => Object.fromEntries(Object.keys(localStorage).filter(key=>key.startsWith('lt41.')).sort().map(key=>[key,localStorage.getItem(key)])));
+  const waitVisit = async (page,view) => {
+    const filename=screens[view];
+    try {
+      await page.waitForFunction(({filename,shareId,view})=>{
+        const frame=document.querySelector('#view'),ctx=window.LT41;
+        return location.hash===`#visit/${shareId}/${view}` && ctx?.source==='share' && ctx.visitReadOnly===true && ctx.writable===false
+          && frame&&!frame.hidden&&frame.contentDocument?.readyState==='complete'
+          && frame.contentWindow?.location?.pathname?.endsWith(filename)
+          && frame.contentWindow?.LTDEMO?.visitReadOnly===true
+          && (frame.contentDocument?.querySelector('.lt-screen-toolbar')||frame.contentDocument?.querySelector('header'));
+      },{filename,shareId,view},{timeout:15000});
+    } catch (error) {
+      const diagnostic=await page.evaluate(requests=>({
+        hash:location.hash,source:window.LT41?.source,tree:window.LT41?.tree?.id,visitReadOnly:window.LT41?.visitReadOnly,
+        confirmOpen:!!document.querySelector('#lt-confirm')?.open,empty:document.querySelector('#empty')?.innerText?.slice(0,160),
+        frames:[...document.querySelectorAll('#stage>iframe')].map(frame=>({id:frame.id,hidden:frame.hidden,url:frame.contentWindow?.location.href,ready:frame.contentDocument?.readyState})),
+        requests
+      }),activeRequests.slice(-12));
+      throw Error('방문 화면 진입 실패: '+JSON.stringify({view,diagnostic}));
+    }
+    const element=await page.locator('#view').elementHandle();
+    const frame=await element?.contentFrame();
+    assert.ok(frame,view+' 방문 화면 프레임');
+    await frame.waitForFunction(()=>!!window.LTDEMO?.moments,null,{timeout:10000});
+    return frame;
+  };
+  let browser;
+  try {
+    browser = await chromium.launch({headless:true});
+    for (const authenticated of [false,true]) {
+      const label=authenticated?'로그인 방문자':'로그아웃 방문자';
+      const context=await browser.newContext({viewport:{width:1440,height:900},reducedMotion:'reduce'});
+      try {
+        const requests=[];
+        activeRequests=requests;
+        await context.route('**/api/**',route=>{
+          const request=route.request(),u=new URL(request.url());
+          requests.push({method:request.method(),path:u.pathname});
+          if(u.pathname===`/api/public/visits/${shareId}`)return route.fulfill({status:200,json:{
+            ok:true,visit:{shareId,view:'book',entryMomentId:'m1',momentCount:publicTree.moments.length,updatedAt:time,aiTester:false,ownerLabel:'',prefs:publicPrefs,omittedPrivateMedia:0},tree:publicTree,shelf:[],stats:{}
+          }});
+          if(u.pathname===`/api/public/shares/${shareId}`)return route.fulfill({status:200,json:{
+            ok:true,share:{id:shareId,view:'book',entryMomentId:'m1'},tree:ownerTree
+          }});
+          if(u.pathname==='/api/workspace')return route.fulfill({status:200,json:{
+            revision:1,state:{version:1,trees:[ownerTree],prefs:{...publicPrefs}},subject:'fixture-visitor',writeSubjectBound:true,savedAt:time
+          }});
+          if(u.pathname==='/api/account')return route.fulfill(authenticated
+            ? {status:200,json:{ok:true,subject:'fixture-visitor',email:'방문자'}}
+            : {status:401,json:{ok:false,error:{code:'not_logged_in'}}});
+          return route.fulfill({status:200,json:{ok:true,items:[],shares:[]}});
+        });
+        await context.route('**://i.ytimg.com/**',route=>route.abort());
+        await context.route('**/auth/**',route=>{
+          const request=route.request(),u=new URL(request.url());
+          requests.push({method:request.method(),path:u.pathname});
+          return route.fulfill({status:401,json:{ok:false,error:{code:'not_logged_in'}}});
+        });
+        const page=await context.newPage(),errors=[];
+        page.on('pageerror',e=>errors.push(String(e).slice(0,160)));
+        await page.goto(base+'/v41/visit-seed.html',{waitUntil:'domcontentloaded'});
+        await page.evaluate(()=>{
+          const values={
+            'lt41.theme':'night','lt41.boardTheme':'night','lt41.bookDisplay':'book','lt41.titleDisplay':'both',
+            'lt41.shelfView':'carousel','lt41.dateStyle':'dot','lt41.network.view':'network','lt41.avatarLetter':'V','lt41.tips.bookStory':'seen'
+          };
+          for(const [key,value] of Object.entries(values))localStorage.setItem(key,value);
+        });
+        const before=await snapshot(page),visitMarker=requests.length;
+        await page.goto(base+'/v41/#visit/'+shareId+'/book',{waitUntil:'domcontentloaded'});
+        await waitVisit(page,'book');
+        if(authenticated)await page.waitForFunction(()=>!document.querySelector('#account-avatar')?.hidden,null,{timeout:8000});
+        assert.deepEqual(await page.evaluate(()=>({
+          source:window.LT41.source,treeId:window.LT41.tree.id,treeCount:window.LT41.trees.length,
+          readOnly:window.LT41.readOnly,visitReadOnly:window.LT41.visitReadOnly,writable:window.LT41.writable,
+          theme:window.LT41.prefs.theme,globalReadOnly:globalThis.LT41_VISIT_READ_ONLY
+        })),{source:'share',treeId:shareId,treeCount:1,readOnly:true,visitReadOnly:true,writable:false,theme:'night',globalReadOnly:true},label+' 공개 트리만 연다');
+        assert.deepEqual(await snapshot(page),before,label+' 진입 직후 lt41.* 저장값 동일');
+        await page.locator('#theme-toggle').click();
+        await page.waitForFunction(()=>document.documentElement.getAttribute('data-lt-theme')==='garden'&&window.LT41?.prefs?.theme==='garden',null,{timeout:5000});
+        assert.deepEqual(await snapshot(page),before,label+' 테마 변경은 방문 메모리에만 남는다');
+        for(const view of ['board','network','tree','book']){
+          await page.locator(`#tree-views button[data-view="${screens[view]}"]`).click();
+          const frame=await waitVisit(page,view);
+          const flags=await frame.evaluate(()=>({readOnly:window.LTDEMO.readOnly,visitReadOnly:window.LTDEMO.visitReadOnly,globalReadOnly:globalThis.LT41_VISIT_READ_ONLY,theme:parent.LT41?.prefs?.theme}));
+          assert.deepEqual(flags,{readOnly:true,visitReadOnly:true,globalReadOnly:true,theme:'garden'},label+' '+view+' 읽기 전용·세션 테마 유지');
+          await frame.evaluate(()=>{
+            localStorage.setItem('lt41.titleDisplay','title');
+            localStorage.removeItem('lt41.boardTheme');
+            localStorage.setItem('lt41.network.view','tag');
+            localStorage.setItem('lt41.bookDisplay','list');
+          });
+          assert.deepEqual(await snapshot(page),before,label+' '+view+' 안쪽 저장소 시도 차단');
+        }
+        await page.evaluate(({shareId})=>{location.hash=`#visit/${shareId}/board`},{shareId});
+        await waitVisit(page,'board');
+        assert.equal(await page.evaluate(()=>window.LT41?.prefs?.theme),'garden',label+' 방문 안에서 주소를 바꿔도 세션 테마 유지');
+        await page.locator(`#tree-views button[data-view="${screens.book}"]`).click();
+        await waitVisit(page,'book');
+        await page.evaluate(()=>{
+          localStorage.setItem('lt41.theme','night');
+          localStorage.removeItem('lt41.avatarLetter');
+        });
+        const frame=page.frames().find(f=>f.url().endsWith('/'+screens.book));
+        assert.ok(frame,label+' 책 프레임');
+        await frame.evaluate(()=>parent.postMessage({type:'lt41-write',mode:'edit',momentId:'m1'},location.origin));
+        await page.waitForTimeout(180);
+        assert.equal(await page.locator('#write-panel').evaluate(el=>el.open),false,label+' 쓰기 메시지 차단');
+        const blocked=await page.evaluate(async()=>{
+          const {createWorkspaceApi}=await import('/v41/api.mjs');
+          return createWorkspaceApi().put({});
+        });
+        assert.equal(blocked.status,403,label+' 다른 모듈 영역 저장도 api 관문에서 차단');
+        assert.equal(blocked.code,'visit_read_only');
+        assert.deepEqual(await snapshot(page),before,label+' 모든 조작 뒤 lt41.* 저장값 동일');
+        const visitRequests=requests.slice(visitMarker);
+        assert.deepEqual(visitRequests.filter(r=>!['GET','HEAD','OPTIONS'].includes(r.method)),[],label+' 저장·설정·테마 요청 0회');
+        assert.equal(visitRequests.some(r=>r.path==='/api/workspace'),false,label+' 방문 중 내 기록 읽기 0회');
+        assert.equal(visitRequests.filter(r=>r.path==='/auth/refresh').length,0,label+' 방문 중 인증 갱신 요청 0회');
+        if(authenticated)await shot(page,'1443-visit-authenticated-book-garden');
+        const shareMarker=requests.length;
+        await page.evaluate(({shareId})=>{location.hash=`#share/${shareId}/book`},{shareId});
+        await page.waitForFunction(({shareId,filename})=>{
+          const frame=document.querySelector('#view');
+          return location.hash===`#share/${shareId}/book`&&window.LT41?.source==='share'&&window.LT41?.visitReadOnly===false
+            &&globalThis.LT41_VISIT_READ_ONLY===false&&frame?.contentWindow?.LTDEMO?.readOnly===true
+            &&frame?.contentWindow?.LTDEMO?.visitReadOnly===false&&frame.contentWindow?.location?.pathname?.endsWith(filename);
+        },{shareId,filename:screens.book},{timeout:15000});
+        assert.ok(requests.slice(shareMarker).some(r=>r.path===`/api/public/shares/${shareId}`),label+' 옛 공유 주소는 기존 읽기 경로 사용');
+        assert.deepEqual(errors,[],label+' 화면 스크립트 오류 없음');
+        console.log(label+': 저장 요청 0·저장값 동일·옛 공유 주소 유지 확인');
+      } finally {
+        await context.close();
+      }
+    }
+  } finally {
     await browser?.close().catch(()=>{});
     server.close();
   }

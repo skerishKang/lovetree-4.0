@@ -14,6 +14,7 @@ import {report} from "../report.mjs";
 import {createNotifier, syncedNoticeText, newlyPublishedTrees, NOTICE_HIDE_MS} from "./notice.mjs";
 import {normalizeTitleDisplay, normalizeAccentColor, normalizeDateStyle, normalizeStartPlace, normalizeShareView, normalizeHomeMoment, normalizeBookDisplay, normalizeShelfView, coverModeOf, normalizeCoverDesign} from "../domain.mjs";
 import {askAppConfirm} from "../confirm.mjs";
+import {setVisitMode} from "../visit-mode.mjs";
 
 export function createMemberRuntime(ctx){
   let memberCheckTimer = 0, checkingStill = false; // #1320: 확인이 5초를 넘겼을 때만 조용한 표시를 켠다.
@@ -134,7 +135,7 @@ export function createMemberRuntime(ctx){
    ctx.previousDirty=status.dirty;(0,ctx.renderAccount)();(0,ctx.flowNavigation)();document.body.dataset.member=ctx.member?.snapshot().owned?'in':'out';document.body.dataset.treeCount=String(ctx.model?.trees?.length||0);(0,ctx.applyAdvanced)();
   }
 
-  async function startMember(){setMemberRefreshStarted(true);if(!(await (0,ctx.leaveMember)()))return;ctx.backfillStarted=false;ctx.backfillAttempted.clear();const startup=parseSelectionRoute(location.hash);if(startup.scope==='owner')stashPendingOwnerRoute(sessionStorage,location.hash);++ctx.loadGeneration;const generation=ctx.loadGeneration;(0,ctx.clear)(true);
+  async function startMember(){setMemberRefreshStarted(true);if(!(await (0,ctx.leaveMember)()))return;setVisitMode(false);ctx.backfillStarted=false;ctx.backfillAttempted.clear();const startup=parseSelectionRoute(location.hash);if(startup.scope==='owner')stashPendingOwnerRoute(sessionStorage,location.hash);++ctx.loadGeneration;const generation=ctx.loadGeneration;(0,ctx.clear)(true);
    const api=createWorkspaceApi({fetchImpl:(url,init)=>fetch(init?.method==='GET'&&url==='/api/workspace'?'/api/workspace?features=bound-writes':url,init)});
    let initialized=false,startupNotice='',session;
    session=createMemberSession({api,onGuard:read=>(0,ctx.workspaceGuardNotice)(read),onState:(state,selection,meta)=>{if(generation!==ctx.loadGeneration)return;try{
@@ -206,10 +207,11 @@ export function createMemberRuntime(ctx){
    if(generation===ctx.loadGeneration){const startupJourney=parseJourneyRoute(location.hash);if(startupJourney){if(session.snapshot().owned&&session.snapshot().writable)(0,ctx.openFirstJourney)({step:startupJourney.step,route:true});else{history.replaceState(null,'','#home');ctx.handledHash='#home';}}}
   }
 
-  async function sample(selection={},view){if(!(await (0,ctx.pauseMember)()))return;const tree=await (0,ctx.loadExampleTree)();++ctx.loadGeneration;if(view)ctx.current=view;(0,ctx.load)(null,'example',selection,{},tree);if(view)(0,ctx.writeLocation)();(0,ctx.$)('save-feedback').hidden=true;if((0,ctx.$)('account-settings').open)(0,ctx.$)('account-settings').close();}
+  async function sample(selection={},view){if(!(await (0,ctx.pauseMember)()))return;setVisitMode(false);const tree=await (0,ctx.loadExampleTree)();++ctx.loadGeneration;if(view)ctx.current=view;(0,ctx.load)(null,'example',selection,{},tree);if(view)(0,ctx.writeLocation)();(0,ctx.$)('save-feedback').hidden=true;if((0,ctx.$)('account-settings').open)(0,ctx.$)('account-settings').close();}
 
   // #1175: 공유 화면 밖으로 나가는 길 한 벌 — share 잔여를 치우고 예시 첫 화면으로 돌아가며, 화면에 남은 '감상' 안내를 거둔다.
   function leaveShare(view){
+    setVisitMode(false);
     (0,ctx.hideToast)();
     // 남의 공유에서 로고·뒤로가기로 나가면 방문자 자신의 첫 화면/계정으로 돌아간다.
     if(ctx.member?.snapshot().owned||ctx.visitorAccount){ctx.current=view||'src064-orbit.html';void (0,ctx.startMember)();}
