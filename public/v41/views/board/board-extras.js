@@ -802,6 +802,7 @@ function updateKeywordFilter() {
     vals.map(v => `<option value="${esc(v)}">#${esc(v)}</option>`).join('');
 }
 function applyFilters() {
+  scheduleBoardMoreHint();
   const state = {
     mediaFilter: $('#mediaFilter')?.value || 'all',
     keywordFilter: $('#keywordFilter')?.value || 'all',
@@ -1416,7 +1417,8 @@ if (typeof ResizeObserver === 'function') {
   [
     document.querySelector('header'),
     document.getElementById('themeBadge'),
-    document.querySelector('.boardTitle')
+    document.querySelector('.boardTitle'),
+    document.querySelector('.lt-screen-toolbar')
   ]
     .filter(Boolean)
     .forEach(el => pickerTopObserver.observe(el));

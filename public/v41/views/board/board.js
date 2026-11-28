@@ -814,7 +814,27 @@ function boardResizeMobile() {
 }
 viewport.addEventListener('scroll', () => {
   if (viewport.classList.contains('board-scroll')) view.y = mobileBoardBaseY - viewport.scrollTop;
+  scheduleBoardMoreHint();
 }, { passive: true });
+// #1595: 카드가 아래에 남았는지 실제 회전된 경계로 판정한다.
+// 끌기·스크롤 중에는 프레임당 한 번만 읽고, 카드 자리·배율·저장은 건드리지 않는다.
+let boardMoreHintFrame = 0;
+function scheduleBoardMoreHint() {
+  if (boardMoreHintFrame) return;
+  boardMoreHintFrame = requestAnimationFrame(() => {
+    boardMoreHintFrame = 0;
+    const hint = $('#board-more-hint');
+    if (!hint) return;
+    const bottom = viewport.getBoundingClientRect().bottom;
+    const more = innerWidth >= 700 && !cinema && [...cardLayer.querySelectorAll('.card[data-id]:not(.filteredOut)')]
+      .some(card => card.getBoundingClientRect().bottom > bottom + 1);
+    hint.hidden = !more;
+    if (more) {
+      const label = mobileBoardScroll() ? '아래에도 순간이 있어요. 스크롤해 보세요.' : '아래에도 순간이 있어요. 빈 판을 끌어 보세요.';
+      if (hint.textContent !== label) hint.textContent = label;
+    }
+  });
+}
 // 카드 위치와 독립적으로 이동형 판의 배경이 보이는 화면을 채우게 한다.
 function fitWideSurfaceBackground() {
   const surface = world.querySelector('.surface');
@@ -838,6 +858,7 @@ function applyView(animated = false) {
   const space = $('#boardScrollSpace');
   viewport.classList.toggle('board-scroll', scroll);
   viewport.classList.toggle('board-scroll-editing', scroll && boardMode === 'mine');
+  scheduleBoardMoreHint();
   if (scroll) {
     const bounds = mobileBoardBounds(), safe = boardSafeArea();
     if (bounds) {
