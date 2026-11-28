@@ -555,6 +555,50 @@ homeDesign1571.textContent=`
 .topbar .menuBtn{box-sizing:border-box;min-height:44px}
 `;
 shadow.append(homeDesign1571);
+
+// #1605: 세로 첫 화면의 새 소식이 마지막 내용을 덮을 때만 문서 끝에 여백을 둔다.
+// 궤도의 높이와 프레임의 가시 높이는 그대로 유지한다(안전 구역 배치와 무관).
+const newsCard=parent.document.getElementById('updates-card');
+const homeFrame=frameElement;
+if(newsCard&&homeFrame){
+ const portrait=parent.matchMedia('(max-width:520px) and (min-height:521px)');
+ const endSpace=document.createElement('div');
+ endSpace.setAttribute('aria-hidden','true');
+ endSpace.style.cssText='height:0;pointer-events:none';
+ document.body.append(endSpace);
+ const reserveNewsEnd=()=>{
+  let height=0;
+  if(portrait.matches&&shellBody.classList.contains('home-screen')&&!newsCard.hidden&&!homeFrame.hidden){
+   const notice=newsCard.getBoundingClientRect(),frame=homeFrame.getBoundingClientRect();
+   const actions=shadow.querySelector('.center .actions')?.getBoundingClientRect();
+   if(actions&&notice.width>0&&notice.height>0&&frame.height>0&&
+      actions.right+frame.left>notice.left&&actions.left+frame.left<notice.right){
+    const scroll=document.scrollingElement.scrollTop;
+    const naturalEnd=endSpace.getBoundingClientRect().top+scroll;
+    const naturalScroll=Math.max(0,naturalEnd-innerHeight);
+    const last=actions.bottom+scroll-naturalScroll+frame.top;
+    // 이미 보이는 화면에는 불필요한 스크롤을 만들지 않는다.
+    if(last>notice.top)height=Math.ceil(Math.max(notice.height,last-notice.top+8));
+   }
+  }
+  const value=height+'px';
+  if(endSpace.style.height!==value)endSpace.style.height=value;
+ };
+ const newsResize=new ResizeObserver(reserveNewsEnd);
+ for(const element of [newsCard,homeFrame,themeHost,shadow.querySelector('.center')])if(element)newsResize.observe(element);
+ const newsWatch=new MutationObserver(reserveNewsEnd);
+ newsWatch.observe(newsCard,{attributes:true,attributeFilter:['hidden','class','style']});
+ newsWatch.observe(shellBody,{attributes:true,attributeFilter:['class']});
+ newsWatch.observe(homeFrame,{attributes:true,attributeFilter:['hidden']});
+ portrait.addEventListener('change',reserveNewsEnd);
+ addEventListener('resize',reserveNewsEnd);
+ addEventListener('pagehide',()=>{
+  newsResize.disconnect();newsWatch.disconnect();
+  portrait.removeEventListener('change',reserveNewsEnd);
+  removeEventListener('resize',reserveNewsEnd);
+ },{once:true});
+ reserveNewsEnd();
+}
 // #380 5번: 첫 화면 오른쪽 위 "보기 ▾" 메뉴(테마·움직임·카드 출처)는 없앴다.
 // 로그인 상태의 같은 항목은 설정 창(셸)의 '화면' 묶음에 있고, 셸이 아래 두 메시지로 알려 준다.
 // 로그아웃에는 설정 입구가 없으므로 테마만 오른쪽 위 작은 ◐ 단추로 남긴다(저장 키 lt41.theme 그대로).

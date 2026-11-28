@@ -1,26 +1,34 @@
 // 화면 검사 결과 모으기: 화면 바뀜 판정이 먼저 성공해야 하고, 잡 건너뜀은 판정이 '안 바뀜'일 때만 통과다.
-import { tokenOf } from './screen-changes.mjs';
+import { SELECTABLE_JOBS } from './screen-changes.mjs';
 
 export function checkScreenResults(needs = {}) {
   const gate = needs['screen-changes'];
   const changed = gate?.outputs?.changed;
+  const jobs = gate?.outputs?.jobs;
   const failures = [];
   const lines = [];
+  const selected = jobs === 'all' ? SELECTABLE_JOBS : jobs === 'none' ? [] : (jobs || '').split(',').filter(Boolean);
+  if (gate?.result !== 'success') failures.push('screen-changes failed');
+  if (gate?.outputs?.mode === 'full') {
+    if (needs.deploy?.result !== 'skipped' || jobs !== 'all') failures.push('invalid scheduled full run');
+  } else if (needs.deploy?.result !== 'success') failures.push('deploy failed');
+  if (!['true','false'].includes(changed) || !jobs ||
+      (changed === 'false' && jobs !== 'none') ||
+      (changed === 'true' && !selected.length) ||
+      selected.some(j => !SELECTABLE_JOBS.includes(j))) failures.push('invalid screen selection');
   for (const [name, value] of Object.entries(needs)) {
-    const result = value?.result;
-    lines.push(`${name}: ${result}`);
-    if (name === 'screen-changes') {
-      if (result !== 'success') failures.push(`${name}이 성공하지 않았다(${result})`);
-    } else if (name === 'deploy') {
-      if (result !== 'success') failures.push(`${name}이 성공하지 않았다(${result})`);
-    } else if (result === 'skipped') {
-      // 2026-11-24: 한 화면만 바뀐 PR은 고른 잡 밖의 화면 잡을 건너뛴다. 고르지 않은 잡의 건너뜀만 통과다.
-      const jobs = gate?.outputs?.jobs;
-      // 빈 값·없음은 옛 판정 도구(jobs를 모름)라 전부 돌았어야 한다 — 건너뜀을 통과시키지 않는다.
-      const notPicked = changed === 'true' && typeof jobs === 'string' && jobs !== '' && jobs !== 'all' && !jobs.split(',').includes(tokenOf(name));
-      if (changed !== 'false' && !notPicked) failures.push(`${name}이 바뀜 판정 ${changed}에서 건너뛰었다`);
-    } else if (result !== 'success') {
-      failures.push(`${name}이 성공하지 않았다(${result})`);
+    if (!name.startsWith('screen-') || name === 'screen-changes' || SELECTABLE_JOBS.includes(name)) continue;
+    if (['failure', 'cancelled'].includes(value?.result)) {
+      failures.push(name + ': unrecognized screen job failed (' + value.result + ')');
+    }
+  }
+  for (const name of SELECTABLE_JOBS) {
+    const result = needs[name]?.result;
+    lines.push(name + ': ' + result);
+    if (selected.includes(name)) {
+      if (result !== 'success') failures.push(name + ': selected job did not succeed (' + result + ')');
+    } else if (result !== 'skipped' && result !== 'success') {
+      failures.push(name + ': unexpected result (' + result + ')');
     }
   }
   return { ok: failures.length === 0, failures, lines, changed };
