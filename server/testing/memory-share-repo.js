@@ -1,3 +1,5 @@
+import { SHARE_LIST_PAGE_SIZE, decodeShareListCursor, encodeShareListCursor } from '../share-list-pagination.js';
+
 export function createMemoryShareRepo({now=Date.UTC(2026,10,1)}={}) {
   const rows=new Map(),previews=new Map();let tick=0;const key=(p,id)=>p+'\0'+id,stamp=()=>new Date(now+(++tick)*1000).toISOString();
   const clone=value=>structuredClone(value);
@@ -34,6 +36,16 @@ export function createMemoryShareRepo({now=Date.UTC(2026,10,1)}={}) {
     // 시험·집계용 읽기(#655 2차). 제품의 공유 행 전체.
     async allForProduct({productId}){return [...rows.values()].filter(v=>v.productId===productId).map(clone);},
     async list({productId,subjectId}){return [...rows.values()].filter(v=>v.productId===productId&&v.subjectId===subjectId).sort((a,b)=>b.createdAt.localeCompare(a.createdAt)).map(clone);},
+    async listPage({productId,subjectId,cursor=null}){
+      const after=decodeShareListCursor(cursor);
+      const sorted=[...rows.values()].filter(value=>value.productId===productId&&value.subjectId===subjectId)
+        .sort((a,b)=>b.createdAt.localeCompare(a.createdAt)||b.shareId.localeCompare(a.shareId));
+      const older=after?sorted.filter(value=>Date.parse(value.createdAt)<Date.parse(after.createdAt)||
+        (Date.parse(value.createdAt)===Date.parse(after.createdAt)&&value.shareId<after.shareId)):sorted;
+      const page=older.slice(0,SHARE_LIST_PAGE_SIZE),tail=page.at(-1);
+      return {rows:page.map(clone),nextCursor:older.length>SHARE_LIST_PAGE_SIZE
+        ? encodeShareListCursor({createdAt:tail.createdAt,shareId:tail.shareId}):null};
+    },
     async setDiscoverable({productId,subjectId,shareId,discoverable}){const value=rows.get(key(productId,shareId));if(!value||value.subjectId!==subjectId||value.status!=='active')return null;value.discoverable=discoverable;value.discoverableAt=discoverable?(value.discoverableAt||stamp()):null;return clone(value);},
     async revoke({productId,subjectId,shareId}){const value=rows.get(key(productId,shareId));if(!value||value.subjectId!==subjectId)return null;if(value.status==='active'){value.status='revoked';value.revokedAt=stamp();}return clone(value);},
     // #538: 저장 성공 뒤 같은 훅으로 순간 수를 갱신한다(주인이 만든 행도 함께).

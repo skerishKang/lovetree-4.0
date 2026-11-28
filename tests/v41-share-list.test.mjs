@@ -50,7 +50,12 @@ function listHarness({ shares = [], confirmAnswer = true, clipboard = null } = {
   const shareApi = {
     preview: async () => ({ok: true, preview: {previewToken: 'tok', tree: {title: '윤슬', moments: []}}}),
     create: async payload => { requests.push(['create', payload]); return {ok: true, share: {id: 'share-new', view: 'book'}}; },
-    list: async () => { requests.push(['list']); return {ok: true, shares}; },
+    list: async cursor => {
+      requests.push(cursor ? ['list', cursor] : ['list']);
+      if (shares.length <= 50) return {ok:true, shares, nextCursor:null};
+      return cursor ? {ok:true, shares:shares.slice(50), nextCursor:null}
+        : {ok:true, shares:shares.slice(0,50), nextCursor:'more-share-list'};
+    },
     setDiscoverable: async (id, next) => { requests.push(['discoverable', id, next]); return {ok: true}; },
     revoke: async id => { requests.push(['revoke', id]); return {ok: true}; },
     getTreeDiscover: async () => ({ok: true, discover: false}),
@@ -223,4 +228,42 @@ test('실제 서버(share-service)가 만든 목록 응답을 클라 렌더러�
     assert.match(row.children[0].children[1].textContent, /지도 · .+에 만든 주소/, '서버의 createdAt을 Invalid Date 없이 날짜로 그린다');
     assert.doesNotMatch(row.children[0].children[1].textContent, /Invalid Date/);
   } finally { h.restore(); }
+});
+
+test('55개 공유 주소를 더 보기로 끝까지 열어 오래된 주소를 회수한다', async () => {
+  const rows=Array.from({length:55},(_,i)=>({...share('link-'+String(54-i).padStart(20,'0'),'active'),
+    createdAt:new Date(Date.UTC(2026,10,28,0,0,54-i)).toISOString()}));
+  const h=listHarness({shares:rows});
+  try{
+    await h.messages.openSharePanel();
+    const host=h.els['share-list'];
+    assert.equal(host.children.filter(el=>el.className==='share-item').length,50);
+    const more=host.children.find(el=>el.textContent==='더 보기');
+    assert.ok(more,'다음 공유 주소를 보는 단추가 있어야 한다');
+    await more.onclick();
+    const shown=host.children.filter(el=>el.className==='share-item');
+    assert.equal(shown.length,55);
+    const last=shown.at(-1),oldId=rows.at(-1).id;
+    await last.children[1].children[1].onclick();
+    assert.deepEqual(h.requests.filter(r=>r[0]==='list'),[['list'],['list','more-share-list']]);
+    assert.deepEqual(h.requests.filter(r=>r[0]==='revoke'),[['revoke',oldId]]);
+    assert.equal(h.els['share-list'].children.filter(el=>el.className==='share-item').length,54,
+      '회수된 오래된 주소만 지난 주소 접힘으로 이동하고 앞서 연 목록을 유지한다');
+  }finally{h.restore();}
+});
+
+test('다른 트리 주소가 첫 50개를 차지해도 이어 보기로 내 주소를 찾는다', async () => {
+  const rows=Array.from({length:55},(_,i)=>({...share('different-'+String(54-i).padStart(20,'0'),'active'),
+    treeId:i<50?'other-tree':'tree1'}));
+  const h=listHarness({shares:rows});
+  try {
+    await h.messages.openSharePanel();
+    const host=h.els['share-list'];
+    assert.match(host.children[0].textContent,/더 확인해 주세요/);
+    const more=host.children.find(child=>child.textContent==='더 보기');
+    assert.ok(more);
+    await more.onclick();
+    assert.equal(host.children.filter(child=>child.className==='share-item').length,5);
+    assert.equal(host.children.find(child=>child.textContent==='더 보기'),undefined);
+  }finally{h.restore();}
 });
