@@ -340,7 +340,7 @@ stage.addEventListener('click', (e) => {
   if (suppressClick) { e.preventDefault(); e.stopPropagation(); return; }
   const node = e.target.closest('[data-id]');
   if (!node) { if (state.pick) setPick(null); return; }
-  if (node.dataset.kind === 'moment') { setPick(node.dataset.id); openDetail(node.dataset.id); pushTree('detail'); return; }
+  if (node.dataset.kind === 'moment') { setPick(node.dataset.id); openDetail(node.dataset.id); pushTree('detail'); parent.postMessage({type:MSG.treeDetail,open:true},location.origin); return; }
   // 묶음 가지를 펼치거나 다시 접는다. 그 갈림의 부모 카드가 화면에서 움직이지 않게 자리를 맞춘다.
   const hubId = node.dataset.id.slice(0, node.dataset.id.lastIndexOf(':'));
   const before = state.layout.cards.find((c) => c.id === hubId);
@@ -396,7 +396,7 @@ function openDetail(id){
 }
 $('treeDetailClose').addEventListener('click',()=>detail.close());
 // 닫기로 기록을 더 쌓지 않는다 — 현재 칸의 상태만 '상세 닫힘'으로 갱신한다(뒤로 가기는 그 칸을 소비한다).
-detail.addEventListener('close',()=>{if(!restoringTree){try{history.replaceState(treeSnapshot(null),'');}catch{}if(state.pick&&typeof data?.select==='function')data.select(state.pick,{noHistory:true});}});
+detail.addEventListener('close',()=>{if(!restoringTree){try{history.replaceState(treeSnapshot(null),'');}catch{}if(state.pick&&typeof data?.select==='function')data.select(state.pick,{noHistory:true});parent.postMessage({type:MSG.treeDetail,open:false},location.origin);}});
 $('openMoment').addEventListener('click',()=>{if(state.pick)parent.postMessage({type:MSG.openBook,treeId:data.treeId,id:state.pick},location.origin);});
 function rehome(){if(!state.layout)return;if(state.mode==='fit')fitAll(false);else if(state.mode==='root')toRoot(false);else applyNow();rememberTree();}
 function load(){

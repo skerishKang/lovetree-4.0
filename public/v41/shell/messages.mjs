@@ -152,6 +152,8 @@ export function createMessages(deps) {
       window.LT41.momentId = data.id; links(); writeLocation(data.noHistory || data.boardState?.noHistory ? 'replace' : 'push', data.boardState);
     }
     if (data?.type === MSG.boardDetail) { writeLocation('replace'); return; }
+    // 상세 창이 실제 열린 뒤 셸 주소에도 detail=1을 기록한다. 초기 선택 알림은 창 열기보다 먼저 올 수 있다.
+    if (data?.type === MSG.treeDetail && getCurrent() === 'track61-tree.html') { links(); writeLocation('replace'); return; }
     // #315: 공유 감상(share)은 읽기 전용이다. 안쪽 화면의 버튼 정리를 통과한 쓰기 메시지가 남아도 여기서 막는다(이중).
     if (data?.type === MSG.newTree) { if (getSource() !== 'share') openNewTree(); return; }
     if (data?.type === MSG.write && getSource() === 'share') return;
