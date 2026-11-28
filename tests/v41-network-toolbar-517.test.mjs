@@ -91,7 +91,7 @@ const mapHost1574HTML = (n) => {
   const media = Object.fromEntries(ids.map(id => [id, { image: PHOTO, type: 'photo' }]));
   return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>지도 시험</title></head><body data-member="in" data-record-source="server"><script>window.LT41={source:'server',writable:true,tree:${JSON.stringify(tree)},trees:[],exampleMedia:${JSON.stringify(media)},momentId:'m01'};location.hash='#network';</script><iframe src="/v41/views/track56-network.html" style="position:fixed;inset:0;width:100vw;height:100vh;border:0"></iframe></body></html>`;
 };
-const EXTRA_ROUTES = { '/map-host-3.html': mapHostHTML(3), '/map-host-8.html': mapHostHTML(8), '/map-host-thumb.html': mapHostThumbHTML(), '/map-host-member-3.html': mapHostMemberHTML(3), '/map-host-member-8.html': mapHostMemberHTML(8), '/map-host-member-2g.html': mapHostMember2GHTML(), '/map-host-1574-26.html': mapHost1574HTML(26), '/map-host-1574-60.html': mapHost1574HTML(60) };
+const EXTRA_ROUTES = { '/map-host-3.html': mapHostHTML(3), '/map-host-8.html': mapHostHTML(8), '/map-host-thumb.html': mapHostThumbHTML(), '/map-host-member-3.html': mapHostMemberHTML(3), '/map-host-member-8.html': mapHostMemberHTML(8), '/map-host-member-2g.html': mapHostMember2GHTML(), '/map-host-1574-26.html': mapHost1574HTML(26), '/map-host-1574-60.html': mapHost1574HTML(60), '/map-host-1574-300.html': mapHost1574HTML(300) };
 async function serve() {
   const server = createServer(async (req, res) => {
     const clean = decodeURIComponent((req.url || '/').split('?')[0]);
@@ -887,6 +887,110 @@ test('#1574 밀집 이름표·점·안내 겹침 0, 가로 상세 판과 가로 
     }
   } finally {
     await browser?.close();
+    server.close();
+  }
+});
+
+test('#1640 창 폭이 바뀌면 긴 제목 접힘과 전체 보기 단추를 다시 잰다', { skip: REQUIRE ? false : skip, timeout: 120000 }, async () => {
+  if (skip) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip}`);
+  const server = await serve();
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR', reducedMotion: 'reduce' });
+    await context.addInitScript(() => { try { localStorage.setItem('lt41.theme', 'night'); } catch {} });
+    const page = await context.newPage();
+    await page.goto(`${base}/map-host-1574-26.html`, { waitUntil: 'load' });
+    let frame = null;
+    for (let i = 0; i < 80 && !frame; i++) { frame = page.frames().find(f => /track56-network/.test(f.url())); if (!frame) await page.waitForTimeout(100); }
+    assert.ok(frame, '지도 프레임이 열린다');
+    await frame.waitForFunction(() => window.__lt?.dots?.()?.length === 26, null, { timeout: 20000 });
+    await settleMap(frame, { timeout: 8000 });
+    await frame.evaluate(() => window.__lt.selectMoment(window.__lt.FIRST, true));
+    await frame.locator('#detail.open').waitFor({ state: 'visible' });
+    await frame.waitForFunction(() => !document.getElementById('detailTitleToggle').hidden, null, { timeout: 5000 });
+    await frame.evaluate(() => {
+      const panel = document.getElementById('detail'), title = document.getElementById('detailTitle');
+      const toggle = document.getElementById('detailTitleToggle');
+      panel.style.width = '600px';
+      const fits = text => {
+        title.textContent = text;
+        title.classList.add('is-clamped');
+        title.classList.remove('is-expanded');
+        return title.scrollHeight <= title.clientHeight + 1;
+      };
+      let text = '가';
+      for (let n = 2; n <= 200; n++) {
+        if (!fits('가'.repeat(n))) { text = '가'.repeat(n - 1); break; }
+        text = '가'.repeat(n);
+      }
+      toggle.hidden = true;
+    });
+    await frame.evaluate(() => document.getElementById('detail').style.removeProperty('width'));
+    await page.setViewportSize({ width: 980, height: 900 });
+    await frame.waitForFunction(() => {
+      const title = document.getElementById('detailTitle'), toggle = document.getElementById('detailTitleToggle');
+      return !toggle.hidden && title.scrollHeight > title.clientHeight + 1;
+    }, null, { timeout: 5000 });
+    await frame.locator('#detailTitleToggle').click();
+    await frame.waitForFunction(() => document.getElementById('detailTitleToggle').getAttribute('aria-expanded') === 'true', null, { timeout: 5000 });
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await frame.waitForFunction(() => {
+      const title = document.getElementById('detailTitle'), toggle = document.getElementById('detailTitleToggle');
+      return title.classList.contains('is-expanded') && !toggle.hidden &&
+        toggle.getAttribute('aria-expanded') === 'true';
+    }, null, { timeout: 5000 });
+    await context.close();
+  } finally {
+    await browser.close();
+    server.close();
+  }
+});
+
+test('#1640 밀집 300순간은 겹침 0이고 키보드로 끝까지 이동할 수 있다', { skip: REQUIRE ? false : skip, timeout: 180000 }, async () => {
+  if (skip) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip}`);
+  const server = await serve();
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch({ headless: true });
+  try {
+    for (const [width, height] of [[844, 390], [390, 844]]) for (const [view, id] of [['network', 'viewNet'], ['time', 'viewGraph']]) {
+      const context = await browser.newContext({ viewport: { width, height }, locale: 'ko-KR', reducedMotion: 'reduce' });
+      await context.addInitScript(() => { try { localStorage.setItem('lt41.theme', 'night'); } catch {} });
+      const page = await context.newPage(), errors = [];
+      page.on('pageerror', e => errors.push(String(e.message || e)));
+      await page.goto(`${base}/map-host-1574-300.html`, { waitUntil: 'load' });
+      let frame = null;
+      for (let i = 0; i < 80 && !frame; i++) { frame = page.frames().find(f => /track56-network/.test(f.url())); if (!frame) await page.waitForTimeout(100); }
+      assert.ok(frame, `${width}/${view}: 지도 프레임이 열린다`);
+      await frame.waitForFunction(() => window.__lt?.dots?.()?.length === 300, null, { timeout: 20000 });
+      await frame.waitForFunction(() => !!document.querySelector('.lt-screen-toolbar'), null, { timeout: 20000 });
+      await frame.evaluate(id => { window.__lt.overview(false); document.getElementById(id).click(); }, id);
+      await settleMap(frame, { timeout: 8000 });
+      const overlap = await frame.evaluate(() => {
+        const dots = window.__lt.dots();
+        let count = 0;
+        for (let i = 0; i < dots.length; i++) for (let j = i + 1; j < dots.length; j++) {
+          const a = dots[i], b = dots[j];
+          if (Math.hypot(a.x - b.x, a.y - b.y) + 0.01 < Math.max(a.r, a.tr || 0) + Math.max(b.r, b.tr || 0)) count++;
+        }
+        return count;
+      });
+      assert.equal(overlap, 0, `${width}/${view}: 300순간 점 겹침 0`);
+      const last = await frame.evaluate(() => window.__lt.nodes.filter(n => n.kind === 'moment').at(-1).id);
+      await frame.locator('#stage').focus();
+      await frame.locator('#stage').press('End');
+      await frame.waitForFunction(last => {
+        const dot = window.__lt.dots().find(d => d.id === last);
+        return window.__lt.state.selected?.id === last && dot &&
+          dot.x >= 0 && dot.x <= innerWidth && dot.y >= 0 && dot.y <= innerHeight;
+      }, last, { timeout: 5000 });
+      await frame.locator('#stage').press('Home');
+      await frame.waitForFunction(() => window.__lt.state.selected?.id === window.__lt.FIRST.id, null, { timeout: 5000 });
+      assert.deepEqual(errors, [], `${width}/${view}: 화면 오류 없음`);
+      await context.close();
+    }
+  } finally {
+    await browser.close();
     server.close();
   }
 });

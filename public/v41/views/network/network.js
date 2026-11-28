@@ -730,6 +730,8 @@
     else if (state.mode === 'CLUSTER_PATH_OVERVIEW' && state.cluster)
       centerOn(state.cluster, clusterZoom());
     else if (state.selected) centerOn(state.selected, state.scale);
+    if (state.selected && $('detail').classList.contains('open'))
+      requestAnimationFrame(() => measureTitleToggle(state.selected));
     scheduleDraw();
   }
   // #366 동심원형: 첫 순간을 가운데, 단계별 바깥 원(LT56Model.concentricLayout). #461: 상자(BOX)에 맞춰 화면 좌표로 — 배율 1이 전체 보기다.
@@ -1053,6 +1055,13 @@
       return `<video class="detailVideo" src="${escHtml(m.video)}" controls muted playsinline></video>`;
     return '';
   }
+  function measureTitleToggle(n) {
+    if (!n || state.selected?.id !== n.id) return;
+    const title = $('detailTitle'), titleToggle = $('detailTitleToggle');
+    if (!title || !titleToggle) return;
+    const expanded = title.classList.contains('is-expanded');
+    titleToggle.hidden = !expanded && title.scrollHeight <= title.clientHeight + 1;
+  }
   function paintDetail(n) {
     const { raw, clean, sub } = autoTitleOf(n);
     $('detailKicker').textContent = n.first ? '첫 순간' : '순간';
@@ -1063,10 +1072,8 @@
     titleToggle.hidden = true;
     titleToggle.textContent = '제목 전체 보기';
     titleToggle.setAttribute('aria-expanded', 'false');
-    requestAnimationFrame(() => {
-      if (state.selected?.id !== n.id) return;
-      titleToggle.hidden = title.scrollHeight <= title.clientHeight + 1;
-    });
+    requestAnimationFrame(() => measureTitleToggle(n));
+    document.fonts?.ready?.then(() => measureTitleToggle(n));
     const ds = $('detailSub');
     if (ds) {
       const show = !!sub && sub !== clean;
