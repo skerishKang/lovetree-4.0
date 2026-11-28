@@ -157,7 +157,13 @@ export function createCommunityRepo(pool, { hasRealCustomers = false } = {}){
      WHERE ($2::text IS NULL OR s.subject_id<>$2)
        AND NOT EXISTS (
          SELECT 1 FROM lovetree_community_hidden_shares h
-         WHERE h.product_id=s.product_id AND h.share_id=s.share_id
+         WHERE h.product_id=s.product_id AND (
+           h.share_id=s.share_id OR EXISTS (
+             SELECT 1 FROM lovetree_shares hidden
+             WHERE hidden.product_id=s.product_id AND hidden.share_id=h.share_id
+               AND hidden.subject_id=s.subject_id AND hidden.tree_id=s.tree_id
+           )
+         )
        )
        AND NOT EXISTS (
          SELECT 1 FROM lovetree_tree_visibility v
