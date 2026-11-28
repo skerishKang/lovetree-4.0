@@ -228,7 +228,9 @@ export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSel
   const head=mainOf(c)||'제목 없는 순간';
   const writable=!c.example;
   const vertical=isVerticalMoment(c);
-  const videoId=c.youtubeThumb?youtubeIdFrom(c.url):'';
+  // The recent owned moment may arrive before its thumbnail flag is enriched.
+   // A valid YouTube URL is enough to reserve the same-sized loading image slot.
+   const videoId=(c.youtubeThumb||!c.image)?youtubeIdFrom(c.url||c.externalUrl):'';
   const candidates=videoId?thumbnailCandidates(c,{autoLoad:true}):[];
   const bgStyle=src=>vertical&&src?` style="--lt-recent-bg:url('${esc(src)}')"`:'';
   const media=videoId&&candidates.length
