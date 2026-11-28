@@ -69,7 +69,21 @@ const themeToggleTop=$('theme-toggle');if(themeToggleTop)themeToggleTop.onclick=
    avatar.title=tip||'내 계정';
   }
   const updatesItem=$('account-updates'),updatesCount=$('account-updates-count');
-  if(updatesItem)updatesItem.classList.toggle('has-dot',!!dotState.updates);
+  if(updatesItem){
+   updatesItem.classList.toggle('has-dot',!!dotState.updates);
+   updatesItem.setAttribute('aria-label',dotState.updates?'새 소식 있음':'새 소식');
+  }
+  // 새 소식 읽음 상태는 기존 mountUpdates.onDot()에서만 받아온다.
+  const more=$('mobile-more');
+  if(more){
+   more.classList.toggle('has-updates-dot',!!dotState.updates);
+   more.setAttribute('aria-label',dotState.updates?'메뉴 더보기 · 새 소식 있음':'메뉴 더보기');
+  }
+  const mobileUpdates=document.querySelector('#header-overflow .lt-updates-entry');
+  if(mobileUpdates){
+   mobileUpdates.classList.toggle('has-dot',!!dotState.updates);
+   mobileUpdates.setAttribute('aria-label',dotState.updates?'새 소식 있음':'새 소식');
+  }
   if(updatesCount){updatesCount.hidden=!dotState.updates;if(dotState.updates)updatesCount.textContent='1';}
   const postsItem=$('account-my-posts');
   if(postsItem)postsItem.classList.toggle('has-dot',dotState.replies);
