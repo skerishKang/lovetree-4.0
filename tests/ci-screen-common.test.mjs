@@ -140,3 +140,46 @@ test('#1629 실제 화면 잡 이름과 모음 잡 needs·판정의 이름이 �
     assert.throws(()=>assertContract(changedJob),assert.AssertionError,'옛 이름의 잡 정의를 거부한다');
   }
 });
+
+test('#1639 실행 워크플로의 merge 판으로 화면 선택·실행기·모음 판정을 읽는다',()=>{
+  const jobBody=name=>{
+    const start=workflow.indexOf('\n  '+name+':\n');
+    assert.ok(start>=0,'잡 정의: '+name);
+    const tail=workflow.slice(start+1);
+    const next=tail.slice(3+name.length).search(/\n  [a-z0-9-]+:\n/);
+    return next<0?tail:tail.slice(0,3+name.length+next);
+  };
+  for(const job of ['screen-changes','runner_picker','preview']){
+    const checkout=jobBody(job).match(/- uses: actions\/checkout@v4\n\s+with:\n\s+ref: ([^\n]+)/);
+    assert.ok(checkout,job+' 체크아웃 설정');
+    assert.match(checkout[1],/github\.sha/,'실행 워크플로의 merge SHA');
+    assert.doesNotMatch(checkout[1],/pull_request\.head\.sha/,'오래된 PR head 선택 금지');
+  }
+  assert.match(jobBody('screen-board'),/ref: .*pull_request\.head\.sha/,
+    '실제 화면 시험 대상은 PR head 그대로');
+});
+
+test('#1639 예전 PR head의 잡 목록은 실제 needs의 성공을 실패로 오판하지 않는다',()=>{
+  const obsolete=['screen-audit-a','screen-audit-b','screen-audit-c'];
+  const oldHeadJobs=SELECTABLE_JOBS.filter(j=>!common.includes(j)).concat(obsolete);
+  const runningNeeds={
+    'screen-changes':{result:'success',outputs:{changed:'true',jobs:'all'}},
+    deploy:{result:'success'},
+    ...Object.fromEntries(SELECTABLE_JOBS.map(j=>[j,{result:'success'}]))
+  };
+  assert.deepEqual(oldHeadJobs.filter(j=>!Object.hasOwn(runningNeeds,j)),obsolete,
+    '예전 PR head의 이름은 실제 needs에 없다');
+  assert.equal(checkScreenResults(runningNeeds).ok,true,
+    '모음 잡은 실행된 merge 판의 이름을 사용한다');
+  for(const status of ['skipped','failure','cancelled']){
+    for(const job of ['screen-common-a','screen-common-b','screen-board']){
+      const broken={...runningNeeds,[job]:{result:status}};
+      const result=checkScreenResults(broken);
+      assert.equal(result.ok,false,job+' '+status+'는 실패');
+      assert.ok(result.failures.some(s=>s.includes(job)),job+' 결과가 판정에 남는다');
+    }
+  }
+  const missing={...runningNeeds};
+  delete missing['screen-common-b'];
+  assert.equal(checkScreenResults(missing).ok,false,'실제 필요한 공통 잡 누락도 실패');
+});
