@@ -556,7 +556,7 @@ async function showPublicRoute(route){
  const generation=++deps.loadGeneration;
  document.body.removeAttribute('data-public-ai-tester');
  deps.activeShareId=route.shareId;
- deps.current=screenForView(['tree','book','board','network'].includes(route.view)?route.view:'book')[1];
+ deps.current=screenForView(['tree','book','board','network','exhibit'].includes(route.view)?route.view:'book')[1];
  deps.handledHash=location.hash;
  $('empty').querySelector('h1').textContent='공유된 순간을 펼치고 있어요.';
  $('empty').querySelector('p').textContent='소유자가 공개한 트리 한 개만 확인합니다.';
@@ -565,7 +565,7 @@ async function showPublicRoute(route){
  const share=visiting?answer.visit:answer.share,meta=visiting?answer.visit:answer;
  document.body.toggleAttribute('data-public-ai-tester',meta.aiTester===true);
  if(visiting){setVisitPrefs(share.prefs);if(!wasVisiting||!readVisitTheme())setVisitTheme(readTheme(localStorage));window.LT41=null;}
- deps.activeShareId=share.shareId||share.id;const view=['tree','book','board','network'].includes(route.view)?route.view:share.view;deps.current=screenForView(view)[1];load({revision:0,state:{version:1,trees:[answer.tree]}},'share',{treeId:answer.tree.id,momentId:share.entryMomentId});
+ deps.activeShareId=share.shareId||share.id;const view=['tree','book','board','network','exhibit'].includes(route.view)?route.view:share.view;deps.current=screenForView(view)[1];load({revision:0,state:{version:1,trees:[answer.tree]}},'share',{treeId:answer.tree.id,momentId:share.entryMomentId});
  if(visiting&&window.LT41)window.LT41.prefs={...(share.prefs||{titleDisplay:'both'}),theme:readVisitTheme()||readTheme(localStorage)};
  // #891: 공유 주소가 특정 순간을 가리키면(시작 순간) 보드만 그 순간의 상세 판을 열어 보여 준다.
  if(view==='board'&&share.entryMomentId)requestBoardOpen(share.entryMomentId);

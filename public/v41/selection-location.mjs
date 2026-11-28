@@ -1,4 +1,4 @@
-const VIEWS = new Set(['home','shelf','tree','book','board','network','graph']); // graph: 그래프 보기(#627 3단계) — 지금은 주소(#my/graph)로만 연다
+const VIEWS = new Set(['home','shelf','tree','book','board','network','graph','exhibit']); // graph: 그래프 보기(#627 3단계) — 지금은 주소(#my/graph)로만 연다
 // #map 도 지도다 — 'network' 의 별칭(#book·#board·#graph 처럼 주소로 지도를 열게)
 const VIEW_ALIASES = new Map([['map','network']]);
 const POSITION_KEY = 'lovetree.v41.account-positions.v1';
@@ -30,7 +30,7 @@ export function parseSelectionRoute(hash = '') {
   if (path.startsWith('visit/')) {
     const parts = path.split('/');
     const requested = VIEW_ALIASES.get(parts[2]) || parts[2] || 'book';
-    const view = ['tree', 'book', 'board', 'network'].includes(requested) ? requested : 'book';
+    const view = ['tree', 'book', 'board', 'network', 'exhibit'].includes(requested) ? requested : 'book';
     return {scope:'public', kind:'visit', shareId:safe(parts[1]), view, explicit:true};
   }
   return {scope:'screen', view:viewName(path), treeId:null, momentId:null, explicit:VIEWS.has(VIEW_ALIASES.get(path) || path)};

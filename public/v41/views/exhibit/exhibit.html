@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="ko" data-v41-screen="tree" data-lt-view="exhibit">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>러브트리 4.1 · 전시 보기</title>
+<script src="/v41/theme-registry.js"></script><script>try{const registry=LT41_THEME_REGISTRY;let stored='';try{stored=localStorage.getItem('lt41.theme')||''}catch{}let theme=registry.find(stored);if(!stored&&window.parent!==window)theme=registry.find(parent.document.documentElement.getAttribute('data-lt-theme'));registry.apply(document.documentElement,theme?.id)}catch(e){}</script>
+<link rel="stylesheet" href="/v41/screen-toolbar.css"><link rel="stylesheet" href="/v41/views/exhibit/exhibit.css"><link rel="stylesheet" href="/v41/identity.css">
+</head><body>
+<div class="lt-screen-toolbar" role="region" aria-label="화면 도구"><div class="lt-toolbar-left"><button class="lt-toolbar-tree-choice" type="button" disabled aria-label="트리 고르기" title="트리 고르기" aria-haspopup="dialog" aria-pressed="true"><span class="lt-toolbar-tree-thumb" aria-hidden="true"></span><span class="lt-toolbar-tree-name"></span><span class="lt-toolbar-tree-caret" aria-hidden="true">▾</span></button><span class="lt-toolbar-title" hidden>전시</span></div><div class="lt-toolbar-tools">
+<button id="exPrev" class="ex-step" type="button" aria-label="앞 순간" title="앞 순간">←</button><span class="ex-count" id="exCount" aria-hidden="true">00 / 00</span><button id="exNext" class="ex-step" type="button" aria-label="다음 순간" title="다음 순간">→</button>
+</div></div><script>/* 트리 보기와 같은 판정: 남의 트리·예시는 트리 고르기 단추 대신 이름표로 첫 그림을 맞춘다. */(function(){var bar=document.currentScript.previousElementSibling,own=false;try{var c=window.parent.LT41;own=!!(c&&c.source==='server'&&c.writable===true&&c.tree&&!c.tree.demoData)}catch(e){}var choice=bar.querySelector('.lt-toolbar-tree-choice');if(!own&&choice){var label=document.createElement('span');label.className='lt-toolbar-tree-choice lt-toolbar-tree-label';label.innerHTML='<span class="lt-toolbar-tree-name"></span>';choice.replaceWith(label)}})()</script>
+<main class="ex-stage" id="stage" tabindex="0" aria-roledescription="전시" aria-label="전시 보기 — 좌우 화살표로 넘기고, Enter로 순간을 엽니다">
+  <div class="ex-rail">
+    <span class="ex-ring" id="ring" aria-hidden="true"></span>
+    <span class="ex-station" id="station" aria-hidden="true"></span>
+    <div class="ex-nodes" id="nodes" role="tablist" aria-label="전시 차례"></div>
+  </div>
+  <div class="ex-world" id="world"></div>
+  <p class="ex-guide" aria-hidden="true"><span class="ex-guide-line"></span><span>휠 · 끌기 · 밀기 · ← →</span></p>
+  <div class="ex-progress" aria-hidden="true"><span class="ex-progress-fill" id="progressFill"></span></div>
+  <p class="ex-live" id="live" role="status" aria-live="polite"></p>
+</main>
+<div class="ex-empty" id="exEmpty" hidden>아직 기록한 순간이 없어요.</div>
+<dialog class="ex-detail" id="exDetail" aria-labelledby="exDetailTitle">
+  <button class="ex-detail-close" id="exDetailClose" type="button" aria-label="닫기">×</button>
+  <div class="ex-detail-grid">
+    <div class="ex-detail-media" id="exDetailMedia"></div>
+    <div class="ex-detail-info">
+      <p class="ex-kicker" id="exDetailKicker"></p>
+      <h2 id="exDetailTitle"></h2>
+      <p class="ex-detail-sub" id="exDetailSub" hidden></p>
+      <div class="ex-detail-block" id="exDetailNoteBlock" hidden><p class="ex-label">마음 한마디</p><p class="ex-detail-text" id="exDetailNote"></p></div>
+      <div class="ex-detail-block" id="exDetailWhyBlock" hidden><p class="ex-label">이어진 이유</p><p class="ex-detail-text" id="exDetailWhy"></p></div>
+      <div class="ex-detail-actions"><button class="ex-btn is-primary" id="exDetailPlay" type="button" hidden>크게 보기</button><button class="ex-btn" id="exDetailBook" type="button">책에서 보기</button></div>
+    </div>
+  </div>
+</dialog>
+<script src="/v41/frame-messages.js"></script><script src="/v41/html-escape.js"></script><script src="/v41/media-preview.js"></script><script src="/v41/runtime.js"></script>
+<script type="module" src="/v41/views/exhibit/exhibit.js"></script></body></html>

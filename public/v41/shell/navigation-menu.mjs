@@ -30,6 +30,8 @@ export function createNavigationMenu(ctx){
    // 2026-11-23: 모바일 접기 메뉴도 머리줄 탭과 같은 동작 — 로그아웃이면 해당 빈 화면을 연다.
    // 방문자에게는 서재가 없으므로 접기 메뉴에서도 숨긴다.
    if(ctx.source!=='share')add('서재',()=>(0,ctx.show)('track32-bookshelf.html',true,'',true),ctx.current==='track32-bookshelf.html');
+   // #1425: 휴대폰 접기 메뉴에서도 전시 보기를 다른 트리 보기와 같은 자리에서 고른다.
+   add('전시',()=>(0,ctx.show)('exhibit.html',true,'',true),ctx.current==='exhibit.html');
    // 2026-11-17 대표 결정: 트리 0개여도 네 화면이 모두 열리므로 접기 메뉴에서도 책·보드·지도를 늘 둔다.
    add('트리',()=>(0,ctx.show)('track61-tree.html',true,'',true),ctx.current==='track61-tree.html');
    add('보드',()=>(0,ctx.show)('track58-pinboard.html',true,'',true),ctx.current==='track58-pinboard.html');

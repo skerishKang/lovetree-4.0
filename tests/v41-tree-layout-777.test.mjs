@@ -717,3 +717,5 @@ test('#1368 트리 상세 판 글자 대비와 무대 흐림 — 390·1440 밤·
     });
   }
 });
+
+import './helpers/exhibit-screen-1425.mjs';

@@ -57,13 +57,14 @@ test('owner address loads account records but public address never opens private
 });
 
 test('visit routes reuse share validation and keep a safe public view',()=>{
-  for (const view of ['tree','book','board','network']) {
+  for (const view of ['tree','book','board','network','exhibit']) {
     assert.deepEqual(parseSelectionRoute(`#visit/public-token/${view}`),{
       scope:'public',kind:'visit',shareId:'public-token',view,explicit:true
     });
   }
   assert.equal(parseSelectionRoute('#visit/public-token').view,'book');
   assert.equal(parseSelectionRoute('#visit/public-token/map').view,'network');
+  assert.equal(parseSelectionRoute('#share/public-token/exhibit').view,'exhibit');
   for (const view of ['unknown','shelf','home','graph']) {
     assert.equal(parseSelectionRoute(`#visit/public-token/${view}`).view,'book');
   }

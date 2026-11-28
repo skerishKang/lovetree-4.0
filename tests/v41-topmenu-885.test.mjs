@@ -102,7 +102,7 @@ test('상단 메뉴: 같은 글자 크기·테두리 0·세로선 0·현재 탭 
           };
         });
         assert.deepEqual(order.ids, [
-          'community-menu', 'record-menu', 'track32-bookshelf.html',
+          'community-menu', 'record-menu', 'track32-bookshelf.html', 'exhibit.html',
           'track61-tree.html', 'track58-pinboard.html',
           'track59-sketchbook.html', 'track56-network.html',
         ], width + '/' + theme + ': ??? ?? ??? Tab ?? ??? ??');
@@ -114,7 +114,7 @@ test('상단 메뉴: 같은 글자 크기·테두리 0·세로선 0·현재 탭 
           await page.locator('#mobile-more').click();
           const folded = await page.locator('#header-overflow [role="menuitem"]').allTextContents();
           const labels = [
-            '\uB458\uB7EC\uBCF4\uAE30', '\uC11C\uC7AC', '\uD2B8\uB9AC',
+            '\uB458\uB7EC\uBCF4\uAE30', '\uC11C\uC7AC', '\uC804\uC2DC', '\uD2B8\uB9AC',
             '\uBCF4\uB4DC', '\uCC45', '\uC9C0\uB3C4',
           ];
           assert.deepEqual(folded.map((x) => x.trim()).filter((x) => labels.includes(x)), labels,
@@ -866,7 +866,7 @@ test('#1488 머리줄: 390 오른쪽 간격 8px·누름 44px·순간 추가 올�
         const h = await header(page);
         memberHeaders[width] = h;
         rows.push({ case: 'taps', width, brand: h.brand, tabs: h.tabs });
-        assert.equal(h.tabs.length, 5, width + ': 보기 탭 다섯');
+        assert.equal(h.tabs.length, 6, width + ': 전시를 포함한 보기 탭 여섯');
         for (const t of h.tabs) assert.ok(t.w >= 44 && t.h >= 44, `${width} '${t.t}' 탭 누름 ${t.w}×${t.h} — 44px 이상`);
         assert.ok(h.brand.h >= 44, `${width} 로고 링크 높이 44px 이상(${h.brand.h})`);
         if (width === 1440) {

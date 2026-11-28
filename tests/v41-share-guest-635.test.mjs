@@ -873,14 +873,14 @@ test('방문자 공용 화면: 1440·390 책·보드·지도, 옛 공유 주소,
             await visiting.page.setViewportSize({width,height});
             const m=await metrics(visiting.page);
             if(width===1440){
-              assert.deepEqual(m.tabs,['트리','보드','책','지도'],width+' '+theme+' '+view+': 공유 탭 구성');
+              assert.deepEqual(m.tabs,['전시','트리','보드','책','지도'],width+' '+theme+' '+view+': 공유 탭 구성');
               assert.equal(m.browseVisible,true,'데스크톱 둘러보기 단추');
             } else {
               // #1488 7번(CTO 결정 #1452): 390 공개 감상의 보기 탭은 내 트리 390과 같은 규칙 — 머리줄에는 같은 탭 구성(없음), 탭은 접기 메뉴에서 고른다.
               assert.deepEqual(m.tabs,ownerLayouts[390][view].tabs,'모바일 보기 탭은 내 트리 390과 같다');
               await visiting.page.locator('#mobile-more').click();
               const items=await visiting.page.locator('#header-overflow button').allTextContents();
-              for(const name of ['트리','책','보드','지도','둘러보기'])assert.ok(items.includes(name),'모바일 메뉴 '+name);
+              for(const name of ['전시','트리','책','보드','지도','둘러보기'])assert.ok(items.includes(name),'모바일 메뉴 '+name);
               assert.ok(!items.includes('서재'),'방문자 메뉴에는 서재가 없다');
               assert.ok(!items.some(x=>x.includes('순간 추가')),'방문자 메뉴에는 쓰기 입구가 없다');
               await visiting.page.locator('#mobile-more').click();
@@ -971,7 +971,7 @@ test('#1443 방문 주소는 로그아웃·로그인 방문자의 기록과 저�
     moments:tree.moments.map(m=>({...m,createdAt:time,links:[]}))};
   const publicTree = {...ownerTree, id:shareId, subject:'공개 기록 시험'};
   const publicPrefs = {dateStyle:'dot',titleDisplay:'both',bookDisplay:'book',shelfView:'carousel',treeChipOrder:[],theme:'night'};
-  const screens = {book:'track59-sketchbook.html',board:'track58-pinboard.html',network:'track56-network.html',tree:'track61-tree.html'};
+  const screens = {book:'track59-sketchbook.html',board:'track58-pinboard.html',network:'track56-network.html',tree:'track61-tree.html',exhibit:'exhibit.html'};
   let activeRequests=[];
   // #1615: 두 기기 저장소의 원래 값과 메서드 정의를 비교한다.
   const snapshot = page => page.evaluate(() => {
@@ -1106,7 +1106,7 @@ test('#1443 방문 주소는 로그아웃·로그인 방문자의 기록과 저�
         await page.locator('#theme-toggle').click();
         await page.waitForFunction(()=>document.documentElement.getAttribute('data-lt-theme')==='garden'&&window.LT41?.prefs?.theme==='garden',null,{timeout:5000});
         assert.deepEqual(await snapshot(page),before,label+' 테마 변경은 방문 메모리에만 남는다');
-        for(const view of ['board','network','tree','book']){
+        for(const view of ['board','network','tree','exhibit','book']){
           await page.locator(`#tree-views button[data-view="${screens[view]}"]`).click();
           const frame=await waitVisit(page,view);
           assert.equal(await methodsRestored(frame),false,label+' '+view+' 프레임 저장 보호 활성');
