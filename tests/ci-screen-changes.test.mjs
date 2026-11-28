@@ -163,7 +163,8 @@ test('#1413 5단계: 옮긴 시험 위치·보드 둘째 잡 고르기·공통 �
   const jobBody = (key) => { const s = workflow.indexOf(`\n  ${key}:\n`); const rest = workflow.slice(s + 1); const m = rest.slice(3).search(/\n  [a-z0-9-]+:\n/); return m < 0 ? rest : rest.slice(0, m + 3); };
   const header = (body) => body.slice(0, body.indexOf('\n    steps:'));
   const board = jobBody('screen-board'), boardB = jobBody('screen-board-b');
-  assert.equal(header(boardB).match(/runs-on: .*/)[0], header(board).match(/runs-on: .*/)[0], '보드 둘째 잡은 보드 잡과 같은 실행기 선택식을 쓴다');
+  assert.match(header(board).match(/runs-on: .*/)[0], /needs\.runner_picker\.outputs\.screen_board\b/, '보드 잡은 자신의 실행기 판정을 사용한다');
+  assert.match(header(boardB).match(/runs-on: .*/)[0], /needs\.runner_picker\.outputs\.screen_board_b\b/, '보드 둘째 잡도 자신의 실행기 판정을 사용한다');
   assert.ok(header(boardB).includes("',screen-board-b,'"));
   for (const [job, token] of Object.entries(JOB_TOKEN)) {
     assert.ok(header(jobBody(job)).includes(`',${token},'`), `${job}의 if는 고르기 이름 ${token}을 본다`);
@@ -234,7 +235,7 @@ test('#1611 schedule, visual selection and every original screen command are pre
   for (const job of SELECTABLE_JOBS)
     assert.deepEqual(current[job],baseline.jobs[job],job+': 9896d3a1 기준 시험 파일·명령·timeout·retry 보존');
   // #1620 자체 실행기별 npm 캐시 준비는 테스트 명령이 아니며 그대로 남겨야 한다.
-  assert.match(after,/run: echo "npm_config_cache=\$HOME\/\.npm-runner-\$RUNNER_NAME" >> "\$GITHUB_ENV"/);
+  assert.match(after,/run: echo "npm_config_cache=\$HOME\/\.npm-lovetree-ci-cache" >> "\$GITHUB_ENV"/);
 });
 
 test('#1616 dedicated home source picks five owner jobs, A/B/C and only home visuals', async () => {
