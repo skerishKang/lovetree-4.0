@@ -453,3 +453,13 @@ test('#1598 로그인 후 기기 테마만 바뀌어도 서재·트리·책·보
     }
   }finally{await browser.close();await new Promise(resolve=>server.close(resolve));}
 });
+
+test('#1598 테마 선택 후 저장 3초 지연·500·오프라인·다른 기기 변경·로그아웃 회귀', {skip:skip952t||undefined,timeout:180000}, async()=>{
+  const {checkThemeSaveRace}=await import('./helpers/theme-save-race-1598.mjs');
+  const observations=await checkThemeSaveRace();
+  assert.equal(observations.filter(r=>r.view).length,20);
+  for(const mode of ['delay','failure','offline']){
+    assert.ok(observations.some(r=>r.mode===mode&&r.afterSave),mode+' 저장 응답 이후 검증');
+  }
+  assert.ok(observations.some(r=>r.mode==='guest'&&r.theme==='garden'&&r.puts===0));
+});
