@@ -23,6 +23,9 @@ export const AVG_SECONDS = Object.freeze({
   'screen-home-1284': 95
 });
 export const JOBS = Object.freeze(Object.keys(AVG_SECONDS));
+// 글꼴 차이로 화면 넘침 계측이 달랐던 책 시험은 항상 GitHub에서 실행한다.
+export const CGI_EXCLUDED_JOBS = Object.freeze(['screen-book', 'screen-book-screen']);
+const CGI_EXCLUDED = new Set(CGI_EXCLUDED_JOBS);
 export const CGI_LABELS = Object.freeze(['self-hosted', 'Linux', 'X64', 'cgi']);
 export const HOSTED_LABELS = Object.freeze(['ubuntu-latest']);
 export const OUTPUT_KEY = job => job.replaceAll('-', '_');
@@ -42,7 +45,7 @@ export function assignRunners(selection = 'all', available = 0) {
   const ordered = activeJobs(selection).sort((a, b) =>
     AVG_SECONDS[b] - AVG_SECONDS[a] || a.localeCompare(b));
   const slots = Number.isSafeInteger(available) && available > 0 ? available : 0;
-  const onCGI = new Set(ordered.slice(0, slots));
+  const onCGI = new Set(ordered.filter(job => !CGI_EXCLUDED.has(job)).slice(0, slots));
   return {
     ordered,
     chosen: [...onCGI],

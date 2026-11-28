@@ -51,7 +51,7 @@ jobs:
             printf '%s\n' changed=true map_changed=true jobs=all screens=all >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          if [ '${{ github.event.pull_request.draft }}' = 'true' ]; then
+          if [ '${{ github.event.pull_request.draft }}' = 'true' ] && [ '${{ github.event.action }}' != 'ready_for_review' ]; then
             echo "초안 PR — 화면 시험 건너뜀(준비 완료로 바꾸면 돈다)" | tee -a "$GITHUB_STEP_SUMMARY"
             echo "changed=false" >> "$GITHUB_OUTPUT"; echo "map_changed=false" >> "$GITHUB_OUTPUT"; echo "jobs=none" >> "$GITHUB_OUTPUT"; echo "screens=none" >> "$GITHUB_OUTPUT"; exit 0
           fi
@@ -103,6 +103,7 @@ jobs:
           node-version: 22
       - name: 실행기 배정
         id: pick
+        continue-on-error: true
         env:
           USE_CGI_RUNNER: ${{ vars.USE_CGI_RUNNER || '0' }}
           GITHUB_EVENT_NAME: ${{ github.event_name }}
@@ -123,7 +124,7 @@ jobs:
     runs-on: ${{ fromJSON(needs.runner_picker.outputs.screen_board || '["ubuntu-latest"]') }}
     timeout-minutes: 25
     needs: [screen-changes, runner_picker]
-    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-board,'))
+    if: ${{ !cancelled() && needs.screen-changes.result == 'success' && needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-board,')) }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -136,6 +137,11 @@ jobs:
         if: runner.environment == 'self-hosted'
         run: echo "npm_config_cache=$HOME/.npm-lovetree-ci-cache" >> "$GITHUB_ENV"
       - uses: actions/setup-node@v4
+        if: runner.environment == 'self-hosted'
+        with:
+          node-version: 22
+      - uses: actions/setup-node@v4
+        if: runner.environment != 'self-hosted'
         with:
           node-version: 22
           cache: npm
@@ -286,7 +292,7 @@ jobs:
     runs-on: ${{ fromJSON(needs.runner_picker.outputs.screen_board_b || '["ubuntu-latest"]') }}
     timeout-minutes: 25
     needs: [screen-changes, runner_picker]
-    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-board-b,'))
+    if: ${{ !cancelled() && needs.screen-changes.result == 'success' && needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-board-b,')) }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -299,6 +305,11 @@ jobs:
         if: runner.environment == 'self-hosted'
         run: echo "npm_config_cache=$HOME/.npm-lovetree-ci-cache" >> "$GITHUB_ENV"
       - uses: actions/setup-node@v4
+        if: runner.environment == 'self-hosted'
+        with:
+          node-version: 22
+      - uses: actions/setup-node@v4
+        if: runner.environment != 'self-hosted'
         with:
           node-version: 22
           cache: npm
@@ -417,7 +428,7 @@ jobs:
     runs-on: ${{ fromJSON(needs.runner_picker.outputs.screen_home || '["ubuntu-latest"]') }}
     timeout-minutes: 12
     needs: [screen-changes, runner_picker]
-    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-home,'))
+    if: ${{ !cancelled() && needs.screen-changes.result == 'success' && needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-home,')) }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -430,6 +441,11 @@ jobs:
         if: runner.environment == 'self-hosted'
         run: echo "npm_config_cache=$HOME/.npm-lovetree-ci-cache" >> "$GITHUB_ENV"
       - uses: actions/setup-node@v4
+        if: runner.environment == 'self-hosted'
+        with:
+          node-version: 22
+      - uses: actions/setup-node@v4
+        if: runner.environment != 'self-hosted'
         with:
           node-version: 22
           cache: npm
@@ -490,7 +506,7 @@ jobs:
     runs-on: ${{ fromJSON(needs.runner_picker.outputs.screen_home_followup || '["ubuntu-latest"]') }}
     timeout-minutes: 12
     needs: [screen-changes, runner_picker]
-    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-home-followup,'))
+    if: ${{ !cancelled() && needs.screen-changes.result == 'success' && needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-home-followup,')) }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -503,6 +519,11 @@ jobs:
         if: runner.environment == 'self-hosted'
         run: echo "npm_config_cache=$HOME/.npm-lovetree-ci-cache" >> "$GITHUB_ENV"
       - uses: actions/setup-node@v4
+        if: runner.environment == 'self-hosted'
+        with:
+          node-version: 22
+      - uses: actions/setup-node@v4
+        if: runner.environment != 'self-hosted'
         with:
           node-version: 22
           cache: npm
@@ -582,7 +603,7 @@ jobs:
     runs-on: ${{ fromJSON(needs.runner_picker.outputs.screen_home_1284 || '["ubuntu-latest"]') }}
     timeout-minutes: 8
     needs: [screen-changes, runner_picker]
-    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-home-1284,'))
+    if: ${{ !cancelled() && needs.screen-changes.result == 'success' && needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-home-1284,')) }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -593,6 +614,11 @@ jobs:
         if: runner.environment == 'self-hosted'
         run: echo "npm_config_cache=$HOME/.npm-lovetree-ci-cache" >> "$GITHUB_ENV"
       - uses: actions/setup-node@v4
+        if: runner.environment == 'self-hosted'
+        with:
+          node-version: 22
+      - uses: actions/setup-node@v4
+        if: runner.environment != 'self-hosted'
         with:
           node-version: 22
           cache: npm
@@ -620,7 +646,7 @@ jobs:
     runs-on: ${{ fromJSON(needs.runner_picker.outputs.screen_book || '["ubuntu-latest"]') }}
     timeout-minutes: 12
     needs: [screen-changes, runner_picker]
-    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-book,'))
+    if: ${{ !cancelled() && needs.screen-changes.result == 'success' && needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-book,')) }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -631,6 +657,11 @@ jobs:
         if: runner.environment == 'self-hosted'
         run: echo "npm_config_cache=$HOME/.npm-lovetree-ci-cache" >> "$GITHUB_ENV"
       - uses: actions/setup-node@v4
+        if: runner.environment == 'self-hosted'
+        with:
+          node-version: 22
+      - uses: actions/setup-node@v4
+        if: runner.environment != 'self-hosted'
         with:
           node-version: 22
           cache: npm
@@ -717,7 +748,7 @@ jobs:
     runs-on: ${{ fromJSON(needs.runner_picker.outputs.screen_shell || '["ubuntu-latest"]') }}
     timeout-minutes: 12
     needs: [screen-changes, runner_picker]
-    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-shell,'))
+    if: ${{ !cancelled() && needs.screen-changes.result == 'success' && needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-shell,')) }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -728,6 +759,11 @@ jobs:
         if: runner.environment == 'self-hosted'
         run: echo "npm_config_cache=$HOME/.npm-lovetree-ci-cache" >> "$GITHUB_ENV"
       - uses: actions/setup-node@v4
+        if: runner.environment == 'self-hosted'
+        with:
+          node-version: 22
+      - uses: actions/setup-node@v4
+        if: runner.environment != 'self-hosted'
         with:
           node-version: 22
           cache: npm
@@ -815,7 +851,7 @@ jobs:
     runs-on: ${{ fromJSON(needs.runner_picker.outputs.screen_shell_extra || '["ubuntu-latest"]') }}
     timeout-minutes: 12
     needs: [screen-changes, runner_picker]
-    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-shell-extra,'))
+    if: ${{ !cancelled() && needs.screen-changes.result == 'success' && needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-shell-extra,')) }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -826,6 +862,11 @@ jobs:
         if: runner.environment == 'self-hosted'
         run: echo "npm_config_cache=$HOME/.npm-lovetree-ci-cache" >> "$GITHUB_ENV"
       - uses: actions/setup-node@v4
+        if: runner.environment == 'self-hosted'
+        with:
+          node-version: 22
+      - uses: actions/setup-node@v4
+        if: runner.environment != 'self-hosted'
         with:
           node-version: 22
           cache: npm
@@ -953,7 +994,7 @@ jobs:
     runs-on: ${{ fromJSON(needs.runner_picker.outputs.screen_audit_a || '["ubuntu-latest"]') }}
     timeout-minutes: 12
     needs: [screen-changes, runner_picker]
-    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-audit-a,'))
+    if: ${{ !cancelled() && needs.screen-changes.result == 'success' && needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-audit-a,')) }}
     env:
       LT_SCREEN_AUDIT_SCREENS: ${{ needs.screen-changes.outputs.screens }}
     steps:
@@ -965,6 +1006,11 @@ jobs:
         if: runner.environment == 'self-hosted'
         run: echo "npm_config_cache=$HOME/.npm-lovetree-ci-cache" >> "$GITHUB_ENV"
       - uses: actions/setup-node@v4
+        if: runner.environment == 'self-hosted'
+        with:
+          node-version: 22
+      - uses: actions/setup-node@v4
+        if: runner.environment != 'self-hosted'
         with:
           node-version: 22
           cache: npm
@@ -1075,7 +1121,7 @@ jobs:
     runs-on: ${{ fromJSON(needs.runner_picker.outputs.screen_audit_b || '["ubuntu-latest"]') }}
     timeout-minutes: 12
     needs: [screen-changes, runner_picker]
-    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-audit-b,'))
+    if: ${{ !cancelled() && needs.screen-changes.result == 'success' && needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-audit-b,')) }}
     env:
       LT_SCREEN_AUDIT_SCREENS: ${{ needs.screen-changes.outputs.screens }}
     steps:
@@ -1087,6 +1133,11 @@ jobs:
         if: runner.environment == 'self-hosted'
         run: echo "npm_config_cache=$HOME/.npm-lovetree-ci-cache" >> "$GITHUB_ENV"
       - uses: actions/setup-node@v4
+        if: runner.environment == 'self-hosted'
+        with:
+          node-version: 22
+      - uses: actions/setup-node@v4
+        if: runner.environment != 'self-hosted'
         with:
           node-version: 22
           cache: npm
@@ -1194,7 +1245,7 @@ jobs:
     runs-on: ${{ fromJSON(needs.runner_picker.outputs.screen_audit_c || '["ubuntu-latest"]') }}
     timeout-minutes: 12
     needs: [screen-changes, runner_picker]
-    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-audit-c,'))
+    if: ${{ !cancelled() && needs.screen-changes.result == 'success' && needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-audit-c,')) }}
     env:
       LT_SCREEN_AUDIT_SCREENS: ${{ needs.screen-changes.outputs.screens }}
     steps:
@@ -1206,6 +1257,11 @@ jobs:
         if: runner.environment == 'self-hosted'
         run: echo "npm_config_cache=$HOME/.npm-lovetree-ci-cache" >> "$GITHUB_ENV"
       - uses: actions/setup-node@v4
+        if: runner.environment == 'self-hosted'
+        with:
+          node-version: 22
+      - uses: actions/setup-node@v4
+        if: runner.environment != 'self-hosted'
         with:
           node-version: 22
           cache: npm
@@ -1315,7 +1371,7 @@ jobs:
     runs-on: ${{ fromJSON(needs.runner_picker.outputs.screen_reload || '["ubuntu-latest"]') }}
     timeout-minutes: 12
     needs: [screen-changes, runner_picker]
-    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-reload,'))
+    if: ${{ !cancelled() && needs.screen-changes.result == 'success' && needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-reload,')) }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -1326,6 +1382,11 @@ jobs:
         if: runner.environment == 'self-hosted'
         run: echo "npm_config_cache=$HOME/.npm-lovetree-ci-cache" >> "$GITHUB_ENV"
       - uses: actions/setup-node@v4
+        if: runner.environment == 'self-hosted'
+        with:
+          node-version: 22
+      - uses: actions/setup-node@v4
+        if: runner.environment != 'self-hosted'
         with:
           node-version: 22
           cache: npm
@@ -1382,7 +1443,7 @@ jobs:
     runs-on: ${{ fromJSON(needs.runner_picker.outputs.screen_map_a || '["ubuntu-latest"]') }}
     timeout-minutes: 25
     needs: [screen-changes, runner_picker]
-    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-map-a,'))
+    if: ${{ !cancelled() && needs.screen-changes.result == 'success' && needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-map-a,')) }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -1392,6 +1453,11 @@ jobs:
         if: runner.environment == 'self-hosted'
         run: echo "npm_config_cache=$HOME/.npm-lovetree-ci-cache" >> "$GITHUB_ENV"
       - uses: actions/setup-node@v4
+        if: runner.environment == 'self-hosted'
+        with:
+          node-version: 22
+      - uses: actions/setup-node@v4
+        if: runner.environment != 'self-hosted'
         with:
           node-version: 22
           cache: npm
@@ -1526,7 +1592,7 @@ jobs:
     runs-on: ${{ fromJSON(needs.runner_picker.outputs.screen_shelf || '["ubuntu-latest"]') }}
     timeout-minutes: 12
     needs: [screen-changes, runner_picker]
-    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-shelf,'))
+    if: ${{ !cancelled() && needs.screen-changes.result == 'success' && needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-shelf,')) }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -1538,6 +1604,11 @@ jobs:
         if: runner.environment == 'self-hosted'
         run: echo "npm_config_cache=$HOME/.npm-lovetree-ci-cache" >> "$GITHUB_ENV"
       - uses: actions/setup-node@v4
+        if: runner.environment == 'self-hosted'
+        with:
+          node-version: 22
+      - uses: actions/setup-node@v4
+        if: runner.environment != 'self-hosted'
         with:
           node-version: 22
           cache: npm
@@ -1639,7 +1710,7 @@ jobs:
     runs-on: ${{ fromJSON(needs.runner_picker.outputs.screen_map_b || '["ubuntu-latest"]') }}
     timeout-minutes: 25
     needs: [screen-changes, runner_picker]
-    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-map-b,'))
+    if: ${{ !cancelled() && needs.screen-changes.result == 'success' && needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-map-b,')) }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -1649,6 +1720,11 @@ jobs:
         if: runner.environment == 'self-hosted'
         run: echo "npm_config_cache=$HOME/.npm-lovetree-ci-cache" >> "$GITHUB_ENV"
       - uses: actions/setup-node@v4
+        if: runner.environment == 'self-hosted'
+        with:
+          node-version: 22
+      - uses: actions/setup-node@v4
+        if: runner.environment != 'self-hosted'
         with:
           node-version: 22
           cache: npm
@@ -1819,7 +1895,7 @@ jobs:
     runs-on: ${{ fromJSON(needs.runner_picker.outputs.screen_book_screen || '["ubuntu-latest"]') }}
     timeout-minutes: 25
     needs: [screen-changes, runner_picker]
-    if: needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-book-screen,'))
+    if: ${{ !cancelled() && needs.screen-changes.result == 'success' && needs.screen-changes.outputs.changed == 'true' && (needs.screen-changes.outputs.jobs == 'all' || contains(format(',{0},', needs.screen-changes.outputs.jobs), ',screen-book-screen,')) }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -1830,6 +1906,11 @@ jobs:
         if: runner.environment == 'self-hosted'
         run: echo "npm_config_cache=$HOME/.npm-lovetree-ci-cache" >> "$GITHUB_ENV"
       - uses: actions/setup-node@v4
+        if: runner.environment == 'self-hosted'
+        with:
+          node-version: 22
+      - uses: actions/setup-node@v4
+        if: runner.environment != 'self-hosted'
         with:
           node-version: 22
           cache: npm

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { assignRunners, activeJobs, freeCGIRunners, pickRunners,
-  githubOutputs, githubSummary, AVG_SECONDS, JOBS } from '../tools/ci/pick-runners.mjs';
+  githubOutputs, githubSummary, AVG_SECONDS, JOBS, CGI_EXCLUDED_JOBS } from '../tools/ci/pick-runners.mjs';
 
 const env = {
   SCREEN_CHANGED: 'true',
@@ -47,10 +47,24 @@ test('CGI 2자리면 실제 선택한 잡 중 평균이 긴 순서 2개만 배�
 });
 test('CGI 4자리면 평균 긴 화면 잡 4개만 CGI로 배정한다', async () => {
   const result=await pickRunners(env, response(runners(4)));
-  assert.deepEqual(result.chosen, ['screen-map-a','screen-audit-a','screen-board','screen-book']);
+  assert.deepEqual(result.chosen, ['screen-map-a','screen-audit-a','screen-board','screen-shell-extra']);
   assert.equal(result.available, 4);
   assert.equal(result.ordered.length, 16);
 });
+test('CGI 빈자리가 16개여도 책 관련 두 잡은 항상 GitHub에서 실행한다', async () => {
+  assert.deepEqual(CGI_EXCLUDED_JOBS, ['screen-book','screen-book-screen']);
+  const result = await pickRunners(env, response(runners(16)));
+  assert.equal(result.available, 16);
+  assert.equal(result.chosen.length, 14);
+  for(const job of CGI_EXCLUDED_JOBS) {
+    assert.equal(result.ordered.includes(job), true, job+' 시험은 빠지지 않는다');
+    assert.equal(result.chosen.includes(job), false, job+' CGI 배정 금지');
+    assert.deepEqual(result.labels[job], ['ubuntu-latest']);
+  }
+  for(const job of JOBS.filter(j=>!CGI_EXCLUDED_JOBS.includes(j)))
+    assert.deepEqual(result.labels[job],['self-hosted','Linux','X64','cgi']);
+});
+
 test('대기 중 또는 오프라인 실행기는 빈자리로 계산하지 않는다', () => {
   assert.equal(freeCGIRunners({runners:runners(2)}),2);
   assert.throws(()=>freeCGIRunners({message:'error'}),/응답 오류/);
