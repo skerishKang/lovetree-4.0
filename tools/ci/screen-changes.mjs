@@ -8,7 +8,7 @@
 import { readFileSync, existsSync, appendFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { TEST_OWNERS } from './screen-owners.mjs';
+import { TEST_OWNERS, SHARED_SCREEN_SOURCES } from './screen-owners.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const WORKFLOW = resolve(ROOT, '.github/workflows/preview-check.yml');
@@ -54,6 +54,9 @@ export const AREA_SOURCES = [
   [/^src\/views\/orbit[^/]*\.(js|css|json)$/, ['home']],
   [/^src\/views\/book(?:-source\.css|\.js)$/, ['book']],
   [/^src\/views\/shelf(?:-source\.css|\.css|\.js)$/, ['shelf']],
+  // 트리 상세는 별도 작업 잡이 없으며, 트리 시험을 포함한 책/셸 소유 잡을 고른다.
+  [/^public\/v41\/views\/tree\//, ['shell','book']],
+  [/^public\/v41\/views\/track61-tree\.html$/, ['shell','book']],
   [/^public\/v41\/views\/board\//, ['board']],
   [/^public\/v41\/views\/track58-pinboard\.html$/, ['board']],
   [/^public\/v41\/views\/book\//, ['book']],
@@ -72,6 +75,8 @@ export function selectScreens(changedFiles) {
   for (const f of changedFiles) {
     if (!f) return 'all';
     if (/^(docs|reference)\/.+\.md$/i.test(f) || /^(README|CHANGELOG)\.md$/i.test(f)) continue;
+    // 셸·프레임 메시지는 어느 화면에서든 호출하므로 개별 영역보다 먼저 전체를 고른다.
+    if (SHARED_SCREEN_SOURCES.some(pattern => pattern.test(f))) return 'all';
     const owners = TEST_OWNERS[f];
     if (owners) {
       if (owners.includes('common')) return 'all';
@@ -79,6 +84,9 @@ export function selectScreens(changedFiles) {
       continue;
     }
     const areas = AREA_SOURCES.filter(([re]) => re.test(f));
+    // public/v41/ 미분류 파일은 안전하게 전체 화면을 실행한다.
+    // 다른 미분류 소스도 기존처럼 전체로 보내는 정책을 유지한다.
+    if (!areas.length && f.startsWith('public/v41/')) return 'all';
     if (!areas.length) return 'all';
     for (const [, screens] of areas) screens.forEach(x => picked.add(x));
   }
