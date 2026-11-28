@@ -12,6 +12,7 @@ import { mkdirSync, writeFileSync, existsSync, readdirSync, readFileSync } from 
 import path from 'node:path';
 import os from 'node:os';
 import { installVisualPublicApiStubs } from './public-api-stub.mjs';
+import { STABILIZE, FIX_ORBIT_PHASE } from './capture-stability.mjs';
 
 // 화면별 기준치(%). 기억 보드는 실·핀 선을 매 로드마다 미세하게 다시 그려 0.1%를 넘는 장이 나온다
 // (정리는 리팩터링 3단계 예정, #231).
@@ -62,22 +63,6 @@ const FREEZE_INNER = `(() => {
 })();`;
 
 // 화면이 다 열린 뒤 안쪽 문서에만 거는 고정 장치: CSS 애니메이션 정지·커서 제거·토스트 숨김.
-const STABILIZE = `(() => {
-  if (document.querySelector('style[data-visual-baseline]')) return;
-  const style = document.createElement('style');
-  style.setAttribute('data-visual-baseline', '1');
-  style.textContent = '*,*::before,*::after{animation-play-state:paused!important;animation-delay:0s!important;animation-duration:0s!important;transition:none!important;caret-color:transparent!important}#toast,.toast,[role="status"]{visibility:hidden!important}';
-  document.documentElement.append(style);
-  for (const animation of document.getAnimations?.() || []) {
-    try {
-      const timing = animation.effect?.getComputedTiming?.() || {};
-      if (Number.isFinite(timing.duration) && Number.isFinite(timing.iterations)) animation.finish();
-      else { animation.pause(); animation.currentTime = 0; }
-    } catch {}
-  }
-  try { window.scrollTo(0, 0); } catch {}
-})();`;
-
 async function loadChromium() {
   const candidates = ['playwright-core', '../postdeploy/node_modules/playwright-core/index.mjs'];
   for (const candidate of candidates) {
@@ -196,14 +181,6 @@ const ASSETS_PENDING = `(() => {
 
 // #1585: 같은 코드의 두 촬영에서 궤도·리본 카드가 서로 다른 시각에 머무르지 않게 한다.
 // 실제 화면은 건드리지 않고 비교용 iframe에 공개된 시험 훅으로 같은 위상만 그린다.
-const FIX_ORBIT_PHASE = `(() => {
-  const orbit = globalThis.__LT_ORBIT_TEST__;
-  if (!orbit) return;
-  orbit.pauseFloat?.();
-  orbit.hold?.(true);
-  orbit.seek?.(0.25);
-})()`;
-
 async function settleInside(frame, page) {
   // 화면 교체 애니메이션이 소수점 배율로 남으면 같은 화면도 픽셀이 흔들리므로, 다 열린 뒤 배율을 1로 고정한다.
   await page.evaluate(SETTLE_SHELL).catch(() => {});
@@ -242,6 +219,9 @@ async function stableShot(frame, page, file) {
   for (let attempt = 0; attempt < 8 && Date.now() < deadline; attempt += 1) {
     // 자료가 다 익지 않았으면 찍지 않고 기다린다 — 읽는 중 화면도 "안정"으로 둔갑하기 때문.
     if (!(await assetsReady(frame, page, deadline))) { previous = null; await settleInside(frame, page); continue; }
+    // Freeze Web Animations mounted after the first pass, including shadow DOM.
+    await frame.evaluate(STABILIZE).catch(() => {});
+    await frame.evaluate(FIX_ORBIT_PHASE).catch(() => {});
     const buffer = await page.screenshot();
     if (previous && buffer.equals(previous)) {
       writeFileSync(file, buffer);
