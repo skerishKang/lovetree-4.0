@@ -814,7 +814,44 @@ function boardResizeMobile() {
 }
 viewport.addEventListener('scroll', () => {
   if (viewport.classList.contains('board-scroll')) view.y = mobileBoardBaseY - viewport.scrollTop;
+  scheduleBoardMoreHint();
 }, { passive: true });
+// #1595: 카드가 아래에 남았는지 실제 회전된 경계로 판정한다.
+// 끌기·스크롤 중에는 프레임당 한 번만 읽고, 카드 자리·배율·저장은 건드리지 않는다.
+let boardMoreHintFrame = 0;
+function scheduleBoardMoreHint() {
+  if (boardMoreHintFrame) return;
+  boardMoreHintFrame = requestAnimationFrame(() => {
+    boardMoreHintFrame = 0;
+    const hint = $('#board-more-hint');
+    if (!hint) return;
+    // #1599 후속: 선택 줄 때문에 작은 판이 아래로 내려간 경우, 다음 스크롤 한 화면 안의
+    // 지연 썸네일만 먼저 요청한다. 멀리 있는 카드까지 한꺼번에 불러오지 않는다.
+    if (innerWidth < 700 && viewport.classList.contains('board-scroll')) {
+      const bounds = viewport.getBoundingClientRect();
+      const ahead = bounds.bottom + bounds.height;
+      let started = 0;
+      for (const card of cardLayer.querySelectorAll('.card[data-id]:not(.filteredOut)')) {
+        const rect = card.getBoundingClientRect();
+        if (rect.top > ahead || rect.bottom < bounds.top) continue;
+        for (const img of card.querySelectorAll('.lt-yt-preview img[loading="lazy"]')) {
+          if (img.complete) continue;
+          img.loading = 'eager';
+          if (++started >= 8) break;
+        }
+        if (started >= 8) break;
+      }
+    }
+    const bottom = viewport.getBoundingClientRect().bottom;
+    const more = innerWidth >= 700 && !cinema && [...cardLayer.querySelectorAll('.card[data-id]:not(.filteredOut)')]
+      .some(card => card.getBoundingClientRect().bottom > bottom + 1);
+    hint.hidden = !more;
+    if (more) {
+      const label = mobileBoardScroll() ? '아래에도 순간이 있어요. 스크롤해 보세요.' : '아래에도 순간이 있어요. 빈 판을 끌어 보세요.';
+      if (hint.textContent !== label) hint.textContent = label;
+    }
+  });
+}
 // 카드 위치와 독립적으로 이동형 판의 배경이 보이는 화면을 채우게 한다.
 function fitWideSurfaceBackground() {
   const surface = world.querySelector('.surface');
@@ -838,6 +875,7 @@ function applyView(animated = false) {
   const space = $('#boardScrollSpace');
   viewport.classList.toggle('board-scroll', scroll);
   viewport.classList.toggle('board-scroll-editing', scroll && boardMode === 'mine');
+  scheduleBoardMoreHint();
   if (scroll) {
     const bounds = mobileBoardBounds(), safe = boardSafeArea();
     if (bounds) {
