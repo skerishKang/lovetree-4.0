@@ -3814,16 +3814,71 @@ test('#1084 세로 영상 첫 화면의 미디어 칸에는 회색 여백이 없
           });
           for (const slot of ['book', 'board']) {
             await page.evaluate(({id, slot}) => { location.hash = 'my/' + slot + '?tree=' + id; }, {id: tree.id, slot});
-            const locator = page.frameLocator('#view').locator(slot === 'book' ? '#rightPage .yt-play.is-remote-vertical' : '.lt-media[data-lt-vertical="1"] .lt-yt-preview');
+            const screenshotSelector = slot === 'book' ? '#rightPage .yt-play.is-remote-vertical' : '.lt-media[data-lt-vertical="1"] .lt-yt-preview';
+            const locator = page.frameLocator('#view').locator(screenshotSelector);
+            // 기존 15초 준비 상한 안에서 요소 표시와 이미지 로딩을 함께 확인한다.
+            const readyDeadline = Date.now() + 15000;
             await locator.waitFor({state: 'visible', timeout: 15000});
+            const ready = await page.waitForFunction(selector => {
+              // 판정할 때 iframe 안의 현재 요소를 다시 찾아 오래된 DOM 참조를 피한다.
+              const frame = document.getElementById('view'), doc = frame?.contentDocument;
+              const el = doc?.querySelector(selector);
+              const layer = el?.querySelector('.yt-vertical-backdrop,.lt-vertical-backdrop');
+              const pic = layer?.querySelector('img');
+              const css = layer ? doc.defaultView.getComputedStyle(layer) : null;
+              if (!el?.getClientRects().length || !(pic?.naturalWidth > 0) || !css?.filter?.includes('blur(')) return false;
+              window.__lt1084Tracked = {node: el, frame: frame.contentWindow, document: doc, href: frame.contentWindow.location.href};
+              const r = el.getBoundingClientRect();
+              return {image: pic.currentSrc || '', loaded: true, filter: css.filter, width: r.width, height: r.height};
+            }, screenshotSelector, {timeout: Math.max(1, readyDeadline - Date.now())});
+            const info = await ready.jsonValue();
             if (process.env.LT_1084_CAPTURE_DIR) await page.screenshot({path: join(process.env.LT_1084_CAPTURE_DIR, `${slot}-after-${width}-${theme}.png`), animations: 'disabled'});
-            const info = await locator.evaluate(el => {
-              const layer = el.querySelector('.yt-vertical-backdrop,.lt-vertical-backdrop');
-              const pic = layer?.querySelector('img'), css = layer ? getComputedStyle(layer) : null, r = el.getBoundingClientRect();
-              return {image: pic?.currentSrc || '', loaded: (pic?.naturalWidth || 0) > 0, filter: css?.filter || '', width: r.width, height: r.height};
-            });
             assert.ok(info.loaded && info.image && info.filter.includes('blur('), slot + ': 세로 썸네일 배경이 이미지로 채워진다');
-            const png = await locator.screenshot({animations: 'disabled'});
+            // #1084: 화면 이동 후 보드 미디어가 다시 그려질 수 있다.
+            // 요소가 스크린샷 도중 분리될 때만 현재 iframe에서 다시 찾아 촬영한다.
+            // Playwright 기본 30초 상한을 모든 시도에 합쳐서 적용한다. 고정 대기는 없다.
+            const screenshotDeadline = Date.now() + 30000;
+            let png;
+            for (let attempt = 0; attempt < 3; attempt++) {
+              try {
+                const remaining = Math.max(1, screenshotDeadline - Date.now());
+                png = await page.frameLocator('#view').locator(screenshotSelector).screenshot({animations: 'disabled', timeout: remaining});
+                break;
+              } catch (error) {
+                if (/Element is not attached to the DOM/.test(String(error.message)) && attempt < 2 && Date.now() < screenshotDeadline) {
+                  console.log('#1084 요소 재탐색', JSON.stringify({slot, width, theme, nextAttempt: attempt + 2}));
+                  continue;
+                }
+              const diagnostic = await page.evaluate(slot => {
+                const before = window.__lt1084Tracked;
+                const frame = document.getElementById('view');
+                const doc = frame?.contentDocument;
+                const selector = slot === 'book' ? '#rightPage .yt-play.is-remote-vertical' : '.lt-media[data-lt-vertical="1"] .lt-yt-preview';
+                const matches = doc ? [...doc.querySelectorAll(selector)] : [];
+                const node = before?.node;
+                const now = matches.find(el => el.getClientRects().length > 0) || matches[0];
+                return {
+                  hash: location.hash,
+                  frameUrl: frame?.contentWindow?.location?.href || null,
+                  priorFrameUrl: before?.href || null,
+                  previousConnected: node?.isConnected ?? null,
+                  previousInDocument: doc?.contains(node) ?? null,
+                  previousOwnerIsCurrentDocument: before?.document === doc,
+                  previousFrameIsCurrent: before?.frame === frame?.contentWindow,
+                  previousIsCurrentMatch: matches.includes(node),
+                  matchCount: matches.length,
+                  matchedConnected: now?.isConnected ?? null,
+                  matchedVisible: now ? now.getClientRects().length > 0 : null,
+                  matchedTag: now?.tagName || null,
+                  matchedClass: now?.className || null,
+                  shellDocumentLoaded: document.readyState,
+                  frameDocumentLoaded: doc?.readyState || null
+                };
+              }, slot).catch(e => ({diagnosticError: String(e)}));
+                console.error('#1084 DOM_AT_FAILURE ' + JSON.stringify({slot, width, theme, message: String(error.message).slice(0, 350), ...diagnostic}));
+                throw error;
+              }
+            }
             const count = await page.evaluate(async b64 => {
               const blob = await (await fetch('data:image/png;base64,' + b64)).blob();
               const bmp = await createImageBitmap(blob), cv = new OffscreenCanvas(bmp.width, bmp.height), cx = cv.getContext('2d');

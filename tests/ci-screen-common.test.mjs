@@ -82,8 +82,8 @@ test('#1611 예약 전체 검사와 네 필수 검사 이름·실행기 분배�
     assert.ok(body(job).includes('    name: '+name),job+' 필수 검사 이름 그대로');
   assert.match(workflow,/cron: "0 2,10,18 \* \* \*"/);
   assert.match(workflow,/workflow_dispatch:/);
-  assert.match(body('screen-common-a'),/runs-on: .*vars\.USE_CGI_RUNNER/);
-  assert.match(body('screen-common-b'),/runs-on: ubuntu-latest/);
+  assert.match(body('screen-common-a'),/runs-on: .*needs\.runner_picker\.outputs\.screen_common_a/);
+  assert.match(body('screen-common-b'),/runs-on: .*needs\.runner_picker\.outputs\.screen_common_b/);
   const runs=body('screen-common-a').match(/LT_SCREEN_AUDIT_SHARD=[abc] .*tests\/v41-screen-audit\.test\.mjs/g)||[];
   assert.equal(runs.length,3,'공통 검사 A/B/C 원래 세 실행 조합 유지');
   for(const shard of ['a','b','c'])
@@ -111,4 +111,75 @@ test('#1611 고른 공통 잡을 건너뛰거나 실패·취소하면 필수 결
   }
   const missing={...needs,'screen-changes':{result:'success',outputs:{changed:'true',jobs:'screen-home'}}};
   assert.equal(checkScreenResults(missing).ok,false,'공통 잡 둘이 빠진 선택을 거부');
+});
+
+test('#1629 실제 화면 잡 이름과 모음 잡 needs·판정의 이름이 정확히 같아야 한다',()=>{
+  const assertContract=source=>{
+    const normalized=source.replace(/\r\n/g,'\n');
+    const jobIds=[...normalized.matchAll(/^  (screen-[a-z0-9-]+):[ \t]*$/gm)]
+      .map(m=>m[1]).filter(id=>id!=='screen-changes').sort();
+    const preview=normalized.slice(normalized.indexOf('  preview:\n'));
+    const match=/^    needs: \[([^\]\n]+)\]$/m.exec(preview);
+    assert.ok(match,'모음 잡의 needs가 있다');
+    const expected=match[1].split(',').map(s=>s.trim())
+      .filter(id=>id.startsWith('screen-')&&id!=='screen-changes').sort();
+    assert.deepEqual(expected,jobIds,'실제 워크플로 잡 이름 = 모음 잡 needs');
+    assert.deepEqual(jobIds,[...SELECTABLE_JOBS].sort(),'판정의 선택 가능 잡 = 실제 워크플로 잡');
+    assert.deepEqual(jobIds.filter(id=>id.startsWith('screen-common-')),common,'공통 잡 A/B만 존재한다');
+  };
+  assertContract(workflow);
+  for(const old of ['screen-audit-a','screen-audit-b','screen-audit-c']){
+    const changedNeeds=workflow.replace(
+      /(  preview:\n[\s\S]*?    needs: \[[^\]\n]*?)screen-common-a(?=, screen-common-b, deploy\])/m,
+      (_all,prefix)=>prefix+old
+    );
+    assert.notEqual(changedNeeds,workflow,'이전 잡 이름으로 needs 변경 시험 준비');
+    assert.throws(()=>assertContract(changedNeeds),assert.AssertionError,'옛 이름의 needs를 거부한다');
+    const changedJob=workflow.replace(/^  screen-common-a:$/m,'  '+old+':');
+    assert.notEqual(changedJob,workflow,'이전 잡 이름으로 정의 변경 시험 준비');
+    assert.throws(()=>assertContract(changedJob),assert.AssertionError,'옛 이름의 잡 정의를 거부한다');
+  }
+});
+
+test('#1639 실행 워크플로의 merge 판으로 화면 선택·실행기·모음 판정을 읽는다',()=>{
+  const jobBody=name=>{
+    const start=workflow.indexOf('\n  '+name+':\n');
+    assert.ok(start>=0,'잡 정의: '+name);
+    const tail=workflow.slice(start+1);
+    const next=tail.slice(3+name.length).search(/\n  [a-z0-9-]+:\n/);
+    return next<0?tail:tail.slice(0,3+name.length+next);
+  };
+  for(const job of ['screen-changes','runner_picker','preview']){
+    const checkout=jobBody(job).match(/- uses: actions\/checkout@v4\n\s+with:\n\s+ref: ([^\n]+)/);
+    assert.ok(checkout,job+' 체크아웃 설정');
+    assert.match(checkout[1],/github\.sha/,'실행 워크플로의 merge SHA');
+    assert.doesNotMatch(checkout[1],/pull_request\.head\.sha/,'오래된 PR head 선택 금지');
+  }
+  assert.match(jobBody('screen-board'),/ref: .*pull_request\.head\.sha/,
+    '실제 화면 시험 대상은 PR head 그대로');
+});
+
+test('#1639 예전 PR head의 잡 목록은 실제 needs의 성공을 실패로 오판하지 않는다',()=>{
+  const obsolete=['screen-audit-a','screen-audit-b','screen-audit-c'];
+  const oldHeadJobs=SELECTABLE_JOBS.filter(j=>!common.includes(j)).concat(obsolete);
+  const runningNeeds={
+    'screen-changes':{result:'success',outputs:{changed:'true',jobs:'all'}},
+    deploy:{result:'success'},
+    ...Object.fromEntries(SELECTABLE_JOBS.map(j=>[j,{result:'success'}]))
+  };
+  assert.deepEqual(oldHeadJobs.filter(j=>!Object.hasOwn(runningNeeds,j)),obsolete,
+    '예전 PR head의 이름은 실제 needs에 없다');
+  assert.equal(checkScreenResults(runningNeeds).ok,true,
+    '모음 잡은 실행된 merge 판의 이름을 사용한다');
+  for(const status of ['skipped','failure','cancelled']){
+    for(const job of ['screen-common-a','screen-common-b','screen-board']){
+      const broken={...runningNeeds,[job]:{result:status}};
+      const result=checkScreenResults(broken);
+      assert.equal(result.ok,false,job+' '+status+'는 실패');
+      assert.ok(result.failures.some(s=>s.includes(job)),job+' 결과가 판정에 남는다');
+    }
+  }
+  const missing={...runningNeeds};
+  delete missing['screen-common-b'];
+  assert.equal(checkScreenResults(missing).ok,false,'실제 필요한 공통 잡 누락도 실패');
 });
