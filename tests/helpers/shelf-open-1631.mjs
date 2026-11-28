@@ -223,8 +223,32 @@ test('#1631 서재 미리보기·바로 펼치기 선택과 복원', {
   }
   async function shelfChoice(page,mode,input) {
     const b=page.frameLocator('#view').locator('#shelf-open-choice [data-shelf-open-mode="'+mode+'"]');
-    if(input==='Enter')await b.press('Enter');
-    else await b.click();
+    if(input==='Enter'){
+      // #1631 CI: 라디오 DOM 렌더만으로는 iframe 모듈의 이벤트 연결이 끝났다고 볼 수 없다.
+      await page.waitForFunction(()=>{
+        const frame=document.querySelector('#view'),doc=frame?.contentDocument;
+        return doc?.readyState==='complete' && frame?.contentWindow?.__shelfListenerInstalled===true;
+      },null,{timeout:10000});
+      // CI에서 Enter가 셸의 account-avatar에 전달된 사례가 있다.
+      // 실제 키다운이 해당 라디오에 도달했는지 확인하고, 잘못 전달된 입력만 다시 보낸다.
+      // 라디오가 Enter를 받았는데 설정을 바꾸지 못하면 아래 기존 10초 단언이 그대로 실패한다.
+      await b.evaluate(button=>{
+        button.dataset.ltTestEnterAck='0';
+        button.addEventListener('keydown',event=>{
+          if(event.key==='Enter' && event.target===button)
+            button.dataset.ltTestEnterAck=String(Number(button.dataset.ltTestEnterAck||0)+1);
+        },{capture:true});
+      });
+      let received=false;
+      for(let attempt=0;attempt<3;attempt++){
+        await b.focus();
+        await b.press('Enter');
+        received=Number(await b.getAttribute('data-lt-test-enter-ack'))>0;
+        if(received)break;
+        console.log('서재 Enter 초점 재확인',JSON.stringify({mode,attempt:attempt+1}));
+      }
+      assert.ok(received,'Enter 키다운이 서재의 해당 라디오에 실제 전달되어야 한다');
+    }else await b.click();
     await page.waitForFunction(v=>window.LT41?.prefs?.shelfOpenMode===v,mode,{timeout:10000});
     return checkSynced(page,mode);
   }
