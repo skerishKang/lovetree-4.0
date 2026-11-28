@@ -38,6 +38,23 @@ test('바뀜 판정이고 화면 잡이 모두 성공이면 통과한다', () =>
 });
 
 
+test('화면 변경 시 모든 선택 잡이 skipped이면 모음 검사는 반드시 실패한다', () => {
+  const needs = results('skipped', gate('success','true'));
+  needs.runner_picker = { result: 'success' };
+  const result = checkScreenResults(needs);
+  assert.equal(result.ok,false);
+  assert.equal(result.failures.filter(x=>x.includes('changed screen job skipped')).length,SCREENS.length);
+});
+
+test('선택기 실패 또는 취소 이후 GitHub에서 화면 시험이 전부 통과하면 모음 검사도 통과한다', () => {
+  for (const picker of ['failure','cancelled']) {
+    const needs=results('success',gate('success','true'));
+    needs.runner_picker={result:picker};
+    const result=checkScreenResults(needs);
+    assert.equal(result.ok,true,JSON.stringify(result.failures));
+  }
+});
+
 test('unknown future screen job failure and cancellation cannot be ignored', () => {
   for (const status of ['failure', 'cancelled']) {
     const needs = results('success', gate('success', 'true'));

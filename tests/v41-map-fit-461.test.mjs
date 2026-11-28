@@ -119,6 +119,20 @@ test('#461 이름표 자리: 우선순위대로, 서로·점과 겹치지 않게
 });
 
 
+test('#1574 이름표는 상자 가장자리에서도 안으로 들어가 잘리지 않는다', () => {
+  const bounds = { x: 20, y: 30, w: 260, h: 180 };
+  const out = M.placeLabels([
+    { id: 'right', text: '오른쪽 끝 이름표', x: 272, y: 80, r: 4, w: 90, h: 16, dir: { x: 1, y: 0 } },
+    { id: 'bottom', text: '아래 끝 이름표', x: 80, y: 202, r: 4, w: 90, h: 16, dir: { x: 0, y: 1 } }
+  ], [{ id: 'right', x: 272, y: 80, r: 4 }, { id: 'bottom', x: 80, y: 202, r: 4 }], bounds, { clamp: true });
+  assert.equal(out.length, 2);
+  for (const label of out) {
+    const r = label.rect;
+    assert.ok(r.l >= bounds.x && r.r <= bounds.x + bounds.w && r.t >= bounds.y && r.b <= bounds.y + bounds.h, `${label.id} 잘림 0`);
+  }
+});
+
+
 test('#1259 시작 순간 이름표는 선분과 교차하지 않는 방향에 놓인다', () => {
  const bounds={x:0,y:0,w:500,h:350};
  const c={id:'first',text:'여기서 시작 · 긴 제목',x:200,y:150,r:20,w:180,h:16,dir:{x:1,y:0},avoidEdges:true};
