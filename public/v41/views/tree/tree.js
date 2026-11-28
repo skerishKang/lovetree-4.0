@@ -44,7 +44,8 @@ function pushTree(panel) {
 }
 function rememberTree() {
   if (restoringTree) return;
-  try { history.replaceState(treeSnapshot(null), ''); } catch {}
+  // 크기·위치 재계산으로 현재 열린 상세 기록을 닫힌 상태로 덮어쓰지 않는다.
+  try { history.replaceState(treeSnapshot(detail?.open ? 'detail' : null), ''); } catch {}
 }
 function restoreTree(st) {
   if (!st?.lt41Tree) return;

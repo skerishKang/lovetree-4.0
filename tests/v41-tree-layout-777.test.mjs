@@ -659,16 +659,19 @@ test('#1525 상세 창은 새로고침·뒤로 가기·주소 다시 열기 6/6 
         const view = document.getElementById('view'), doc = view?.contentDocument;
         return !view?.hidden && doc?.readyState === 'complete' &&
           !!doc.querySelector('#cards [data-kind="moment"]') &&
-          !!doc.getElementById('treeDetail')?.open;
+          !!doc.getElementById('treeDetail')?.open &&
+          view.contentWindow?.history.state?.lt41TreePanel === 'detail';
       }, null, { timeout: 10000 });
       frame = await page.$('#view').then(handle => handle.contentFrame());
       assert.equal(await frame.locator('#treeDetail[open]').count(), 1, '새로고침');
-      // 상세 열림은 같은 문서의 history 항목이다. 새 load 대신 닫힌 상세와 카드 복원을 기다린다.
-      await page.evaluate(() => history.back());
+      // 상세 기록을 만든 iframe에서 뒤로 가고, 같은 iframe의 복원 결과를 확인한다.
+      await frame.evaluate(() => history.back());
       await page.waitForFunction(() => {
-        const doc = document.getElementById('view')?.contentDocument;
-        // 기존 단언과 같이 열린 상세가 사라졌는지만 확인한다.
-        return doc?.readyState === 'complete' && !doc.querySelector('#treeDetail[open]');
+        const view = document.getElementById('view'), doc = view?.contentDocument;
+        return !view?.hidden && doc?.readyState === 'complete' &&
+          view.contentWindow?.history.state?.lt41TreePanel !== 'detail' &&
+          !doc.querySelector('#treeDetail[open]') &&
+          doc.querySelectorAll('#cards [data-kind="moment"]').length === 6;
       }, null, { timeout: 10000 });
       frame = await page.$('#view').then(handle => handle.contentFrame());
       assert.equal(await frame.locator('#treeDetail[open]').count(), 0, '뒤로 가기');
