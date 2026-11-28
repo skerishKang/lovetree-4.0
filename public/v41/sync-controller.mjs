@@ -72,7 +72,7 @@ export function createSyncController({getState, replaceState, api, draftStorage 
   let draftGeneration = 0;
   let lastHideFailureGeneration = null;
   let draftBackupFailed = false;
-  let rateRetryCount = 0, rateTimer = null;
+  let rateRetryCount = 0, rateTimer = null, rateWaitSeconds = null;
   // 이슈 644 3번: 충돌 띠 문구는 쉬운 말 한 벌만 쓴다 — 고친 개수가 있으면 개수를, 없으면 내용만 말한다.
   const conflictDetail = () => editCount > 0
     ? `다른 곳에서 기록이 바뀌었어요. 이 화면에서 고친 ${editCount}개는 따로 보관해 둘게요.`
@@ -90,17 +90,29 @@ export function createSyncController({getState, replaceState, api, draftStorage 
   function resetRateRetry() {
     cancelRateRetry();
     rateRetryCount = 0;
+    rateWaitSeconds = null;
+  }
+  // 저장 대기·기기 보관 실패를 한 안내로 표현한다. 예약 재시도 시간은 바꾸지 않는다.
+  function showRateStatus() {
+    const finished = rateRetryCount >= 4;
+    const detail = finished
+      ? '저장 요청이 잠시 많아요. 다시 시도하거나 기록을 백업해 주세요.'
+      : `저장 대기 중이에요. ${rateWaitSeconds}초 뒤 다시 저장합니다.`;
+    const warning = draftBackupFailed ? '기기에 기록을 보관하지 못했어요. 이 화면을 닫지 말고 백업해 주세요. ' : '';
+    return emit(status({phase:'throttled',detail:warning + detail,
+      actions:finished ? [...actions.retry,...actions.backup] : draftBackupFailed ? actions.backup : []}));
   }
   function scheduleRateRetry(answer) {
     cancelRateRetry();
-    if (rateRetryCount >= 4) return emit(status({
-      phase:'throttled', detail:'저장 요청이 잠시 많아요. 다시 시도하거나 기록을 백업해 주세요.',
-      actions:[...actions.retry,...actions.backup]
-    }));
+    if (rateRetryCount >= 4) {
+      rateWaitSeconds = null;
+      return showRateStatus();
+    }
     const wait = rateRetryCount === 0
       ? Math.max(2, Math.min(60, answer.retryAfterSeconds || 2))
       : [2, 4, 8][rateRetryCount - 1];
-    emit(status({phase:'throttled',detail:`저장 대기 중이에요. ${wait}초 뒤 다시 저장합니다.`,actions:[]}));
+    rateWaitSeconds = wait;
+    showRateStatus();
     rateTimer = schedule(() => {
       rateTimer = null;
       rateRetryCount += 1;
@@ -122,8 +134,10 @@ export function createSyncController({getState, replaceState, api, draftStorage 
     // 숨김으로 이미 쓴 최신 세대는 앞 요청의 늦은 401로 교체하지 않는다.
     const previous = readPendingDraft(activeSubject);
     if (previous && previous.draftGeneration > savedGeneration) return true;
+    // 같은 본문이라도 숨김 보관으로 승격은 허용한다. 앞 요청의 늦은 응답은 역으로 낮추지 못한다.
     if (previous && previous.draftGeneration === savedGeneration &&
-        previous.serial === sent.serial && previous.expectedRevision === sent.expected) return true;
+        previous.serial === sent.serial && previous.expectedRevision === sent.expected &&
+        (previous.reason === 'hide' || reason !== 'hide')) return true;
     try {
       draftStorage.setItem(key, JSON.stringify({
         version: 1, subject: activeSubject, expectedRevision: sent.expected,
@@ -313,7 +327,15 @@ export function createSyncController({getState, replaceState, api, draftStorage 
       return emit(status({phase:'conflict',detail:conflictDetail(),changes:editCount,
         actions:[{name:'pull',label:'최신 기록 불러오기'},{name:'force',label:'이 화면 것으로 덮어쓰기'}]}));
     }
-    if (answer.status === 429) return scheduleRateRetry(answer);
+    if (answer.status === 429) {
+      // 서버가 받지 않은 기록은 대기를 시작하기 전에 현재 편집본으로 기기에 남긴다.
+      const serialNow = JSON.stringify(getState());
+      if (!attempt || attempt.serial !== serialNow || attempt.expected !== revision)
+        attempt = {serial:serialNow,expected:revision,key:makeClientKey()};
+      const previous = readPendingDraft(activeSubject);
+      draftBackupFailed = !savePendingDraft(attempt, previous?.reason === 'hide' ? 'hide' : 'auth');
+      return scheduleRateRetry(answer);
+    }
      if (answer.status === 409 && answer.code === 'client_key_conflict') attempt = null;
      // #1056: 400·413은 다시 보내도 달라지지 않는다 — 서버가 준 문구와 백업 내려받기를 보여 준다.
      // 연결 문제(status 0)와 그 밖의 일시적 오류만 다시 시도로 안내한다.
@@ -340,10 +362,15 @@ export function createSyncController({getState, replaceState, api, draftStorage 
       attempt = {serial, expected:revision, key:makeClientKey()};
     // 숨기기 전에 먼저 동기 보관한다. 작은 keepalive도 네트워크가 끊기면 도달하지 않는다.
     const saved = savePendingDraft(attempt, 'hide');
+    const previousFailure = draftBackupFailed;
     draftBackupFailed = !saved;
-    if (current.phase === 'throttled') return false;
     if (saved) lastHideFailureGeneration = null;
-    else if (lastHideFailureGeneration !== draftGeneration) {
+    if (current.phase === 'throttled') {
+      // 예약 재시도는 그대로 두고 보관 실패·백업 단추만 안내한다.
+      if (!saved || previousFailure) showRateStatus();
+      return false;
+    }
+    if (!saved && lastHideFailureGeneration !== draftGeneration) {
       // visibilitychange와 pagehide가 연속 와도 같은 편집의 보관 실패는 한 번만 알린다.
       lastHideFailureGeneration = draftGeneration;
       emit(status({phase:'rejected',
@@ -376,7 +403,16 @@ export function createSyncController({getState, replaceState, api, draftStorage 
     if (closed) return current;
     if (!owned || revision === null) return emit(status({phase:'login',actions:actions.login}));
     if (current.phase === 'conflict') { dirty = true; editCount += 1; return emit(current); }
-    if (current.phase === 'throttled') { dirty = true; editCount += 1; draftGeneration += 1; return emit(current); }
+    if (current.phase === 'throttled') {
+      dirty = true; editCount += 1; draftGeneration += 1;
+      // 기다리는 동안 새로 고친 내용도 즉시 보관한다. PUT는 예약된 재시도만 보낸다.
+      const serial = JSON.stringify(getState());
+      if (!attempt || attempt.serial !== serial || attempt.expected !== revision)
+        attempt = {serial,expected:revision,key:makeClientKey()};
+      const previous = readPendingDraft(activeSubject);
+      draftBackupFailed = !savePendingDraft(attempt, previous?.reason === 'hide' ? 'hide' : 'auth');
+      return showRateStatus();
+    }
     dirty = true; editCount += 1; draftGeneration += 1; const gen = generation, ticket = ++queued;
     const pending = new AbortController();
     pendingSaveWaits.add(pending);
@@ -384,7 +420,7 @@ export function createSyncController({getState, replaceState, api, draftStorage 
     void (async () => {
       try {
         await delay(900, pending.signal);
-        if (!closed && !pending.signal.aborted && gen === generation && ticket === queued) await push();
+        if (!closed && !pending.signal.aborted && gen === generation && ticket === queued && current.phase !== 'throttled') await push();
       } finally { pendingSaveWaits.delete(pending); }
     })();
     return current;

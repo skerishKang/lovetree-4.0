@@ -72,6 +72,11 @@ export function createRateLimiter({now=()=>Date.now(),windowMs=60_000,message='�
 export async function rateRequest(limiter,{productId,scope,subjectId,clientIp=null,account,ip=[],accountWindows=account,ipWindows=ip,message}={}){
   if(!limiter)return;
   const base=`${productId}\0${scope}`;
-  await limiter.rateWindows(`${base}\0account\0${subjectId}`,accountWindows,message);
-  if(clientIp)await limiter.rateWindows(`${base}\0ip\0${clientIp}`,ipWindows,message);
+  // 로그인한 쓰기는 계정별로 센다. 같은 네트워크의 다른 계정까지 묶지 않는다.
+  if(typeof subjectId==='string'&&subjectId){
+    await limiter.rateWindows(`${base}\0account\0${subjectId}`,accountWindows,message);
+  }else if(clientIp){
+    // 계정 확인 전 요청만 프록시가 확인한 IP로 센다.
+    await limiter.rateWindows(`${base}\0ip\0${clientIp}`,ipWindows,message);
+  }
 }

@@ -68,13 +68,14 @@ export function createShareRepo(pool) {
         const preview = found.rows[0];
         if (!preview) return {status:'missing'};
         if (preview.subject_id !== input.subjectId) return {status:'forbidden'};
+        // 소비된 토큰도 유효 시간과 같은 요청 내용이 확인될 때에만 재응답한다.
+        if (new Date(preview.expires_at).getTime() <= (input.now ?? Date.now())) return {status:'expired'};
+        if (preview.tree_id !== input.treeId || preview.request_hash !== input.requestHash) return {status:'stale'};
         if (preview.consumed_at) {
           if (!preview.result_share_id) return {status:'stale'};
           const existing = await client.query('SELECT * FROM lovetree_shares WHERE product_id=$1 AND share_id=$2', [input.productId,preview.result_share_id]);
           return existing.rows[0] ? {status:'replayed',share:row(existing.rows[0])} : {status:'missing'};
         }
-        if (new Date(preview.expires_at).getTime() <= (input.now ?? Date.now())) return {status:'expired'};
-        if (preview.tree_id !== input.treeId || preview.request_hash !== input.requestHash) return {status:'stale'};
         const inserted = await client.query(
           `INSERT INTO lovetree_shares (product_id, share_id, subject_id, tree_id, entry_moment_id, initial_view, moment_count)
            VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (product_id, share_id) DO NOTHING RETURNING *`,

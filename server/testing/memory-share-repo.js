@@ -14,13 +14,13 @@ export function createMemoryShareRepo({now=Date.UTC(2026,10,1)}={}) {
       const preview=previews.get(input.tokenHash);
       if(!preview||preview.productId!==input.productId)return {status:'missing'};
       if(preview.subjectId!==input.subjectId)return {status:'forbidden'};
+      if(Date.parse(preview.expiresAt)<=(input.now??Date.now()))return {status:'expired'};
+      if(preview.treeId!==input.treeId||preview.requestHash!==input.requestHash)return {status:'stale'};
       if(preview.consumedAt){
         if(!preview.resultShareId)return {status:'stale'};
         const value=rows.get(key(input.productId,preview.resultShareId));
         return value?{status:'replayed',share:clone(value)}:{status:'missing'};
       }
-      if(Date.parse(preview.expiresAt)<=(input.now??Date.now()))return {status:'expired'};
-      if(preview.treeId!==input.treeId||preview.requestHash!==input.requestHash)return {status:'stale'};
       const share=insertShare(input);
       if(!share)return {status:'collision'};
       preview.consumedAt=new Date(input.now??Date.now()).toISOString();preview.resultShareId=share.shareId;

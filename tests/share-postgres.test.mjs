@@ -70,6 +70,10 @@ test('share preview tokens are single-use and replay the same row in PostgreSQL'
   const input={productId,subjectId,shareId:('p'+tag).padEnd(24,'x').slice(0,24),treeId,entryMomentId:'moment-a',view:'book',momentCount:3,tokenHash,requestHash};
   const made=await repo.createShareWithPreview(input);assert.equal(made.status,'created');
   const replay=await repo.createShareWithPreview(input);assert.equal(replay.status,'replayed');assert.equal(replay.share.shareId,made.share.shareId);
+  const changed=await repo.createShareWithPreview({...input,requestHash:'d'.repeat(64)});
+  assert.equal(changed.status,'stale','이미 소비한 토큰은 다른 요청으로 재사용할 수 없다');
+  const tooLate=await repo.createShareWithPreview({...input,now:Date.now()+300_001});
+  assert.equal(tooLate.status,'expired','이미 소비한 토큰도 기한 뒤에는 재사용할 수 없다');
   assert.equal((await repo.list({productId,subjectId})).length,1);
   const expiredHash='c'.repeat(64);
   await repo.createPreview({tokenHash:expiredHash,productId,subjectId,treeId,requestHash,expiresAt:new Date(Date.now()-1).toISOString()});
