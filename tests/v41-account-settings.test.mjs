@@ -193,6 +193,7 @@ test('#1636 설정 선택 줄·스위치·메뉴·중복 제목 (1440·390 × �
           await openSettings952(page);
           await page.evaluate(()=>document.fonts?.ready);
           const allLeft=[],allWidths=[];
+          let threeOptionRows=0;
           for(const [tab,fold] of [
             ['screen','account-settings-screen-more'],
             ['profile',null],
@@ -215,7 +216,11 @@ test('#1636 설정 선택 줄·스위치·메뉴·중복 제목 (1440·390 × �
                   return {label:label.textContent.trim(),labelRect:rect(label),choiceRect:rect(choice),
                     buttons:buttons.map(b=>{
                       const st=getComputedStyle(b);
+                      const text=document.createRange();text.selectNodeContents(b);
                       return {text:b.textContent.trim(),role:b.getAttribute('role'),colorSwatch:b.hasAttribute('data-accent-color'),box:rect(b),
+                        checked:b.getAttribute('aria-checked'),pressed:b.getAttribute('aria-pressed'),fontWeight:Number(st.fontWeight),
+                        actualTextWidth:text.getBoundingClientRect().width,
+                        horizontalPadding:parseFloat(st.paddingLeft)+parseFloat(st.paddingRight),
                         scrollWidth:b.scrollWidth,clientWidth:b.clientWidth,whiteSpace:st.whiteSpace,
                         textAlign:st.textAlign,font:st.font};
                     })};
@@ -241,11 +246,32 @@ test('#1636 설정 선택 줄·스위치·메뉴·중복 제목 (1440·390 × �
                 assert.ok(row.buttons[0].box.y>=row.labelRect.bottom-1,tab+' '+row.label+' 390 이름 아래 선택 단추');
                 assert.ok(Math.abs(row.labelRect.x-row.buttons[0].box.x)<=1,tab+' '+row.label+' 390 같은 왼쪽 선');
               }
+              if(width===1440 && row.buttons.length===3 && row.buttons.every(b=>b.role==='radio')){
+                const tops=row.buttons.map(b=>b.box.y);
+                assert.ok(Math.max(...tops)-Math.min(...tops)<=1,
+                  tab+' '+row.label+' 선택지 3개가 1440에서 한 줄이어야 한다');
+                threeOptionRows++;
+              }
+              const selectedWeights=[];
+              const unselectedWeights=[];
               for(const button of row.buttons) {
                 if(button.colorSwatch){
                   assert.ok(Math.abs(button.box.width-44)<=1,tab+' 색 견본은 기존 원형 44px 유지');
                   assert.ok(Math.abs(button.box.height-44)<=1,tab+' 색 견본 높이 44px 유지');
-                }else allWidths.push({label:tab+':'+row.label+':'+button.text,width:button.box.width});
+                }else {
+                  allWidths.push({label:tab+':'+row.label+':'+button.text,width:button.box.width});
+                  assert.ok(button.actualTextWidth+button.horizontalPadding<=button.box.width+0.5,
+                    tab+' '+row.label+' '+button.text+' 실제 글자와 여백이 단추 안에 들어가야 한다');
+                  if(button.role==='radio'){
+                    if(button.checked==='true'||button.pressed==='true'){
+                      selectedWeights.push(button.fontWeight);
+                      assert.ok(button.fontWeight>=600,tab+' '+row.label+' 고른 단추는 굵은 글자');
+                    }else {
+                      unselectedWeights.push(button.fontWeight);
+                      assert.ok(button.fontWeight<=500,tab+' '+row.label+' 고르지 않은 단추는 보통 글자');
+                    }
+                  }
+                }
                 assert.ok(button.box.height>=44,tab+' '+row.label+' 누름 높이 44px');
                 assert.ok(button.scrollWidth<=button.clientWidth+1,
                   tab+' '+row.label+' '+button.text+' 잘린 글자 없음');
@@ -253,14 +279,20 @@ test('#1636 설정 선택 줄·스위치·메뉴·중복 제목 (1440·390 × �
                 assert.ok(button.box.x>=0&&button.box.right<=width+1,
                   tab+' '+row.label+' 가로 넘침 없음');
               }
+              if(selectedWeights.length&&unselectedWeights.length){
+                assert.ok(Math.min(...selectedWeights)>Math.max(...unselectedWeights),
+                  tab+' '+row.label+' 고른 단추가 비선택 단추보다 더 굵어야 한다');
+              }
             }
           }
+          if(width===1440)assert.ok(threeOptionRows>=4,'1440의 선택지 3개짜리 줄을 최소 네 줄 확인');
           assert.ok(allLeft.length>=12,'화면·프로필·기록 보기의 선택 행 측정');
           assert.ok(allWidths.length>=25,'선택 단추 실제 크기 측정');
           const leftDelta=Math.max(...allLeft.map(x=>x.x))-Math.min(...allLeft.map(x=>x.x));
           const widthDelta=Math.max(...allWidths.map(x=>x.width))-Math.min(...allWidths.map(x=>x.width));
           assert.ok(leftDelta<=1,'줄별 첫 단추 시작선 차이 <=1px: '+JSON.stringify({leftDelta,allLeft}));
           assert.ok(widthDelta<=1,'선택 단추 폭 차이 <=1px: '+JSON.stringify({widthDelta,allWidths}));
+          assert.ok(Math.max(...allWidths.map(x=>x.width))<=120.5,'선택 단추 폭은 120px 안팎이어야 한다');
           await page.locator('#settings-tab-screen').click();
           const motion=page.locator('#settings-motion');
           assert.equal(await motion.getAttribute('role'),'switch');
@@ -281,7 +313,7 @@ test('#1636 설정 선택 줄·스위치·메뉴·중복 제목 (1440·390 × �
           await page.locator('#settings-tab-profile').focus();
           await page.locator('#settings-tab-profile').press('ArrowRight');
           assert.equal(await page.locator('#settings-tab-records').getAttribute('aria-selected'),'true','메뉴 화살표 이동 유지');
-          console.log('SETTINGS_1636',JSON.stringify({width,theme,leftDelta,widthDelta,rows:allLeft.length,buttons:allWidths.length}));
+          console.log('SETTINGS_1636',JSON.stringify({width,theme,leftDelta,widthDelta,threeOptionRows,rows:allLeft.length,buttons:allWidths.length,buttonWidth:allWidths[0]?.width}));
         }finally{
           await ctx.close();
           server.closeAllConnections?.();
